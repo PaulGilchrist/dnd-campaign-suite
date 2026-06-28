@@ -744,3 +744,18 @@
     font-style: italic;
     color: var(--color-text-muted);
 }
+
+.log-gwf {
+    display: inline-block;
+    font-size: 0.8em;
+    font-weight: bold;
+    color: #2196F3;
+    background: rgba(33, 150, 243, 0.12);
+    padding: 2px 6px;
+    border-radius: 3px;
+    margin-left: 8px;
+}
+
+.log-gwf i {
+    margin-right: 3px;
+}

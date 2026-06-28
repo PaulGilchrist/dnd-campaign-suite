@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import './diceRollResult.css';
 
-function DiceRollResult({ name, type, rolls, rollType, bonus = 0, bonusDetail, formula = '', modifier = 0, total = 0, targetName, targetAc, hit, resistanceNotice, hunterLoreNotice, forcedMode, isAutoMiss, rangeReason, coverReason, isAutoCrit, isCrit, isNatural1, dc, success, dcType, dcSuccess, waitingForPlayerSave, saveDc, saveType, saveResult, finalDamage, damageApplied, targetCurrentHp, damageReduced, damageType, onQuickRoll, autoDamage, coverLevel, coverAcBonus, autoReroll, autoRerollBonus, strSaveReplace, strCheckReplace, strScore, wisCheckReplace, wisCheckMinBonus, reliableTalent, onReroll, tacticalMind, tacticalMindBonus, gloriousDefenseBonus, onCounterAttack, strokeOfLuck, onStrokeOfLuck, defensiveDuelistBonus, baitAndSwitchBonus, isPotentCantrip, luckyAdvantage, luckyDisadvantage, onLuckyAdvantage, onLuckyDisadvantage, secondaryFormula, secondaryRolls, secondaryTotal, secondaryModifier, secondaryDamageType, secondaryFinalDamage, secondarySaveResult, availableSuperiorityManeuvers, onSuperiorityManeuver, onTacticalMind }) {
+function DiceRollResult({ name, type, rolls, rollType, bonus = 0, bonusDetail, formula = '', modifier = 0, total = 0, targetName, targetAc, hit, resistanceNotice, hunterLoreNotice, forcedMode, isAutoMiss, rangeReason, coverReason, isAutoCrit, isCrit, isNatural1, dc, success, dcType, dcSuccess, waitingForPlayerSave, saveDc, saveType, saveResult, finalDamage, damageApplied, targetCurrentHp, damageReduced, damageType, onQuickRoll, autoDamage, coverLevel, coverAcBonus, autoReroll, autoRerollBonus, strSaveReplace, strCheckReplace, strScore, wisCheckReplace, wisCheckMinBonus, reliableTalent, onReroll, tacticalMind, tacticalMindBonus, gloriousDefenseBonus, onCounterAttack, strokeOfLuck, onStrokeOfLuck, defensiveDuelistBonus, baitAndSwitchBonus, isPotentCantrip, luckyAdvantage, luckyDisadvantage, onLuckyAdvantage, onLuckyDisadvantage, secondaryFormula, secondaryRolls, secondaryTotal, secondaryModifier, secondaryDamageType, secondaryFinalDamage, secondarySaveResult, availableSuperiorityManeuvers, onSuperiorityManeuver, onTacticalMind, gwfApplied, gwfOriginalRolls }) {
     const [mode, setMode] = useState(forcedMode || 'normal');
     const [rerollUsed, setRerollUsed] = useState(false);
     const [rerollResult, setRerollResult] = useState(null);
@@ -130,6 +130,12 @@ function DiceRollResult({ name, type, rolls, rollType, bonus = 0, bonusDetail, f
             {reliableTalent && (rollType === 'check' || rollType === 'skill') && safeRolls[0] <= 9 && (
               <div className="dice-roll-reliable-talent">
                 <i className="fa-solid fa-star"></i> Reliable Talent: d20 {safeRolls[0]} → 10
+              </div>
+            )}
+
+            {gwfApplied && gwfOriginalRolls && (
+              <div className="dice-roll-gwf">
+                <i className="fa-solid fa-shield-halved"></i> Great Weapon Fighting: {gwfOriginalRolls.join(', ')} → {safeRolls.join(', ')}
               </div>
             )}
 

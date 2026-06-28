@@ -75,6 +75,7 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
               autoDamageSecondaryName: autoDamage.secondaryName,
               autoDamageSecondaryDamageType: autoDamage.secondaryDamageType,
               isAutoCrit: isCrit,
+              playerStats: monsterCharacter?.computedStats,
             };
           if (autoDamage.saveDc) {
             context.saveDc = autoDamage.saveDc;

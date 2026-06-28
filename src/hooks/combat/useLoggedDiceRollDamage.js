@@ -182,7 +182,7 @@ export function createLogDamageAndShow(deps) {
         });
     }
 
-    async function handleAoeDamage(name, formula, total, rolls, modifier, context, adjustedTotal) {
+    async function handleAoeDamage(name, formula, total, rolls, modifier, context, adjustedTotal, displayRolls) {
         const { saveDc, saveType, dcSuccess, damageType, attackerName } = context || {};
         const overlayId = context?.targetName?.startsWith('overlay-') ? context.targetName.slice('overlay-'.length) : null;
         const aoeCtx = overlayId ? await readAoeContext(campaignName, overlayId) : null;
@@ -254,18 +254,20 @@ export function createLogDamageAndShow(deps) {
             characterName,
             rollType: 'aoe-damage',
             name,
-            formula, rolls, total, modifier, damageType,
+            formula, rolls: displayRolls, total: adjustedTotal, modifier, damageType,
             targetName: overlayLabel,
             affectedCount: affected.length,
             npcResults: npcResults.map(r => r.creatureName),
             saveType, saveDc, dcSuccess,
+            gwfApplied: displayRolls !== rolls,
+            gwfOriginalRolls: displayRolls !== rolls ? rolls : null,
         });
         setPopupHtml(html);
 
         handleOverchannelSelfDamage(characterName, campaignName, context, logEntry, characters);
     }
 
-    async function handleNpcSaveDamage(name, formula, total, rolls, modifier, context, adjustedTotal, combatSummary) {
+    async function handleNpcSaveDamage(name, formula, total, rolls, modifier, context, adjustedTotal, combatSummary, displayRolls) {
         const { saveDc, saveType, dcSuccess, damageType } = context || {};
         const target = combatSummary?.creatures?.find(c => c.name === context?.targetName) || null;
         if (!target) return;
@@ -298,7 +300,8 @@ export function createLogDamageAndShow(deps) {
                 let secondaryTotal = applyMinDamageAdjustment(secondaryRollResult.total, secondaryRollResult.rolls, context?.playerStats, secondaryDamageType);
                 if (hasGreatWeaponFighting(context?.playerStats)) {
                     const gwfSecondaryRolls = applyGreatWeaponFightingToDamage(secondaryRollResult.rolls, context?.playerStats);
-                    if (gwfSecondaryRolls !== secondaryRollResult.rolls) {
+                    const hasSecondaryChanges = gwfSecondaryRolls.some((r, i) => r !== secondaryRollResult.rolls[i]);
+                    if (hasSecondaryChanges) {
                         const gwfSecondaryTotal = gwfSecondaryRolls.reduce((sum, r) => sum + r, 0) + secondaryRollResult.modifier;
                         secondaryTotal = applyMinDamageAdjustment(gwfSecondaryTotal, gwfSecondaryRolls, context?.playerStats, secondaryDamageType);
                     }
@@ -342,7 +345,7 @@ export function createLogDamageAndShow(deps) {
         }
 
         const isCrit = context?.isAutoCrit || false;
-        const displayFormula = isCrit ? formatDamageFormula(formula, rolls, true) : formula;
+        const displayFormula = isCrit ? formatDamageFormula(formula, displayRolls, true) : formula;
 
         const logEntryData = {
             type: 'roll',
@@ -350,8 +353,8 @@ export function createLogDamageAndShow(deps) {
             rollType: 'save-damage',
             name,
             formula: displayFormula,
-            rolls,
-            total,
+            rolls: displayRolls,
+            total: adjustedTotal,
             modifier,
             damageType,
             targetName: target.name,
@@ -362,10 +365,12 @@ export function createLogDamageAndShow(deps) {
             saveBonus: saveResult.bonus,
             saveRawRolls: saveResult.rawRolls,
             mode: disadvantage ? 'disadvantage' : 'normal',
-             finalDamage: primaryApplyResult?.finalDamage ?? finalDamage,
-             note: 'combined_save_damage_roll',
-             isCrit,
-         };
+              finalDamage: primaryApplyResult?.finalDamage ?? finalDamage,
+              note: 'combined_save_damage_roll',
+              isCrit,
+              gwfApplied: displayRolls !== rolls,
+              gwfOriginalRolls: displayRolls !== rolls ? rolls : null,
+          };
         if (secondaryResult) {
             logEntryData.secondaryName = secondaryResult.name;
             logEntryData.secondaryFormula = secondaryResult.formula;
@@ -456,7 +461,7 @@ export function createLogDamageAndShow(deps) {
             type: 'save-damage',
             name,
             formula,
-            rolls,
+            rolls: displayRolls,
             bonus: 0,
             modifier,
             damageType,
@@ -471,6 +476,8 @@ export function createLogDamageAndShow(deps) {
             damageApplied: true,
             damageReduced: primaryApplyResult?.damageReduced,
             isCrit,
+            gwfApplied: displayRolls !== rolls,
+            gwfOriginalRolls: displayRolls !== rolls ? rolls : null,
         };
         if (secondaryResult) {
             popupData.secondaryName = secondaryResult.name;
@@ -497,14 +504,14 @@ export function createLogDamageAndShow(deps) {
                 const twinSaveModifiers = twinCharacter?.saveModifiers || twinCharacter?.computedStats?.saveModifiers || [];
                 const twinAdvantage = twinSaveModifiers.some(mod => mod.target === 'saving_throw' && mod.effect === 'advantage' && mod.condition === 'against_spell');
                 const twinSaveResult = rollSaveForCreature(twinTarget, saveType, saveDc, twinDisadvantage, twinAdvantage);
-                let twinFinalDamage = computeDamageAfterSave(total, twinSaveResult.success, dcSuccess);
+                let twinFinalDamage = computeDamageAfterSave(adjustedTotal, twinSaveResult.success, dcSuccess);
                 if (hasPotentFlag && isCantripFlag && twinSaveResult.success && dcSuccess === 'none') {
-                    twinFinalDamage = Math.floor(total / 2);
+                    twinFinalDamage = Math.floor(adjustedTotal / 2);
                 }
                 const ignoreResistance = (context?.playerStats && hasIgnoreResistance(context.playerStats, damageType)) || false;
 
                 const isCrit = context?.isAutoCrit || false;
-                const displayFormula = isCrit ? formatDamageFormula(formula, rolls, true) : formula;
+                const displayFormula = isCrit ? formatDamageFormula(formula, displayRolls, true) : formula;
 
                 logEntry({
                     type: 'roll',
@@ -512,8 +519,8 @@ export function createLogDamageAndShow(deps) {
                     rollType: 'save-damage',
                     name: `${name} (Twinned)`,
                     formula: displayFormula,
-                    rolls,
-                    total,
+                    rolls: displayRolls,
+                    total: adjustedTotal,
                     modifier,
                     damageType,
                     targetName: twinTarget.name,
@@ -527,6 +534,8 @@ export function createLogDamageAndShow(deps) {
                      finalDamage: null,
                      note: 'twin_save_damage_roll_before_apply',
                      isCrit,
+                     gwfApplied: displayRolls !== rolls,
+                     gwfOriginalRolls: displayRolls !== rolls ? rolls : null,
                  });
 
                 await new Promise(resolve => setTimeout(resolve, 500));
@@ -556,20 +565,20 @@ export function createLogDamageAndShow(deps) {
                     const multiSaveModifiers = multiCharacter?.saveModifiers || multiCharacter?.computedStats?.saveModifiers || [];
                     const multiAdvantage = multiSaveModifiers.some(mod => mod.target === 'saving_throw' && mod.effect === 'advantage' && mod.condition === 'against_spell');
                     const multiSaveResult = rollSaveForCreature(multiTarget, saveType, saveDc, false, multiAdvantage);
-                    let multiFinalDamage = computeDamageAfterSave(total, multiSaveResult.success, dcSuccess);
+                    let multiFinalDamage = computeDamageAfterSave(adjustedTotal, multiSaveResult.success, dcSuccess);
                     if (hasPotentFlag && isCantripFlag && multiSaveResult.success && dcSuccess === 'none') {
-                        multiFinalDamage = Math.floor(total / 2);
+                        multiFinalDamage = Math.floor(adjustedTotal / 2);
                     }
                     const isCrit = context?.isAutoCrit || false;
-                    const displayFormula = isCrit ? formatDamageFormula(formula, rolls, true) : formula;
+                    const displayFormula = isCrit ? formatDamageFormula(formula, displayRolls, true) : formula;
                     logEntry({
                         type: 'roll',
                         characterName,
                         rollType: 'save-damage',
                         name: `${name} (Words of Creation)`,
                         formula: displayFormula,
-                        rolls,
-                        total,
+                        rolls: displayRolls,
+                        total: adjustedTotal,
                         modifier,
                         damageType,
                         targetName: multiTarget.name,
@@ -583,6 +592,8 @@ export function createLogDamageAndShow(deps) {
                          finalDamage: null,
                          note: 'multi_save_damage_roll_before_apply',
                          isCrit,
+                         gwfApplied: displayRolls !== rolls,
+                         gwfOriginalRolls: displayRolls !== rolls ? rolls : null,
                      });
 
                     await new Promise(resolve => setTimeout(resolve, 500));
@@ -631,7 +642,7 @@ export function createLogDamageAndShow(deps) {
         }
     }
 
-    async function handlePlayerSaveDamage(name, formula, total, rolls, modifier, context, adjustedTotal, combatSummary) {
+    async function handlePlayerSaveDamage(name, formula, total, rolls, modifier, context, adjustedTotal, combatSummary, displayRolls) {
         const { saveDc, saveType, dcSuccess, damageType, attackerName } = context || {};
         const target = combatSummary?.creatures?.find(c => c.name === context?.targetName) || null;
         if (!target || target.type !== 'player') return;
@@ -648,8 +659,8 @@ export function createLogDamageAndShow(deps) {
                 rollType: 'save-damage',
                 name,
                 formula,
-                rolls,
-                total,
+                rolls: displayRolls,
+                total: adjustedTotal,
                 modifier,
                 damageType,
                 targetName: target.name,
@@ -660,6 +671,8 @@ export function createLogDamageAndShow(deps) {
                 saveBonus: 0,
                 finalDamage: null,
                 note: 'careful_spell_damage_roll_before_apply',
+                gwfApplied: displayRolls !== rolls,
+                gwfOriginalRolls: displayRolls !== rolls ? rolls : null,
             });
 
             await new Promise(resolve => setTimeout(resolve, 500));
@@ -673,7 +686,7 @@ export function createLogDamageAndShow(deps) {
                 type: 'save-damage',
                 name,
                 formula,
-                rolls,
+                rolls: displayRolls,
                 bonus: 0,
                 modifier,
                 damageType,
@@ -688,6 +701,8 @@ export function createLogDamageAndShow(deps) {
                 damageApplied: true,
                 damageReduced: false,
                 carefulSpell: true,
+                gwfApplied: displayRolls !== rolls,
+                gwfOriginalRolls: displayRolls !== rolls ? rolls : null,
             });
             return true;
         }
@@ -705,8 +720,8 @@ export function createLogDamageAndShow(deps) {
                 rollType: 'save-damage',
                 name,
                 formula,
-                rolls,
-                total,
+                rolls: displayRolls,
+                total: adjustedTotal,
                 modifier,
                 damageType,
                 targetName: target.name,
@@ -717,6 +732,8 @@ export function createLogDamageAndShow(deps) {
                 saveBonus: 0,
                 finalDamage: null,
                 note: 'contact_patron_damage_roll_before_apply',
+                gwfApplied: displayRolls !== rolls,
+                gwfOriginalRolls: displayRolls !== rolls ? rolls : null,
             });
 
             await new Promise(resolve => setTimeout(resolve, 500));
@@ -730,7 +747,7 @@ export function createLogDamageAndShow(deps) {
                 type: 'save-damage',
                 name,
                 formula,
-                rolls,
+                rolls: displayRolls,
                 bonus: 0,
                 modifier,
                 damageType,
@@ -745,6 +762,8 @@ export function createLogDamageAndShow(deps) {
                 damageApplied: true,
                 damageReduced: false,
                 contactPatron: true,
+                gwfApplied: displayRolls !== rolls,
+                gwfOriginalRolls: displayRolls !== rolls ? rolls : null,
             });
             return true;
         }
@@ -785,8 +804,8 @@ export function createLogDamageAndShow(deps) {
             rollType: 'save-prompt',
             name,
             formula,
-            rolls,
-            total,
+            rolls: displayRolls,
+            total: adjustedTotal,
             modifier,
             bonus: modifier,
             damageType,
@@ -795,13 +814,15 @@ export function createLogDamageAndShow(deps) {
             saveDc,
             dcSuccess,
             mode: context?.metamagicHeighten ? 'disadvantage' : 'normal',
+            gwfApplied: displayRolls !== rolls,
+            gwfOriginalRolls: displayRolls !== rolls ? rolls : null,
         });
 
         setPopupHtml({
             type: 'save-damage',
             name,
             formula,
-            rolls,
+            rolls: displayRolls,
             bonus: 0,
             modifier,
             damageType,
@@ -813,6 +834,8 @@ export function createLogDamageAndShow(deps) {
             promptId,
             rawDamage: adjustedTotal,
             attackerName: attackerName || characterName,
+            gwfApplied: displayRolls !== rolls,
+            gwfOriginalRolls: displayRolls !== rolls ? rolls : null,
         });
 
         handleOverchannelSelfDamage(characterName, campaignName, context, logEntry, characters);
@@ -820,7 +843,7 @@ export function createLogDamageAndShow(deps) {
         return true;
     }
 
-    async function handlePlainDamage(name, formula, total, rolls, modifier, context, adjustedTotal, combatSummary) {
+    async function handlePlainDamage(name, formula, total, rolls, modifier, context, adjustedTotal, combatSummary, displayRolls) {
         const { damageType, attackerName } = context || {};
         const target = combatSummary?.creatures?.find(c => c.name === context?.targetName) || null;
         const targetMaxHp = target?.type === 'player'
@@ -873,7 +896,8 @@ export function createLogDamageAndShow(deps) {
                     let secondaryTotal = applyMinDamageAdjustment(secondaryRollResult.total, secondaryRollResult.rolls, context?.playerStats, secondaryDamageType);
                     if (hasGreatWeaponFighting(context?.playerStats)) {
                         const gwfSecondaryRolls = applyGreatWeaponFightingToDamage(secondaryRollResult.rolls, context?.playerStats);
-                        if (gwfSecondaryRolls !== secondaryRollResult.rolls) {
+                        const hasSecondaryChanges = gwfSecondaryRolls.some((r, i) => r !== secondaryRollResult.rolls[i]);
+                        if (hasSecondaryChanges) {
                             const gwfSecondaryTotal = gwfSecondaryRolls.reduce((sum, r) => sum + r, 0) + secondaryRollResult.modifier;
                             secondaryTotal = applyMinDamageAdjustment(gwfSecondaryTotal, gwfSecondaryRolls, context?.playerStats, secondaryDamageType);
                         }
@@ -935,14 +959,16 @@ export function createLogDamageAndShow(deps) {
             rollType: 'damage',
             name,
             formula: displayFormula,
-            rolls,
-            total,
+            rolls: displayRolls,
+            total: adjustedTotal,
             modifier,
             damageType,
             targetName: target?.name,
             finalDamage: applyResult?.finalDamage ?? reducedTotal,
             note: 'combined_damage_roll',
             isCrit,
+            gwfApplied: displayRolls !== rolls,
+            gwfOriginalRolls: displayRolls !== rolls ? rolls : null,
         };
         if (secondaryResult) {
             logEntryData.secondaryName = secondaryResult.name;
@@ -1083,7 +1109,7 @@ export function createLogDamageAndShow(deps) {
             type: 'damage',
             name,
             formula,
-            rolls,
+            rolls: displayRolls,
             bonus: 0,
             modifier,
             dc: context?.dc,
@@ -1091,10 +1117,12 @@ export function createLogDamageAndShow(deps) {
             dcSuccess: context?.dcSuccess,
             damageType,
             targetName: target?.name,
-            total,
+            total: adjustedTotal,
             adjustedTotal: adjustedTotal,
             elementalAdeptBonus: adjustedTotal > total ? adjustedTotal - total : 0,
             isCrit,
+            gwfApplied: displayRolls !== rolls,
+            gwfOriginalRolls: displayRolls !== rolls ? rolls : null,
         };
 
         if (secondaryResult) {
@@ -1126,13 +1154,15 @@ export function createLogDamageAndShow(deps) {
                     rollType: 'damage',
                     name: `${name} (Twinned)`,
                     formula,
-                    rolls,
-                    total,
+                    rolls: displayRolls,
+                    total: adjustedTotal,
                     modifier,
                     damageType,
                     targetName: twinTarget.name,
                     finalDamage: null,
                     note: 'twin_damage_roll_before_apply',
+                    gwfApplied: displayRolls !== rolls,
+                    gwfOriginalRolls: displayRolls !== rolls ? rolls : null,
                 });
 
                 await new Promise(resolve => setTimeout(resolve, 500));
@@ -1163,18 +1193,20 @@ export function createLogDamageAndShow(deps) {
                     rollType: 'damage',
                     name: `${name} (Words of Creation)`,
                     formula,
-                    rolls,
-                    total,
+                    rolls: displayRolls,
+                    total: adjustedTotal,
                     modifier,
                     damageType,
                     targetName: multiTarget.name,
                     finalDamage: null,
                     note: 'multi_damage_roll_before_apply',
+                    gwfApplied: displayRolls !== rolls,
+                    gwfOriginalRolls: displayRolls !== rolls ? rolls : null,
                 });
 
                 await new Promise(resolve => setTimeout(resolve, 500));
 
-                const multiApplyResult = applyDamageToTarget(combatSummary, multiTarget.name, total, [damageType], campaignName, null, false, characterName);
+                const multiApplyResult = applyDamageToTarget(combatSummary, multiTarget.name, adjustedTotal, [damageType], campaignName, null, false, characterName);
 
                 setPopupHtml(prev => ({
                     ...prev,
@@ -1228,11 +1260,14 @@ export function createLogDamageAndShow(deps) {
 
         const { saveDc, saveType, damageType, isAutoMiss } = context || {};
         let adjustedTotal = applyMinDamageAdjustment(total, rolls, context?.playerStats, damageType);
+        let displayRolls = rolls;
         if (hasGreatWeaponFighting(context?.playerStats)) {
             const gwfRolls = applyGreatWeaponFightingToDamage(rolls, context?.playerStats);
-            if (gwfRolls !== rolls) {
+            const hasChanges = gwfRolls.some((r, i) => r !== rolls[i]);
+            if (hasChanges) {
                 const gwfTotal = gwfRolls.reduce((sum, r) => sum + r, 0) + modifier;
                 adjustedTotal = applyMinDamageAdjustment(gwfTotal, gwfRolls, context?.playerStats, damageType);
+                displayRolls = gwfRolls;
             }
         }
 
@@ -1250,7 +1285,7 @@ export function createLogDamageAndShow(deps) {
 
         const targetTargetName = context?.targetName;
         if (targetTargetName && targetTargetName.startsWith('overlay-')) {
-            await handleAoeDamage(name, formula, total, rolls, modifier, context, adjustedTotal);
+            await handleAoeDamage(name, formula, total, rolls, modifier, context, adjustedTotal, displayRolls);
             return;
         }
 
@@ -1258,16 +1293,16 @@ export function createLogDamageAndShow(deps) {
 
         if (saveDc && saveType && target) {
             if (target.type === 'npc') {
-                await handleNpcSaveDamage(name, formula, total, rolls, modifier, context, adjustedTotal, combatSummary);
+                await handleNpcSaveDamage(name, formula, total, rolls, modifier, context, adjustedTotal, combatSummary, displayRolls);
                 return;
             }
 
             if (target.type === 'player') {
-                const handled = await handlePlayerSaveDamage(name, formula, total, rolls, modifier, context, adjustedTotal, combatSummary);
+                const handled = await handlePlayerSaveDamage(name, formula, total, rolls, modifier, context, adjustedTotal, combatSummary, displayRolls);
                 if (handled) return;
             }
         }
 
-        await handlePlainDamage(name, formula, total, rolls, modifier, context, adjustedTotal, combatSummary);
+        await handlePlainDamage(name, formula, total, rolls, modifier, context, adjustedTotal, combatSummary, displayRolls);
     };
 }

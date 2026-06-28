@@ -334,6 +334,13 @@ function parse2024Benefit(benefit, feat) {
           type: 'reroll_damage_once_per_turn',
           automation: { type: 'reroll_damage_once_per_turn' },
         });
+      } else if (benefit.name && (benefit.name.includes('Great Weapon Fighting') || benefit.name.includes('Damage Die Reroll'))) {
+        buffs.features.push({
+          name: 'Great Weapon Fighting',
+          description: benefit.description,
+          type: 'great_weapon_fighting',
+          automation: { type: 'great_weapon_fighting' },
+        });
       } else if (benefit.name && benefit.name.includes('Enhanced Unarmed')) {
         buffs.features.push({
           name: 'Enhanced Unarmed Strike',

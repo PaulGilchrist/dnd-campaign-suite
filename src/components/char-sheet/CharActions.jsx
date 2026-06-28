@@ -132,6 +132,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     saveType: autoDamage.saveType,
                     dcSuccess: autoDamage.dcSuccess,
                     isAutoCrit: isCrit,
+                    playerStats,
                 };
                 if (autoDamage.metamagicTwinTarget) {
                     context.metamagicTwinTarget = autoDamage.metamagicTwinTarget;

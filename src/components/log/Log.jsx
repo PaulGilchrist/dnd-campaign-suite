@@ -120,6 +120,11 @@ function RollEntry({ entry }) {
             <span className="log-dice-formula">{entry.formula}</span>
           )}
           <span className="log-total"><b>{entry.total}{(isDamage || isSaveDamage || isAoeDamage || isOverchannelDamage || isGrazeDamage) ? '' : (entry.bonus >= 0 ? `+${entry.bonus}` : `${entry.bonus}`)}{entry.bonusDetail ? ' ' + entry.bonusDetail : ''}</b></span>
+          {entry.gwfApplied && entry.gwfOriginalRolls && (
+            <span className="log-gwf">
+              <i className="fa-solid fa-shield-halved"></i> GWF: {entry.gwfOriginalRolls.join(', ')} → {entry.rolls.join(', ')}
+            </span>
+          )}
         </div>
         {(isSaveDamage || isOverchannelDamage) && entry.finalDamage != null && entry.damageType && (
           <span className="log-final-damage">→ {entry.finalDamage} {entry.damageType} damage</span>

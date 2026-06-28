@@ -362,9 +362,9 @@ describe('createLogDamageAndShow (useLoggedDiceRollDamage)', () => {
         it('skips GWF reroll when no 1s or 2s are rolled', async () => {
             loadCombatSummary.mockResolvedValue({ creatures: [{ name: 'Goblin', type: 'npc', ac: 12, currentHp: 13, maxHp: 13 }] });
             hasGreatWeaponFighting.mockReturnValue(true);
-            applyGreatWeaponFightingToDamage.mockReturnValue([3, 4, 5, 6]);
+            applyGreatWeaponFightingToDamage.mockImplementation((rolls) => rolls);
             const fn = createFn();
-            await fn('Longsword', '4d6', 10, [3, 4, 5, 6], 0, {
+            await fn('Longsword', '4d6', 18, [3, 4, 5, 6], 0, {
                 targetName: 'Goblin',
                 damageType: 'slashing',
                 playerStats: {},
