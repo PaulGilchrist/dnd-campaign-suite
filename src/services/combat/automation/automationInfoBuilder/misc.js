@@ -23,6 +23,8 @@ export const miscHandlers = {
             value: auto.value || null,
             uses: auto.uses || null,
             recharge: auto.recharge || 'long_rest',
+            duration: auto.duration || '',
+            casting_time: auto.casting_time || '',
             hasAutomation: true
         }
     },

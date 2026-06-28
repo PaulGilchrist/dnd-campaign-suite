@@ -40,7 +40,7 @@ export function buildAttackContextSync(attack, playerStats, campaignName, condit
             }
         }
 
-       // Check for Stunning Strike save advantage (consumed on use)
+        // Check for Stunning Strike save advantage (consumed on use)
         let hasSaveAdvantage = false;
         if (targetName) {
             const advKey = `_advantageOn_${targetName}`;
@@ -51,9 +51,9 @@ export function buildAttackContextSync(attack, playerStats, campaignName, condit
                     hasSaveAdvantage = true;
                     storedAdvantage.splice(idx, 1);
                     setRuntimeValue(playerName, advKey, storedAdvantage, campaignName);
-                  }
-              }
-           }
+                }
+            }
+        }
 
         const innateSorceryBonus = getInnateSorceryBonus(playerName, campaignName);
 
@@ -78,10 +78,10 @@ export function buildAttackContextSync(attack, playerStats, campaignName, condit
         }
         if (hasSaveAdvantage && forcedMode === undefined) {
             forcedMode = 'advantage';
-          }
+        }
         if (innateSorceryBonus.spellAdvantage && forcedMode === undefined) {
             forcedMode = 'advantage';
-          }
+        }
 
         // Add stance damage bonus (e.g. Rage) if an active combat buff provides one
         let stanceDamageBonus = 0;
@@ -328,13 +328,13 @@ export function buildAttackContextSync(attack, playerStats, campaignName, condit
             weaponType: attack.weaponType,
             weaponName: attack.name,
         };
-        });
+    });
 }
 
 export function buildAttackContext(attack, playerStats, campaignName, mapName, conditionAttackMode, featRangeEffects) {
     if (!mapName) {
         return buildAttackContextSync(attack, playerStats, campaignName, conditionAttackMode, featRangeEffects);
-      }
+    }
 
     const basePromise = buildAttackContextSync(attack, playerStats, campaignName, conditionAttackMode, featRangeEffects);
 
@@ -342,266 +342,266 @@ export function buildAttackContext(attack, playerStats, campaignName, mapName, c
         basePromise,
         mapsService.loadMapData(campaignName, mapName),
         loadNPCs(campaignName),
-       ]).then(([base, mapData, npcs]) => {
-            const attackerPlayer = mapData?.players?.find(p => p.name === playerStats.name);
-            if (!attackerPlayer) return base;
+    ]).then(([base, mapData, npcs]) => {
+        const attackerPlayer = mapData?.players?.find(p => p.name === playerStats.name);
+        if (!attackerPlayer) return base;
 
-            let targetPos = null;
-            return getCombatContext(campaignName).then(cs => {
-                if (cs) {
-                    const target = getTargetFromAttacker(cs, playerStats.name);
-                    if (target) {
-                        const targetPlayer = mapData?.players?.find(p => p.name === target.name);
-                        const targetNpc = mapData?.placedItems?.length
-                              ? getNearestPlacedItem(mapData.placedItems, target.name, { gridX: attackerPlayer.gridX, gridY: attackerPlayer.gridY })
-                              : null;
-                        if (targetPlayer) {
-                            targetPos = { gridX: targetPlayer.gridX, gridY: targetPlayer.gridY };
-                          } else if (targetNpc) {
-                            targetPos = { gridX: targetNpc.gridX, gridY: targetNpc.gridY };
-                          }
-                      }
-                  }
+        let targetPos = null;
+        return getCombatContext(campaignName).then(cs => {
+            if (cs) {
+                const target = getTargetFromAttacker(cs, playerStats.name);
+                if (target) {
+                    const targetPlayer = mapData?.players?.find(p => p.name === target.name);
+                    const targetNpc = mapData?.placedItems?.length
+                        ? getNearestPlacedItem(mapData.placedItems, target.name, { gridX: attackerPlayer.gridX, gridY: attackerPlayer.gridY })
+                        : null;
+                    if (targetPlayer) {
+                        targetPos = { gridX: targetPlayer.gridX, gridY: targetPlayer.gridY };
+                    } else if (targetNpc) {
+                        targetPos = { gridX: targetNpc.gridX, gridY: targetNpc.gridY };
+                    }
+                }
+            }
 
-                  if (targetPos && base.forcedMode === undefined) {
-                       const wolfResult = getWolfAdvantageAgainst({
-                           targetPos,
-                           attackerName: playerStats.name,
-                           campaignName,
-                           mapData,
-                       });
-                       if (wolfResult.advantage) {
-                           base.forcedMode = 'advantage';
-                       }
-                       if (base.forcedMode === undefined) {
-                           const duplicityResult = getDuplicityAdvantageAgainst({
-                               targetPos,
-                               attackerName: playerStats.name,
-                               campaignName,
-                               mapData,
-                           });
-                           if (duplicityResult.advantage) {
-                               base.forcedMode = 'advantage';
-                           }
-                       }
-                       const lionResult = getLionDisadvantageAgainst({
-                          attackerName: playerStats.name,
-                          campaignName,
-                          mapData,
-                      });
-                      if (lionResult.disadvantage) {
-                          base.forcedMode = 'disadvantage';
-                      }
-                      if (base.forcedMode === undefined && base.targetName) {
-                          if (hasProtectionBuff(base.targetName, campaignName)) {
-                              base.forcedMode = 'disadvantage';
-                          }
-                      }
-                      const coronaResult = getCoronaSaveDisadvantage({
-                          targetName: base.targetName,
-                          campaignName,
-                          mapData,
-                          damageType: base.damageType,
-                      });
-                      if (coronaResult.disadvantage && base.forcedMode === undefined) {
-                          base.forcedMode = 'disadvantage';
-                      }
-                  }
-
-                   // When map is active but target has no position, fall back to no-map aura checks
-                   if (!targetPos && base.forcedMode === undefined) {
-                       const noMapWolf = getWolfAdvantageAgainst({
-                           attackerName: playerStats.name,
-                           campaignName,
-                           mapData,
-                           skipRangeCheck: true,
-                       });
-                       if (noMapWolf.advantage) {
-                           base.forcedMode = 'advantage';
-                       }
-                       if (base.forcedMode === undefined) {
-                           const noMapDuplicity = getDuplicityAdvantageAgainst({
-                               attackerName: playerStats.name,
-                               campaignName,
-                               mapData,
-                               skipRangeCheck: true,
-                           });
-                           if (noMapDuplicity.advantage) {
-                               base.forcedMode = 'advantage';
-                           }
-                       }
-                       const noMapLion = getLionDisadvantageAgainst({
-                          attackerName: playerStats.name,
-                          campaignName,
-                          mapData,
-                          skipRangeCheck: true,
-                      });
-                      if (noMapLion.disadvantage) {
-                          base.forcedMode = 'disadvantage';
-                      }
-                      if (base.forcedMode === undefined && base.targetName) {
-                          if (hasProtectionBuff(base.targetName, campaignName)) {
-                              base.forcedMode = 'disadvantage';
-                          }
-                      }
-                      if (base.forcedMode === undefined) {
-                          const noMapCorona = getCoronaSaveDisadvantage({
-                              targetName: base.targetName,
-                              campaignName,
-                              mapData,
-                              damageType: base.damageType,
-                              skipRangeCheck: true,
-                          });
-                          if (noMapCorona.disadvantage) {
-                              base.forcedMode = 'disadvantage';
-                          }
-                      }
-                  }
-
-                const numericRange = rangeToFeet(attack.range) || 0;
-                const isRanged = numericRange > 8;
-                const feats = featRangeEffects || { ignoresMeleeDisadvantage: false, ignoresLongRangeDisadvantage: false, rangeMultiplier: 1, spellRangeBonus: 0 };
-
-                // Improved Illusions: only apply range bonus to Illusion spells with range 10+ feet
-                const hasImprovedIllusions = playerStats.automation?.passives?.some(p => p.type === 'improved_illusions');
-                const isIllusionSpell = attack.school && attack.school.toLowerCase() === 'illusion';
-                const effectiveRangeBonus = (hasImprovedIllusions && isIllusionSpell && numericRange >= 10)
-                    ? (feats.spellRangeBonus || 0) + 60
-                    : feats.spellRangeBonus || 0;
-
-                if (targetPos) {
-                    const effectiveRange = isRanged ? numericRange + effectiveRangeBonus : attack.range;
-                    const distanceFt = getDistanceFeet(
-                         { gridX: attackerPlayer.gridX, gridY: attackerPlayer.gridY },
-                        targetPos
-                      );
-                    const rangeResult = computeRangeEffect(effectiveRange, distanceFt, feats);
-                    if (rangeResult.mode === 'disadvantage') {
+            if (targetPos && base.forcedMode === undefined) {
+                const wolfResult = getWolfAdvantageAgainst({
+                    targetPos,
+                    attackerName: playerStats.name,
+                    campaignName,
+                    mapData,
+                });
+                if (wolfResult.advantage) {
+                    base.forcedMode = 'advantage';
+                }
+                if (base.forcedMode === undefined) {
+                    const duplicityResult = getDuplicityAdvantageAgainst({
+                        targetPos,
+                        attackerName: playerStats.name,
+                        campaignName,
+                        mapData,
+                    });
+                    if (duplicityResult.advantage) {
+                        base.forcedMode = 'advantage';
+                    }
+                }
+                const lionResult = getLionDisadvantageAgainst({
+                    attackerName: playerStats.name,
+                    campaignName,
+                    mapData,
+                });
+                if (lionResult.disadvantage) {
+                    base.forcedMode = 'disadvantage';
+                }
+                if (base.forcedMode === undefined && base.targetName) {
+                    if (hasProtectionBuff(base.targetName, campaignName)) {
                         base.forcedMode = 'disadvantage';
-                        base.rangeReason = rangeResult.reason;
-                      } else if (rangeResult.mode === 'miss') {
-                        base.isAutoMiss = true;
-                        base.rangeReason = rangeResult.reason;
-                        base.forcedMode = undefined;
-                      }
-                  }
-
-                if (isRanged && !base.isAutoMiss && targetPos) {
-                    const walls = mapData?.walls || new Set();
-                    let coverResult = computeCover(
-                         { gridX: attackerPlayer.gridX, gridY: attackerPlayer.gridY },
-                         { gridX: targetPos.gridX, gridY: targetPos.gridY },
-                        walls,
-                        mapData?.placedItems || [],
-                      );
-
-                    // Check ignore_cover_ranged passive (e.g., Sharpshooter feat bypass cover)
-                    const hasIgnoreCoverRanged = (playerStats.automation?.passives || []).some(
-                        p => p.type === 'passive_rule' && p.effect === 'ignore_cover_ranged'
-                    );
-                    if (hasIgnoreCoverRanged) {
-                        coverResult = { level: 'none', acBonus: 0 };
                     }
+                }
+                const coronaResult = getCoronaSaveDisadvantage({
+                    targetName: base.targetName,
+                    campaignName,
+                    mapData,
+                    damageType: base.damageType,
+                });
+                if (coronaResult.disadvantage && base.forcedMode === undefined) {
+                    base.forcedMode = 'disadvantage';
+                }
+            }
 
-                    // Check Nature's Sanctuary half cover (15-ft cube = 3x3 grid centered on placement)
-                    const sanctuaryActive = getRuntimeValue(playerStats.name, 'naturesSanctuaryActive', campaignName);
-                    if (sanctuaryActive) {
-                        const sanctuaryX = Number(getRuntimeValue(playerStats.name, 'naturesSanctuaryCubeX', campaignName) || 0);
-                        const sanctuaryY = Number(getRuntimeValue(playerStats.name, 'naturesSanctuaryCubeY', campaignName) || 0);
-                        const cubeHalfSize = 1; // 15ft cube = 3 cells wide, half-size = 1 cell from center
-                        if (sanctuaryX > 0 && sanctuaryY > 0) {
-                            const dx = Math.abs(targetPos.gridX - sanctuaryX);
-                            const dy = Math.abs(targetPos.gridY - sanctuaryY);
-                            const inCube = dx <= cubeHalfSize && dy <= cubeHalfSize;
-                            if (inCube && coverResult.acBonus < 2) {
-                                coverResult = { level: 'half', acBonus: 2 };
-                            }
-                        }
+            // When map is active but target has no position, fall back to no-map aura checks
+            if (!targetPos && base.forcedMode === undefined) {
+                const noMapWolf = getWolfAdvantageAgainst({
+                    attackerName: playerStats.name,
+                    campaignName,
+                    mapData,
+                    skipRangeCheck: true,
+                });
+                if (noMapWolf.advantage) {
+                    base.forcedMode = 'advantage';
+                }
+                if (base.forcedMode === undefined) {
+                    const noMapDuplicity = getDuplicityAdvantageAgainst({
+                        attackerName: playerStats.name,
+                        campaignName,
+                        mapData,
+                        skipRangeCheck: true,
+                    });
+                    if (noMapDuplicity.advantage) {
+                        base.forcedMode = 'advantage';
                     }
+                }
+                const noMapLion = getLionDisadvantageAgainst({
+                    attackerName: playerStats.name,
+                    campaignName,
+                    mapData,
+                    skipRangeCheck: true,
+                });
+                if (noMapLion.disadvantage) {
+                    base.forcedMode = 'disadvantage';
+                }
+                if (base.forcedMode === undefined && base.targetName) {
+                    if (hasProtectionBuff(base.targetName, campaignName)) {
+                        base.forcedMode = 'disadvantage';
+                    }
+                }
+                if (base.forcedMode === undefined) {
+                    const noMapCorona = getCoronaSaveDisadvantage({
+                        targetName: base.targetName,
+                        campaignName,
+                        mapData,
+                        damageType: base.damageType,
+                        skipRangeCheck: true,
+                    });
+                    if (noMapCorona.disadvantage) {
+                        base.forcedMode = 'disadvantage';
+                    }
+                }
+            }
 
-                    // Check Bulwark of Force half cover (target must be in the allowed targets list)
-                    const bulwarkActive = getRuntimeValue(playerStats.name, 'bulwarkOfForceActive', campaignName);
-                    if (bulwarkActive) {
-                        const bulwarkTargets = getRuntimeValue(playerStats.name, 'bulwarkOfForceTargets', campaignName) || [];
-                        if (bulwarkTargets.includes(base.targetName) && coverResult.acBonus < 2) {
+            const numericRange = rangeToFeet(attack.range) || 0;
+            const isRanged = numericRange > 8;
+            const feats = featRangeEffects || { ignoresMeleeDisadvantage: false, ignoresLongRangeDisadvantage: false, rangeMultiplier: 1, spellRangeBonus: 0 };
+
+            // Improved Illusions: only apply range bonus to Illusion spells with range 10+ feet
+            const hasImprovedIllusions = playerStats.automation?.passives?.some(p => p.type === 'improved_illusions');
+            const isIllusionSpell = attack.school && attack.school.toLowerCase() === 'illusion';
+            const effectiveRangeBonus = (hasImprovedIllusions && isIllusionSpell && numericRange >= 10)
+                ? (feats.spellRangeBonus || 0) + 60
+                : feats.spellRangeBonus || 0;
+
+            if (targetPos) {
+                const effectiveRange = isRanged ? numericRange + effectiveRangeBonus : attack.range;
+                const distanceFt = getDistanceFeet(
+                    { gridX: attackerPlayer.gridX, gridY: attackerPlayer.gridY },
+                    targetPos
+                );
+                const rangeResult = computeRangeEffect(effectiveRange, distanceFt, feats);
+                if (rangeResult.mode === 'disadvantage') {
+                    base.forcedMode = 'disadvantage';
+                    base.rangeReason = rangeResult.reason;
+                } else if (rangeResult.mode === 'miss') {
+                    base.isAutoMiss = true;
+                    base.rangeReason = rangeResult.reason;
+                    base.forcedMode = undefined;
+                }
+            }
+
+            if (isRanged && !base.isAutoMiss && targetPos) {
+                const walls = mapData?.walls || new Set();
+                let coverResult = computeCover(
+                    { gridX: attackerPlayer.gridX, gridY: attackerPlayer.gridY },
+                    { gridX: targetPos.gridX, gridY: targetPos.gridY },
+                    walls,
+                    mapData?.placedItems || [],
+                );
+
+                // Check ignore_cover_ranged passive (e.g., Sharpshooter feat bypass cover)
+                const hasIgnoreCoverRanged = (playerStats.automation?.passives || []).some(
+                    p => p.type === 'passive_rule' && p.effect === 'ignore_cover_ranged'
+                );
+                if (hasIgnoreCoverRanged) {
+                    coverResult = { level: 'none', acBonus: 0 };
+                }
+
+                // Check Nature's Sanctuary half cover (15-ft cube = 3x3 grid centered on placement)
+                const sanctuaryActive = getRuntimeValue(playerStats.name, 'naturesSanctuaryActive', campaignName);
+                if (sanctuaryActive) {
+                    const sanctuaryX = Number(getRuntimeValue(playerStats.name, 'naturesSanctuaryCubeX', campaignName) || 0);
+                    const sanctuaryY = Number(getRuntimeValue(playerStats.name, 'naturesSanctuaryCubeY', campaignName) || 0);
+                    const cubeHalfSize = 1; // 15ft cube = 3 cells wide, half-size = 1 cell from center
+                    if (sanctuaryX > 0 && sanctuaryY > 0) {
+                        const dx = Math.abs(targetPos.gridX - sanctuaryX);
+                        const dy = Math.abs(targetPos.gridY - sanctuaryY);
+                        const inCube = dx <= cubeHalfSize && dy <= cubeHalfSize;
+                        if (inCube && coverResult.acBonus < 2) {
                             coverResult = { level: 'half', acBonus: 2 };
                         }
                     }
+                }
 
-                    // Check Smite of Protection half cover (allies within Aura of Protection range)
-                    const smiteCoverActive = getRuntimeValue(playerStats.name, 'smiteOfProtectionActive', campaignName);
-                    if (smiteCoverActive && coverResult.acBonus < 2) {
-                        const auraSource = getAuraSourceForSmiteCover(playerStats, mapData);
-                        if (auraSource) {
-                            const inAura = checkInAuraOfProtectionSync(auraSource, base.targetName, mapData, playerStats);
-                            if (inAura) {
-                                coverResult = { level: 'half', acBonus: 2 };
-                            }
+                // Check Bulwark of Force half cover (target must be in the allowed targets list)
+                const bulwarkActive = getRuntimeValue(playerStats.name, 'bulwarkOfForceActive', campaignName);
+                if (bulwarkActive) {
+                    const bulwarkTargets = getRuntimeValue(playerStats.name, 'bulwarkOfForceTargets', campaignName) || [];
+                    if (bulwarkTargets.includes(base.targetName) && coverResult.acBonus < 2) {
+                        coverResult = { level: 'half', acBonus: 2 };
+                    }
+                }
+
+                // Check Smite of Protection half cover (allies within Aura of Protection range)
+                const smiteCoverActive = getRuntimeValue(playerStats.name, 'smiteOfProtectionActive', campaignName);
+                if (smiteCoverActive && coverResult.acBonus < 2) {
+                    const auraSource = getAuraSourceForSmiteCover(playerStats, mapData);
+                    if (auraSource) {
+                        const inAura = checkInAuraOfProtectionSync(auraSource, base.targetName, mapData, playerStats);
+                        if (inAura) {
+                            coverResult = { level: 'half', acBonus: 2 };
                         }
                     }
+                }
 
-                    // Check Glorious Defense AC bonus (target Paladin has active buff)
-                    const gloriousDefenseActive = getRuntimeValue(base.targetName, 'gloriousDefenseActive', campaignName);
-                    if (gloriousDefenseActive && coverResult.acBonus < 2) {
-                        const targetChar = mapData?.players?.find(p => p.name === base.targetName);
-                        const attackerPlayer = mapData?.players?.find(p => p.name === playerStats.name);
-                        if (targetChar && attackerPlayer) {
-                            const dist = getDistanceFeet(attackerPlayer, targetChar);
-                            if (dist <= 10) {
-                                const gloriousDefenseBonus = Number(getRuntimeValue(base.targetName, 'gloriousDefenseBonus', campaignName) || 1);
-                                coverResult.acBonus = Math.max(coverResult.acBonus, gloriousDefenseBonus);
-                            }
+                // Check Glorious Defense AC bonus (target Paladin has active buff)
+                const gloriousDefenseActive = getRuntimeValue(base.targetName, 'gloriousDefenseActive', campaignName);
+                if (gloriousDefenseActive && coverResult.acBonus < 2) {
+                    const targetChar = mapData?.players?.find(p => p.name === base.targetName);
+                    const attackerPlayer = mapData?.players?.find(p => p.name === playerStats.name);
+                    if (targetChar && attackerPlayer) {
+                        const dist = getDistanceFeet(attackerPlayer, targetChar);
+                        if (dist <= 10) {
+                            const gloriousDefenseBonus = Number(getRuntimeValue(base.targetName, 'gloriousDefenseBonus', campaignName) || 1);
+                            coverResult.acBonus = Math.max(coverResult.acBonus, gloriousDefenseBonus);
                         }
                     }
+                }
 
-                    // Check Defensive Duelist AC bonus (2024 rules)
-                    const defensiveDuelistActive = getRuntimeValue(base.targetName, 'defensiveDuelistActive', campaignName);
-                    if (defensiveDuelistActive) {
-                        const defensiveDuelistBonus = Number(getRuntimeValue(base.targetName, 'defensiveDuelistBonus', campaignName) || 0);
-                        if (defensiveDuelistBonus > coverResult.acBonus) {
-                            coverResult.acBonus = defensiveDuelistBonus;
-                        }
+                // Check Defensive Duelist AC bonus (2024 rules)
+                const defensiveDuelistActive = getRuntimeValue(base.targetName, 'defensiveDuelistActive', campaignName);
+                if (defensiveDuelistActive) {
+                    const defensiveDuelistBonus = Number(getRuntimeValue(base.targetName, 'defensiveDuelistBonus', campaignName) || 0);
+                    if (defensiveDuelistBonus > coverResult.acBonus) {
+                        coverResult.acBonus = defensiveDuelistBonus;
                     }
+                }
 
-                    // Check Bait and Switch AC bonus (2024 rules)
-                    const baitAndSwitchActive = getRuntimeValue(base.targetName, 'baitAndSwitchActive', campaignName);
-                    if (baitAndSwitchActive) {
-                        const baitAndSwitchBonus = Number(getRuntimeValue(base.targetName, 'baitAndSwitchBonus', campaignName) || 0);
-                        if (baitAndSwitchBonus > coverResult.acBonus) {
-                            coverResult.acBonus = baitAndSwitchBonus;
-                        }
+                // Check Bait and Switch AC bonus (2024 rules)
+                const baitAndSwitchActive = getRuntimeValue(base.targetName, 'baitAndSwitchActive', campaignName);
+                if (baitAndSwitchActive) {
+                    const baitAndSwitchBonus = Number(getRuntimeValue(base.targetName, 'baitAndSwitchBonus', campaignName) || 0);
+                    if (baitAndSwitchBonus > coverResult.acBonus) {
+                        coverResult.acBonus = baitAndSwitchBonus;
                     }
+                }
 
-                    if (coverResult.level === 'full') {
-                        base.isAutoMiss = true;
-                        base.coverReason = 'Target has full cover';
-                      } else if (coverResult.acBonus > 0) {
-                        base.coverAcBonus = coverResult.acBonus;
-                        base.coverLevel = coverResult.level;
-                      }
-                  }
+                if (coverResult.level === 'full') {
+                    base.isAutoMiss = true;
+                    base.coverReason = 'Target has full cover';
+                } else if (coverResult.acBonus > 0) {
+                    base.coverAcBonus = coverResult.acBonus;
+                    base.coverLevel = coverResult.level;
+                }
+            }
 
-                if (isRanged && !base.isAutoMiss) {
-                    const nearbyThreats = (mapData?.placedItems || [])
-                         .filter(i => i.type === 'npc')
-                         .map(i => {
-                            const npcData = npcs?.find(n => n.name === i.name || n.name === i.name?.replace(/\s+\d+$/, ''));
-                            return { ...i, attitude: npcData?.attitude };
-                          })
-                         .filter(i => isHostileNPC(i))
-                         .map(i => ({ gridX: i.gridX, gridY: i.gridY, name: i.name }));
+            if (isRanged && !base.isAutoMiss) {
+                const nearbyThreats = (mapData?.placedItems || [])
+                    .filter(i => i.type === 'npc')
+                    .map(i => {
+                        const npcData = npcs?.find(n => n.name === i.name || n.name === i.name?.replace(/\s+\d+$/, ''));
+                        return { ...i, attitude: npcData?.attitude };
+                    })
+                    .filter(i => isHostileNPC(i))
+                    .map(i => ({ gridX: i.gridX, gridY: i.gridY, name: i.name }));
 
-                    const meleeResult = computeMeleeProximityEffect(true, attackerPlayer, nearbyThreats, feats);
-                    if (meleeResult.mode === 'disadvantage' && base.forcedMode !== 'disadvantage') {
-                        base.forcedMode = 'disadvantage';
-                        base.rangeReason = meleeResult.reason;
-                      }
-                  }
+                const meleeResult = computeMeleeProximityEffect(true, attackerPlayer, nearbyThreats, feats);
+                if (meleeResult.mode === 'disadvantage' && base.forcedMode !== 'disadvantage') {
+                    base.forcedMode = 'disadvantage';
+                    base.rangeReason = meleeResult.reason;
+                }
+            }
 
-                 return base;
-               });
-            })
-           .catch(() => basePromise);
+            return base;
+        });
+    })
+        .catch(() => basePromise);
 }
 
 function getAuraSourceForSmiteCover(playerStats, mapData) {

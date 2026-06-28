@@ -3,7 +3,7 @@ import utils from '../../services/ui/utils.js';
 import storage from '../../services/ui/storage.js';
 import { getTargetFromAttacker, findCreatureByName } from '../../services/rules/combat/damageUtils.js';
 import {
-  applyDamageToTarget,
+    applyDamageToTarget,
 } from '../../services/rules/combat/applyDamage.js';
 import { getRuntimeValue, setRuntimeValue } from '../runtime/useRuntimeState.js';
 import { clearAllExpirationEffects } from '../../services/rules/effects/expirations.js';
@@ -459,6 +459,35 @@ export function createLogAndShow(deps) {
                 }
             }
 
+            if (!hit && !isAutoMiss && targetName && ps?.automation?.passives) {
+                const missEffects = ps.automation.passives.filter(
+                    p => p.type === 'auto_effect' && p.trigger === 'miss' && p.effect === 'next_attack_advantage'
+                );
+                if (missEffects.length > 0) {
+                    const storedEffects = getRuntimeValue(campaignName, 'targetEffects') || [];
+                    for (const effect of missEffects) {
+                        const newEffect = {
+                            target: characterName,
+                            source: effect.name,
+                            effect: 'next_attack_advantage',
+                            vexTarget: targetName,
+                            duration: effect.duration || 'until_start_of_next_turn',
+                        };
+                        storedEffects.push(newEffect);
+                    }
+                    setRuntimeValue(campaignName, 'targetEffects', storedEffects, campaignName);
+                    for (const effect of missEffects) {
+                        addEntry(campaignName, {
+                            type: 'ability_use',
+                            characterName: characterName,
+                            abilityName: effect.name,
+                            description: `${characterName}'s ${effect.name} grants advantage on the next attack roll against ${targetName}`,
+                            targetName: targetName,
+                        }).catch(() => { });
+                    }
+                }
+            }
+
             if (context?.grazeDamage && targetName && !hit && !isAutoMiss) {
                 const grazeAbilityMod = context?.grazeAbilityMod || 0;
                 const grazeDamageAmount = Math.max(0, grazeAbilityMod);
@@ -493,7 +522,7 @@ export function createLogAndShow(deps) {
                             abilityName: 'Graze',
                             description: `${characterName} used Graze on ${name} against ${targetName}`,
                             targetName: targetName,
-                        }).catch(() => {});
+                        }).catch(() => { });
                         setPopupHtml({
                             type: 'graze-damage',
                             name: `${name} (Graze)`,
@@ -514,7 +543,7 @@ export function createLogAndShow(deps) {
                 }
             }
 
-            if (targetName) {
+            if (targetName && hit) {
                 const allEffects = getRuntimeValue(campaignName, 'targetEffects') || [];
                 const vexEffects = allEffects.filter(te => te.effect === 'next_attack_advantage' && te.target === characterName && te.vexTarget === targetName);
                 if (vexEffects.length > 0) {
@@ -777,25 +806,25 @@ export function createLogAndShow(deps) {
             }
 
             logEntry({
-                    type: 'roll',
-                    characterName: targetName || characterName,
-                    rollType: 'save',
-                    name: actionName,
-                    rolls: [effectiveD20],
-                    mode: 'normal',
-                    total: saveTotal,
-                    bonus,
-                    isNatural20: effectiveD20 === 20,
-                    isNatural1: effectiveD20 === 1,
-                    targetName: targetName,
-                    saveType: saveType,
-                    saveDc: saveDc,
-                    saveResult: saveSuccess ? 'success' : 'failure',
-                    attackerName: attackerName,
-                    dcSuccess: context?.dcSuccess,
-                    timestamp: Date.now(),
-                    id: utils.guid(),
-                });
+                type: 'roll',
+                characterName: targetName || characterName,
+                rollType: 'save',
+                name: actionName,
+                rolls: [effectiveD20],
+                mode: 'normal',
+                total: saveTotal,
+                bonus,
+                isNatural20: effectiveD20 === 20,
+                isNatural1: effectiveD20 === 1,
+                targetName: targetName,
+                saveType: saveType,
+                saveDc: saveDc,
+                saveResult: saveSuccess ? 'success' : 'failure',
+                attackerName: attackerName,
+                dcSuccess: context?.dcSuccess,
+                timestamp: Date.now(),
+                id: utils.guid(),
+            });
         }
 
         if (rollType === 'initiative') {
