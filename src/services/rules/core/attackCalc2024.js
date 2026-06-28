@@ -18,13 +18,15 @@ export function getAttacks(allEquipment, allSpells, playerStats) {
     const proficiency = Math.floor((playerStats.level - 1) / 4 + 2);
     const attacks = [];
 
-    // Ranged weapon (2024: no Archery fighting style)
+    // Ranged weapon
     const rangedWeapons = findEquippedWeapons(allEquipment, playerStats.inventory.equipped, 'Ranged');
+    const fightingStyles2024 = playerStats.class?.fightingStyles != null ? playerStats.class.fightingStyles : [];
     if (rangedWeapons.length > 0) {
         const rangedWeaponName = rangedWeapons[0];
         const { baseName } = parseMagicItemName(rangedWeaponName);
         const rangedWeapon = allEquipment.find(item => item.name === baseName);
         if (rangedWeapon) {
+            const archeryBonus = fightingStyles2024.includes('Archery') ? 2 : 0;
             attacks.push(buildWeaponAttack({
                 weapon: rangedWeapon,
                 weaponName: rangedWeaponName,
@@ -32,6 +34,8 @@ export function getAttacks(allEquipment, allSpells, playerStats) {
                 abilityName: 'Dexterity',
                 proficiency,
                 actionType: 'Action',
+                extraHitBonus: archeryBonus,
+                extraHitBonusLabel: archeryBonus ? 'Archery Fighting Style (2)' : '',
             }));
         }
     }

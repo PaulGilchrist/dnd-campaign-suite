@@ -1083,5 +1083,38 @@ describe('attackCalc2024', () => {
 
       expect(() => getAttacks([], [], playerStats)).not.toThrow();
     });
+
+    it('applies Archery fighting style +2 to ranged weapon attack hit bonus', () => {
+      findEquippedWeaponsStub
+        .mockReturnValueOnce(['Shortbow'])
+        .mockReturnValueOnce([]);
+
+      const allEquipment = [
+        {
+          name: 'Shortbow',
+          equipment_category: 'Weapon',
+          weapon_range: 'Ranged',
+          damage: { damage_dice: '1d6', damage_type: 'Piercing' },
+          range: { normal: 80 },
+        },
+      ];
+      const playerStats = defaultPlayerStats({
+        level: 1,
+        abilities: [
+          { name: 'Strength', baseScore: 10, abilityImprovements: 0, miscBonus: 0, bonus: 0 },
+          { name: 'Dexterity', baseScore: 16, abilityImprovements: 0, miscBonus: 0, bonus: 3 },
+        ],
+        class: { name: 'Fighter', fightingStyles: ['Archery'] },
+      });
+
+      getAttacks(allEquipment, [], playerStats);
+
+      expect(buildWeaponAttackStub).toHaveBeenCalledWith(
+        expect.objectContaining({
+          extraHitBonus: 2,
+          extraHitBonusLabel: 'Archery Fighting Style (2)',
+        })
+      );
+    });
   });
 });
