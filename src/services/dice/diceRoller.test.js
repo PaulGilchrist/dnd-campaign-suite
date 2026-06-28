@@ -243,18 +243,20 @@ describe('rollExpression', () => {
 });
 
 describe('rollExpressionDoubled', () => {
-  it('doubles the dice total but not the modifier', () => {
+  it('doubles the dice total and rolls', () => {
     const result = rollExpressionDoubled('1d8+3');
     expect(result).not.toBeNull();
     expect(result.modifier).toBe(3);
     expect(result.rolls).toHaveLength(1);
-    expect(result.total).toBe(result.rolls[0] * 2 + 3);
+    expect(result.doubledRolls).toHaveLength(2);
+    expect(result.total).toBe(result.doubledRolls.reduce((s, r) => s + r, 0) + 3);
   });
 
-  it('doubles combined damage dice but not the modifier', () => {
+  it('doubles combined damage dice and rolls', () => {
     const result = rollExpressionDoubled('1d8+3 plus 2d6');
     expect(result).not.toBeNull();
     expect(result.rolls).toHaveLength(3);
+    expect(result.doubledRolls).toHaveLength(6);
     expect(result.modifier).toBe(3);
   });
 
@@ -267,6 +269,7 @@ describe('rollExpressionDoubled', () => {
     const result = rollExpressionDoubled('1d8+3 or 2d6');
     expect(result).not.toBeNull();
     expect(result.rolls).toHaveLength(1);
+    expect(result.doubledRolls).toHaveLength(2);
     expect(result.modifier).toBe(3);
   });
 });

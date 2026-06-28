@@ -110,22 +110,25 @@ function rollExpressionDoubled(formula) {
     const parts = baseFormula.split(/\s+plus\s+/);
     let total = 0;
     let rolls = [];
+    let doubledRolls = [];
     let modifier = 0;
     for (const part of parts) {
       const result = rollExpressionDoubled(part);
       if (result) {
         total += result.total;
         rolls = rolls.concat(result.rolls);
+        doubledRolls = doubledRolls.concat(result.doubledRolls || result.rolls);
         modifier += result.modifier;
       }
     }
-    return { total, rolls, modifier, formula };
+    return { total, rolls, doubledRolls, modifier, formula };
   }
   const parsed = parseExpression(formula);
   if (!parsed) return null;
   const { count, sides, modifier } = parsed;
   const { total, rolls } = rollDice(count, sides);
-  return { total: (total * 2) + modifier, rolls, modifier, formula };
+  const doubledRolls = rolls.concat(rolls);
+  return { total: (total * 2) + modifier, rolls, doubledRolls, modifier, formula };
 }
 
 function rollExpressionMaximized(formula) {

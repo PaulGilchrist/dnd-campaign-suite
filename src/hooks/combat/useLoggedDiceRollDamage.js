@@ -182,7 +182,7 @@ export function createLogDamageAndShow(deps) {
         });
     }
 
-    async function handleAoeDamage(name, formula, total, rolls, modifier, context, adjustedTotal, displayRolls) {
+    async function handleAoeDamage(name, formula, total, rolls, modifier, context, adjustedTotal, displayRolls, gwfBaseRolls, gwfDisplayRolls) {
         const { saveDc, saveType, dcSuccess, damageType, attackerName } = context || {};
         const overlayId = context?.targetName?.startsWith('overlay-') ? context.targetName.slice('overlay-'.length) : null;
         const aoeCtx = overlayId ? await readAoeContext(campaignName, overlayId) : null;
@@ -259,15 +259,15 @@ export function createLogDamageAndShow(deps) {
             affectedCount: affected.length,
             npcResults: npcResults.map(r => r.creatureName),
             saveType, saveDc, dcSuccess,
-            gwfApplied: displayRolls !== rolls,
-            gwfOriginalRolls: displayRolls !== rolls ? rolls : null,
+            gwfApplied: gwfDisplayRolls !== gwfBaseRolls,
+            gwfOriginalRolls: gwfDisplayRolls !== gwfBaseRolls ? gwfBaseRolls : null,
         });
         setPopupHtml(html);
 
         handleOverchannelSelfDamage(characterName, campaignName, context, logEntry, characters);
     }
 
-    async function handleNpcSaveDamage(name, formula, total, rolls, modifier, context, adjustedTotal, combatSummary, displayRolls) {
+    async function handleNpcSaveDamage(name, formula, total, rolls, modifier, context, adjustedTotal, combatSummary, displayRolls, gwfBaseRolls, gwfDisplayRolls) {
         const { saveDc, saveType, dcSuccess, damageType } = context || {};
         const target = combatSummary?.creatures?.find(c => c.name === context?.targetName) || null;
         if (!target) return;
@@ -368,8 +368,8 @@ export function createLogDamageAndShow(deps) {
               finalDamage: primaryApplyResult?.finalDamage ?? finalDamage,
               note: 'combined_save_damage_roll',
               isCrit,
-              gwfApplied: displayRolls !== rolls,
-              gwfOriginalRolls: displayRolls !== rolls ? rolls : null,
+              gwfApplied: gwfDisplayRolls !== gwfBaseRolls,
+              gwfOriginalRolls: gwfDisplayRolls !== gwfBaseRolls ? gwfBaseRolls : null,
           };
         if (secondaryResult) {
             logEntryData.secondaryName = secondaryResult.name;
@@ -461,7 +461,7 @@ export function createLogDamageAndShow(deps) {
             type: 'save-damage',
             name,
             formula,
-            rolls: displayRolls,
+            rolls,
             bonus: 0,
             modifier,
             damageType,
@@ -476,8 +476,9 @@ export function createLogDamageAndShow(deps) {
             damageApplied: true,
             damageReduced: primaryApplyResult?.damageReduced,
             isCrit,
-            gwfApplied: displayRolls !== rolls,
-            gwfOriginalRolls: displayRolls !== rolls ? rolls : null,
+            gwfApplied: gwfDisplayRolls !== gwfBaseRolls,
+            gwfOriginalRolls: gwfDisplayRolls !== gwfBaseRolls ? gwfBaseRolls : null,
+            gwfDisplayRolls: gwfDisplayRolls,
         };
         if (secondaryResult) {
             popupData.secondaryName = secondaryResult.name;
@@ -487,10 +488,8 @@ export function createLogDamageAndShow(deps) {
             popupData.secondaryModifier = secondaryResult.modifier;
             popupData.secondaryDamageType = secondaryResult.damageType;
             popupData.secondaryFinalDamage = secondaryResult.finalDamage;
-            popupData.secondarySaveResult = secondaryResult.saveResult;
-            popupData.secondarySaveRoll = secondaryResult.saveRoll;
-            popupData.secondarySaveBonus = secondaryResult.saveBonus;
         }
+
         setPopupHtml(popupData);
 
         handleOverchannelSelfDamage(characterName, campaignName, context, logEntry, characters);
@@ -534,9 +533,10 @@ export function createLogDamageAndShow(deps) {
                      finalDamage: null,
                      note: 'twin_save_damage_roll_before_apply',
                      isCrit,
-                     gwfApplied: displayRolls !== rolls,
-                     gwfOriginalRolls: displayRolls !== rolls ? rolls : null,
-                 });
+            gwfApplied: gwfDisplayRolls !== gwfBaseRolls,
+            gwfOriginalRolls: gwfDisplayRolls !== gwfBaseRolls ? gwfBaseRolls : null,
+            gwfDisplayRolls: displayRolls,
+        });
 
                 await new Promise(resolve => setTimeout(resolve, 500));
 
@@ -592,8 +592,8 @@ export function createLogDamageAndShow(deps) {
                          finalDamage: null,
                          note: 'multi_save_damage_roll_before_apply',
                          isCrit,
-                         gwfApplied: displayRolls !== rolls,
-                         gwfOriginalRolls: displayRolls !== rolls ? rolls : null,
+                         gwfApplied: gwfDisplayRolls !== gwfBaseRolls,
+                         gwfOriginalRolls: gwfDisplayRolls !== gwfBaseRolls ? gwfBaseRolls : null,
                      });
 
                     await new Promise(resolve => setTimeout(resolve, 500));
@@ -642,7 +642,7 @@ export function createLogDamageAndShow(deps) {
         }
     }
 
-    async function handlePlayerSaveDamage(name, formula, total, rolls, modifier, context, adjustedTotal, combatSummary, displayRolls) {
+    async function handlePlayerSaveDamage(name, formula, total, rolls, modifier, context, adjustedTotal, combatSummary, displayRolls, gwfBaseRolls, gwfDisplayRolls) {
         const { saveDc, saveType, dcSuccess, damageType, attackerName } = context || {};
         const target = combatSummary?.creatures?.find(c => c.name === context?.targetName) || null;
         if (!target || target.type !== 'player') return;
@@ -671,8 +671,8 @@ export function createLogDamageAndShow(deps) {
                 saveBonus: 0,
                 finalDamage: null,
                 note: 'careful_spell_damage_roll_before_apply',
-                gwfApplied: displayRolls !== rolls,
-                gwfOriginalRolls: displayRolls !== rolls ? rolls : null,
+                gwfApplied: gwfDisplayRolls !== gwfBaseRolls,
+                gwfOriginalRolls: gwfDisplayRolls !== gwfBaseRolls ? gwfBaseRolls : null,
             });
 
             await new Promise(resolve => setTimeout(resolve, 500));
@@ -701,8 +701,8 @@ export function createLogDamageAndShow(deps) {
                 damageApplied: true,
                 damageReduced: false,
                 carefulSpell: true,
-                gwfApplied: displayRolls !== rolls,
-                gwfOriginalRolls: displayRolls !== rolls ? rolls : null,
+                gwfApplied: gwfDisplayRolls !== gwfBaseRolls,
+                gwfOriginalRolls: gwfDisplayRolls !== gwfBaseRolls ? gwfBaseRolls : null,
             });
             return true;
         }
@@ -732,8 +732,8 @@ export function createLogDamageAndShow(deps) {
                 saveBonus: 0,
                 finalDamage: null,
                 note: 'contact_patron_damage_roll_before_apply',
-                gwfApplied: displayRolls !== rolls,
-                gwfOriginalRolls: displayRolls !== rolls ? rolls : null,
+                gwfApplied: gwfDisplayRolls !== gwfBaseRolls,
+                gwfOriginalRolls: gwfDisplayRolls !== gwfBaseRolls ? gwfBaseRolls : null,
             });
 
             await new Promise(resolve => setTimeout(resolve, 500));
@@ -762,8 +762,8 @@ export function createLogDamageAndShow(deps) {
                 damageApplied: true,
                 damageReduced: false,
                 contactPatron: true,
-                gwfApplied: displayRolls !== rolls,
-                gwfOriginalRolls: displayRolls !== rolls ? rolls : null,
+                gwfApplied: gwfDisplayRolls !== gwfBaseRolls,
+                gwfOriginalRolls: gwfDisplayRolls !== gwfBaseRolls ? gwfBaseRolls : null,
             });
             return true;
         }
@@ -814,15 +814,15 @@ export function createLogDamageAndShow(deps) {
             saveDc,
             dcSuccess,
             mode: context?.metamagicHeighten ? 'disadvantage' : 'normal',
-            gwfApplied: displayRolls !== rolls,
-            gwfOriginalRolls: displayRolls !== rolls ? rolls : null,
+            gwfApplied: gwfDisplayRolls !== gwfBaseRolls,
+            gwfOriginalRolls: gwfDisplayRolls !== gwfBaseRolls ? gwfBaseRolls : null,
         });
 
         setPopupHtml({
             type: 'save-damage',
             name,
             formula,
-            rolls: displayRolls,
+            rolls,
             bonus: 0,
             modifier,
             damageType,
@@ -834,8 +834,8 @@ export function createLogDamageAndShow(deps) {
             promptId,
             rawDamage: adjustedTotal,
             attackerName: attackerName || characterName,
-            gwfApplied: displayRolls !== rolls,
-            gwfOriginalRolls: displayRolls !== rolls ? rolls : null,
+            gwfApplied: gwfDisplayRolls !== gwfBaseRolls,
+            gwfOriginalRolls: gwfDisplayRolls !== gwfBaseRolls ? gwfBaseRolls : null,
         });
 
         handleOverchannelSelfDamage(characterName, campaignName, context, logEntry, characters);
@@ -843,7 +843,7 @@ export function createLogDamageAndShow(deps) {
         return true;
     }
 
-    async function handlePlainDamage(name, formula, total, rolls, modifier, context, adjustedTotal, combatSummary, displayRolls) {
+    async function handlePlainDamage(name, formula, total, rolls, modifier, context, adjustedTotal, combatSummary, displayRolls, gwfBaseRolls, gwfDisplayRolls) {
         const { damageType, attackerName } = context || {};
         const target = combatSummary?.creatures?.find(c => c.name === context?.targetName) || null;
         const targetMaxHp = target?.type === 'player'
@@ -967,8 +967,8 @@ export function createLogDamageAndShow(deps) {
             finalDamage: applyResult?.finalDamage ?? reducedTotal,
             note: 'combined_damage_roll',
             isCrit,
-            gwfApplied: displayRolls !== rolls,
-            gwfOriginalRolls: displayRolls !== rolls ? rolls : null,
+            gwfApplied: gwfDisplayRolls !== gwfBaseRolls,
+            gwfOriginalRolls: gwfDisplayRolls !== gwfBaseRolls ? gwfBaseRolls : null,
         };
         if (secondaryResult) {
             logEntryData.secondaryName = secondaryResult.name;
@@ -1109,7 +1109,7 @@ export function createLogDamageAndShow(deps) {
             type: 'damage',
             name,
             formula,
-            rolls: displayRolls,
+            rolls,
             bonus: 0,
             modifier,
             dc: context?.dc,
@@ -1121,8 +1121,9 @@ export function createLogDamageAndShow(deps) {
             adjustedTotal: adjustedTotal,
             elementalAdeptBonus: adjustedTotal > total ? adjustedTotal - total : 0,
             isCrit,
-            gwfApplied: displayRolls !== rolls,
-            gwfOriginalRolls: displayRolls !== rolls ? rolls : null,
+            gwfApplied: gwfDisplayRolls !== gwfBaseRolls,
+            gwfOriginalRolls: gwfDisplayRolls !== gwfBaseRolls ? gwfBaseRolls : null,
+            gwfDisplayRolls: gwfDisplayRolls,
         };
 
         if (secondaryResult) {
@@ -1161,8 +1162,8 @@ export function createLogDamageAndShow(deps) {
                     targetName: twinTarget.name,
                     finalDamage: null,
                     note: 'twin_damage_roll_before_apply',
-                    gwfApplied: displayRolls !== rolls,
-                    gwfOriginalRolls: displayRolls !== rolls ? rolls : null,
+                    gwfApplied: gwfDisplayRolls !== gwfBaseRolls,
+                    gwfOriginalRolls: gwfDisplayRolls !== gwfBaseRolls ? gwfBaseRolls : null,
                 });
 
                 await new Promise(resolve => setTimeout(resolve, 500));
@@ -1200,8 +1201,8 @@ export function createLogDamageAndShow(deps) {
                     targetName: multiTarget.name,
                     finalDamage: null,
                     note: 'multi_damage_roll_before_apply',
-                    gwfApplied: displayRolls !== rolls,
-                    gwfOriginalRolls: displayRolls !== rolls ? rolls : null,
+                    gwfApplied: gwfDisplayRolls !== gwfBaseRolls,
+                    gwfOriginalRolls: gwfDisplayRolls !== gwfBaseRolls ? gwfBaseRolls : null,
                 });
 
                 await new Promise(resolve => setTimeout(resolve, 500));
@@ -1259,15 +1260,20 @@ export function createLogDamageAndShow(deps) {
         }
 
         const { saveDc, saveType, damageType, isAutoMiss } = context || {};
-        let adjustedTotal = applyMinDamageAdjustment(total, rolls, context?.playerStats, damageType);
-        let displayRolls = rolls;
+        const isCrit = context?.isAutoCrit || false;
+        const gwfBaseRolls = isCrit && context?.doubledRolls ? context.doubledRolls.slice(0, context.doubledRolls.length / 2) : rolls;
+        const rollsForMin = isCrit && context?.doubledRolls ? context.doubledRolls : rolls;
+        let adjustedTotal = applyMinDamageAdjustment(total, rollsForMin, context?.playerStats, damageType);
+        let displayRolls = isCrit && context?.doubledRolls ? context.doubledRolls : rolls;
+        let gwfDisplayRolls = gwfBaseRolls;
         if (hasGreatWeaponFighting(context?.playerStats)) {
-            const gwfRolls = applyGreatWeaponFightingToDamage(rolls, context?.playerStats);
-            const hasChanges = gwfRolls.some((r, i) => r !== rolls[i]);
+            const gwfRolls = applyGreatWeaponFightingToDamage(gwfBaseRolls, context?.playerStats);
+            const hasChanges = gwfRolls.some((r, i) => r !== gwfBaseRolls[i]);
             if (hasChanges) {
-                const gwfTotal = gwfRolls.reduce((sum, r) => sum + r, 0) + modifier;
+                const gwfTotal = (isCrit ? gwfRolls.reduce((sum, r) => sum + r, 0) * 2 : gwfRolls.reduce((sum, r) => sum + r, 0)) + modifier;
                 adjustedTotal = applyMinDamageAdjustment(gwfTotal, gwfRolls, context?.playerStats, damageType);
-                displayRolls = gwfRolls;
+                displayRolls = isCrit ? gwfRolls.concat(gwfRolls) : gwfRolls;
+                gwfDisplayRolls = gwfRolls;
             }
         }
 
@@ -1285,7 +1291,7 @@ export function createLogDamageAndShow(deps) {
 
         const targetTargetName = context?.targetName;
         if (targetTargetName && targetTargetName.startsWith('overlay-')) {
-            await handleAoeDamage(name, formula, total, rolls, modifier, context, adjustedTotal, displayRolls);
+            await handleAoeDamage(name, formula, total, rolls, modifier, context, adjustedTotal, displayRolls, gwfBaseRolls, gwfDisplayRolls);
             return;
         }
 
@@ -1293,16 +1299,16 @@ export function createLogDamageAndShow(deps) {
 
         if (saveDc && saveType && target) {
             if (target.type === 'npc') {
-                await handleNpcSaveDamage(name, formula, total, rolls, modifier, context, adjustedTotal, combatSummary, displayRolls);
+                await handleNpcSaveDamage(name, formula, total, rolls, modifier, context, adjustedTotal, combatSummary, displayRolls, gwfBaseRolls, gwfDisplayRolls);
                 return;
             }
 
             if (target.type === 'player') {
-                const handled = await handlePlayerSaveDamage(name, formula, total, rolls, modifier, context, adjustedTotal, combatSummary, displayRolls);
+                const handled = await handlePlayerSaveDamage(name, formula, total, rolls, modifier, context, adjustedTotal, combatSummary, displayRolls, gwfBaseRolls, gwfDisplayRolls);
                 if (handled) return;
             }
         }
 
-        await handlePlainDamage(name, formula, total, rolls, modifier, context, adjustedTotal, combatSummary, displayRolls);
+        await handlePlainDamage(name, formula, total, rolls, modifier, context, adjustedTotal, combatSummary, displayRolls, gwfBaseRolls, gwfDisplayRolls);
     };
 }

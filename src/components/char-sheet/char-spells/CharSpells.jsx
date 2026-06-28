@@ -68,6 +68,7 @@ const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells
               attackerName: autoDamage.attackerName,
               isAutoCrit: isCrit,
               playerStats,
+              doubledRolls: overchannelResult.doubledRolls,
              };
             if (autoDamage.saveDc) {
                context.saveDc = autoDamage.saveDc;
