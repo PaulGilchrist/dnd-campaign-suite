@@ -261,6 +261,7 @@ export function createLogDamageAndShow(deps) {
             saveType, saveDc, dcSuccess,
             gwfApplied: gwfDisplayRolls !== gwfBaseRolls,
             gwfOriginalRolls: gwfDisplayRolls !== gwfBaseRolls ? gwfBaseRolls : null,
+            gwfDisplayRolls: gwfDisplayRolls,
         });
         setPopupHtml(html);
 
@@ -370,6 +371,7 @@ export function createLogDamageAndShow(deps) {
               isCrit,
               gwfApplied: gwfDisplayRolls !== gwfBaseRolls,
               gwfOriginalRolls: gwfDisplayRolls !== gwfBaseRolls ? gwfBaseRolls : null,
+              gwfDisplayRolls: gwfDisplayRolls,
           };
         if (secondaryResult) {
             logEntryData.secondaryName = secondaryResult.name;
@@ -673,6 +675,7 @@ export function createLogDamageAndShow(deps) {
                 note: 'careful_spell_damage_roll_before_apply',
                 gwfApplied: gwfDisplayRolls !== gwfBaseRolls,
                 gwfOriginalRolls: gwfDisplayRolls !== gwfBaseRolls ? gwfBaseRolls : null,
+                gwfDisplayRolls: gwfDisplayRolls,
             });
 
             await new Promise(resolve => setTimeout(resolve, 500));
@@ -734,6 +737,7 @@ export function createLogDamageAndShow(deps) {
                 note: 'contact_patron_damage_roll_before_apply',
                 gwfApplied: gwfDisplayRolls !== gwfBaseRolls,
                 gwfOriginalRolls: gwfDisplayRolls !== gwfBaseRolls ? gwfBaseRolls : null,
+                gwfDisplayRolls: gwfDisplayRolls,
             });
 
             await new Promise(resolve => setTimeout(resolve, 500));
@@ -969,6 +973,7 @@ export function createLogDamageAndShow(deps) {
             isCrit,
             gwfApplied: gwfDisplayRolls !== gwfBaseRolls,
             gwfOriginalRolls: gwfDisplayRolls !== gwfBaseRolls ? gwfBaseRolls : null,
+            gwfDisplayRolls: gwfDisplayRolls,
         };
         if (secondaryResult) {
             logEntryData.secondaryName = secondaryResult.name;
@@ -1164,6 +1169,7 @@ export function createLogDamageAndShow(deps) {
                     note: 'twin_damage_roll_before_apply',
                     gwfApplied: gwfDisplayRolls !== gwfBaseRolls,
                     gwfOriginalRolls: gwfDisplayRolls !== gwfBaseRolls ? gwfBaseRolls : null,
+                    gwfDisplayRolls: gwfDisplayRolls,
                 });
 
                 await new Promise(resolve => setTimeout(resolve, 500));
@@ -1203,6 +1209,7 @@ export function createLogDamageAndShow(deps) {
                     note: 'multi_damage_roll_before_apply',
                     gwfApplied: gwfDisplayRolls !== gwfBaseRolls,
                     gwfOriginalRolls: gwfDisplayRolls !== gwfBaseRolls ? gwfBaseRolls : null,
+                    gwfDisplayRolls: gwfDisplayRolls,
                 });
 
                 await new Promise(resolve => setTimeout(resolve, 500));
