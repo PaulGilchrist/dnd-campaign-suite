@@ -1,8 +1,8 @@
-// @improved-by-ai
-import { handle, handleAddTarget } from './bulwarkOfForceHandler.js';
+import { handle, activateBulwarkOfForce } from './bulwarkOfForceHandler.js';
 import * as runtimeState from '../../../../hooks/runtime/useRuntimeState.js';
 import * as expirations from '../../../rules/effects/expirations.js';
 import * as logService from '../../../ui/logService.js';
+import * as damageUtils from '../../../rules/combat/damageUtils.js';
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
     getRuntimeValue: vi.fn(),
@@ -15,6 +15,10 @@ vi.mock('../../../rules/effects/expirations.js', () => ({
 
 vi.mock('../../../ui/logService.js', () => ({
     addEntry: vi.fn(() => Promise.resolve()),
+}));
+
+vi.mock('../../../rules/combat/damageUtils.js', () => ({
+    getCombatContext: vi.fn(),
 }));
 
 const makePlayerStats = (overrides = {}) => ({
@@ -43,68 +47,40 @@ describe('bulwarkOfForceHandler', () => {
     });
 
     describe('handle', () => {
-        it('activates bulwark and sets runtime state when not already active', async () => {
-            runtimeState.getRuntimeValue
-                .mockReturnValueOnce(false) // bulwark not active
-                .mockReturnValueOnce(undefined); // targets (not read on activation)
+        it('returns modal with creature targets when not already active', async () => {
+            runtimeState.getRuntimeValue.mockReturnValue(false);
+            damageUtils.getCombatContext.mockResolvedValue({
+                creatures: [
+                    { name: 'Test Fighter' },
+                    { name: 'Ally Joe' },
+                    { name: 'Ally Sue' },
+                ],
+            });
 
             const result = await handle(makeAction(), makePlayerStats(), campaignName, 'test-map');
 
-            expect(result.type).toBe('popup');
-            expect(result.payload.type).toBe('automation_info');
-            expect(result.payload.name).toBe('Bulwark of Force');
-            expect(result.payload.automationType).toBe('bulwark_of_force');
-            expect(result.payload.description).toContain('Max targets: 3');
-            expect(result.payload.automation).toEqual(makeAction().automation);
-
-            expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-                'Test Fighter',
-                'bulwarkOfForceActive',
-                true,
-                campaignName
-            );
-            expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-                'Test Fighter',
-                'bulwarkOfForceTargets',
-                [],
-                campaignName
-            );
+            expect(result.type).toBe('modal');
+            expect(result.modalName).toBe('bulwarkOfForceTarget');
+            expect(result.payload.maxTargets).toBe(3);
+            expect(result.payload.creatureTargets).toEqual([
+                { name: 'Ally Joe' },
+                { name: 'Ally Sue' },
+            ]);
         });
 
-        it('sets expiration when activating bulwark', async () => {
-            runtimeState.getRuntimeValue
-                .mockReturnValueOnce(false)
-                .mockReturnValueOnce(undefined);
+        it('returns modal with empty targets list when no combat context', async () => {
+            runtimeState.getRuntimeValue.mockReturnValue(false);
+            damageUtils.getCombatContext.mockResolvedValue(null);
 
-            await handle(makeAction(), makePlayerStats(), campaignName, 'test-map');
+            const result = await handle(makeAction(), makePlayerStats(), campaignName, 'test-map');
 
-            expect(expirations.addExpiration).toHaveBeenCalledWith(
-                'Test Fighter',
-                'Test Fighter',
-                [{ type: 'remove_bulwark_of_force' }],
-                campaignName,
-                1
-            );
-        });
-
-        it('logs the ability use when activating bulwark', async () => {
-            runtimeState.getRuntimeValue
-                .mockReturnValueOnce(false)
-                .mockReturnValueOnce(undefined);
-
-            await handle(makeAction(), makePlayerStats(), campaignName, 'test-map');
-
-            expect(logService.addEntry).toHaveBeenCalledWith(campaignName, {
-                type: 'ability_use',
-                characterName: 'Test Fighter',
-                abilityName: 'Bulwark of Force',
-                description: expect.stringContaining('Allies within 30 feet have Half Cover'),
-                timestamp: expect.any(Number),
-            });
+            expect(result.type).toBe('modal');
+            expect(result.modalName).toBe('bulwarkOfForceTarget');
+            expect(result.payload.creatureTargets).toEqual([]);
         });
 
         it('returns error popup when bulwark is already active', async () => {
-            runtimeState.getRuntimeValue.mockReturnValueOnce(true);
+            runtimeState.getRuntimeValue.mockReturnValue(true);
 
             const result = await handle(makeAction(), makePlayerStats(), campaignName, 'test-map');
 
@@ -117,92 +93,73 @@ describe('bulwarkOfForceHandler', () => {
         });
 
         it('uses minimum 1 target when INT modifier is 0', async () => {
+            runtimeState.getRuntimeValue.mockReturnValue(false);
+
             const stats = makePlayerStats({
                 abilities: [{ name: 'Intelligence', bonus: 0 }],
             });
 
-            runtimeState.getRuntimeValue
-                .mockReturnValueOnce(false)
-                .mockReturnValueOnce(undefined);
-
             const result = await handle(makeAction(), stats, campaignName, 'test-map');
 
-            expect(result.payload.description).toContain('Max targets: 1');
+            expect(result.payload.maxTargets).toBe(1);
         });
 
         it('uses minimum 1 target when INT modifier is negative', async () => {
+            runtimeState.getRuntimeValue.mockReturnValue(false);
+
             const stats = makePlayerStats({
                 abilities: [{ name: 'Intelligence', bonus: -5 }],
             });
 
-            runtimeState.getRuntimeValue
-                .mockReturnValueOnce(false)
-                .mockReturnValueOnce(undefined);
-
             const result = await handle(makeAction(), stats, campaignName, 'test-map');
 
-            expect(result.payload.description).toContain('Max targets: 1');
+            expect(result.payload.maxTargets).toBe(1);
         });
 
         it('uses minimum 1 target when Intelligence ability is missing', async () => {
+            runtimeState.getRuntimeValue.mockReturnValue(false);
+
             const stats = makePlayerStats({
                 abilities: [],
             });
 
-            runtimeState.getRuntimeValue
-                .mockReturnValueOnce(false)
-                .mockReturnValueOnce(undefined);
-
             const result = await handle(makeAction(), stats, campaignName, 'test-map');
 
-            expect(result.payload.description).toContain('Max targets: 1');
+            expect(result.payload.maxTargets).toBe(1);
         });
 
         it('respects high INT modifier for max targets', async () => {
+            runtimeState.getRuntimeValue.mockReturnValue(false);
+
             const stats = makePlayerStats({
                 abilities: [{ name: 'Intelligence', bonus: 10 }],
             });
 
-            runtimeState.getRuntimeValue
-                .mockReturnValueOnce(false)
-                .mockReturnValueOnce(undefined);
-
             const result = await handle(makeAction(), stats, campaignName, 'test-map');
 
-            expect(result.payload.description).toContain('Max targets: 10');
+            expect(result.payload.maxTargets).toBe(10);
         });
     });
 
-    describe('handleAddTarget', () => {
-        it('adds target when bulwark is active and under limit', async () => {
-            const stats = makePlayerStats();
-            runtimeState.getRuntimeValue
-                .mockReturnValueOnce(true) // bulwark active
-                .mockReturnValueOnce([]); // no targets yet
+    describe('activateBulwarkOfForce', () => {
+        it('activates bulwark and sets targets', async () => {
+            const result = await activateBulwarkOfForce(
+                makeAction(),
+                makePlayerStats(),
+                campaignName,
+                ['Ally Joe', 'Ally Sue']
+            );
 
-            const result = await handleAddTarget(makeAction(), stats, 'Ally Joe', campaignName);
+            expect(result.type).toBe('popup');
+            expect(result.payload.type).toBe('automation_info');
+            expect(result.payload.description).toContain('Ally Joe, Ally Sue');
 
-            expect(result.success).toBe(true);
-            expect(result.targetName).toBe('Ally Joe');
-            expect(result.targets).toEqual(['Ally Joe']);
             expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
                 'Test Fighter',
-                'bulwarkOfForceTargets',
-                ['Ally Joe'],
+                'bulwarkOfForceActive',
+                true,
                 campaignName
             );
-        });
-
-        it('appends to existing targets list', async () => {
-            const stats = makePlayerStats();
-            runtimeState.getRuntimeValue
-                .mockReturnValueOnce(true) // bulwark active
-                .mockReturnValueOnce(['Ally Joe']); // one target already
-
-            const result = await handleAddTarget(makeAction(), stats, 'Ally Sue', campaignName);
-
-            expect(result.success).toBe(true);
-            expect(result.targets).toEqual(['Ally Joe', 'Ally Sue']);
             expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
                 'Test Fighter',
                 'bulwarkOfForceTargets',
@@ -211,45 +168,75 @@ describe('bulwarkOfForceHandler', () => {
             );
         });
 
-        it('returns error when bulwark is not active', async () => {
-            runtimeState.getRuntimeValue.mockReturnValueOnce(false);
+        it('clamps targets to max allowed', async () => {
+            const stats = makePlayerStats({
+                abilities: [{ name: 'Intelligence', bonus: 1 }],
+            });
 
-            const result = await handleAddTarget(makeAction(), makePlayerStats(), 'Ally Joe', campaignName);
+            await activateBulwarkOfForce(
+                makeAction(),
+                stats,
+                campaignName,
+                ['Ally A', 'Ally B', 'Ally C']
+            );
 
-            expect(result.error).toBe('Bulwark of Force is not active.');
+            expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
+                'Test Fighter',
+                'bulwarkOfForceTargets',
+                ['Ally A'],
+                campaignName
+            );
         });
 
-        it('returns error when max targets reached', async () => {
-            // INT modifier is 3, so max 3 targets
-            runtimeState.getRuntimeValue
-                .mockReturnValueOnce(true) // bulwark active
-                .mockReturnValueOnce(['A', 'B', 'C']); // 3 targets already
+        it('sets expiration when activating bulwark', async () => {
+            await activateBulwarkOfForce(
+                makeAction(),
+                makePlayerStats(),
+                campaignName,
+                ['Ally Joe']
+            );
 
-            const result = await handleAddTarget(makeAction(), makePlayerStats(), 'D', campaignName);
-
-            expect(result.error).toBe('Maximum targets reached (3).');
+            expect(expirations.addExpiration).toHaveBeenCalledWith(
+                'Test Fighter',
+                'Test Fighter',
+                [{ type: 'remove_bulwark_of_force' }],
+                campaignName,
+                1
+            );
         });
 
-        it('returns error when target already has cover', async () => {
-            runtimeState.getRuntimeValue
-                .mockReturnValueOnce(true) // bulwark active
-                .mockReturnValueOnce(['Ally Joe']); // Ally Joe already has cover
+        it('logs the ability use when activating bulwark', async () => {
+            await activateBulwarkOfForce(
+                makeAction(),
+                makePlayerStats(),
+                campaignName,
+                ['Ally Joe']
+            );
 
-            const result = await handleAddTarget(makeAction(), makePlayerStats(), 'Ally Joe', campaignName);
-
-            expect(result.error).toBe('Ally Joe is already granted Half Cover.');
+            expect(logService.addEntry).toHaveBeenCalledWith(campaignName, {
+                type: 'ability_use',
+                characterName: 'Test Fighter',
+                abilityName: 'Bulwark of Force',
+                description: expect.stringContaining('Ally Joe'),
+                timestamp: expect.any(Number),
+            });
         });
 
-        it('handles undefined targets list as empty', async () => {
-            const stats = makePlayerStats();
-            runtimeState.getRuntimeValue
-                .mockReturnValueOnce(true) // bulwark active
-                .mockReturnValueOnce(undefined); // targets not yet initialized
+        it('handles empty targets list', async () => {
+            const result = await activateBulwarkOfForce(
+                makeAction(),
+                makePlayerStats(),
+                campaignName,
+                []
+            );
 
-            const result = await handleAddTarget(makeAction(), stats, 'Ally Joe', campaignName);
-
-            expect(result.success).toBe(true);
-            expect(result.targets).toEqual(['Ally Joe']);
+            expect(result.payload.description).toContain('0 target(s)');
+            expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
+                'Test Fighter',
+                'bulwarkOfForceTargets',
+                [],
+                campaignName
+            );
         });
     });
 });

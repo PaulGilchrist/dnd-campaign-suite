@@ -11,7 +11,7 @@ import { getAbilitySaveModifier } from '../../services/shared/abilityLookup.js';
 import { computeConditionEffects, combineAttackModes, CONDITIONS_THAT_CANNOT_ACT } from '../../services/combat/conditions/conditionEffects.js';
 import { computeRangeEffect, getDistanceFeet, getNearestPlacedItem, rangeToFeet } from '../../services/rules/combat/rangeValidation.js';
 import * as mapsService from '../../services/maps/mapsService.js';
-import { useRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
+import { useRuntimeValue, getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import './MonsterCardModal.css';
 
 const ABBR_MAP = { Strength: 'str', Dexterity: 'dex', Constitution: 'con', Intelligence: 'int', Wisdom: 'wis', Charisma: 'cha', str: 'str', dex: 'dex', con: 'con', int: 'int', wis: 'wis', cha: 'cha' };
@@ -184,6 +184,9 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
     let isAutoMiss = false;
     let rangeReason = null;
     let rangeForcedMode = null;
+    let coverAcBonus = 0;
+    let coverLevel = null;
+    let coverReason = null;
     if (mapData && target) {
       const attackerPlaced = (mapData?.placedItems || []).find(i => i.name === monsterName) || null;
       let targetPos = null;
@@ -212,6 +215,27 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
       }
     }
 
+    // Check Bulwark of Force half cover — applies to all attacks, independent of map data
+    console.log('[BOF] Start check', { targetName: target?.name, charactersCount: characters?.length, isAutoMiss });
+    if (!isAutoMiss && characters) {
+      for (const player of characters) {
+        console.log('[BOF] Checking player', player.name, 'type:', player.type);
+        const bulwarkActive = getRuntimeValue(player.name, 'bulwarkOfForceActive');
+        console.log('[BOF]', player.name, 'bulwarkActive:', bulwarkActive, 'typeof:', typeof bulwarkActive);
+        if (bulwarkActive) {
+          const bulwarkTargets = getRuntimeValue(player.name, 'bulwarkOfForceTargets') || [];
+          console.log('[BOF]', player.name, 'targets:', bulwarkTargets, 'includes target:', bulwarkTargets.includes(target?.name));
+          if (bulwarkTargets.includes(target?.name) && coverAcBonus < 2) {
+            coverAcBonus = 2;
+            coverLevel = 'half';
+            console.log('[BOF] Applied cover, coverAcBonus:', coverAcBonus);
+            break;
+          }
+        }
+      }
+    }
+    console.log('[BOF] Final coverAcBonus:', coverAcBonus);
+
     rollAttack(name, bonus, {
       damageType: formatDamageTypes(primaryDamageType),
       resistanceNotice,
@@ -219,6 +243,9 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
       isAutoCrit,
       isAutoMiss,
       rangeReason,
+      coverAcBonus,
+      coverLevel,
+      coverReason,
       autoDamageFormula: extractDamageDiceFromDescription(action?.description, action?.damage_dice_primary) || null,
       autoDamageName: name,
       autoDamageSecondaryFormula: action?.damage_dice_secondary || null,

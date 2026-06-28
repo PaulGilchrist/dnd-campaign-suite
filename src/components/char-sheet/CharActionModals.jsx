@@ -44,6 +44,7 @@ import ConstellationSelectionModal from './modals/ConstellationSelectionModal.js
 import CombatSuperiorityModal from './modals/CombatSuperiorityModal.jsx'
 import AttackRiderManeuverPrompt from './modals/AttackRiderManeuverPrompt.jsx'
 import SecondaryTargetModal from './modals/shared/SecondaryTargetModal.jsx'
+import BulwarkOfForceModal from './modals/BulwarkOfForceModal.jsx'
 import { handleClearWard, handleSpendDice, handleApply } from '../../services/automation/handlers/class-cleric-paladin/bastionOfLawHandler.js'
 
 export default function CharActionModals({
@@ -126,6 +127,8 @@ export default function CharActionModals({
     handleCommanderStrikeChoiceConfirm,
     rallyChoiceModal, setRallyChoiceModal,
     handleRallyChoiceConfirm,
+    bulwarkOfForceModal, setBulwarkOfForceModal,
+    handleBulwarkOfForceConfirm,
     handleDivineInterventionCast,
     pendingDamageRef,
 }) {
@@ -621,6 +624,14 @@ export default function CharActionModals({
                     isTwinkled={true}
                     onConfirm={(option) => handleConstellationSelect(twinklingConstellationModal.payload, option)}
                     onClose={() => setTwinklingConstellationModal(null)}
+                />
+            )}
+            {bulwarkOfForceModal && (
+                <BulwarkOfForceModal
+                    targets={bulwarkOfForceModal.creatureTargets}
+                    maxTargets={bulwarkOfForceModal.maxTargets}
+                    onConfirm={handleBulwarkOfForceConfirm}
+                    onSkip={() => setBulwarkOfForceModal(null)}
                 />
             )}
         </>

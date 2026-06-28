@@ -65,6 +65,7 @@ export default function useCharActionModals({
     const [baitAndSwitchChoiceModal, setBaitAndSwitchChoiceModal] = useState(null);
     const [commanderStrikeChoiceModal, setCommanderStrikeChoiceModal] = useState(null);
     const [rallyChoiceModal, setRallyChoiceModal] = useState(null);
+    const [bulwarkOfForceModal, setBulwarkOfForceModal] = useState(null);
 
     const pendingDamageRef = useRef(null);
 
@@ -174,6 +175,7 @@ export default function useCharActionModals({
         baitAndSwitchChoiceModal, setBaitAndSwitchChoiceModal,
         commanderStrikeChoiceModal, setCommanderStrikeChoiceModal,
         rallyChoiceModal, setRallyChoiceModal,
+        bulwarkOfForceModal, setBulwarkOfForceModal,
         handleDamageClick,
         handleMasteryClose,
         handleWeaponMasteryChoice,

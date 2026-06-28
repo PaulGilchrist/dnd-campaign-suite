@@ -22,7 +22,13 @@
     border-color: var(--color-link);
 }
 
-.secondary-target-row input[type="radio"] {
+.secondary-target-row.secondary-target-disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.secondary-target-row input[type="radio"],
+.secondary-target-row input[type="checkbox"] {
     margin-right: 8px;
 }
 

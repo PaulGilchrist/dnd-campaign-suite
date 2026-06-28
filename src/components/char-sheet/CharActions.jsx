@@ -27,6 +27,7 @@ import { executeSpellCast } from '../../services/rules/spells/spellCastService.j
 import { getTargetFromAttacker, getCombatContext, getAttackerTargetName } from '../../services/rules/combat/damageUtils.js';
 import { loadCombatSummary } from '../../services/encounters/combatData.js';
 import { executeSweepingAttack, executeBaitAndSwitchChoice, executeCommanderStrikeChoice, executeRallyChoice } from '../../services/automation/handlers/class-fighter-rogue/combatSuperiorityHandler.js';
+import { activateBulwarkOfForce } from '../../services/automation/handlers/class-sorcerer/bulwarkOfForceHandler.js';
 import { endFriendsOnHostileAction } from '../../services/rules/features/friendsService.js';
 import { endInvisibilityOnHostileAction } from '../../services/rules/features/invisibilityService.js';
 import { applyDamageToTarget } from '../../services/rules/combat/applyDamage.js';
@@ -467,6 +468,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         baitAndSwitchChoiceModal, setBaitAndSwitchChoiceModal,
         commanderStrikeChoiceModal, setCommanderStrikeChoiceModal,
         rallyChoiceModal, setRallyChoiceModal,
+        bulwarkOfForceModal, setBulwarkOfForceModal,
         handleAttackRiderManeuverUse,
         handleAttackRiderManeuverSkip,
         handleCombatSuperiorityConfirm,
@@ -776,6 +778,20 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         setRallyChoiceModal(null);
     }, [setPopupHtml, setRallyChoiceModal]);
 
+    const handleBulwarkOfForceConfirm = React.useCallback(async (targetNames) => {
+        if (!targetNames || !bulwarkOfForceModal) return;
+        const result = await activateBulwarkOfForce(
+            bulwarkOfForceModal.action,
+            bulwarkOfForceModal.playerStats,
+            bulwarkOfForceModal.campaignName,
+            targetNames
+        );
+        if (result?.payload) {
+            setPopupHtml(result.payload);
+        }
+        setBulwarkOfForceModal(null);
+    }, [setPopupHtml, bulwarkOfForceModal, setBulwarkOfForceModal]);
+
     async function handleAutomationAction(action) {
         if (cannotAct) return;
 
@@ -979,6 +995,9 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                         break;
                     case 'baitAndSwitchChoice':
                         setBaitAndSwitchChoiceModal(result.payload);
+                        break;
+                    case 'bulwarkOfForceTarget':
+                        setBulwarkOfForceModal(result.payload);
                         break;
                     case 'arcaneWardRestore':
                         setArcaneWardRestoreModal(result.payload);
@@ -1290,6 +1309,8 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     handleCommanderStrikeChoiceConfirm={handleCommanderStrikeChoiceConfirm}
                     rallyChoiceModal={rallyChoiceModal} setRallyChoiceModal={setRallyChoiceModal}
                     handleRallyChoiceConfirm={handleRallyChoiceConfirm}
+                    bulwarkOfForceModal={bulwarkOfForceModal} setBulwarkOfForceModal={setBulwarkOfForceModal}
+                    handleBulwarkOfForceConfirm={handleBulwarkOfForceConfirm}
                     handleCombatSuperiorityConfirm={handleCombatSuperiorityConfirm}
                     handleAttackRiderManeuverUse={handleAttackRiderManeuverUse}
                     handleAttackRiderManeuverSkip={handleAttackRiderManeuverSkip}

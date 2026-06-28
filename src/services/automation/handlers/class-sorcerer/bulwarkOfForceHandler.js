@@ -1,6 +1,7 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addExpiration } from '../../../rules/effects/expirations.js';
 import { addEntry } from '../../../ui/logService.js';
+import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 
 const BULWARK_KEY = 'bulwarkOfForceActive';
 const BULWARK_TARGETS_KEY = 'bulwarkOfForceTargets';
@@ -8,8 +9,6 @@ const BULWARK_TARGETS_KEY = 'bulwarkOfForceTargets';
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
     const playerName = playerStats.name;
-    const intMod = playerStats.abilities?.find(a => a.name === 'Intelligence')?.bonus || 0;
-    const maxTargets = Math.max(1, intMod);
 
     // Check if bulwark is already active
     const isActive = getRuntimeValue(playerName, BULWARK_KEY, campaignName);
@@ -25,11 +24,42 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         };
     }
 
+    const intMod = playerStats.abilities?.find(a => a.name === 'Intelligence')?.bonus || 0;
+    const maxTargets = Math.max(1, intMod);
+
+    // Gather creature targets from combat context (exclude self)
+    const combatSummary = await getCombatContext(campaignName);
+    const creatureTargets = combatSummary?.creatures
+        ? combatSummary.creatures
+            .filter(c => c.name !== playerName)
+            .map(c => ({ name: c.name }))
+        : [];
+
+    return {
+        type: 'modal',
+        modalName: 'bulwarkOfForceTarget',
+        payload: {
+            action,
+            playerStats,
+            campaignName,
+            creatureTargets,
+            maxTargets,
+        },
+    };
+}
+
+export async function activateBulwarkOfForce(action, playerStats, campaignName, targetNames) {
+    const playerName = playerStats.name;
+    const auto = action.automation;
+    const intMod = playerStats.abilities?.find(a => a.name === 'Intelligence')?.bonus || 0;
+    const maxTargets = Math.max(1, intMod);
+
+    // Clamp targets to max allowed
+    const finalTargets = (targetNames || []).slice(0, maxTargets);
+
     // Activate the bulwark
     await setRuntimeValue(playerName, BULWARK_KEY, true, campaignName);
-
-    // Initialize empty targets list
-    await setRuntimeValue(playerName, BULWARK_TARGETS_KEY, [], campaignName);
+    await setRuntimeValue(playerName, BULWARK_TARGETS_KEY, finalTargets, campaignName);
 
     // Set up expiration for 1 round
     addExpiration(playerName, playerName, [
@@ -41,7 +71,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         type: 'ability_use',
         characterName: playerName,
         abilityName: action.name,
-        description: `${playerName} activated Bulwark of Force. Allies within 30 feet have Half Cover.`,
+        description: `${playerName} activated Bulwark of Force, granting Half Cover to ${finalTargets.join(', ') || 'no one'}.`,
         timestamp: Date.now(),
     }).catch((e) => { console.error("[bulwarkOfForce] Error:", e); });
 
@@ -51,32 +81,8 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             type: 'automation_info',
             name: action.name,
             automationType: auto.type,
-            description: `${action.name} activated! Allies within 30 feet have Half Cover until the start of your next turn. Max targets: ${maxTargets}.`,
+            description: `${action.name} activated! Granting Half Cover to ${finalTargets.length} target(s) (${finalTargets.join(', ') || 'none'}).`,
             automation: auto,
         },
     };
-}
-
-export async function handleAddTarget(action, playerStats, targetName, campaignName) {
-    const isActive = getRuntimeValue(playerStats.name, BULWARK_KEY, campaignName);
-    if (!isActive) {
-        return { error: 'Bulwark of Force is not active.' };
-    }
-
-    const targets = getRuntimeValue(playerStats.name, BULWARK_TARGETS_KEY, campaignName) || [];
-    const intMod = playerStats.abilities?.find(a => a.name === 'Intelligence')?.bonus || 0;
-    const maxTargets = Math.max(1, intMod);
-
-    if (targets.includes(targetName)) {
-        return { error: `${targetName} is already granted Half Cover.` };
-    }
-
-    if (targets.length >= maxTargets) {
-        return { error: `Maximum targets reached (${maxTargets}).` };
-    }
-
-    targets.push(targetName);
-    await setRuntimeValue(playerStats.name, BULWARK_TARGETS_KEY, targets, campaignName);
-
-    return { success: true, targetName, targets };
 }
