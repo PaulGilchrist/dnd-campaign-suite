@@ -1,124 +1,125 @@
 {
-    "name": "Grommok",
-    "level": 20,
-    "alignment": "Neutral Good",
-    "abilities": [
-        {
-            "name": "Strength",
-            "baseScore": 15,
-            "featIncrease": 2,
-            "backgroundIncrease": 1,
-            "miscIncrease": 0
-        },
-        {
-            "name": "Dexterity",
-            "baseScore": 15,
-            "featIncrease": 0,
-            "backgroundIncrease": 1,
-            "miscIncrease": 0
-        },
-        {
-            "name": "Constitution",
-            "baseScore": 15,
-            "featIncrease": 2,
-            "backgroundIncrease": 0,
-            "miscIncrease": 0
-        },
-        {
-            "name": "Intelligence",
-            "baseScore": 8,
-            "featIncrease": 0,
-            "backgroundIncrease": 0,
-            "miscIncrease": 0
-        },
-        {
-            "name": "Wisdom",
-            "baseScore": 8,
-            "featIncrease": 0,
-            "backgroundIncrease": 0,
-            "miscIncrease": 0
-        },
-        {
-            "name": "Charisma",
-            "baseScore": 8,
-            "featIncrease": 0,
-            "backgroundIncrease": 1,
-            "miscIncrease": 0
-        }
-    ],
-    "background": "Entertainer",
-    "class": {
-        "name": "Fighter",
-        "subclass": {
-            "name": "Champion",
-            "type": ""
-        },
-        "divineOrder": "",
-        "primalOrder": "",
-        "fightingStyles": [
-            "Defense",
-            "Protection"
-        ]
+  "name": "Grommok",
+  "level": 20,
+  "alignment": "Neutral Good",
+  "abilities": [
+    {
+      "name": "Strength",
+      "baseScore": 15,
+      "featIncrease": 2,
+      "backgroundIncrease": 1,
+      "miscIncrease": 0
     },
-    "expertSkills": [],
-    "feats": [],
-    "race": {
-        "name": "Orc",
-        "subrace": {
-            "name": ""
-        }
+    {
+      "name": "Dexterity",
+      "baseScore": 15,
+      "featIncrease": 0,
+      "backgroundIncrease": 1,
+      "miscIncrease": 0
     },
-    "immunities": [],
-    "inventory": {
-        "backpack": [
-            "Fishing Tackle",
-            "Grappling Hook",
-            "Playing Card Set",
-            "Rations (5 days)",
-            "Rope",
-            "Silk (50 feet)",
-            "String",
-            "Waterskin"
-        ],
-        "equipped": [
-            "Longbow",
-            "Shield",
-            "Plate Armor",
-            "Longsword"
-        ],
-        "gold": 10,
-        "magicItems": []
+    {
+      "name": "Constitution",
+      "baseScore": 15,
+      "featIncrease": 2,
+      "backgroundIncrease": 0,
+      "miscIncrease": 0
     },
-    "languages": [
-        "Common",
-        "Orc"
-    ],
-    "resistances": [
-        "Poison"
-    ],
-    "skillProficiencies": [
-        "Athletics",
-        "Intimidation",
-        "Perception",
-        "Survival"
-    ],
-    "specialActions": [],
-    "spells": [
-        "Fire Bolt",
-        "Mage Hand",
-        "Feather Fall",
-        "Jump",
-        "Magic Missile",
-        "Shield"
-    ],
-    "rules": "2024",
-    "xp": 0,
-    "xpMode": "milestone",
-    "imagePath": "campaigns/2024 Testing/images/Grommok.png",
-    "originalFileName": "Grommok.json",
-    "featAbilityChoices": {
-        "0": "Strength",
-        "1": "Strength",
-        "2": "Strength"
+    {
+      "name": "Intelligence",
+      "baseScore": 8,
+      "featIncrease": 0,
+      "backgroundIncrease": 0,
+      "miscIncrease": 0
+    },
+    {
+      "name": "Wisdom",
+      "baseScore": 8,
+      "featIncrease": 0,
+      "backgroundIncrease": 0,
+      "miscIncrease": 0
+    },
+    {
+      "name": "Charisma",
+      "baseScore": 8,
+      "featIncrease": 0,
+      "backgroundIncrease": 1,
+      "miscIncrease": 0
     }
+  ],
+  "background": "Entertainer",
+  "class": {
+    "name": "Fighter",
+    "subclass": {
+      "name": "Champion",
+      "type": ""
+    },
+    "divineOrder": "",
+    "primalOrder": "",
+    "fightingStyles": [
+      "Archery",
+      "Interception"
+    ]
+  },
+  "expertSkills": [],
+  "feats": [],
+  "fightingStyles": [],
+  "race": {
+    "name": "Orc",
+    "subrace": {
+      "name": ""
+    }
+  },
+  "immunities": [],
+  "inventory": {
+    "backpack": [
+      "Fishing Tackle",
+      "Grappling Hook",
+      "Playing Card Set",
+      "Rations (5 days)",
+      "Rope",
+      "Silk (50 feet)",
+      "String",
+      "Waterskin"
+    ],
+    "equipped": [
+      "Longbow",
+      "Shield",
+      "Plate Armor",
+      "Longsword"
+    ],
+    "gold": 10,
+    "magicItems": []
+  },
+  "languages": [
+    "Common",
+    "Orc"
+  ],
+  "resistances": [
+    "Poison"
+  ],
+  "skillProficiencies": [
+    "Athletics",
+    "Intimidation",
+    "Perception",
+    "Survival"
+  ],
+  "specialActions": [],
+  "spells": [
+    "Fire Bolt",
+    "Mage Hand",
+    "Feather Fall",
+    "Jump",
+    "Magic Missile",
+    "Shield"
+  ],
+  "rules": "2024",
+  "xp": 0,
+  "xpMode": "milestone",
+  "imagePath": "campaigns/2024 Testing/images/Grommok.png",
+  "originalFileName": "Grommok.json",
+  "featAbilityChoices": {
+    "0": "Strength",
+    "1": "Strength",
+    "2": "Strength"
+  }
 }

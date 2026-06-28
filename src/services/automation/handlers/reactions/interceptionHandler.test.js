@@ -173,7 +173,7 @@ describe('interceptionHandler', () => {
             const action = makeAction();
             const ps = makePlayerStats({
                 inventory: { equipped: ['Shield'] },
-                equipment: [{ name: 'Shield', equipment_category: 'Shield' }],
+                equipment: [{ name: 'Shield', armor_category: 'Shield' }],
             });
 
             const result = await handle(action, ps, campaignName, mapName);
@@ -188,7 +188,7 @@ describe('interceptionHandler', () => {
             const action = makeAction();
             const ps = makePlayerStats({
                 inventory: { equipped: ['Shield'] },
-                equipment: [{ name: 'Shield', equipment_category: 'Shield' }],
+                equipment: [{ name: 'Shield', armor_category: 'Shield' }],
             });
             rangeValidation.getDistanceFeet.mockReturnValue(10);
 
@@ -204,7 +204,7 @@ describe('interceptionHandler', () => {
             const action = makeAction();
             const ps = makePlayerStats({
                 inventory: { equipped: ['Shield'] },
-                equipment: [{ name: 'Shield', equipment_category: 'Shield' }],
+                equipment: [{ name: 'Shield', armor_category: 'Shield' }],
             });
             diceRoller.rollExpression.mockReturnValue({ total: 7, rolls: [7], modifier: 0 });
 
@@ -220,7 +220,7 @@ describe('interceptionHandler', () => {
             const action = makeAction();
             const ps = makePlayerStats({
                 inventory: { equipped: ['Shield'] },
-                equipment: [{ name: 'Shield', equipment_category: 'Shield' }],
+                equipment: [{ name: 'Shield', armor_category: 'Shield' }],
                 proficiency: 6,
             });
             diceRoller.rollExpression.mockReturnValue({ total: 3, rolls: [3], modifier: 0 });
@@ -234,7 +234,7 @@ describe('interceptionHandler', () => {
             const action = makeAction();
             const ps = makePlayerStats({
                 inventory: { equipped: ['Shield'] },
-                equipment: [{ name: 'Shield', equipment_category: 'Shield' }],
+                equipment: [{ name: 'Shield', armor_category: 'Shield' }],
             });
             diceRoller.rollExpression.mockReturnValue({ total: 12, rolls: [12], modifier: 0 });
 
@@ -247,7 +247,7 @@ describe('interceptionHandler', () => {
             const action = makeAction();
             const ps = makePlayerStats({
                 inventory: { equipped: ['Shield'] },
-                equipment: [{ name: 'Shield', equipment_category: 'Shield' }],
+                equipment: [{ name: 'Shield', armor_category: 'Shield' }],
             });
             diceRoller.rollExpression.mockReturnValue({ total: 8, rolls: [8], modifier: 0 });
 
@@ -276,7 +276,7 @@ describe('interceptionHandler', () => {
             });
             const ps = makePlayerStats({
                 inventory: { equipped: ['Shield'] },
-                equipment: [{ name: 'Shield', equipment_category: 'Shield' }],
+                equipment: [{ name: 'Shield', armor_category: 'Shield' }],
             });
             diceRoller.rollExpression.mockReturnValue({ total: 4, rolls: [4], modifier: 0 });
 
@@ -296,7 +296,7 @@ describe('interceptionHandler', () => {
             const action = makeAction();
             const ps = makePlayerStats({
                 inventory: { equipped: ['Shield'] },
-                equipment: [{ name: 'Shield', equipment_category: 'Shield' }],
+                equipment: [{ name: 'Shield', armor_category: 'Shield' }],
             });
 
             await handle(action, ps, campaignName, mapName);
@@ -318,7 +318,7 @@ describe('interceptionHandler', () => {
             const action = makeAction();
             const ps = makePlayerStats({
                 inventory: { equipped: ['Shield'] },
-                equipment: [{ name: 'Shield', equipment_category: 'Shield' }],
+                equipment: [{ name: 'Shield', armor_category: 'Shield' }],
             });
 
             await handle(action, ps, campaignName, mapName);
@@ -340,7 +340,7 @@ describe('interceptionHandler', () => {
             const action = makeAction();
             const ps = makePlayerStats({
                 inventory: { equipped: ['Shield'] },
-                equipment: [{ name: 'Shield', equipment_category: 'Shield' }],
+                equipment: [{ name: 'Shield', armor_category: 'Shield' }],
             });
             damageRollback.findLastAttack.mockResolvedValue({
                 attackEvent: null,
@@ -362,7 +362,7 @@ describe('interceptionHandler', () => {
             const action = makeAction();
             const ps = makePlayerStats({
                 inventory: { equipped: ['Shield'] },
-                equipment: [{ name: 'Shield', equipment_category: 'Shield' }],
+                equipment: [{ name: 'Shield', armor_category: 'Shield' }],
             });
             damageRollback.findLastAttack.mockResolvedValue({
                 attackEvent: { d20: 15, bonus: 5, hit: true, targetAc: 16 },
@@ -386,7 +386,7 @@ describe('interceptionHandler', () => {
             const action = makeAction();
             const ps = makePlayerStats({
                 inventory: { equipped: ['Shield'] },
-                equipment: [{ name: 'Shield', equipment_category: 'Shield' }],
+                equipment: [{ name: 'Shield', armor_category: 'Shield' }],
             });
             damageUtils.getCombatContext.mockResolvedValue(null);
 
@@ -402,7 +402,7 @@ describe('interceptionHandler', () => {
             const action = makeAction();
             const ps = makePlayerStats({
                 inventory: { equipped: ['Shield'] },
-                equipment: [{ name: 'Shield', equipment_category: 'Shield' }],
+                equipment: [{ name: 'Shield', armor_category: 'Shield' }],
             });
             targetResolver.resolveTarget.mockResolvedValue({});
 

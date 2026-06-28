@@ -166,7 +166,7 @@ function hasShield(playerStats) {
         const { baseName } = parseMagicItemName(itemName);
         const item = playerStats.equipment?.find(e => e.name === baseName);
         if (item) {
-            if (item.equipment_category === 'Shield') return true;
+            if (item.armor_category === 'Shield') return true;
         }
     }
     return false;
@@ -209,7 +209,7 @@ export async function handle(action, playerStats, campaignName, mapName) {
 
     const bardicUsesMax = !auto.uses_expression
         ? (playerStats?.class?.class_levels?.[(playerStats.level || 1) - 1]?.bardic_inspiration_uses
-            ?? (playerStats.proficiency || 0))
+            ?? 0)
         : 0;
 
     const effectiveUsesMax = usesMax || bardicUsesMax;
@@ -281,8 +281,48 @@ export async function handle(action, playerStats, campaignName, mapName) {
     let result;
 
     if (effect === 'disadvantage_on_attacks_vs_ally') {
-        const defenderName = targetInfo.target.name;
+        const attackResult = await findLastAttack(campaignName);
+        const attackEvent = attackResult.attackEvent;
+        if (!attackEvent) {
+            return infoPopup(action.name, `No recent attack found. ${action.name} can only be used after an attack roll.`, auto);
+        }
+
+        const lastAttackerName = attackResult.attackerName;
+        const defenderName = attackEvent.targetName;
+        if (!defenderName) {
+            return infoPopup(action.name, `Could not determine who was attacked. Cannot apply ${action.name}.`, auto);
+        }
+
+        const rangeFt = rangeToFeet(auto.range || '5_ft');
+        if (mapName && rangeFt != null) {
+            const positions = await resolveMapPositions(campaignName, mapName, playerName);
+            if (positions?.attackerPos && positions?.targetPos) {
+                const dist = getDistanceFeet(positions.attackerPos, positions.targetPos);
+                if (dist != null && dist > rangeFt) {
+                    return infoPopup(action.name, `${lastAttackerName} is out of range (${Math.round(dist)} ft > ${rangeFt} ft).`, auto);
+                }
+            }
+        }
+
         const duration = auto.duration || 'until_start_of_next_turn';
+
+        const storedEffects = getRuntimeValue(campaignName, 'targetEffects') || [];
+        const protectionEffect = {
+            effect: 'protection',
+            target: defenderName,
+            source: playerName,
+            duration: duration,
+            timestamp: Date.now(),
+        };
+        const existingIndex = storedEffects.findIndex(
+            te => te.effect === 'protection' && te.target === defenderName
+        );
+        if (existingIndex === -1) {
+            storedEffects.push(protectionEffect);
+        } else {
+            storedEffects[existingIndex] = protectionEffect;
+        }
+        await setRuntimeValue(campaignName, 'targetEffects', storedEffects, campaignName);
 
         await setRuntimeValue(defenderName, 'protectionBuff', {
             source: playerName,
@@ -290,49 +330,75 @@ export async function handle(action, playerStats, campaignName, mapName) {
             timestamp: Date.now(),
         }, campaignName);
 
-        const description = `<b>${action.name}</b><br/>You interpose your Shield. ${attackerName} and all other creatures have Disadvantage on attack rolls against ${defenderName} until the start of your next turn.`;
-
-        result = {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: action.name,
-                description,
-                automation: auto,
-            },
-        };
-    } else if (effect === 'disadvantage_on_attack_roll') {
-        const attackResult = await findLastAttack(campaignName);
-        const attackEvent = attackResult.attackEvent;
-    if (!attackEvent || attackResult.attackerName !== attackerName) {
-            return infoPopup(action.name, `No recent attack roll found for ${attackerName}. ${action.name} can only be used shortly after an attack roll.`, auto);
-        }
-        result = await handleDisadvantageDebuff(action, playerStats, campaignName, attackerName, combatSummary);
+        result = await handleDisadvantageDebuff(action, playerStats, campaignName, lastAttackerName, combatSummary);
     } else {
-        const classLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level);
-        const bardicDieSize = classLevel?.bardic_die || 6;
-        const biDieRoll = Math.floor(Math.random() * bardicDieSize) + 1;
-
-        const attackResult = await findLastAttack(campaignName);
-        const attackEvent = attackResult.attackEvent;
-        const hasAttack = attackEvent && attackResult.attackerName === attackerName;
-
-        if (!hasAttack) {
+        const targetInfo = await resolveTarget(campaignName, playerName);
+        if (!targetInfo?.target) {
             return {
                 type: 'popup',
                 payload: {
                     type: 'automation_info',
                     name: featureName,
-                    description: `No recent roll found for ${attackerName} (attack, damage, or ability check). ${featureName} must be used shortly after the roll.`,
+                    description: `${featureName} requires a target. Select a creature in combat and try again.`,
                     automation: auto,
                 },
             };
         }
 
-        if (attackEvent?.damageTypes?.length || attackResult.totalDamage > 0) {
-            result = await handleDamageDebuff(action, playerStats, campaignName, attackerName, bardicDieSize, biDieRoll, combatSummary);
+        const attackerName = targetInfo.target.name;
+        const rangeFt = rangeToFeet(auto.range || '60_ft');
+
+        if (mapName && rangeFt != null) {
+            const positions = await resolveMapPositions(campaignName, mapName, playerName);
+            if (positions?.attackerPos && positions?.targetPos) {
+                const dist = getDistanceFeet(positions.attackerPos, positions.targetPos);
+                if (dist != null && dist > rangeFt) {
+                    return {
+                        type: 'popup',
+                        payload: {
+                            type: 'automation_info',
+                            name: featureName,
+                            description: `${attackerName} is out of range (${Math.round(dist)} ft > ${rangeFt} ft).`,
+                            automation: auto,
+                        },
+                    };
+                }
+            }
+        }
+
+        if (effect === 'disadvantage_on_attack_roll') {
+            const attackResult = await findLastAttack(campaignName);
+            const attackEvent = attackResult.attackEvent;
+            if (!attackEvent || attackResult.attackerName !== attackerName) {
+                return infoPopup(action.name, `No recent attack roll found for ${attackerName}. ${action.name} can only be used shortly after an attack roll.`, auto);
+            }
+            result = await handleDisadvantageDebuff(action, playerStats, campaignName, attackerName, combatSummary);
         } else {
-            result = await handleAttackRollDebuff(action, playerStats, campaignName, attackerName, bardicDieSize, biDieRoll, combatSummary);
+            const classLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level);
+            const bardicDieSize = classLevel?.bardic_die || 6;
+            const biDieRoll = Math.floor(Math.random() * bardicDieSize) + 1;
+
+            const attackResult = await findLastAttack(campaignName);
+            const attackEvent = attackResult.attackEvent;
+            const hasAttack = attackEvent && attackResult.attackerName === attackerName;
+
+            if (!hasAttack) {
+                return {
+                    type: 'popup',
+                    payload: {
+                        type: 'automation_info',
+                        name: featureName,
+                        description: `No recent roll found for ${attackerName} (attack, damage, or ability check). ${featureName} must be used shortly after the roll.`,
+                        automation: auto,
+                    },
+                };
+            }
+
+            if (attackEvent?.damageTypes?.length || attackResult.totalDamage > 0) {
+                result = await handleDamageDebuff(action, playerStats, campaignName, attackerName, bardicDieSize, biDieRoll, combatSummary);
+            } else {
+                result = await handleAttackRollDebuff(action, playerStats, campaignName, attackerName, bardicDieSize, biDieRoll, combatSummary);
+            }
         }
     }
 
@@ -342,12 +408,13 @@ export async function handle(action, playerStats, campaignName, mapName) {
     }
 
     if (effect === 'disadvantage_on_attacks_vs_ally') {
+        const defenderName = result?.defenderName || 'the target';
         addEntry(campaignName, {
             type: 'ability_use',
             characterName: playerName,
             abilityName: featureName,
-            description: `${playerName} used ${featureName} to impose Disadvantage on attacks against ${targetInfo.target.name}.`,
-            targetName: targetInfo.target.name,
+            description: `${playerName} used ${featureName} to impose Disadvantage on attacks against ${defenderName}.`,
+            targetName: defenderName,
             timestamp: Date.now(),
         }).catch((e) => { console.error("[reactionDebuff] Error:", e); });
         return result;

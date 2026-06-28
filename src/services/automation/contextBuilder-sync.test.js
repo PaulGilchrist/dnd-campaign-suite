@@ -62,10 +62,6 @@ vi.mock('../combat/auras/auraOfProtection.js', () => ({
   hasAuraOfProtection: vi.fn(),
 }));
 
-vi.mock('../combat/auras/protectionBuffUtils.js', () => ({
-  hasProtectionBuff: vi.fn(),
-}));
-
 vi.mock('./handlers/class-cleric-paladin/avengingAngelHandler.js', () => ({
   isActive: vi.fn(),
   isAuraTarget: vi.fn(),
@@ -77,7 +73,6 @@ const { getWolfAdvantageAgainst } = await import('../combat/auras/wolfAuraUtils.
 const { getDuplicityAdvantageAgainst } = await import('../combat/auras/duplicityAuraUtils.js');
 const { getLionDisadvantageAgainst } = await import('../combat/auras/lionAuraUtils.js');
 const { getCoronaSaveDisadvantage } = await import('../combat/auras/coronaAuraUtils.js');
-const { hasProtectionBuff } = await import('../combat/auras/protectionBuffUtils.js');
 const { isActive: isAvengingAngelActive, isAuraTarget } = await import(
   './handlers/class-cleric-paladin/avengingAngelHandler.js'
 );
@@ -126,7 +121,6 @@ function defaultAuraMocks() {
   getDuplicityAdvantageAgainst.mockReturnValue({ advantage: false });
   getLionDisadvantageAgainst.mockReturnValue({ disadvantage: false });
   getCoronaSaveDisadvantage.mockReturnValue({ disadvantage: false });
-  hasProtectionBuff.mockReturnValue(false);
   getInnateSorceryBonus.mockReturnValue({ spellAdvantage: false, saveDcBonus: 0 });
   isAvengingAngelActive.mockReturnValue(false);
   isAuraTarget.mockReturnValue(false);
@@ -727,7 +721,10 @@ describe('contextBuilder: buildAttackContextSync', () => {
     });
 
     it('sets disadvantage when protection buff is on target', async () => {
-      hasProtectionBuff.mockReturnValue(true);
+      getRuntimeValue.mockImplementation((name, key) => {
+        if (key === 'targetEffects') return [{ effect: 'protection', target: 'Orc', source: 'Paladin' }];
+        return undefined;
+      });
 
       const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal', {});
 
@@ -740,7 +737,10 @@ describe('contextBuilder: buildAttackContextSync', () => {
         targetName: null,
         resistanceNotice: null,
       });
-      hasProtectionBuff.mockReturnValue(true);
+      getRuntimeValue.mockImplementation((name, key) => {
+        if (key === 'targetEffects') return [{ effect: 'protection', target: 'Goblin', source: 'Paladin' }];
+        return undefined;
+      });
 
       const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal', {});
 
@@ -1343,10 +1343,10 @@ describe('contextBuilder: buildAttackContextSync', () => {
     it('all advantage sources are checked before any disadvantage sources', async () => {
       getRuntimeValue.mockImplementation((name, key) => {
         if (key === 'activeBuffs') return [{ effect: 'advantage_attacks_disadvantage_against' }];
+        if (key === 'targetEffects') return [{ effect: 'protection', target: 'Orc', source: 'Paladin' }];
         return undefined;
       });
       getLionDisadvantageAgainst.mockReturnValue({ disadvantage: true });
-      hasProtectionBuff.mockReturnValue(true);
       getCoronaSaveDisadvantage.mockReturnValue({ disadvantage: true });
 
       const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal', {});

@@ -195,6 +195,7 @@ const categories2024 = {
     ],
 
     reactions: [
+        "Protection"
     ],
 
     characterAdvancement: [

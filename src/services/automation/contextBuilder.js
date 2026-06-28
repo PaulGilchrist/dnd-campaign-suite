@@ -11,7 +11,6 @@ import { getDuplicityAdvantageAgainst } from '../combat/auras/duplicityAuraUtils
 import { getLionDisadvantageAgainst } from '../combat/auras/lionAuraUtils.js';
 import { getCoronaSaveDisadvantage } from '../combat/auras/coronaAuraUtils.js';
 import { hasAuraOfProtection } from '../combat/auras/auraOfProtection.js';
-import { hasProtectionBuff } from '../combat/auras/protectionBuffUtils.js';
 import { isActive as isAvengingAngelActive, isAuraTarget } from '../automation/handlers/class-cleric-paladin/avengingAngelHandler.js';
 import { collectWeaponMastery } from '../combat/automation/automationService.js';
 
@@ -201,11 +200,6 @@ export function buildAttackContextSync(attack, playerStats, campaignName, condit
             }
         }
         if (forcedMode === undefined && targetName) {
-            if (hasProtectionBuff(targetName, campaignName)) {
-                forcedMode = 'disadvantage';
-            }
-        }
-        if (forcedMode === undefined && targetName) {
             const storedEffects = getRuntimeValue(campaignName, 'targetEffects') || [];
             const distractingEffect = storedEffects.find(
                 te => te.effect === 'distracting_strike_advantage' && te.target === targetName && te.source !== playerName
@@ -233,6 +227,15 @@ export function buildAttackContextSync(attack, playerStats, campaignName, condit
                 if (cleanedEffects.length !== storedEffects.length) {
                     setRuntimeValue(campaignName, 'targetEffects', cleanedEffects, campaignName);
                 }
+            }
+        }
+        if (forcedMode === undefined && targetName) {
+            const storedEffects = getRuntimeValue(campaignName, 'targetEffects') || [];
+            const protectionEffect = storedEffects.find(
+                te => te.effect === 'protection' && te.target === targetName
+            );
+            if (protectionEffect) {
+                forcedMode = 'disadvantage';
             }
         }
         if (forcedMode === undefined && targetName) {
@@ -400,11 +403,6 @@ export function buildAttackContext(attack, playerStats, campaignName, mapName, c
                 if (lionResult.disadvantage) {
                     base.forcedMode = 'disadvantage';
                 }
-                if (base.forcedMode === undefined && base.targetName) {
-                    if (hasProtectionBuff(base.targetName, campaignName)) {
-                        base.forcedMode = 'disadvantage';
-                    }
-                }
                 const coronaResult = getCoronaSaveDisadvantage({
                     targetName: base.targetName,
                     campaignName,
@@ -448,7 +446,11 @@ export function buildAttackContext(attack, playerStats, campaignName, mapName, c
                     base.forcedMode = 'disadvantage';
                 }
                 if (base.forcedMode === undefined && base.targetName) {
-                    if (hasProtectionBuff(base.targetName, campaignName)) {
+                    const storedEffects = getRuntimeValue(campaignName, 'targetEffects') || [];
+                    const protectionEffect = storedEffects.find(
+                        te => te.effect === 'protection' && te.target === base.targetName
+                    );
+                    if (protectionEffect) {
                         base.forcedMode = 'disadvantage';
                     }
                 }

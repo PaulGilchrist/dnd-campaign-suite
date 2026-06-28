@@ -21,7 +21,6 @@ import { getDuplicityAdvantageAgainst } from '../combat/auras/duplicityAuraUtils
 import { getLionDisadvantageAgainst } from '../combat/auras/lionAuraUtils.js';
 import { getCoronaSaveDisadvantage } from '../combat/auras/coronaAuraUtils.js';
 import { hasAuraOfProtection } from '../combat/auras/auraOfProtection.js';
-import { hasProtectionBuff } from '../combat/auras/protectionBuffUtils.js';
 import { isActive, isAuraTarget } from './handlers/class-cleric-paladin/avengingAngelHandler.js';
 
 vi.mock('./common/damageRoll.js', () => ({
@@ -81,10 +80,6 @@ vi.mock('../combat/auras/coronaAuraUtils.js', () => ({
 
 vi.mock('../combat/auras/auraOfProtection.js', () => ({
   hasAuraOfProtection: vi.fn(),
-}));
-
-vi.mock('../combat/auras/protectionBuffUtils.js', () => ({
-  hasProtectionBuff: vi.fn(),
 }));
 
 vi.mock('./handlers/class-cleric-paladin/avengingAngelHandler.js', () => ({
@@ -148,7 +143,6 @@ function setupDefaults() {
   getDuplicityAdvantageAgainst.mockReturnValue({ advantage: false });
   getLionDisadvantageAgainst.mockReturnValue({ disadvantage: false });
   getCoronaSaveDisadvantage.mockReturnValue({ disadvantage: false });
-  hasProtectionBuff.mockReturnValue(false);
   // Map path defaults
   getCombatContext.mockResolvedValue(null);
   getTargetFromAttacker.mockReturnValue(null);
@@ -790,7 +784,7 @@ describe('contextBuilder: buildAttackContext (map-based)', () => {
       getWolfAdvantageAgainst.mockReturnValue({ advantage: false });
       getDuplicityAdvantageAgainst.mockReturnValue({ advantage: false });
       getLionDisadvantageAgainst.mockReturnValue({ disadvantage: false });
-      hasProtectionBuff.mockReturnValue(true);
+      getRuntimeValue.mockReturnValue([{ effect: 'protection', target: 'Orc', source: 'Paladin' }]);
 
       const result = await buildAttackContext(mockRangedAttack, mockStats, 'camp', 'test-map', 'normal', {});
 
@@ -808,7 +802,6 @@ describe('contextBuilder: buildAttackContext (map-based)', () => {
       getWolfAdvantageAgainst.mockReturnValue({ advantage: false });
       getDuplicityAdvantageAgainst.mockReturnValue({ advantage: false });
       getLionDisadvantageAgainst.mockReturnValue({ disadvantage: false });
-      hasProtectionBuff.mockReturnValue(false);
       getCoronaSaveDisadvantage.mockReturnValue({ disadvantage: true });
 
       const result = await buildAttackContext(mockRangedAttack, mockStats, 'camp', 'test-map', 'normal', {});
@@ -827,7 +820,6 @@ describe('contextBuilder: buildAttackContext (map-based)', () => {
       getWolfAdvantageAgainst.mockReturnValue({ advantage: true });
       getDuplicityAdvantageAgainst.mockReturnValue({ advantage: false });
       getLionDisadvantageAgainst.mockReturnValue({ disadvantage: true });
-      hasProtectionBuff.mockReturnValue(false);
       getCoronaSaveDisadvantage.mockReturnValue({ disadvantage: false });
 
       const result = await buildAttackContext(mockRangedAttack, mockStats, 'camp', 'test-map', 'normal', {});

@@ -142,8 +142,8 @@ describe('featureCategories2024', () => {
       expect(Array.isArray(reactions)).toBe(true);
     });
 
-    it('should be empty (no 2024-specific reactions defined)', () => {
-      expect(reactions).toHaveLength(0);
+    it('should contain 2024-specific reactions', () => {
+      expect(reactions).toContain('Protection');
     });
 
     it('should contain no duplicate entries', () => {

@@ -98,8 +98,19 @@ function RollEntry({ entry }) {
           {!isDamage && !isSaveDamage && !isAoeDamage && entry.rolls?.length === 2 && (
             showBothDice ? (
               <>
-                <span className={`log-die${entry.rolls[0] >= entry.rolls[1] ? ' log-die-selected' : ''}`}>({entry.rolls[0]} high)</span>
-                <span className={`log-die${entry.rolls[1] > entry.rolls[0] ? ' log-die-selected' : ''}`}>({entry.rolls[1]} low)</span>
+                {entry.mode === 'advantage' ? (
+                  <>
+                    <span className={`log-die${entry.rolls[0] >= entry.rolls[1] ? ' log-die-selected' : ''}`}>({entry.rolls[0]} {entry.rolls[0] >= entry.rolls[1] ? 'selected' : 'discarded'})</span>
+                    <span className={`log-die${entry.rolls[1] > entry.rolls[0] ? ' log-die-selected' : ''}`}>({entry.rolls[1]} {entry.rolls[1] > entry.rolls[0] ? 'selected' : 'discarded'})</span>
+                  </>
+                ) : entry.mode === 'disadvantage' ? (
+                  <>
+                    <span className={`log-die${entry.rolls[0] <= entry.rolls[1] ? ' log-die-selected' : ''}`}>({entry.rolls[0]} {entry.rolls[0] <= entry.rolls[1] ? 'selected' : 'discarded'})</span>
+                    <span className={`log-die${entry.rolls[1] < entry.rolls[0] ? ' log-die-selected' : ''}`}>({entry.rolls[1]} {entry.rolls[1] < entry.rolls[0] ? 'selected' : 'discarded'})</span>
+                  </>
+                ) : (
+                  <span className="log-die log-die-selected">({entry.total})</span>
+                )}
               </>
             ) : (
               <span className="log-die log-die-selected">({entry.total})</span>

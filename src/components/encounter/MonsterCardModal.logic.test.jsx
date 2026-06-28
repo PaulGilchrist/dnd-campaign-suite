@@ -109,6 +109,10 @@ vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
   useRuntimeValue: vi.fn((_characterKey, _propertyName, _campaignName) => null),
 }));
 
+vi.mock('../../services/combat/auras/protectionBuffUtils.js', () => ({
+  hasProtectionBuff: vi.fn(() => false),
+}));
+
 // ── Re-import mocked modules for test setup helpers ─────────────────────────
 
 import * as useLoggedDiceRoll from '../../hooks/combat/useLoggedDiceRoll.js';

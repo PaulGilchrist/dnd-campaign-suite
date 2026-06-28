@@ -14,6 +14,7 @@ import { applyGreatWeaponFighting } from '../../rules/core/greatWeaponFighting.j
  * @returns {boolean}
  */
 export function hasPassiveEffect(playerStats, type, effect) {
+    if (!playerStats) return false;
     const passives = playerStats.automation?.passives || [];
     return passives.some(p => p.type === type && p.effect === effect);
 }

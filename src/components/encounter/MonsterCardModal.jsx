@@ -219,7 +219,7 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
       rangeReason,
       autoDamageFormula: extractDamageDiceFromDescription(action?.description, action?.damage_dice_primary) || null,
       autoDamageName: name,
-      autoDamageSecondaryFormula: extractDamageDiceFromDescription(action?.description, action?.damage_dice_secondary) || null,
+      autoDamageSecondaryFormula: action?.damage_dice_secondary || null,
       autoDamageSecondaryName: name,
       autoDamageSecondaryDamageType: action?.damage_type_secondary ? formatDamageTypes([action.damage_type_secondary]) : null,
       targetName: target?.name,

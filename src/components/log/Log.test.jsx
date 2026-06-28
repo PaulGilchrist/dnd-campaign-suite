@@ -1049,10 +1049,10 @@ describe('Log', () => {
 
   // ── showBothDice - two dice display edge cases ───────────────
   describe('RollEntry - showBothDice modes', () => {
-    it('two dice + advantage shows both with high low labels', () => {
-      setup([roll({ rolls: [17, 9], mode: 'adv' })]);
-      expect(screen.getByText(/high/i)).toBeInTheDocument();
-      expect(screen.getByText(/low/i)).toBeInTheDocument();
+    it('two dice + advantage shows both with selected/discarded labels', () => {
+      setup([roll({ rolls: [17, 9], mode: 'advantage' })]);
+      expect(screen.getByText(/selected/i)).toBeInTheDocument();
+      expect(screen.getByText(/discarded/i)).toBeInTheDocument();
     });
   });
 

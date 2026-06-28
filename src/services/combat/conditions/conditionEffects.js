@@ -528,6 +528,9 @@ function computeConditionEffects(conditions = [], saveModifiers = [], targetEffe
     if (te.effect === 'escape_the_horde') {
       effects.targetDisadvantageCount = (effects.targetDisadvantageCount || 0) + 1;
     }
+    if (te.effect === 'protection') {
+      effects.targetDisadvantageCount = (effects.targetDisadvantageCount || 0) + 1;
+    }
     if (te.effect === 'multiattack_defense') {
       effects.targetDisadvantageCount = (effects.targetDisadvantageCount || 0) + 1;
     }

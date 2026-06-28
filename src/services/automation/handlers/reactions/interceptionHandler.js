@@ -15,7 +15,7 @@ function hasShield(playerStats) {
         const { baseName } = parseMagicItemName(itemName);
         const item = playerStats.equipment?.find(e => e.name === baseName);
         if (item) {
-            if (item.equipment_category === 'Shield') return true;
+            if (item.armor_category === 'Shield') return true;
         }
     }
     return false;

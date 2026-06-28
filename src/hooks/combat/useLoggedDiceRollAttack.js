@@ -50,6 +50,16 @@ export function createLogAndShow(deps) {
 
         const effectiveD20 = (context?.d20Floor10 && r1 <= 9) ? 10 : r1;
 
+        const forcedMode = context?.forcedMode || 'normal';
+        let effectiveD20Roll;
+        if (forcedMode === 'advantage') {
+            effectiveD20Roll = Math.max(r1, r2);
+        } else if (forcedMode === 'disadvantage') {
+            effectiveD20Roll = Math.min(r1, r2);
+        } else {
+            effectiveD20Roll = effectiveD20;
+        }
+
         const combatSummary = await loadCombatSummary(campaignName);
 
         // Pre-load maneuver cache for skill check / initiative superiority buttons
@@ -115,7 +125,7 @@ export function createLogAndShow(deps) {
         }
 
         const effectiveAc = target ? targetAc + coverAcBonus + (context?.gloriousDefenseBonus || 0) + (context?.defensiveDuelistBonus || 0) + (context?.baitAndSwitchBonus || 0) + getShieldAcBonus(target.name, campaignName) + getShieldOfFaithAcBonus(target.name, campaignName) : undefined;
-        let hit = isAutoMiss ? false : (target ? (effectiveD20 + bonus >= effectiveAc) : undefined);
+        let hit = isAutoMiss ? false : (target ? (effectiveD20Roll + bonus >= effectiveAc) : undefined);
         const targetName = target?.name || context?.targetName;
         const attackerName = context?.attackerName || characterName;
 
@@ -247,12 +257,12 @@ export function createLogAndShow(deps) {
         if (criticalRange) {
             const match = criticalRange.match(/^(\d+)-(\d+)$/);
             if (match) {
-                const low = parseInt(match[1], 10);
-                const high = parseInt(match[2], 10);
-                rollsInCriticalRange = effectiveD20 >= low && effectiveD20 <= high;
+            const low = parseInt(match[1], 10);
+            const high = parseInt(match[2], 10);
+            rollsInCriticalRange = effectiveD20Roll >= low && effectiveD20Roll <= high;
             }
         }
-        const isCrit = !isAutoMiss && (r1 === 20 || context?.isAutoCrit || rollsInCriticalRange) && (hit || rollsInCriticalRange);
+        const isCrit = !isAutoMiss && (effectiveD20Roll === 20 || context?.isAutoCrit || rollsInCriticalRange) && (hit || rollsInCriticalRange);
 
         const autoDamage = hit && context?.autoDamageFormula ? {
             name: context.autoDamageName || name,
@@ -283,10 +293,10 @@ export function createLogAndShow(deps) {
             name,
             rolls: [r1, r2],
             mode: context?.forcedMode || 'normal',
-            total: r1,
+            total: effectiveD20Roll,
             bonus,
-            isNatural20: r1 === 20,
-            isNatural1: r1 === 1,
+            isNatural20: effectiveD20Roll === 20,
+            isNatural1: effectiveD20Roll === 1,
             targetName,
             targetAc,
             damageType: context?.damageType,
@@ -319,8 +329,8 @@ export function createLogAndShow(deps) {
             forcedMode: context?.forcedMode,
             isAutoCrit: context?.isAutoCrit,
             isCrit,
-            isNatural20: r1 === 20,
-            isNatural1: r1 === 1,
+            isNatural20: effectiveD20Roll === 20,
+            isNatural1: effectiveD20Roll === 1,
             autoDamage,
             autoReroll: context?.autoReroll,
             autoRerollBonus: context?.autoRerollBonus,
@@ -372,8 +382,8 @@ export function createLogAndShow(deps) {
                         : (context?.damageType === 'ranged' ? 'ranged' : 'melee'),
                     isUnarmedStrike: context?.isUnarmedStrike || false,
                     isAutoMiss,
-                    isNatural20: r1 === 20,
-                    isNatural1: r1 === 1,
+                    isNatural20: effectiveD20Roll === 20,
+                    isNatural1: effectiveD20Roll === 1,
                     attackName: name,
                     rollType,
                     damageType: context?.damageType || null,

@@ -895,25 +895,76 @@ const rules = {
                    }
                }
 
-               // 5e-specific: Protection fighting style - add reaction feature
-               if (playerStats.class.fightingStyles && playerStats.class.fightingStyles.includes('Protection')) {
-                   const existingProtection = playerStats.reactions.find(r => r.name === 'Protection');
-                   if (!existingProtection) {
-                       playerStats.reactions.push({
-                           name: 'Protection',
-                           description: 'When a creature you can see attacks a target other than you that is within 5 feet of you, you can use your reaction to impose disadvantage on the attack roll. You must be wielding a shield.',
-                           type: 'protection',
-                           automation: {
-                               type: 'protection',
-                               trigger: 'ally_within_5ft_attacked',
-                               range: '5_ft',
-                               requiresShield: true,
-                               casting_time: '1 reaction',
-                               hasAutomation: true,
-                           },
-                           hasAutomation: true,
-                       });
-                   }
+                // Protection fighting style - add reaction feature
+                if (playerStats.class.fightingStyles && playerStats.class.fightingStyles.includes('Protection')) {
+                    const existingProtection = playerStats.reactions.find(r => r.name === 'Protection');
+                    if (!existingProtection) {
+                        playerStats.reactions.push({
+                            name: 'Protection',
+                            description: 'When a creature you can see attacks a target other than you that is within 5 feet of you, you can use your reaction to impose disadvantage on the attack roll. You must be wielding a shield.',
+                            type: 'protection',
+                            automation: {
+                                type: 'reaction_debuff',
+                                trigger: 'creature_attacks_ally_within_5ft_while_holding_shield',
+                                effect: 'disadvantage_on_attacks_vs_ally',
+                                duration: 'until_start_of_next_turn',
+                                requiresShield: true,
+                                casting_time: '1 reaction',
+                                hasAutomation: true,
+                            },
+                            hasAutomation: true,
+                        });
+                    }
+                  }
+              }
+
+            // 2024: Protection fighting style - add reaction feature
+            if (is2024(playerStats, playerSummary)) {
+                if (playerStats.class.fightingStyles && playerStats.class.fightingStyles.includes('Protection')) {
+                    const existingProtection = playerStats.reactions.find(r => r.name === 'Protection');
+                    if (!existingProtection) {
+                        playerStats.reactions.push({
+                            name: 'Protection',
+                            description: 'When a creature you can see attacks a target other than you that is within 5 feet of you, you can take a Reaction to interpose your Shield if you\'re holding one. You impose Disadvantage on the triggering attack roll and all other attack rolls against the target until the start of your next turn if you remain within 5 feet of the target.',
+                            type: 'protection',
+                            automation: {
+                                type: 'reaction_debuff',
+                                trigger: 'creature_attacks_ally_within_5ft_while_holding_shield',
+                                effect: 'disadvantage_on_attacks_vs_ally',
+                                duration: 'until_start_of_next_turn',
+                                requiresShield: true,
+                                casting_time: '1 reaction',
+                                hasAutomation: true,
+                            },
+                            hasAutomation: true,
+                        });
+                    }
+                }
+            }
+
+            // 2024: Interception fighting style - add reaction feature
+            if (is2024(playerStats, playerSummary)) {
+                if (playerStats.class.fightingStyles && playerStats.class.fightingStyles.includes('Interception')) {
+                    const existingInterception = playerStats.reactions.find(r => r.name === 'Interception');
+                    if (!existingInterception) {
+                        playerStats.reactions.push({
+                            name: 'Interception',
+                            description: 'When a creature you can see hits another creature within 5 feet of you with an attack roll, you can take a Reaction to reduce the damage dealt to the target by 1d10 plus your Proficiency Bonus. You must be holding a Shield or a Simple or Martial weapon to use this Reaction.',
+                            type: 'interception',
+                            automation: {
+                                type: 'damage_reduction',
+                                trigger: 'creature_hits_ally_within_5ft',
+                                reductionExpression: '1d10 + proficiency_bonus',
+                                reaction: true,
+                                target: 'ally',
+                                requiresShieldOrWeapon: true,
+                                casting_time: '1 reaction',
+                                condition: 'interception',
+                                hasAutomation: true,
+                            },
+                            hasAutomation: true,
+                        });
+                    }
                 }
             }
 

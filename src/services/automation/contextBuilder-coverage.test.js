@@ -21,7 +21,6 @@ import { getDuplicityAdvantageAgainst } from '../combat/auras/duplicityAuraUtils
 import { getLionDisadvantageAgainst } from '../combat/auras/lionAuraUtils.js';
 import { getCoronaSaveDisadvantage } from '../combat/auras/coronaAuraUtils.js';
 import { hasAuraOfProtection } from '../combat/auras/auraOfProtection.js';
-import { hasProtectionBuff } from '../combat/auras/protectionBuffUtils.js';
 import { isActive, isAuraTarget } from './handlers/class-cleric-paladin/avengingAngelHandler.js';
 
 vi.mock('./common/damageRoll.js', () => ({
@@ -83,10 +82,6 @@ vi.mock('../combat/auras/auraOfProtection.js', () => ({
   hasAuraOfProtection: vi.fn(),
 }));
 
-vi.mock('../combat/auras/protectionBuffUtils.js', () => ({
-  hasProtectionBuff: vi.fn(),
-}));
-
 vi.mock('./handlers/class-cleric-paladin/avengingAngelHandler.js', () => ({
   isActive: vi.fn(),
   isAuraTarget: vi.fn(),
@@ -146,7 +141,6 @@ function setupDefaults() {
   getDuplicityAdvantageAgainst.mockReturnValue({ advantage: false });
   getLionDisadvantageAgainst.mockReturnValue({ disadvantage: false });
   getCoronaSaveDisadvantage.mockReturnValue({ disadvantage: false });
-  hasProtectionBuff.mockReturnValue(false);
   getCombatContext.mockResolvedValue(null);
   getTargetFromAttacker.mockReturnValue(null);
   getDistanceFeet.mockReturnValue(5);

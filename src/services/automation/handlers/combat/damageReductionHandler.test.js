@@ -87,7 +87,7 @@ describe('damageReductionHandler', () => {
       automationService.evaluateAutoExpression.mockReturnValue(5);
       const ps = makePlayerStats({
         inventory: { equipped: ['Shield'] },
-        equipment: [{ name: 'Shield', equipment_category: 'Shield' }],
+        equipment: [{ name: 'Shield', armor_category: 'Shield' }],
       });
       const action = makeAction({ requiresShield: true, reductionExpression: '2d6' });
 
@@ -101,7 +101,7 @@ describe('damageReductionHandler', () => {
       automationService.evaluateAutoExpression.mockReturnValue(5);
       const ps = makePlayerStats({
         inventory: { equipped: ['+2 Shield'] },
-        equipment: [{ name: 'Shield', equipment_category: 'Shield' }],
+        equipment: [{ name: 'Shield', armor_category: 'Shield' }],
       });
       const action = makeAction({ requiresShield: true, reductionExpression: '2d6' });
 
@@ -140,7 +140,7 @@ describe('damageReductionHandler', () => {
     it('skips invalid inventory items gracefully', async () => {
       const ps = makePlayerStats({
         inventory: { equipped: [null, 42, 'Shield'] },
-        equipment: [{ name: 'Shield', equipment_category: 'Shield' }],
+        equipment: [{ name: 'Shield', armor_category: 'Shield' }],
       });
       const action = makeAction({ requiresShield: true, reductionExpression: '2d6' });
 
@@ -182,7 +182,7 @@ describe('damageReductionHandler', () => {
       automationService.evaluateAutoExpression.mockReturnValue(5);
       const ps = makePlayerStats({
         inventory: { equipped: ['Shield'] },
-        equipment: [{ name: 'Shield', equipment_category: 'Shield' }],
+        equipment: [{ name: 'Shield', armor_category: 'Shield' }],
       });
       const action = makeAction({ requiresShieldOrWeapon: true, reductionExpression: '2d6' });
 
