@@ -304,11 +304,14 @@ export async function applyShortRest(playerStats, campaignName) {
      }
    }
 
-   // Clear active buffs and conditions as part of the atomic batch so SSE echo carries correct final state
-   updates.activeBuffs = [];
-   updates.activeConditions = [];
+    // Clear active buffs and conditions as part of the atomic batch so SSE echo carries correct final state
+    updates.activeBuffs = [];
+    updates.activeConditions = [];
 
-   setRuntimeBatch(name, updates, campaignName)
+    // Reset Psionic Strike once-per-turn flag on short rest
+    updates.psionicStrikeUsedThisTurn = null;
+
+    setRuntimeBatch(name, updates, campaignName)
 
   clearAllExpirationEffects(name, campaignName)
 }
@@ -381,7 +384,10 @@ export async function applyLongRest(playerStats, campaignName) {
      }
    }
 
-   clearAllExpirationEffects(name, campaignName)
+    clearAllExpirationEffects(name, campaignName)
+
+    // Reset Psionic Strike once-per-turn flag on long rest
+    setRuntimeValue(name, 'psionicStrikeUsedThisTurn', null, campaignName, true)
 
     // Reset Uncanny Metabolism tracking on long rest
     setRuntimeValue(name, 'uncannyMetabolismUsed', false, campaignName, true)

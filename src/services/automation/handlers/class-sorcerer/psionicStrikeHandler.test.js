@@ -18,6 +18,23 @@ vi.mock('../../../dice/diceRoller.js', () => ({
     rollExpression: vi.fn(),
 }));
 
+vi.mock('../../../rules/combat/damageUtils.js', () => ({
+    getCombatContext: vi.fn(),
+    getTargetFromAttacker: vi.fn(),
+}));
+
+vi.mock('../../../encounters/combatData.js', () => ({
+    loadCombatSummary: vi.fn(),
+}));
+
+vi.mock('../../../rules/combat/applyDamage.js', () => ({
+    applyDamageToTarget: vi.fn(),
+}));
+
+import { getCombatContext, getTargetFromAttacker } from '../../../rules/combat/damageUtils.js';
+import { loadCombatSummary } from '../../../encounters/combatData.js';
+import { applyDamageToTarget } from '../../../rules/combat/applyDamage.js';
+
 const { getRuntimeValue, setRuntimeValue } = runtimeState;
 const { addEntry } = logService;
 const { rollExpression } = diceRoller;
@@ -56,6 +73,10 @@ function makeRollResult(total, sides = 8) {
 describe('psionicStrikeHandler', () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        getCombatContext.mockResolvedValue({ creatures: [] });
+        getTargetFromAttacker.mockReturnValue({ name: 'Target Goblin' });
+        loadCombatSummary.mockResolvedValue({ creatures: [] });
+        applyDamageToTarget.mockReturnValue(undefined);
     });
 
     describe('resource validation', () => {
@@ -89,11 +110,8 @@ describe('psionicStrikeHandler', () => {
         });
 
         it('uses default max when resources is null', async () => {
-            getRuntimeValue.mockImplementation((player, key) => {
-                if (key === 'psionicEnergy') return 3;
-                return null;
-            });
             getRuntimeValue.mockImplementation((player, key, _campaign) => {
+                if (player === 'characters' && key === 'characters') return [];
                 if (key === 'psionicEnergy') return 3;
                 if (key === 'psionicStrikeUsedThisTurn') return null;
                 return null;
@@ -108,11 +126,13 @@ describe('psionicStrikeHandler', () => {
             );
 
             expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain('Target Goblin');
             expect(result.payload.description).toContain('Psionic Energy: 2/6');
         });
 
         it('uses default max when resource key is missing from resources', async () => {
             getRuntimeValue.mockImplementation((player, key, _campaign) => {
+                if (player === 'characters' && key === 'characters') return [];
                 if (key === 'psionicEnergy') return 3;
                 if (key === 'psionicStrikeUsedThisTurn') return null;
                 return null;
@@ -126,6 +146,7 @@ describe('psionicStrikeHandler', () => {
                 'test-campaign'
             );
 
+            expect(result.payload.description).toContain('Target Goblin');
             expect(result.payload.description).toContain('Psionic Energy: 2/6');
         });
     });
@@ -135,6 +156,7 @@ describe('psionicStrikeHandler', () => {
             getRuntimeValue.mockImplementation((player, key) => {
                 if (key === 'psionicEnergy') return 5;
                 if (key === 'psionicStrikeUsedThisTurn') return 'turn-1';
+                if (key === 'currentTurn') return 'turn-1';
                 return null;
             });
 
@@ -153,6 +175,7 @@ describe('psionicStrikeHandler', () => {
 
         it('does not enforce once-per-turn when oncePerTurn is false', async () => {
             getRuntimeValue.mockImplementation((player, key, _campaign) => {
+                if (player === 'characters' && key === 'characters') return [];
                 if (key === 'psionicEnergy') return 5;
                 return null;
             });
@@ -166,6 +189,7 @@ describe('psionicStrikeHandler', () => {
             );
 
             expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain('Target Goblin');
             expect(result.payload.description).toContain('Force damage');
             expect(setRuntimeValue).toHaveBeenCalledWith(
                 'Test Fighter',
@@ -183,6 +207,7 @@ describe('psionicStrikeHandler', () => {
 
         it('marks turn usage when oncePerTurn is true and not yet used', async () => {
             getRuntimeValue.mockImplementation((player, key) => {
+                if (player === 'characters' && key === 'characters') return [];
                 if (key === 'psionicEnergy') return 5;
                 if (key === 'psionicStrikeUsedThisTurn') return null;
                 if (key === 'currentTurn') return 'turn-3';
@@ -209,6 +234,7 @@ describe('psionicStrikeHandler', () => {
 
         it('uses "unknown" as turn marker when currentTurn runtime value is missing', async () => {
             getRuntimeValue.mockImplementation((player, key) => {
+                if (player === 'characters' && key === 'characters') return [];
                 if (key === 'psionicEnergy') return 5;
                 if (key === 'psionicStrikeUsedThisTurn') return null;
                 if (key === 'currentTurn') return undefined;
@@ -231,6 +257,7 @@ describe('psionicStrikeHandler', () => {
     describe('damage calculation', () => {
         it('rolls die and calculates damage with INT modifier', async () => {
             getRuntimeValue.mockImplementation((player, key, _campaign) => {
+                if (player === 'characters' && key === 'characters') return [];
                 if (key === 'psionicEnergy') return 5;
                 if (key === 'psionicStrikeUsedThisTurn') return null;
                 if (key === 'currentTurn') return 'turn-1';
@@ -242,7 +269,11 @@ describe('psionicStrikeHandler', () => {
             const result = await handle(makeAction(), makePlayerStats(), 'test-campaign');
 
             expect(rollExpression).toHaveBeenCalledWith('1d8');
+            expect(applyDamageToTarget).toHaveBeenCalledWith(
+                expect.anything(), 'Target Goblin', 8, ['Force'], 'test-campaign', [], false, 'Test Fighter'
+            );
             expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain('Target Goblin');
             expect(result.payload.description).toContain('Force damage');
             expect(result.payload.description).toContain('Psionic Energy: 4/8');
             expect(result.payload.description).toContain('+ INT 3');
@@ -250,6 +281,7 @@ describe('psionicStrikeHandler', () => {
 
         it('uses INT modifier of 0 when Intelligence ability is missing', async () => {
             getRuntimeValue.mockImplementation((player, key, _campaign) => {
+                if (player === 'characters' && key === 'characters') return [];
                 if (key === 'psionicEnergy') return 5;
                 if (key === 'psionicStrikeUsedThisTurn') return null;
                 if (key === 'currentTurn') return 'turn-1';
@@ -264,11 +296,13 @@ describe('psionicStrikeHandler', () => {
                 'test-campaign'
             );
 
+            expect(result.payload.description).toContain('Target Goblin');
             expect(result.payload.description).toContain('+ INT 0');
         });
 
         it('applies negative INT modifier', async () => {
             getRuntimeValue.mockImplementation((player, key, _campaign) => {
+                if (player === 'characters' && key === 'characters') return [];
                 if (key === 'psionicEnergy') return 5;
                 if (key === 'psionicStrikeUsedThisTurn') return null;
                 if (key === 'currentTurn') return 'turn-1';
@@ -283,12 +317,14 @@ describe('psionicStrikeHandler', () => {
                 'test-campaign'
             );
 
+            expect(result.payload.description).toContain('Target Goblin');
             expect(result.payload.description).toContain('+ INT -2');
             expect(result.payload.description).toContain('Psionic Energy: 4/8');
         });
 
         it('uses psionicDieSize as fallback when rollExpression returns null', async () => {
             getRuntimeValue.mockImplementation((player, key, _campaign) => {
+                if (player === 'characters' && key === 'characters') return [];
                 if (key === 'psionicEnergy') return 5;
                 if (key === 'psionicStrikeUsedThisTurn') return null;
                 if (key === 'currentTurn') return 'turn-1';
@@ -299,11 +335,13 @@ describe('psionicStrikeHandler', () => {
 
             const result = await handle(makeAction(), makePlayerStats(), 'test-campaign');
 
+            expect(result.payload.description).toContain('Target Goblin');
             expect(result.payload.description).toContain('Rolled 8 for 8');
         });
 
         it('uses psionicDieSize as fallback when dieRoll.total is falsy', async () => {
             getRuntimeValue.mockImplementation((player, key, _campaign) => {
+                if (player === 'characters' && key === 'characters') return [];
                 if (key === 'psionicEnergy') return 5;
                 if (key === 'psionicStrikeUsedThisTurn') return null;
                 if (key === 'currentTurn') return 'turn-1';
@@ -314,6 +352,7 @@ describe('psionicStrikeHandler', () => {
 
             const result = await handle(makeAction(), makePlayerStats(), 'test-campaign');
 
+            expect(result.payload.description).toContain('Target Goblin');
             expect(result.payload.description).toContain('Rolled 8 for 8');
         });
     });
@@ -323,6 +362,7 @@ describe('psionicStrikeHandler', () => {
             it(`uses 1d${expectedDie} for level ${level}`, async () => {
                 const playerStats = makePlayerStats({ level });
                 getRuntimeValue.mockImplementation((player, key, _campaign) => {
+                    if (player === 'characters' && key === 'characters') return [];
                     if (key === 'psionicEnergy') return 8;
                     if (key === 'psionicStrikeUsedThisTurn') return null;
                     if (key === 'currentTurn') return 'turn-1';
@@ -346,6 +386,7 @@ describe('psionicStrikeHandler', () => {
     describe('logging', () => {
         it('calls addEntry with ability_use log entry', async () => {
             getRuntimeValue.mockImplementation((player, key, _campaign) => {
+                if (player === 'characters' && key === 'characters') return [];
                 if (key === 'psionicEnergy') return 5;
                 if (key === 'psionicStrikeUsedThisTurn') return null;
                 if (key === 'currentTurn') return 'turn-1';
@@ -364,8 +405,31 @@ describe('psionicStrikeHandler', () => {
             }));
         });
 
+        it('calls addEntry with damage_roll log entry', async () => {
+            getRuntimeValue.mockImplementation((player, key, _campaign) => {
+                if (player === 'characters' && key === 'characters') return [];
+                if (key === 'psionicEnergy') return 5;
+                if (key === 'psionicStrikeUsedThisTurn') return null;
+                if (key === 'currentTurn') return 'turn-1';
+                return null;
+            });
+            rollExpression.mockReturnValue(makeRollResult(5));
+            setRuntimeValue.mockResolvedValue(undefined);
+
+            await handle(makeAction(), makePlayerStats(), 'test-campaign');
+
+            expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
+                type: 'damage_roll',
+                characterName: 'Test Fighter',
+                targetName: 'Target Goblin',
+                damageType: 'Force',
+                total: 8,
+            }));
+        });
+
         it('handles addEntry failure gracefully', async () => {
             getRuntimeValue.mockImplementation((player, key, _campaign) => {
+                if (player === 'characters' && key === 'characters') return [];
                 if (key === 'psionicEnergy') return 5;
                 if (key === 'psionicStrikeUsedThisTurn') return null;
                 if (key === 'currentTurn') return 'turn-1';
@@ -378,6 +442,7 @@ describe('psionicStrikeHandler', () => {
             const result = await handle(makeAction(), makePlayerStats(), 'test-campaign');
 
             expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain('Target Goblin');
             expect(result.payload.description).toContain('Force damage');
         });
     });
@@ -385,6 +450,7 @@ describe('psionicStrikeHandler', () => {
     describe('result structure', () => {
         it('returns popup with correct payload shape', async () => {
             getRuntimeValue.mockImplementation((player, key, _campaign) => {
+                if (player === 'characters' && key === 'characters') return [];
                 if (key === 'psionicEnergy') return 5;
                 if (key === 'psionicStrikeUsedThisTurn') return null;
                 if (key === 'currentTurn') return 'turn-1';
@@ -398,9 +464,60 @@ describe('psionicStrikeHandler', () => {
             expect(result.type).toBe('popup');
             expect(result.payload.type).toBe('automation_info');
             expect(result.payload.name).toBe('Psionic Strike');
+            expect(result.payload.targetName).toBe('Target Goblin');
             expect(result.payload.automationType).toBe('psionic_strike');
             expect(result.payload.automation).toEqual(DEFAULT_ACTION.automation);
             expect(typeof result.payload.description).toBe('string');
+        });
+    });
+
+    describe('target resolution', () => {
+        it('returns error popup when no combat context exists', async () => {
+            getCombatContext.mockResolvedValue(null);
+            getRuntimeValue.mockImplementation((player, key) => {
+                if (key === 'psionicEnergy') return 5;
+                return null;
+            });
+
+            const result = await handle(makeAction(), makePlayerStats(), 'test-campaign');
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain('No target available');
+            expect(setRuntimeValue).not.toHaveBeenCalled();
+            expect(rollExpression).not.toHaveBeenCalled();
+            expect(addEntry).not.toHaveBeenCalled();
+        });
+
+        it('returns error popup when no target found in combat', async () => {
+            getTargetFromAttacker.mockReturnValue(null);
+            getRuntimeValue.mockImplementation((player, key) => {
+                if (key === 'psionicEnergy') return 5;
+                return null;
+            });
+
+            const result = await handle(makeAction(), makePlayerStats(), 'test-campaign');
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain('No target available');
+            expect(setRuntimeValue).not.toHaveBeenCalled();
+            expect(rollExpression).not.toHaveBeenCalled();
+            expect(addEntry).not.toHaveBeenCalled();
+        });
+
+        it('returns error popup when target name is missing', async () => {
+            getTargetFromAttacker.mockReturnValue({ name: null });
+            getRuntimeValue.mockImplementation((player, key) => {
+                if (key === 'psionicEnergy') return 5;
+                return null;
+            });
+
+            const result = await handle(makeAction(), makePlayerStats(), 'test-campaign');
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain('No target available');
+            expect(setRuntimeValue).not.toHaveBeenCalled();
+            expect(rollExpression).not.toHaveBeenCalled();
+            expect(addEntry).not.toHaveBeenCalled();
         });
     });
 });

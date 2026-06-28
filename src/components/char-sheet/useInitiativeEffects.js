@@ -14,6 +14,9 @@ export default function useInitiativeEffects(playerStats, campaignName, rollDama
             // Reset Action Surge once-per-turn flag at the start of each turn
             updates.actionSurgeUsedThisRound = null;
 
+            // Reset Psionic Strike once-per-turn flag on initiative (new combat)
+            updates.psionicStrikeUsedThisTurn = null;
+
             // Reset Relentless (Battle Master level 15) when the player rolls initiative
             const hasRelentless = (playerStats.automation?.passives ?? []).some(p => p.type === 'passive_rule' && p.effect === 'relentless');
             if (hasRelentless) {
