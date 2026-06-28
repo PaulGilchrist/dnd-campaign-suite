@@ -160,7 +160,7 @@ describe('attackCalc', () => {
         extraDamageLabel: 'Dueling Fighting Style (2)',
       });
 
-      expect(result.damage).toBe('1d8+3+2');
+      expect(result.damage).toBe('1d8+5');
       expect(result.damageFormula).toContain('Dueling Fighting Style (2)');
     });
 
@@ -225,7 +225,7 @@ describe('attackCalc', () => {
         extraDamageLabel: 'Two-Weapon Fighting Style (3)',
       });
 
-      expect(result.damage).toBe('1d8+1+3');
+      expect(result.damage).toBe('1d8+4');
       expect(result.hitBonus).toBe(6);
     });
 
@@ -562,7 +562,7 @@ describe('attackCalc', () => {
       });
       const result = getAttacks(allEquipment, [], playerStats);
       expect(result[0].hitBonus).toBe(8);
-      expect(result[0].damage).toBe('1d8+3+2');
+      expect(result[0].damage).toBe('1d8+5');
       expect(result[0].hitBonusFormula).toContain('Blessed Warrior (2)');
       expect(result[0].damageFormula).toContain('Dueling');
     });
@@ -583,7 +583,7 @@ describe('attackCalc', () => {
         class: { name: 'Fighter', fightingStyles: ['Dueling'] },
       });
       const result = getAttacks(allEquipment, [], playerStats);
-      expect(result[0].damage).toBe('1d8+3+2');
+      expect(result[0].damage).toBe('1d8+5');
     });
 
     it('should not apply Dueling when two melee weapons equipped', () => {

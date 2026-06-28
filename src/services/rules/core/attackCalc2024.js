@@ -52,9 +52,12 @@ export function getAttacks(allEquipment, allSpells, playerStats) {
         const hasBlessedWarrior = fightingStyles2024.includes('Blessed Warrior');
         const hasDruidicWarrior = fightingStyles2024.includes('Druidic Warrior');
         if (mainHandWeapon) {
+            const isDueling = fightingStyles2024.includes('Dueling') && meleeWeaponNames.length === 1 && rangedWeapons.length === 0;
             const blessedWarriorHitBonus = hasBlessedWarrior ? 2 : 0;
             const druidicWarriorDamage = hasDruidicWarrior ? '+2' : '';
             const druidicWarriorLabel = hasDruidicWarrior ? 'Druidic Warrior (2)' : '';
+            const combinedExtraDamage = [isDueling ? '+2' : '', druidicWarriorDamage].filter(Boolean).join(' + ');
+            const combinedExtraDamageLabel = [isDueling ? 'Dueling Fighting Style (2)' : '', druidicWarriorLabel].filter(Boolean).join(' + ') || '';
             attacks.push(buildWeaponAttack({
                 weapon: mainHandWeapon,
                 weaponName: mainHandName,
@@ -63,8 +66,8 @@ export function getAttacks(allEquipment, allSpells, playerStats) {
                 proficiency,
                 actionType: 'Action',
                 weaponType: 'melee',
-                extraDamage: druidicWarriorDamage,
-                extraDamageLabel: druidicWarriorLabel,
+                extraDamage: combinedExtraDamage,
+                extraDamageLabel: combinedExtraDamageLabel,
                 extraHitBonus: blessedWarriorHitBonus,
                 extraHitBonusLabel: blessedWarriorHitBonus ? 'Blessed Warrior (2)' : '',
             }));

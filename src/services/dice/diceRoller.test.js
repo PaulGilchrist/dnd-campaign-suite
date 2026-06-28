@@ -142,6 +142,18 @@ describe('parseExpression', () => {
   it('supports multi-digit counts and sides', () => {
     expect(parseExpression('10d100')).toEqual({ count: 10, sides: 100, modifier: 0 });
   });
+
+  it('parses multiple modifiers like "1d8+4+2"', () => {
+    expect(parseExpression('1d8+4+2')).toEqual({ count: 1, sides: 8, modifier: 6 });
+  });
+
+  it('parses multiple modifiers with mixed signs', () => {
+    expect(parseExpression('1d10+5-3')).toEqual({ count: 1, sides: 10, modifier: 2 });
+  });
+
+  it('parses three modifiers', () => {
+    expect(parseExpression('2d6+1+2+3')).toEqual({ count: 2, sides: 6, modifier: 6 });
+  });
 });
 
 describe('rollExpression', () => {

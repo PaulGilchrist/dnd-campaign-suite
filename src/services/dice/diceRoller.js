@@ -32,12 +32,20 @@ function parseExpression(formula) {
   const stripped = formula.replace(/\s*\[.*?\]\s*/g, '').trim();
   if (!stripped) return null;
   const cleaned = stripped.replace(/\s/g, '');
-  const match = cleaned.match(/^(\d+)?d(\d+)([+-]\d+)?$/i);
+  const match = cleaned.match(/^(\d+)?d(\d+)((?:[+-]\d+)+)?$/i);
   if (match) {
+    const modifierStr = match[3];
+    let modifier = 0;
+    if (modifierStr) {
+      const segments = modifierStr.match(/([+-]\d+)/g);
+      for (const seg of segments) {
+        modifier += parseInt(seg, 10);
+      }
+    }
     return {
       count: parseInt(match[1] || 1, 10),
       sides: parseInt(match[2], 10),
-      modifier: match[3] ? parseInt(match[3], 10) : 0
+      modifier
     };
   }
   if (stripped.toLowerCase().includes(' or ')) {
@@ -129,4 +137,23 @@ function rollExpressionMaximized(formula) {
   return { total: maxTotal + modifier, rolls, modifier, formula, maximized: true };
 }
 
-export { rollD20, rollDie, rollDice, rollAdvantage, rollDisadvantage, parseExpression, rollExpression, rollExpressionDoubled, rollExpressionMaximized };
+function formatDamageFormula(formula, rolls, isCrit) {
+  if (!formula) return formula;
+  const stripped = formula.replace(/\s*\[.*?\]\s*/g, '').trim();
+  if (!stripped) return formula;
+  const parsed = parseExpression(formula);
+  if (!parsed) return formula;
+  const { count, sides, modifier } = parsed;
+  const dicePart = count === 1 ? `d${sides}` : `${count}d${sides}`;
+  const rollStr = rolls && rolls.length > 0 ? ` (${rolls.join(', ')})` : '';
+  const critSuffix = isCrit ? '*2' : '';
+  let formulaStr = `${dicePart}${critSuffix}`;
+  if (modifier > 0) {
+    formulaStr += `+${modifier}`;
+  } else if (modifier < 0) {
+    formulaStr += `${modifier}`;
+  }
+  return `${formulaStr}${rollStr}`;
+}
+
+export { rollD20, rollDie, rollDice, rollAdvantage, rollDisadvantage, parseExpression, rollExpression, rollExpressionDoubled, rollExpressionMaximized, formatDamageFormula };

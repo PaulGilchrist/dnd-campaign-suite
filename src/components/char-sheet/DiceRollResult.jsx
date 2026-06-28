@@ -1,7 +1,8 @@
 import { useState } from 'react';
+import { formatDamageFormula } from '../../services/dice/diceRoller.js';
 import './diceRollResult.css';
 
-function DiceRollResult({ name, type, rolls, rollType, bonus = 0, bonusDetail, formula = '', modifier = 0, targetName, targetAc, hit, resistanceNotice, hunterLoreNotice, forcedMode, isAutoMiss, rangeReason, coverReason, isAutoCrit, isCrit, isNatural1, dc, success, dcType, dcSuccess, waitingForPlayerSave, saveDc, saveType, saveResult, finalDamage, damageApplied, targetCurrentHp, damageReduced, damageType, onQuickRoll, autoDamage, coverLevel, coverAcBonus, autoReroll, autoRerollBonus, strSaveReplace, strCheckReplace, strScore, wisCheckReplace, wisCheckMinBonus, reliableTalent, onReroll, tacticalMind, tacticalMindBonus, gloriousDefenseBonus, onCounterAttack, strokeOfLuck, onStrokeOfLuck, defensiveDuelistBonus, baitAndSwitchBonus, isPotentCantrip, luckyAdvantage, luckyDisadvantage, onLuckyAdvantage, onLuckyDisadvantage, secondaryFormula, secondaryRolls, secondaryTotal, secondaryModifier, secondaryDamageType, secondaryFinalDamage, secondarySaveResult, availableSuperiorityManeuvers, onSuperiorityManeuver, onTacticalMind }) {
+function DiceRollResult({ name, type, rolls, rollType, bonus = 0, bonusDetail, formula = '', modifier = 0, total = 0, targetName, targetAc, hit, resistanceNotice, hunterLoreNotice, forcedMode, isAutoMiss, rangeReason, coverReason, isAutoCrit, isCrit, isNatural1, dc, success, dcType, dcSuccess, waitingForPlayerSave, saveDc, saveType, saveResult, finalDamage, damageApplied, targetCurrentHp, damageReduced, damageType, onQuickRoll, autoDamage, coverLevel, coverAcBonus, autoReroll, autoRerollBonus, strSaveReplace, strCheckReplace, strScore, wisCheckReplace, wisCheckMinBonus, reliableTalent, onReroll, tacticalMind, tacticalMindBonus, gloriousDefenseBonus, onCounterAttack, strokeOfLuck, onStrokeOfLuck, defensiveDuelistBonus, baitAndSwitchBonus, isPotentCantrip, luckyAdvantage, luckyDisadvantage, onLuckyAdvantage, onLuckyDisadvantage, secondaryFormula, secondaryRolls, secondaryTotal, secondaryModifier, secondaryDamageType, secondaryFinalDamage, secondarySaveResult, availableSuperiorityManeuvers, onSuperiorityManeuver, onTacticalMind }) {
     const [mode, setMode] = useState(forcedMode || 'normal');
     const [rerollUsed, setRerollUsed] = useState(false);
     const [rerollResult, setRerollResult] = useState(null);
@@ -34,7 +35,9 @@ function DiceRollResult({ name, type, rolls, rollType, bonus = 0, bonusDetail, f
          finalRoll = safeRolls.reduce((sum, r) => sum + r, 0);
       }
 
-    const originalTotal = finalRoll + bonus + modifier;
+    const isDamageType = rollType === 'damage' || rollType === 'save-damage' || rollType === 'aoe-damage' || rollType === 'overchannel-damage' || rollType === 'graze-damage';
+
+    const originalTotal = isDamageType ? total : (finalRoll + bonus + modifier);
     const displayRoll = strokeResult !== null ? 20 : (rerollResult !== null ? rerollResult.roll : finalRoll);
     const displayTotal = strokeResult !== null ? 20 + bonus + modifier : (rerollResult !== null ? rerollResult.total : originalTotal);
     const appliesReplace = (strSaveReplace && rollType === 'save') || (strCheckReplace && (rollType === 'check' || rollType === 'skill'));
@@ -45,6 +48,8 @@ function DiceRollResult({ name, type, rolls, rollType, bonus = 0, bonusDetail, f
     const finalTotal = reliableTalentTotal !== null ? reliableTalentTotal : (wisCheckReplace && (rollType === 'check' || rollType === 'skill') ? wisDisplayTotal : finalDisplayTotal);
     const showCrit = isCrit || isAutoCrit || (isD20 && displayRoll === 20) || (strokeResult !== null && isD20);
     const showFumble = isNatural1 && rollType === 'attack';
+
+    const displayFormula = isDamageType && isCrit ? formatDamageFormula(formula, rolls, true) : formula;
 
     const handleTacticalMind = async () => {
         const dieResult = Math.floor(Math.random() * 10) + 1;
@@ -92,7 +97,7 @@ function DiceRollResult({ name, type, rolls, rollType, bonus = 0, bonusDetail, f
             </div>
             <div className="dice-roll-total">{finalTotal}</div>
             <div className="dice-roll-breakdown">
-                {formula ? `${formula}: ` : type === 'd20' ? 'd20 ' : ''}
+                {displayFormula ? `${displayFormula}: ` : type === 'd20' ? 'd20 ' : ''}
                 {strokeResult !== null ? (
                   <span className="dice-rolled">
                     20 (Stroke of Luck)
@@ -117,7 +122,7 @@ function DiceRollResult({ name, type, rolls, rollType, bonus = 0, bonusDetail, f
                   ` +${20 + bonus + modifier - 20}`
                 ) : rerollResult !== null ? (
                   ` +${rerollResult.total - rerollResult.roll}`
-                ) : (bonus + modifier) >= 0 && (bonus + modifier) !== 0 ? ` +${(bonus + modifier)}${bonusDetail ? ' ' + bonusDetail : ''}` :
+                ) : (isDamageType && isCrit) ? ` +${modifier}${bonusDetail && bonus > 0 ? ' ' + bonusDetail : ''}` : (bonus + modifier) >= 0 && (bonus + modifier) !== 0 ? ` +${(bonus + modifier)}${bonusDetail ? ' ' + bonusDetail : ''}` :
                  (bonus + modifier) < 0 ? ` ${(bonus + modifier)}${bonusDetail ? ' ' + bonusDetail : ''}` : ''}
             </div>
 

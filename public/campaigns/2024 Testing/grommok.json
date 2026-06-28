@@ -56,8 +56,8 @@
     "divineOrder": "",
     "primalOrder": "",
     "fightingStyles": [
-      "Archery",
-      "Interception"
+      "Blind Fighting",
+      "Dueling"
     ]
   },
   "expertSkills": [],
@@ -82,7 +82,6 @@
       "Waterskin"
     ],
     "equipped": [
-      "Longbow",
       "Shield",
       "Plate Armor",
       "Longsword"

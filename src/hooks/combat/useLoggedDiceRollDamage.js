@@ -1,4 +1,4 @@
-import { rollExpression, rollExpressionDoubled } from '../../services/dice/diceRoller.js';
+import { rollExpression, rollExpressionDoubled, formatDamageFormula } from '../../services/dice/diceRoller.js';
 import { postLogEntry } from '../../services/shared/logPoster.js';
 import utils from '../../services/ui/utils.js';
 import {
@@ -60,12 +60,14 @@ export function createLogDamageAndShow(deps) {
         const targetMaxHp = target?.type === 'player'
             ? (getRuntimeValue(target.name, 'hitPoints') ?? 0)
             : target?.maxHp ?? 0;
+        const isCrit = context?.isAutoCrit || false;
+        const displayFormula = isCrit ? formatDamageFormula(formula, rolls, true) : formula;
         logEntry({
             type: 'roll',
             characterName,
             rollType: 'damage',
             name,
-            formula,
+            formula: displayFormula,
             rolls,
             total,
             modifier,
@@ -73,7 +75,7 @@ export function createLogDamageAndShow(deps) {
             targetName: context?.targetName,
              finalDamage: 0,
              note: 'Shield: Immune to Magic Missile',
-             isCrit: context?.isAutoCrit || false,
+             isCrit,
          });
         setPopupHtml({
             type: 'damage',
@@ -111,19 +113,21 @@ export function createLogDamageAndShow(deps) {
                 const targetMaxHp = target?.type === 'player'
                     ? (getRuntimeValue(target.name, 'hitPoints') ?? 0)
                     : target?.maxHp ?? 0;
+                const isCrit = context?.isAutoCrit || false;
+                const displayFormula = isCrit ? formatDamageFormula(formula, damageResult.rolls, true) : formula;
                 logEntry({
                     type: 'roll',
                     characterName,
                     rollType: 'cantrip-miss-half-damage',
                     name,
-                    formula,
+                    formula: displayFormula,
                     rolls: damageResult.rolls,
                     total: halfDamage,
                     modifier: damageResult.modifier,
                     damageType: context?.damageType,
                      targetName: context?.targetName,
                      isPotentCantrip: true,
-                     isCrit: context?.isAutoCrit || false,
+                     isCrit,
                  });
                 setPopupHtml({
                     type: 'save-damage',
@@ -148,19 +152,21 @@ export function createLogDamageAndShow(deps) {
             }
         }
 
+        const isCrit = context?.isAutoCrit || false;
+        const displayFormula = isCrit ? formatDamageFormula(formula, rolls, true) : formula;
         logEntry({
             type: 'roll',
             characterName,
             rollType: 'auto-miss-damage',
             name,
-            formula,
+            formula: displayFormula,
             rolls,
             total,
             modifier,
             damageType: context?.damageType,
             targetName: context?.targetName,
             rangeReason: context?.rangeReason,
-            isCrit: context?.isAutoCrit || false,
+            isCrit,
         });
         setPopupHtml({
             type: 'auto-miss',
@@ -334,12 +340,15 @@ export function createLogDamageAndShow(deps) {
             endInvisibilityOnHostileAction(characterName, campaignName);
         }
 
+        const isCrit = context?.isAutoCrit || false;
+        const displayFormula = isCrit ? formatDamageFormula(formula, rolls, true) : formula;
+
         const logEntryData = {
             type: 'roll',
             characterName,
             rollType: 'save-damage',
             name,
-            formula,
+            formula: displayFormula,
             rolls,
             total,
             modifier,
@@ -354,7 +363,7 @@ export function createLogDamageAndShow(deps) {
             mode: disadvantage ? 'disadvantage' : 'normal',
              finalDamage: primaryApplyResult?.finalDamage ?? finalDamage,
              note: 'combined_save_damage_roll',
-             isCrit: context?.isAutoCrit || false,
+             isCrit,
          };
         if (secondaryResult) {
             logEntryData.secondaryName = secondaryResult.name;
@@ -492,12 +501,15 @@ export function createLogDamageAndShow(deps) {
                 }
                 const ignoreResistance = (context?.playerStats && hasIgnoreResistance(context.playerStats, damageType)) || false;
 
+                const isCrit = context?.isAutoCrit || false;
+                const displayFormula = isCrit ? formatDamageFormula(formula, rolls, true) : formula;
+
                 logEntry({
                     type: 'roll',
                     characterName,
                     rollType: 'save-damage',
                     name: `${name} (Twinned)`,
-                    formula,
+                    formula: displayFormula,
                     rolls,
                     total,
                     modifier,
@@ -512,7 +524,7 @@ export function createLogDamageAndShow(deps) {
                     mode: twinDisadvantage ? 'disadvantage' : 'normal',
                      finalDamage: null,
                      note: 'twin_save_damage_roll_before_apply',
-                     isCrit: context?.isAutoCrit || false,
+                     isCrit,
                  });
 
                 await new Promise(resolve => setTimeout(resolve, 500));
@@ -546,12 +558,14 @@ export function createLogDamageAndShow(deps) {
                     if (hasPotentFlag && isCantripFlag && multiSaveResult.success && dcSuccess === 'none') {
                         multiFinalDamage = Math.floor(total / 2);
                     }
+                    const isCrit = context?.isAutoCrit || false;
+                    const displayFormula = isCrit ? formatDamageFormula(formula, rolls, true) : formula;
                     logEntry({
                         type: 'roll',
                         characterName,
                         rollType: 'save-damage',
                         name: `${name} (Words of Creation)`,
-                        formula,
+                        formula: displayFormula,
                         rolls,
                         total,
                         modifier,
@@ -566,7 +580,7 @@ export function createLogDamageAndShow(deps) {
                         mode: 'normal',
                          finalDamage: null,
                          note: 'multi_save_damage_roll_before_apply',
-                         isCrit: context?.isAutoCrit || false,
+                         isCrit,
                      });
 
                     await new Promise(resolve => setTimeout(resolve, 500));
@@ -585,12 +599,14 @@ export function createLogDamageAndShow(deps) {
                 } else {
                     const ignoreResistance = (context?.playerStats && hasIgnoreResistance(context.playerStats, damageType)) || false;
 
+                    const isCrit = context?.isAutoCrit || false;
+                    const displayFormula = isCrit ? formatDamageFormula(formula, rolls, true) : formula;
                     logEntry({
                         type: 'roll',
                         characterName,
                         rollType: 'save-damage',
                         name: `${name} (Words of Creation)`,
-                        formula,
+                        formula: displayFormula,
                         rolls,
                         total,
                         modifier,
@@ -598,7 +614,7 @@ export function createLogDamageAndShow(deps) {
                          targetName: multiTarget.name,
                          finalDamage: null,
                          note: 'multi_plain_damage_roll_before_apply',
-                         isCrit: context?.isAutoCrit || false,
+                         isCrit,
                      });
 
                     await new Promise(resolve => setTimeout(resolve, 500));
@@ -908,12 +924,15 @@ export function createLogDamageAndShow(deps) {
         else if (!wasBloodied && isBloodied) threshold = 'bloodied';
         else if (wasBloodied && !isBloodied && newHp > 0) threshold = 'recovering';
 
+        const isCrit = context?.isAutoCrit || false;
+        const displayFormula = isCrit ? formatDamageFormula(formula, rolls, true) : formula;
+
         const logEntryData = {
             type: 'roll',
             characterName,
             rollType: 'damage',
             name,
-            formula,
+            formula: displayFormula,
             rolls,
             total,
             modifier,
@@ -921,7 +940,7 @@ export function createLogDamageAndShow(deps) {
             targetName: target?.name,
             finalDamage: applyResult?.finalDamage ?? reducedTotal,
             note: 'combined_damage_roll',
-            isCrit: context?.isAutoCrit || false,
+            isCrit,
         };
         if (secondaryResult) {
             logEntryData.secondaryName = secondaryResult.name;

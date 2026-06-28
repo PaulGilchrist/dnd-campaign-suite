@@ -4,6 +4,25 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 vi.mock('../../services/dice/diceRoller.js', () => ({
     rollExpression: vi.fn(),
     rollExpressionDoubled: vi.fn(),
+    formatDamageFormula: vi.fn((formula, rolls, isCrit) => {
+        if (!isCrit) return formula;
+        const parsed = formula.match(/^(\d+)?d(\d+)((?:[+-]\d+)+)?$/i);
+        if (!parsed) return formula;
+        const count = parsed[1] || 1;
+        const sides = parsed[2];
+        const modifierStr = parsed[3];
+        let modifier = 0;
+        if (modifierStr) {
+            const segments = modifierStr.match(/([+-]\d+)/g);
+            for (const seg of segments) { modifier += parseInt(seg, 10); }
+        }
+        const dicePart = count === 1 ? `d${sides}` : `${count}d${sides}`;
+        const rollStr = rolls && rolls.length > 0 ? ` (${rolls.join(', ')})` : '';
+        let result = `${dicePart}*2${rollStr}`;
+        if (modifier > 0) result += `+${modifier}`;
+        else if (modifier < 0) result += `${modifier}`;
+        return result;
+    }),
 }));
 
 vi.mock('../../services/ui/utils.js', () => ({

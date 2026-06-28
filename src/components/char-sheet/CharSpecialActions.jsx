@@ -62,6 +62,7 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct, characters }
                     damageType: autoDamage.damageType,
                     targetName: autoDamage.targetName,
                     attackerName: autoDamage.attackerName,
+                    isAutoCrit: isCrit,
                 };
                 rollDamage(autoDamage.name, autoDamage.formula, result.total, result.rolls, result.modifier, context);
                 if (autoDamage.ripostePopup) {

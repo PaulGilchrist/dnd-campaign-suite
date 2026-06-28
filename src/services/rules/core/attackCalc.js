@@ -69,23 +69,37 @@ export function buildWeaponAttack(opts) {
     let toHitBonus = abilityBonus + proficiency;
     let hitBonusFormula = `To Hit Bonus Formula = ${abilityName} Bonus (${abilityBonus}) + Proficiency (${proficiency})`;
 
+    // Calculate the total numeric modifier for display (combines ability, magic, and extra damage)
+    let totalDamageModifier = 0;
+    if (includeAbilityBonusInDamage) {
+        totalDamageModifier += abilityBonus;
+    }
     if (magicBonus) {
-        if (includeAbilityBonusInDamage) {
-            damage += `+${abilityBonus + magicBonus}`;
-            damageFormula += ` + ${abilityName} Bonus (${abilityBonus}) + Weapon Magic Bonus (${magicBonus})`;
-        } else {
-            damage += `+${magicBonus}`;
-            damageFormula += ` + Weapon Magic Bonus (${magicBonus})`;
-        }
+        totalDamageModifier += magicBonus;
         toHitBonus += magicBonus;
         hitBonusFormula += ` + Weapon Magic Bonus (${magicBonus})`;
+    }
+    if (extraDamage) {
+        const extraMatch = extraDamage.match(/([+-]?\d+)$/);
+        if (extraMatch) {
+            totalDamageModifier += parseInt(extraMatch[1], 10);
+        }
+    }
+
+    if (magicBonus || includeAbilityBonusInDamage || extraDamage) {
+        damage += `+${totalDamageModifier}`;
+    }
+
+    if (magicBonus) {
+        if (includeAbilityBonusInDamage) {
+            damageFormula += ` + ${abilityName} Bonus (${abilityBonus})`;
+        }
+        damageFormula += ` + Weapon Magic Bonus (${magicBonus})`;
     } else if (includeAbilityBonusInDamage) {
-        damage += `+${abilityBonus}`;
         damageFormula += ` + ${abilityName} Bonus (${abilityBonus})`;
     }
 
     if (extraDamage) {
-        damage += extraDamage;
         damageFormula += ` + ${extraDamageLabel}`;
     }
 

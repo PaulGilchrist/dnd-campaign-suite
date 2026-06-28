@@ -1116,5 +1116,75 @@ describe('attackCalc2024', () => {
         })
       );
     });
+
+    it('applies Dueling fighting style +2 damage to single melee weapon attack', () => {
+      findEquippedWeaponsStub
+        .mockReturnValueOnce([])
+        .mockReturnValueOnce(['Longsword']);
+
+      const allEquipment = [
+        {
+          name: 'Longsword',
+          equipment_category: 'Weapon',
+          weapon_range: 'Melee',
+          damage: { damage_dice: '1d8', damage_type: 'Slashing' },
+          range: { normal: 5 },
+        },
+      ];
+      const playerStats = defaultPlayerStats({
+        level: 1,
+        abilities: [
+          { name: 'Strength', baseScore: 16, abilityImprovements: 0, miscBonus: 0, bonus: 3 },
+          { name: 'Dexterity', baseScore: 10, abilityImprovements: 0, miscBonus: 0, bonus: 0 },
+        ],
+        class: { name: 'Fighter', fightingStyles: ['Dueling'] },
+      });
+
+      getAttacks(allEquipment, [], playerStats);
+
+      expect(buildWeaponAttackStub).toHaveBeenCalledWith(
+        expect.objectContaining({
+          extraDamage: '+2',
+          extraDamageLabel: 'Dueling Fighting Style (2)',
+        })
+      );
+    });
+
+    it('does not apply Dueling when a ranged weapon is also equipped', () => {
+      findEquippedWeaponsStub
+        .mockReturnValueOnce(['Shortbow'])
+        .mockReturnValueOnce(['Longsword']);
+
+      const allEquipment = [
+        {
+          name: 'Shortbow',
+          equipment_category: 'Weapon',
+          weapon_range: 'Ranged',
+          damage: { damage_dice: '1d6', damage_type: 'Piercing' },
+          range: { normal: 80 },
+        },
+        {
+          name: 'Longsword',
+          equipment_category: 'Weapon',
+          weapon_range: 'Melee',
+          damage: { damage_dice: '1d8', damage_type: 'Slashing' },
+          range: { normal: 5 },
+        },
+      ];
+      const playerStats = defaultPlayerStats({
+        level: 1,
+        abilities: [
+          { name: 'Strength', baseScore: 16, abilityImprovements: 0, miscBonus: 0, bonus: 3 },
+          { name: 'Dexterity', baseScore: 10, abilityImprovements: 0, miscBonus: 0, bonus: 0 },
+        ],
+        class: { name: 'Fighter', fightingStyles: ['Dueling'] },
+      });
+
+      getAttacks(allEquipment, [], playerStats);
+
+      expect(buildWeaponAttackStub).not.toHaveBeenCalledWith(
+        expect.objectContaining({ extraDamage: '+2' })
+      );
+    });
   });
 });
