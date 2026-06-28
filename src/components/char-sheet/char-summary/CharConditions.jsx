@@ -1,6 +1,6 @@
 /* eslint-disable react-refresh/only-export-components */
 import React from 'react'
-import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js'
+import { getRuntimeValue, setRuntimeValue, addStorageChangeListener } from '../../../hooks/runtime/useRuntimeState.js'
 import { rollD20 } from '../../../services/dice/diceRoller.js'
 import { CONDITIONS, CONDITION_SAVE_DC, CONDITION_SAVE_MAP, getAbilityLabel, getAbilitySaveBonus } from '../../../services/combat/conditions/conditionUtils.js'
 import { addEntry } from '../../../services/ui/logService.js'
@@ -44,6 +44,13 @@ function CharConditions({ playerStats, campaignName, activeMapName, characters, 
    React.useEffect(() => {
     saveConditions(playerStats.name, campaignName, activeConditions)
    }, [activeConditions, playerStats.name, campaignName])
+
+   React.useEffect(() => {
+     const unsubscribe = addStorageChangeListener(playerStats.name, () => {
+       setActiveConditions(loadConditions(playerStats.name, campaignName))
+     })
+     return unsubscribe
+   }, [playerStats.name, campaignName])
 
   function logEntry(entry) {
     addEntry(campaignName, entry).catch((e) => { console.error("[CharConditions] Error:", e); })

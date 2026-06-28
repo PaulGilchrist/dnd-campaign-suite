@@ -7,7 +7,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
     const playerName = playerStats.name;
     const usesKey = auto.resource || 'psionicEnergy';
-    const defaultMax = playerStats.resources?.[usesKey]?.max || 6;
+    const defaultMax = playerStats._trackedResources?.[usesKey]?.max || 6;
     const currentUses = Number(getRuntimeValue(playerName, usesKey, campaignName) ?? defaultMax);
 
     if (currentUses <= 0) {

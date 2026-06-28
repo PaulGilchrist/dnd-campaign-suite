@@ -25,7 +25,7 @@ const makePlayerStats = (overrides = {}) => ({
         { name: 'Intelligence', bonus: 3 },
     ],
     proficiency: 3,
-    resources: { psionicEnergy: { max: 8 } },
+    _trackedResources: { psionicEnergy: { max: 8 } },
     ...overrides,
 });
 
@@ -95,7 +95,7 @@ describe('psychicTeleportationHandler', () => {
         });
 
         it('uses default max of 6 when resources config is missing', async () => {
-            const playerStats = makePlayerStats({ resources: undefined });
+            const playerStats = makePlayerStats({ _trackedResources: undefined });
             runtimeState.getRuntimeValue.mockImplementation((_player, _key, _campaign) => 5);
             automationExpressions.evaluateAutoExpression.mockReturnValue(8);
             runtimeState.setRuntimeValue.mockResolvedValue(undefined);

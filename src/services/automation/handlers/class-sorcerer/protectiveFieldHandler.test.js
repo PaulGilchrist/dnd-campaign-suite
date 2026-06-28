@@ -143,7 +143,7 @@ describe('protectiveFieldHandler', () => {
             const playerStats = {
                 name: 'TestHero',
                 abilities: [{ name: 'Intelligence', bonus: 2 }],
-                resources: { psionicEnergy: { max: 8 } },
+                _trackedResources: { psionicEnergy: { max: 8 } },
             };
 
             const result = await handle(makeAction(), playerStats, 'campaign', 'map');
@@ -157,7 +157,7 @@ describe('protectiveFieldHandler', () => {
             const playerStats = {
                 name: 'TestHero',
                 abilities: [{ name: 'Intelligence', bonus: 2 }],
-                resources: { psionicEnergy: { max: 10 } },
+                _trackedResources: { psionicEnergy: { max: 10 } },
             };
 
             const result = await handle(makeAction(), playerStats, 'campaign', 'map');

@@ -464,7 +464,17 @@ export {
 export async function executeHandler(action, playerStats, campaignName, mapName) {
     if (!action?.automation) return null;
 
-    const auto = action.automation;
+    let auto = action.automation;
+
+    // Some features (e.g. Guarded Mind) have an array of automation entries
+    // (passive resistance + active expend-resource). Find the actionable one.
+    if (Array.isArray(auto)) {
+        const actionable = auto.find(a => a?.casting_time || a?.action || a?.trigger);
+        if (!actionable) return null;
+        action = { ...action, automation: actionable };
+        auto = actionable;
+    }
+
     let handler;
 
     if (auto.type === 'passive_rule' && PASSIVE_RULE_EFFECTS[auto.effect]) {

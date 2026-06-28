@@ -328,6 +328,31 @@ describe('contextBuilder: buildAttackContext — cover AC bonuses (map path)', (
       expect(result.coverAcBonus).toBeUndefined();
     });
 
+    it('applies half cover when bulwark is on a different PC than the attacker', async () => {
+      loadMapData.mockResolvedValue(makeMapWithPlayersAndNpc(
+        [
+          { name: 'Fighter1', gridX: 1, gridY: 1 },
+          { name: 'Sorcerer1', gridX: 5, gridY: 8 },
+        ],
+        [{ name: 'Orc', gridX: 10, gridY: 10, type: 'npc' }],
+      ));
+      getCombatContext.mockResolvedValue(makeCombatContext('Fighter1', 'Orc', 10, 10));
+      getTargetFromAttacker.mockReturnValue({ name: 'Orc', gridX: 10, gridY: 10 });
+      getNearestPlacedItem.mockReturnValue({ name: 'Orc', gridX: 10, gridY: 10 });
+      getDistanceFeet.mockReturnValue(50);
+      computeCover.mockReturnValue({ level: 'none', acBonus: 0 });
+      getRuntimeValue.mockImplementation((name, key) => {
+        if (name === 'Sorcerer1' && key === 'bulwarkOfForceActive') return true;
+        if (name === 'Sorcerer1' && key === 'bulwarkOfForceTargets') return ['Orc'];
+        return undefined;
+      });
+
+      const result = await buildAttackContext(mockRangedAttack, mockStats, 'camp', 'test-map', 'normal', {});
+
+      expect(result.coverAcBonus).toBe(2);
+      expect(result.coverLevel).toBe('half');
+    });
+
     it('does not override existing cover when bulwark acBonus is lower', async () => {
       loadMapData.mockResolvedValue(makeMapWithPlayersAndNpc(
         [{ name: 'Fighter1', gridX: 1, gridY: 1 }],

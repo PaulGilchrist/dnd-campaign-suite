@@ -265,7 +265,7 @@ export async function handle(action, playerStats, campaignName, mapName) {
 
     if (auto.bonusExpression === 'psionic_energy_die') {
         const usesKey = 'psionicEnergy';
-        const defaultMax = playerStats.resources?.[usesKey]?.max || 6;
+        const defaultMax = playerStats._trackedResources?.[usesKey]?.max || 6;
         const currentUses = Number(getRuntimeValue(playerName, usesKey, campaignName) ?? defaultMax);
 
         if (currentUses <= 0) {

@@ -598,7 +598,7 @@ describe('autoRerollHandler', () => {
             const action = makeAction({
                 automation: { bonusExpression: 'psionic_energy_die' },
             });
-            const stats = makePlayerStats({ level: 1, resources: { psionicEnergy: { max: 4 } } });
+            const stats = makePlayerStats({ level: 1, _trackedResources: { psionicEnergy: { max: 4 } } });
             const result = await handle(action, stats, 'campaign', 'map');
 
             expect(result.type).toBe('popup');
@@ -629,7 +629,7 @@ describe('autoRerollHandler', () => {
             const action = makeAction({
                 automation: { bonusExpression: 'psionic_energy_die' },
             });
-            const stats = makePlayerStats({ level: 1, resources: { psionicEnergy: { max: 6 } } });
+            const stats = makePlayerStats({ level: 1, _trackedResources: { psionicEnergy: { max: 6 } } });
             const result = await handle(action, stats, 'campaign', 'map');
 
             expect(result.payload.description).toContain('No recent failed ability check or attack roll');
@@ -646,7 +646,7 @@ describe('autoRerollHandler', () => {
             const action = makeAction({
                 automation: { bonusExpression: 'psionic_energy_die' },
             });
-            const stats = makePlayerStats({ level: 1, resources: { psionicEnergy: { max: 6 } } });
+            const stats = makePlayerStats({ level: 1, _trackedResources: { psionicEnergy: { max: 6 } } });
             await handle(action, stats, 'campaign', 'map');
 
             expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', 'psionicEnergy', 3, 'campaign');

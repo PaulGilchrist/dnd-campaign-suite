@@ -529,12 +529,17 @@ export function buildAttackContext(attack, playerStats, campaignName, mapName, c
                     }
                 }
 
-                // Check Bulwark of Force half cover (target must be in the allowed targets list)
-                const bulwarkActive = getRuntimeValue(playerStats.name, 'bulwarkOfForceActive', campaignName);
-                if (bulwarkActive) {
-                    const bulwarkTargets = getRuntimeValue(playerStats.name, 'bulwarkOfForceTargets', campaignName) || [];
-                    if (bulwarkTargets.includes(base.targetName) && coverResult.acBonus < 2) {
-                        coverResult = { level: 'half', acBonus: 2 };
+                // Check Bulwark of Force half cover — any PC with the buff can grant cover to the target
+                if (coverResult.acBonus < 2 && mapData?.players) {
+                    for (const player of mapData.players) {
+                        const bulwarkActive = getRuntimeValue(player.name, 'bulwarkOfForceActive');
+                        if (bulwarkActive) {
+                            const bulwarkTargets = getRuntimeValue(player.name, 'bulwarkOfForceTargets') || [];
+                            if (bulwarkTargets.includes(base.targetName)) {
+                                coverResult = { level: 'half', acBonus: 2 };
+                                break;
+                            }
+                        }
                     }
                 }
 

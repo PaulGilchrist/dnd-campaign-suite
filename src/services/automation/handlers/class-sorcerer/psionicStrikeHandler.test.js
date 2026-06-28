@@ -37,7 +37,7 @@ const DEFAULT_ACTION = {
 const DEFAULT_PLAYER_STATS = {
     name: 'Test Fighter',
     level: 12,
-    resources: { psionicEnergy: { max: 8 } },
+    _trackedResources: { psionicEnergy: { max: 8 } },
     abilities: [{ name: 'Intelligence', bonus: 3 }],
 };
 
@@ -103,7 +103,7 @@ describe('psionicStrikeHandler', () => {
 
             const result = await handle(
                 makeAction(),
-                makePlayerStats({ resources: null }),
+                makePlayerStats({ _trackedResources: null }),
                 'test-campaign'
             );
 
@@ -122,7 +122,7 @@ describe('psionicStrikeHandler', () => {
 
             const result = await handle(
                 makeAction(),
-                makePlayerStats({ resources: { otherResource: { max: 10 } } }),
+                makePlayerStats({ _trackedResources: { otherResource: { max: 10 } } }),
                 'test-campaign'
             );
 

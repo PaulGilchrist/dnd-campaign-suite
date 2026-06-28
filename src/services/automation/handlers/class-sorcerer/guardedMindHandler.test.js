@@ -20,7 +20,7 @@ const makeAction = (auto = {}) => ({
 const makePlayerStats = (overrides = {}) => ({
     name: 'TestHero',
     level: 10,
-    resources: { psionicEnergy: { max: 6 } },
+    _trackedResources: { psionicEnergy: { max: 6 } },
     ...overrides,
 });
 
@@ -169,7 +169,7 @@ describe('guardedMindHandler', () => {
 
             const result = await handle(
                 makeAction(),
-                makePlayerStats({ resources: { otherResource: { max: 10 } } }),
+                makePlayerStats({ _trackedResources: { otherResource: { max: 10 } } }),
                 'test-campaign'
             );
 
