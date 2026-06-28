@@ -324,12 +324,6 @@ export async function handle(action, playerStats, campaignName, mapName) {
         }
         await setRuntimeValue(campaignName, 'targetEffects', storedEffects, campaignName);
 
-        await setRuntimeValue(defenderName, 'protectionBuff', {
-            source: playerName,
-            duration: duration,
-            timestamp: Date.now(),
-        }, campaignName);
-
         result = await handleDisadvantageDebuff(action, playerStats, campaignName, lastAttackerName, combatSummary);
     } else {
         const targetInfo = await resolveTarget(campaignName, playerName);

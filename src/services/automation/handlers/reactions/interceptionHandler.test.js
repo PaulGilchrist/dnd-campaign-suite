@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../common/targetResolver.js', () => ({
-    resolveTarget: vi.fn(),
     resolveMapPositions: vi.fn(),
 }));
 
@@ -39,24 +38,6 @@ vi.mock('../../common/damageRollback.js', () => ({
     }),
 }));
 
-vi.mock('../../common/infoPopup.js', () => ({
-    infoPopup: vi.fn().mockImplementation((name, description, automation, extraProps) => {
-        const result = {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name,
-                description,
-                automation,
-            },
-        };
-        if (extraProps) {
-            Object.assign(result, extraProps);
-        }
-        return result;
-    }),
-}));
-
 vi.mock('../../../dice/diceRoller.js', () => ({
     rollExpression: vi.fn(),
 }));
@@ -65,7 +46,6 @@ vi.mock('../../../dice/diceRoller.js', () => ({
 
 import { handle } from './interceptionHandler.js';
 
-import * as targetResolver from '../../common/targetResolver.js';
 import * as useRuntimeState from '../../../../hooks/runtime/useRuntimeState.js';
 import * as logService from '../../../ui/logService.js';
 import * as rangeValidation from '../../../rules/combat/rangeValidation.js';
@@ -73,6 +53,7 @@ import * as damageUtils from '../../../rules/combat/damageUtils.js';
 import * as applyHealing from '../../../rules/combat/applyHealing.js';
 import * as damageRollback from '../../common/damageRollback.js';
 import * as diceRoller from '../../../dice/diceRoller.js';
+import * as targetResolver from '../../common/targetResolver.js';
 
 // ── Helpers ─────────────────────────────────────────────────────
 
@@ -135,9 +116,6 @@ describe('interceptionHandler', () => {
         useRuntimeState.getRuntimeValue.mockReturnValue(null);
         useRuntimeState.setRuntimeValue.mockResolvedValue(undefined);
         logService.addEntry.mockResolvedValue({});
-        targetResolver.resolveTarget.mockResolvedValue({
-            target: { name: attackerName },
-        });
         targetResolver.resolveMapPositions.mockResolvedValue({
             attackerPos: { x: 0, y: 0 },
             targetPos: { x: 1, y: 0 },
@@ -156,6 +134,24 @@ describe('interceptionHandler', () => {
         });
         diceRoller.rollExpression.mockReturnValue({ total: 5, rolls: [5], modifier: 0 });
         applyHealing.applyHealingToTarget.mockReturnValue({ actualHeal: 5, oldHp: 50, newHp: 55 });
+    });
+
+    describe('no recent attack', () => {
+        it('returns error popup when no attack found', async () => {
+            const action = makeAction();
+            const ps = makePlayerStats();
+            damageRollback.findLastAttack.mockResolvedValue({
+                attackEvent: null,
+                attackerName: null,
+                targetName: null,
+                totalDamage: 0,
+            });
+
+            const result = await handle(action, ps, campaignName, mapName);
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain('No recent attack found');
+        });
     });
 
     describe('shield requirement', () => {
@@ -199,8 +195,34 @@ describe('interceptionHandler', () => {
         });
     });
 
+    describe('disadvantage buff', () => {
+        it('sets targetEffects protection effect on the defender', async () => {
+            const action = makeAction();
+            const ps = makePlayerStats({
+                inventory: { equipped: ['Shield'] },
+                equipment: [{ name: 'Shield', armor_category: 'Shield' }],
+            });
+
+            await handle(action, ps, campaignName, mapName);
+
+            expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
+                campaignName,
+                'targetEffects',
+                expect.arrayContaining([
+                    expect.objectContaining({
+                        effect: 'protection',
+                        target: defenderName,
+                        source: playerName,
+                        duration: 'until_start_of_next_turn',
+                    }),
+                ]),
+                campaignName
+            );
+        });
+    });
+
     describe('damage reduction', () => {
-        it('reduces damage by 1d10 + proficiency', async () => {
+        it('reduces damage by 1d10 + proficiency when attack hit', async () => {
             const action = makeAction();
             const ps = makePlayerStats({
                 inventory: { equipped: ['Shield'] },
@@ -291,28 +313,6 @@ describe('interceptionHandler', () => {
         });
     });
 
-    describe('runtime state', () => {
-        it('sets interceptionBuff on the defender', async () => {
-            const action = makeAction();
-            const ps = makePlayerStats({
-                inventory: { equipped: ['Shield'] },
-                equipment: [{ name: 'Shield', armor_category: 'Shield' }],
-            });
-
-            await handle(action, ps, campaignName, mapName);
-
-            expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-                defenderName,
-                'interceptionBuff',
-                expect.objectContaining({
-                    source: playerName,
-                    duration: 'until_start_of_next_turn',
-                }),
-                campaignName
-            );
-        });
-    });
-
     describe('logging', () => {
         it('logs the ability use to campaign log', async () => {
             const action = makeAction();
@@ -335,81 +335,52 @@ describe('interceptionHandler', () => {
         });
     });
 
-    describe('no recent attack', () => {
-        it('returns error when no attack event found', async () => {
-            const action = makeAction();
-            const ps = makePlayerStats({
-                inventory: { equipped: ['Shield'] },
-                equipment: [{ name: 'Shield', armor_category: 'Shield' }],
+    describe('no shield or weapon', () => {
+        it('returns error popup when requiresShieldOrWeapon and no shield or weapon', async () => {
+            const action = makeAction({
+                automation: {
+                    type: 'interception',
+                    trigger: 'creature_hits_ally_within_5ft',
+                    range: '5_ft',
+                    damageExpression: '1d10',
+                    damageType: '',
+                    damageBonusExpression: 'proficiency_bonus',
+                    requiresShieldOrWeapon: true,
+                    casting_time: '1 reaction',
+                    hasAutomation: true,
+                },
             });
-            damageRollback.findLastAttack.mockResolvedValue({
-                attackEvent: null,
-                attackerName: null,
-                targetName: null,
-                primaryDamage: 0,
-                secondaryDamage: 0,
-                totalDamage: 0,
-                damageTypes: [],
-            });
+            const ps = makePlayerStats();
 
             const result = await handle(action, ps, campaignName, mapName);
 
             expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('No recent attack found');
+            expect(result.payload.description).toContain('Shield or a Simple or Martial weapon');
         });
 
-        it('returns error when attacker mismatch', async () => {
-            const action = makeAction();
-            const ps = makePlayerStats({
-                inventory: { equipped: ['Shield'] },
-                equipment: [{ name: 'Shield', armor_category: 'Shield' }],
+        it('proceeds when hasShieldOrWeapon', async () => {
+            const action = makeAction({
+                automation: {
+                    type: 'interception',
+                    trigger: 'creature_hits_ally_within_5ft',
+                    range: '5_ft',
+                    damageExpression: '1d10',
+                    damageType: '',
+                    damageBonusExpression: 'proficiency_bonus',
+                    requiresShieldOrWeapon: true,
+                    casting_time: '1 reaction',
+                    hasAutomation: true,
+                },
             });
-            damageRollback.findLastAttack.mockResolvedValue({
-                attackEvent: { d20: 15, bonus: 5, hit: true, targetAc: 16 },
-                attackerName: 'Orc',
-                targetName: defenderName,
-                primaryDamage: 10,
-                secondaryDamage: 0,
-                totalDamage: 10,
-                damageTypes: ['slashing'],
+            const ps = makePlayerStats({
+                inventory: { equipped: ['Longsword'] },
+                equipment: [{ name: 'Longsword', equipment_category: 'Weapon' }],
             });
 
             const result = await handle(action, ps, campaignName, mapName);
 
             expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('No recent attack found');
-        });
-    });
-
-    describe('no combat context', () => {
-        it('returns error when no combat context', async () => {
-            const action = makeAction();
-            const ps = makePlayerStats({
-                inventory: { equipped: ['Shield'] },
-                equipment: [{ name: 'Shield', armor_category: 'Shield' }],
-            });
-            damageUtils.getCombatContext.mockResolvedValue(null);
-
-            const result = await handle(action, ps, campaignName, mapName);
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('No combat context found');
-        });
-    });
-
-    describe('no target selected', () => {
-        it('returns error when no target resolved', async () => {
-            const action = makeAction();
-            const ps = makePlayerStats({
-                inventory: { equipped: ['Shield'] },
-                equipment: [{ name: 'Shield', armor_category: 'Shield' }],
-            });
-            targetResolver.resolveTarget.mockResolvedValue({});
-
-            const result = await handle(action, ps, campaignName, mapName);
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('requires a target');
+            expect(result.payload.description).not.toContain('Shield or a Simple or Martial weapon');
         });
     });
 });

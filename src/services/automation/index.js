@@ -18,7 +18,6 @@ import { handle as handleReactionDamage } from './handlers/reactions/reactionDam
 import { handle as handleReactionDebuff } from './handlers/reactions/reactionDebuffHandler.js';
 import { handle as handleReactionSpell } from './handlers/reactions/reactionSpellHandler.js';
 import { handle as handleInterception } from './handlers/reactions/interceptionHandler.js';
-import { handle as handleProtection } from './handlers/reactions/protectionHandler.js';
 import { handle as handleBoonOfEnergyResistance, applyTypeChoice as applyBoonOfEnergyResistance } from './handlers/reactions/boonOfEnergyResistanceHandler.js';
 import { handle as handleBoonOfFate } from './handlers/reactions/boonOfFateHandler.js';
 import { handle as handleBoonOfRecovery } from './handlers/reactions/boonOfRecoveryHandler.js';
@@ -246,7 +245,6 @@ const HANDLER_MAP = {
     reaction_debuff: handleReactionDebuff,
     reaction_spell: handleReactionSpell,
     interception: handleInterception,
-    protection: handleProtection,
     damage_reduction: handleDamageReduction,
     arcane_ward: handleArcaneWard,
     projected_ward: handleArcaneWard,
