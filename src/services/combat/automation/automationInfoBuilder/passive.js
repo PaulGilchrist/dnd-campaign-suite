@@ -8,6 +8,7 @@ export const passiveHandlers = {
             range_expression: auto.range_expression || '10_ft',
             effect: auto.effect || '',
             bonusExpression: auto.bonusExpression || auto.bonus || '',
+            bonus: auto.bonus ?? undefined,
             condition: auto.condition || '',
             conditionImmunity: auto.conditionImmunity || '',
             resistances: auto.resistances || [],

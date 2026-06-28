@@ -1045,9 +1045,38 @@ const rules = {
               } catch (_e) {
                   // Background data not available yet, skip
               }
-         }
+          }
 
-          playerStats.automation = collectAutomationFromFeatures(allFeatures, playerStats);
+          // 2024: Add fighting style feat features to allFeatures so their passive_buff automation is collected
+          if (is2024(playerStats, playerSummary) && playerStats.class?.fightingStyles?.length > 0) {
+              try {
+                  const feats = await loadFeatData('2024');
+                  if (feats) {
+                      const fightingStyleFeats = feats.filter(f =>
+                          f.prerequisites && f.prerequisites.feature === 'Fighting Style'
+                      );
+                      fightingStyleFeats.forEach(feat => {
+                          if (playerStats.class.fightingStyles.includes(feat.name) && feat.benefits) {
+                              feat.benefits.forEach(benefit => {
+                                  if (benefit.automation) {
+                                      const automations = Array.isArray(benefit.automation) ? benefit.automation : [benefit.automation];
+                                      automations.forEach(auto => {
+                                          const info = buildAttackInfo({ ...benefit, automation: auto }, playerStats);
+                                          if (info && (info.type === 'passive_buff' || info.type === 'passive_rule')) {
+                                              allFeatures.push({ name: feat.name, description: feat.description || '', automation: auto, hasAutomation: true });
+                                          }
+                                      });
+                                  }
+                              });
+                          }
+                      });
+                  }
+              } catch (_e) {
+                  // Feat data not available yet, skip
+              }
+          }
+
+           playerStats.automation = collectAutomationFromFeatures(allFeatures, playerStats);
          playerStats.saveModifiers = collectSaveModifiers(allFeatures);
         playerStats.evasionEffects = getEvasionEffects(allFeatures);
         playerStats.automationConditionImmunities = getConditionImmunities(allFeatures);

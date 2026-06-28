@@ -72,20 +72,23 @@ function WizardStepLanguages({ formData, errors, onLanguageToggle, onFightingSty
        <div className="form-group">
          <label>Languages</label>
          <div className="multi-select-container multi-select-compact">
-           {languagesList.map(language => (
-             <label 
-              key={language} 
-               className={`multi-select-item ${languages.includes(language) ? 'selected' : ''} ${isLanguagePreSelected(language) ? 'pre-selected' : ''}`}
-             >
-               <input
-                type="checkbox"
-                 checked={languages.includes(language)}
-                onChange={() => onLanguageToggle(language)}
-                 disabled={isLanguagePreSelected(language) && languages.includes(language)}
-               />
-               &nbsp;{language}
-             </label>
-           ))}
+            {languagesList.map(language => {
+              const langName = typeof language === 'object' ? language.name : language;
+              return (
+              <label 
+               key={langName} 
+                className={`multi-select-item ${languages.includes(langName) ? 'selected' : ''} ${isLanguagePreSelected(langName) ? 'pre-selected' : ''}`}
+              >
+                <input
+                 type="checkbox"
+                  checked={languages.includes(langName)}
+                 onChange={() => onLanguageToggle(langName)}
+                  disabled={isLanguagePreSelected(langName) && languages.includes(langName)}
+                />
+                &nbsp;{langName}
+              </label>
+            );
+          })}
          </div>
          {errors.languages && <span className="error-message">{errors.languages}</span>}
        </div>
@@ -93,20 +96,23 @@ function WizardStepLanguages({ formData, errors, onLanguageToggle, onFightingSty
        <div className="form-group">
          <label>Fighting Styles</label>
          <div className="multi-select-container multi-select-compact">
-           {fightingStylesList.map(style => (
-             <label 
-              key={style} 
-              className={`multi-select-item ${fightingStyles.includes(style) ? 'selected' : ''} ${isFightingStylePreSelected(style) ? 'pre-selected' : ''}`}
-             >
-               <input
-                type="checkbox"
-                checked={fightingStyles.includes(style)}
-                onChange={() => onFightingStyleToggle(style)}
-                 disabled={isFightingStylePreSelected(style) && fightingStyles.includes(style)}
-               />
-               &nbsp;{style}
-             </label>
-           ))}
+            {fightingStylesList.map(style => {
+              const styleName = typeof style === 'object' ? style.name : style;
+              return (
+              <label 
+               key={styleName} 
+               className={`multi-select-item ${fightingStyles.includes(styleName) ? 'selected' : ''} ${isFightingStylePreSelected(styleName) ? 'pre-selected' : ''}`}
+              >
+                <input
+                 type="checkbox"
+                 checked={fightingStyles.includes(styleName)}
+                 onChange={() => onFightingStyleToggle(styleName)}
+                  disabled={isFightingStylePreSelected(styleName) && fightingStyles.includes(styleName)}
+                />
+                &nbsp;{styleName}
+              </label>
+            );
+          })}
          </div>
          {errors.fightingStyles && <span className="error-message">{errors.fightingStyles}</span>}
        </div>
