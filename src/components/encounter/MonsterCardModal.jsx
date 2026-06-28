@@ -216,25 +216,19 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
     }
 
     // Check Bulwark of Force half cover — applies to all attacks, independent of map data
-    console.log('[BOF] Start check', { targetName: target?.name, charactersCount: characters?.length, isAutoMiss });
     if (!isAutoMiss && characters) {
       for (const player of characters) {
-        console.log('[BOF] Checking player', player.name, 'type:', player.type);
         const bulwarkActive = getRuntimeValue(player.name, 'bulwarkOfForceActive');
-        console.log('[BOF]', player.name, 'bulwarkActive:', bulwarkActive, 'typeof:', typeof bulwarkActive);
         if (bulwarkActive) {
           const bulwarkTargets = getRuntimeValue(player.name, 'bulwarkOfForceTargets') || [];
-          console.log('[BOF]', player.name, 'targets:', bulwarkTargets, 'includes target:', bulwarkTargets.includes(target?.name));
           if (bulwarkTargets.includes(target?.name) && coverAcBonus < 2) {
             coverAcBonus = 2;
             coverLevel = 'half';
-            console.log('[BOF] Applied cover, coverAcBonus:', coverAcBonus);
             break;
           }
         }
       }
     }
-    console.log('[BOF] Final coverAcBonus:', coverAcBonus);
 
     rollAttack(name, bonus, {
       damageType: formatDamageTypes(primaryDamageType),

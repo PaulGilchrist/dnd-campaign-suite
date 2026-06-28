@@ -5114,8 +5114,8 @@
         "description": "Psi Warriors awaken the power of their minds to augment their physical might. They harness this psionic power to infuse their weapon strikes, lash out with telekinetic energy, and create barriers of mental force.",
         "features": [
           {
-            "name": "Psionic Power",
-            "description": "Psionic Energy Dice: Level 3: d6 x6. Level 9: d8 x8. Level 11: d10 x8. Level 13: d10 x10. Level 17: d12 x12. Protective Field: Reaction to reduce damage by die roll + Intelligence modifier. Psionic Strike: Once per turn, after hitting with weapon attack, deal extra Force damage (die + Intelligence). Telekinetic Movement: Action to move object or willing creature up to 30 feet.",
+            "name": "Psionic Strike",
+            "description": "Psionic Strike. You can propel your weapons with psionic force. Once on each of your turns, immediately after you hit a target within 30 feet of yourself with an attack and deal damage to it with a weapon, you can expend one Psionic Energy Die, rolling it and dealing Force damage to the target equal to the number rolled plus your Intelligence modifier.",
             "level": 3,
             "automation": {
               "type": "psionic_strike",
@@ -5123,7 +5123,7 @@
               "damageExpression": "psionic_energy_die + INT modifier",
               "damageType": "Force",
               "oncePerTurn": true,
-              "casting_time": "1 reaction, after attack"
+              "casting_time": "1 reaction"
             }
           },
           {
@@ -5154,7 +5154,7 @@
           },
           {
             "name": "Telekinetic Adept",
-            "description": "Psi-Powered Leap - Bonus Action Fly Speed (2x Speed) until end of turn. Telekinetic Thrust - on Psionic Strike damage, force Strength save or be Prone/pushed 10 feet.",
+            "description": "Psi-Powered Leap - Bonus Action Fly Speed (2x Speed) until end of turn. Telekinetic Thrust - When you deal damage to a target with your Psionic Strike, you can force the target to make a Strength saving throw (DC 8 plus your intelligence modifier and Proficiency Bonus). On a failed save, you can give the target the Prone condition or transport it up to 10 feet horizontally.  Once you utalize this Bonus Action, you can't do so again until you finish a Short or Long Rest unless you expend a Psionic Energy Die (no action required) to restore your use of it.",
             "level": 7,
             "automation": [
               {
