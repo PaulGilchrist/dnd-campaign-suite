@@ -5,6 +5,9 @@ import { evaluateAutoExpression } from '../../../combat/automation/automationSer
 import { getCombatContext, getTargetFromAttacker } from '../../../rules/combat/damageUtils.js';
 import { loadCombatSummary } from '../../../encounters/combatData.js';
 import { applyDamageToTarget } from '../../../rules/combat/applyDamage.js';
+import { buildSaveDc, createSaveListener } from '../../common/savePrompt.js';
+import storage from '../../../../services/ui/storage.js';
+import { addCondition } from '../../../../services/combat/conditions/conditionSaveService.js';
 
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
@@ -75,6 +78,60 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         await setRuntimeValue(playerName, 'psionicStrikeUsedThisTurn', currentTurn, campaignName);
     }
 
+    let thrustResult = null;
+    const thrustAutomation = playerStats.automation?.reactions?.find(r => r.type === 'telekinetic_thrust');
+    if (thrustAutomation) {
+        const saveType = thrustAutomation.saveType || 'STR';
+        const saveDc = buildSaveDc(thrustAutomation, playerStats);
+        const { promise } = createSaveListener(campaignName, {
+            targetName,
+            saveType,
+            saveDc,
+        });
+
+        await addEntry(campaignName, {
+            type: 'roll',
+            name: 'Telekinetic Adept',
+            characterName: playerName,
+            rollType: 'save-damage',
+            targetName,
+            saveDc,
+            saveType,
+            description: `Telekinetic Adept — ${targetName} must make a ${saveType} saving throw (DC ${saveDc}).`,
+        }).catch(() => {});
+
+        const saveResult = await promise;
+        const success = saveResult.success;
+
+        if (success) {
+            thrustResult = `${targetName} saved vs Telekinetic Adept (DC ${saveDc}).`;
+        } else {
+            const cs = await getCombatContext(campaignName);
+            if (cs?.creatures) {
+                const targetCreature = cs.creatures.find(c => c.name === targetName);
+                if (targetCreature) {
+                    const proneAlready = targetCreature.conditions?.some(c => c.key === 'prone');
+                    if (!proneAlready) {
+                        const conditionDef = { key: 'prone', label: 'Prone' };
+                        addCondition(cs, targetName, conditionDef, 0, null, getRuntimeValue, setRuntimeValue, campaignName, playerStats);
+                        storage.set('combatSummary', cs, campaignName);
+                    }
+                }
+            }
+            const storedEffects = getRuntimeValue(campaignName, 'targetEffects') || [];
+            storedEffects.push({
+                target: targetName,
+                source: 'Telekinetic Adept',
+                option: 'Push 10ft',
+                effect: 'push',
+                value: 10,
+                duration: 'until_start_of_next_turn',
+            });
+            setRuntimeValue(campaignName, 'targetEffects', storedEffects, campaignName);
+            thrustResult = `${targetName} failed the ${saveType} save (DC ${saveDc}) — Prone + pushed 10ft.`;
+        }
+    }
+
     await addEntry(campaignName, {
         type: 'ability_use',
         characterName: playerName,
@@ -92,6 +149,11 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         description: `${action.name} dealt ${totalDamage} Force damage to ${targetName}.`,
     }).catch(() => {});
 
+    let description = `${action.name}: Dealt <strong>${totalDamage}</strong> Force damage to ${targetName}. (Rolled ${psionicDieSize} for ${dieValue} + INT ${intMod}). Psionic Energy: ${currentUses - 1}/${defaultMax}.`;
+    if (thrustResult) {
+        description += `<br/><br/>${thrustResult}`;
+    }
+
     return {
         type: 'popup',
         payload: {
@@ -99,7 +161,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             name: action.name,
             automationType: auto.type,
             targetName,
-            description: `${action.name}: Dealt <strong>${totalDamage}</strong> Force damage to ${targetName}. (Rolled ${psionicDieSize} for ${dieValue} + INT ${intMod}). Psionic Energy: ${currentUses - 1}/${defaultMax}.`,
+            description,
             automation: auto,
         },
     };

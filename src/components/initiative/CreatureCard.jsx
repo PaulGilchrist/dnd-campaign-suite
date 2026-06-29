@@ -149,7 +149,7 @@ function CreatureCard({
                         </div>
                     )
                 })}
-                <ConditionEffectBadges conditions={creature.conditions} targetEffects={myTargetEffects} creatureName={creature.name} campaignName={campaignName} hasTacticalShift={hasTacticalShift} hasSpeedyOpportunityDisadvantage={hasSpeedyOpportunityDisadvantage} hasSpeedyDifficultTerrainIgnore={hasSpeedyDifficultTerrainIgnore} />
+                <ConditionEffectBadges conditions={creature.conditions} targetEffects={myTargetEffects} creatureName={creature.name} campaignName={campaignName} hasTacticalShift={hasTacticalShift} hasSpeedyOpportunityDisadvantage={hasSpeedyOpportunityDisadvantage} hasSpeedyDifficultTerrainIgnore={hasSpeedyDifficultTerrainIgnore} isLocalhost={isLocalhost} />
                 {isLocalhost && (
                     <button
                         className='condition-add-btn'

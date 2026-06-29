@@ -31,9 +31,25 @@ vi.mock('../../../rules/combat/applyDamage.js', () => ({
     applyDamageToTarget: vi.fn(),
 }));
 
+vi.mock('../../common/savePrompt.js', () => ({
+    buildSaveDc: vi.fn(() => 14),
+    createSaveListener: vi.fn(),
+}));
+
+vi.mock('../../../../services/ui/storage.js', () => ({
+    default: {
+        set: vi.fn(() => Promise.resolve()),
+    },
+}));
+
+vi.mock('../../../../services/combat/conditions/conditionSaveService.js', () => ({
+    addCondition: vi.fn(),
+}));
+
 import { getCombatContext, getTargetFromAttacker } from '../../../rules/combat/damageUtils.js';
 import { loadCombatSummary } from '../../../encounters/combatData.js';
 import { applyDamageToTarget } from '../../../rules/combat/applyDamage.js';
+import { buildSaveDc, createSaveListener } from '../../common/savePrompt.js';
 
 const { getRuntimeValue, setRuntimeValue } = runtimeState;
 const { addEntry } = logService;
@@ -518,6 +534,184 @@ describe('psionicStrikeHandler', () => {
             expect(setRuntimeValue).not.toHaveBeenCalled();
             expect(rollExpression).not.toHaveBeenCalled();
             expect(addEntry).not.toHaveBeenCalled();
+        });
+    });
+
+    describe('telekinetic thrust integration', () => {
+        function setupWithThrust(saveResult = { success: true, total: 15, roll: 12, saveBonus: 3 }) {
+            getRuntimeValue.mockImplementation((player, key, _campaign) => {
+                if (player === 'characters' && key === 'characters') return [];
+                if (key === 'psionicEnergy') return 5;
+                if (key === 'psionicStrikeUsedThisTurn') return null;
+                if (key === 'currentTurn') return 'turn-1';
+                return null;
+            });
+            rollExpression.mockReturnValue(makeRollResult(5));
+            setRuntimeValue.mockResolvedValue(undefined);
+            getCombatContext.mockResolvedValue({
+                creatures: [{ name: 'Target Goblin', conditions: [] }],
+            });
+            buildSaveDc.mockReturnValue(14);
+            createSaveListener.mockReturnValue({
+                promptId: 'test-id',
+                promise: Promise.resolve(saveResult),
+            });
+        }
+
+        const playerWithThrust = makePlayerStats({
+            automation: {
+                reactions: [{ type: 'telekinetic_thrust', saveType: 'STR', saveDc: 'ability', saveAbility: 'INT', options: [{ name: 'Prone + Push 10ft', effect: 'prone_and_push', value: 10 }] }],
+            },
+        });
+
+        it('does nothing when player lacks telekinetic_thrust automation', async () => {
+            getRuntimeValue.mockImplementation((player, key, _campaign) => {
+                if (player === 'characters' && key === 'characters') return [];
+                if (key === 'psionicEnergy') return 5;
+                if (key === 'psionicStrikeUsedThisTurn') return null;
+                if (key === 'currentTurn') return 'turn-1';
+                return null;
+            });
+            rollExpression.mockReturnValue(makeRollResult(5));
+            setRuntimeValue.mockResolvedValue(undefined);
+
+            const result = await handle(makeAction(), makePlayerStats(), 'test-campaign');
+
+            expect(result.payload.description).not.toContain('saved');
+            expect(result.payload.description).not.toContain('failed');
+        });
+
+        it('creates save listener when telekinetic_thrust is present', async () => {
+            setupWithThrust();
+
+            await handle(makeAction(), playerWithThrust, 'test-campaign');
+
+            expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
+                type: 'roll',
+                rollType: 'save-damage',
+                targetName: 'Target Goblin',
+                saveType: 'STR',
+                saveDc: 14,
+            }));
+        });
+
+        it('reports success in description when save passes', async () => {
+            setupWithThrust();
+
+            const result = await handle(makeAction(), playerWithThrust, 'test-campaign');
+
+            expect(result.payload.description).toContain('saved vs Telekinetic Adept');
+        });
+
+        it('applies prone condition when save fails', async () => {
+            setupWithThrust({ success: false, total: 10, roll: 6, saveBonus: 4 });
+
+            await handle(makeAction(), playerWithThrust, 'test-campaign');
+
+            const storageModule = await import('../../../../services/ui/storage.js');
+            const storageCalls = storageModule.default.set.mock.calls.filter(
+                call => call[0] === 'combatSummary'
+            );
+            expect(storageCalls.length).toBeGreaterThan(0);
+
+            const { addCondition } = await import('../../../../services/combat/conditions/conditionSaveService.js');
+            expect(addCondition).toHaveBeenCalled();
+            const addConditionCall = addCondition.mock.calls[0];
+            expect(addConditionCall[1]).toBe('Target Goblin');
+            expect(addConditionCall[2].key).toBe('prone');
+        });
+
+        it('does not duplicate prone when already present', async () => {
+            setupWithThrust({ success: false, total: 10, roll: 6, saveBonus: 4 });
+            getCombatContext.mockResolvedValue({
+                creatures: [{ name: 'Target Goblin', conditions: [{ key: 'prone', source: 'other' }] }],
+            });
+
+            await handle(makeAction(), playerWithThrust, 'test-campaign');
+
+            const storageModule = await import('../../../../services/ui/storage.js');
+            const storageCalls = storageModule.default.set.mock.calls.filter(
+                call => call[0] === 'combatSummary'
+            );
+            expect(storageCalls.length).toBe(0);
+
+            const { addCondition } = await import('../../../../services/combat/conditions/conditionSaveService.js');
+            expect(addCondition).not.toHaveBeenCalled();
+        });
+
+        it('stores targetEffects when save fails', async () => {
+            setupWithThrust({ success: false, total: 10, roll: 6, saveBonus: 4 });
+            getRuntimeValue.mockImplementation((player, key, _campaign) => {
+                if (player === 'characters' && key === 'characters') return [];
+                if (key === 'psionicEnergy') return 5;
+                if (key === 'psionicStrikeUsedThisTurn') return null;
+                if (key === 'currentTurn') return 'turn-1';
+                if (key === 'targetEffects') return [];
+                return null;
+            });
+
+            await handle(makeAction(), playerWithThrust, 'test-campaign');
+
+            const effectsCalls = setRuntimeValue.mock.calls.filter(
+                call => call[1] === 'targetEffects'
+            );
+            expect(effectsCalls.length).toBeGreaterThan(0);
+            expect(effectsCalls[0][2]).toEqual(
+                expect.arrayContaining([
+                    expect.objectContaining({
+                        target: 'Target Goblin',
+                        source: 'Telekinetic Adept',
+                        effect: 'push',
+                        value: 10,
+                        duration: 'until_start_of_next_turn',
+                    }),
+                ])
+            );
+        });
+
+        it('logs a roll entry for the save prompt', async () => {
+            setupWithThrust();
+
+            await handle(makeAction(), playerWithThrust, 'test-campaign');
+
+            expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
+                type: 'roll',
+                rollType: 'save-damage',
+                targetName: 'Target Goblin',
+                saveType: 'STR',
+                saveDc: 14,
+            }));
+        });
+
+        it('reports failure in description when save fails', async () => {
+            setupWithThrust({ success: false, total: 10, roll: 6, saveBonus: 4 });
+
+            const result = await handle(makeAction(), playerWithThrust, 'test-campaign');
+
+            expect(result.payload.description).toContain('Prone + pushed 10ft');
+            expect(result.payload.description).toContain('failed');
+        });
+
+        it('handles missing combat context gracefully on save fail', async () => {
+            setupWithThrust({ success: false, total: 10, roll: 6, saveBonus: 4 });
+            getCombatContext
+                .mockResolvedValueOnce({
+                    creatures: [{ name: 'Target Goblin', conditions: [] }],
+                })
+                .mockResolvedValueOnce(null);
+            getRuntimeValue.mockImplementation((player, key, _campaign) => {
+                if (player === 'characters' && key === 'characters') return [];
+                if (key === 'psionicEnergy') return 5;
+                if (key === 'psionicStrikeUsedThisTurn') return null;
+                if (key === 'currentTurn') return 'turn-1';
+                if (key === 'targetEffects') return [];
+                return null;
+            });
+
+            const result = await handle(makeAction(), playerWithThrust, 'test-campaign');
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain('failed');
         });
     });
 });

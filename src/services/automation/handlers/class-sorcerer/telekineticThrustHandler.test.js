@@ -24,6 +24,16 @@ vi.mock('../../common/savePrompt.js', () => ({
     createSaveListener: vi.fn(),
 }));
 
+vi.mock('../../../../services/ui/storage.js', () => ({
+    default: {
+        set: vi.fn(() => Promise.resolve()),
+    },
+}));
+
+vi.mock('../../../../services/combat/conditions/conditionSaveService.js', () => ({
+    addCondition: vi.fn(),
+}));
+
 const makeAction = (auto = {}) => ({
     name: 'Telekinetic Thrust',
     automation: { type: 'telekinetic_thrust', saveType: 'STR', options: [], ...auto },
@@ -48,6 +58,17 @@ describe('telekineticThrustHandler', () => {
     });
 
     describe('handle', () => {
+        function setupSaveMock() {
+            savePrompt.createSaveListener.mockReturnValue({
+                promptId: 'test-id',
+                promise: Promise.resolve({ success: true, total: 15, roll: 12, saveBonus: 3 }),
+            });
+        }
+
+        beforeEach(() => {
+            runtimeState.getRuntimeValue.mockReturnValue([]);
+        });
+
         it('should return info popup when no options available', async () => {
             const result = await handle(makeAction(), makePlayerStats(), 'campaign', 'map');
 
@@ -56,30 +77,33 @@ describe('telekineticThrustHandler', () => {
             expect(result.payload.description).toContain('ready');
         });
 
-        it('should return modal when options are available', async () => {
+        it('should return no-target popup when options exist but no target', async () => {
             const result = await handle(makeActionWithOptions(), makePlayerStats(), 'campaign', 'map');
 
-            expect(result.type).toBe('modal');
-            expect(result.modalName).toBe('telekineticThrust');
-            expect(result.payload.saveDc).toBe(13);
-            expect(result.payload.saveType).toBe('STR');
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain('No target selected');
         });
 
-        it('should include targetName in modal payload when combat context provides a target', async () => {
+        it('should create save listener when options exist and target is present', async () => {
+            setupSaveMock();
             damageUtils.getCombatContext.mockReturnValue({
                 attacker: { nextTargetAttacking: 'Goblin' },
             });
             damageUtils.getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
 
-            const result = await handle(makeActionWithOptions(), makePlayerStats(), 'campaign', 'map');
+            await handle(makeActionWithOptions(), makePlayerStats(), 'campaign', 'map');
 
-            expect(result.payload.targetName).toBe('Goblin');
+            expect(savePrompt.createSaveListener).toHaveBeenCalledWith('campaign', {
+                targetName: 'Goblin',
+                saveType: 'STR',
+                saveDc: 13,
+            });
         });
 
-        it('should pass null targetName when no combat context exists', async () => {
+        it('should pass null targetName to applyTelekineticThrust when no combat context exists', async () => {
             const result = await handle(makeActionWithOptions(), makePlayerStats(), 'campaign', 'map');
 
-            expect(result.payload.targetName).toBeNull();
+            expect(result.payload.description).toContain('No target selected');
         });
 
         it('should add campaign log entry for ability use', async () => {
@@ -114,15 +138,35 @@ describe('telekineticThrustHandler', () => {
         });
 
         it('should use custom saveType when specified in automation', async () => {
-            const result = await handle(makeActionWithOptions({ saveType: 'DEX' }), makePlayerStats(), 'campaign', 'map');
+            setupSaveMock();
+            damageUtils.getCombatContext.mockReturnValue({
+                attacker: { nextTargetAttacking: 'Goblin' },
+            });
+            damageUtils.getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
 
-            expect(result.payload.saveType).toBe('DEX');
+            await handle(makeActionWithOptions({ saveType: 'DEX' }), makePlayerStats(), 'campaign', 'map');
+
+            expect(savePrompt.createSaveListener).toHaveBeenCalledWith('campaign', {
+                targetName: 'Goblin',
+                saveType: 'DEX',
+                saveDc: 13,
+            });
         });
 
         it('should default saveType to STR when not specified', async () => {
-            const result = await handle(makeActionWithOptions(), makePlayerStats(), 'campaign', 'map');
+            setupSaveMock();
+            damageUtils.getCombatContext.mockReturnValue({
+                attacker: { nextTargetAttacking: 'Goblin' },
+            });
+            damageUtils.getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
 
-            expect(result.payload.saveType).toBe('STR');
+            await handle(makeActionWithOptions(), makePlayerStats(), 'campaign', 'map');
+
+            expect(savePrompt.createSaveListener).toHaveBeenCalledWith('campaign', {
+                targetName: 'Goblin',
+                saveType: 'STR',
+                saveDc: 13,
+            });
         });
 
         it('should call buildSaveDc with automation and playerStats', async () => {
@@ -134,12 +178,17 @@ describe('telekineticThrustHandler', () => {
             );
         });
 
-        it('should pass action and playerStats in modal payload', async () => {
+        it('should return a popup with save result when target exists and save resolves', async () => {
+            setupSaveMock();
+            damageUtils.getCombatContext.mockReturnValue({
+                attacker: { nextTargetAttacking: 'Goblin' },
+            });
+            damageUtils.getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
+
             const result = await handle(makeActionWithOptions(), makePlayerStats(), 'campaign', 'map');
 
-            expect(result.payload.action).toBeInstanceOf(Object);
-            expect(result.payload.playerStats).toBeInstanceOf(Object);
-            expect(result.payload.campaignName).toBe('campaign');
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain('Success');
         });
     });
 
@@ -323,6 +372,9 @@ describe('telekineticThrustHandler', () => {
                 promise: Promise.resolve({ success: false, total: 10, roll: 8, saveBonus: 2 }),
             });
             runtimeState.getRuntimeValue.mockReturnValue([]);
+            damageUtils.getCombatContext.mockResolvedValue({
+                creatures: [{ name: 'Goblin', conditions: [] }],
+            });
 
             await applyTelekineticThrust(
                 makeActionWithOptions(),
@@ -342,7 +394,7 @@ describe('telekineticThrustHandler', () => {
                     expect.objectContaining({
                         target: 'Goblin',
                         source: 'Telekinetic Thrust',
-                        effect: 'prone_and_push',
+                        effect: 'push',
                         value: 10,
                         duration: 'until_start_of_next_turn',
                     }),
@@ -369,10 +421,16 @@ describe('telekineticThrustHandler', () => {
                 'STR'
             );
 
-            const combatContextCalls = runtimeState.setRuntimeValue.mock.calls.filter(
-                (call) => call[1] === 'combatContext'
+            const storageCalls = (await import('../../../../services/ui/storage.js')).default.set.mock.calls.filter(
+                (call) => call[0] === 'combatSummary'
             );
-            expect(combatContextCalls.length).toBeGreaterThan(0);
+            expect(storageCalls.length).toBeGreaterThan(0);
+
+            const { addCondition } = await import('../../../../services/combat/conditions/conditionSaveService.js');
+            expect(addCondition).toHaveBeenCalled();
+            const addConditionCall = addCondition.mock.calls[0];
+            expect(addConditionCall[1]).toBe('Goblin');
+            expect(addConditionCall[2].key).toBe('prone');
         });
 
         it('should not duplicate prone condition when target already has it', async () => {
@@ -394,10 +452,13 @@ describe('telekineticThrustHandler', () => {
                 'STR'
             );
 
-            const combatContextCalls = runtimeState.setRuntimeValue.mock.calls.filter(
-                (call) => call[1] === 'combatContext'
+            const storageCalls = (await import('../../../../services/ui/storage.js')).default.set.mock.calls.filter(
+                (call) => call[0] === 'combatSummary'
             );
-            expect(combatContextCalls.length).toBe(0);
+            expect(storageCalls.length).toBe(0);
+
+            const { addCondition } = await import('../../../../services/combat/conditions/conditionSaveService.js');
+            expect(addCondition).not.toHaveBeenCalled();
         });
 
         it('should handle missing combatContext gracefully on failure', async () => {

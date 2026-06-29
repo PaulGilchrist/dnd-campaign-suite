@@ -167,6 +167,10 @@ function clearCombat(characters, npcCount, getName) {
 }
 
 function mergeCombatSummaryWithCharacters(initialSummary, characters, getName) {
+    if (!initialSummary?.creatures) {
+        const creatures = setupCreatures(characters, 0, getName)
+        return { round: 1, creatures }
+    }
     const creatureNameSet = new Set(initialSummary.creatures.map(c => c.name))
     const mergedCreatures = initialSummary.creatures.map(c => {
         if (c.type === 'player') {

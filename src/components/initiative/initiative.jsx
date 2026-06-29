@@ -101,7 +101,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
     const [turnStartTick, setTurnStartTick] = React.useState(0)
 
     const displayCreatures = React.useMemo(() => {
-        if (!combatSummary) return []
+        if (!combatSummary || !combatSummary.creatures) return []
         return combatSummary.creatures.map(c => {
             if (c.type !== 'player') return c
             const character = characters.find(ch => utils.getName(ch.name) === c.name)
@@ -187,8 +187,9 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
         if (!event.key.startsWith(`change-${campaignName}-`)) return
 
         const dataKey = event.key.slice(`change-${campaignName}-`.length)
-          if (dataKey === 'combatSummary') {
-              const prevRound = combatSummaryRef.current?.round ?? 1
+           if (dataKey === 'combatSummary') {
+               if (!event.data?.creatures) return
+               const prevRound = combatSummaryRef.current?.round ?? 1
                combatSummaryRef.current = event.data
               setCombatSummaryG(event.data)
               if (event.data.round !== prevRound) {
@@ -309,7 +310,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
         ;(async () => {
             const initialSummary = await loadCombatSummary(campaignName)
 
-            if (initialSummary) {
+            if (initialSummary && initialSummary.creatures) {
                 const merged = mergeCombatSummaryWithCharacters(initialSummary, characters, utils.getName)
 
                 if (cancelled) return
@@ -652,7 +653,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
     return (
         <div className='initiative'>
             <Subscriber campaignName={campaignName} handleEvent={handleEvent} />
-            {combatSummary ? (
+            {combatSummary && combatSummary.creatures ? (
              <>
              <h4>Initiative (round {combatSummary.round})</h4>
              <div className='carousel-container' ref={carouselRef}>

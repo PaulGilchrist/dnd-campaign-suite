@@ -2,6 +2,8 @@ import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useR
 import { addEntry } from '../../../ui/logService.js';
 import { getCombatContext, getTargetFromAttacker } from '../../../rules/combat/damageUtils.js';
 import { buildSaveDc, createSaveListener } from '../../common/savePrompt.js';
+import storage from '../../../../services/ui/storage.js';
+import { addCondition } from '../../../combat/conditions/conditionSaveService.js';
 
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
@@ -21,18 +23,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     const saveDc = buildSaveDc(auto, playerStats);
 
     if (options.length > 0) {
-        return {
-            type: 'modal',
-            modalName: 'telekineticThrust',
-            payload: {
-                action,
-                playerStats,
-                campaignName,
-                targetName,
-                saveDc,
-                saveType: auto.saveType || 'STR',
-            },
-        };
+        return applyTelekineticThrust(action, playerStats, campaignName, targetName, saveDc, auto.saveType || 'STR');
     }
 
     return {
@@ -123,31 +114,31 @@ export async function applyTelekineticThrust(action, playerStats, campaignName, 
 async function applyThrustEffect(action, playerStats, campaignName, targetName, option) {
     if (!targetName) return;
 
+    const combatContext = await getCombatContext(campaignName);
+    if (!combatContext || !combatContext.creatures) return;
+
+    const targetCreature = combatContext.creatures.find(c => c.name === targetName);
+    if (!targetCreature) return;
+
+    const proneAlready = targetCreature.conditions?.some(c => c.key === 'prone');
+    if (proneAlready) return;
+
+    const conditionDef = { key: 'prone', label: 'Prone' };
+    addCondition(combatContext, targetName, conditionDef, 0, null, getRuntimeValue, setRuntimeValue, campaignName, playerStats);
+    storage.set('combatSummary', combatContext, campaignName);
+
     const storedEffects = getRuntimeValue(campaignName, 'targetEffects') || [];
+    const pushValue = option.value || 10;
     const newEffect = {
         target: targetName,
         source: action.name,
         option: option.name,
-        effect: option.effect,
-        value: option.value || null,
+        effect: 'push',
+        value: pushValue,
         duration: 'until_start_of_next_turn',
     };
     const updatedEffects = [...storedEffects, newEffect];
     setRuntimeValue(campaignName, 'targetEffects', updatedEffects, campaignName);
-
-    // Apply prone condition to the target
-    const combatContext = await getCombatContext(campaignName);
-    if (combatContext && combatContext.creatures) {
-        const targetCreature = combatContext.creatures.find(c => c.name === targetName);
-        if (targetCreature) {
-            const conditions = targetCreature.conditions || [];
-            const proneAlready = conditions.some(c => c.key === 'prone');
-            if (!proneAlready) {
-                conditions.push({ key: 'prone', source: action.name });
-                setRuntimeValue(campaignName, 'combatContext', combatContext, campaignName);
-            }
-        }
-    }
 }
 
 function buildResultMessage(actionName, targetName, option, saveDc, saveType, success) {

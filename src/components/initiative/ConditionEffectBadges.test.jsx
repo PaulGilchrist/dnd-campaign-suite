@@ -1,7 +1,19 @@
 // @improved-by-ai
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import ConditionEffectBadges from './ConditionEffectBadges.jsx';
+import * as runtimeState from '../../hooks/runtime/useRuntimeState.js';
+
+vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
+    getRuntimeValue: vi.fn(),
+    setRuntimeValue: vi.fn(),
+}));
+
+vi.mock('../../services/ui/storage.js', () => ({
+    default: {
+        set: vi.fn(),
+    },
+}));
 
 const defaultEffects = {
     cannotAct: false,
@@ -37,6 +49,7 @@ vi.mock('../../services/combat/conditions/conditionEffects.js', () => ({
 
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
     getRuntimeValue: vi.fn(() => null),
+    setRuntimeValue: vi.fn(),
 }));
 
 import { computeConditionEffects } from '../../services/combat/conditions/conditionEffects.js';
@@ -463,6 +476,44 @@ describe('ConditionEffectBadges', () => {
             expect(screen.getByText('Adv vs')).toBeInTheDocument();
             expect(screen.getByText('Disadv')).toBeInTheDocument();
             expect(screen.getByText('No Conc.')).toBeInTheDocument();
+        });
+    });
+
+    describe('GM effect removal', () => {
+        it('should render X button for removable effects when isLocalhost is true', () => {
+            computeConditionEffects.mockReturnValue(makeEffects({ pushEffect: true, pushDistance: 10, proneEffect: true }));
+            render(<ConditionEffectBadges conditions={[]} targetEffects={[{ target: 'Goblin', effect: 'push', value: 10 }]} creatureName="Goblin" campaignName="test" isLocalhost={true} />);
+            const pushBadge = screen.getByText('Push 10 ft').closest('.condition-effect-badge');
+            expect(pushBadge.querySelector('.effect-break-btn')).toBeInTheDocument();
+        });
+
+        it('should not render X button when isLocalhost is false', () => {
+            computeConditionEffects.mockReturnValue(makeEffects({ pushEffect: true, pushDistance: 10 }));
+            render(<ConditionEffectBadges conditions={[]} targetEffects={[{ target: 'Goblin', effect: 'push', value: 10 }]} creatureName="Goblin" campaignName="test" isLocalhost={false} />);
+            const pushBadge = screen.getByText('Push 10 ft').closest('.condition-effect-badge');
+            expect(pushBadge.querySelector('.effect-break-btn')).toBeNull();
+        });
+
+        it('should not render X button for non-removable effects', () => {
+            computeConditionEffects.mockReturnValue(makeEffects({ cannotAct: true, speedZero: true }));
+            render(<ConditionEffectBadges conditions={[]} targetEffects={[]} creatureName="Goblin" campaignName="test" isLocalhost={true} />);
+            const badges = document.querySelectorAll('.condition-effect-badge');
+            badges.forEach(badge => {
+                expect(badge.querySelector('.effect-break-btn')).toBeNull();
+            });
+        });
+
+        it('should remove targetEffects entry when X is clicked', () => {
+            const existingEffects = [
+                { target: 'Goblin', effect: 'push', value: 10, source: 'Test' },
+                { target: 'Goblin', effect: 'push', value: 15, source: 'Other' },
+            ];
+            runtimeState.getRuntimeValue.mockReturnValue(existingEffects);
+            computeConditionEffects.mockReturnValue(makeEffects({ pushEffect: true, pushDistance: 10 }));
+            render(<ConditionEffectBadges conditions={[]} targetEffects={existingEffects} creatureName="Goblin" campaignName="test" isLocalhost={true} />);
+            const pushBadge = screen.getByText('Push 10 ft').closest('.condition-effect-badge');
+            fireEvent.click(pushBadge.querySelector('.effect-break-btn'));
+            expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith('test', 'targetEffects', [existingEffects[1]], 'test');
         });
     });
 });
