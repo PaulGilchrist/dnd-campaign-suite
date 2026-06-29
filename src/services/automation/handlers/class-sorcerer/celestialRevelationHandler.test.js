@@ -23,6 +23,18 @@ vi.mock('../buffs/buffHandler.js', () => ({
     handle: vi.fn(() => null),
 }));
 
+vi.mock('../buffs/conditionHandler.js', () => ({
+    handle: vi.fn(() => ({
+        type: 'modal',
+        modalName: 'setCondition',
+        payload: {
+            conditionName: 'frightened',
+            saveType: 'CHA',
+            rangeFeet: 10,
+        },
+    })),
+}));
+
 vi.mock('../combat/saveAttackHandler.js', () => ({
     handle: vi.fn(() => null),
 }));
@@ -394,7 +406,7 @@ describe('celestialRevelationHandler', () => {
             expect(result.payload.description).toContain('1 minute or until you end it');
         });
 
-        it('returns popup with transformation description for Necrotic Shroud', async () => {
+        it('returns setCondition modal for Necrotic Shroud', async () => {
             runtimeState.getRuntimeValue.mockReturnValue(1);
 
             const result = await confirmCelestialRevelation(
@@ -403,11 +415,10 @@ describe('celestialRevelationHandler', () => {
                 campaignName
             );
 
-            expect(result.payload.description).toContain('Transforming into Necrotic Shroud');
-            expect(result.payload.description).toContain(
-                'Your eyes become pools of darkness'
-            );
-            expect(result.payload.description).toContain('1 minute or until you end it');
+            expect(result.type).toBe('setCondition');
+            expect(result.payload.conditionName).toBe('frightened');
+            expect(result.payload.saveType).toBe('CHA');
+            expect(result.payload.rangeFeet).toBe(10);
         });
 
         it('handles unknown option with empty description fallback', async () => {

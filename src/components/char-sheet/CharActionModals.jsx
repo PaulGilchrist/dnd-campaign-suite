@@ -421,6 +421,7 @@ export default function CharActionModals({
                 <CelestialRevelationModal
                     {...celestialRevelationModal}
                     onClose={() => setCelestialRevelationModal(null)}
+                    onSetConditionModal={setSetConditionModal}
                 />
             )}
             {fiendishLegacyModal && (

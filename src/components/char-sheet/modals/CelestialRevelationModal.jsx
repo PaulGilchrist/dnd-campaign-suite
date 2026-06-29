@@ -8,7 +8,7 @@ const TRANSFORMATION_OPTIONS = [
     { name: 'Necrotic Shroud', description: 'Your eyes become pools of darkness, and flightless wings sprout from your back. Creatures within 10 feet (other than allies) must make a CHA saving throw or be Frightened until the end of your next turn.', icon: 'fa-skull', damageType: 'Necrotic' },
 ];
 
-function CelestialRevelationModal({ action: _action, playerStats, campaignName, onClose }) {
+function CelestialRevelationModal({ action: _action, playerStats, campaignName, onClose, onSetConditionModal }) {
     const [selected, setSelected] = useState(null);
     const [applied, setApplied] = useState(false);
     const [result, setResult] = useState(null);
@@ -16,6 +16,11 @@ function CelestialRevelationModal({ action: _action, playerStats, campaignName, 
     const handleApply = async () => {
         if (!selected) return;
         const res = await confirmCelestialRevelation(playerStats, selected, campaignName);
+        if (res?.type === 'setCondition') {
+            onClose();
+            onSetConditionModal(res.payload);
+            return;
+        }
         setResult(res);
         setApplied(true);
     };

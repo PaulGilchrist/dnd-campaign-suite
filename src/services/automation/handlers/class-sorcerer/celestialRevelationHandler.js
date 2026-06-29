@@ -3,7 +3,7 @@ import { addExpiration } from '../../../rules/effects/expirations.js';
 import { toggleBuff } from '../../common/buffToggle.js';
 import { addEntry } from '../../../ui/logService.js';
 import { handle as handleBuff } from '../buffs/buffHandler.js';
-import { handle as handleSaveAttack } from '../combat/saveAttackHandler.js';
+import { handle as handleCondition } from '../buffs/conditionHandler.js';
 import { handle as handleAttackRider } from '../combat/attackRiderHandler.js';
 import { applyAuraDamage } from '../../../rules/effects/expirations.js';
 
@@ -171,39 +171,24 @@ export async function confirmCelestialRevelation(playerStats, chosenOption, camp
             damageType: 'Radiant',
         });
     } else if (chosenOption === 'Necrotic Shroud') {
-        // save_attack for CHA save, frightened condition
-        const saveResult = await handleSaveAttack({
+        const conditionResult = await handleCondition({
             name: chosenOption,
             automation: {
-                type: 'save_attack',
+                type: 'set_condition',
                 saveType: 'CHA',
                 saveDc: 'ability',
-                conditionInflicted: 'frightened',
-                shape: 'emanation_10_ft',
-                range: '10_ft',
+                condition: 'frightened',
+                range: '10 ft',
                 duration: 'until_end_of_next_turn',
-                recharge: 'long_rest',
                 casting_time: '1 bonus action',
             },
         }, playerStats, campaignName, null);
-        if (saveResult?.type === 'popup' && saveResult.payload?.description) {
-            popupDescriptions.push(saveResult.payload.description);
-        }
 
-        // attack_rider for necrotic damage on hit
-        const riderResult = await handleAttackRider({
-            name: chosenOption,
-            automation: {
-                type: 'attack_rider',
-                damageExpression: 'proficiency_bonus',
-                damageType: 'Necrotic',
-                trigger: 'hit',
-                oncePerTurn: true,
-                casting_time: 'passive',
-            },
-        }, playerStats, campaignName, null);
-        if (riderResult?.type === 'popup' && riderResult.payload?.description) {
-            popupDescriptions.push(riderResult.payload.description);
+        if (conditionResult?.type === 'modal' && conditionResult.modalName === 'setCondition') {
+            return {
+                type: 'setCondition',
+                payload: conditionResult.payload,
+            };
         }
     }
 

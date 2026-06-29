@@ -93,6 +93,7 @@ export async function handle(action, playerStats, campaignName, mapName) {
             durationRounds: (() => {
                 const lower = (auto.duration || '').toLowerCase();
                 if (lower.startsWith('1_minute')) return 10;
+                if (lower.startsWith('until_end_of_next_turn')) return 2;
                 const match = lower.match(/(\d+)_round/);
                 if (match) return parseInt(match[1], 10);
                 return undefined;
