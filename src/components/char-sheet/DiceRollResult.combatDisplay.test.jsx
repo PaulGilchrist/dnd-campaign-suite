@@ -494,11 +494,11 @@ describe('DiceRollResult', () => {
                     type="damage"
                     rolls={[6, 5, 4]}
                     bonus={0}
+                    total={15}
                     finalDamage={8}
                     damageApplied={true}
                     damageReduced={true}
                     targetName="Orc"
-                    originalTotal={15}
                 />
             );
             const damageEl = container.querySelector('.dice-roll-damage-applied');

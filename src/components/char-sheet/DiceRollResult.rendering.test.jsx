@@ -72,9 +72,9 @@ describe('DiceRollResult', () => {
 
         it('shows correct total with modifier', () => {
             render(
-                <DiceRollResult name="Test" type="damage" rolls={[6, 4]} bonus={0} modifier={3} />
+                <DiceRollResult name="Test" type="damage" rolls={[6, 4]} bonus={0} total={10} modifier={3} />
             );
-            expect(screen.getByText('13')).toBeInTheDocument();
+            expect(screen.getByText('10')).toBeInTheDocument();
         });
 
         it('shows correct total with both bonus and modifier', () => {
@@ -121,7 +121,7 @@ describe('DiceRollResult', () => {
 
         it('handles empty rolls array for non-d20', () => {
             const { container } = render(
-                <DiceRollResult name="Test" type="damage" rolls={[]} bonus={5} />
+                <DiceRollResult name="Test" type="damage" rolls={[]} bonus={5} total={5} />
             );
             expect(container.querySelector('.dice-roll-total').textContent).toBe('5');
         });
@@ -228,7 +228,7 @@ describe('DiceRollResult', () => {
 
         it('shows sum of all rolls for non-d20 type', () => {
             render(
-                <DiceRollResult name="Fireball" type="damage" rolls={[6, 5, 4]} bonus={0} />
+                <DiceRollResult name="Fireball" type="damage" rolls={[6, 5, 4]} bonus={0} total={15} />
             );
             expect(screen.getByText('15')).toBeInTheDocument();
         });

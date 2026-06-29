@@ -1,15 +1,9 @@
-// @improved-by-ai
 import { handle, applyTelekineticLeap } from './telekineticLeapHandler.js';
 import * as runtimeState from '../../../../hooks/runtime/useRuntimeState.js';
-import * as buffToggle from '../../common/buffToggle.js';
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
     getRuntimeValue: vi.fn(),
     setRuntimeValue: vi.fn(),
-}));
-
-vi.mock('../../common/buffToggle.js', () => ({
-    toggleBuff: vi.fn(),
 }));
 
 const makeAction = (auto = {}) => ({
@@ -35,7 +29,7 @@ describe('telekineticLeapHandler', () => {
 
     describe('handle', () => {
         it('should activate buff and return popup with fly speed description when not already active', async () => {
-            buffToggle.toggleBuff.mockReturnValue({ wasActive: false });
+            runtimeState.getRuntimeValue.mockReturnValue(null);
 
             const result = await handle(makeAction(), makePlayerStats(), 'campaign', 'map');
 
@@ -45,93 +39,179 @@ describe('telekineticLeapHandler', () => {
             expect(result.payload.automationType).toBe('telekinetic_leap');
             expect(result.payload.description).toContain('activated');
             expect(result.payload.description).toContain('Fly Speed 60');
-            expect(buffToggle.toggleBuff).toHaveBeenCalledWith(
+            expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
                 'TestHero',
-                'Telekinetic Leap',
-                expect.objectContaining({ effect: 'telekinetic_leap', flySpeed: 60 }),
-                'campaign',
-                'TestHero'
+                'activeBuffs',
+                expect.arrayContaining([
+                    expect.objectContaining({
+                        name: 'Telekinetic Leap',
+                        effect: 'telekinetic_leap',
+                        flySpeed: 60,
+                        leapEffect: true,
+                    }),
+                ]),
+                'campaign'
             );
         });
 
-        it('should deactivate buff and return popup when already active', async () => {
-            buffToggle.toggleBuff.mockReturnValue({ wasActive: true });
+        it('should show popup when already active and no psionic energy remaining', async () => {
+            runtimeState.getRuntimeValue
+                .mockReturnValueOnce([
+                    { name: 'Telekinetic Leap', effect: 'telekinetic_leap', leapEffect: true },
+                ])
+                .mockReturnValueOnce(0);
 
             const result = await handle(makeAction(), makePlayerStats(), 'campaign', 'map');
 
             expect(result.type).toBe('popup');
-            expect(result.payload.description).toMatch(/deactivated/);
-            expect(result.payload.automationType).toBe('telekinetic_leap');
+            expect(result.payload.type).toBe('automation_info');
+            expect(result.payload.description).toContain('already active');
+            expect(result.payload.description).toContain('Psionic Energy Die');
+            expect(runtimeState.setRuntimeValue).not.toHaveBeenCalledWith('TestHero', 'psionicEnergy', expect.any(Number), 'campaign');
+        });
+
+        it('should spend a psionic energy die and show refresh popup when already active with energy available', async () => {
+            runtimeState.getRuntimeValue
+                .mockReturnValueOnce([
+                    { name: 'Telekinetic Leap', effect: 'telekinetic_leap', leapEffect: true },
+                ])
+                .mockReturnValueOnce(3);
+
+            const result = await handle(makeAction(), makePlayerStats(), 'campaign', 'map');
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.type).toBe('automation_info');
+            expect(result.payload.description).toContain('refreshed');
+            expect(result.payload.description).toContain('spent 1 Psionic Energy Die');
+            expect(result.payload.description).toContain('Fly Speed 60');
+            expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith('TestHero', 'psionicEnergy', 2, 'campaign');
+        });
+
+        it('should not deactivate on second click — always either activate or refresh', async () => {
+            // First click: not active → activates
+            runtimeState.getRuntimeValue.mockReturnValueOnce([]);
+            const firstResult = await handle(makeAction(), makePlayerStats(), 'campaign', 'map');
+            expect(firstResult.payload.description).toContain('activated');
+
+            // Second click: already active → refreshes (spends energy) or shows popup
+            runtimeState.getRuntimeValue
+                .mockReturnValueOnce([
+                    { name: 'Telekinetic Leap', effect: 'telekinetic_leap', leapEffect: true },
+                ])
+                .mockReturnValueOnce(5);
+            const secondResult = await handle(makeAction(), makePlayerStats(), 'campaign', 'map');
+            expect(secondResult.payload.description).toContain('refreshed');
+            expect(secondResult.payload.description).not.toContain('deactivated');
         });
 
         it('should compute fly speed as 2x player base speed when flySpeed is 2x_speed', async () => {
-            buffToggle.toggleBuff.mockReturnValue({ wasActive: false });
+            runtimeState.getRuntimeValue.mockReturnValue([]);
 
             await handle(makeAction(), makePlayerStats(), 'campaign', 'map');
 
-            expect(buffToggle.toggleBuff).toHaveBeenCalledWith(
+            expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
                 'TestHero',
-                'Telekinetic Leap',
-                expect.objectContaining({ flySpeed: 60 }),
-                'campaign',
-                'TestHero'
+                'activeBuffs',
+                expect.arrayContaining([
+                    expect.objectContaining({ flySpeed: 60 }),
+                ]),
+                'campaign'
             );
         });
 
         it('should compute fly speed using custom base speed when playerStats.speed differs', async () => {
-            buffToggle.toggleBuff.mockReturnValue({ wasActive: false });
+            runtimeState.getRuntimeValue.mockReturnValue([]);
 
             await handle(makeAction(), { name: 'TestHero', speed: 40 }, 'campaign', 'map');
 
-            expect(buffToggle.toggleBuff).toHaveBeenCalledWith(
+            expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
                 'TestHero',
-                'Telekinetic Leap',
-                expect.objectContaining({ flySpeed: 80 }),
-                'campaign',
-                'TestHero'
+                'activeBuffs',
+                expect.arrayContaining([
+                    expect.objectContaining({ flySpeed: 80 }),
+                ]),
+                'campaign'
             );
         });
 
         it('should default to 30 base speed when playerStats.speed is missing', async () => {
-            buffToggle.toggleBuff.mockReturnValue({ wasActive: false });
+            runtimeState.getRuntimeValue.mockReturnValue([]);
 
             await handle(makeAction(), { name: 'TestHero' }, 'campaign', 'map');
 
-            expect(buffToggle.toggleBuff).toHaveBeenCalledWith(
+            expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
                 'TestHero',
-                'Telekinetic Leap',
-                expect.objectContaining({ flySpeed: 60 }),
-                'campaign',
-                'TestHero'
+                'activeBuffs',
+                expect.arrayContaining([
+                    expect.objectContaining({ flySpeed: 60 }),
+                ]),
+                'campaign'
             );
         });
 
         it('should use custom flySpeed value directly when not 2x_speed', async () => {
-            buffToggle.toggleBuff.mockReturnValue({ wasActive: false });
+            runtimeState.getRuntimeValue.mockReturnValue([]);
 
             await handle(makeActionCustomSpeed(), makePlayerStats(), 'campaign', 'map');
 
-            expect(buffToggle.toggleBuff).toHaveBeenCalledWith(
+            expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
                 'TestHero',
-                'Telekinetic Leap',
-                expect.objectContaining({ flySpeed: 60 }),
-                'campaign',
-                'TestHero'
+                'activeBuffs',
+                expect.arrayContaining([
+                    expect.objectContaining({ flySpeed: 60 }),
+                ]),
+                'campaign'
             );
         });
 
         it('should default to 30 base speed when playerStats.speed is 0', async () => {
-            buffToggle.toggleBuff.mockReturnValue({ wasActive: false });
+            runtimeState.getRuntimeValue.mockReturnValue([]);
 
             await handle(makeAction(), { name: 'TestHero', speed: 0 }, 'campaign', 'map');
 
-            expect(buffToggle.toggleBuff).toHaveBeenCalledWith(
+            expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
                 'TestHero',
-                'Telekinetic Leap',
-                expect.objectContaining({ flySpeed: 60 }),
-                'campaign',
-                'TestHero'
+                'activeBuffs',
+                expect.arrayContaining([
+                    expect.objectContaining({ flySpeed: 60 }),
+                ]),
+                'campaign'
             );
+        });
+
+        it('should use _trackedResources max when getRuntimeValue returns undefined for psionicEnergy', async () => {
+            runtimeState.getRuntimeValue
+                .mockReturnValueOnce([
+                    { name: 'Telekinetic Leap', effect: 'telekinetic_leap', leapEffect: true },
+                ])
+                .mockReturnValueOnce(undefined);
+
+            const playerStats = {
+                name: 'TestHero',
+                _trackedResources: { psionicEnergy: { max: 8 } },
+            };
+
+            const result = await handle(makeAction(), playerStats, 'campaign', 'map');
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain('refreshed');
+            expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith('TestHero', 'psionicEnergy', 7, 'campaign');
+        });
+
+        it('should default max psionic energy to 6 when no tracked resources', async () => {
+            runtimeState.getRuntimeValue
+                .mockReturnValueOnce([
+                    { name: 'Telekinetic Leap', effect: 'telekinetic_leap', leapEffect: true },
+                ])
+                .mockReturnValueOnce(undefined);
+
+            const playerStats = { name: 'TestHero' };
+
+            const result = await handle(makeAction(), playerStats, 'campaign', 'map');
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain('refreshed');
+            expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith('TestHero', 'psionicEnergy', 5, 'campaign');
         });
     });
 
