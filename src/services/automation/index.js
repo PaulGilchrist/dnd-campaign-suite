@@ -245,7 +245,13 @@ const HANDLER_MAP = {
     reaction_debuff: handleReactionDebuff,
     reaction_spell: handleReactionSpell,
     interception: handleInterception,
-    damage_reduction: handleDamageReduction,
+    damage_reduction: (action, playerStats, campaignName, mapName) => {
+        const auto = action.automation;
+        if (auto?.cost?.resource === 'psionicEnergy') {
+            return handleProtectiveField(action, playerStats, campaignName, mapName);
+        }
+        return handleDamageReduction(action, playerStats, campaignName, mapName);
+    },
     arcane_ward: handleArcaneWard,
     projected_ward: handleArcaneWard,
     arcane_ward_bonus_action: handleArcaneWardBonusActionRestore,

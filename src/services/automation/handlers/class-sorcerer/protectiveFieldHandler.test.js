@@ -5,6 +5,9 @@ import * as runtimeState from '../../../../hooks/runtime/useRuntimeState.js';
 import * as logService from '../../../ui/logService.js';
 import * as automationService from '../../../combat/automation/automationService.js';
 import * as diceRoller from '../../../dice/diceRoller.js';
+import * as damageUtils from '../../../rules/combat/damageUtils.js';
+import * as applyHealing from '../../../rules/combat/applyHealing.js';
+import * as damageRollback from '../../common/damageRollback.js';
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
     getRuntimeValue: vi.fn(),
@@ -21,6 +24,26 @@ vi.mock('../../../combat/automation/automationService.js', () => ({
 
 vi.mock('../../../dice/diceRoller.js', () => ({
     rollExpression: vi.fn(),
+}));
+
+vi.mock('../../../rules/combat/damageUtils.js', () => ({
+    getCombatContext: vi.fn(),
+}));
+
+vi.mock('../../../rules/combat/applyHealing.js', () => ({
+    applyHealingToTarget: vi.fn(),
+}));
+
+vi.mock('../../common/damageRollback.js', () => ({
+    findLastAttack: vi.fn().mockResolvedValue({
+        attackEvent: null,
+        attackerName: null,
+        targetName: null,
+        primaryDamage: 0,
+        secondaryDamage: 0,
+        totalDamage: 0,
+        damageTypes: [],
+    }),
 }));
 
 const makeAction = (auto = {}) => ({
@@ -40,6 +63,18 @@ describe('protectiveFieldHandler', () => {
         runtimeState.getRuntimeValue.mockReturnValue(6);
         automationService.evaluateAutoExpression.mockReturnValue(6);
         diceRoller.rollExpression.mockReturnValue({ total: 4 });
+        damageUtils.getCombatContext.mockResolvedValue({
+            players: [{ name: 'TestHero', hp: 50, maxHp: 50 }],
+        });
+        damageRollback.findLastAttack.mockResolvedValue({
+            attackEvent: { targetName: 'TestHero', attackerName: 'Goblin' },
+            attackerName: 'Goblin',
+            targetName: 'TestHero',
+            primaryDamage: 12,
+            secondaryDamage: 0,
+            totalDamage: 12,
+            damageTypes: ['slashing'],
+        });
     });
 
     describe('handle', () => {
@@ -239,6 +274,54 @@ describe('protectiveFieldHandler', () => {
             expect(runtimeState.getRuntimeValue).toHaveBeenCalledWith('TestHero', 'psionicEnergy', 'my-campaign');
             expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith('TestHero', 'psionicEnergy', 5, 'my-campaign');
             expect(logService.addEntry).toHaveBeenCalledWith('my-campaign', expect.any(Object));
+        });
+
+        it('applies healing to target for reduction amount when attack found', async () => {
+            await handle(makeAction(), makePlayerStats(), 'campaign', 'map');
+
+            expect(applyHealing.applyHealingToTarget).toHaveBeenCalledWith(
+                expect.anything(),
+                'TestHero',
+                7,
+                'campaign'
+            );
+        });
+
+        it('does not apply healing when no attack found', async () => {
+            damageRollback.findLastAttack.mockResolvedValue({
+                attackEvent: null,
+                attackerName: null,
+                targetName: null,
+                totalDamage: 0,
+            });
+
+            await handle(makeAction(), makePlayerStats(), 'campaign', 'map');
+
+            expect(applyHealing.applyHealingToTarget).not.toHaveBeenCalled();
+        });
+
+        it('does not apply healing when reduction is zero', async () => {
+            diceRoller.rollExpression.mockReturnValue({ total: 0 });
+            automationService.evaluateAutoExpression.mockReturnValue(0);
+            const playerStats = { name: 'TestHero', abilities: [{ name: 'Intelligence', bonus: 0 }] };
+
+            await handle(makeAction(), playerStats, 'campaign', 'map');
+
+            expect(applyHealing.applyHealingToTarget).not.toHaveBeenCalled();
+        });
+
+        it('includes defender name in popup when attack found', async () => {
+            const result = await handle(makeAction(), makePlayerStats(), 'campaign', 'map');
+
+            expect(result.payload.description).toContain('Damage to TestHero reduced.');
+        });
+
+        it('includes defender name in log entry when attack found', async () => {
+            await handle(makeAction(), makePlayerStats(), 'campaign', 'map');
+
+            expect(logService.addEntry).toHaveBeenCalledWith('campaign', expect.objectContaining({
+                description: expect.stringContaining('Damage reduced to TestHero.'),
+            }));
         });
     });
 });
