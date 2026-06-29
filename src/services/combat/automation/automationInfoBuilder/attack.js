@@ -243,7 +243,8 @@ export const attackHandlers = {
             attacks: auto.attacks || 2,
             weaponRequirement: auto.weaponRequirement || null,
             attack_type: auto.attack_type || 'ranged',
-            hasAutomation: true
+            hasAutomation: true,
+            automation: auto,
         }
     },
 

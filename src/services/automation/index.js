@@ -472,10 +472,16 @@ export async function executeHandler(action, playerStats, campaignName, mapName)
 
     let auto = action.automation;
 
-    // Some features (e.g. Guarded Mind) have an array of automation entries
-    // (passive resistance + active expend-resource). Find the actionable one.
+    // Some features (e.g. Guarded Mind, Telekinetic Master) have an array of
+    // automation entries (passive resistance + active uses). Find the first
+    // actionable one: skip passive_rule entries (they have no runtime handler),
+    // and prefer entries with a registered handler.
     if (Array.isArray(auto)) {
-        const actionable = auto.find(a => a?.casting_time || a?.action || a?.trigger);
+        const actionable = auto.find(a => {
+            if (!a) return false;
+            if (a.type === 'passive_rule') return PASSIVE_RULE_EFFECTS[a.effect];
+            return (a.casting_time || a.action || a.trigger) && HANDLER_MAP[a.type];
+        });
         if (!actionable) return null;
         action = { ...action, automation: actionable };
         auto = actionable;

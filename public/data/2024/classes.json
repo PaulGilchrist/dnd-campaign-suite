@@ -5222,15 +5222,6 @@
                 "spells": [
                   "Telekinesis"
                 ],
-                "casting_time": "passive"
-              },
-              {
-                "type": "free_spell",
-                "spell": "Telekinesis",
-                "concentration": true,
-                "noConcentration": false,
-                "action": "action",
-                "duration": "Concentration, up to 10 minutes",
                 "casting_time": "1 action"
               },
               {
@@ -5240,6 +5231,15 @@
                 "weaponAttack": true,
                 "concentrationSpell": "Telekinesis",
                 "casting_time": "1 bonus action"
+              },
+              {
+                "type": "free_spell",
+                "spell": "Telekinesis",
+                "concentration": true,
+                "noConcentration": false,
+                "action": "action",
+                "duration": "Concentration, up to 10 minutes",
+                "casting_time": "1 action"
               }
             ]
           }

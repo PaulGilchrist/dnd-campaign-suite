@@ -7,52 +7,54 @@
       "name": "Strength",
       "baseScore": 14,
       "featIncrease": 0,
-      "miscIncrease": 0,
-      "backgroundIncrease": 0
+      "backgroundIncrease": 0,
+      "miscIncrease": 0
     },
     {
       "name": "Dexterity",
       "baseScore": 8,
       "featIncrease": 0,
-      "miscIncrease": 0,
-      "backgroundIncrease": 0
+      "backgroundIncrease": 1,
+      "miscIncrease": 0
     },
     {
       "name": "Constitution",
       "baseScore": 14,
       "featIncrease": 0,
-      "miscIncrease": 0,
-      "backgroundIncrease": 0
+      "backgroundIncrease": 1,
+      "miscIncrease": 0
     },
     {
       "name": "Intelligence",
       "baseScore": 10,
       "featIncrease": 0,
-      "miscIncrease": 0,
-      "backgroundIncrease": 0
+      "backgroundIncrease": 0,
+      "miscIncrease": 0
     },
     {
       "name": "Wisdom",
       "baseScore": 15,
       "featIncrease": 0,
-      "miscIncrease": 0,
-      "backgroundIncrease": 0
+      "backgroundIncrease": 0,
+      "miscIncrease": 0
     },
     {
       "name": "Charisma",
       "baseScore": 10,
       "featIncrease": 0,
-      "miscIncrease": 0,
-      "backgroundIncrease": 0
+      "backgroundIncrease": 1,
+      "miscIncrease": 0
     }
   ],
   "background": "Charlatan",
   "class": {
     "name": "Cleric",
     "subclass": {
-      "name": "Trickery Domain",
+      "name": "Life Domain",
       "type": ""
-    }
+    },
+    "divineOrder": "Protector",
+    "primalOrder": ""
   },
   "expertSkills": [],
   "feats": [],

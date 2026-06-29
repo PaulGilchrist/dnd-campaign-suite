@@ -19,6 +19,7 @@ const INTERACTIVE_HANDLER_TYPES = new Set([
     'weapon_kind_mastery',
     'weapon_mastery_choice',
     'tactical_mind',
+    'concentration_bonus_attack',
 ]);
 
 const INTERACTIVE_PASSIVE_EFFECTS = new Set([

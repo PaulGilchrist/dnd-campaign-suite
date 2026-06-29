@@ -1,14 +1,26 @@
 // @improved-by-ai
 import { handle } from './concentrationBonusAttackHandler.js';
 import { getCombatSummary } from '../../../encounters/combatData.js';
-import { automationInfoPopup } from '../../../shared/popupResponse.js';
+import { addConcentration } from '../../../combat/concentration/concentrationService.js';
+import storage from '../../../ui/storage.js';
+import { addEntry } from '../../../ui/logService.js';
 
 vi.mock('../../../encounters/combatData.js', () => ({
     getCombatSummary: vi.fn(),
 }));
 
-vi.mock('../../../shared/popupResponse.js', () => ({
-    automationInfoPopup: vi.fn(),
+vi.mock('../../../combat/concentration/concentrationService.js', () => ({
+    addConcentration: vi.fn(),
+}));
+
+vi.mock('../../../ui/storage.js', () => ({
+    default: {
+        set: vi.fn(),
+    },
+}));
+
+vi.mock('../../../ui/logService.js', () => ({
+    addEntry: vi.fn().mockResolvedValue(undefined),
 }));
 
 describe('concentrationBonusAttackHandler', () => {
@@ -17,6 +29,7 @@ describe('concentrationBonusAttackHandler', () => {
 
     const baseAction = {
         name: 'Telekinetic Master',
+        description: 'Always have Telekinesis spell prepared. Cast without spell slot. On each turn while maintaining Concentration, make one weapon attack as Bonus Action.',
         automation: {
             type: 'concentration_bonus_attack',
             concentrationSpell: 'Telekinesis',
@@ -29,186 +42,182 @@ describe('concentrationBonusAttackHandler', () => {
     });
 
     describe('concentration check', () => {
-        it('returns info popup when no concentration is active', async () => {
+        it('sets concentration on Telekinesis at DC 10 when no concentration is active', async () => {
             getCombatSummary.mockReturnValue({
                 creatures: [{ name: 'TestCharacter', concentration: null }],
             });
 
             const result = await handle(baseAction, mockPlayerStats, campaignName);
 
+            expect(addConcentration).toHaveBeenCalledWith(
+                expect.objectContaining({ creatures: expect.any(Array) }),
+                'TestCharacter',
+                'Telekinesis',
+                10,
+            );
+            expect(storage.set).toHaveBeenCalledWith(
+                'combatSummary',
+                expect.objectContaining({ creatures: expect.any(Array) }),
+                campaignName,
+            );
+            expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+                type: 'ability_use',
+                characterName: 'TestCharacter',
+                abilityName: 'Telekinetic Master',
+            }));
             expect(result).toEqual({
                 type: 'popup',
                 payload: {
                     type: 'automation_info',
                     name: 'Telekinetic Master',
-                    description: 'Telekinetic Master requires Concentration on Telekinesis to use.',
+                    automationType: 'concentration_bonus_attack',
+                    description: expect.stringContaining('Concentrating on'),
                     automation: baseAction.automation,
                 },
             });
-            expect(automationInfoPopup).not.toHaveBeenCalled();
         });
 
-        it('returns info popup when concentration is on a different spell', async () => {
+        it('overwrites existing concentration when on a different spell', async () => {
             getCombatSummary.mockReturnValue({
                 creatures: [{ name: 'TestCharacter', concentration: { spell: 'Bless', dc: 10 } }],
             });
 
             const result = await handle(baseAction, mockPlayerStats, campaignName);
 
-            expect(result).toEqual({
-                type: 'popup',
-                payload: {
-                    type: 'automation_info',
-                    name: 'Telekinetic Master',
-                    description: 'Telekinetic Master requires Concentration on Telekinesis to use.',
-                    automation: baseAction.automation,
-                },
-            });
-            expect(automationInfoPopup).not.toHaveBeenCalled();
+            expect(addConcentration).toHaveBeenCalledWith(
+                expect.any(Object),
+                'TestCharacter',
+                'Telekinesis',
+                10,
+            );
+            expect(storage.set).toHaveBeenCalled();
+            expect(addEntry).toHaveBeenCalled();
+            expect(result.payload.description).toContain('Concentrating on');
         });
 
-        it('returns info popup when concentration object has no spell field', async () => {
+        it('overwrites existing concentration when concentration object has no spell field', async () => {
             getCombatSummary.mockReturnValue({
                 creatures: [{ name: 'TestCharacter', concentration: {} }],
             });
 
             const result = await handle(baseAction, mockPlayerStats, campaignName);
 
-            expect(result).toEqual({
-                type: 'popup',
-                payload: {
-                    type: 'automation_info',
-                    name: 'Telekinetic Master',
-                    description: 'Telekinetic Master requires Concentration on Telekinesis to use.',
-                    automation: baseAction.automation,
-                },
-            });
-            expect(automationInfoPopup).not.toHaveBeenCalled();
+            expect(addConcentration).toHaveBeenCalledWith(
+                expect.any(Object),
+                'TestCharacter',
+                'Telekinesis',
+                10,
+            );
+            expect(storage.set).toHaveBeenCalled();
+            expect(addEntry).toHaveBeenCalled();
+            expect(result.payload.description).toContain('Concentrating on');
         });
 
-        it('delegates to automationInfoPopup when concentration on correct spell', async () => {
-            const expectedPopupResult = { type: 'popup', payload: { type: 'automation_info', name: 'Action', automationType: 'test', description: 'desc', automation: {} } };
-            automationInfoPopup.mockReturnValue(expectedPopupResult);
+        it('does not set concentration when already concentrating on Telekinesis', async () => {
             getCombatSummary.mockReturnValue({
                 creatures: [{ name: 'TestCharacter', concentration: { spell: 'Telekinesis', dc: 12 } }],
             });
 
             const result = await handle(baseAction, mockPlayerStats, campaignName);
 
-            expect(automationInfoPopup).toHaveBeenCalledWith(baseAction);
-            expect(result).toBe(expectedPopupResult);
+            expect(addConcentration).not.toHaveBeenCalled();
+            expect(storage.set).not.toHaveBeenCalled();
+            expect(addEntry).not.toHaveBeenCalled();
+            expect(result.payload.description).toContain('Concentrating on');
         });
     });
 
     describe('default concentration spell', () => {
         const actionWithoutSpell = {
             name: 'Test Feature',
+            description: 'Test description.',
             automation: {
                 type: 'concentration_bonus_attack',
                 action: 'bonus_action',
             },
         };
 
-        it('uses Telekinesis as default when concentrationSpell is not specified and creature has it', async () => {
-            automationInfoPopup.mockReturnValue({ popup: 'ok' });
+        it('uses Telekinesis as default and does not set concentration when creature already has it', async () => {
             getCombatSummary.mockReturnValue({
                 creatures: [{ name: 'TestCharacter', concentration: { spell: 'Telekinesis', dc: 12 } }],
             });
 
             const result = await handle(actionWithoutSpell, mockPlayerStats, campaignName);
 
-            expect(automationInfoPopup).toHaveBeenCalledWith(actionWithoutSpell);
-            expect(result).toEqual({ popup: 'ok' });
+            expect(addConcentration).not.toHaveBeenCalled();
+            expect(storage.set).not.toHaveBeenCalled();
+            expect(addEntry).not.toHaveBeenCalled();
+            expect(result.payload.description).toContain('Concentrating on');
         });
 
-        it('uses Telekinesis as default when concentrationSpell is not specified and creature lacks it', async () => {
+        it('uses Telekinesis as default and sets concentration when creature lacks it', async () => {
             getCombatSummary.mockReturnValue({
                 creatures: [{ name: 'TestCharacter', concentration: { spell: 'Bless', dc: 10 } }],
             });
 
             const result = await handle(actionWithoutSpell, mockPlayerStats, campaignName);
 
-            expect(result).toEqual({
-                type: 'popup',
-                payload: {
-                    type: 'automation_info',
-                    name: 'Test Feature',
-                    description: 'Test Feature requires Concentration on Telekinesis to use.',
-                    automation: actionWithoutSpell.automation,
-                },
-            });
+            expect(addConcentration).toHaveBeenCalledWith(
+                expect.any(Object),
+                'TestCharacter',
+                'Telekinesis',
+                10,
+            );
+            expect(storage.set).toHaveBeenCalled();
+            expect(addEntry).toHaveBeenCalled();
+            expect(result.payload.description).toContain('Concentrating on');
         });
     });
 
     describe('missing data handling', () => {
-        it('returns info popup when combat summary is null', async () => {
+        it('still adds campaign log entry when combat summary is null', async () => {
             getCombatSummary.mockReturnValue(null);
 
             const result = await handle(baseAction, mockPlayerStats, campaignName);
 
-            expect(result).toEqual({
-                type: 'popup',
-                payload: {
-                    type: 'automation_info',
-                    name: 'Telekinetic Master',
-                    description: 'Telekinetic Master requires Concentration on Telekinesis to use.',
-                    automation: baseAction.automation,
-                },
-            });
-            expect(automationInfoPopup).not.toHaveBeenCalled();
+            expect(addConcentration).not.toHaveBeenCalled();
+            expect(storage.set).not.toHaveBeenCalled();
+            expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+                type: 'ability_use',
+                characterName: 'TestCharacter',
+                abilityName: 'Telekinetic Master',
+            }));
+            expect(result.payload.description).toContain('Concentrating on');
         });
 
-        it('returns info popup when creatures array is undefined', async () => {
+        it('calls addConcentration when creatures array is undefined (no-op internally)', async () => {
             getCombatSummary.mockReturnValue({});
 
             const result = await handle(baseAction, mockPlayerStats, campaignName);
 
-            expect(result).toEqual({
-                type: 'popup',
-                payload: {
-                    type: 'automation_info',
-                    name: 'Telekinetic Master',
-                    description: 'Telekinetic Master requires Concentration on Telekinesis to use.',
-                    automation: baseAction.automation,
-                },
-            });
-            expect(automationInfoPopup).not.toHaveBeenCalled();
+            expect(addConcentration).toHaveBeenCalled();
+            expect(storage.set).toHaveBeenCalled();
+            expect(addEntry).toHaveBeenCalled();
+            expect(result.payload.description).toContain('Concentrating on');
         });
 
-        it('returns info popup when creatures array is empty', async () => {
+        it('calls addConcentration when creatures array is empty (no-op internally)', async () => {
             getCombatSummary.mockReturnValue({ creatures: [] });
 
             const result = await handle(baseAction, mockPlayerStats, campaignName);
 
-            expect(result).toEqual({
-                type: 'popup',
-                payload: {
-                    type: 'automation_info',
-                    name: 'Telekinetic Master',
-                    description: 'Telekinetic Master requires Concentration on Telekinesis to use.',
-                    automation: baseAction.automation,
-                },
-            });
-            expect(automationInfoPopup).not.toHaveBeenCalled();
+            expect(addConcentration).toHaveBeenCalled();
+            expect(storage.set).toHaveBeenCalled();
+            expect(addEntry).toHaveBeenCalled();
+            expect(result.payload.description).toContain('Concentrating on');
         });
 
-        it('returns info popup when creature is not found in combat summary', async () => {
+        it('calls addConcentration when creature is not found in combat summary (no-op internally)', async () => {
             getCombatSummary.mockReturnValue({
                 creatures: [{ name: 'OtherCharacter', concentration: { spell: 'Telekinesis', dc: 12 } }],
             });
 
             const result = await handle(baseAction, mockPlayerStats, campaignName);
 
-            expect(result).toEqual({
-                type: 'popup',
-                payload: {
-                    type: 'automation_info',
-                    name: 'Telekinetic Master',
-                    description: 'Telekinetic Master requires Concentration on Telekinesis to use.',
-                    automation: baseAction.automation,
-                },
-            });
-            expect(automationInfoPopup).not.toHaveBeenCalled();
+            expect(addConcentration).toHaveBeenCalled();
+            expect(storage.set).toHaveBeenCalled();
+            expect(addEntry).toHaveBeenCalled();
+            expect(result.payload.description).toContain('Concentrating on');
         });
     });
 
@@ -219,6 +228,9 @@ describe('concentrationBonusAttackHandler', () => {
             await handle(baseAction, mockPlayerStats, campaignName);
 
             expect(getCombatSummary).toHaveBeenCalledWith(campaignName);
+            expect(addConcentration).toHaveBeenCalled();
+            expect(storage.set).toHaveBeenCalled();
+            expect(addEntry).toHaveBeenCalled();
         });
 
         it('passes campaignName to getCombatSummary even when creature not found', async () => {
@@ -229,6 +241,9 @@ describe('concentrationBonusAttackHandler', () => {
             await handle(baseAction, mockPlayerStats, campaignName);
 
             expect(getCombatSummary).toHaveBeenCalledWith(campaignName);
+            expect(addConcentration).toHaveBeenCalled();
+            expect(storage.set).toHaveBeenCalled();
+            expect(addEntry).toHaveBeenCalled();
         });
     });
 });

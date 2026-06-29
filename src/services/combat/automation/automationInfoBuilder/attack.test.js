@@ -568,6 +568,7 @@ describe('attackHandlers – concentration_bonus_attack', () => {
             weaponRequirement: null,
             attack_type: 'ranged',
             hasAutomation: true,
+            automation: { type: 'concentration_bonus_attack' },
         })
     })
 
