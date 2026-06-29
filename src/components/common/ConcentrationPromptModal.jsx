@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import utils from '../../services/ui/utils.js';
 import { rollD20 } from '../../services/dice/diceRoller.js';
-import { sendConcentrationResult } from '../../services/combat/conditions/savePromptService.js';
+import { sendConcentrationResult, clearConcentrationPrompt } from '../../services/combat/conditions/savePromptService.js';
 import Subscriber from './Subscriber.jsx';
 import { computeAuraBonus } from '../../services/combat/auras/auraOfProtection.js';
 import { getAbilitySaveBonus } from '../../services/combat/conditions/conditionUtils.js';
@@ -105,6 +105,8 @@ function ConcentrationPromptModal({ campaignName, characters, activeMapName }) {
         ? { ...p, result: { success, roll, total, saveBonus: saveBonus + auraBonus, bonusDetail } }
         : p
     ));
+
+    clearConcentrationPrompt(campaignName, current.targetName);
   }, [campaignName, current, characters, activeMapName]);
 
   const handleNext = useCallback(() => {

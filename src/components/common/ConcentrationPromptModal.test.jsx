@@ -20,6 +20,7 @@ vi.mock('../../services/dice/diceRoller.js', () => ({
 
 vi.mock('../../services/combat/conditions/savePromptService.js', () => ({
   sendConcentrationResult: vi.fn(),
+  clearConcentrationPrompt: vi.fn(),
 }))
 
 vi.mock('../../services/combat/auras/auraOfProtection.js', () => ({

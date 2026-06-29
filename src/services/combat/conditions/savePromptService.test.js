@@ -10,6 +10,7 @@ import {
   sendDeathSaveResult,
   sendConcentrationPrompt,
   sendConcentrationResult,
+  clearConcentrationPrompt,
 } from './savePromptService.js';
 
 // Suppress unhandled rejection warnings from the service's fire-and-forget
@@ -114,21 +115,37 @@ describe('savePromptService', () => {
   });
 
   describe('clearSavePrompt', () => {
-    it('posts promptId to the cleared endpoint', () => {
+    it('sends a DELETE request to the correct endpoint with no body', () => {
       mockFetchResolved();
-      clearSavePrompt('Test Campaign', 'Goblin', 'prompt-123');
+      clearSavePrompt('Test Campaign', 'Goblin');
 
-      expectPostToCampaign(
-        globalThis.fetch,
-        'Test Campaign',
-        'savePromptCleared-Goblin',
-        { promptId: 'prompt-123' }
+      const expectedUrl = '/api/campaigns/Test%20Campaign/savePrompt-Goblin';
+      expect(globalThis.fetch).toHaveBeenCalledWith(
+        expectedUrl,
+        expect.objectContaining({
+          method: 'DELETE',
+        })
+      );
+
+      const callArgs = globalThis.fetch.mock.calls[0][1];
+      expect(callArgs.headers).toBeUndefined();
+      expect(callArgs.body).toBeUndefined();
+    });
+
+    it('URL-encodes special characters in the campaign name', () => {
+      mockFetchResolved();
+      clearSavePrompt('Campaign #1', 'T');
+
+      const expectedUrl = '/api/campaigns/Campaign%20%231/savePrompt-T';
+      expect(globalThis.fetch).toHaveBeenCalledWith(
+        expectedUrl,
+        expect.any(Object)
       );
     });
 
     it('does not propagate fetch rejections to the caller', () => {
       mockFetchRejected();
-      const result = clearSavePrompt('C', 'T', 'id');
+      const result = clearSavePrompt('C', 'T');
       expect(result).toBeUndefined();
     });
   });
@@ -245,6 +262,42 @@ describe('savePromptService', () => {
     it('does not propagate fetch rejections to the caller', () => {
       mockFetchRejected();
       const result = sendConcentrationResult('C', 'T', {});
+      expect(result).toBeUndefined();
+    });
+  });
+
+  describe('clearConcentrationPrompt', () => {
+    it('sends a DELETE request to the correct endpoint with no body', () => {
+      mockFetchResolved();
+      clearConcentrationPrompt('Test Campaign', 'Wizard');
+
+      const expectedUrl = '/api/campaigns/Test%20Campaign/concentrationPrompt-Wizard';
+      expect(globalThis.fetch).toHaveBeenCalledWith(
+        expectedUrl,
+        expect.objectContaining({
+          method: 'DELETE',
+        })
+      );
+
+      const callArgs = globalThis.fetch.mock.calls[0][1];
+      expect(callArgs.headers).toBeUndefined();
+      expect(callArgs.body).toBeUndefined();
+    });
+
+    it('URL-encodes special characters in the campaign name', () => {
+      mockFetchResolved();
+      clearConcentrationPrompt('Campaign #1', 'T');
+
+      const expectedUrl = '/api/campaigns/Campaign%20%231/concentrationPrompt-T';
+      expect(globalThis.fetch).toHaveBeenCalledWith(
+        expectedUrl,
+        expect.any(Object)
+      );
+    });
+
+    it('does not propagate fetch rejections to the caller', () => {
+      mockFetchRejected();
+      const result = clearConcentrationPrompt('C', 'T');
       expect(result).toBeUndefined();
     });
   });

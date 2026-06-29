@@ -40,7 +40,7 @@ function SavePromptModal({ campaignName, characters, activeMapName }) {
 
   const handleDismiss = useCallback(() => {
     if (current) {
-      clearSavePrompt(campaignName, current.targetName, current.promptId);
+      clearSavePrompt(campaignName, current.targetName);
       advance();
     }
   }, [campaignName, current, advance]);
@@ -127,6 +127,8 @@ function SavePromptModal({ campaignName, characters, activeMapName }) {
         ? { ...p, result: { success, roll: finalRoll, total, saveBonus: saveBonus + auraBonus, bonusDetail, rawRolls: [roll1, roll2], mode: rollMode } }
         : p
     ));
+
+    clearSavePrompt(campaignName, current.targetName);
   }, [campaignName, current, characters, activeMapName]);
 
   const handleNext = useCallback(() => {

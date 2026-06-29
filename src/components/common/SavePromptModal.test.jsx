@@ -296,7 +296,7 @@ describe('SavePromptModal', () => {
       expect(screen.queryByText(/must make a/i)).not.toBeInTheDocument();
     });
 
-    expect(clearSavePrompt).toHaveBeenCalledWith('test-campaign', 'testTarget', 'test-prompt-1');
+    expect(clearSavePrompt).toHaveBeenCalledWith('test-campaign', 'testTarget');
   });
 
   it('dismisses the prompt when overlay is clicked', async () => {
@@ -324,7 +324,7 @@ describe('SavePromptModal', () => {
       expect(screen.queryByText(/must make a/i)).not.toBeInTheDocument();
     });
 
-    expect(clearSavePrompt).toHaveBeenCalledWith('test-campaign', 'testTarget', 'test-prompt-1');
+    expect(clearSavePrompt).toHaveBeenCalledWith('test-campaign', 'testTarget');
   });
 
   it('does not dismiss when clicking inside the modal', async () => {

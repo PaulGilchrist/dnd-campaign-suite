@@ -16,12 +16,10 @@ export function sendSaveResult(campaignName, targetName, resultData) {
   }).catch((e) => { console.error("[savePromptService] Error:", e); });
 }
 
-export function clearSavePrompt(campaignName, targetName, promptId) {
-  const key = `savePromptCleared-${targetName}`;
+export function clearSavePrompt(campaignName, targetName) {
+  const key = `savePrompt-${targetName}`;
   fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/${key}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ value: { promptId } }),
+    method: 'DELETE',
   }).catch((e) => { console.error("[savePromptService] Error:", e); });
 }
 
@@ -65,5 +63,12 @@ export function sendConcentrationResult(campaignName, targetName, resultData) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ value: resultData }),
+  }).catch((e) => { console.error("[savePromptService] Error:", e); });
+}
+
+export function clearConcentrationPrompt(campaignName, targetName) {
+  const key = `concentrationPrompt-${targetName}`;
+  fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/${key}`, {
+    method: 'DELETE',
   }).catch((e) => { console.error("[savePromptService] Error:", e); });
 }
