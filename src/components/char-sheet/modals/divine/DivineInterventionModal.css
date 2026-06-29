@@ -1,0 +1,64 @@
+.divine-intervention-modal .divine-intervention-filters {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-bottom: 12px;
+}
+
+.divine-intervention-modal .divine-intervention-spell-list {
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.divine-intervention-modal .divine-intervention-spell-item {
+    padding: 8px 12px;
+    border-bottom: 1px solid #333;
+    cursor: pointer;
+}
+
+.divine-intervention-modal .divine-intervention-spell-item .spell-name {
+    font-weight: bold;
+}
+
+.divine-intervention-modal .divine-intervention-spell-item .spell-meta {
+    font-size: 0.85em;
+    color: #aaa;
+}
+
+.divine-intervention-modal .divine-intervention-selected-spell h3 {
+    margin: 0 0 8px 0;
+}
+
+.divine-intervention-modal .divine-intervention-selected-spell .spell-level-meta {
+    font-size: 0.9em;
+    color: #ccc;
+    margin-bottom: 8px;
+}
+
+.divine-intervention-modal .divine-intervention-selected-spell .spell-details {
+    font-size: 0.85em;
+    color: #aaa;
+    margin-bottom: 12px;
+}
+
+.divine-intervention-modal .divine-intervention-selected-spell .spell-description {
+    font-size: 0.85em;
+    color: #bbb;
+    margin-bottom: 12px;
+    max-height: 120px;
+    overflow-y: auto;
+}
+
+.divine-intervention-modal .divine-intervention-selected-spell .spell-description p {
+    margin: 4px 0;
+}
+
+.divine-intervention-modal .divine-intervention-selected-spell .spell-damage {
+    font-size: 0.85em;
+    color: #e8b84b;
+    margin-bottom: 8px;
+}
+
+.divine-intervention-modal .divine-intervention-selected-spell .back-btn {
+    margin-left: 8px;
+}

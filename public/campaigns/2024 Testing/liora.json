@@ -12,14 +12,14 @@
     },
     {
       "name": "Dexterity",
-      "baseScore": 8,
+      "baseScore": 9,
       "featIncrease": 0,
       "backgroundIncrease": 1,
       "miscIncrease": 0
     },
     {
       "name": "Constitution",
-      "baseScore": 14,
+      "baseScore": 15,
       "featIncrease": 0,
       "backgroundIncrease": 1,
       "miscIncrease": 0
@@ -33,20 +33,20 @@
     },
     {
       "name": "Wisdom",
-      "baseScore": 15,
+      "baseScore": 14,
       "featIncrease": 0,
-      "backgroundIncrease": 0,
+      "backgroundIncrease": 2,
       "miscIncrease": 0
     },
     {
       "name": "Charisma",
-      "baseScore": 10,
+      "baseScore": 9,
       "featIncrease": 0,
       "backgroundIncrease": 1,
       "miscIncrease": 0
     }
   ],
-  "background": "Charlatan",
+  "background": "Acolyte",
   "class": {
     "name": "Cleric",
     "subclass": {
@@ -89,9 +89,10 @@
     "gold": 10,
     "magicItems": []
   },
-  "languages": [],
+  "languages": [
+    "Common"
+  ],
   "resistances": [
-    "Poison",
     "Necrotic",
     "Radiant"
   ],
