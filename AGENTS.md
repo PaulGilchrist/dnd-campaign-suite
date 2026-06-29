@@ -113,3 +113,8 @@ npm run test:coverage                             # Vitest with coverage (v8, ou
 - **Prefer derived state over parallel state:** Compute `isCritDamage = isDamageType && (isCrit || isAutoCrit)` once, use it everywhere. Don't re-check `isCrit || isAutoCrit` scattered across the component.
 - **Remove dead code:** When refactoring, delete the old variables and branches that are no longer used. Don't leave orphaned code "just in case."
 - **Test-driven simplification:** When a test fails after simplification, fix the test or the logic — don't add complexity to make the test pass. The test should reflect the simplified design.
+
+# Core Rules
+- Never leave dead code.  It just confuses people later.
+- Look for and re-use existing code and avoid duplicating code.
+- If a map is active, use position on map, but if no map is active, assume all creatures are within range.
