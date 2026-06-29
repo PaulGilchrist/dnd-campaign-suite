@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import './diceRollResult.css';
 
-function DiceRollResult({ name, type, rolls, rollType, bonus = 0, bonusDetail, formula = '', modifier = 0, total = 0, targetName, targetAc, hit, resistanceNotice, hunterLoreNotice, forcedMode, isAutoMiss, rangeReason, coverReason, isAutoCrit, isCrit, isNatural1, dc, success, dcType, dcSuccess, waitingForPlayerSave, saveDc, saveType, saveResult, finalDamage, damageApplied, targetCurrentHp, damageReduced, damageType, onQuickRoll, autoDamage, coverLevel, coverAcBonus, autoReroll, autoRerollBonus, strSaveReplace, strCheckReplace, strScore, wisCheckReplace, wisCheckMinBonus, reliableTalent, onReroll, tacticalMind, tacticalMindBonus, gloriousDefenseBonus, onCounterAttack, strokeOfLuck, onStrokeOfLuck, defensiveDuelistBonus, baitAndSwitchBonus, isPotentCantrip, luckyAdvantage, luckyDisadvantage, onLuckyAdvantage, onLuckyDisadvantage, secondaryFormula, secondaryRolls, secondaryTotal, secondaryModifier, secondaryDamageType, secondaryFinalDamage, secondarySaveResult, availableSuperiorityManeuvers, onSuperiorityManeuver, onTacticalMind, gwfApplied, gwfOriginalRolls, gwfDisplayRolls }) {
+function DiceRollResult({ name, type, rolls, rollType, bonus = 0, bonusDetail, formula = '', modifier = 0, total = 0, targetName, targetAc, hit, resistanceNotice, hunterLoreNotice, forcedMode, isAutoMiss, rangeReason, coverReason, isAutoCrit, isCrit, isNatural1, dc, success, dcType, dcSuccess, waitingForPlayerSave, saveDc, saveType, saveResult, finalDamage, damageApplied, targetCurrentHp, damageReduced, damageType, onQuickRoll, autoDamage, coverLevel, coverAcBonus, autoReroll, autoRerollBonus, strSaveReplace, strCheckReplace, strScore, wisCheckReplace, wisCheckMinBonus, reliableTalent, onReroll, tacticalMind, tacticalMindBonus, gloriousDefenseBonus, onCounterAttack, strokeOfLuck, onStrokeOfLuck, defensiveDuelistBonus, baitAndSwitchBonus, isPotentCantrip, luckyAdvantage, luckyDisadvantage, onLuckyAdvantage, onLuckyDisadvantage, secondaryFormula, secondaryRolls, secondaryTotal, secondaryModifier, secondaryDamageType, secondaryFinalDamage, secondarySaveResult, availableSuperiorityManeuvers, onSuperiorityManeuver, onTacticalMind, gwfApplied, gwfOriginalRolls, gwfDisplayRolls, types, baseFormula, baseTotal, baseRolls, bonusFormula, bonusTotal, bonusRolls }) {
     const [mode, setMode] = useState(forcedMode || 'normal');
     const [rerollUsed, setRerollUsed] = useState(false);
     const [rerollResult, setRerollResult] = useState(null);
@@ -87,45 +87,49 @@ function DiceRollResult({ name, type, rolls, rollType, bonus = 0, bonusDetail, f
 
     return (
         <div className="dice-roll-result">
-            <div className="dice-roll-header">
-                <i className={`fa-solid ${
-                    type === 'd20' ? 'fa-dice-d20' :
-                    type === 'attack' ? 'fa-crosshairs' :
-                    type === 'save' || isSaveDamageType ? 'fa-shield-halved' :
-                    type === 'initiative' ? 'fa-gavel' : 'fa-bolt'
-                }`}></i>
-                {name}
-            </div>
-            <div className="dice-roll-total">{finalTotal}</div>
-            <div className="dice-roll-breakdown">
-                {displayFormula ? `${displayFormula}: ` : type === 'd20' ? 'd20 ' : ''}
-                {strokeResult !== null ? (
-                  <span className="dice-rolled">
-                    20 (Stroke of Luck)
-                  </span>
-                ) : rerollResult !== null ? (
-                  <span className="dice-rolled">
-                    {rerollResult.roll} (reroll)
-                  </span>
-                ) : isD20 && mode !== 'normal' && safeRolls.length === 2 ? (
-                  <span className="dice-rolled">
-                    {safeRolls[0]}, {safeRolls[1]} → {finalRoll}
-                  </span>
-                ) : (
-                  <span className="dice-rolled">
-                    {isD20
-                        ? (mode === 'normal' ? safeRolls[0] || 0 : finalRoll)
-                        : (critDiceRolls ? critDiceRolls.join(', ') : safeRolls.join(', '))
-                    }
-                  </span>
-                )}
-                {strokeResult !== null ? (
-                  ` +${20 + bonus + modifier - 20}`
-                ) : rerollResult !== null ? (
-                  ` +${rerollResult.total - rerollResult.roll}`
-                ) : isCritDamage ? ` +${modifier}${bonusDetail && bonus > 0 ? ' ' + bonusDetail : ''}` : (bonus + modifier) >= 0 && (bonus + modifier) !== 0 ? ` +${(bonus + modifier)}${bonusDetail ? ' ' + bonusDetail : ''}` :
-                 (bonus + modifier) < 0 ? ` ${(bonus + modifier)}${bonusDetail ? ' ' + bonusDetail : ''}` : ''}
-            </div>
+            {type !== 'damage_type_choice' && (
+                <div className="dice-roll-header">
+                    <i className={`fa-solid ${
+                        type === 'd20' ? 'fa-dice-d20' :
+                        type === 'attack' ? 'fa-crosshairs' :
+                        type === 'save' || isSaveDamageType ? 'fa-shield-halved' :
+                        type === 'initiative' ? 'fa-gavel' : 'fa-bolt'
+                    }`}></i>
+                    {name}
+                </div>
+            )}
+            {type !== 'damage_type_choice' && <div className="dice-roll-total">{finalTotal}</div>}
+            {type !== 'damage_type_choice' && (
+                <div className="dice-roll-breakdown">
+                    {displayFormula ? `${displayFormula}: ` : type === 'd20' ? 'd20 ' : ''}
+                    {strokeResult !== null ? (
+                      <span className="dice-rolled">
+                        20 (Stroke of Luck)
+                      </span>
+                    ) : rerollResult !== null ? (
+                      <span className="dice-rolled">
+                        {rerollResult.roll} (reroll)
+                      </span>
+                    ) : isD20 && mode !== 'normal' && safeRolls.length === 2 ? (
+                      <span className="dice-rolled">
+                        {safeRolls[0]}, {safeRolls[1]} → {finalRoll}
+                      </span>
+                    ) : (
+                      <span className="dice-rolled">
+                        {isD20
+                            ? (mode === 'normal' ? safeRolls[0] || 0 : finalRoll)
+                            : (critDiceRolls ? critDiceRolls.join(', ') : safeRolls.join(', '))
+                        }
+                      </span>
+                    )}
+                    {strokeResult !== null ? (
+                      ` +${20 + bonus + modifier - 20}`
+                    ) : rerollResult !== null ? (
+                      ` +${rerollResult.total - rerollResult.roll}`
+                    ) : isCritDamage ? ` +${modifier}${bonusDetail && bonus > 0 ? ' ' + bonusDetail : ''}` : (bonus + modifier) >= 0 && (bonus + modifier) !== 0 ? ` +${(bonus + modifier)}${bonusDetail ? ' ' + bonusDetail : ''}` :
+                     (bonus + modifier) < 0 ? ` ${(bonus + modifier)}${bonusDetail ? ' ' + bonusDetail : ''}` : ''}
+                </div>
+            )}
 
             {reliableTalent && (rollType === 'check' || rollType === 'skill') && safeRolls[0] <= 9 && (
               <div className="dice-roll-reliable-talent">
@@ -348,6 +352,43 @@ function DiceRollResult({ name, type, rolls, rollType, bonus = 0, bonusDetail, f
                   </div>
                 )}
               </div>
+            )}
+
+            {type === 'damage_type_choice' && (
+                <div className="dice-roll-damage-type-choice">
+                    <div className="dice-roll-header">
+                        <i className="fa-solid fa-bolt"></i> {name}
+                    </div>
+                    <p>Choose the damage type for this hit:</p>
+                    <div style={{ textAlign: 'center', marginTop: '16px' }}>
+                        <div className="dice-roll-breakdown">
+                            <strong>Weapon Damage:</strong> {baseFormula}: {baseRolls?.join(', ')} = {baseTotal}
+                        </div>
+                        <div className="dice-roll-breakdown">
+                            <strong>Divine Strike:</strong> {bonusFormula}: {bonusRolls?.join(', ')} = {bonusTotal}
+                        </div>
+                        <div style={{ marginTop: '12px' }}>
+                            <div style={{ marginBottom: '8px', fontWeight: 'bold' }}>Choose bonus damage type:</div>
+                            {types?.map((typeChoice) => (
+                                <button
+                                    key={typeChoice}
+                                    className="sp-roll-btn"
+                                    style={{ margin: '0 6px 8px 6px' }}
+                                    onClick={() => {
+                                        window.dispatchEvent(new CustomEvent('damage-type-choice', { detail: { chosenType: typeChoice } }));
+                                    }}
+                                >
+                                    {typeChoice}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                    <div className="sp-actions">
+                        <button className="sp-dismiss-btn" onClick={() => {
+                            window.dispatchEvent(new CustomEvent('damage-type-skip'));
+                        }}>Skip</button>
+                    </div>
+                </div>
             )}
 
             <div className="dice-roll-hint">click to dismiss</div>

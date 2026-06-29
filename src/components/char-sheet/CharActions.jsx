@@ -9,6 +9,7 @@ import { useDiceRollPopup } from '../../hooks/combat/DiceRollContext.js'
 import { showWeaponMasteryPopup, buildFeatureDetailHtml } from '../../hooks/combat/useActionPopup.js'
 import { useSpellUpcastFlow } from '../../hooks/combat/useSpellUpcastFlow.js'
 import { rollExpression, rollExpressionDoubled, rollExpressionMaximized } from '../../services/dice/diceRoller.js';
+import { getCurrentCombatRound } from '../../services/encounters/combatData.js';
 import * as mapsService from '../../services/maps/mapsService.js';
 import { computeFeatRangeEffects } from '../../services/character/featRangeService.js';
 import { hasAutomation } from '../../services/combat/automation/automationService.js'
@@ -114,6 +115,71 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
             if (shouldApplyEmpoweredEvoc) {
                 autoFormula = `${autoFormula} + ${empEvocIntMod} [Empowered Evocation]`;
             }
+
+            // Apply weapon_attack_hit damage bonus automations (e.g. Blessed Strikes, Divine Strike, Primal Strike)
+            // These are applied as a separate damage roll after the base weapon damage
+            const isWeaponAttack = !autoDamage.autoDamageSchool && !autoDamage.overchannelActive;
+            let pendingBonusDamage = null;
+            if (isWeaponAttack && playerStats.automation?.actions) {
+                const allAutomation = [
+                    ...(playerStats.automation.actions || []),
+                    ...(playerStats.automation.passives || []),
+                ];
+                const upgradedNames = new Set(allAutomation.filter(b => b.upgrades).map(b => b.upgrades));
+                const weaponHitBonuses = playerStats.automation.actions.filter(
+                    a => a.type === 'damage_bonus' && (a.trigger === 'weapon_attack_hit' || a.trigger === 'weapon_or_beast_form_attack_hit')
+                ).filter(b => !upgradedNames.has(b.name));
+                for (const bonus of weaponHitBonuses) {
+                    const optionKey = `_${bonus.name.replace(/\s+/g, '_')}_option`;
+                    const chosenOption = getRuntimeValue(playerStats.name, optionKey, campaignName);
+                    const selected = chosenOption || bonus.options?.[0] || '';
+                    if (bonus.options?.length > 0) {
+                        const isStrikeOption = selected.toLowerCase().includes('strike');
+                        if (!isStrikeOption) continue;
+                    }
+                    const usedKey = `_${bonus.name.replace(/\s+/g, '_')}_usedRound`;
+                    const currentRound = getCurrentCombatRound();
+                    if (bonus.uses_expression && bonus.recharge) {
+                        const usesKey = `_${bonus.name.replace(/\s+/g, '_')}_uses`;
+                        const currentUses = Number(getRuntimeValue(playerStats.name, usesKey, campaignName) ?? bonus.usesMax);
+                        if (currentUses <= 0) continue;
+                    }
+                    const bonusResult = rollExpression(bonus.damageExpression);
+                    if (bonusResult) {
+                        const damageType = bonus.damageType || '';
+                        if (damageType.includes(' or ')) {
+                            const types = damageType.split(/\s+or\s+/).flatMap(t => t.split(/\s+/)).filter(Boolean);
+                            pendingBonusDamage = {
+                                bonusName: bonus.name,
+                                damageExpression: bonus.damageExpression,
+                                rolls: bonusResult.rolls,
+                                total: bonusResult.total,
+                                damageTypes: types,
+                                usedKey,
+                                currentRound,
+                            };
+                        } else {
+                            const context = {
+                                damageType,
+                                targetName: autoDamage.targetName,
+                                attackerName: autoDamage.attackerName,
+                            };
+                            rollDamage(bonus.name, bonus.damageExpression, bonusResult.total, bonusResult.rolls, 0, context);
+                            if (bonus.oncePerTurn) {
+                                setRuntimeValue(playerStats.name, usedKey, currentRound, campaignName);
+                            }
+                            if (bonus.uses_expression && bonus.recharge) {
+                                const usesKey = `_${bonus.name.replace(/\s+/g, '_')}_uses`;
+                                const currentUses = Number(getRuntimeValue(playerStats.name, usesKey, campaignName) ?? bonus.usesMax);
+                                if (currentUses > 0) {
+                                    setRuntimeValue(playerStats.name, usesKey, currentUses - 1, campaignName);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
             const isOverchannel = autoDamage.overchannelActive;
             const overchannelUseCount = autoDamage.overchannelUseCount || 0;
             const overchannelSpellLevel = autoDamage.overchannelSpellLevel || 1;
@@ -142,7 +208,34 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                 if (autoDamage.metamagicHeighten) {
                     context.metamagicHeighten = autoDamage.metamagicHeighten;
                 }
-                rollDamage(autoDamage.name, autoFormula, overchannelResult.total, overchannelResult.rolls, overchannelResult.modifier, context);
+
+                // When there's a pending type choice, apply base damage normally then show type choice popup after delay
+                if (isWeaponAttack && pendingBonusDamage) {
+                    const { bonusName, damageExpression, rolls: bonusRolls, total: bonusTotal, damageTypes, usedKey, currentRound } = pendingBonusDamage;
+                    const baseFormula = autoFormula;
+                    const baseTotal = overchannelResult.total;
+                    const baseRolls = overchannelResult.rolls;
+                    rollDamage(autoDamage.name, autoFormula, overchannelResult.total, overchannelResult.rolls, overchannelResult.modifier, context);
+                    setTimeout(() => {
+                        setPopupHtml({
+                            type: 'damage_type_choice',
+                            name: `${bonusName} — Damage Type`,
+                            types: damageTypes,
+                            baseFormula,
+                            baseTotal,
+                            baseRolls,
+                            bonusFormula: damageExpression,
+                            bonusRolls,
+                            bonusTotal,
+                            usedKey,
+                            currentRound,
+                            targetName: autoDamage.targetName,
+                            attackerName: autoDamage.attackerName,
+                        });
+                    }, SHOW_DICE_ROLL_DELAY);
+                } else {
+                    rollDamage(autoDamage.name, autoFormula, overchannelResult.total, overchannelResult.rolls, overchannelResult.modifier, context);
+                }
 
                 // Post-damage: check for Cleave mastery and show target selection if applicable
                 if (autoDamage.targetName) {
@@ -371,6 +464,36 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                 }
         },
     });
+
+    // Handle damage type choice popup (e.g. Blessed Strikes: Necrotic or Radiant)
+    useEffect(() => {
+        if (popupHtml?.type === 'damage_type_choice') {
+            const handleChoice = (chosenType) => {
+                const { bonusFormula, bonusRolls, bonusTotal, usedKey, currentRound, targetName, attackerName, name } = popupHtml;
+                const context = {
+                    damageType: chosenType,
+                    targetName,
+                    attackerName,
+                };
+                rollDamage(name, bonusFormula, bonusTotal, bonusRolls, 0, context);
+                if (usedKey) {
+                    setRuntimeValue(playerStats.name, usedKey, currentRound, campaignName);
+                }
+                setPopupHtml(null);
+            };
+            const handleSkip = () => {
+                setPopupHtml(null);
+            };
+            window.addEventListener('damage-type-choice', (e) => {
+                handleChoice(e.detail.chosenType);
+            });
+            window.addEventListener('damage-type-skip', handleSkip);
+            return () => {
+                window.removeEventListener('damage-type-choice', handleChoice);
+                window.removeEventListener('damage-type-skip', handleSkip);
+            };
+        }
+    }, [popupHtml, playerStats.name, campaignName, rollDamage, setPopupHtml]);
 
     useInitiativeEffects(playerStats, campaignName, rollDamage);
 
