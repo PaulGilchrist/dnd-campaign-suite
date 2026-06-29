@@ -2379,6 +2379,7 @@
               "action": "action",
               "poolExpression": "5 * cleric_level",
               "range": "30 ft",
+              "resourceKey": "preserveLifePool",
               "resourceCost": "channel_divinity",
               "bloodiedOnly": true,
               "casting_time": "1 action"

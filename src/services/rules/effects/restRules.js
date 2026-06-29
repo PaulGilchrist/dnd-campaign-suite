@@ -83,6 +83,7 @@ export const LONG_REST_RESOURCES = [
        'actionSurgeUses',
         'actionSurgeUsedThisRound',
       'layOnHandsPool',
+      'preserveLifePool',
       'warlockPactMagic',
       'luckyPoints',
       'innateSorceryUses',

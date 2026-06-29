@@ -18,6 +18,7 @@ export const ALL_TRACKED_RESOURCES = [
   'actionSurgeUsedThisRound',
   'ragePoints',
   'layOnHandsPool',
+  'preserveLifePool',
   'superiorityDice',
   'psionicEnergy',
   'arcaneRecoveryLevels',
@@ -169,6 +170,10 @@ export function computeTrackedResources(playerStats) {
   const isCleric = playerStats.class?.name === 'Cleric'
   const maxDI = isCleric && playerStats.level >= 10 ? 1 : 0
   resources.divineInterventionUses = { current: maxDI, max: maxDI }
+
+  const isLifeDomain = (playerStats.class?.major?.name === 'Life Domain') || (playerStats.class?.subclass?.name === 'Life Domain')
+  const maxPL = isCleric && isLifeDomain ? (5 * (playerStats.level || 0)) : 0
+  resources.preserveLifePool = { current: maxPL, max: maxPL }
 
   const isMonk = playerStats.class?.name === 'Monk'
   const maxWB = isMonk && playerStats.level >= 6 ? 1 : 0

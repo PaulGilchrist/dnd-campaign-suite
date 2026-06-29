@@ -136,11 +136,15 @@ const BardFeatures = function BardFeatures({ playerStats, campaignName }) {
 /* ─── Cleric ─── */
 const ClericFeatures = function ClericFeatures({ playerStats, campaignName }) {
     const clericFeatures = getClassFeatures(playerStats);
+    const isLifeDomain = (playerStats.class?.major?.name === 'Life Domain') || (playerStats.class?.subclass?.name === 'Life Domain');
+    const preserveLifePoolMax = isLifeDomain ? (5 * playerStats.level) : 0;
     return (
          <div data-testid="char-class-cleric">
              <TrackedResourceInput label="Channel Divinity Charges" resourceKey="channelDivinityCharges" playerName={playerStats.name} getMax={() => clericFeatures?.maxChannelDivinity || 0} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
              {clericFeatures?.destroyUndeadCR !== null && <div><b>Destroy Undead Challenge Rating: </b>{clericFeatures.destroyUndeadCR}</div>}
-
+             {isLifeDomain && (
+                 <TrackedResourceInput label="Preserve Life Pool" resourceKey="preserveLifePool" playerName={playerStats.name} getMax={() => preserveLifePoolMax} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
+             )}
          </div>
     );
 };

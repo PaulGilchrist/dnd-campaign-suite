@@ -35,7 +35,7 @@ function conditionLabel(name) {
 function HealingPoolModal({ playerStats, campaignName, name: featureName = 'Lay On Hands', poolMax: poolMaxProp = 0, _poolExpression, isDicePool = false, dieType = null, resourceKey: resourceKeyProp, alsoCures, cureCost, restoringTouchConditions, bloodiedOnly = false, maxDicePerUse: maxDicePerUseProp = '', onClose }) {
     const layOnHandsPoolMax = 5 * (playerStats.level || 1);
     const effectivePoolMax = isDicePool ? poolMaxProp : layOnHandsPoolMax;
-    const effectiveResourceKey = isDicePool ? (resourceKeyProp || featureName.toLowerCase().replace(/\s+/g, '') + 'Pool') : 'layOnHandsPool';
+    const effectiveResourceKey = resourceKeyProp || (isDicePool ? featureName.toLowerCase().replace(/\s+/g, '') + 'Pool' : 'layOnHandsPool');
 
     const { current: poolRemaining, max: poolMaxFromHook, update: setPoolRemaining } = useTrackedResource(
         effectiveResourceKey,
@@ -146,6 +146,14 @@ function HealingPoolModal({ playerStats, campaignName, name: featureName = 'Lay 
         if (target && combatSummary) {
             const result = applyHealingToTarget(combatSummary, target.name, amount, campaignName);
             if (result) {
+                addEntry(campaignName, {
+                    type: 'healing_pool',
+                    sourceName: playerStats.name,
+                    featureName,
+                    targetName: target.name,
+                    amount: result.actualHeal,
+                    poolAfter: newPool,
+                }).catch((e) => { console.error("[HealingPoolModal] Error:", e); });
                 setLog(prev => [...prev, { action: 'Heal', target: target.name, amount: result.actualHeal, poolAfter: newPool }]);
                 setHealAmount(Math.min(healAmount, newPool));
             }
@@ -153,13 +161,12 @@ function HealingPoolModal({ playerStats, campaignName, name: featureName = 'Lay 
             const newHp = Math.min(playerStats.hitPoints, targetCurrentHp + amount);
             setRuntimeValue(playerStats.name, 'currentHitPoints', newHp, campaignName);
             addEntry(campaignName, {
-                type: 'hp_change',
+                type: 'healing_pool',
+                sourceName: playerStats.name,
+                featureName,
                 targetName: playerStats.name,
-                delta: amount,
-                currentHp: newHp,
-                maxHp: playerStats.hitPoints,
-                isHealing: true,
-                isUnconscious: false,
+                amount,
+                poolAfter: newPool,
             }).catch((e) => { console.error("[HealingPoolModal] Error:", e); });
             setLog(prev => [...prev, { action: 'Heal', target: playerStats.name, amount, poolAfter: newPool }]);
             setHealAmount(Math.min(healAmount, newPool));
@@ -185,6 +192,14 @@ function HealingPoolModal({ playerStats, campaignName, name: featureName = 'Lay 
         if (target && combatSummary) {
             const result = applyHealingToTarget(combatSummary, target.name, total, campaignName);
             if (result) {
+                addEntry(campaignName, {
+                    type: 'healing_pool',
+                    sourceName: playerStats.name,
+                    featureName,
+                    targetName: target.name,
+                    amount: result.actualHeal,
+                    poolAfter: newPool,
+                }).catch((e) => { console.error("[HealingPoolModal] Error:", e); });
                 setLog(prev => [...prev, {
                     action: `Roll ${diceToRoll}d${dieType}`,
                     target: target.name,
@@ -196,13 +211,12 @@ function HealingPoolModal({ playerStats, campaignName, name: featureName = 'Lay 
             const newHp = Math.min(playerStats.hitPoints, targetCurrentHp + total);
             setRuntimeValue(playerStats.name, 'currentHitPoints', newHp, campaignName);
             addEntry(campaignName, {
-                type: 'hp_change',
+                type: 'healing_pool',
+                sourceName: playerStats.name,
+                featureName,
                 targetName: playerStats.name,
-                delta: total,
-                currentHp: newHp,
-                maxHp: playerStats.hitPoints,
-                isHealing: true,
-                isUnconscious: false,
+                amount: total,
+                poolAfter: newPool,
             }).catch((e) => { console.error("[HealingPoolModal] Error:", e); });
             setLog(prev => [...prev, {
                 action: `Roll ${diceToRoll}d${dieType}`,
@@ -239,6 +253,7 @@ function HealingPoolModal({ playerStats, campaignName, name: featureName = 'Lay 
             condition: condition,
             action: 'broken',
             sourceName: playerStats.name,
+            featureName,
             timestamp: Date.now(),
           }).catch((e) => { console.error("[HealingPoolModal] Error:", e); });
 
@@ -273,6 +288,7 @@ function HealingPoolModal({ playerStats, campaignName, name: featureName = 'Lay 
                 condition: condition,
                 action: 'broken',
                 sourceName: playerStats.name,
+                featureName,
                 timestamp: Date.now(),
             }).catch((e) => { console.error("[HealingPoolModal] Error:", e); });
 

@@ -480,6 +480,23 @@ function MetamagicEntry({ entry }) {
   );
 }
 
+function HealingPoolEntry({ entry }) {
+  return (
+    <div className="log-entry log-healing">
+      <div className="log-entry-header">
+        <span className="log-icon"><i className="fas fa-hand-holding-heart"></i></span>
+        <span className="log-character">{entry.sourceName}</span>
+        <span className="log-name">{entry.featureName} → {entry.targetName} (+{entry.amount} HP)</span>
+        <span className="log-time">{formatTimestamp(entry.timestamp)}</span>
+      </div>
+      <div className="log-hp-details">
+        <span className="log-hp-delta">Used {entry.amount} HP point from from pool with </span>
+        <span className="log-hp-current"> {entry.poolAfter} remaining</span>
+      </div>
+    </div>
+  );
+}
+
 function AbilityUseEntry({ entry }) {
   return (
     <div className="log-entry log-ability-use">
@@ -566,6 +583,7 @@ export default function Log({ campaignName, characters }) {
             {entry.type === 'death_save' && <DeathSaveEntry entry={entry}/>}
             {entry.type === 'spell' && <SpellEntry entry={entry}/>}
             {entry.type === 'metamagic' && <MetamagicEntry entry={entry}/>}
+            {entry.type === 'healing_pool' && <HealingPoolEntry entry={entry}/>}
             {entry.type === 'ability_use' && <AbilityUseEntry entry={entry}/>}
           </div>
         ))}
