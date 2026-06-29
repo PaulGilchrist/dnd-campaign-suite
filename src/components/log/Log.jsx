@@ -357,6 +357,7 @@ function HpChangeEntry({ entry }) {
                 <>
                   {entry.isUnconscious && 'Knocked Unconscious — '}
                   {isDamage ? 'Takes Damage' : (entry.sourceName ? `Healed (${entry.sourceName})` : 'Healed')}
+                  {entry.maximizeHealingDice && !isDamage && ' — Dice maximized by Supreme Healing'}
                 </>
               )}
         </span>
@@ -369,8 +370,27 @@ function HpChangeEntry({ entry }) {
           <>
             <span className="log-hp-delta">{entry.delta > 0 ? '+' : ''}{entry.delta} HP</span>
             <span className="log-hp-current"> {entry.currentHp}/{entry.maxHp}</span>
+            {entry.rollInfo && !isDamage && <span className="log-roll-info"> ({entry.rollInfo})</span>}
           </>
         )}
+      </div>
+    </div>
+  );
+}
+
+function HealingEntry({ entry }) {
+  return (
+    <div className="log-entry log-healing">
+      <div className="log-entry-header">
+        <span className="log-icon">
+          <i className="fas fa-heart"></i>
+        </span>
+        <span className="log-character">{entry.targetName}</span>
+        <span className="log-name">Healed ({entry.sourceName || entry.healingName})</span>
+        <span className="log-time">{formatTimestamp(entry.timestamp)}</span>
+      </div>
+      <div className="log-hp-details">
+        {entry.popupText && <span>{entry.popupText}</span>}
       </div>
     </div>
   );
@@ -542,6 +562,7 @@ export default function Log({ campaignName, characters }) {
             {entry.type === 'condition' && <ConditionEntry entry={entry}/>}
             {entry.type === 'encounter' && <EncounterEntry entry={entry}/>}
             {entry.type === 'hp_change' && <HpChangeEntry entry={entry}/>}
+            {entry.type === 'healing' && <HealingEntry entry={entry}/>}
             {entry.type === 'death_save' && <DeathSaveEntry entry={entry}/>}
             {entry.type === 'spell' && <SpellEntry entry={entry}/>}
             {entry.type === 'metamagic' && <MetamagicEntry entry={entry}/>}

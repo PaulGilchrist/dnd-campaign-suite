@@ -468,7 +468,9 @@ export {
     getWardingBondTarget, getWardingBondSource, isWardingBondActive,
 };
 export async function executeHandler(action, playerStats, campaignName, mapName) {
-    if (!action?.automation) return null;
+    if (!action?.automation) {
+        return null;
+    }
 
     let auto = action.automation;
 
@@ -482,7 +484,9 @@ export async function executeHandler(action, playerStats, campaignName, mapName)
             if (a.type === 'passive_rule') return PASSIVE_RULE_EFFECTS[a.effect];
             return (a.casting_time || a.action || a.trigger) && HANDLER_MAP[a.type];
         });
-        if (!actionable) return null;
+        if (!actionable) {
+            return null;
+        }
         action = { ...action, automation: actionable };
         auto = actionable;
     }
@@ -495,10 +499,13 @@ export async function executeHandler(action, playerStats, campaignName, mapName)
         handler = HANDLER_MAP[auto.type];
     }
 
-    if (!handler) return null;
+    if (!handler) {
+        return null;
+    }
 
     try {
-        return await handler(action, playerStats, campaignName, mapName);
+        const result = await handler(action, playerStats, campaignName, mapName);
+        return result;
       } catch (e) {
           console.error(`[automation] Handler ${auto.type}/${auto.effect} failed:`, e);
           return { type: 'popup', payload: { type: 'automation_info', name: action.name, description: `Failed to execute ${action.name}` } };

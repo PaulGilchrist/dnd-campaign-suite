@@ -65,6 +65,7 @@ export function getShortRestResources() {
 }
 
 export const LONG_REST_RESOURCES = [
+      'healinghandsUses',
       'ragePoints',
       'bardicInspirationUses',
       'channelDivinityCharges',

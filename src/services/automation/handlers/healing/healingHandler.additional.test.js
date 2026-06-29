@@ -77,7 +77,7 @@ function makeAction(automation = {}) {
 
 describe('healingHandler - additional coverage', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     diceRoller.rollExpression.mockReturnValue({ total: 5, rolls: [5], modifier: 0 });
     diceRoller.rollExpressionMaximized.mockReturnValue({ total: 8, rolls: [8], modifier: 0 });
     automationService.resolveHealingBonuses.mockReturnValue(0);
@@ -158,6 +158,9 @@ describe('healingHandler - additional coverage', () => {
         actualHeal: 9,
         newHp: 18,
         maxHp: 20,
+        rollInfo: '1d6=6 (6)',
+        maximize: false,
+        healingName: 'Hand of Healing',
       });
     });
   });
@@ -277,9 +280,10 @@ describe('healingHandler - additional coverage', () => {
       );
     });
 
-    it('should return healing popup when target resolves to ally (not self)', async () => {
+    it('should roll, apply, and log healing when target resolves to ally (not self)', async () => {
       runtimeState.getRuntimeValue.mockReturnValue(1);
       targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Ally' } });
+      healingRoll.applyHealingDirectly.mockReturnValue({ newHp: 15, maxHp: 20, actualHeal: 5 });
 
       const ps = makePlayerStats();
       const action = {
@@ -294,8 +298,27 @@ describe('healingHandler - additional coverage', () => {
       const result = await handle(action, ps, campaignName, null);
 
       expect(result.type).toBe('popup');
-      expect(result.payload.type).toBe('healing');
-      expect(result.payload.healAmount).toBe('1d8');
+      expect(result.payload.type).toBe('automation_info');
+      expect(diceRoller.rollExpression).toHaveBeenCalledWith('1d8');
+      expect(healingRoll.applyHealingDirectly).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'TestHealer' }),
+        'Ally',
+        5,
+        campaignName,
+      );
+      expect(healingRoll.logHealingToSSE).toHaveBeenCalledWith(campaignName, {
+        targetName: 'Ally',
+        sourceName: 'Cure Wounds',
+        actualHeal: 5,
+        newHp: 15,
+        maxHp: 20,
+        rollInfo: '1d8=5 (5)',
+        maximize: false,
+        healingName: 'Cure Wounds',
+        remainingUses: 0,
+        maxUses: 1,
+      });
+      expect(result.payload.description).toContain('Regained 5 HP');
     });
 
     it('should decrement uses when target resolves to ally', async () => {
@@ -900,12 +923,20 @@ describe('healingHandler - additional coverage', () => {
         actualHeal: 7,
         newHp: 17,
         maxHp: 20,
+        rollInfo: '1d8=7 (7)',
+        maximize: false,
+        healingName: 'Cure Wounds',
+        remainingUses: 0,
+        maxUses: 1,
       });
     });
 
-    it('should return healing popup for non-self path when target is ally (no self-heal)', async () => {
+    it('should apply healing and log for non-self path when target is ally (no self-heal)', async () => {
       runtimeState.getRuntimeValue.mockReturnValue(1);
       targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Ally' } });
+      healingRoll.applyHealingDirectly.mockReturnValue({ newHp: 15, maxHp: 20, actualHeal: 5 });
+      automationService.hasHealingMaximization.mockReturnValue(false);
+      automationService.hasRerollHealingOnes.mockReturnValue(false);
 
       const ps = makePlayerStats();
       const action = {
@@ -920,13 +951,16 @@ describe('healingHandler - additional coverage', () => {
       const result = await handle(action, ps, campaignName, null);
 
       expect(result.type).toBe('popup');
-      expect(result.payload.type).toBe('healing');
+      expect(result.payload.type).toBe('automation_info');
+      expect(result.payload.description).toContain('Regained 5 HP');
+      expect(healingRoll.logHealingToSSE).toHaveBeenCalled();
     });
 
-    it('should include bonus HP in non-self healing popup description', async () => {
+    it('should include bonus HP in non-self healing result', async () => {
       automationService.resolveHealingBonuses.mockReturnValue(2);
       runtimeState.getRuntimeValue.mockReturnValue(1);
       targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Ally' } });
+      healingRoll.applyHealingDirectly.mockReturnValue({ newHp: 17, maxHp: 20, actualHeal: 7 });
 
       const ps = makePlayerStats();
       const action = {
@@ -940,7 +974,7 @@ describe('healingHandler - additional coverage', () => {
 
       const result = await handle(action, ps, campaignName, null);
 
-      expect(result.payload.description).toContain('+ 2 bonus HP');
+      expect(result.payload.description).toContain('Regained 7 HP');
     });
 
     it('should return healing popup with healAmount number for non-self path with number healAmount', async () => {

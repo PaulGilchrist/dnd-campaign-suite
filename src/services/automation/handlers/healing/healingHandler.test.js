@@ -788,6 +788,11 @@ describe('healingHandler', () => {
         actualHeal: 5,
         newHp: 15,
         maxHp: 20,
+        rollInfo: '1d4=5 (5)',
+        maximize: false,
+        healingName: 'Healing Touch',
+        remainingUses: 0,
+        maxUses: 1,
       });
     });
 
@@ -809,6 +814,9 @@ describe('healingHandler', () => {
         actualHeal: 8,
         newHp: 16,
         maxHp: 20,
+        rollInfo: '1d6=6 (6)',
+        maximize: false,
+        healingName: 'Healing Touch',
       });
     });
   });

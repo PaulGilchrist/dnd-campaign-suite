@@ -41,17 +41,13 @@ export function applyHealingDirectly(playerStats, targetName, amount, campaignNa
 
     setRuntimeValue(targetName, 'currentHitPoints', newHp, campaignName);
 
-    getCombatContext(campaignName).then(cs => {
-        if (cs) applyHealingToTarget(cs, targetName, amount, campaignName);
-      });
-
     window.dispatchEvent(new CustomEvent('combat-summary-updated'));
 
     return { maxHp, newHp, actualHeal };
 }
 
 export function logHealingToSSE(campaignName, info) {
-    const { targetName, sourceName, actualHeal, newHp, maxHp } = info;
+    const { targetName, sourceName, actualHeal, newHp, maxHp, rollInfo, maximize, healingName, remainingUses } = info;
     postLogEntry(campaignName, {
         type: 'hp_change',
         targetName,
@@ -61,7 +57,27 @@ export function logHealingToSSE(campaignName, info) {
         maxHp,
         isHealing: true,
         isUnconscious: false,
-      });
+        rollInfo: rollInfo || null,
+        maximizeHealingDice: maximize || false,
+      }).catch(() => {});
+
+    if (healingName) {
+        const healDesc = actualHeal > 0
+            ? `Regained ${actualHeal} HP`
+            : 'Already at full HP';
+        const maximizeNote = maximize ? ' (dice maximized by Supreme Healing)' : '';
+        const popupText = `${healingName} on ${targetName}: ${rollInfo}${maximizeNote} — ${healDesc}${remainingUses !== undefined ? (remainingUses > 0 ? ` (${remainingUses} use${remainingUses > 1 ? 's' : ''} remaining)` : ' (no uses remaining)') : ''}`;
+
+        postLogEntry(campaignName, {
+            type: 'healing',
+            targetName,
+            sourceName,
+            healingName,
+            rollInfo: rollInfo || null,
+            maximizeHealingDice: maximize || false,
+            popupText,
+          }).catch(() => {});
+    }
 
     window.dispatchEvent(new CustomEvent('combat-summary-updated'));
 }

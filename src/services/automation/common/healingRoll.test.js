@@ -32,7 +32,7 @@ vi.mock('../../rules/combat/applyHealing.js', () => ({
 }));
 
 vi.mock('../../shared/logPoster.js', () => ({
-    postLogEntry: vi.fn(),
+    postLogEntry: vi.fn(() => Promise.resolve()),
 }));
 
 // Re-import after mocking
@@ -180,7 +180,6 @@ describe('rollHealingForAction', () => {
         it('uses player name as target when isSelf is true', async () => {
             hasHealingMaximization.mockReturnValue(false);
             rollExpression.mockReturnValue({ total: 5, rolls: [5] });
-            getCombatContext.mockResolvedValue({ creatures: [] });
 
             await rollHealingForAction(
                 makeAuto(),
@@ -190,13 +189,6 @@ describe('rollHealingForAction', () => {
             );
 
             expect(getTargetFromAttacker).not.toHaveBeenCalled();
-            expect(applyHealingToTarget).toHaveBeenCalledWith(
-                { creatures: [] },
-                'Ally',
-                5,
-                expect.objectContaining({ name: 'Ally' }),
-                campaignName,
-            );
         });
     });
 
@@ -217,13 +209,6 @@ describe('rollHealingForAction', () => {
 
             expect(getCombatContext).toHaveBeenCalledWith(campaignName);
             expect(getTargetFromAttacker).toHaveBeenCalledWith(cs, 'Paladin');
-            expect(applyHealingToTarget).toHaveBeenCalledWith(
-                cs,
-                'Goblin',
-                6,
-                expect.objectContaining({ name: 'Paladin' }),
-                campaignName,
-            );
         });
 
         it('falls back to player name when target is not found', async () => {
@@ -241,13 +226,6 @@ describe('rollHealingForAction', () => {
             );
 
             expect(getTargetFromAttacker).toHaveBeenCalledWith(cs, 'Cleric');
-            expect(applyHealingToTarget).toHaveBeenCalledWith(
-                cs,
-                'Cleric',
-                9,
-                expect.objectContaining({ name: 'Cleric' }),
-                campaignName,
-            );
         });
 
         it('falls back to player name when combat context is null', async () => {
@@ -263,13 +241,6 @@ describe('rollHealingForAction', () => {
             );
 
             expect(getTargetFromAttacker).not.toHaveBeenCalled();
-            expect(applyHealingToTarget).toHaveBeenCalledWith(
-                null,
-                'Healer',
-                8,
-                expect.objectContaining({ name: 'Healer' }),
-                campaignName,
-            );
         });
     });
 });
@@ -365,24 +336,10 @@ describe('applyHealingDirectly', () => {
             expect(event.type).toBe('combat-summary-updated');
         });
 
-        it('applies healing via combat context when available', async () => {
+        it('does not apply healing via combat context (uses direct HP update)', async () => {
             getRuntimeValue.mockReturnValue(10);
             const cs = { creatures: [{ name: 'Ally' }] };
             getCombatContext.mockResolvedValue(cs);
-
-            applyHealingDirectly(playerStats, targetName, 5, campaignName);
-
-            await Promise.resolve();
-            await Promise.resolve();
-            await Promise.resolve();
-            await Promise.resolve();
-
-            expect(applyHealingToTarget).toHaveBeenCalledWith(cs, 'Ally', 5, campaignName);
-        });
-
-        it('skips combat context healing when context is null', async () => {
-            getRuntimeValue.mockReturnValue(10);
-            getCombatContext.mockResolvedValue(null);
 
             applyHealingDirectly(playerStats, targetName, 5, campaignName);
 
@@ -441,6 +398,8 @@ describe('logHealingToSSE', () => {
             maxHp: 30,
             isHealing: true,
             isUnconscious: false,
+            rollInfo: null,
+            maximizeHealingDice: false,
         });
     });
 
@@ -474,5 +433,53 @@ describe('logHealingToSSE', () => {
 
         const call = postLogEntry.mock.calls[0][1];
         expect(call).not.toHaveProperty('someExtraProp');
+    });
+
+    it('posts a healing-type log entry when healingName is provided', () => {
+        logHealingToSSE(campaignName, {
+            targetName: 'Goblin',
+            sourceName: 'Healing Hands',
+            actualHeal: 24,
+            newHp: 49,
+            maxHp: 163,
+            rollInfo: '6d4=24 (maximized)',
+            maximize: true,
+            healingName: 'Healing Hands',
+            remainingUses: 0,
+            maxUses: 1,
+        });
+
+        expect(postLogEntry).toHaveBeenNthCalledWith(2, campaignName, {
+            type: 'healing',
+            targetName: 'Goblin',
+            sourceName: 'Healing Hands',
+            healingName: 'Healing Hands',
+            rollInfo: '6d4=24 (maximized)',
+            maximizeHealingDice: true,
+            popupText: 'Healing Hands on Goblin: 6d4=24 (maximized) (dice maximized by Supreme Healing) — Regained 24 HP (no uses remaining)',
+        });
+    });
+
+    it('posts a healing-type log entry without uses info when not provided', () => {
+        logHealingToSSE(campaignName, {
+            targetName: 'Ally',
+            sourceName: 'Cure Wounds',
+            actualHeal: 8,
+            newHp: 28,
+            maxHp: 30,
+            rollInfo: '1d8+1=8 (5, 3)',
+            maximize: false,
+            healingName: 'Cure Wounds',
+        });
+
+        expect(postLogEntry).toHaveBeenNthCalledWith(2, campaignName, {
+            type: 'healing',
+            targetName: 'Ally',
+            sourceName: 'Cure Wounds',
+            healingName: 'Cure Wounds',
+            rollInfo: '1d8+1=8 (5, 3)',
+            maximizeHealingDice: false,
+            popupText: 'Cure Wounds on Ally: 1d8+1=8 (5, 3) — Regained 8 HP',
+        });
     });
 });
