@@ -481,7 +481,7 @@ describe('spellCastService', () => {
           level: 1,
           heal_at_slot_level: { 1: '1d8', 2: '2d8', 3: '3d8' },
         }
-        const playerStats = makePlayerStats()
+        const playerStats = { ...makePlayerStats(), automation: { passives: [] }, activeBuffs: [] }
         const metaCtx = makeMetaCtx({ slotLevel: 1 })
 
         const { executeSpellCast: spellCast } = await import('./spellCastService.js')

@@ -85,6 +85,7 @@ vi.mock('../combat/auras/auraOfProtection.js', () => ({
 vi.mock('./handlers/class-cleric-paladin/avengingAngelHandler.js', () => ({
   isActive: vi.fn(),
   isAuraTarget: vi.fn(),
+  handle: vi.fn(),
 }));
 
 const mockStats = {

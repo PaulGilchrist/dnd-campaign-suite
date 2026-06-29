@@ -23,6 +23,7 @@ vi.mock('../../encounters/combatData.js', () => ({
   getCurrentCombatRound: vi.fn(() => 5),
   getActiveCreatureName: vi.fn(() => 'Goblin'),
   getCombatSummary: vi.fn(),
+  loadCombatSummary: vi.fn(),
 }));
 
 vi.mock('../../ui/logService.js', () => ({
@@ -36,10 +37,12 @@ vi.mock('../../rules/combat/rangeValidation.js', () => ({
 
 vi.mock('../../automation/handlers/spells/slowHandler.js', () => ({
   processSlowRepeatSave: vi.fn().mockResolvedValue(undefined),
+  handle: vi.fn(),
 }));
 
 vi.mock('../../automation/handlers/spells/tashasLaughterHandler.js', () => ({
   processTashasLaughterRepeatSave: vi.fn().mockResolvedValue(undefined),
+  handle: vi.fn(),
 }));
 
 vi.mock('../../combat/automation/automationExpressions.js', () => ({

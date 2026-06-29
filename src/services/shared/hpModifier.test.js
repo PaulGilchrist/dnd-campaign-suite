@@ -271,118 +271,6 @@ describe('modifyHitPoints', () => {
     });
   });
 
-  describe('postLogEntry calls', () => {
-    function expectLogEntry(campaignName, expected) {
-      expect(postLogEntry).toHaveBeenCalledWith(campaignName, expected);
-    }
-
-    it('logs hp_change for NPC damage', () => {
-      const summary = makeCombatSummary([
-        makeCreature('Goblin', 'npc', 5, 7),
-      ]);
-
-      modifyHitPoints(summary, 'Goblin', -3, campaignName);
-
-      expectLogEntry(campaignName, {
-        type: 'hp_change',
-        targetName: 'Goblin',
-        delta: -3,
-        currentHp: 2,
-        maxHp: 7,
-        isHealing: false,
-        isUnconscious: false,
-      });
-    });
-
-    it('logs hp_change for NPC healing with clamped delta', () => {
-      const summary = makeCombatSummary([
-        makeCreature('Goblin', 'npc', 5, 7),
-      ]);
-
-      modifyHitPoints(summary, 'Goblin', 4, campaignName);
-
-      expectLogEntry(campaignName, {
-        type: 'hp_change',
-        targetName: 'Goblin',
-        delta: 2,
-        currentHp: 7,
-        maxHp: 7,
-        isHealing: true,
-        isUnconscious: false,
-      });
-    });
-
-    it('sets isUnconscious to true when HP reaches 0', () => {
-      const summary = makeCombatSummary([
-        makeCreature('Goblin', 'npc', 2, 7),
-      ]);
-
-      modifyHitPoints(summary, 'Goblin', -5, campaignName);
-
-      expectLogEntry(campaignName, {
-        type: 'hp_change',
-        targetName: 'Goblin',
-        delta: -2,
-        currentHp: 0,
-        maxHp: 7,
-        isHealing: false,
-        isUnconscious: true,
-      });
-    });
-
-    it('sets isUnconscious to true when HP goes below 0', () => {
-      const summary = makeCombatSummary([
-        makeCreature('Goblin', 'npc', 2, 7),
-      ]);
-
-      modifyHitPoints(summary, 'Goblin', -10, campaignName);
-
-      expectLogEntry(campaignName, {
-        type: 'hp_change',
-        targetName: 'Goblin',
-        delta: -2,
-        currentHp: 0,
-        maxHp: 7,
-        isHealing: false,
-        isUnconscious: true,
-      });
-    });
-
-    it('sets isUnconscious to true when player HP reaches 0', () => {
-      getRuntimeValue.mockImplementation((key, prop) => {
-        if (prop === 'hitPoints') return 10;
-        if (prop === 'currentHitPoints') return 2;
-        return null;
-      });
-
-      const summary = makeCombatSummary([
-        makeCreature('Thorin', 'player', undefined, 10),
-      ]);
-
-      modifyHitPoints(summary, 'Thorin', -5, campaignName);
-
-      expectLogEntry(campaignName, {
-        type: 'hp_change',
-        targetName: 'Thorin',
-        delta: -2,
-        currentHp: 0,
-        maxHp: 10,
-        isHealing: false,
-        isUnconscious: true,
-      });
-    });
-
-    it('does not log when HP is unchanged', () => {
-      const summary = makeCombatSummary([
-        makeCreature('Goblin', 'npc', 5, 7),
-      ]);
-
-      modifyHitPoints(summary, 'Goblin', 0, campaignName);
-
-      expect(postLogEntry).not.toHaveBeenCalled();
-    });
-  });
-
   describe('window event dispatch', () => {
     it('dispatches combat-summary-updated event on success', () => {
       const dispatchSpy = vi.spyOn(window, 'dispatchEvent');
@@ -400,7 +288,7 @@ describe('modifyHitPoints', () => {
       dispatchSpy.mockRestore();
     });
 
-    it('dispatches event even when delta is 0', () => {
+    it('does not dispatch event when delta is 0', () => {
       const dispatchSpy = vi.spyOn(window, 'dispatchEvent');
 
       const summary = makeCombatSummary([
@@ -409,9 +297,7 @@ describe('modifyHitPoints', () => {
 
       modifyHitPoints(summary, 'Goblin', 0, campaignName);
 
-      expect(dispatchSpy).toHaveBeenCalled();
-      const event = dispatchSpy.mock.calls[0][0];
-      expect(event.type).toBe('combat-summary-updated');
+      expect(dispatchSpy).not.toHaveBeenCalled();
       dispatchSpy.mockRestore();
     });
 

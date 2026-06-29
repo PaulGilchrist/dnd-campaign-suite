@@ -107,8 +107,8 @@ function resolveDiceExpression(expression, playerStats, slotLevel) {
         .replace(/rogue_level/gi, level)
         .replace(/warlock_level/gi, level)
         .replace(/warlock level/gi, level)
-        .replace(/level/gi, level)
         .replace(/spell_slot_level/g, slotLevel)
+        .replace(/\blevel\b/gi, level)
     const abilities = playerStats?.abilities || {}
     const abilityModifiers = {
         strength: getAbilityModifier(abilities, 'strength'),

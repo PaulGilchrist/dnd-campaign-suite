@@ -25,25 +25,13 @@ function isHealingSpell(spell) {
 }
 
 function getPostCastSelfHeals(playerStats) {
-    const passives = playerStats.automation?.passives;
-    if (passives == null) {
-        console.error('[postCastHealService] Missing array:', passives);
-        throw new Error('Expected array, got ' + passives);
-    }
+    const passives = playerStats.automation?.passives ?? [];
     return passives.filter(p => p.type === 'post_cast_self_heal');
 }
 
 function getPostCastAllyHeals(playerStats) {
-    const passives = playerStats.automation?.passives;
-    if (passives == null) {
-        console.error('[postCastHealService] Missing array:', passives);
-        throw new Error('Expected array, got ' + passives);
-    }
-    const activeBuffs = playerStats.activeBuffs;
-    if (activeBuffs == null) {
-        console.error('[postCastHealService] Missing array:', activeBuffs);
-        throw new Error('Expected array, got ' + activeBuffs);
-    }
+    const passives = playerStats.automation?.passives ?? [];
+    const activeBuffs = playerStats.activeBuffs ?? [];
     const starryFormActive = activeBuffs.some(b => b.name === 'Starry Form' && b.constellation === 'Chalice');
     if (!starryFormActive) {
         return [];
@@ -51,7 +39,7 @@ function getPostCastAllyHeals(playerStats) {
     return passives.filter(p => p.type === 'post_cast_ally_heal');
 }
 
-export async function triggerPostCastSelfHeals(spell, metaCtx, playerStats, campaignName, _mapName) {
+ export async function triggerPostCastSelfHeals(spell, metaCtx, playerStats, campaignName, _mapName) {
     if (!isHealingSpell(spell)) {
         return null;
     }
@@ -109,7 +97,7 @@ export async function triggerPostCastSelfHeals(spell, metaCtx, playerStats, camp
     return results.length > 0 ? results : null;
 }
 
-export async function triggerPostCastAllyHeals(spell, metaCtx, playerStats, campaignName, _mapName) {
+ export async function triggerPostCastAllyHeals(spell, metaCtx, playerStats, campaignName, _mapName) {
     if (!isHealingSpell(spell)) {
         return null;
     }
@@ -152,7 +140,8 @@ export async function triggerPostCastAllyHeals(spell, metaCtx, playerStats, camp
         }
 
         const targetName = heal.targetName || playerStats.name;
-        const { newHp, maxHp, actualHeal } = applyHealingDirectly(playerStats, targetName, amount, campaignName);
+        const targetMaxHp = targetName === playerStats.name ? playerStats.hitPoints : null;
+        const { newHp, maxHp, actualHeal } = applyHealingDirectly(playerStats, targetName, amount, campaignName, targetMaxHp);
 
         logHealingToSSE(campaignName, {
             targetName,

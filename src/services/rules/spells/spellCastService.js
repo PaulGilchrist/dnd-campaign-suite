@@ -464,6 +464,14 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
                     }
                 }
             }
+
+            triggerPostCastSelfHeals(spell, metaCtx, playerStats, campaignName, mapName).catch(e => {
+                console.error('[spellCast] Post-cast self-heal failed:', e);
+            });
+            triggerPostCastAllyHeals(spell, metaCtx, playerStats, campaignName, mapName).catch(e => {
+                console.error('[spellCast] Post-cast ally-heal failed:', e);
+            });
+
             return;
         }
 
@@ -844,6 +852,17 @@ async function applyPowerWordHealToTarget(targetName, playerStats, campaignName)
 
     if (healAmount > 0) {
         applyHealingToTarget(combatSummary, targetName, healAmount, campaignName);
+        postLogEntry(campaignName, {
+            type: 'hp_change',
+            targetName,
+            delta: healAmount,
+            currentHp: Math.min(maxHp, currentHp + healAmount),
+            maxHp,
+            isHealing: true,
+            sourceName: playerStats.name,
+            note: 'Power Word Heal',
+            timestamp: Date.now(),
+        });
     }
 
     const conditionsToRemove = ['charmed', 'frightened', 'paralyzed', 'poisoned', 'stunned'];
@@ -924,6 +943,17 @@ async function triggerHeal(spell, metaCtx, playerStats, campaignName, _mapName) 
 
     if (actualHeal > 0) {
         applyHealingToTarget(combatSummary, targetName, actualHeal, campaignName);
+        postLogEntry(campaignName, {
+            type: 'hp_change',
+            targetName,
+            delta: actualHeal,
+            currentHp: Math.min(maxHp, currentHp + actualHeal),
+            maxHp,
+            isHealing: true,
+            sourceName: playerStats.name,
+            note: spell.name,
+            timestamp: Date.now(),
+        });
     }
 
     const conditionsToRemove = ['blinded', 'deafened', 'poisoned'];

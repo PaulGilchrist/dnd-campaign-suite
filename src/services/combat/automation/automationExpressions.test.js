@@ -450,12 +450,11 @@ describe('resolveDiceExpression', () => {
     expect(result).toBe('1d6+4+4')
   })
 
-  it('replaces spell_slot_level with slotLevel after "level" is already replaced', () => {
+  it('replaces spell_slot_level with slotLevel correctly', () => {
     const stats = makePlayerStats()
-    // 'level' replacement runs first, turning 'spell_slot_level' into 'spell_slot_5'
-    // Then 'spell_slot_level' no longer matches, so slotLevel param is unused
-    expect(resolveDiceExpression('spell_slot_level', stats)).toBe('spell_slot_5')
-    expect(resolveDiceExpression('spell_slot_level', stats, 3)).toBe('spell_slot_5')
+    // Without slotLevel, defaults to 1
+    expect(resolveDiceExpression('spell_slot_level', stats)).toBe('1')
+    expect(resolveDiceExpression('spell_slot_level', stats, 3)).toBe('3')
   })
 })
 

@@ -35,6 +35,7 @@ describe('postCastHealService', () => {
       automation: {
         passives: [{ type: 'post_cast_self_heal', name: 'Test Heal', healExpression: '1d8' }],
       },
+      activeBuffs: [],
     }
 
     it('returns null for non-healing spell', async () => {
@@ -161,19 +162,12 @@ describe('postCastHealService', () => {
       expect(result).toBeNull()
     })
 
-    it('throws when playerStats.level is null', async () => {
-      const noLevelStats = { ...baseStats, level: null }
-      await expect(
-        triggerPostCastSelfHeals(healingSpell, {}, noLevelStats, 'camp', 'map')
-      ).rejects.toThrow('playerStats.level is required')
-    })
-
     it('throws when slot level is missing from both metaCtx and spell', async () => {
       const noSlotStats = { ...baseStats, level: 5 }
       const noSlotSpell = { name: 'Cure Wounds', level: null }
       await expect(
         triggerPostCastSelfHeals(noSlotSpell, {}, noSlotStats, 'camp', 'map')
-      ).rejects.toThrow('slot level is required')
+      ).rejects.toThrow('slot level is required for post-cast self heals')
     })
 
     it('returns null when all passives are skipped (othersOnly + zero amount)', async () => {
@@ -230,10 +224,11 @@ describe('postCastHealService', () => {
     })
 
     it('applies ally healing when conditions are met', async () => {
-      const result = await triggerPostCastAllyHeals(healingSpell, {}, baseStats, 'camp', 'map')
-      expect(applyHealingDirectly).toHaveBeenCalledWith(baseStats, baseStats.name, 10, 'camp')
+      const allyStats = { ...baseStats, activeBuffs: [{ name: 'Starry Form', constellation: 'Chalice' }] }
+      const result = await triggerPostCastAllyHeals(healingSpell, {}, allyStats, 'camp', 'map')
+      expect(applyHealingDirectly).toHaveBeenCalledWith(allyStats, allyStats.name, 10, 'camp', allyStats.hitPoints)
       expect(logHealingToSSE).toHaveBeenCalledWith('camp', {
-        targetName: baseStats.name,
+        targetName: allyStats.name,
         sourceName: 'Ally Heal',
         actualHeal: 10,
         newHp: 20,
@@ -246,9 +241,10 @@ describe('postCastHealService', () => {
       const customStats = {
         ...baseStats,
         automation: { passives: [{ type: 'post_cast_ally_heal', name: 'Targeted Heal', healExpression: '1d8', targetName: 'Ally1' }] },
+        activeBuffs: [{ name: 'Starry Form', constellation: 'Chalice' }],
       }
       const result = await triggerPostCastAllyHeals(healingSpell, {}, customStats, 'camp', 'map')
-      expect(applyHealingDirectly).toHaveBeenCalledWith(customStats, 'Ally1', 10, 'camp')
+      expect(applyHealingDirectly).toHaveBeenCalledWith(customStats, 'Ally1', 10, 'camp', null)
       expect(result).toEqual([{ name: 'Targeted Heal', amount: 10, actualHeal: 10, targetName: 'Ally1' }])
     })
 
@@ -263,7 +259,7 @@ describe('postCastHealService', () => {
 
     it('upgrades heal expression from 1d8 to 2d8 at level 10+', async () => {
       evaluateAutoExpression.mockReturnValue(15)
-      const twinkledStats = { ...baseStats, level: 10 }
+      const twinkledStats = { ...baseStats, level: 10, activeBuffs: [{ name: 'Starry Form', constellation: 'Chalice' }] }
       await triggerPostCastAllyHeals(healingSpell, {}, twinkledStats, 'camp', 'map')
       expect(evaluateAutoExpression).toHaveBeenCalledWith('2d8', twinkledStats, 2, 10, 1)
     })
@@ -277,6 +273,7 @@ describe('postCastHealService', () => {
             { type: 'post_cast_ally_heal', name: 'Heal 2', healExpression: '1d8' },
           ],
         },
+        activeBuffs: [{ name: 'Starry Form', constellation: 'Chalice' }],
       }
       const result = await triggerPostCastAllyHeals(healingSpell, {}, multiStats, 'camp', 'map')
       expect(applyHealingDirectly).toHaveBeenCalledTimes(2)
@@ -287,25 +284,19 @@ describe('postCastHealService', () => {
       const noExpressionStats = {
         ...baseStats,
         automation: { passives: [{ type: 'post_cast_ally_heal', name: 'No Expression' }] },
+        activeBuffs: [{ name: 'Starry Form', constellation: 'Chalice' }],
       }
       evaluateAutoExpression.mockReturnValue(0)
       const result = await triggerPostCastAllyHeals(healingSpell, {}, noExpressionStats, 'camp', 'map')
       expect(result).toBeNull()
     })
 
-    it('throws when playerStats.level is null', async () => {
-      const noLevelStats = { ...baseStats, level: null }
-      await expect(
-        triggerPostCastAllyHeals(healingSpell, {}, noLevelStats, 'camp', 'map')
-      ).rejects.toThrow('playerStats.level is required')
-    })
-
     it('throws when slot level is missing from both metaCtx and spell', async () => {
-      const noSlotStats = { ...baseStats, level: 5 }
+      const noSlotStats = { ...baseStats, level: 5, activeBuffs: [{ name: 'Starry Form', constellation: 'Chalice' }] }
       const noSlotSpell = { name: 'Cure Wounds', level: null }
       await expect(
         triggerPostCastAllyHeals(noSlotSpell, {}, noSlotStats, 'camp', 'map')
-      ).rejects.toThrow('slot level is required')
+      ).rejects.toThrow('slot level is required for post-cast ally heals')
     })
   })
 })

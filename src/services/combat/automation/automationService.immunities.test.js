@@ -12,6 +12,7 @@ import { makePlayerStats, makeFeature } from './automationService.fixtures.js'
 vi.mock('../../automation/handlers/buffs/protectionFromEvilAndGoodHandler.js', () => ({
   isProtectionFromEvilAndGoodActive: vi.fn(() => false),
   isCreatureWarded: vi.fn(() => false),
+  handle: vi.fn(),
 }))
 
 // ── getConditionImmunities ────────────────────────────────────────

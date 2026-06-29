@@ -435,7 +435,8 @@ describe('logHealingToSSE', () => {
         expect(call).not.toHaveProperty('someExtraProp');
     });
 
-    it('posts a healing-type log entry when healingName is provided', () => {
+    it('dispatches healing-popup event when healingName is provided', () => {
+        const customEventSpy = vi.spyOn(window, 'CustomEvent');
         logHealingToSSE(campaignName, {
             targetName: 'Goblin',
             sourceName: 'Healing Hands',
@@ -449,18 +450,17 @@ describe('logHealingToSSE', () => {
             maxUses: 1,
         });
 
-        expect(postLogEntry).toHaveBeenNthCalledWith(2, campaignName, {
-            type: 'healing',
-            targetName: 'Goblin',
-            sourceName: 'Healing Hands',
-            healingName: 'Healing Hands',
-            rollInfo: '6d4=24 (maximized)',
-            maximizeHealingDice: true,
-            popupText: 'Healing Hands on Goblin: 6d4=24 (maximized) (dice maximized by Supreme Healing) — Regained 24 HP (no uses remaining)',
-        });
+        expect(postLogEntry).toHaveBeenCalledTimes(1);
+        const popupEvent = customEventSpy.mock.calls.find(
+            call => call[0] === 'healing-popup'
+        );
+        expect(popupEvent).toBeDefined();
+        expect(popupEvent[1].detail.popupText).toBe('Healing Hands on Goblin: 6d4=24 (maximized) (dice maximized by Supreme Healing) — Regained 24 HP (no uses remaining)');
+        customEventSpy.mockRestore();
     });
 
-    it('posts a healing-type log entry without uses info when not provided', () => {
+    it('dispatches healing-popup event without uses info when not provided', () => {
+        const customEventSpy = vi.spyOn(window, 'CustomEvent');
         logHealingToSSE(campaignName, {
             targetName: 'Ally',
             sourceName: 'Cure Wounds',
@@ -472,14 +472,12 @@ describe('logHealingToSSE', () => {
             healingName: 'Cure Wounds',
         });
 
-        expect(postLogEntry).toHaveBeenNthCalledWith(2, campaignName, {
-            type: 'healing',
-            targetName: 'Ally',
-            sourceName: 'Cure Wounds',
-            healingName: 'Cure Wounds',
-            rollInfo: '1d8+1=8 (5, 3)',
-            maximizeHealingDice: false,
-            popupText: 'Cure Wounds on Ally: 1d8+1=8 (5, 3) — Regained 8 HP',
-        });
+        expect(postLogEntry).toHaveBeenCalledTimes(1);
+        const popupEvent = customEventSpy.mock.calls.find(
+            call => call[0] === 'healing-popup'
+        );
+        expect(popupEvent).toBeDefined();
+        expect(popupEvent[1].detail.popupText).toBe('Cure Wounds on Ally: 1d8+1=8 (5, 3) — Regained 8 HP');
+        customEventSpy.mockRestore();
     });
 });

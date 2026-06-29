@@ -73,8 +73,8 @@ vi.mock('./postCastRiderService.js', () => ({
 }))
 
 vi.mock('./postCastHealService.js', () => ({
-  triggerPostCastSelfHeals: vi.fn(),
-  triggerPostCastAllyHeals: vi.fn(),
+  triggerPostCastSelfHeals: vi.fn(async () => null),
+  triggerPostCastAllyHeals: vi.fn(async () => null),
 }))
 
 vi.mock('../features/smiteOfProtectionService.js', () => ({
@@ -131,6 +131,8 @@ function makePlayerStats(overrides = {}) {
     proficiency: 4,
     spellAbilities: { spellCastingAbility: 'Wisdom', toHit: 9, saveDc: 17, modifier: 5 },
     automation: { passives: [] },
+    activeBuffs: [],
+    level: 5,
     hitPoints: 100,
     ...overrides,
   }

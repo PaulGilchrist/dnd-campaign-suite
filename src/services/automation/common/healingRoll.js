@@ -24,14 +24,25 @@ export function rollHealingForAction(auto, playerStats, campaignName, isSelf = f
             targetName = target ? target.name : playerStats.name;
          }
 
-        applyHealingToTarget(cs, targetName, healAmount, playerStats, campaignName);
-     });
+         const result = applyHealingToTarget(cs, targetName, healAmount, campaignName);
+         if (result) {
+             postLogEntry(campaignName, {
+                 type: 'hp_change',
+                 targetName,
+                 delta: result.delta,
+                 currentHp: result.newHp,
+                 maxHp: result.maxHp,
+                 isHealing: true,
+                 isUnconscious: false,
+             }).catch(() => {});
+         }
+      });
 
     return { healAmount, formula, rolls: result.rolls };
 }
 
-export function applyHealingDirectly(playerStats, targetName, amount, campaignName) {
-    const maxHp = playerStats.hitPoints;
+export function applyHealingDirectly(playerStats, targetName, amount, campaignName, targetMaxHp) {
+    const maxHp = targetMaxHp ?? playerStats.hitPoints;
 
     const storedHp = getRuntimeValue(targetName, 'currentHitPoints', campaignName);
     const currentHp = storedHp != null && storedHp !== '' ? Number(storedHp) : maxHp;
@@ -68,15 +79,16 @@ export function logHealingToSSE(campaignName, info) {
         const maximizeNote = maximize ? ' (dice maximized by Supreme Healing)' : '';
         const popupText = `${healingName} on ${targetName}: ${rollInfo}${maximizeNote} — ${healDesc}${remainingUses !== undefined ? (remainingUses > 0 ? ` (${remainingUses} use${remainingUses > 1 ? 's' : ''} remaining)` : ' (no uses remaining)') : ''}`;
 
-        postLogEntry(campaignName, {
-            type: 'healing',
-            targetName,
-            sourceName,
-            healingName,
-            rollInfo: rollInfo || null,
-            maximizeHealingDice: maximize || false,
-            popupText,
-          }).catch(() => {});
+        window.dispatchEvent(new CustomEvent('healing-popup', {
+            detail: {
+                targetName,
+                sourceName,
+                healingName,
+                rollInfo: rollInfo || null,
+                maximizeHealingDice: maximize || false,
+                popupText,
+            },
+        }));
     }
 
     window.dispatchEvent(new CustomEvent('combat-summary-updated'));
