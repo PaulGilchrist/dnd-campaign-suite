@@ -1,6 +1,7 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addExpiration } from '../../../rules/effects/expirations.js';
 import { toggleBuff } from '../../common/buffToggle.js';
+import { addEntry } from '../../../ui/logService.js';
 
 const TRANSFORMATION_EFFECTS = {
     'Heavenly Wings': {
@@ -122,6 +123,13 @@ export async function confirmCelestialRevelation(playerStats, chosenOption, camp
         campaignName,
         playerStats.name
     );
+
+    await addEntry(campaignName, {
+        type: 'ability_use',
+        characterName: playerStats.name,
+        abilityName: chosenOption,
+        description: `${chosenOption} used`,
+    }).catch((e) => { console.error('[celestialRevelation] Error:', e); });
 
     return {
         type: 'popup',

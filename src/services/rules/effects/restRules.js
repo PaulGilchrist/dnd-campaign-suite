@@ -57,8 +57,9 @@ export const SHORT_REST_RESOURCES = [
     'actionSurgeUses',
     'actionSurgeUsedThisRound',
     'luckyPoints',
-    'adrenalineRushUses'
-]
+                'adrenalineRushUses',
+                '_celestialRevelationUses'
+       ]
 
 export function getShortRestResources() {
   return [...SHORT_REST_RESOURCES]
@@ -107,8 +108,9 @@ export const LONG_REST_RESOURCES = [
              '_Phantasmal_Creatures_freeCastCount',
               'breathWeaponUses',
                'stonecunningUses',
-               'adrenalineRushUses'
-       ]
+                'adrenalineRushUses',
+                '_celestialRevelationUses'
+        ]
 
 export function getLongRestResources() {
   return [...LONG_REST_RESOURCES]
