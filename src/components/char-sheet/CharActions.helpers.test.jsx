@@ -21,7 +21,7 @@ vi.mock('../../services/combat/automation/automationService.js', () => ({
 vi.mock('../../hooks/combat/useActionSpellMetamagic.js', () => ({
   useActionSpellMetamagic: vi.fn(() => ({
     pendingActionMetamagic: null, handleActionMetamagicConfirm: vi.fn(), handleActionMetamagicSkip: vi.fn(),
-    handleActionSpellDamageClick: vi.fn(), handleSpellAttackClick: vi.fn(), handleSpellDamageClick: vi.fn(),
+    resolveSpellDamage: vi.fn(), handleSpellAttackClick: vi.fn(),
   })),
 }));
 vi.mock('../../hooks/combat/useActionPopup.js', () => ({
@@ -121,7 +121,7 @@ vi.mock('./useCharActionModals.js', () => ({
     damageTypeChoice: null,
     featureChoice: null,
     setFeatureChoice: vi.fn(),
-    handleDamageClick: vi.fn(),
+    resolveAttackDamage: vi.fn(),
     handleMasteryClose: vi.fn(),
     handleWeaponMasteryChoice: vi.fn(),
     handleDivineFuryDamageType: vi.fn(),

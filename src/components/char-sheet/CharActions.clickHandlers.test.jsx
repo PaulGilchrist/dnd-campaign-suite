@@ -163,7 +163,7 @@ vi.mock('../../hooks/combat/useLoggedDiceRoll.js', () => {
 
 vi.mock('./useCharActionModals.js', () => ({
   default: vi.fn(() => ({
-    handleDamageClick: vi.fn(),
+    resolveAttackDamage: vi.fn(),
   })),
 }));
 
@@ -172,9 +172,8 @@ vi.mock('../../hooks/combat/useActionSpellMetamagic.js', () => ({
     pendingActionMetamagic: null,
     handleActionMetamagicConfirm: vi.fn(),
     handleActionMetamagicSkip: vi.fn(),
-    handleActionSpellDamageClick: vi.fn(),
+    resolveSpellDamage: vi.fn(),
     handleSpellAttackClick: vi.fn(),
-    handleSpellDamageClick: vi.fn(),
   })),
 }));
 
@@ -315,40 +314,16 @@ describe('CharActions click handlers', () => {
       expect(mockHandleSpellAttackClick).not.toHaveBeenCalled();
     });
 
-    it('should not call handleSpellDamageClick when cannotAct is true for weapon attack', async () => {
-      const mockHandleSpellDamageClick = vi.fn();
+    it('should not call resolveSpellDamage when cannotAct is true for save-DC attack', async () => {
+      const mockResolveSpellDamage = vi.fn();
       vi.mocked(getInnateSorceryBonus).mockReturnValue({ saveDcBonus: 0 });
 
       useActionSpellMetamagic.mockReturnValue({
         pendingActionMetamagic: null,
         handleActionMetamagicConfirm: vi.fn(),
         handleActionMetamagicSkip: vi.fn(),
-        handleActionSpellDamageClick: vi.fn(),
+        handleActionSpellDamageClick: mockResolveSpellDamage,
         handleSpellAttackClick: vi.fn(),
-        handleSpellDamageClick: mockHandleSpellDamageClick,
-      });
-
-      const stats = createStats({
-        attacks: [{ name: 'Longsword', range: 5, hitBonus: 5, damage: '1d8+3', damageType: 'Slashing', type: 'Action' }],
-      });
-
-      await renderWithFetch(<CharActions playerStats={stats} cannotAct={true} />);
-      const damageElement = screen.getByText('1d8+3');
-      await act(async () => { fireEvent.click(damageElement); });
-      expect(mockHandleSpellDamageClick).not.toHaveBeenCalled();
-    });
-
-    it('should not call handleActionSpellDamageClick when cannotAct is true for save-DC attack', async () => {
-      const mockHandleActionSpellDamageClick = vi.fn();
-      vi.mocked(getInnateSorceryBonus).mockReturnValue({ saveDcBonus: 0 });
-
-      useActionSpellMetamagic.mockReturnValue({
-        pendingActionMetamagic: null,
-        handleActionMetamagicConfirm: vi.fn(),
-        handleActionMetamagicSkip: vi.fn(),
-        handleActionSpellDamageClick: mockHandleActionSpellDamageClick,
-        handleSpellAttackClick: vi.fn(),
-        handleSpellDamageClick: vi.fn(),
       });
 
       const stats = createStats({
@@ -358,22 +333,21 @@ describe('CharActions click handlers', () => {
       await renderWithFetch(<CharActions playerStats={stats} cannotAct={true} />);
       const damageElement = screen.getByText('1d12');
       await act(async () => { fireEvent.click(damageElement); });
-      expect(mockHandleActionSpellDamageClick).not.toHaveBeenCalled();
+      expect(mockResolveSpellDamage).not.toHaveBeenCalled();
     });
   });
 
   describe('spell attack/damage click handlers', () => {
-    it('should call handleActionSpellDamageClick when damage is clicked for save-DC attack', async () => {
-      const mockHandleActionSpellDamageClick = vi.fn();
+    it('should call resolveSpellDamage when damage is clicked for save-DC attack', async () => {
+      const mockResolveSpellDamage = vi.fn();
       vi.mocked(getInnateSorceryBonus).mockReturnValue({ saveDcBonus: 0 });
 
       useActionSpellMetamagic.mockReturnValue({
         pendingActionMetamagic: null,
         handleActionMetamagicConfirm: vi.fn(),
         handleActionMetamagicSkip: vi.fn(),
-        handleActionSpellDamageClick: mockHandleActionSpellDamageClick,
+        handleActionSpellDamageClick: mockResolveSpellDamage,
         handleSpellAttackClick: vi.fn(),
-        handleSpellDamageClick: vi.fn(),
       });
 
       const stats = createStats({
@@ -383,7 +357,7 @@ describe('CharActions click handlers', () => {
       await renderWithFetch(<CharActions playerStats={stats} />);
       const damageElement = screen.getByText('1d12');
       await act(async () => { fireEvent.click(damageElement); });
-      expect(mockHandleActionSpellDamageClick).toHaveBeenCalledWith(stats.attacks[0]);
+      expect(mockResolveSpellDamage).toHaveBeenCalledWith(stats.attacks[0]);
     });
 
     it('should log a simple damage roll for non-save-DC weapon attacks (no targeting or riders)', async () => {

@@ -358,7 +358,7 @@ describe('CharBonusActions - Interactive', () => {
     });
   });
 
-  describe('save DC attack damage click', () => {
+  describe('save DC attack resolve spell damage', () => {
     const saveDcAttack = {
       name: 'Cone of Cold',
       range: 60,
@@ -369,20 +369,20 @@ describe('CharBonusActions - Interactive', () => {
       type: 'Bonus Action',
     };
 
-    it('calls onActionSpellDamageClick when save DC attack damage is clicked', () => {
-      const mockOnActionSpellDamageClick = vi.fn();
-      render(<CharBonusActions playerStats={createStats({ attacks: [saveDcAttack] })} onActionSpellDamageClick={mockOnActionSpellDamageClick} />);
+    it('calls onResolveSpellDamage when save DC attack damage is clicked', () => {
+      const mockOnResolveSpellDamage = vi.fn();
+      render(<CharBonusActions playerStats={createStats({ attacks: [saveDcAttack] })} onResolveSpellDamage={mockOnResolveSpellDamage} />);
       const damageElement = screen.getByText('8d8');
       fireEvent.click(damageElement);
-      expect(mockOnActionSpellDamageClick).toHaveBeenCalledWith(saveDcAttack);
+      expect(mockOnResolveSpellDamage).toHaveBeenCalledWith(saveDcAttack);
     });
 
-    it('does not call onActionSpellDamageClick when cannotAct is true', () => {
-      const mockOnActionSpellDamageClick = vi.fn();
-      render(<CharBonusActions playerStats={createStats({ attacks: [saveDcAttack] })} onActionSpellDamageClick={mockOnActionSpellDamageClick} cannotAct />);
+    it('does not call onResolveSpellDamage when cannotAct is true', () => {
+      const mockOnResolveSpellDamage = vi.fn();
+      render(<CharBonusActions playerStats={createStats({ attacks: [saveDcAttack] })} onResolveSpellDamage={mockOnResolveSpellDamage} cannotAct />);
       const damageElement = screen.getByText('8d8');
       fireEvent.click(damageElement);
-      expect(mockOnActionSpellDamageClick).not.toHaveBeenCalled();
+      expect(mockOnResolveSpellDamage).not.toHaveBeenCalled();
     });
   });
 

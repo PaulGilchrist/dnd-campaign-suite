@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import useCharActionModals from './useCharActionModals.js';
 
-vi.mock('./useDamageClick.js', () => ({
+vi.mock('./useAttackDamageResolution.js', () => ({
   default: vi.fn(),
 }));
 
@@ -11,11 +11,11 @@ vi.mock('./useModalHandlers.js', () => ({
   default: vi.fn(),
 }));
 
-const useDamageClick = (await import('./useDamageClick.js')).default;
+const useAttackDamageResolution = (await import('./useAttackDamageResolution.js')).default;
 const useModalHandlers = (await import('./useModalHandlers.js')).default;
 
-const mockDamageClickResult = {
-  handleDamageClick: vi.fn(),
+const mockResolveAttackDamageResult = {
+  resolveAttackDamage: vi.fn(),
   proceedWithDamage: vi.fn(),
 };
 
@@ -121,7 +121,7 @@ const delegatedHandlerNames = [
 describe('useCharActionModals', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    useDamageClick.mockReturnValue(mockDamageClickResult);
+    useAttackDamageResolution.mockReturnValue(mockResolveAttackDamageResult);
     useModalHandlers.mockReturnValue(mockModalHandlersResult);
   });
 
@@ -152,9 +152,9 @@ describe('useCharActionModals', () => {
     }
 
   describe('delegated functions', () => {
-    it('returns handleDamageClick from useDamageClick', () => {
+    it('returns resolveAttackDamage from useAttackDamageResolution', () => {
       const { result } = renderHook(() => useCharActionModals(baseArgs));
-      expect(result.current.handleDamageClick).toBe(mockDamageClickResult.handleDamageClick);
+      expect(result.current.resolveAttackDamage).toBe(mockResolveAttackDamageResult.resolveAttackDamage);
     });
 
     for (const handlerName of delegatedHandlerNames) {
@@ -174,7 +174,7 @@ describe('useCharActionModals', () => {
       }
 
       expect(result.current).toHaveProperty('pendingDamageRef');
-      expect(result.current).toHaveProperty('handleDamageClick');
+      expect(result.current).toHaveProperty('resolveAttackDamage');
 
       for (const handlerName of delegatedHandlerNames) {
         expect(result.current).toHaveProperty(handlerName);
@@ -204,10 +204,10 @@ describe('useCharActionModals', () => {
       expect(handlersCall).toHaveProperty('setPopupHtml');
     });
 
-    it('passes all expected setters to useDamageClick', () => {
+    it('passes all expected setters to useAttackDamageResolution', () => {
       renderHook(() => useCharActionModals(baseArgs));
 
-      const clickCall = useDamageClick.mock.calls[0][0];
+      const clickCall = useAttackDamageResolution.mock.calls[0][0];
 
       expect(clickCall).toHaveProperty('setDamageTypeChoice');
       expect(clickCall).toHaveProperty('setDivineFuryChoice');

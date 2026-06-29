@@ -1,6 +1,6 @@
 // @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import useDamageClick from './useDamageClick.js';
+import useAttackDamageResolution from './useAttackDamageResolution.js';
 
 vi.mock('../../services/dice/diceRoller.js', () => ({
     rollExpression: vi.fn(),
@@ -69,7 +69,7 @@ const mockPlayerStats = {
 const mockCampaignName = 'test-campaign';
 const defaultRollResult = { total: 5, rolls: [5], modifier: 0 };
 
-describe('useDamageClick - feats', () => {
+describe('useAttackDamageResolution - feats', () => {
     const mockSetPopupHtml = vi.fn();
     const mockRollDamage = vi.fn();
     const mockBuildCtx = vi.fn(() => Promise.resolve({ targetName: 'Goblin' }));
@@ -81,7 +81,7 @@ describe('useDamageClick - feats', () => {
     const mockPendingDamageRef = { current: null };
 
      
-    function useDamageClickHook(overrides = {}) {
+    function useAttackDamageResolutionHook(overrides = {}) {
         const deps = {
             playerStats: mockPlayerStats,
             campaignName: mockCampaignName,
@@ -98,7 +98,7 @@ describe('useDamageClick - feats', () => {
             pendingDamageRef: mockPendingDamageRef,
             ...overrides,
         };
-        return useDamageClick(deps);
+        return useAttackDamageResolution(deps);
     }
 
     beforeEach(() => {
@@ -157,12 +157,12 @@ describe('useDamageClick - feats', () => {
                     ],
                 },
             };
-            const { handleDamageClick } = useDamageClickHook({ playerStats: stats });
+            const { resolveAttackDamage } = useAttackDamageResolutionHook({ playerStats: stats });
             const attack = {
                 name: 'Longsword', damage: '1d8+5', damageType: 'Slashing',
                 weaponType: 'melee', properties: [],
             };
-            await handleDamageClick(attack);
+            await resolveAttackDamage(attack);
             await tick();
             expect(setRuntimeValue).toHaveBeenCalledWith('test-campaign', 'targetEffects', expect.arrayContaining([
                 expect.objectContaining({
@@ -192,12 +192,12 @@ describe('useDamageClick - feats', () => {
                     ],
                 },
             };
-            const { handleDamageClick } = useDamageClickHook({ playerStats: stats });
+            const { resolveAttackDamage } = useAttackDamageResolutionHook({ playerStats: stats });
             const attack = {
                 name: 'Longsword', damage: '1d8+5', damageType: 'Slashing',
                 weaponType: 'melee', properties: [],
             };
-            await handleDamageClick(attack);
+            await resolveAttackDamage(attack);
             await tick();
             expect(setRuntimeValue).not.toHaveBeenCalledWith('TestFighter', '_Charge_Attack_usedRound', expect.any(Number), 'test-campaign');
         });
@@ -218,12 +218,12 @@ describe('useDamageClick - feats', () => {
                     ],
                 },
             };
-            const { handleDamageClick } = useDamageClickHook({ playerStats: stats });
+            const { resolveAttackDamage } = useAttackDamageResolutionHook({ playerStats: stats });
             const attack = {
                 name: 'Longsword', damage: '1d8+5', damageType: 'Slashing',
                 weaponType: 'melee', properties: [],
             };
-            await handleDamageClick(attack);
+            await resolveAttackDamage(attack);
             await tick();
             expect(setRuntimeValue).not.toHaveBeenCalledWith('TestFighter', '_Charge_Attack_usedRound', expect.any(Number), 'test-campaign');
             expect(mockRollDamage).toHaveBeenCalled();
@@ -247,12 +247,12 @@ describe('useDamageClick - feats', () => {
                     ],
                 },
             };
-            const { handleDamageClick } = useDamageClickHook({ playerStats: stats });
+            const { resolveAttackDamage } = useAttackDamageResolutionHook({ playerStats: stats });
             const attack = {
                 name: 'Longsword', damage: '1d8+5', damageType: 'Slashing',
                 weaponType: 'melee', properties: [],
             };
-            await handleDamageClick(attack);
+            await resolveAttackDamage(attack);
             await tick();
             expect(setRuntimeValue).toHaveBeenCalledWith('test-campaign', 'targetEffects', expect.arrayContaining([
                 expect.objectContaining({
@@ -280,12 +280,12 @@ describe('useDamageClick - feats', () => {
                     ],
                 },
             };
-            const { handleDamageClick } = useDamageClickHook({ playerStats: stats });
+            const { resolveAttackDamage } = useAttackDamageResolutionHook({ playerStats: stats });
             const attack = {
                 name: 'Longsword', damage: '1d8+5', damageType: 'Slashing',
                 weaponType: 'melee', properties: [],
             };
-            await handleDamageClick(attack);
+            await resolveAttackDamage(attack);
             await tick();
             expect(setRuntimeValue).not.toHaveBeenCalledWith('test-campaign', 'targetEffects', expect.anything(), 'test-campaign');
             expect(mockRollDamage).toHaveBeenCalled();
@@ -310,12 +310,12 @@ describe('useDamageClick - feats', () => {
                     ],
                 },
             };
-            const { handleDamageClick } = useDamageClickHook({ playerStats: stats });
+            const { resolveAttackDamage } = useAttackDamageResolutionHook({ playerStats: stats });
             const attack = {
                 name: 'Longsword', damage: '1d8+5', damageType: 'Slashing',
                 weaponType: 'melee', properties: [],
             };
-            await handleDamageClick(attack);
+            await resolveAttackDamage(attack);
             await tick();
             expect(parseMagicItemName).toHaveBeenCalledWith('Shield+1');
             expect(mockRollDamage).toHaveBeenCalled();
@@ -338,12 +338,12 @@ describe('useDamageClick - feats', () => {
                     ],
                 },
             };
-            const { handleDamageClick } = useDamageClickHook({ playerStats: stats });
+            const { resolveAttackDamage } = useAttackDamageResolutionHook({ playerStats: stats });
             const attack = {
                 name: 'Longsword', damage: '1d8+5', damageType: 'Slashing',
                 weaponType: 'melee', properties: [],
             };
-            await handleDamageClick(attack);
+            await resolveAttackDamage(attack);
             await tick();
             expect(setRuntimeValue).not.toHaveBeenCalledWith('TestFighter', '_Shield_Bash_usedRound', expect.any(Number), 'test-campaign');
         });
@@ -367,12 +367,12 @@ describe('useDamageClick - feats', () => {
                     ],
                 },
             };
-            const { handleDamageClick } = useDamageClickHook({ playerStats: stats });
+            const { resolveAttackDamage } = useAttackDamageResolutionHook({ playerStats: stats });
             const attack = {
                 name: 'Warhammer', damage: '1d8+5', damageType: 'Bludgeoning',
                 weaponType: 'melee', properties: [],
             };
-            await handleDamageClick(attack);
+            await resolveAttackDamage(attack);
             await tick();
             expect(setRuntimeValue).toHaveBeenCalledWith('test-campaign', 'targetEffects', expect.arrayContaining([
                 expect.objectContaining({
@@ -398,12 +398,12 @@ describe('useDamageClick - feats', () => {
                     ],
                 },
             };
-            const { handleDamageClick } = useDamageClickHook({ playerStats: stats });
+            const { resolveAttackDamage } = useAttackDamageResolutionHook({ playerStats: stats });
             const attack = {
                 name: 'Longsword', damage: '1d8+5', damageType: 'Slashing',
                 weaponType: 'melee', properties: [],
             };
-            await handleDamageClick(attack);
+            await resolveAttackDamage(attack);
             await tick();
             expect(setRuntimeValue).not.toHaveBeenCalledWith('test-campaign', 'targetEffects', expect.anything(), 'test-campaign');
             expect(mockRollDamage).toHaveBeenCalled();
@@ -426,12 +426,12 @@ describe('useDamageClick - feats', () => {
                     ],
                 },
             };
-            const { handleDamageClick } = useDamageClickHook({ playerStats: stats });
+            const { resolveAttackDamage } = useAttackDamageResolutionHook({ playerStats: stats });
             const attack = {
                 name: 'Warhammer', damage: '1d8+5', damageType: 'Bludgeoning',
                 weaponType: 'melee', properties: [],
             };
-            await handleDamageClick(attack);
+            await resolveAttackDamage(attack);
             await tick();
             expect(setRuntimeValue).not.toHaveBeenCalledWith('TestFighter', '_Crusher_usedRound', expect.any(Number), 'test-campaign');
         });
@@ -448,7 +448,7 @@ describe('useDamageClick - feats', () => {
                     ],
                 },
             };
-            const { handleDamageClick } = useDamageClickHook({
+            const { resolveAttackDamage } = useAttackDamageResolutionHook({
                 playerStats: stats,
                 popupHtml: { isCrit: true },
             });
@@ -456,7 +456,7 @@ describe('useDamageClick - feats', () => {
                 name: 'Warhammer', damage: '1d8+5', damageType: 'Bludgeoning',
                 weaponType: 'melee', properties: [],
             };
-            await handleDamageClick(attack);
+            await resolveAttackDamage(attack);
             await tick();
             expect(setRuntimeValue).toHaveBeenCalledWith('test-campaign', 'targetEffects', expect.arrayContaining([
                 expect.objectContaining({
@@ -478,7 +478,7 @@ describe('useDamageClick - feats', () => {
                     ],
                 },
             };
-            const { handleDamageClick } = useDamageClickHook({
+            const { resolveAttackDamage } = useAttackDamageResolutionHook({
                 playerStats: stats,
                 popupHtml: { isCrit: true },
             });
@@ -486,7 +486,7 @@ describe('useDamageClick - feats', () => {
                 name: 'Longsword', damage: '1d8+5', damageType: 'Slashing',
                 weaponType: 'melee', properties: [],
             };
-            await handleDamageClick(attack);
+            await resolveAttackDamage(attack);
             await tick();
             expect(setRuntimeValue).not.toHaveBeenCalledWith('test-campaign', 'targetEffects', expect.anything(), 'test-campaign');
         });
@@ -510,12 +510,12 @@ describe('useDamageClick - feats', () => {
                     ],
                 },
             };
-            const { handleDamageClick } = useDamageClickHook({ playerStats: stats });
+            const { resolveAttackDamage } = useAttackDamageResolutionHook({ playerStats: stats });
             const attack = {
                 name: 'Longsword', damage: '1d8+5', damageType: 'Slashing',
                 weaponType: 'melee', properties: [],
             };
-            await handleDamageClick(attack);
+            await resolveAttackDamage(attack);
             await tick();
             expect(setRuntimeValue).toHaveBeenCalledWith('test-campaign', 'targetEffects', expect.arrayContaining([
                 expect.objectContaining({
@@ -542,12 +542,12 @@ describe('useDamageClick - feats', () => {
                     ],
                 },
             };
-            const { handleDamageClick } = useDamageClickHook({ playerStats: stats });
+            const { resolveAttackDamage } = useAttackDamageResolutionHook({ playerStats: stats });
             const attack = {
                 name: 'Rapier', damage: '1d8+5', damageType: 'Piercing',
                 weaponType: 'melee', properties: [],
             };
-            await handleDamageClick(attack);
+            await resolveAttackDamage(attack);
             await tick();
             expect(setRuntimeValue).not.toHaveBeenCalledWith('test-campaign', 'targetEffects', expect.anything(), 'test-campaign');
             expect(mockRollDamage).toHaveBeenCalled();
@@ -570,12 +570,12 @@ describe('useDamageClick - feats', () => {
                     ],
                 },
             };
-            const { handleDamageClick } = useDamageClickHook({ playerStats: stats });
+            const { resolveAttackDamage } = useAttackDamageResolutionHook({ playerStats: stats });
             const attack = {
                 name: 'Longsword', damage: '1d8+5', damageType: 'Slashing',
                 weaponType: 'melee', properties: [],
             };
-            await handleDamageClick(attack);
+            await resolveAttackDamage(attack);
             await tick();
             expect(setRuntimeValue).not.toHaveBeenCalledWith('TestFighter', '_Slasher_usedRound', expect.any(Number), 'test-campaign');
         });
@@ -592,7 +592,7 @@ describe('useDamageClick - feats', () => {
                     ],
                 },
             };
-            const { handleDamageClick } = useDamageClickHook({
+            const { resolveAttackDamage } = useAttackDamageResolutionHook({
                 playerStats: stats,
                 popupHtml: { isCrit: true },
             });
@@ -600,7 +600,7 @@ describe('useDamageClick - feats', () => {
                 name: 'Longsword', damage: '1d8+5', damageType: 'Slashing',
                 weaponType: 'melee', properties: [],
             };
-            await handleDamageClick(attack);
+            await resolveAttackDamage(attack);
             await tick();
             expect(setRuntimeValue).toHaveBeenCalledWith('test-campaign', 'targetEffects', expect.arrayContaining([
                 expect.objectContaining({
@@ -622,7 +622,7 @@ describe('useDamageClick - feats', () => {
                     ],
                 },
             };
-            const { handleDamageClick } = useDamageClickHook({
+            const { resolveAttackDamage } = useAttackDamageResolutionHook({
                 playerStats: stats,
                 popupHtml: { isCrit: true },
             });
@@ -630,7 +630,7 @@ describe('useDamageClick - feats', () => {
                 name: 'Rapier', damage: '1d8+5', damageType: 'Piercing',
                 weaponType: 'melee', properties: [],
             };
-            await handleDamageClick(attack);
+            await resolveAttackDamage(attack);
             await tick();
             expect(setRuntimeValue).not.toHaveBeenCalledWith('test-campaign', 'targetEffects', expect.anything(), 'test-campaign');
         });
@@ -652,12 +652,12 @@ describe('useDamageClick - feats', () => {
                     ],
                 },
             };
-            const { handleDamageClick } = useDamageClickHook({ playerStats: stats });
+            const { resolveAttackDamage } = useAttackDamageResolutionHook({ playerStats: stats });
             const attack = {
                 name: 'Rapier', damage: '1d8+5', damageType: 'Piercing',
                 weaponType: 'melee', properties: [],
             };
-            await handleDamageClick(attack);
+            await resolveAttackDamage(attack);
             await tick();
             expect(setRuntimeValue).toHaveBeenCalledWith('TestFighter', '_Piercer_usedRound', 1, 'test-campaign');
             expect(mockRollDamage).toHaveBeenCalledWith(
@@ -680,12 +680,12 @@ describe('useDamageClick - feats', () => {
                     ],
                 },
             };
-            const { handleDamageClick } = useDamageClickHook({ playerStats: stats });
+            const { resolveAttackDamage } = useAttackDamageResolutionHook({ playerStats: stats });
             const attack = {
                 name: 'Longsword', damage: '1d8+5', damageType: 'Slashing',
                 weaponType: 'melee', properties: [],
             };
-            await handleDamageClick(attack);
+            await resolveAttackDamage(attack);
             await tick();
             expect(mockRollDamage).toHaveBeenCalledWith(
                 'Longsword',
@@ -710,12 +710,12 @@ describe('useDamageClick - feats', () => {
                     ],
                 },
             };
-            const { handleDamageClick } = useDamageClickHook({ playerStats: stats });
+            const { resolveAttackDamage } = useAttackDamageResolutionHook({ playerStats: stats });
             const attack = {
                 name: 'Rapier', damage: '1d8+5', damageType: 'Piercing',
                 weaponType: 'melee', properties: [],
             };
-            await handleDamageClick(attack);
+            await resolveAttackDamage(attack);
             await tick();
             expect(setRuntimeValue).not.toHaveBeenCalledWith('TestFighter', '_Piercer_usedRound', expect.any(Number), 'test-campaign');
             expect(mockRollDamage).toHaveBeenCalledWith(
@@ -735,7 +735,7 @@ describe('useDamageClick - feats', () => {
                     ],
                 },
             };
-            const { handleDamageClick } = useDamageClickHook({
+            const { resolveAttackDamage } = useAttackDamageResolutionHook({
                 playerStats: stats,
                 popupHtml: { isCrit: true },
             });
@@ -743,7 +743,7 @@ describe('useDamageClick - feats', () => {
                 name: 'Rapier', damage: '1d8+5', damageType: 'Piercing',
                 weaponType: 'melee', properties: [],
             };
-            await handleDamageClick(attack);
+            await resolveAttackDamage(attack);
             await tick();
             expect(mockRollDamage).toHaveBeenCalledWith(
                 'Rapier',
@@ -762,7 +762,7 @@ describe('useDamageClick - feats', () => {
                     ],
                 },
             };
-            const { handleDamageClick } = useDamageClickHook({
+            const { resolveAttackDamage } = useAttackDamageResolutionHook({
                 playerStats: stats,
                 popupHtml: { isCrit: true },
             });
@@ -770,7 +770,7 @@ describe('useDamageClick - feats', () => {
                 name: 'Longsword', damage: '1d8+5', damageType: 'Slashing',
                 weaponType: 'melee', properties: [],
             };
-            await handleDamageClick(attack);
+            await resolveAttackDamage(attack);
             await tick();
             expect(mockRollDamage).toHaveBeenCalledWith(
                 'Longsword',
@@ -794,12 +794,12 @@ describe('useDamageClick - feats', () => {
                     ],
                 },
             };
-            const { handleDamageClick } = useDamageClickHook({ playerStats: stats });
+            const { resolveAttackDamage } = useAttackDamageResolutionHook({ playerStats: stats });
             const attack = {
                 name: 'Greataxe', damage: '1d12+5', damageType: 'Slashing',
                 weaponType: 'melee', properties: ['Heavy'],
             };
-            await handleDamageClick(attack);
+            await resolveAttackDamage(attack);
             await tick();
             expect(setRuntimeValue).toHaveBeenCalledWith('TestFighter', '_Savage_Attacker_usedRound', 1, 'test-campaign');
             expect(mockRollDamage).toHaveBeenCalled();
@@ -818,12 +818,12 @@ describe('useDamageClick - feats', () => {
                     ],
                 },
             };
-            const { handleDamageClick } = useDamageClickHook({ playerStats: stats });
+            const { resolveAttackDamage } = useAttackDamageResolutionHook({ playerStats: stats });
             const attack = {
                 name: 'Greataxe', damage: '1d12+5', damageType: 'Slashing',
                 weaponType: 'melee', properties: ['Heavy'],
             };
-            await handleDamageClick(attack);
+            await resolveAttackDamage(attack);
             await tick();
             // Feature should always be marked as used regardless of whether reroll improved the total
             expect(setRuntimeValue).toHaveBeenCalledWith('TestFighter', '_Savage_Attacker_usedRound', 1, 'test-campaign');
@@ -841,12 +841,12 @@ describe('useDamageClick - feats', () => {
                     ],
                 },
             };
-            const { handleDamageClick } = useDamageClickHook({ playerStats: stats });
+            const { resolveAttackDamage } = useAttackDamageResolutionHook({ playerStats: stats });
             const attack = {
                 name: 'Greataxe', damage: '1d12+5', damageType: 'Slashing',
                 weaponType: 'melee', properties: ['Heavy'],
             };
-            await handleDamageClick(attack);
+            await resolveAttackDamage(attack);
             await tick();
             expect(setRuntimeValue).not.toHaveBeenCalledWith('TestFighter', '_Savage_Attacker_usedRound', expect.any(Number), 'test-campaign');
         });
@@ -866,12 +866,12 @@ describe('useDamageClick - feats', () => {
                     passives: [{ effect: 'tavern_brawler_reroll_ones' }],
                 },
             };
-            const { handleDamageClick } = useDamageClickHook({ playerStats: stats });
+            const { resolveAttackDamage } = useAttackDamageResolutionHook({ playerStats: stats });
             const attack = {
                 name: 'Unarmed Strike', damage: '1d4', damageType: 'Bludgeoning',
                 weaponType: 'unarmed', properties: [],
             };
-            await handleDamageClick(attack);
+            await resolveAttackDamage(attack);
             await tick();
             expect(mockRollDamage).toHaveBeenCalledWith(
                 'Unarmed Strike',
@@ -890,12 +890,12 @@ describe('useDamageClick - feats', () => {
                     passives: [{ effect: 'tavern_brawler_reroll_ones' }],
                 },
             };
-            const { handleDamageClick } = useDamageClickHook({ playerStats: stats });
+            const { resolveAttackDamage } = useAttackDamageResolutionHook({ playerStats: stats });
             const attack = {
                 name: 'Unarmed Strike', damage: '1d4', damageType: 'Bludgeoning',
                 weaponType: 'unarmed', properties: [],
             };
-            await handleDamageClick(attack);
+            await resolveAttackDamage(attack);
             await tick();
             expect(mockRollDamage).toHaveBeenCalledWith(
                 'Unarmed Strike',
@@ -914,12 +914,12 @@ describe('useDamageClick - feats', () => {
                     passives: [{ effect: 'tavern_brawler_push' }],
                 },
             };
-            const { handleDamageClick } = useDamageClickHook({ playerStats: stats });
+            const { resolveAttackDamage } = useAttackDamageResolutionHook({ playerStats: stats });
             const attack = {
                 name: 'Unarmed Strike', damage: '1d4', damageType: 'Bludgeoning',
                 weaponType: 'unarmed', properties: [],
             };
-            await handleDamageClick(attack);
+            await resolveAttackDamage(attack);
             await tick();
             expect(setRuntimeValue).toHaveBeenCalledWith('test-campaign', 'targetEffects', expect.arrayContaining([
                 expect.objectContaining({
@@ -941,12 +941,12 @@ describe('useDamageClick - feats', () => {
                     passives: [{ effect: 'tavern_brawler_push' }],
                 },
             };
-            const { handleDamageClick } = useDamageClickHook({ playerStats: stats });
+            const { resolveAttackDamage } = useAttackDamageResolutionHook({ playerStats: stats });
             const attack = {
                 name: 'Longsword', damage: '1d8+5', damageType: 'Slashing',
                 weaponType: 'melee', properties: [],
             };
-            await handleDamageClick(attack);
+            await resolveAttackDamage(attack);
             await tick();
             expect(setRuntimeValue).not.toHaveBeenCalledWith('test-campaign', 'targetEffects', expect.anything(), 'test-campaign');
             expect(mockRollDamage).toHaveBeenCalled();
@@ -963,12 +963,12 @@ describe('useDamageClick - feats', () => {
                     passives: [{ effect: 'tavern_brawler_push' }],
                 },
             };
-            const { handleDamageClick } = useDamageClickHook({ playerStats: stats });
+            const { resolveAttackDamage } = useAttackDamageResolutionHook({ playerStats: stats });
             const attack = {
                 name: 'Unarmed Strike', damage: '1d4', damageType: 'Bludgeoning',
                 weaponType: 'unarmed', properties: [],
             };
-            await handleDamageClick(attack);
+            await resolveAttackDamage(attack);
             await tick();
             expect(setRuntimeValue).not.toHaveBeenCalledWith('TestFighter', '_Tavern_Brawler_Push_UsedRound', expect.any(Number), 'test-campaign');
         });
@@ -989,12 +989,12 @@ describe('useDamageClick - feats', () => {
                     passives: [{ name: 'Sacred Weapon', effect: 'sacred_weapon' }],
                 },
             };
-            const { handleDamageClick } = useDamageClickHook({ playerStats: stats });
+            const { resolveAttackDamage } = useAttackDamageResolutionHook({ playerStats: stats });
             const attack = {
                 name: 'Longsword', damage: '1d8+5', damageType: 'Slashing',
                 weaponType: 'melee', properties: [],
             };
-            await handleDamageClick(attack);
+            await resolveAttackDamage(attack);
             await tick();
             expect(attack.damageType).toBe('radiant');
             expect(mockRollDamage).toHaveBeenCalledWith(
@@ -1018,12 +1018,12 @@ describe('useDamageClick - feats', () => {
                     passives: [{ name: 'Sacred Weapon', effect: 'sacred_weapon' }],
                 },
             };
-            const { handleDamageClick } = useDamageClickHook({ playerStats: stats });
+            const { resolveAttackDamage } = useAttackDamageResolutionHook({ playerStats: stats });
             const attack = {
                 name: 'Longbow', damage: '1d8+5', damageType: 'Piercing',
                 weaponType: 'ranged', properties: [],
             };
-            await handleDamageClick(attack);
+            await resolveAttackDamage(attack);
             await tick();
             expect(attack.damageType).toBe('Piercing');
         });
@@ -1047,12 +1047,12 @@ describe('useDamageClick - feats', () => {
                     ],
                 },
             };
-            const { handleDamageClick } = useDamageClickHook({ playerStats: stats });
+            const { resolveAttackDamage } = useAttackDamageResolutionHook({ playerStats: stats });
             const attack = {
                 name: 'Unarmed Strike', damage: '1d6+5', damageType: 'Bludgeoning',
                 weaponType: 'unarmed', properties: [],
             };
-            await handleDamageClick(attack);
+            await resolveAttackDamage(attack);
             await tick();
             expect(attack.damageType).toBe('Force');
             expect(setRuntimeValue).toHaveBeenCalledWith('TestFighter', 'empoweredStrikesDamageType', null, 'test-campaign');
@@ -1076,12 +1076,12 @@ describe('useDamageClick - feats', () => {
                     ],
                 },
             };
-            const { handleDamageClick } = useDamageClickHook({ playerStats: stats });
+            const { resolveAttackDamage } = useAttackDamageResolutionHook({ playerStats: stats });
             const attack = {
                 name: 'Longsword', damage: '1d8+5', damageType: 'Slashing',
                 weaponType: 'melee', properties: [],
             };
-            await handleDamageClick(attack);
+            await resolveAttackDamage(attack);
             await tick();
             expect(attack.damageType).toBe('Slashing');
         });
@@ -1101,12 +1101,12 @@ describe('useDamageClick - feats', () => {
                     ],
                 },
             };
-            const { handleDamageClick } = useDamageClickHook({ playerStats: stats });
+            const { resolveAttackDamage } = useAttackDamageResolutionHook({ playerStats: stats });
             const attack = {
                 name: 'Unarmed Strike', damage: '1d6+5', damageType: 'Bludgeoning',
                 weaponType: 'unarmed', properties: [],
             };
-            await handleDamageClick(attack);
+            await resolveAttackDamage(attack);
             await tick();
             expect(mockSetDamageTypeChoice).toHaveBeenCalledWith(expect.objectContaining({
                 title: 'Empowered Strikes — Damage Type',
@@ -1136,12 +1136,12 @@ describe('useDamageClick - feats', () => {
                     ],
                 },
             };
-            const { handleDamageClick } = useDamageClickHook({ playerStats: stats });
+            const { resolveAttackDamage } = useAttackDamageResolutionHook({ playerStats: stats });
             const attack = {
                 name: 'Unarmed Strike', damage: '1d6+5', damageType: 'Bludgeoning',
                 weaponType: 'unarmed', properties: [],
             };
-            await handleDamageClick(attack);
+            await resolveAttackDamage(attack);
             await tick();
             expect(rollExpression).toHaveBeenCalledWith('1d4');
             expect(mockRollDamage).toHaveBeenCalledWith(
@@ -1169,12 +1169,12 @@ describe('useDamageClick - feats', () => {
                     ],
                 },
             };
-            const { handleDamageClick } = useDamageClickHook({ playerStats: stats });
+            const { resolveAttackDamage } = useAttackDamageResolutionHook({ playerStats: stats });
             const attack = {
                 name: 'Unarmed Strike', damage: '1d6+5', damageType: 'Bludgeoning',
                 weaponType: 'unarmed', properties: [],
             };
-            await handleDamageClick(attack);
+            await resolveAttackDamage(attack);
             await tick();
             expect(mockSetDamageTypeChoice).toHaveBeenCalledWith(expect.objectContaining({
                 title: 'Enhanced Unarmed Strike — Enhanced Unarmed Strike',
@@ -1200,12 +1200,12 @@ describe('useDamageClick - feats', () => {
                     ],
                 },
             };
-            const { handleDamageClick } = useDamageClickHook({ playerStats: stats });
+            const { resolveAttackDamage } = useAttackDamageResolutionHook({ playerStats: stats });
             const attack = {
                 name: 'Longsword', damage: '1d8+5', damageType: 'Slashing',
                 weaponType: 'melee', properties: [],
             };
-            await handleDamageClick(attack);
+            await resolveAttackDamage(attack);
             await tick();
             expect(mockSetDamageTypeChoice).not.toHaveBeenCalled();
             expect(mockRollDamage).toHaveBeenCalled();
@@ -1229,12 +1229,12 @@ describe('useDamageClick - feats', () => {
                     ],
                 },
             };
-            const { handleDamageClick } = useDamageClickHook({ playerStats: stats });
+            const { resolveAttackDamage } = useAttackDamageResolutionHook({ playerStats: stats });
             const attack = {
                 name: 'Unarmed Strike', damage: '1d6+5', damageType: 'Bludgeoning',
                 weaponType: 'unarmed', properties: [],
             };
-            await handleDamageClick(attack);
+            await resolveAttackDamage(attack);
             await tick();
             expect(mockSetDamageTypeChoice).not.toHaveBeenCalled();
             expect(mockRollDamage).toHaveBeenCalled();

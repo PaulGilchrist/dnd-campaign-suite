@@ -53,7 +53,7 @@ function isActionSpell(castingTime) {
     return actionCastingTimes.includes(ct);
 }
 
-function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, conditionAttackMode, cannotAct, mapName, characters, onAttackClick, onActionSpellDamageClick, onAutomationAction, getWeaponMastery, rollAttack, rollDamage, getTargetInfo }) {
+function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, conditionAttackMode, cannotAct, mapName, characters, onAttackClick, onResolveSpellDamage, onAutomationAction, getWeaponMastery, rollAttack, rollDamage, getTargetInfo }) {
     const { popupHtml, setPopupHtml } = useDiceRollPopup();
     const [selectedBonusSpell, setSelectedBonusSpell] = useState(null);
 
@@ -206,7 +206,7 @@ function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, condit
                                   : <div className={"clickable" + (exhaustionPenalty > 0 || conditionAttackMode === 'disadvantage' || cannotAct ? " stat--penalized" : "") + (cannotAct ? " disabled-attack" : "")} onClick={() => onAttackClick(attack)}>{signFormatter.format(attack.hitBonus - exhaustionPenalty)}</div>}
                                <div className={attack.damage ? "clickable" : ""} onClick={() => {
                                    if (cannotAct) return;
-                                   if (attack.saveDc) { onActionSpellDamageClick(attack); return; }
+                                    if (attack.saveDc) { onResolveSpellDamage(attack); return; }
                                    // To-Hit attacks: damage is ALWAYS rolled through the "To Hit" flow.
                                    // Direct damage click only logs a simple die roll — no targeting, no riders.
                                    handleSimpleDamageRoll(attack);

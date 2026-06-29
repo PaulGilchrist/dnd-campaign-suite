@@ -1,6 +1,6 @@
 // @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import useDamageClick from './useDamageClick.js';
+import useAttackDamageResolution from './useAttackDamageResolution.js';
 
 vi.mock('../../services/dice/diceRoller.js', () => ({
     rollExpression: vi.fn(),
@@ -98,7 +98,7 @@ const mockSetWeaponMasteryModal = vi.fn();
 const mockSetAttackRiderModal = vi.fn();
 const mockPendingDamageRef = { current: null };
 
-function UseDamageClick(overrides = {}) {
+function UseAttackDamageResolution(overrides = {}) {
     const deps = {
         playerStats: createMockPlayerStats(overrides.playerStats),
         campaignName: mockCampaignName,
@@ -115,7 +115,7 @@ function UseDamageClick(overrides = {}) {
         pendingDamageRef: mockPendingDamageRef,
         ...overrides,
     };
-    return useDamageClick(deps);
+        return useAttackDamageResolution(deps);
 }
 
 function makeAttack(overrides = {}) {
@@ -133,7 +133,7 @@ function tick() {
     return new Promise((r) => setTimeout(r, 0));
 }
 
-describe('useDamageClick - class features', () => {
+describe('useAttackDamageResolution - class features', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         rollExpression.mockReturnValue(defaultRollResult);
@@ -180,8 +180,8 @@ describe('useDamageClick - class features', () => {
                 ],
             });
             getCurrentCombatRound.mockReturnValue(1);
-            const { handleDamageClick } = UseDamageClick({ playerStats: makeAssassinateStats() });
-            await handleDamageClick(makeAttack());
+            const { resolveAttackDamage } = UseAttackDamageResolution({ playerStats: makeAssassinateStats() });
+            await resolveAttackDamage(makeAttack());
             await tick();
             expect(rollExpression).toHaveBeenCalledWith('2d6');
             expect(mockRollDamage).toHaveBeenCalledWith(
@@ -201,8 +201,8 @@ describe('useDamageClick - class features', () => {
                 ],
             });
             getCurrentCombatRound.mockReturnValue(1);
-            const { handleDamageClick } = UseDamageClick({ playerStats: makeAssassinateStats() });
-            await handleDamageClick(makeAttack());
+            const { resolveAttackDamage } = UseAttackDamageResolution({ playerStats: makeAssassinateStats() });
+            await resolveAttackDamage(makeAttack());
             await tick();
             expect(rollExpression).not.toHaveBeenCalledWith('2d6');
             expect(mockRollDamage).toHaveBeenCalledWith(
@@ -222,16 +222,16 @@ describe('useDamageClick - class features', () => {
                 ],
             });
             getCurrentCombatRound.mockReturnValue(2);
-            const { handleDamageClick } = UseDamageClick({ playerStats: makeAssassinateStats() });
-            await handleDamageClick(makeAttack());
+            const { resolveAttackDamage } = UseAttackDamageResolution({ playerStats: makeAssassinateStats() });
+            await resolveAttackDamage(makeAttack());
             await tick();
             expect(rollExpression).not.toHaveBeenCalledWith('2d6');
         });
 
         it('skips Assassinate when no combat context exists', async () => {
             getCombatContext.mockResolvedValue(null);
-            const { handleDamageClick } = UseDamageClick({ playerStats: makeAssassinateStats() });
-            await handleDamageClick(makeAttack());
+            const { resolveAttackDamage } = UseAttackDamageResolution({ playerStats: makeAssassinateStats() });
+            await resolveAttackDamage(makeAttack());
             await tick();
             expect(rollExpression).not.toHaveBeenCalledWith('2d6');
         });
@@ -266,8 +266,8 @@ describe('useDamageClick - class features', () => {
                 ],
             });
             getCurrentCombatRound.mockReturnValue(1);
-            const { handleDamageClick } = UseDamageClick({ playerStats: makeStealthAttackStats() });
-            await handleDamageClick(makeAttack());
+            const { resolveAttackDamage } = UseAttackDamageResolution({ playerStats: makeStealthAttackStats() });
+            await resolveAttackDamage(makeAttack());
             await tick();
             expect(setRuntimeValue).toHaveBeenCalledWith('TestRogue', 'stealthAttackCost', 0, 'test-campaign');
         });
@@ -286,8 +286,8 @@ describe('useDamageClick - class features', () => {
                 class: { name: 'Rogue', class_levels: [{ level: 1, sneak_attack_num_d6: 0 }] },
                 automation: { actions: [], passives: [] },
             });
-            const { handleDamageClick } = UseDamageClick({ playerStats: stats });
-            await handleDamageClick(makeAttack());
+            const { resolveAttackDamage } = UseAttackDamageResolution({ playerStats: stats });
+            await resolveAttackDamage(makeAttack());
             await tick();
             expect(setRuntimeValue).not.toHaveBeenCalledWith(
                 'TestRogue',
@@ -311,8 +311,8 @@ describe('useDamageClick - class features', () => {
                 class: { name: 'Rogue', class_levels: [{ level: 1, sneak_attack_num_d6: 2 }] },
                 automation: { actions: [], passives: [] },
             });
-            const { handleDamageClick } = UseDamageClick({ playerStats: stats });
-            await handleDamageClick(makeAttack());
+            const { resolveAttackDamage } = UseAttackDamageResolution({ playerStats: stats });
+            await resolveAttackDamage(makeAttack());
             await tick();
             expect(setRuntimeValue).not.toHaveBeenCalledWith(
                 'TestRogue',
@@ -350,8 +350,8 @@ describe('useDamageClick - class features', () => {
             });
             getTargetFromAttacker.mockReturnValue({ name: 'Goblin King' });
             getCurrentCombatRound.mockReturnValue(1);
-            const { handleDamageClick } = UseDamageClick({ playerStats: makeDeathStrikeStats() });
-            await handleDamageClick(makeAttack());
+            const { resolveAttackDamage } = UseAttackDamageResolution({ playerStats: makeDeathStrikeStats() });
+            await resolveAttackDamage(makeAttack());
             await tick();
             expect(setRuntimeValue).toHaveBeenCalledWith(
                 'test-campaign',
@@ -380,8 +380,8 @@ describe('useDamageClick - class features', () => {
             });
             getTargetFromAttacker.mockReturnValue({ name: 'Goblin King' });
             getCurrentCombatRound.mockReturnValue(1);
-            const { handleDamageClick } = UseDamageClick({ playerStats: makeDeathStrikeStats() });
-            await handleDamageClick(makeAttack());
+            const { resolveAttackDamage } = UseAttackDamageResolution({ playerStats: makeDeathStrikeStats() });
+            await resolveAttackDamage(makeAttack());
             await tick();
             expect(setRuntimeValue).not.toHaveBeenCalledWith(
                 'test-campaign',
@@ -399,8 +399,8 @@ describe('useDamageClick - class features', () => {
             });
             getTargetFromAttacker.mockReturnValue(null);
             getCurrentCombatRound.mockReturnValue(1);
-            const { handleDamageClick } = UseDamageClick({ playerStats: makeDeathStrikeStats() });
-            await handleDamageClick(makeAttack());
+            const { resolveAttackDamage } = UseAttackDamageResolution({ playerStats: makeDeathStrikeStats() });
+            await resolveAttackDamage(makeAttack());
             await tick();
             expect(setRuntimeValue).not.toHaveBeenCalledWith(
                 'test-campaign',
@@ -419,8 +419,8 @@ describe('useDamageClick - class features', () => {
             });
             getTargetFromAttacker.mockReturnValue({ name: 'Goblin King' });
             getCurrentCombatRound.mockReturnValue(2);
-            const { handleDamageClick } = UseDamageClick({ playerStats: makeDeathStrikeStats() });
-            await handleDamageClick(makeAttack());
+            const { resolveAttackDamage } = UseAttackDamageResolution({ playerStats: makeDeathStrikeStats() });
+            await resolveAttackDamage(makeAttack());
             await tick();
             expect(setRuntimeValue).not.toHaveBeenCalledWith(
                 'test-campaign',
@@ -432,8 +432,8 @@ describe('useDamageClick - class features', () => {
 
         it('does not set target effect when no combat context', async () => {
             getCombatContext.mockResolvedValue(null);
-            const { handleDamageClick } = UseDamageClick({ playerStats: makeDeathStrikeStats() });
-            await handleDamageClick(makeAttack());
+            const { resolveAttackDamage } = UseAttackDamageResolution({ playerStats: makeDeathStrikeStats() });
+            await resolveAttackDamage(makeAttack());
             await tick();
             expect(setRuntimeValue).not.toHaveBeenCalledWith(
                 'test-campaign',
@@ -474,8 +474,8 @@ describe('useDamageClick - class features', () => {
                 ],
             });
             getTargetFromAttacker.mockReturnValue({ name: 'Mind Flayer' });
-            const { handleDamageClick } = UseDamageClick({ playerStats: makeRendMindStats() });
-            await handleDamageClick(makeAttack({ name: 'Psychic Blade', damage: '1d6+5', damageType: 'Psychic' }));
+            const { resolveAttackDamage } = UseAttackDamageResolution({ playerStats: makeRendMindStats() });
+            await resolveAttackDamage(makeAttack({ name: 'Psychic Blade', damage: '1d6+5', damageType: 'Psychic' }));
             await tick();
             expect(setRuntimeValue).toHaveBeenCalledWith(
                 'test-campaign',
@@ -513,8 +513,8 @@ describe('useDamageClick - class features', () => {
                 ],
             });
             getTargetFromAttacker.mockReturnValue({ name: 'Mind Flayer' });
-            const { handleDamageClick } = UseDamageClick({ playerStats: makeRendMindStats() });
-            await handleDamageClick(makeAttack({ name: 'Psychic Blade', damage: '1d6+5', damageType: 'Psychic' }));
+            const { resolveAttackDamage } = UseAttackDamageResolution({ playerStats: makeRendMindStats() });
+            await resolveAttackDamage(makeAttack({ name: 'Psychic Blade', damage: '1d6+5', damageType: 'Psychic' }));
             await tick();
             expect(setRuntimeValue).toHaveBeenCalledWith('TestRogue', '_RendMind_Used', false, 'test-campaign');
         });
@@ -526,8 +526,8 @@ describe('useDamageClick - class features', () => {
                 if (key === '_CurrentLongRest') return 2;
                 return null;
             });
-            const { handleDamageClick } = UseDamageClick({ playerStats: makeRendMindStats() });
-            await handleDamageClick(makeAttack({ name: 'Psychic Blade', damage: '1d6+5', damageType: 'Psychic' }));
+            const { resolveAttackDamage } = UseAttackDamageResolution({ playerStats: makeRendMindStats() });
+            await resolveAttackDamage(makeAttack({ name: 'Psychic Blade', damage: '1d6+5', damageType: 'Psychic' }));
             await tick();
             expect(setRuntimeValue).not.toHaveBeenCalledWith(
                 'test-campaign',
@@ -540,8 +540,8 @@ describe('useDamageClick - class features', () => {
         it('skips Rend Mind when no combat context', async () => {
             getRuntimeValue.mockReturnValue(null);
             getCombatContext.mockResolvedValue(null);
-            const { handleDamageClick } = UseDamageClick({ playerStats: makeRendMindStats() });
-            await handleDamageClick(makeAttack({ name: 'Psychic Blade', damage: '1d6+5', damageType: 'Psychic' }));
+            const { resolveAttackDamage } = UseAttackDamageResolution({ playerStats: makeRendMindStats() });
+            await resolveAttackDamage(makeAttack({ name: 'Psychic Blade', damage: '1d6+5', damageType: 'Psychic' }));
             await tick();
             expect(setRuntimeValue).not.toHaveBeenCalledWith(
                 'test-campaign',
@@ -559,8 +559,8 @@ describe('useDamageClick - class features', () => {
                 ],
             });
             getTargetFromAttacker.mockReturnValue(null);
-            const { handleDamageClick } = UseDamageClick({ playerStats: makeRendMindStats() });
-            await handleDamageClick(makeAttack({ name: 'Psychic Blade', damage: '1d6+5', damageType: 'Psychic' }));
+            const { resolveAttackDamage } = UseAttackDamageResolution({ playerStats: makeRendMindStats() });
+            await resolveAttackDamage(makeAttack({ name: 'Psychic Blade', damage: '1d6+5', damageType: 'Psychic' }));
             await tick();
             expect(setRuntimeValue).not.toHaveBeenCalledWith(
                 'test-campaign',
@@ -584,8 +584,8 @@ describe('useDamageClick - class features', () => {
                 ],
             });
             getTargetFromAttacker.mockReturnValue({ name: 'Ogre', currentHp: 20, maxHp: 60 });
-            const { handleDamageClick } = UseDamageClick();
-            await handleDamageClick(makeAttack());
+            const { resolveAttackDamage } = UseAttackDamageResolution();
+            await resolveAttackDamage(makeAttack());
             await tick();
             expect(rollExpression).toHaveBeenCalledWith('1d8');
             expect(mockRollDamage).toHaveBeenCalledWith(
@@ -616,8 +616,8 @@ describe('useDamageClick - class features', () => {
                 ],
             });
             getTargetFromAttacker.mockReturnValue({ name: 'Ogre', currentHp: 60, maxHp: 60 });
-            const { handleDamageClick } = UseDamageClick();
-            await handleDamageClick(makeAttack());
+            const { resolveAttackDamage } = UseAttackDamageResolution();
+            await resolveAttackDamage(makeAttack());
             await tick();
             expect(rollExpression).not.toHaveBeenCalledWith('1d8');
             expect(mockRollDamage).toHaveBeenCalledWith(
@@ -642,8 +642,8 @@ describe('useDamageClick - class features', () => {
                 ],
             });
             getTargetFromAttacker.mockReturnValue({ name: 'Ogre', currentHp: 20, maxHp: 60 });
-            const { handleDamageClick } = UseDamageClick();
-            await handleDamageClick(makeAttack());
+            const { resolveAttackDamage } = UseAttackDamageResolution();
+            await resolveAttackDamage(makeAttack());
             await tick();
             expect(rollExpression).not.toHaveBeenCalledWith('1d8');
         });
@@ -661,8 +661,8 @@ describe('useDamageClick - class features', () => {
                 ],
             });
             getTargetFromAttacker.mockReturnValue({ name: 'Ogre', currentHp: 20, maxHp: 60 });
-            const { handleDamageClick } = UseDamageClick();
-            await handleDamageClick(makeAttack());
+            const { resolveAttackDamage } = UseAttackDamageResolution();
+            await resolveAttackDamage(makeAttack());
             await tick();
             expect(rollExpression).not.toHaveBeenCalledWith('1d8');
         });
@@ -679,8 +679,8 @@ describe('useDamageClick - class features', () => {
                 ],
             });
             getTargetFromAttacker.mockReturnValue({ name: 'Ogre' });
-            const { handleDamageClick } = UseDamageClick();
-            await handleDamageClick(makeAttack());
+            const { resolveAttackDamage } = UseAttackDamageResolution();
+            await resolveAttackDamage(makeAttack());
             await tick();
             expect(rollExpression).not.toHaveBeenCalledWith('1d8');
         });
@@ -710,8 +710,8 @@ describe('useDamageClick - class features', () => {
             });
             getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
             loadCombatSummary.mockResolvedValue({ some: 'data' });
-            const { handleDamageClick } = UseDamageClick({ playerStats: makeSuperiorHunterStats() });
-            await handleDamageClick(makeAttack());
+            const { resolveAttackDamage } = UseAttackDamageResolution({ playerStats: makeSuperiorHunterStats() });
+            await resolveAttackDamage(makeAttack());
             await tick();
             expect(rollExpression).toHaveBeenCalledWith('1d6');
             expect(loadCombatSummary).toHaveBeenCalledWith('test-campaign');
@@ -749,8 +749,8 @@ describe('useDamageClick - class features', () => {
                 ],
             });
             getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
-            const { handleDamageClick } = UseDamageClick({ playerStats: makeSuperiorHunterStats() });
-            await handleDamageClick(makeAttack());
+            const { resolveAttackDamage } = UseAttackDamageResolution({ playerStats: makeSuperiorHunterStats() });
+            await resolveAttackDamage(makeAttack());
             await tick();
             expect(rollExpression).not.toHaveBeenCalledWith('1d6');
             expect(applyDamageToTarget).not.toHaveBeenCalled();
@@ -768,8 +768,8 @@ describe('useDamageClick - class features', () => {
                 ],
             });
             getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
-            const { handleDamageClick } = UseDamageClick({ playerStats: makeSuperiorHunterStats() });
-            await handleDamageClick(makeAttack());
+            const { resolveAttackDamage } = UseAttackDamageResolution({ playerStats: makeSuperiorHunterStats() });
+            await resolveAttackDamage(makeAttack());
             await tick();
             expect(applyDamageToTarget).not.toHaveBeenCalled();
         });
@@ -788,8 +788,8 @@ describe('useDamageClick - class features', () => {
                 ],
             });
             getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
-            const { handleDamageClick } = UseDamageClick({ playerStats: makeSuperiorHunterStats() });
-            await handleDamageClick(makeAttack());
+            const { resolveAttackDamage } = UseAttackDamageResolution({ playerStats: makeSuperiorHunterStats() });
+            await resolveAttackDamage(makeAttack());
             await tick();
             expect(rollExpression).not.toHaveBeenCalledWith('1d6');
             expect(applyDamageToTarget).not.toHaveBeenCalled();
@@ -822,8 +822,8 @@ describe('useDamageClick - class features', () => {
                 ],
             });
             getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
-            const { handleDamageClick } = UseDamageClick({ playerStats: makeEldritchStrikeStats() });
-            await handleDamageClick(makeAttack());
+            const { resolveAttackDamage } = UseAttackDamageResolution({ playerStats: makeEldritchStrikeStats() });
+            await resolveAttackDamage(makeAttack());
             await tick();
             expect(setRuntimeValue).toHaveBeenCalledWith(
                 'test-campaign',
@@ -853,8 +853,8 @@ describe('useDamageClick - class features', () => {
                 ],
             });
             getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
-            const { handleDamageClick } = UseDamageClick({ playerStats: makeEldritchStrikeStats({ oncePerTurn: true }) });
-            await handleDamageClick(makeAttack());
+            const { resolveAttackDamage } = UseAttackDamageResolution({ playerStats: makeEldritchStrikeStats({ oncePerTurn: true }) });
+            await resolveAttackDamage(makeAttack());
             await tick();
             expect(setRuntimeValue).toHaveBeenCalledWith(
                 'TestRogue',
@@ -869,8 +869,8 @@ describe('useDamageClick - class features', () => {
                 if (key === '_Eldritch_Strike_usedRound') return 1;
                 return null;
             });
-            const { handleDamageClick } = UseDamageClick({ playerStats: makeEldritchStrikeStats({ oncePerTurn: true }) });
-            await handleDamageClick(makeAttack());
+            const { resolveAttackDamage } = UseAttackDamageResolution({ playerStats: makeEldritchStrikeStats({ oncePerTurn: true }) });
+            await resolveAttackDamage(makeAttack());
             await tick();
             expect(setRuntimeValue).not.toHaveBeenCalledWith(
                 'test-campaign',
@@ -901,8 +901,8 @@ describe('useDamageClick - class features', () => {
                     passives: [],
                 },
             });
-            const { handleDamageClick } = UseDamageClick({ playerStats: stats });
-            await handleDamageClick(makeAttack());
+            const { resolveAttackDamage } = UseAttackDamageResolution({ playerStats: stats });
+            await resolveAttackDamage(makeAttack());
             await tick();
             expect(setRuntimeValue).not.toHaveBeenCalledWith(
                 'test-campaign',
@@ -952,8 +952,8 @@ describe('useDamageClick - class features', () => {
                 ],
             });
             getTargetFromAttacker.mockReturnValue({ name: 'Bugbear' });
-            const { handleDamageClick } = UseDamageClick({ playerStats: makeStalkersFlurryStats() });
-            await handleDamageClick(makeAttack());
+            const { resolveAttackDamage } = UseAttackDamageResolution({ playerStats: makeStalkersFlurryStats() });
+            await resolveAttackDamage(makeAttack());
             await tick();
             expect(setRuntimeValue).toHaveBeenCalledWith(
                 'TestRogue',
@@ -981,8 +981,8 @@ describe('useDamageClick - class features', () => {
                 ],
             });
             getTargetFromAttacker.mockReturnValue({ name: 'Bugbear' });
-            const { handleDamageClick } = UseDamageClick({ playerStats: makeStalkersFlurryStats() });
-            await handleDamageClick(makeAttack());
+            const { resolveAttackDamage } = UseAttackDamageResolution({ playerStats: makeStalkersFlurryStats() });
+            await resolveAttackDamage(makeAttack());
             await tick();
             expect(setRuntimeValue).toHaveBeenCalledWith(
                 'test-campaign',
@@ -1014,8 +1014,8 @@ describe('useDamageClick - class features', () => {
                 ],
             });
             getTargetFromAttacker.mockReturnValue({ name: 'Bugbear' });
-            const { handleDamageClick } = UseDamageClick({ playerStats: makeStalkersFlurryStats() });
-            await handleDamageClick(makeAttack());
+            const { resolveAttackDamage } = UseAttackDamageResolution({ playerStats: makeStalkersFlurryStats() });
+            await resolveAttackDamage(makeAttack());
             await tick();
             expect(mockSetAttackRiderModal).toHaveBeenCalledWith(
                 expect.objectContaining({
@@ -1039,8 +1039,8 @@ describe('useDamageClick - class features', () => {
                 ],
             });
             getTargetFromAttacker.mockReturnValue({ name: 'Bugbear' });
-            const { handleDamageClick } = UseDamageClick({ playerStats: makeStalkersFlurryStats() });
-            await handleDamageClick(makeAttack());
+            const { resolveAttackDamage } = UseAttackDamageResolution({ playerStats: makeStalkersFlurryStats() });
+            await resolveAttackDamage(makeAttack());
             await tick();
             expect(mockSetAttackRiderModal).not.toHaveBeenCalled();
             expect(setRuntimeValue).not.toHaveBeenCalledWith(
@@ -1062,8 +1062,8 @@ describe('useDamageClick - class features', () => {
                 ],
             });
             getTargetFromAttacker.mockReturnValue(null);
-            const { handleDamageClick } = UseDamageClick({ playerStats: makeStalkersFlurryStats() });
-            await handleDamageClick(makeAttack());
+            const { resolveAttackDamage } = UseAttackDamageResolution({ playerStats: makeStalkersFlurryStats() });
+            await resolveAttackDamage(makeAttack());
             await tick();
             expect(mockSetAttackRiderModal).not.toHaveBeenCalled();
         });

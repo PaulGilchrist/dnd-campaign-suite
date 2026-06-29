@@ -9,7 +9,7 @@ import { parseMagicItemName } from '../../services/rules/core/attackCalc.js';
 import { addEntry } from '../../services/ui/logService.js';
 import { getAttackRiderOptions, getAttackRiderOptionsByContext, executeAttackRiderManeuver as executeAttackRiderManeuverService } from '../../services/automation/handlers/class-fighter-rogue/combatSuperiorityHandler.js';
 
-export default function useDamageClick({
+export default function useAttackDamageResolution({
     playerStats, campaignName, mapName,
     popupHtml, setPopupHtml, rollDamage, buildCtx, buildCtxSync,
     setDamageTypeChoice, setDivineFuryChoice, setWeaponMasteryModal: _, setAttackRiderModal,
@@ -20,10 +20,10 @@ export default function useDamageClick({
     const proceedWithDamage = (attack, formula, total, rolls, modifier) => {
         (mapName ? buildCtx(attack) : buildCtxSync(attack)).then(ctx => {
             rollDamage(attack.name, formula, total, rolls, modifier, ctx);
-        }).catch((e) => { console.error("[useDamageClick] Error:", e); });
+        }).catch((e) => { console.error("[useAttackDamageResolution] Error:", e); });
     };
 
-    const handleDamageClick = async (attack) => {
+    const resolveAttackDamage = async (attack) => {
         // Handle Sudden Strike: clear the pending flag for this attack
         const isBonusActionAttack = attack.type === 'Bonus Action';
         if (isBonusActionAttack) {
@@ -703,7 +703,7 @@ export default function useDamageClick({
                                     damageType: spreadDamageType,
                                     targetName: spreadTarget.name,
                                     finalDamage: spreadApplyResult?.finalDamage,
-                                }).catch((e) => { console.error("[useDamageClick] Error:", e); });
+}).catch((e) => { console.error("[useAttackDamageResolution] Error:", e); });
 
                                 // Update popup to include spread damage info
                                 if (spreadApplyResult) {
@@ -769,7 +769,7 @@ export default function useDamageClick({
                     abilityName: rider.name,
                     description: `${playerStats.name} used ${rider.name} on ${targetName}, imposing Disadvantage on the target's next saving throw.`,
                     targetName: targetName,
-                }).catch((e) => { console.error("[useDamageClick] Error:", e); });
+                }).catch((e) => { console.error("[useAttackDamageResolution] Error:", e); });
             }
         }
 
@@ -1297,5 +1297,5 @@ export default function useDamageClick({
         setAttackRiderManeuverPrompt(null);
     };
 
-    return { handleDamageClick, proceedWithDamage, handleAttackRiderManeuverUse, handleAttackRiderManeuverSkip };
+    return { resolveAttackDamage, proceedWithDamage, handleAttackRiderManeuverUse, handleAttackRiderManeuverSkip };
 }

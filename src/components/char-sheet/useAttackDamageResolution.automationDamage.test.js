@@ -1,6 +1,6 @@
 // @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import useDamageClick from './useDamageClick.js';
+import useAttackDamageResolution from './useAttackDamageResolution.js';
 
 vi.mock('../../services/dice/diceRoller.js', () => ({
     rollExpression: vi.fn(),
@@ -67,7 +67,7 @@ const mockPlayerStats = {
 const mockCampaignName = 'test-campaign';
 const defaultRollResult = { total: 5, rolls: [5], modifier: 0 };
 
-describe('useDamageClick - automation damage bonuses', () => {
+describe('useAttackDamageResolution - automation damage bonuses', () => {
     const mockSetPopupHtml = vi.fn();
     const mockRollDamage = vi.fn();
     const mockBuildCtx = vi.fn(() => Promise.resolve({ targetName: 'Goblin' }));
@@ -78,7 +78,7 @@ describe('useDamageClick - automation damage bonuses', () => {
     const mockSetAttackRiderModal = vi.fn();
     const mockPendingDamageRef = { current: null };
 
-    function UseDamageClick(overrides = {}) {
+    function UseAttackDamageResolution(overrides = {}) {
         const deps = {
             playerStats: mockPlayerStats,
             campaignName: mockCampaignName,
@@ -95,7 +95,7 @@ describe('useDamageClick - automation damage bonuses', () => {
             pendingDamageRef: mockPendingDamageRef,
             ...overrides,
         };
-        return useDamageClick(deps);
+        return useAttackDamageResolution(deps);
     }
 
     beforeEach(() => {
@@ -135,8 +135,8 @@ describe('useDamageClick - automation damage bonuses', () => {
                     passives: [],
                 },
             };
-            const { handleDamageClick } = UseDamageClick({ playerStats: stats });
-            await handleDamageClick(meleeAttack);
+            const { resolveAttackDamage } = UseAttackDamageResolution({ playerStats: stats });
+            await resolveAttackDamage(meleeAttack);
             await tick();
             expect(mockRollDamage).toHaveBeenCalledWith(
                 'Longsword',
@@ -155,9 +155,9 @@ describe('useDamageClick - automation damage bonuses', () => {
                     passives: [],
                 },
             };
-            const { handleDamageClick } = UseDamageClick({ playerStats: stats });
+            const { resolveAttackDamage } = UseAttackDamageResolution({ playerStats: stats });
             const unarmedAttack = { ...meleeAttack, weaponType: 'unarmed', name: 'Unarmed Strike', damage: '1d4' };
-            await handleDamageClick(unarmedAttack);
+            await resolveAttackDamage(unarmedAttack);
             await tick();
             expect(mockRollDamage).toHaveBeenCalledWith(
                 'Unarmed Strike',
@@ -176,9 +176,9 @@ describe('useDamageClick - automation damage bonuses', () => {
                     passives: [],
                 },
             };
-            const { handleDamageClick } = UseDamageClick({ playerStats: stats });
+            const { resolveAttackDamage } = UseAttackDamageResolution({ playerStats: stats });
             const rangedAttack = { ...meleeAttack, weaponType: 'ranged' };
-            await handleDamageClick(rangedAttack);
+            await resolveAttackDamage(rangedAttack);
             await tick();
             expect(mockRollDamage).toHaveBeenCalledWith(
                 'Longsword',
@@ -204,12 +204,12 @@ describe('useDamageClick - automation damage bonuses', () => {
                     passives: [],
                 },
             };
-            const { handleDamageClick } = UseDamageClick({ playerStats: stats });
+            const { resolveAttackDamage } = UseAttackDamageResolution({ playerStats: stats });
             const attack = {
                 name: 'Unarmed Strike', damage: '1d6', damageType: 'bludgeoning',
                 weaponType: 'unarmed', properties: [],
             };
-            await handleDamageClick(attack);
+            await resolveAttackDamage(attack);
             await tick();
             expect(mockRollDamage).toHaveBeenCalledWith(
                 'Unarmed Strike',
@@ -232,12 +232,12 @@ describe('useDamageClick - automation damage bonuses', () => {
                     passives: [],
                 },
             };
-            const { handleDamageClick } = UseDamageClick({ playerStats: stats });
+            const { resolveAttackDamage } = UseAttackDamageResolution({ playerStats: stats });
             const attack = {
                 name: 'Unarmed Strike', damage: '1d6', damageType: 'bludgeoning',
                 weaponType: 'unarmed', properties: [],
             };
-            await handleDamageClick(attack);
+            await resolveAttackDamage(attack);
             await tick();
             expect(mockRollDamage).toHaveBeenCalledWith(
                 'Unarmed Strike',
@@ -258,12 +258,12 @@ describe('useDamageClick - automation damage bonuses', () => {
                     passives: [],
                 },
             };
-            const { handleDamageClick } = UseDamageClick({ playerStats: stats });
+            const { resolveAttackDamage } = UseAttackDamageResolution({ playerStats: stats });
             const attack = {
                 name: 'Greataxe', damage: '1d12+3', damageType: 'Slashing',
                 weaponType: 'melee', properties: ['Heavy'],
             };
-            await handleDamageClick(attack);
+            await resolveAttackDamage(attack);
             await tick();
             expect(mockRollDamage).toHaveBeenCalledWith(
                 'Greataxe',
@@ -282,12 +282,12 @@ describe('useDamageClick - automation damage bonuses', () => {
                     passives: [],
                 },
             };
-            const { handleDamageClick } = UseDamageClick({ playerStats: stats });
+            const { resolveAttackDamage } = UseAttackDamageResolution({ playerStats: stats });
             const attack = {
                 name: 'Longsword', damage: '1d8+3', damageType: 'Slashing',
                 weaponType: 'melee', properties: [],
             };
-            await handleDamageClick(attack);
+            await resolveAttackDamage(attack);
             await tick();
             expect(mockRollDamage).toHaveBeenCalledWith(
                 'Longsword',
@@ -306,12 +306,12 @@ describe('useDamageClick - automation damage bonuses', () => {
                     passives: [],
                 },
             };
-            const { handleDamageClick } = UseDamageClick({ playerStats: stats });
+            const { resolveAttackDamage } = UseAttackDamageResolution({ playerStats: stats });
             const attack = {
                 name: 'Greataxe', damage: '1d12+3', damageType: 'Slashing',
                 weaponType: 'melee', properties: ['Heavy'],
             };
-            await handleDamageClick(attack);
+            await resolveAttackDamage(attack);
             await tick();
             expect(mockRollDamage).toHaveBeenCalledWith(
                 'Greataxe',
@@ -339,12 +339,12 @@ describe('useDamageClick - automation damage bonuses', () => {
                     passives: [],
                 },
             };
-            const { handleDamageClick } = UseDamageClick({ playerStats: stats });
+            const { resolveAttackDamage } = UseAttackDamageResolution({ playerStats: stats });
             const attack = {
                 name: 'Greataxe', damage: '1d12+3', damageType: 'Slashing',
                 weaponType: 'melee', properties: ['Heavy'], abilityName: 'Strength',
             };
-            await handleDamageClick(attack);
+            await resolveAttackDamage(attack);
             await tick();
             expect(setRuntimeValue).toHaveBeenCalledWith('TestFighter', '_frenzyUsedRound', 1, 'test-campaign');
             expect(mockRollDamage).toHaveBeenCalledWith(
@@ -372,12 +372,12 @@ describe('useDamageClick - automation damage bonuses', () => {
                     passives: [],
                 },
             };
-            const { handleDamageClick } = UseDamageClick({ playerStats: stats });
+            const { resolveAttackDamage } = UseAttackDamageResolution({ playerStats: stats });
             const attack = {
                 name: 'Greataxe', damage: '1d12+3', damageType: 'Slashing',
                 weaponType: 'melee', properties: ['Heavy'], abilityName: 'Strength',
             };
-            await handleDamageClick(attack);
+            await resolveAttackDamage(attack);
             await tick();
             expect(setRuntimeValue).not.toHaveBeenCalledWith('TestFighter', '_frenzyUsedRound', 1, 'test-campaign');
         });
@@ -399,12 +399,12 @@ describe('useDamageClick - automation damage bonuses', () => {
                     passives: [],
                 },
             };
-            const { handleDamageClick } = UseDamageClick({ playerStats: stats });
+            const { resolveAttackDamage } = UseAttackDamageResolution({ playerStats: stats });
             const attack = {
                 name: 'Rapier', damage: '1d8+3', damageType: 'Piercing',
                 weaponType: 'melee', properties: [], abilityName: 'Dexterity',
             };
-            await handleDamageClick(attack);
+            await resolveAttackDamage(attack);
             await tick();
             expect(setRuntimeValue).not.toHaveBeenCalledWith('TestFighter', '_frenzyUsedRound', expect.any(Number), 'test-campaign');
         });
@@ -425,12 +425,12 @@ describe('useDamageClick - automation damage bonuses', () => {
                     passives: [],
                 },
             };
-            const { handleDamageClick } = UseDamageClick({ playerStats: stats });
+            const { resolveAttackDamage } = UseAttackDamageResolution({ playerStats: stats });
             const attack = {
                 name: 'Greataxe', damage: '1d12+3', damageType: 'Slashing',
                 weaponType: 'melee', properties: ['Heavy'], abilityName: 'Strength',
             };
-            await handleDamageClick(attack);
+            await resolveAttackDamage(attack);
             await tick();
             expect(mockRollDamage).toHaveBeenCalledWith(
                 'Greataxe',
@@ -455,12 +455,12 @@ describe('useDamageClick - automation damage bonuses', () => {
                     passives: [],
                 },
             };
-            const { handleDamageClick } = UseDamageClick({ playerStats: stats });
+            const { resolveAttackDamage } = UseAttackDamageResolution({ playerStats: stats });
             const attack = {
                 name: 'Greataxe', damage: '1d12+3', damageType: 'Slashing',
                 weaponType: 'melee', properties: ['Heavy'], abilityName: 'Strength',
             };
-            await handleDamageClick(attack);
+            await resolveAttackDamage(attack);
             await tick();
             expect(mockRollDamage).toHaveBeenCalledWith(
                 'Greataxe',
@@ -487,12 +487,12 @@ describe('useDamageClick - automation damage bonuses', () => {
                     passives: [],
                 },
             };
-            const { handleDamageClick } = UseDamageClick({ playerStats: stats });
+            const { resolveAttackDamage } = UseAttackDamageResolution({ playerStats: stats });
             const attack = {
                 name: 'Greataxe', damage: '1d12+3', damageType: 'Slashing',
                 weaponType: 'melee', properties: ['Heavy'],
             };
-            await handleDamageClick(attack);
+            await resolveAttackDamage(attack);
             await tick();
             expect(setRuntimeValue).toHaveBeenCalledWith('TestFighter', '_divineFuryUsedRound', 1, 'test-campaign');
             expect(mockRollDamage).toHaveBeenCalledWith(
@@ -518,12 +518,12 @@ describe('useDamageClick - automation damage bonuses', () => {
                     passives: [],
                 },
             };
-            const { handleDamageClick } = UseDamageClick({ playerStats: stats });
+            const { resolveAttackDamage } = UseAttackDamageResolution({ playerStats: stats });
             const attack = {
                 name: 'Greataxe', damage: '1d12+3', damageType: 'Slashing',
                 weaponType: 'melee', properties: ['Heavy'],
             };
-            await handleDamageClick(attack);
+            await resolveAttackDamage(attack);
             await tick();
             expect(mockSetDivineFuryChoice).toHaveBeenCalledWith('radiant or necrotic');
             expect(mockPendingDamageRef.current).toEqual(expect.objectContaining({
@@ -549,12 +549,12 @@ describe('useDamageClick - automation damage bonuses', () => {
                     passives: [],
                 },
             };
-            const { handleDamageClick } = UseDamageClick({ playerStats: stats });
+            const { resolveAttackDamage } = UseAttackDamageResolution({ playerStats: stats });
             const attack = {
                 name: 'Greataxe', damage: '1d12+3', damageType: 'Slashing',
                 weaponType: 'melee', properties: ['Heavy'],
             };
-            await handleDamageClick(attack);
+            await resolveAttackDamage(attack);
             await tick();
             expect(mockRollDamage).toHaveBeenCalledWith(
                 'Greataxe',
@@ -577,12 +577,12 @@ describe('useDamageClick - automation damage bonuses', () => {
                     passives: [],
                 },
             };
-            const { handleDamageClick } = UseDamageClick({ playerStats: stats });
+            const { resolveAttackDamage } = UseAttackDamageResolution({ playerStats: stats });
             const attack = {
                 name: 'Greataxe', damage: '1d12+3', damageType: 'Slashing',
                 weaponType: 'melee', properties: ['Heavy'],
             };
-            await handleDamageClick(attack);
+            await resolveAttackDamage(attack);
             await tick();
             expect(mockRollDamage).toHaveBeenCalledWith(
                 'Greataxe',
@@ -603,12 +603,12 @@ describe('useDamageClick - automation damage bonuses', () => {
                     passives: [],
                 },
             };
-            const { handleDamageClick } = UseDamageClick({ playerStats: stats });
+            const { resolveAttackDamage } = UseAttackDamageResolution({ playerStats: stats });
             const attack = {
                 name: 'Greataxe', damage: '1d12+3', damageType: 'Slashing',
                 weaponType: 'melee', properties: ['Heavy'],
             };
-            await handleDamageClick(attack);
+            await resolveAttackDamage(attack);
             await tick();
             expect(mockRollDamage).toHaveBeenCalledWith(
                 'Greataxe',
@@ -629,12 +629,12 @@ describe('useDamageClick - automation damage bonuses', () => {
                     passives: [],
                 },
             };
-            const { handleDamageClick } = UseDamageClick({ playerStats: stats });
+            const { resolveAttackDamage } = UseAttackDamageResolution({ playerStats: stats });
             const attack = {
                 name: 'Mace', damage: '1d6+2', damageType: 'Bludgeoning',
                 weaponType: 'melee', properties: [],
             };
-            await handleDamageClick(attack);
+            await resolveAttackDamage(attack);
             await tick();
             expect(mockRollDamage).toHaveBeenCalledWith(
                 'Mace',
@@ -653,12 +653,12 @@ describe('useDamageClick - automation damage bonuses', () => {
                     passives: [],
                 },
             };
-            const { handleDamageClick } = UseDamageClick({ playerStats: stats });
+            const { resolveAttackDamage } = UseAttackDamageResolution({ playerStats: stats });
             const attack = {
                 name: 'Quarterstaff', damage: '1d6+3', damageType: 'Bludgeoning',
                 weaponType: 'melee', properties: [],
             };
-            await handleDamageClick(attack);
+            await resolveAttackDamage(attack);
             await tick();
             expect(mockRollDamage).toHaveBeenCalledWith(
                 'Quarterstaff',
@@ -681,12 +681,12 @@ describe('useDamageClick - automation damage bonuses', () => {
                     passives: [],
                 },
             };
-            const { handleDamageClick } = UseDamageClick({ playerStats: stats });
+            const { resolveAttackDamage } = UseAttackDamageResolution({ playerStats: stats });
             const attack = {
                 name: 'Mace', damage: '1d6+2', damageType: 'Bludgeoning',
                 weaponType: 'melee', properties: [],
             };
-            await handleDamageClick(attack);
+            await resolveAttackDamage(attack);
             await tick();
             expect(mockRollDamage).toHaveBeenCalledWith(
                 'Mace',
@@ -706,12 +706,12 @@ describe('useDamageClick - automation damage bonuses', () => {
                     passives: [],
                 },
             };
-            const { handleDamageClick } = UseDamageClick({ playerStats: stats });
+            const { resolveAttackDamage } = UseAttackDamageResolution({ playerStats: stats });
             const attack = {
                 name: 'Mace', damage: '1d6+2', damageType: 'Bludgeoning',
                 weaponType: 'melee', properties: [],
             };
-            await handleDamageClick(attack);
+            await resolveAttackDamage(attack);
             await tick();
             expect(mockRollDamage).toHaveBeenCalledWith(
                 'Mace',
@@ -730,12 +730,12 @@ describe('useDamageClick - automation damage bonuses', () => {
                     passives: [],
                 },
             };
-            const { handleDamageClick } = UseDamageClick({ playerStats: stats });
+            const { resolveAttackDamage } = UseAttackDamageResolution({ playerStats: stats });
             const attack = {
                 name: 'Mace', damage: '1d6+2', damageType: 'Bludgeoning',
                 weaponType: 'melee', properties: [],
             };
-            await handleDamageClick(attack);
+            await resolveAttackDamage(attack);
             await tick();
             expect(mockSetDamageTypeChoice).toHaveBeenCalledWith(expect.objectContaining({
                 title: 'Divine Strike — Damage Type',
@@ -758,12 +758,12 @@ describe('useDamageClick - automation damage bonuses', () => {
                     passives: [],
                 },
             };
-            const { handleDamageClick } = UseDamageClick({ playerStats: stats });
+            const { resolveAttackDamage } = UseAttackDamageResolution({ playerStats: stats });
             const attack = {
                 name: 'Mace', damage: '1d6+2', damageType: 'Bludgeoning',
                 weaponType: 'melee', properties: [],
             };
-            await handleDamageClick(attack);
+            await resolveAttackDamage(attack);
             await tick();
             expect(mockRollDamage).toHaveBeenCalledWith(
                 'Mace',
@@ -790,12 +790,12 @@ describe('useDamageClick - automation damage bonuses', () => {
                     passives: [],
                 },
             };
-            const { handleDamageClick } = UseDamageClick({ playerStats: stats });
+            const { resolveAttackDamage } = UseAttackDamageResolution({ playerStats: stats });
             const attack = {
                 name: 'Mace', damage: '1d6+2', damageType: 'Bludgeoning',
                 weaponType: 'melee', properties: [],
             };
-            await handleDamageClick(attack);
+            await resolveAttackDamage(attack);
             await tick();
             expect(mockRollDamage).toHaveBeenCalledWith(
                 'Mace',
@@ -815,12 +815,12 @@ describe('useDamageClick - automation damage bonuses', () => {
                     passives: [],
                 },
             };
-            const { handleDamageClick } = UseDamageClick({ playerStats: stats });
+            const { resolveAttackDamage } = UseAttackDamageResolution({ playerStats: stats });
             const attack = {
                 name: 'Mace', damage: '1d6+2', damageType: 'Bludgeoning',
                 weaponType: 'melee', properties: [],
             };
-            await handleDamageClick(attack);
+            await resolveAttackDamage(attack);
             await tick();
             expect(setRuntimeValue).toHaveBeenCalledWith('TestFighter', '_Divine_Strike_usedRound', 1, 'test-campaign');
         });
@@ -844,12 +844,12 @@ describe('useDamageClick - automation damage bonuses', () => {
                     passives: [],
                 },
             };
-            const { handleDamageClick } = UseDamageClick({ playerStats: stats });
+            const { resolveAttackDamage } = UseAttackDamageResolution({ playerStats: stats });
             const attack = {
                 name: 'Longbow', damage: '1d8+3', damageType: 'Piercing',
                 weaponType: 'ranged', properties: [],
             };
-            await handleDamageClick(attack);
+            await resolveAttackDamage(attack);
             await tick();
             expect(mockRollDamage).toHaveBeenCalledWith(
                 'Longbow',
@@ -878,12 +878,12 @@ describe('useDamageClick - automation damage bonuses', () => {
                     passives: [],
                 },
             };
-            const { handleDamageClick } = UseDamageClick({ playerStats: stats });
+            const { resolveAttackDamage } = UseAttackDamageResolution({ playerStats: stats });
             const attack = {
                 name: 'Longbow', damage: '1d8+3', damageType: 'Piercing',
                 weaponType: 'ranged', properties: [],
             };
-            await handleDamageClick(attack);
+            await resolveAttackDamage(attack);
             await tick();
             expect(mockRollDamage).toHaveBeenCalledWith(
                 'Longbow',

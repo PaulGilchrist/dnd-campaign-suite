@@ -444,7 +444,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         divineFuryChoice,
         damageTypeChoice,
         featureChoice, setFeatureChoice,
-        handleDamageClick,
+        resolveAttackDamage,
         handleMasteryClose,
         handleWeaponMasteryChoice,
         handleWeaponKindMasteryClose,
@@ -660,7 +660,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         pendingActionMetamagic,
         handleActionMetamagicConfirm,
         handleActionMetamagicSkip,
-        handleActionSpellDamageClick,
+        handleActionSpellDamageClick: resolveSpellDamage,
         handleSpellAttackClick,
     } = useActionSpellMetamagic({
         playerStats,
@@ -675,7 +675,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         buildCtx,
         buildCtxSync,
         handleAttackClick,
-        handleDamageClick,
+        handleDamageClick: resolveAttackDamage,
     });
 
     const MONK_KI_FEATURES = ['Flurry of Blows', 'Patient Defense', 'Step of the Wind', 'Heightened Flurry of Blows', 'Heightened Patient Defense', 'Heightened Step of the Wind', 'Hand of Healing', 'Stunning Strike'];
@@ -1182,7 +1182,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                                 : <div className={"clickable" + (exhaustionPenalty > 0 || conditionAttackMode === 'disadvantage' || cannotAct ? " stat--penalized" : "") + (cannotAct ? " disabled-attack" : "")} onClick={() => handleSpellAttackClick(attack)}>{signFormatter.format(attack.hitBonus - exhaustionPenalty)}</div>}
                             <div className={attack.damage ? "clickable" : ""} onClick={() => {
                                 if (cannotAct) return;
-                                if (attack.saveDc) { handleActionSpellDamageClick(attack); return; }
+                                if (attack.saveDc) { resolveSpellDamage(attack); return; }
                                 // To-Hit attacks: damage is ALWAYS rolled through the "To Hit" flow.
                                 // Save DC attacks: damage is rolled when the target fails the save.
                                 handleSimpleDamageRoll(attack);
@@ -1407,8 +1407,8 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                 cannotAct={cannotAct}
                 mapName={mapName}
                 onAttackClick={handleAttackClick}
-                onDamageClick={handleDamageClick}
-                onActionSpellDamageClick={handleActionSpellDamageClick}
+                onResolveAttackDamage={resolveAttackDamage}
+                onResolveSpellDamage={resolveSpellDamage}
                 onAutomationAction={handleAutomationAction}
                 getWeaponMastery={getWeaponMastery}
                 rollAttack={rollAttack}

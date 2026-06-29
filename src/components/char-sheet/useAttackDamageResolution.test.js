@@ -1,6 +1,6 @@
 // @improved-by-ai
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import useDamageClick from './useDamageClick.js';
+import useAttackDamageResolution from './useAttackDamageResolution.js';
 
 vi.mock('../../services/dice/diceRoller.js', () => ({
     rollExpression: vi.fn(),
@@ -84,10 +84,10 @@ function createMockDeps(overrides = {}) {
 }
 
 function HookFactory(deps) {
-    return useDamageClick(deps);
+    return useAttackDamageResolution(deps);
 }
 
-describe('useDamageClick', () => {
+describe('useAttackDamageResolution', () => {
     let deps;
 
     beforeEach(() => {
@@ -113,10 +113,10 @@ describe('useDamageClick', () => {
 
     describe('basic damage click', () => {
         it('rolls damage and calls rollDamage with computed values', async () => {
-            const { handleDamageClick } = HookFactory(deps);
+            const { resolveAttackDamage } = useAttackDamageResolution(deps);
             const attack = { name: 'Longsword', damage: '1d8+3', damageType: 'slashing', properties: [] };
 
-            await handleDamageClick(attack);
+            await resolveAttackDamage(attack);
             await new Promise(r => setTimeout(r, 0));
 
             expect(rollExpression).toHaveBeenCalledWith('1d8+3');
@@ -133,10 +133,10 @@ describe('useDamageClick', () => {
 
         it('double-rolls damage when popupHtml.isCrit is true', async () => {
             deps = createMockDeps({ popupHtml: { isCrit: true } });
-            const { handleDamageClick } = HookFactory(deps);
+            const { resolveAttackDamage } = useAttackDamageResolution(deps);
             const attack = { name: 'Longsword', damage: '1d8+3', damageType: 'slashing', properties: [] };
 
-            await handleDamageClick(attack);
+            await resolveAttackDamage(attack);
             await new Promise(r => setTimeout(r, 0));
 
             expect(rollExpressionDoubled).toHaveBeenCalledWith('1d8+3');
@@ -145,10 +145,10 @@ describe('useDamageClick', () => {
 
         it('clears popupHtml when it had isCrit', async () => {
             deps = createMockDeps({ popupHtml: { isCrit: true, isNatural20: true } });
-            const { handleDamageClick } = HookFactory(deps);
+            const { resolveAttackDamage } = useAttackDamageResolution(deps);
             const attack = { name: 'Longsword', damage: '1d8+3', damageType: 'slashing', properties: [] };
 
-            await handleDamageClick(attack);
+            await resolveAttackDamage(attack);
             await new Promise(r => setTimeout(r, 0));
 
             expect(deps.setPopupHtml).toHaveBeenCalledWith(null);
@@ -156,10 +156,10 @@ describe('useDamageClick', () => {
 
         it('does not clear popupHtml when isCrit is absent', async () => {
             deps = createMockDeps({ popupHtml: { isNatural20: true } });
-            const { handleDamageClick } = HookFactory(deps);
+            const { resolveAttackDamage } = useAttackDamageResolution(deps);
             const attack = { name: 'Longsword', damage: '1d8+3', damageType: 'slashing', properties: [] };
 
-            await handleDamageClick(attack);
+            await resolveAttackDamage(attack);
             await new Promise(r => setTimeout(r, 0));
 
             expect(deps.setPopupHtml).not.toHaveBeenCalled();
@@ -167,10 +167,10 @@ describe('useDamageClick', () => {
 
         it('returns early without calling rollDamage when rollExpression returns null', async () => {
             rollExpression.mockReturnValue(null);
-            const { handleDamageClick } = HookFactory(deps);
+            const { resolveAttackDamage } = useAttackDamageResolution(deps);
             const attack = { name: 'Longsword', damage: '1d8+3', damageType: 'slashing', properties: [] };
 
-            await handleDamageClick(attack);
+            await resolveAttackDamage(attack);
 
             expect(deps.rollDamage).not.toHaveBeenCalled();
             expect(deps.buildCtxSync).not.toHaveBeenCalled();
@@ -179,19 +179,19 @@ describe('useDamageClick', () => {
         it('returns early without calling rollDamage when rollExpressionDoubled returns null', async () => {
             rollExpressionDoubled.mockReturnValue(null);
             deps = createMockDeps({ popupHtml: { isCrit: true } });
-            const { handleDamageClick } = HookFactory(deps);
+            const { resolveAttackDamage } = useAttackDamageResolution(deps);
             const attack = { name: 'Longsword', damage: '1d8+3', damageType: 'slashing', properties: [] };
 
-            await handleDamageClick(attack);
+            await resolveAttackDamage(attack);
 
             expect(deps.rollDamage).not.toHaveBeenCalled();
         });
 
         it('does not call setPopupHtml when popupHtml is null', async () => {
-            const { handleDamageClick } = HookFactory(deps);
+            const { resolveAttackDamage } = useAttackDamageResolution(deps);
             const attack = { name: 'Longsword', damage: '1d8+3', damageType: 'slashing', properties: [] };
 
-            await handleDamageClick(attack);
+            await resolveAttackDamage(attack);
             await new Promise(r => setTimeout(r, 0));
 
             expect(deps.setPopupHtml).not.toHaveBeenCalled();
@@ -199,10 +199,10 @@ describe('useDamageClick', () => {
 
         it('does not call setPopupHtml when setPopupHtml is undefined', async () => {
             const testDeps = createMockDeps({ setPopupHtml: undefined });
-            const { handleDamageClick } = HookFactory(testDeps);
+            const { resolveAttackDamage } = useAttackDamageResolution(testDeps);
             const attack = { name: 'Longsword', damage: '1d8+3', damageType: 'slashing', properties: [] };
 
-            await handleDamageClick(attack);
+            await resolveAttackDamage(attack);
             await new Promise(r => setTimeout(r, 0));
 
             expect(testDeps.setPopupHtml).toBeUndefined();
@@ -210,10 +210,10 @@ describe('useDamageClick', () => {
 
         it('uses buildCtx when mapName is truthy', async () => {
             const testDeps = createMockDeps({ mapName: 'test-map' });
-            const { handleDamageClick } = HookFactory(testDeps);
+            const { resolveAttackDamage } = useAttackDamageResolution(testDeps);
             const attack = { name: 'Fire Bolt', damage: '1d10', damageType: 'fire', properties: [] };
 
-            await handleDamageClick(attack);
+            await resolveAttackDamage(attack);
             await new Promise(r => setTimeout(r, 0));
 
             expect(testDeps.buildCtx).toHaveBeenCalledWith(attack);
@@ -221,20 +221,20 @@ describe('useDamageClick', () => {
         });
 
         it('uses buildCtxSync when mapName is falsy', async () => {
-            const { handleDamageClick } = HookFactory(deps);
+            const { resolveAttackDamage } = useAttackDamageResolution(deps);
             const attack = { name: 'Longsword', damage: '1d8+3', damageType: 'slashing', properties: [] };
 
-            await handleDamageClick(attack);
+            await resolveAttackDamage(attack);
             await new Promise(r => setTimeout(r, 0));
 
             expect(deps.buildCtxSync).toHaveBeenCalledWith(attack);
             expect(deps.buildCtx).not.toHaveBeenCalled();
         });
 
-        it('returns { handleDamageClick, proceedWithDamage }', async () => {
-            const { handleDamageClick, proceedWithDamage } = HookFactory(deps);
+        it('returns { resolveAttackDamage, proceedWithDamage }', async () => {
+            const { resolveAttackDamage, proceedWithDamage } = HookFactory(deps);
 
-            expect(typeof handleDamageClick).toBe('function');
+            expect(typeof resolveAttackDamage).toBe('function');
             expect(typeof proceedWithDamage).toBe('function');
         });
     });
@@ -244,7 +244,7 @@ describe('useDamageClick', () => {
     describe('two weapon fighting', () => {
         it('appends ability modifier to formula for light bonus action weapons', async () => {
             hasTwoWeaponFighting.mockReturnValue(true);
-            const { handleDamageClick } = HookFactory(deps);
+            const { resolveAttackDamage } = useAttackDamageResolution(deps);
             const attack = {
                 name: 'Handaxe',
                 damage: '1d6',
@@ -254,7 +254,7 @@ describe('useDamageClick', () => {
                 abilityName: 'Strength',
             };
 
-            await handleDamageClick(attack);
+            await resolveAttackDamage(attack);
             await new Promise(r => setTimeout(r, 0));
 
             expect(deps.rollDamage).toHaveBeenCalledWith(
@@ -268,7 +268,7 @@ describe('useDamageClick', () => {
         });
 
         it('does not append ability modifier for non-light weapons', async () => {
-            const { handleDamageClick } = HookFactory(deps);
+            const { resolveAttackDamage } = useAttackDamageResolution(deps);
             const attack = {
                 name: 'Warhammer',
                 damage: '1d8',
@@ -278,7 +278,7 @@ describe('useDamageClick', () => {
                 abilityName: 'Strength',
             };
 
-            await handleDamageClick(attack);
+            await resolveAttackDamage(attack);
             await new Promise(r => setTimeout(r, 0));
 
             expect(deps.rollDamage).toHaveBeenCalledWith(
@@ -295,7 +295,7 @@ describe('useDamageClick', () => {
             hasTwoWeaponFighting.mockReturnValue(true);
             const stats = { ...deps.playerStats, abilities: [{ name: 'Strength', bonus: 0 }] };
             const testDeps = createMockDeps({ playerStats: stats });
-            const { handleDamageClick } = HookFactory(testDeps);
+            const { resolveAttackDamage } = useAttackDamageResolution(testDeps);
             const attack = {
                 name: 'Handaxe',
                 damage: '1d6',
@@ -305,7 +305,7 @@ describe('useDamageClick', () => {
                 abilityName: 'Strength',
             };
 
-            await handleDamageClick(attack);
+            await resolveAttackDamage(attack);
             await new Promise(r => setTimeout(r, 0));
 
             expect(testDeps.rollDamage).toHaveBeenCalledWith(
@@ -320,7 +320,7 @@ describe('useDamageClick', () => {
 
         it('does not append when abilityName is missing', async () => {
             hasTwoWeaponFighting.mockReturnValue(true);
-            const { handleDamageClick } = HookFactory(deps);
+            const { resolveAttackDamage } = useAttackDamageResolution(deps);
             const attack = {
                 name: 'Handaxe',
                 damage: '1d6',
@@ -329,7 +329,7 @@ describe('useDamageClick', () => {
                 properties: ['Light'],
             };
 
-            await handleDamageClick(attack);
+            await resolveAttackDamage(attack);
             await new Promise(r => setTimeout(r, 0));
 
             expect(deps.rollDamage).toHaveBeenCalledWith(
@@ -345,7 +345,7 @@ describe('useDamageClick', () => {
         it('does not append when modifier is already in formula', async () => {
             hasTwoWeaponFighting.mockReturnValue(true);
             rollExpression.mockReturnValue({ total: 8, rolls: [5, 3], modifier: 3 });
-            const { handleDamageClick } = HookFactory(deps);
+            const { resolveAttackDamage } = useAttackDamageResolution(deps);
             const attack = {
                 name: 'Handaxe',
                 damage: '1d6+3',
@@ -355,7 +355,7 @@ describe('useDamageClick', () => {
                 abilityName: 'Strength',
             };
 
-            await handleDamageClick(attack);
+            await resolveAttackDamage(attack);
             await new Promise(r => setTimeout(r, 0));
 
             const formulaArg = deps.rollDamage.mock.calls[0][1];
@@ -374,10 +374,10 @@ describe('useDamageClick', () => {
                 }
                 return null;
             });
-            const { handleDamageClick } = HookFactory(deps);
+            const { resolveAttackDamage } = useAttackDamageResolution(deps);
             const attack = { name: 'Longsword', damage: '1d8', damageType: 'slashing', properties: [] };
 
-            await handleDamageClick(attack);
+            await resolveAttackDamage(attack);
             await new Promise(r => setTimeout(r, 0));
 
             expect(deps.rollDamage).toHaveBeenCalledWith(
@@ -392,10 +392,10 @@ describe('useDamageClick', () => {
 
         it('skips rider effects when targetEffects is empty', async () => {
             getRuntimeValue.mockReturnValueOnce([]);
-            const { handleDamageClick } = HookFactory(deps);
+            const { resolveAttackDamage } = useAttackDamageResolution(deps);
             const attack = { name: 'Longsword', damage: '1d8', damageType: 'slashing', properties: [] };
 
-            await handleDamageClick(attack);
+            await resolveAttackDamage(attack);
             await new Promise(r => setTimeout(r, 0));
 
             expect(deps.rollDamage).toHaveBeenCalledWith(
@@ -409,10 +409,10 @@ describe('useDamageClick', () => {
         });
 
         it('skips rider effects when getRuntimeValue returns null', async () => {
-            const { handleDamageClick } = HookFactory(deps);
+            const { resolveAttackDamage } = useAttackDamageResolution(deps);
             const attack = { name: 'Longsword', damage: '1d8', damageType: 'slashing', properties: [] };
 
-            await handleDamageClick(attack);
+            await resolveAttackDamage(attack);
             await new Promise(r => setTimeout(r, 0));
 
             expect(deps.rollDamage).toHaveBeenCalledWith(
@@ -431,7 +431,7 @@ describe('useDamageClick', () => {
     describe('sudden strike handling', () => {
         it('clears pendingSuddenStrike for bonus action attacks when flag is set', async () => {
             getRuntimeValue.mockReturnValueOnce(true);
-            const { handleDamageClick } = HookFactory(deps);
+            const { resolveAttackDamage } = useAttackDamageResolution(deps);
             const attack = {
                 name: 'Sudden Strike',
                 damage: '1d6',
@@ -440,7 +440,7 @@ describe('useDamageClick', () => {
                 properties: [],
             };
 
-            await handleDamageClick(attack);
+            await resolveAttackDamage(attack);
             await new Promise(r => setTimeout(r, 0));
 
             expect(setRuntimeValue).toHaveBeenCalledWith(
@@ -452,7 +452,7 @@ describe('useDamageClick', () => {
         });
 
         it('does not clear pendingSuddenStrike for non-bonus action attacks', async () => {
-            const { handleDamageClick } = HookFactory(deps);
+            const { resolveAttackDamage } = useAttackDamageResolution(deps);
             const attack = {
                 name: 'Longsword',
                 damage: '1d8',
@@ -461,7 +461,7 @@ describe('useDamageClick', () => {
                 properties: [],
             };
 
-            await handleDamageClick(attack);
+            await resolveAttackDamage(attack);
             await new Promise(r => setTimeout(r, 0));
 
             expect(setRuntimeValue).not.toHaveBeenCalledWith(
@@ -474,7 +474,7 @@ describe('useDamageClick', () => {
 
         it('does not clear pendingSuddenStrike when flag is falsy', async () => {
             getRuntimeValue.mockReturnValueOnce(false);
-            const { handleDamageClick } = HookFactory(deps);
+            const { resolveAttackDamage } = useAttackDamageResolution(deps);
             const attack = {
                 name: 'Longsword',
                 damage: '1d8',
@@ -483,7 +483,7 @@ describe('useDamageClick', () => {
                 properties: [],
             };
 
-            await handleDamageClick(attack);
+            await resolveAttackDamage(attack);
             await new Promise(r => setTimeout(r, 0));
 
             expect(setRuntimeValue).not.toHaveBeenCalledWith(
@@ -500,7 +500,7 @@ describe('useDamageClick', () => {
     describe('horde breaker handling', () => {
         it('marks horde breaker as used for the current round', async () => {
             getRuntimeValue.mockReturnValueOnce(null).mockReturnValueOnce('Horde Breaker');
-            const { handleDamageClick } = HookFactory(deps);
+            const { resolveAttackDamage } = useAttackDamageResolution(deps);
             const attack = {
                 name: 'Horde Breaker',
                 damage: '1d6',
@@ -509,7 +509,7 @@ describe('useDamageClick', () => {
                 properties: [],
             };
 
-            await handleDamageClick(attack);
+            await resolveAttackDamage(attack);
             await new Promise(r => setTimeout(r, 0));
 
             expect(setRuntimeValue).toHaveBeenCalledWith(
@@ -522,7 +522,7 @@ describe('useDamageClick', () => {
 
         it('does not mark when hunter prey choice is different', async () => {
             getRuntimeValue.mockReturnValueOnce(null).mockReturnValueOnce('Colossus Slayer');
-            const { handleDamageClick } = HookFactory(deps);
+            const { resolveAttackDamage } = useAttackDamageResolution(deps);
             const attack = {
                 name: 'Horde Breaker',
                 damage: '1d6',
@@ -531,7 +531,7 @@ describe('useDamageClick', () => {
                 properties: [],
             };
 
-            await handleDamageClick(attack);
+            await resolveAttackDamage(attack);
             await new Promise(r => setTimeout(r, 0));
 
             expect(setRuntimeValue).not.toHaveBeenCalledWith(
@@ -544,7 +544,7 @@ describe('useDamageClick', () => {
 
         it('does not mark when attack is not a bonus action', async () => {
             getRuntimeValue.mockReturnValueOnce(null).mockReturnValueOnce('Horde Breaker');
-            const { handleDamageClick } = HookFactory(deps);
+            const { resolveAttackDamage } = useAttackDamageResolution(deps);
             const attack = {
                 name: 'Horde Breaker',
                 damage: '1d6',
@@ -553,7 +553,7 @@ describe('useDamageClick', () => {
                 properties: [],
             };
 
-            await handleDamageClick(attack);
+            await resolveAttackDamage(attack);
             await new Promise(r => setTimeout(r, 0));
 
             expect(setRuntimeValue).not.toHaveBeenCalledWith(
@@ -570,7 +570,7 @@ describe('useDamageClick', () => {
     describe('weapon mastery modal', () => {
         it('does not open modal for ranged attacks', async () => {
             collectWeaponMastery.mockReturnValue({ baseMastery: 'Sap', extraMasteries: [] });
-            const { handleDamageClick } = HookFactory(deps);
+            const { resolveAttackDamage } = useAttackDamageResolution(deps);
             const attack = {
                 name: 'Longbow',
                 damage: '1d8+3',
@@ -579,7 +579,7 @@ describe('useDamageClick', () => {
                 properties: [],
             };
 
-            await handleDamageClick(attack);
+            await resolveAttackDamage(attack);
             await new Promise(r => setTimeout(r, 0));
 
             expect(deps.setWeaponMasteryModal).not.toHaveBeenCalled();
@@ -587,7 +587,7 @@ describe('useDamageClick', () => {
 
         it('does not open modal when no mastery is available', async () => {
             collectWeaponMastery.mockReturnValue({ baseMastery: null, extraMasteries: [] });
-            const { handleDamageClick } = HookFactory(deps);
+            const { resolveAttackDamage } = useAttackDamageResolution(deps);
             const attack = {
                 name: 'Longsword',
                 damage: '1d8+3',
@@ -596,7 +596,7 @@ describe('useDamageClick', () => {
                 properties: [],
             };
 
-            await handleDamageClick(attack);
+            await resolveAttackDamage(attack);
             await new Promise(r => setTimeout(r, 0));
 
             expect(deps.setWeaponMasteryModal).not.toHaveBeenCalled();
@@ -610,7 +610,7 @@ describe('useDamageClick', () => {
                 creatures: [{ name: 'Goblin', type: 'npc' }],
             });
             getTargetFromAttacker.mockReturnValue({ name: 'Goblin', type: 'npc' });
-            const { handleDamageClick } = HookFactory(deps);
+            const { resolveAttackDamage } = useAttackDamageResolution(deps);
             const attack = {
                 name: 'Longsword',
                 damage: '1d8+3',
@@ -619,7 +619,7 @@ describe('useDamageClick', () => {
                 properties: [],
             };
 
-            await handleDamageClick(attack);
+            await resolveAttackDamage(attack);
             await new Promise(r => setTimeout(r, 0));
 
             expect(deps.setWeaponMasteryModal).not.toHaveBeenCalled();
@@ -631,7 +631,7 @@ describe('useDamageClick', () => {
     describe('sacred weapon damage type', () => {
         it('applies damageTypeChoice from active sacred weapon buff for melee attacks', async () => {
             getRuntimeValue.mockReturnValueOnce(null).mockReturnValueOnce([{ name: 'Sacred Weapon', effect: 'sacred_weapon', damageTypeChoice: 'radiant' }]);
-            const { handleDamageClick } = HookFactory(deps);
+            const { resolveAttackDamage } = useAttackDamageResolution(deps);
             const attack = {
                 name: 'Longsword',
                 damage: '1d8+3',
@@ -640,7 +640,7 @@ describe('useDamageClick', () => {
                 properties: [],
             };
 
-            await handleDamageClick(attack);
+            await resolveAttackDamage(attack);
             await new Promise(r => setTimeout(r, 0));
 
             expect(deps.rollDamage).toHaveBeenCalled();
@@ -648,7 +648,7 @@ describe('useDamageClick', () => {
 
         it('does not apply sacred weapon when attack is ranged', async () => {
             getRuntimeValue.mockReturnValueOnce(null).mockReturnValueOnce([{ name: 'Sacred Weapon', effect: 'sacred_weapon', damageTypeChoice: 'radiant' }]);
-            const { handleDamageClick } = HookFactory(deps);
+            const { resolveAttackDamage } = useAttackDamageResolution(deps);
             const attack = {
                 name: 'Longbow',
                 damage: '1d8+3',
@@ -657,7 +657,7 @@ describe('useDamageClick', () => {
                 properties: [],
             };
 
-            await handleDamageClick(attack);
+            await resolveAttackDamage(attack);
             await new Promise(r => setTimeout(r, 0));
 
             expect(deps.rollDamage).toHaveBeenCalled();
@@ -678,7 +678,7 @@ describe('useDamageClick', () => {
                 },
             };
             const testDeps = createMockDeps({ playerStats: stats });
-            const { handleDamageClick } = HookFactory(testDeps);
+            const { resolveAttackDamage } = useAttackDamageResolution(testDeps);
             const attack = {
                 name: 'Longsword',
                 damage: '1d8',
@@ -687,7 +687,7 @@ describe('useDamageClick', () => {
                 properties: [],
             };
 
-            await handleDamageClick(attack);
+            await resolveAttackDamage(attack);
             await new Promise(r => setTimeout(r, 0));
 
             expect(testDeps.rollDamage).toHaveBeenCalledWith(
@@ -711,7 +711,7 @@ describe('useDamageClick', () => {
                 },
             };
             const testDeps = createMockDeps({ playerStats: stats });
-            const { handleDamageClick } = HookFactory(testDeps);
+            const { resolveAttackDamage } = useAttackDamageResolution(testDeps);
             const attack = {
                 name: 'Fire Bolt',
                 damage: '1d10',
@@ -720,7 +720,7 @@ describe('useDamageClick', () => {
                 properties: [],
             };
 
-            await handleDamageClick(attack);
+            await resolveAttackDamage(attack);
             await new Promise(r => setTimeout(r, 0));
 
             expect(testDeps.rollDamage).toHaveBeenCalledWith(
@@ -758,7 +758,7 @@ describe('useDamageClick', () => {
                 return null;
             });
             const testDeps = createMockDeps({ playerStats: stats });
-            const { handleDamageClick } = HookFactory(testDeps);
+            const { resolveAttackDamage } = useAttackDamageResolution(testDeps);
             const attack = {
                 name: 'Longsword',
                 damage: '1d8+3',
@@ -767,7 +767,7 @@ describe('useDamageClick', () => {
                 properties: [],
             };
 
-            await handleDamageClick(attack);
+            await resolveAttackDamage(attack);
             await new Promise(r => setTimeout(r, 0));
 
             expect(testDeps.setDivineFuryChoice).toHaveBeenCalledWith('fire or cold');
@@ -800,7 +800,7 @@ describe('useDamageClick', () => {
                 return null;
             });
             const testDeps = createMockDeps({ playerStats: stats });
-            const { handleDamageClick } = HookFactory(testDeps);
+            const { resolveAttackDamage } = useAttackDamageResolution(testDeps);
             const attack = {
                 name: 'Longsword',
                 damage: '1d8+3',
@@ -809,7 +809,7 @@ describe('useDamageClick', () => {
                 properties: [],
             };
 
-            await handleDamageClick(attack);
+            await resolveAttackDamage(attack);
             await new Promise(r => setTimeout(r, 0));
 
             expect(testDeps.rollDamage).toHaveBeenCalledWith(
@@ -842,7 +842,7 @@ describe('useDamageClick', () => {
                 },
             };
             const testDeps = createMockDeps({ playerStats: stats });
-            const { handleDamageClick } = HookFactory(testDeps);
+            const { resolveAttackDamage } = useAttackDamageResolution(testDeps);
             const attack = {
                 name: 'Longsword',
                 damage: '1d8',
@@ -852,7 +852,7 @@ describe('useDamageClick', () => {
                 abilityName: 'Strength',
             };
 
-            await handleDamageClick(attack);
+            await resolveAttackDamage(attack);
             await new Promise(r => setTimeout(r, 0));
 
             expect(testDeps.rollDamage).toHaveBeenCalledWith(
@@ -887,7 +887,7 @@ describe('useDamageClick', () => {
                 },
             };
             const testDeps = createMockDeps({ playerStats: stats });
-            const { handleDamageClick } = HookFactory(testDeps);
+            const { resolveAttackDamage } = useAttackDamageResolution(testDeps);
             const attack = {
                 name: 'Longsword',
                 damage: '1d8+3',
@@ -896,7 +896,7 @@ describe('useDamageClick', () => {
                 properties: [],
             };
 
-            await handleDamageClick(attack);
+            await resolveAttackDamage(attack);
             await new Promise(r => setTimeout(r, 0));
 
             expect(testDeps.rollDamage).toHaveBeenCalledWith(
@@ -936,7 +936,7 @@ describe('useDamageClick', () => {
             // We need to mock the usedRound check to return 1 (current round)
             getRuntimeValue.mockReturnValue(1);
             const testDeps = createMockDeps({ playerStats: stats });
-            const { handleDamageClick } = HookFactory(testDeps);
+            const { resolveAttackDamage } = useAttackDamageResolution(testDeps);
             const attack = {
                 name: 'Longsword',
                 damage: '1d8+3',
@@ -945,7 +945,7 @@ describe('useDamageClick', () => {
                 properties: [],
             };
 
-            await handleDamageClick(attack);
+            await resolveAttackDamage(attack);
             await new Promise(r => setTimeout(r, 0));
 
             expect(testDeps.rollDamage).toHaveBeenCalledWith(
@@ -983,7 +983,7 @@ describe('useDamageClick', () => {
                 },
             };
             const testDeps = createMockDeps({ playerStats: stats });
-            const { handleDamageClick } = HookFactory(testDeps);
+            const { resolveAttackDamage } = useAttackDamageResolution(testDeps);
             const attack = {
                 name: 'Longsword',
                 damage: '1d8+3',
@@ -992,7 +992,7 @@ describe('useDamageClick', () => {
                 properties: [],
             };
 
-            await handleDamageClick(attack);
+            await resolveAttackDamage(attack);
             await new Promise(r => setTimeout(r, 0));
 
             // Should only include the upgraded (higher-level) feature's damage
@@ -1023,7 +1023,7 @@ describe('useDamageClick', () => {
                 },
             };
             const testDeps = createMockDeps({ playerStats: stats });
-            const { handleDamageClick } = HookFactory(testDeps);
+            const { resolveAttackDamage } = useAttackDamageResolution(testDeps);
             const attack = {
                 name: 'Longsword',
                 damage: '1d8+3',
@@ -1032,7 +1032,7 @@ describe('useDamageClick', () => {
                 properties: [],
             };
 
-            await handleDamageClick(attack);
+            await resolveAttackDamage(attack);
             await new Promise(r => setTimeout(r, 0));
 
             // weaponAttackHitBonuses only filters actions, not passives
@@ -1068,7 +1068,7 @@ describe('useDamageClick', () => {
                 },
             };
             const testDeps = createMockDeps({ playerStats: stats, popupHtml: { isNatural20: true } });
-            const { handleDamageClick } = HookFactory(testDeps);
+            const { resolveAttackDamage } = useAttackDamageResolution(testDeps);
             const attack = {
                 name: 'Longsword',
                 damage: '1d8+3',
@@ -1077,7 +1077,7 @@ describe('useDamageClick', () => {
                 properties: [],
             };
 
-            await handleDamageClick(attack);
+            await resolveAttackDamage(attack);
             await new Promise(r => setTimeout(r, 0));
 
             expect(testDeps.rollDamage).toHaveBeenCalledWith(
@@ -1107,7 +1107,7 @@ describe('useDamageClick', () => {
                 },
             };
             const testDeps = createMockDeps({ playerStats: stats, popupHtml: { isNatural20: false } });
-            const { handleDamageClick } = HookFactory(testDeps);
+            const { resolveAttackDamage } = useAttackDamageResolution(testDeps);
             const attack = {
                 name: 'Longsword',
                 damage: '1d8+3',
@@ -1116,7 +1116,7 @@ describe('useDamageClick', () => {
                 properties: [],
             };
 
-            await handleDamageClick(attack);
+            await resolveAttackDamage(attack);
             await new Promise(r => setTimeout(r, 0));
 
             expect(testDeps.rollDamage).toHaveBeenCalledWith(
@@ -1147,7 +1147,7 @@ describe('useDamageClick', () => {
                 },
             };
             const testDeps = createMockDeps({ playerStats: stats, popupHtml: { isNatural20: true } });
-            const { handleDamageClick } = HookFactory(testDeps);
+            const { resolveAttackDamage } = useAttackDamageResolution(testDeps);
             const attack = {
                 name: 'Longsword',
                 damage: '1d8+3',
@@ -1156,7 +1156,7 @@ describe('useDamageClick', () => {
                 properties: [],
             };
 
-            await handleDamageClick(attack);
+            await resolveAttackDamage(attack);
             await new Promise(r => setTimeout(r, 0));
 
             expect(testDeps.rollDamage).toHaveBeenCalledWith(
@@ -1192,7 +1192,7 @@ describe('useDamageClick', () => {
             };
             getActiveBuffs.mockReturnValue([{ name: 'Heavenly Wings' }]);
             const testDeps = createMockDeps({ playerStats: stats });
-            const { handleDamageClick } = HookFactory(testDeps);
+            const { resolveAttackDamage } = useAttackDamageResolution(testDeps);
             const attack = {
                 name: 'Longsword',
                 damage: '1d8',
@@ -1201,7 +1201,7 @@ describe('useDamageClick', () => {
                 properties: [],
             };
 
-            await handleDamageClick(attack);
+            await resolveAttackDamage(attack);
             await new Promise(r => setTimeout(r, 0));
 
             expect(testDeps.rollDamage).toHaveBeenCalledWith(
@@ -1233,7 +1233,7 @@ describe('useDamageClick', () => {
             };
             getActiveBuffs.mockReturnValue([]);
             const testDeps = createMockDeps({ playerStats: stats });
-            const { handleDamageClick } = HookFactory(testDeps);
+            const { resolveAttackDamage } = useAttackDamageResolution(testDeps);
             const attack = {
                 name: 'Longsword',
                 damage: '1d8',
@@ -1242,7 +1242,7 @@ describe('useDamageClick', () => {
                 properties: [],
             };
 
-            await handleDamageClick(attack);
+            await resolveAttackDamage(attack);
             await new Promise(r => setTimeout(r, 0));
 
             expect(testDeps.rollDamage).toHaveBeenCalledWith(
@@ -1257,7 +1257,7 @@ describe('useDamageClick', () => {
 
         it('does not apply rider when transformation passive is missing', async () => {
             getActiveBuffs.mockReturnValue([{ name: 'Heavenly Wings' }]);
-            const { handleDamageClick } = HookFactory(deps);
+            const { resolveAttackDamage } = useAttackDamageResolution(deps);
             const attack = {
                 name: 'Longsword',
                 damage: '1d8',
@@ -1266,7 +1266,7 @@ describe('useDamageClick', () => {
                 properties: [],
             };
 
-            await handleDamageClick(attack);
+            await resolveAttackDamage(attack);
             await new Promise(r => setTimeout(r, 0));
 
             expect(deps.rollDamage).toHaveBeenCalledWith(
@@ -1286,7 +1286,7 @@ describe('useDamageClick', () => {
         it('adds 1d8 extra damage when target is below max HP', async () => {
             getRuntimeValue.mockReturnValueOnce(null).mockReturnValueOnce("Colossus Slayer");
             getTargetFromAttacker.mockReturnValue({ name: 'Goblin', currentHp: 5, maxHp: 15 });
-            const { handleDamageClick } = HookFactory(deps);
+            const { resolveAttackDamage } = useAttackDamageResolution(deps);
             const attack = {
                 name: 'Longsword',
                 damage: '1d8+3',
@@ -1295,7 +1295,7 @@ describe('useDamageClick', () => {
                 properties: [],
             };
 
-            await handleDamageClick(attack);
+            await resolveAttackDamage(attack);
             await new Promise(r => setTimeout(r, 0));
 
             expect(deps.rollDamage).toHaveBeenCalledWith(
@@ -1311,7 +1311,7 @@ describe('useDamageClick', () => {
         it('does not add extra damage when target is at full HP', async () => {
             getRuntimeValue.mockReturnValueOnce(null).mockReturnValueOnce("Colossus Slayer");
             getTargetFromAttacker.mockReturnValue({ name: 'Goblin', currentHp: 15, maxHp: 15 });
-            const { handleDamageClick } = HookFactory(deps);
+            const { resolveAttackDamage } = useAttackDamageResolution(deps);
             const attack = {
                 name: 'Longsword',
                 damage: '1d8+3',
@@ -1320,7 +1320,7 @@ describe('useDamageClick', () => {
                 properties: [],
             };
 
-            await handleDamageClick(attack);
+            await resolveAttackDamage(attack);
             await new Promise(r => setTimeout(r, 0));
 
             expect(deps.rollDamage).toHaveBeenCalledWith(
@@ -1336,7 +1336,7 @@ describe('useDamageClick', () => {
         it('does not add extra damage when no target from combat context', async () => {
             getRuntimeValue.mockReturnValueOnce(null).mockReturnValueOnce("Colossus Slayer");
             getTargetFromAttacker.mockReturnValue(null);
-            const { handleDamageClick } = HookFactory(deps);
+            const { resolveAttackDamage } = useAttackDamageResolution(deps);
             const attack = {
                 name: 'Longsword',
                 damage: '1d8+3',
@@ -1345,7 +1345,7 @@ describe('useDamageClick', () => {
                 properties: [],
             };
 
-            await handleDamageClick(attack);
+            await resolveAttackDamage(attack);
             await new Promise(r => setTimeout(r, 0));
 
             expect(deps.rollDamage).toHaveBeenCalledWith(
@@ -1381,7 +1381,7 @@ describe('useDamageClick', () => {
             getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
             getCombatContext.mockResolvedValue({ creatures: [{ name: 'TestFighter', hasActed: false }] });
             const testDeps = createMockDeps({ playerStats: stats });
-            const { handleDamageClick } = HookFactory(testDeps);
+            const { resolveAttackDamage } = useAttackDamageResolution(testDeps);
             const attack = {
                 name: 'Mace',
                 damage: '1d6',
@@ -1390,7 +1390,7 @@ describe('useDamageClick', () => {
                 properties: [],
             };
 
-            await handleDamageClick(attack);
+            await resolveAttackDamage(attack);
             await new Promise(r => setTimeout(r, 0));
 
             expect(setRuntimeValue).toHaveBeenCalledWith(
@@ -1423,7 +1423,7 @@ describe('useDamageClick', () => {
                 },
             };
             const testDeps = createMockDeps({ playerStats: stats });
-            const { handleDamageClick } = HookFactory(testDeps);
+            const { resolveAttackDamage } = useAttackDamageResolution(testDeps);
             const attack = {
                 name: 'Longsword',
                 damage: '1d8',
@@ -1432,7 +1432,7 @@ describe('useDamageClick', () => {
                 properties: [],
             };
 
-            await handleDamageClick(attack);
+            await resolveAttackDamage(attack);
             await new Promise(r => setTimeout(r, 0));
 
             expect(setRuntimeValue).not.toHaveBeenCalledWith(
@@ -1470,7 +1470,7 @@ describe('useDamageClick', () => {
             getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
             getCombatContext.mockResolvedValue({ creatures: [{ name: 'TestFighter', hasActed: false }] });
             const testDeps = createMockDeps({ playerStats: stats });
-            const { handleDamageClick } = HookFactory(testDeps);
+            const { resolveAttackDamage } = useAttackDamageResolution(testDeps);
             const attack = {
                 name: 'Scimitar',
                 damage: '1d6',
@@ -1479,7 +1479,7 @@ describe('useDamageClick', () => {
                 properties: [],
             };
 
-            await handleDamageClick(attack);
+            await resolveAttackDamage(attack);
             await new Promise(r => setTimeout(r, 0));
 
             expect(setRuntimeValue).toHaveBeenCalledWith(
@@ -1522,7 +1522,7 @@ describe('useDamageClick', () => {
             getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
             getCombatContext.mockResolvedValue({ creatures: [{ name: 'TestFighter', hasActed: false }] });
             const testDeps = createMockDeps({ playerStats: stats });
-            const { handleDamageClick } = HookFactory(testDeps);
+            const { resolveAttackDamage } = useAttackDamageResolution(testDeps);
             const attack = {
                 name: 'Shortsword',
                 damage: '1d6+3',
@@ -1531,7 +1531,7 @@ describe('useDamageClick', () => {
                 properties: [],
             };
 
-            await handleDamageClick(attack);
+            await resolveAttackDamage(attack);
             await new Promise(r => setTimeout(r, 0));
 
             expect(testDeps.setAttackRiderModal).toHaveBeenCalledWith(
@@ -1560,7 +1560,7 @@ describe('useDamageClick', () => {
             };
             getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
             const testDeps = createMockDeps({ playerStats: stats });
-            const { handleDamageClick } = HookFactory(testDeps);
+            const { resolveAttackDamage } = useAttackDamageResolution(testDeps);
             const attack = {
                 name: 'Unarmed Strike',
                 damage: '1d4',
@@ -1569,7 +1569,7 @@ describe('useDamageClick', () => {
                 properties: [],
             };
 
-            await handleDamageClick(attack);
+            await resolveAttackDamage(attack);
             await new Promise(r => setTimeout(r, 0));
 
             expect(setRuntimeValue).toHaveBeenCalledWith(
@@ -1599,7 +1599,7 @@ describe('useDamageClick', () => {
                 },
             };
             const testDeps = createMockDeps({ playerStats: stats });
-            const { handleDamageClick } = HookFactory(testDeps);
+            const { resolveAttackDamage } = useAttackDamageResolution(testDeps);
             const attack = {
                 name: 'Longsword',
                 damage: '1d8',
@@ -1608,7 +1608,7 @@ describe('useDamageClick', () => {
                 properties: [],
             };
 
-            await handleDamageClick(attack);
+            await resolveAttackDamage(attack);
             await new Promise(r => setTimeout(r, 0));
 
             expect(setRuntimeValue).not.toHaveBeenCalledWith(
@@ -1647,7 +1647,7 @@ describe('useDamageClick', () => {
                 },
             };
             const testDeps = createMockDeps({ playerStats: stats });
-            const { handleDamageClick } = HookFactory(testDeps);
+            const { resolveAttackDamage } = useAttackDamageResolution(testDeps);
             const attack = {
                 name: 'Unarmed Strike',
                 damage: '1d4',
@@ -1656,7 +1656,7 @@ describe('useDamageClick', () => {
                 properties: [],
             };
 
-            await handleDamageClick(attack);
+            await resolveAttackDamage(attack);
             await new Promise(r => setTimeout(r, 0));
 
             expect(testDeps.setDamageTypeChoice).toHaveBeenCalledWith(

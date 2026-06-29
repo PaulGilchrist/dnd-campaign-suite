@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react'
-import useDamageClick from './useDamageClick.js';
+import useAttackDamageResolution from './useAttackDamageResolution.js';
 import useModalHandlers from './useModalHandlers.js';
 import { useCombatSuperiorityModal } from '../../hooks/combat/useCombatSuperiorityModal.js';
 
@@ -69,7 +69,7 @@ export default function useCharActionModals({
 
     const pendingDamageRef = useRef(null);
 
-    const { handleDamageClick, proceedWithDamage } = useDamageClick({
+    const { resolveAttackDamage, proceedWithDamage } = useAttackDamageResolution({
         playerStats, campaignName, mapName,
         popupHtml, setPopupHtml, rollDamage, buildCtx, buildCtxSync,
         setDamageTypeChoice, setDivineFuryChoice, setWeaponMasteryModal, setAttackRiderModal,
@@ -176,7 +176,7 @@ export default function useCharActionModals({
         commanderStrikeChoiceModal, setCommanderStrikeChoiceModal,
         rallyChoiceModal, setRallyChoiceModal,
         bulwarkOfForceModal, setBulwarkOfForceModal,
-        handleDamageClick,
+        resolveAttackDamage,
         handleMasteryClose,
         handleWeaponMasteryChoice,
         handleDivineFuryDamageType,

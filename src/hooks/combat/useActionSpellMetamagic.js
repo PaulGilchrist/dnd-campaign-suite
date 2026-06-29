@@ -19,7 +19,6 @@ export function useActionSpellMetamagic({
     buildCtx,
     buildCtxSync,
     handleAttackClick,
-    handleDamageClick,
 }) {
     const [pendingActionMetamagic, setPendingActionMetamagic] = useState(null);
     const isBonusSorcerer = playerStats.class?.name === 'Sorcerer';
@@ -125,7 +124,7 @@ export function useActionSpellMetamagic({
         pending.action({});
     }, [pendingActionMetamagic, playerStats.name, campaignName]);
 
-    const handleActionSpellDamageClick = async (attack) => {
+    const resolveSpellDamage = async (attack) => {
         if (!isBonusSorcerer) {
             addEntry(campaignName, {
                 type: 'spell',
@@ -226,54 +225,13 @@ export function useActionSpellMetamagic({
         });
     };
 
-    const handleSpellDamageClick = (attack) => {
-        const spell = playerStats.spellAbilities?.spells?.find(s => s.name === attack.name);
-        if (!spell) {
-            handleDamageClick(attack);
-            return;
-        }
-        if (!isBonusSorcerer) {
-            handleDamageClick(attack);
-            return;
-        }
-
-        const spellLevel = spell.level || 0;
-        const currentSP = getCurrentSorceryPoints(playerStats.name, getMaxSorceryPoints(playerStats));
-        const isPsionic = isPsionicSpell(playerStats, spell.name);
-        const hasPsionic = hasPsionicSorcery(playerStats);
-
-        setPendingActionMetamagic({
-            spellName: attack.name,
-            spellLevel: spellLevel,
-            castingTime: spell.casting_time || 'Action',
-            _currentSP: currentSP,
-            isPsionic: isPsionic && hasPsionic,
-            psionicCost: isPsionic && hasPsionic ? spellLevel : 0,
-            action: async (metaCtx) => {
-                const wasCrit = popupHtml?.isCrit;
-                if (wasCrit && setPopupHtml) setPopupHtml(null);
-                const r = wasCrit ? rollExpressionDoubled(attack.damage) : rollExpression(attack.damage);
-                if (!r) return;
-                const { formula, total, rolls, modifier } = applyEmpoweredEvocation(attack, attack.damage, r.total, r.rolls, r.modifier);
-                if (!mapName) {
-                    const ctx = await buildCtxSync(attack);
-                    rollDamage(attack.name, formula, total, rolls, modifier, { ...ctx, ...metaCtx });
-                } else {
-                    buildCtx(attack).then(ctx => {
-                        rollDamage(attack.name, formula, total, rolls, modifier, { ...ctx, ...metaCtx });
-                    }).catch((e) => { console.error("[useActionSpellMetamagic] Error:", e); });
-                }
-            },
-        });
-    };
 
     return {
         pendingActionMetamagic,
         isBonusSorcerer,
         handleActionMetamagicConfirm,
         handleActionMetamagicSkip,
-        handleActionSpellDamageClick,
+        resolveSpellDamage,
         handleSpellAttackClick,
-        handleSpellDamageClick,
     };
 }
