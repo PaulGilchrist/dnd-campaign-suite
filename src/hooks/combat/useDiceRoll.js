@@ -44,7 +44,8 @@ export default function useDiceRoll() {
       name,
       formula,
       rolls,
-      bonus: 0, // Base bonus is’ 0 because modifier is separate
+      total,
+      bonus: 0, // Base bonus is' 0 because modifier is separate
       modifier
     });
   };

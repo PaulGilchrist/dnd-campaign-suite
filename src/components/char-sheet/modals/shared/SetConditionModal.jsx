@@ -9,7 +9,7 @@ import { sendSavePrompt, sendSaveResult } from '../../../../services/combat/cond
 import AreaEffectTargetModalBase from './AreaEffectTargetModalBase.jsx';
 import { renderTargetList, logSaveEntry, persistAndNotify } from './AreaEffectTargetModalBase.utils.jsx';
 
-function SetConditionModal({ combatSummary, attackerName, attackerPos, saveDc, campaignName, mapData, onClose, characters, featureName = 'Abjure Foes', conditionName = 'frightened', additionalCondition = null, saveType = 'WIS', rangeFeet = 60, durationRounds }) {
+function SetConditionModal({ combatSummary, attackerName, attackerPos, saveDc, campaignName, mapData, monsters, channelDivinityCharges, onClose, characters, featureName = 'Abjure Foes', conditionName = 'frightened', additionalCondition = null, saveType = 'WIS', rangeFeet = 60, durationRounds }) {
     const applyConditionToCreature = useCallback((targetName, saveDcValue, condName, ctx) => {
         const creature = ctx.combatSummary.creatures.find(c => c.name === targetName);
         if (!creature) return;
@@ -77,14 +77,18 @@ function SetConditionModal({ combatSummary, attackerName, attackerPos, saveDc, c
         if (ctx.selected.size === 0) return;
         ctx.setProcessing(true);
 
+        if (channelDivinityCharges != null && channelDivinityCharges > 0) {
+            setRuntimeValue(attackerName, 'channelDivinityCharges', channelDivinityCharges - 1, campaignName);
+        }
+
         const npcResults = [];
         const playerPrompts = [];
 
         ctx.selected.forEach(targetName => {
             const target = ctx.combatSummary.creatures.find(c => c.name === targetName);
-            const isNpc = !target || target.type === 'npc';
+            const isPlayer = target && target.type === 'player';
 
-            if (isNpc) {
+            if (!isPlayer) {
                 const saveBonus = target?.saveBonuses?.[saveType.toLowerCase()] ?? 0;
                 const roll1 = rollD20();
                 const total = roll1 + saveBonus;
@@ -129,7 +133,7 @@ function SetConditionModal({ combatSummary, attackerName, attackerPos, saveDc, c
 
         ctx.setResults(npcResults);
         ctx.setPendingPrompts(playerPrompts);
-    }, [campaignName, attackerName, saveDc, saveType, featureName, addConditionToCreature, logCondition]);
+    }, [campaignName, attackerName, saveDc, saveType, featureName, addConditionToCreature, logCondition, channelDivinityCharges]);
 
     const handleSaveResultOverride = useCallback((event, ctx) => {
         const detail = event.detail;
@@ -175,11 +179,18 @@ function SetConditionModal({ combatSummary, attackerName, attackerPos, saveDc, c
         }
     }, [featureName, attackerName, saveDc, saveType, campaignName]);
 
+    const isTurnUndead = featureName.toLowerCase().includes('turn undead');
+
     const renderBody = (ctx) => {
         if (!ctx.processing) {
             return (
                 <>
-                    <p>Select creatures within {rangeFeet} feet. Each must make a <strong>{saveType}</strong> saving throw (DC {saveDc}) or become <strong>{conditionLabel}</strong> for 1 minute.</p>
+                    {isTurnUndead && ctx.eligibleTargets.length === 0 && (
+                        <p>No undead creatures found within range.</p>
+                    )}
+                    {!(isTurnUndead && ctx.eligibleTargets.length === 0) && (
+                        <p>Select creatures within {rangeFeet} feet. Each must make a <strong>{saveType}</strong> saving throw (DC {saveDc}) or become <strong>{conditionLabel}</strong> for 1 minute.</p>
+                    )}
                     <p className="sp-note">Targets selected: {ctx.selected.size}/{ctx.eligibleTargets.length}</p>
                     {renderTargetList({ eligibleTargets: ctx.eligibleTargets, selected: ctx.selected, toggleTarget: ctx.toggleTarget })}
                 </>
@@ -212,7 +223,7 @@ function SetConditionModal({ combatSummary, attackerName, attackerPos, saveDc, c
         if (!ctx.processing) {
             return (
                 <>
-                    <button className="sp-roll-btn" onClick={ctx.handleApply} disabled={ctx.selected.size === 0} type="button">
+                    <button className="sp-roll-btn" onClick={ctx.handleApply} disabled={ctx.selected.size === 0 || (isTurnUndead && ctx.eligibleTargets.length === 0)} type="button">
                         <i className="fa-solid fa-dice-d20"></i> {featureName} ({ctx.selected.size} target{ctx.selected.size !== 1 ? 's' : ''})
                     </button>
                     <button className="sp-dismiss-btn" onClick={onClose} type="button">
@@ -241,6 +252,7 @@ function SetConditionModal({ combatSummary, attackerName, attackerPos, saveDc, c
             saveDc={saveDc}
             campaignName={campaignName}
             mapData={mapData}
+            monsters={monsters}
             featureName={featureName}
             saveType={saveType}
             rangeFeet={rangeFeet}
@@ -252,6 +264,7 @@ function SetConditionModal({ combatSummary, attackerName, attackerPos, saveDc, c
             onAllResolved={onAllResolved}
             renderBody={renderBody}
             renderActions={renderActions}
+            turnUndead={isTurnUndead}
         />
     );
 }

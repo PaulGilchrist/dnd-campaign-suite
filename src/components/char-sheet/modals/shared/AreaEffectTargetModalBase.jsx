@@ -8,6 +8,7 @@ function AreaEffectTargetModalBase({
   saveDc,
   campaignName,
   mapData,
+  monsters,
   featureName,
   saveType,
   rangeFeet,
@@ -20,6 +21,7 @@ function AreaEffectTargetModalBase({
   onAllResolved,
   renderBody,
   renderActions,
+  turnUndead = false,
 }) {
   const [selected, setSelected] = useState(new Set());
   const [processing, setProcessing] = useState(false);
@@ -30,13 +32,17 @@ function AreaEffectTargetModalBase({
     if (!combatSummary?.creatures) return [];
     return combatSummary.creatures.filter(c => {
       if (c.name === attackerName) return false;
+      if (turnUndead) {
+        const monster = Array.isArray(monsters) ? monsters.find(m => m.name === c.name) : undefined;
+        if (!monster || monster.type.toLowerCase() !== 'undead') return false;
+      }
       if (!mapData || !attackerPos) return true;
       const targetPos = mapData.players?.find(p => p.name === c.name) || mapData.placedItems?.find(i => i.name === c.name);
       if (!targetPos) return true;
       const dist = getDistanceFeet(attackerPos, { gridX: targetPos.gridX, gridY: targetPos.gridY });
       return dist != null && dist <= rangeFeet;
     });
-  }, [combatSummary, attackerName, mapData, attackerPos, rangeFeet]);
+  }, [combatSummary, attackerName, mapData, attackerPos, rangeFeet, turnUndead, monsters]);
 
   const toggleTarget = useCallback((name) => {
     setSelected(prev => {

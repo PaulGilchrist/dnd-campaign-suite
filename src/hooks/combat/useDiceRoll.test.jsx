@@ -107,6 +107,7 @@ describe('useDiceRoll', () => {
         name: 'Longsword',
         formula: '1d8+3',
         rolls: [4, 3],
+        total: 7,
         bonus: 0,
         modifier: 3,
       });

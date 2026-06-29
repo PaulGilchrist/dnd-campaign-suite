@@ -60,11 +60,19 @@ import * as savePromptService from '../../../../services/combat/conditions/saveP
 const mockCombatSummary = {
   creatures: [
     { name: 'Attacker', type: 'player' },
-    { name: 'Goblin A', type: 'npc', conditions: [] },
-    { name: 'Goblin B', type: 'npc', conditions: [], saveBonuses: { wis: 2 } },
+    { name: 'Skeleton A', type: 'npc', conditions: [] },
+    { name: 'Zombie B', type: 'npc', conditions: [], saveBonuses: { wis: 2 } },
     { name: 'Player Ally', type: 'player' },
+    { name: 'Goblin C', type: 'npc', conditions: [] },
   ],
 };
+
+const mockMonsters = [
+  { name: 'Skeleton A', type: 'Undead' },
+  { name: 'Zombie B', type: 'undead' },
+  { name: 'Goblin C', type: 'Humanoid' },
+  { name: 'Player Ally', type: 'Undead' },
+];
 
 const mockAttackerPos = { gridX: 0, gridY: 0 };
 
@@ -76,6 +84,7 @@ function makeProps(overrides) {
     saveDc: 14,
     campaignName: 'test-campaign',
     mapData: null,
+    monsters: mockMonsters,
     onClose: vi.fn(),
     ...(overrides || {}),
   };
@@ -93,7 +102,7 @@ describe('SetConditionModal - Turn Undead', () => {
     vi.restoreAllMocks();
   });
 
-  it('dispatches turn-undead-result event when feature name includes "turn undead" and there are failed targets', () => {
+  it('dispatches turn-undead-result event when feature name includes "turn undead" and there are failed targets', async () => {
     diceRoller.rollD20.mockReturnValue(5);
 
     const customEvents = [];
@@ -104,16 +113,18 @@ describe('SetConditionModal - Turn Undead', () => {
     };
 
     render(<SetConditionModal {...makeProps({ featureName: 'Turn Undead' })} />);
-    fireEvent.click(screen.getAllByRole('checkbox')[0]); // Goblin A
+    fireEvent.click(screen.getAllByRole('checkbox')[0]); // Skeleton A
     fireEvent.click(screen.getByRole('button', { name: /Turn Undead \(1 target\)/ }));
 
-    const turnUndeadEvent = customEvents.find(e => e.type === 'turn-undead-result');
-    expect(turnUndeadEvent).toBeDefined();
-    expect(turnUndeadEvent.detail.failedTargets).toContain('Goblin A');
-    expect(turnUndeadEvent.detail.attackerName).toBe('Attacker');
-    expect(turnUndeadEvent.detail.saveDc).toBe(14);
-    expect(turnUndeadEvent.detail.saveType).toBe('WIS');
-    expect(turnUndeadEvent.detail.campaignName).toBe('test-campaign');
+    await waitFor(() => {
+      const turnUndeadEvent = customEvents.find(e => e.type === 'turn-undead-result');
+      expect(turnUndeadEvent).toBeDefined();
+      expect(turnUndeadEvent.detail.failedTargets).toContain('Skeleton A');
+      expect(turnUndeadEvent.detail.attackerName).toBe('Attacker');
+      expect(turnUndeadEvent.detail.saveDc).toBe(14);
+      expect(turnUndeadEvent.detail.saveType).toBe('WIS');
+      expect(turnUndeadEvent.detail.campaignName).toBe('test-campaign');
+    });
 
     window.dispatchEvent = originalDispatch;
   });
@@ -129,7 +140,7 @@ describe('SetConditionModal - Turn Undead', () => {
     };
 
     render(<SetConditionModal {...makeProps({ featureName: 'Turn Undead' })} />);
-    fireEvent.click(screen.getAllByRole('checkbox')[0]); // Goblin A
+    fireEvent.click(screen.getAllByRole('checkbox')[0]); // Skeleton A
     fireEvent.click(screen.getByRole('button', { name: /Turn Undead \(1 target\)/ }));
 
     const turnUndeadEvent = customEvents.find(e => e.type === 'turn-undead-result');
@@ -158,7 +169,7 @@ describe('SetConditionModal - Turn Undead', () => {
     window.dispatchEvent = originalDispatch;
   });
 
-  it('dispatches turn-undead-result with multiple failed targets', () => {
+  it('dispatches turn-undead-result with multiple failed targets', async () => {
     diceRoller.rollD20.mockReturnValueOnce(5).mockReturnValueOnce(3);
 
     const customEvents = [];
@@ -169,15 +180,17 @@ describe('SetConditionModal - Turn Undead', () => {
     };
 
     render(<SetConditionModal {...makeProps({ featureName: 'Turn Undead' })} />);
-    fireEvent.click(screen.getAllByRole('checkbox')[0]); // Goblin A
-    fireEvent.click(screen.getAllByRole('checkbox')[1]); // Goblin B
+    fireEvent.click(screen.getAllByRole('checkbox')[0]); // Skeleton A
+    fireEvent.click(screen.getAllByRole('checkbox')[1]); // Zombie B
     fireEvent.click(screen.getByRole('button', { name: /Turn Undead \(2 targets\)/ }));
 
-    const turnUndeadEvent = customEvents.find(e => e.type === 'turn-undead-result');
-    expect(turnUndeadEvent).toBeDefined();
-    expect(turnUndeadEvent.detail.failedTargets).toContain('Goblin A');
-    expect(turnUndeadEvent.detail.failedTargets).toContain('Goblin B');
-    expect(turnUndeadEvent.detail.failedTargets).toHaveLength(2);
+    await waitFor(() => {
+      const turnUndeadEvent = customEvents.find(e => e.type === 'turn-undead-result');
+      expect(turnUndeadEvent).toBeDefined();
+      expect(turnUndeadEvent.detail.failedTargets).toContain('Skeleton A');
+      expect(turnUndeadEvent.detail.failedTargets).toContain('Zombie B');
+      expect(turnUndeadEvent.detail.failedTargets).toHaveLength(2);
+    });
 
     window.dispatchEvent = originalDispatch;
   });
@@ -193,11 +206,11 @@ describe('SetConditionModal - Turn Undead', () => {
     };
 
     render(<SetConditionModal {...makeProps({ featureName: 'Turn Undead' })} />);
-    fireEvent.click(screen.getAllByRole('checkbox')[0]); // Goblin A (NPC)
+    fireEvent.click(screen.getAllByRole('checkbox')[0]); // Skeleton A (undead)
     fireEvent.click(screen.getAllByRole('checkbox')[2]); // Player Ally
     fireEvent.click(screen.getByRole('button', { name: /Turn Undead \(2 targets\)/ }));
 
-    // At this point the NPC failed but the player is pending, so allResolved is false
+    // At this point the undead failed but the player is pending, so allResolved is false
     const turnUndeadEvent = customEvents.find(e => e.type === 'turn-undead-result');
     expect(turnUndeadEvent).toBeUndefined();
 
@@ -215,7 +228,7 @@ describe('SetConditionModal - Turn Undead', () => {
     };
 
     render(<SetConditionModal {...makeProps({ featureName: 'Turn Undead' })} />);
-    fireEvent.click(screen.getAllByRole('checkbox')[0]); // Goblin A
+    fireEvent.click(screen.getAllByRole('checkbox')[0]); // Skeleton A (undead)
     fireEvent.click(screen.getAllByRole('checkbox')[2]); // Player Ally
     fireEvent.click(screen.getByRole('button', { name: /Turn Undead \(2 targets\)/ }));
 
@@ -230,7 +243,7 @@ describe('SetConditionModal - Turn Undead', () => {
     await waitFor(() => {
       const turnUndeadEvent = customEvents.find(e => e.type === 'turn-undead-result');
       expect(turnUndeadEvent).toBeDefined();
-      expect(turnUndeadEvent.detail.failedTargets).toContain('Goblin A');
+      expect(turnUndeadEvent.detail.failedTargets).toContain('Skeleton A');
       expect(turnUndeadEvent.detail.failedTargets).toContain('Player Ally');
     });
 
@@ -248,7 +261,7 @@ describe('SetConditionModal - Turn Undead', () => {
     };
 
     render(<SetConditionModal {...makeProps({ featureName: 'Turn Undead' })} />);
-    fireEvent.click(screen.getAllByRole('checkbox')[0]); // Goblin A
+    fireEvent.click(screen.getAllByRole('checkbox')[0]); // Skeleton A (undead)
     fireEvent.click(screen.getAllByRole('checkbox')[2]); // Player Ally
     fireEvent.click(screen.getByRole('button', { name: /Turn Undead \(2 targets\)/ }));
 
@@ -266,5 +279,68 @@ describe('SetConditionModal - Turn Undead', () => {
     });
 
     window.dispatchEvent = originalDispatch;
+  });
+
+  it('only shows undead creatures as eligible targets for Turn Undead', () => {
+    render(<SetConditionModal {...makeProps({ featureName: 'Turn Undead' })} />);
+
+    const checkboxes = screen.getAllByRole('checkbox');
+    expect(checkboxes).toHaveLength(3);
+
+    const labels = checkboxes.map(cb => cb.nextSibling?.textContent);
+    expect(labels).toContain('Skeleton A');
+    expect(labels).toContain('Zombie B');
+    expect(labels).toContain('Player Ally');
+    expect(labels).not.toContain('Goblin C');
+  });
+
+  it('shows no undead message when no undead creatures exist', () => {
+    const noUndeadCombatSummary = {
+      creatures: [
+        { name: 'Attacker', type: 'player' },
+        { name: 'Goblin A', type: 'npc', conditions: [] },
+        { name: 'Player Ally', type: 'player' },
+      ],
+    };
+    const noUndeadMonsters = [
+      { name: 'Goblin A', type: 'Humanoid' },
+    ];
+
+    render(<SetConditionModal {...makeProps({ featureName: 'Turn Undead', combatSummary: noUndeadCombatSummary, monsters: noUndeadMonsters })} />);
+
+    expect(screen.getByText('No undead creatures found within range.')).toBeInTheDocument();
+    const checkboxes = screen.queryAllByRole('checkbox');
+    expect(checkboxes).toHaveLength(0);
+  });
+
+  it('shows "no undead" message and disabled button when no undead exist', () => {
+    const noUndeadCombatSummary = {
+      creatures: [
+        { name: 'Attacker', type: 'player' },
+        { name: 'Goblin A', type: 'npc', conditions: [] },
+      ],
+    };
+    const noUndeadMonsters2 = [
+      { name: 'Goblin A', type: 'Humanoid' },
+    ];
+
+    render(<SetConditionModal {...makeProps({ featureName: 'Turn Undead', combatSummary: noUndeadCombatSummary, monsters: noUndeadMonsters2 })} />);
+
+    expect(screen.getByText('No undead creatures found within range.')).toBeInTheDocument();
+    const applyButton = screen.getByRole('button', { name: /Turn Undead/ });
+    expect(applyButton).toBeDisabled();
+  });
+
+  it('does NOT filter by undead type for non-Turn Undead features', () => {
+    render(<SetConditionModal {...makeProps({ featureName: 'Abjure Foes' })} />);
+
+    const checkboxes = screen.getAllByRole('checkbox');
+    expect(checkboxes).toHaveLength(4);
+
+    const labels = checkboxes.map(cb => cb.nextSibling?.textContent);
+    expect(labels).toContain('Skeleton A');
+    expect(labels).toContain('Zombie B');
+    expect(labels).toContain('Player Ally');
+    expect(labels).toContain('Goblin C');
   });
 });

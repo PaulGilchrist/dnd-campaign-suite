@@ -114,6 +114,39 @@
       },
       "encounterCompleted": false,
       "effectiveXP": 1275
+    },
+    {
+      "name": "Undead Alliance",
+      "savedAt": "2026-06-29T15:57:16.733Z",
+      "selectedMonsters": [
+        {
+          "index": "adult-blue-dracolich",
+          "name": "Adult Blue Dracolich",
+          "qty": 1
+        },
+        {
+          "index": "dracolich",
+          "name": "Dracolich",
+          "qty": 1
+        },
+        {
+          "index": "lich",
+          "name": "Lich",
+          "qty": 1
+        },
+        {
+          "index": "demilich",
+          "name": "Demilich",
+          "qty": 1
+        }
+      ],
+      "description": "",
+      "lootData": {
+        "lootEntries": [],
+        "totalEncounterXp": 0
+      },
+      "encounterCompleted": false,
+      "effectiveXP": 133500
     }
   ]
 }

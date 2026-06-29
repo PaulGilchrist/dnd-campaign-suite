@@ -214,7 +214,7 @@ describe('conditionHandler.handle', () => {
       expect(setRuntimeValue).not.toHaveBeenCalled();
     });
 
-    it('decrements charges and returns modal when charges > 0', async () => {
+    it('returns modal when charges > 0 without decrementing', async () => {
       const ps = makePlayerStats();
       const action = makeAction({});
 
@@ -225,7 +225,7 @@ describe('conditionHandler.handle', () => {
 
       expect(result.type).toBe('modal');
       expect(result.modalName).toBe('setCondition');
-      expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', 'channelDivinityCharges', 2, CAMPAIGN_NAME);
+      expect(setRuntimeValue).not.toHaveBeenCalled();
     });
 
     it('uses max charges from class_levels when stored value is undefined', async () => {
@@ -236,7 +236,7 @@ describe('conditionHandler.handle', () => {
 
       await handle(action, ps, CAMPAIGN_NAME, null);
 
-      expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', 'channelDivinityCharges', 2, CAMPAIGN_NAME);
+      expect(setRuntimeValue).not.toHaveBeenCalled();
     });
 
     it('uses class_specific.channel_divinity_charges fallback from class_levels', async () => {
@@ -254,8 +254,7 @@ describe('conditionHandler.handle', () => {
 
       await handle(action, ps, CAMPAIGN_NAME, null);
 
-      // currentCharges = 4, newCharges = 3
-      expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', 'channelDivinityCharges', 3, CAMPAIGN_NAME);
+      expect(setRuntimeValue).not.toHaveBeenCalled();
     });
 
     it('defaults to 2 charges when class data is missing', async () => {
@@ -266,7 +265,7 @@ describe('conditionHandler.handle', () => {
 
       await handle(action, ps, CAMPAIGN_NAME, null);
 
-      expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', 'channelDivinityCharges', 1, CAMPAIGN_NAME);
+      expect(setRuntimeValue).not.toHaveBeenCalled();
     });
 
     it('defaults to 2 charges when class_levels is empty', async () => {
@@ -277,7 +276,7 @@ describe('conditionHandler.handle', () => {
 
       await handle(action, ps, CAMPAIGN_NAME, null);
 
-      expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', 'channelDivinityCharges', 1, CAMPAIGN_NAME);
+      expect(setRuntimeValue).not.toHaveBeenCalled();
     });
 
     it('defaults to 2 charges when channel_divinity is 0', async () => {
@@ -294,7 +293,7 @@ describe('conditionHandler.handle', () => {
 
       await handle(action, ps, CAMPAIGN_NAME, null);
 
-      expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', 'channelDivinityCharges', 1, CAMPAIGN_NAME);
+      expect(setRuntimeValue).not.toHaveBeenCalled();
     });
 
     it('does not call setRuntimeValue when no charges remain', async () => {

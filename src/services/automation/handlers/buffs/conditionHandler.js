@@ -1,9 +1,10 @@
-import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
+import { getRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../ui/logService.js';
 import * as mapsService from '../../../maps/mapsService.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { rangeToFeet } from '../../../rules/combat/rangeValidation.js';
 import { getAbilityModifier } from '../../../shared/abilityLookup.js';
+import { loadMonsters } from '../../../ui/dataLoader.js';
 
 function buildSaveDc(auto, playerStats) {
     if (auto.saveDc === 'ability') {
@@ -46,9 +47,6 @@ export async function handle(action, playerStats, campaignName, mapName) {
         };
     }
 
-    const newCharges = currentCharges - 1;
-    setRuntimeValue(playerStats.name, 'channelDivinityCharges', newCharges, campaignName);
-
     const cs = await getCombatContext(campaignName);
 
     let attackerPos = null;
@@ -62,6 +60,11 @@ export async function handle(action, playerStats, campaignName, mapName) {
              }
            } catch { /* positions unavailable */ }
      }
+
+    let monsters = [];
+    try {
+        monsters = await loadMonsters();
+    } catch { /* monsters unavailable */ }
 
     addEntry(campaignName, {
         type: 'ability_use',
@@ -80,6 +83,8 @@ export async function handle(action, playerStats, campaignName, mapName) {
             saveDc,
             campaignName,
             mapData,
+            monsters,
+            channelDivinityCharges: currentCharges,
             featureName: action.name,
             conditionName,
             additionalCondition,

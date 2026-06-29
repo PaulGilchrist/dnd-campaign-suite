@@ -244,6 +244,7 @@ export function setupEventListeners(deps) {
                 name: pending.name,
                 formula: pending.formula,
                 rolls: pending.rolls,
+                total: applyResult?.finalDamage ?? finalDamage,
                 bonus: 0,
                 modifier: pending.modifier,
                 damageType: pending.damageType,

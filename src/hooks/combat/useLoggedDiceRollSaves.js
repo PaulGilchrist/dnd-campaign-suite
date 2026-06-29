@@ -160,6 +160,7 @@ export function createSaves(deps) {
             name: pending.name,
             formula: pending.formula,
             rolls: pending.rolls,
+            total: applyResult?.finalDamage,
             bonus: 0,
             modifier: pending.modifier,
             damageType: pending.damageType,
