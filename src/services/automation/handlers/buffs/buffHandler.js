@@ -63,7 +63,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         const stored = getRuntimeValue(playerStats.name, 'activeBuffs', campaignName);
         const activeBuffs = Array.isArray(stored) ? stored : [];
         const isActive = activeBuffs.some(b => b.name === action.name);
-        if (!isActive) {
+        if (isActive) {
             return {
                 type: 'popup',
                 payload: {

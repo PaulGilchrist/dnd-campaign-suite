@@ -379,10 +379,10 @@ describe('buffHandler.handle', () => {
   });
 
   describe('Long rest recharge guard', () => {
-    it('should block activation when recharge is long_rest, no uses field, and buff is not active', async () => {
+    it('should block activation when recharge is long_rest, no uses field, and buff is already active', async () => {
       const ps = makePlayerStats();
       const action = makeAction({ recharge: 'long_rest' });
-      runtimeState.getRuntimeValue.mockReturnValue([]);
+      runtimeState.getRuntimeValue.mockReturnValue([{ name: 'Test Buff' }]);
 
       const result = await handle(action, ps, campaignName, null);
 
@@ -391,11 +391,11 @@ describe('buffHandler.handle', () => {
       expect(buffToggle.toggleBuff).not.toHaveBeenCalled();
     });
 
-    it('should allow activation when recharge is long_rest but buff is already active (toggling off)', async () => {
+    it('should allow activation when recharge is long_rest but buff is not active (first use)', async () => {
       const ps = makePlayerStats();
       const action = makeAction({ recharge: 'long_rest' });
-      runtimeState.getRuntimeValue.mockReturnValue([{ name: 'Test Buff' }]);
-      buffToggle.toggleBuff.mockReturnValue({ wasActive: true });
+      runtimeState.getRuntimeValue.mockReturnValue([]);
+      buffToggle.toggleBuff.mockReturnValue({ wasActive: false });
 
       await handle(action, ps, campaignName, null);
 
@@ -432,14 +432,15 @@ describe('buffHandler.handle', () => {
       expect(buffToggle.toggleBuff).toHaveBeenCalled();
     });
 
-    it('should check buff name case-sensitively when determining if active', async () => {
+    it('should allow activation when buff name does not match (case-sensitive check)', async () => {
       const ps = makePlayerStats();
       const action = makeAction({ recharge: 'long_rest' });
       runtimeState.getRuntimeValue.mockReturnValue([{ name: 'different buff name' }]);
+      buffToggle.toggleBuff.mockReturnValue({ wasActive: false });
 
-      const result = await handle(action, ps, campaignName, null);
+      await handle(action, ps, campaignName, null);
 
-      expect(result.payload.description).toContain('cannot be used again until a Long Rest');
+      expect(buffToggle.toggleBuff).toHaveBeenCalled();
     });
   });
 
