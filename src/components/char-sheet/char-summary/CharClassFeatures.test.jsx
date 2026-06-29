@@ -471,7 +471,8 @@ describe('CharClassFeatures', () => {
                 automation: { passives: [] },
             });
             renderComponent(stats);
-            expect(screen.getByText(/Psionic Energy/)).toBeInTheDocument();
+            expect(screen.getByText(/Energy Dice/)).toBeInTheDocument();
+            expect(screen.getByText(/Energy Die Type/)).toBeInTheDocument();
         });
 
         it('renders superiority dice for Battle Master subclass', () => {

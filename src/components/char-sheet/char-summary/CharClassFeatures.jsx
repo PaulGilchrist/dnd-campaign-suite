@@ -240,7 +240,6 @@ const FighterFeatures = function FighterFeatures({ playerStats, campaignName, on
               <TrackedResourceInput label="Action Surge Uses" resourceKey="actionSurgeUses" playerName={playerStats.name} getMax={() => actionsurgeMax} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
               {hasEnergy && (
                   <div>
-                      <div><b>Psionic Energy (Psi Warrior):</b></div>
                       <TrackedResourceInput label="Energy Dice" resourceKey="psionicEnergy" playerName={playerStats.name} getMax={() => hasEnergy ? classLevel?.energy?.energy_die_num || 0 : 0} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
                       <div><b>Energy Die Type: </b>d{classLevel.energy.energy_die_type}</div>
                   </div>
