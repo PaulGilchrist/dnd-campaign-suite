@@ -2,9 +2,10 @@ import { getRuntimeValue, setRuntimeValue, getAllStoreKeys } from '../../../hook
 import { evaluateAutoExpression } from '../../combat/automation/automationExpressions.js';
 import utils from '../../ui/utils.js';
 import storage from '../../ui/storage.js';
-import { getCurrentCombatRound, getActiveCreatureName, getCombatSummary } from '../../encounters/combatData.js';
+import { getCurrentCombatRound, getActiveCreatureName, getCombatSummary, loadCombatSummary } from '../../encounters/combatData.js';
 import { addEntry } from '../../ui/logService.js';
 import { getDistanceFeet } from '../../rules/combat/rangeValidation.js';
+import { applyDamageToTarget } from '../../rules/combat/applyDamage.js';
 import { processSlowRepeatSave } from '../../automation/handlers/spells/slowHandler.js';
 import { processTashasLaughterRepeatSave } from '../../automation/handlers/spells/tashasLaughterHandler.js';
 
@@ -24,7 +25,7 @@ function ensureArray(value, name) {
     return value;
 }
 
-export function applyTurnStartEffects(activeName, playerStats, campaignName) {
+export async function applyTurnStartEffects(activeName, playerStats, campaignName, characters = []) {
     if (!activeName || !playerStats) {
         return;
     }
@@ -64,7 +65,15 @@ export function applyTurnStartEffects(activeName, playerStats, campaignName) {
             applyFlurryHealingHarmTurnStart(activeName, playerStats, effect, campaignName);
         }
         if (effect.type === 'holy_nimbus_radiant_damage') {
-            applyHolyNimbusRadiantDamage(activeName, playerStats, effect, campaignName);
+            const chaMod = playerStats.abilities?.find(a => a.name === 'Charisma')?.bonus || 0;
+            const prof = playerStats.proficiency || 0;
+            await applyAuraDamage(activeName, playerStats, campaignName, characters, {
+                activeKey: 'holyNimbusActive',
+                damageValue: prof + chaMod,
+                range: 10,
+                damageType: 'Radiant',
+                targetFilter: (c) => c.type === 'fiend' || c.type === 'undead',
+            });
         }
         if (effect.type === 'living_legend_turn_start') {
             setRuntimeValue(activeName, 'unerringStrikeUsed', false, campaignName);
@@ -76,9 +85,12 @@ export function applyTurnStartEffects(activeName, playerStats, campaignName) {
             const key = `_radiantSoul_${activeName.replace(/\s+/g, '_')}_oncePerTurn`;
             setRuntimeValue(activeName, key, false, campaignName);
         }
-        if (effect.type === 'inner_radiance_turn_start') {
-            applyInnerRadianceDamage(activeName, playerStats, effect, campaignName);
-        }
+        await applyAuraDamage(activeName, playerStats, campaignName, characters, {
+            activeKey: 'innerRadianceActive',
+            damageValue: playerStats.proficiency || 0,
+            range: 10,
+            damageType: 'Radiant',
+        });
         if (effect.type === 'dread_ambush_speed') {
             applyDreadAmbushSpeedTurnStart(activeName, playerStats, effect, campaignName);
         }
@@ -336,160 +348,6 @@ async function applyFlurryHealingHarmTurnStart(activeName, playerStats, effect, 
     }
 
     await setRuntimeValue(activeName, 'flurryHealingHarmUses', uses, campaignName);
-}
-
-async function applyHolyNimbusRadiantDamage(activeName, playerStats, effect, campaignName) {
-    const holyNimbusActive = getRuntimeValue(activeName, 'holyNimbusActive', campaignName);
-    if (!holyNimbusActive) return;
-
-    const combatSummary = getCombatSummary(campaignName);
-    if (!combatSummary) return;
-
-    const creatures = combatSummary.creatures;
-    if (!Array.isArray(creatures)) {
-        console.error('expirations: expected creatures to be an array in combatSummary');
-        throw new Error('Missing array: creatures in combatSummary');
-    }
-    const damageExpression = effect.damageExpression || 'CHA modifier + proficiency_bonus';
-
-    const prof = playerStats.proficiency || 0;
-    const chaMod = playerStats.abilities?.find(a => a.name === 'Charisma')?.bonus || 0;
-
-    let expr = damageExpression
-        .replace(/proficiency_bonus/gi, prof)
-        .replace(/CHA modifier/gi, chaMod);
-
-    let damage;
-    try {
-        damage = new Function(`"use strict"; return (${expr})`)();
-    } catch {
-        damage = prof + chaMod;
-    }
-
-    if (typeof damage !== 'number' || isNaN(damage) || damage <= 0) return;
-
-    for (const creature of creatures) {
-        const creatureName = utils.getName(creature.name);
-        if (creatureName === utils.getName(activeName)) continue;
-
-        const creatureType = creature.type || '';
-        if (creatureType !== 'fiend' && creatureType !== 'undead') continue;
-
-        try {
-            const creatureCurrentHp = creature.hit_points?.current ?? creature.currentHp;
-            if (creatureCurrentHp == null) {
-                console.error(`[expirations] Holy Nimbus: hit_points.current not found for creature ${creature.name}`);
-                throw new Error(`Holy Nimbus: hit_points.current not found for creature ${creature.name}`);
-            }
-            const currentHp = creatureCurrentHp;
-            const newHp = Math.max(0, currentHp - damage);
-            if (creature.hit_points == null || typeof creature.hit_points !== 'object') {
-                console.error('expirations: expected hit_points to be an object, got', typeof creature.hit_points, 'for', creature.name);
-                throw new Error('Missing object: hit_points for ' + creature.name);
-            }
-            creature.hit_points.current = newHp;
-            if (creature.currentHp != null) {
-                creature.currentHp = newHp;
-            }
-
-            await addEntry(campaignName, {
-                type: 'damage',
-                characterName: activeName,
-                targetName: creatureName,
-                damageType: 'radiant',
-                damageAmount: damage,
-                description: `Holy Nimbus radiant damage: ${damage} radiant to ${creatureName}`,
-                timestamp: Date.now(),
-            }).catch((e) => { console.error("[expirations] Error:", e); });
-        } catch { /* ignore per-creature errors */ }
-    }
-
-    storage.set('combatSummary', combatSummary, campaignName);
-    window.dispatchEvent(new CustomEvent('combat-summary-updated'));
-}
-
-async function applyInnerRadianceDamage(activeName, playerStats, effect, campaignName) {
-    const innerRadianceActive = getRuntimeValue(activeName, 'activeBuffs', campaignName);
-    const activeBuffs = Array.isArray(innerRadianceActive) ? innerRadianceActive : [];
-    if (!activeBuffs.some(b => b.name === 'Inner Radiance')) return;
-
-    const combatSummary = getCombatSummary(campaignName);
-    if (!combatSummary) return;
-
-    const creatures = combatSummary.creatures;
-    if (!Array.isArray(creatures)) {
-        console.error('expirations: expected creatures to be an array in combatSummary');
-        throw new Error('Missing array: creatures in combatSummary');
-    }
-    const damageExpression = effect.damageExpression || 'proficiency_bonus';
-    const damageType = effect.damageType || 'Radiant';
-    const range = effect.range || '10_ft';
-    const rangeNum = (() => {
-        const parsed = parseInt(range, 10);
-        if (Number.isNaN(parsed)) {
-          console.error('[expirations] applyInnerRadianceDamage: effect.range is not a valid number:', range)
-          throw new Error('effect.range must be a valid number for Inner Radiance')
-        }
-        return parsed
-      })()
-
-    const prof = playerStats.proficiency || 0;
-
-    let expr = damageExpression
-        .replace(/proficiency_bonus/gi, prof);
-
-    let damage;
-    try {
-        damage = new Function(`"use strict"; return (${expr})`)();
-    } catch {
-        damage = prof;
-    }
-
-    if (typeof damage !== 'number' || isNaN(damage) || damage <= 0) return;
-
-    for (const creature of creatures) {
-        const creatureName = utils.getName(creature.name);
-        if (creatureName === utils.getName(activeName)) continue;
-
-        if (!creature.position) continue;
-
-        const playerCreature = combatSummary.players?.find(p => p.name === activeName);
-        if (!playerCreature?.position) continue;
-
-        const dist = getDistanceFeet(playerCreature.position, creature.position);
-        if (dist !== null && dist <= rangeNum) {
-            try {
-                const creatureCurrentHp = creature.hit_points?.current ?? creature.currentHp;
-                if (creatureCurrentHp == null) {
-                    console.error(`[expirations] Inner Radiance: hit_points.current not found for creature ${creature.name}`);
-                    throw new Error(`Inner Radiance: hit_points.current not found for creature ${creature.name}`);
-                }
-                const currentHp = creatureCurrentHp;
-                const newHp = Math.max(0, currentHp - damage);
-            if (creature.hit_points == null || typeof creature.hit_points !== 'object') {
-                console.error('expirations: expected hit_points to be an object, got', typeof creature.hit_points, 'for', creature.name);
-                throw new Error('Missing object: hit_points for ' + creature.name);
-            }
-            creature.hit_points.current = newHp;
-            if (creature.currentHp != null) {
-                creature.currentHp = newHp;
-            }
-
-            await addEntry(campaignName, {
-                type: 'damage',
-                characterName: activeName,
-                targetName: creatureName,
-                damageType: damageType.toLowerCase(),
-                    damageAmount: damage,
-                    description: `Inner Radiance aura: ${damage} ${damageType.toLowerCase()} to ${creatureName}`,
-                    timestamp: Date.now(),
-                }).catch((e) => { console.error("[expirations] Error:", e); });
-            } catch { /* ignore per-creature errors */ }
-        }
-    }
-
-    storage.set('combatSummary', combatSummary, campaignName);
-    window.dispatchEvent(new CustomEvent('combat-summary-updated'));
 }
 
 async function applyElderChampionRegeneration(activeName, playerStats, effect, campaignName) {
@@ -768,8 +626,9 @@ export function addExpiration(attackerName, targetName, effects, campaignName, r
     if (!characterName || !campaignName) return;
 
      // Clear all active buffs (Innate Sorcery, Reckless Attack, etc.)
-     setRuntimeValue(characterName, 'activeBuffs', [], campaignName);
-     setRuntimeValue(characterName, 'mantleOfMajestyActive', null, campaignName);
+      setRuntimeValue(characterName, 'activeBuffs', [], campaignName);
+      setRuntimeValue(characterName, 'mantleOfMajestyActive', null, campaignName);
+      setRuntimeValue(characterName, 'innerRadianceActive', null, campaignName);
 
       // Clear Bait and Switch (Evasive Footwork) AC bonus
       const wasActive = getRuntimeValue(characterName, 'baitAndSwitchActive');
@@ -858,7 +717,57 @@ export function expireStaleEffects(campaignName) {
 
            setRuntimeValue(attacker.name, KEY, newEntries, campaignName);
             }
-          } catch (_e) { /* ignore */ }
+           } catch (_e) { /* ignore */ }
+}
+
+export async function applyAuraDamage(activeName, playerStats, campaignName, characters = [], options = {}) {
+    const { activeKey, damageValue, range, damageType = 'Radiant', targetFilter } = options;
+
+    const isActive = getRuntimeValue(activeName, activeKey, campaignName);
+    if (!isActive) return;
+
+    let combatSummary = getCombatSummary(campaignName);
+    if (!combatSummary) {
+        combatSummary = await loadCombatSummary(campaignName);
+    }
+    if (!combatSummary) return;
+
+    const creatures = combatSummary.creatures;
+    if (!Array.isArray(creatures)) {
+        console.error('expirations: expected creatures to be an array in combatSummary');
+        return;
+    }
+
+    if (typeof damageValue !== 'number' || isNaN(damageValue) || damageValue <= 0) return;
+
+    const activeMapName = getRuntimeValue('__map__', 'activeMapName');
+    const playerCreature = combatSummary.players?.find(p => p.name === activeName);
+
+    for (const creature of creatures) {
+        const creatureName = utils.getName(creature.name);
+        if (creatureName === utils.getName(activeName)) continue;
+
+        if (targetFilter && !targetFilter(creature)) continue;
+
+        const hasMap = !!activeMapName;
+        const hasPlayerPos = playerCreature?.gridX != null && playerCreature?.gridY != null;
+        const hasCreaturePos = creature.gridX != null && creature.gridY != null;
+
+        if (hasMap && hasPlayerPos && hasCreaturePos) {
+            const dist = getDistanceFeet(
+                { gridX: playerCreature.gridX, gridY: playerCreature.gridY },
+                { gridX: creature.gridX, gridY: creature.gridY }
+            );
+            if (dist === null || dist > range) continue;
+        }
+
+        try {
+            applyDamageToTarget(combatSummary, creatureName, damageValue, [damageType], campaignName, characters, false, activeName);
+        } catch { /* ignore per-creature errors */ }
+    }
+
+    storage.set('combatSummary', combatSummary, campaignName);
+    window.dispatchEvent(new CustomEvent('combat-summary-updated'));
 }
 
 function clearExpirationEffects(effects, targetName, attackerName, campaignName) {

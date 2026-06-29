@@ -12,10 +12,23 @@ vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
 
 vi.mock('../../../rules/effects/expirations.js', () => ({
     addExpiration: vi.fn(),
+    applyAuraDamage: vi.fn(),
 }));
 
 vi.mock('../../common/buffToggle.js', () => ({
-    toggleBuff: vi.fn(),
+    toggleBuff: vi.fn(() => ({ wasActive: false, buffs: [], isActive: false })),
+}));
+
+vi.mock('../buffs/buffHandler.js', () => ({
+    handle: vi.fn(() => null),
+}));
+
+vi.mock('../combat/saveAttackHandler.js', () => ({
+    handle: vi.fn(() => null),
+}));
+
+vi.mock('../combat/attackRiderHandler.js', () => ({
+    handle: vi.fn(() => null),
 }));
 
 const campaignName = 'test-campaign';

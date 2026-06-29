@@ -2,6 +2,10 @@ import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useR
 import { addExpiration } from '../../../rules/effects/expirations.js';
 import { toggleBuff } from '../../common/buffToggle.js';
 import { addEntry } from '../../../ui/logService.js';
+import { handle as handleBuff } from '../buffs/buffHandler.js';
+import { handle as handleSaveAttack } from '../combat/saveAttackHandler.js';
+import { handle as handleAttackRider } from '../combat/attackRiderHandler.js';
+import { applyAuraDamage } from '../../../rules/effects/expirations.js';
 
 const TRANSFORMATION_EFFECTS = {
     'Heavenly Wings': {
@@ -124,6 +128,85 @@ export async function confirmCelestialRevelation(playerStats, chosenOption, camp
         playerStats.name
     );
 
+    // Dispatch sub-feature automations for the chosen option
+    const popupDescriptions = [];
+
+    if (chosenOption === 'Heavenly Wings') {
+        // temp_buff for fly speed
+        const buffResult = await handleBuff({
+            name: chosenOption,
+            automation: {
+                type: 'temp_buff',
+                effect: 'fly_speed_equals_walk_speed',
+                duration: '1_minute',
+                recharge: 'long_rest',
+                casting_time: '1 bonus action',
+            },
+        }, playerStats, campaignName, null);
+        if (buffResult?.type === 'popup' && buffResult.payload?.description) {
+            popupDescriptions.push(buffResult.payload.description);
+        }
+
+        // attack_rider for radiant damage on hit
+        const riderResult = await handleAttackRider({
+            name: chosenOption,
+            automation: {
+                type: 'attack_rider',
+                damageExpression: 'proficiency_bonus',
+                damageType: 'Radiant',
+                trigger: 'hit',
+                oncePerTurn: true,
+                casting_time: 'passive',
+            },
+        }, playerStats, campaignName, null);
+        if (riderResult?.type === 'popup' && riderResult.payload?.description) {
+            popupDescriptions.push(riderResult.payload.description);
+        }
+    } else if (chosenOption === 'Inner Radiance') {
+        setRuntimeValue(playerStats.name, 'innerRadianceActive', true, campaignName);
+        await applyAuraDamage(playerStats.name, playerStats, campaignName, [], {
+            activeKey: 'innerRadianceActive',
+            damageValue: playerStats.proficiency || 0,
+            range: 10,
+            damageType: 'Radiant',
+        });
+    } else if (chosenOption === 'Necrotic Shroud') {
+        // save_attack for CHA save, frightened condition
+        const saveResult = await handleSaveAttack({
+            name: chosenOption,
+            automation: {
+                type: 'save_attack',
+                saveType: 'CHA',
+                saveDc: 'ability',
+                conditionInflicted: 'frightened',
+                shape: 'emanation_10_ft',
+                range: '10_ft',
+                duration: 'until_end_of_next_turn',
+                recharge: 'long_rest',
+                casting_time: '1 bonus action',
+            },
+        }, playerStats, campaignName, null);
+        if (saveResult?.type === 'popup' && saveResult.payload?.description) {
+            popupDescriptions.push(saveResult.payload.description);
+        }
+
+        // attack_rider for necrotic damage on hit
+        const riderResult = await handleAttackRider({
+            name: chosenOption,
+            automation: {
+                type: 'attack_rider',
+                damageExpression: 'proficiency_bonus',
+                damageType: 'Necrotic',
+                trigger: 'hit',
+                oncePerTurn: true,
+                casting_time: 'passive',
+            },
+        }, playerStats, campaignName, null);
+        if (riderResult?.type === 'popup' && riderResult.payload?.description) {
+            popupDescriptions.push(riderResult.payload.description);
+        }
+    }
+
     await addEntry(campaignName, {
         type: 'ability_use',
         characterName: playerStats.name,
@@ -131,12 +214,16 @@ export async function confirmCelestialRevelation(playerStats, chosenOption, camp
         description: `${chosenOption} used`,
     }).catch((e) => { console.error('[celestialRevelation] Error:', e); });
 
+    const description = popupDescriptions.length > 0
+        ? popupDescriptions.join('. ') + '.'
+        : effectConfig.description;
+
     return {
         type: 'popup',
         payload: {
             type: 'automation_info',
             name: 'Celestial Revelation',
-            description: `Transforming into ${chosenOption}. ${effectConfig.description} The transformation lasts for 1 minute or until you end it.`,
+            description: `Transforming into ${chosenOption}. ${description} The transformation lasts for 1 minute or until you end it.`,
             automation: auto,
         },
     };

@@ -216,7 +216,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
                       setCombatSummary(cloneDeep(cs))
                   }
                   const newActiveChar = characters.find(ch => utils.getName(ch.name) === utils.getName(event.data))
-                  applyTurnStartEffects(event.data, newActiveChar?.computedStats || newActiveChar, campaignName)
+                  applyTurnStartEffects(event.data, newActiveChar?.computedStats || newActiveChar, campaignName, characters)
                   setTurnStartTick(t => t + 1)
               }
           }
