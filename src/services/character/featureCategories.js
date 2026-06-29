@@ -162,11 +162,14 @@ const categories2024 = {
         "Fighting Style",
         "Foe Slayer",
         "Gnomish Cunning",
+        "Heavenly Wings", // Included in Celestial Revelation
         "Implements of Mercy",
         "Improved Combat Superiority",
         "Increased Hit Points",
+        "Inner Radiance", // Included in Celestial Revelation
         "Keen Senses",
         "Monk Subclass",
+        "Necrotic Shroud", // Included in Celestial Revelation
         "Paladin Subclass",
         "Rage",
         "Ranger Subclass",
