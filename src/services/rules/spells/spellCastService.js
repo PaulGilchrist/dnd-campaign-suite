@@ -95,7 +95,7 @@ function applyEldritchHex(spell, playerStats, campaignName, targetName) {
     setRuntimeValue(campaignName, 'targetEffects', effects, campaignName);
 }
 
-export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage, playerStats, getTargetInfo, attackerPos, targetPos, featEffects, campaignName, mapName, characters }) {
+ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage, playerStats, getTargetInfo, attackerPos, targetPos, featEffects, campaignName, mapName, characters }) {
     if (getActiveBuffs(playerStats.name, campaignName).some(b => b.blocksSpellcasting)) {
         console.warn(`[spellCast] ${playerStats.name} cannot cast spells (blocked by active buff)`);
         return;
@@ -616,6 +616,22 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
         empEvocFormula = `${formula} + ${empEvocIntMod} [Empowered Evocation]`;
     }
 
+    // Blessed Strikes / Potent Spellcasting: add Wisdom modifier to cantrip damage
+    const isCantrip = spell.baseLevel === 0;
+    let finalFormula = empEvocFormula;
+    if (isCantrip && spell.damage && playerStats.automation?.actions) {
+        const potentFeature = playerStats.automation.actions.find(
+            a => a.type === 'damage_bonus' && !a.upgrades && a.options?.some(o => o.toLowerCase().includes('spellcasting'))
+        );
+        if (potentFeature) {
+            const wis = playerStats.abilities?.find(a => a.name === 'Wisdom');
+            const wisMod = Math.max(0, wis?.bonus || 0);
+                if (wisMod > 0) {
+                    finalFormula = `${empEvocFormula} + ${wisMod} [Blessed Strikes]`;
+                }
+        }
+    }
+
     // Overchannel: maximize damage for Wizard spells (slot levels 1-5) that deal damage
     let overchannelFormula = formula;
     let overchannelActive = false;
@@ -667,14 +683,14 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
           context.statusEffects = spell.status_effects;
         }
       let overchannelResult;
-     if (overchannelActive) {
-         overchannelResult = rollExpressionMaximized(empEvocFormula);
-     } else {
-         overchannelResult = rollExpression(empEvocFormula);
-     }
-     if (overchannelResult) {
-        rollDamage(spell.name, empEvocFormula, overchannelResult.total, overchannelResult.rolls, overchannelResult.modifier, context);
+      if (overchannelActive) {
+          overchannelResult = rollExpressionMaximized(finalFormula);
+      } else {
+          overchannelResult = rollExpression(finalFormula);
       }
+      if (overchannelResult) {
+         rollDamage(spell.name, finalFormula, overchannelResult.total, overchannelResult.rolls, overchannelResult.modifier, context);
+       }
         } else {
         if (isMagicMissile(spell)) {
           await executeMagicMissile(spell, metaCtx, { rollDamage, playerStats, getTargetInfo, campaignName, mapName, characters });

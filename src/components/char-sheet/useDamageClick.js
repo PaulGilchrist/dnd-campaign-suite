@@ -1081,10 +1081,10 @@ export default function useDamageClick({
         }
 
         if (playerStats.automation?.actions) {
-            const isCantrip = playerStats.spellAbilities?.spells?.some(s => s.name === attack.name && s.level === 0);
+            const isCantrip = attack.baseLevel === 0 || playerStats.spellAbilities?.spells?.some(s => s.name === attack.name && s.level === 0);
             if (isCantrip) {
                 const cantripBonuses = playerStats.automation.actions.filter(
-                    a => a.type === 'damage_bonus' && a.trigger === 'weapon_attack_hit' && a.options?.length > 0
+                    a => a.type === 'damage_bonus' && a.options?.length > 0
                 );
                 // Deduplicate: skip features that are upgraded by a higher-level feature
                 const upgradedNames = new Set(cantripBonuses.filter(b => b.upgrades).map(b => b.upgrades));

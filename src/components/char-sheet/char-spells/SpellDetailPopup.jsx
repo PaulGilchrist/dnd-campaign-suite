@@ -148,7 +148,7 @@ function SpellDetailPopup({ spell, playerStats, campaignName, onClose, onCast, u
       metaCtx.dispelAbilityCheckBonus = profBonus;
     }
     if (isCantrip) {
-      const modifiedSpell = cantripAutoLevel ? { ...spell, level: cantripAutoLevel } : spell;
+      const modifiedSpell = cantripAutoLevel ? { ...spell, level: cantripAutoLevel, baseLevel: 0 } : { ...spell, baseLevel: 0 };
       onCast(modifiedSpell, metaCtx);
       return;
     }
@@ -162,7 +162,7 @@ function SpellDetailPopup({ spell, playerStats, campaignName, onClose, onCast, u
       if (availableSlots > 0) {
         setRuntimeValue(playerStats.name, slotKey, availableSlots - 1, campaignName);
       }
-      const modifiedSpell = { ...spell, level: upcastLevel };
+      const modifiedSpell = { ...spell, level: upcastLevel, baseLevel: spell.level };
       onCast(modifiedSpell, metaCtx);
       return;
     }

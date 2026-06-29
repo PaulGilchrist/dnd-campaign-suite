@@ -3,6 +3,12 @@ import { vi } from 'vitest';
 export const mockPlayerStats = {
   name: 'Test Character',
   rules: '5e (default)',
+  proficiency: 4,
+  automation: {
+    passives: [],
+    actions: [],
+  },
+  activeConditions: [],
   spellAbilities: {
     toHit: 5,
     modifier: 3,

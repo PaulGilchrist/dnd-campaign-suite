@@ -18,6 +18,7 @@ import { rollExpression, rollExpressionDoubled, rollExpressionMaximized } from '
 import { getCombatContext, getTargetFromAttacker, getAttackerTargetName } from '../../../services/rules/combat/damageUtils.js';
 import { getCombatSummary } from '../../../services/encounters/combatData.js';
 import { getCurrentSorceryPoints, getMaxSorceryPoints, spendSorceryPoints } from '../../../hooks/combat/useMetamagic.js'
+import { isPsionicSpell, hasPsionicSorcery } from '../../../services/rules/spells/metamagicRules.js';
 import { useSpellMetamagicFlow } from '../../../hooks/combat/useSpellMetamagicFlow.js'
 import { useSpellUpcastFlow } from '../../../hooks/combat/useSpellUpcastFlow.js'
 import UpcastPopup from './UpcastPopup.jsx'
@@ -29,7 +30,6 @@ import { useRuntimeValue, setRuntimeValue, getRuntimeValue } from '../../../hook
 import utils from '../../../services/ui/utils.js';
 import { addEntry } from '../../../services/ui/logService.js';
 import { applyDamageToTarget } from '../../../services/rules/combat/applyDamage.js';
-import { isPsionicSpell, hasPsionicSorcery } from '../../../services/rules/spells/metamagicRules.js';
 import { getEmpoweredEvocationFeatures, getEmpoweredEvocationIntModifier } from '../../../services/rules/spells/postCastRiderService.js';
 import './CharSpells.css'
 
@@ -37,7 +37,7 @@ const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells
     const _activeBuffs = useRuntimeValue(playerStats.name, 'activeBuffs', campaignName); (void _activeBuffs); // subscribe to activeBuffs changes for re-render
     const innateSorceryActive = isInnateSorceryActive(playerStats.name, campaignName);
     useActionPopup('spell');
-    const { popupHtml: dicePopupHtml, setPopupHtml: setDicePopupHtml } = useDiceRollPopup();
+    useDiceRollPopup();
     const { rollAttack, rollDamage } = useLoggedDiceRoll(playerStats.name, campaignName, {
         characters,
         autoDamageSource: 'char-spells',
@@ -226,116 +226,64 @@ const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells
         gateMetamagic(spell, metaCtx);
     }, [gateMetamagic, resolveSpellPositions]);
 
-    const executeDamageRoll = (formula, spellName, spell) => {
-        const wasCrit = dicePopupHtml?.isCrit;
-        if (wasCrit && setDicePopupHtml) setDicePopupHtml(null);
-        const hasEmpoweredEvoc = getEmpoweredEvocationFeatures(playerStats).length > 0;
-        const empEvocIntMod = hasEmpoweredEvoc ? getEmpoweredEvocationIntModifier(playerStats) : 0;
-        const spellSchool = (spell.school || '').toLowerCase();
-        const isEvocation = spellSchool === 'evocation';
-        const shouldApplyEmpoweredEvoc = hasEmpoweredEvoc && isEvocation && empEvocIntMod > 0;
-        let empEvocFormula = formula;
-        if (shouldApplyEmpoweredEvoc) {
-            empEvocFormula = `${formula} + ${empEvocIntMod} [Empowered Evocation]`;
-        }
-        const result = wasCrit ? rollExpressionDoubled(empEvocFormula) : rollExpression(empEvocFormula);
-        if (result) {
-            const doDamage = async (metaCtx) => {
-                const cs = await getCombatContext(campaignName);
-                const target = cs ? getTargetFromAttacker(cs, playerStats.name) : null;
-                const targetName = target?.name || (cs ? getAttackerTargetName(cs, playerStats.name) : undefined);
-                const isWarlock = playerStats.class?.name === 'Warlock';
-                const hasPsychicSpells = playerStats.automation?.passives?.some(p => p.type === 'psychic_spells');
-                const isEnchantmentOrIllusion = () => {
-                    const school = (spell.school || '').toLowerCase();
-                    return school === 'enchantment' || school === 'illusion';
-                };
-                const componentReduction = isWarlock && hasPsychicSpells && isEnchantmentOrIllusion();
-                const psychicOverride = spell._psychicSpellsOverride && isWarlock && hasPsychicSpells && !!spell.damage;
-                const context = {
-                    targetName,
-                    attackerName: playerStats.name,
-                    damageType: spell.damage?.damage_type || '',
-                    psychicSpellsOverride: psychicOverride,
-                    psychicSpellsNoVS: componentReduction,
-                    ...metaCtx,
-                };
-                if (spell.dc) {
-                    context.dc = playerStats.spellAbilities.saveDc + (innateSorceryActive ? 1 : 0);
-                    context.dcType = spell.dc.dc_type;
-                    context.dcSuccess = spell.dc.dc_success;
-                    context.saveDc = playerStats.spellAbilities.saveDc + (innateSorceryActive ? 1 : 0);
-                    context.saveType = spell.dc.dc_type;
-                    context.dcSuccess = spell.dc.dc_success;
-                    if (spell.status_effects && spell.status_effects.length > 0) {
-                        context.statusEffects = spell.status_effects;
-                    }
-                 }
-                rollDamage(spellName, empEvocFormula, result.total, result.rolls, result.modifier, context);
-            };
-            if (isSorcerer) {
-                const currentSP = getCurrentSorceryPoints(playerStats.name, getMaxSorceryPoints(playerStats));
-                const spellLevel = spell.level || 0;
-                const isPsionic = isPsionicSpell(playerStats, spellName);
-                const hasPsionic = hasPsionicSorcery(playerStats);
-                setPendingSimpleMetamagic({
-                    spellName,
-                    spellLevel,
-                    action: doDamage,
-                    _currentSP: currentSP,
-                    isPsionic: isPsionic && hasPsionic,
-                    psionicCost: isPsionic && hasPsionic ? spellLevel : 0,
-                });
-            } else {
-                doDamage({});
-            }
-        }
-    };
-
     const handleDamageRoll = (formula, spellName, spell) => {
-      let finalFormula = formula;
+      let targetSpell = { ...spell, baseLevel: spell.level };
       if (spellName === "Hunter's Mark" && playerStats.class?.name === 'Ranger' && playerStats.level >= 20) {
-        finalFormula = finalFormula.replace('1d6', '1d10');
+        targetSpell = { ...targetSpell, damage: { ...targetSpell.damage, damage_at_slot_level: { ...(targetSpell.damage?.damage_at_slot_level || {}), '1': '1d10', '5': '2d10', '11': '3d10', '17': '4d10' } } };
       }
 
       if (spellName && spellName.toLowerCase() === 'magic missile') {
         const mmAfterUpcast = (modifiedSpell) => {
           gateMetamagic(modifiedSpell);
         };
-
-        if (gateUpcast(spell, mmAfterUpcast, false)) {
+        if (gateUpcast(targetSpell, mmAfterUpcast, false)) {
           return;
         }
         return;
       }
 
+      if (isSorcerer) {
+        const currentSP = getCurrentSorceryPoints(playerStats.name, getMaxSorceryPoints(playerStats));
+        const spellLevel = targetSpell.level || 0;
+        const isPsionic = isPsionicSpell(playerStats, spellName);
+        const hasPsionic = hasPsionicSorcery(playerStats);
+        setPendingSimpleMetamagic({
+          spellName,
+          spellLevel,
+          action: (metaCtx) => {
+            const totalMetamagicCost = metaCtx?.totalCost || 0;
+            const psionicCost = (isPsionic && !metaCtx?.options?.includes('Subtle Spell')) ? (metaCtx?.psionicCost || 0) : 0;
+            const totalCost = totalMetamagicCost + psionicCost;
+            if (totalCost > 0) spendSorceryPoints(playerStats.name, totalCost, campaignName, getMaxSorceryPoints(playerStats));
+            const castSpell = { ...targetSpell, baseLevel: spell.level };
+            castAction(castSpell, metaCtx);
+          },
+          _currentSP: currentSP,
+          isPsionic: isPsionic && hasPsionic,
+          psionicCost: isPsionic && hasPsionic ? spellLevel : 0,
+        });
+        return;
+      }
+
       const afterUpcast = (modifiedSpell) => {
-        let upcastFormula = modifiedSpell.damage?.damage_at_slot_level?.[modifiedSpell.level]
-          || modifiedSpell.damage?.damage_at_character_level?.[modifiedSpell.level]
-          || finalFormula;
-        if (spellName === "Hunter's Mark" && playerStats.class?.name === 'Ranger' && playerStats.level >= 20) {
-          upcastFormula = upcastFormula.replace('1d6', '1d10');
-        }
-        executeDamageRoll(upcastFormula, modifiedSpell.name || spellName, modifiedSpell);
+        const castSpell = { ...modifiedSpell, baseLevel: spell.level };
+        castAction(castSpell, {});
       };
 
-      if (gateUpcast(spell, afterUpcast, false)) {
+      if (gateUpcast(targetSpell, afterUpcast, false)) {
         return;
       }
 
       if (spell.level === 0) {
         const autoLevel = getCantripAutoLevel(spell, playerStats.level);
         if (autoLevel) {
-          const modifiedSpell = { ...spell, level: autoLevel };
-          const upcastFormula = modifiedSpell.damage?.damage_at_slot_level?.[modifiedSpell.level]
-            || modifiedSpell.damage?.damage_at_character_level?.[modifiedSpell.level]
-            || formula;
-          executeDamageRoll(upcastFormula, modifiedSpell.name || spellName, modifiedSpell);
+          const modifiedSpell = { ...spell, level: autoLevel, baseLevel: 0 };
+          castAction(modifiedSpell, {});
           return;
         }
       }
 
-      executeDamageRoll(formula, spellName, spell);
+      castAction(targetSpell, {});
     };
     const [filterPrepared, setFilterPrepared] = React.useState(false);
     const [spells, setSpells] = React.useState([]);
