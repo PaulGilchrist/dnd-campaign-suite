@@ -1296,9 +1296,11 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         const isAction = actionCastingTimes.includes(spell.casting_time);
         if (!isAction) return false;
         if (elderChampionActive) return false;
+        const hasDamage = !!spell.damage;
+        const hasHealing = !!spell.heal_at_slot_level;
         return (spell.prepared === 'Always' || spell.prepared === 'Prepared') &&
             !actionAttackNames.has(spell.name) &&
-            spell.damage
+            (hasDamage || hasHealing)
     }) || [];
     const actionSpellNames = actionSpells.reduce((acc, spell) => { acc[spell.name] = spell; return acc; }, {});
 

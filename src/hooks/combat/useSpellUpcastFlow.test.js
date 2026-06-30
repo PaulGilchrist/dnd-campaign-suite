@@ -335,6 +335,59 @@ describe('useSpellUpcastFlow', () => {
       };
       expect(result.current.isUpcastable(spell)).toBe(false);
     });
+
+    it('returns true for a healing spell with multiple heal_at_slot_level entries', () => {
+      const playerStats = makePlayerStats();
+      const { result } = renderHook(() =>
+        useSpellUpcastFlow(playerStats, 'TestCampaign')
+      );
+
+      const spell = {
+        name: 'Cure Wounds',
+        level: 1,
+        heal_at_slot_level: {
+          1: '1d8 + MOD',
+          2: '2d8 + MOD',
+          3: '3d8 + MOD',
+          5: '5d8 + MOD',
+        },
+      };
+      expect(result.current.isUpcastable(spell)).toBe(true);
+    });
+
+    it('returns false for a healing spell with only one heal_at_slot_level entry', () => {
+      const playerStats = makePlayerStats();
+      const { result } = renderHook(() =>
+        useSpellUpcastFlow(playerStats, 'TestCampaign')
+      );
+
+      const spell = {
+        name: 'Single Heal',
+        level: 2,
+        heal_at_slot_level: { 2: '1d8 + MOD' },
+      };
+      expect(result.current.isUpcastable(spell)).toBe(false);
+    });
+
+    it('returns true for a spell with both damage and healing upcast', () => {
+      const playerStats = makePlayerStats();
+      const { result } = renderHook(() =>
+        useSpellUpcastFlow(playerStats, 'TestCampaign')
+      );
+
+      const spell = {
+        name: 'Vampiric Touch',
+        level: 2,
+        damage: {
+          damage_at_slot_level: { 2: '2d6', 3: '3d6' },
+        },
+        heal_at_slot_level: {
+          2: '2d6 + MOD',
+          3: '3d6 + MOD',
+        },
+      };
+      expect(result.current.isUpcastable(spell)).toBe(true);
+    });
   });
 
   // ── buildUpcastLevels ──────────────────────────────────────────────────
@@ -416,6 +469,112 @@ describe('useSpellUpcastFlow', () => {
       );
 
       expect(() => result.current.buildUpcastLevels(null)).toThrow();
+    });
+
+    it('returns sorted levels with formula and availableSlots for healing spells', () => {
+      const playerStats = makePlayerStats();
+      mockGetRuntimeValue.mockReturnValue(null);
+
+      const { result } = renderHook(() =>
+        useSpellUpcastFlow(playerStats, 'TestCampaign')
+      );
+
+      const spell = {
+        name: 'Cure Wounds',
+        level: 1,
+        heal_at_slot_level: {
+          1: '1d8 + MOD',
+          2: '2d8 + MOD',
+          5: '5d8 + MOD',
+        },
+      };
+
+      const levels = result.current.buildUpcastLevels(spell);
+
+      expect(levels).toHaveLength(3);
+      expect(levels).toEqual(
+        expect.arrayContaining([
+          { level: 1, formula: '1d8 + MOD', availableSlots: 4 },
+          { level: 2, formula: '2d8 + MOD', availableSlots: 3 },
+          { level: 5, formula: '5d8 + MOD', availableSlots: 0 },
+        ])
+      );
+      expect(levels[0].level).toBeLessThan(levels[1].level);
+      expect(levels[1].level).toBeLessThan(levels[2].level);
+    });
+
+    it('returns healing spell levels with runtime slot values', () => {
+      const playerStats = makePlayerStats();
+      mockGetRuntimeValue.mockImplementation((_name, key) => {
+        if (key === 'spell_slots_level_1') return 2;
+        if (key === 'spell_slots_level_2') return 1;
+        return null;
+      });
+
+      const { result } = renderHook(() =>
+        useSpellUpcastFlow(playerStats, 'TestCampaign')
+      );
+
+      const spell = {
+        name: 'Healing Word',
+        level: 1,
+        heal_at_slot_level: {
+          1: '2d4 + MOD',
+          2: '3d4 + MOD',
+          3: '4d4 + MOD',
+        },
+      };
+
+      const levels = result.current.buildUpcastLevels(spell);
+      expect(levels[0].availableSlots).toBe(2);
+      expect(levels[1].availableSlots).toBe(1);
+      expect(levels[2].availableSlots).toBe(2);
+    });
+
+    it('prioritizes damage over healing when both exist', () => {
+      const playerStats = makePlayerStats();
+      mockGetRuntimeValue.mockReturnValue(null);
+
+      const { result } = renderHook(() =>
+        useSpellUpcastFlow(playerStats, 'TestCampaign')
+      );
+
+      const spell = {
+        name: 'Vampiric Touch',
+        level: 2,
+        damage: {
+          damage_at_slot_level: { 2: '2d6', 3: '3d6' },
+        },
+        heal_at_slot_level: {
+          2: '2d6 + MOD',
+          3: '3d6 + MOD',
+        },
+      };
+
+      const levels = result.current.buildUpcastLevels(spell);
+      expect(levels[0].formula).toBe('2d6');
+      expect(levels[1].formula).toBe('3d6');
+    });
+
+    it('returns empty array when only damage_at_slot_level is empty but healing exists', () => {
+      const playerStats = makePlayerStats();
+      const { result } = renderHook(() =>
+        useSpellUpcastFlow(playerStats, 'TestCampaign')
+      );
+
+      const spell = {
+        name: 'Cure Wounds',
+        level: 1,
+        damage: { damage_at_slot_level: {} },
+        heal_at_slot_level: {
+          1: '1d8 + MOD',
+          2: '2d8 + MOD',
+        },
+      };
+
+      const levels = result.current.buildUpcastLevels(spell);
+      expect(levels).toHaveLength(2);
+      expect(levels[0].formula).toBe('1d8 + MOD');
     });
   });
 

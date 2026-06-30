@@ -13,22 +13,37 @@ export function useSpellUpcastFlow(playerStats, campaignName) {
   const isUpcastable = React.useCallback((spell) => {
     if (!spell || spell.level === 0) return false;
     const slotDmg = spell.damage?.damage_at_slot_level;
-    if (!slotDmg) return false;
-    return Object.keys(slotDmg).length > 1;
+    if (slotDmg && Object.keys(slotDmg).length > 1) return true;
+    const healAtSlotLevel = spell.heal_at_slot_level;
+    if (healAtSlotLevel && Object.keys(healAtSlotLevel).length > 1) return true;
+    return false;
   }, []);
 
   const buildUpcastLevels = React.useCallback((spell) => {
     const slotDmg = spell.damage?.damage_at_slot_level;
-    if (!slotDmg) return [];
-    const isFoeSlayer = spell.name === "Hunter's Mark" && playerStats.class?.name === 'Ranger' && playerStats.level >= 20;
-    return Object.keys(slotDmg)
-      .map(Number)
-      .sort((a, b) => a - b)
-      .map(level => ({
-        level,
-        formula: isFoeSlayer ? String(slotDmg[level]).replace('1d6', '1d10') : slotDmg[level],
-        availableSlots: getAvailableSlotCount(level),
-      }));
+    const healAtSlotLevel = spell.heal_at_slot_level;
+    if (slotDmg && Object.keys(slotDmg).length > 0) {
+      const isFoeSlayer = spell.name === "Hunter's Mark" && playerStats.class?.name === 'Ranger' && playerStats.level >= 20;
+      return Object.keys(slotDmg)
+        .map(Number)
+        .sort((a, b) => a - b)
+        .map(level => ({
+          level,
+          formula: isFoeSlayer ? String(slotDmg[level]).replace('1d6', '1d10') : slotDmg[level],
+          availableSlots: getAvailableSlotCount(level),
+        }));
+    }
+    if (healAtSlotLevel && Object.keys(healAtSlotLevel).length > 0) {
+      return Object.keys(healAtSlotLevel)
+        .map(Number)
+        .sort((a, b) => a - b)
+        .map(level => ({
+          level,
+          formula: healAtSlotLevel[level],
+          availableSlots: getAvailableSlotCount(level),
+        }));
+    }
+    return [];
   }, [getAvailableSlotCount, playerStats.class?.name, playerStats.level]);
 
   const gateUpcast = React.useCallback((spell, afterUpcast, deductSlot = true) => {

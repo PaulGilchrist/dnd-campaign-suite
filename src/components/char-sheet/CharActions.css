@@ -1,6 +1,6 @@
 .char-actions .attacks {
     display: grid;
-    grid-template-columns: 120px 80px 100px 80px 70px;
+    grid-template-columns: 120px 80px 100px 80px 135px;
     text-align: center;
 }
 .char-actions .attacks > div {
@@ -24,7 +24,7 @@
 
 /* Add extra column for Mastery when using 2024 rules */
 .char-actions .attacks.mastery-enabled {
-    grid-template-columns: 120px 80px 100px 80px 90px 80px;
+    grid-template-columns: 120px 80px 100px 80px 135px 80px;
 }
 
 /* Automation UI elements */

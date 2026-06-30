@@ -85,8 +85,9 @@ function isFreeCastAuthorized(playerName, spellName, spellLevel, playerStats, ca
 function SpellDetailPopup({ spell, playerStats, campaignName, onClose, onCast, upcastLevels = [], playerLevel = 1 }) {
   const isCantrip = spell.level === 0;
   const slotDmg = spell.damage?.damage_at_slot_level;
+  const healAtSlotLevel = spell.heal_at_slot_level;
   const charDmg = spell.damage?.damage_at_character_level;
-  const isUpcastable = !isCantrip && slotDmg && Object.keys(slotDmg).length > 1;
+  const isUpcastable = !isCantrip && ((slotDmg && Object.keys(slotDmg).length > 1) || (healAtSlotLevel && Object.keys(healAtSlotLevel).length > 1));
 
   const freeCastAuthorized = isFreeCastAuthorized(playerStats.name, spell.name, spell.level, playerStats, campaignName);
   const hasAnySlots = isCantrip || freeCastAuthorized || upcastLevels.some(l => l.availableSlots > 0);
@@ -298,6 +299,7 @@ function SpellDetailPopup({ spell, playerStats, campaignName, onClose, onCast, u
             <p className="spell-detail-upcast-label"><i className="fa-solid fa-arrow-up"></i> Cast at Level:</p>
             {upcastLevels.map(({ level, formula, availableSlots }) => {
               const isSelected = selectedUpcastLvl === String(level);
+              const resolvedFormula = formula.replace(/\bMOD\b/g, String(playerStats.spellAbilities?.modifier || 0));
               return (
                 <label
                   key={level}
@@ -312,7 +314,7 @@ function SpellDetailPopup({ spell, playerStats, campaignName, onClose, onCast, u
                     disabled={availableSlots <= 0}
                   />
                   <span className="spell-detail-upcast-level-number">Level {level}</span>
-                  <span className="spell-detail-upcast-formula">{formula}</span>
+                  <span className="spell-detail-upcast-formula">{resolvedFormula}</span>
                   <span className="spell-detail-upcast-slots">{availableSlots} slot{availableSlots !== 1 ? 's' : ''}</span>
                 </label>
               );
