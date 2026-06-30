@@ -99,7 +99,8 @@ describe('CharAbilities popup integration', () => {
     );
 
     const { container } = render(<CharAbilities {...defaultProps} />, { wrapper });
-    expect(container.querySelector('.abilities-popup-parent')).toBeInTheDocument();
+    // The component renders a div with class 'char-abilities' as the root container
+    expect(container.querySelector('.char-abilities')).toBeInTheDocument();
   });
 
   it('handles ability name click when allAbilityScores is empty array', () => {

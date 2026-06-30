@@ -4,7 +4,7 @@
     display: grid;
     grid-template-columns: auto auto auto auto;
     padding-bottom: 5px;
-    margin-top: -5px;
+    margin-top: -10px;
 }
 .char-spells .spell-popup-parent {
     overflow: visible;
@@ -18,7 +18,7 @@
     width: 100%;
 }
 .char-spells .table-spells tr {
-    background-color: var(--background-color-table-header);
+    background-color: var(--background-color-body);
 }
 .spell-detail-popup {
     font-size: 14px;

@@ -80,7 +80,7 @@ html {
     --color-info-hover: #0056b3;
 
     /* Component-specific backgrounds */
-    --background-color-header: #063511;
+    --background-color-header: #0c481a;
     --background-color-table-header: #022209;
     --background-color-spell-level-cantrip: #6c757d;
     --background-color-spell-level-low: #28a745;
@@ -267,7 +267,8 @@ th {
     /* Backgrounds */
     --background-color-main: #fff;
     --background-color-body: #eee;
-    --background-color-header: #063511;
+    --background-color-header: #093613;
+    --background-color-table-header: #073311;
     --background-color-header-inner: #ddd;
     --background-color-card: #f9f9f9;
     --background-color-card-hover: #f0f7f0;
@@ -301,7 +302,7 @@ th {
     /* Text */
     --color-main: #222;
     --color-body: #000;
-    --color-header: #070;
+    --color-header: rgb(123, 200, 123);
     --color-header-inner: #070;
     --color-text: #222;
     --color-text-secondary: #444;

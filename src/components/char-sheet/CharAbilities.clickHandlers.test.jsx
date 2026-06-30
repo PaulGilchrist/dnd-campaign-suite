@@ -82,7 +82,7 @@ describe('CharAbilities click handlers', () => {
     it('calls rollAbilityCheck when an ability bonus is clicked', () => {
       render(<CharAbilities {...defaultProps} />);
       const clickableEls = document.querySelectorAll('.clickable');
-      const bonusCell = Array.from(clickableEls).find(el => el.textContent === '+4' && el.closest('.abilities:nth-child(2)'));
+      const bonusCell = Array.from(clickableEls).find(el => el.textContent === '+4');
       if (bonusCell) {
         fireEvent.click(bonusCell);
       }
@@ -118,7 +118,7 @@ describe('CharAbilities click handlers', () => {
     it('passes strokeOfLuck context when ability check is clicked', () => {
       render(<CharAbilities {...defaultProps} conditionEffects={{ strokeOfLuck: true }} />);
       const clickableEls = document.querySelectorAll('.clickable');
-      const bonusCell = Array.from(clickableEls).find(el => el.textContent === '+4' && el.closest('.abilities:nth-child(2)'));
+      const bonusCell = Array.from(clickableEls).find(el => el.textContent === '+4' && el.closest('.abilities'));
       if (bonusCell) {
         fireEvent.click(bonusCell);
       }
@@ -131,7 +131,7 @@ describe('CharAbilities click handlers', () => {
     it('passes luckyAdvantage context when ability check is clicked', () => {
       render(<CharAbilities {...defaultProps} conditionEffects={{ luckyAdvantage: true }} />);
       const clickableEls = document.querySelectorAll('.clickable');
-      const bonusCell = Array.from(clickableEls).find(el => el.textContent === '+4' && el.closest('.abilities:nth-child(2)'));
+      const bonusCell = Array.from(clickableEls).find(el => el.textContent === '+4' && el.closest('.abilities'));
       if (bonusCell) {
         fireEvent.click(bonusCell);
       }
@@ -142,7 +142,7 @@ describe('CharAbilities click handlers', () => {
     it('passes luckyDisadvantage context when ability check is clicked', () => {
       render(<CharAbilities {...defaultProps} conditionEffects={{ luckyDisadvantage: true }} />);
       const clickableEls = document.querySelectorAll('.clickable');
-      const bonusCell = Array.from(clickableEls).find(el => el.textContent === '+4' && el.closest('.abilities:nth-child(2)'));
+      const bonusCell = Array.from(clickableEls).find(el => el.textContent === '+4' && el.closest('.abilities'));
       if (bonusCell) {
         fireEvent.click(bonusCell);
       }
@@ -155,7 +155,7 @@ describe('CharAbilities click handlers', () => {
     it('passes d20Floor10 context when ability check is clicked', () => {
       render(<CharAbilities {...defaultProps} conditionEffects={{ d20Floor10: true }} />);
       const clickableEls = document.querySelectorAll('.clickable');
-      const bonusCell = Array.from(clickableEls).find(el => el.textContent === '+4' && el.closest('.abilities:nth-child(2)'));
+      const bonusCell = Array.from(clickableEls).find(el => el.textContent === '+4' && el.closest('.abilities'));
       if (bonusCell) {
         fireEvent.click(bonusCell);
       }
@@ -168,7 +168,7 @@ describe('CharAbilities click handlers', () => {
     it('passes reliableTalent context when ability check is clicked', () => {
       render(<CharAbilities {...defaultProps} conditionEffects={{ reliableTalent: true }} />);
       const clickableEls = document.querySelectorAll('.clickable');
-      const bonusCell = Array.from(clickableEls).find(el => el.textContent === '+4' && el.closest('.abilities:nth-child(2)'));
+      const bonusCell = Array.from(clickableEls).find(el => el.textContent === '+4' && el.closest('.abilities'));
       if (bonusCell) {
         fireEvent.click(bonusCell);
       }
@@ -191,7 +191,7 @@ describe('CharAbilities click handlers', () => {
       });
       render(<CharAbilities {...defaultProps} playerStats={stats} conditionEffects={{ strCheckReplace: true }} />);
       const clickableEls = document.querySelectorAll('.clickable');
-      const bonusCell = Array.from(clickableEls).find(el => el.textContent === '+2' && el.closest('.abilities:nth-child(2)'));
+      const bonusCell = Array.from(clickableEls).find(el => el.textContent === '+2' && el.closest('.abilities'));
       if (bonusCell) {
         fireEvent.click(bonusCell);
       }
@@ -204,7 +204,7 @@ describe('CharAbilities click handlers', () => {
     it('passes strCheckDisadvantage context when Strength ability check is clicked', () => {
       render(<CharAbilities {...defaultProps} conditionEffects={{ strCheckDisadvantage: true }} />);
       const clickableEls = document.querySelectorAll('.clickable');
-      const bonusCell = Array.from(clickableEls).find(el => el.textContent === '+4' && el.closest('.abilities:nth-child(2)'));
+      const bonusCell = Array.from(clickableEls).find(el => el.textContent === '+4' && el.closest('.abilities'));
       if (bonusCell) {
         fireEvent.click(bonusCell);
       }
@@ -215,7 +215,7 @@ describe('CharAbilities click handlers', () => {
     it('does not pass forcedMode when strCheckDisadvantage is true but non-Strength ability is clicked', () => {
       render(<CharAbilities {...defaultProps} conditionEffects={{ strCheckDisadvantage: true }} />);
       const clickableEls = document.querySelectorAll('.clickable');
-      const bonusCell = Array.from(clickableEls).find(el => el.textContent === '+2' && el.closest('.abilities:nth-child(3)'));
+      const bonusCell = Array.from(clickableEls).find(el => el.textContent === '+2' && el.closest('.abilities'));
       if (bonusCell) {
         fireEvent.click(bonusCell);
       }
@@ -228,7 +228,7 @@ describe('CharAbilities click handlers', () => {
     it('passes tacticalMind context when ability check is clicked', () => {
       render(<CharAbilities {...defaultProps} conditionEffects={{ tacticalMind: true, tacticalMindBonus: 5 }} />);
       const clickableEls = document.querySelectorAll('.clickable');
-      const bonusCell = Array.from(clickableEls).find(el => el.textContent === '+4' && el.closest('.abilities:nth-child(2)'));
+      const bonusCell = Array.from(clickableEls).find(el => el.textContent === '+4' && el.closest('.abilities'));
       if (bonusCell) {
         fireEvent.click(bonusCell);
       }
@@ -241,7 +241,7 @@ describe('CharAbilities click handlers', () => {
     it('passes advantage context when ability abbreviation matches', () => {
       render(<CharAbilities {...defaultProps} conditionEffects={{ abilityCheckAdvantageAbilities: ['STR'] }} />);
       const clickableEls = document.querySelectorAll('.clickable');
-      const bonusCell = Array.from(clickableEls).find(el => el.textContent === '+4' && el.closest('.abilities:nth-child(2)'));
+      const bonusCell = Array.from(clickableEls).find(el => el.textContent === '+4' && el.closest('.abilities'));
       if (bonusCell) {
         fireEvent.click(bonusCell);
       }
@@ -252,7 +252,7 @@ describe('CharAbilities click handlers', () => {
     it('does not pass advantage context when abbreviation does not match', () => {
       render(<CharAbilities {...defaultProps} conditionEffects={{ abilityCheckAdvantageAbilities: ['DEX'] }} />);
       const clickableEls = document.querySelectorAll('.clickable');
-      const bonusCell = Array.from(clickableEls).find(el => el.textContent === '+4' && el.closest('.abilities:nth-child(2)'));
+      const bonusCell = Array.from(clickableEls).find(el => el.textContent === '+4' && el.closest('.abilities'));
       if (bonusCell) {
         fireEvent.click(bonusCell);
       }
@@ -265,7 +265,7 @@ describe('CharAbilities click handlers', () => {
     it('passes advantage context when abilityCheckAdvantageSkill matches the ability name', () => {
       render(<CharAbilities {...defaultProps} conditionEffects={{ abilityCheckAdvantage: true, abilityCheckAdvantageSkill: 'Strength' }} />);
       const clickableEls = document.querySelectorAll('.clickable');
-      const bonusCell = Array.from(clickableEls).find(el => el.textContent === '+4' && el.closest('.abilities:nth-child(2)'));
+      const bonusCell = Array.from(clickableEls).find(el => el.textContent === '+4' && el.closest('.abilities'));
       if (bonusCell) {
         fireEvent.click(bonusCell);
       }
@@ -276,7 +276,7 @@ describe('CharAbilities click handlers', () => {
     it('does not pass advantage context when abilityCheckAdvantageSkill does not match', () => {
       render(<CharAbilities {...defaultProps} conditionEffects={{ abilityCheckAdvantage: true, abilityCheckAdvantageSkill: 'Acrobatics' }} />);
       const clickableEls = document.querySelectorAll('.clickable');
-      const bonusCell = Array.from(clickableEls).find(el => el.textContent === '+4' && el.closest('.abilities:nth-child(2)'));
+      const bonusCell = Array.from(clickableEls).find(el => el.textContent === '+4' && el.closest('.abilities'));
       if (bonusCell) {
         fireEvent.click(bonusCell);
       }
@@ -289,7 +289,7 @@ describe('CharAbilities click handlers', () => {
     it('disadvantage takes priority over abilityCheckAdvantageAbilities', () => {
       render(<CharAbilities {...defaultProps} conditionEffects={{ abilityCheckDisadvantage: true, abilityCheckAdvantageAbilities: ['STR'] }} />);
       const clickableEls = document.querySelectorAll('.clickable');
-      const bonusCell = Array.from(clickableEls).find(el => el.textContent === '+4' && el.closest('.abilities:nth-child(2)'));
+      const bonusCell = Array.from(clickableEls).find(el => el.textContent === '+4' && el.closest('.abilities'));
       if (bonusCell) {
         fireEvent.click(bonusCell);
       }
@@ -311,10 +311,10 @@ describe('CharAbilities click handlers', () => {
         ],
       });
       render(<CharAbilities {...defaultProps} playerStats={stats} conditionEffects={{ wisCheckReplace: true }} />);
-      // Wisdom is nth-child(6) (header is nth-child(1), Strength is 2, Dex 3, Con 4, Int 5, Wis 6)
-      const wisBonusCell = document.querySelectorAll('.abilities:nth-child(6) > div:nth-child(3)');
-      if (wisBonusCell[0]) {
-        fireEvent.click(wisBonusCell[0]);
+      const wisRow = Array.from(document.querySelectorAll('.abilities')).find(el => el.querySelector('.left')?.textContent === 'Wisdom');
+      const wisBonusCell = wisRow ? wisRow.querySelector('div:nth-child(3)') : null;
+      if (wisBonusCell) {
+        fireEvent.click(wisBonusCell);
       }
       const mocks = vi.mocked(useLoggedDiceRoll).mock.results[0].value;
       expect(mocks.rollAbilityCheck).toHaveBeenCalledWith('Wisdom', expect.any(Number), expect.objectContaining({ wisCheckReplace: true, wisCheckMinBonus: 1 }));
@@ -332,9 +332,10 @@ describe('CharAbilities click handlers', () => {
         ],
       });
       render(<CharAbilities {...defaultProps} playerStats={stats} conditionEffects={{ wisCheckReplace: true }} />);
-      const wisBonusCell = document.querySelectorAll('.abilities:nth-child(6) > div:nth-child(3)');
-      if (wisBonusCell[0]) {
-        fireEvent.click(wisBonusCell[0]);
+      const wisRow = Array.from(document.querySelectorAll('.abilities')).find(el => el.querySelector('.left')?.textContent === 'Wisdom');
+      const wisBonusCell = wisRow ? wisRow.querySelector('div:nth-child(3)') : null;
+      if (wisBonusCell) {
+        fireEvent.click(wisBonusCell);
       }
       const mocks = vi.mocked(useLoggedDiceRoll).mock.results[0].value;
       expect(mocks.rollAbilityCheck).toHaveBeenCalledWith('Wisdom', expect.any(Number), expect.objectContaining({ wisCheckReplace: true, wisCheckMinBonus: 3 }));
@@ -345,7 +346,7 @@ describe('CharAbilities click handlers', () => {
     it('passes autoReroll context when save is clicked', () => {
       render(<CharAbilities {...defaultProps} conditionEffects={{ autoReroll: true, autoRerollCondition: 'frightened', autoRerollBonus: 3 }} />);
       const clickableEls = document.querySelectorAll('.clickable');
-      const saveCell = Array.from(clickableEls).find(el => el.textContent === '+6' && el.closest('.abilities:nth-child(2)'));
+      const saveCell = Array.from(clickableEls).find(el => el.textContent === '+6' && el.closest('.abilities'));
       if (saveCell) {
         fireEvent.click(saveCell);
       }
@@ -368,7 +369,7 @@ describe('CharAbilities click handlers', () => {
       });
       render(<CharAbilities {...defaultProps} playerStats={stats} conditionEffects={{ strSaveReplace: true }} />);
       const clickableEls = document.querySelectorAll('.clickable');
-      const saveCell = Array.from(clickableEls).find(el => el.textContent === '+4' && el.closest('.abilities:nth-child(2)'));
+      const saveCell = Array.from(clickableEls).find(el => el.textContent === '+4' && el.closest('.abilities'));
       if (saveCell) {
         fireEvent.click(saveCell);
       }
@@ -381,7 +382,7 @@ describe('CharAbilities click handlers', () => {
     it('passes d20Floor10 context when save is clicked', () => {
       render(<CharAbilities {...defaultProps} conditionEffects={{ d20Floor10: true }} />);
       const clickableEls = document.querySelectorAll('.clickable');
-      const saveCell = Array.from(clickableEls).find(el => el.textContent === '+6' && el.closest('.abilities:nth-child(2)'));
+      const saveCell = Array.from(clickableEls).find(el => el.textContent === '+6' && el.closest('.abilities'));
       if (saveCell) {
         fireEvent.click(saveCell);
       }
@@ -394,7 +395,7 @@ describe('CharAbilities click handlers', () => {
     it('passes strokeOfLuck context when save is clicked', () => {
       render(<CharAbilities {...defaultProps} conditionEffects={{ strokeOfLuck: true }} />);
       const clickableEls = document.querySelectorAll('.clickable');
-      const saveCell = Array.from(clickableEls).find(el => el.textContent === '+6' && el.closest('.abilities:nth-child(2)'));
+      const saveCell = Array.from(clickableEls).find(el => el.textContent === '+6' && el.closest('.abilities'));
       if (saveCell) {
         fireEvent.click(saveCell);
       }
@@ -407,7 +408,7 @@ describe('CharAbilities click handlers', () => {
     it('passes luckyAdvantage context when save is clicked', () => {
       render(<CharAbilities {...defaultProps} conditionEffects={{ luckyAdvantage: true }} />);
       const clickableEls = document.querySelectorAll('.clickable');
-      const saveCell = Array.from(clickableEls).find(el => el.textContent === '+6' && el.closest('.abilities:nth-child(2)'));
+      const saveCell = Array.from(clickableEls).find(el => el.textContent === '+6' && el.closest('.abilities'));
       if (saveCell) {
         fireEvent.click(saveCell);
       }
@@ -418,7 +419,7 @@ describe('CharAbilities click handlers', () => {
     it('passes luckyDisadvantage context when save is clicked', () => {
       render(<CharAbilities {...defaultProps} conditionEffects={{ luckyDisadvantage: true }} />);
       const clickableEls = document.querySelectorAll('.clickable');
-      const saveCell = Array.from(clickableEls).find(el => el.textContent === '+6' && el.closest('.abilities:nth-child(2)'));
+      const saveCell = Array.from(clickableEls).find(el => el.textContent === '+6' && el.closest('.abilities'));
       if (saveCell) {
         fireEvent.click(saveCell);
       }
@@ -440,7 +441,7 @@ describe('CharAbilities click handlers', () => {
     it('passes forcedMode disadvantage when str is in saveDisadvantage', () => {
       render(<CharAbilities {...defaultProps} conditionEffects={{ saveDisadvantage: ['str'] }} />);
       const clickableEls = document.querySelectorAll('.clickable');
-      const saveCell = Array.from(clickableEls).find(el => el.textContent === '+6' && el.closest('.abilities:nth-child(2)'));
+      const saveCell = Array.from(clickableEls).find(el => el.textContent === '+6' && el.closest('.abilities'));
       if (saveCell) {
         fireEvent.click(saveCell);
       }
@@ -451,7 +452,7 @@ describe('CharAbilities click handlers', () => {
     it('does not pass forcedMode when ability is not in saveDisadvantage', () => {
       render(<CharAbilities {...defaultProps} conditionEffects={{ saveDisadvantage: ['dex'] }} />);
       const clickableEls = document.querySelectorAll('.clickable');
-      const saveCell = Array.from(clickableEls).find(el => el.textContent === '+6' && el.closest('.abilities:nth-child(2)'));
+      const saveCell = Array.from(clickableEls).find(el => el.textContent === '+6' && el.closest('.abilities'));
       if (saveCell) {
         fireEvent.click(saveCell);
       }
@@ -463,7 +464,7 @@ describe('CharAbilities click handlers', () => {
   describe('makeSaveContext - saveAdvantageCount', () => {
     it('passes forcedMode advantage when saveAdvantageCount > 0', () => {
       render(<CharAbilities {...defaultProps} conditionEffects={{ saveAdvantageCount: 2 }} />);
-      const saveCell = document.querySelectorAll('.abilities:nth-child(2) > div:nth-child(4)');
+      const saveCell = document.querySelectorAll('.abilities > div:nth-child(4)');
       if (saveCell[0]) {
         fireEvent.click(saveCell[0]);
       }
@@ -475,7 +476,7 @@ describe('CharAbilities click handlers', () => {
   describe('makeSaveContext - saveAdvantageAbilities', () => {
     it('passes forcedMode advantage when ability is in saveAdvantageAbilities', () => {
       render(<CharAbilities {...defaultProps} conditionEffects={{ saveAdvantageAbilities: ['STR'] }} />);
-      const saveCell = document.querySelectorAll('.abilities:nth-child(2) > div:nth-child(4)');
+      const saveCell = document.querySelectorAll('.abilities > div:nth-child(4)');
       if (saveCell[0]) {
         fireEvent.click(saveCell[0]);
       }
@@ -485,7 +486,7 @@ describe('CharAbilities click handlers', () => {
 
     it('does not pass forcedMode when ability is not in saveAdvantageAbilities', () => {
       render(<CharAbilities {...defaultProps} conditionEffects={{ saveAdvantageAbilities: ['DEX'] }} />);
-      const saveCell = document.querySelectorAll('.abilities:nth-child(2) > div:nth-child(4)');
+      const saveCell = document.querySelectorAll('.abilities > div:nth-child(4)');
       if (saveCell[0]) {
         fireEvent.click(saveCell[0]);
       }
@@ -508,7 +509,7 @@ describe('CharAbilities click handlers', () => {
       });
       render(<CharAbilities {...defaultProps} playerStats={stats} conditionEffects={{ wisCheckReplace: true }} />);
       const clickableEls = document.querySelectorAll('.clickable');
-      const saveCell = Array.from(clickableEls).find(el => el.textContent === '+5' && el.closest('.abilities:nth-child(6)'));
+      const saveCell = Array.from(clickableEls).find(el => el.textContent === '+5' && el.closest('.abilities'));
       if (saveCell) {
         fireEvent.click(saveCell);
       }
@@ -521,7 +522,7 @@ describe('CharAbilities click handlers', () => {
     it('includes forcedMode when abilityCheckDisadvantage is set AND strokeOfLuck is also set', () => {
       render(<CharAbilities {...defaultProps} conditionEffects={{ abilityCheckDisadvantage: true, strokeOfLuck: true }} />);
       const clickableEls = document.querySelectorAll('.clickable');
-      const bonusCell = Array.from(clickableEls).find(el => el.textContent === '+4' && el.closest('.abilities:nth-child(2)'));
+      const bonusCell = Array.from(clickableEls).find(el => el.textContent === '+4' && el.closest('.abilities'));
       if (bonusCell) {
         fireEvent.click(bonusCell);
       }
@@ -532,7 +533,7 @@ describe('CharAbilities click handlers', () => {
     it('includes forcedMode when abilityCheckDisadvantage is set AND luckyAdvantage is also set', () => {
       render(<CharAbilities {...defaultProps} conditionEffects={{ abilityCheckDisadvantage: true, luckyAdvantage: true }} />);
       const clickableEls = document.querySelectorAll('.clickable');
-      const bonusCell = Array.from(clickableEls).find(el => el.textContent === '+4' && el.closest('.abilities:nth-child(2)'));
+      const bonusCell = Array.from(clickableEls).find(el => el.textContent === '+4' && el.closest('.abilities'));
       if (bonusCell) {
         fireEvent.click(bonusCell);
       }
@@ -543,7 +544,7 @@ describe('CharAbilities click handlers', () => {
     it('includes forcedMode when abilityCheckDisadvantage is set AND d20Floor10 is also set', () => {
       render(<CharAbilities {...defaultProps} conditionEffects={{ abilityCheckDisadvantage: true, d20Floor10: true }} />);
       const clickableEls = document.querySelectorAll('.clickable');
-      const bonusCell = Array.from(clickableEls).find(el => el.textContent === '+4' && el.closest('.abilities:nth-child(2)'));
+      const bonusCell = Array.from(clickableEls).find(el => el.textContent === '+4' && el.closest('.abilities'));
       if (bonusCell) {
         fireEvent.click(bonusCell);
       }
@@ -554,7 +555,7 @@ describe('CharAbilities click handlers', () => {
     it('includes forcedMode when abilityCheckDisadvantage is set AND tacticalMind is also set', () => {
       render(<CharAbilities {...defaultProps} conditionEffects={{ abilityCheckDisadvantage: true, tacticalMind: true, tacticalMindBonus: 3 }} />);
       const clickableEls = document.querySelectorAll('.clickable');
-      const bonusCell = Array.from(clickableEls).find(el => el.textContent === '+4' && el.closest('.abilities:nth-child(2)'));
+      const bonusCell = Array.from(clickableEls).find(el => el.textContent === '+4' && el.closest('.abilities'));
       if (bonusCell) {
         fireEvent.click(bonusCell);
       }
@@ -565,7 +566,7 @@ describe('CharAbilities click handlers', () => {
     it('includes forcedMode when abilityCheckDisadvantage is set AND reliableTalent is also set', () => {
       render(<CharAbilities {...defaultProps} conditionEffects={{ abilityCheckDisadvantage: true, reliableTalent: true }} />);
       const clickableEls = document.querySelectorAll('.clickable');
-      const bonusCell = Array.from(clickableEls).find(el => el.textContent === '+4' && el.closest('.abilities:nth-child(2)'));
+      const bonusCell = Array.from(clickableEls).find(el => el.textContent === '+4' && el.closest('.abilities'));
       if (bonusCell) {
         fireEvent.click(bonusCell);
       }
@@ -576,7 +577,7 @@ describe('CharAbilities click handlers', () => {
     it('includes forcedMode when abilityCheckDisadvantage is set AND strokeOfLuck is also set for DEX', () => {
       render(<CharAbilities {...defaultProps} conditionEffects={{ abilityCheckDisadvantage: true, strokeOfLuck: true }} />);
       const clickableEls = document.querySelectorAll('.clickable');
-      const bonusCell = Array.from(clickableEls).find(el => el.textContent === '+2' && el.closest('.abilities:nth-child(3)'));
+      const bonusCell = Array.from(clickableEls).find(el => el.textContent === '+2' && el.closest('.abilities'));
       if (bonusCell) {
         fireEvent.click(bonusCell);
       }
@@ -587,7 +588,7 @@ describe('CharAbilities click handlers', () => {
     it('includes forcedMode when abilityCheckAdvantage is set AND strokeOfLuck is also set', () => {
       render(<CharAbilities {...defaultProps} conditionEffects={{ abilityCheckAdvantage: true, strokeOfLuck: true }} />);
       const clickableEls = document.querySelectorAll('.clickable');
-      const bonusCell = Array.from(clickableEls).find(el => el.textContent === '+4' && el.closest('.abilities:nth-child(2)'));
+      const bonusCell = Array.from(clickableEls).find(el => el.textContent === '+4' && el.closest('.abilities'));
       if (bonusCell) {
         fireEvent.click(bonusCell);
       }
@@ -598,7 +599,7 @@ describe('CharAbilities click handlers', () => {
     it('includes forcedMode when strCheckDisadvantage is set AND strokeOfLuck is also set', () => {
       render(<CharAbilities {...defaultProps} conditionEffects={{ strCheckDisadvantage: true, strokeOfLuck: true }} />);
       const clickableEls = document.querySelectorAll('.clickable');
-      const bonusCell = Array.from(clickableEls).find(el => el.textContent === '+4' && el.closest('.abilities:nth-child(2)'));
+      const bonusCell = Array.from(clickableEls).find(el => el.textContent === '+4' && el.closest('.abilities'));
       if (bonusCell) {
         fireEvent.click(bonusCell);
       }
@@ -609,7 +610,7 @@ describe('CharAbilities click handlers', () => {
     it('includes forcedMode when abilityCheckAdvantageAbilities is set AND strokeOfLuck is also set', () => {
       render(<CharAbilities {...defaultProps} conditionEffects={{ abilityCheckAdvantageAbilities: ['STR'], strokeOfLuck: true }} />);
       const clickableEls = document.querySelectorAll('.clickable');
-      const bonusCell = Array.from(clickableEls).find(el => el.textContent === '+4' && el.closest('.abilities:nth-child(2)'));
+      const bonusCell = Array.from(clickableEls).find(el => el.textContent === '+4' && el.closest('.abilities'));
       if (bonusCell) {
         fireEvent.click(bonusCell);
       }
@@ -620,7 +621,7 @@ describe('CharAbilities click handlers', () => {
     it('includes forcedMode when abilityCheckAdvantageAbilities is set AND luckyDisadvantage is also set', () => {
       render(<CharAbilities {...defaultProps} conditionEffects={{ abilityCheckAdvantageAbilities: ['STR'], luckyDisadvantage: true }} />);
       const clickableEls = document.querySelectorAll('.clickable');
-      const bonusCell = Array.from(clickableEls).find(el => el.textContent === '+4' && el.closest('.abilities:nth-child(2)'));
+      const bonusCell = Array.from(clickableEls).find(el => el.textContent === '+4' && el.closest('.abilities'));
       if (bonusCell) {
         fireEvent.click(bonusCell);
       }
@@ -643,7 +644,7 @@ describe('CharAbilities click handlers', () => {
       });
       render(<CharAbilities {...defaultProps} playerStats={stats} conditionEffects={{ abilityCheckDisadvantage: true, strCheckReplace: true }} />);
       const clickableEls = document.querySelectorAll('.clickable');
-      const bonusCell = Array.from(clickableEls).find(el => el.textContent === '+2' && el.closest('.abilities:nth-child(2)'));
+      const bonusCell = Array.from(clickableEls).find(el => el.textContent === '+2' && el.closest('.abilities'));
       if (bonusCell) {
         fireEvent.click(bonusCell);
       }
@@ -665,9 +666,10 @@ describe('CharAbilities click handlers', () => {
         ],
       });
       render(<CharAbilities {...defaultProps} playerStats={stats} conditionEffects={{ abilityCheckDisadvantage: true, wisCheckReplace: true }} />);
-      const wisBonusCell = document.querySelectorAll('.abilities:nth-child(6) > div:nth-child(3)');
-      if (wisBonusCell[0]) {
-        fireEvent.click(wisBonusCell[0]);
+      const wisRow = Array.from(document.querySelectorAll('.abilities')).find(el => el.querySelector('.left')?.textContent === 'Wisdom');
+      const wisBonusCell = wisRow ? wisRow.querySelector('div:nth-child(3)') : null;
+      if (wisBonusCell) {
+        fireEvent.click(wisBonusCell);
       }
       const mocks = vi.mocked(useLoggedDiceRoll).mock.results[0].value;
       expect(mocks.rollAbilityCheck).toHaveBeenCalledWith('Wisdom', expect.any(Number), expect.objectContaining({ forcedMode: 'disadvantage', wisCheckReplace: true, wisCheckMinBonus: 3 }));
@@ -678,7 +680,7 @@ describe('CharAbilities click handlers', () => {
     it('includes forcedMode when abilityCheckDisadvantage is set AND luckyDisadvantage is also set', () => {
       render(<CharAbilities {...defaultProps} conditionEffects={{ abilityCheckDisadvantage: true, luckyDisadvantage: true }} />);
       const clickableEls = document.querySelectorAll('.clickable');
-      const bonusCell = Array.from(clickableEls).find(el => el.textContent === '+4' && el.closest('.abilities:nth-child(2)'));
+      const bonusCell = Array.from(clickableEls).find(el => el.textContent === '+4' && el.closest('.abilities'));
       if (bonusCell) {
         fireEvent.click(bonusCell);
       }
@@ -691,7 +693,7 @@ describe('CharAbilities click handlers', () => {
     it('returns { forcedMode } object when only abilityCheckDisadvantage is set', () => {
       render(<CharAbilities {...defaultProps} conditionEffects={{ abilityCheckDisadvantage: true }} />);
       const clickableEls = document.querySelectorAll('.clickable');
-      const bonusCell = Array.from(clickableEls).find(el => el.textContent === '+4' && el.closest('.abilities:nth-child(2)'));
+      const bonusCell = Array.from(clickableEls).find(el => el.textContent === '+4' && el.closest('.abilities'));
       if (bonusCell) {
         fireEvent.click(bonusCell);
       }
@@ -702,7 +704,7 @@ describe('CharAbilities click handlers', () => {
     it('returns { forcedMode } object when only abilityCheckAdvantage is set', () => {
       render(<CharAbilities {...defaultProps} conditionEffects={{ abilityCheckAdvantage: true }} />);
       const clickableEls = document.querySelectorAll('.clickable');
-      const bonusCell = Array.from(clickableEls).find(el => el.textContent === '+4' && el.closest('.abilities:nth-child(2)'));
+      const bonusCell = Array.from(clickableEls).find(el => el.textContent === '+4' && el.closest('.abilities'));
       if (bonusCell) {
         fireEvent.click(bonusCell);
       }
@@ -730,8 +732,9 @@ describe('CharAbilities click handlers', () => {
 
     it('passes autoFail to context when autoFailSaves does NOT include the ability', () => {
       render(<CharAbilities {...defaultProps} conditionEffects={{ autoFailSaves: ['str'], strokeOfLuck: true }} />);
-      const clickableEls = document.querySelectorAll('.clickable');
-      const saveCell = Array.from(clickableEls).find(el => el.textContent === '+4' && el.closest('.abilities:nth-child(3)'));
+      // Dex save is +4 (ability save bonus 4), find it in the Dex row
+      const dexRow = Array.from(document.querySelectorAll('.abilities')).find(el => el.querySelector('.left')?.textContent === 'Dexterity');
+      const saveCell = dexRow ? Array.from(dexRow.querySelectorAll('.clickable')).find(el => el.textContent === '+4') : null;
       if (saveCell) {
         fireEvent.click(saveCell);
       }
@@ -744,7 +747,7 @@ describe('CharAbilities click handlers', () => {
     it('includes forcedMode when saveDisadvantage is set AND strokeOfLuck is also set', () => {
       render(<CharAbilities {...defaultProps} conditionEffects={{ saveDisadvantage: ['str'], strokeOfLuck: true }} />);
       const clickableEls = document.querySelectorAll('.clickable');
-      const saveCell = Array.from(clickableEls).find(el => el.textContent === '+6' && el.closest('.abilities:nth-child(2)'));
+      const saveCell = Array.from(clickableEls).find(el => el.textContent === '+6' && el.closest('.abilities'));
       if (saveCell) {
         fireEvent.click(saveCell);
       }
@@ -755,7 +758,7 @@ describe('CharAbilities click handlers', () => {
     it('includes forcedMode when saveDisadvantage is set AND autoReroll is also set', () => {
       render(<CharAbilities {...defaultProps} conditionEffects={{ saveDisadvantage: ['str'], autoReroll: true, autoRerollCondition: 'frightened', autoRerollBonus: 2 }} />);
       const clickableEls = document.querySelectorAll('.clickable');
-      const saveCell = Array.from(clickableEls).find(el => el.textContent === '+6' && el.closest('.abilities:nth-child(2)'));
+      const saveCell = Array.from(clickableEls).find(el => el.textContent === '+6' && el.closest('.abilities'));
       if (saveCell) {
         fireEvent.click(saveCell);
       }
@@ -765,7 +768,7 @@ describe('CharAbilities click handlers', () => {
 
     it('includes forcedMode when saveAdvantageCount is set AND autoReroll is also set', () => {
       render(<CharAbilities {...defaultProps} conditionEffects={{ saveAdvantageCount: 1, autoReroll: true, autoRerollCondition: 'stunned', autoRerollBonus: 4 }} />);
-      const saveCell = document.querySelectorAll('.abilities:nth-child(2) > div:nth-child(4)');
+      const saveCell = document.querySelectorAll('.abilities > div:nth-child(4)');
       if (saveCell[0]) {
         fireEvent.click(saveCell[0]);
       }
@@ -775,7 +778,7 @@ describe('CharAbilities click handlers', () => {
 
     it('includes forcedMode when saveAdvantageAbilities is set AND autoReroll is also set', () => {
       render(<CharAbilities {...defaultProps} conditionEffects={{ saveAdvantageAbilities: ['STR'], autoReroll: true, autoRerollCondition: 'paralyzed', autoRerollBonus: 5 }} />);
-      const saveCell = document.querySelectorAll('.abilities:nth-child(2) > div:nth-child(4)');
+      const saveCell = document.querySelectorAll('.abilities > div:nth-child(4)');
       if (saveCell[0]) {
         fireEvent.click(saveCell[0]);
       }
@@ -785,7 +788,7 @@ describe('CharAbilities click handlers', () => {
 
     it('includes forcedMode when saveAdvantageAbilities is set AND autoReroll is also set without bonus', () => {
       render(<CharAbilities {...defaultProps} conditionEffects={{ saveAdvantageAbilities: ['STR'], autoReroll: true, autoRerollCondition: 'paralyzed' }} />);
-      const saveCell = document.querySelectorAll('.abilities:nth-child(2) > div:nth-child(4)');
+      const saveCell = document.querySelectorAll('.abilities > div:nth-child(4)');
       if (saveCell[0]) {
         fireEvent.click(saveCell[0]);
       }
@@ -796,7 +799,7 @@ describe('CharAbilities click handlers', () => {
     it('includes forcedMode when saveDisadvantage is set AND luckyAdvantage is also set', () => {
       render(<CharAbilities {...defaultProps} conditionEffects={{ saveDisadvantage: ['str'], luckyAdvantage: true }} />);
       const clickableEls = document.querySelectorAll('.clickable');
-      const saveCell = Array.from(clickableEls).find(el => el.textContent === '+6' && el.closest('.abilities:nth-child(2)'));
+      const saveCell = Array.from(clickableEls).find(el => el.textContent === '+6' && el.closest('.abilities'));
       if (saveCell) {
         fireEvent.click(saveCell);
       }
@@ -807,7 +810,7 @@ describe('CharAbilities click handlers', () => {
     it('includes forcedMode when saveDisadvantage is set AND luckyDisadvantage is also set', () => {
       render(<CharAbilities {...defaultProps} conditionEffects={{ saveDisadvantage: ['str'], luckyDisadvantage: true }} />);
       const clickableEls = document.querySelectorAll('.clickable');
-      const saveCell = Array.from(clickableEls).find(el => el.textContent === '+6' && el.closest('.abilities:nth-child(2)'));
+      const saveCell = Array.from(clickableEls).find(el => el.textContent === '+6' && el.closest('.abilities'));
       if (saveCell) {
         fireEvent.click(saveCell);
       }
@@ -828,7 +831,7 @@ describe('CharAbilities click handlers', () => {
       });
       render(<CharAbilities {...defaultProps} playerStats={stats} conditionEffects={{ saveDisadvantage: ['dex'], strSaveReplace: true }} />);
       const clickableEls = document.querySelectorAll('.clickable');
-      const saveCell = Array.from(clickableEls).find(el => el.textContent === '+4' && el.closest('.abilities:nth-child(2)'));
+      const saveCell = Array.from(clickableEls).find(el => el.textContent === '+4' && el.closest('.abilities'));
       if (saveCell) {
         fireEvent.click(saveCell);
       }
@@ -839,7 +842,7 @@ describe('CharAbilities click handlers', () => {
     it('includes forcedMode when saveDisadvantage is set AND d20Floor10 is also set', () => {
       render(<CharAbilities {...defaultProps} conditionEffects={{ saveDisadvantage: ['str'], d20Floor10: true }} />);
       const clickableEls = document.querySelectorAll('.clickable');
-      const saveCell = Array.from(clickableEls).find(el => el.textContent === '+6' && el.closest('.abilities:nth-child(2)'));
+      const saveCell = Array.from(clickableEls).find(el => el.textContent === '+6' && el.closest('.abilities'));
       if (saveCell) {
         fireEvent.click(saveCell);
       }

@@ -114,7 +114,10 @@ describe('CharAbilities condition effects on rendering', () => {
       const { container } = render(<CharAbilities {...testProps} />);
       const saveCells = container.querySelectorAll('.abilities > div:nth-child(4)');
       const saveTexts = Array.from(saveCells).map(c => c.textContent);
-      expect(saveTexts[1]).not.toBe('AUTO FAIL');
+      // dex is in autoFailSaves, so Dexterity (index 1) should show AUTO FAIL
+      expect(saveTexts[1]).toBe('AUTO FAIL');
+      // Strength (index 0) should NOT show AUTO FAIL
+      expect(saveTexts[0]).not.toBe('AUTO FAIL');
     });
 
     it('does not show AUTO FAIL for empty autoFailSaves', () => {
@@ -140,7 +143,7 @@ describe('CharAbilities condition effects on rendering', () => {
       };
       render(<CharAbilities {...testProps} />);
       const clickableEls = document.querySelectorAll('.clickable');
-      const saveCell = Array.from(clickableEls).find(el => el.textContent === 'AUTO FAIL' && el.closest('.abilities:nth-child(3)'));
+      const saveCell = Array.from(clickableEls).find(el => el.textContent === 'AUTO FAIL' && el.closest('.abilities'));
       expect(saveCell).toBeInTheDocument();
     });
 
@@ -157,7 +160,7 @@ describe('CharAbilities condition effects on rendering', () => {
       };
       render(<CharAbilities {...testProps} />);
       const clickableEls = document.querySelectorAll('.clickable');
-      const saveCell = Array.from(clickableEls).find(el => el.textContent === 'AUTO FAIL' && el.closest('.abilities:nth-child(4)'));
+      const saveCell = Array.from(clickableEls).find(el => el.textContent === 'AUTO FAIL' && el.closest('.abilities'));
       expect(saveCell).toBeInTheDocument();
     });
 
@@ -174,7 +177,7 @@ describe('CharAbilities condition effects on rendering', () => {
       };
       render(<CharAbilities {...testProps} />);
       const clickableEls = document.querySelectorAll('.clickable');
-      const saveCell = Array.from(clickableEls).find(el => el.textContent === 'AUTO FAIL' && el.closest('.abilities:nth-child(5)'));
+      const saveCell = Array.from(clickableEls).find(el => el.textContent === 'AUTO FAIL' && el.closest('.abilities'));
       expect(saveCell).toBeInTheDocument();
     });
 
@@ -191,7 +194,7 @@ describe('CharAbilities condition effects on rendering', () => {
       };
       render(<CharAbilities {...testProps} />);
       const clickableEls = document.querySelectorAll('.clickable');
-      const saveCell = Array.from(clickableEls).find(el => el.textContent === 'AUTO FAIL' && el.closest('.abilities:nth-child(6)'));
+      const saveCell = Array.from(clickableEls).find(el => el.textContent === 'AUTO FAIL' && el.closest('.abilities'));
       expect(saveCell).toBeInTheDocument();
     });
 
@@ -208,7 +211,7 @@ describe('CharAbilities condition effects on rendering', () => {
       };
       render(<CharAbilities {...testProps} />);
       const clickableEls = document.querySelectorAll('.clickable');
-      const saveCell = Array.from(clickableEls).find(el => el.textContent === 'AUTO FAIL' && el.closest('.abilities:nth-child(7)'));
+      const saveCell = Array.from(clickableEls).find(el => el.textContent === 'AUTO FAIL' && el.closest('.abilities'));
       expect(saveCell).toBeInTheDocument();
     });
   });

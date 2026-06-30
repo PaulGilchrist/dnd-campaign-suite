@@ -2,3 +2,7 @@
     margin-top: 10px;
     background-color: var(--background-color-header);
 }
+
+.char-special-actions thead {
+    background-color: var(--background-color-body);
+}

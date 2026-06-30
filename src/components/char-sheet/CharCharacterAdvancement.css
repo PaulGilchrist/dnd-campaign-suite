@@ -3,6 +3,10 @@
     background-color: var(--background-color-header);
 }
 
+.char-character-advancement thead {
+    background-color: var(--background-color-body);
+}
+
 @media print {
     .char-character-advancement {
         display: none;

@@ -373,11 +373,6 @@ describe('CharBonusActions - Rendering', () => {
   });
 
   describe('section structure', () => {
-    it('renders a horizontal rule before the Bonus Actions section', () => {
-      render(<CharBonusActions playerStats={createStats({ bonusActions: [{ name: 'Test', description: 'Test desc', details: 'Test details' }] })} />);
-      expect(document.querySelector('hr')).toBeInTheDocument();
-    });
-
     it('renders Bonus Actions text with sectionHeader class', () => {
       render(<CharBonusActions playerStats={createStats({ bonusActions: [{ name: 'Test', description: 'Test desc', details: 'Test details' }] })} />);
       expect(screen.getByText('Bonus Actions')).toHaveClass('sectionHeader');

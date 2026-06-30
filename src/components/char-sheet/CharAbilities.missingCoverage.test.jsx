@@ -486,8 +486,9 @@ describe('CharAbilities getSaveAdvantageSource edge cases', () => {
     const { container } = render(
       <CharAbilities {...defaultProps} conditionEffects={{ saveAdvantageCount: 0, saveAdvantageAbilities: ['WIS'] }} />
     );
-    const saveCell = container.querySelectorAll('.abilities:nth-child(2) > div:nth-child(4)');
-    expect(saveCell[0]).not.toHaveAttribute('title');
+    const strengthRow = container.querySelector('.abilities');
+    const saveCell = strengthRow ? strengthRow.querySelector('div:nth-child(4)') : null;
+    expect(saveCell).not.toHaveAttribute('title');
   });
 
   it('uses source from matching saveModifier for against_spell condition', () => {
@@ -499,8 +500,8 @@ describe('CharAbilities getSaveAdvantageSource edge cases', () => {
     const { container } = render(
       <CharAbilities {...defaultProps} playerStats={stats} conditionEffects={{ saveAdvantage: ['against_spell'] }} />
     );
-    const abilitiesDivs = container.querySelectorAll('.abilities-popup-parent > .abilities');
-    const saveCell = abilitiesDivs[1].querySelectorAll('div')[3];
+    const strengthRow = container.querySelector('.abilities');
+    const saveCell = strengthRow ? strengthRow.querySelector('div:nth-child(4)') : null;
     expect(saveCell).toHaveAttribute('title', 'Magic Resistance');
   });
 });

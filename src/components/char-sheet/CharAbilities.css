@@ -2,13 +2,15 @@
     margin-top: 5px;
     overflow: visible;
 }
-.char-abilities .abilities {
+.char-abilities .sectionHeader {
+    background-color: var(--background-color-header);
+}
+.char-abilities .tableHeader {
     display: grid;
     grid-template-columns: 80px 45px 50px 80px auto;
     text-align: center;
 }
-.char-abilities .sectionHeader {
-    background-color: var(--background-color-header);
+.char-abilities .abilities {
     display: grid;
     grid-template-columns: 80px 45px 50px 80px auto;
     text-align: center;

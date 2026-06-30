@@ -96,7 +96,7 @@ describe('CharAbilities rendering', () => {
   describe('header rendering', () => {
     it('renders all column headers', () => {
       render(<CharAbilities {...defaultProps} />);
-      expect(screen.getByText('Ability')).toBeInTheDocument();
+      expect(screen.getByText('Abilities')).toBeInTheDocument();
       expect(screen.getByText('Score')).toBeInTheDocument();
       expect(screen.getByText('Bonus')).toBeInTheDocument();
       expect(screen.getByText('Save')).toBeInTheDocument();
@@ -219,7 +219,7 @@ describe('CharAbilities rendering', () => {
     it('renders when abilities array is empty', () => {
       const stats = createPlayerStats({ abilities: [] });
       render(<CharAbilities {...defaultProps} playerStats={stats} />);
-      expect(screen.getByText('Ability')).toBeInTheDocument();
+      expect(screen.getByText('Abilities')).toBeInTheDocument();
       expect(screen.queryByText('Strength')).not.toBeInTheDocument();
     });
 

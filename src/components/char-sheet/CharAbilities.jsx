@@ -186,8 +186,9 @@ function CharAbilities({ allAbilityScores, playerStats, campaignName, exhaustion
 
     return (
         <div className='char-abilities'>
-            <div className='sectionHeader'>
-                <div className='left'><b>Ability</b></div>
+            <div className='sectionHeader'>Abilities</div>
+            <div className='tableHeader'>
+                <div className='left'><b>Name</b></div>
                 <div><b>Score</b></div>
                 <div><b>Bonus</b></div>
                 <div><b>Save</b></div>

@@ -90,7 +90,8 @@ describe('CharAbilities getSaveAdvantageSource tooltip', () => {
       ],
     });
     const { container } = render(<CharAbilities {...defaultProps} playerStats={stats} conditionEffects={{ saveAdvantage: ['against_spell'] }} />);
-    const saveCell = container.querySelectorAll('.abilities:nth-child(2) > div:nth-child(4)');
+    const strengthRow = container.querySelector('.abilities');
+    const saveCell = strengthRow ? strengthRow.querySelectorAll('div:nth-child(4)') : [];
     expect(saveCell[0]).toHaveAttribute('title', 'Spell Resistance');
   });
 
@@ -102,7 +103,8 @@ describe('CharAbilities getSaveAdvantageSource tooltip', () => {
       ],
     });
     const { container } = render(<CharAbilities {...defaultProps} playerStats={stats} conditionEffects={{ saveAdvantageCount: 1 }} />);
-    const saveCell = container.querySelectorAll('.abilities:nth-child(2) > div:nth-child(4)');
+    const strengthRow = container.querySelector('.abilities');
+    const saveCell = strengthRow ? strengthRow.querySelectorAll('div:nth-child(4)') : [];
     expect(saveCell[0]).toHaveAttribute('title', 'Bless, Aura of Protection');
   });
 
@@ -111,7 +113,8 @@ describe('CharAbilities getSaveAdvantageSource tooltip', () => {
       saveModifiers: [],
     });
     const { container } = render(<CharAbilities {...defaultProps} playerStats={stats} conditionEffects={{ saveAdvantageCount: 1 }} />);
-    const saveCell = container.querySelectorAll('.abilities:nth-child(2) > div:nth-child(4)');
+    const strengthRow = container.querySelector('.abilities');
+    const saveCell = strengthRow ? strengthRow.querySelectorAll('div:nth-child(4)') : [];
     expect(saveCell[0]).not.toHaveAttribute('title');
   });
 
@@ -125,7 +128,8 @@ describe('CharAbilities getSaveAdvantageSource tooltip', () => {
       },
     });
     const { container } = render(<CharAbilities {...defaultProps} playerStats={stats} conditionEffects={{ saveAdvantage: ['against_spell'] }} />);
-    const saveCell = container.querySelectorAll('.abilities:nth-child(2) > div:nth-child(4)');
+    const strengthRow = container.querySelector('.abilities');
+    const saveCell = strengthRow ? strengthRow.querySelectorAll('div:nth-child(4)') : [];
     expect(saveCell[0]).toHaveAttribute('title', 'Magic Resistance');
   });
 
@@ -139,7 +143,8 @@ describe('CharAbilities getSaveAdvantageSource tooltip', () => {
       },
     });
     const { container } = render(<CharAbilities {...defaultProps} playerStats={stats} conditionEffects={{ saveAdvantage: ['against_spell'] }} />);
-    const saveCell = container.querySelectorAll('.abilities:nth-child(2) > div:nth-child(4)');
+    const strengthRow = container.querySelector('.abilities');
+    const saveCell = strengthRow ? strengthRow.querySelectorAll('div:nth-child(4)') : [];
     expect(saveCell[0]).toHaveAttribute('title', 'Magic Resistance');
   });
 
@@ -150,7 +155,8 @@ describe('CharAbilities getSaveAdvantageSource tooltip', () => {
       ],
     });
     const { container } = render(<CharAbilities {...defaultProps} playerStats={stats} conditionEffects={{ saveAdvantage: ['against_spell'] }} />);
-    const saveCell = container.querySelectorAll('.abilities:nth-child(2) > div:nth-child(4)');
+    const strengthRow = container.querySelector('.abilities');
+    const saveCell = strengthRow ? strengthRow.querySelectorAll('div:nth-child(4)') : [];
     expect(saveCell[0]).toHaveAttribute('title', 'Spell Resistance');
   });
 
@@ -160,7 +166,8 @@ describe('CharAbilities getSaveAdvantageSource tooltip', () => {
       computedStats: undefined,
     });
     const { container } = render(<CharAbilities {...defaultProps} playerStats={stats} conditionEffects={{ saveAdvantageCount: 1 }} />);
-    const saveCell = container.querySelectorAll('.abilities:nth-child(2) > div:nth-child(4)');
+    const strengthRow = container.querySelector('.abilities');
+    const saveCell = strengthRow ? strengthRow.querySelectorAll('div:nth-child(4)') : [];
     expect(saveCell[0]).not.toHaveAttribute('title');
   });
 
@@ -170,7 +177,8 @@ describe('CharAbilities getSaveAdvantageSource tooltip', () => {
       computedStats: null,
     });
     const { container } = render(<CharAbilities {...defaultProps} playerStats={stats} conditionEffects={{ saveAdvantageCount: 1 }} />);
-    const saveCell = container.querySelectorAll('.abilities:nth-child(2) > div:nth-child(4)');
+    const strengthRow = container.querySelector('.abilities');
+    const saveCell = strengthRow ? strengthRow.querySelectorAll('div:nth-child(4)') : [];
     expect(saveCell[0]).not.toHaveAttribute('title');
   });
 });

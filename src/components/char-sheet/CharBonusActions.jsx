@@ -15,7 +15,7 @@ import { getCurrentCombatRound } from '../../services/encounters/combatData.js'
 import { getInnateSorceryBonus } from '../../services/combat/buffs/buffService.js';
 import { useDiceRollPopup } from '../../hooks/combat/DiceRollContext.js';
 import { formatRange, signFormatter, getAttackSpellLevel } from '../../services/ui/formatUtils.js';
-import { resolveSpellDamageAtLevel } from '../../services/rules/core/attackCalc.js';
+import { resolveSpellDamageAtLevel, isAutoHitSpell } from '../../services/rules/core/spellDamageUtils.js';
 import { useSimpleDamageRoll } from '../../hooks/combat/useSimpleDamageRoll.js';
 import { useSpellPositionResolver } from '../../hooks/combat/useSpellPositionResolver.js';
 import { useSpellCastExecutor } from '../../hooks/combat/useSpellCastExecutor.js';
@@ -100,7 +100,7 @@ function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, condit
                             const attackItem = { ...attack };
                             return <React.Fragment key={attack.name}>
                                 <div className='left'>{attack.name}</div>
-                                <div>{attackLevel != null ? (attackLevel === 0 ? 'Cantrip' : attackLevel) : '-'}</div>
+                                <div>{attackLevel != null ? (attackLevel === 0 ? 'Cantrip' : attackLevel) : ''}</div>
                                 <div>{formatRange(attack.range)}</div>
                                 {attack.saveDc
                                    ? <div className="save-dc-display">DC {attack.saveDc + displaySaveDcBonus} {attack.saveType}</div>
@@ -118,7 +118,7 @@ function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, condit
                             const hbItem = { ...hordeBreakerAttack };
                             return <React.Fragment key="Horde Breaker">
                                 <div className='left'>{hordeBreakerAttack.name}</div>
-                                <div>-</div>
+                                <div></div>
                                 <div>{formatRange(hordeBreakerAttack.range)}</div>
                                 <div className={"clickable" + (exhaustionPenalty > 0 || conditionAttackMode === 'disadvantage' || cannotAct ? " stat--penalized" : "") + (cannotAct ? " disabled-attack" : "")} onClick={() => onAttackClick(hbItem)}>{signFormatter.format(hordeBreakerAttack.hitBonus - exhaustionPenalty)}</div>
                                 <div className={hordeBreakerAttack.damage ? "clickable" : ""} onClick={() => {
@@ -132,15 +132,18 @@ function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, condit
                         {bonusActionSpells.map((spell) => {
                             const damageType = typeof spell.damage === 'string' ? '' : (spell.damage?.damage_type || '');
                             const resolvedDamage = spell.heal_at_slot_level ? '' : resolveSpellDamageAtLevel(spell, playerStats.level);
+                            const autoHit = isAutoHitSpell(spell);
                             const isSpellAtk = !spell.dc;
                             const attackItem = { ...spell, type: 'Bonus Action', hitBonus: playerStats.spellAbilities?.toHit, saveDc: spell.dc ? playerStats.spellAbilities.saveDc : null, saveType: spell.dc?.dc_type, saveSuccess: spell.dc?.dc_success, damage: resolvedDamage, damageType };
                             return <React.Fragment key={spell.name}>
                                 <div className='left clickable' onClick={() => handleBonusSpellClick(spell.name)}>{spell.name}</div>
                                 <div>{spell.level === 0 ? 'Cantrip' : spell.level}</div>
                                 <div>{formatRange(spell.range)}</div>
-                                {isSpellAtk
-                                    ? <div className={"clickable" + (exhaustionPenalty > 0 || conditionAttackMode === 'disadvantage' || cannotAct ? " stat--penalized" : "") + (cannotAct ? " disabled-attack" : "")} onClick={() => onAttackClick(attackItem)}>{signFormatter.format(playerStats.spellAbilities?.toHit - exhaustionPenalty)}</div>
-                                    : <div className="save-dc-display">DC {playerStats.spellAbilities?.saveDc + displaySaveDcBonus} {spell.dc?.dc_type}</div>}
+                                {autoHit
+                                    ? <div></div>
+                                    : isSpellAtk
+                                        ? <div className={"clickable" + (exhaustionPenalty > 0 || conditionAttackMode === 'disadvantage' || cannotAct ? " stat--penalized" : "") + (cannotAct ? " disabled-attack" : "")} onClick={() => onAttackClick(attackItem)}>{signFormatter.format(playerStats.spellAbilities?.toHit - exhaustionPenalty)}</div>
+                                        : <div className="save-dc-display">DC {playerStats.spellAbilities?.saveDc + displaySaveDcBonus} {spell.dc?.dc_type}</div>}
                                 <div className={resolvedDamage ? "clickable" : ""} onClick={() => {
                                     if (cannotAct) return;
                                     if (isSpellAtk && spell.saveDc) { onResolveSpellDamage(attackItem); return; }

@@ -19,7 +19,7 @@ import { useSpellMetamagicFlow } from '../../hooks/combat/useSpellMetamagicFlow.
 import { useSpellUpcastFlow } from '../../hooks/combat/useSpellUpcastFlow.js'
 import { useSpellPositionResolver } from '../../hooks/combat/useSpellPositionResolver.js';
 import { useSpellCastExecutor } from '../../hooks/combat/useSpellCastExecutor.js';
-import { resolveSpellDamageAtLevel } from '../../services/rules/core/attackCalc.js';
+import { resolveSpellDamageAtLevel, isAutoHitSpell } from '../../services/rules/core/spellDamageUtils.js';
 import { signFormatter } from '../../services/ui/formatUtils.js';
 import { useSimpleDamageRoll } from '../../hooks/combat/useSimpleDamageRoll.js';
 import './CharActions.css'
@@ -270,17 +270,20 @@ function CharReactions({ playerStats, campaignName, cannotAct, mapName, characte
                 {reactionSpells.map((spell) => {
                     const damageType = typeof spell.damage === 'string' ? '' : (spell.damage?.damage_type || '');
                     const resolvedDamage = spell.heal_at_slot_level ? '' : resolveSpellDamageAtLevel(spell, playerStats.level);
+                    const autoHit = isAutoHitSpell(spell);
                     const isSpellAtk = !spell.dc;
                     return <React.Fragment key={spell.name}>
                         <div className='left clickable' onClick={() => setSelectedSpell(spell)}>{spell.name}</div>
                         <div>{spell.level === 0 ? 'Cantrip' : spell.level}</div>
                         <div>{spell.range}</div>
-                        {isSpellAtk
-                            ? <div className={"clickable" + (cannotAct ? " disabled-attack" : "")} onClick={() => {
-                                const attackItem = { ...spell, type: 'Reaction', hitBonus: playerStats.spellAbilities?.toHit, saveDc: null, saveType: null, saveSuccess: null, damage: resolvedDamage, damageType };
-                                rollAttack(attackItem.name, attackItem.hitBonus, { forcedMode: undefined });
-                            }}>{signFormatter.format(playerStats.spellAbilities?.toHit)}</div>
-                            : <div className="save-dc-display">DC {playerStats.spellAbilities?.saveDc} {spell.dc?.dc_type}</div>}
+                        {autoHit
+                            ? <div></div>
+                            : isSpellAtk
+                                ? <div className={"clickable" + (cannotAct ? " disabled-attack" : "")} onClick={() => {
+                                    const attackItem = { ...spell, type: 'Reaction', hitBonus: playerStats.spellAbilities?.toHit, saveDc: null, saveType: null, saveSuccess: null, damage: resolvedDamage, damageType };
+                                    rollAttack(attackItem.name, attackItem.hitBonus, { forcedMode: undefined });
+                                }}>{signFormatter.format(playerStats.spellAbilities?.toHit)}</div>
+                                : <div className="save-dc-display">DC {playerStats.spellAbilities?.saveDc} {spell.dc?.dc_type}</div>}
                         <div className={resolvedDamage ? "clickable" : ""} onClick={() => {
                             if (cannotAct) return;
                             const attackItem = { ...spell, type: 'Reaction', hitBonus: playerStats.spellAbilities?.toHit, saveDc: spell.dc ? playerStats.spellAbilities.saveDc : null, saveType: spell.dc?.dc_type, saveSuccess: spell.dc?.dc_success, damage: resolvedDamage, damageType };

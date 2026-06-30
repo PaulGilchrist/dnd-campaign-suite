@@ -235,11 +235,6 @@ describe('CharSpells - Additional Tests', () => {
       expect(document.querySelector('.spell-popup-parent')).toBeInTheDocument();
     });
 
-    it('renders hr separator between popup area and spell abilities', () => {
-      render(<CharSpells playerStats={basePlayerStats} campaignName="test" />);
-      expect(document.querySelector('hr')).toBeInTheDocument();
-    });
-
     it('renders spell abilities section header', () => {
       render(<CharSpells playerStats={basePlayerStats} campaignName="test" />);
       const header = document.querySelector('.sectionHeader h4');

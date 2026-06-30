@@ -20,3 +20,16 @@ export function resolveSpellDamageAtLevel(spell, playerLevel) {
     }
     return dmgObj[Object.keys(dmgObj)[0]];
 }
+
+/**
+ * Determines if a spell auto-hits (no attack roll needed).
+ * Healing spells and Magic Missile always hit.
+ * @param {Object} spell - The spell object
+ * @returns {boolean} True if the spell auto-hits
+ */
+export function isAutoHitSpell(spell) {
+    if (!spell) return false;
+    if (spell.heal_at_slot_level) return true;
+    if (spell.name && spell.name.toLowerCase() === 'magic missile') return true;
+    return false;
+}
