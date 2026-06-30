@@ -210,6 +210,7 @@ function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, condit
     const allBonusItems = [
         ...bonusActionAttacks.map(a => ({ ...a, _isAttack: true })),
         ...bonusActionSpells.map(s => ({ ...s, _isAttack: false })),
+        ...(isHordeBreakerAvailable && hordeBreakerAttack ? [{ ...hordeBreakerAttack, _isAttack: true }] : []),
     ];
 
     const sortedBonusItems = allBonusItems.sort((a, b) => {
@@ -232,42 +233,44 @@ function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, condit
              <div className='sectionHeader'>Bonus Actions</div>
              {bonusActionAttacks.length > 0 || bonusActionSpells.length > 0 ? (
                  <div className={`attacks ${is2024Rules ? 'mastery-enabled' : ''}`}>
-                  <div className='left'><b>Name</b></div>
-                      <div><b>Range</b></div>
-                      <div><b>Level</b></div>
-                      {useFullGrid && <div><b>Hit</b></div>}
-                      {useFullGrid && <div><b>Damage</b></div>}
-                      <div className='left'><b>Type</b></div>
-                      {is2024Rules && useFullGrid && <div><b>Mastery</b></div>}
-                       {sortedBonusItems.map((item) => {
-                           if (item._isAttack) {
-                               const attackLevel = getAttackSpellLevel(item.name);
-                               return <React.Fragment key={item.name}>
-                                   <div className='left'>{item.name}</div>
-                                   <div>{formatRange(item.range)}</div>
-                                   <div>{attackLevel != null ? (attackLevel === 0 ? 'Cantrip' : attackLevel) : '-'}</div>
-                                   {item.saveDc
+                   <div className='left'><b>Name</b></div>
+                       <div><b>Level</b></div>
+                       <div><b>Range</b></div>
+                       {useFullGrid && <div><b>Hit</b></div>}
+                       {useFullGrid && <div><b>Damage</b></div>}
+                       <div className='left'><b>Type</b></div>
+                       {is2024Rules && useFullGrid && <div><b>Mastery</b></div>}
+                        {sortedBonusItems.map((item) => {
+                            if (item._isAttack) {
+                                const attackLevel = getAttackSpellLevel(item.name);
+                                const attackItem = { ...item };
+                                delete attackItem._isAttack;
+                                return <React.Fragment key={item.name}>
+                                    <div className='left'>{item.name}</div>
+                                    <div>{attackLevel != null ? (attackLevel === 0 ? 'Cantrip' : attackLevel) : '-'}</div>
+                                    <div>{formatRange(item.range)}</div>
+                                    {item.saveDc
                                        ? <div className="save-dc-display">DC {item.saveDc + displaySaveDcBonus} {item.saveType}</div>
-                                     : <div className={"clickable" + (exhaustionPenalty > 0 || conditionAttackMode === 'disadvantage' || cannotAct ? " stat--penalized" : "") + (cannotAct ? " disabled-attack" : "")} onClick={() => onAttackClick(item)}>{signFormatter.format(item.hitBonus - exhaustionPenalty)}</div>}
+                                     : <div className={"clickable" + (exhaustionPenalty > 0 || conditionAttackMode === 'disadvantage' || cannotAct ? " stat--penalized" : "") + (cannotAct ? " disabled-attack" : "")} onClick={() => onAttackClick(attackItem)}>{signFormatter.format(item.hitBonus - exhaustionPenalty)}</div>}
                                    <div className={item.damage ? "clickable" : ""} onClick={() => {
                                        if (cannotAct) return;
-                                       if (item.saveDc) { onResolveSpellDamage(item); return; }
+                                       if (item.saveDc) { onResolveSpellDamage(attackItem); return; }
                                        // To-Hit attacks: damage is ALWAYS rolled through the "To Hit" flow.
                                        // Direct damage click only logs a simple die roll — no targeting, no riders.
-                                       handleSimpleDamageRoll(item);
+                                       handleSimpleDamageRoll(attackItem);
                                    }}>{item.damage}</div>
                                   <div className='left'>{item.damageType}</div>
                                    {is2024Rules && (() => { const mastery = getWeaponMastery(item.name, item); return <div className={mastery ? "clickable" : ""} onClick={() => { if (mastery) showWeaponMasteryPopup(mastery, setPopupHtml); }}>{mastery}</div>; })()}
                               </React.Fragment>;
                            } else {
                                return <React.Fragment key={item.name}>
-                                   <div className='left clickable' onClick={() => handleBonusSpellClick(item.name)}>{item.name}</div>
-                                   <div>{item.range}</div>
-                                   <div>{item.level === 0 ? 'Cantrip' : item.level}</div>
-                                   {useFullGrid && <div>-</div>}
-                                   {useFullGrid && <div>Utility</div>}
-                                   <div className='left'>Utility</div>
-                                   {is2024Rules && useFullGrid && <div></div>}
+                                    <div className='left clickable' onClick={() => handleBonusSpellClick(item.name)}>{item.name}</div>
+                                    <div>{item.level === 0 ? 'Cantrip' : item.level}</div>
+                                    <div>{item.range}</div>
+                                    {useFullGrid && <div>-</div>}
+                                    {useFullGrid && <div>Utility</div>}
+                                    <div className='left'></div>
+                                    {is2024Rules && useFullGrid && <div></div>}
                                </React.Fragment>;
                            }
                        })}

@@ -355,8 +355,8 @@ describe('CharSpells', () => {
     it('should show spell detail popup when spell name is clicked', () => {
       renderCharSpells();
 
-      const fireballLink = screen.getByText('Fireball');
-      fireEvent.click(fireballLink);
+      const lightLink = screen.getByText('Light');
+      fireEvent.click(lightLink);
 
       expect(screen.getByText('Cast Spell')).toBeInTheDocument();
     });
@@ -364,8 +364,8 @@ describe('CharSpells', () => {
     it('should close spell detail popup when close button is clicked', () => {
       renderCharSpells();
 
-      const fireballLink = screen.getByText('Fireball');
-      fireEvent.click(fireballLink);
+      const lightLink = screen.getByText('Light');
+      fireEvent.click(lightLink);
 
       expect(screen.getByText('Cast Spell')).toBeInTheDocument();
 
@@ -387,7 +387,7 @@ describe('CharSpells', () => {
             {
               name: 'Fire Bolt',
               level: 0,
-              casting_time: '1 action',
+              casting_time: '1 turn',
               range: '120 feet',
               duration: 'Instantaneous',
               components: ['V', 'S'],
@@ -421,7 +421,7 @@ describe('CharSpells', () => {
             {
               name: 'Fire Bolt',
               level: 0,
-              casting_time: '1 action',
+              casting_time: '1 turn',
               range: '120 feet',
               duration: 'Instantaneous',
               components: ['V', 'S'],
@@ -454,7 +454,7 @@ describe('CharSpells', () => {
             {
               name: 'Scorching Ray',
               level: 2,
-              casting_time: '1 action',
+              casting_time: '1 turn',
               range: '120 feet',
               duration: 'Instantaneous',
               components: ['V', 'S'],
@@ -487,7 +487,7 @@ describe('CharSpells', () => {
             {
               name: 'Custom Spell',
               level: 1,
-              casting_time: '1 action',
+              casting_time: '1 turn',
               range: '60 feet',
               duration: 'Instantaneous',
               components: ['V'],
@@ -517,17 +517,17 @@ describe('CharSpells', () => {
           ...mockPlayerStats.spellAbilities,
           spells: [
             {
-              name: 'Fireball',
-              level: 3,
-              casting_time: '1 action',
-              range: '150 feet',
+              name: 'Cone of Cold',
+              level: 2,
+              casting_time: '1 turn',
+              range: '60 feet',
               duration: 'Instantaneous',
               components: ['V', 'S', 'M'],
               damage: {
                 damage_at_slot_level: {
-                  '3': '8d6',
+                  '2': '3d8',
                 },
-                damage_type: 'Fire',
+                damage_type: 'Cold',
               },
               dc: {
                 dc_type: 'DEX',
@@ -541,7 +541,7 @@ describe('CharSpells', () => {
 
       renderCharSpells({ playerStats: statsWithSaveDc });
 
-      expect(screen.getByText('8d6 Fire (DEX half)')).toBeInTheDocument();
+      expect(screen.getByText('3d8 Cold (DEX half)')).toBeInTheDocument();
     });
 
     it('should display negates for spell save DC with negates success', () => {
@@ -553,7 +553,7 @@ describe('CharSpells', () => {
             {
               name: 'Frostbite',
               level: 0,
-              casting_time: '1 action',
+              casting_time: '1 turn',
               range: '60 feet',
               duration: 'Instantaneous',
               components: ['V', 'S'],

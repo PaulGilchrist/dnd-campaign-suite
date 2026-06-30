@@ -282,29 +282,29 @@ describe('CharSpells interactions', () => {
     it('should display the spell detail popup with the correct spell name when a spell name is clicked', () => {
       renderCharSpells();
 
-      const fireballLink = screen.getByText('Fireball');
-      fireEvent.click(fireballLink);
+      const lightLink = screen.getByText('Light');
+      fireEvent.click(lightLink);
 
       expect(screen.getByTestId('spell-detail-popup')).toBeInTheDocument();
-      expect(screen.getByTestId('spell-detail-name')).toHaveTextContent('Fireball');
+      expect(screen.getByTestId('spell-detail-name')).toHaveTextContent('Light');
       expect(screen.getByTestId('cast-spell-btn')).toBeInTheDocument();
     });
 
     it('should display the spell detail popup for any spell in the list', () => {
       renderCharSpells();
 
-      const magicMissileLink = screen.getByText('Magic Missile');
-      fireEvent.click(magicMissileLink);
+      const detectMagicLink = screen.getByText('Detect Magic');
+      fireEvent.click(detectMagicLink);
 
       expect(screen.getByTestId('spell-detail-popup')).toBeInTheDocument();
-      expect(screen.getByTestId('spell-detail-name')).toHaveTextContent('Magic Missile');
+      expect(screen.getByTestId('spell-detail-name')).toHaveTextContent('Detect Magic');
     });
 
     it('should close the spell detail popup when the close button is clicked', () => {
       renderCharSpells();
 
-      const fireballLink = screen.getByText('Fireball');
-      fireEvent.click(fireballLink);
+      const lightLink = screen.getByText('Light');
+      fireEvent.click(lightLink);
 
       expect(screen.getByTestId('spell-detail-popup')).toBeInTheDocument();
 
@@ -317,8 +317,8 @@ describe('CharSpells interactions', () => {
     it('should invoke onCast with the spell when the cast button is clicked', () => {
       renderCharSpells();
 
-      const fireballLink = screen.getByText('Fireball');
-      fireEvent.click(fireballLink);
+      const lightLink = screen.getByText('Light');
+      fireEvent.click(lightLink);
 
       const castButton = screen.getByTestId('cast-spell-btn');
       fireEvent.click(castButton);
@@ -338,7 +338,7 @@ describe('CharSpells interactions', () => {
             {
               name: 'Vicious Mockery',
               level: 0,
-              casting_time: '1 action',
+              casting_time: '1 turn',
               range: '60 feet',
               duration: 'Instantaneous',
               components: ['V'],
@@ -356,9 +356,8 @@ describe('CharSpells interactions', () => {
       fireEvent.click(preparedHeader);
 
       expect(screen.queryByText('Vicious Mockery')).not.toBeInTheDocument();
-      expect(screen.getByText('Fireball')).toBeInTheDocument();
-      expect(screen.getByText('Magic Missile')).toBeInTheDocument();
       expect(screen.getByText('Light')).toBeInTheDocument();
+      expect(screen.getByText('Detect Magic')).toBeInTheDocument();
     });
 
     it('should restore filtered spells when the Prepared header is clicked again', () => {
@@ -392,7 +391,24 @@ describe('CharSpells interactions', () => {
     });
 
     it('should call handleTogglePreparedSpells for spells with "Prepared" status when their checkbox is toggled', () => {
-      renderCharSpells();
+      const spellWithCheckbox = {
+        name: 'Shield',
+        level: 1,
+        casting_time: '1 turn',
+        range: 'Self',
+        duration: '1 round',
+        components: ['S'],
+        prepared: 'Prepared',
+      };
+      const stats = {
+        ...mockPlayerStats,
+        spellAbilities: {
+          ...mockPlayerStats.spellAbilities,
+          spells: [spellWithCheckbox],
+        },
+      };
+
+      renderCharSpells({ playerStats: stats });
 
       const table = screen.getByRole('table');
       const checkbox = table.querySelector('tbody tr td:nth-child(3) input[type="checkbox"]');
@@ -400,7 +416,7 @@ describe('CharSpells interactions', () => {
 
       fireEvent.click(checkbox);
 
-      expect(mockHandleTogglePreparedSpells).toHaveBeenCalledWith('Fireball');
+      expect(mockHandleTogglePreparedSpells).toHaveBeenCalledWith('Shield');
     });
   });
 
@@ -545,9 +561,26 @@ describe('CharSpells interactions', () => {
 
   describe('damage cell click', () => {
     it('should call executeSpellCast when a clickable damage cell is clicked for a sorcerer', () => {
+      const spellWithDamage = {
+        name: 'Shield',
+        level: 1,
+        casting_time: '1 turn',
+        range: 'Self',
+        duration: '1 round',
+        components: ['V', 'S'],
+        damage: {
+          damage_at_slot_level: { '1': '1d4' },
+          damage_type: 'Force',
+        },
+        prepared: 'Always',
+      };
       const statsWithSorcerer = {
         ...mockPlayerStats,
         class: { name: 'Sorcerer' },
+        spellAbilities: {
+          ...mockPlayerStats.spellAbilities,
+          spells: [spellWithDamage],
+        },
       };
 
       renderCharSpells({ playerStats: statsWithSorcerer });
@@ -606,8 +639,8 @@ describe('CharSpells interactions', () => {
     it('should not show the metamagic popup for a non-sorcerer casting a spell', () => {
       renderCharSpells();
 
-      const fireballLink = screen.getByText('Fireball');
-      fireEvent.click(fireballLink);
+      const lightLink = screen.getByText('Light');
+      fireEvent.click(lightLink);
 
       const castButton = screen.getByTestId('cast-spell-btn');
       fireEvent.click(castButton);
@@ -645,31 +678,31 @@ describe('CharSpells interactions', () => {
     it('should allow switching between spell detail popups', () => {
       renderCharSpells();
 
-      const fireballLink = screen.getByText('Fireball');
-      fireEvent.click(fireballLink);
+      const lightLink = screen.getByText('Light');
+      fireEvent.click(lightLink);
 
-      expect(screen.getByTestId('spell-detail-name')).toHaveTextContent('Fireball');
+      expect(screen.getByTestId('spell-detail-name')).toHaveTextContent('Light');
 
-      const magicMissileLink = screen.getByText('Magic Missile');
-      fireEvent.click(magicMissileLink);
+      const detectMagicLink = screen.getByText('Detect Magic');
+      fireEvent.click(detectMagicLink);
 
-      // The detail popup should now show Magic Missile
-      expect(screen.getByTestId('spell-detail-name')).toHaveTextContent('Magic Missile');
+      // The detail popup should now show Detect Magic
+      expect(screen.getByTestId('spell-detail-name')).toHaveTextContent('Detect Magic');
     });
 
     it('should close the detail popup and open a different one when a new spell is clicked while one is open', () => {
       renderCharSpells();
 
-      const fireballLink = screen.getByText('Fireball');
-      fireEvent.click(fireballLink);
-
-      expect(screen.getByTestId('spell-detail-popup')).toBeInTheDocument();
-
       const lightLink = screen.getByText('Light');
       fireEvent.click(lightLink);
 
       expect(screen.getByTestId('spell-detail-popup')).toBeInTheDocument();
-      expect(screen.getByTestId('spell-detail-name')).toHaveTextContent('Light');
+
+      const detectMagicLink = screen.getByText('Detect Magic');
+      fireEvent.click(detectMagicLink);
+
+      expect(screen.getByTestId('spell-detail-popup')).toBeInTheDocument();
+      expect(screen.getByTestId('spell-detail-name')).toHaveTextContent('Detect Magic');
     });
   });
 });

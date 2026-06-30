@@ -4,21 +4,22 @@ import SpellDetailPopup from './char-spells/SpellDetailPopup.jsx'
 import MetamagicPopup from './popups/MetamagicPopup.jsx'
 import ArcaneWardRestoreModal from './modals/arcane/ArcaneWardRestoreModal.jsx'
 import { getCategories } from '../../services/character/featureCategories.js'
-      import { sanitizeHtml } from '../../services/ui/sanitize.js';
-       import { buildFeatureDetailHtml } from '../../hooks/combat/useActionPopup.js'
-       import useLoggedDiceRoll from '../../hooks/combat/useLoggedDiceRoll.js'
-       import { useDiceRollPopup } from '../../hooks/combat/DiceRollContext.js'
-       import { OPPORTUNITY_ATTACK, MELEE_REACH_FEET } from '../../services/combat/baseCombatActions.js'
-         import { hasAutomation, hasTacticalShift, hasSpeedyOpportunityDisadvantage } from '../../services/combat/automation/automationService.js'
-        import { getCombatContext, getTargetFromAttacker } from '../../services/rules/combat/damageUtils.js'
-        import { useRuntimeValue, getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js'
-       import { executeHandler } from '../../services/automation/index.js'
+import { sanitizeHtml } from '../../services/ui/sanitize.js';
+import { buildFeatureDetailHtml } from '../../hooks/combat/useActionPopup.js'
+import useLoggedDiceRoll from '../../hooks/combat/useLoggedDiceRoll.js'
+import { useDiceRollPopup } from '../../hooks/combat/DiceRollContext.js'
+import { OPPORTUNITY_ATTACK, MELEE_REACH_FEET } from '../../services/combat/baseCombatActions.js'
+import { hasAutomation, hasTacticalShift, hasSpeedyOpportunityDisadvantage } from '../../services/combat/automation/automationService.js'
+import { getCombatContext, getTargetFromAttacker } from '../../services/rules/combat/damageUtils.js'
+import { useRuntimeValue, getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js'
+import { executeHandler } from '../../services/automation/index.js'
 import { applyWarCasterReaction } from '../../services/automation/handlers/reactions/reactionSpellHandler.js'
-     import { useSpellMetamagicFlow } from '../../hooks/combat/useSpellMetamagicFlow.js'
-     import { useSpellUpcastFlow } from '../../hooks/combat/useSpellUpcastFlow.js'
-     import { executeSpellCast } from '../../services/rules/spells/spellCastService.js'
-     import * as mapsService from '../../services/maps/mapsService.js';
-     import { getNearestPlacedItem } from '../../services/rules/combat/rangeValidation.js';
+import { useSpellMetamagicFlow } from '../../hooks/combat/useSpellMetamagicFlow.js'
+import { useSpellUpcastFlow } from '../../hooks/combat/useSpellUpcastFlow.js'
+import { executeSpellCast } from '../../services/rules/spells/spellCastService.js'
+import * as mapsService from '../../services/maps/mapsService.js';
+import { getNearestPlacedItem } from '../../services/rules/combat/rangeValidation.js';
+import './CharActions.css'
 
 function CharReactions({ playerStats, campaignName, cannotAct, mapName, characters }) {
     const { setPopupHtml } = useDiceRollPopup();
@@ -33,7 +34,7 @@ function CharReactions({ playerStats, campaignName, cannotAct, mapName, characte
 
     const pwhStance = useRuntimeValue(playerStats?.name, 'powerWordHealStandPermission', campaignName);
 
-     // Build reactions list immutably
+    // Build reactions list immutably
     let reactions = [...(playerStats.reactions || [])];
 
     // Add dynamic reactions from active buffs (e.g., Revivification from Rage of the Gods)
@@ -64,10 +65,10 @@ function CharReactions({ playerStats, campaignName, cannotAct, mapName, characte
         const attackNames = new Set((playerStats.attacks || []).map(a => a.name));
         reactionSpells = playerStats.spellAbilities.spells.filter(spell => reactionCastingTimes.includes(spell.casting_time) && (spell.prepared === 'Always' || spell.prepared === 'Prepared') && !attackNames.has(spell.name));
     }
-     // Add base reactions to reaction list
+    // Add base reactions to reaction list
     if (!reactions.find((reaction) => reaction.name === OPPORTUNITY_ATTACK.name)) {
         reactions.push(OPPORTUNITY_ATTACK);
-       }
+    }
 
     const handleReactionClick = async (reaction) => {
         if (cannotAct) return;
@@ -164,79 +165,79 @@ function CharReactions({ playerStats, campaignName, cannotAct, mapName, characte
         if (html) setPopupHtml(html);
     };
 
-     const getTargetInfo = React.useCallback(async () => {
+    const getTargetInfo = React.useCallback(async () => {
         const cs = await getCombatContext(campaignName);
         if (!cs) return null;
         return getTargetFromAttacker(cs, playerStats.name);
     }, [playerStats.name, campaignName]);
 
-      const cachedReactionCastPosRef = React.useRef(null);
+    const cachedReactionCastPosRef = React.useRef(null);
 
-const reactionCastAction = React.useCallback((spell, metaCtx) => {
+    const reactionCastAction = React.useCallback((spell, metaCtx) => {
         const pos = cachedReactionCastPosRef.current;
         executeSpellCast(spell, metaCtx, { rollAttack, rollDamage, playerStats, getTargetInfo, attackerPos: pos?.attackerPos, targetPos: pos?.targetPos, campaignName, mapName, characters }).then((result) => {
-          if (result && result.healAmount > 0) {
-            const bonusHealDetail = result.bonusDetails?.length > 0
-              ? result.bonusDetails.map(d => `${d.amount} ${d.name}`).join(', ')
-              : '';
-            const rawTotal = result.rawTotal ?? result.healAmount;
-            setPopupHtml({
-              type: 'heal',
-              name: spell.name,
-              formula: result.formula,
-              rolls: result.rolls || [],
-              total: rawTotal,
-              targetName: result.targetName,
-              finalHeal: result.healAmount,
-              bonusHeal: result.bonusHeal || 0,
-              bonusHealDetail,
-            });
-          }
+            if (result && result.healAmount > 0) {
+                const bonusHealDetail = result.bonusDetails?.length > 0
+                    ? result.bonusDetails.map(d => `${d.amount} ${d.name}`).join(', ')
+                    : '';
+                const rawTotal = result.rawTotal ?? result.healAmount;
+                setPopupHtml({
+                    type: 'heal',
+                    name: spell.name,
+                    formula: result.formula,
+                    rolls: result.rolls || [],
+                    total: rawTotal,
+                    targetName: result.targetName,
+                    finalHeal: result.healAmount,
+                    bonusHeal: result.bonusHeal || 0,
+                    bonusHealDetail,
+                });
+            }
         }).catch((e) => { console.error('[CharReactions] executeSpellCast error:', e); });
         cachedReactionCastPosRef.current = null;
     }, [rollAttack, rollDamage, playerStats, getTargetInfo, campaignName, mapName, characters, setPopupHtml]);
-      const { pendingMetamagic, gateMetamagic, handleConfirm, handleSkip } = useSpellMetamagicFlow(playerStats, campaignName, reactionCastAction);
-      const { buildUpcastLevels } = useSpellUpcastFlow(playerStats, campaignName);
+    const { pendingMetamagic, gateMetamagic, handleConfirm, handleSkip } = useSpellMetamagicFlow(playerStats, campaignName, reactionCastAction);
+    const { buildUpcastLevels } = useSpellUpcastFlow(playerStats, campaignName);
 
-      const resolveReactionSpellPositions = React.useCallback(async () => {
+    const resolveReactionSpellPositions = React.useCallback(async () => {
         if (!mapName) return;
         try {
-          const [mapData] = await Promise.all([
-            mapsService.loadMapData(campaignName, mapName),
-          ]);
-          const attackerPlayer = mapData?.players?.find(p => p.name === playerStats.name);
-          if (attackerPlayer) {
-            const cs = await getCombatContext(campaignName);
-            const target = cs ? getTargetFromAttacker(cs, playerStats.name) : null;
-            if (target) {
-              const targetPlayer = mapData?.players?.find(p => p.name === target.name);
-              const targetNpc = mapData?.placedItems?.length
-                ? getNearestPlacedItem(mapData.placedItems, target.name, attackerPlayer)
-                : null;
-              const targetPos = targetPlayer
-                ? { gridX: targetPlayer.gridX, gridY: targetPlayer.gridY }
-                : targetNpc
-                  ? { gridX: targetNpc.gridX, gridY: targetNpc.gridY }
-                  : null;
-              if (targetPos) {
-                cachedReactionCastPosRef.current = {
-                  attackerPos: { gridX: attackerPlayer.gridX, gridY: attackerPlayer.gridY },
-                  targetPos,
-                };
-              }
+            const [mapData] = await Promise.all([
+                mapsService.loadMapData(campaignName, mapName),
+            ]);
+            const attackerPlayer = mapData?.players?.find(p => p.name === playerStats.name);
+            if (attackerPlayer) {
+                const cs = await getCombatContext(campaignName);
+                const target = cs ? getTargetFromAttacker(cs, playerStats.name) : null;
+                if (target) {
+                    const targetPlayer = mapData?.players?.find(p => p.name === target.name);
+                    const targetNpc = mapData?.placedItems?.length
+                        ? getNearestPlacedItem(mapData.placedItems, target.name, attackerPlayer)
+                        : null;
+                    const targetPos = targetPlayer
+                        ? { gridX: targetPlayer.gridX, gridY: targetPlayer.gridY }
+                        : targetNpc
+                            ? { gridX: targetNpc.gridX, gridY: targetNpc.gridY }
+                            : null;
+                    if (targetPos) {
+                        cachedReactionCastPosRef.current = {
+                            attackerPos: { gridX: attackerPlayer.gridX, gridY: attackerPlayer.gridY },
+                            targetPos,
+                        };
+                    }
+                }
             }
-          }
         } catch { /* positions unavailable */ }
-      }, [mapName, campaignName, playerStats.name]);
+    }, [mapName, campaignName, playerStats.name]);
 
-      const handleReactionSpellCast = React.useCallback(async (spell, metaCtx) => {
+    const handleReactionSpellCast = React.useCallback(async (spell, metaCtx) => {
         setSelectedSpell(null);
 
         await resolveReactionSpellPositions();
         gateMetamagic(spell, metaCtx);
-      }, [gateMetamagic, resolveReactionSpellPositions]);
+    }, [gateMetamagic, resolveReactionSpellPositions]);
 
-      const handleReactiveSpellCast = React.useCallback(async (spell, metaCtx) => {
+    const handleReactiveSpellCast = React.useCallback(async (spell, metaCtx) => {
         setReactiveSpellEligible(null);
         setReactiveSpellWarnings(false);
         setSelectedSpell(null);
@@ -246,87 +247,87 @@ const reactionCastAction = React.useCallback((spell, metaCtx) => {
 
         await resolveReactionSpellPositions();
         gateMetamagic(spell, metaCtx);
-      }, [gateMetamagic, resolveReactionSpellPositions, campaignName, playerStats]);
+    }, [gateMetamagic, resolveReactionSpellPositions, campaignName, playerStats]);
 
     return (
-        <div className='char-reactions'>
+        <div className='char-actions'>
             <div className='sectionHeader'>Reactions</div>
-                {selectedSpell && (
-                    <Popup onClickOrKeyDown={() => { setSelectedSpell(null); setIsReactiveSpellFlow(false); }}>
-                        <SpellDetailPopup
-                           spell={selectedSpell}
-                           playerStats={playerStats}
-                           campaignName={campaignName}
-                           playerLevel={playerStats.level}
-                           upcastLevels={buildUpcastLevels(selectedSpell)}
-                           onClose={() => { setSelectedSpell(null); setIsReactiveSpellFlow(false); }}
-                            onCast={isReactiveSpellFlow ? handleReactiveSpellCast : handleReactionSpellCast}
-                         />
-                    </Popup>
-                )}
-                {reactiveSpellEligible && (
-                    <Popup onClickOrKeyDown={() => { setReactiveSpellEligible(null); setReactiveSpellWarnings(false); }}>
-                        <div className="dice-roll-result">
-                            <div className="dice-roll-header">
-                                <i className="fa-solid fa-wand-magic-sparkles"></i>Reactive Spell
-                            </div>
-                            <div>Select a spell with casting time of 1 action to cast as a reaction:</div>
-                            <div className="attacks" style={{ marginTop: '8px' }}>
-                                {reactiveSpellEligible.map((spellData) => (
-                                    <div key={spellData.name} className="clickable" style={{ padding: '4px 0', color: '#4fc3f7' }}
-                                          onClick={(e) => {
-                                              e.stopPropagation();
-                                              setReactiveSpellEligible(null);
-                                              const fullSpell = {
-                                                  ...spellData,
-                                                  prepared: 'Always',
-                                              };
-                                              setSelectedSpell(fullSpell);
-                                              setIsReactiveSpellFlow(true);
-                                          }}>
-                                        {spellData.name}{!spellData.isSingleTarget ? ' <i>(multi-target)</i>' : ''}
-                                    </div>
-                                ))}
-                            </div>
-                            {reactiveSpellWarnings && (
-                                <div className="dice-roll-hint" style={{ color: '#ff9800', marginTop: '8px' }}>
-                                    Some selected spells target more than one creature. Reactive Spell works best with single-target spells.
-                                </div>
-                            )}
-                            <div className="dice-roll-hint" style={{ marginTop: '8px' }}>click to dismiss</div>
+            {selectedSpell && (
+                <Popup onClickOrKeyDown={() => { setSelectedSpell(null); setIsReactiveSpellFlow(false); }}>
+                    <SpellDetailPopup
+                        spell={selectedSpell}
+                        playerStats={playerStats}
+                        campaignName={campaignName}
+                        playerLevel={playerStats.level}
+                        upcastLevels={buildUpcastLevels(selectedSpell)}
+                        onClose={() => { setSelectedSpell(null); setIsReactiveSpellFlow(false); }}
+                        onCast={isReactiveSpellFlow ? handleReactiveSpellCast : handleReactionSpellCast}
+                    />
+                </Popup>
+            )}
+            {reactiveSpellEligible && (
+                <Popup onClickOrKeyDown={() => { setReactiveSpellEligible(null); setReactiveSpellWarnings(false); }}>
+                    <div className="dice-roll-result">
+                        <div className="dice-roll-header">
+                            <i className="fa-solid fa-wand-magic-sparkles"></i>Reactive Spell
                         </div>
-                    </Popup>
-                )}
-                {pendingMetamagic && (
-                    <div>
-                     <MetamagicPopup
-                          spell={{ name: pendingMetamagic.spellName, level: pendingMetamagic.spellLevel || 0 }}
-                          playerStats={{ ...playerStats, _metamagicCurrentSP: pendingMetamagic._currentSP }}
-                          campaignName={campaignName}
-                          onConfirm={handleConfirm}
-                          onSkip={handleSkip}
-                       />
+                        <div>Select a spell with casting time of 1 action to cast as a reaction:</div>
+                        <div className="attacks" style={{ marginTop: '8px' }}>
+                            {reactiveSpellEligible.map((spellData) => (
+                                <div key={spellData.name} className="clickable" style={{ padding: '4px 0', color: '#4fc3f7' }}
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        setReactiveSpellEligible(null);
+                                        const fullSpell = {
+                                            ...spellData,
+                                            prepared: 'Always',
+                                        };
+                                        setSelectedSpell(fullSpell);
+                                        setIsReactiveSpellFlow(true);
+                                    }}>
+                                    {spellData.name}{!spellData.isSingleTarget ? ' <i>(multi-target)</i>' : ''}
+                                </div>
+                            ))}
+                        </div>
+                        {reactiveSpellWarnings && (
+                            <div className="dice-roll-hint" style={{ color: '#ff9800', marginTop: '8px' }}>
+                                Some selected spells target more than one creature. Reactive Spell works best with single-target spells.
+                            </div>
+                        )}
+                        <div className="dice-roll-hint" style={{ marginTop: '8px' }}>click to dismiss</div>
                     </div>
-                )}
-             {reactionSpells.length > 0 && <div className='attacks'>
-                  <div className='left'><b>Name</b></div>
-                  <div><b>Range</b></div>
-                  <div><b>Level</b></div>
-                  <div><b>Hit</b></div>
-                  <div><b>Damage</b></div>
-                  <div className='left'><b>Type</b></div>
-                  {reactionSpells.map((spell) => {
-                      return <React.Fragment key={spell.name}>
-                          <div className='left clickable' onClick={() => setSelectedSpell(spell)}>{spell.name}</div>
-                          <div>{spell.range}</div>
-                          <div>{spell.level === 0 ? 'Cantrip' : spell.level}</div>
-                          <div>—</div>
-                          <div>Utility</div>
-                          <div className='left'></div>
-                      </React.Fragment>;
-                  })}<div className='half-line'></div>
-              </div>}
-              {arcaneWardRestoreModal && (
+                </Popup>
+            )}
+            {pendingMetamagic && (
+                <div>
+                    <MetamagicPopup
+                        spell={{ name: pendingMetamagic.spellName, level: pendingMetamagic.spellLevel || 0 }}
+                        playerStats={{ ...playerStats, _metamagicCurrentSP: pendingMetamagic._currentSP }}
+                        campaignName={campaignName}
+                        onConfirm={handleConfirm}
+                        onSkip={handleSkip}
+                    />
+                </div>
+            )}
+            {reactionSpells.length > 0 && <div className='attacks'>
+                <div className='left'><b>Name</b></div>
+                <div><b>Level</b></div>
+                <div><b>Range</b></div>
+                <div><b>Hit</b></div>
+                <div><b>Damage</b></div>
+                <div className='left'><b>Type</b></div>
+                {reactionSpells.map((spell) => {
+                    return <React.Fragment key={spell.name}>
+                        <div className='left clickable' onClick={() => setSelectedSpell(spell)}>{spell.name}</div>
+                        <div>{spell.level === 0 ? 'Cantrip' : spell.level}</div>
+                        <div>{spell.range}</div>
+                        <div>—</div>
+                        <div>Utility</div>
+                        <div className='left'></div>
+                    </React.Fragment>;
+                })}<div className='half-line'></div>
+            </div>}
+            {arcaneWardRestoreModal && (
                 <ArcaneWardRestoreModal
                     {...arcaneWardRestoreModal}
                     playerStats={playerStats}
@@ -334,12 +335,12 @@ const reactionCastAction = React.useCallback((spell, metaCtx) => {
                     onClose={() => setArcaneWardRestoreModal(null)}
                 />
             )}
-              {reactions.filter(r => !getCategories(playerStats.rules || '5e').featuresToIgnore.includes(r.name)).map((reaction) => {
+            {reactions.filter(r => !getCategories(playerStats.rules || '5e').featuresToIgnore.includes(r.name)).map((reaction) => {
                 const isClickable = reaction.details || reaction.name === OPPORTUNITY_ATTACK.name || hasAutomation(reaction);
                 return <div key={reaction.name}>
-                     <b className={isClickable ? "clickable" : ""} onClick={() => handleReactionClick(reaction)}>{reaction.name}:</b> <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(reaction.description) }}></span>
-                 </div>
-             })}
+                    <b className={isClickable ? "clickable" : ""} onClick={() => handleReactionClick(reaction)}>{reaction.name}:</b> <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(reaction.description) }}></span>
+                </div>
+            })}
         </div>
     )
 }

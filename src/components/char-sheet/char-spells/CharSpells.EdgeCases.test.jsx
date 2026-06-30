@@ -370,9 +370,9 @@ describe('CharSpells edge cases', () => {
           ...mockPlayerStats.spellAbilities,
           spells: [
             {
-              name: 'Magic Missile',
+              name: 'Custom Spell',
               level: 1,
-              casting_time: '1 action',
+              casting_time: '1 turn',
               range: '120 feet',
               duration: 'Instantaneous',
               components: ['V', 'S'],
@@ -389,7 +389,7 @@ describe('CharSpells edge cases', () => {
 
       render(<CharSpells playerStats={stats} handleTogglePreparedSpells={mockHandleTogglePreparedSpells} />);
 
-      expect(screen.getByText('Magic Missile')).toBeInTheDocument();
+      expect(screen.getByText('Custom Spell')).toBeInTheDocument();
       const table = screen.getByRole('table');
       const effectCell = table.querySelector('tbody tr td:nth-child(6)');
       // Effect should show damage amount but no damage_type
@@ -405,7 +405,7 @@ describe('CharSpells edge cases', () => {
             {
               name: 'Strangely Empty Spell',
               level: 1,
-              casting_time: '1 action',
+              casting_time: '1 turn',
               range: '30 feet',
               duration: 'Instantaneous',
               components: ['V'],
@@ -463,17 +463,17 @@ describe('CharSpells edge cases', () => {
           ...mockPlayerStats.spellAbilities,
           spells: [
             {
-              name: 'Burning Hands',
-              level: 1,
-              casting_time: '1 action',
+              name: 'Cone of Cold',
+              level: 2,
+              casting_time: '1 turn',
               range: 'Self',
               duration: 'Instantaneous',
               components: ['V', 'S'],
               damage: {
                 damage_at_slot_level: {
-                  '1': '3d6',
+                  '2': '3d8',
                 },
-                damage_type: 'Fire',
+                damage_type: 'Cold',
               },
               dc: {
                 dc_type: 'Dex',
@@ -487,11 +487,11 @@ describe('CharSpells edge cases', () => {
 
       render(<CharSpells playerStats={stats} handleTogglePreparedSpells={mockHandleTogglePreparedSpells} />);
 
-      expect(screen.getByText('Burning Hands')).toBeInTheDocument();
+      expect(screen.getByText('Cone of Cold')).toBeInTheDocument();
       const table = screen.getByRole('table');
       const effectCell = table.querySelector('tbody tr td:nth-child(6)');
-      expect(effectCell.textContent).toContain('3d6');
-      expect(effectCell.textContent).toContain('Fire');
+      expect(effectCell.textContent).toContain('3d8');
+      expect(effectCell.textContent).toContain('Cold');
       expect(effectCell.textContent).toContain('Dex');
       expect(effectCell.textContent).toContain('half');
     });
@@ -535,9 +535,9 @@ describe('CharSpells edge cases', () => {
           ...mockPlayerStats.spellAbilities,
           spells: [
             {
-              name: 'Fireball',
+              name: 'Custom Spell',
               level: 3,
-              casting_time: '1 action',
+              casting_time: '1 turn',
               range: '150 feet',
               duration: 'Instantaneous',
               components: ['V', 'S', 'M'],
@@ -559,12 +559,12 @@ describe('CharSpells edge cases', () => {
       const row = table.querySelector('tbody tr');
       const cells = row.querySelectorAll('td');
 
-      expect(cells[0].textContent).toBe('Fireball');
+      expect(cells[0].textContent).toBe('Custom Spell');
       expect(cells[1].textContent).toBe('3');
       // Prepared cell should have a checkbox
       expect(cells[2].querySelector('input[type="checkbox"]')).not.toBeNull();
-      // Casting time should have "1" prefix and abbreviated
-      expect(cells[3].textContent).toContain(' A');
+      // Casting time
+      expect(cells[3].textContent).toContain('1');
       // Range
       expect(cells[4].textContent).toBe('150 feet');
       // Effect
@@ -572,10 +572,8 @@ describe('CharSpells edge cases', () => {
       expect(cells[5].textContent).toContain('Fire');
       // Duration abbreviated
       expect(cells[6].textContent).toBe('Instant');
-      // Notes: Concentration + Ritual + Components
-      expect(cells[7].textContent).toContain('Con');
-      expect(cells[7].textContent).toContain('Ritual');
-      expect(cells[7].textContent).toContain('V/S/M');
+      // Notes: Components only (Concentration and Ritual are in Duration/Time columns)
+      expect(cells[7].textContent).toBe('V/S/M');
     });
 
     it('renders cantrip level as "Cantrip" text', () => {
@@ -606,7 +604,7 @@ describe('CharSpells edge cases', () => {
   });
 
   describe('notes column formatting', () => {
-    it('shows concentration as "Con" in notes', () => {
+    it('shows only components in notes when spell has concentration flag', () => {
       const stats = {
         ...mockPlayerStats,
         spellAbilities: {
@@ -630,11 +628,10 @@ describe('CharSpells edge cases', () => {
 
       const table = screen.getByRole('table');
       const notesCell = table.querySelector('tbody tr td:nth-child(8)');
-      expect(notesCell.textContent).toContain('Con');
-      expect(notesCell.textContent).toContain('V');
+      expect(notesCell.textContent).toBe('V');
     });
 
-    it('shows ritual as "Ritual" in notes', () => {
+    it('shows only components in notes when spell has ritual flag', () => {
       const stats = {
         ...mockPlayerStats,
         spellAbilities: {
@@ -658,8 +655,7 @@ describe('CharSpells edge cases', () => {
 
       const table = screen.getByRole('table');
       const notesCell = table.querySelector('tbody tr td:nth-child(8)');
-      expect(notesCell.textContent).toContain('Ritual');
-      expect(notesCell.textContent).toContain('S');
+      expect(notesCell.textContent).toBe('S');
     });
 
     it('joins multiple components with slashes in notes', () => {
@@ -829,6 +825,10 @@ describe('CharSpells edge cases', () => {
               casting_time: '1 bonus action',
               range: 'Self',
               duration: 'Instantaneous',
+              damage: {
+                damage_at_slot_level: { '1': '1d4' },
+                damage_type: 'Fire',
+              },
               prepared: 'Always',
             },
           ],
@@ -837,9 +837,8 @@ describe('CharSpells edge cases', () => {
 
       render(<CharSpells playerStats={stats} handleTogglePreparedSpells={mockHandleTogglePreparedSpells} />);
 
-      const table = screen.getByRole('table');
-      const timeCell = table.querySelector('tbody tr td:nth-child(4)');
-      expect(timeCell.textContent).toContain('BA');
+      // Bonus action + damage spells are filtered from the Spells table
+      expect(screen.queryByText('Bonus Action Spell')).not.toBeInTheDocument();
     });
 
     it('abbreviates "reaction" to "Reaction"', () => {
@@ -854,6 +853,10 @@ describe('CharSpells edge cases', () => {
               casting_time: '1 reaction',
               range: '60 feet',
               duration: 'Instantaneous',
+              damage: {
+                damage_at_slot_level: { '0': '1d4' },
+                damage_type: 'Fire',
+              },
               prepared: 'Always',
             },
           ],
@@ -862,9 +865,8 @@ describe('CharSpells edge cases', () => {
 
       render(<CharSpells playerStats={stats} handleTogglePreparedSpells={mockHandleTogglePreparedSpells} />);
 
-      const table = screen.getByRole('table');
-      const timeCell = table.querySelector('tbody tr td:nth-child(4)');
-      expect(timeCell.textContent).toContain('Reaction');
+      // Reaction + damage spells are filtered from the Spells table
+      expect(screen.queryByText('Reaction Spell')).not.toBeInTheDocument();
     });
   });
 
@@ -904,7 +906,7 @@ describe('CharSpells edge cases', () => {
             {
               name: 'Damage Cantrip',
               level: 0,
-              casting_time: '1 action',
+              casting_time: '1 turn',
               range: '60 feet',
               duration: 'Instantaneous',
               damage: {

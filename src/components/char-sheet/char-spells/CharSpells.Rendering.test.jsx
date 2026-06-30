@@ -354,9 +354,8 @@ describe('CharSpells rendering', () => {
         />,
       );
 
-      expect(screen.getByText('Fireball')).toBeInTheDocument();
-      expect(screen.getByText('Magic Missile')).toBeInTheDocument();
       expect(screen.getByText('Light')).toBeInTheDocument();
+      expect(screen.getByText('Detect Magic')).toBeInTheDocument();
     });
 
     it('renders the spell table with correct column headers', () => {
@@ -385,7 +384,7 @@ describe('CharSpells rendering', () => {
         />,
       );
 
-      const spellName = screen.getByText('Fireball');
+      const spellName = screen.getByText('Light');
       expect(spellName).toHaveClass('clickable');
     });
 
@@ -398,9 +397,10 @@ describe('CharSpells rendering', () => {
       );
 
       const table = screen.getByRole('table');
-      const fireballRow = table.querySelector('tbody tr');
-      const levelCell = fireballRow.querySelectorAll('td')[1];
-      expect(levelCell.textContent).toBe('3');
+      const rows = table.querySelectorAll('tbody tr');
+      const levelCells = Array.from(rows).map(row => row.querySelectorAll('td')[1].textContent);
+      expect(levelCells).toContain('1');
+      expect(levelCells).toContain('Cantrip');
     });
 
     it('renders a cantrip row with "Cantrip" level text', () => {
@@ -413,24 +413,45 @@ describe('CharSpells rendering', () => {
 
       const table = screen.getByRole('table');
       const rows = table.querySelectorAll('tbody tr');
-      const lightRow = rows[rows.length - 1];
+      const lightRow = Array.from(rows).find(row => row.querySelectorAll('td')[0].textContent === 'Light');
       const levelCell = lightRow.querySelectorAll('td')[1];
       expect(levelCell.textContent).toBe('Cantrip');
     });
 
     it('renders damage display for a spell with damage', () => {
+      const spellWithDamage = {
+        name: 'Custom Spell',
+        level: 1,
+        casting_time: '1 turn',
+        range: '60 feet',
+        duration: 'Instantaneous',
+        components: ['V', 'S'],
+        damage: {
+          damage_at_slot_level: { '1': '2d6' },
+          damage_type: 'Acid',
+        },
+        prepared: 'Always',
+      };
+      const stats = {
+        ...mockPlayerStats,
+        spellAbilities: {
+          ...mockPlayerStats.spellAbilities,
+          spells: [spellWithDamage],
+        },
+      };
+
       render(
         <CharSpells
-          playerStats={mockPlayerStats}
+          playerStats={stats}
           handleTogglePreparedSpells={mockHandleTogglePreparedSpells}
         />,
       );
 
       const table = screen.getByRole('table');
-      const fireballRow = table.querySelector('tbody tr');
-      const effectCell = fireballRow.querySelectorAll('td')[5];
-      expect(effectCell.textContent).toContain('8d6');
-      expect(effectCell.textContent).toContain('Fire');
+      const row = table.querySelector('tbody tr');
+      const effectCell = row.querySelectorAll('td')[5];
+      expect(effectCell.textContent).toContain('2d6');
+      expect(effectCell.textContent).toContain('Acid');
     });
 
     it('renders "Utility" for a spell without damage', () => {
@@ -465,7 +486,7 @@ describe('CharSpells rendering', () => {
       expect(effectCell.textContent).toBe('Utility');
     });
 
-    it('renders notes column with concentration abbreviation', () => {
+    it('renders notes column with only components (concentration is in Duration column)', () => {
       const stats = {
         ...mockPlayerStats,
         spellAbilities: {
@@ -495,7 +516,7 @@ describe('CharSpells rendering', () => {
       const table = screen.getByRole('table');
       const row = table.querySelector('tbody tr');
       const notesCell = row.querySelectorAll('td')[7];
-      expect(notesCell.textContent).toContain('Con');
+      expect(notesCell.textContent).toBe('V');
     });
 
     it('renders notes column with components joined by slashes', () => {

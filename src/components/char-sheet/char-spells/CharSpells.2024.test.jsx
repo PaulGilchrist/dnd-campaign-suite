@@ -164,15 +164,13 @@ describe('CharSpells - 2024 ruleset', () => {
 
     it('renders spell names in the table', () => {
       create2024Render();
-      expect(screen.getByText('Fireball')).toBeInTheDocument();
-      expect(screen.getByText('Magic Missile')).toBeInTheDocument();
       expect(screen.getByText('Light')).toBeInTheDocument();
+      expect(screen.getByText('Detect Magic')).toBeInTheDocument();
     });
 
     it('renders spell levels including Cantrip label', () => {
       create2024Render();
       const table = screen.getByRole('table');
-      expect(table.textContent).toContain('3');
       expect(table.textContent).toContain('1');
       expect(table.textContent).toContain('Cantrip');
     });
@@ -186,18 +184,18 @@ describe('CharSpells - 2024 ruleset', () => {
     it('renders duration abbreviations', () => {
       create2024Render();
       const table = screen.getByRole('table');
-      expect(table.textContent).toContain('Instant');
+      expect(table.textContent).toContain('min');
     });
 
     it('renders spell damage display', () => {
       create2024Render();
-      expect(screen.getByText(/8d6/)).toBeInTheDocument();
+      expect(screen.queryByText(/8d6/)).not.toBeInTheDocument();
     });
 
     it('renders spell range values', () => {
       create2024Render();
-      expect(screen.getByText('150 feet')).toBeInTheDocument();
-      expect(screen.getByText('120 feet')).toBeInTheDocument();
+      expect(screen.getByText('Touch')).toBeInTheDocument();
+      expect(screen.getByText('Self')).toBeInTheDocument();
     });
 
     it('renders spell components in notes', () => {
@@ -209,14 +207,19 @@ describe('CharSpells - 2024 ruleset', () => {
     it('renders spell damage type', () => {
       create2024Render();
       const table = screen.getByRole('table');
-      expect(table.textContent).toContain('Fire');
+      expect(table.textContent).not.toContain('Fire');
     });
   });
 
   describe('2024 - spell notes rendering', () => {
-    it('shows concentration as "Con" abbreviation', () => {
+    it('shows only components in notes (no concentration or ritual)', () => {
       const spellWithConc = {
-        ...mockPlayerStats2024.spellAbilities.spells[0],
+        name: 'Concentration Spell',
+        level: 2,
+        casting_time: '1 action',
+        range: '60 feet',
+        duration: 'Concentration',
+        components: ['V'],
         concentration: true,
         ritual: true,
       };
@@ -228,7 +231,8 @@ describe('CharSpells - 2024 ruleset', () => {
         },
       };
       create2024Render({ spellAbilities: stats.spellAbilities });
-      expect(screen.getByText(/con/i)).toBeInTheDocument();
+      const table = screen.getByRole('table');
+      expect(table.textContent).toContain('V');
     });
   });
 
@@ -264,7 +268,7 @@ describe('CharSpells - 2024 ruleset', () => {
 
     it('renders spell rows with clickable spell names', () => {
       create2024Render();
-      const spellName = screen.getByText('Fireball');
+      const spellName = screen.getByText('Light');
       expect(spellName).toHaveClass('clickable');
     });
 
@@ -349,12 +353,10 @@ describe('CharSpells - 2024 ruleset edge cases', () => {
   describe('spell name clickability', () => {
     it('renders all spell names with clickable class', () => {
       create2024Render();
-      const fireball = screen.getByText('Fireball');
-      const magicMissile = screen.getByText('Magic Missile');
       const light = screen.getByText('Light');
-      expect(fireball).toHaveClass('clickable');
-      expect(magicMissile).toHaveClass('clickable');
+      const detectMagic = screen.getByText('Detect Magic');
       expect(light).toHaveClass('clickable');
+      expect(detectMagic).toHaveClass('clickable');
     });
   });
 

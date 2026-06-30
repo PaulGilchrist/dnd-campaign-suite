@@ -146,7 +146,7 @@ const getSpellRow = (table, spellName) => {
 const createSpell = (overrides) => ({
   name: 'Test Spell',
   level: 1,
-  casting_time: '1 action',
+  casting_time: '1 turn',
   range: 'Self',
   duration: 'Instantaneous',
   components: ['V', 'S'],
@@ -328,7 +328,7 @@ describe('CharSpells', () => {
   });
 
   describe('Notes column', () => {
-    it('should display "Con" abbreviation for concentration spells', () => {
+    it('should display only components for concentration spells (no Con in notes)', () => {
       const spell = createSpell({
         name: 'Hold Person',
         concentration: true,
@@ -340,11 +340,10 @@ describe('CharSpells', () => {
 
       const row = getSpellRow(table, 'Hold Person');
       expect(row).toBeDefined();
-      expect(row[7]).toContain('Con');
-      expect(row[7]).not.toContain('Concentration');
+      expect(row[7]).toBe('V/S');
     });
 
-    it('should display "Ritual" for ritual spells', () => {
+    it('should display only components for ritual spells (no Ritual in notes)', () => {
       const spell = createSpell({
         name: 'Detect Magic',
         ritual: true,
@@ -356,10 +355,10 @@ describe('CharSpells', () => {
 
       const row = getSpellRow(table, 'Detect Magic');
       expect(row).toBeDefined();
-      expect(row[7]).toContain('Ritual');
+      expect(row[7]).toBe('V/S');
     });
 
-    it('should display both concentration and ritual when both are true', () => {
+    it('should display only components when both concentration and ritual are true', () => {
       const spell = createSpell({
         name: 'Wand of Magic Awareness',
         concentration: true,
@@ -372,7 +371,7 @@ describe('CharSpells', () => {
 
       const row = getSpellRow(table, 'Wand of Magic Awareness');
       expect(row).toBeDefined();
-      expect(row[7]).toMatch(/Con, Ritual/);
+      expect(row[7]).toBe('V/S');
     });
 
     it('should display components joined with slashes', () => {
@@ -420,7 +419,7 @@ describe('CharSpells', () => {
       expect(row[7]).toBe('');
     });
 
-    it('should display all note types together in correct order', () => {
+    it('should display only components in notes (no concentration or ritual)', () => {
       const spell = createSpell({
         name: 'Concentration Ritual Spell',
         concentration: true,
@@ -434,7 +433,7 @@ describe('CharSpells', () => {
 
       const row = getSpellRow(table, 'Concentration Ritual Spell');
       expect(row).toBeDefined();
-      expect(row[7]).toBe('Con, Ritual, V/S/M');
+      expect(row[7]).toBe('V/S/M');
     });
   });
 
@@ -565,30 +564,36 @@ describe('CharSpells', () => {
       const spell = createSpell({
         name: 'Cunning Action',
         casting_time: '1 bonus action',
+        damage: {
+          damage_at_slot_level: { '1': '1d4' },
+          damage_type: 'Fire',
+        },
       });
       const { table } = renderSpellsTable({
         ...mockPlayerStats,
         spellAbilities: { ...mockPlayerStats.spellAbilities, spells: [spell] },
       });
 
-      const row = getSpellRow(table, 'Cunning Action');
-      expect(row).toBeDefined();
-      expect(row[3]).toBe('1 BA');
+      // Bonus action + damage spells are filtered from the Spells table
+      expect(getSpellRow(table, 'Cunning Action')).toBeUndefined();
     });
 
     it('should abbreviate "reaction" to "Reaction"', () => {
       const spell = createSpell({
         name: 'Shield',
         casting_time: '1 reaction',
+        damage: {
+          damage_at_slot_level: { '1': '1d4' },
+          damage_type: 'Force',
+        },
       });
       const { table } = renderSpellsTable({
         ...mockPlayerStats,
         spellAbilities: { ...mockPlayerStats.spellAbilities, spells: [spell] },
       });
 
-      const row = getSpellRow(table, 'Shield');
-      expect(row).toBeDefined();
-      expect(row[3]).toBe('1 Reaction');
+      // Reaction + damage spells are filtered from the Spells table
+      expect(getSpellRow(table, 'Shield')).toBeUndefined();
     });
 
     it('should leave casting_time unchanged when no match', () => {
@@ -689,7 +694,7 @@ describe('CharSpells', () => {
       const spell = createSpell({
         name: 'Complete Spell',
         level: 2,
-        casting_time: '1 action',
+        casting_time: '1 turn',
         range: '60 feet',
         duration: 'Concentration, up to 1 minute',
         components: ['V', 'S', 'M'],
@@ -717,11 +722,11 @@ describe('CharSpells', () => {
       expect(row[1]).toBe('2');
       // Prepared column renders a checkbox input, so textContent is empty
       expect(row[2]).toBe('');
-      expect(row[3]).toBe('1  A');
+      expect(row[3]).toBe('1 turn');
       expect(row[4]).toBe('60 feet');
       expect(row[5]).toBe('2d6 Acid (Dexterity half)');
       expect(row[6]).toBe('Concentration, 1 min');
-      expect(row[7]).toBe('Con, Ritual, V/S/M');
+      expect(row[7]).toBe('V/S/M');
     });
 
     it('should render cantrip level as "Cantrip" text', () => {

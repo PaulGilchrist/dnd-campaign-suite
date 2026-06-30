@@ -405,9 +405,8 @@ describe('CharSpells', () => {
 
       const table = document.querySelector('.table-spells');
       expect(table).not.toBeNull();
-      expect(screen.getByText('Fireball')).toBeInTheDocument();
-      expect(screen.getByText('Magic Missile')).toBeInTheDocument();
       expect(screen.getByText('Light')).toBeInTheDocument();
+      expect(screen.getByText('Detect Magic')).toBeInTheDocument();
     });
 
     it('does not render spell abilities or table when spellAbilities is null', () => {

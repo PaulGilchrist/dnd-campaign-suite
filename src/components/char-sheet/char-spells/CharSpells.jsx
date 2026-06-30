@@ -306,6 +306,45 @@ const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells
     const [filterPrepared, setFilterPrepared] = React.useState(false);
     const [spells, setSpells] = React.useState([]);
     const is2024 = playerStats.rules === '2024';
+    const actionCastingTimes = ['1 action', '1 Action', 'action', 'Action'];
+    const bonusActionCastingTimes = ['1 bonus action', '1 Bonus Action', 'bonus action', 'Bonus Action'];
+    const reactionCastingTimes = ['1 reaction', '1 Reaction', 'reaction', 'Reaction'];
+    const isElderChampionActive = (charName, cName) => {
+        const activeBuffs = getRuntimeValue(charName, 'activeBuffs', cName) || [];
+        return Array.isArray(activeBuffs) && activeBuffs.some(b => b.effect === 'elder_champion');
+    };
+    const elderChampionActive = isElderChampionActive(playerStats.name, campaignName);
+
+    // Build set of spell names that already appear in Actions/Bonus Actions sections
+    // (damage/healing spells castable as action or bonus action)
+    const actionNames = new Set(playerStats.attacks?.filter(a => a.type === 'Action').map(a => a.name) || []);
+    const bonusAttackNames = new Set((playerStats.attacks || []).map(a => a.name));
+    const actionSpells = (playerStats.spellAbilities?.spells || []).filter(spell => {
+        if (elderChampionActive) return false;
+        return actionCastingTimes.includes(spell.casting_time) &&
+            (spell.prepared === 'Always' || spell.prepared === 'Prepared') &&
+            !actionNames.has(spell.name) &&
+            (!!spell.damage || !!spell.heal_at_slot_level);
+    });
+    const bonusActionSpellsList = (playerStats.spellAbilities?.spells || []).filter(spell => {
+        const isBonusAction = bonusActionCastingTimes.includes(spell.casting_time);
+        return isBonusAction &&
+            (spell.prepared === 'Always' || spell.prepared === 'Prepared') &&
+            !bonusAttackNames.has(spell.name);
+    });
+    const reactionSpellNames = new Set((playerStats.spellAbilities?.spells || []).filter(spell => {
+        return reactionCastingTimes.includes(spell.casting_time) &&
+            (spell.prepared === 'Always' || spell.prepared === 'Prepared') &&
+            !bonusAttackNames.has(spell.name);
+    }).map(s => s.name));
+
+    const actionBonusSpellNames = new Set([
+        ...actionSpells.map(s => s.name),
+        ...bonusActionSpellsList.map(s => s.name),
+    ]);
+
+    const allActionableSpellNames = new Set([...actionBonusSpellNames, ...reactionSpellNames]);
+
     React.useEffect(() => {
         if(playerStats.spellAbilities) {
             setFilterPrepared(false);
@@ -680,9 +719,8 @@ return (
                 </thead>
                 <tbody>
                     {spells.map((spell) => {
+                        if (allActionableSpellNames.has(spell.name)) return null;
                         let notes = [];
-                        if(spell.concentration) notes.push('Concentration');
-                        if(spell.ritual) notes.push('Ritual');
                         if(spell.components) notes.push(spell.components.join('/'));
                         let effect = 'Utility';
                         if(spell.damage) {

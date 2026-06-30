@@ -58,8 +58,17 @@ export const mockPlayerStats = {
         components: ['V', 'M'],
         prepared: 'Always',
       },
+      {
+        name: 'Detect Magic',
+        level: 1,
+        casting_time: '1 action',
+        range: 'Self',
+        duration: 'Concentration, up to 10 minutes',
+        components: ['V', 'S'],
+        prepared: 'Always',
+      },
          ],
-       },
+        },
 };
 
 export const mockPlayerStats2024 = {
@@ -114,8 +123,17 @@ export const mockPlayerStats2024 = {
         components: ['V', 'M'],
         prepared: 'Always',
       },
+      {
+        name: 'Detect Magic',
+        level: 1,
+        casting_time: '1 action',
+        range: 'Self',
+        duration: 'Concentration, up to 10 minutes',
+        components: ['V', 'S'],
+        prepared: 'Always',
+      },
          ],
-       },
+        },
 };
 
 export const mockHandleTogglePreparedSpells = vi.fn();

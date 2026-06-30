@@ -1406,8 +1406,8 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                 {cannotAct && <span className='disabled-attack-label'>(Incapacitated)</span>}
                 <div className={`attacks ${is2024Rules ? 'mastery-enabled' : ''}`}>
                     <div className='left'><b>Name</b></div>
-                    <div><b>Range</b></div>
                     <div><b>Level</b></div>
+                    <div><b>Range</b></div>
                     <div><b>Hit</b></div>
                     <div><b>Damage</b></div>
                     <div className='left'><b>Type</b></div>
@@ -1415,19 +1415,21 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     {sortedActionItems.map((item) => {
                         if (item._isAttack) {
                             const attackLevel = getAttackSpellLevel(item.name);
+                            const attackItem = { ...item };
+                            delete attackItem._isAttack;
                             return <React.Fragment key={item.name}>
                                 <div className='left clickable' onClick={() => handleActionSpellClick(item.name)}>{item.name}</div>
-                                <div>{formatRange(item.range)}</div>
                                 <div>{attackLevel != null ? (attackLevel === 0 ? 'Cantrip' : attackLevel) : '-'}</div>
+                                <div>{formatRange(item.range)}</div>
                                 {item.saveDc
                                     ? <div className="save-dc-display">DC {item.saveDc + displaySaveDcBonus} {item.saveType}</div>
-                                    : <div className={"clickable" + (exhaustionPenalty > 0 || conditionAttackMode === 'disadvantage' || cannotAct ? " stat--penalized" : "") + (cannotAct ? " disabled-attack" : "")} onClick={() => handleSpellAttackClick(item)}>{signFormatter.format(item.hitBonus - exhaustionPenalty)}</div>}
+                                    : <div className={"clickable" + (exhaustionPenalty > 0 || conditionAttackMode === 'disadvantage' || cannotAct ? " stat--penalized" : "") + (cannotAct ? " disabled-attack" : "")} onClick={() => handleSpellAttackClick(attackItem)}>{signFormatter.format(item.hitBonus - exhaustionPenalty)}</div>}
                                 <div className={item.damage ? "clickable" : ""} onClick={() => {
                                     if (cannotAct) return;
-                                    if (item.saveDc) { resolveSpellDamage(item); return; }
+                                    if (item.saveDc) { resolveSpellDamage(attackItem); return; }
                                     // To-Hit attacks: damage is ALWAYS rolled through the "To Hit" flow.
                                     // Save DC attacks: damage is rolled when the target fails the save.
-                                    handleSimpleDamageRoll(item);
+                                    handleSimpleDamageRoll(attackItem);
                                 }}>{item.damage}</div>
 
                                 <div className='left'>{item.damageType}</div>
@@ -1436,8 +1438,8 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                         } else {
                             return <React.Fragment key={item.name}>
                                 <div className='left clickable' onClick={() => handleActionSpellClick(item.name)}>{item.name}</div>
-                                <div>{item.range}</div>
                                 <div>{item.level === 0 ? 'Cantrip' : item.level}</div>
+                                <div>{item.range}</div>
                                 <div>-</div>
                                 <div>Utility</div>
                                 <div className='left'></div>

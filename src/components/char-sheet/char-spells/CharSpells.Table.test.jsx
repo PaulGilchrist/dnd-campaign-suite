@@ -440,7 +440,7 @@ describe('CharSpells - Table Rendering', () => {
   });
 
   describe('notes column formatting', () => {
-    it('abbreviates "Concentration" as "Con" in notes', () => {
+    it('shows only components in notes when spell has concentration flag', () => {
       const concSpell = {
         ...basePlayerStats.spellAbilities.spells[0],
         concentration: true,
@@ -454,10 +454,10 @@ describe('CharSpells - Table Rendering', () => {
       };
       render(<CharSpells playerStats={stats} campaignName="test" />);
       const table = screen.getByRole('table');
-      expect(table.textContent).toContain('Con');
+      expect(table.textContent).toContain('V');
     });
 
-    it('shows "Ritual" in notes when spell has ritual flag', () => {
+    it('shows only components in notes when spell has ritual flag', () => {
       const ritualSpell = {
         ...basePlayerStats.spellAbilities.spells[0],
         ritual: true,
@@ -471,7 +471,7 @@ describe('CharSpells - Table Rendering', () => {
       };
       render(<CharSpells playerStats={stats} campaignName="test" />);
       const table = screen.getByRole('table');
-      expect(table.textContent).toContain('Ritual');
+      expect(table.textContent).toContain('V');
     });
 
     it('renders components joined with slashes in notes', () => {

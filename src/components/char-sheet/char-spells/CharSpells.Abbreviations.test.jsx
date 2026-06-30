@@ -157,6 +157,10 @@ describe('CharSpells abbreviations', () => {
               casting_time: '1 reaction',
               range: 'Self',
               duration: '1 round',
+              damage: {
+                damage_at_slot_level: { '1': '1d4' },
+                damage_type: 'Force',
+              },
               prepared: 'Prepared',
             },
           ],
@@ -165,7 +169,8 @@ describe('CharSpells abbreviations', () => {
 
       render(<CharSpells playerStats={stats} handleTogglePreparedSpells={mockHandleTogglePreparedSpells} />);
 
-      expect(screen.getByText('1 Reaction')).toBeInTheDocument();
+      // Reaction + damage spells are filtered from the Spells table
+      expect(screen.queryByText('Shield')).not.toBeInTheDocument();
     });
 
     it('replaces "1 bonus action" with abbreviated form "1 BA"', () => {
@@ -180,6 +185,10 @@ describe('CharSpells abbreviations', () => {
               casting_time: '1 bonus action',
               range: '60 feet',
               duration: 'Instantaneous',
+              damage: {
+                damage_at_slot_level: { '1': '1d4' },
+                damage_type: 'Psychic',
+              },
               prepared: 'Prepared',
             },
           ],
@@ -188,7 +197,8 @@ describe('CharSpells abbreviations', () => {
 
       render(<CharSpells playerStats={stats} handleTogglePreparedSpells={mockHandleTogglePreparedSpells} />);
 
-      expect(screen.getByText('1 BA')).toBeInTheDocument();
+      // Bonus action + damage spells are filtered from the Spells table
+      expect(screen.queryByText('Healing Word')).not.toBeInTheDocument();
     });
 
     it('leaves casting time unchanged when no matching pattern exists', () => {
@@ -408,19 +418,28 @@ describe('CharSpells abbreviations', () => {
           ...mockPlayerStats.spellAbilities,
           spells: [
             {
+              name: 'Burning Hands',
+              level: 1,
+              casting_time: '1 action',
+              range: 'Self',
+              duration: 'Instantaneous',
+              components: ['V', 'S'],
+              damage: {
+                damage_at_slot_level: { '1': '3d6' },
+                damage_type: 'Fire',
+              },
+              prepared: 'Prepared',
+            },
+            {
               name: 'Shield',
               level: 1,
               casting_time: '1 reaction',
               range: 'Self',
               duration: '1 round',
-              prepared: 'Prepared',
-            },
-            {
-              name: 'Fireball',
-              level: 3,
-              casting_time: '1 action',
-              range: '150 feet',
-              duration: 'Instantaneous',
+              damage: {
+                damage_at_slot_level: { '1': '1d4' },
+                damage_type: 'Force',
+              },
               prepared: 'Prepared',
             },
           ],
@@ -429,9 +448,9 @@ describe('CharSpells abbreviations', () => {
 
       render(<CharSpells playerStats={stats} handleTogglePreparedSpells={mockHandleTogglePreparedSpells} />);
 
-      expect(screen.getByText('1 Reaction')).toBeInTheDocument();
-      expect(screen.getByText('Instant')).toBeInTheDocument();
-      expect(screen.getByText(/1\s+A/)).toBeInTheDocument();
+      // Action+damage and reaction+damage spells are filtered from the Spells table
+      expect(screen.queryByText('Burning Hands')).not.toBeInTheDocument();
+      expect(screen.queryByText('Shield')).not.toBeInTheDocument();
     });
 
     it('abbreviates both casting time and duration for a bonus action spell', () => {
@@ -446,6 +465,10 @@ describe('CharSpells abbreviations', () => {
               casting_time: '1 bonus action',
               range: '60 feet',
               duration: '1 round',
+              damage: {
+                damage_at_slot_level: { '1': '1d4' },
+                damage_type: 'Psychic',
+              },
               prepared: 'Prepared',
             },
           ],
@@ -454,7 +477,8 @@ describe('CharSpells abbreviations', () => {
 
       render(<CharSpells playerStats={stats} handleTogglePreparedSpells={mockHandleTogglePreparedSpells} />);
 
-      expect(screen.getByText('1 BA')).toBeInTheDocument();
+      // Bonus action + damage spells are filtered from the Spells table
+      expect(screen.queryByText('Healing Word')).not.toBeInTheDocument();
     });
   });
 });
