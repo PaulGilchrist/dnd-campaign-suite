@@ -7,6 +7,7 @@ import CreatureHp from './CreatureHp.jsx'
 import { getAbilityLabel } from '../../services/combat/conditions/conditionUtils.js'
 import { useRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import ConditionEffectBadges from './ConditionEffectBadges.jsx'
+import { CONDITION_DESCRIPTIONS } from '../../services/combat/conditions/effectDescriptions.js'
 
 const SHAPE_LABELS = {
     sphere: 'Sphere',
@@ -132,7 +133,7 @@ function CreatureCard({
                                 onClick={() => canRoll && onRollConditionSave(creature.name, cond)}
                                 disabled={!canRoll}
                                 type='button'
-                                title={cond.dc ? `${cond.label} (DC ${cond.dc} ${getAbilityLabel(cond.ability)})` : cond.label}
+                                title={cond.dc ? `${cond.label}\n\n${CONDITION_DESCRIPTIONS[cond.label] || ''}\n\nDC ${cond.dc} ${getAbilityLabel(cond.ability)}` : (CONDITION_DESCRIPTIONS[cond.label] || cond.label)}
                             >
                                 {cond.dc ? `${cond.label} DC ${cond.dc}` : cond.label}
                             </button>

@@ -1,5 +1,7 @@
 
 
+import { HP_STATUS_DESCRIPTIONS } from '../../services/combat/conditions/effectDescriptions.js'
+
 function CreatureHp({ creature, isLocalhost, onChange }) {
     const { currentHp: rawCurrentHp, maxHp: rawMaxHp, type } = creature
     const currentHp = rawCurrentHp ?? 0
@@ -15,9 +17,9 @@ function CreatureHp({ creature, isLocalhost, onChange }) {
                 </div>
                 <div className="hp-inline-row">
                     <span className="hp-status">
-                        {isDead && <span className="status-badge dead">DEAD</span>}
-                        {isBloodied && <span className="status-badge bloodied">BLOODIED</span>}
-                        {!isDead && !isBloodied && <span className="status-badge healthy">OK</span>}
+                        {isDead && <span className="status-badge dead" title={HP_STATUS_DESCRIPTIONS['DEAD']}>DEAD</span>}
+                        {isBloodied && <span className="status-badge bloodied" title={HP_STATUS_DESCRIPTIONS['BLOODIED']}>BLOODIED</span>}
+                        {!isDead && !isBloodied && <span className="status-badge healthy" title={HP_STATUS_DESCRIPTIONS['OK']}>OK</span>}
                     </span>
                 </div>
             </div>

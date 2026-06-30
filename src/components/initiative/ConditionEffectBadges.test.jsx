@@ -35,6 +35,7 @@ const defaultEffects = {
     riderSaveDisadvantage: false,
     riderAttackBonus: 0,
     riderCannotOpportunityAttack: false,
+    riderNoReactions: false,
 };
 
 function makeEffects(overrides = {}) {
@@ -82,14 +83,6 @@ describe('ConditionEffectBadges', () => {
     });
 
     describe('cannot act effects', () => {
-        it('should render Can\'t Act badge when cannotAct is true', () => {
-            computeConditionEffects.mockReturnValue(makeEffects({ cannotAct: true }));
-            render(<ConditionEffectBadges conditions={[]} targetEffects={[]} creatureName="Alice" campaignName="test" />);
-            const badge = screen.getByText("Can't Act");
-            expect(badge).toBeInTheDocument();
-            expect(badge.closest('.condition-effect-badge')).toHaveClass('effect-cannot-act');
-        });
-
         it('should render Insp. Move badge when inspiringMovementNoOA runtime value is true', () => {
             getRuntimeValue.mockReturnValue(true);
             computeConditionEffects.mockReturnValue(makeEffects({}));
@@ -129,14 +122,6 @@ describe('ConditionEffectBadges', () => {
     });
 
     describe('speed effects', () => {
-        it('should render Speed 0 badge when speedZero is true', () => {
-            computeConditionEffects.mockReturnValue(makeEffects({ speedZero: true }));
-            render(<ConditionEffectBadges conditions={[]} targetEffects={[]} creatureName="Alice" campaignName="test" />);
-            const badge = screen.getByText('Speed 0');
-            expect(badge).toBeInTheDocument();
-            expect(badge.closest('.condition-effect-badge')).toHaveClass('effect-speed-zero');
-        });
-
         it('should render Speed -N badge when speedReduction is set', () => {
             computeConditionEffects.mockReturnValue(makeEffects({ speedReduction: 15 }));
             render(<ConditionEffectBadges conditions={[]} targetEffects={[]} creatureName="Alice" campaignName="test" />);
@@ -152,153 +137,13 @@ describe('ConditionEffectBadges', () => {
         });
     });
 
-    describe('push effect', () => {
-        it('should render Push 10 ft badge when pushEffect is true with default distance', () => {
-            computeConditionEffects.mockReturnValue(makeEffects({ pushEffect: true, pushDistance: 10 }));
-            render(<ConditionEffectBadges conditions={[]} targetEffects={[]} creatureName="Alice" campaignName="test" />);
-            const badge = screen.getByText('Push 10 ft');
-            expect(badge).toBeInTheDocument();
-            expect(badge.closest('.condition-effect-badge')).toHaveClass('effect-push');
-        });
-
-        it('should render Push with custom distance when pushDistance is set', () => {
-            computeConditionEffects.mockReturnValue(makeEffects({ pushEffect: true, pushDistance: 15 }));
-            render(<ConditionEffectBadges conditions={[]} targetEffects={[]} creatureName="Alice" campaignName="test" />);
-            expect(screen.getByText('Push 15 ft')).toBeInTheDocument();
-        });
-
-        it('should render Push 10 ft when pushDistance is falsy', () => {
-            computeConditionEffects.mockReturnValue(makeEffects({ pushEffect: true, pushDistance: null }));
-            render(<ConditionEffectBadges conditions={[]} targetEffects={[]} creatureName="Alice" campaignName="test" />);
-            expect(screen.getByText('Push 10 ft')).toBeInTheDocument();
-        });
-    });
-
-    describe('prone effect', () => {
-        it('should render Prone badge when proneEffect is true', () => {
-            computeConditionEffects.mockReturnValue(makeEffects({ proneEffect: true }));
-            render(<ConditionEffectBadges conditions={[]} targetEffects={[]} creatureName="Alice" campaignName="test" />);
-            const badge = screen.getByText('Prone');
-            expect(badge).toBeInTheDocument();
-            expect(badge.closest('.condition-effect-badge')).toHaveClass('effect-prone');
-        });
-    });
-
-    describe('auto crit effect', () => {
-        it('should render Auto-Crit badge when autoCritWithin5ft is true', () => {
-            computeConditionEffects.mockReturnValue(makeEffects({ autoCritWithin5ft: true }));
-            render(<ConditionEffectBadges conditions={[]} targetEffects={[]} creatureName="Alice" campaignName="test" />);
-            const badge = screen.getByText('Auto-Crit');
-            expect(badge).toBeInTheDocument();
-            expect(badge.closest('.condition-effect-badge')).toHaveClass('effect-auto-crit');
-        });
-    });
-
-    describe('concentration broken', () => {
-        it('should render No Conc. badge when concentrationBroken is true', () => {
-            computeConditionEffects.mockReturnValue(makeEffects({ concentrationBroken: true }));
-            render(<ConditionEffectBadges conditions={[]} targetEffects={[]} creatureName="Alice" campaignName="test" />);
-            const badge = screen.getByText('No Conc.');
-            expect(badge).toBeInTheDocument();
-            expect(badge.closest('.condition-effect-badge')).toHaveClass('effect-no-conc');
-        });
-    });
-
-    describe('auto fail saves', () => {
-        it('should render Auto-Fail badge with uppercase save types', () => {
-            computeConditionEffects.mockReturnValue(makeEffects({ autoFailSaves: ['str', 'dex'] }));
-            render(<ConditionEffectBadges conditions={[]} targetEffects={[]} creatureName="Alice" campaignName="test" />);
-            const badge = screen.getByText('Auto-Fail STR/DEX');
-            expect(badge).toBeInTheDocument();
-            expect(badge.closest('.condition-effect-badge')).toHaveClass('effect-auto-fail');
-        });
-
-        it('should render Auto-Fail badge with single save type', () => {
-            computeConditionEffects.mockReturnValue(makeEffects({ autoFailSaves: ['con'] }));
-            render(<ConditionEffectBadges conditions={[]} targetEffects={[]} creatureName="Alice" campaignName="test" />);
-            expect(screen.getByText('Auto-Fail CON')).toBeInTheDocument();
-        });
-
-        it('should not render Auto-Fail badge when autoFailSaves is empty', () => {
-            computeConditionEffects.mockReturnValue(makeEffects({ autoFailSaves: [] }));
-            render(<ConditionEffectBadges conditions={[]} targetEffects={[]} creatureName="Alice" campaignName="test" />);
-            expect(screen.queryByText(/Auto-Fail/)).not.toBeInTheDocument();
-        });
-    });
-
-    describe('resistance effects', () => {
-        it('should render Resist All badge when resistantToAll is true', () => {
-            computeConditionEffects.mockReturnValue(makeEffects({ resistantToAll: true }));
-            render(<ConditionEffectBadges conditions={[]} targetEffects={[]} creatureName="Alice" campaignName="test" />);
-            const badge = screen.getByText('Resist All');
-            expect(badge).toBeInTheDocument();
-            expect(badge.closest('.condition-effect-badge')).toHaveClass('effect-resist');
-        });
-    });
-
-    describe('disadvantage effects', () => {
-        it('should render Disadv badge when attackDisadvantageCount > 0', () => {
-            computeConditionEffects.mockReturnValue(makeEffects({ attackDisadvantageCount: 2 }));
-            render(<ConditionEffectBadges conditions={[]} targetEffects={[]} creatureName="Alice" campaignName="test" />);
-            const badge = screen.getByText('Disadv');
-            expect(badge).toBeInTheDocument();
-            expect(badge.closest('.condition-effect-badge')).toHaveClass('effect-disadvantage');
-        });
-
-        it('should render Disadv badge when abilityCheckDisadvantage is true', () => {
-            computeConditionEffects.mockReturnValue(makeEffects({ abilityCheckDisadvantage: true }));
-            render(<ConditionEffectBadges conditions={[]} targetEffects={[]} creatureName="Alice" campaignName="test" />);
-            expect(screen.getByText('Disadv')).toBeInTheDocument();
-        });
-
-        it('should render STR Disadv badge when strCheckDisadvantage is true', () => {
-            computeConditionEffects.mockReturnValue(makeEffects({ strCheckDisadvantage: true }));
-            render(<ConditionEffectBadges conditions={[]} targetEffects={[]} creatureName="Alice" campaignName="test" />);
-            const badge = screen.getByText('STR Disadv');
-            expect(badge).toBeInTheDocument();
-            expect(badge.closest('.condition-effect-badge')).toHaveClass('effect-disadvantage');
-        });
-
-        it('should render both Disadv and STR Disadv badges when both are true', () => {
-            computeConditionEffects.mockReturnValue(makeEffects({ attackDisadvantageCount: 1, strCheckDisadvantage: true }));
-            render(<ConditionEffectBadges conditions={[]} targetEffects={[]} creatureName="Alice" campaignName="test" />);
-            expect(screen.getByText('Disadv')).toBeInTheDocument();
-            expect(screen.getByText('STR Disadv')).toBeInTheDocument();
-        });
-    });
-
-    describe('ray of enfeeblement', () => {
-        it('should render -1d8 dmg badge when rayOfEnfeebleDamageReduction is true', () => {
-            computeConditionEffects.mockReturnValue(makeEffects({ rayOfEnfeebleDamageReduction: true }));
-            render(<ConditionEffectBadges conditions={[]} targetEffects={[]} creatureName="Alice" campaignName="test" />);
-            const badge = screen.getByText('-1d8 dmg');
-            expect(badge).toBeInTheDocument();
-            expect(badge.closest('.condition-effect-badge')).toHaveClass('effect-damage-reduction');
-        });
-    });
-
-    describe('target advantage/disadvantage', () => {
-        it('should render Adv vs badge when targetAdvantageCount > 0', () => {
-            computeConditionEffects.mockReturnValue(makeEffects({ targetAdvantageCount: 3 }));
-            render(<ConditionEffectBadges conditions={[]} targetEffects={[]} creatureName="Alice" campaignName="test" />);
-            const badge = screen.getByText('Adv vs');
-            expect(badge).toBeInTheDocument();
-            expect(badge.closest('.condition-effect-badge')).toHaveClass('effect-target-adv');
-        });
-
+    describe('target disadvantage', () => {
         it('should render Disadv vs badge when targetDisadvantageCount > 0', () => {
             computeConditionEffects.mockReturnValue(makeEffects({ targetDisadvantageCount: 2 }));
             render(<ConditionEffectBadges conditions={[]} targetEffects={[]} creatureName="Alice" campaignName="test" />);
             const badge = screen.getByText('Disadv vs');
             expect(badge).toBeInTheDocument();
             expect(badge.closest('.condition-effect-badge')).toHaveClass('effect-target-disadv');
-        });
-
-        it('should render both Adv vs and Disadv vs badges when both are set', () => {
-            computeConditionEffects.mockReturnValue(makeEffects({ targetAdvantageCount: 1, targetDisadvantageCount: 1 }));
-            render(<ConditionEffectBadges conditions={[]} targetEffects={[]} creatureName="Alice" campaignName="test" />);
-            expect(screen.getByText('Adv vs')).toBeInTheDocument();
-            expect(screen.getByText('Disadv vs')).toBeInTheDocument();
         });
     });
 
@@ -421,24 +266,24 @@ describe('ConditionEffectBadges', () => {
 
     describe('badge structure', () => {
         it('should render each badge with condition-effect-badge class', () => {
-            computeConditionEffects.mockReturnValue(makeEffects({ cannotAct: true, speedZero: true }));
+            computeConditionEffects.mockReturnValue(makeEffects({ speedReduction: 10, targetDisadvantageCount: 1 }));
             render(<ConditionEffectBadges conditions={[]} targetEffects={[]} creatureName="Alice" campaignName="test" />);
             const badges = document.querySelectorAll('.condition-effect-badge');
             expect(badges.length).toBe(2);
             badges.forEach(badge => expect(badge).toHaveClass('condition-effect-badge'));
         });
 
-        it('should set title attribute equal to badge label', () => {
-            computeConditionEffects.mockReturnValue(makeEffects({ cannotAct: true }));
+        it('should set title attribute to badge description', () => {
+            computeConditionEffects.mockReturnValue(makeEffects({ speedReduction: 10 }));
             render(<ConditionEffectBadges conditions={[]} targetEffects={[]} creatureName="Alice" campaignName="test" />);
-            const badge = screen.getByText("Can't Act");
-            expect(badge.closest('.condition-effect-badge')).toHaveAttribute('title', "Can't Act");
+            const badge = screen.getByText(/Speed -10/);
+            expect(badge.closest('.condition-effect-badge')).toHaveAttribute('title', 'Speed is reduced by the amount shown.');
         });
 
         it('should render badges as div elements', () => {
-            computeConditionEffects.mockReturnValue(makeEffects({ cannotAct: true }));
+            computeConditionEffects.mockReturnValue(makeEffects({ speedReduction: 5 }));
             render(<ConditionEffectBadges conditions={[]} targetEffects={[]} creatureName="Alice" campaignName="test" />);
-            const badge = screen.getByText("Can't Act").closest('div');
+            const badge = screen.getByText(/Speed -5/).closest('div');
             expect(badge.tagName).toBe('DIV');
         });
     });
@@ -446,56 +291,50 @@ describe('ConditionEffectBadges', () => {
     describe('multiple badges at once', () => {
         it('should render multiple badges for multiple effects', () => {
             computeConditionEffects.mockReturnValue(makeEffects({
-                cannotAct: true,
-                speedZero: true,
-                proneEffect: true,
-                concentrationBroken: true,
+                speedReduction: 15,
+                targetDisadvantageCount: 2,
+                riderSaveDisadvantage: true,
             }));
             render(<ConditionEffectBadges conditions={[]} targetEffects={[]} creatureName="Alice" campaignName="test" />);
-            expect(screen.getByText("Can't Act")).toBeInTheDocument();
-            expect(screen.getByText('Speed 0')).toBeInTheDocument();
-            expect(screen.getByText('Prone')).toBeInTheDocument();
-            expect(screen.getByText('No Conc.')).toBeInTheDocument();
+            expect(screen.getByText(/Speed -15/)).toBeInTheDocument();
+            expect(screen.getByText('Disadv vs')).toBeInTheDocument();
+            expect(screen.getByText('Save Disadv')).toBeInTheDocument();
         });
 
-        it('should render all badges when conditions create multiple effects', () => {
+        it('should render all badges when effects create multiple badges', () => {
             computeConditionEffects.mockReturnValue(makeEffects({
-                cannotAct: true,
-                speedZero: true,
-                autoFailSaves: ['str', 'dex'],
-                autoCritWithin5ft: true,
-                targetAdvantageCount: 2,
-                attackDisadvantageCount: 3,
-                concentrationBroken: true,
+                speedReduction: 10,
+                targetDisadvantageCount: 2,
+                riderSaveDisadvantage: true,
+                riderAttackBonus: 5,
+                riderCannotOpportunityAttack: true,
             }));
             render(<ConditionEffectBadges conditions={[]} targetEffects={[]} creatureName="Alice" campaignName="test" />);
-            expect(screen.getByText("Can't Act")).toBeInTheDocument();
-            expect(screen.getByText('Speed 0')).toBeInTheDocument();
-            expect(screen.getByText('Auto-Fail STR/DEX')).toBeInTheDocument();
-            expect(screen.getByText('Auto-Crit')).toBeInTheDocument();
-            expect(screen.getByText('Adv vs')).toBeInTheDocument();
-            expect(screen.getByText('Disadv')).toBeInTheDocument();
-            expect(screen.getByText('No Conc.')).toBeInTheDocument();
+            expect(screen.getByText(/Speed -10/)).toBeInTheDocument();
+            expect(screen.getByText('Disadv vs')).toBeInTheDocument();
+            expect(screen.getByText('Save Disadv')).toBeInTheDocument();
+            expect(screen.getByText('+5 to hit')).toBeInTheDocument();
+            expect(screen.getByText('No OA')).toBeInTheDocument();
         });
     });
 
     describe('GM effect removal', () => {
         it('should render X button for removable effects when isLocalhost is true', () => {
-            computeConditionEffects.mockReturnValue(makeEffects({ pushEffect: true, pushDistance: 10, proneEffect: true }));
-            render(<ConditionEffectBadges conditions={[]} targetEffects={[{ target: 'Goblin', effect: 'push', value: 10 }]} creatureName="Goblin" campaignName="test" isLocalhost={true} />);
-            const pushBadge = screen.getByText('Push 10 ft').closest('.condition-effect-badge');
-            expect(pushBadge.querySelector('.effect-break-btn')).toBeInTheDocument();
+            computeConditionEffects.mockReturnValue(makeEffects({ riderAttackBonus: 3, riderCannotOpportunityAttack: true }));
+            render(<ConditionEffectBadges conditions={[]} targetEffects={[{ target: 'Goblin', effect: 'damage_bonus', value: 3 }]} creatureName="Goblin" campaignName="test" isLocalhost={true} />);
+            const badge = screen.getByText('+3 to hit').closest('.condition-effect-badge');
+            expect(badge.querySelector('.effect-break-btn')).toBeInTheDocument();
         });
 
         it('should not render X button when isLocalhost is false', () => {
-            computeConditionEffects.mockReturnValue(makeEffects({ pushEffect: true, pushDistance: 10 }));
-            render(<ConditionEffectBadges conditions={[]} targetEffects={[{ target: 'Goblin', effect: 'push', value: 10 }]} creatureName="Goblin" campaignName="test" isLocalhost={false} />);
-            const pushBadge = screen.getByText('Push 10 ft').closest('.condition-effect-badge');
-            expect(pushBadge.querySelector('.effect-break-btn')).toBeNull();
+            computeConditionEffects.mockReturnValue(makeEffects({ riderAttackBonus: 3 }));
+            render(<ConditionEffectBadges conditions={[]} targetEffects={[{ target: 'Goblin', effect: 'damage_bonus', value: 3 }]} creatureName="Goblin" campaignName="test" isLocalhost={false} />);
+            const badge = screen.getByText('+3 to hit').closest('.condition-effect-badge');
+            expect(badge.querySelector('.effect-break-btn')).toBeNull();
         });
 
         it('should not render X button for non-removable effects', () => {
-            computeConditionEffects.mockReturnValue(makeEffects({ cannotAct: true, speedZero: true }));
+            computeConditionEffects.mockReturnValue(makeEffects({ targetDisadvantageCount: 1, riderSaveDisadvantage: true }));
             render(<ConditionEffectBadges conditions={[]} targetEffects={[]} creatureName="Goblin" campaignName="test" isLocalhost={true} />);
             const badges = document.querySelectorAll('.condition-effect-badge');
             badges.forEach(badge => {
@@ -505,14 +344,14 @@ describe('ConditionEffectBadges', () => {
 
         it('should remove targetEffects entry when X is clicked', () => {
             const existingEffects = [
-                { target: 'Goblin', effect: 'push', value: 10, source: 'Test' },
-                { target: 'Goblin', effect: 'push', value: 15, source: 'Other' },
+                { target: 'Goblin', effect: 'damage_bonus', value: 3, source: 'Test' },
+                { target: 'Goblin', effect: 'damage_bonus', value: 5, source: 'Other' },
             ];
             runtimeState.getRuntimeValue.mockReturnValue(existingEffects);
-            computeConditionEffects.mockReturnValue(makeEffects({ pushEffect: true, pushDistance: 10 }));
+            computeConditionEffects.mockReturnValue(makeEffects({ riderAttackBonus: 3 }));
             render(<ConditionEffectBadges conditions={[]} targetEffects={existingEffects} creatureName="Goblin" campaignName="test" isLocalhost={true} />);
-            const pushBadge = screen.getByText('Push 10 ft').closest('.condition-effect-badge');
-            fireEvent.click(pushBadge.querySelector('.effect-break-btn'));
+            const badge = screen.getByText('+3 to hit').closest('.condition-effect-badge');
+            fireEvent.click(badge.querySelector('.effect-break-btn'));
             expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith('test', 'targetEffects', [existingEffects[1]], 'test');
         });
     });

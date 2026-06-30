@@ -1,23 +1,19 @@
 import { computeConditionEffects } from '../../services/combat/conditions/conditionEffects.js'
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js'
+import { EFFECT_DESCRIPTIONS } from '../../services/combat/conditions/effectDescriptions.js'
+
+function getEffectDescription(label) {
+    if (EFFECT_DESCRIPTIONS[label]) return EFFECT_DESCRIPTIONS[label]
+    if (label.startsWith('Speed -')) return 'Speed is reduced by the amount shown.'
+    if (label.startsWith('+') && label.includes('to hit')) return 'Attackers gain the shown bonus to hit this creature.'
+    return label
+}
 
 function ConditionEffectBadges({ conditions, targetEffects = [], creatureName, campaignName, hasTacticalShift, hasSpeedyOpportunityDisadvantage, hasSpeedyDifficultTerrainIgnore, isLocalhost }) {
     const condKeys = (conditions || []).map(c => c.key)
     const effects = computeConditionEffects(condKeys, [], targetEffects)
     const badges = []
-    if (effects.cannotAct) badges.push({ label: "Can't Act", cls: 'effect-cannot-act', icon: 'fa-hand', removable: false })
-    if (effects.speedZero) badges.push({ label: 'Speed 0', cls: 'effect-speed-zero', icon: 'fa-stop', removable: false })
     if (effects.speedReduction) badges.push({ label: `Speed -${effects.speedReduction}`, cls: 'effect-speed-zero', icon: 'fa-minus', removable: false })
-    if (effects.pushEffect) badges.push({ label: `Push ${effects.pushDistance || 10} ft`, cls: 'effect-push', icon: 'fa-angles-right', removable: true, effectType: 'push' })
-    if (effects.proneEffect) badges.push({ label: 'Prone', cls: 'effect-prone', icon: 'fa-person-falling', removable: true, effectType: 'prone_and_push' })
-    if (effects.autoCritWithin5ft) badges.push({ label: 'Auto-Crit', cls: 'effect-auto-crit', icon: 'fa-bolt', removable: false })
-    if (effects.concentrationBroken) badges.push({ label: 'No Conc.', cls: 'effect-no-conc', icon: 'fa-spinner', removable: false })
-    if (effects.autoFailSaves.length > 0) badges.push({ label: `Auto-Fail ${effects.autoFailSaves.join('/').toUpperCase()}`, cls: 'effect-auto-fail', icon: 'fa-shield', removable: false })
-    if (effects.resistantToAll) badges.push({ label: 'Resist All', cls: 'effect-resist', icon: 'fa-shield-halved', removable: false })
-    if (effects.attackDisadvantageCount > 0 || effects.abilityCheckDisadvantage) badges.push({ label: 'Disadv', cls: 'effect-disadvantage', icon: 'fa-arrow-down', removable: false })
-    if (effects.strCheckDisadvantage) badges.push({ label: 'STR Disadv', cls: 'effect-disadvantage', icon: 'fa-arrow-down', removable: false })
-    if (effects.rayOfEnfeebleDamageReduction) badges.push({ label: '-1d8 dmg', cls: 'effect-damage-reduction', icon: 'fa-burst', removable: false })
-    if (effects.targetAdvantageCount > 0) badges.push({ label: 'Adv vs', cls: 'effect-target-adv', icon: 'fa-arrow-up', removable: false })
     if (effects.targetDisadvantageCount > 0) badges.push({ label: 'Disadv vs', cls: 'effect-target-disadv', icon: 'fa-arrow-down', removable: false })
     if (effects.riderSaveDisadvantage) badges.push({ label: 'Save Disadv', cls: 'effect-disadvantage', icon: 'fa-shield', removable: false })
     if (effects.riderAttackBonus > 0) badges.push({ label: `+${effects.riderAttackBonus} to hit`, cls: 'effect-target-adv', icon: 'fa-bullseye', removable: true, effectType: 'damage_bonus' })
@@ -48,7 +44,7 @@ function ConditionEffectBadges({ conditions, targetEffects = [], creatureName, c
     return (
         <>
             {badges.map(b => (
-                <div key={b.label} className={`condition-effect-badge ${b.cls}`} title={b.label}>
+                <div key={b.label} className={`condition-effect-badge ${b.cls}`} title={getEffectDescription(b.label)}>
                     <i className={`fa-solid ${b.icon}`}></i> {b.label}
                     {isLocalhost && b.removable && (
                         <button

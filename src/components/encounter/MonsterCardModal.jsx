@@ -12,6 +12,7 @@ import { computeConditionEffects, combineAttackModes, CONDITIONS_THAT_CANNOT_ACT
 import { computeRangeEffect, getDistanceFeet, getNearestPlacedItem, rangeToFeet } from '../../services/rules/combat/rangeValidation.js';
 import * as mapsService from '../../services/maps/mapsService.js';
 import { useRuntimeValue, getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
+import { EFFECT_DESCRIPTIONS } from '../../services/combat/conditions/effectDescriptions.js';
 import './MonsterCardModal.css';
 
 const ABBR_MAP = { Strength: 'str', Dexterity: 'dex', Constitution: 'con', Intelligence: 'int', Wisdom: 'wis', Charisma: 'cha', str: 'str', dex: 'dex', con: 'con', int: 'int', wis: 'wis', cha: 'cha' };
@@ -357,16 +358,7 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
     const condEffects = computeConditionEffects(condKeys, [], monsterTargetEffects);
     const condEffectBadges = [];
     if (condEffects) {
-      if (condEffects.cannotAct) condEffectBadges.push({ label: "Can't Act", cls: 'effect-cannot-act', icon: 'fa-hand' });
-      if (condEffects.speedZero) condEffectBadges.push({ label: 'Speed 0', cls: 'effect-speed-zero', icon: 'fa-stop' });
-      if (condEffects.autoCritWithin5ft) condEffectBadges.push({ label: 'Auto-Crit', cls: 'effect-auto-crit', icon: 'fa-bolt' });
-      if (condEffects.concentrationBroken) condEffectBadges.push({ label: 'No Conc.', cls: 'effect-no-conc', icon: 'fa-spinner' });
-      if (condEffects.autoFailSaves.length > 0) condEffectBadges.push({ label: `Auto-Fail ${condEffects.autoFailSaves.join('/').toUpperCase()}`, cls: 'effect-auto-fail', icon: 'fa-shield' });
-      if (condEffects.resistantToAll) condEffectBadges.push({ label: 'Resist All', cls: 'effect-resist', icon: 'fa-shield-halved' });
-      if (condEffects.attackDisadvantageCount > 0 || condEffects.abilityCheckDisadvantage) condEffectBadges.push({ label: 'Disadv', cls: 'effect-disadvantage', icon: 'fa-arrow-down' });
-      if (condEffects.strCheckDisadvantage) condEffectBadges.push({ label: 'STR Disadv', cls: 'effect-disadvantage', icon: 'fa-arrow-down' });
-      if (condEffects.rayOfEnfeebleDamageReduction) condEffectBadges.push({ label: '-1d8 dmg', cls: 'effect-damage-reduction', icon: 'fa-burst' });
-      if (condEffects.targetAdvantageCount > 0) condEffectBadges.push({ label: 'Adv vs', cls: 'effect-target-adv', icon: 'fa-arrow-up' });
+      if (condEffects.targetDisadvantageCount > 0) condEffectBadges.push({ label: 'Disadv vs', cls: 'effect-target-disadv', icon: 'fa-arrow-down' });
       if (condEffects.riderSaveDisadvantage) condEffectBadges.push({ label: 'Save Disadv', cls: 'effect-disadvantage', icon: 'fa-shield' });
       if (condEffects.riderAttackBonus > 0) condEffectBadges.push({ label: `+${condEffects.riderAttackBonus} to hit`, cls: 'effect-target-adv', icon: 'fa-bullseye' });
       if (condEffects.riderCannotOpportunityAttack) condEffectBadges.push({ label: 'No OA', cls: 'effect-cannot-act', icon: 'fa-ban' });
@@ -435,7 +427,7 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
               </div>
               <div className="mc-conditions-effects">
                 {condEffectBadges.map(b => (
-                  <span key={b.label} className={`mc-effect-badge ${b.cls}`}>
+                  <span key={b.label} className={`mc-effect-badge ${b.cls}`} title={EFFECT_DESCRIPTIONS[b.label] || b.label}>
                     <i className={`fa-solid ${b.icon}`}></i> {b.label}
                   </span>
                 ))}

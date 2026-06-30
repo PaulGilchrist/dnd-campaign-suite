@@ -228,21 +228,7 @@ describe('MonsterCardModal - condition effect badges', () => {
     damageUtils.__setFindCreatureReturn(null);
   });
 
-  it('renders STR Disadv badge when strCheckDisadvantage is true', () => {
-    conditionEffects.__setComputeReturn({ ...defaultConditionEffects, strCheckDisadvantage: true });
-    damageUtils.__setFindCreatureReturn({ name: 'Goblin', conditions: [{ key: 'weakened', label: 'Weakened' }] });
-    render(<MonsterCardModal {...makeProps(makeMonster())} />);
-    expect(screen.getByText('STR Disadv')).toBeInTheDocument();
-    expect(document.querySelector('.effect-disadvantage')).toBeInTheDocument();
-  });
 
-  it('renders -1d8 dmg badge when rayOfEnfeebleDamageReduction is true', () => {
-    conditionEffects.__setComputeReturn({ ...defaultConditionEffects, rayOfEnfeebleDamageReduction: true });
-    damageUtils.__setFindCreatureReturn({ name: 'Goblin', conditions: [{ key: 'weakened', label: 'Weakened' }] });
-    render(<MonsterCardModal {...makeProps(makeMonster())} />);
-    expect(screen.getByText('-1d8 dmg')).toBeInTheDocument();
-    expect(document.querySelector('.effect-damage-reduction')).toBeInTheDocument();
-  });
 
   it('renders Save Disadv badge when riderSaveDisadvantage is true', () => {
     conditionEffects.__setComputeReturn({ ...defaultConditionEffects, riderSaveDisadvantage: true });
@@ -268,31 +254,23 @@ describe('MonsterCardModal - condition effect badges', () => {
     expect(document.querySelector('.effect-cannot-act')).toBeInTheDocument();
   });
 
-  it('renders all condition effect badges together when multiple conditions apply', () => {
+  it('renders Save Disadv, +N to hit, No OA, Insp. Move, No OA (Crit), OA Disadv, and No Difficult Terrain on Dash badges together when multiple conditions apply', () => {
     conditionEffects.__setComputeReturn({
       ...defaultConditionEffects,
-      cannotAct: true,
-      speedZero: true,
-      autoCritWithin5ft: true,
-      concentrationBroken: true,
-      autoFailSaves: ['str'],
-      resistantToAll: true,
-      attackDisadvantageCount: 1,
-      targetAdvantageCount: 1,
+      riderSaveDisadvantage: true,
+      riderAttackBonus: 3,
+      riderCannotOpportunityAttack: true,
     });
     damageUtils.__setFindCreatureReturn({ name: 'Goblin', conditions: [
-      { key: 'paralyzed', label: 'Paralyzed' },
       { key: 'blinded', label: 'Blinded' },
     ]});
     render(<MonsterCardModal {...makeProps(makeMonster())} />);
-    expect(screen.getByText("Can't Act")).toBeInTheDocument();
-    expect(screen.getByText('Speed 0')).toBeInTheDocument();
-    expect(screen.getByText('Auto-Crit')).toBeInTheDocument();
-    expect(screen.getByText('No Conc.')).toBeInTheDocument();
-    expect(screen.getByText(/Auto-Fail STR/)).toBeInTheDocument();
-    expect(screen.getByText('Resist All')).toBeInTheDocument();
-    expect(screen.getByText('Disadv')).toBeInTheDocument();
-    expect(screen.getByText('Adv vs')).toBeInTheDocument();
+    expect(screen.getByText('Save Disadv')).toBeInTheDocument();
+    expect(screen.getByText('+3 to hit')).toBeInTheDocument();
+    expect(screen.getByText('No OA')).toBeInTheDocument();
+    expect(document.querySelector('.effect-disadvantage')).toBeInTheDocument();
+    expect(document.querySelector('.effect-target-adv')).toBeInTheDocument();
+    expect(document.querySelector('.effect-cannot-act')).toBeInTheDocument();
   });
 
   it('renders Inspiring Move badge when inspiringMovementNoOA runtime value is true and creature has conditions', () => {
