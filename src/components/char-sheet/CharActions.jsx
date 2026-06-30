@@ -1313,6 +1313,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                             <div className={resolvedDamage ? "clickable" : ""} onClick={() => {
                                 if (cannotAct) return;
                                 if (isSpellAtk && spell.saveDc) { resolveSpellDamage(attackItem); return; }
+                                if (isSpellAtk) { actionCastAction(spell, {}); return; }
                                 handleSimpleDamageRoll(attackItem);
                             }}>{resolvedDamage}</div>
                             <div className='left'>{damageType || (spell.heal_at_slot_level ? 'Healing' : 'Utility')}</div>

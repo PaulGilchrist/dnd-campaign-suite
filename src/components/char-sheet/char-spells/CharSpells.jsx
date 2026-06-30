@@ -22,10 +22,9 @@ import { getCurrentSorceryPoints, getMaxSorceryPoints, spendSorceryPoints } from
 import { isPsionicSpell, hasPsionicSorcery } from '../../../services/rules/spells/metamagicRules.js';
 import { useSpellMetamagicFlow } from '../../../hooks/combat/useSpellMetamagicFlow.js'
 import { useSpellUpcastFlow } from '../../../hooks/combat/useSpellUpcastFlow.js'
-import UpcastPopup from './UpcastPopup.jsx'
-import { executeSpellCast } from '../../../services/rules/spells/spellCastService.js'
-import * as mapsService from '../../../services/maps/mapsService.js';
-import { getNearestPlacedItem } from '../../../services/rules/combat/rangeValidation.js';
+import UpcastPopup from './UpcastPopup.jsx';
+import { useSpellCastExecutor } from '../../../hooks/combat/useSpellCastExecutor.js';
+import { useSpellPositionResolver } from '../../../hooks/combat/useSpellPositionResolver.js';
 import { isInnateSorceryActive } from '../../../services/combat/buffs/buffService.js';
 import { useRuntimeValue, setRuntimeValue, getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import utils from '../../../services/ui/utils.js';
@@ -163,11 +162,6 @@ const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells
       pending.action({});
     }, [pendingSimpleMetamagic]);
 
-    const getDamageFormula = (effect) => {
-        const match = effect.match(/^(\d+d\d+(?:[+-]\d+)?)/);
-        return match ? match[1] : null;
-    };
-
     const getTargetInfo = React.useCallback(async () => {
         const cs = await getCombatContext(campaignName);
         if (!cs) return null;
@@ -178,64 +172,12 @@ const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells
         return null;
     }, [playerStats.name, campaignName]);
 
-    const cachedCastPosRef = React.useRef(null);
+    const { resolvePositions: resolveSpellPositions, cachedPosRef: cachedCastPosRef } = useSpellPositionResolver(campaignName, mapName, playerStats.name);
 
-    const castAction = React.useCallback((spell, metaCtx) => {
-      const pos = cachedCastPosRef.current;
-      executeSpellCast(spell, metaCtx, { rollAttack, rollDamage, playerStats, getTargetInfo, attackerPos: pos?.attackerPos, targetPos: pos?.targetPos, campaignName, mapName, characters }).then((result) => {
-        if (result && result.healAmount > 0) {
-          const bonusHealDetail = result.bonusDetails?.length > 0
-            ? result.bonusDetails.map(d => `${d.amount} ${d.name}`).join(', ')
-            : '';
-          const rawTotal = result.rawTotal ?? result.healAmount;
-          setPopupHtml({
-            type: 'heal',
-            name: spell.name,
-            formula: result.formula,
-            rolls: result.rolls || [],
-            total: rawTotal,
-            targetName: result.targetName,
-            finalHeal: result.healAmount,
-            bonusHeal: result.bonusHeal || 0,
-            bonusHealDetail,
-          });
-        }
-      }).catch((e) => { console.error('[CharSpells] executeSpellCast error:', e); });
-      cachedCastPosRef.current = null;
-      }, [rollAttack, rollDamage, playerStats, getTargetInfo, campaignName, mapName, characters, setPopupHtml]);
+    const { castAction } = useSpellCastExecutor(rollAttack, rollDamage, playerStats, getTargetInfo, campaignName, mapName, characters, setPopupHtml, {}, cachedCastPosRef);
+
     const { pendingMetamagic, pendingMultiTarget, gateMetamagic, handleConfirm, handleSkip, handleMultiTargetConfirm, handleMultiTargetSkip, pendingAid, handleAidConfirm, handleAidSkip, pendingHeroesFeast, handleHeroesFeastConfirm, handleHeroesFeastSkip, pendingGreaterRestoration, handleGreaterRestorationConfirm, handleGreaterRestorationSkip, pendingLesserRestoration, handleLesserRestorationConfirm, handleLesserRestorationSkip, pendingMageArmor, handleMageArmorConfirm, handleMageArmorSkip, pendingShieldOfFaith, handleShieldOfFaithConfirm, handleShieldOfFaithSkip, pendingProtectionFromEnergy, handleProtectionFromEnergyConfirm, handleProtectionFromEnergySkip, pendingResistance, handleResistanceConfirm, handleResistanceSkip, pendingRemoveCurse, handleRemoveCurseConfirm, handleRemoveCurseSkip, pendingMagicMissile, handleMagicMissileConfirm, handleMagicMissileSkip } = useSpellMetamagicFlow(playerStats, campaignName, castAction);
     const { pendingUpcast, buildUpcastLevels, gateUpcast, handleUpcastConfirm, handleUpcastCancel, getCantripAutoLevel } = useSpellUpcastFlow(playerStats, campaignName);
-
-    const resolveSpellPositions = React.useCallback(async () => {
-      if (!mapName) return;
-      try {
-        const [mapData] = await Promise.all([
-          mapsService.loadMapData(campaignName, mapName),
-        ]);
-        const attackerPlayer = mapData?.players?.find(p => p.name === playerStats.name);
-        if (attackerPlayer) {
-          const cs = await getCombatContext(campaignName);
-          const target = cs ? getTargetFromAttacker(cs, playerStats.name) : null;
-          if (target) {
-            const targetPlayer = mapData?.players?.find(p => p.name === target.name);
-            const targetNpc = mapData?.placedItems?.length
-              ? getNearestPlacedItem(mapData.placedItems, target.name, attackerPlayer)
-              : null;
-            const targetPos = targetPlayer
-              ? { gridX: targetPlayer.gridX, gridY: targetPlayer.gridY }
-              : targetNpc
-                ? { gridX: targetNpc.gridX, gridY: targetNpc.gridY }
-                : null;
-            if (targetPos) {
-              cachedCastPosRef.current = {
-                attackerPos: { gridX: attackerPlayer.gridX, gridY: attackerPlayer.gridY },
-                targetPos,
-              };
-            }
-          }
-        }
-      } catch { /* positions unavailable */ }
-    }, [mapName, campaignName, playerStats.name]);
 
     const handleSpellCast = React.useCallback(async (spell, metaCtx) => {
         setSelectedSpell(null);
@@ -690,6 +632,7 @@ return (
                         let notes = [];
                         if(spell.components) notes.push(spell.components.join('/'));
                         let effect = 'Utility';
+                        let hasEffect = false;
                         if(spell.damage) {
                             const slotDmg = spell.damage.damage_at_slot_level;
                             const charDmg = spell.damage.damage_at_character_level;
@@ -709,7 +652,12 @@ return (
                                     const saveLabel = spell.dc.dc_success === 'half' ? 'half' : 'negates';
                                     effect += ` (${spell.dc.dc_type} ${saveLabel})`;
                                 }
+                                hasEffect = true;
                             }
+                        } else if (spell.dc) {
+                            const saveLabel = spell.dc.dc_success === 'half' ? 'half' : spell.dc.dc_success === 'negates' ? 'negates' : '';
+                            effect = spell.dc.dc_type + (saveLabel ? ` ${saveLabel}` : '');
+                            hasEffect = true;
                         }
                         return <tr key={spell.name}>
                             <td className='left spell-name clickable' onClick={() => setSelectedSpell(spell)}>{spell.name}</td>
@@ -718,7 +666,7 @@ return (
                             {!is2024 && (spell.prepared === 'Prepared' || spell.prepared === '') && <td><input tabIndex={0} type="checkbox" checked={spell.prepared === 'Prepared'} onChange={() => handleTogglePreparedSpells(spell.name)}/></td>}
                             <td>{spell.casting_time ? spell.casting_time.replace(/\bbonus action\b/g, 'BA').replace(/\baction\b/g, ' A').replace(/\breaction\b/g, 'Reaction').replace(/\bminute\b/g, 'min').replace(/\bminutes\b/g, 'min') : ''}</td>
                             <td>{spell.range}</td>
-                            <td className={getDamageFormula(effect) ? 'clickable' : ''} onClick={getDamageFormula(effect) ? () => handleDamageRoll(getDamageFormula(effect), spell.name, spell) : undefined}>{effect}</td>
+                            <td className={hasEffect ? 'clickable' : ''} onClick={hasEffect ? () => handleDamageRoll(null, spell.name, spell) : undefined}>{effect}</td>
                             <td>{spell.duration ? spell.duration.replace('Instantaneous','Instant').replace('minute','min').replace('minutes','min').replace('up to ','') : ''}</td>
                             <td className='left'>{notes.join(', ').replace('Concentration','Con')}</td>
                         </tr>

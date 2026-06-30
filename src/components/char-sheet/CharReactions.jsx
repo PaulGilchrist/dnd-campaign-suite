@@ -287,6 +287,7 @@ function CharReactions({ playerStats, campaignName, cannotAct, mapName, characte
                         <div className={resolvedDamage ? "clickable" : ""} onClick={() => {
                             if (cannotAct) return;
                             const attackItem = { ...spell, type: 'Reaction', hitBonus: playerStats.spellAbilities?.toHit, saveDc: spell.dc ? playerStats.spellAbilities.saveDc : null, saveType: spell.dc?.dc_type, saveSuccess: spell.dc?.dc_success, damage: resolvedDamage, damageType };
+                            if (isSpellAtk) { reactionCastAction(spell, {}); return; }
                             handleSimpleDamageRoll(attackItem);
                         }}>{resolvedDamage}</div>
                         <div className='left'>{damageType || (spell.heal_at_slot_level ? 'Healing' : 'Utility')}</div>
