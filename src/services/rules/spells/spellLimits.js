@@ -55,9 +55,11 @@ async function fetchClassData(className, version = '5e') {
  * @param {string} className - The name of the class (e.g., 'Wizard', 'Bard')
  * @param {number} level - The character level (1-20)
  * @param {string} version - '5e' or '2024'
+ * @param {string|null} majorName - The subclass name
+ * @param {object} [extraOptions] - Additional class options (divineOrder, primalOrder)
  * @returns {object} - Object containing spell limits for each level
  */
-export async function getSpellLimits(className, level, version = '5e', majorName = null) {
+export async function getSpellLimits(className, level, version = '5e', majorName = null, extraOptions = null) {
   try {
     const classData = await fetchClassData(className, version);
     
@@ -85,7 +87,19 @@ export async function getSpellLimits(className, level, version = '5e', majorName
      }
     }
 
-    return convertSpellcastingToLimits(levelEntry.spellcasting, className);
+    let limits = convertSpellcastingToLimits(levelEntry.spellcasting, className);
+
+    // Apply 2024 Divine Order / Primal Order bonus cantrips
+    if (version === '2024' && extraOptions) {
+      if (extraOptions.divineOrder === 'Thaumaturge' && className === 'Cleric') {
+        limits.cantrip = (limits.cantrip || 0) + 1;
+      }
+      if (extraOptions.primalOrder === 'Magician' && className === 'Druid') {
+        limits.cantrip = (limits.cantrip || 0) + 1;
+      }
+    }
+
+    return limits;
   } catch (error) {
     console.error(`Error fetching spell limits for ${className} level ${level}:`, error);
     return getDefaultSpellLimits(className);

@@ -22,10 +22,14 @@ function WizardStepSpells({ formData, allSpells, onArrayFieldChange, preSelected
       const charLevel = parseInt(formData.level) || 1;
       const version = formData.rules || '5e';
       const majorName = formData.class.major?.name || formData.class.subclass?.name || null;
+      const classOptions = {
+        divineOrder: formData.class.divineOrder || null,
+        primalOrder: formData.class.primalOrder || null
+      };
       
       setIsLoadingLimits(true);
       try {
-        const limits = await getSpellLimits(className, charLevel, version, majorName);
+        const limits = await getSpellLimits(className, charLevel, version, majorName, classOptions);
         setSpellLimits(limits);
       } catch (error) {
         console.error('Error fetching spell limits:', error);

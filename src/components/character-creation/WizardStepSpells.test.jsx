@@ -649,7 +649,7 @@ describe('WizardStepSpells', () => {
       });
       render(<WizardStepSpells {...mockProps} formData={{ ...mockProps.formData, rules: '2024' }} />);
       await waitFor(() => {
-        expect(spellLimits.getSpellLimits).toHaveBeenCalledWith('Wizard', 5, '2024', expect.any(String));
+        expect(spellLimits.getSpellLimits).toHaveBeenCalledWith('Wizard', 5, '2024', expect.any(String), expect.any(Object));
       });
     });
 
@@ -663,7 +663,7 @@ describe('WizardStepSpells', () => {
       });
       render(<WizardStepSpells {...mockProps} formData={{ ...mockProps.formData, rules: undefined }} />);
       await waitFor(() => {
-        expect(spellLimits.getSpellLimits).toHaveBeenCalledWith('Wizard', 5, '5e', expect.any(String));
+        expect(spellLimits.getSpellLimits).toHaveBeenCalledWith('Wizard', 5, '5e', expect.any(String), expect.any(Object));
       });
     });
   });
@@ -988,7 +988,7 @@ describe('WizardStepSpells', () => {
       });
       render(<WizardStepSpells {...mockProps} formData={{ ...mockProps.formData, class: { name: 'Wizard', major: { name: 'Evocation' } } }} />);
       await waitFor(() => {
-        expect(spellLimits.getSpellLimits).toHaveBeenCalledWith('Wizard', 5, '5e', 'Evocation');
+        expect(spellLimits.getSpellLimits).toHaveBeenCalledWith('Wizard', 5, '5e', 'Evocation', expect.any(Object));
       });
     });
 
@@ -1002,7 +1002,7 @@ describe('WizardStepSpells', () => {
       });
       render(<WizardStepSpells {...mockProps} formData={{ ...mockProps.formData, class: { name: 'Wizard', major: null, subclass: { name: 'School of Necromancy' } } }} />);
       await waitFor(() => {
-        expect(spellLimits.getSpellLimits).toHaveBeenCalledWith('Wizard', 5, '5e', 'School of Necromancy');
+        expect(spellLimits.getSpellLimits).toHaveBeenCalledWith('Wizard', 5, '5e', 'School of Necromancy', expect.any(Object));
       });
     });
   });
