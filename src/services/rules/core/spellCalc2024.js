@@ -123,12 +123,21 @@ export function getSpellAbilities(allSpells, playerStats, playerSummary) {
                 ...(playerStats.automation.actions || []),
                 ...(playerStats.automation.bonusActions || []),
                 ...(playerStats.automation.passives || []),
+                ...(playerStats.automation.specialActions || []),
             ];
             autoFeatures.forEach(feature => {
                 if (feature.type === 'cantrip_spellcasting_ability') {
                     const cantripEntry = spellAbilities.spells.find(s => s.name === feature.cantripName);
-                    if (cantripEntry && feature.spellcastingAbility) {
-                        cantripEntry.spellCastingAbility = feature.spellcastingAbility;
+                    if (cantripEntry) {
+                        if (feature.spellcastingAbility) {
+                            cantripEntry.spellCastingAbility = feature.spellcastingAbility;
+                        }
+                    } else if (feature.cantripName) {
+                        spellAbilities.spells.push({
+                            name: feature.cantripName,
+                            prepared: 'Always',
+                            ...(feature.spellcastingAbility ? { spellCastingAbility: feature.spellcastingAbility } : {})
+                        });
                     }
                 }
                 if (feature.type === 'elfish_lineage') {
@@ -260,6 +269,13 @@ export function getSpellAbilities(allSpells, playerStats, playerSummary) {
                     feature.alwaysPreparedSpells.forEach(spellName => {
                         const knownSpell = spellAbilities.spells.find(s => s.name === spellName);
                         if (!knownSpell) {
+                            spellAbilities.spells.push({ name: spellName, prepared: 'Always' });
+                        }
+                    });
+                }
+                if (feature.type === 'psionic_spells_list' && feature.psionic_spells) {
+                    feature.psionic_spells.forEach(spellName => {
+                        if (!spellAbilities.spells.find(s => s.name === spellName)) {
                             spellAbilities.spells.push({ name: spellName, prepared: 'Always' });
                         }
                     });

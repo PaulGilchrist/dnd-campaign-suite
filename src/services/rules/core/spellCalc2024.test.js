@@ -691,7 +691,7 @@ describe('spellCalc2024', () => {
       expect(fireBolt.spellCastingAbility).toBeUndefined();
     });
 
-    it('ignores cantrip_spellcasting_ability when cantripName not in spell list', () => {
+    it('adds cantrip_spellcasting_ability cantrip even when not in spell list', () => {
       const stats = makePlayerStats();
       stats.spells = ['Fire Bolt'];
       stats.automation = {
@@ -701,7 +701,7 @@ describe('spellCalc2024', () => {
       const result = getSpellAbilities([], stats);
 
       const light = result.spells.find(s => s.name === 'Light');
-      expect(light).toBeUndefined();
+      expect(light).toEqual({ name: 'Light', prepared: 'Always', spellCastingAbility: 'Charisma' });
     });
 
     // ── Automation: elfish_lineage ──
