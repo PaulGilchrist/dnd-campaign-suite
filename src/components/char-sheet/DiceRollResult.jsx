@@ -40,7 +40,7 @@ function DiceRollResult({ name, type, rolls, rollType, bonus = 0, bonusDetail, f
 
     const isCritDamage = isDamageType && (isCrit || isAutoCrit);
 
-    const originalTotal = isDamageType ? total : (finalRoll + bonus + modifier);
+    const originalTotal = (isDamageType || isHealType) ? total : (finalRoll + bonus + modifier);
     const displayRoll = strokeResult !== null ? 20 : (rerollResult !== null ? rerollResult.roll : finalRoll);
     const displayTotal = strokeResult !== null ? 20 + bonus + modifier : (rerollResult !== null ? rerollResult.total : originalTotal);
     const appliesReplace = (strSaveReplace && rollType === 'save') || (strCheckReplace && (rollType === 'check' || rollType === 'skill'));
