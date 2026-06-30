@@ -3,6 +3,7 @@ import { getCombatContext } from '../combat/damageUtils.js';
 import { applyHealingToTarget } from '../combat/applyHealing.js';
 import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import { postLogEntry } from '../../shared/logPoster.js';
+import { resolveHealingBonusesWithDetails } from '../../combat/automation/automationService.js';
 
 const MASS_HEALING_WORD_NAME = 'Mass Healing Word';
 
@@ -68,7 +69,8 @@ export async function triggerMassHealingWord(spell, metaCtx, playerStats, campai
         return null;
     }
 
-    const healAmount = result.total;
+    const { totalBonus: bonusHeal, details: bonusDetails } = resolveHealingBonusesWithDetails(playerStats, playerStats.proficiency || 0, playerStats.level || 1, slotLevel);
+    const healAmount = result.total + bonusHeal;
     const combatSummary = await getCombatContext(campaignName);
     if (!combatSummary) {
         return null;
@@ -99,6 +101,12 @@ export async function triggerMassHealingWord(spell, metaCtx, playerStats, campai
 
         const newHp = Math.min(maxHp, currentHp + actualHeal);
 
+        const formulaParts = [healExpression];
+        if (bonusDetails.length > 0) {
+            const bonusParts = bonusDetails.map(d => `${d.amount} ${d.name}`).join(' + ');
+            formulaParts.push(`(${bonusParts})`);
+        }
+
         postLogEntry(campaignName, {
             type: 'hp_change',
             targetName,
@@ -108,7 +116,7 @@ export async function triggerMassHealingWord(spell, metaCtx, playerStats, campai
             isHealing: true,
             sourceName: casterName,
             note: 'Mass Healing Word',
-            formula: healExpression,
+            formula: formulaParts.join(' + '),
             timestamp: Date.now(),
         });
 
@@ -117,5 +125,5 @@ export async function triggerMassHealingWord(spell, metaCtx, playerStats, campai
 
     window.dispatchEvent(new CustomEvent('combat-summary-updated'));
 
-    return { targets: results, formula: healExpression, totalHealed: results.reduce((sum, r) => sum + r.healAmount, 0) };
+    return { targets: results, formula: healExpression, totalHealed: results.reduce((sum, r) => sum + r.healAmount, 0), rolls: result.rolls, rawTotal: result.total + bonusHeal };
 }

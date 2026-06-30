@@ -3,6 +3,7 @@ import { applyHealingToTarget } from '../combat/applyHealing.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import { postLogEntry } from '../../shared/logPoster.js';
 import { getDistanceFeet, rangeToFeet } from '../combat/rangeValidation.js';
+import { resolveHealingBonusesWithDetails } from '../../combat/automation/automationService.js';
 
 const MASS_HEAL_NAME = 'Mass Heal';
 const CONDITIONS_TO_REMOVE = ['blinded', 'deafened', 'poisoned'];
@@ -112,13 +113,17 @@ export async function triggerMassHeal(spell, metaCtx, playerStats, campaignName,
         }
     }
     let remainingPool = totalPool;
+    const { totalBonus: bonusHeal, details: bonusDetails } = resolveHealingBonusesWithDetails(playerStats, playerStats.proficiency || 0, playerStats.level || 1, slotLevel);
+    if (bonusHeal > 0) {
+        remainingPool += bonusHeal * targets.length;
+    }
 
     for (const target of targets) {
         const targetName = target.name;
         const maxHp = target.maxHp || playerStats.hitPoints || 0;
         const storedHp = getRuntimeValue(targetName, 'currentHitPoints', campaignName);
         const currentHp = storedHp != null && storedHp !== '' ? Number(storedHp) : maxHp;
-        const healAmount = Math.min(totalPool - (totalPool - remainingPool), maxHp - currentHp);
+        const healAmount = Math.min(totalPool - (totalPool - remainingPool) + bonusHeal, maxHp - currentHp);
         const actualHeal = Math.min(healAmount, remainingPool);
 
         if (actualHeal > 0) {
@@ -127,6 +132,12 @@ export async function triggerMassHeal(spell, metaCtx, playerStats, campaignName,
         }
 
         const newHp = Math.min(maxHp, currentHp + actualHeal);
+
+        const formulaParts = [`${totalPool}`];
+        if (bonusDetails.length > 0) {
+            const bonusParts = bonusDetails.map(d => `${d.amount} ${d.name} × ${targets.length}`).join(' + ');
+            formulaParts.push(`(${bonusParts})`);
+        }
 
         postLogEntry(campaignName, {
             type: 'hp_change',
@@ -137,6 +148,7 @@ export async function triggerMassHeal(spell, metaCtx, playerStats, campaignName,
             isHealing: true,
             sourceName: casterName,
             note: 'Mass Heal',
+            formula: formulaParts.join(' + '),
             timestamp: Date.now(),
         });
 
@@ -147,5 +159,5 @@ export async function triggerMassHeal(spell, metaCtx, playerStats, campaignName,
 
     window.dispatchEvent(new CustomEvent('combat-summary-updated'));
 
-    return { targets: results, totalHealed: results.reduce((sum, r) => sum + r.healAmount, 0) };
+    return { targets: results, totalHealed: results.reduce((sum, r) => sum + r.healAmount, 0), rolls: [], rawTotal: totalPool };
 }

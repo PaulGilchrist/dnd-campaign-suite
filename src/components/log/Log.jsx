@@ -354,6 +354,7 @@ function HpChangeEntry({ entry }) {
                 <>
                   {entry.isUnconscious && 'Knocked Unconscious — '}
                   {isDamage ? 'Takes Damage' : (entry.sourceName ? `Healed (${entry.sourceName})` : 'Healed')}
+                  {entry.note && !isDamage && <span className="log-dice-formula">{entry.note}</span>}
                   {entry.maximizeHealingDice && !isDamage && ' — Dice maximized by Supreme Healing'}
                 </>
               )}
@@ -368,6 +369,7 @@ function HpChangeEntry({ entry }) {
             <span className="log-hp-delta">{entry.delta > 0 ? '+' : ''}{entry.delta} HP</span>
             <span className="log-hp-current"> {entry.currentHp}/{entry.maxHp}</span>
             {entry.rollInfo && !isDamage && <span className="log-roll-info"> ({entry.rollInfo})</span>}
+            {entry.formula && !isDamage && <span className="log-dice-formula">{entry.formula}</span>}
           </>
         )}
       </div>

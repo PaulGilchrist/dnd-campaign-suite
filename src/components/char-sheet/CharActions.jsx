@@ -1249,7 +1249,25 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                 campaignName,
                 mapName,
                 characters,
-            });
+            }).then((healResult) => {
+                if (healResult && healResult.healAmount > 0) {
+                    const bonusHealDetail = healResult.bonusDetails?.length > 0
+                        ? healResult.bonusDetails.map(d => `${d.amount} ${d.name}`).join(', ')
+                        : '';
+                    const rawTotal = healResult.rawTotal ?? healResult.healAmount;
+                    setPopupHtml({
+                        type: 'heal',
+                        name: spell.name,
+                        formula: healResult.formula,
+                        rolls: healResult.rolls || [],
+                        total: rawTotal,
+                        targetName: healResult.targetName,
+                        finalHeal: healResult.healAmount,
+                        bonusHeal: healResult.bonusHeal || 0,
+                        bonusHealDetail,
+                    });
+                }
+            }).catch((e) => { console.error('[CharActions] executeSpellCast error:', e); });
 
             setPopupHtml({
                 type: 'automation_info',
@@ -1297,9 +1315,27 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
 
     const actionCastAction = React.useCallback((spell, metaCtx) => {
         const pos = cachedActionCastPosRef.current;
-        executeSpellCast(spell, metaCtx, { rollAttack, rollDamage, playerStats, getTargetInfo, attackerPos: pos?.attackerPos, targetPos: pos?.targetPos, featEffects: featRangeEffects, campaignName, mapName, characters });
+        executeSpellCast(spell, metaCtx, { rollAttack, rollDamage, playerStats, getTargetInfo, attackerPos: pos?.attackerPos, targetPos: pos?.targetPos, featEffects: featRangeEffects, campaignName, mapName, characters }).then((result) => {
+            if (result && result.healAmount > 0) {
+                const bonusHealDetail = result.bonusDetails?.length > 0
+                    ? result.bonusDetails.map(d => `${d.amount} ${d.name}`).join(', ')
+                    : '';
+                const rawTotal = result.rawTotal ?? result.healAmount;
+                setPopupHtml({
+                    type: 'heal',
+                    name: spell.name,
+                    formula: result.formula,
+                    rolls: result.rolls || [],
+                    total: rawTotal,
+                    targetName: result.targetName,
+                    finalHeal: result.healAmount,
+                    bonusHeal: result.bonusHeal || 0,
+                    bonusHealDetail,
+                });
+            }
+        }).catch((e) => { console.error('[CharActions] executeSpellCast error:', e); });
         cachedActionCastPosRef.current = null;
-    }, [rollAttack, rollDamage, playerStats, getTargetInfo, featRangeEffects, campaignName, mapName, characters]);
+    }, [rollAttack, rollDamage, playerStats, getTargetInfo, featRangeEffects, campaignName, mapName, characters, setPopupHtml]);
     const { pendingMetamagic: actionPendingMetamagic, gateMetamagic: actionGateMetamagic, handleConfirm: actionHandleConfirm, handleSkip: actionHandleSkip, pendingAid: actionPendingAid, handleAidConfirm: actionHandleAidConfirm, handleAidSkip: actionHandleAidSkip, pendingGreaterRestoration: actionPendingGreaterRestoration, handleGreaterRestorationConfirm: actionHandleGreaterRestorationConfirm, handleGreaterRestorationSkip: actionHandleGreaterRestorationSkip, pendingRemoveCurse: actionPendingRemoveCurse, handleRemoveCurseConfirm: actionHandleRemoveCurseConfirm, handleRemoveCurseSkip: actionHandleRemoveCurseSkip, pendingMagicMissile: actionPendingMagicMissile, handleMagicMissileConfirm: actionHandleMagicMissileConfirm, handleMagicMissileSkip: actionHandleMagicMissileSkip } = useSpellMetamagicFlow(playerStats, campaignName, actionCastAction);
     const handleActionSpellCast = React.useCallback(async (spell, metaCtx) => {
         setSelectedActionSpell(null);

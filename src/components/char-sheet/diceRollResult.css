@@ -280,3 +280,26 @@
 .dice-roll-gwf i {
     margin-right: 4px;
 }
+
+.dice-roll-heal-applied {
+    text-align: center;
+    font-size: 0.95em;
+    font-weight: bold;
+    color: #4CAF50;
+    background: rgba(76, 175, 80, 0.12);
+    padding: 6px 10px;
+    border-radius: 4px;
+    margin: 8px 0;
+}
+
+.dice-roll-heal-bonus {
+    text-align: center;
+    font-size: 0.85em;
+    font-weight: normal;
+    color: #8BC34A;
+    margin-top: 4px;
+}
+
+.dice-roll-heal-bonus i {
+    margin-right: 4px;
+}

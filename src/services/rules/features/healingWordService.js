@@ -3,6 +3,7 @@ import { getCombatContext, getTargetFromAttacker } from '../combat/damageUtils.j
 import { applyHealingToTarget } from '../combat/applyHealing.js';
 import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import { postLogEntry } from '../../shared/logPoster.js';
+import { resolveHealingBonusesWithDetails } from '../../combat/automation/automationService.js';
 
 const HEALING_WORD_NAME = 'Healing Word';
 
@@ -47,7 +48,8 @@ export async function triggerHealingWord(spell, metaCtx, playerStats, campaignNa
     const result = rollExpression(healExpression);
     if (!result) return null;
 
-    const healAmount = result.total;
+    const { totalBonus: bonusHeal, details: bonusDetails } = resolveHealingBonusesWithDetails(playerStats, playerStats.proficiency || 0, playerStats.level || 1, slotLevel);
+    const healAmount = result.total + bonusHeal;
     const maxHp = combatSummary.creatures.find(c => c.name === targetName)?.maxHp || playerStats.hitPoints || 0;
     const storedHp = getRuntimeValue(targetName, 'currentHitPoints', campaignName);
     const currentHp = storedHp != null && storedHp !== '' ? Number(storedHp) : maxHp;
@@ -59,6 +61,12 @@ export async function triggerHealingWord(spell, metaCtx, playerStats, campaignNa
 
     const newHp = Math.min(maxHp, currentHp + actualHeal);
 
+    const formulaParts = [healExpression];
+    if (bonusDetails.length > 0) {
+        const bonusParts = bonusDetails.map(d => `${d.amount} ${d.name}`).join(' + ');
+        formulaParts.push(`(${bonusParts})`);
+    }
+
     postLogEntry(campaignName, {
         type: 'hp_change',
         targetName,
@@ -68,11 +76,11 @@ export async function triggerHealingWord(spell, metaCtx, playerStats, campaignNa
         isHealing: true,
         sourceName: playerStats.name,
         note: 'Healing Word',
-        formula: healExpression,
+        formula: formulaParts.join(' + '),
         timestamp: Date.now(),
     });
 
     window.dispatchEvent(new CustomEvent('combat-summary-updated'));
 
-    return { targetName, healAmount: actualHeal, formula: healExpression };
+    return { targetName, healAmount: actualHeal, formula: healExpression, rolls: result.rolls, rawTotal: result.total + bonusHeal };
 }

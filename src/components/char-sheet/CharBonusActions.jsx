@@ -102,9 +102,27 @@ function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, condit
 
     const bonusCastAction = React.useCallback((spell, metaCtx) => {
       const pos = cachedBonusCastPosRef.current;
-      executeSpellCast(spell, metaCtx, { rollAttack, rollDamage, playerStats, getTargetInfo, attackerPos: pos?.attackerPos, targetPos: pos?.targetPos, innateSorceryActive: !!displaySaveDcBonus, campaignName, mapName, characters });
+      executeSpellCast(spell, metaCtx, { rollAttack, rollDamage, playerStats, getTargetInfo, attackerPos: pos?.attackerPos, targetPos: pos?.targetPos, innateSorceryActive: !!displaySaveDcBonus, campaignName, mapName, characters }).then((result) => {
+        if (result && result.healAmount > 0) {
+          const bonusHealDetail = result.bonusDetails?.length > 0
+            ? result.bonusDetails.map(d => `${d.amount} ${d.name}`).join(', ')
+            : '';
+          const rawTotal = result.rawTotal ?? result.healAmount;
+          setPopupHtml({
+            type: 'heal',
+            name: spell.name,
+            formula: result.formula,
+            rolls: result.rolls || [],
+            total: rawTotal,
+            targetName: result.targetName,
+            finalHeal: result.healAmount,
+            bonusHeal: result.bonusHeal || 0,
+            bonusHealDetail,
+          });
+        }
+      }).catch((e) => { console.error('[CharBonusActions] executeSpellCast error:', e); });
       cachedBonusCastPosRef.current = null;
-      }, [rollAttack, rollDamage, playerStats, getTargetInfo, displaySaveDcBonus, campaignName, mapName, characters]);
+      }, [rollAttack, rollDamage, playerStats, getTargetInfo, displaySaveDcBonus, campaignName, mapName, characters, setPopupHtml]);
     const { pendingMetamagic, gateMetamagic, handleConfirm, handleSkip } = useSpellMetamagicFlow(playerStats, campaignName, bonusCastAction);
     const { buildUpcastLevels } = useSpellUpcastFlow(playerStats, campaignName);
 

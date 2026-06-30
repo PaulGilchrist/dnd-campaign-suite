@@ -37,7 +37,7 @@ const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells
     const _activeBuffs = useRuntimeValue(playerStats.name, 'activeBuffs', campaignName); (void _activeBuffs); // subscribe to activeBuffs changes for re-render
     const innateSorceryActive = isInnateSorceryActive(playerStats.name, campaignName);
     useActionPopup('spell');
-    useDiceRollPopup();
+    const { setPopupHtml } = useDiceRollPopup();
     const { rollAttack, rollDamage } = useLoggedDiceRoll(playerStats.name, campaignName, {
         characters,
         autoDamageSource: 'char-spells',
@@ -181,9 +181,27 @@ const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells
 
     const castAction = React.useCallback((spell, metaCtx) => {
       const pos = cachedCastPosRef.current;
-      executeSpellCast(spell, metaCtx, { rollAttack, rollDamage, playerStats, getTargetInfo, attackerPos: pos?.attackerPos, targetPos: pos?.targetPos, campaignName, mapName, characters });
+      executeSpellCast(spell, metaCtx, { rollAttack, rollDamage, playerStats, getTargetInfo, attackerPos: pos?.attackerPos, targetPos: pos?.targetPos, campaignName, mapName, characters }).then((result) => {
+        if (result && result.healAmount > 0) {
+          const bonusHealDetail = result.bonusDetails?.length > 0
+            ? result.bonusDetails.map(d => `${d.amount} ${d.name}`).join(', ')
+            : '';
+          const rawTotal = result.rawTotal ?? result.healAmount;
+          setPopupHtml({
+            type: 'heal',
+            name: spell.name,
+            formula: result.formula,
+            rolls: result.rolls || [],
+            total: rawTotal,
+            targetName: result.targetName,
+            finalHeal: result.healAmount,
+            bonusHeal: result.bonusHeal || 0,
+            bonusHealDetail,
+          });
+        }
+      }).catch((e) => { console.error('[CharSpells] executeSpellCast error:', e); });
       cachedCastPosRef.current = null;
-      }, [rollAttack, rollDamage, playerStats, getTargetInfo, campaignName, mapName, characters]);
+      }, [rollAttack, rollDamage, playerStats, getTargetInfo, campaignName, mapName, characters, setPopupHtml]);
     const { pendingMetamagic, pendingMultiTarget, gateMetamagic, handleConfirm, handleSkip, handleMultiTargetConfirm, handleMultiTargetSkip, pendingAid, handleAidConfirm, handleAidSkip, pendingHeroesFeast, handleHeroesFeastConfirm, handleHeroesFeastSkip, pendingGreaterRestoration, handleGreaterRestorationConfirm, handleGreaterRestorationSkip, pendingLesserRestoration, handleLesserRestorationConfirm, handleLesserRestorationSkip, pendingMageArmor, handleMageArmorConfirm, handleMageArmorSkip, pendingShieldOfFaith, handleShieldOfFaithConfirm, handleShieldOfFaithSkip, pendingProtectionFromEnergy, handleProtectionFromEnergyConfirm, handleProtectionFromEnergySkip, pendingResistance, handleResistanceConfirm, handleResistanceSkip, pendingRemoveCurse, handleRemoveCurseConfirm, handleRemoveCurseSkip, pendingMagicMissile, handleMagicMissileConfirm, handleMagicMissileSkip } = useSpellMetamagicFlow(playerStats, campaignName, castAction);
     const { pendingUpcast, buildUpcastLevels, gateUpcast, handleUpcastConfirm, handleUpcastCancel, getCantripAutoLevel } = useSpellUpcastFlow(playerStats, campaignName);
 

@@ -117,6 +117,29 @@ export function resolveHealingBonuses(playerStats, prof, level, slotLevel) {
     return totalBonus;
 }
 
+export function resolveHealingBonusesWithDetails(playerStats, prof, level, slotLevel) {
+    const passives = playerStats.automation?.passives || [];
+    let totalBonus = 0;
+    const details = [];
+    for (const passive of passives) {
+        if (passive.type === 'passive_rule' && passive.effect === 'bonus_healing' && passive.bonusExpression) {
+            const bonus = evaluateAutoExpression(passive.bonusExpression, playerStats, prof, level, slotLevel);
+            if (typeof bonus === 'number' && !isNaN(bonus) && bonus > 0) {
+                totalBonus += bonus;
+                details.push({ name: passive.name, amount: bonus });
+            }
+        }
+        if (passive.type === 'passive_rule' && passive.effect === 'max_hp_increase' && passive.alsoSelfHealing?.extraHealingExpression) {
+            const bonus = evaluateAutoExpression(passive.alsoSelfHealing.extraHealingExpression, playerStats, prof, level, slotLevel);
+            if (typeof bonus === 'number' && !isNaN(bonus) && bonus > 0) {
+                totalBonus += bonus;
+                details.push({ name: passive.name, amount: bonus });
+            }
+        }
+    }
+    return { totalBonus, details };
+}
+
 export function hasHealingMaximization(playerStats) {
     return hasPassiveEffect(playerStats, 'passive_rule', 'maximize_healing_dice');
 }
