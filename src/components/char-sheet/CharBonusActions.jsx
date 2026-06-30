@@ -8,35 +8,18 @@ import { getBonusActionSpellNames } from '../../services/ui/spellSectionUtils.js
 import { showWeaponMasteryPopup, buildFeatureDetailHtml } from '../../hooks/combat/useActionPopup.js'
 import { hasAutomation } from '../../services/combat/automation/automationService.js'
 import { isExhausted } from '../../services/automation/handlers/combat/saveAttackHandler.js'
-import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js'
+import { getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js'
 import { useSpellMetamagicFlow } from '../../hooks/combat/useSpellMetamagicFlow.js'
 import { useSpellUpcastFlow } from '../../hooks/combat/useSpellUpcastFlow.js'
-import { executeSpellCast } from '../../services/rules/spells/spellCastService.js'
 import { getCurrentCombatRound } from '../../services/encounters/combatData.js'
-import * as mapsService from '../../services/maps/mapsService.js';
-import { getNearestPlacedItem } from '../../services/rules/combat/rangeValidation.js';
-import { getCombatContext, getTargetFromAttacker } from '../../services/rules/combat/damageUtils.js';
 import { getInnateSorceryBonus } from '../../services/combat/buffs/buffService.js';
 import { useDiceRollPopup } from '../../hooks/combat/DiceRollContext.js';
-import { rollExpression } from '../../services/dice/diceRoller.js';
-import { addEntry } from '../../services/ui/logService.js';
+import { formatRange, signFormatter, getAttackSpellLevel } from '../../services/ui/formatUtils.js';
+import { useSimpleDamageRoll } from '../../hooks/combat/useSimpleDamageRoll.js';
+import { useSpellPositionResolver } from '../../hooks/combat/useSpellPositionResolver.js';
+import { useSpellCastExecutor } from '../../hooks/combat/useSpellCastExecutor.js';
+import { handleRestoreRage } from '../../services/character/rageUtils.js';
 import './CharActions.css'
-
-const signFormatter = new Intl.NumberFormat('en-US', { signDisplay: 'always' });
-function formatRange(range) {
-    if (!range && range !== 0) return '';
-    let s = String(range);
-    // Plain number: append ft.
-    if (/^\d+$/.test(s)) return s + ' ft.';
-    // Normalize: strip trailing dots/spaces, convert feet/foot to ft
-    s = s.replace(/\.\s*$/, '');
-    s = s.replace(/\bfeet\b/gi, 'ft');
-    s = s.replace(/\bfoot\b/gi, 'ft');
-    // Add the trailing dot
-    s = s.replace(/(\d+)\s*ft$/i, '$1 ft.');
-    s = s.replace(/(\d+\/\d+)\s*ft$/i, '$1 ft.');
-    return s;
-}
 
 function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, conditionAttackMode, cannotAct, mapName, characters, onAttackClick, onResolveSpellDamage, onAutomationAction, getWeaponMastery, rollAttack, rollDamage, getTargetInfo }) {
     const { popupHtml, setPopupHtml } = useDiceRollPopup();
@@ -52,95 +35,14 @@ function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, condit
         setSelectedBonusSpell(spell);
      };
 
-    // To-Hit attacks: damage is ALWAYS rolled through the "To Hit" flow.
-    // Direct damage click only logs a simple die roll — no targeting, no riders, no damage application.
-    // This is the ONLY way to apply damage to a selected target: successful To Hit → auto-damage.
-    const handleSimpleDamageRoll = React.useCallback(async (attack) => {
-        const result = rollExpression(attack.damage);
-        if (!result) return;
-        if (popupHtml) setPopupHtml(null);
-        await addEntry(campaignName, {
-            type: 'roll',
-            characterName: playerStats.name,
-            rollType: 'damage',
-            name: attack.name,
-            formula: attack.damage,
-            rolls: result.rolls,
-            total: result.total,
-            modifier: result.modifier,
-            damageType: attack.damageType,
-            note: 'Direct damage roll (no target)',
-        });
-        setPopupHtml({
-            type: 'damage',
-            name: attack.name,
-            formula: attack.damage,
-            rolls: result.rolls,
-            total: result.total,
-            modifier: result.modifier,
-            damageType: attack.damageType,
-            note: 'Direct damage roll (no target)',
-        });
-    }, [playerStats.name, campaignName, popupHtml, setPopupHtml]);
+    const handleSimpleDamageRoll = useSimpleDamageRoll(playerStats.name, campaignName, popupHtml, setPopupHtml);
 
-    const cachedBonusCastPosRef = React.useRef(null);
+    const { resolvePositions: resolveBonusSpellPositions, cachedPosRef: cachedBonusCastPosRef } = useSpellPositionResolver(campaignName, mapName, playerStats.name);
 
-    const bonusCastAction = React.useCallback((spell, metaCtx) => {
-      const pos = cachedBonusCastPosRef.current;
-      executeSpellCast(spell, metaCtx, { rollAttack, rollDamage, playerStats, getTargetInfo, attackerPos: pos?.attackerPos, targetPos: pos?.targetPos, innateSorceryActive: !!displaySaveDcBonus, campaignName, mapName, characters }).then((result) => {
-        if (result && result.healAmount > 0) {
-          const bonusHealDetail = result.bonusDetails?.length > 0
-            ? result.bonusDetails.map(d => `${d.amount} ${d.name}`).join(', ')
-            : '';
-          const rawTotal = result.rawTotal ?? result.healAmount;
-          setPopupHtml({
-            type: 'heal',
-            name: spell.name,
-            formula: result.formula,
-            rolls: result.rolls || [],
-            total: rawTotal,
-            targetName: result.targetName,
-            finalHeal: result.healAmount,
-            bonusHeal: result.bonusHeal || 0,
-            bonusHealDetail,
-          });
-        }
-      }).catch((e) => { console.error('[CharBonusActions] executeSpellCast error:', e); });
-      cachedBonusCastPosRef.current = null;
-      }, [rollAttack, rollDamage, playerStats, getTargetInfo, displaySaveDcBonus, campaignName, mapName, characters, setPopupHtml]);
+    const { castAction: bonusCastAction } = useSpellCastExecutor(rollAttack, rollDamage, playerStats, getTargetInfo, campaignName, mapName, characters, setPopupHtml, { innateSorceryActive: !!displaySaveDcBonus }, cachedBonusCastPosRef);
+
     const { pendingMetamagic, gateMetamagic, handleConfirm, handleSkip } = useSpellMetamagicFlow(playerStats, campaignName, bonusCastAction);
     const { buildUpcastLevels } = useSpellUpcastFlow(playerStats, campaignName);
-
-    const resolveBonusSpellPositions = React.useCallback(async () => {
-      if (!mapName) return;
-      try {
-        const [mapData] = await Promise.all([
-          mapsService.loadMapData(campaignName, mapName),
-        ]);
-        const attackerPlayer = mapData?.players?.find(p => p.name === playerStats.name);
-        if (attackerPlayer) {
-          const cs = await getCombatContext(campaignName);
-          const target = cs ? getTargetFromAttacker(cs, playerStats.name) : null;
-          if (target) {
-            const targetPlayer = mapData?.players?.find(p => p.name === target.name);
-            const targetNpc = mapData?.placedItems?.length
-              ? getNearestPlacedItem(mapData.placedItems, target.name, attackerPlayer)
-              : null;
-            const targetPos = targetPlayer
-              ? { gridX: targetPlayer.gridX, gridY: targetPlayer.gridY }
-              : targetNpc
-                ? { gridX: targetNpc.gridX, gridY: targetNpc.gridY }
-                : null;
-            if (targetPos) {
-              cachedBonusCastPosRef.current = {
-                attackerPos: { gridX: attackerPlayer.gridX, gridY: attackerPlayer.gridY },
-                targetPos,
-              };
-            }
-          }
-        }
-      } catch { /* positions unavailable */ }
-    }, [mapName, campaignName, playerStats.name]);
 
     const handleBonusSpellCast = React.useCallback(async (spell, metaCtx) => {
       setSelectedBonusSpell(null);
@@ -180,11 +82,6 @@ function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, condit
 
     const bonusSpellNames = bonusActionSpells.reduce((acc, spell) => { acc[spell.name] = spell; return acc; }, {});
 
-    const getAttackSpellLevel = (attackName) => {
-        const spell = playerStats.spellAbilities?.spells?.find(s => s.name === attackName);
-        return spell ? spell.level : null;
-    };
-
     return (
          <div>
              <hr />
@@ -198,23 +95,23 @@ function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, condit
                        {bonusActionAttacks.length > 0 && <div><b>Damage</b></div>}
                        <div className='left'><b>Type</b></div>
                        {is2024Rules && bonusActionAttacks.length > 0 && <div><b>Mastery</b></div>}
-                       {bonusActionAttacks.map((attack) => {
-                           const attackLevel = getAttackSpellLevel(attack.name);
-                           const attackItem = { ...attack };
-                           return <React.Fragment key={attack.name}>
-                               <div className='left'>{attack.name}</div>
-                               <div>{attackLevel != null ? (attackLevel === 0 ? 'Cantrip' : attackLevel) : '-'}</div>
-                               <div>{formatRange(attack.range)}</div>
-                               {attack.saveDc
-                                  ? <div className="save-dc-display">DC {attack.saveDc + displaySaveDcBonus} {attack.saveType}</div>
-                                : <div className={"clickable" + (exhaustionPenalty > 0 || conditionAttackMode === 'disadvantage' || cannotAct ? " stat--penalized" : "") + (cannotAct ? " disabled-attack" : "")} onClick={() => onAttackClick(attackItem)}>{signFormatter.format(attack.hitBonus - exhaustionPenalty)}</div>}
-                              <div className={attack.damage ? "clickable" : ""} onClick={() => {
-                                  if (cannotAct) return;
-                                  if (attack.saveDc) { onResolveSpellDamage(attackItem); return; }
-                                  handleSimpleDamageRoll(attackItem);
-                              }}>{attack.damage}</div>
-                             <div className='left'>{attack.damageType}</div>
-                              {is2024Rules && (() => { const mastery = getWeaponMastery(attack.name, attack); return <div className={mastery ? "clickable" : ""} onClick={() => { if (mastery) showWeaponMasteryPopup(mastery, setPopupHtml); }}>{mastery}</div>; })()}
+                        {bonusActionAttacks.map((attack) => {
+                            const attackLevel = getAttackSpellLevel(playerStats.spellAbilities, attack.name);
+                            const attackItem = { ...attack };
+                            return <React.Fragment key={attack.name}>
+                                <div className='left'>{attack.name}</div>
+                                <div>{attackLevel != null ? (attackLevel === 0 ? 'Cantrip' : attackLevel) : '-'}</div>
+                                <div>{formatRange(attack.range)}</div>
+                                {attack.saveDc
+                                   ? <div className="save-dc-display">DC {attack.saveDc + displaySaveDcBonus} {attack.saveType}</div>
+                                 : <div className={"clickable" + (exhaustionPenalty > 0 || conditionAttackMode === 'disadvantage' || cannotAct ? " stat--penalized" : "") + (cannotAct ? " disabled-attack" : "")} onClick={() => onAttackClick(attackItem)}>{signFormatter.format(attack.hitBonus - exhaustionPenalty)}</div>}
+                               <div className={attack.damage ? "clickable" : ""} onClick={() => {
+                                   if (cannotAct) return;
+                                   if (attack.saveDc) { onResolveSpellDamage(attackItem); return; }
+                                   handleSimpleDamageRoll(attackItem);
+                               }}>{attack.damage}</div>
+                              <div className='left'>{attack.damageType}</div>
+                               {is2024Rules && (() => { const mastery = getWeaponMastery(attack.name, attack, playerStats); return <div className={mastery ? "clickable" : ""} onClick={() => { if (mastery) showWeaponMasteryPopup(mastery, setPopupHtml); }}>{mastery}</div>; })()}
                          </React.Fragment>;
                         })}
                         {isHordeBreakerAvailable && hordeBreakerAttack ? (() => {
@@ -233,12 +130,13 @@ function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, condit
                             </React.Fragment>;
                         })() : null}
                         {bonusActionSpells.map((spell) => {
-                           return <React.Fragment key={spell.name}>
+                            const damageType = typeof spell.damage === 'string' ? '' : (spell.damage?.damage_type || '');
+                            return <React.Fragment key={spell.name}>
                                 <div className='left clickable' onClick={() => handleBonusSpellClick(spell.name)}>{spell.name}</div>
                                 <div>{spell.level === 0 ? 'Cantrip' : spell.level}</div>
                                 <div>{spell.range}</div>
                                 <div>-</div>
-                                <div>Utility</div>
+                                <div>{damageType || (spell.heal_at_slot_level ? 'Healing' : 'Utility')}</div>
                                 <div className='left'></div>
                                 {is2024Rules && <div></div>}
                            </React.Fragment>;
@@ -272,36 +170,27 @@ function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, condit
               )}
              {(popupHtml && hasBonusActions) && <br />}
               {hasBonusActions && <div>
-              {((playerStats.bonusActions || []).filter(a => getCategories(playerStats.rules || '5e').featuresToIgnore.includes(a.name) === false)).map((bonusAction) => {
-                     const isBonusClickable = bonusAction.details || hasAutomation(bonusAction);
-                     const bonusAuto = bonusAction.automation;
-                     const isRageExpendable = bonusAuto?.recharge === 'long_rest_or_expend_rage';
-                     const exhausted = isRageExpendable && isExhausted(bonusAction, playerStats, campaignName);
-                     const handleRestoreRage = async () => {
-                         const rageKey = bonusAuto.resourceKey || (bonusAction.name.toLowerCase().replace(/\s+/g, '') + 'Uses');
-                         const currentRage = Number(getRuntimeValue(playerStats.name, 'ragePoints', campaignName) ?? 0);
-                         if (currentRage <= 0) {
-                             setPopupHtml(`<b>${bonusAction.name}</b><br/>No Rage remaining to restore this feature.`);
-                             return;
-                         }
-                         await setRuntimeValue(playerStats.name, 'ragePoints', currentRage - 1, campaignName);
-                         await setRuntimeValue(playerStats.name, rageKey, 0, campaignName);
-                         setPopupHtml(`<b>${bonusAction.name}</b><br/>Expended 1 Rage to restore use.`);
-                         window.dispatchEvent(new CustomEvent('combat-summary-updated'));
-                     };
-                     const handleBonusClick = () => {
-                         if (exhausted) return;
-                         if (hasAutomation(bonusAction)) {
-                             onAutomationAction(bonusAction);
-                          } else {
-                             setPopupHtml(buildFeatureDetailHtml(bonusAction));
-                          }
+               {((playerStats.bonusActions || []).filter(a => getCategories(playerStats.rules || '5e').featuresToIgnore.includes(a.name) === false)).map((bonusAction) => {
+                      const isBonusClickable = bonusAction.details || hasAutomation(bonusAction);
+                      const bonusAuto = bonusAction.automation;
+                      const isRageExpendable = bonusAuto?.recharge === 'long_rest_or_expend_rage';
+                      const exhausted = isRageExpendable && isExhausted(bonusAction, playerStats, campaignName);
+                      const restoreRage = async () => {
+                          await handleRestoreRage(playerStats, campaignName, bonusAction.name, bonusAuto, setPopupHtml);
                       };
-                     return <div key={bonusAction.name}>
-                          <b className={isBonusClickable && !exhausted ? "clickable" : ""} onClick={handleBonusClick}>{bonusAction.name}:</b> <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(bonusAction.description) }}></span>
-                          {hasAutomation(bonusAction) && bonusAction.automation?.type === 'healing_pool' && <span className="automation-badge"> Pool: {bonusAction.automation.pool} HP</span>}
+                      const handleBonusClick = () => {
+                          if (exhausted) return;
+                          if (hasAutomation(bonusAction)) {
+                              onAutomationAction(bonusAction);
+                           } else {
+                              setPopupHtml(buildFeatureDetailHtml(bonusAction));
+                           }
+                       };
+                      return <div key={bonusAction.name}>
+                           <b className={isBonusClickable && !exhausted ? "clickable" : ""} onClick={handleBonusClick}>{bonusAction.name}:</b> <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(bonusAction.description) }}></span>
+                           {hasAutomation(bonusAction) && bonusAction.automation?.type === 'healing_pool' && <span className="automation-badge"> Pool: {bonusAction.automation.pool} HP</span>}
                           {hasAutomation(bonusAction) && bonusAction.automation?.damage && <span className="automation-badge"> {bonusAction.automation.damage} {bonusAction.automation.damageType}</span>}
-                          {exhausted && isRageExpendable && <span className="automation-badge clickable" onClick={handleRestoreRage}><i className="fa-solid fa-fire-flame-curved"></i> Restore with Rage</span>}
+                           {exhausted && isRageExpendable && <span className="automation-badge clickable" onClick={restoreRage}><i className="fa-solid fa-fire-flame-curved"></i> Restore with Rage</span>}
                       </div>
                   })}
              </div>}

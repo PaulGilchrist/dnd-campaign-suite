@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { getCategories } from '../../services/character/featureCategories.js'
 import { getActionSpellNames } from '../../services/ui/spellSectionUtils.js'
+import { formatRange, signFormatter, getAttackSpellLevel } from '../../services/ui/formatUtils.js'
 import { collectWeaponMastery } from '../../services/combat/automation/automationService.js';
 import { applyPostDamageMasteryEffects, applyMasteryEffect } from '../../services/automation/handlers/combat/weaponMasteryHandler.js';
 import { sanitizeHtml } from '../../services/ui/sanitize.js';
@@ -11,7 +12,6 @@ import { showWeaponMasteryPopup, buildFeatureDetailHtml } from '../../hooks/comb
 import { useSpellUpcastFlow } from '../../hooks/combat/useSpellUpcastFlow.js'
 import { rollExpression, rollExpressionDoubled, rollExpressionMaximized } from '../../services/dice/diceRoller.js';
 import { getCurrentCombatRound } from '../../services/encounters/combatData.js';
-import * as mapsService from '../../services/maps/mapsService.js';
 import { computeFeatRangeEffects } from '../../services/character/featRangeService.js';
 import { hasAutomation } from '../../services/combat/automation/automationService.js'
 import { isExhausted } from '../../services/automation/handlers/combat/saveAttackHandler.js'
@@ -34,13 +34,17 @@ import { activateBulwarkOfForce } from '../../services/automation/handlers/class
 import { endFriendsOnHostileAction } from '../../services/rules/features/friendsService.js';
 import { endInvisibilityOnHostileAction } from '../../services/rules/features/invisibilityService.js';
 import { applyDamageToTarget } from '../../services/rules/combat/applyDamage.js';
-import { getNearestPlacedItem } from '../../services/rules/combat/rangeValidation.js';
 import { getDistanceFeet } from '../../services/rules/combat/rangeValidation.js';
 import { getInnateSorceryBonus } from '../../services/combat/buffs/buffService.js';
 import { buildAttackContext, buildAttackContextSync } from '../../services/automation/contextBuilder.js';
 import { buildEmpoweredSpellState, getEmpoweredSpellDescription } from '../../services/rules/spells/empoweredSpellService.js';
 import { getEmpoweredEvocationFeatures, getEmpoweredEvocationIntModifier } from '../../services/rules/spells/postCastRiderService.js';
 import { useActionSpellMetamagic } from '../../hooks/combat/useActionSpellMetamagic.js';
+import { useSimpleDamageRoll } from '../../hooks/combat/useSimpleDamageRoll.js';
+import { useSpellPositionResolver } from '../../hooks/combat/useSpellPositionResolver.js';
+import { useSpellCastExecutor } from '../../hooks/combat/useSpellCastExecutor.js';
+import { getWeaponMastery } from '../../services/combat/weaponMasteryUtils.js';
+import { handleRestoreRage } from '../../services/character/rageUtils.js';
 import useCharActionModals from './useCharActionModals.js';
 import useInitiativeEffects from './useInitiativeEffects.js';
 import SecondaryTargetModal from './modals/shared/SecondaryTargetModal.jsx';
@@ -48,8 +52,6 @@ import TacticalMasterModal from './modals/TacticalMasterModal.jsx';
 
 import './CharActions.css'
 import { isEqual } from 'lodash';
-
-const signFormatter = new Intl.NumberFormat('en-US', { signDisplay: 'always' });
 
 function resolveCreatureHp(creature, playerStatsForHp) {
     if (!creature) return { currentHp: 0, maxHp: 0 };
@@ -59,21 +61,6 @@ function resolveCreatureHp(creature, playerStatsForHp) {
         return { currentHp, maxHp };
     }
     return { currentHp: creature.currentHp ?? creature.maxHp, maxHp: creature.maxHp };
-}
-
-function formatRange(range) {
-    if (!range && range !== 0) return '';
-    let s = String(range);
-    // Plain number: append ft.
-    if (/^\d+$/.test(s)) return s + ' ft.';
-    // Normalize: strip trailing dots/spaces, convert feet/foot to ft
-    s = s.replace(/\.\s*$/, '');
-    s = s.replace(/\bfeet\b/gi, 'ft');
-    s = s.replace(/\bfoot\b/gi, 'ft');
-    // Add the trailing dot
-    s = s.replace(/(\d+)\s*ft$/i, '$1 ft.');
-    s = s.replace(/(\d+\/\d+)\s*ft$/i, '$1 ft.');
-    return s;
 }
 
 const areEqual = (prevProps, nextProps) => isEqual(prevProps.playerStats, nextProps.playerStats) && prevProps.conditionAttackMode === nextProps.conditionAttackMode && prevProps.exhaustionPenalty === nextProps.exhaustionPenalty && prevProps.cannotAct === nextProps.cannotAct;
@@ -797,36 +784,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         }).catch((e) => { console.error("[CharActions] Error:", e); });
     }, [cannotAct, buildCtx, rollAttack, exhaustionPenalty, playerStats.name, campaignName]);
 
-    // To-Hit attacks: damage is ALWAYS rolled through the "To Hit" flow.
-    // Save DC attacks: damage is rolled when the target fails the save.
-    // This is the ONLY way to apply damage to a selected target: successful To Hit → auto-damage.
-    const handleSimpleDamageRoll = React.useCallback(async (attack) => {
-        const result = rollExpression(attack.damage);
-        if (!result) return;
-        if (popupHtml) setPopupHtml(null);
-        await addEntry(campaignName, {
-            type: 'roll',
-            characterName: playerStats.name,
-            rollType: 'damage',
-            name: attack.name,
-            formula: attack.damage,
-            rolls: result.rolls,
-            total: result.total,
-            modifier: result.modifier,
-            damageType: attack.damageType,
-            note: 'Direct damage roll (no target)',
-        });
-        setPopupHtml({
-            type: 'damage',
-            name: attack.name,
-            formula: attack.damage,
-            rolls: result.rolls,
-            total: result.total,
-            modifier: result.modifier,
-            damageType: attack.damageType,
-            note: 'Direct damage roll (no target)',
-        });
-    }, [playerStats.name, campaignName, popupHtml, setPopupHtml]);
+    const handleSimpleDamageRoll = useSimpleDamageRoll(playerStats.name, campaignName, popupHtml, setPopupHtml);
 
     const {
         pendingActionMetamagic,
@@ -1271,25 +1229,11 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
     }, [divineInterventionAction, playerStats, campaignName, rollAttack, rollDamage, mapName, setPopupHtml, setDivineInterventionModal, setDivineInterventionAction, characters]);
 
 
-    const getWeaponMastery = (weaponName, attack) => {
-        if (playerStats.rules !== '2024') {
-            return null;
-        }
-
-        const available = collectWeaponMastery(weaponName, playerStats);
-        return available.baseMastery || attack?.mastery || null;
-    };
-
     const { buildUpcastLevels } = useSpellUpcastFlow(playerStats, campaignName);
 
     const actionSpellNameSet = getActionSpellNames(playerStats, campaignName);
     const actionSpells = (playerStats.spellAbilities?.spells || []).filter(spell => actionSpellNameSet.has(spell.name));
     const actionSpellNames = actionSpells.reduce((acc, spell) => { acc[spell.name] = spell; return acc; }, {});
-
-    const getAttackSpellLevel = (attackName) => {
-        const spell = playerStats.spellAbilities?.spells?.find(s => s.name === attackName);
-        return spell ? spell.level : null;
-    };
 
     const actionAttacks = playerStats.attacks?.filter(a => a.type === 'Action') || [];
 
@@ -1302,65 +1246,17 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         setSelectedActionSpell(spell);
     };
 
-    const cachedActionCastPosRef = React.useRef(null);
+    const { resolvePositions: resolveActionSpellPositions, cachedPosRef: cachedActionCastPosRef } = useSpellPositionResolver(campaignName, mapName, playerStats.name);
 
-    const actionCastAction = React.useCallback((spell, metaCtx) => {
-        const pos = cachedActionCastPosRef.current;
-        executeSpellCast(spell, metaCtx, { rollAttack, rollDamage, playerStats, getTargetInfo, attackerPos: pos?.attackerPos, targetPos: pos?.targetPos, featEffects: featRangeEffects, campaignName, mapName, characters }).then((result) => {
-            if (result && result.healAmount > 0) {
-                const bonusHealDetail = result.bonusDetails?.length > 0
-                    ? result.bonusDetails.map(d => `${d.amount} ${d.name}`).join(', ')
-                    : '';
-                const rawTotal = result.rawTotal ?? result.healAmount;
-                setPopupHtml({
-                    type: 'heal',
-                    name: spell.name,
-                    formula: result.formula,
-                    rolls: result.rolls || [],
-                    total: rawTotal,
-                    targetName: result.targetName,
-                    finalHeal: result.healAmount,
-                    bonusHeal: result.bonusHeal || 0,
-                    bonusHealDetail,
-                });
-            }
-        }).catch((e) => { console.error('[CharActions] executeSpellCast error:', e); });
-        cachedActionCastPosRef.current = null;
-    }, [rollAttack, rollDamage, playerStats, getTargetInfo, featRangeEffects, campaignName, mapName, characters, setPopupHtml]);
+    const { castAction: actionCastAction } = useSpellCastExecutor(rollAttack, rollDamage, playerStats, getTargetInfo, campaignName, mapName, characters, setPopupHtml, { featEffects: featRangeEffects }, cachedActionCastPosRef);
+
     const { pendingMetamagic: actionPendingMetamagic, gateMetamagic: actionGateMetamagic, handleConfirm: actionHandleConfirm, handleSkip: actionHandleSkip, pendingAid: actionPendingAid, handleAidConfirm: actionHandleAidConfirm, handleAidSkip: actionHandleAidSkip, pendingGreaterRestoration: actionPendingGreaterRestoration, handleGreaterRestorationConfirm: actionHandleGreaterRestorationConfirm, handleGreaterRestorationSkip: actionHandleGreaterRestorationSkip, pendingRemoveCurse: actionPendingRemoveCurse, handleRemoveCurseConfirm: actionHandleRemoveCurseConfirm, handleRemoveCurseSkip: actionHandleRemoveCurseSkip, pendingMagicMissile: actionPendingMagicMissile, handleMagicMissileConfirm: actionHandleMagicMissileConfirm, handleMagicMissileSkip: actionHandleMagicMissileSkip } = useSpellMetamagicFlow(playerStats, campaignName, actionCastAction);
+
     const handleActionSpellCast = React.useCallback(async (spell, metaCtx) => {
         setSelectedActionSpell(null);
-        if (mapName) {
-            try {
-                const [mapData] = await Promise.all([
-                    mapsService.loadMapData(campaignName, mapName),
-                ]);
-                const attackerPlayer = mapData?.players?.find(p => p.name === playerStats.name);
-                if (attackerPlayer) {
-                    const cs = await getCombatContext(campaignName);
-                    const target = cs ? getTargetFromAttacker(cs, playerStats.name) : null;
-                    if (target) {
-                        const targetPlayer = mapData?.players?.find(p => p.name === target.name);
-                        const targetNpc = mapData?.placedItems?.length
-                            ? getNearestPlacedItem(mapData.placedItems, target.name, attackerPlayer)
-                            : null;
-                        const targetPos = targetPlayer
-                            ? { gridX: targetPlayer.gridX, gridY: targetPlayer.gridY }
-                            : targetNpc
-                                ? { gridX: targetNpc.gridX, gridY: targetNpc.gridY }
-                                : null;
-                        if (targetPos) {
-                            cachedActionCastPosRef.current = {
-                                attackerPos: { gridX: attackerPlayer.gridX, gridY: attackerPlayer.gridY },
-                                targetPos,
-                            };
-                        }
-                    }
-                }
-            } catch { /* positions unavailable */ }
-        }
+        await resolveActionSpellPositions();
         actionGateMetamagic(spell, metaCtx);
-    }, [actionGateMetamagic, mapName, campaignName, playerStats.name]);
+    }, [actionGateMetamagic, resolveActionSpellPositions]);
 
     const is2024Rules = playerStats.rules === '2024';
 
@@ -1395,7 +1291,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                                 handleSimpleDamageRoll(attackItem);
                             }}>{attack.damage}</div>
                             <div className='left'>{attack.damageType}</div>
-                            {is2024Rules && (() => { const mastery = getWeaponMastery(attack.name, attack); return <div className={mastery ? "clickable" : ""} onClick={() => { if (mastery) showWeaponMasteryPopup(mastery, setPopupHtml); }}>{mastery}</div>; })()}
+                            {is2024Rules && (() => { const mastery = getWeaponMastery(attack.name, attack, playerStats); return <div className={mastery ? "clickable" : ""} onClick={() => { if (mastery) showWeaponMasteryPopup(mastery, setPopupHtml); }}>{mastery}</div>; })()}
                         </React.Fragment>;
                     })}
                     {actionSpells.map((spell) => {
@@ -1588,16 +1484,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     const displayName = isMetamagic ? 'Empowered Spell' : action.name;
                     const displayDesc = isMetamagic ? getEmpoweredSpellDescription(action) : action.description;
                     const renderRageRestore = async () => {
-                        const rageKey = auto.resourceKey || (action.name.toLowerCase().replace(/\s+/g, '') + 'Uses');
-                        const currentRage = Number(getRuntimeValue(playerStats.name, 'ragePoints', campaignName) ?? 0);
-                        if (currentRage <= 0) {
-                            setPopupHtml(`<b>${action.name}</b><br/>No Rage remaining to restore this feature.`);
-                            return;
-                        }
-                        await setRuntimeValue(playerStats.name, 'ragePoints', currentRage - 1, campaignName);
-                        await setRuntimeValue(playerStats.name, rageKey, 0, campaignName);
-                        setPopupHtml(`<b>${action.name}</b><br/>Expended 1 Rage to restore use.`);
-                        window.dispatchEvent(new CustomEvent('combat-summary-updated'));
+                        await handleRestoreRage(playerStats, campaignName, action.name, auto, setPopupHtml);
                     };
                     return <div key={action.name}>
                         <b className={isClickable && !exhausted ? "clickable" : ""} onClick={handleClick}>{displayName}:</b> <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(displayDesc) }}></span>

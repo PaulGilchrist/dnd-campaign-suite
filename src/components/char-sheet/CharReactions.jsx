@@ -17,9 +17,8 @@ import { executeHandler } from '../../services/automation/index.js'
 import { applyWarCasterReaction } from '../../services/automation/handlers/reactions/reactionSpellHandler.js'
 import { useSpellMetamagicFlow } from '../../hooks/combat/useSpellMetamagicFlow.js'
 import { useSpellUpcastFlow } from '../../hooks/combat/useSpellUpcastFlow.js'
-import { executeSpellCast } from '../../services/rules/spells/spellCastService.js'
-import * as mapsService from '../../services/maps/mapsService.js';
-import { getNearestPlacedItem } from '../../services/rules/combat/rangeValidation.js';
+import { useSpellPositionResolver } from '../../hooks/combat/useSpellPositionResolver.js';
+import { useSpellCastExecutor } from '../../hooks/combat/useSpellCastExecutor.js';
 import './CharActions.css'
 
 function CharReactions({ playerStats, campaignName, cannotAct, mapName, characters }) {
@@ -171,64 +170,12 @@ function CharReactions({ playerStats, campaignName, cannotAct, mapName, characte
         return getTargetFromAttacker(cs, playerStats.name);
     }, [playerStats.name, campaignName]);
 
-    const cachedReactionCastPosRef = React.useRef(null);
+    const { resolvePositions: resolveReactionSpellPositions, cachedPosRef: cachedReactionCastPosRef } = useSpellPositionResolver(campaignName, mapName, playerStats.name);
 
-    const reactionCastAction = React.useCallback((spell, metaCtx) => {
-        const pos = cachedReactionCastPosRef.current;
-        executeSpellCast(spell, metaCtx, { rollAttack, rollDamage, playerStats, getTargetInfo, attackerPos: pos?.attackerPos, targetPos: pos?.targetPos, campaignName, mapName, characters }).then((result) => {
-            if (result && result.healAmount > 0) {
-                const bonusHealDetail = result.bonusDetails?.length > 0
-                    ? result.bonusDetails.map(d => `${d.amount} ${d.name}`).join(', ')
-                    : '';
-                const rawTotal = result.rawTotal ?? result.healAmount;
-                setPopupHtml({
-                    type: 'heal',
-                    name: spell.name,
-                    formula: result.formula,
-                    rolls: result.rolls || [],
-                    total: rawTotal,
-                    targetName: result.targetName,
-                    finalHeal: result.healAmount,
-                    bonusHeal: result.bonusHeal || 0,
-                    bonusHealDetail,
-                });
-            }
-        }).catch((e) => { console.error('[CharReactions] executeSpellCast error:', e); });
-        cachedReactionCastPosRef.current = null;
-    }, [rollAttack, rollDamage, playerStats, getTargetInfo, campaignName, mapName, characters, setPopupHtml]);
+    const { castAction: reactionCastAction } = useSpellCastExecutor(rollAttack, rollDamage, playerStats, getTargetInfo, campaignName, mapName, characters, setPopupHtml, {}, cachedReactionCastPosRef);
+
     const { pendingMetamagic, gateMetamagic, handleConfirm, handleSkip } = useSpellMetamagicFlow(playerStats, campaignName, reactionCastAction);
     const { buildUpcastLevels } = useSpellUpcastFlow(playerStats, campaignName);
-
-    const resolveReactionSpellPositions = React.useCallback(async () => {
-        if (!mapName) return;
-        try {
-            const [mapData] = await Promise.all([
-                mapsService.loadMapData(campaignName, mapName),
-            ]);
-            const attackerPlayer = mapData?.players?.find(p => p.name === playerStats.name);
-            if (attackerPlayer) {
-                const cs = await getCombatContext(campaignName);
-                const target = cs ? getTargetFromAttacker(cs, playerStats.name) : null;
-                if (target) {
-                    const targetPlayer = mapData?.players?.find(p => p.name === target.name);
-                    const targetNpc = mapData?.placedItems?.length
-                        ? getNearestPlacedItem(mapData.placedItems, target.name, attackerPlayer)
-                        : null;
-                    const targetPos = targetPlayer
-                        ? { gridX: targetPlayer.gridX, gridY: targetPlayer.gridY }
-                        : targetNpc
-                            ? { gridX: targetNpc.gridX, gridY: targetNpc.gridY }
-                            : null;
-                    if (targetPos) {
-                        cachedReactionCastPosRef.current = {
-                            attackerPos: { gridX: attackerPlayer.gridX, gridY: attackerPlayer.gridY },
-                            targetPos,
-                        };
-                    }
-                }
-            }
-        } catch { /* positions unavailable */ }
-    }, [mapName, campaignName, playerStats.name]);
 
     const handleReactionSpellCast = React.useCallback(async (spell, metaCtx) => {
         setSelectedSpell(null);
@@ -317,12 +264,13 @@ function CharReactions({ playerStats, campaignName, cannotAct, mapName, characte
                 <div><b>Damage</b></div>
                 <div className='left'><b>Type</b></div>
                 {reactionSpells.map((spell) => {
+                    const damageType = typeof spell.damage === 'string' ? '' : (spell.damage?.damage_type || '');
                     return <React.Fragment key={spell.name}>
                         <div className='left clickable' onClick={() => setSelectedSpell(spell)}>{spell.name}</div>
                         <div>{spell.level === 0 ? 'Cantrip' : spell.level}</div>
                         <div>{spell.range}</div>
                         <div>—</div>
-                        <div>Utility</div>
+                        <div>{damageType || (spell.heal_at_slot_level ? 'Healing' : 'Utility')}</div>
                         <div className='left'></div>
                     </React.Fragment>;
                 })}<div className='half-line'></div>
