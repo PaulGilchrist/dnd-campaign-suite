@@ -1,9 +1,10 @@
-import { rollExpression } from '../../../dice/diceRoller.js';
+import { rollExpression, rollExpressionMaximized } from '../../../dice/diceRoller.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { postLogEntry } from '../../../shared/logPoster.js';
 import storage from '../../../ui/storage.js';
 import { resolveTarget } from '../../common/targetResolver.js';
+import { hasHealingMaximization } from '../../../combat/automation/automationService.js';
 
 const CUREABLE_CONDITIONS = ['Blinded', 'Deafened', 'Paralyzed', 'Poisoned', 'Stunned'];
 
@@ -68,7 +69,8 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         };
     }
 
-    const rollResult = rollExpression(auto.healExpression || '4d10');
+    const maximize = hasHealingMaximization(playerStats);
+    const rollResult = maximize ? rollExpressionMaximized(auto.healExpression || '4d10') : rollExpression(auto.healExpression || '4d10');
     if (!rollResult) {
         return {
             type: 'popup',

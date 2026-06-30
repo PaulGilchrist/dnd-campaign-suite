@@ -1,9 +1,9 @@
-import { rollExpression } from '../../dice/diceRoller.js';
+import { rollExpression, rollExpressionMaximized } from '../../dice/diceRoller.js';
 import { getCombatContext, getTargetFromAttacker } from '../combat/damageUtils.js';
 import { applyHealingToTarget } from '../combat/applyHealing.js';
 import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import { postLogEntry } from '../../shared/logPoster.js';
-import { resolveHealingBonusesWithDetails } from '../../combat/automation/automationService.js';
+import { resolveHealingBonusesWithDetails, hasHealingMaximization } from '../../combat/automation/automationService.js';
 
 const HEALING_WORD_NAME = 'Healing Word';
 
@@ -45,7 +45,8 @@ export async function triggerHealingWord(spell, metaCtx, playerStats, campaignNa
     const targetName = metaCtx?.targetName || (getTargetFromAttacker(combatSummary, playerStats.name)?.name);
     if (!targetName) return null;
 
-    const result = rollExpression(healExpression);
+    const maximize = hasHealingMaximization(playerStats);
+    const result = maximize ? rollExpressionMaximized(healExpression) : rollExpression(healExpression);
     if (!result) return null;
 
     const { totalBonus: bonusHeal, details: bonusDetails } = resolveHealingBonusesWithDetails(playerStats, playerStats.proficiency || 0, playerStats.level || 1, slotLevel);

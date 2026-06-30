@@ -1,10 +1,10 @@
-import { rollExpression } from '../../dice/diceRoller.js';
+import { rollExpression, rollExpressionMaximized } from '../../dice/diceRoller.js';
 import { getCombatContext } from '../combat/damageUtils.js';
 import { applyHealingToTarget } from '../combat/applyHealing.js';
 import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import { postLogEntry } from '../../shared/logPoster.js';
 import { getDistanceFeet } from '../combat/rangeValidation.js';
-import { resolveHealingBonusesWithDetails } from '../../combat/automation/automationService.js';
+import { resolveHealingBonusesWithDetails, hasHealingMaximization } from '../../combat/automation/automationService.js';
 
 const MASS_CURE_WOUNDS_NAME = 'Mass Cure Wounds';
 
@@ -65,7 +65,8 @@ export async function triggerMassCureWounds(spell, metaCtx, playerStats, campaig
         return null;
     }
 
-    const result = rollExpression(healExpression);
+    const maximize = hasHealingMaximization(playerStats);
+    const result = maximize ? rollExpressionMaximized(healExpression) : rollExpression(healExpression);
     if (!result) {
         return null;
     }

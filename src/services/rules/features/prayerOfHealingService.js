@@ -1,11 +1,11 @@
-import { rollExpression } from '../../dice/diceRoller.js';
+import { rollExpression, rollExpressionMaximized } from '../../dice/diceRoller.js';
 import { getCombatContext } from '../combat/damageUtils.js';
 import { applyHealingToTarget } from '../combat/applyHealing.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import { postLogEntry } from '../../shared/logPoster.js';
 import { getDistanceFeet, rangeToFeet } from '../combat/rangeValidation.js';
 import { getCurrentCombatRound } from '../../encounters/combatData.js';
-import { resolveHealingBonusesWithDetails } from '../../combat/automation/automationService.js';
+import { resolveHealingBonusesWithDetails, hasHealingMaximization } from '../../combat/automation/automationService.js';
 
 const PRAYER_OF_HEALING_NAME = 'Prayer of Healing';
 
@@ -98,7 +98,8 @@ export async function triggerPrayerOfHealing(spell, metaCtx, playerStats, campai
     }
 
     const healExpression = getHealExpression(spell);
-    const result = rollExpression(healExpression);
+    const maximize = hasHealingMaximization(playerStats);
+    const result = maximize ? rollExpressionMaximized(healExpression) : rollExpression(healExpression);
     if (!result) {
         return null;
     }

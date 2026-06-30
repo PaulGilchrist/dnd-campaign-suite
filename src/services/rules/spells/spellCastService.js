@@ -54,7 +54,7 @@ import { onAbjurationSpellCast } from '../../automation/handlers/class-wizard/ar
 import { getCombatSummary } from '../../../services/encounters/combatData.js';
 import { applyDamageToTarget } from '../../../services/rules/combat/applyDamage.js';
 import { addEntry } from '../../../services/ui/logService.js';
-import { resolveHealingBonusesWithDetails } from '../../combat/automation/automationService.js';
+import { resolveHealingBonusesWithDetails, hasHealingMaximization } from '../../combat/automation/automationService.js';
 
 function applyEldritchHex(spell, playerStats, campaignName, targetName) {
     if (spell.name !== 'Hex') return;
@@ -436,7 +436,8 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
                         }
                     } else {
                         let resolvedExpression = expression.replace(/\bMOD\b/g, String(spellCastingMod));
-                        const result = rollExpression(resolvedExpression);
+                        const maximize = hasHealingMaximization(playerStats);
+                        const result = maximize ? rollExpressionMaximized(resolvedExpression) : rollExpression(resolvedExpression);
                         if (result) {
                             const combatSummary = await getCombatContext(campaignName);
                             if (combatSummary) {
@@ -1099,7 +1100,8 @@ async function applyRegenerateSpell(spell, target, caster, campaignName) {
     let result = null;
     // Apply initial healing
     if (expression) {
-        result = rollExpression(expression);
+        const maximize = hasHealingMaximization(caster);
+        result = maximize ? rollExpressionMaximized(expression) : rollExpression(expression);
         if (result) {
             const combatSummary = await getCombatContext(campaignName);
             if (combatSummary) {
