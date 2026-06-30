@@ -262,16 +262,16 @@ function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, condit
                                   <div className='left'>{item.damageType}</div>
                                    {is2024Rules && (() => { const mastery = getWeaponMastery(item.name, item); return <div className={mastery ? "clickable" : ""} onClick={() => { if (mastery) showWeaponMasteryPopup(mastery, setPopupHtml); }}>{mastery}</div>; })()}
                               </React.Fragment>;
-                           } else {
-                               return <React.Fragment key={item.name}>
-                                    <div className='left clickable' onClick={() => handleBonusSpellClick(item.name)}>{item.name}</div>
-                                    <div>{item.level === 0 ? 'Cantrip' : item.level}</div>
-                                    <div>{item.range}</div>
-                                    {useFullGrid && <div>-</div>}
-                                    {useFullGrid && <div>Utility</div>}
-                                    <div className='left'></div>
-                                    {is2024Rules && useFullGrid && <div></div>}
-                               </React.Fragment>;
+                            } else {
+                                return <React.Fragment key={item.name}>
+                                     <div className='left clickable' onClick={() => handleBonusSpellClick(item.name)}>{item.name}</div>
+                                     <div>{item.level === 0 ? 'Cantrip' : item.level}</div>
+                                     <div>{item.range}</div>
+                                     {useFullGrid && <div>-</div>}
+                                     <div>Utility</div>
+                                     <div className='left'></div>
+                                     {is2024Rules && useFullGrid && <div></div>}
+                                </React.Fragment>;
                            }
                        })}
                      <div className='half-line'></div>

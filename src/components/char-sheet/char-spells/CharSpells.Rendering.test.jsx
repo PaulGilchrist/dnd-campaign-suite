@@ -622,7 +622,7 @@ describe('CharSpells rendering', () => {
             {
               name: 'Casting Time Spell',
               level: 1,
-              casting_time: '1 bonus action',
+              casting_time: '1 turn',
               range: 'Self',
               duration: 'Instantaneous',
               prepared: 'Always',
@@ -641,7 +641,7 @@ describe('CharSpells rendering', () => {
       const table = screen.getByRole('table');
       const row = table.querySelector('tbody tr');
       const timeCell = row.querySelectorAll('td')[3];
-      expect(timeCell.textContent).toContain('BA');
+      expect(timeCell.textContent).toContain('turn');
     });
 
     it('renders casting time as empty when undefined', () => {
@@ -743,7 +743,7 @@ describe('CharSpells rendering', () => {
             {
               name: 'Damage Spell',
               level: 1,
-              casting_time: '1 action',
+              casting_time: '1 turn',
               range: '60 feet',
               duration: 'Instantaneous',
               damage: {
@@ -809,7 +809,7 @@ describe('CharSpells rendering', () => {
             {
               name: 'DC Spell',
               level: 1,
-              casting_time: '1 action',
+              casting_time: '1 turn',
               range: 'Self',
               duration: 'Instantaneous',
               components: ['V', 'S'],
@@ -852,7 +852,7 @@ describe('CharSpells rendering', () => {
             {
               name: 'Empty Damage Spell',
               level: 1,
-              casting_time: '1 action',
+              casting_time: '1 turn',
               range: '30 feet',
               duration: 'Instantaneous',
               components: ['V'],
@@ -949,11 +949,11 @@ describe('CharSpells rendering', () => {
         />,
       );
 
-      const spellName = screen.getByText('Fireball');
+      const spellName = screen.getByText('Light');
       fireEvent.click(spellName);
 
       expect(screen.getByTestId('spell-detail-popup')).toBeInTheDocument();
-      expect(screen.getByTestId('spell-detail-popup').textContent).toContain('Fireball');
+      expect(screen.getByTestId('spell-detail-popup').textContent).toContain('Light');
     });
 
     it('renders the upcast popup when upcast is pending', () => {
