@@ -736,7 +736,6 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                         targetName,
                         note: `Gained ${tempHp} temporary hit points from Potent Spellcasting`,
                         total: tempHp,
-                        bonus: 0,
                     });
                     setSecondaryTargetModal(null);
                 },
@@ -751,7 +750,6 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                         targetName: attackerName,
                         note: `Gained ${tempHp} temporary hit points from Potent Spellcasting`,
                         total: tempHp,
-                        bonus: 0,
                     });
                     setSecondaryTargetModal(null);
                 },

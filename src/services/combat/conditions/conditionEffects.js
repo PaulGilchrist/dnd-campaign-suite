@@ -122,12 +122,10 @@ function applySaveModifiers(effects, modifiers, saveType, abilityName, isRaging 
             // Specific check: only set global advantage if ability matches (or no filter)
             const abbr = abilityName.substring(0, 3).toUpperCase();
             if (mod.abilities.includes(abbr)) {
-              console.log('[conditionEffects] SETTING abilityCheckAdvantage for:', abilityName);
               effects.abilityCheckAdvantage = true;
             }
           }
         } else {
-          console.log('[conditionEffects] SETTING abilityCheckAdvantage (no abilities filter)');
           effects.abilityCheckAdvantage = true;
         }
       }

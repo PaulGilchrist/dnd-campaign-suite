@@ -1131,7 +1131,6 @@ export default function useAttackDamageResolution({
                                           targetName,
                                           note: `Gained ${tempHp} temporary hit points from Potent Spellcasting`,
                                           total: tempHp,
-                                          bonus: 0,
                                       });
                                       setSecondaryTargetModal(null);
                                   },
@@ -1146,7 +1145,6 @@ export default function useAttackDamageResolution({
                                           targetName: playerStats.name,
                                           note: `Gained ${tempHp} temporary hit points from Potent Spellcasting`,
                                           total: tempHp,
-                                          bonus: 0,
                                       });
                                       setSecondaryTargetModal(null);
                                   },
