@@ -3,6 +3,7 @@ import React from 'react'
 import { getRuntimeValue, setRuntimeValue, addStorageChangeListener } from '../../../hooks/runtime/useRuntimeState.js'
 import { rollD20 } from '../../../services/dice/diceRoller.js'
 import { CONDITIONS, CONDITION_SAVE_DC, CONDITION_SAVE_MAP, getAbilityLabel, getAbilitySaveBonus } from '../../../services/combat/conditions/conditionUtils.js'
+import { CONDITION_DESCRIPTIONS } from '../../../services/combat/conditions/effectDescriptions.js'
 import { addEntry } from '../../../services/ui/logService.js'
 import { EXHAUSTION_LEVELS, isDeadFromExhaustion, getExhaustionSaveDC } from '../../../services/combat/conditions/exhaustionRules.js'
 import usePopup from '../../../hooks/combat/usePopup.js'
@@ -197,7 +198,7 @@ function CharConditions({ playerStats, campaignName, activeMapName, characters, 
       <div className="char-conditions-grid">
         <span className={`exhaustion-badge ${dead ? 'exhaustion-badge--dead' : active ? 'exhaustion-badge--active' : ''}`}>
           <button className="exhaustion-badge-btn" onClick={() => adjustExhaustion(-1)} type="button" disabled={exhaustionLevel <= 0}>−</button>
-          <span className="exhaustion-badge-label" title={`Exhaustion level ${exhaustionLevel}${dead ? ' - DEAD' : ''}`}>Exhaustion ({exhaustionLevel})</span>
+          <span className="exhaustion-badge-label" title={`Exhaustion level ${exhaustionLevel}${dead ? ' - DEAD' : ''}\n\n${CONDITION_DESCRIPTIONS['Exhausted'] || ''}`}>Exhaustion ({exhaustionLevel})</span>
           <button className="exhaustion-badge-btn" onClick={() => adjustExhaustion(1)} type="button" disabled={dead}>+</button>
         </span>
         {CONDITIONS.map(({ key, label }) => (
@@ -206,6 +207,7 @@ function CharConditions({ playerStats, campaignName, activeMapName, characters, 
             className={`condition-badge ${activeConditions.includes(key) ? 'condition-badge--active' : ''}`}
             onClick={() => toggle(key)}
             type="button"
+            title={CONDITION_DESCRIPTIONS[label] || label}
           >
             {label}
           </button>
