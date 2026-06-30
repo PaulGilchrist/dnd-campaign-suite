@@ -648,8 +648,6 @@ describe('reactionDebuffHandler.handle', () => {
       const ps = makePlayerStats({});
       const action = makeAction({ effect: 'disadvantage_on_attack_roll' });
 
-      targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
-      damageUtils.getCombatContext.mockResolvedValue(makeCombatSummary());
       damageRollback.findLastAttack.mockResolvedValue({
         attackEvent: null,
         attackerName: null,
@@ -663,7 +661,7 @@ describe('reactionDebuffHandler.handle', () => {
       const result = await handle(action, ps, campaignName, mapName);
 
       expect(result.type).toBe('popup');
-      expect(result.payload.description).toContain('No recent attack roll found for Goblin');
+      expect(result.payload.description).toContain('No recent attack roll found');
     });
 
     it('reports disadvantage in description', async () => {

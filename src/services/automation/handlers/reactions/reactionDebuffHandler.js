@@ -36,12 +36,14 @@ async function handleAttackRollDebuff(action, _playerStats, campaignName, attack
     const defenderName = targetName;
 
     let defenderHp = null;
+    let healedAmount = 0;
 
     if (hit === true && reducedHit === false && defenderName) {
-        const healAmount = attackResult.primaryDamage || attackResult.totalDamage || 0;
+        const healAmount = attackResult.totalDamage || attackResult.primaryDamage || 0;
         if (healAmount > 0) {
             const healResult = applyHealingToTarget(combatSummary, defenderName, healAmount, campaignName);
             defenderHp = healResult?.newHp ?? null;
+            healedAmount = healResult?.actualHeal ?? 0;
         }
     }
 
@@ -53,8 +55,8 @@ async function handleAttackRollDebuff(action, _playerStats, campaignName, attack
         description += `<br/><i>Attack still hits.</i>`;
     } else if (hit === true && reducedHit === false) {
         description += `<br/><i>The attack now misses!</i>`;
-        if (defenderHp != null) {
-            description += `<br/>${defenderName} healed to ${defenderHp} HP.`;
+        if (healedAmount > 0) {
+            description += `<br/>${defenderName} healed for ${healedAmount} HP.`;
         } else if (defenderName) {
             description += `<br/><i>No damage event found to reverse for ${defenderName}.</i>`;
         }
@@ -112,12 +114,14 @@ async function handleDisadvantageDebuff(action, _playerStats, campaignName, atta
     const finalHit = ac != null ? (finalD20 + bonus >= ac) : null;
 
     let defenderHp = null;
+    let healedAmount = 0;
 
     if (hit === true && finalHit === false && defenderName) {
-        const healAmount = attackResult.primaryDamage || attackResult.totalDamage || 0;
+        const healAmount = attackResult.totalDamage || attackResult.primaryDamage || 0;
         if (healAmount > 0) {
             const healResult = applyHealingToTarget(combatSummary, defenderName, healAmount, campaignName);
             defenderHp = healResult?.newHp ?? null;
+            healedAmount = healResult?.actualHeal ?? 0;
         }
     }
 
@@ -129,8 +133,8 @@ async function handleDisadvantageDebuff(action, _playerStats, campaignName, atta
         description += `<br/><i>Attack still hits.</i>`;
     } else if (hit === true && finalHit === false) {
         description += `<br/><i>The attack now misses!</i>`;
-        if (defenderHp != null) {
-            description += `<br/>${defenderName} healed to ${defenderHp} HP.`;
+        if (healedAmount > 0) {
+            description += `<br/>${defenderName} healed for ${healedAmount} HP.`;
         } else if (defenderName) {
             description += `<br/><i>No damage event found to reverse for ${defenderName}.</i>`;
         }
@@ -138,7 +142,7 @@ async function handleDisadvantageDebuff(action, _playerStats, campaignName, atta
         description += `<br/><i>The attack already missed — no effect.</i>`;
     }
 
-    return infoPopup(action.name, description, auto, { defenderHp, defenderName });
+    return infoPopup(action.name, description, auto, { defenderHp, defenderName, healedAmount });
 }
 
 async function applyImprovedWardingFlare(playerStats, defenderName, campaignName) {
@@ -229,40 +233,6 @@ export async function handle(action, playerStats, campaignName, mapName) {
         }
     }
 
-    const targetInfo = await resolveTarget(campaignName, playerName);
-    if (!targetInfo?.target) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: featureName,
-                description: `${featureName} requires a target. Select a creature in combat and try again.`,
-                automation: auto,
-            },
-        };
-    }
-
-    const attackerName = targetInfo.target.name;
-    const rangeFt = rangeToFeet(auto.range || '60_ft');
-
-    if (mapName && rangeFt != null) {
-        const positions = await resolveMapPositions(campaignName, mapName, playerName);
-        if (positions?.attackerPos && positions?.targetPos) {
-            const dist = getDistanceFeet(positions.attackerPos, positions.targetPos);
-            if (dist != null && dist > rangeFt) {
-                return {
-                    type: 'popup',
-                    payload: {
-                        type: 'automation_info',
-                        name: featureName,
-                        description: `${attackerName} is out of range (${Math.round(dist)} ft > ${rangeFt} ft).`,
-                        automation: auto,
-                    },
-                };
-            }
-        }
-    }
-
     const combatSummary = await getCombatContext(campaignName);
     if (!combatSummary) {
         return {
@@ -277,6 +247,7 @@ export async function handle(action, playerStats, campaignName, mapName) {
     }
 
     const effect = auto.effect || '';
+    let attackerName = null;
 
     let result;
 
@@ -325,6 +296,28 @@ export async function handle(action, playerStats, campaignName, mapName) {
         await setRuntimeValue(campaignName, 'targetEffects', storedEffects, campaignName);
 
         result = await handleDisadvantageDebuff(action, playerStats, campaignName, lastAttackerName, combatSummary);
+    } else if (effect === 'disadvantage_on_attack_roll') {
+        const attackResult = await findLastAttack(campaignName);
+        const attackEvent = attackResult.attackEvent;
+        if (!attackEvent) {
+            return infoPopup(action.name, `No recent attack roll found. ${action.name} can only be used after an attack roll.`, auto);
+        }
+
+        const attackerName = attackResult.attackerName;
+
+        const rangeFt = rangeToFeet(auto.range || '30_ft');
+
+        if (mapName && rangeFt != null) {
+            const positions = await resolveMapPositions(campaignName, mapName, playerName);
+            if (positions?.attackerPos && positions?.targetPos) {
+                const dist = getDistanceFeet(positions.attackerPos, positions.targetPos);
+                if (dist != null && dist > rangeFt) {
+                    return infoPopup(action.name, `${attackerName} is out of range (${Math.round(dist)} ft > ${rangeFt} ft).`, auto);
+                }
+            }
+        }
+
+        result = await handleDisadvantageDebuff(action, playerStats, campaignName, attackerName, combatSummary);
     } else {
         const targetInfo = await resolveTarget(campaignName, playerName);
         if (!targetInfo?.target) {
@@ -339,7 +332,7 @@ export async function handle(action, playerStats, campaignName, mapName) {
             };
         }
 
-        const attackerName = targetInfo.target.name;
+        attackerName = targetInfo.target.name;
         const rangeFt = rangeToFeet(auto.range || '60_ft');
 
         if (mapName && rangeFt != null) {
@@ -360,39 +353,30 @@ export async function handle(action, playerStats, campaignName, mapName) {
             }
         }
 
-        if (effect === 'disadvantage_on_attack_roll') {
-            const attackResult = await findLastAttack(campaignName);
-            const attackEvent = attackResult.attackEvent;
-            if (!attackEvent || attackResult.attackerName !== attackerName) {
-                return infoPopup(action.name, `No recent attack roll found for ${attackerName}. ${action.name} can only be used shortly after an attack roll.`, auto);
-            }
-            result = await handleDisadvantageDebuff(action, playerStats, campaignName, attackerName, combatSummary);
+        const classLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level);
+        const bardicDieSize = classLevel?.bardic_die || 6;
+        const biDieRoll = Math.floor(Math.random() * bardicDieSize) + 1;
+
+        const attackResult = await findLastAttack(campaignName);
+        const attackEvent = attackResult.attackEvent;
+        const hasAttack = attackEvent && attackResult.attackerName === attackerName;
+
+        if (!hasAttack) {
+            return {
+                type: 'popup',
+                payload: {
+                    type: 'automation_info',
+                    name: featureName,
+                    description: `No recent roll found for ${attackerName} (attack, damage, or ability check). ${featureName} must be used shortly after the roll.`,
+                    automation: auto,
+                },
+            };
+        }
+
+        if (attackEvent?.damageTypes?.length || attackResult.totalDamage > 0) {
+            result = await handleDamageDebuff(action, playerStats, campaignName, attackerName, bardicDieSize, biDieRoll, combatSummary);
         } else {
-            const classLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level);
-            const bardicDieSize = classLevel?.bardic_die || 6;
-            const biDieRoll = Math.floor(Math.random() * bardicDieSize) + 1;
-
-            const attackResult = await findLastAttack(campaignName);
-            const attackEvent = attackResult.attackEvent;
-            const hasAttack = attackEvent && attackResult.attackerName === attackerName;
-
-            if (!hasAttack) {
-                return {
-                    type: 'popup',
-                    payload: {
-                        type: 'automation_info',
-                        name: featureName,
-                        description: `No recent roll found for ${attackerName} (attack, damage, or ability check). ${featureName} must be used shortly after the roll.`,
-                        automation: auto,
-                    },
-                };
-            }
-
-            if (attackEvent?.damageTypes?.length || attackResult.totalDamage > 0) {
-                result = await handleDamageDebuff(action, playerStats, campaignName, attackerName, bardicDieSize, biDieRoll, combatSummary);
-            } else {
-                result = await handleAttackRollDebuff(action, playerStats, campaignName, attackerName, bardicDieSize, biDieRoll, combatSummary);
-            }
+            result = await handleAttackRollDebuff(action, playerStats, campaignName, attackerName, bardicDieSize, biDieRoll, combatSummary);
         }
     }
 
@@ -414,11 +398,31 @@ export async function handle(action, playerStats, campaignName, mapName) {
         return result;
     }
 
-    if (effect === 'disadvantage_on_attack_roll' && result?.defenderName) {
-        const tempHpAmount = await applyImprovedWardingFlare(playerStats, result.defenderName, campaignName);
-        if (tempHpAmount) {
-            result.payload.description += `<br/><br/>${result.defenderName} gains ${tempHpAmount} Temporary Hit Points from Improved Warding Flare.`;
+    if (effect === 'disadvantage_on_attack_roll') {
+        const defenderName = result?.defenderName;
+        if (defenderName) {
+            const tempHpAmount = await applyImprovedWardingFlare(playerStats, defenderName, campaignName);
+            if (tempHpAmount) {
+                result.payload.description += `<br/><br/>${defenderName} gains ${tempHpAmount} Temporary Hit Points from Improved Warding Flare.`;
+            }
         }
+
+        const logDefenderName = defenderName || 'the target';
+        const healedAmt = result?.healedAmount ?? 0;
+        const logDescription = healedAmt > 0
+            ? `${playerName} used ${featureName} — the attack misses and ${logDefenderName} is healed for ${healedAmt} HP.`
+            : `${playerName} used ${featureName} on ${logDefenderName}.`;
+
+        addEntry(campaignName, {
+            type: 'ability_use',
+            characterName: playerName,
+            abilityName: featureName,
+            description: logDescription,
+            targetName: logDefenderName,
+            timestamp: Date.now(),
+        }).catch((e) => { console.error("[reactionDebuff] Error:", e); });
+
+        return result;
     }
 
     addEntry(campaignName, {

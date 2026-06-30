@@ -138,6 +138,7 @@ const ClericFeatures = function ClericFeatures({ playerStats, campaignName }) {
     const clericFeatures = getClassFeatures(playerStats);
     const isLifeDomain = (playerStats.class?.major?.name === 'Life Domain') || (playerStats.class?.subclass?.name === 'Life Domain');
     const preserveLifePoolMax = isLifeDomain ? (5 * playerStats.level) : 0;
+    const wisMod = playerStats.abilities?.find(a => a.name === 'Wisdom')?.bonus || 0;
     return (
          <div data-testid="char-class-cleric">
              <TrackedResourceInput label="Channel Divinity Charges" resourceKey="channelDivinityCharges" playerName={playerStats.name} getMax={() => clericFeatures?.maxChannelDivinity || 0} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
@@ -145,6 +146,7 @@ const ClericFeatures = function ClericFeatures({ playerStats, campaignName }) {
              {isLifeDomain && (
                  <TrackedResourceInput label="Preserve Life Pool" resourceKey="preserveLifePool" playerName={playerStats.name} getMax={() => preserveLifePoolMax} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
              )}
+             <TrackedResourceInput label="Warding Flare Uses" resourceKey="wardingflareUses" playerName={playerStats.name} getMax={() => Math.max(1, wisMod)} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
          </div>
     );
 };

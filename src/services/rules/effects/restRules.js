@@ -87,16 +87,17 @@ export const LONG_REST_RESOURCES = [
       'preserveLifePool',
       'warlockPactMagic',
       'luckyPoints',
-      'innateSorceryUses',
-      'sorcerousRestorationUses',
-       'zealousPresenceUses',
-       'rageOfTheGodsUses',
-       'divineInterventionUses',
-         'wholenessofbodyUses',
-         'wildResurgenceReversedThisRest',
-         'indomitableUses',
-           'naturalRecoveryFreeCast',
-           'naturalRecoverySlots',
+       'innateSorceryUses',
+       'sorcerousRestorationUses',
+        'zealousPresenceUses',
+        'rageOfTheGodsUses',
+        'divineInterventionUses',
+          'wholenessofbodyUses',
+          'wildResurgenceReversedThisRest',
+          'indomitableUses',
+            'naturalRecoveryFreeCast',
+            'naturalRecoverySlots',
+            'wardingflareUses',
             '_Star_Map_freeCastCount',
            '_Dragon_Companion_freeCastCount',
             '_Contact_Patron_freeCastCount',
@@ -343,11 +344,6 @@ export async function applyLongRest(playerStats, campaignName) {
   getLongRestResources().forEach((key) => {
     charData[key] = null
      })
-
-  const hasImprovedWardingFlare = playerStats.characterAdvancement?.some(f => f.name === 'Improved Warding Flare')
-  if (hasImprovedWardingFlare) {
-    charData.wardingflareUses = null
-  }
 
   // Clear active buffs and conditions as part of the atomic batch so SSE echo carries correct final state
   charData.activeBuffs = [];
