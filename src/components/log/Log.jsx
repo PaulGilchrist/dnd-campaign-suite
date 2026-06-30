@@ -146,9 +146,6 @@ function RollEntry({ entry }) {
             )}
           </div>
         )}
-        {(isSaveDamage || isSaveDamage || isOverchannelDamage) && entry.finalDamage != null && entry.damageType && (
-          <span className="log-final-damage">→ {entry.finalDamage} {entry.damageType} damage</span>
-        )}
         {(isDamage || isSaveDamage) && entry.resistanceDetails && entry.resistanceDetails.length > 0 && (
           <span className="log-resistance-details">
             {entry.resistanceDetails.map((rd, i) => (
