@@ -50,12 +50,6 @@ function App() {
   useEffect(() => {
     campaignRef.current.setCampaignSelectCallback(async (_, loaded) => {
       charMgmtRef.current.setCharacters(loaded);
-      if (loaded.length > 0) {
-        charMgmtRef.current.setActiveCharacter(cloneDeep(loaded[0]));
-        setActiveView('charSheet');
-      } else {
-        wizardRef.current.handleAddCharacter();
-      }
       // Pre-load combatSummary for the selected campaign so attack rider maneuvers work immediately
       const cs = await loadCombatSummary(campaignNameRef.current);
       if (cs) {
@@ -70,6 +64,13 @@ function App() {
         }));
         const initial = { round: 1, creatures };
         setCombatSummaryCache(initial, campaignNameRef.current);
+      }
+      setCombatSummaryLoaded(true);
+      if (loaded.length > 0) {
+        charMgmtRef.current.setActiveCharacter(cloneDeep(loaded[0]));
+        setActiveView('charSheet');
+      } else {
+        wizardRef.current.handleAddCharacter();
       }
     });
     campaignRef.current.setDeleteCampaignCallback(() => { charMgmtRef.current.setCharacters([]); charMgmtRef.current.setActiveCharacter(null); });
@@ -183,6 +184,8 @@ function App() {
       setMapsView({ type: isLocalhost ? 'manager' : 'none' });
     }
   }, [isLocalhost]);
+
+  const [combatSummaryLoaded, setCombatSummaryLoaded] = useState(false);
 
   const [theme, setTheme] = useState(() => {
     try {
@@ -386,6 +389,7 @@ function App() {
   };
 
   if (showCampaignSelection) return <CampaignSelection onCampaignSelect={handleCampaignSelect} />;
+  if (!combatSummaryLoaded) return <div className="loading-overlay"><div className="loading-spinner">Loading campaign...</div></div>;
 
   return (
     <div className="app">
