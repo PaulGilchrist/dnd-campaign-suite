@@ -146,7 +146,11 @@ async function handleDisadvantageDebuff(action, _playerStats, campaignName, atta
 }
 
 async function applyImprovedWardingFlare(playerStats, defenderName, campaignName) {
-    const improvedWf = (playerStats.characterAdvancement || []).find(
+    const allFeatures = [
+        ...(playerStats.characterAdvancement || []),
+        ...(playerStats.specialActions || []),
+    ];
+    const improvedWf = allFeatures.find(
         f => f.name === 'Improved Warding Flare' && f.automation?.tempHpExpression
     );
     if (!improvedWf) return null;
