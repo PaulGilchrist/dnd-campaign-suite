@@ -148,7 +148,7 @@ function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, condit
                                     if (cannotAct) return;
                                     if (isSpellAtk && spell.saveDc) { onResolveSpellDamage(attackItem); return; }
                                     if (isSpellAtk) { bonusCastAction(spell, {}); return; }
-                                    handleSimpleDamageRoll(attackItem);
+                                    bonusCastAction(spell, {});
                                 }}>{resolvedDamage}</div>
                                 <div className='left'>{damageType || (spell.heal_at_slot_level ? 'Healing' : 'Utility')}</div>
                                 {is2024Rules && <div></div>}

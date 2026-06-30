@@ -21,13 +21,11 @@ import { useSpellPositionResolver } from '../../hooks/combat/useSpellPositionRes
 import { useSpellCastExecutor } from '../../hooks/combat/useSpellCastExecutor.js';
 import { resolveSpellDamageAtLevel, isAutoHitSpell } from '../../services/rules/core/spellDamageUtils.js';
 import { signFormatter } from '../../services/ui/formatUtils.js';
-import { useSimpleDamageRoll } from '../../hooks/combat/useSimpleDamageRoll.js';
 import './CharActions.css'
 
 function CharReactions({ playerStats, campaignName, cannotAct, mapName, characters }) {
     const { setPopupHtml } = useDiceRollPopup();
     const { rollAttack, rollDamage } = useLoggedDiceRoll(playerStats.name, campaignName, { characters });
-    const handleSimpleDamageRoll = useSimpleDamageRoll(playerStats.name, campaignName, null, setPopupHtml);
     const [selectedSpell, setSelectedSpell] = React.useState(null);
     const [reactiveSpellEligible, setReactiveSpellEligible] = React.useState(null);
     const [reactiveSpellWarnings, setReactiveSpellWarnings] = React.useState(false);
@@ -286,9 +284,7 @@ function CharReactions({ playerStats, campaignName, cannotAct, mapName, characte
                                 : <div className="save-dc-display">DC {playerStats.spellAbilities?.saveDc} {spell.dc?.dc_type}</div>}
                         <div className={resolvedDamage ? "clickable" : ""} onClick={() => {
                             if (cannotAct) return;
-                            const attackItem = { ...spell, type: 'Reaction', hitBonus: playerStats.spellAbilities?.toHit, saveDc: spell.dc ? playerStats.spellAbilities.saveDc : null, saveType: spell.dc?.dc_type, saveSuccess: spell.dc?.dc_success, damage: resolvedDamage, damageType };
-                            if (isSpellAtk) { reactionCastAction(spell, {}); return; }
-                            handleSimpleDamageRoll(attackItem);
+                            reactionCastAction(spell, {});
                         }}>{resolvedDamage}</div>
                         <div className='left'>{damageType || (spell.heal_at_slot_level ? 'Healing' : 'Utility')}</div>
                     </React.Fragment>;

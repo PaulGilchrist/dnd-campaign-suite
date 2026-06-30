@@ -50,7 +50,7 @@
   "class": {
     "name": "Cleric",
     "subclass": {
-      "name": "War Domain",
+      "name": "Light Domain",
       "type": ""
     },
     "divineOrder": "Protector",

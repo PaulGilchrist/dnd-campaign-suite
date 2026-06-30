@@ -1314,7 +1314,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                                 if (cannotAct) return;
                                 if (isSpellAtk && spell.saveDc) { resolveSpellDamage(attackItem); return; }
                                 if (isSpellAtk) { actionCastAction(spell, {}); return; }
-                                handleSimpleDamageRoll(attackItem);
+                                actionCastAction(spell, {});
                             }}>{resolvedDamage}</div>
                             <div className='left'>{damageType || (spell.heal_at_slot_level ? 'Healing' : 'Utility')}</div>
                             {is2024Rules && <div></div>}
