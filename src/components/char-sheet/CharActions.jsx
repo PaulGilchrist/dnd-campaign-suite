@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { getCategories } from '../../services/character/featureCategories.js'
+import { getActionSpellNames } from '../../services/ui/spellSectionUtils.js'
 import { collectWeaponMastery } from '../../services/combat/automation/automationService.js';
 import { applyPostDamageMasteryEffects, applyMasteryEffect } from '../../services/automation/handlers/combat/weaponMasteryHandler.js';
 import { sanitizeHtml } from '../../services/ui/sanitize.js';
@@ -73,14 +74,6 @@ function formatRange(range) {
     s = s.replace(/(\d+)\s*ft$/i, '$1 ft.');
     s = s.replace(/(\d+\/\d+)\s*ft$/i, '$1 ft.');
     return s;
-}
-
-function isElderChampionActive(playerName, campaignName) {
-    try {
-        const stored = getRuntimeValue(playerName, 'activeBuffs', campaignName);
-        const activeBuffs = Array.isArray(stored) ? stored : [];
-        return activeBuffs.some(b => b.name === 'Elder Champion');
-    } catch { return false; }
 }
 
 const areEqual = (prevProps, nextProps) => isEqual(prevProps.playerStats, nextProps.playerStats) && prevProps.conditionAttackMode === nextProps.conditionAttackMode && prevProps.exhaustionPenalty === nextProps.exhaustionPenalty && prevProps.cannotAct === nextProps.cannotAct;
@@ -1289,19 +1282,8 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
 
     const { buildUpcastLevels } = useSpellUpcastFlow(playerStats, campaignName);
 
-    const actionCastingTimes = ['1 action', '1 Action', 'action', 'Action'];
-    const actionAttackNames = new Set(playerStats.attacks?.filter(a => a.type === 'Action').map(a => a.name) || []);
-    const elderChampionActive = isElderChampionActive(playerStats.name, campaignName);
-    const actionSpells = playerStats.spellAbilities?.spells?.filter(spell => {
-        const isAction = actionCastingTimes.includes(spell.casting_time);
-        if (!isAction) return false;
-        if (elderChampionActive) return false;
-        const hasDamage = !!spell.damage;
-        const hasHealing = !!spell.heal_at_slot_level;
-        return (spell.prepared === 'Always' || spell.prepared === 'Prepared') &&
-            !actionAttackNames.has(spell.name) &&
-            (hasDamage || hasHealing)
-    }) || [];
+    const actionSpellNameSet = getActionSpellNames(playerStats, campaignName);
+    const actionSpells = (playerStats.spellAbilities?.spells || []).filter(spell => actionSpellNameSet.has(spell.name));
     const actionSpellNames = actionSpells.reduce((acc, spell) => { acc[spell.name] = spell; return acc; }, {});
 
     const getAttackSpellLevel = (attackName) => {
@@ -1309,22 +1291,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         return spell ? spell.level : null;
     };
 
-    const allActionItems = [
-        ...playerStats.attacks?.filter(a => a.type === 'Action').map(a => ({ ...a, _isAttack: true })) || [],
-        ...actionSpells.map(s => ({ ...s, _isAttack: false })),
-    ];
-
-    const sortedActionItems = allActionItems.sort((a, b) => {
-        const levelA = a._isAttack ? getAttackSpellLevel(a.name) : a.level;
-        const levelB = b._isAttack ? getAttackSpellLevel(b.name) : b.level;
-        if (levelA != null && levelB != null) {
-            if (levelA !== levelB) return levelA - levelB;
-            return a.name.localeCompare(b.name);
-        }
-        if (levelA == null && levelB == null) return a.name.localeCompare(b.name);
-        if (levelA == null) return -1;
-        return 1;
-    });
+    const actionAttacks = playerStats.attacks?.filter(a => a.type === 'Action') || [];
 
     const handleActionSpellClick = (spellName) => {
         let spell = actionSpellNames[spellName];
@@ -1412,40 +1379,36 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     <div><b>Damage</b></div>
                     <div className='left'><b>Type</b></div>
                     {is2024Rules && <div><b>Mastery</b></div>}
-                    {sortedActionItems.map((item) => {
-                        if (item._isAttack) {
-                            const attackLevel = getAttackSpellLevel(item.name);
-                            const attackItem = { ...item };
-                            delete attackItem._isAttack;
-                            return <React.Fragment key={item.name}>
-                                <div className='left clickable' onClick={() => handleActionSpellClick(item.name)}>{item.name}</div>
-                                <div>{attackLevel != null ? (attackLevel === 0 ? 'Cantrip' : attackLevel) : '-'}</div>
-                                <div>{formatRange(item.range)}</div>
-                                {item.saveDc
-                                    ? <div className="save-dc-display">DC {item.saveDc + displaySaveDcBonus} {item.saveType}</div>
-                                    : <div className={"clickable" + (exhaustionPenalty > 0 || conditionAttackMode === 'disadvantage' || cannotAct ? " stat--penalized" : "") + (cannotAct ? " disabled-attack" : "")} onClick={() => handleSpellAttackClick(attackItem)}>{signFormatter.format(item.hitBonus - exhaustionPenalty)}</div>}
-                                <div className={item.damage ? "clickable" : ""} onClick={() => {
-                                    if (cannotAct) return;
-                                    if (item.saveDc) { resolveSpellDamage(attackItem); return; }
-                                    // To-Hit attacks: damage is ALWAYS rolled through the "To Hit" flow.
-                                    // Save DC attacks: damage is rolled when the target fails the save.
-                                    handleSimpleDamageRoll(attackItem);
-                                }}>{item.damage}</div>
-
-                                <div className='left'>{item.damageType}</div>
-                                {is2024Rules && (() => { const mastery = getWeaponMastery(item.name, item); return <div className={mastery ? "clickable" : ""} onClick={() => { if (mastery) showWeaponMasteryPopup(mastery, setPopupHtml); }}>{mastery}</div>; })()}
-                            </React.Fragment>;
-                        } else {
-                            return <React.Fragment key={item.name}>
-                                <div className='left clickable' onClick={() => handleActionSpellClick(item.name)}>{item.name}</div>
-                                <div>{item.level === 0 ? 'Cantrip' : item.level}</div>
-                                <div>{item.range}</div>
-                                <div>-</div>
-                                <div>Utility</div>
-                                <div className='left'></div>
-                                {is2024Rules && <div></div>}
-                            </React.Fragment>;
-                        }
+                    {actionAttacks.map((attack) => {
+                        const attackLevel = getAttackSpellLevel(attack.name);
+                        const attackItem = { ...attack };
+                        return <React.Fragment key={attack.name}>
+                            <div className='left clickable' onClick={() => handleAttackClick(attackItem)}>{attack.name}</div>
+                            <div>{attackLevel != null ? (attackLevel === 0 ? 'Cantrip' : attackLevel) : '-'}</div>
+                            <div>{formatRange(attack.range)}</div>
+                            {attack.saveDc
+                                ? <div className="save-dc-display">DC {attack.saveDc + displaySaveDcBonus} {attack.saveType}</div>
+                                : <div className={"clickable" + (exhaustionPenalty > 0 || conditionAttackMode === 'disadvantage' || cannotAct ? " stat--penalized" : "") + (cannotAct ? " disabled-attack" : "")} onClick={() => handleSpellAttackClick(attackItem)}>{signFormatter.format(attack.hitBonus - exhaustionPenalty)}</div>}
+                            <div className={attack.damage ? "clickable" : ""} onClick={() => {
+                                if (cannotAct) return;
+                                if (attack.saveDc) { resolveSpellDamage(attackItem); return; }
+                                handleSimpleDamageRoll(attackItem);
+                            }}>{attack.damage}</div>
+                            <div className='left'>{attack.damageType}</div>
+                            {is2024Rules && (() => { const mastery = getWeaponMastery(attack.name, attack); return <div className={mastery ? "clickable" : ""} onClick={() => { if (mastery) showWeaponMasteryPopup(mastery, setPopupHtml); }}>{mastery}</div>; })()}
+                        </React.Fragment>;
+                    })}
+                    {actionSpells.map((spell) => {
+                        const damageType = typeof spell.damage === 'string' ? '' : (spell.damage?.damage_type || '');
+                        return <React.Fragment key={spell.name}>
+                            <div className='left clickable' onClick={() => handleActionSpellClick(spell.name)}>{spell.name}</div>
+                            <div>{spell.level === 0 ? 'Cantrip' : spell.level}</div>
+                            <div>{spell.range}</div>
+                            <div>-</div>
+                            <div>{damageType || (spell.heal_at_slot_level ? 'Healing' : 'Utility')}</div>
+                            <div className='left'></div>
+                            {is2024Rules && <div></div>}
+                        </React.Fragment>;
                     })}
                 </div>
                 {(() => {

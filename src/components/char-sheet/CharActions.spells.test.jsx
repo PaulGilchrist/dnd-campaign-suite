@@ -318,15 +318,15 @@ describe('CharActions spells', () => {
       expect(calledWith.spell).toEqual(actionSpell);
     });
 
-    it('opens SpellDetailPopup for a non-action spell clicked from action attacks (name match fallback)', () => {
-      const stats = createStats({
+    it('does not open SpellDetailPopup when an attack with matching spell name is clicked (attack uses handleAttackClick)', () => {
+      render(<CharActions playerStats={createStats({
         attacks: [{ name: 'Fireball', range: 60, hitBonus: 5, damage: '8d6', damageType: 'Fire', type: 'Action' }],
         spellAbilities: { spells: [{ ...actionSpell, casting_time: '1 bonus action' }] },
-      });
-      render(<CharActions playerStats={stats} />);
+      })} />);
       const attackName = screen.getByText('Fireball');
       fireEvent.click(attackName);
-      expect(screen.getByTestId('spell-detail-popup')).toBeInTheDocument();
+      // Attack names now call handleAttackClick, not handleActionSpellClick
+      expect(screen.queryByTestId('spell-detail-popup')).not.toBeInTheDocument();
     });
 
     it('does not open SpellDetailPopup when spell name does not exist', () => {

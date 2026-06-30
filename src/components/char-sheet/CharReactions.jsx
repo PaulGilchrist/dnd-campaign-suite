@@ -3,6 +3,7 @@ import Popup from '../common/popup.jsx'
 import SpellDetailPopup from './char-spells/SpellDetailPopup.jsx'
 import MetamagicPopup from './popups/MetamagicPopup.jsx'
 import ArcaneWardRestoreModal from './modals/arcane/ArcaneWardRestoreModal.jsx'
+import { getReactionSpellNames } from '../../services/ui/spellSectionUtils.js'
 import { getCategories } from '../../services/character/featureCategories.js'
 import { sanitizeHtml } from '../../services/ui/sanitize.js';
 import { buildFeatureDetailHtml } from '../../hooks/combat/useActionPopup.js'
@@ -59,11 +60,10 @@ function CharReactions({ playerStats, campaignName, cannotAct, mapName, characte
         });
     }
 
+    const reactionSpellNames = getReactionSpellNames(playerStats);
     let reactionSpells = [];
     if (playerStats.spellAbilities && playerStats.spellAbilities.spells.length > 0) {
-        const reactionCastingTimes = ['1 reaction', '1 Reaction', 'reaction', 'Reaction'];
-        const attackNames = new Set((playerStats.attacks || []).map(a => a.name));
-        reactionSpells = playerStats.spellAbilities.spells.filter(spell => reactionCastingTimes.includes(spell.casting_time) && (spell.prepared === 'Always' || spell.prepared === 'Prepared') && !attackNames.has(spell.name));
+        reactionSpells = playerStats.spellAbilities.spells.filter(spell => reactionSpellNames.has(spell.name));
     }
     // Add base reactions to reaction list
     if (!reactions.find((reaction) => reaction.name === OPPORTUNITY_ATTACK.name)) {

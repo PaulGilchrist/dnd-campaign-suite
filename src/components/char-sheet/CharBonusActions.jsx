@@ -4,6 +4,7 @@ import MetamagicPopup from './popups/MetamagicPopup.jsx'
 import SpellDetailPopup from './char-spells/SpellDetailPopup.jsx'
 import { getCategories } from '../../services/character/featureCategories.js'
 import { sanitizeHtml } from '../../services/ui/sanitize.js';
+import { getBonusActionSpellNames } from '../../services/ui/spellSectionUtils.js'
 import { showWeaponMasteryPopup, buildFeatureDetailHtml } from '../../hooks/combat/useActionPopup.js'
 import { hasAutomation } from '../../services/combat/automation/automationService.js'
 import { isExhausted } from '../../services/automation/handlers/combat/saveAttackHandler.js'
@@ -22,9 +23,6 @@ import { addEntry } from '../../services/ui/logService.js';
 import './CharActions.css'
 
 const signFormatter = new Intl.NumberFormat('en-US', { signDisplay: 'always' });
-const bonusActionCastingTimes = ['1 bonus action', '1 Bonus Action', 'bonus action', 'Bonus Action'];
-const actionCastingTimes = ['1 action', '1 Action', 'action', 'Action'];
-
 function formatRange(range) {
     if (!range && range !== 0) return '';
     let s = String(range);
@@ -38,19 +36,6 @@ function formatRange(range) {
     s = s.replace(/(\d+)\s*ft$/i, '$1 ft.');
     s = s.replace(/(\d+\/\d+)\s*ft$/i, '$1 ft.');
     return s;
-}
-
-function isElderChampionActive(playerName, campaignName) {
-    try {
-        const stored = getRuntimeValue(playerName, 'activeBuffs', campaignName);
-        const activeBuffs = Array.isArray(stored) ? stored : [];
-        return activeBuffs.some(b => b.name === 'Elder Champion');
-    } catch { return false; }
-}
-
-function isActionSpell(castingTime) {
-    const ct = castingTime || '';
-    return actionCastingTimes.includes(ct);
 }
 
 function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, conditionAttackMode, cannotAct, mapName, characters, onAttackClick, onResolveSpellDamage, onAutomationAction, getWeaponMastery, rollAttack, rollDamage, getTargetInfo }) {
@@ -179,15 +164,8 @@ function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, condit
         }
         return true;
     });
-    const attackNames = new Set((playerStats.attacks || []).map(a => a.name));
-    const elderActive = isElderChampionActive(playerStats.name, campaignName);
-    const bonusActionSpells = playerStats.spellAbilities?.spells?.filter(spell => {
-        const isBonusAction = bonusActionCastingTimes.includes(spell.casting_time);
-        const isActionSpellSwift = elderActive && isActionSpell(spell.casting_time);
-        return (isBonusAction || isActionSpellSwift) &&
-          (spell.prepared === 'Always' || spell.prepared === 'Prepared') &&
-          !attackNames.has(spell.name)
-     }) || [];
+    const bonusSpellNameSet = getBonusActionSpellNames(playerStats, campaignName);
+    const bonusActionSpells = (playerStats.spellAbilities?.spells || []).filter(spell => bonusSpellNameSet.has(spell.name));
     const hasBonusActions = playerStats.bonusActions.length > 0;
     const hordeBreakerAttack = playerStats.attacks.find(a => a.isHordeBreaker);
     const hunterPreyChoice = hordeBreakerAttack ? getRuntimeValue(playerStats.name, "_Hunter's Prey_choice", campaignName) : null;
@@ -207,76 +185,67 @@ function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, condit
         return spell ? spell.level : null;
     };
 
-    const allBonusItems = [
-        ...bonusActionAttacks.map(a => ({ ...a, _isAttack: true })),
-        ...bonusActionSpells.map(s => ({ ...s, _isAttack: false })),
-        ...(isHordeBreakerAvailable && hordeBreakerAttack ? [{ ...hordeBreakerAttack, _isAttack: true }] : []),
-    ];
-
-    const sortedBonusItems = allBonusItems.sort((a, b) => {
-        const levelA = a._isAttack ? getAttackSpellLevel(a.name) : a.level;
-        const levelB = b._isAttack ? getAttackSpellLevel(b.name) : b.level;
-        if (levelA != null && levelB != null) {
-            if (levelA !== levelB) return levelA - levelB;
-            return a.name.localeCompare(b.name);
-        }
-        if (levelA == null && levelB == null) return a.name.localeCompare(b.name);
-        if (levelA == null) return -1;
-        return 1;
-    });
-
-    const useFullGrid = bonusActionAttacks.length > 0;
-
     return (
          <div>
              <hr />
              <div className='sectionHeader'>Bonus Actions</div>
-             {bonusActionAttacks.length > 0 || bonusActionSpells.length > 0 ? (
+              {(bonusActionAttacks.length > 0 || bonusActionSpells.length > 0 || isHordeBreakerAvailable) ? (
                  <div className={`attacks ${is2024Rules ? 'mastery-enabled' : ''}`}>
                    <div className='left'><b>Name</b></div>
                        <div><b>Level</b></div>
                        <div><b>Range</b></div>
-                       {useFullGrid && <div><b>Hit</b></div>}
-                       {useFullGrid && <div><b>Damage</b></div>}
+                       {bonusActionAttacks.length > 0 && <div><b>Hit</b></div>}
+                       {bonusActionAttacks.length > 0 && <div><b>Damage</b></div>}
                        <div className='left'><b>Type</b></div>
-                       {is2024Rules && useFullGrid && <div><b>Mastery</b></div>}
-                        {sortedBonusItems.map((item) => {
-                            if (item._isAttack) {
-                                const attackLevel = getAttackSpellLevel(item.name);
-                                const attackItem = { ...item };
-                                delete attackItem._isAttack;
-                                return <React.Fragment key={item.name}>
-                                    <div className='left'>{item.name}</div>
-                                    <div>{attackLevel != null ? (attackLevel === 0 ? 'Cantrip' : attackLevel) : '-'}</div>
-                                    <div>{formatRange(item.range)}</div>
-                                    {item.saveDc
-                                       ? <div className="save-dc-display">DC {item.saveDc + displaySaveDcBonus} {item.saveType}</div>
-                                     : <div className={"clickable" + (exhaustionPenalty > 0 || conditionAttackMode === 'disadvantage' || cannotAct ? " stat--penalized" : "") + (cannotAct ? " disabled-attack" : "")} onClick={() => onAttackClick(attackItem)}>{signFormatter.format(item.hitBonus - exhaustionPenalty)}</div>}
-                                   <div className={item.damage ? "clickable" : ""} onClick={() => {
-                                       if (cannotAct) return;
-                                       if (item.saveDc) { onResolveSpellDamage(attackItem); return; }
-                                       // To-Hit attacks: damage is ALWAYS rolled through the "To Hit" flow.
-                                       // Direct damage click only logs a simple die roll — no targeting, no riders.
-                                       handleSimpleDamageRoll(attackItem);
-                                   }}>{item.damage}</div>
-                                  <div className='left'>{item.damageType}</div>
-                                   {is2024Rules && (() => { const mastery = getWeaponMastery(item.name, item); return <div className={mastery ? "clickable" : ""} onClick={() => { if (mastery) showWeaponMasteryPopup(mastery, setPopupHtml); }}>{mastery}</div>; })()}
-                              </React.Fragment>;
-                            } else {
-                                return <React.Fragment key={item.name}>
-                                     <div className='left clickable' onClick={() => handleBonusSpellClick(item.name)}>{item.name}</div>
-                                     <div>{item.level === 0 ? 'Cantrip' : item.level}</div>
-                                     <div>{item.range}</div>
-                                     {useFullGrid && <div>-</div>}
-                                     <div>Utility</div>
-                                     <div className='left'></div>
-                                     {is2024Rules && useFullGrid && <div></div>}
-                                </React.Fragment>;
-                           }
-                       })}
-                     <div className='half-line'></div>
-                 </div>
-              ) : null}
+                       {is2024Rules && bonusActionAttacks.length > 0 && <div><b>Mastery</b></div>}
+                       {bonusActionAttacks.map((attack) => {
+                           const attackLevel = getAttackSpellLevel(attack.name);
+                           const attackItem = { ...attack };
+                           return <React.Fragment key={attack.name}>
+                               <div className='left'>{attack.name}</div>
+                               <div>{attackLevel != null ? (attackLevel === 0 ? 'Cantrip' : attackLevel) : '-'}</div>
+                               <div>{formatRange(attack.range)}</div>
+                               {attack.saveDc
+                                  ? <div className="save-dc-display">DC {attack.saveDc + displaySaveDcBonus} {attack.saveType}</div>
+                                : <div className={"clickable" + (exhaustionPenalty > 0 || conditionAttackMode === 'disadvantage' || cannotAct ? " stat--penalized" : "") + (cannotAct ? " disabled-attack" : "")} onClick={() => onAttackClick(attackItem)}>{signFormatter.format(attack.hitBonus - exhaustionPenalty)}</div>}
+                              <div className={attack.damage ? "clickable" : ""} onClick={() => {
+                                  if (cannotAct) return;
+                                  if (attack.saveDc) { onResolveSpellDamage(attackItem); return; }
+                                  handleSimpleDamageRoll(attackItem);
+                              }}>{attack.damage}</div>
+                             <div className='left'>{attack.damageType}</div>
+                              {is2024Rules && (() => { const mastery = getWeaponMastery(attack.name, attack); return <div className={mastery ? "clickable" : ""} onClick={() => { if (mastery) showWeaponMasteryPopup(mastery, setPopupHtml); }}>{mastery}</div>; })()}
+                         </React.Fragment>;
+                        })}
+                        {isHordeBreakerAvailable && hordeBreakerAttack ? (() => {
+                            const hbItem = { ...hordeBreakerAttack };
+                            return <React.Fragment key="Horde Breaker">
+                                <div className='left'>{hordeBreakerAttack.name}</div>
+                                <div>-</div>
+                                <div>{formatRange(hordeBreakerAttack.range)}</div>
+                                <div className={"clickable" + (exhaustionPenalty > 0 || conditionAttackMode === 'disadvantage' || cannotAct ? " stat--penalized" : "") + (cannotAct ? " disabled-attack" : "")} onClick={() => onAttackClick(hbItem)}>{signFormatter.format(hordeBreakerAttack.hitBonus - exhaustionPenalty)}</div>
+                                <div className={hordeBreakerAttack.damage ? "clickable" : ""} onClick={() => {
+                                    if (cannotAct) return;
+                                    handleSimpleDamageRoll(hbItem);
+                                }}>{hordeBreakerAttack.damage}</div>
+                                <div className='left'>{hordeBreakerAttack.damageType}</div>
+                                {is2024Rules && <div></div>}
+                            </React.Fragment>;
+                        })() : null}
+                        {bonusActionSpells.map((spell) => {
+                           return <React.Fragment key={spell.name}>
+                                <div className='left clickable' onClick={() => handleBonusSpellClick(spell.name)}>{spell.name}</div>
+                                <div>{spell.level === 0 ? 'Cantrip' : spell.level}</div>
+                                <div>{spell.range}</div>
+                                <div>-</div>
+                                <div>Utility</div>
+                                <div className='left'></div>
+                                {is2024Rules && <div></div>}
+                           </React.Fragment>;
+                      })}
+                      <div className='half-line'></div>
+                  </div>
+               ) : null}
               {selectedBonusSpell && (
                  <Popup onClickOrKeyDown={() => setSelectedBonusSpell(null)}>
                      <SpellDetailPopup
