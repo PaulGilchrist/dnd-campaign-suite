@@ -21,7 +21,7 @@ function isWearingArmor(playerStats) {
     return formula.includes('Armor (');
 }
 
-export async function handle(action, playerStats, campaignName) {
+export async function handle(action, playerStats, campaignName, mapName) {
     const auto = action.automation;
     const playerName = playerStats.name;
 
@@ -39,7 +39,7 @@ export async function handle(action, playerStats, campaignName) {
             return {
                 type: 'modal',
                 modalName: 'healingIllusion',
-                payload: { action, playerStats, campaignName },
+                payload: { action, playerStats, campaignName, mapName },
             };
         }
         return {

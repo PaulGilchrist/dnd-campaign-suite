@@ -1449,6 +1449,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                 <CharActionModals
                     playerStats={playerStats}
                     campaignName={campaignName}
+                    mapName={mapName}
                     characters={characters}
                     healingPoolModal={healingPoolModal} setHealingPoolModal={setHealingPoolModal}
                     handOfHealingModal={handOfHealingModal} setHandOfHealingModal={setHandOfHealingModal}

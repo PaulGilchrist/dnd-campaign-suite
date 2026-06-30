@@ -13,7 +13,6 @@ import WeaponKindMasteryModal from './modals/WeaponKindMasteryModal.jsx'
 import BastionOfLawModal from './modals/divine/BastionOfLawModal.jsx'
 import CombatStanceModal from './modals/shared/CombatStanceModal.jsx'
 import TeleportModal from './modals/TeleportModal.jsx'
-import HealingIllusionModal from './modals/shared/HealingIllusionModal.jsx'
 import SaveAttackHealModal from './modals/shared/SaveAttackHealModal.jsx'
 import DivineSparkModal from './modals/divine/DivineSparkModal.jsx'
 import DivineInterventionModal from './modals/divine/DivineInterventionModal.jsx'
@@ -48,6 +47,34 @@ import BulwarkOfForceModal from './modals/BulwarkOfForceModal.jsx'
 import CoronaEnemySelectionModal from './modals/CoronaEnemySelectionModal.jsx'
 import RadianceOfDawnModal from './modals/RadianceOfDawnModal.jsx'
 import { handleClearWard, handleSpendDice, handleApply } from '../../services/automation/handlers/class-cleric-paladin/bastionOfLawHandler.js'
+import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js'
+import { logHealingToSSE } from '../../services/automation/common/healingRoll.js'
+
+function buildHealingIllusionTargets(playerStats, characters) {
+    return (characters || [])
+        .filter(c => c.name !== playerStats.name)
+        .map(c => ({ name: c.name, type: c.type, size: c.size, currentHp: c.currentHp, maxHp: c.maxHp }));
+}
+
+async function handleHealingIllusionConfirm(targetName, payload, characters, campaignName, onClose) {
+    const { action, playerStats } = payload;
+    const healAmount = playerStats.level || 1;
+    const maxHp = targetName === playerStats.name
+        ? playerStats.hitPoints
+        : (Number(getRuntimeValue(targetName, 'hitPoints', campaignName)) || 0);
+    const currentHp = Number(getRuntimeValue(targetName, 'currentHitPoints', campaignName)) || 0;
+    const newHp = Math.min(maxHp, currentHp + healAmount);
+    await setRuntimeValue(targetName, 'currentHitPoints', newHp, campaignName);
+    logHealingToSSE(campaignName, {
+        targetName,
+        sourceName: action.name,
+        actualHeal: newHp - currentHp,
+        newHp,
+        maxHp,
+        healingName: 'Healing Illusion',
+    });
+    onClose();
+}
 
 export default function CharActionModals({
     playerStats,
@@ -287,9 +314,16 @@ export default function CharActionModals({
                 />
             )}
             {healingIllusionModal && (
-                <HealingIllusionModal
-                    {...healingIllusionModal}
-                    onClose={() => { setHealingIllusionModal(null); window.dispatchEvent(new CustomEvent('buffs-updated')); }}
+                <SecondaryTargetModal
+                    title="Healing Illusion"
+                    targets={buildHealingIllusionTargets(playerStats, characters)}
+                    description={`The illusion has ended. Choose a creature within 5 feet to regain ${playerStats.level || 1} HP:`}
+                    onTargetSelected={(targetName) => handleHealingIllusionConfirm(targetName, healingIllusionModal.payload, characters, campaignName, () => { setHealingIllusionModal(null); window.dispatchEvent(new CustomEvent('buffs-updated')); })}
+                    onSkip={() => { setHealingIllusionModal(null); window.dispatchEvent(new CustomEvent('buffs-updated')); }}
+                    confirmLabel="Heal"
+                    confirmIcon="fa-heart"
+                    showHp={true}
+                    showSize={false}
                 />
             )}
             {saveAttackHealModal && (

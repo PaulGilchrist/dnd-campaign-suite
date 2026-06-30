@@ -82,7 +82,7 @@ function TeleportModal({ action, playerStats, campaignName, onClose, triggeredBy
                         <i className="fa-solid fa-arrows-rotate"></i> {action.name}
                     </div>
                     <div className="sp-body">
-                        <p>Swap places with your illusion (up to {auto.distance || '30 ft'}).</p>
+                        <p>Swap places with your illusion (up to {(auto && auto.distance) || '30 ft'}).</p>
                     </div>
                     <div className="sp-actions">
                         <button className="sp-roll-btn" onClick={handleConfirm}>
@@ -95,8 +95,8 @@ function TeleportModal({ action, playerStats, campaignName, onClose, triggeredBy
         );
     }
 
-    const standardDistance = auto.distance || '60 ft';
-    const extendedDistance = auto.extendedDistance || '150 ft';
+    const standardDistance = (auto && auto.distance) || '60 ft';
+    const extendedDistance = (auto && auto.extendedDistance) || '150 ft';
 
     return (
         <div className="sp-overlay" onClick={onClose}>
@@ -133,9 +133,9 @@ function TeleportModal({ action, playerStats, campaignName, onClose, triggeredBy
                             </span>
                         </label>
                     </div>
-                    {auto.bringAllies && auto.allyCount > 0 && (
+                    {(auto && auto.bringAllies && auto.allyCount > 0) && (
                         <p style={{ marginTop: '12px', opacity: 0.8 }}>
-                            <i className="fa-solid fa-users"></i> When using the extended teleport, you can bring up to {auto.allyCount} willing creatures within 10 ft of you. Each appears within {auto.teleportRange || '10 ft'} of your destination.
+                            <i className="fa-solid fa-users"></i> When using the extended teleport, you can bring up to {auto.allyCount} willing creatures within 10 ft of you. Each appears within {(auto && auto.teleportRange) || '10 ft'} of your destination.
                         </p>
                     )}
                 </div>

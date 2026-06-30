@@ -73,6 +73,13 @@ vi.mock('./modals/shared/HealingIllusionModal.jsx', () => ({
     return <div data-testid="healing-illusion-modal"><button data-testid="healing-illusion-close" onClick={onClose}>Close</button></div>;
   },
 }));
+vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
+  getRuntimeValue: vi.fn(() => null),
+  setRuntimeValue: vi.fn(),
+}));
+vi.mock('../../services/automation/common/healingRoll.js', () => ({
+  logHealingToSSE: vi.fn(),
+}));
 vi.mock('./modals/shared/SaveAttackHealModal.jsx', () => ({
   default: function TestModal() { return <div data-testid="save-attack-heal-modal">SaveAttackHealModal</div>; },
 }));
