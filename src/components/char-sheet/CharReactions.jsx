@@ -309,21 +309,23 @@ const reactionCastAction = React.useCallback((spell, metaCtx) => {
                     </div>
                 )}
              {reactionSpells.length > 0 && <div className='attacks'>
-                 <div className='left'><b>Name</b></div>
-                 <div><b>Range</b></div>
-                 <div><b>Hit</b></div>
-                 <div><b>Damage</b></div>
-                 <div className='left'><b>Type</b></div>
-                 {reactionSpells.map((spell) => {
-                     return <React.Fragment key={spell.name}>
-                         <div className='left clickable' onClick={() => setSelectedSpell(spell)}>{spell.name}</div>
-                         <div>{spell.range}</div>
-                         <div>—</div>
-                         <div>Utility</div>
-                         <div className='left'></div>
-                     </React.Fragment>;
-                 })}<div className='half-line'></div>
-             </div>}
+                  <div className='left'><b>Name</b></div>
+                  <div><b>Range</b></div>
+                  <div><b>Level</b></div>
+                  <div><b>Hit</b></div>
+                  <div><b>Damage</b></div>
+                  <div className='left'><b>Type</b></div>
+                  {reactionSpells.map((spell) => {
+                      return <React.Fragment key={spell.name}>
+                          <div className='left clickable' onClick={() => setSelectedSpell(spell)}>{spell.name}</div>
+                          <div>{spell.range}</div>
+                          <div>{spell.level === 0 ? 'Cantrip' : spell.level}</div>
+                          <div>—</div>
+                          <div>Utility</div>
+                          <div className='left'></div>
+                      </React.Fragment>;
+                  })}<div className='half-line'></div>
+              </div>}
               {arcaneWardRestoreModal && (
                 <ArcaneWardRestoreModal
                     {...arcaneWardRestoreModal}

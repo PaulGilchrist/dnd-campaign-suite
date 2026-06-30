@@ -201,6 +201,29 @@ function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, condit
     if (!hasBonusContent) return null;
 
     const bonusSpellNames = bonusActionSpells.reduce((acc, spell) => { acc[spell.name] = spell; return acc; }, {});
+
+    const getAttackSpellLevel = (attackName) => {
+        const spell = playerStats.spellAbilities?.spells?.find(s => s.name === attackName);
+        return spell ? spell.level : null;
+    };
+
+    const allBonusItems = [
+        ...bonusActionAttacks.map(a => ({ ...a, _isAttack: true })),
+        ...bonusActionSpells.map(s => ({ ...s, _isAttack: false })),
+    ];
+
+    const sortedBonusItems = allBonusItems.sort((a, b) => {
+        const levelA = a._isAttack ? getAttackSpellLevel(a.name) : a.level;
+        const levelB = b._isAttack ? getAttackSpellLevel(b.name) : b.level;
+        if (levelA != null && levelB != null) {
+            if (levelA !== levelB) return levelA - levelB;
+            return a.name.localeCompare(b.name);
+        }
+        if (levelA == null && levelB == null) return a.name.localeCompare(b.name);
+        if (levelA == null) return -1;
+        return 1;
+    });
+
     const useFullGrid = bonusActionAttacks.length > 0;
 
     return (
@@ -209,56 +232,45 @@ function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, condit
              <div className='sectionHeader'>Bonus Actions</div>
              {bonusActionAttacks.length > 0 || bonusActionSpells.length > 0 ? (
                  <div className={`attacks ${is2024Rules ? 'mastery-enabled' : ''}`}>
-                     <div className='left'><b>Name</b></div>
-                     <div><b>Range</b></div>
-                     {useFullGrid && <div><b>Hit</b></div>}
-                     {useFullGrid && <div><b>Damage</b></div>}
-                     <div className='left'><b>Type</b></div>
-                     {is2024Rules && useFullGrid && <div><b>Mastery</b></div>}
-                      {bonusActionAttacks.map((attack) => {
-                         return <React.Fragment key={attack.name}>
-                              <div className='left'>{attack.name}</div>
-                               <div>{formatRange(attack.range)}</div>
-                                {attack.saveDc
-                                    ? <div className="save-dc-display">DC {attack.saveDc + displaySaveDcBonus} {attack.saveType}</div>
-                                  : <div className={"clickable" + (exhaustionPenalty > 0 || conditionAttackMode === 'disadvantage' || cannotAct ? " stat--penalized" : "") + (cannotAct ? " disabled-attack" : "")} onClick={() => onAttackClick(attack)}>{signFormatter.format(attack.hitBonus - exhaustionPenalty)}</div>}
-                               <div className={attack.damage ? "clickable" : ""} onClick={() => {
-                                   if (cannotAct) return;
-                                    if (attack.saveDc) { onResolveSpellDamage(attack); return; }
-                                   // To-Hit attacks: damage is ALWAYS rolled through the "To Hit" flow.
-                                   // Direct damage click only logs a simple die roll — no targeting, no riders.
-                                   handleSimpleDamageRoll(attack);
-                               }}>{attack.damage}</div>
-                              <div className='left'>{attack.damageType}</div>
-                               {is2024Rules && (() => { const mastery = getWeaponMastery(attack.name, attack); return <div className={mastery ? "clickable" : ""} onClick={() => { if (mastery) showWeaponMasteryPopup(mastery, setPopupHtml); }}>{mastery}</div>; })()}
-                          </React.Fragment>;
-                      })}
-                      {/* Horde Breaker bonus action attack (only shown when Hunter's Prey choice is Horde Breaker) */}
-                      {isHordeBreakerAvailable && hordeBreakerAttack && (
-                          <React.Fragment>
-                              <div className='left'>Horde Breaker</div>
-                               <div>{formatRange(hordeBreakerAttack.range)}</div>
-                              <div className={"clickable" + (exhaustionPenalty > 0 || conditionAttackMode === 'disadvantage' ? " stat--penalized" : "")} onClick={() => onAttackClick(hordeBreakerAttack)}>{signFormatter.format(hordeBreakerAttack.hitBonus - exhaustionPenalty)}</div>
-                               <div className={hordeBreakerAttack.damage ? "clickable" : ""} onClick={() => {
-                                   if (cannotAct) return;
-                                   // To-Hit attacks: damage is ALWAYS rolled through the "To Hit" flow.
-                                   // Direct damage click only logs a simple die roll — no targeting, no riders.
-                                   handleSimpleDamageRoll(hordeBreakerAttack);
-                               }}>{hordeBreakerAttack.damage}</div>
-                              <div className='left'>{hordeBreakerAttack.damageType}</div>
-                              {is2024Rules && <div></div>}
-                          </React.Fragment>
-                      )}
-                     {bonusActionSpells.map((spell) => {
-                        return <React.Fragment key={spell.name}>
-                             <div className='left clickable' onClick={() => handleBonusSpellClick(spell.name)}>{spell.name}</div>
-                             <div>{spell.range}</div>
-                             {useFullGrid && <div>-</div>}
-                             {useFullGrid && <div>Utility</div>}
-                             <div className='left'>Utility</div>
-                             {is2024Rules && useFullGrid && <div></div>}
-                         </React.Fragment>;
-                     })}
+                  <div className='left'><b>Name</b></div>
+                      <div><b>Range</b></div>
+                      <div><b>Level</b></div>
+                      {useFullGrid && <div><b>Hit</b></div>}
+                      {useFullGrid && <div><b>Damage</b></div>}
+                      <div className='left'><b>Type</b></div>
+                      {is2024Rules && useFullGrid && <div><b>Mastery</b></div>}
+                       {sortedBonusItems.map((item) => {
+                           if (item._isAttack) {
+                               const attackLevel = getAttackSpellLevel(item.name);
+                               return <React.Fragment key={item.name}>
+                                   <div className='left'>{item.name}</div>
+                                   <div>{formatRange(item.range)}</div>
+                                   <div>{attackLevel != null ? (attackLevel === 0 ? 'Cantrip' : attackLevel) : '-'}</div>
+                                   {item.saveDc
+                                       ? <div className="save-dc-display">DC {item.saveDc + displaySaveDcBonus} {item.saveType}</div>
+                                     : <div className={"clickable" + (exhaustionPenalty > 0 || conditionAttackMode === 'disadvantage' || cannotAct ? " stat--penalized" : "") + (cannotAct ? " disabled-attack" : "")} onClick={() => onAttackClick(item)}>{signFormatter.format(item.hitBonus - exhaustionPenalty)}</div>}
+                                   <div className={item.damage ? "clickable" : ""} onClick={() => {
+                                       if (cannotAct) return;
+                                       if (item.saveDc) { onResolveSpellDamage(item); return; }
+                                       // To-Hit attacks: damage is ALWAYS rolled through the "To Hit" flow.
+                                       // Direct damage click only logs a simple die roll — no targeting, no riders.
+                                       handleSimpleDamageRoll(item);
+                                   }}>{item.damage}</div>
+                                  <div className='left'>{item.damageType}</div>
+                                   {is2024Rules && (() => { const mastery = getWeaponMastery(item.name, item); return <div className={mastery ? "clickable" : ""} onClick={() => { if (mastery) showWeaponMasteryPopup(mastery, setPopupHtml); }}>{mastery}</div>; })()}
+                              </React.Fragment>;
+                           } else {
+                               return <React.Fragment key={item.name}>
+                                   <div className='left clickable' onClick={() => handleBonusSpellClick(item.name)}>{item.name}</div>
+                                   <div>{item.range}</div>
+                                   <div>{item.level === 0 ? 'Cantrip' : item.level}</div>
+                                   {useFullGrid && <div>-</div>}
+                                   {useFullGrid && <div>Utility</div>}
+                                   <div className='left'>Utility</div>
+                                   {is2024Rules && useFullGrid && <div></div>}
+                               </React.Fragment>;
+                           }
+                       })}
                      <div className='half-line'></div>
                  </div>
               ) : null}

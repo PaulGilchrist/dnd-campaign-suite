@@ -1304,6 +1304,28 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
     }) || [];
     const actionSpellNames = actionSpells.reduce((acc, spell) => { acc[spell.name] = spell; return acc; }, {});
 
+    const getAttackSpellLevel = (attackName) => {
+        const spell = playerStats.spellAbilities?.spells?.find(s => s.name === attackName);
+        return spell ? spell.level : null;
+    };
+
+    const allActionItems = [
+        ...playerStats.attacks?.filter(a => a.type === 'Action').map(a => ({ ...a, _isAttack: true })) || [],
+        ...actionSpells.map(s => ({ ...s, _isAttack: false })),
+    ];
+
+    const sortedActionItems = allActionItems.sort((a, b) => {
+        const levelA = a._isAttack ? getAttackSpellLevel(a.name) : a.level;
+        const levelB = b._isAttack ? getAttackSpellLevel(b.name) : b.level;
+        if (levelA != null && levelB != null) {
+            if (levelA !== levelB) return levelA - levelB;
+            return a.name.localeCompare(b.name);
+        }
+        if (levelA == null && levelB == null) return a.name.localeCompare(b.name);
+        if (levelA == null) return -1;
+        return 1;
+    });
+
     const handleActionSpellClick = (spellName) => {
         let spell = actionSpellNames[spellName];
         if (!spell) {
@@ -1385,39 +1407,43 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                 <div className={`attacks ${is2024Rules ? 'mastery-enabled' : ''}`}>
                     <div className='left'><b>Name</b></div>
                     <div><b>Range</b></div>
+                    <div><b>Level</b></div>
                     <div><b>Hit</b></div>
                     <div><b>Damage</b></div>
                     <div className='left'><b>Type</b></div>
                     {is2024Rules && <div><b>Mastery</b></div>}
-                    {playerStats.attacks.map((attack) => {
-                        if (attack.type != 'Action') return '';
-                        return <React.Fragment key={attack.name}>
-                            <div className='left clickable' onClick={() => handleActionSpellClick(attack.name)}>{attack.name}</div>
-                            <div>{formatRange(attack.range)}</div>
-                            {attack.saveDc
-                                ? <div className="save-dc-display">DC {attack.saveDc + displaySaveDcBonus} {attack.saveType}</div>
-                                : <div className={"clickable" + (exhaustionPenalty > 0 || conditionAttackMode === 'disadvantage' || cannotAct ? " stat--penalized" : "") + (cannotAct ? " disabled-attack" : "")} onClick={() => handleSpellAttackClick(attack)}>{signFormatter.format(attack.hitBonus - exhaustionPenalty)}</div>}
-                            <div className={attack.damage ? "clickable" : ""} onClick={() => {
-                                if (cannotAct) return;
-                                if (attack.saveDc) { resolveSpellDamage(attack); return; }
-                                // To-Hit attacks: damage is ALWAYS rolled through the "To Hit" flow.
-                                // Save DC attacks: damage is rolled when the target fails the save.
-                                handleSimpleDamageRoll(attack);
-                            }}>{attack.damage}</div>
+                    {sortedActionItems.map((item) => {
+                        if (item._isAttack) {
+                            const attackLevel = getAttackSpellLevel(item.name);
+                            return <React.Fragment key={item.name}>
+                                <div className='left clickable' onClick={() => handleActionSpellClick(item.name)}>{item.name}</div>
+                                <div>{formatRange(item.range)}</div>
+                                <div>{attackLevel != null ? (attackLevel === 0 ? 'Cantrip' : attackLevel) : '-'}</div>
+                                {item.saveDc
+                                    ? <div className="save-dc-display">DC {item.saveDc + displaySaveDcBonus} {item.saveType}</div>
+                                    : <div className={"clickable" + (exhaustionPenalty > 0 || conditionAttackMode === 'disadvantage' || cannotAct ? " stat--penalized" : "") + (cannotAct ? " disabled-attack" : "")} onClick={() => handleSpellAttackClick(item)}>{signFormatter.format(item.hitBonus - exhaustionPenalty)}</div>}
+                                <div className={item.damage ? "clickable" : ""} onClick={() => {
+                                    if (cannotAct) return;
+                                    if (item.saveDc) { resolveSpellDamage(item); return; }
+                                    // To-Hit attacks: damage is ALWAYS rolled through the "To Hit" flow.
+                                    // Save DC attacks: damage is rolled when the target fails the save.
+                                    handleSimpleDamageRoll(item);
+                                }}>{item.damage}</div>
 
-                            <div className='left'>{attack.damageType}</div>
-                            {is2024Rules && (() => { const mastery = getWeaponMastery(attack.name, attack); return <div className={mastery ? "clickable" : ""} onClick={() => { if (mastery) showWeaponMasteryPopup(mastery, setPopupHtml); }}>{mastery}</div>; })()}
-                        </React.Fragment>;
-                    })}
-                    {actionSpells.map((spell) => {
-                        return <React.Fragment key={spell.name}>
-                            <div className='left clickable' onClick={() => handleActionSpellClick(spell.name)}>{spell.name}</div>
-                            <div>{spell.range}</div>
-                            <div>-</div>
-                            <div>Utility</div>
-                            <div className='left'></div>
-                            {is2024Rules && <div></div>}
-                        </React.Fragment>;
+                                <div className='left'>{item.damageType}</div>
+                                {is2024Rules && (() => { const mastery = getWeaponMastery(item.name, item); return <div className={mastery ? "clickable" : ""} onClick={() => { if (mastery) showWeaponMasteryPopup(mastery, setPopupHtml); }}>{mastery}</div>; })()}
+                            </React.Fragment>;
+                        } else {
+                            return <React.Fragment key={item.name}>
+                                <div className='left clickable' onClick={() => handleActionSpellClick(item.name)}>{item.name}</div>
+                                <div>{item.range}</div>
+                                <div>{item.level === 0 ? 'Cantrip' : item.level}</div>
+                                <div>-</div>
+                                <div>Utility</div>
+                                <div className='left'></div>
+                                {is2024Rules && <div></div>}
+                            </React.Fragment>;
+                        }
                     })}
                 </div>
                 {(() => {
@@ -1432,6 +1458,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                             <div className='attacks'>
                                 <div className='left'><b>Action</b></div>
                                 <div><b>Range</b></div>
+                                <div><b>Level</b></div>
                                 <div><b>Hit</b></div>
                                 <div><b>Damage</b></div>
                                 <div className='left'><b>Type</b></div>
@@ -1451,6 +1478,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                                         <React.Fragment key={actionName}>
                                             <div className={`left clickable ${isDisabled ? 'disabled-attack' : ''}`} onClick={handleClick}>{actionName}</div>
                                             <div>—</div>
+                                            <div>-</div>
                                             <div>—</div>
                                             <div>—</div>
                                             <div className='left'>{isAttack ? 'Melee/Ranged' : 'Special'}</div>
