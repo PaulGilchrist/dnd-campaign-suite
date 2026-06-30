@@ -75,7 +75,13 @@ export function getExcludedSpellNames(playerStats, campaignName) {
     const action = getActionSpellNames(playerStats, campaignName);
     const bonus = getBonusActionSpellNames(playerStats, campaignName);
     const reaction = getReactionSpellNames(playerStats);
-    return new Set([...action, ...bonus, ...reaction]);
+    const allSpellNames = new Set([...action, ...bonus, ...reaction]);
+    // Also exclude any spell that shares a name with an attack (attacks are shown in action/bonus/reaction sections)
+    for (const attack of playerStats.attacks || []) {
+        if (allSpellNames.has(attack.name)) continue;
+        allSpellNames.add(attack.name);
+    }
+    return allSpellNames;
 }
 
 function elderChampionActive(playerStats, campaignName) {

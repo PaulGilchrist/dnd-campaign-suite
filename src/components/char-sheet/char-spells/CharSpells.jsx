@@ -307,20 +307,24 @@ const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells
     const [filterPrepared, setFilterPrepared] = React.useState(false);
     const [spells, setSpells] = React.useState([]);
     const is2024 = playerStats.rules === '2024';
-    const excludedSpellNames = getExcludedSpellNames(playerStats, campaignName);
 
     React.useEffect(() => {
         if(playerStats.spellAbilities) {
             setFilterPrepared(false);
-            setSpells(playerStats.spellAbilities.spells);
+            const excludedSpellNames = getExcludedSpellNames(playerStats, campaignName);
+            const allSpells = playerStats.spellAbilities.spells;
+            setSpells(allSpells.filter(spell => !excludedSpellNames.has(spell.name)));
           }
-      }, [playerStats]);
+      }, [playerStats, campaignName]);
     const handleTogglePreparedFilter = () => {
+        const excludedSpellNames = getExcludedSpellNames(playerStats, campaignName);
         const spells = cloneDeep(playerStats.spellAbilities.spells);
         if(!filterPrepared) {
-            setSpells(spells.filter(spell => spell.prepared === 'Always' || spell.prepared === 'Prepared'));
+            const filtered = spells.filter(spell => !excludedSpellNames.has(spell.name) && (spell.prepared === 'Always' || spell.prepared === 'Prepared'));
+            setSpells(filtered);
         } else {
-            setSpells(spells)
+            const filtered = spells.filter(spell => !excludedSpellNames.has(spell.name));
+            setSpells(filtered);
         }
         setFilterPrepared(!filterPrepared)
     }
@@ -683,7 +687,6 @@ return (
                 </thead>
                 <tbody>
                     {spells.map((spell) => {
-                        if (excludedSpellNames.has(spell.name)) return null;
                         let notes = [];
                         if(spell.components) notes.push(spell.components.join('/'));
                         let effect = 'Utility';
