@@ -185,8 +185,8 @@ function CharAbilities({ allAbilityScores, playerStats, campaignName, exhaustion
         }
 
     return (
-        <div className='abilities-popup-parent'>
-            <div className='abilities'>
+        <div className='char-abilities'>
+            <div className='sectionHeader'>
                 <div className='left'><b>Ability</b></div>
                 <div><b>Score</b></div>
                 <div><b>Bonus</b></div>

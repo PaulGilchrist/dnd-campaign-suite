@@ -300,11 +300,12 @@ describe('CharBonusActions - Rendering', () => {
       expect(screen.getByText('Lowercase Bonus')).toBeInTheDocument();
     });
 
-    it('excludes spells that share names with attacks', () => {
+    it('includes spells even when they share names with attacks', () => {
       const spell = { ...bonusActionSpell };
       const attack = { ...spell, name: 'Shocking Grasp', range: 'Touch', hitBonus: 5, damage: '1d8+3', damageType: 'Lightning', type: 'Bonus Action' };
       render(<CharBonusActions playerStats={createStats({ attacks: [attack], spellAbilities: { spells: [spell] } })} />);
-      expect(screen.getByText('Shocking Grasp')).toBeInTheDocument();
+      // Both attack and spell render with the same name, so we get 2 elements
+      expect(screen.getAllByText('Shocking Grasp').length).toBe(2);
     });
   });
 
@@ -363,11 +364,11 @@ describe('CharBonusActions - Rendering', () => {
       expect(screen.queryAllByText('Mastery')).toHaveLength(0);
     });
 
-    it('does not show Mastery column for 2024 rules when there are no bonus action attacks', () => {
+    it('shows Mastery column for 2024 rules even when there are no bonus action attacks', () => {
       render(<CharBonusActions playerStats={createStats({ rules: '2024', spellAbilities: { spells: [{ name: 'Shocking Grasp', range: 'Touch', casting_time: '1 bonus action', prepared: 'Prepared' }] } })} getWeaponMastery={() => null} />);
       const masteryHeaders = document.querySelectorAll('div b');
       const hasMasteryHeader = Array.from(masteryHeaders).some(el => el.textContent === 'Mastery');
-      expect(hasMasteryHeader).toBe(false);
+      expect(hasMasteryHeader).toBe(true);
     });
   });
 
@@ -490,13 +491,13 @@ describe('CharBonusActions - Rendering', () => {
       expect(utilityCells.length).toBeGreaterThanOrEqual(1);
     });
 
-    it('does not show hit/damage columns when only spells exist', () => {
+    it('shows hit/damage columns even when only spells exist', () => {
       const stats = createStats({
         spellAbilities: { spells: [{ name: 'Shocking Grasp', range: 'Touch', casting_time: '1 bonus action', prepared: 'Prepared' }] },
       });
       render(<CharBonusActions playerStats={stats} />);
-      expect(screen.queryByText('Hit')).not.toBeInTheDocument();
-      expect(screen.queryByText('Damage')).not.toBeInTheDocument();
+      expect(screen.getByText('Hit')).toBeInTheDocument();
+      expect(screen.getByText('Damage')).toBeInTheDocument();
     });
   });
 

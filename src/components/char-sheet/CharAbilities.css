@@ -1,17 +1,24 @@
-.abilities-popup-parent .abilities {
+.char-abilities {
+    margin-top: 5px;
+    overflow: visible;
+}
+.char-abilities .abilities {
     display: grid;
-    grid-template-columns: 80px 45px 45px 80px auto;
+    grid-template-columns: 80px 45px 50px 80px auto;
     text-align: center;
 }
-.abilities-popup-parent .abilities > div {
-    padding-right: 10px;
+.char-abilities .sectionHeader {
+    background-color: var(--background-color-header);
+    display: grid;
+    grid-template-columns: 80px 45px 50px 80px auto;
+    text-align: center;
 }
-.abilities-popup-parent {
-    overflow: visible;
+.char-abilities .abilities > div {
+    padding-right: 10px;
 }
 
 @media print {
-    .abilities-popup-parent .abilities {
+    .char-abilities .abilities {
         font-size: 11px;
     }
 }

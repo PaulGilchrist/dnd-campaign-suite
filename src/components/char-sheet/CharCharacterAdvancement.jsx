@@ -2,6 +2,7 @@
 import { getCategories } from '../../services/character/featureCategories.js'
 import { sanitizeHtml } from '../../services/ui/sanitize.js';
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
+import './CharCharacterAdvancement.css';
 
 function CharCharacterAdvancement({ playerStats, campaignName }) {
     const categories = getCategories(playerStats.rules || '5e');
@@ -15,7 +16,7 @@ function CharCharacterAdvancement({ playerStats, campaignName }) {
     };
 
     return (
-          <div>
+          <div className='char-character-advancement'>
               <div className='sectionHeader'>Character Advancement</div>
               {features.map((feature, index) => {
                 const options = feature.automation?.options;

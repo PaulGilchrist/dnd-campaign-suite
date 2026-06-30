@@ -1,10 +1,10 @@
-.char-inventory .sectionHeader {
+.char-character-advancement .sectionHeader {
     margin-top: 10px;
     background-color: var(--background-color-header);
 }
 
 @media print {
-    .magic-item-description {
+    .char-character-advancement {
         display: none;
     }
 }

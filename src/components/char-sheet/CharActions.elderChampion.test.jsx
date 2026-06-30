@@ -132,6 +132,7 @@ vi.mock('../../services/rules/core/attackCalc.js', () => ({
     if (name.startsWith('+')) return { baseName: name.replace(/^\+\d+\s*/, '') };
     return { baseName: name };
   }),
+  resolveSpellDamageAtLevel: vi.fn(() => '8d6'),
 }));
 
 vi.mock('../../services/character/classFeatures.js', () => ({

@@ -118,6 +118,7 @@ vi.mock('../../services/ui/logService.js', () => ({
 
 vi.mock('../../services/rules/core/attackCalc.js', () => ({
   parseMagicItemName: vi.fn((name) => ({ baseName: name })),
+  resolveSpellDamageAtLevel: vi.fn(() => '8d6'),
 }));
 
 vi.mock('../../services/character/classFeatures.js', () => ({
@@ -221,14 +222,14 @@ describe('CharActions spells', () => {
       expect(screen.getByText('Fireball')).toBeInTheDocument();
     });
 
-    it('excludes spells that share a name with an action attack', () => {
+    it('includes spells even when they share a name with an attack', () => {
       const stats = createStats({
         attacks: [{ name: 'Fireball', range: 60, hitBonus: 5, damage: '8d6', damageType: 'Fire', type: 'Action' }],
         spellAbilities: { spells: [actionSpell] },
       });
       render(<CharActions playerStats={stats} />);
-      // The attack name appears, not the spell (they share the name so the spell is excluded)
-      expect(screen.getByText('Fireball')).toBeInTheDocument();
+      // Both the attack and the spell share the same name and both render
+      expect(screen.getAllByText('Fireball').length).toBe(2);
     });
 
     it('does not render spells when spellAbilities is undefined', () => {
@@ -263,7 +264,7 @@ describe('CharActions spells', () => {
 
     it('displays the spell range', () => {
       render(<CharActions playerStats={createStats({ spellAbilities: { spells: [actionSpell] } })} />);
-      expect(screen.getByText('150 ft')).toBeInTheDocument();
+      expect(screen.getByText('150 ft.')).toBeInTheDocument();
     });
 
     it('renders multiple action spells', () => {
@@ -379,9 +380,10 @@ describe('CharActions spells', () => {
   });
 
   describe('spell column structure', () => {
-    it('renders a dash "-" in the hit column for action spells', () => {
+    it('renders hit and damage columns for action spells', () => {
       render(<CharActions playerStats={createStats({ spellAbilities: { spells: [{ name: 'Fireball', range: '150 ft', casting_time: '1 action', prepared: 'Prepared', damage: '8d6' }] } })} />);
-      expect(screen.getByText('-')).toBeInTheDocument();
+      expect(screen.getByText('Hit')).toBeInTheDocument();
+      expect(screen.getByText('Damage')).toBeInTheDocument();
     });
   });
 });

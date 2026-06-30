@@ -15,6 +15,7 @@ import { getCurrentCombatRound } from '../../services/encounters/combatData.js'
 import { getInnateSorceryBonus } from '../../services/combat/buffs/buffService.js';
 import { useDiceRollPopup } from '../../hooks/combat/DiceRollContext.js';
 import { formatRange, signFormatter, getAttackSpellLevel } from '../../services/ui/formatUtils.js';
+import { resolveSpellDamageAtLevel } from '../../services/rules/core/attackCalc.js';
 import { useSimpleDamageRoll } from '../../hooks/combat/useSimpleDamageRoll.js';
 import { useSpellPositionResolver } from '../../hooks/combat/useSpellPositionResolver.js';
 import { useSpellCastExecutor } from '../../hooks/combat/useSpellCastExecutor.js';
@@ -83,18 +84,17 @@ function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, condit
     const bonusSpellNames = bonusActionSpells.reduce((acc, spell) => { acc[spell.name] = spell; return acc; }, {});
 
     return (
-         <div>
-             <hr />
+         <div className='char-actions'>
              <div className='sectionHeader'>Bonus Actions</div>
-              {(bonusActionAttacks.length > 0 || bonusActionSpells.length > 0 || isHordeBreakerAvailable) ? (
-                 <div className={`attacks ${is2024Rules ? 'mastery-enabled' : ''}`}>
-                   <div className='left'><b>Name</b></div>
-                       <div><b>Level</b></div>
-                       <div><b>Range</b></div>
-                       {bonusActionAttacks.length > 0 && <div><b>Hit</b></div>}
-                       {bonusActionAttacks.length > 0 && <div><b>Damage</b></div>}
-                       <div className='left'><b>Type</b></div>
-                       {is2024Rules && bonusActionAttacks.length > 0 && <div><b>Mastery</b></div>}
+               {(bonusActionAttacks.length > 0 || bonusActionSpells.length > 0 || isHordeBreakerAvailable) ? (
+                  <div className={`attacks ${is2024Rules ? 'mastery-enabled' : ''}`}>
+                    <div className='left'><b>Name</b></div>
+                        <div><b>Level</b></div>
+                        <div><b>Range</b></div>
+                        <div><b>Hit</b></div>
+                        <div><b>Damage</b></div>
+                        <div className='left'><b>Type</b></div>
+                        {is2024Rules && <div><b>Mastery</b></div>}
                         {bonusActionAttacks.map((attack) => {
                             const attackLevel = getAttackSpellLevel(playerStats.spellAbilities, attack.name);
                             const attackItem = { ...attack };
@@ -131,13 +131,22 @@ function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, condit
                         })() : null}
                         {bonusActionSpells.map((spell) => {
                             const damageType = typeof spell.damage === 'string' ? '' : (spell.damage?.damage_type || '');
+                            const resolvedDamage = spell.heal_at_slot_level ? '' : resolveSpellDamageAtLevel(spell, playerStats.level);
+                            const isSpellAtk = !spell.dc;
+                            const attackItem = { ...spell, type: 'Bonus Action', hitBonus: playerStats.spellAbilities?.toHit, saveDc: spell.dc ? playerStats.spellAbilities.saveDc : null, saveType: spell.dc?.dc_type, saveSuccess: spell.dc?.dc_success, damage: resolvedDamage, damageType };
                             return <React.Fragment key={spell.name}>
                                 <div className='left clickable' onClick={() => handleBonusSpellClick(spell.name)}>{spell.name}</div>
                                 <div>{spell.level === 0 ? 'Cantrip' : spell.level}</div>
-                                <div>{spell.range}</div>
-                                <div>-</div>
-                                <div>{damageType || (spell.heal_at_slot_level ? 'Healing' : 'Utility')}</div>
-                                <div className='left'></div>
+                                <div>{formatRange(spell.range)}</div>
+                                {isSpellAtk
+                                    ? <div className={"clickable" + (exhaustionPenalty > 0 || conditionAttackMode === 'disadvantage' || cannotAct ? " stat--penalized" : "") + (cannotAct ? " disabled-attack" : "")} onClick={() => onAttackClick(attackItem)}>{signFormatter.format(playerStats.spellAbilities?.toHit - exhaustionPenalty)}</div>
+                                    : <div className="save-dc-display">DC {playerStats.spellAbilities?.saveDc + displaySaveDcBonus} {spell.dc?.dc_type}</div>}
+                                <div className={resolvedDamage ? "clickable" : ""} onClick={() => {
+                                    if (cannotAct) return;
+                                    if (isSpellAtk && spell.saveDc) { onResolveSpellDamage(attackItem); return; }
+                                    handleSimpleDamageRoll(attackItem);
+                                }}>{resolvedDamage}</div>
+                                <div className='left'>{damageType || (spell.heal_at_slot_level ? 'Healing' : 'Utility')}</div>
                                 {is2024Rules && <div></div>}
                            </React.Fragment>;
                       })}

@@ -1,4 +1,4 @@
-import { parseMagicItemName, findEquippedWeapons, buildWeaponAttack, buildMonkAttacks, buildSpellAttacks } from './attackCalc.js';
+import { parseMagicItemName, findEquippedWeapons, buildWeaponAttack, buildMonkAttacks } from './attackCalc.js';
 import classRules from '../../character/classRules2024.js';
 import { getCombatSummary, getCurrentCombatRound } from '../../encounters/combatData.js';
 import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
@@ -182,11 +182,6 @@ export function getAttacks(allEquipment, allSpells, playerStats) {
             damageFormula: `Damage Formula = Bardic Inspiration Die (${diceStr}) + Dexterity Bonus (${dexterity.bonus})`,
             hitBonusFormula: `To Hit Bonus Formula = Dexterity Bonus (${dexterity.bonus}) + Proficiency (${proficiency})`,
         })));
-    }
-
-    // Spell attacks
-    if (playerStats.spellAbilities) {
-        attacks.push(...buildSpellAttacks(playerStats.spellAbilities.spells, allSpells, playerStats.spellAbilities, playerStats.level));
     }
 
     // Soulknife (2024): Psychic Blade attacks

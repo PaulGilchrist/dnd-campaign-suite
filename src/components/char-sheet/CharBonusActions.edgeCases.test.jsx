@@ -281,12 +281,13 @@ describe('CharBonusActions - Edge Cases', () => {
     });
   });
 
-  describe('spells that share names with attacks are excluded from spell list', () => {
-    it('shows the attack version but not the spell version when names match', () => {
+  describe('spells that share names with attacks are included alongside attacks', () => {
+    it('shows both attack and spell versions when names match', () => {
       const spell = { name: 'Shocking Grasp', range: 'Touch', casting_time: '1 bonus action', prepared: 'Prepared' };
       const attack = { name: 'Shocking Grasp', range: 'Touch', hitBonus: 5, damage: '1d8+3', damageType: 'Lightning', type: 'Bonus Action' };
       render(<CharBonusActions playerStats={createStats({ attacks: [attack], spellAbilities: { spells: [spell] } })} />);
-      expect(screen.getByText('Shocking Grasp')).toBeInTheDocument();
+      // Both attack and spell render with the same name, so we get 2 elements
+      expect(screen.getAllByText('Shocking Grasp').length).toBe(2);
     });
   });
 

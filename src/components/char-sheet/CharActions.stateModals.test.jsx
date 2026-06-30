@@ -118,6 +118,7 @@ vi.mock('../../services/ui/logService.js', () => ({
 
 vi.mock('../../services/rules/core/attackCalc.js', () => ({
   parseMagicItemName: vi.fn((name) => ({ baseName: name })),
+  resolveSpellDamageAtLevel: vi.fn(() => '8d6'),
 }));
 
 vi.mock('../../services/character/classFeatures.js', () => ({

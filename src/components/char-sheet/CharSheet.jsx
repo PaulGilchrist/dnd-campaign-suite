@@ -43,7 +43,7 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
             const effectiveClasses = playerSummary.rules === '2024' ? allClasses2024 : allClasses;
             const effectiveRaces = playerSummary.rules === '2024' ? allRaces2024 : allRaces;
             const effectiveMagicItems = playerSummary.rules === '2024' ? allMagicItems2024 : allMagicItems;
-                const stats = await rulesFactory.getPlayerStats(effectiveClasses, allEquipment, effectiveMagicItems, effectiveRaces, spellData, playerSummary);
+            const stats = await rulesFactory.getPlayerStats(effectiveClasses, allEquipment, effectiveMagicItems, effectiveRaces, spellData, playerSummary);
 
             // Load prepared spells from runtime state (skip for 2024 ruleset where all spells are known/prepared)
             if (playerSummary.rules !== '2024') {
@@ -209,8 +209,8 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
         }
     }
 
-    const handleConditionsChange = () => {}
-    const handleBuffsChange = () => {}
+    const handleConditionsChange = () => { }
+    const handleBuffsChange = () => { }
 
     const exhaustionPenalty = 2 * exhaustionLevel;
 
@@ -229,7 +229,7 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
                         : null;
                 })
                 .filter(Boolean)
-          )
+        )
         : [];
 
     // Protection from Evil and Good: check if spell is active
@@ -541,111 +541,111 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
 
     const [auraComboEffects, setAuraComboEffects] = React.useState(null);
     React.useEffect(() => {
-      if (!playerStats || !characters?.length) { setAuraComboEffects(null); return; }
-      computeAuraComboEffects({
-        targetName: playerStats.name,
-        characters,
-        campaignName,
-        activeMapName,
-      }).then(setAuraComboEffects);
+        if (!playerStats || !characters?.length) { setAuraComboEffects(null); return; }
+        computeAuraComboEffects({
+            targetName: playerStats.name,
+            characters,
+            campaignName,
+            activeMapName,
+        }).then(setAuraComboEffects);
     }, [playerStats, characters, campaignName, activeMapName]);
 
     return (<Provider value={value}>
         <React.Fragment>
-        {playerStats && <div className='char-sheet' data-testid='char-sheet'>
-            <CharSummary
-              playerStats={playerStats}
-              onDeleteCharacter={onDeleteCharacter}
-              onEditCharacter={onEditCharacter}
-              onUploadClick={onUploadClick}
-              onSaveClick={onSaveClick}
-              campaignName={campaignName}
-              activeMapName={activeMapName}
-              characters={characters}
-              onLongRest={() => {}}
-              exhaustionLevel={exhaustionLevel}
-              conditionEffects={conditionEffects}
-              onConditionsChange={handleConditionsChange}
-              auraComboEffects={auraComboEffects}
-            ></CharSummary><hr />
-              <CharAbilities
-                allAbilityScores={allAbilityScores}
-                playerStats={playerStats}
-                campaignName={campaignName}
-                exhaustionPenalty={exhaustionPenalty}
-                conditionEffects={conditionEffects}
-                isRaging={isRaging}
-                onReroll={handleReroll}
-                onStrokeOfLuck={handleStrokeOfLuck}
-              ></CharAbilities><hr />
+            {playerStats && <div className='char-sheet' data-testid='char-sheet'>
+                <CharSummary
+                    playerStats={playerStats}
+                    onDeleteCharacter={onDeleteCharacter}
+                    onEditCharacter={onEditCharacter}
+                    onUploadClick={onUploadClick}
+                    onSaveClick={onSaveClick}
+                    campaignName={campaignName}
+                    activeMapName={activeMapName}
+                    characters={characters}
+                    onLongRest={() => { }}
+                    exhaustionLevel={exhaustionLevel}
+                    conditionEffects={conditionEffects}
+                    onConditionsChange={handleConditionsChange}
+                    auraComboEffects={auraComboEffects}
+                ></CharSummary>
+                <CharAbilities
+                    allAbilityScores={allAbilityScores}
+                    playerStats={playerStats}
+                    campaignName={campaignName}
+                    exhaustionPenalty={exhaustionPenalty}
+                    conditionEffects={conditionEffects}
+                    isRaging={isRaging}
+                    onReroll={handleReroll}
+                    onStrokeOfLuck={handleStrokeOfLuck}
+                ></CharAbilities>
 
-               <CharActions
-                  playerStats={playerStats}
-                  campaignName={campaignName}
-                  exhaustionPenalty={exhaustionPenalty}
-                  conditionAttackMode={conditionAttackMode}
-                  cannotAct={cannotAct}
-                  mapName={activeMapName}
-                  onBuffsChange={handleBuffsChange}
-                  characters={characters}
-                 ></CharActions><hr />
-               <CharReactions
-                  playerStats={playerStats}
-                  campaignName={campaignName}
-                  cannotAct={cannotAct}
-                  mapName={activeMapName}
-                  characters={characters}
+                <CharActions
+                    playerStats={playerStats}
+                    campaignName={campaignName}
+                    exhaustionPenalty={exhaustionPenalty}
+                    conditionAttackMode={conditionAttackMode}
+                    cannotAct={cannotAct}
+                    mapName={activeMapName}
+                    onBuffsChange={handleBuffsChange}
+                    characters={characters}
+                ></CharActions>
+                <CharReactions
+                    playerStats={playerStats}
+                    campaignName={campaignName}
+                    cannotAct={cannotAct}
+                    mapName={activeMapName}
+                    characters={characters}
                 ></CharReactions>
-             {playerSummary.rules === '2024'
-  ? <CharSpells playerStats={playerStats} campaignName={campaignName} exhaustionPenalty={exhaustionPenalty} conditionAttackMode={conditionAttackMode} cannotAct={cannotAct} mapName={activeMapName} characters={characters}></CharSpells>
-  : <CharSpells playerStats={playerStats} handleTogglePreparedSpells={(spellName) => handleTogglePreparedSpells(spellName)} campaignName={campaignName} exhaustionPenalty={exhaustionPenalty} conditionAttackMode={conditionAttackMode} cannotAct={cannotAct} mapName={activeMapName} characters={characters}></CharSpells>
+                {playerSummary.rules === '2024'
+                    ? <CharSpells playerStats={playerStats} campaignName={campaignName} exhaustionPenalty={exhaustionPenalty} conditionAttackMode={conditionAttackMode} cannotAct={cannotAct} mapName={activeMapName} characters={characters}></CharSpells>
+                    : <CharSpells playerStats={playerStats} handleTogglePreparedSpells={(spellName) => handleTogglePreparedSpells(spellName)} campaignName={campaignName} exhaustionPenalty={exhaustionPenalty} conditionAttackMode={conditionAttackMode} cannotAct={cannotAct} mapName={activeMapName} characters={characters}></CharSpells>
 
-}<hr />
-            <CharInventory playerStats={playerStats}></CharInventory><hr />
-            <CharSpecialActions playerStats={playerStats} campaignName={campaignName} cannotAct={cannotAct} characters={characters}></CharSpecialActions><hr />
-            <div className='no-print'><CharCharacterAdvancement playerStats={playerStats} campaignName={campaignName}></CharCharacterAdvancement></div>
-        </div>}
-    </React.Fragment>
+                }
+                <CharInventory playerStats={playerStats}></CharInventory>
+                <CharSpecialActions playerStats={playerStats} campaignName={campaignName} cannotAct={cannotAct} characters={characters}></CharSpecialActions>
+                <div className='no-print'><CharCharacterAdvancement playerStats={playerStats} campaignName={campaignName}></CharCharacterAdvancement></div>
+            </div>}
+        </React.Fragment>
         {popupHtml && (
             <Popup onClickOrKeyDown={() => setPopupHtml(null)}>
                 {typeof popupHtml === 'string' ? <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(popupHtml) }}></div> :
                     popupHtml.type === 'automation_info' ? <div className="dice-roll-result"><div className="dice-roll-header"><i className="fa-solid fa-info-circle"></i>{popupHtml.name}</div><div dangerouslySetInnerHTML={{ __html: sanitizeHtml(popupHtml.description) }}></div><div className="dice-roll-hint">click to dismiss</div></div> :
                         popupHtml.type === 'empowered_spell' ?
-                                <div className="dice-roll-result">
-                                    <div className="dice-roll-header">
-                                        <i className="fa-solid fa-wand-magic-sparkles"></i>{popupHtml.name}
-                                    </div>
+                            <div className="dice-roll-result">
+                                <div className="dice-roll-header">
+                                    <i className="fa-solid fa-wand-magic-sparkles"></i>{popupHtml.name}
+                                </div>
+                                <div className="dice-roll-breakdown">
+                                    SP: {popupHtml.currentSP}/{popupHtml.maxSP} | Cha Mod: +{popupHtml.chaMod}
+                                </div>
+                                {popupHtml.lastEvent && (
                                     <div className="dice-roll-breakdown">
-                                        SP: {popupHtml.currentSP}/{popupHtml.maxSP} | Cha Mod: +{popupHtml.chaMod}
+                                        {popupHtml.lastEvent.damageInfo?.map((d, i) => (
+                                            <div key={i}>{d.formula}: {d.rolls.join(', ')} = {d.total} {d.type}</div>
+                                        ))}
                                     </div>
-                                    {popupHtml.lastEvent && (
-                                        <div className="dice-roll-breakdown">
-                                            {popupHtml.lastEvent.damageInfo?.map((d, i) => (
-                                                <div key={i}>{d.formula}: {d.rolls.join(', ')} = {d.total} {d.type}</div>
-                                            ))}
-                                        </div>
-                                    )}
-                                    {popupHtml.error ? (
-                                        <div className="dice-roll-crit dice-roll-crit-miss">{popupHtml.error}</div>
-                                    ) : popupHtml.lastEvent && !popupHtml.error ? (
-                                        <div className="dice-roll-reroll">
-                                            <button className="dice-roll-reroll-btn" onClick={() => {
-                                                setPopupHtml({
-                                                    ...popupHtml,
-                                                    lastEvent: { ...popupHtml.lastEvent, completed: true }
-                                                });
-                                            }}>
-                                                <i className="fa-solid fa-check"></i> Apply Reroll
-                                            </button>
-                                        </div>
-                                    ) : null}
-                                    <div className="dice-roll-hint">click to dismiss</div>
-                                </div> :
+                                )}
+                                {popupHtml.error ? (
+                                    <div className="dice-roll-crit dice-roll-crit-miss">{popupHtml.error}</div>
+                                ) : popupHtml.lastEvent && !popupHtml.error ? (
+                                    <div className="dice-roll-reroll">
+                                        <button className="dice-roll-reroll-btn" onClick={() => {
+                                            setPopupHtml({
+                                                ...popupHtml,
+                                                lastEvent: { ...popupHtml.lastEvent, completed: true }
+                                            });
+                                        }}>
+                                            <i className="fa-solid fa-check"></i> Apply Reroll
+                                        </button>
+                                    </div>
+                                ) : null}
+                                <div className="dice-roll-hint">click to dismiss</div>
+                            </div> :
                             <DiceRollResult {...popupHtml} onSuperiorityManeuver={popupHtml?.availableSuperiorityManeuvers ? handleSuperiorityManeuver : undefined} onTacticalMind={popupHtml?.tacticalMind ? handleTacticalMind : undefined} />
                 }
             </Popup>
         )}
-        </Provider>)
+    </Provider>)
 }
 
 export default CharSheet

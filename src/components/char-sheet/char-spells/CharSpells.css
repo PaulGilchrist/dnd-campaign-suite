@@ -1,6 +1,6 @@
 .char-spells .spell-abilities {
     align-items: center;
-    background-color: var(--background-color-body);
+    background-color: var(--background-color-header);
     display: grid;
     grid-template-columns: auto auto auto auto;
     padding-bottom: 5px;
@@ -16,6 +16,9 @@
     border-collapse: collapse;
     text-align: center;
     width: 100%;
+}
+.char-spells .table-spells tr {
+    background-color: var(--background-color-table-header);
 }
 .spell-detail-popup {
     font-size: 14px;

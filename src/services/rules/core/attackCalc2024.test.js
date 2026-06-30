@@ -45,17 +45,6 @@ const buildMonkAttacksStub = vi.fn((_opts) => [
     type: 'Bonus Action',
   },
 ]);
-const buildSpellAttacksStub = vi.fn((_spells) => {
-  if (!_spells || _spells.length === 0) return [];
-  return [
-    {
-      name: _spells[0].name,
-      damage: '1d10',
-      damageType: 'Fire',
-      type: 'Action',
-    },
-  ];
-});
 
 vi.mock('./attackCalc.js', () => ({
   parseMagicItemName: (name) =>
@@ -65,7 +54,6 @@ vi.mock('./attackCalc.js', () => ({
   findEquippedWeapons: (...args) => findEquippedWeaponsStub(...args),
   buildWeaponAttack: (...args) => buildWeaponAttackStub(...args),
   buildMonkAttacks: (...args) => buildMonkAttacksStub(...args),
-  buildSpellAttacks: (...args) => buildSpellAttacksStub(...args),
 }));
 
 vi.mock('../../character/classRules2024.js', () => ({
@@ -381,7 +369,7 @@ describe('attackCalc2024', () => {
       expect(result[0].name).toBe('Unarmed Strike');
     });
 
-    it('adds spell attacks when spellAbilities are present', () => {
+    it('does not add spell attacks when spellAbilities are present', () => {
       findEquippedWeaponsStub.mockReturnValue([]);
 
       const playerStats = defaultPlayerStats({
@@ -403,9 +391,9 @@ describe('attackCalc2024', () => {
 
       const result = getAttacks([], allSpells, playerStats);
 
+      // Spells no longer create attack objects; only the fallback unarmed strike
       expect(result).toHaveLength(1);
-      expect(result[0].name).toBe('Fire Bolt');
-      expect(result[0].type).toBe('Action');
+      expect(result[0].name).toBe('Unarmed Strike');
     });
 
     it('does not add spell attacks when spellAbilities is absent', () => {
@@ -839,8 +827,8 @@ describe('attackCalc2024', () => {
 
       const result = getAttacks(allEquipment, allSpells, playerStats);
 
-      // Ranged weapon (Shortbow) + Melee weapon (Quarterstaff) + 2 Monk attacks + 1 Spell attack = 5
-      expect(result).toHaveLength(5);
+      // Ranged weapon (Shortbow) + Melee weapon (Quarterstaff) + 2 Monk attacks = 4 (no spell attacks)
+      expect(result).toHaveLength(4);
     });
 
     it('handles off-hand with Dual Wielder feat bonus action attack', () => {

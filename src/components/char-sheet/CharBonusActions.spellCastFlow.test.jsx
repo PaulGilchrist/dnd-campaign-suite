@@ -488,20 +488,21 @@ describe('CharBonusActions - Spell Cast Flow', () => {
     });
   });
 
-  describe('attackNames Set for spell exclusion', () => {
-    it('excludes spells whose name matches any attack name (not just bonus action attacks)', () => {
+  describe('spells render alongside attacks with matching names', () => {
+    it('includes spells whose name matches any attack name (not just bonus action attacks)', () => {
       const spell = { name: 'Main Gauche', range: 'Touch', casting_time: '1 bonus action', prepared: 'Prepared' };
       const attack = { name: 'Main Gauche', range: 5, hitBonus: 5, damage: '1d4+3', damageType: 'Piercing', type: 'Bonus Action' };
       render(<CharBonusActions playerStats={createStats({ attacks: [attack], spellAbilities: { spells: [spell] } })} />);
-      // The attack version should show, spell version should be excluded
-      expect(screen.getByText('Main Gauche')).toBeInTheDocument();
+      // Both attack and spell render with the same name, so we get 2 elements
+      expect(screen.getAllByText('Main Gauche').length).toBe(2);
     });
 
-    it('excludes spells whose name matches any attack regardless of attack type', () => {
+    it('includes spells whose name matches any attack regardless of attack type', () => {
       const spell = { name: 'Reaction Attack', range: 'Touch', casting_time: '1 bonus action', prepared: 'Prepared' };
       const attack = { name: 'Reaction Attack', range: 5, hitBonus: 5, damage: '1d4+3', damageType: 'Piercing', type: 'Bonus Action' };
       render(<CharBonusActions playerStats={createStats({ attacks: [attack], spellAbilities: { spells: [spell] } })} />);
-      expect(screen.getByText('Reaction Attack')).toBeInTheDocument();
+      // Both attack and spell render with the same name, so we get 2 elements
+      expect(screen.getAllByText('Reaction Attack').length).toBe(2);
     });
   });
 
@@ -548,13 +549,13 @@ describe('CharBonusActions - Spell Cast Flow', () => {
   });
 
   describe('full grid layout with spells only', () => {
-    it('does not render hit/damage columns when only spells exist', () => {
+    it('renders hit/damage columns even when only spells exist', () => {
       const stats = createStats({
         spellAbilities: { spells: [{ name: 'Shocking Grasp', range: 'Touch', casting_time: '1 bonus action', prepared: 'Prepared' }] },
       });
       render(<CharBonusActions playerStats={stats} />);
-      expect(screen.queryByText('Hit')).not.toBeInTheDocument();
-      expect(screen.queryByText('Damage')).not.toBeInTheDocument();
+      expect(screen.getByText('Hit')).toBeInTheDocument();
+      expect(screen.getByText('Damage')).toBeInTheDocument();
     });
 
     it('renders half-line div between attacks/spells and bonus actions', () => {

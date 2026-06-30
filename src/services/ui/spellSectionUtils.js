@@ -19,12 +19,10 @@ function isElderChampionActive(playerName, campaignName) {
  */
 export function getActionSpellNames(playerStats, campaignName) {
     if (elderChampionActive(playerStats, campaignName)) return new Set();
-    const attackNames = new Set(playerStats.attacks?.filter(a => a.type === 'Action').map(a => a.name) || []);
     const names = new Set();
     for (const spell of playerStats.spellAbilities?.spells || []) {
         if (!actionCastingTimes.includes(spell.casting_time)) continue;
         if (spell.prepared !== 'Always' && spell.prepared !== 'Prepared') continue;
-        if (attackNames.has(spell.name)) continue;
         if (!spell.damage && !spell.heal_at_slot_level) continue;
         names.add(spell.name);
     }
@@ -38,14 +36,12 @@ export function getActionSpellNames(playerStats, campaignName) {
  */
 export function getBonusActionSpellNames(playerStats, campaignName) {
     const elderActive = isElderChampionActive(playerStats.name, campaignName);
-    const attackNames = new Set((playerStats.attacks || []).map(a => a.name));
     const names = new Set();
     for (const spell of playerStats.spellAbilities?.spells || []) {
         const isBonusAction = bonusActionCastingTimes.includes(spell.casting_time);
         const isActionSpellSwift = elderActive && actionCastingTimes.includes(spell.casting_time);
         if (!isBonusAction && !isActionSpellSwift) continue;
         if (spell.prepared !== 'Always' && spell.prepared !== 'Prepared') continue;
-        if (attackNames.has(spell.name)) continue;
         names.add(spell.name);
     }
     return names;
@@ -56,12 +52,10 @@ export function getBonusActionSpellNames(playerStats, campaignName) {
  * All prepared spells with casting time of 1 reaction.
  */
 export function getReactionSpellNames(playerStats) {
-    const attackNames = new Set((playerStats.attacks || []).map(a => a.name));
     const names = new Set();
     for (const spell of playerStats.spellAbilities?.spells || []) {
         if (!reactionCastingTimes.includes(spell.casting_time)) continue;
         if (spell.prepared !== 'Always' && spell.prepared !== 'Prepared') continue;
-        if (attackNames.has(spell.name)) continue;
         names.add(spell.name);
     }
     return names;
@@ -75,13 +69,7 @@ export function getExcludedSpellNames(playerStats, campaignName) {
     const action = getActionSpellNames(playerStats, campaignName);
     const bonus = getBonusActionSpellNames(playerStats, campaignName);
     const reaction = getReactionSpellNames(playerStats);
-    const allSpellNames = new Set([...action, ...bonus, ...reaction]);
-    // Also exclude any spell that shares a name with an attack (attacks are shown in action/bonus/reaction sections)
-    for (const attack of playerStats.attacks || []) {
-        if (allSpellNames.has(attack.name)) continue;
-        allSpellNames.add(attack.name);
-    }
-    return allSpellNames;
+    return new Set([...action, ...bonus, ...reaction]);
 }
 
 function elderChampionActive(playerStats, campaignName) {

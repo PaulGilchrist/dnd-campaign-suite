@@ -639,7 +639,7 @@ return (
                         onSkip={handleResistanceSkip}
                       />
                     )}
-            <hr />
+            <br />
             <div className='spell-abilities'>
                 <div className="sectionHeader"><h4>&nbsp;Spells</h4></div>
                 <div>

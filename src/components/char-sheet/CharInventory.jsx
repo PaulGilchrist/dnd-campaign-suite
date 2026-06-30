@@ -116,7 +116,7 @@ function CharInventory({ playerStats }) {
     };
     
     return (
-        <div>
+        <div className='char-inventory'>
              {popupHtml && <Popup html={popupHtml} onClickOrKeyDown={() => setPopupHtml(null)} />}
             <div className='sectionHeader'>Inventory</div>
             {playerStats.inventory.magicItems && playerStats.inventory.magicItems.length > 0 && <div>

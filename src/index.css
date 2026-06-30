@@ -80,6 +80,8 @@ html {
     --color-info-hover: #0056b3;
 
     /* Component-specific backgrounds */
+    --background-color-header: #063511;
+    --background-color-table-header: #022209;
     --background-color-spell-level-cantrip: #6c757d;
     --background-color-spell-level-low: #28a745;
     --background-color-spell-level-mid: #ffc107;
@@ -265,7 +267,7 @@ th {
     /* Backgrounds */
     --background-color-main: #fff;
     --background-color-body: #eee;
-    --background-color-header: #bbb;
+    --background-color-header: #063511;
     --background-color-header-inner: #ddd;
     --background-color-card: #f9f9f9;
     --background-color-card-hover: #f0f7f0;

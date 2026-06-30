@@ -5,7 +5,7 @@ import {
   findEquippedWeapons,
   buildWeaponAttack,
   buildMonkAttacks,
-  buildSpellAttacks,
+  resolveSpellDamageAtLevel,
   getAttacks,
 } from './attackCalc.js';
 
@@ -325,153 +325,42 @@ describe('attackCalc', () => {
     });
   });
 
-  describe('buildSpellAttacks', () => {
-    const allSpells = [
-      { name: 'Fire Bolt', damage: { damage_at_slot_level: { '1': '1d10' }, damage_type: 'Fire' }, range: '120 feet', casting_time: '1 action', level: 0, classes: ['Wizard'], school: 'Evocation' },
-      { name: 'Magic Missile', damage: { damage_at_slot_level: { '1': '1d4+1' }, damage_type: 'Force' }, range: '120 feet', casting_time: '1 action', level: 1, classes: ['Wizard'], school: 'Evocation' },
-      { name: 'Sacred Flame', damage: { damage_at_slot_level: { '1': '1d8' }, damage_type: 'Radiant' }, range: '60 feet', casting_time: '1 action', level: 0, classes: ['Cleric'], dc: { dc_type: 'DEX', dc_success: 'none' }, school: 'Evocation' },
-    ];
+  describe('resolveSpellDamageAtLevel', () => {
+    const cantripSpell = { name: 'Fire Bolt', damage: { damage_at_slot_level: { '1': '1d10', '5': '2d10', '9': '3d10' }, damage_type: 'Fire' }, level: 0 };
+    const leveledSpell = { name: 'Magic Missile', damage: { damage_at_slot_level: { '1': '1d4+1' }, damage_type: 'Force' }, level: 1 };
+    const spellWithCharLevel = { name: 'Charm Spell', damage: { damage_at_character_level: { '1': '2d6' }, damage_at_slot_level: {} }, damage_type: 'Psychic', level: 1 };
+    const noDamageSpell = { name: 'Mage Hand', damage: null, level: 0 };
 
-    it('should build spell attacks from prepared spells with correct fields', () => {
-      const playerSpells = [
-        { name: 'Fire Bolt', prepared: 'Always' },
-        { name: 'Magic Missile', prepared: 'Prepared' },
-      ];
-      const result = buildSpellAttacks(playerSpells, allSpells, { modifier: 4, toHit: 7, saveDc: 13 });
-
-      expect(result).toHaveLength(2);
-      expect(result[0].name).toBe('Fire Bolt');
-      expect(result[0].damage).toBe('1d10');
-      expect(result[0].damageType).toBe('Fire');
-      expect(result[0].hitBonus).toBe(7);
-      expect(result[0].range).toBe('120 feet');
-      expect(result[0].type).toBe('Action');
-      expect(result[0].school).toBe('Evocation');
+    it('should resolve cantrip damage at low character level', () => {
+      expect(resolveSpellDamageAtLevel(cantripSpell, 1)).toBe('1d10');
     });
 
-    it('should build save-based spell attacks without hitBonus', () => {
-      const playerSpells = [
-        { name: 'Sacred Flame', prepared: 'Always' },
-      ];
-      const result = buildSpellAttacks(playerSpells, allSpells, { modifier: 4, toHit: 7, saveDc: 13 });
-
-      expect(result).toHaveLength(1);
-      expect(result[0].name).toBe('Sacred Flame');
-      expect(result[0].damage).toBe('1d8');
-      expect(result[0].saveDc).toBe(13);
-      expect(result[0].saveType).toBe('DEX');
-      expect(result[0].saveSuccess).toBe('none');
-      expect(result[0].hitBonus).toBeUndefined();
+    it('should resolve cantrip damage at mid character level', () => {
+      expect(resolveSpellDamageAtLevel(cantripSpell, 5)).toBe('2d10');
     });
 
-    it('should skip spells without a damage property', () => {
-      const spellsWithNoDamage = [
-        { name: 'Mage Hand', damage: null, range: '30 feet', casting_time: '1 action', level: 0, classes: ['Wizard'] },
-      ];
-      const playerSpells = [{ name: 'Mage Hand', prepared: 'Always' }];
-      const result = buildSpellAttacks(playerSpells, spellsWithNoDamage, { modifier: 4, toHit: 7 });
-      expect(result).toHaveLength(0);
+    it('should resolve cantrip damage at high character level', () => {
+      expect(resolveSpellDamageAtLevel(cantripSpell, 9)).toBe('3d10');
     });
 
-    it('should skip unprepared spells', () => {
-      const playerSpells = [{ name: 'Magic Missile', prepared: '' }];
-      const result = buildSpellAttacks(playerSpells, allSpells, { modifier: 4, toHit: 7 });
-      expect(result).toHaveLength(0);
+    it('should resolve cantrip damage at very high character level', () => {
+      expect(resolveSpellDamageAtLevel(cantripSpell, 17)).toBe('3d10');
     });
 
-    it('should handle empty spell list', () => {
-      const result = buildSpellAttacks([], allSpells, { modifier: 4, toHit: 7 });
-      expect(result).toHaveLength(0);
-    });
-
-    it('should include custom spell not in catalog when prepared and has combat-relevant casting time', () => {
-      const playerSpells = [{ name: 'Custom Spell', prepared: 'Always', damage: { damage_type: 'Force' }, range: '60 feet', casting_time: '1 action' }];
-      const result = buildSpellAttacks(playerSpells, [], { modifier: 4, toHit: 7 });
-      expect(result).toHaveLength(1);
-      expect(result[0].name).toBe('Custom Spell');
-      expect(result[0].damageType).toBe('Force');
-      expect(result[0].damage).toBe('');
-    });
-
-    it('should skip custom spell not in catalog when unprepared', () => {
-      const playerSpells = [{ name: 'Custom Spell', prepared: '' }];
-      const result = buildSpellAttacks(playerSpells, [], { modifier: 4, toHit: 7 });
-      expect(result).toHaveLength(0);
-    });
-
-    it('should skip spells with non-combat casting times', () => {
-      const playerSpells = [{ name: 'Ritual Spell', prepared: 'Always', damage: { damage_type: 'Force' }, range: '30 feet', casting_time: '1 minute' }];
-      const result = buildSpellAttacks(playerSpells, [], { modifier: 4, toHit: 7 });
-      expect(result).toHaveLength(0);
-    });
-
-    it('should normalize casting_time values to Action/Bonus Action', () => {
-      const spellsWithVariations = [
-        { name: 'Normal Action', damage: { damage_at_slot_level: { '1': '1d6' }, damage_type: 'Fire' }, range: '60 feet', casting_time: '1 action', level: 0, classes: ['Wizard'] },
-        { name: 'Action Capitalized', damage: { damage_at_slot_level: { '1': '1d6' }, damage_type: 'Fire' }, range: '60 feet', casting_time: 'Action', level: 0, classes: ['Wizard'] },
-        { name: 'Bonus Action', damage: { damage_at_slot_level: { '1': '1d6' }, damage_type: 'Fire' }, range: '60 feet', casting_time: '1 bonus action', level: 0, classes: ['Wizard'] },
-        { name: 'Bonus Action Capitalized', damage: { damage_at_slot_level: { '1': '1d6' }, damage_type: 'Fire' }, range: '60 feet', casting_time: 'Bonus Action', level: 0, classes: ['Wizard'] },
-      ];
-      const playerSpells = spellsWithVariations.map(s => ({ name: s.name, prepared: 'Always' }));
-      const result = buildSpellAttacks(playerSpells, spellsWithVariations, { modifier: 4, toHit: 7 });
-
-      expect(result).toHaveLength(4);
-      expect(result[0].type).toBe('Action');
-      expect(result[1].type).toBe('Action');
-      expect(result[2].type).toBe('Bonus Action');
-      expect(result[3].type).toBe('Bonus Action');
+    it('should resolve leveled spell base damage', () => {
+      expect(resolveSpellDamageAtLevel(leveledSpell, 5)).toBe('1d4+1');
     });
 
     it('should use character-level damage when slot-level is empty', () => {
-      const allSpellsWithCharLevel = [
-        { name: 'Charm Spell', damage: { damage_at_character_level: { '1': '2d6' }, damage_at_slot_level: {} }, damage_type: 'Psychic', range: '60 feet', casting_time: '1 action', level: 1, classes: ['Bard'] },
-      ];
-      const playerSpells = [{ name: 'Charm Spell', prepared: 'Prepared' }];
-      const result = buildSpellAttacks(playerSpells, allSpellsWithCharLevel, { modifier: 3, toHit: 6 });
-      expect(result).toHaveLength(1);
-      expect(result[0].damage).toBe('2d6');
+      expect(resolveSpellDamageAtLevel(spellWithCharLevel, 5)).toBe('2d6');
     });
 
-    it('should deduplicate spell attacks by name', () => {
-      const playerSpells = [
-        { name: 'Fire Bolt', prepared: 'Always' },
-        { name: 'Fire Bolt', prepared: 'Prepared' },
-      ];
-      const result = buildSpellAttacks(playerSpells, allSpells, { modifier: 4, toHit: 7 });
-      expect(result).toHaveLength(1);
+    it('should return empty string when spell has no damage', () => {
+      expect(resolveSpellDamageAtLevel(noDamageSpell, 5)).toBe('');
     });
 
-    it('should use slot-level damage over character-level when slot-level has entries', () => {
-      const spells = [
-        { name: 'Fire Bolt', damage: { damage_at_slot_level: { '1': '1d10', '5': '2d10' }, damage_at_character_level: { '1': '3d10' }, damage_type: 'Fire' }, range: '120 feet', casting_time: '1 action', level: 0, classes: ['Wizard'] },
-      ];
-      const playerSpells = [{ name: 'Fire Bolt', prepared: 'Always' }];
-      const result = buildSpellAttacks(playerSpells, spells, { modifier: 4, toHit: 7 }, 1);
-      expect(result).toHaveLength(1);
-      expect(result[0].damage).toBe('1d10');
-    });
-
-    it('should use highest available slot level up to player level for cantrips', () => {
-      const spells = [
-        { name: 'Fire Bolt', damage: { damage_at_slot_level: { '1': '1d10', '5': '2d10', '9': '3d10' }, damage_type: 'Fire' }, range: '120 feet', casting_time: '1 action', level: 0, classes: ['Wizard'] },
-      ];
-      const playerSpells = [{ name: 'Fire Bolt', prepared: 'Always' }];
-      const result = buildSpellAttacks(playerSpells, spells, { modifier: 4, toHit: 7 }, 9);
-      expect(result[0].damage).toBe('3d10');
-    });
-
-    it('should throw when playerSpells is null', () => {
-      expect(() => buildSpellAttacks(null, [], { modifier: 4, toHit: 7 }))
-        .toThrow('Expected array, got null');
-    });
-
-    it('should set school to null when spell has no school', () => {
-      const spellsNoSchool = [
-        { name: 'No School Spell', damage: { damage_at_slot_level: { '1': '1d6' }, damage_type: 'Fire' }, range: '60 feet', casting_time: '1 action', level: 0, classes: ['Wizard'] },
-      ];
-      const playerSpells = [{ name: 'No School Spell', prepared: 'Always' }];
-      const result = buildSpellAttacks(playerSpells, spellsNoSchool, { modifier: 4, toHit: 7 });
-      expect(result[0].school).toBeNull();
+    it('should return empty string when spell is null', () => {
+      expect(resolveSpellDamageAtLevel(null, 5)).toBe('');
     });
   });
 
@@ -689,7 +578,7 @@ describe('attackCalc', () => {
       expect(unarmedStrikes[1].type).toBe('Bonus Action');
     });
 
-    it('should build spell attacks when spellAbilities present', () => {
+    it('should not build spell attacks from spellAbilities (spells are rendered as spell objects)', () => {
       const allSpells = [
         { name: 'Fire Bolt', damage: { damage_at_slot_level: { '1': '1d10' }, damage_type: 'Fire' }, range: '120 feet', casting_time: '1 action', level: 0, classes: ['Wizard'] },
       ];
@@ -703,8 +592,7 @@ describe('attackCalc', () => {
       });
       const result = getAttacks(allEquipment, allSpells, playerStats);
       const spellAttacks = result.filter(a => a.name === 'Fire Bolt');
-      expect(spellAttacks).toHaveLength(1);
-      expect(spellAttacks[0].hitBonus).toBe(7);
+      expect(spellAttacks).toHaveLength(0);
     });
 
     it('should return unarmed strike when no weapons or spells', () => {

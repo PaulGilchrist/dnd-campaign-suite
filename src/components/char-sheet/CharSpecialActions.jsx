@@ -20,6 +20,8 @@ import { SHOW_DICE_ROLL_DELAY } from '../../config/ui-config.js';
 import useLoggedDiceRoll from '../../hooks/combat/useLoggedDiceRoll.js';
 import { useDiceRollPopup } from '../../hooks/combat/DiceRollContext.js';
 import { useCombatSuperiorityModal } from '../../hooks/combat/useCombatSuperiorityModal.js';
+import './CharSpecialActions.css';
+
 
 function CharSpecialActions({ playerStats, campaignName, cannotAct, characters }) {
     const [teleportModal, setTeleportModal] = useState(null);
@@ -202,7 +204,7 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct, characters }
     
     const uniqueActions = Array.from(new Map(filteredActions.map(action => [action.name, action])).values());
     return (
-            <div>
+            <div className='char-special-actions'>
                 <div className='sectionHeader'>Special Actions</div>
              {teleportModal && (
                 <TeleportModal

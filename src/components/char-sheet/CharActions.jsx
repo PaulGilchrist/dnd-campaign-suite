@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { getCategories } from '../../services/character/featureCategories.js'
 import { getActionSpellNames } from '../../services/ui/spellSectionUtils.js'
 import { formatRange, signFormatter, getAttackSpellLevel } from '../../services/ui/formatUtils.js'
+import { resolveSpellDamageAtLevel } from '../../services/rules/core/attackCalc.js';
 import { collectWeaponMastery } from '../../services/combat/automation/automationService.js';
 import { applyPostDamageMasteryEffects, applyMasteryEffect } from '../../services/automation/handlers/combat/weaponMasteryHandler.js';
 import { sanitizeHtml } from '../../services/ui/sanitize.js';
@@ -1265,7 +1266,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
     return (
         <div className="char-actions">
             <div>
-                <span className='sectionHeader'>Actions</span>
+                <div className='sectionHeader'>Actions</div>
                 {cannotAct && <span className='disabled-attack-label'>(Incapacitated)</span>}
                 <div className={`attacks ${is2024Rules ? 'mastery-enabled' : ''}`}>
                     <div className='left'><b>Name</b></div>
@@ -1276,7 +1277,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     <div className='left'><b>Type</b></div>
                     {is2024Rules && <div><b>Mastery</b></div>}
                     {actionAttacks.map((attack) => {
-                        const attackLevel = getAttackSpellLevel(attack.name);
+                        const attackLevel = getAttackSpellLevel(playerStats.spellAbilities, attack.name);
                         const attackItem = { ...attack };
                         return <React.Fragment key={attack.name}>
                             <div className='left clickable' onClick={() => handleAttackClick(attackItem)}>{attack.name}</div>
@@ -1296,13 +1297,22 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     })}
                     {actionSpells.map((spell) => {
                         const damageType = typeof spell.damage === 'string' ? '' : (spell.damage?.damage_type || '');
+                        const resolvedDamage = spell.heal_at_slot_level ? '' : resolveSpellDamageAtLevel(spell, playerStats.level);
+                        const isSpellAtk = !spell.dc;
+                        const attackItem = { ...spell, type: 'Action', hitBonus: playerStats.spellAbilities?.toHit, saveDc: spell.dc ? playerStats.spellAbilities.saveDc : null, saveType: spell.dc?.dc_type, saveSuccess: spell.dc?.dc_success, damage: resolvedDamage, damageType };
                         return <React.Fragment key={spell.name}>
                             <div className='left clickable' onClick={() => handleActionSpellClick(spell.name)}>{spell.name}</div>
                             <div>{spell.level === 0 ? 'Cantrip' : spell.level}</div>
-                            <div>{spell.range}</div>
-                            <div>-</div>
-                            <div>{damageType || (spell.heal_at_slot_level ? 'Healing' : 'Utility')}</div>
-                            <div className='left'></div>
+                            <div>{formatRange(spell.range)}</div>
+                            {isSpellAtk
+                                ? <div className={"clickable" + (exhaustionPenalty > 0 || conditionAttackMode === 'disadvantage' || cannotAct ? " stat--penalized" : "") + (cannotAct ? " disabled-attack" : "")} onClick={() => handleSpellAttackClick(attackItem)}>{signFormatter.format(playerStats.spellAbilities?.toHit - exhaustionPenalty)}</div>
+                                : <div className="save-dc-display">DC {playerStats.spellAbilities?.saveDc + displaySaveDcBonus} {spell.dc?.dc_type}</div>}
+                            <div className={resolvedDamage ? "clickable" : ""} onClick={() => {
+                                if (cannotAct) return;
+                                if (isSpellAtk && spell.saveDc) { resolveSpellDamage(attackItem); return; }
+                                handleSimpleDamageRoll(attackItem);
+                            }}>{resolvedDamage}</div>
+                            <div className='left'>{damageType || (spell.heal_at_slot_level ? 'Healing' : 'Utility')}</div>
                             {is2024Rules && <div></div>}
                         </React.Fragment>;
                     })}

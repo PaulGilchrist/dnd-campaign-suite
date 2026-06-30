@@ -1,3 +1,9 @@
+
+.char-actions .sectionHeader {
+    margin-top: 10px;
+    background-color: var(--background-color-header);
+}
+
 .char-actions .attacks {
     display: grid;
     grid-template-columns: 150px 60px 80px 100px 80px 135px;

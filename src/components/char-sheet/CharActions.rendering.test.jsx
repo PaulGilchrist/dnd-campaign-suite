@@ -118,6 +118,7 @@ vi.mock('../../services/ui/logService.js', () => ({
 
 vi.mock('../../services/rules/core/attackCalc.js', () => ({
   parseMagicItemName: vi.fn((name) => ({ baseName: name })),
+  resolveSpellDamageAtLevel: vi.fn(() => '8d6'),
 }));
 
 vi.mock('../../services/character/classFeatures.js', () => ({
@@ -611,14 +612,14 @@ describe('CharActions rendering', () => {
       expect(screen.getByText('Base Actions:')).toBeInTheDocument();
     });
 
-    it('renders attack and spell with same name prioritizes attack', () => {
+    it('renders attack and spell with same name together', () => {
       const stats = createStats({
         attacks: [{ name: 'Fireball', range: 5, hitBonus: 5, damage: '1d8+3', damageType: 'Fire', type: 'Action' }],
         spellAbilities: { spells: [{ name: 'Fireball', range: '150 ft', casting_time: '1 action', prepared: 'Prepared', damage: '8d6' }] },
       });
       render(<CharActions playerStats={stats} />);
-      // Attack should appear in the attacks table
-      expect(screen.getByText('Fireball')).toBeInTheDocument();
+      // Both attack and spell render with the same name in the DOM
+      expect(screen.getAllByText('Fireball').length).toBe(2);
     });
   });
 });

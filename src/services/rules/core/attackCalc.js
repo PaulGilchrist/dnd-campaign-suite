@@ -163,59 +163,49 @@ export function buildMonkAttacks(opts) {
  * @param {Object} spellAbilities - { modifier }
  * @returns {Object[]}
  */
-export function buildSpellAttacks(playerSpells, allSpells, spellAbilities, playerLevel = 1) {
-    const attacks = [];
+/**
+ * Resolves a spell's damage string at the given character level.
+ * Handles both damage_at_slot_level and damage_at_character_level formats.
+ * For cantrips (level 0), selects the highest applicable tier.
+ * For leveled spells, selects the base tier.
+ * @param {Object} spell - The spell object with damage property
+ * @param {number} playerLevel - The character's level
+ * @returns {string} The resolved damage string (e.g. "1d10" or "8d6")
+ */
+export function resolveSpellDamageAtLevel(spell, playerLevel) {
+    if (!spell || !spell.damage) return '';
+    const slotDmg = spell.damage.damage_at_slot_level;
+    const charDmg = spell.damage.damage_at_character_level;
+    const dmgObj = slotDmg && Object.keys(slotDmg).length ? slotDmg : charDmg;
+    if (!dmgObj) return '';
+    if (spell.level === 0) {
+        const lvls = Object.keys(dmgObj).map(Number).filter(l => l <= playerLevel);
+        const bestLevel = lvls.length > 0 ? Math.max(...lvls) : Object.keys(dmgObj)[0];
+        return dmgObj[bestLevel];
+    }
+    return dmgObj[Object.keys(dmgObj)[0]];
+}
 
-    if (playerSpells == null) { console.error('[attackCalc] Missing array:', playerSpells); throw new Error('Expected array, got ' + playerSpells); }
-    const spells = playerSpells.map(spell => {
-        const spellDetail = allSpells.find(d => d.name === spell.name);
-        if (spellDetail) return { ...spellDetail, prepared: spell.prepared };
-        return { ...spell };
-    }).filter(s => s.damage && (s.prepared === 'Always' || s.prepared === 'Prepared'));
+/**
+ * Determines if a spell uses a spell attack or a saving throw.
+ * @param {Object} spell - The spell object with dc property
+ * @returns {boolean} true if the spell uses a spell attack (no DC)
+ */
+export function isSpellAttack(spell) {
+    return !spell.dc;
+}
 
-    spells.forEach(spell => {
-        if (attacks.find(a => a.name === spell.name)) return;
-
-        let damage = '';
-        const slotDmg = spell.damage.damage_at_slot_level;
-        const charDmg = spell.damage.damage_at_character_level;
-        const dmgObj = slotDmg && Object.keys(slotDmg).length ? slotDmg : charDmg;
-        if (dmgObj) {
-            if (spell.level === 0) {
-                const lvls = Object.keys(dmgObj).map(Number).filter(l => l <= playerLevel);
-                const bestLevel = lvls.length > 0 ? Math.max(...lvls) : Object.keys(dmgObj)[0];
-                damage = dmgObj[bestLevel];
-            } else {
-                damage = dmgObj[Object.keys(dmgObj)[0]];
-            }
-        }
-
-        const attackEntry = {
-            name: spell.name,
-            damage,
-            damageType: spell.damage.damage_type,
-            range: spell.range,
-            type: spell.casting_time,
-            school: spell.school || null,
-         };
-
-        // Only include spells cast as an Action or Bonus Action in the attacks list
-        const isCombatCastingTime = ['1 action', 'Action', '1 bonus action', 'Bonus Action'].includes(attackEntry.type);
-        if (!isCombatCastingTime) return;
-
-        attackEntry.type = (attackEntry.type === '1 action' || attackEntry.type === 'Action') ? 'Action' : 'Bonus Action';
-
-        if (spell.dc) {
-            attackEntry.saveDc = spellAbilities.saveDc;
-            attackEntry.saveType = spell.dc.dc_type;
-            attackEntry.saveSuccess = spell.dc.dc_success;
-         } else {
-            attackEntry.hitBonus = spellAbilities.toHit;
-         }
-        attacks.push(attackEntry);
-    });
-
-    return attacks;
+/**
+ * Determines the combat action type from a spell's casting_time.
+ * @param {string} castingTime - The spell's casting_time
+ * @returns {string} "Action" or "Bonus Action" or null
+ */
+export function getSpellActionType(castingTime) {
+    const actionCastingTimes = ['1 action', '1 Action', 'action', 'Action'];
+    const bonusActionCastingTimes = ['1 bonus action', '1 Bonus Action', 'bonus action', 'Bonus Action'];
+    if (actionCastingTimes.includes(castingTime)) return 'Action';
+    if (bonusActionCastingTimes.includes(castingTime)) return 'Bonus Action';
+    return null;
 }
 
 /**
@@ -413,12 +403,7 @@ export function getAttacks(allEquipment, allSpells, playerStats) {
          }
       }
 
-       // Spell attacks
-     if (playerStats.spellAbilities) {
-         attacks.push(...buildSpellAttacks(playerStats.spellAbilities.spells, allSpells, playerStats.spellAbilities, playerStats.level));
-      }
-
-     // Starry Form: Archer constellation - ranged spell attack
+      // Starry Form: Archer constellation - ranged spell attack
      const starryArrow = buildStarryFormLuminousArrow(playerStats);
      if (starryArrow) attacks.push(starryArrow);
 
