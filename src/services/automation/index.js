@@ -90,6 +90,7 @@ import { handle as handleRelentlessAvenger } from './handlers/class-cleric-palad
 import { handle as handleRelentlessEndurance } from './handlers/class-cleric-paladin/relentlessEnduranceHandler.js';
 import { handle as handleSoulOfVengeance } from './handlers/class-cleric-paladin/soulOfVengeanceHandler.js';
 import { handle as handleAvengingAngel } from './handlers/class-cleric-paladin/avengingAngelHandler.js';
+import { handle as handleRadianceOfDawn } from './handlers/class-cleric-paladin/radianceOfDawnHandler.js';
 import { handle as handlePrimalCompanionSummon, handleCommand as handlePrimalCompanionCommand, handleRestore as handlePrimalCompanionRestore, handleBonusActionCommand as handlePrimalCompanionBonusActionCommand, applyBonusActionCommand as applyPrimalCompanionBonusActionCommand } from './handlers/class-ranger/primalCompanionHandler.js';
 import { handle as handlePrimalCompanionSpellShare, applySpellShare as applyPrimalCompanionSpellShare } from './handlers/class-ranger/primalCompanionSpellShareHandler.js';
 import { handle as handleBeguilingTwist } from './handlers/class-warlock/beguilingTwistHandler.js';
@@ -319,6 +320,7 @@ const HANDLER_MAP = {
         relentless_endurance: handleRelentlessEndurance,
         soul_of_vengeance: handleSoulOfVengeance,
         avenging_angel: handleAvengingAngel,
+        radiance_of_dawn: handleRadianceOfDawn,
         primal_companion_summon: handlePrimalCompanionSummon,
         primal_companion_command: handlePrimalCompanionCommand,
         primal_companion_restore: handlePrimalCompanionRestore,

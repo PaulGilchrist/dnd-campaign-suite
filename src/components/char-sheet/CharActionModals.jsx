@@ -46,6 +46,7 @@ import AttackRiderManeuverPrompt from './modals/AttackRiderManeuverPrompt.jsx'
 import SecondaryTargetModal from './modals/shared/SecondaryTargetModal.jsx'
 import BulwarkOfForceModal from './modals/BulwarkOfForceModal.jsx'
 import CoronaEnemySelectionModal from './modals/CoronaEnemySelectionModal.jsx'
+import RadianceOfDawnModal from './modals/RadianceOfDawnModal.jsx'
 import { handleClearWard, handleSpendDice, handleApply } from '../../services/automation/handlers/class-cleric-paladin/bastionOfLawHandler.js'
 
 export default function CharActionModals({
@@ -132,6 +133,8 @@ export default function CharActionModals({
     handleBulwarkOfForceConfirm,
     coronaEnemySelectionModal, setCoronaEnemySelectionModal,
     handleCoronaEnemySelectionConfirm,
+    radianceOfDawnModal, setRadianceOfDawnModal,
+    handleRadianceOfDawnConfirm,
     handleDivineInterventionCast,
     pendingDamageRef,
 }) {
@@ -643,6 +646,18 @@ export default function CharActionModals({
                     creatureTargets={coronaEnemySelectionModal.creatureTargets}
                     onConfirm={handleCoronaEnemySelectionConfirm}
                     onSkip={() => setCoronaEnemySelectionModal(null)}
+                />
+            )}
+            {radianceOfDawnModal && (
+                <RadianceOfDawnModal
+                    creatureTargets={radianceOfDawnModal.creatureTargets}
+                    saveType={radianceOfDawnModal.saveType}
+                    saveDc={radianceOfDawnModal.saveDc}
+                    damageExpression={radianceOfDawnModal.damageExpression}
+                    damageType={radianceOfDawnModal.damageType}
+                    rangeFeet={radianceOfDawnModal.rangeFeet}
+                    onConfirm={handleRadianceOfDawnConfirm}
+                    onSkip={() => setRadianceOfDawnModal(null)}
                 />
             )}
         </>

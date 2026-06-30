@@ -67,6 +67,7 @@ export default function useCharActionModals({
     const [rallyChoiceModal, setRallyChoiceModal] = useState(null);
     const [bulwarkOfForceModal, setBulwarkOfForceModal] = useState(null);
     const [coronaEnemySelectionModal, setCoronaEnemySelectionModal] = useState(null);
+    const [radianceOfDawnModal, setRadianceOfDawnModal] = useState(null);
     const [secondaryTargetModal, setSecondaryTargetModal] = useState(null);
 
     const pendingDamageRef = useRef(null);
@@ -180,6 +181,7 @@ export default function useCharActionModals({
         rallyChoiceModal, setRallyChoiceModal,
         bulwarkOfForceModal, setBulwarkOfForceModal,
         coronaEnemySelectionModal, setCoronaEnemySelectionModal,
+        radianceOfDawnModal, setRadianceOfDawnModal,
         secondaryTargetModal, setSecondaryTargetModal,
         resolveAttackDamage,
         handleMasteryClose,

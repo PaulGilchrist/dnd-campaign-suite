@@ -2464,7 +2464,7 @@
                         "description": "As a Action, you present your Holy Symbol and expend a use of your Channel Divinity to emit a flash of light in a 30-foot Emanation originating from yourself. Any magical Darkness in that area is dispelled. Each creature of your choice in that area must make a Constitution saving throw or take Radiant damage equal to 2d10 plus your Cleric level.",
                         "level": 3,
                         "automation": {
-                            "type": "save_attack",
+                            "type": "radiance_of_dawn",
                             "damage": "2d10 + cleric level",
                             "damageType": "Radiant",
                             "saveType": "CON",

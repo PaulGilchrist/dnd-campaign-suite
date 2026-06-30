@@ -33,6 +33,7 @@ import { loadCombatSummary } from '../../services/encounters/combatData.js';
 import { executeSweepingAttack, executeBaitAndSwitchChoice, executeCommanderStrikeChoice, executeRallyChoice } from '../../services/automation/handlers/class-fighter-rogue/combatSuperiorityHandler.js';
 import { activateBulwarkOfForce } from '../../services/automation/handlers/class-sorcerer/bulwarkOfForceHandler.js';
 import { activateCoronaOfLight } from '../../services/automation/handlers/class-cleric-paladin/coronaOfLightHandler.js';
+import { confirmRadianceOfDawn } from '../../services/automation/handlers/class-cleric-paladin/radianceOfDawnHandler.js';
 import { endFriendsOnHostileAction } from '../../services/rules/features/friendsService.js';
 import { endInvisibilityOnHostileAction } from '../../services/rules/features/invisibilityService.js';
 import { applyDamageToTarget } from '../../services/rules/combat/applyDamage.js';
@@ -576,6 +577,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         rallyChoiceModal, setRallyChoiceModal,
         bulwarkOfForceModal, setBulwarkOfForceModal,
         coronaEnemySelectionModal, setCoronaEnemySelectionModal,
+        radianceOfDawnModal, setRadianceOfDawnModal,
         secondaryTargetModal, setSecondaryTargetModal,
         handleAttackRiderManeuverUse,
         handleAttackRiderManeuverSkip,
@@ -939,6 +941,20 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         setCoronaEnemySelectionModal(null);
     }, [setPopupHtml, coronaEnemySelectionModal, setCoronaEnemySelectionModal]);
 
+    const handleRadianceOfDawnConfirm = React.useCallback(async (selectedTargets) => {
+        if (!selectedTargets || !radianceOfDawnModal) return;
+        const result = await confirmRadianceOfDawn(
+            radianceOfDawnModal.action,
+            radianceOfDawnModal.playerStats,
+            radianceOfDawnModal.campaignName,
+            selectedTargets
+        );
+        if (result?.payload) {
+            setPopupHtml(result.payload);
+        }
+        setRadianceOfDawnModal(null);
+    }, [setPopupHtml, radianceOfDawnModal, setRadianceOfDawnModal]);
+
     async function handleAutomationAction(action) {
         if (cannotAct) return;
 
@@ -1148,6 +1164,9 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                         break;
                     case 'coronaEnemySelection':
                         setCoronaEnemySelectionModal(result.payload);
+                        break;
+                    case 'radianceOfDawn':
+                        setRadianceOfDawnModal(result.payload);
                         break;
                     case 'arcaneWardRestore':
                         setArcaneWardRestoreModal(result.payload);
@@ -1452,6 +1471,8 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     handleBulwarkOfForceConfirm={handleBulwarkOfForceConfirm}
                     coronaEnemySelectionModal={coronaEnemySelectionModal} setCoronaEnemySelectionModal={setCoronaEnemySelectionModal}
                     handleCoronaEnemySelectionConfirm={handleCoronaEnemySelectionConfirm}
+                    radianceOfDawnModal={radianceOfDawnModal} setRadianceOfDawnModal={setRadianceOfDawnModal}
+                    handleRadianceOfDawnConfirm={handleRadianceOfDawnConfirm}
                     handleCombatSuperiorityConfirm={handleCombatSuperiorityConfirm}
                     handleAttackRiderManeuverUse={handleAttackRiderManeuverUse}
                     handleAttackRiderManeuverSkip={handleAttackRiderManeuverSkip}
@@ -1508,14 +1529,14 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     const isClickable = action.details || hasAutomation(action);
                     const isRageExpendable = auto?.recharge === 'long_rest_or_expend_rage';
                     const exhausted = isRageExpendable && isExhausted(action, playerStats, campaignName);
-                    const handleClick = () => {
-                        if (exhausted) return;
-                        if (hasAutomation(action)) {
-                            handleAutomationAction(action);
-                        } else {
-                            setPopupHtml(buildFeatureDetailHtml(action));
-                        }
-                    };
+                     const handleClick = () => {
+                         if (exhausted) return;
+                         if (hasAutomation(action)) {
+                             handleAutomationAction(action);
+                         } else {
+                             setPopupHtml(buildFeatureDetailHtml(action));
+                         }
+                     };
                     const displayName = isMetamagic ? 'Empowered Spell' : action.name;
                     const displayDesc = isMetamagic ? getEmpoweredSpellDescription(action) : action.description;
                     const renderRageRestore = async () => {
