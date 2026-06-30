@@ -215,7 +215,7 @@ describe('createSaves (useLoggedDiceRollSaves)', () => {
                 modifier: 0,
                 campaignName: 'test-campaign',
                 setPopupHtml: vi.fn(),
-                context: { playerStats: {} },
+                context: { playerStats: { automation: { actions: [{ type: 'damage_bonus', options: ['Potent Spellcasting'] }] } } },
                 isCantrip: true,
             };
             loadCombatSummary.mockResolvedValue({

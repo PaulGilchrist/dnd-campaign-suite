@@ -95,7 +95,7 @@ function applyEldritchHex(spell, playerStats, campaignName, targetName) {
     setRuntimeValue(campaignName, 'targetEffects', effects, campaignName);
 }
 
- export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage, playerStats, getTargetInfo, attackerPos, targetPos, featEffects, campaignName, mapName, characters }) {
+export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage, playerStats, getTargetInfo, attackerPos, targetPos, featEffects, campaignName, mapName, characters }) {
     if (getActiveBuffs(playerStats.name, campaignName).some(b => b.blocksSpellcasting)) {
         console.warn(`[spellCast] ${playerStats.name} cannot cast spells (blocked by active buff)`);
         return;
@@ -124,35 +124,35 @@ function applyEldritchHex(spell, playerStats, campaignName, targetName) {
     }
 
     const innateSorceryActive = isInnateSorceryActive(playerStats.name, campaignName);
-  const slotDmg = spell.damage?.damage_at_slot_level;
-  const charDmg = spell.damage?.damage_at_character_level;
-  const formula =
-     (slotDmg && slotDmg[spell.level]) ||
-     (charDmg && charDmg[spell.level]) ||
-     (slotDmg && Object.keys(slotDmg).length ? slotDmg[Object.keys(slotDmg)[0]] : null) ||
-     (charDmg && Object.keys(charDmg).length ? charDmg[Object.keys(charDmg)[0]] : null) ||
-    null;
-  const damageType = spell.damage?.damage_type || '';
+    const slotDmg = spell.damage?.damage_at_slot_level;
+    const charDmg = spell.damage?.damage_at_character_level;
+    const formula =
+        (slotDmg && slotDmg[spell.level]) ||
+        (charDmg && charDmg[spell.level]) ||
+        (slotDmg && Object.keys(slotDmg).length ? slotDmg[Object.keys(slotDmg)[0]] : null) ||
+        (charDmg && Object.keys(charDmg).length ? charDmg[Object.keys(charDmg)[0]] : null) ||
+        null;
+    const damageType = spell.damage?.damage_type || '';
 
-  const cantripSpellAbility = spell.spellCastingAbility || playerStats.spellAbilities?.spellCastingAbility;
-  let spellToHit = playerStats.spellAbilities?.toHit || 0;
-  let spellSaveDc;
-  if (playerStats.spellAbilities?.saveDc == null) {
-    if (playerStats.proficiency == null) {
-      console.error('[spellCast] executeSpellCast: playerStats.proficiency is missing')
-      throw new Error('playerStats.proficiency is required for spell save DC calculation')
+    const cantripSpellAbility = spell.spellCastingAbility || playerStats.spellAbilities?.spellCastingAbility;
+    let spellToHit = playerStats.spellAbilities?.toHit || 0;
+    let spellSaveDc;
+    if (playerStats.spellAbilities?.saveDc == null) {
+        if (playerStats.proficiency == null) {
+            console.error('[spellCast] executeSpellCast: playerStats.proficiency is missing')
+            throw new Error('playerStats.proficiency is required for spell save DC calculation')
+        }
+        spellSaveDc = 8 + playerStats.proficiency;
+    } else {
+        spellSaveDc = playerStats.spellAbilities.saveDc;
     }
-    spellSaveDc = 8 + playerStats.proficiency;
-  } else {
-    spellSaveDc = playerStats.spellAbilities.saveDc;
-  }
-  if (cantripSpellAbility && playerStats.abilities) {
-    const ability = playerStats.abilities.find(a => a.name === cantripSpellAbility);
-    if (ability) {
-      spellToHit = ability.bonus + playerStats.proficiency;
-      spellSaveDc = 8 + ability.bonus + playerStats.proficiency;
+    if (cantripSpellAbility && playerStats.abilities) {
+        const ability = playerStats.abilities.find(a => a.name === cantripSpellAbility);
+        if (ability) {
+            spellToHit = ability.bonus + playerStats.proficiency;
+            spellSaveDc = 8 + ability.bonus + playerStats.proficiency;
+        }
     }
-  }
 
     let spellCastingMod = 0;
     if (cantripSpellAbility && playerStats.abilities) {
@@ -377,21 +377,21 @@ function applyEldritchHex(spell, playerStats, campaignName, targetName) {
         }
 
         if (spell.dc && spell.status_effects && spell.status_effects.length > 0) {
-         const target = await getTargetInfo();
-         const context = {
-           targetName: target?.name,
-           attackerName: playerStats.name,
-            ...rollContext,
-           saveDc: spellSaveDc + (innateSorceryActive ? 1 : 0),
-           saveType: spell.dc.dc_type,
-           dcSuccess: spell.dc.dc_success,
-           metamagicHeighten: hasInvisible,
-           isCantrip: spell.level === 0,
-         };
-         if (spell.status_effects && spell.status_effects.length > 0) {
-           context.statusEffects = spell.status_effects;
-         }
-          rollDamage(spell.name, '0', 0, [], 0, context);
+            const target = await getTargetInfo();
+            const context = {
+                targetName: target?.name,
+                attackerName: playerStats.name,
+                ...rollContext,
+                saveDc: spellSaveDc + (innateSorceryActive ? 1 : 0),
+                saveType: spell.dc.dc_type,
+                dcSuccess: spell.dc.dc_success,
+                metamagicHeighten: hasInvisible,
+                isCantrip: spell.baseLevel === 0 || spell.level === 0,
+            };
+            if (spell.status_effects && spell.status_effects.length > 0) {
+                context.statusEffects = spell.status_effects;
+            }
+            rollDamage(spell.name, '0', 0, [], 0, context);
         }
 
         // Generic healing: use heal_at_slot_level for any healing spell without a dedicated handler
@@ -401,8 +401,8 @@ function applyEldritchHex(spell, playerStats, campaignName, targetName) {
                 if (metaCtx?.slotLevel == null && spell.level == null) {
                     console.error('[spellCast] executeSpellCast: slot level is missing (metaCtx.slotLevel and spell.level) for healing spell')
                     throw new Error('slot level is required for healing spell')
-                  }
-                  const slotLevel = metaCtx?.slotLevel || spell.level;
+                }
+                const slotLevel = metaCtx?.slotLevel || spell.level;
                 const healAtSlotLevel = spell.heal_at_slot_level;
                 let expression = healAtSlotLevel[slotLevel];
                 if (!expression) {
@@ -479,75 +479,75 @@ function applyEldritchHex(spell, playerStats, campaignName, targetName) {
             console.error('[spellCast] False Life trigger failed:', e);
         });
 
-         triggerHealingWord(spell, metaCtx, playerStats, campaignName, mapName).catch(e => {
-             console.error('[spellCast] Healing Word trigger failed:', e);
-         });
+        triggerHealingWord(spell, metaCtx, playerStats, campaignName, mapName).catch(e => {
+            console.error('[spellCast] Healing Word trigger failed:', e);
+        });
 
-          // Protection from Energy — apply resistance buff to target
-          if (spell.name && spell.name.toLowerCase() === 'protection from energy') {
-              const target = await getTargetInfo();
-              if (target) {
-                  const action = {
-                      name: 'Protection from Energy',
-                      spell: spell,
-                      automation: spell.automation ?? {},
-                  };
-                  await executeProtectionFromEnergy(action, playerStats, campaignName, mapName);
-              }
-          }
-
-           // Protection from Poison — remove Poisoned condition and apply buff
-            if (spell.name && spell.name.toLowerCase() === 'protection from poison') {
-                const target = await getTargetInfo();
-                if (target) {
-                    const action = {
-                        name: 'Protection from Poison',
-                        spell: spell,
-                        automation: spell.automation ?? {},
-                    };
-                    await executeProtectionFromPoison(action, playerStats, campaignName, mapName);
-                }
+        // Protection from Energy — apply resistance buff to target
+        if (spell.name && spell.name.toLowerCase() === 'protection from energy') {
+            const target = await getTargetInfo();
+            if (target) {
+                const action = {
+                    name: 'Protection from Energy',
+                    spell: spell,
+                    automation: spell.automation ?? {},
+                };
+                await executeProtectionFromEnergy(action, playerStats, campaignName, mapName);
             }
+        }
 
-            // Stone Skin — apply resistance to Bludgeoning, Piercing, and Slashing damage
-            if (spell.name && spell.name.toLowerCase() === 'stone skin') {
-                const target = await getTargetInfo();
-                if (target) {
-                    const action = {
-                        name: 'Stone Skin',
-                        spell: spell,
-                        automation: spell.automation ?? {},
-                    };
-                    await executeStoneSkin(action, playerStats, campaignName, mapName);
-                }
+        // Protection from Poison — remove Poisoned condition and apply buff
+        if (spell.name && spell.name.toLowerCase() === 'protection from poison') {
+            const target = await getTargetInfo();
+            if (target) {
+                const action = {
+                    name: 'Protection from Poison',
+                    spell: spell,
+                    automation: spell.automation ?? {},
+                };
+                await executeProtectionFromPoison(action, playerStats, campaignName, mapName);
             }
+        }
 
-            // Remove Curse — remove curses and break attunement on target
-            if (spell.name && spell.name.toLowerCase() === 'remove curse') {
-                await triggerRemoveCurse(spell, metaCtx, playerStats, campaignName, mapName);
+        // Stone Skin — apply resistance to Bludgeoning, Piercing, and Slashing damage
+        if (spell.name && spell.name.toLowerCase() === 'stone skin') {
+            const target = await getTargetInfo();
+            if (target) {
+                const action = {
+                    name: 'Stone Skin',
+                    spell: spell,
+                    automation: spell.automation ?? {},
+                };
+                await executeStoneSkin(action, playerStats, campaignName, mapName);
             }
+        }
 
-            // Dispel Magic — ability check to dispel a spell on a target
-            if (spell.name && spell.name.toLowerCase() === 'dispel magic') {
-                const dispelTarget = await getTargetInfo();
-                if (dispelTarget) {
-                    const dispelMetaCtx = { ...metaCtx, targetName: dispelTarget.name };
-                    await triggerDispelMagic(dispelMetaCtx, spell, playerStats, campaignName, mapName);
-                }
-            }
+        // Remove Curse — remove curses and break attunement on target
+        if (spell.name && spell.name.toLowerCase() === 'remove curse') {
+            await triggerRemoveCurse(spell, metaCtx, playerStats, campaignName, mapName);
+        }
 
-            // Resistance (2024) — apply damage reduction buff to target
-            if (spell.name && spell.name.toLowerCase() === 'resistance') {
-                const target = await getTargetInfo();
-                if (target) {
-                    const action = {
-                        name: 'Resistance',
-                        spell: spell,
-                        automation: spell.automation ?? {},
-                    };
-                    await executeHandler(action, playerStats, campaignName, mapName);
-                }
+        // Dispel Magic — ability check to dispel a spell on a target
+        if (spell.name && spell.name.toLowerCase() === 'dispel magic') {
+            const dispelTarget = await getTargetInfo();
+            if (dispelTarget) {
+                const dispelMetaCtx = { ...metaCtx, targetName: dispelTarget.name };
+                await triggerDispelMagic(dispelMetaCtx, spell, playerStats, campaignName, mapName);
             }
+        }
+
+        // Resistance (2024) — apply damage reduction buff to target
+        if (spell.name && spell.name.toLowerCase() === 'resistance') {
+            const target = await getTargetInfo();
+            if (target) {
+                const action = {
+                    name: 'Resistance',
+                    spell: spell,
+                    automation: spell.automation ?? {},
+                };
+                await executeHandler(action, playerStats, campaignName, mapName);
+            }
+        }
 
         // Generic automation routing — any spell with automation.type that hasn't been handled by a specific case above
         // This ensures all automated spells (shield, blade_ward, buff_ally, temp_buff, etc.) work when cast
@@ -568,28 +568,28 @@ function applyEldritchHex(spell, playerStats, campaignName, targetName) {
         }
     }
 
-   const rollContext = { ...metaCtx, damageType };
+    const rollContext = { ...metaCtx, damageType };
 
-   if (attackerPos && targetPos) {
-     let effectiveRange = computeEffectiveSpellRange(spell.range, metaCtx);
-     if (effectiveRange != null) {
-       const cantripRangeBonus = (featEffects?.cantripRangeBonus) || 0;
-       if (cantripRangeBonus > 0 && spell.level === 0) {
-         const baseRange = rangeToFeet(spell.range);
-         if (baseRange != null && baseRange >= 10) {
-           effectiveRange += cantripRangeBonus;
-         }
-       }
-       const distanceFt = getDistanceFeet(attackerPos, targetPos);
-        const rangeResult = computeRangeEffect(effectiveRange, distanceFt, featEffects ?? {});
-       if (rangeResult.mode === 'miss') {
-         rollContext.isAutoMiss = true;
-         rollContext.rangeReason = rangeResult.reason;
+    if (attackerPos && targetPos) {
+        let effectiveRange = computeEffectiveSpellRange(spell.range, metaCtx);
+        if (effectiveRange != null) {
+            const cantripRangeBonus = (featEffects?.cantripRangeBonus) || 0;
+            if (cantripRangeBonus > 0 && spell.level === 0) {
+                const baseRange = rangeToFeet(spell.range);
+                if (baseRange != null && baseRange >= 10) {
+                    effectiveRange += cantripRangeBonus;
+                }
+            }
+            const distanceFt = getDistanceFeet(attackerPos, targetPos);
+            const rangeResult = computeRangeEffect(effectiveRange, distanceFt, featEffects ?? {});
+            if (rangeResult.mode === 'miss') {
+                rollContext.isAutoMiss = true;
+                rollContext.rangeReason = rangeResult.reason;
+            }
         }
-     }
-   }
+    }
 
-    const magicalAmbush = (function() {
+    const magicalAmbush = (function () {
         const passives = playerStats.automation?.passives;
         if (passives == null) {
             console.error('[spellCast] magicalAmbush check: playerStats.automation.passives is missing');
@@ -626,9 +626,9 @@ function applyEldritchHex(spell, playerStats, campaignName, targetName) {
         if (potentFeature) {
             const wis = playerStats.abilities?.find(a => a.name === 'Wisdom');
             const wisMod = Math.max(0, wis?.bonus || 0);
-                if (wisMod > 0) {
-                    finalFormula = `${empEvocFormula} + ${wisMod} [Blessed Strikes]`;
-                }
+            if (wisMod > 0) {
+                finalFormula = `${empEvocFormula} + ${wisMod} [Blessed Strikes]`;
+            }
         }
     }
 
@@ -636,7 +636,7 @@ function applyEldritchHex(spell, playerStats, campaignName, targetName) {
     let overchannelFormula = formula;
     let overchannelActive = false;
     let overchannelUseCount = 0;
-    const overchannelPassives = (function() {
+    const overchannelPassives = (function () {
         const passives = playerStats.automation?.passives;
         if (passives == null) {
             console.error('[spellCast] overchannelPassives: playerStats.automation.passives is missing');
@@ -658,7 +658,7 @@ function applyEldritchHex(spell, playerStats, campaignName, targetName) {
         }
     }
 
-      if (spell.dc) {
+    if (spell.dc) {
         try {
             await triggerSoulstitchSpells(spell, metaCtx, playerStats, campaignName, mapName);
         } catch (e) {
@@ -666,55 +666,55 @@ function applyEldritchHex(spell, playerStats, campaignName, targetName) {
         }
         const target = await getTargetInfo();
         const context = {
-          targetName: target?.name,
-          attackerName: playerStats.name,
+            targetName: target?.name,
+            attackerName: playerStats.name,
             ...rollContext,
             saveDc: spellSaveDc + (innateSorceryActive ? 1 : 0),
             saveType: spell.dc.dc_type,
             dcSuccess: spell.dc.dc_success,
             metamagicHeighten: hasInvisible,
-            isCantrip: spell.level === 0,
+            isCantrip: spell.baseLevel === 0 || spell.level === 0,
             overchannelActive,
             overchannelUseCount,
             overchannelSpellLevel: metaCtx?.slotLevel || spell.level,
             playerStats,
         };
         if (spell.status_effects && spell.status_effects.length > 0) {
-          context.statusEffects = spell.status_effects;
+            context.statusEffects = spell.status_effects;
         }
-      let overchannelResult;
-      if (overchannelActive) {
-          overchannelResult = rollExpressionMaximized(finalFormula);
-      } else {
-          overchannelResult = rollExpression(finalFormula);
-      }
-      if (overchannelResult) {
-         rollDamage(spell.name, finalFormula, overchannelResult.total, overchannelResult.rolls, overchannelResult.modifier, context);
-       }
+        let overchannelResult;
+        if (overchannelActive) {
+            overchannelResult = rollExpressionMaximized(finalFormula);
         } else {
+            overchannelResult = rollExpression(finalFormula);
+        }
+        if (overchannelResult) {
+            rollDamage(spell.name, finalFormula, overchannelResult.total, overchannelResult.rolls, overchannelResult.modifier, context);
+        }
+    } else {
         if (isMagicMissile(spell)) {
-          await executeMagicMissile(spell, metaCtx, { rollDamage, playerStats, getTargetInfo, campaignName, mapName, characters });
+            await executeMagicMissile(spell, metaCtx, { rollDamage, playerStats, getTargetInfo, campaignName, mapName, characters });
         } else {
-          const rollCtx = innateSorceryActive && !rollContext.forcedMode ? { ...rollContext, forcedMode: 'advantage' } : rollContext;
-          const damageRollResult = rollExpression(overchannelFormula);
-          const attackCtx = {
-            autoDamageFormula: overchannelFormula,
-            autoDamageName: spell.name,
-            autoDamageSchool: spell.school,
-            overchannelActive,
-            overchannelUseCount,
-            overchannelSpellLevel: metaCtx?.slotLevel || spell.level,
-            autoDamageRollResult: damageRollResult,
-              ...rollCtx,
-              isCantrip: spell.level === 0,
-              playerStats,
-              };
-          if (hasInvisible) {
-            attackCtx.metamagicHeighten = true;
-          }
-           rollAttack(spell.name, spellToHit, attackCtx);
-           }
-         }
+            const rollCtx = innateSorceryActive && !rollContext.forcedMode ? { ...rollContext, forcedMode: 'advantage' } : rollContext;
+            const damageRollResult = rollExpression(overchannelFormula);
+            const attackCtx = {
+                autoDamageFormula: overchannelFormula,
+                autoDamageName: spell.name,
+                autoDamageSchool: spell.school,
+                overchannelActive,
+                overchannelUseCount,
+                overchannelSpellLevel: metaCtx?.slotLevel || spell.level,
+                autoDamageRollResult: damageRollResult,
+                ...rollCtx,
+                isCantrip: spell.baseLevel === 0 || spell.level === 0,
+                playerStats,
+            };
+            if (hasInvisible) {
+                attackCtx.metamagicHeighten = true;
+            }
+            rollAttack(spell.name, spellToHit, attackCtx);
+        }
+    }
 
     triggerPostCastRiderSaves(spell, metaCtx, playerStats, campaignName, mapName).catch(e => {
         console.error('[spellCast] Post-cast rider save failed:', e);
@@ -938,19 +938,19 @@ async function triggerHeal(spell, metaCtx, playerStats, campaignName, _mapName) 
     if (metaCtx?.slotLevel == null && spell.level == null) {
         console.error('[spellCast] triggerHeal: slot level is missing (metaCtx.slotLevel and spell.level)')
         throw new Error('slot level is required for heal spell')
-      }
-      const slotLevel = metaCtx?.slotLevel || spell.level;
-      const healAtSlotLevel = spell.heal_at_slot_level;
-      let healAmount = 70;
-      if (healAtSlotLevel) {
+    }
+    const slotLevel = metaCtx?.slotLevel || spell.level;
+    const healAtSlotLevel = spell.heal_at_slot_level;
+    let healAmount = 70;
+    if (healAtSlotLevel) {
         const expression = healAtSlotLevel[slotLevel] || healAtSlotLevel[Object.keys(healAtSlotLevel).map(Number).sort((a, b) => a - b).pop()];
         if (expression) {
-          const parsed = parseInt(expression, 10);
-          if (Number.isNaN(parsed)) {
-            console.error('[spellCast] triggerHeal: heal_at_slot_level expression is not a valid number:', expression)
-            throw new Error('heal_at_slot_level expression must be a valid number for heal spell')
-          }
-          healAmount = parsed;
+            const parsed = parseInt(expression, 10);
+            if (Number.isNaN(parsed)) {
+                console.error('[spellCast] triggerHeal: heal_at_slot_level expression is not a valid number:', expression)
+                throw new Error('heal_at_slot_level expression must be a valid number for heal spell')
+            }
+            healAmount = parsed;
         }
     }
     const maxHp = creature.maxHp || playerStats.hitPoints || 0;
@@ -1061,21 +1061,21 @@ async function applyRegenerateSpell(spell, target, caster, campaignName) {
     if (spell.level == null) {
         console.error('[spellCast] applyRegenerateSpell: spell.level is missing')
         throw new Error('spell.level is required for regenerate spell')
-      }
-      const slotLevel = spell.level;
-      const healAtSlotLevel = spell.heal_at_slot_level;
-      if (healAtSlotLevel == null || typeof healAtSlotLevel !== 'object') {
+    }
+    const slotLevel = spell.level;
+    const healAtSlotLevel = spell.heal_at_slot_level;
+    if (healAtSlotLevel == null || typeof healAtSlotLevel !== 'object') {
         console.error('[spellCast] applyRegenerateSpell: heal_at_slot_level is not an object');
         throw new Error('heal_at_slot_level must be an object');
-      }
-      let expression = healAtSlotLevel[slotLevel];
-      if (!expression) {
+    }
+    let expression = healAtSlotLevel[slotLevel];
+    if (!expression) {
         const levels = Object.keys(healAtSlotLevel).map(Number).sort((a, b) => a - b);
         const highestBelow = levels.filter(l => l <= slotLevel).pop();
         if (highestBelow) {
-          expression = healAtSlotLevel[highestBelow];
+            expression = healAtSlotLevel[highestBelow];
         }
-      }
+    }
 
     // Apply initial healing
     if (expression) {
@@ -1087,8 +1087,8 @@ async function applyRegenerateSpell(spell, target, caster, campaignName) {
                 if (creature?.maxHp == null && caster.hitPoints == null) {
                     console.error('[spellCast] applyRegenerateSpell: max HP is missing for both creature and caster')
                     throw new Error('max HP is required for regenerate spell')
-                  }
-                  const maxHp = creature?.maxHp || caster.hitPoints;
+                }
+                const maxHp = creature?.maxHp || caster.hitPoints;
                 const currentHp = creature?.currentHp ?? getRuntimeValue(targetName, 'currentHitPoints', campaignName) ?? maxHp;
                 const actualHeal = Math.min(result.total, maxHp - currentHp);
                 if (actualHeal > 0) {
@@ -1178,7 +1178,7 @@ async function executeMagicMissile(spell, metaCtx, { rollDamage: _rollDamage, pl
             finalDamage = 0;
             damageReduced = true;
         } else {
-            const ignoreResistance = (function() {
+            const ignoreResistance = (function () {
                 const passives = playerStats.automation?.passives;
                 if (passives == null) {
                     console.error('[spellCast] executeMagicMissile: playerStats.automation.passives is missing');

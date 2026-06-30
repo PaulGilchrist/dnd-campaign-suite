@@ -1,15 +1,14 @@
 import { loadCombatSummary } from '../../services/encounters/combatData.js';
 import {
-  computeDamageAfterEvasion,
-  rollSaveForCreature,
-  applyDamageToTarget,
+    computeDamageAfterEvasion,
+    rollSaveForCreature,
+    applyDamageToTarget,
 } from '../../services/rules/combat/applyDamage.js';
 import { sendSaveResult } from '../../services/combat/conditions/savePromptService.js';
 import { getTargetFromAttacker, getCombatContext } from '../../services/rules/combat/damageUtils.js';
 import { getRuntimeValue, setRuntimeValue } from '../runtime/useRuntimeState.js';
 import { MELEE_REACH_FEET } from '../../services/combat/baseCombatActions.js';
-import { hasIgnoreResistance } from '../../services/combat/automation/automationService.js';
-import { hasPotentCantrip } from './loggedDiceRollUtils.js';
+import { hasIgnoreResistance, evaluateAutoExpression } from '../../services/combat/automation/automationService.js';
 
 export function createSaves(deps) {
     const { characterName, campaignName, setPopupHtml, logEntry, logAndShow, pendingSaves, charactersRef } = deps;
@@ -138,9 +137,54 @@ export function createSaves(deps) {
         }
 
         const isCantripFlag = pending.isCantrip || false;
-        const hasPotentFlag = hasPotentCantrip(pending.context?.playerStats);
-        if (hasPotentFlag && isCantripFlag && saveResult.success && pending.dcSuccess === 'none') {
+        const hasBlessedStrikesOptions = pending.context?.playerStats?.automation?.actions?.some(
+            a => a.type === 'damage_bonus' && a.options?.length > 0 && a.options.includes('Potent Spellcasting')
+        ) || false;
+        if (hasBlessedStrikesOptions && isCantripFlag && saveResult.success && pending.dcSuccess === 'none') {
             finalDamage = Math.floor(pending.rawDamage / 2);
+        }
+        if (isCantripFlag && !saveResult.success && pending.dcSuccess === 'none') {
+            const playerStats = pending.context?.playerStats;
+            if (playerStats?.automation?.actions) {
+                const allAutomation = [
+                    ...(playerStats.automation.actions || []),
+                    ...(playerStats.automation.passives || []),
+                ];
+                const cantripBonuses = playerStats.automation.actions.filter(
+                    a => a.type === 'damage_bonus' && a.options?.length > 0 && a.tempHpExpression
+                );
+                const upgradedNames = new Set(allAutomation.filter(b => b.upgrades).map(b => b.upgrades));
+                const filteredBonuses = cantripBonuses.filter(b => !upgradedNames.has(b.name));
+                for (const bonus of filteredBonuses) {
+                    const tempHp = evaluateAutoExpression(bonus.tempHpExpression, playerStats);
+                    if (tempHp && !isNaN(tempHp) && tempHp > 0) {
+                        const combatSummaryForTargets = await loadCombatSummary(campaignName);
+                        const allies = combatSummaryForTargets?.creatures?.filter(c =>
+                            c.type === 'player' || c.type === 'npc' || c.type === 'monster'
+                        ) || [];
+                        if (allies.length > 0) {
+                            const targets = allies.map(c => ({
+                                name: c.name,
+                                currentHp: c.currentHp,
+                                maxHp: c.maxHp,
+                                size: c.size,
+                                type: c.type,
+                            }));
+                            window.dispatchEvent(new CustomEvent('potent-spellcasting-temp-hp', {
+                                detail: {
+                                    title: 'Improved Blessed Strikes — Potent Spellcasting',
+                                    targets,
+                                    tempHp,
+                                    campaignName,
+                                    attackerName: characterName,
+                                    confirmLabel: 'Grant Temp HP',
+                                },
+                                bubbles: true,
+                            }));
+                        }
+                    }
+                }
+            }
         }
         const ignoreResistance = (pending.playerStats && hasIgnoreResistance(pending.playerStats, pending.damageType)) || false;
         const applyResult = applyDamageToTarget(combatSummary, pending.targetName, finalDamage, [pending.damageType], campaignName, null, ignoreResistance, pending.attackerName || characterName);

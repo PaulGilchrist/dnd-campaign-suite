@@ -2,6 +2,7 @@ import { rollExpression, rollExpressionDoubled } from '../../services/dice/diceR
 import { getCombatContext, getTargetFromAttacker } from '../../services/rules/combat/damageUtils.js';
 import { getCurrentCombatRound, loadCombatSummary } from '../../services/encounters/combatData.js';
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
+import { postLogEntry } from '../../services/shared/logPoster.js';
 import { getActiveBuffs } from '../../services/automation/common/buffToggle.js';
 import { evaluateAutoExpression, hasTwoWeaponFighting } from '../../services/combat/automation/automationService.js';
 import { applyDamageToTarget } from '../../services/rules/combat/applyDamage.js';
@@ -16,6 +17,7 @@ export default function useAttackDamageResolution({
     setAttackRiderManeuverPrompt,
     setSweepingAttackTargetModal,
     pendingDamageRef,
+    setSecondaryTargetModal,
 }) {
     const proceedWithDamage = (attack, formula, total, rolls, modifier) => {
         (mapName ? buildCtx(attack) : buildCtxSync(attack)).then(ctx => {
@@ -353,7 +355,7 @@ export default function useAttackDamageResolution({
                         });
                         return;
                     } else {
-                    formula += ` + ${bonus.damageExpression} [${damageType}]`;
+                        formula += ` + ${bonus.damageExpression} [${damageType}]`;
                         total += bonusResult.total;
                         rolls = [...rolls, ...bonusResult.rolls];
                     }
@@ -703,7 +705,7 @@ export default function useAttackDamageResolution({
                                     damageType: spreadDamageType,
                                     targetName: spreadTarget.name,
                                     finalDamage: spreadApplyResult?.finalDamage,
-}).catch((e) => { console.error("[useAttackDamageResolution] Error:", e); });
+                                }).catch((e) => { console.error("[useAttackDamageResolution] Error:", e); });
 
                                 // Update popup to include spread damage info
                                 if (spreadApplyResult) {
@@ -1087,23 +1089,72 @@ export default function useAttackDamageResolution({
                     a => a.type === 'damage_bonus' && a.options?.length > 0
                 );
                 // Deduplicate: skip features that are upgraded by a higher-level feature
-                const upgradedNames = new Set(cantripBonuses.filter(b => b.upgrades).map(b => b.upgrades));
+                const allAutomation = [
+                    ...(playerStats.automation.actions || []),
+                    ...(playerStats.automation.passives || []),
+                ];
+                const upgradedNames = new Set(allAutomation.filter(b => b.upgrades).map(b => b.upgrades));
                 const filteredBonuses = cantripBonuses.filter(b => !upgradedNames.has(b.name));
                 for (const bonus of filteredBonuses) {
-                    const optionKey = `_${bonus.name.replace(/\s+/g, '_')}_option`;
-                    const chosenOption = getRuntimeValue(playerStats.name, optionKey, campaignName);
-                    const selected = chosenOption || bonus.options?.[0] || '';
-                    const isPotentSpellcasting = selected.toLowerCase().includes('spellcasting');
-                    if (!isPotentSpellcasting) continue;
                     const wis = playerStats.abilities?.find(a => a.name === 'Wisdom');
                     const wisMod = Math.max(0, wis?.bonus || 0);
                     if (wisMod > 0) {
                         formula += ` + ${wisMod} [Cantrip]`;
                         total += wisMod;
                     }
-                    if (bonus.tempHpExpression) {
-                        const tempHp = evaluateAutoExpression(bonus.tempHpExpression, playerStats);
-                        if (tempHp && !isNaN(tempHp)) {
+                    const tempHp = evaluateAutoExpression(bonus.tempHpExpression, playerStats);
+                    if (tempHp && !isNaN(tempHp)) {
+                        const cs = await getCombatContext(campaignName);
+                        const allies = cs?.creatures?.filter(c =>
+                            c.type === 'player' || c.type === 'npc' || c.type === 'monster'
+                        ) || [];
+                        if (setSecondaryTargetModal && allies.length > 0) {
+                            const targets = allies.map(c => ({
+                                name: c.name,
+                                currentHp: c.currentHp,
+                                maxHp: c.maxHp,
+                                size: c.size,
+                                type: c.type,
+                            }));
+                              setSecondaryTargetModal({
+                                  title: 'Improved Blessed Strikes — Potent Spellcasting',
+                                  targets,
+                                  confirmLabel: 'Grant Temp HP',
+                                  onTargetSelected: async (targetName) => {
+                                      const existing = getRuntimeValue(targetName, 'tempHp', campaignName) || 0;
+                                      setRuntimeValue(targetName, 'tempHp', Math.max(existing, tempHp), campaignName);
+                                      postLogEntry(campaignName, {
+                                          type: 'roll',
+                                          characterName: playerStats.name,
+                                          rollType: 'temp-hp',
+                                          name: 'Potent Spellcasting',
+                                          targetName,
+                                          note: `Gained ${tempHp} temporary hit points from Potent Spellcasting`,
+                                          total: tempHp,
+                                          bonus: 0,
+                                      });
+                                      setSecondaryTargetModal(null);
+                                  },
+                                  onSkip: () => {
+                                      const existing = getRuntimeValue(playerStats.name, 'tempHp', campaignName) || 0;
+                                      setRuntimeValue(playerStats.name, 'tempHp', Math.max(existing, tempHp), campaignName);
+                                      postLogEntry(campaignName, {
+                                          type: 'roll',
+                                          characterName: playerStats.name,
+                                          rollType: 'temp-hp',
+                                          name: 'Potent Spellcasting',
+                                          targetName: playerStats.name,
+                                          note: `Gained ${tempHp} temporary hit points from Potent Spellcasting`,
+                                          total: tempHp,
+                                          bonus: 0,
+                                      });
+                                      setSecondaryTargetModal(null);
+                                  },
+                                  featureDescription: `Grant ${tempHp} temporary hit points to a creature within 60 feet.`,
+                                  description: 'Choose a creature to grant temporary hit points from Potent Spellcasting.',
+                              });
+                            return;
+                        } else {
                             const existing = getRuntimeValue(playerStats.name, 'tempHp', campaignName) || 0;
                             setRuntimeValue(playerStats.name, 'tempHp', Math.max(existing, tempHp), campaignName);
                         }

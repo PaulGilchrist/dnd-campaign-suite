@@ -15,6 +15,7 @@ import { computeFeatRangeEffects } from '../../services/character/featRangeServi
 import { hasAutomation } from '../../services/combat/automation/automationService.js'
 import { isExhausted } from '../../services/automation/handlers/combat/saveAttackHandler.js'
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
+import { postLogEntry } from '../../services/shared/logPoster.js';
 import { SHOW_DICE_ROLL_DELAY } from '../../config/ui-config.js';
 import CharActionModals from './CharActionModals.jsx'
 import CharActionSpellPopups from './CharActionSpellPopups.jsx'
@@ -405,63 +406,63 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     }
                 }
             }
-                // Remarkable Athlete: after critical hit, enable movement without opportunity attacks
-                if (isCrit) {
-                    const hasRemarkableAthlete = (playerStats.automation?.passives || []).some(
-                        p => p.type === 'auto_effect' && p.effect === 'remarkable_athlete_movement'
-                    );
-                    if (hasRemarkableAthlete) {
-                        setRuntimeValue(playerStats.name, 'remarkableAthleteNoOA', true, campaignName);
-                    }
-                }
-
-                // Apply attack_rider automations with weapon_attack_hit trigger (e.g. Eldritch Strike)
-                const combatSummary = await loadCombatSummary(campaignName);
-                const currentRound = combatSummary?.round ?? null;
-                const eldritchStrikes = [
-                    ...(playerStats.automation?.actions || []),
-                    ...(playerStats.automation?.passives || []),
-                ].filter(
-                    a => a.type === 'attack_rider' && a.trigger === 'weapon_attack_hit' && !a.damageExpression && a.name !== "Stalker's Flurry"
+            // Remarkable Athlete: after critical hit, enable movement without opportunity attacks
+            if (isCrit) {
+                const hasRemarkableAthlete = (playerStats.automation?.passives || []).some(
+                    p => p.type === 'auto_effect' && p.effect === 'remarkable_athlete_movement'
                 );
-                for (const rider of eldritchStrikes) {
-                    const usedKey = `_${rider.name.replace(/\s+/g, '_')}_usedRound`;
-                    const usedRound = getRuntimeValue(playerStats.name, usedKey, campaignName);
-                    const isOncePerTurn = rider.oncePerTurn;
-                    if (isOncePerTurn && usedRound === currentRound) continue;
-
-                    const cs = await getCombatContext(campaignName);
-                    const target = cs ? getTargetFromAttacker(cs, playerStats.name) : null;
-                    const targetName = target?.name || null;
-
-                    if (targetName && rider.options?.length > 0) {
-                        const option = rider.options[0];
-                        const storedEffects = getRuntimeValue(campaignName, 'targetEffects') || [];
-                        const newEffect = {
-                            target: targetName,
-                            source: rider.name,
-                            option: option.name,
-                            effect: option.effect,
-                            value: option.value || null,
-                            noOpportunityAttacks: option.noOpportunityAttacks || false,
-                            duration: 'until_start_of_next_turn',
-                        };
-                        const updatedEffects = [...storedEffects, newEffect];
-                        setRuntimeValue(campaignName, 'targetEffects', updatedEffects, campaignName);
-
-                        if (isOncePerTurn) {
-                            setRuntimeValue(playerStats.name, usedKey, currentRound, campaignName);
-                        }
-
-                        await addEntry(campaignName, {
-                            type: 'ability_use',
-                            characterName: playerStats.name,
-                            abilityName: rider.name,
-                            description: `${playerStats.name} used ${rider.name} on ${targetName}, imposing Disadvantage on the target's next saving throw.`,
-                            targetName: targetName,
-                        }).catch((e) => { console.error("[CharActions] Eldritch Strike error:", e); });
-                    }
+                if (hasRemarkableAthlete) {
+                    setRuntimeValue(playerStats.name, 'remarkableAthleteNoOA', true, campaignName);
                 }
+            }
+
+            // Apply attack_rider automations with weapon_attack_hit trigger (e.g. Eldritch Strike)
+            const combatSummary = await loadCombatSummary(campaignName);
+            const currentRound = combatSummary?.round ?? null;
+            const eldritchStrikes = [
+                ...(playerStats.automation?.actions || []),
+                ...(playerStats.automation?.passives || []),
+            ].filter(
+                a => a.type === 'attack_rider' && a.trigger === 'weapon_attack_hit' && !a.damageExpression && a.name !== "Stalker's Flurry"
+            );
+            for (const rider of eldritchStrikes) {
+                const usedKey = `_${rider.name.replace(/\s+/g, '_')}_usedRound`;
+                const usedRound = getRuntimeValue(playerStats.name, usedKey, campaignName);
+                const isOncePerTurn = rider.oncePerTurn;
+                if (isOncePerTurn && usedRound === currentRound) continue;
+
+                const cs = await getCombatContext(campaignName);
+                const target = cs ? getTargetFromAttacker(cs, playerStats.name) : null;
+                const targetName = target?.name || null;
+
+                if (targetName && rider.options?.length > 0) {
+                    const option = rider.options[0];
+                    const storedEffects = getRuntimeValue(campaignName, 'targetEffects') || [];
+                    const newEffect = {
+                        target: targetName,
+                        source: rider.name,
+                        option: option.name,
+                        effect: option.effect,
+                        value: option.value || null,
+                        noOpportunityAttacks: option.noOpportunityAttacks || false,
+                        duration: 'until_start_of_next_turn',
+                    };
+                    const updatedEffects = [...storedEffects, newEffect];
+                    setRuntimeValue(campaignName, 'targetEffects', updatedEffects, campaignName);
+
+                    if (isOncePerTurn) {
+                        setRuntimeValue(playerStats.name, usedKey, currentRound, campaignName);
+                    }
+
+                    await addEntry(campaignName, {
+                        type: 'ability_use',
+                        characterName: playerStats.name,
+                        abilityName: rider.name,
+                        description: `${playerStats.name} used ${rider.name} on ${targetName}, imposing Disadvantage on the target's next saving throw.`,
+                        targetName: targetName,
+                    }).catch((e) => { console.error("[CharActions] Eldritch Strike error:", e); });
+                }
+            }
         },
     });
 
@@ -553,8 +554,8 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         boonOfEnergyResistanceModal, setBoonOfEnergyResistanceModal,
         dragonCompanionModal, setDragonCompanionModal,
         wildMagicDoubleRollModal, setWildMagicDoubleRollModal,
-                    wildMagicTamedModal, setWildMagicTamedModal,
-                    thirdEyeModal, setThirdEyeModal,
+        wildMagicTamedModal, setWildMagicTamedModal,
+        thirdEyeModal, setThirdEyeModal,
         soulstitchSpellsModal, setSoulstitchSpellsModal,
         illusoryRealityModal, setIllusoryRealityModal,
         celestialRevelationModal, setCelestialRevelationModal,
@@ -592,6 +593,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         commanderStrikeChoiceModal, setCommanderStrikeChoiceModal,
         rallyChoiceModal, setRallyChoiceModal,
         bulwarkOfForceModal, setBulwarkOfForceModal,
+        secondaryTargetModal, setSecondaryTargetModal,
         handleAttackRiderManeuverUse,
         handleAttackRiderManeuverSkip,
         handleCombatSuperiorityConfirm,
@@ -653,7 +655,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                 abilityName: 'Cleave',
                 description: `${playerStats.name} used Cleave on ${lastAttack.attackName} against ${cleaveTargetName}`,
                 targetName: cleaveTargetName,
-            }).catch(() => {});
+            }).catch(() => { });
         } else {
             const context = {
                 targetName: cleaveTargetName,
@@ -668,7 +670,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                 abilityName: 'Cleave',
                 description: `${playerStats.name} used Cleave on ${lastAttack.attackName} against ${cleaveTargetName} — Miss`,
                 targetName: cleaveTargetName,
-            }).catch(() => {});
+            }).catch(() => { });
         }
     }, [campaignName, playerStats, rollDamage]);
 
@@ -685,7 +687,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                 abilityName: 'Tactical Master',
                 description: `${playerStats.name} used Tactical Master on ${attackName} against ${targetName} — changed mastery from ${oldMastery} to ${chosenMastery}`,
                 targetName: targetName,
-            }).catch(() => {});
+            }).catch(() => { });
         }
         const combatSummary = await getCombatContext(campaignName);
         const actualTargetName = combatSummary?.lastAttack?.targetName;
@@ -704,6 +706,62 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         window.addEventListener('soulstitch-modal-show', handler);
         return () => window.removeEventListener('soulstitch-modal-show', handler);
     }, [setSoulstitchSpellsModal]);
+
+    useEffect(() => {
+        const handler = async (event) => {
+            const { title, tempHp, campaignName: evtCampaignName, attackerName, confirmLabel: evtConfirmLabel } = event.detail;
+            const cs = await getCombatContext(evtCampaignName);
+            const allAllies = cs?.creatures?.filter(c =>
+                c.type === 'player' || c.type === 'npc' || c.type === 'monster'
+            ) || [];
+            const allyTargets = allAllies.map(c => ({
+                name: c.name,
+                currentHp: c.currentHp,
+                maxHp: c.maxHp,
+                size: c.size,
+                type: c.type,
+            }));
+            setSecondaryTargetModal({
+                title,
+                targets: allyTargets,
+                confirmLabel: evtConfirmLabel || 'Grant Temp HP',
+                onTargetSelected: async (targetName) => {
+                    const existing = getRuntimeValue(targetName, 'tempHp', evtCampaignName) || 0;
+                    setRuntimeValue(targetName, 'tempHp', Math.max(existing, tempHp), evtCampaignName);
+                    postLogEntry(evtCampaignName, {
+                        type: 'roll',
+                        characterName: attackerName,
+                        rollType: 'temp-hp',
+                        name: 'Potent Spellcasting',
+                        targetName,
+                        note: `Gained ${tempHp} temporary hit points from Potent Spellcasting`,
+                        total: tempHp,
+                        bonus: 0,
+                    });
+                    setSecondaryTargetModal(null);
+                },
+                onSkip: () => {
+                    const existing = getRuntimeValue(attackerName, 'tempHp', evtCampaignName) || 0;
+                    setRuntimeValue(attackerName, 'tempHp', Math.max(existing, tempHp), evtCampaignName);
+                    postLogEntry(evtCampaignName, {
+                        type: 'roll',
+                        characterName: attackerName,
+                        rollType: 'temp-hp',
+                        name: 'Potent Spellcasting',
+                        targetName: attackerName,
+                        note: `Gained ${tempHp} temporary hit points from Potent Spellcasting`,
+                        total: tempHp,
+                        bonus: 0,
+                    });
+                    setSecondaryTargetModal(null);
+                },
+                featureDescription: `Grant ${tempHp} temporary hit points to a creature within 60 feet.`,
+                description: 'Choose a creature to grant temporary hit points from Potent Spellcasting.',
+            });
+        };
+        window.addEventListener('potent-spellcasting-temp-hp', handler);
+        return () => window.removeEventListener('potent-spellcasting-temp-hp', handler);
+    }, [setSecondaryTargetModal]);
 
     useEffect(() => {
         const handler = (event) => {
@@ -1162,7 +1220,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         }
 
         if (result.logEntries) {
-            result.logEntries.forEach(entry => addEntry(campaignName, entry).catch(() => {}));
+            result.logEntries.forEach(entry => addEntry(campaignName, entry).catch(() => { }));
         }
 
         if (result.type === 'popup' && (auto?.type === 'temp_buff' || auto?.type === 'combat_stance')) {
@@ -1557,6 +1615,17 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     campaignName={campaignName}
                     onConfirm={handleTacticalMasterConfirm}
                     onClose={handleTacticalMasterDismiss}
+                />
+            )}
+            {secondaryTargetModal && (
+                <SecondaryTargetModal
+                    title={secondaryTargetModal.title}
+                    targets={secondaryTargetModal.targets}
+                    onTargetSelected={secondaryTargetModal.onTargetSelected}
+                    onSkip={secondaryTargetModal.onSkip}
+                    featureDescription={secondaryTargetModal.featureDescription}
+                    description={secondaryTargetModal.description}
+                    confirmLabel={secondaryTargetModal.confirmLabel}
                 />
             )}
         </div>

@@ -2,16 +2,16 @@ import { rollExpression, rollExpressionDoubled, formatDamageFormula } from '../.
 import { postLogEntry } from '../../services/shared/logPoster.js';
 import utils from '../../services/ui/utils.js';
 import {
-  computeDamageAfterSave,
-  rollSaveForCreature,
-  applyDamageToTarget,
-  clearReTriggeredSequence,
+    computeDamageAfterSave,
+    rollSaveForCreature,
+    applyDamageToTarget,
+    clearReTriggeredSequence,
 } from '../../services/rules/combat/applyDamage.js';
 import { sendSavePrompt } from '../../services/combat/conditions/savePromptService.js';
 import { getAffectedCreatures, processAoeNpcs, sendAoePlayerSaves } from '../../services/rules/combat/aoeService.js';
 import { getRuntimeValue, setRuntimeValue } from '../runtime/useRuntimeState.js';
 import { loadCombatSummary, getCombatSummary } from '../../services/encounters/combatData.js';
-import { hasIgnoreResistance, playerIsImmuneToCondition, hasGreatWeaponFighting, applyGreatWeaponFightingToDamage } from '../../services/combat/automation/automationService.js';
+import { hasIgnoreResistance, playerIsImmuneToCondition, hasGreatWeaponFighting, applyGreatWeaponFightingToDamage, evaluateAutoExpression } from '../../services/combat/automation/automationService.js';
 import { endInvisibilityOnHostileAction } from '../../services/rules/features/invisibilityService.js';
 import {
     readAoeContext,
@@ -73,10 +73,10 @@ export function createLogDamageAndShow(deps) {
             modifier,
             damageType: context?.damageType,
             targetName: context?.targetName,
-             finalDamage: 0,
-             note: 'Shield: Immune to Magic Missile',
-             isCrit,
-         });
+            finalDamage: 0,
+            note: 'Shield: Immune to Magic Missile',
+            isCrit,
+        });
         setPopupHtml({
             type: 'damage',
             name,
@@ -125,10 +125,10 @@ export function createLogDamageAndShow(deps) {
                     total: halfDamage,
                     modifier: damageResult.modifier,
                     damageType: context?.damageType,
-                     targetName: context?.targetName,
-                     isPotentCantrip: true,
-                     isCrit,
-                 });
+                    targetName: context?.targetName,
+                    isPotentCantrip: true,
+                    isCrit,
+                });
                 setPopupHtml({
                     type: 'save-damage',
                     name,
@@ -295,8 +295,53 @@ export function createLogDamageAndShow(deps) {
         let finalDamage = isSoulstitchProtected ? 0 : computeDamageAfterSave(adjustedTotal, saveResult.success, dcSuccess);
         const isCantripFlag = context?.isCantrip || false;
         const hasPotentFlag = hasPotentCantrip(context?.playerStats);
+        const hasBlessedStrikesOptions = context?.playerStats?.automation?.actions?.some(
+            a => a.type === 'damage_bonus' && a.options?.length > 0 && a.options.includes('Potent Spellcasting')
+        ) || false;
         if (!isSoulstitchProtected && hasPotentFlag && isCantripFlag && saveResult.success && dcSuccess === 'none') {
             finalDamage = Math.floor(adjustedTotal / 2);
+        }
+        if (!isSoulstitchProtected && hasBlessedStrikesOptions && isCantripFlag && !saveResult.success && dcSuccess === 'none') {
+            const playerStats = context?.playerStats;
+            if (playerStats?.automation?.actions) {
+                const allAutomation = [
+                    ...(playerStats.automation.actions || []),
+                    ...(playerStats.automation.passives || []),
+                ];
+                const cantripBonuses = playerStats.automation.actions.filter(
+                    a => a.type === 'damage_bonus' && a.options?.length > 0 && a.tempHpExpression
+                );
+                const upgradedNames = new Set(allAutomation.filter(b => b.upgrades).map(b => b.upgrades));
+                const filteredBonuses = cantripBonuses.filter(b => !upgradedNames.has(b.name));
+                for (const bonus of filteredBonuses) {
+                    const tempHp = evaluateAutoExpression(bonus.tempHpExpression, playerStats);
+                    if (tempHp && !isNaN(tempHp) && tempHp > 0) {
+                        const allies = combatSummary?.creatures?.filter(c =>
+                            c.type === 'player' || c.type === 'npc' || c.type === 'monster'
+                        ) || [];
+                        if (allies.length > 0) {
+                            const targets = allies.map(c => ({
+                                name: c.name,
+                                currentHp: c.currentHp,
+                                maxHp: c.maxHp,
+                                size: c.size,
+                                type: c.type,
+                            }));
+                            window.dispatchEvent(new CustomEvent('potent-spellcasting-temp-hp', {
+                                detail: {
+                                    title: 'Improved Blessed Strikes — Potent Spellcasting',
+                                    targets,
+                                    tempHp,
+                                    campaignName,
+                                    attackerName: characterName,
+                                    confirmLabel: 'Grant Temp HP',
+                                },
+                                bubbles: true,
+                            }));
+                        }
+                    }
+                }
+            }
         }
         const ignoreResistance = (context?.playerStats && hasIgnoreResistance(context.playerStats, damageType)) || false;
 
@@ -376,13 +421,13 @@ export function createLogDamageAndShow(deps) {
             saveBonus: saveResult.bonus,
             saveRawRolls: saveResult.rawRolls,
             mode: disadvantage ? 'disadvantage' : 'normal',
-              finalDamage: primaryApplyResult?.finalDamage ?? finalDamage,
-              note: 'combined_save_damage_roll',
-              isCrit,
-              gwfApplied: gwfDisplayRolls !== gwfBaseRolls,
-              gwfOriginalRolls: gwfDisplayRolls !== gwfBaseRolls ? gwfBaseRolls : null,
-              gwfDisplayRolls: gwfDisplayRolls,
-          };
+            finalDamage: primaryApplyResult?.finalDamage ?? finalDamage,
+            note: 'combined_save_damage_roll',
+            isCrit,
+            gwfApplied: gwfDisplayRolls !== gwfBaseRolls,
+            gwfOriginalRolls: gwfDisplayRolls !== gwfBaseRolls ? gwfBaseRolls : null,
+            gwfDisplayRolls: gwfDisplayRolls,
+        };
         if (secondaryResult) {
             logEntryData.secondaryName = secondaryResult.name;
             logEntryData.secondaryFormula = secondaryResult.formula;
@@ -553,13 +598,13 @@ export function createLogDamageAndShow(deps) {
                     saveBonus: twinSaveResult.bonus,
                     saveRawRolls: twinSaveResult.rawRolls,
                     mode: twinDisadvantage ? 'disadvantage' : 'normal',
-                     finalDamage: null,
-                     note: 'twin_save_damage_roll_before_apply',
-                     isCrit,
-            gwfApplied: gwfDisplayRolls !== gwfBaseRolls,
-            gwfOriginalRolls: gwfDisplayRolls !== gwfBaseRolls ? gwfBaseRolls : null,
-            gwfDisplayRolls: displayRolls,
-        });
+                    finalDamage: null,
+                    note: 'twin_save_damage_roll_before_apply',
+                    isCrit,
+                    gwfApplied: gwfDisplayRolls !== gwfBaseRolls,
+                    gwfOriginalRolls: gwfDisplayRolls !== gwfBaseRolls ? gwfBaseRolls : null,
+                    gwfDisplayRolls: displayRolls,
+                });
 
                 await new Promise(resolve => setTimeout(resolve, 500));
 
@@ -612,12 +657,12 @@ export function createLogDamageAndShow(deps) {
                         saveBonus: multiSaveResult.bonus,
                         saveRawRolls: multiSaveResult.rawRolls,
                         mode: 'normal',
-                         finalDamage: null,
-                         note: 'multi_save_damage_roll_before_apply',
-                         isCrit,
-                         gwfApplied: gwfDisplayRolls !== gwfBaseRolls,
-                         gwfOriginalRolls: gwfDisplayRolls !== gwfBaseRolls ? gwfBaseRolls : null,
-                     });
+                        finalDamage: null,
+                        note: 'multi_save_damage_roll_before_apply',
+                        isCrit,
+                        gwfApplied: gwfDisplayRolls !== gwfBaseRolls,
+                        gwfOriginalRolls: gwfDisplayRolls !== gwfBaseRolls ? gwfBaseRolls : null,
+                    });
 
                     await new Promise(resolve => setTimeout(resolve, 500));
 
@@ -647,11 +692,11 @@ export function createLogDamageAndShow(deps) {
                         total,
                         modifier,
                         damageType,
-                         targetName: multiTarget.name,
-                         finalDamage: null,
-                         note: 'multi_plain_damage_roll_before_apply',
-                         isCrit,
-                     });
+                        targetName: multiTarget.name,
+                        finalDamage: null,
+                        note: 'multi_plain_damage_roll_before_apply',
+                        isCrit,
+                    });
 
                     await new Promise(resolve => setTimeout(resolve, 500));
 
