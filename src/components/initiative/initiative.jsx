@@ -664,6 +664,27 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
                     const hasTacticalShift = stats?.automation?.passives?.some(p => p.type === 'passive_rule' && p.effect === 'tactical_shift_no_oa')
                     const hasSpeedyOpportunityDisadvantage = stats?.automation?.passives?.some(p => p.type === 'passive_rule' && p.effect === 'opportunity_attacks_disadvantage')
                     const hasSpeedyDifficultTerrainIgnore = stats?.automation?.passives?.some(p => p.type === 'passive_rule' && p.effect === 'ignore_difficult_terrain_on_dash')
+                    const coronaDisadvantage = (() => {
+                        const playerNames = (combatSummary?.creatures || [])
+                            .filter(c => c.type === 'player')
+                            .map(c => c.name)
+                        let result = false
+                        for (const playerName of playerNames) {
+                            const buffs = getRuntimeValue(playerName, 'activeBuffs', campaignName) || []
+                            const coronaBuff = Array.isArray(buffs) ? buffs.find(b => b.effect === 'sunlight_aura') : null
+                            if (!coronaBuff) continue
+                            const storedEnemies = getRuntimeValue(playerName, 'coronaOfLightEnemies', campaignName) || []
+                            if (storedEnemies.length === 0) {
+                                result = true
+                                break
+                            }
+                            if (storedEnemies.includes(creature.name)) {
+                                result = true
+                                break
+                            }
+                        }
+                        return result
+                    })()
                     return (
                         <CreatureCard
                             key={creature.name}
@@ -690,6 +711,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
                             hasTacticalShift={hasTacticalShift}
                             hasSpeedyOpportunityDisadvantage={hasSpeedyOpportunityDisadvantage}
                             hasSpeedyDifficultTerrainIgnore={hasSpeedyDifficultTerrainIgnore}
+                            coronaDisadvantage={coronaDisadvantage}
                         />
                     )
                 })}

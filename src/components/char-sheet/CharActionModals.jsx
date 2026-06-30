@@ -45,6 +45,7 @@ import CombatSuperiorityModal from './modals/CombatSuperiorityModal.jsx'
 import AttackRiderManeuverPrompt from './modals/AttackRiderManeuverPrompt.jsx'
 import SecondaryTargetModal from './modals/shared/SecondaryTargetModal.jsx'
 import BulwarkOfForceModal from './modals/BulwarkOfForceModal.jsx'
+import CoronaEnemySelectionModal from './modals/CoronaEnemySelectionModal.jsx'
 import { handleClearWard, handleSpendDice, handleApply } from '../../services/automation/handlers/class-cleric-paladin/bastionOfLawHandler.js'
 
 export default function CharActionModals({
@@ -129,6 +130,8 @@ export default function CharActionModals({
     handleRallyChoiceConfirm,
     bulwarkOfForceModal, setBulwarkOfForceModal,
     handleBulwarkOfForceConfirm,
+    coronaEnemySelectionModal, setCoronaEnemySelectionModal,
+    handleCoronaEnemySelectionConfirm,
     handleDivineInterventionCast,
     pendingDamageRef,
 }) {
@@ -633,6 +636,13 @@ export default function CharActionModals({
                     maxTargets={bulwarkOfForceModal.maxTargets}
                     onConfirm={handleBulwarkOfForceConfirm}
                     onSkip={() => setBulwarkOfForceModal(null)}
+                />
+            )}
+            {coronaEnemySelectionModal && (
+                <CoronaEnemySelectionModal
+                    creatureTargets={coronaEnemySelectionModal.creatureTargets}
+                    onConfirm={handleCoronaEnemySelectionConfirm}
+                    onSkip={() => setCoronaEnemySelectionModal(null)}
                 />
             )}
         </>

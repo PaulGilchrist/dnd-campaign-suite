@@ -11,11 +11,16 @@ vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(),
 }))
 
+vi.mock('../../encounters/combatData.js', () => ({
+  getCombatSummary: vi.fn(),
+}))
+
 // ── Imports ─────────────────────────────────────────────────────
 
 import { getCoronaSaveDisadvantage } from './coronaAuraUtils.js'
 import { getDistanceFeet } from '../../rules/combat/rangeValidation.js'
 import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js'
+import { getCombatSummary } from '../../encounters/combatData.js'
 
 // ── Helpers ─────────────────────────────────────────────────────
 
@@ -39,7 +44,11 @@ describe('getCoronaSaveDisadvantage', () => {
   beforeEach(() => {
     getRuntimeValue.mockReset()
     getDistanceFeet.mockReset()
-    getRuntimeValue.mockReturnValue([])
+    getCombatSummary.mockReset()
+    getRuntimeValue.mockImplementation((_name, key) => {
+      if (key === 'coronaOfLightEnemies') return []
+      return []
+    })
   })
 
   // ── Early returns: invalid mapData / no players ──────────────
@@ -613,6 +622,221 @@ describe('getCoronaSaveDisadvantage', () => {
         skipRangeCheck: false,
       })
       expect(result).toEqual({ disadvantage: true, source: 'Paladin' })
+    })
+  })
+
+  // ── getCombatSummary fallback ─────────────────────────────────
+
+  describe('getCombatSummary fallback when mapData is unavailable', () => {
+    it('falls back to getCombatSummary when mapData is undefined and skipRangeCheck is true', () => {
+      getCombatSummary.mockReturnValue({
+        creatures: [
+          { name: 'Target', type: 'player' },
+          { name: 'Paladin', type: 'player' },
+        ],
+      })
+      getRuntimeValue.mockImplementation((name) =>
+        name === 'Paladin' ? [makeCoronaBuff()] : [],
+      )
+
+      const result = getCoronaSaveDisadvantage({
+        targetName: 'Target',
+        campaignName: 'test',
+        mapData: undefined,
+        damageType: null,
+        skipRangeCheck: true,
+      })
+      expect(result).toEqual({ disadvantage: true, source: 'Paladin' })
+    })
+
+    it('falls back to getCombatSummary when mapData is null and skipRangeCheck is true', () => {
+      getCombatSummary.mockReturnValue({
+        creatures: [
+          { name: 'Target', type: 'player' },
+          { name: 'Paladin', type: 'player' },
+        ],
+      })
+      getRuntimeValue.mockImplementation((name) =>
+        name === 'Paladin' ? [makeCoronaBuff()] : [],
+      )
+
+      const result = getCoronaSaveDisadvantage({
+        targetName: 'Target',
+        campaignName: 'test',
+        mapData: null,
+        damageType: null,
+        skipRangeCheck: true,
+      })
+      expect(result).toEqual({ disadvantage: true, source: 'Paladin' })
+    })
+
+    it('returns false when getCombatSummary returns no player creatures', () => {
+      getCombatSummary.mockReturnValue({
+        creatures: [
+          { name: 'Goblin', type: 'npc' },
+          { name: 'Ogre', type: 'npc' },
+        ],
+      })
+
+      const result = getCoronaSaveDisadvantage({
+        targetName: 'Goblin',
+        campaignName: 'test',
+        mapData: undefined,
+        damageType: null,
+        skipRangeCheck: true,
+      })
+      expect(result).toEqual({ disadvantage: false })
+    })
+
+    it('falls back to getCombatSummary when mapData.players is empty and skipRangeCheck is true', () => {
+      getCombatSummary.mockReturnValue({
+        creatures: [
+          { name: 'Target', type: 'player' },
+          { name: 'Paladin', type: 'player' },
+        ],
+      })
+      getRuntimeValue.mockImplementation((name) =>
+        name === 'Paladin' ? [makeCoronaBuff()] : [],
+      )
+
+      const result = getCoronaSaveDisadvantage({
+        targetName: 'Target',
+        campaignName: 'test',
+        mapData: makeMapData([]),
+        damageType: null,
+        skipRangeCheck: true,
+      })
+      expect(result).toEqual({ disadvantage: true, source: 'Paladin' })
+    })
+  })
+
+  // ── NPC target path ───────────────────────────────────────────
+
+  describe('NPC target path (range check mode)', () => {
+    it('finds NPC target in placedItems', () => {
+      getRuntimeValue.mockReturnValue([makeCoronaBuff()])
+      getDistanceFeet.mockReturnValue(30)
+
+      const result = getCoronaSaveDisadvantage({
+        targetName: 'Goblin',
+        campaignName: 'test',
+        mapData: {
+          players: [makePlayer('Paladin', 2, 3)],
+          placedItems: [{ name: 'Goblin', gridX: 7, gridY: 11 }],
+        },
+        damageType: null,
+        skipRangeCheck: false,
+      })
+      expect(result).toEqual({ disadvantage: true, source: 'Paladin' })
+    })
+
+    it('returns false when NPC target is not in placedItems', () => {
+      const result = getCoronaSaveDisadvantage({
+        targetName: 'Goblin',
+        campaignName: 'test',
+        mapData: {
+          players: [makePlayer('Paladin', 2, 3)],
+          placedItems: [{ name: 'Ogre', gridX: 7, gridY: 11 }],
+        },
+        damageType: null,
+        skipRangeCheck: false,
+      })
+      expect(result).toEqual({ disadvantage: false })
+    })
+  })
+
+  // ── Enemy list filtering ──────────────────────────────────────
+
+  describe('enemy list filtering', () => {
+    it('applies disadvantage only to creatures in the stored enemy list', () => {
+      getCombatSummary.mockReturnValue({
+        creatures: [
+          { name: 'Target', type: 'player' },
+          { name: 'Paladin', type: 'player' },
+        ],
+      })
+      getRuntimeValue.mockImplementation((name, key, _campaign) => {
+        if (key === 'activeBuffs' && name === 'Paladin') return [makeCoronaBuff()]
+        if (key === 'coronaOfLightEnemies') return ['Target']
+        return []
+      })
+
+      const result = getCoronaSaveDisadvantage({
+        targetName: 'Target',
+        campaignName: 'test',
+        mapData: undefined,
+        damageType: 'Fire',
+        skipRangeCheck: true,
+      })
+      expect(result).toEqual({ disadvantage: true, source: 'Paladin' })
+    })
+
+    it('skips creatures not in the stored enemy list', () => {
+      getCombatSummary.mockReturnValue({
+        creatures: [
+          { name: 'Target', type: 'player' },
+          { name: 'Ally', type: 'player' },
+          { name: 'Paladin', type: 'player' },
+        ],
+      })
+      getRuntimeValue.mockImplementation((name, key, _campaign) => {
+        if (key === 'activeBuffs' && name === 'Paladin') return [makeCoronaBuff()]
+        if (key === 'coronaOfLightEnemies') return ['Target']
+        return []
+      })
+
+      const result = getCoronaSaveDisadvantage({
+        targetName: 'Ally',
+        campaignName: 'test',
+        mapData: undefined,
+        damageType: 'Fire',
+        skipRangeCheck: true,
+      })
+      expect(result).toEqual({ disadvantage: false })
+    })
+
+    it('applies to all creatures when enemy list is empty (backward compatibility)', () => {
+      getCombatSummary.mockReturnValue({
+        creatures: [
+          { name: 'Target', type: 'player' },
+          { name: 'Paladin', type: 'player' },
+        ],
+      })
+      getRuntimeValue.mockImplementation((name, key, _campaign) => {
+        if (key === 'activeBuffs' && name === 'Paladin') return [makeCoronaBuff()]
+        return []
+      })
+
+      const result = getCoronaSaveDisadvantage({
+        targetName: 'Target',
+        campaignName: 'test',
+        mapData: undefined,
+        damageType: 'Fire',
+        skipRangeCheck: true,
+      })
+      expect(result).toEqual({ disadvantage: true, source: 'Paladin' })
+    })
+
+    it('skips caster even if in enemy list', () => {
+      getCombatSummary.mockReturnValue({
+        creatures: [
+          { name: 'Paladin', type: 'player' },
+        ],
+      })
+      getRuntimeValue.mockImplementation((name, key, _campaign) => {
+        if (key === 'activeBuffs' && name === 'Paladin') return [makeCoronaBuff()]
+        if (key === 'coronaOfLightEnemies') return ['Paladin']
+        return []
+      })
+
+      const result = getCoronaSaveDisadvantage({
+        targetName: 'Paladin',
+        campaignName: 'test',
+        mapData: undefined,
+        damageType: 'Fire',
+        skipRangeCheck: true,
+      })
+      expect(result).toEqual({ disadvantage: false })
     })
   })
 })

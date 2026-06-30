@@ -32,6 +32,7 @@ import { getTargetFromAttacker, getCombatContext, getAttackerTargetName } from '
 import { loadCombatSummary } from '../../services/encounters/combatData.js';
 import { executeSweepingAttack, executeBaitAndSwitchChoice, executeCommanderStrikeChoice, executeRallyChoice } from '../../services/automation/handlers/class-fighter-rogue/combatSuperiorityHandler.js';
 import { activateBulwarkOfForce } from '../../services/automation/handlers/class-sorcerer/bulwarkOfForceHandler.js';
+import { activateCoronaOfLight } from '../../services/automation/handlers/class-cleric-paladin/coronaOfLightHandler.js';
 import { endFriendsOnHostileAction } from '../../services/rules/features/friendsService.js';
 import { endInvisibilityOnHostileAction } from '../../services/rules/features/invisibilityService.js';
 import { applyDamageToTarget } from '../../services/rules/combat/applyDamage.js';
@@ -574,6 +575,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         commanderStrikeChoiceModal, setCommanderStrikeChoiceModal,
         rallyChoiceModal, setRallyChoiceModal,
         bulwarkOfForceModal, setBulwarkOfForceModal,
+        coronaEnemySelectionModal, setCoronaEnemySelectionModal,
         secondaryTargetModal, setSecondaryTargetModal,
         handleAttackRiderManeuverUse,
         handleAttackRiderManeuverSkip,
@@ -923,6 +925,20 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         setBulwarkOfForceModal(null);
     }, [setPopupHtml, bulwarkOfForceModal, setBulwarkOfForceModal]);
 
+    const handleCoronaEnemySelectionConfirm = React.useCallback(async (selectedEnemies) => {
+        if (!selectedEnemies || !coronaEnemySelectionModal) return;
+        const result = await activateCoronaOfLight(
+            coronaEnemySelectionModal.action,
+            coronaEnemySelectionModal.playerStats,
+            coronaEnemySelectionModal.campaignName,
+            selectedEnemies
+        );
+        if (result?.payload) {
+            setPopupHtml(result.payload);
+        }
+        setCoronaEnemySelectionModal(null);
+    }, [setPopupHtml, coronaEnemySelectionModal, setCoronaEnemySelectionModal]);
+
     async function handleAutomationAction(action) {
         if (cannotAct) return;
 
@@ -1129,6 +1145,9 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                         break;
                     case 'bulwarkOfForceTarget':
                         setBulwarkOfForceModal(result.payload);
+                        break;
+                    case 'coronaEnemySelection':
+                        setCoronaEnemySelectionModal(result.payload);
                         break;
                     case 'arcaneWardRestore':
                         setArcaneWardRestoreModal(result.payload);
@@ -1431,6 +1450,8 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     handleRallyChoiceConfirm={handleRallyChoiceConfirm}
                     bulwarkOfForceModal={bulwarkOfForceModal} setBulwarkOfForceModal={setBulwarkOfForceModal}
                     handleBulwarkOfForceConfirm={handleBulwarkOfForceConfirm}
+                    coronaEnemySelectionModal={coronaEnemySelectionModal} setCoronaEnemySelectionModal={setCoronaEnemySelectionModal}
+                    handleCoronaEnemySelectionConfirm={handleCoronaEnemySelectionConfirm}
                     handleCombatSuperiorityConfirm={handleCombatSuperiorityConfirm}
                     handleAttackRiderManeuverUse={handleAttackRiderManeuverUse}
                     handleAttackRiderManeuverSkip={handleAttackRiderManeuverSkip}

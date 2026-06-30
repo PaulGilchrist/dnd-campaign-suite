@@ -5,7 +5,7 @@ import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRunt
  *
  * For round-limited durations like "until_start_of_next_turn", the caller
  * MUST also register an expiration via addExpiration(attacker, target,
- * [{ type: 'remove_active_buff', buffName }], campaignName) so the buff
+ * [{ type: 'remove_active_buff', buffName }], campaignName, rounds) so the buff
  * is auto-cleared when expireStaleEffects runs on round advance.
  *
  * See buffAllyHandler.js for a complete example of this pattern.

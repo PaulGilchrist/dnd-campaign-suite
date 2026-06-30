@@ -41,6 +41,7 @@ function CreatureCard({
     hasTacticalShift,
     hasSpeedyOpportunityDisadvantage,
     hasSpeedyDifficultTerrainIgnore,
+    coronaDisadvantage,
 }) {
     const isUnconscious = creature.currentHp <= 0
     const allTargetEffects = useRuntimeValue(campaignName, 'targetEffects') ?? [];
@@ -150,7 +151,7 @@ function CreatureCard({
                         </div>
                     )
                 })}
-                <ConditionEffectBadges conditions={creature.conditions} targetEffects={myTargetEffects} creatureName={creature.name} campaignName={campaignName} hasTacticalShift={hasTacticalShift} hasSpeedyOpportunityDisadvantage={hasSpeedyOpportunityDisadvantage} hasSpeedyDifficultTerrainIgnore={hasSpeedyDifficultTerrainIgnore} isLocalhost={isLocalhost} />
+                <ConditionEffectBadges conditions={creature.conditions} targetEffects={myTargetEffects} creatureName={creature.name} campaignName={campaignName} hasTacticalShift={hasTacticalShift} hasSpeedyOpportunityDisadvantage={hasSpeedyOpportunityDisadvantage} hasSpeedyDifficultTerrainIgnore={hasSpeedyDifficultTerrainIgnore} isLocalhost={isLocalhost} coronaDisadvantage={coronaDisadvantage} />
                 {isLocalhost && (
                     <button
                         className='condition-add-btn'

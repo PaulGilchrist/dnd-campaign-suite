@@ -377,7 +377,7 @@ describe('processAoeNpcs', () => {
       6, 'Fire', 15, 'dexterity', 'half', 'TestCampaign', 'TestHero'
     );
 
-    expect(rollSaveForCreature).toHaveBeenCalledWith(npc, 'dexterity', 15);
+    expect(rollSaveForCreature).toHaveBeenCalledWith(npc, 'dexterity', 15, false);
   });
 
   it('handles mixed NPC and player in affected list — only processes NPCs', () => {
@@ -513,6 +513,7 @@ describe('sendAoePlayerSaves', () => {
       sourceName: 'Fireball',
       sourceAttackerName: 'Wizard',
       rawDamage: 8,
+      disadvantage: false,
     });
   });
 
@@ -599,6 +600,7 @@ describe('sendAoePlayerSaves', () => {
       sourceName: 'Guiding Bolt',
       sourceAttackerName: 'Cleric',
       rawDamage: 7,
+      disadvantage: false,
     });
   });
 
@@ -621,6 +623,7 @@ describe('sendAoePlayerSaves', () => {
       sourceName: '',
       sourceAttackerName: '',
       rawDamage: 5,
+      disadvantage: false,
     });
   });
 });

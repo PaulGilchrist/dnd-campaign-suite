@@ -66,6 +66,7 @@ export default function useCharActionModals({
     const [commanderStrikeChoiceModal, setCommanderStrikeChoiceModal] = useState(null);
     const [rallyChoiceModal, setRallyChoiceModal] = useState(null);
     const [bulwarkOfForceModal, setBulwarkOfForceModal] = useState(null);
+    const [coronaEnemySelectionModal, setCoronaEnemySelectionModal] = useState(null);
     const [secondaryTargetModal, setSecondaryTargetModal] = useState(null);
 
     const pendingDamageRef = useRef(null);
@@ -178,6 +179,7 @@ export default function useCharActionModals({
         commanderStrikeChoiceModal, setCommanderStrikeChoiceModal,
         rallyChoiceModal, setRallyChoiceModal,
         bulwarkOfForceModal, setBulwarkOfForceModal,
+        coronaEnemySelectionModal, setCoronaEnemySelectionModal,
         secondaryTargetModal, setSecondaryTargetModal,
         resolveAttackDamage,
         handleMasteryClose,

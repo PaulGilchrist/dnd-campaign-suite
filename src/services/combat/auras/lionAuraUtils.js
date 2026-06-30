@@ -1,14 +1,22 @@
 import { getDistanceFeet } from '../../rules/combat/rangeValidation.js';
 import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
+import { getCombatSummary } from '../../encounters/combatData.js';
+
+function getPlayersList(mapData, campaignName) {
+    if (mapData?.players?.length) return mapData.players;
+    const combatSummary = getCombatSummary(campaignName);
+    return combatSummary?.creatures?.filter(c => c.type === 'player') || [];
+}
 
 export function getLionDisadvantageAgainst({ attackerName, campaignName, mapData, skipRangeCheck }) {
-    if (!skipRangeCheck && (!mapData?.players?.length)) return { disadvantage: false };
+    const players = getPlayersList(mapData, campaignName);
+    if (!skipRangeCheck && !players.length) return { disadvantage: false };
 
     if (!skipRangeCheck) {
-        const attacker = mapData.players.find(p => p.name === attackerName);
+        const attacker = players.find(p => p.name === attackerName);
         if (!attacker) return { disadvantage: false };
 
-        for (const player of mapData.players) {
+        for (const player of players) {
             if (player.name === attackerName) continue;
             const buffs = getRuntimeValue(player.name, 'activeBuffs', campaignName) || [];
             const lionBuff = Array.isArray(buffs) ? buffs.find(b => b.optionName === 'Lion') : null;
@@ -26,7 +34,7 @@ export function getLionDisadvantageAgainst({ attackerName, campaignName, mapData
             }
         }
     } else {
-        for (const player of (mapData?.players || [])) {
+        for (const player of players) {
             if (player.name === attackerName) continue;
             const buffs = getRuntimeValue(player.name, 'activeBuffs', campaignName) || [];
             const lionBuff = Array.isArray(buffs) ? buffs.find(b => b.optionName === 'Lion') : null;

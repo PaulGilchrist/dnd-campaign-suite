@@ -3,6 +3,7 @@ import { rollSaveForCreature, computeDamageAfterSave, applyDamageToTarget } from
 import { sendSavePrompt } from '../../combat/conditions/savePromptService.js';
 import utils from '../../ui/utils.js';
 import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
+import { getCoronaSaveDisadvantage } from '../../combat/auras/coronaAuraUtils.js';
 
 function hasSoulstitchProtection(targetName, attackerName, campaignName) {
     if (!attackerName) return false;
@@ -39,7 +40,17 @@ export function processAoeNpcs(combatSummary, affected, rawDamage, damageType, s
   const results = [];
   for (const { creature } of affected) {
     if (creature.type !== 'npc') continue;
-    const saveResult = rollSaveForCreature(creature, saveType, saveDc);
+    let disadvantage = false;
+    const coronaResult = getCoronaSaveDisadvantage({
+      targetName: creature.name,
+      campaignName,
+      damageType,
+      skipRangeCheck: true,
+    });
+    if (coronaResult.disadvantage) {
+      disadvantage = true;
+    }
+    const saveResult = rollSaveForCreature(creature, saveType, saveDc, disadvantage);
     const isSoulstitchProtected = hasSoulstitchProtection(creature.name, attackerName, campaignName);
     const finalDamage = isSoulstitchProtected ? 0 : computeDamageAfterSave(rawDamage, saveResult.success, dcSuccess);
     const applyResult = applyDamageToTarget(combatSummary, creature.name, finalDamage, [damageType], campaignName, characters, false, attackerName);
@@ -68,6 +79,14 @@ export function sendAoePlayerSaves(affected, rawDamage, damageType, saveDc, save
       creature,
      });
 
+    const coronaResult = getCoronaSaveDisadvantage({
+      targetName: creature.name,
+      campaignName,
+      damageType,
+      skipRangeCheck: true,
+    });
+    const disadvantage = coronaResult.disadvantage || false;
+
     sendSavePrompt(campaignName, {
       promptId,
       targetName: creature.name,
@@ -79,6 +98,7 @@ export function sendAoePlayerSaves(affected, rawDamage, damageType, saveDc, save
       sourceName: spellName,
       sourceAttackerName: attackerName,
       rawDamage,
+      disadvantage,
     });
   }
   return pendingList;

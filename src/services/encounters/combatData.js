@@ -44,8 +44,7 @@ export async function loadActiveCreatureName(campaignName) {
 export function getActiveCreatureName(campaignName) {
   const cs = getCombatSummary(campaignName)
   if (cs?.activeCreatureName) return cs.activeCreatureName
-  // Fallback: read from character change data storage
-  return null  // storage.get is async, so we can't use it here
+  return null
 }
 
 export async function loadCurrentCombatRound(campaignName) {

@@ -84,6 +84,11 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         return handleVowOfEnmity(action, playerStats, campaignName, _mapName);
     }
 
+    // Corona of Light: defer to modal for enemy selection
+    if (auto?.effect === 'sunlight_aura') {
+        return handleCoronaOfLight(action, playerStats, campaignName, _mapName);
+    }
+
     let targetName = playerStats.name;
     if (auto?.target === 'willing_creature') {
         const combatSummary = getCombatSummary(campaignName);
@@ -175,6 +180,47 @@ export async function handle(action, playerStats, campaignName, _mapName) {
                 ? `${action.name} toggled OFF`
                 : `${action.name} activated on ${displayTarget} (${auto.duration || '10 min'})`,
             automation: auto,
+        },
+    };
+}
+
+async function handleCoronaOfLight(action, playerStats, campaignName, _mapName) {
+    const auto = action.automation;
+    const playerName = playerStats.name;
+
+    // Check if corona is already active
+    const storedBuffs = getRuntimeValue(playerName, 'activeBuffs', campaignName);
+    const activeBuffs = Array.isArray(storedBuffs) ? storedBuffs : [];
+    const wasActive = activeBuffs.some(b => b.effect === 'sunlight_aura');
+
+    if (wasActive) {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: action.name,
+                description: `${action.name} is already active.`,
+                automation: auto,
+            },
+        };
+    }
+
+    // Gather creature targets from combat context (exclude self)
+    const combatSummary = getCombatSummary(campaignName);
+    const creatureTargets = combatSummary?.creatures
+        ? combatSummary.creatures
+            .filter(c => c.name !== playerName)
+            .map(c => ({ name: c.name }))
+        : [];
+
+    return {
+        type: 'modal',
+        modalName: 'coronaEnemySelection',
+        payload: {
+            action,
+            playerStats,
+            campaignName,
+            creatureTargets,
         },
     };
 }

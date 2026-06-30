@@ -60,6 +60,16 @@ function App() {
       const cs = await loadCombatSummary(campaignNameRef.current);
       if (cs) {
         setCombatSummaryCache(cs, campaignNameRef.current);
+      } else if (loaded.length > 0) {
+        // No combat data on server yet — initialize from player characters
+        const creatures = loaded.map(c => ({
+          name: c.name,
+          type: 'player',
+          currentHp: c.computedStats?.hp?.current || c.hp?.current || 1,
+          maxHp: c.computedStats?.hp?.max || c.hp?.max || 1,
+        }));
+        const initial = { round: 1, creatures };
+        setCombatSummaryCache(initial, campaignNameRef.current);
       }
     });
     campaignRef.current.setDeleteCampaignCallback(() => { charMgmtRef.current.setCharacters([]); charMgmtRef.current.setActiveCharacter(null); });

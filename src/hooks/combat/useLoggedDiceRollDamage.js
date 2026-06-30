@@ -20,6 +20,7 @@ import {
     hasSoulstitchProtection,
     applyMinDamageAdjustment,
 } from './loggedDiceRollUtils.js';
+import { getCoronaSaveDisadvantage } from '../../services/combat/auras/coronaAuraUtils.js';
 
 function handleOverchannelSelfDamage(characterName, campaignName, context, logEntry, characters) {
     if (context?.overchannelActive) {
@@ -287,6 +288,17 @@ export function createLogDamageAndShow(deps) {
                 setRuntimeValue(campaignName, 'targetEffects', targetEffects, campaignName);
             }
         }
+        if (!disadvantage) {
+            const coronaResult = getCoronaSaveDisadvantage({
+                targetName: target.name,
+                campaignName,
+                damageType,
+                skipRangeCheck: true,
+            });
+            if (coronaResult.disadvantage) {
+                disadvantage = true;
+            }
+        }
         const isSoulstitchProtected = hasSoulstitchProtection(target.name, characterName, campaignName);
         const targetCharacter = (characters || []).find(c => utils.getName(c.name) === target.name);
         const targetSaveModifiers = targetCharacter?.saveModifiers || targetCharacter?.computedStats?.saveModifiers || [];
@@ -364,7 +376,18 @@ export function createLogDamageAndShow(deps) {
                 }
                 let secondarySaveResult = saveResult;
                 if (context.saveDc && context.saveType) {
-                    const secondaryDisadvantage = context.metamagicHeighten || false;
+                    let secondaryDisadvantage = context.metamagicHeighten || false;
+                    if (!secondaryDisadvantage) {
+                        const coronaResult = getCoronaSaveDisadvantage({
+                            targetName: target.name,
+                            campaignName,
+                            damageType: secondaryDamageType,
+                            skipRangeCheck: true,
+                        });
+                        if (coronaResult.disadvantage) {
+                            secondaryDisadvantage = true;
+                        }
+                    }
                     secondarySaveResult = rollSaveForCreature(target, context.saveType, context.saveDc, secondaryDisadvantage, advantage);
                 }
                 let secondaryRawDamage = isSoulstitchProtected ? 0 : computeDamageAfterSave(secondaryTotal, secondarySaveResult.success, context.dcSuccess);
@@ -565,6 +588,17 @@ export function createLogDamageAndShow(deps) {
                         twinDisadvantage = true;
                         targetEffects.splice(riderEffectIdx, 1);
                         setRuntimeValue(campaignName, 'targetEffects', targetEffects, campaignName);
+                    }
+                }
+                if (!twinDisadvantage) {
+                    const coronaResult = getCoronaSaveDisadvantage({
+                        targetName: twinTarget.name,
+                        campaignName,
+                        damageType,
+                        skipRangeCheck: true,
+                    });
+                    if (coronaResult.disadvantage) {
+                        twinDisadvantage = true;
                     }
                 }
                 const twinCharacter = (characters || []).find(c => utils.getName(c.name) === twinTarget.name);
@@ -841,10 +875,18 @@ export function createLogDamageAndShow(deps) {
         }
 
         const promptId = utils.guid();
+        const coronaDisadvantage = getCoronaSaveDisadvantage({
+            targetName: target.name,
+            campaignName,
+            damageType,
+            skipRangeCheck: true,
+        }).disadvantage || false;
+        const saveDisadvantage = (context?.metamagicHeighten || false) || coronaDisadvantage;
+
         pendingSaves[promptId] = {
             targetName: target.name, rawDamage: adjustedTotal, saveDc, saveType, dcSuccess,
             damageType, attackerName: attackerName || characterName, name, formula, modifier, rolls, campaignName, setPopupHtml,
-            metamagicHeighten: context?.metamagicHeighten || false,
+            metamagicHeighten: saveDisadvantage,
             isCantrip: context?.isCantrip || false,
             overchannelActive: context?.overchannelActive || false,
             overchannelUseCount: context?.overchannelUseCount || 0,
@@ -867,7 +909,7 @@ export function createLogDamageAndShow(deps) {
             sourceName: name,
             sourceAttackerName: attackerName || characterName,
             rawDamage: adjustedTotal,
-            disadvantage: context?.metamagicHeighten || false,
+            disadvantage: saveDisadvantage,
         });
 
         logEntry({

@@ -9,7 +9,7 @@ function getEffectDescription(label) {
     return label
 }
 
-function ConditionEffectBadges({ conditions, targetEffects = [], creatureName, campaignName, hasTacticalShift, hasSpeedyOpportunityDisadvantage, hasSpeedyDifficultTerrainIgnore, isLocalhost }) {
+function ConditionEffectBadges({ conditions, targetEffects = [], creatureName, campaignName, hasTacticalShift, hasSpeedyOpportunityDisadvantage, hasSpeedyDifficultTerrainIgnore, isLocalhost, coronaDisadvantage }) {
     const condKeys = (conditions || []).map(c => c.key)
     const effects = computeConditionEffects(condKeys, [], targetEffects)
     const badges = []
@@ -31,6 +31,9 @@ function ConditionEffectBadges({ conditions, targetEffects = [], creatureName, c
     }
     if (hasSpeedyDifficultTerrainIgnore) {
         badges.push({ label: 'No Difficult Terrain on Dash', cls: 'effect-cannot-act', icon: 'fa-person-walking', removable: false })
+    }
+    if (coronaDisadvantage) {
+        badges.push({ label: 'Disadv Fire/Radiant', cls: 'effect-disadvantage', icon: 'fa-sun', removable: false })
     }
 
     const handleRemoveEffect = (effectType) => {
