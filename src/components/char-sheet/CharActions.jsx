@@ -578,6 +578,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         bulwarkOfForceModal, setBulwarkOfForceModal,
         coronaEnemySelectionModal, setCoronaEnemySelectionModal,
         radianceOfDawnModal, setRadianceOfDawnModal,
+        tricksterBlessingModal, setTricksterBlessingModal,
         secondaryTargetModal, setSecondaryTargetModal,
         handleAttackRiderManeuverUse,
         handleAttackRiderManeuverSkip,
@@ -955,6 +956,44 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         setRadianceOfDawnModal(null);
     }, [setPopupHtml, radianceOfDawnModal, setRadianceOfDawnModal]);
 
+    const handleTricksterBlessingConfirm = React.useCallback(async (targetName) => {
+        if (!tricksterBlessingModal) return;
+        const { action, playerStats, campaignName: evtCampaignName } = tricksterBlessingModal;
+        const auto = action.automation;
+        const featureName = action.name || 'Blessing of the Trickster';
+
+        const resolvedTarget = targetName || playerStats.name;
+
+        const { toggleBuff } = await import('../../services/automation/common/buffToggle.js');
+        const { wasActive } = toggleBuff(
+            resolvedTarget,
+            featureName,
+            auto,
+            evtCampaignName,
+            resolvedTarget
+        );
+
+        if (!wasActive) {
+            postLogEntry(evtCampaignName, {
+                type: 'ability_use',
+                characterName: playerStats.name,
+                abilityName: featureName,
+                description: `Blessing granted to ${resolvedTarget} with advantage on Stealth checks.`,
+            });
+        }
+
+        setPopupHtml({
+            type: 'automation_info',
+            name: featureName,
+            automationType: auto?.type,
+            description: wasActive
+                ? `${featureName} toggled OFF`
+                : `${featureName} activated on ${resolvedTarget === playerStats.name ? 'yourself' : resolvedTarget} (${auto?.duration || '1 hour'})`,
+            automation: auto,
+        });
+        setTricksterBlessingModal(null);
+    }, [setPopupHtml, tricksterBlessingModal, setTricksterBlessingModal]);
+
     async function handleAutomationAction(action) {
         if (cannotAct) return;
 
@@ -1167,6 +1206,9 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                         break;
                     case 'radianceOfDawn':
                         setRadianceOfDawnModal(result.payload);
+                        break;
+                    case 'tricksterBlessing':
+                        setTricksterBlessingModal(result.payload);
                         break;
                     case 'arcaneWardRestore':
                         setArcaneWardRestoreModal(result.payload);
@@ -1473,6 +1515,8 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     handleCoronaEnemySelectionConfirm={handleCoronaEnemySelectionConfirm}
                     radianceOfDawnModal={radianceOfDawnModal} setRadianceOfDawnModal={setRadianceOfDawnModal}
                     handleRadianceOfDawnConfirm={handleRadianceOfDawnConfirm}
+                    tricksterBlessingModal={tricksterBlessingModal} setTricksterBlessingModal={setTricksterBlessingModal}
+                    handleTricksterBlessingConfirm={handleTricksterBlessingConfirm}
                     handleCombatSuperiorityConfirm={handleCombatSuperiorityConfirm}
                     handleAttackRiderManeuverUse={handleAttackRiderManeuverUse}
                     handleAttackRiderManeuverSkip={handleAttackRiderManeuverSkip}

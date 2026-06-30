@@ -135,6 +135,8 @@ export default function CharActionModals({
     handleCoronaEnemySelectionConfirm,
     radianceOfDawnModal, setRadianceOfDawnModal,
     handleRadianceOfDawnConfirm,
+    tricksterBlessingModal,
+    handleTricksterBlessingConfirm,
     handleDivineInterventionCast,
     pendingDamageRef,
 }) {
@@ -658,6 +660,17 @@ export default function CharActionModals({
                     rangeFeet={radianceOfDawnModal.rangeFeet}
                     onConfirm={handleRadianceOfDawnConfirm}
                     onSkip={() => setRadianceOfDawnModal(null)}
+                />
+            )}
+            {tricksterBlessingModal && (
+                <SecondaryTargetModal
+                    title="Blessing of the Trickster — Choose Target"
+                    targets={tricksterBlessingModal.creatureTargets}
+                    confirmLabel="Grant Blessing"
+                    confirmIcon="fa-hands"
+                    showHp={false}
+                    onTargetSelected={handleTricksterBlessingConfirm}
+                    onSkip={() => handleTricksterBlessingConfirm(null)}
                 />
             )}
         </>

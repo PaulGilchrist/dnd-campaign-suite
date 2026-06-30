@@ -84,6 +84,11 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         return handleVowOfEnmity(action, playerStats, campaignName, _mapName);
     }
 
+    // Blessing of the Trickster: defer to modal for ally selection
+    if (auto?.effect === 'advantage_on_stealth') {
+        return handleTricksterBlessing(action, playerStats, campaignName, _mapName);
+    }
+
     // Corona of Light: defer to modal for enemy selection
     if (auto?.effect === 'sunlight_aura') {
         return handleCoronaOfLight(action, playerStats, campaignName, _mapName);
@@ -296,4 +301,49 @@ async function handleBonusActionDash(action, playerStats, campaignName, _mapName
 
 export function restoreAdrenalineRushUses(playerName, campaignName) {
     setRuntimeValue(playerName, ADRENALINE_RUSH_USES_KEY, null, campaignName);
+}
+
+async function handleTricksterBlessing(action, playerStats, campaignName, _mapName) {
+    const auto = action.automation;
+    const playerName = playerStats.name;
+    const featureName = action.name || 'Blessing of the Trickster';
+
+    const storedBuffs = getRuntimeValue(playerName, 'activeBuffs', campaignName);
+    const activeBuffs = Array.isArray(storedBuffs) ? storedBuffs : [];
+    const wasActive = activeBuffs.some(b => b.name === featureName);
+
+    if (wasActive) {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: featureName,
+                description: `${featureName} is already active. It expires after a Long Rest or when you use this feature again.`,
+                automation: auto,
+            },
+        };
+    }
+
+    const combatSummary = await loadCombatSummary(campaignName);
+    const allCreatures = combatSummary?.creatures || [];
+    const allyTargets = allCreatures
+        .filter(c => c.type === 'player' || c.type === 'npc' || c.type === 'monster')
+        .map(c => ({
+            name: c.name,
+            currentHp: c.currentHp,
+            maxHp: c.maxHp,
+            size: c.size,
+            type: c.type,
+        }));
+
+    return {
+        type: 'modal',
+        modalName: 'tricksterBlessing',
+        payload: {
+            action,
+            playerStats,
+            campaignName,
+            creatureTargets: allyTargets,
+        },
+    };
 }

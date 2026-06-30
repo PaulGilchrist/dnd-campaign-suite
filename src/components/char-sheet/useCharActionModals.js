@@ -68,6 +68,7 @@ export default function useCharActionModals({
     const [bulwarkOfForceModal, setBulwarkOfForceModal] = useState(null);
     const [coronaEnemySelectionModal, setCoronaEnemySelectionModal] = useState(null);
     const [radianceOfDawnModal, setRadianceOfDawnModal] = useState(null);
+    const [tricksterBlessingModal, setTricksterBlessingModal] = useState(null);
     const [secondaryTargetModal, setSecondaryTargetModal] = useState(null);
 
     const pendingDamageRef = useRef(null);
@@ -182,6 +183,7 @@ export default function useCharActionModals({
         bulwarkOfForceModal, setBulwarkOfForceModal,
         coronaEnemySelectionModal, setCoronaEnemySelectionModal,
         radianceOfDawnModal, setRadianceOfDawnModal,
+        tricksterBlessingModal, setTricksterBlessingModal,
         secondaryTargetModal, setSecondaryTargetModal,
         resolveAttackDamage,
         handleMasteryClose,
