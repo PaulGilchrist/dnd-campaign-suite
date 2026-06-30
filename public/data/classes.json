@@ -2713,7 +2713,19 @@
                 "name": "Corona of Light",
                 "level": 17,
                 "prerequisites": [],
-                "description": "You can use your action to activate an aura of sunlight that lasts for 1 minute or until you dismiss it using another action. You emit bright light in a 60-foot radius and dim light 30 feet beyond that. Your enemies in the bright light have disadvantage on saving throws against any spell that deals fire or radiant damage."
+                "description": "You can use your action to activate an aura of sunlight that lasts for 1 minute or until you dismiss it using another action. You emit bright light in a 60-foot radius and dim light 30 feet beyond that. Your enemies in the bright light have disadvantage on saving throws against any spell that deals fire or radiant damage.",
+                "automation": {
+                  "type": "temp_buff",
+                  "effect": "sunlight_aura",
+                  "duration": "1_minute",
+                  "action": "action",
+                  "range": "60_ft",
+                  "enemies_disadvantage_saves": [
+                    "Fire",
+                    "Radiant"
+                  ],
+                  "casting_time": "1 action"
+                }
               }
             ]
           }

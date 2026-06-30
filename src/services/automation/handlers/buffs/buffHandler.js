@@ -3,7 +3,7 @@ import { addExpiration } from '../../../rules/effects/expirations.js';
 import { handle as handleTeleport } from '../class-warlock/tempTeleportHandler.js';
 import { handle as handleVowOfEnmity } from '../class-cleric-paladin/vowOfEnmityHandler.js';
 import { getTargetFromAttacker } from '../../../rules/combat/damageUtils.js';
-import { getCombatSummary } from '../../../encounters/combatData.js';
+import { getCombatSummary, loadCombatSummary } from '../../../encounters/combatData.js';
 import { evaluateAutoExpression } from '../../../combat/automation/automationService.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../ui/logService.js';
@@ -199,18 +199,17 @@ async function handleCoronaOfLight(action, playerStats, campaignName, _mapName) 
             payload: {
                 type: 'automation_info',
                 name: action.name,
-                description: `${action.name} is already active.`,
+                description: `${action.name} is already active. It expires after 1 minute (10 rounds) or on a short/long rest.`,
                 automation: auto,
             },
         };
     }
 
-    // Gather creature targets from combat context (exclude self)
-    const combatSummary = getCombatSummary(campaignName);
+    // Fetch fresh creature targets from server (exclude self)
+    const combatSummary = await loadCombatSummary(campaignName);
     const creatureTargets = combatSummary?.creatures
         ? combatSummary.creatures
             .filter(c => c.name !== playerName)
-            .map(c => ({ name: c.name }))
         : [];
 
     return {
