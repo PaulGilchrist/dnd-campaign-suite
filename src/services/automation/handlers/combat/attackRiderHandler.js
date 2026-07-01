@@ -313,7 +313,8 @@ async function applyRiderEffect(action, playerStats, campaignName, targetName, o
 
         if (saveResult.success === false && option.condition) {
             const conditions = getRuntimeValue(targetName, 'activeConditions') || [];
-            const updatedConditions = [...conditions, option.condition];
+            const filtered = conditions.filter(c => String(c).toLowerCase() !== option.condition.toLowerCase());
+            const updatedConditions = [...filtered, option.condition];
             setRuntimeValue(targetName, 'activeConditions', updatedConditions, campaignName);
         }
 
