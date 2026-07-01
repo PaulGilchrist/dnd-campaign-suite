@@ -322,6 +322,25 @@ export default function CharActionModals({
                             if (!costUsed || costUsed === 0) {
                                 const currentRound = getCurrentCombatRound();
                                 setRuntimeValue(attackRiderModal.playerStats.name, '_cunningStrikeSkippedRound', currentRound, attackRiderModal.campaignName);
+                                if (autoDamageContext?.current) {
+                                    const ctx = autoDamageContext.current;
+                                    const sneakAttackDice = ctx.sneakAttackDice || 0;
+                                    let formula = ctx.formula;
+                                    let total = ctx.total;
+                                    let rolls = ctx.rolls;
+                                    if (sneakAttackDice > 0) {
+                                        const sneakFormula = `${sneakAttackDice}d6`;
+                                        const sneakResult = ctx.context?.isAutoCrit ? rollExpressionDoubled(sneakFormula) : rollExpression(sneakFormula);
+                                        if (sneakResult) {
+                                            formula += ` + ${sneakFormula} [Sneak Attack]`;
+                                            total += sneakResult.total;
+                                            rolls = [...rolls, ...sneakResult.rolls];
+                                        }
+                                    }
+                                    setPopupHtml(null);
+                                    rollDamage(ctx.attackName, formula, total, rolls, ctx.modifier, ctx.context);
+                                    autoDamageContext.current = null;
+                                }
                             } else if (autoDamageContext) {
                                 const ctx = autoDamageContext.current;
                                 if (ctx) {
@@ -329,14 +348,18 @@ export default function CharActionModals({
                                     const effectiveSneakDice = Math.max(0, ctx.sneakAttackDice - cunningStrikeCost);
                                     let formula = ctx.formula;
                                     let total = ctx.total;
-                                    if (effectiveSneakDice < ctx.sneakAttackDice) {
-                                        const diceRemoved = ctx.sneakAttackDice - effectiveSneakDice;
-                                        const avgPerDie = ctx.context?.isAutoCrit ? 7 : 3;
-                                        total = Math.round(total - diceRemoved * avgPerDie);
-                                        formula = formula.replace(/\+ \d+d6 \[Sneak Attack\]/, `+ ${effectiveSneakDice}d6 [Sneak Attack]`);
+                                    let rolls = ctx.rolls;
+                                    if (effectiveSneakDice > 0) {
+                                        const sneakFormula = `${effectiveSneakDice}d6`;
+                                        const sneakResult = ctx.context?.isAutoCrit ? rollExpressionDoubled(sneakFormula) : rollExpression(sneakFormula);
+                                        if (sneakResult) {
+                                            formula += ` + ${sneakFormula} [Sneak Attack]`;
+                                            total += sneakResult.total;
+                                            rolls = [...rolls, ...sneakResult.rolls];
+                                        }
                                     }
                                     setPopupHtml(null);
-                                    rollDamage(ctx.attackName, formula, total, ctx.rolls, ctx.modifier, ctx.context);
+                                    rollDamage(ctx.attackName, formula, total, rolls, ctx.modifier, ctx.context);
                                     autoDamageContext.current = null;
                                 }
                             } else if (pendingDamageRef?.current?._cunningStrike) {
