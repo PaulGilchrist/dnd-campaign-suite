@@ -52,7 +52,8 @@ import RadianceOfDawnModal from './modals/RadianceOfDawnModal.jsx'
 import { handleClearWard, handleSpendDice, handleApply } from '../../services/automation/handlers/class-cleric-paladin/bastionOfLawHandler.js'
 import { getCombatContext } from '../../services/rules/combat/damageUtils.js'
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js'
-import { getCurrentCombatRound } from '../../services/encounters/combatData.js'
+
+
 import { logHealingToSSE } from '../../services/automation/common/healingRoll.js'
 import { addEntry } from '../../services/ui/logService.js'
 
@@ -320,8 +321,6 @@ export default function CharActionModals({
                         if (attackRiderModal?.action?.name === 'Cunning Strike') {
                             const costUsed = getRuntimeValue(attackRiderModal.playerStats.name, '_cunningStrikeCostUsed', attackRiderModal.campaignName);
                             if (!costUsed || costUsed === 0) {
-                                const currentRound = getCurrentCombatRound();
-                                setRuntimeValue(attackRiderModal.playerStats.name, '_cunningStrikeSkippedRound', currentRound, attackRiderModal.campaignName);
                                 if (autoDamageContext?.current) {
                                     const ctx = autoDamageContext.current;
                                     const sneakAttackDice = ctx.sneakAttackDice || 0;
