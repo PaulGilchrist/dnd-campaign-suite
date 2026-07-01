@@ -13,6 +13,12 @@ function AttackRiderModal({ action, playerStats, campaignName, targetName, onClo
     const [vtApplied, setVtApplied] = useState(false);
     const [vtResult, setVtResult] = useState(null);
 
+    useEffect(() => {
+        if (applied && !result) {
+            onClose();
+        }
+    }, [applied, result, onClose]);
+
     const options = action.options || action.automation?.options || [];
     const maxEffects = action.automation?.maxEffects || action.maxEffects || 1;
     const multiSelect = maxEffects > 1;
@@ -90,21 +96,24 @@ function AttackRiderModal({ action, playerStats, campaignName, targetName, onClo
         );
     }
 
-    if (applied && result) {
-        return (
-            <div className="sp-overlay" onClick={onClose}>
-                <div className="sp-modal" onClick={e => e.stopPropagation()}>
-                    <div className="sp-header">
-                        <i className="fa-solid fa-bolt"></i> {action.name}
-                    </div>
-                    <div className="sp-body" dangerouslySetInnerHTML={{ __html: result.payload.description }}>
-                    </div>
-                    <div className="sp-actions">
-                        <button className="sp-roll-btn" onClick={onClose}>Done</button>
+    if (applied) {
+        if (result) {
+            return (
+                <div className="sp-overlay" onClick={onClose}>
+                    <div className="sp-modal" onClick={e => e.stopPropagation()}>
+                        <div className="sp-header">
+                            <i className="fa-solid fa-bolt"></i> {action.name}
+                        </div>
+                        <div className="sp-body" dangerouslySetInnerHTML={{ __html: result.payload.description }}>
+                        </div>
+                        <div className="sp-actions">
+                            <button className="sp-roll-btn" onClick={onClose}>Done</button>
+                        </div>
                     </div>
                 </div>
-            </div>
-        );
+            );
+        }
+        return null;
     }
 
     const labelText = multiSelect

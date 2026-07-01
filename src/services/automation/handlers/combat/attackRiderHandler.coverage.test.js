@@ -29,6 +29,14 @@ vi.mock('../../../../../services/encounters/combatData.js', () => ({
     getCurrentCombatRound: vi.fn(() => 1),
 }));
 
+vi.mock('../../../automation/common/savePrompt.js', () => ({
+    buildSaveDc: vi.fn(() => 15),
+    createSaveListener: vi.fn(() => ({
+        promptId: 'test-prompt-id',
+        promise: Promise.resolve({ roll: 12, success: false }),
+    })),
+}));
+
 // ── Re-import after mocking ────────────────────────────────────
 
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
@@ -278,7 +286,7 @@ describe('attackRiderHandler - Psychic Veil removal', () => {
         });
         const result = await applyRiderOption(action, makePlayerStats(), 'campaign', 'Goblin', ['Trip']);
 
-        expect(result.payload.description).toContain('Trip');
+        expect(result).toBeNull();
         expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', 'activeConditions', [], 'campaign');
         expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', 'activeBuffs', [], 'campaign');
     });
@@ -317,7 +325,7 @@ describe('attackRiderHandler - Psychic Veil removal', () => {
         });
         const result = await applyRiderOption(action, makePlayerStats(), 'campaign', 'Goblin', ['Trip']);
 
-        expect(result.payload.description).toContain('Trip');
+        expect(result).toBeNull();
         expect(setRuntimeValue).not.toHaveBeenCalledWith('TestHero', 'activeBuffs', expect.any(Array), 'campaign');
     });
 });

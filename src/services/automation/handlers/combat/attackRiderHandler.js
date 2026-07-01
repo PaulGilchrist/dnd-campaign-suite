@@ -300,7 +300,6 @@ async function applyRiderEffect(action, playerStats, campaignName, targetName, o
     setRuntimeValue(campaignName, 'targetEffects', updatedEffects, campaignName);
 
     if (option.saveType) {
-        // Trigger saving throw prompt for the target (non-blocking)
         const saveDc = buildSaveDc(option, playerStats);
         const { promise } = createSaveListener(campaignName, {
             targetName,
@@ -310,16 +309,20 @@ async function applyRiderEffect(action, playerStats, campaignName, targetName, o
             saveAbility: option.saveAbility,
         });
 
-        // Apply condition on failure (fire and forget)
-        promise.then((saveResult) => {
-            if (saveResult.success === false && option.condition) {
-                const conditions = getRuntimeValue(targetName, 'conditions') || [];
-                const updatedConditions = [...conditions, option.condition];
-                setRuntimeValue(targetName, 'conditions', updatedConditions, campaignName);
-            }
-        }).catch((e) => {
-            console.error('[attackRiderHandler] Save listener error:', e);
-        });
+        const saveResult = await promise;
+
+        if (saveResult.success === false && option.condition) {
+            const conditions = getRuntimeValue(targetName, 'conditions') || [];
+            const updatedConditions = [...conditions, option.condition];
+            setRuntimeValue(targetName, 'conditions', updatedConditions, campaignName);
+        }
+
+        addEntry(campaignName, {
+            type: 'ability_use',
+            characterName: playerStats.name,
+            abilityName: action.name,
+            description: `${option.name} applied to ${targetName} — ${targetName} rolled ${saveResult.roll} on ${option.saveType} save (DC ${saveDc}), ${saveResult.success ? 'succeeded' : 'failed'} — ${saveResult.success ? 'no effect' : `${option.condition} condition applied`}`,
+        }).catch(() => {});
 
         // Handle Psychic Veil interaction
         const attackerBuffs = getRuntimeValue(playerStats.name, 'activeBuffs', campaignName);
@@ -336,6 +339,8 @@ async function applyRiderEffect(action, playerStats, campaignName, targetName, o
                 setRuntimeValue(playerStats.name, 'activeBuffs', filteredBuffs, campaignName);
             }
         }
+
+        return null;
     }
 
     // Build description for Cunning Strike options
