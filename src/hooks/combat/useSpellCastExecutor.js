@@ -7,7 +7,7 @@ export function useSpellCastExecutor(rollAttack, rollDamage, playerStats, getTar
 
     const castAction = useCallback((spell, metaCtx) => {
         const pos = ref.current;
-        executeSpellCast(spell, metaCtx, {
+        const promise = executeSpellCast(spell, metaCtx, {
             rollAttack,
             rollDamage,
             playerStats,
@@ -18,7 +18,9 @@ export function useSpellCastExecutor(rollAttack, rollDamage, playerStats, getTar
             campaignName,
             mapName,
             characters,
-        }).then((result) => {
+        });
+        if (!promise) return;
+        promise.then((result) => {
             if (result?.automationPopup) {
                 setPopupHtml(result.automationPopup.payload);
             } else if (result && result.healAmount > 0) {

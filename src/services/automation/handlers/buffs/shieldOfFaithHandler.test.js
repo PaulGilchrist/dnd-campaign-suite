@@ -5,6 +5,7 @@ import { addExpiration } from '../../../rules/effects/expirations.js';
 import { rangeToFeet } from '../../../rules/combat/rangeValidation.js';
 import { resolveMapPositions } from '../../common/targetResolver.js';
 import { postLogEntry } from '../../../shared/logPoster.js';
+import { getCombatSummary } from '../../../encounters/combatData.js';
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
     getRuntimeValue: vi.fn(),
@@ -27,6 +28,10 @@ vi.mock('../../../shared/logPoster.js', () => ({
     postLogEntry: vi.fn(() => Promise.resolve()),
 }));
 
+vi.mock('../../../encounters/combatData.js', () => ({
+    getCombatSummary: vi.fn(),
+}));
+
 const MOCK_CAMPAIGN = 'test-campaign';
 const MOCK_PLAYER = { name: 'Cleric1', level: 5 };
 
@@ -37,33 +42,36 @@ describe('shieldOfFaithHandler', () => {
     });
 
     describe('handle', () => {
-        it('returns target selection popup with creature list from characters prop', async () => {
+        it('returns target selection popup with creature list from combat summary', async () => {
             resolveMapPositions.mockResolvedValue(null);
+            getCombatSummary.mockReturnValue({
+                creatures: [
+                    { name: 'Ally1' },
+                    { name: 'Cleric1' },
+                    { name: 'Enemy1' },
+                ],
+            });
 
             const action = {
                 name: 'Shield of Faith',
                 spell: { range: '60 feet', duration: 'Concentration, up to 10 minutes' },
             };
 
-            const characters = [
-                { name: 'Ally1' },
-                { name: 'Cleric1' },
-                { name: 'Enemy1' },
-            ];
-
-            const result = await handle(action, MOCK_PLAYER, MOCK_CAMPAIGN, null, characters);
+            const result = await handle(action, MOCK_PLAYER, MOCK_CAMPAIGN, null, []);
 
             expect(result.type).toBe('popup');
             expect(result.payload.type).toBe('shield_of_faith_target_selection');
             expect(result.payload.name).toBe('Shield of Faith');
-            expect(result.payload.creatureTargets).toEqual(['Ally1', 'Enemy1']);
+            expect(result.payload.creatureTargets).toEqual(['Ally1', 'Cleric1', 'Enemy1']);
             expect(result.payload.range).toBe('60 feet');
             expect(result.payload.rangeFt).toBe(60);
             expect(result.payload.duration).toBe('Concentration, up to 10 minutes');
             expect(result.payload.attackerPos).toBeNull();
         });
 
-        it('returns empty creature list when no characters provided', async () => {
+        it('returns empty creature list when no combat summary', async () => {
+            getCombatSummary.mockReturnValue(null);
+
             const action = {
                 name: 'Shield of Faith',
                 spell: { range: '60 feet' },
@@ -76,36 +84,40 @@ describe('shieldOfFaithHandler', () => {
             expect(result.payload.creatureTargets).toEqual([]);
         });
 
-        it('excludes the caster from creature targets', async () => {
+        it('includes the caster in creature targets', async () => {
             resolveMapPositions.mockResolvedValue(null);
+
+            getCombatSummary.mockReturnValue({
+                creatures: [
+                    { name: 'Cleric1' },
+                    { name: 'Enemy1' },
+                ],
+            });
 
             const action = {
                 name: 'Shield of Faith',
                 spell: { range: '60 feet' },
             };
 
-            const characters = [
-                { name: 'Cleric1' },
-                { name: 'Enemy1' },
-            ];
+            const result = await handle(action, MOCK_PLAYER, MOCK_CAMPAIGN, null, []);
 
-            const result = await handle(action, MOCK_PLAYER, MOCK_CAMPAIGN, null, characters);
-
-            expect(result.payload.creatureTargets).not.toContain('Cleric1');
-            expect(result.payload.creatureTargets).toEqual(['Enemy1']);
+            expect(result.payload.creatureTargets).toContain('Cleric1');
+            expect(result.payload.creatureTargets).toEqual(['Cleric1', 'Enemy1']);
         });
 
         it('resolves map positions when mapName is provided', async () => {
             resolveMapPositions.mockResolvedValue({ attackerPos: { gridX: 1, gridY: 2 } });
 
+            getCombatSummary.mockReturnValue({
+                creatures: [{ name: 'Enemy1' }],
+            });
+
             const action = {
                 name: 'Shield of Faith',
                 spell: { range: '60 feet' },
             };
 
-            const characters = [{ name: 'Enemy1' }];
-
-            const result = await handle(action, MOCK_PLAYER, MOCK_CAMPAIGN, 'test-map', characters);
+            const result = await handle(action, MOCK_PLAYER, MOCK_CAMPAIGN, 'test-map', []);
 
             expect(resolveMapPositions).toHaveBeenCalledWith(MOCK_CAMPAIGN, 'test-map', 'Cleric1');
             expect(result.payload.attackerPos).toEqual({ gridX: 1, gridY: 2 });
@@ -114,14 +126,16 @@ describe('shieldOfFaithHandler', () => {
         it('uses default duration when spell has no duration property', async () => {
             resolveMapPositions.mockResolvedValue(null);
 
+            getCombatSummary.mockReturnValue({
+                creatures: [{ name: 'Enemy1' }],
+            });
+
             const action = {
                 name: 'Shield of Faith',
                 spell: { range: '60 feet' },
             };
 
-            const characters = [{ name: 'Enemy1' }];
-
-            const result = await handle(action, MOCK_PLAYER, MOCK_CAMPAIGN, null, characters);
+            const result = await handle(action, MOCK_PLAYER, MOCK_CAMPAIGN, null, []);
 
             expect(result.payload.duration).toBe('Concentration, up to 10 minutes');
         });
@@ -130,14 +144,16 @@ describe('shieldOfFaithHandler', () => {
             resolveMapPositions.mockResolvedValue(null);
             rangeToFeet.mockReturnValue(60);
 
+            getCombatSummary.mockReturnValue({
+                creatures: [{ name: 'Enemy1' }],
+            });
+
             const action = {
                 name: 'Shield of Faith',
                 spell: {},
             };
 
-            const characters = [{ name: 'Enemy1' }];
-
-            const result = await handle(action, MOCK_PLAYER, MOCK_CAMPAIGN, null, characters);
+            const result = await handle(action, MOCK_PLAYER, MOCK_CAMPAIGN, null, []);
 
             expect(result.payload.range).toBe('60 feet');
             expect(rangeToFeet).toHaveBeenCalledWith('60 feet');
@@ -146,11 +162,13 @@ describe('shieldOfFaithHandler', () => {
         it('handles action with no spell property', async () => {
             resolveMapPositions.mockResolvedValue(null);
 
+            getCombatSummary.mockReturnValue({
+                creatures: [{ name: 'Enemy1' }],
+            });
+
             const action = { name: 'Shield of Faith' };
 
-            const characters = [{ name: 'Enemy1' }];
-
-            const result = await handle(action, MOCK_PLAYER, MOCK_CAMPAIGN, null, characters);
+            const result = await handle(action, MOCK_PLAYER, MOCK_CAMPAIGN, null, []);
 
             expect(result.type).toBe('popup');
             expect(result.payload.range).toBe('60 feet');
@@ -161,14 +179,16 @@ describe('shieldOfFaithHandler', () => {
         it('passes spell range to popup when present', async () => {
             resolveMapPositions.mockResolvedValue(null);
 
+            getCombatSummary.mockReturnValue({
+                creatures: [{ name: 'Enemy1' }],
+            });
+
             const action = {
                 name: 'Shield of Faith',
                 spell: { range: '30 feet', duration: '1 minute' },
             };
 
-            const characters = [{ name: 'Enemy1' }];
-
-            const result = await handle(action, MOCK_PLAYER, MOCK_CAMPAIGN, null, characters);
+            const result = await handle(action, MOCK_PLAYER, MOCK_CAMPAIGN, null, []);
 
             expect(result.payload.range).toBe('30 feet');
             expect(result.payload.duration).toBe('1 minute');

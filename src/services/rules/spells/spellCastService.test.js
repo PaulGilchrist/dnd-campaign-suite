@@ -22,6 +22,13 @@ vi.mock('../../../hooks/runtime/useRuntimeState.js', () => {
   }
 })
 
+vi.mock('../../../services/rules/combat/damageUtils.js', () => ({
+  getCombatContext: vi.fn(() => Promise.resolve(null)),
+  getResistanceNotice: vi.fn(),
+  extractDamageTypes: vi.fn(),
+  formatDamageTypes: vi.fn(),
+}))
+
 import { refundSpellBreakerSlot } from './spellCastService.js'
 
 const runtimeStateMock = globalThis.__runtimeStateMock

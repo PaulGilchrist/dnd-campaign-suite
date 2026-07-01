@@ -88,20 +88,24 @@ describe('addExpiration', () => {
       ).toThrow('Missing array: pendingExpirations');
     });
 
-    it('throws when rounds is null', () => {
+    it('uses Infinity when rounds is null', () => {
       getRuntimeValue.mockReturnValueOnce([]);
 
-      expect(() =>
-        addExpiration('Caster', 'Target', [{ type: 'stunned' }], 'TestCampaign', null),
-      ).toThrow('rounds is required');
+      addExpiration('Caster', 'Target', [{ type: 'stunned' }], 'TestCampaign', null);
+
+      expect(setRuntimeValue).toHaveBeenCalledWith('Caster', expect.any(String), expect.arrayContaining([
+        expect.objectContaining({ expiryRounds: Infinity }),
+      ]), 'TestCampaign');
     });
 
-    it('throws when rounds is undefined', () => {
+    it('uses Infinity when rounds is undefined', () => {
       getRuntimeValue.mockReturnValueOnce([]);
 
-      expect(() =>
-        addExpiration('Caster', 'Target', [{ type: 'stunned' }], 'TestCampaign', undefined),
-      ).toThrow('rounds is required');
+      addExpiration('Caster', 'Target', [{ type: 'stunned' }], 'TestCampaign', undefined);
+
+      expect(setRuntimeValue).toHaveBeenCalledWith('Caster', expect.any(String), expect.arrayContaining([
+        expect.objectContaining({ expiryRounds: Infinity }),
+      ]), 'TestCampaign');
     });
   });
 

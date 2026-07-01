@@ -3,6 +3,7 @@ import { addExpiration } from '../../rules/effects/expirations.js';
 import { rangeToFeet } from '../../rules/combat/rangeValidation.js';
 import { resolveMapPositions } from '../common/targetResolver.js';
 import { postLogEntry } from '../../shared/logPoster.js';
+import { getCombatSummary } from '../../encounters/combatData.js';
 
 const SHIELD_OF_FAITH_BUFF_NAME = 'Shield of Faith';
 
@@ -10,7 +11,7 @@ function getShieldOfFaithDuration(spell) {
     return spell.duration || 'Concentration, up to 10 minutes';
 }
 
-export async function handle(action, playerStats, campaignName, mapName, characters) {
+export async function handle(action, playerStats, campaignName, mapName, _characters) {
     const spell = action.spell || {};
 
     const rangeFt = rangeToFeet(spell.range || '60 feet');
@@ -18,9 +19,10 @@ export async function handle(action, playerStats, campaignName, mapName, charact
     const positions = mapName ? await resolveMapPositions(campaignName, mapName, playerStats.name) : null;
     const attackerPos = positions?.attackerPos || null;
 
-    const creatureTargets = (characters || [])
-        .filter(c => c.name !== playerStats.name)
-        .map(c => c.name);
+    const combatSummary = getCombatSummary(campaignName);
+    const allCreatures = combatSummary?.creatures || [];
+
+    const creatureTargets = allCreatures.map(c => c.name);
 
     return {
         type: 'popup',

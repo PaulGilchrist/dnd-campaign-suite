@@ -201,7 +201,7 @@ describe('getCombatContext', () => {
     });
 
     await getCombatContext('My Campaign 2024');
-    expect(global.fetch).toHaveBeenCalledWith('/api/campaigns/My%20Campaign%202024/combatSummary');
+    expect(global.fetch).toHaveBeenCalledWith('/api/campaigns/My%20Campaign%202024/change-data');
   });
 
   it('returns combatSummary from response body', async () => {

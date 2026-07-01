@@ -603,7 +603,7 @@ async function applyGrappleDamageTurnStart(activeName, playerStats, effect, camp
     window.dispatchEvent(new CustomEvent('combat-summary-updated'));
 }
 
-export function addExpiration(attackerName, targetName, effects, campaignName, rounds) {
+ export function addExpiration(attackerName, targetName, effects, campaignName, rounds) {
     const list = getRuntimeValue(attackerName, KEY);
     if (!Array.isArray(list)) {
         console.error('expirations: expected pendingExpirations to be an array for', attackerName);
@@ -612,13 +612,7 @@ export function addExpiration(attackerName, targetName, effects, campaignName, r
     const currentRound = getCurrentCombatRound(campaignName);
     setRuntimeValue(attackerName, KEY, [
          ...list,
-          { target: targetName, effects, appliedRound: currentRound, expiryRounds: (() => {
-            if (rounds == null) {
-              console.error('[expirations] addExpiration: rounds is missing for target:', targetName)
-              throw new Error('rounds is required for addExpiration')
-            }
-            return rounds
-          })() }
+          { target: targetName, effects, appliedRound: currentRound, expiryRounds: rounds ?? Infinity }
      ], campaignName);
 }
 

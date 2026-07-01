@@ -48,12 +48,12 @@ function App() {
   }, []);
 
   useEffect(() => {
-    campaignRef.current.setCampaignSelectCallback(async (_, loaded) => {
+    campaignRef.current.setCampaignSelectCallback(async (name, loaded) => {
       charMgmtRef.current.setCharacters(loaded);
       // Pre-load combatSummary for the selected campaign so attack rider maneuvers work immediately
-      const cs = await loadCombatSummary(campaignNameRef.current);
+      const cs = await loadCombatSummary(name);
       if (cs) {
-        setCombatSummaryCache(cs, campaignNameRef.current);
+        setCombatSummaryCache(cs, name);
       } else if (loaded.length > 0) {
         // No combat data on server yet — initialize from player characters
         const creatures = loaded.map(c => ({
@@ -63,7 +63,7 @@ function App() {
           maxHp: c.computedStats?.hp?.max || c.hp?.max || 1,
         }));
         const initial = { round: 1, creatures };
-        setCombatSummaryCache(initial, campaignNameRef.current);
+        setCombatSummaryCache(initial, name);
       }
       setCombatSummaryLoaded(true);
       if (loaded.length > 0) {

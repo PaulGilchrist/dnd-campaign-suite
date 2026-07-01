@@ -39,11 +39,15 @@ export function getResistanceNotice(damageTypes, targetResistances, targetImmuni
 export async function getCombatContext(campaignName) {
   if (!campaignName) return null;
   try {
-    const response = await fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/combatSummary`);
-    if (!response.ok) return null;
+    const response = await fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/change-data`);
+    if (!response.ok) {
+      console.error('[getCombatContext] Failed to fetch change-data:', response.status, response.statusText, 'for', campaignName);
+      return null;
+    }
     const data = await response.json();
     return data.combatSummary || null;
-   } catch {
+   } catch (err) {
+    console.error('[getCombatContext] Error fetching change-data:', err.message);
     return null;
    }
 }
