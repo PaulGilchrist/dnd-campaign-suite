@@ -368,7 +368,7 @@ export async function applyLongRest(playerStats, campaignName) {
      r => r.type === 'spell_thief'
    )
    if (hasSpellThief) {
-     charData.spellThiefUses = 1
+      charData.spellthiefUses = 1
      const blockList = getRuntimeValue(name, '_spellThiefBlockedList', campaignName)
      if (blockList) {
        const entries = JSON.parse(blockList)
