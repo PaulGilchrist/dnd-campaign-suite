@@ -367,25 +367,42 @@ export async function applyLongRest(playerStats, campaignName) {
    const hasSpellThief = (playerStats.automation?.reactions ?? []).some(
      r => r.type === 'spell_thief'
    )
-   if (hasSpellThief) {
-      charData.spellthiefUses = 1
-     const blockList = getRuntimeValue(name, '_spellThiefBlockedList', campaignName)
-     if (blockList) {
-       const entries = JSON.parse(blockList)
-       for (const entry of entries) {
-         charData[`spellThiefBlocked_${entry.casterName}_${entry.spellName}`] = null
-       }
-     }
-     const stolenList = getRuntimeValue(name, '_spellThiefStolenList', campaignName)
-     if (stolenList) {
-       const entries = JSON.parse(stolenList)
-       for (const entry of entries) {
-         charData[`spellThiefStolen_${entry.casterName}_${entry.spellName}`] = null
-       }
-     }
-     charData._spellThiefBlockedList = null
-     charData._spellThiefStolenList = null
-   }
+    if (hasSpellThief) {
+       charData.spellthiefUses = 1
+      const blockList = getRuntimeValue(name, '_spellThiefBlockedList', campaignName)
+      if (blockList) {
+        const entries = JSON.parse(blockList)
+        for (const entry of entries) {
+          charData[`spellThiefBlocked_${entry.casterName}_${entry.spellName}`] = null
+        }
+      }
+      const stolenList = getRuntimeValue(name, '_spellThiefStolenList', campaignName)
+      if (stolenList) {
+        const entries = JSON.parse(stolenList)
+        for (const entry of entries) {
+          charData[`spellThiefStolen_${entry.casterName}_${entry.spellName}`] = null
+        }
+      }
+      charData._spellThiefBlockedList = null
+      charData._spellThiefStolenList = null
+
+      // Clear blocked spell entries from each caster's runtime store
+      if (blockList) {
+        const entries = JSON.parse(blockList)
+        for (const entry of entries) {
+          const casterBlockList = getRuntimeValue(entry.casterName, '_spellThiefCasterBlock', campaignName)
+          if (casterBlockList) {
+            const casterEntries = JSON.parse(casterBlockList)
+            const updated = casterEntries.filter(e => !(e.thiefName === name && e.spellName === entry.spellName))
+            if (updated.length > 0) {
+              await setRuntimeValue(entry.casterName, '_spellThiefCasterBlock', JSON.stringify(updated), campaignName)
+            } else {
+              await setRuntimeValue(entry.casterName, '_spellThiefCasterBlock', null, campaignName)
+            }
+          }
+        }
+      }
+    }
 
        // Single atomic write fires ONE SSE event with the complete final state
    setRuntimeBatch(name, charData, campaignName)

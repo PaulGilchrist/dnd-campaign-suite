@@ -371,6 +371,30 @@ export function getSpellAbilities(allSpells, playerStats, playerSummary) {
                 }
             }
 
+            // Spell Thief: remove spells stolen by other characters
+            const casterBlockList = getRuntimeValue(playerStats.name, '_spellThiefCasterBlock', campaignName);
+            if (casterBlockList) {
+                const entries = JSON.parse(casterBlockList);
+                if (Array.isArray(entries) && entries.length > 0) {
+                    const blockedSpellNames = new Set(entries.map(e => e.spellName).filter(Boolean));
+                    spellAbilities.spells = spellAbilities.spells.filter(spell => !blockedSpellNames.has(spell.name));
+                }
+            }
+
+            // Spell Thief: add stolen spells from runtime state
+            const stolenList = getRuntimeValue(playerStats.name, '_spellThiefStolenList', campaignName);
+            if (stolenList) {
+                const entries = JSON.parse(stolenList);
+                if (Array.isArray(entries)) {
+                    for (const entry of entries) {
+                        const spellName = entry?.spellName;
+                        if (spellName && !spellAbilities.spells.find(s => s.name === spellName)) {
+                            spellAbilities.spells.push({ name: spellName, prepared: 'Always' });
+                        }
+                    }
+                }
+            }
+
             // Ritual Adept: add all ritual-tagged spells from the spellbook that aren't already known
             const ritualSpellsPassives = playerStats.automation.ritualSpells || [];
             if (ritualSpellsPassives.length > 0 && allSpells) {

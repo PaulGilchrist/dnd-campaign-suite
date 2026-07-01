@@ -70,6 +70,8 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
 
     const biDieRuntime = useRuntimeValue(playerSummary?.name, 'bardicInspirationDie', campaignName);
     const biCombatOptRuntime = useRuntimeValue(playerSummary?.name, 'bardicInspirationCombatOptions', campaignName);
+    const spellThiefStolenRuntime = useRuntimeValue(playerSummary?.name, '_spellThiefStolenList', campaignName);
+    const spellThiefCasterBlockRuntime = useRuntimeValue(playerSummary?.name, '_spellThiefCasterBlock', campaignName);
     React.useEffect(() => {
         const fetchData = async () => {
             const spellData = playerSummary.rules === '2024' ? allSpells2024 : allSpells;
@@ -213,7 +215,7 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
             setPlayerStats(stats);
         };
         fetchData();
-    }, [allAbilityScores, allClasses, allClasses2024, allEquipment, allMagicItems, allRaces, allSpells, allSpells2024, playerSummary, allRaces2024, allMagicItems2024, biDieRuntime, biCombatOptRuntime, campaignName]);
+    }, [allAbilityScores, allClasses, allClasses2024, allEquipment, allMagicItems, allRaces, allSpells, allSpells2024, playerSummary, allRaces2024, allMagicItems2024, biDieRuntime, biCombatOptRuntime, spellThiefStolenRuntime, spellThiefCasterBlockRuntime, campaignName]);
 
     React.useEffect(() => {
         if (!playerStats) return;

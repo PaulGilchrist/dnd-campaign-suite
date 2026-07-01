@@ -1,12 +1,12 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../ui/logService.js';
 import { createSaveListener, buildSaveDc } from '../../common/savePrompt.js';
-import { addExpiration } from '../../../rules/effects/expirations.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 const SPELL_THIEF_BLOCK_KEY = 'spellThiefBlocked';
 const SPELL_THIEF_STOLEN_KEY = 'spellThiefStolen';
 const SPELL_THIEF_BLOCKED_LIST_KEY = '_spellThiefBlockedList';
 const SPELL_THIEF_STOLEN_LIST_KEY = '_spellThiefStolenList';
+const SPELL_THIEF_CASTER_BLOCK_KEY = '_spellThiefCasterBlock';
 
 function getRuntimeUsesKey(featureName) {
     return featureName.toLowerCase().replace(/\s+/g, '') + 'Uses';
@@ -22,13 +22,20 @@ function getStolenSpellKey(casterName, spellName) {
     return `${SPELL_THIEF_STOLEN_KEY}_${casterName}_${spellName}`;
 }
 
-async function addBlockedSpell(playerName, casterName, spellName, campaignName) {
-    await setRuntimeValue(playerName, getBlockedSpellKey(casterName, spellName), true, campaignName);
-    const list = getRuntimeValue(playerName, SPELL_THIEF_BLOCKED_LIST_KEY, campaignName);
+async function addBlockedSpell(thiefName, casterName, spellName, campaignName) {
+    await setRuntimeValue(thiefName, getBlockedSpellKey(casterName, spellName), true, campaignName);
+    const list = getRuntimeValue(thiefName, SPELL_THIEF_BLOCKED_LIST_KEY, campaignName);
     const entries = list ? JSON.parse(list) : [];
     if (!entries.some(e => e.casterName === casterName && e.spellName === spellName)) {
         entries.push({ casterName, spellName });
-        await setRuntimeValue(playerName, SPELL_THIEF_BLOCKED_LIST_KEY, JSON.stringify(entries), campaignName);
+        await setRuntimeValue(thiefName, SPELL_THIEF_BLOCKED_LIST_KEY, JSON.stringify(entries), campaignName);
+    }
+
+    const casterList = getRuntimeValue(casterName, SPELL_THIEF_CASTER_BLOCK_KEY, campaignName);
+    const casterEntries = casterList ? JSON.parse(casterList) : [];
+    if (!casterEntries.some(e => e.thiefName === thiefName && e.spellName === spellName)) {
+        casterEntries.push({ thiefName, spellName });
+        await setRuntimeValue(casterName, SPELL_THIEF_CASTER_BLOCK_KEY, JSON.stringify(casterEntries), campaignName);
     }
 }
 
@@ -71,7 +78,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 
     const saveDc = buildSaveDc(auto, playerStats);
 
-    const { promptId } = createSaveListener(campaignName, {
+    const { promise } = createSaveListener(campaignName, {
         targetName: casterName,
         saveType: auto.saveType || 'INT',
         saveDc,
@@ -82,68 +89,61 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         characterName: playerName,
         abilityName: featureName,
         description: `${playerName} used ${featureName} — ${casterName} must make INT save (DC ${saveDc}) or lose the spell.`,
-        promptId,
     }).catch((e) => { console.error("[spellThief] Error:", e); });
 
-    const handleSaveResult = async (event) => {
-        if (event.detail.promptId !== promptId) return;
+    const saveResult = await promise;
+    const success = saveResult.success;
 
-        const isSuccessful = event.detail.success;
+    await setRuntimeValue(playerName, usesKey, currentUses - 1, campaignName);
 
-        await setRuntimeValue(playerName, usesKey, currentUses - 1, campaignName);
+    addEntry(campaignName, {
+        type: 'roll',
+        name: featureName,
+        characterName: playerName,
+        rollType: 'save-damage',
+        targetName: casterName,
+        saveDc,
+        saveType: auto.saveType || 'INT',
+        saveResult: success ? 'success' : 'failure',
+        total: saveResult.total ?? 0,
+        rolls: [saveResult.roll ?? 0],
+        bonus: saveResult.saveBonus ?? 0,
+        formula: `1d20${saveResult.saveBonus !== 0 ? '+' + saveResult.saveBonus : ''}`,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error("[spellThief] Error:", e); });
 
-        if (!isSuccessful) {
-            await addBlockedSpell(playerName, casterName, spellName, campaignName);
-            await addStolenSpell(playerName, casterName, spellName, campaignName);
+    if (!success) {
+        await addBlockedSpell(playerName, casterName, spellName, campaignName);
+        await addStolenSpell(playerName, casterName, spellName, campaignName);
 
-            addExpiration(playerName, playerName, [
-                { type: 'add_prepared_spell', spellName }
-            ], campaignName, 480);
+        addEntry(campaignName, {
+            type: 'ability_use',
+            characterName: playerName,
+            abilityName: featureName,
+            description: `${casterName} failed INT save (DC ${saveDc}). Spell negated. ${playerName} steals ${spellName} for 8 hours. ${casterName} cannot cast ${spellName} for 8 hours.`,
+        }).catch((e) => { console.error("[spellThief] Error:", e); });
 
-            addExpiration(playerName, playerName, [
-                { type: 'remove_prepared_spell', spellName }
-            ], campaignName, 480);
+        window.dispatchEvent(new CustomEvent('combat-summary-updated'));
+    } else {
+        addEntry(campaignName, {
+            type: 'ability_use',
+            characterName: playerName,
+            abilityName: featureName,
+            description: `${casterName} succeeded on INT save (DC ${saveDc}). ${featureName} has no effect.`,
+        }).catch((e) => { console.error("[spellThief] Error:", e); });
+    }
 
-            addEntry(campaignName, {
-                type: 'save_result',
-                characterName: playerName,
-                rollType: `save-${auto.type}`,
-                targetName: casterName,
-                saveDc,
-                saveType: auto.saveType || 'INT',
-                success: false,
-                description: `${casterName} failed INT save. Spell negated. ${playerName} steals ${spellName} for 8 hours. ${casterName} cannot cast ${spellName} for 8 hours.`,
-            }).catch((e) => { console.error("[spellThief] Error:", e); });
-
-            window.dispatchEvent(new CustomEvent('combat-summary-updated'));
-        } else {
-            addEntry(campaignName, {
-                type: 'save_result',
-                characterName: playerName,
-                rollType: `save-${auto.type}`,
-                targetName: casterName,
-                saveDc,
-                saveType: auto.saveType || 'INT',
-                success: true,
-                description: `${casterName} succeeded on INT save. ${featureName} has no effect.`,
-            }).catch((e) => { console.error("[spellThief] Error:", e); });
-        }
-
-        window.removeEventListener('save-result', handleSaveResult);
-    };
-
-    window.addEventListener('save-result', handleSaveResult);
+    const resultDescription = success
+        ? `${casterName} succeeded on INT save (DC ${saveDc}). ${featureName} has no effect.`
+        : `${casterName} failed INT save (DC ${saveDc}). Spell negated. ${playerName} steals ${spellName} for 8 hours.`;
 
     return {
         type: 'popup',
         payload: {
             type: 'automation_info',
             name: featureName,
-            targetName: casterName,
-            description: `${casterName} must make an INT saving throw (DC ${saveDc}) or the spell is negated and ${playerName} steals knowledge of it for 8 hours.`,
+            description: resultDescription,
             automation: auto,
-            casterName,
-            spellName,
         },
     };
 }

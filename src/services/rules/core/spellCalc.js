@@ -1,5 +1,6 @@
 import classRules from '../../character/classRules.js';
 import { getSpellMaxLevel } from '../../shared/spell-utils.js';
+import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 
 export function getSpellAbilities(allSpells, playerStats) {
     // Dependencies: Abilities, Class
@@ -181,12 +182,38 @@ export function getSpellAbilities(allSpells, playerStats) {
                 spellAbilities.maxPreparedSpells = spellAbility.bonus + Math.floor(playerStats.level / 2);
                 break;
             default:
-                 // Classes with all spells prepared = Bard, Eldritch Knight Fighter, Ranger, Arcane Trickster Rogue, Sorcerer, Warlock
+          // Classes with all spells prepared = Bard, Eldritch Knight Fighter, Ranger, Arcane Trickster Rogue, Sorcerer, Warlock
                 spellAbilities.spells.forEach((spell) => {
                     spell.prepared = 'Always';
                  });
-         }
-        if (spellAbilities.spells.length > 0) {
+           }
+
+           // Spell Thief: remove spells stolen by other characters
+           const casterBlockList = getRuntimeValue(playerStats.name, '_spellThiefCasterBlock');
+           if (casterBlockList) {
+               const entries = JSON.parse(casterBlockList);
+               if (Array.isArray(entries) && entries.length > 0) {
+                   const blockedSpellNames = new Set(entries.map(e => e.spellName).filter(Boolean));
+                   spellAbilities.spells = spellAbilities.spells.filter(spell => !blockedSpellNames.has(spell.name));
+               }
+           }
+
+           // Spell Thief: add stolen spells from runtime state
+          const stolenList = getRuntimeValue(playerStats.name, '_spellThiefStolenList');
+          if (stolenList) {
+              const entries = JSON.parse(stolenList);
+              if (Array.isArray(entries)) {
+                  for (const entry of entries) {
+                      const spellName = entry?.spellName;
+                      if (spellName && !spellAbilities.spells.find(s => s.name === spellName)) {
+                          if (spellAbilities.spells_known) spellAbilities.spells_known += 1;
+                          spellAbilities.spells.push({ name: spellName, prepared: 'Always' });
+                      }
+                  }
+              }
+          }
+
+          if (spellAbilities.spells.length > 0) {
             spellAbilities.spells = spellAbilities.spells.map(spell => {
                 let spellDetail = allSpells.find((spellDetail) => spellDetail.name === spell.name);
                 if (spellDetail) {
