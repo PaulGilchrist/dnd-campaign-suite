@@ -285,6 +285,7 @@ export function createLogAndShow(deps) {
             ripostePopup: context.ripostePopup,
             source: autoDamageSourceRef?.current || characterName,
             isAutoCrit: isCrit,
+            sneakAttackDice: context?.sneakAttackDice || 0,
         } : undefined;
 
         logEntry({

@@ -174,6 +174,19 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
             } else {
                 overchannelResult = isCrit ? rollExpressionDoubled(autoFormula) : rollExpression(autoFormula);
             }
+
+            // Add Sneak Attack damage for Rogue class feature
+            const sneakAttackDice = autoDamage.sneakAttackDice || 0;
+            if (sneakAttackDice > 0 && overchannelResult) {
+                const sneakAttackFormula = `${sneakAttackDice}d6`;
+                const sneakAttackResult = isCrit ? rollExpressionDoubled(sneakAttackFormula) : rollExpression(sneakAttackFormula);
+                if (sneakAttackResult) {
+                    autoFormula += ` + ${sneakAttackFormula} [Sneak Attack]`;
+                    overchannelResult.total += sneakAttackResult.total;
+                    overchannelResult.rolls = [...overchannelResult.rolls, ...sneakAttackResult.rolls];
+                }
+            }
+
             if (overchannelResult) {
                 const context = {
                     damageType: autoDamage.damageType,

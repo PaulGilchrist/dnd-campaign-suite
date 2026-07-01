@@ -119,6 +119,7 @@ export function buildWeaponAttack(opts) {
         type: actionType,
         weaponType,
         mastery: weapon.mastery || null,
+        properties: weapon.properties || [],
     };
 }
 

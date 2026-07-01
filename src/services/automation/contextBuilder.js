@@ -17,7 +17,7 @@ import { collectWeaponMastery } from '../combat/automation/automationService.js'
 export function buildAttackContextSync(attack, playerStats, campaignName, conditionAttackMode, _featRangeEffects) {
     const playerName = playerStats.name;
 
-    return buildBaseAttackContext(playerName, campaignName, attack.damageType).then(({ target, targetName, resistanceNotice }) => {
+    return buildBaseAttackContext(playerName, campaignName, attack.damageType).then(async ({ target, targetName, resistanceNotice }) => {
 
         // Hunter's Lore: reveal full IRV info for Hunter's Mark target
         let hunterLoreNotice = null;
@@ -307,6 +307,53 @@ export function buildAttackContextSync(attack, playerStats, campaignName, condit
         const boonOfFateUsed = hasBoonOfFate ? getRuntimeValue(playerName, 'boonOfFateUsed', campaignName) : false;
         const boonOfFateAvailable = hasBoonOfFate && !boonOfFateUsed;
 
+        // Determine sneak attack eligibility
+        let sneakAttackDice = 0;
+        const isRogue = playerStats.class?.name === 'Rogue';
+        if (isRogue) {
+            const classLevel = playerStats.class?.class_levels?.find(cl => cl.level === playerStats.level);
+            // 2024 rules: sneak_attack_num_d6 directly on class level
+            // 5e rules: class_specific.sneak_attack.dice_count
+            const sneakAttackNumD6 = classLevel?.sneak_attack_num_d6 || classLevel?.class_specific?.sneak_attack?.dice_count || 0;
+            const hasSneakAttack = sneakAttackNumD6 > 0;
+            const weaponProperties = attack.properties || [];
+            const hasFinesse = weaponProperties.some(p => p.toLowerCase() === 'finesse');
+            const hasRanged = attack.weaponType === 'ranged';
+            const isSneakAttackWeapon = hasFinesse || hasRanged;
+            const hasDisadvantage = forcedMode === 'disadvantage';
+            const hasAdvantage = forcedMode === 'advantage';
+            if (hasSneakAttack && isSneakAttackWeapon && !hasDisadvantage) {
+                if (hasAdvantage) {
+                    sneakAttackDice = sneakAttackNumD6;
+                } else {
+                    // Check for ally within 5ft of target
+                    const combatSummary = await getCombatContext(campaignName);
+                    if (combatSummary) {
+                        const targetCreature = combatSummary.creatures?.find(c => c.name === targetName);
+                        if (targetCreature) {
+                            const hasAllyInRange = combatSummary.creatures.some(c => {
+                                if (c.name === playerName || c.name === targetName) return false;
+                                if (c.type === 'player' || (c.type === 'npc' && c.attitude !== 'hostile')) {
+                                    const targetPos = targetCreature.position;
+                                    const allyPos = c.position;
+                                    if (targetPos && allyPos) {
+                                        const distance = getDistanceFeet(targetPos, allyPos);
+                                        return distance <= 5;
+                                    } else {
+                                        return true;
+                                    }
+                                }
+                                return false;
+                            });
+                            if (hasAllyInRange) {
+                                sneakAttackDice = sneakAttackNumD6;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         return {
             damageType: attack.damageType,
             resistanceNotice,
@@ -338,6 +385,7 @@ export function buildAttackContextSync(attack, playerStats, campaignName, condit
             grazeAbilityMod,
             weaponType: attack.weaponType,
             weaponName: attack.name,
+            sneakAttackDice,
         };
     });
 }

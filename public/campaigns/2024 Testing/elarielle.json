@@ -1,6 +1,6 @@
 {
   "name": "Elarielle",
-  "level": 2,
+  "level": 20,
   "alignment": "Neutral Good",
   "abilities": [
     {
@@ -26,7 +26,7 @@
     },
     {
       "name": "Intelligence",
-      "baseScore": 8,
+      "baseScore": 15,
       "featIncrease": 4,
       "backgroundIncrease": 1,
       "miscIncrease": 0

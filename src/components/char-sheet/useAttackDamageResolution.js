@@ -90,10 +90,25 @@ export default function useAttackDamageResolution({
         const result = wasCrit ? rollExpressionDoubled(attack.damage) : rollExpression(attack.damage);
         if (!result) return;
 
+        // Build context to get sneak attack dice and other modifiers
+        const ctx = mapName ? await buildCtx(attack) : await buildCtxSync(attack);
+        const sneakAttackDice = ctx?.sneakAttackDice || 0;
+
         let formula = attack.damage;
         let total = result.total;
         let rolls = result.rolls;
         const modifier = result.modifier;
+
+        // Apply Sneak Attack damage (Rogue class feature)
+        if (sneakAttackDice > 0) {
+            const sneakAttackFormula = `${sneakAttackDice}d6`;
+            const sneakAttackResult = wasCrit ? rollExpressionDoubled(sneakAttackFormula) : rollExpression(sneakAttackFormula);
+            if (sneakAttackResult) {
+                formula += ` + ${sneakAttackFormula} [Sneak Attack]`;
+                total += sneakAttackResult.total;
+                rolls = [...rolls, ...sneakAttackResult.rolls];
+            }
+        }
 
         // Apply Two Weapon Fighting feat: add ability modifier to bonus action attack damage for light weapons
         if (isBonusActionAttack && hasTwoWeaponFighting(playerStats)) {
