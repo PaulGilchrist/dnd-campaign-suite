@@ -25,13 +25,12 @@ export function getPostCastRiderSaves(playerStats) {
 }
 
 export function getSpellThiefFeatures(playerStats) {
-    const rawPassives = playerStats.automation?.passives;
-    if (rawPassives == null) {
-        console.error('[postCastRiderService] Missing array:', rawPassives);
-        throw new Error('Expected array, got ' + rawPassives);
+    const reactions = playerStats.automation?.reactions;
+    if (reactions == null) {
+        console.error('[postCastRiderService] Missing array:', reactions);
+        throw new Error('Expected array, got ' + reactions);
     }
-    const passives = rawPassives;
-    return passives.filter(p => p.type === 'spell_thief');
+    return reactions.filter(r => r.type === 'spell_thief');
 }
 
 export function getMultiTargetSpreads(playerStats) {
@@ -230,7 +229,7 @@ export async function triggerSpellThief(spell, metaCtx, playerStats, campaignNam
     for (const thief of spellThiefFeatures) {
         const featureName = thief.name;
         const usesKey = featureName.toLowerCase().replace(/\s+/g, '') + 'Uses';
-        const currentUses = Number(getRuntimeValue(playerStats.name, usesKey) ?? 0);
+        const currentUses = Number(getRuntimeValue(playerStats.name, usesKey) ?? 1);
 
         if (currentUses <= 0) {
             continue;

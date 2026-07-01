@@ -2,8 +2,11 @@ import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useR
 import { addEntry } from '../../../ui/logService.js';
 import { createSaveListener, buildSaveDc } from '../../common/savePrompt.js';
 import { addExpiration } from '../../../rules/effects/expirations.js';
+import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 const SPELL_THIEF_BLOCK_KEY = 'spellThiefBlocked';
 const SPELL_THIEF_STOLEN_KEY = 'spellThiefStolen';
+const SPELL_THIEF_BLOCKED_LIST_KEY = '_spellThiefBlockedList';
+const SPELL_THIEF_STOLEN_LIST_KEY = '_spellThiefStolenList';
 
 function getRuntimeUsesKey(featureName) {
     return featureName.toLowerCase().replace(/\s+/g, '') + 'Uses';
@@ -19,13 +22,34 @@ function getStolenSpellKey(casterName, spellName) {
     return `${SPELL_THIEF_STOLEN_KEY}_${casterName}_${spellName}`;
 }
 
+async function addBlockedSpell(playerName, casterName, spellName, campaignName) {
+    await setRuntimeValue(playerName, getBlockedSpellKey(casterName, spellName), true, campaignName);
+    const list = getRuntimeValue(playerName, SPELL_THIEF_BLOCKED_LIST_KEY, campaignName);
+    const entries = list ? JSON.parse(list) : [];
+    if (!entries.some(e => e.casterName === casterName && e.spellName === spellName)) {
+        entries.push({ casterName, spellName });
+        await setRuntimeValue(playerName, SPELL_THIEF_BLOCKED_LIST_KEY, JSON.stringify(entries), campaignName);
+    }
+}
+
+async function addStolenSpell(playerName, casterName, spellName, campaignName) {
+    await setRuntimeValue(playerName, getStolenSpellKey(casterName, spellName), true, campaignName);
+    const list = getRuntimeValue(playerName, SPELL_THIEF_STOLEN_LIST_KEY, campaignName);
+    const entries = list ? JSON.parse(list) : [];
+    if (!entries.some(e => e.casterName === casterName && e.spellName === spellName)) {
+        entries.push({ casterName, spellName });
+        await setRuntimeValue(playerName, SPELL_THIEF_STOLEN_LIST_KEY, JSON.stringify(entries), campaignName);
+    }
+}
+
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
     const playerName = playerStats.name;
     const featureName = action.name || 'Spell Thief';
 
     const usesKey = getRuntimeUsesKey(featureName);
-    const currentUses = Number(getRuntimeValue(playerName, usesKey) ?? 0);
+    const storedUses = getRuntimeValue(playerName, usesKey);
+    const currentUses = storedUses != null ? Number(storedUses) : 1;
 
     if (currentUses <= 0) {
         return {
@@ -39,21 +63,25 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         };
     }
 
+    const cs = await getCombatContext(campaignName);
+    const lastAttack = cs?.lastAttack || null;
+
+    const casterName = action.casterName || (lastAttack?.attackerName) || action.targetName || 'unknown creature';
+    const spellName = action.spellName || (lastAttack?.attackName) || 'unknown spell';
+
     const saveDc = buildSaveDc(auto, playerStats);
 
     const { promptId } = createSaveListener(campaignName, {
-        targetName: action.targetName || playerName,
+        targetName: casterName,
         saveType: auto.saveType || 'INT',
         saveDc,
     });
-
-    const targetName = action.targetName || 'Target';
 
     addEntry(campaignName, {
         type: 'ability_use',
         characterName: playerName,
         abilityName: featureName,
-        description: `${playerName} used ${featureName} — ${targetName} must make INT save (DC ${saveDc}) or lose the spell.`,
+        description: `${playerName} used ${featureName} — ${casterName} must make INT save (DC ${saveDc}) or lose the spell.`,
         promptId,
     }).catch((e) => { console.error("[spellThief] Error:", e); });
 
@@ -65,13 +93,8 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         await setRuntimeValue(playerName, usesKey, currentUses - 1, campaignName);
 
         if (!isSuccessful) {
-            const casterName = action.casterName || targetName;
-            const spellName = action.spellName || 'unknown spell';
-            const blockedKey = getBlockedSpellKey(casterName, spellName);
-            const stolenKey = getStolenSpellKey(casterName, spellName);
-
-            await setRuntimeValue(playerName, blockedKey, true, campaignName);
-            await setRuntimeValue(playerName, stolenKey, true, campaignName);
+            await addBlockedSpell(playerName, casterName, spellName, campaignName);
+            await addStolenSpell(playerName, casterName, spellName, campaignName);
 
             addExpiration(playerName, playerName, [
                 { type: 'add_prepared_spell', spellName }
@@ -85,11 +108,11 @@ export async function handle(action, playerStats, campaignName, _mapName) {
                 type: 'save_result',
                 characterName: playerName,
                 rollType: `save-${auto.type}`,
-                targetName,
+                targetName: casterName,
                 saveDc,
                 saveType: auto.saveType || 'INT',
                 success: false,
-                description: `${targetName} failed INT save. Spell negated. ${playerName} steals ${spellName} for 8 hours. ${casterName} cannot cast ${spellName} for 8 hours.`,
+                description: `${casterName} failed INT save. Spell negated. ${playerName} steals ${spellName} for 8 hours. ${casterName} cannot cast ${spellName} for 8 hours.`,
             }).catch((e) => { console.error("[spellThief] Error:", e); });
 
             window.dispatchEvent(new CustomEvent('combat-summary-updated'));
@@ -98,11 +121,11 @@ export async function handle(action, playerStats, campaignName, _mapName) {
                 type: 'save_result',
                 characterName: playerName,
                 rollType: `save-${auto.type}`,
-                targetName,
+                targetName: casterName,
                 saveDc,
                 saveType: auto.saveType || 'INT',
                 success: true,
-                description: `${targetName} succeeded on INT save. ${featureName} has no effect.`,
+                description: `${casterName} succeeded on INT save. ${featureName} has no effect.`,
             }).catch((e) => { console.error("[spellThief] Error:", e); });
         }
 
@@ -116,11 +139,11 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         payload: {
             type: 'automation_info',
             name: featureName,
-            targetName,
-            description: `${targetName} must make an INT saving throw (DC ${saveDc}) or the spell is negated and ${playerName} steals knowledge of it for 8 hours.`,
+            targetName: casterName,
+            description: `${casterName} must make an INT saving throw (DC ${saveDc}) or the spell is negated and ${playerName} steals knowledge of it for 8 hours.`,
             automation: auto,
-            casterName: action.casterName,
-            spellName: action.spellName,
+            casterName,
+            spellName,
         },
     };
 }

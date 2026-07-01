@@ -102,13 +102,17 @@ describe('spellThiefHandler', () => {
             expect(result.payload.description).toContain('no uses remaining');
         });
 
-        it('returns popup with no-uses message when uses are undefined', async () => {
+        it('defaults to 1 use when runtime value is undefined', async () => {
             withUses(undefined);
+            buildSaveDc.mockReturnValue(13);
+            createSaveListener.mockReturnValue({ promptId: 'test-prompt-id' });
 
             const result = await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
 
             expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('no uses remaining');
+            expect(result.payload.type).toBe('automation_info');
+            expect(result.payload.description).toContain('INT saving throw');
+            expect(result.payload.description).toContain('DC 13');
         });
     });
 
@@ -140,8 +144,8 @@ describe('spellThiefHandler', () => {
             }));
         });
 
-        it('uses action targetName when provided', async () => {
-            const action = makeAction({ targetName: 'Orc' });
+        it('uses action casterName for save prompt target when provided', async () => {
+            const action = makeAction({ casterName: 'Orc' });
 
             await handle(action, makePlayerStats(), 'test-campaign', null);
 
@@ -150,24 +154,24 @@ describe('spellThiefHandler', () => {
             }));
         });
 
-        it('falls back to playerName when targetName is null', async () => {
-            const action = makeAction({ targetName: null });
+        it('uses action targetName as caster fallback for save prompt when no casterName', async () => {
+            const action = makeAction({ casterName: null });
 
             await handle(action, makePlayerStats(), 'test-campaign', null);
 
             expect(createSaveListener).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
-                targetName: 'FighterRogue',
+                targetName: 'Goblin',
             }));
         });
 
-        it('falls back to playerName when targetName is undefined', async () => {
+        it('uses action targetName as caster fallback for save prompt when casterName is undefined', async () => {
             const action = makeAction();
-            delete action.targetName;
+            delete action.casterName;
 
             await handle(action, makePlayerStats(), 'test-campaign', null);
 
             expect(createSaveListener).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
-                targetName: 'FighterRogue',
+                targetName: 'Goblin',
             }));
         });
 
@@ -320,8 +324,9 @@ describe('spellThiefHandler', () => {
                 call => call[1].includes('spellThiefStolen')
             );
 
-            expect(blockedCalls).toHaveLength(1);
+            expect(blockedCalls).toHaveLength(2);
             expect(blockedCalls[0][1]).toBe('spellThiefBlocked_Wizard_Burning Hands');
+            expect(stolenCalls).toHaveLength(2);
             expect(stolenCalls[0][1]).toBe('spellThiefStolen_Wizard_Burning Hands');
         });
 

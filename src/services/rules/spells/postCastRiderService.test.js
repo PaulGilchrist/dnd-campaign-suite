@@ -98,10 +98,10 @@ describe('postCastRiderService', () => {
   })
 
   describe('getSpellThiefFeatures', () => {
-    it('returns spell_thief passives', () => {
+    it('returns spell_thief reactions', () => {
       const stats = {
         automation: {
-          passives: [
+          reactions: [
             { type: 'spell_thief', name: 'Thief' },
             { type: 'other', name: 'Other' },
           ],
@@ -112,12 +112,12 @@ describe('postCastRiderService', () => {
       expect(result[0].name).toBe('Thief')
     })
 
-    it('throws when automation.passives is missing', () => {
+    it('throws when automation.reactions is missing', () => {
       expect(() => getSpellThiefFeatures({})).toThrow('Expected array')
     })
 
-    it('returns empty array when passives is empty', () => {
-      expect(getSpellThiefFeatures({ automation: { passives: [] } })).toEqual([])
+    it('returns empty array when reactions is empty', () => {
+      expect(getSpellThiefFeatures({ automation: { reactions: [] } })).toEqual([])
     })
   })
 
@@ -492,14 +492,14 @@ describe('postCastRiderService', () => {
     const spell = { name: 'Fireball' }
 
     it('returns null when no spell slot used (both metaCtx and spell have level 0)', async () => {
-      const stats = { name: 'Player', automation: { passives: [{ type: 'spell_thief', name: 'Thief' }] } }
+      const stats = { name: 'Player', automation: { reactions: [{ type: 'spell_thief', name: 'Thief' }] } }
       const result = await triggerSpellThief(spell, { slotLevel: 0 }, stats, 'camp', 'map')
       expect(result).toBeNull()
     })
 
     it('triggers when spell has level > 0', async () => {
       executeHandler.mockResolvedValue({ success: true })
-      const stats = { name: 'Player', automation: { passives: [{ type: 'spell_thief', name: 'Thief' }] } }
+      const stats = { name: 'Player', automation: { reactions: [{ type: 'spell_thief', name: 'Thief' }] } }
       const result = await triggerSpellThief(spell, {}, stats, 'camp', 'map')
       expect(result).toBeNull()
     })
@@ -507,21 +507,21 @@ describe('postCastRiderService', () => {
     it('returns null when blocked by spell thief', async () => {
       const { isBlockedBySpellThief } = await import('../../automation/handlers/class-fighter-rogue/spellThiefHandler.js')
       vi.mocked(isBlockedBySpellThief).mockReturnValue(true)
-      const stats = { name: 'Player', automation: { passives: [{ type: 'spell_thief', name: 'Thief' }] } }
+      const stats = { name: 'Player', automation: { reactions: [{ type: 'spell_thief', name: 'Thief' }] } }
       const result = await triggerSpellThief(spell, { slotLevel: 1 }, stats, 'camp', 'map')
       expect(result).toBeNull()
       vi.mocked(isBlockedBySpellThief).mockRestore()
     })
 
     it('returns null when no spell thief features', async () => {
-      const result = await triggerSpellThief(spell, { slotLevel: 1 }, { automation: { passives: [] } }, 'camp', 'map')
+      const result = await triggerSpellThief(spell, { slotLevel: 1 }, { automation: { reactions: [] } }, 'camp', 'map')
       expect(result).toBeNull()
     })
 
     it('skips riders with exhausted uses', async () => {
       const { getRuntimeValue } = await import('../../../hooks/runtime/useRuntimeState.js')
       vi.mocked(getRuntimeValue).mockReturnValue(0)
-      const stats = { name: 'Player', automation: { passives: [{ type: 'spell_thief', name: 'Thief' }] } }
+      const stats = { name: 'Player', automation: { reactions: [{ type: 'spell_thief', name: 'Thief' }] } }
       const result = await triggerSpellThief(spell, { slotLevel: 1 }, stats, 'camp', 'map')
       expect(result).toBeNull()
       expect(executeHandler).not.toHaveBeenCalled()
@@ -534,7 +534,7 @@ describe('postCastRiderService', () => {
       vi.mocked(getRuntimeValue).mockReturnValue(1)
       const stats = {
         name: 'Player',
-        automation: { passives: [{ type: 'spell_thief', name: 'Thief', saveType: 'INT', saveDc: 15 }] },
+        automation: { reactions: [{ type: 'spell_thief', name: 'Thief', saveType: 'INT', saveDc: 15 }] },
       }
       const result = await triggerSpellThief(spell, { slotLevel: 1 }, stats, 'camp', 'map')
       expect(executeHandler).toHaveBeenCalledWith(
@@ -566,7 +566,7 @@ describe('postCastRiderService', () => {
       vi.mocked(getRuntimeValue).mockReturnValue(1)
       const stats = {
         name: 'Player',
-        automation: { passives: [{ type: 'spell_thief', name: 'Thief' }] },
+        automation: { reactions: [{ type: 'spell_thief', name: 'Thief' }] },
       }
       await triggerSpellThief(spell, { slotLevel: 1 }, stats, 'camp', 'map')
       expect(executeHandler).toHaveBeenCalledWith(
@@ -591,7 +591,7 @@ describe('postCastRiderService', () => {
       const stats = {
         name: 'Player',
         automation: {
-          passives: [
+          reactions: [
             { type: 'spell_thief', name: 'Thief A' },
             { type: 'spell_thief', name: 'Thief B' },
           ],
@@ -604,7 +604,7 @@ describe('postCastRiderService', () => {
 
     it('throws when executeHandler errors', async () => {
       executeHandler.mockRejectedValue(new Error('fail'))
-      const stats = { name: 'Player', automation: { passives: [{ type: 'spell_thief', name: 'Thief' }] } }
+      const stats = { name: 'Player', automation: { reactions: [{ type: 'spell_thief', name: 'Thief' }] } }
       await expect(
         triggerSpellThief(spell, { slotLevel: 1 }, stats, 'camp', 'map')
       ).rejects.toThrow('fail')

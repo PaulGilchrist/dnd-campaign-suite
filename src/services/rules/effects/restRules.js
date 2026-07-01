@@ -58,9 +58,10 @@ export const SHORT_REST_RESOURCES = [
     'actionSurgeUsedThisRound',
     'luckyPoints',
                 'adrenalineRushUses',
-                '_celestialRevelationUses',
-                '_War_Gods_Blessing_active'
-       ]
+                 '_celestialRevelationUses',
+                 '_War_Gods_Blessing_active',
+                 'spellthiefUses'
+        ]
 
 export function getShortRestResources() {
   return [...SHORT_REST_RESOURCES]
@@ -111,8 +112,8 @@ export const LONG_REST_RESOURCES = [
               'breathWeaponUses',
                'stonecunningUses',
                 'adrenalineRushUses',
-                '_celestialRevelationUses',
-                '_War_Gods_Blessing_active'
+                 '_celestialRevelationUses',
+                 '_War_Gods_Blessing_active'
         ]
 
 export function getLongRestResources() {
@@ -341,29 +342,53 @@ export async function applyLongRest(playerStats, campaignName) {
        }
      }
 
-  charData.shortRestHitDice = playerStats.level
+   charData.shortRestHitDice = playerStats.level
 
-  getLongRestResources().forEach((key) => {
-    charData[key] = null
-     })
+    getLongRestResources().forEach((key) => {
+      charData[key] = null
+       })
 
-  // Clear active buffs and conditions as part of the atomic batch so SSE echo carries correct final state
-  charData.activeBuffs = [];
-  charData.activeConditions = [];
+   // Clear active buffs and conditions as part of the atomic batch so SSE echo carries correct final state
+   charData.activeBuffs = [];
+   charData.activeConditions = [];
 
-  const currentExhaustion = getRuntimeValue(name, 'exhaustionLevel')
-  if (typeof currentExhaustion === 'number' && currentExhaustion > 0) {
-    charData.exhaustionLevel = getLevelAfterLongRest(currentExhaustion)
-        }
+   const currentExhaustion = getRuntimeValue(name, 'exhaustionLevel')
+   if (typeof currentExhaustion === 'number' && currentExhaustion > 0) {
+     charData.exhaustionLevel = getLevelAfterLongRest(currentExhaustion)
+         }
 
-     // Grant Heroic Inspiration from Resourceful trait (Human 2024)
-  const hasResourceful = playerStats.characterAdvancement?.some(f => f.name === 'Resourceful')
-  if (hasResourceful) {
-    charData.hasInspiration = true
-        }
+      // Grant Heroic Inspiration from Resourceful trait (Human 2024)
+   const hasResourceful = playerStats.characterAdvancement?.some(f => f.name === 'Resourceful')
+   if (hasResourceful) {
+     charData.hasInspiration = true
+         }
 
-      // Single atomic write fires ONE SSE event with the complete final state
-  setRuntimeBatch(name, charData, campaignName)
+   // Spell Thief: reset uses to 1 and clear blocked/stolen spell tracking on long rest
+   const hasSpellThief = (playerStats.automation?.reactions ?? []).some(
+     r => r.type === 'spell_thief'
+   )
+   if (hasSpellThief) {
+     charData.spellThiefUses = 1
+     const blockList = getRuntimeValue(name, '_spellThiefBlockedList', campaignName)
+     if (blockList) {
+       const entries = JSON.parse(blockList)
+       for (const entry of entries) {
+         charData[`spellThiefBlocked_${entry.casterName}_${entry.spellName}`] = null
+       }
+     }
+     const stolenList = getRuntimeValue(name, '_spellThiefStolenList', campaignName)
+     if (stolenList) {
+       const entries = JSON.parse(stolenList)
+       for (const entry of entries) {
+         charData[`spellThiefStolen_${entry.casterName}_${entry.spellName}`] = null
+       }
+     }
+     charData._spellThiefBlockedList = null
+     charData._spellThiefStolenList = null
+   }
+
+       // Single atomic write fires ONE SSE event with the complete final state
+   setRuntimeBatch(name, charData, campaignName)
 
    // Natural Recovery: reset free cast tracking on long rest
    const hasNaturalRecovery = (playerStats.automation?.passives ?? []).some(
