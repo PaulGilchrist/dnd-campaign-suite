@@ -9217,7 +9217,7 @@
                         "automation": {
                             "type": "passive_rule",
                             "effect": "versatile_trickster",
-                            "casting_time": "1 bonus action"
+                            "casting_time": "passive"
                         }
                     },
                     {

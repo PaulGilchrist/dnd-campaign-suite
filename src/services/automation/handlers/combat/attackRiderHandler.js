@@ -154,7 +154,7 @@ export async function applyRiderOption(action, playerStats, campaignName, target
     if (hasVersatileTrickster && versatileTricksterSecondaryTarget && versatileTricksterSecondaryTarget.length > 0) {
         setRuntimeValue(playerStats.name, 'versatileTricksterSecondaryTargets', versatileTricksterSecondaryTarget, campaignName);
         setRuntimeValue(playerStats.name, 'versatileTricksterPrimaryTarget', targetName, campaignName);
-        setRuntimeValue(playerStats.name, 'versatileTricksterAction', { type: 'versatile_trickster', automation: { type: 'versatile_trickster' } }, campaignName);
+        setRuntimeValue(playerStats.name, 'versatileTricksterAction', { type: 'versatile_trickster', automation: { type: 'versatile_trickster', casting_time: 'passive' } }, campaignName);
     }
 
     if (results.length === 1) {
