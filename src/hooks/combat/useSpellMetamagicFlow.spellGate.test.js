@@ -197,27 +197,6 @@ describe('useSpellMetamagicFlow — spell-specific gate paths', () => {
       expect(pending.creatureTargets).toHaveLength(3);
     });
 
-    it('sets pendingShieldOfFaith when creatures exist', () => {
-      const onExecute = vi.fn();
-      const { result } = renderFlow(
-        makePlayerStats(),
-        'TestCampaign',
-        onExecute
-      );
-
-      act(() => {
-        result.current.gateMetamagic(
-          makeSpell({ name: 'Shield of Faith', range: undefined })
-        );
-      });
-
-      const pending = result.current.pendingShieldOfFaith;
-      expect(pending).not.toBeNull();
-      expect(pending.spellName).toBe('Shield of Faith');
-      expect(pending.range).toBe('60 feet');
-      expect(pending.creatureTargets).toHaveLength(3);
-    });
-
     it('sets pendingProtectionFromEnergy with default damageTypes when creatures exist', () => {
       const onExecute = vi.fn();
       const { result } = renderFlow(
@@ -405,23 +384,6 @@ describe('useSpellMetamagicFlow — spell-specific gate paths', () => {
       });
 
       expect(result.current.pendingMageArmor).toBeNull();
-      expect(result.current.pendingMetamagic).not.toBeNull();
-    });
-
-    it('falls through to sorcerer metamagic path for Shield of Faith when no creatures', () => {
-      setupNoCreatures();
-      const onExecute = vi.fn();
-      const { result } = renderFlow(
-        makePlayerStats(),
-        'TestCampaign',
-        onExecute
-      );
-
-      act(() => {
-        result.current.gateMetamagic(makeSpell({ name: 'Shield of Faith' }));
-      });
-
-      expect(result.current.pendingShieldOfFaith).toBeNull();
       expect(result.current.pendingMetamagic).not.toBeNull();
     });
 

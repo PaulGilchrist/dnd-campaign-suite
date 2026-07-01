@@ -495,25 +495,6 @@ describe('useSpellMetamagicFlow', () => {
       expect(result.current.pendingMageArmor).not.toBeNull();
     });
 
-    it('sets pendingShieldOfFaith when creature targets exist', async () => {
-      const onExecute = vi.fn();
-      const playerStats = makePlayerStats();
-      const { result } = renderHook(() =>
-        useSpellMetamagicFlow(playerStats, 'TestCampaign', onExecute)
-      );
-
-      const combatMod = await import('../../services/encounters/combatData.js');
-      combatMod.getCombatSummary.mockReturnValue({
-        creatures: [{ name: 'Ally 1' }],
-      });
-
-      act(() => {
-        result.current.gateMetamagic({ name: 'Shield of Faith', level: 1, casting_time: '1 Bonus Action', range: '60 feet' });
-      });
-
-      expect(result.current.pendingShieldOfFaith).not.toBeNull();
-    });
-
     it('sets pendingProtectionFromEnergy when creature targets exist', async () => {
       const onExecute = vi.fn();
       const playerStats = makePlayerStats();
@@ -2050,111 +2031,6 @@ describe('useSpellMetamagicFlow', () => {
       });
 
       expect(result.current.pendingMageArmor).toBeNull();
-    });
-  });
-
-  // ── handleShieldOfFaithConfirm / handleShieldOfFaithSkip ───────────────
-
-  describe('handleShieldOfFaithConfirm', () => {
-    it('does nothing when no pending shield of faith', async () => {
-      const onExecute = vi.fn();
-      const playerStats = makePlayerStats();
-      const { result } = renderHook(() =>
-        useSpellMetamagicFlow(playerStats, 'TestCampaign', onExecute)
-      );
-
-      await act(async () => {
-        await result.current.handleShieldOfFaithConfirm({});
-      });
-
-      const logService = await import('../../services/ui/logService.js');
-      expect(logService.addEntry).not.toHaveBeenCalled();
-    });
-
-    it('logs and applies shield of faith effect', async () => {
-      const onExecute = vi.fn();
-      const playerStats = makePlayerStats();
-      const { result } = renderHook(() =>
-        useSpellMetamagicFlow(playerStats, 'TestCampaign', onExecute)
-      );
-
-      const combatMod = await import('../../services/encounters/combatData.js');
-      combatMod.getCombatSummary.mockReturnValue({ creatures: [{ name: 'Ally 1' }] });
-
-      act(() => {
-        result.current.gateMetamagic({ name: 'Shield of Faith', level: 1, casting_time: '1 Bonus Action', range: '60 feet' });
-      });
-
-      const automationMod = await import('../../services/automation/index.js');
-
-      await act(async () => {
-        await result.current.handleShieldOfFaithConfirm({ targetName: 'Ally 1' });
-      });
-
-      const logService = await import('../../services/ui/logService.js');
-      expect(logService.addEntry).toHaveBeenCalled();
-      expect(automationMod.applyShieldOfFaithEffect).toHaveBeenCalled();
-    });
-
-    it('clears pendingShieldOfFaith after confirm', async () => {
-      const onExecute = vi.fn();
-      const playerStats = makePlayerStats();
-      const { result } = renderHook(() =>
-        useSpellMetamagicFlow(playerStats, 'TestCampaign', onExecute)
-      );
-
-      const combatMod = await import('../../services/encounters/combatData.js');
-      combatMod.getCombatSummary.mockReturnValue({ creatures: [{ name: 'Ally 1' }] });
-
-      act(() => {
-        result.current.gateMetamagic({ name: 'Shield of Faith', level: 1, casting_time: '1 Bonus Action', range: '60 feet' });
-      });
-
-      expect(result.current.pendingShieldOfFaith).not.toBeNull();
-
-      await act(async () => {
-        await result.current.handleShieldOfFaithConfirm({ targetName: 'Ally 1' });
-      });
-
-      expect(result.current.pendingShieldOfFaith).toBeNull();
-    });
-  });
-
-  describe('handleShieldOfFaithSkip', () => {
-    it('does nothing when no pending shield of faith', async () => {
-      const onExecute = vi.fn();
-      const playerStats = makePlayerStats();
-      const { result } = renderHook(() =>
-        useSpellMetamagicFlow(playerStats, 'TestCampaign', onExecute)
-      );
-
-      act(() => {
-        result.current.handleShieldOfFaithSkip();
-      });
-
-      const logService = await import('../../services/ui/logService.js');
-      expect(logService.addEntry).not.toHaveBeenCalled();
-    });
-
-    it('logs and clears pending state', async () => {
-      const onExecute = vi.fn();
-      const playerStats = makePlayerStats();
-      const { result } = renderHook(() =>
-        useSpellMetamagicFlow(playerStats, 'TestCampaign', onExecute)
-      );
-
-      const combatMod = await import('../../services/encounters/combatData.js');
-      combatMod.getCombatSummary.mockReturnValue({ creatures: [{ name: 'Ally 1' }] });
-
-      act(() => {
-        result.current.gateMetamagic({ name: 'Shield of Faith', level: 1, casting_time: '1 Bonus Action', range: '60 feet' });
-      });
-
-      act(() => {
-        result.current.handleShieldOfFaithSkip();
-      });
-
-      expect(result.current.pendingShieldOfFaith).toBeNull();
     });
   });
 

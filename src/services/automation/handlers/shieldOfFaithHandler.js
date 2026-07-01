@@ -1,6 +1,5 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import { addExpiration } from '../../rules/effects/expirations.js';
-import { getCombatContext } from '../../rules/combat/damageUtils.js';
 import { rangeToFeet } from '../../rules/combat/rangeValidation.js';
 import { resolveMapPositions } from '../common/targetResolver.js';
 import { postLogEntry } from '../../shared/logPoster.js';
@@ -11,7 +10,7 @@ function getShieldOfFaithDuration(spell) {
     return spell.duration || 'Concentration, up to 10 minutes';
 }
 
-export async function handle(action, playerStats, campaignName, mapName) {
+export async function handle(action, playerStats, campaignName, mapName, characters) {
     const spell = action.spell || {};
 
     const rangeFt = rangeToFeet(spell.range || '60 feet');
@@ -19,19 +18,7 @@ export async function handle(action, playerStats, campaignName, mapName) {
     const positions = mapName ? await resolveMapPositions(campaignName, mapName, playerStats.name) : null;
     const attackerPos = positions?.attackerPos || null;
 
-    const combatSummary = await getCombatContext(campaignName);
-    if (!combatSummary) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: action.name,
-                description: `No combat context found. Cannot apply ${action.name}.`,
-            },
-        };
-    }
-
-    const creatureTargets = combatSummary.creatures
+    const creatureTargets = (characters || [])
         .filter(c => c.name !== playerStats.name)
         .map(c => c.name);
 

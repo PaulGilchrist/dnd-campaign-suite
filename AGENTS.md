@@ -118,3 +118,4 @@ npm run test:coverage                             # Vitest with coverage (v8, ou
 - Never leave dead code.  It just confuses people later.
 - Look for and re-use existing code and avoid duplicating code.
 - If a map is active, use position on map, but if no map is active, assume all creatures are within range.
+- There's no "out of combat" — there are always creatures.  There is always a combatSummary

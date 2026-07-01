@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import Popup from '../common/popup.jsx'
 import MetamagicPopup from './popups/MetamagicPopup.jsx'
 import SpellDetailPopup from './char-spells/SpellDetailPopup.jsx'
+
 import { getCategories } from '../../services/character/featureCategories.js'
 import { sanitizeHtml } from '../../services/ui/sanitize.js';
 import { getBonusActionSpellNames } from '../../services/ui/spellSectionUtils.js'
@@ -50,7 +51,8 @@ function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, condit
 
       await resolveBonusSpellPositions();
       gateMetamagic(spell, metaCtx);
-    }, [gateMetamagic, resolveBonusSpellPositions]);
+      bonusCastAction(spell, metaCtx);
+    }, [gateMetamagic, bonusCastAction, resolveBonusSpellPositions]);
 
     const bonusActionAttacks = playerStats.attacks.filter((attack) => {
         if (attack.type !== 'Bonus Action') return false;
@@ -206,9 +208,10 @@ function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, condit
                            {exhausted && isRageExpendable && <span className="automation-badge clickable" onClick={restoreRage}><i className="fa-solid fa-fire-flame-curved"></i> Restore with Rage</span>}
                       </div>
                   })}
-             </div>}
-         </div>
-     );
+              </div>}
+
+          </div>
+      );
 }
 
 export default CharBonusActions

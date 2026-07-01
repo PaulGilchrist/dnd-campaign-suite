@@ -19,7 +19,9 @@ export function useSpellCastExecutor(rollAttack, rollDamage, playerStats, getTar
             mapName,
             characters,
         }).then((result) => {
-            if (result && result.healAmount > 0) {
+            if (result?.automationPopup) {
+                setPopupHtml(result.automationPopup.payload);
+            } else if (result && result.healAmount > 0) {
                 const bonusHealDetail = result.bonusDetails?.length > 0
                     ? result.bonusDetails.map(d => `${d.amount} ${d.name}`).join(', ')
                     : '';

@@ -203,7 +203,7 @@ describe('executeHandler', () => {
       const result = await executeHandler(action, playerStats, campaignName, mapName);
 
       expect(mockModule.handle).toHaveBeenCalledTimes(1);
-      expect(mockModule.handle).toHaveBeenCalledWith(action, playerStats, campaignName, mapName);
+      expect(mockModule.handle).toHaveBeenCalledWith(action, playerStats, campaignName, mapName, undefined);
       expect(result).toBe(expectedReturn);
     });
   });
@@ -218,8 +218,8 @@ describe('executeHandler', () => {
       await executeHandler(makeAction({ type: 'self_healing' }), makePlayerStats(), campaignName, mapName);
 
       expect(healingHandle).toHaveBeenCalledTimes(2);
-      expect(healingHandle).toHaveBeenNthCalledWith(1, expect.objectContaining({ automation: { type: 'healing' } }), expect.any(Object), campaignName, mapName);
-      expect(healingHandle).toHaveBeenNthCalledWith(2, expect.objectContaining({ automation: { type: 'self_healing' } }), expect.any(Object), campaignName, mapName);
+      expect(healingHandle).toHaveBeenNthCalledWith(1, expect.objectContaining({ automation: { type: 'healing' } }), expect.any(Object), campaignName, mapName, undefined);
+      expect(healingHandle).toHaveBeenNthCalledWith(2, expect.objectContaining({ automation: { type: 'self_healing' } }), expect.any(Object), campaignName, mapName, undefined);
     });
 
     it('routes both "sorcery_aura" and "sorcery_incarnate" to the same handler', async () => {
@@ -305,7 +305,7 @@ describe('executeHandler', () => {
 
       await executeHandler(action, playerStats, campaignName, mapName);
 
-      expect(healingHandle).toHaveBeenCalledWith(action, playerStats, campaignName, mapName);
+      expect(healingHandle).toHaveBeenCalledWith(action, playerStats, campaignName, mapName, undefined);
     });
 
     it('returns the handler result unchanged on success', async () => {

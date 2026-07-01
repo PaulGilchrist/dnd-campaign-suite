@@ -159,25 +159,6 @@ export function useSpellMetamagicFlow(playerStats, campaignName, onExecute) {
       }
     }
 
-    const isShieldOfFaith = (spell.name || '').toLowerCase() === 'shield of faith';
-    if (isShieldOfFaith) {
-      const cs = getCombatSummary(campaignName);
-      const creatureTargets = cs?.creatures
-        ?.filter(c => c.name !== playerStats?.name)
-        .map(c => c.name) || [];
-      if (creatureTargets.length > 0) {
-        cfSetPending('shieldOfFaith', {
-          spell,
-          spellName: spell.name,
-          spellLevel: spell.level || 0,
-          castingTime: spell.casting_time,
-          range: spell.range || '60 feet',
-          creatureTargets,
-        });
-        return;
-      }
-    }
-
     const isProtectionFromEnergy = (spell.name || '').toLowerCase() === 'protection from energy';
     if (isProtectionFromEnergy) {
       const cs = getCombatSummary(campaignName);

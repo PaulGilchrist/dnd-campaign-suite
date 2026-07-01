@@ -469,7 +469,7 @@ export {
     isResistanceUsedThisTurn, applyShieldOfFaithEffect, isShieldOfFaithActive, getShieldOfFaithBonus,
     getWardingBondTarget, getWardingBondSource, isWardingBondActive,
 };
-export async function executeHandler(action, playerStats, campaignName, mapName) {
+export async function executeHandler(action, playerStats, campaignName, mapName, characters) {
     if (!action?.automation) {
         return null;
     }
@@ -506,7 +506,7 @@ export async function executeHandler(action, playerStats, campaignName, mapName)
     }
 
     try {
-        const result = await handler(action, playerStats, campaignName, mapName);
+        const result = await handler(action, playerStats, campaignName, mapName, characters);
         return result;
       } catch (e) {
           console.error(`[automation] Handler ${auto.type}/${auto.effect} failed:`, e);

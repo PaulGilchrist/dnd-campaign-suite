@@ -2,6 +2,7 @@ import { rollExpression } from '../../../dice/diceRoller.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { getEmpoweredEvocationFeatures, getEmpoweredEvocationIntModifier } from '../../../../services/rules/spells/postCastRiderService.js';
 import { getMagicInitiateLevel1Spell } from '../feats/magicInitiateHandler.js';
+import { postLogEntry } from '../../../shared/logPoster.js';
 
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
@@ -35,6 +36,23 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 
         const newCharges = currentCharges - 1;
         await setRuntimeValue(playerStats.name, 'channelDivinityCharges', newCharges, campaignName);
+
+        // Reset per-spell used flags when activating a channel divinity free_spell
+        if (auto.perSpellTracking && auto.spell) {
+            const spells = Array.isArray(auto.spell) ? auto.spell : [auto.spell];
+            for (const sn of spells) {
+                const usedKey = `_${action.name.replace(/\s+/g, '_')}_${sn.replace(/\s+/g, '_')}_used`;
+                const freeKey = `_${action.name.replace(/\s+/g, '_')}_${sn.replace(/\s+/g, '_')}_freeCast`;
+                await setRuntimeValue(playerStats.name, usedKey, null, campaignName);
+                await setRuntimeValue(playerStats.name, freeKey, null, campaignName);
+            }
+            postLogEntry(campaignName, {
+                type: 'ability_use',
+                characterName: playerStats.name,
+                abilityName: action.name,
+                description: `${playerStats.name} activated ${action.name}, gaining free casts of ${spells.join(' or ')}. Channel Divinity charges: ${newCharges}.`,
+            }).catch(() => {});
+        }
     }
 
     // For multi-spell automation, use auto.spell array directly; otherwise use resolved spellName

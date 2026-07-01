@@ -1,10 +1,12 @@
 import React from 'react'
 import { cloneDeep } from 'lodash';
 import { getRuntimeValue, setRuntimeValue, useRuntimeValue } from '../../hooks/runtime/useRuntimeState.js'
+import { applyShieldOfFaith } from '../../services/automation/handlers/shieldOfFaithHandler.js'
 import rulesFactory from '../../services/rules/rulesFactory.js'
 import useSharedPopup from '../../hooks/combat/useSharedPopup.js'
 import Popup from '../common/popup.jsx'
 import DiceRollResult from './DiceRollResult.jsx'
+import SecondaryTargetModal from './modals/shared/SecondaryTargetModal.jsx'
 import { sanitizeHtml } from '../../services/ui/sanitize.js'
 import CharAbilities from './CharAbilities.jsx'
 import CharActions from './CharActions.jsx'
@@ -26,6 +28,37 @@ import { getManeuversForRules, getSuperiorityDice } from '../../services/automat
 import { loadCombatSummary } from '../../services/encounters/combatData.js';
 import * as storageService from '../../services/ui/storage.js';
 import './CharSheet.css'
+import './CharSheet.shieldOfFaith.css'
+
+function ShieldOfFaithTargetSelectionModal({ popupHtml, setPopupHtml, playerStats, campaignName }) {
+    const targets = popupHtml?.creatureTargets?.map(name => ({ name, type: 'creature' })) || [];
+
+    const handleTargetSelected = async (targetName) => {
+        const action = {
+            name: 'Shield of Faith',
+            spell: { duration: popupHtml.duration, range: popupHtml.range },
+            automation: { type: 'shield_of_faith' },
+        };
+        const result = await applyShieldOfFaith(action, playerStats, campaignName, null, [targetName]);
+        if (result) {
+            setPopupHtml(result.payload);
+        } else {
+            setPopupHtml(null);
+        }
+    };
+
+    return (
+        <SecondaryTargetModal
+            title="Shield of Faith"
+            targets={targets}
+            onTargetSelected={handleTargetSelected}
+            onSkip={() => setPopupHtml(null)}
+            description="Choose a creature within 60 feet to gain a +2 bonus to AC."
+            confirmLabel="Cast"
+            confirmIcon="fa-shield-halved"
+        />
+    );
+}
 
 function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment, allMagicItems, allRaces, allSpells, allSpells2024, playerSummary, allRaces2024, allMagicItems2024, onDeleteCharacter, onEditCharacter, onUploadClick, onSaveClick, campaignName, activeMapName, characters }) {
     const [playerStats, setPlayerStats] = React.useState(null);
@@ -606,9 +639,11 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
                 <div className='no-print'><CharCharacterAdvancement playerStats={playerStats} campaignName={campaignName}></CharCharacterAdvancement></div>
             </div>}
         </React.Fragment>
-        {popupHtml && (
+                {popupHtml && (
             <Popup onClickOrKeyDown={() => setPopupHtml(null)}>
                 {typeof popupHtml === 'string' ? <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(popupHtml) }}></div> :
+                    popupHtml.html ? <div className="dice-roll-result"><div dangerouslySetInnerHTML={{ __html: sanitizeHtml(popupHtml.html) }}></div><div className="dice-roll-hint">click to dismiss</div></div> :
+                    popupHtml.type === 'shield_of_faith_target_selection' ? null :
                     popupHtml.type === 'automation_info' ? <div className="dice-roll-result"><div className="dice-roll-header"><i className="fa-solid fa-info-circle"></i>{popupHtml.name}</div><div dangerouslySetInnerHTML={{ __html: sanitizeHtml(popupHtml.description) }}></div><div className="dice-roll-hint">click to dismiss</div></div> :
                         popupHtml.type === 'empowered_spell' ?
                             <div className="dice-roll-result">
@@ -645,6 +680,9 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
                 }
             </Popup>
         )}
+                {popupHtml?.type === 'shield_of_faith_target_selection' && (
+                    <ShieldOfFaithTargetSelectionModal popupHtml={popupHtml} setPopupHtml={setPopupHtml} playerStats={playerStats} campaignName={campaignName} />
+                )}
     </Provider>)
 }
 

@@ -1401,59 +1401,6 @@ describe('CharSpells rendering', () => {
       expect(screen.getByTestId('single-target-popup')).toBeInTheDocument();
     });
 
-    it('renders the shield of faith popup when pending', () => {
-      useSpellMetamagicFlow.mockImplementation(() => ({
-        pendingMetamagic: null,
-        gateMetamagic: vi.fn(),
-        handleConfirm: vi.fn(),
-        handleSkip: vi.fn(),
-        pendingMultiTarget: null,
-        handleMultiTargetConfirm: vi.fn(),
-        handleMultiTargetSkip: vi.fn(),
-        pendingAid: null,
-        handleAidConfirm: vi.fn(),
-        handleAidSkip: vi.fn(),
-        pendingHeroesFeast: null,
-        handleHeroesFeastConfirm: vi.fn(),
-        handleHeroesFeastSkip: vi.fn(),
-        pendingGreaterRestoration: null,
-        handleGreaterRestorationConfirm: vi.fn(),
-        handleGreaterRestorationSkip: vi.fn(),
-        pendingLesserRestoration: null,
-        handleLesserRestorationConfirm: vi.fn(),
-        handleLesserRestorationSkip: vi.fn(),
-        pendingMageArmor: null,
-        handleMageArmorConfirm: vi.fn(),
-        handleMageArmorSkip: vi.fn(),
-        pendingShieldOfFaith: {
-          spellName: 'Shield of Faith',
-          spellLevel: 2,
-          creatureTargets: ['Ally'],
-          range: '60 feet',
-        },
-        handleShieldOfFaithConfirm: vi.fn(),
-        handleShieldOfFaithSkip: vi.fn(),
-        pendingProtectionFromEnergy: null,
-        handleProtectionFromEnergyConfirm: vi.fn(),
-        handleProtectionFromEnergySkip: vi.fn(),
-        pendingResistance: null,
-        handleResistanceConfirm: vi.fn(),
-        handleResistanceSkip: vi.fn(),
-        pendingRemoveCurse: null,
-        handleRemoveCurseConfirm: vi.fn(),
-        handleRemoveCurseSkip: vi.fn(),
-      }));
-
-      render(
-        <CharSpells
-          playerStats={mockPlayerStats}
-          handleTogglePreparedSpells={mockHandleTogglePreparedSpells}
-        />,
-      );
-
-      expect(screen.getByTestId('single-target-popup')).toBeInTheDocument();
-    });
-
     it('renders the protection from energy popup when pending', () => {
       useSpellMetamagicFlow.mockImplementation(() => ({
         pendingMetamagic: null,

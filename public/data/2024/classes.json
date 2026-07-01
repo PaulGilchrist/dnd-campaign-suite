@@ -2707,7 +2707,9 @@
                             "noConcentration": true,
                             "duration": "1_minute",
                             "action": "action",
-                            "casting_time": "1 action"
+                            "casting_time": "1 action",
+                            "perSpellTracking": true,
+                            "recharge": "short_or_long_rest"
                         }
                     },
                     {

@@ -5,9 +5,6 @@ import { getActiveBuffs } from '../../../services/combat/buffs/buffService.js'
 import { getOverchannelNecroticDamage } from '../../../services/automation/handlers/class-wizard/overchannelHandler.js'
 
 function isFreeCastAuthorized(playerName, spellName, spellLevel, playerStats, campaignName) {
-  const raw = getRuntimeValue(playerName, '_War_God_s_Blessing_freeCast');
-  if (raw && Array.isArray(raw) && raw.includes(spellName)) return true;
-
   const naturalRecoveryFreeCast = getRuntimeValue(playerName, 'naturalRecoveryFreeCast');
   if (naturalRecoveryFreeCast && Array.isArray(naturalRecoveryFreeCast) && naturalRecoveryFreeCast.includes(spellName)) return true;
 
@@ -71,7 +68,10 @@ function isFreeCastAuthorized(playerName, spellName, spellLevel, playerStats, ca
 
     if (entry.perSpellTracking) {
       const freeKey = `_${entry.name.replace(/\s+/g, '_')}_${spellName.replace(/\s+/g, '_')}_freeCast`;
-      return !!getRuntimeValue(playerName, freeKey);
+      const usedKey = `_${entry.name.replace(/\s+/g, '_')}_${spellName.replace(/\s+/g, '_')}_used`;
+      const hasFreeCast = !!getRuntimeValue(playerName, freeKey);
+      const isUsed = !!getRuntimeValue(playerName, usedKey);
+      return hasFreeCast && !isUsed;
     }
 
     const sharedKey = `_${entry.name.replace(/\s+/g, '_')}_freeCast`;
@@ -201,6 +201,11 @@ function SpellDetailPopup({ spell, playerStats, campaignName, onClose, onCast, u
           if (entry.perSpellTracking) {
             const usedKey = `_${entry.name.replace(/\s+/g, '_')}_${spell.name.replace(/\s+/g, '_')}_used`;
             setRuntimeValue(playerStats.name, usedKey, true, campaignName);
+            const entrySpells = Array.isArray(entry.spell) ? entry.spell : [entry.spell];
+            for (const s of entrySpells) {
+              const freeKey = `_${entry.name.replace(/\s+/g, '_')}_${s.replace(/\s+/g, '_')}_freeCast`;
+              setRuntimeValue(playerStats.name, freeKey, null, campaignName);
+            }
             break;
           }
         }

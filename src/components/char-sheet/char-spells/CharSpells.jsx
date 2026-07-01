@@ -176,7 +176,7 @@ const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells
 
     const { castAction } = useSpellCastExecutor(rollAttack, rollDamage, playerStats, getTargetInfo, campaignName, mapName, characters, setPopupHtml, {}, cachedCastPosRef);
 
-    const { pendingMetamagic, pendingMultiTarget, gateMetamagic, handleConfirm, handleSkip, handleMultiTargetConfirm, handleMultiTargetSkip, pendingAid, handleAidConfirm, handleAidSkip, pendingHeroesFeast, handleHeroesFeastConfirm, handleHeroesFeastSkip, pendingGreaterRestoration, handleGreaterRestorationConfirm, handleGreaterRestorationSkip, pendingLesserRestoration, handleLesserRestorationConfirm, handleLesserRestorationSkip, pendingMageArmor, handleMageArmorConfirm, handleMageArmorSkip, pendingShieldOfFaith, handleShieldOfFaithConfirm, handleShieldOfFaithSkip, pendingProtectionFromEnergy, handleProtectionFromEnergyConfirm, handleProtectionFromEnergySkip, pendingResistance, handleResistanceConfirm, handleResistanceSkip, pendingRemoveCurse, handleRemoveCurseConfirm, handleRemoveCurseSkip, pendingMagicMissile, handleMagicMissileConfirm, handleMagicMissileSkip } = useSpellMetamagicFlow(playerStats, campaignName, castAction);
+    const { pendingMetamagic, pendingMultiTarget, gateMetamagic, handleConfirm, handleSkip, handleMultiTargetConfirm, handleMultiTargetSkip, pendingAid, handleAidConfirm, handleAidSkip, pendingHeroesFeast, handleHeroesFeastConfirm, handleHeroesFeastSkip, pendingGreaterRestoration, handleGreaterRestorationConfirm, handleGreaterRestorationSkip, pendingLesserRestoration, handleLesserRestorationConfirm, handleLesserRestorationSkip, pendingMageArmor, handleMageArmorConfirm, handleMageArmorSkip, pendingProtectionFromEnergy, handleProtectionFromEnergyConfirm, handleProtectionFromEnergySkip, pendingResistance, handleResistanceConfirm, handleResistanceSkip, pendingRemoveCurse, handleRemoveCurseConfirm, handleRemoveCurseSkip, pendingMagicMissile, handleMagicMissileConfirm, handleMagicMissileSkip } = useSpellMetamagicFlow(playerStats, campaignName, castAction);
     const { pendingUpcast, buildUpcastLevels, gateUpcast, handleUpcastConfirm, handleUpcastCancel, getCantripAutoLevel } = useSpellUpcastFlow(playerStats, campaignName);
 
     const handleSpellCast = React.useCallback(async (spell, metaCtx) => {
@@ -185,7 +185,8 @@ const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells
         await resolveSpellPositions();
 
         gateMetamagic(spell, metaCtx);
-    }, [gateMetamagic, resolveSpellPositions]);
+        castAction(spell, metaCtx);
+    }, [gateMetamagic, castAction, resolveSpellPositions]);
 
     const handleDamageRoll = (formula, spellName, spell) => {
       let targetSpell = { ...spell, baseLevel: spell.level };
@@ -544,17 +545,6 @@ return (
                         creatureTargets={pendingMageArmor.creatureTargets}
                         onConfirm={handleMageArmorConfirm}
                         onSkip={handleMageArmorSkip}
-                      />
-                    )}
-                    {pendingShieldOfFaith && (
-                      <SingleTargetPopup
-                        spell={{ name: pendingShieldOfFaith.spellName, level: pendingShieldOfFaith.spellLevel || 0 }}
-                        playerStats={playerStats}
-                        campaignName={campaignName}
-                        range={pendingShieldOfFaith.range}
-                        creatureTargets={pendingShieldOfFaith.creatureTargets}
-                        onConfirm={handleShieldOfFaithConfirm}
-                        onSkip={handleShieldOfFaithSkip}
                       />
                     )}
                     {pendingProtectionFromEnergy && (

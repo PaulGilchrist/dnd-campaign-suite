@@ -1615,6 +1615,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                 rollAttack={rollAttack}
                 rollDamage={rollDamage}
                 getTargetInfo={getTargetInfo}
+                characters={characters}
             />
             {showCleaveTargetSelection && (
                 <SecondaryTargetModal
