@@ -8536,7 +8536,7 @@
                                 {
                                     "name": "Poison",
                                     "cost": "1d6",
-                                    "effect": "poison",
+                                    "effect": "poisoned",
                                     "saveType": "CON",
                                     "saveDc": "ability",
                                     "saveAbility": "DEX",

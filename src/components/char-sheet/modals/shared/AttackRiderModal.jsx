@@ -13,8 +13,8 @@ function AttackRiderModal({ action, playerStats, campaignName, targetName, onClo
     const [vtApplied, setVtApplied] = useState(false);
     const [vtResult, setVtResult] = useState(null);
 
-    const options = action.automation?.options || [];
-    const maxEffects = action.automation?.maxEffects || 1;
+    const options = action.options || action.automation?.options || [];
+    const maxEffects = action.automation?.maxEffects || action.maxEffects || 1;
     const multiSelect = maxEffects > 1;
 
     // Check for Versatile Trickster secondary targets after applying

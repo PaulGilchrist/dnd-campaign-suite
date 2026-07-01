@@ -630,9 +630,9 @@ describe('CharClassFeatures', () => {
             expect(screen.getByTitle(/Favored Foe/)).toBeInTheDocument();
         });
 
-        it('renders cunning strike button at level 2+', () => {
+        it('does not render cunning strike button (Rogue feature)', () => {
             renderComponent(rangerStats());
-            expect(screen.getByTitle(/Cunning Strike/)).toBeInTheDocument();
+            expect(screen.queryByTitle(/Cunning Strike/)).not.toBeInTheDocument();
         });
 
         it('renders favored enemies', () => {

@@ -120,6 +120,8 @@ export default function useCharActionModals({
 
     return {
         pendingDamageRef,
+        buildCtx,
+        buildCtxSync,
         healingPoolModal, setHealingPoolModal,
         handOfHealingModal, setHandOfHealingModal,
         fontOfMagicModal, setFontOfMagicModal,

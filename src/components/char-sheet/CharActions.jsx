@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { getCategories } from '../../services/character/featureCategories.js'
 import { getActionSpellNames } from '../../services/ui/spellSectionUtils.js'
 import { formatRange, signFormatter, getAttackSpellLevel } from '../../services/ui/formatUtils.js'
@@ -72,6 +72,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
     const [actions, setActions] = useState([]);
     const [selectedActionSpell, setSelectedActionSpell] = useState(null);
     const [featRangeEffects, setFeatRangeEffects] = useState(null);
+    const autoDamageRollContext = useRef(null);
     const { saveDcBonus: displaySaveDcBonus } = getInnateSorceryBonus(playerStats.name, campaignName);
     const { popupHtml, setPopupHtml } = useDiceRollPopup();
 
@@ -178,6 +179,48 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
             // Add Sneak Attack damage for Rogue class feature
             const sneakAttackDice = autoDamage.sneakAttackDice || 0;
             if (sneakAttackDice > 0 && overchannelResult) {
+                const hasCunningStrike = (playerStats.automation?.passives || []).some(
+                    p => p.name === 'Cunning Strike' && p.type === 'attack_rider'
+                );
+                if (hasCunningStrike) {
+                    const currentRound = getCurrentCombatRound();
+                    const oncePerRound = getRuntimeValue(playerStats.name, '_CunningStrike_usedRound', campaignName);
+                    const skipRound = getRuntimeValue(playerStats.name, '_cunningStrikeSkippedRound', campaignName);
+                    if (oncePerRound !== currentRound && skipRound !== currentRound) {
+                        const cs = await getCombatContext(campaignName);
+                        const target = cs ? getTargetFromAttacker(cs, playerStats.name) : null;
+                        const cunningStrikeAction = playerStats.automation.passives.find(p => p.name === 'Cunning Strike');
+                        autoDamageRollContext.current = {
+                            formula: autoFormula,
+                            total: overchannelResult.total,
+                            rolls: overchannelResult.rolls,
+                            modifier: overchannelResult.modifier,
+                            context: {
+                                damageType: autoDamage.damageType,
+                                targetName: autoDamage.targetName,
+                                attackerName: autoDamage.attackerName,
+                                saveDc: autoDamage.saveDc,
+                                saveType: autoDamage.saveType,
+                                dcSuccess: autoDamage.dcSuccess,
+                                isAutoCrit: isCrit,
+                                playerStats,
+                                doubledRolls: overchannelResult.doubledRolls,
+                            },
+                            attackName: autoDamage.name,
+                            sneakAttackDice: sneakAttackDice,
+                        };
+                        setAttackRiderModal({
+                            action: cunningStrikeAction,
+                            playerStats,
+                            campaignName,
+                            targetName: target?.name || null,
+                        });
+                        return;
+                    }
+                    if (skipRound === currentRound) {
+                        setRuntimeValue(playerStats.name, '_cunningStrikeSkippedRound', null, campaignName);
+                    }
+                }
                 const sneakAttackFormula = `${sneakAttackDice}d6`;
                 const sneakAttackResult = isCrit ? rollExpressionDoubled(sneakAttackFormula) : rollExpression(sneakAttackFormula);
                 if (sneakAttackResult) {
@@ -1512,10 +1555,36 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     gnomishLineageModal={gnomishLineageModal} setGnomishLineageModal={setGnomishLineageModal}
                     fiendishLegacyModal={fiendishLegacyModal} setFiendishLegacyModal={setFiendishLegacyModal}
                     giantAncestryModal={giantAncestryModal} setGiantAncestryModal={setGiantAncestryModal}
-                    eyebiteEffectModal={eyebiteEffectModal} setEyebiteEffectModal={setEyebiteEffectModal}
-                    breathWeaponShapeModal={breathWeaponShapeModal} setBreathWeaponShapeModal={setBreathWeaponShapeModal}
                     hypnoticPatternShakeModal={hypnoticPatternShakeModal} setHypnoticPatternShakeModal={setHypnoticPatternShakeModal}
                     arcaneWardRestoreModal={arcaneWardRestoreModal} setArcaneWardRestoreModal={setArcaneWardRestoreModal}
+                    eyebiteEffectModal={eyebiteEffectModal} setEyebiteEffectModal={setEyebiteEffectModal}
+                    breathWeaponShapeModal={breathWeaponShapeModal} setBreathWeaponShapeModal={setBreathWeaponShapeModal}
+                    divineFuryChoice={divineFuryChoice}
+                    damageTypeChoice={damageTypeChoice}
+                    featureChoice={featureChoice}
+                    handleMasteryClose={handleMasteryClose}
+                    handleWeaponMasteryChoice={handleWeaponMasteryChoice}
+                    handleWeaponKindMasteryClose={handleWeaponKindMasteryClose}
+                    handleDivineFuryDamageType={handleDivineFuryDamageType}
+                    handleDivineFurySkip={handleDivineFurySkip}
+                    handleGenericDamageTypeChoice={handleGenericDamageTypeChoice}
+                    handleGenericDamageTypeSkip={handleGenericDamageTypeSkip}
+                    handleDamageTypeModifierChoice={handleDamageTypeModifierChoice}
+                    handleDamageTypeModifierSkip={handleDamageTypeModifierSkip}
+                    handleEnhancedUnarmedChoice={handleEnhancedUnarmedChoice}
+                    handleEnhancedUnarmedSkip={handleEnhancedUnarmedSkip}
+                    handleFeatureChoiceConfirm={handleFeatureChoiceConfirm}
+                    handleFeatureChoiceSkip={handleFeatureChoiceSkip}
+                    handleConstellationSelect={handleConstellationSelect}
+                    handleElderChampionRestore={handleElderChampionRestore}
+                    handleDivineInterventionCast={handleDivineInterventionCast}
+                    pendingDamageRef={pendingDamageRef}
+                    buildCtx={buildCtx}
+                    buildCtxSync={buildCtxSync}
+                    autoDamageContext={autoDamageRollContext}
+                    rollDamage={rollDamage}
+                    setPopupHtml={setPopupHtml}
+                    mapName={mapName}
                     combatSuperiorityModal={combatSuperiorityModal} setCombatSuperiorityModal={setCombatSuperiorityModal}
                     attackRiderManeuverPrompt={attackRiderManeuverPrompt} setAttackRiderManeuverPrompt={setAttackRiderManeuverPrompt}
                     sweepingAttackTargetModal={sweepingAttackTargetModal} setSweepingAttackTargetModal={setSweepingAttackTargetModal}
@@ -1537,26 +1606,6 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     handleCombatSuperiorityConfirm={handleCombatSuperiorityConfirm}
                     handleAttackRiderManeuverUse={handleAttackRiderManeuverUse}
                     handleAttackRiderManeuverSkip={handleAttackRiderManeuverSkip}
-                    divineFuryChoice={divineFuryChoice}
-                    damageTypeChoice={damageTypeChoice}
-                    featureChoice={featureChoice}
-                    handleMasteryClose={handleMasteryClose}
-                    handleWeaponMasteryChoice={handleWeaponMasteryChoice}
-                    handleWeaponKindMasteryClose={handleWeaponKindMasteryClose}
-                    handleDivineFuryDamageType={handleDivineFuryDamageType}
-                    handleDivineFurySkip={handleDivineFurySkip}
-                    handleGenericDamageTypeChoice={handleGenericDamageTypeChoice}
-                    handleGenericDamageTypeSkip={handleGenericDamageTypeSkip}
-                    handleDamageTypeModifierChoice={handleDamageTypeModifierChoice}
-                    handleDamageTypeModifierSkip={handleDamageTypeModifierSkip}
-                    handleEnhancedUnarmedChoice={handleEnhancedUnarmedChoice}
-                    handleEnhancedUnarmedSkip={handleEnhancedUnarmedSkip}
-                    handleFeatureChoiceConfirm={handleFeatureChoiceConfirm}
-                    handleFeatureChoiceSkip={handleFeatureChoiceSkip}
-                    handleConstellationSelect={handleConstellationSelect}
-                    handleElderChampionRestore={handleElderChampionRestore}
-                    handleDivineInterventionCast={handleDivineInterventionCast}
-                    pendingDamageRef={pendingDamageRef}
                 />
                 <CharActionSpellPopups
                     playerStats={playerStats}

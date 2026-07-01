@@ -363,18 +363,13 @@ const RangerFeatures = function RangerFeatures({ playerStats }) {
     };
     return (
          <div data-testid="char-class-ranger">
-             <div className="automation-actions">
-                 {playerStats.level >= 2 && (
-                     <button className="automation-btn" title="Cunning Strike: Add poison/extra effects to weapon hits">
-                         <i className="fas fa-skull-crossbones"></i> Cunning Strike
-                     </button>
-                 )}
-                 {playerStats.level >= 2 && (
-                     <button className="automation-btn" title="Favored Foe: Mark a foe for extra 1d4 damage">
-                         <i className="fas fa-crosshairs"></i> Favored Foe
-                     </button>
-                 )}
-             </div>
+              <div className="automation-actions">
+                  {playerStats.level >= 2 && (
+                      <button className="automation-btn" title="Favored Foe: Mark a foe for extra 1d4 damage">
+                          <i className="fas fa-crosshairs"></i> Favored Foe
+                      </button>
+                  )}
+              </div>
              <div><b>Extra Attacks: </b>{rangerFeatures?.extraAttacks || 0}</div>
              <div><b>Favored Enemies: </b>{rangerFeatures?.favoredEnemies}</div>
               {playerStats.class.fightingStyles && playerStats.level > 1 && <div><b>Fighting Styles: </b>{(

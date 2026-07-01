@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { rollExpression, rollExpressionDoubled } from '../../services/dice/diceRoller.js';
 import HealingPoolModal from './modals/divine/HealingPoolModal.jsx'
 import HandOfHealingModal from './modals/shared/HandOfHealingModal.jsx'
 import FontOfMagicModal from './modals/FontOfMagicModal.jsx'
@@ -51,6 +52,7 @@ import RadianceOfDawnModal from './modals/RadianceOfDawnModal.jsx'
 import { handleClearWard, handleSpendDice, handleApply } from '../../services/automation/handlers/class-cleric-paladin/bastionOfLawHandler.js'
 import { getCombatContext } from '../../services/rules/combat/damageUtils.js'
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js'
+import { getCurrentCombatRound } from '../../services/encounters/combatData.js'
 import { logHealingToSSE } from '../../services/automation/common/healingRoll.js'
 import { addEntry } from '../../services/ui/logService.js'
 
@@ -223,6 +225,12 @@ export default function CharActionModals({
     handleTricksterBlessingConfirm,
     handleDivineInterventionCast,
     pendingDamageRef,
+    buildCtx,
+    buildCtxSync,
+    autoDamageContext,
+    rollDamage,
+    setPopupHtml,
+    mapName,
 }) {
     const [combatSummary, setCombatSummary] = useState(null);
 
@@ -306,7 +314,61 @@ export default function CharActionModals({
             {attackRiderModal && (
                 <AttackRiderModal
                     {...attackRiderModal}
-                    onClose={() => { setAttackRiderModal(null); window.dispatchEvent(new CustomEvent('target-effects-updated')); }}
+                    onClose={() => {
+                        setAttackRiderModal(null);
+                        window.dispatchEvent(new CustomEvent('target-effects-updated'));
+                        if (attackRiderModal?.action?.name === 'Cunning Strike') {
+                            const costUsed = getRuntimeValue(attackRiderModal.playerStats.name, '_cunningStrikeCostUsed', attackRiderModal.campaignName);
+                            if (!costUsed || costUsed === 0) {
+                                const currentRound = getCurrentCombatRound();
+                                setRuntimeValue(attackRiderModal.playerStats.name, '_cunningStrikeSkippedRound', currentRound, attackRiderModal.campaignName);
+                            } else if (autoDamageContext) {
+                                const ctx = autoDamageContext.current;
+                                if (ctx) {
+                                    const cunningStrikeCost = Number(getRuntimeValue(playerStats.name, '_cunningStrikeCostUsed', attackRiderModal.campaignName) ?? 0);
+                                    const effectiveSneakDice = Math.max(0, ctx.sneakAttackDice - cunningStrikeCost);
+                                    let formula = ctx.formula;
+                                    let total = ctx.total;
+                                    if (effectiveSneakDice < ctx.sneakAttackDice) {
+                                        const diceRemoved = ctx.sneakAttackDice - effectiveSneakDice;
+                                        const avgPerDie = ctx.context?.isAutoCrit ? 7 : 3;
+                                        total = Math.round(total - diceRemoved * avgPerDie);
+                                        formula = formula.replace(/\+ \d+d6 \[Sneak Attack\]/, `+ ${effectiveSneakDice}d6 [Sneak Attack]`);
+                                    }
+                                    setPopupHtml(null);
+                                    rollDamage(ctx.attackName, formula, total, ctx.rolls, ctx.modifier, ctx.context);
+                                    autoDamageContext.current = null;
+                                }
+                            } else if (pendingDamageRef?.current?._cunningStrike) {
+                                const pending = pendingDamageRef.current;
+                                const { attack } = pending;
+                                pendingDamageRef.current = null;
+                                (mapName ? buildCtx(attack) : buildCtxSync(attack)).then(ctx => {
+                                    const sneakAttackDice = ctx?.sneakAttackDice || 0;
+                                    const cunningStrikeCost = Number(getRuntimeValue(playerStats.name, '_cunningStrikeCostUsed', campaignName) ?? 0);
+                                    const effectiveSneakDice = Math.max(0, sneakAttackDice - cunningStrikeCost);
+                                    const wasCrit = pending.popupHtml?.isCrit;
+                                    const baseResult = rollExpression(attack.damage);
+                                    if (!baseResult) return;
+                                    let formula = attack.damage;
+                                    let total = baseResult.total;
+                                    let rolls = baseResult.rolls;
+                                    const modifier = baseResult.modifier;
+                                    if (effectiveSneakDice > 0) {
+                                        const sneakFormula = `${effectiveSneakDice}d6`;
+                                        const sneakResult = wasCrit ? rollExpressionDoubled(sneakFormula) : rollExpression(sneakFormula);
+                                        if (sneakResult) {
+                                            formula += ` + ${sneakFormula} [Sneak Attack]`;
+                                            total += sneakResult.total;
+                                            rolls = [...rolls, ...sneakResult.rolls];
+                                        }
+                                    }
+                                    setPopupHtml(null);
+                                    rollDamage(attack.name, formula, total, rolls, modifier, ctx);
+                                }).catch((e) => { console.error("[CharActionModals] Error:", e); });
+                            }
+                        }
+                    }}
                 />
             )}
             {openHandTechniqueModal && (

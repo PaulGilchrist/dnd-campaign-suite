@@ -84,6 +84,43 @@ export default function useAttackDamageResolution({
             }
         }
 
+        // Cunning Strike: prompt before sneak attack damage is applied
+        const combatSummary = await loadCombatSummary(campaignName);
+        const lastAttackResult = combatSummary?.lastAttack;
+        const attackHit = lastAttackResult?.hit === true || lastAttackResult?.isCrit === true;
+        if (attackHit) {
+            const ctx = mapName ? await buildCtx(attack) : await buildCtxSync(attack);
+            const sneakDice = ctx?.sneakAttackDice || 0;
+            const hasCunningStrike = (playerStats.automation?.passives || []).some(
+                p => p.name === 'Cunning Strike' && p.type === 'attack_rider'
+            );
+            if (hasCunningStrike && sneakDice > 0) {
+                const currentRound = getCurrentCombatRound();
+                const oncePerRound = getRuntimeValue(playerStats.name, '_CunningStrike_usedRound', campaignName);
+                const skipRound = getRuntimeValue(playerStats.name, '_cunningStrikeSkippedRound', campaignName);
+                if (oncePerRound !== currentRound && skipRound !== currentRound) {
+                    const cs = await getCombatContext(campaignName);
+                    const target = cs ? getTargetFromAttacker(cs, playerStats.name) : null;
+                    const cunningStrikeAction = playerStats.automation.passives.find(p => p.name === 'Cunning Strike');
+                    pendingDamageRef.current = {
+                        _cunningStrike: true,
+                        attack,
+                        popupHtml,
+                    };
+                    setAttackRiderModal({
+                        action: cunningStrikeAction,
+                        playerStats,
+                        campaignName,
+                        targetName: target?.name || null,
+                    });
+                    return;
+                }
+                if (skipRound === currentRound) {
+                    setRuntimeValue(playerStats.name, '_cunningStrikeSkippedRound', null, campaignName);
+                }
+            }
+        }
+
         const wasCrit = popupHtml?.isCrit;
         const isNatural20 = popupHtml?.isNatural20 === true;
         if (wasCrit && setPopupHtml) setPopupHtml(null);
@@ -99,15 +136,25 @@ export default function useAttackDamageResolution({
         let rolls = result.rolls;
         const modifier = result.modifier;
 
-        // Apply Sneak Attack damage (Rogue class feature)
-        if (sneakAttackDice > 0) {
-            const sneakAttackFormula = `${sneakAttackDice}d6`;
+        // Apply Sneak Attack damage (Rogue class feature) — deduct Cunning Strike cost
+        const cunningStrikeCost = sneakAttackDice > 0
+            ? Number(getRuntimeValue(playerStats.name, '_cunningStrikeCostUsed', campaignName) ?? 0)
+            : 0;
+        const effectiveSneakDice = Math.max(0, sneakAttackDice - cunningStrikeCost);
+
+        if (effectiveSneakDice > 0) {
+            const sneakAttackFormula = `${effectiveSneakDice}d6`;
             const sneakAttackResult = wasCrit ? rollExpressionDoubled(sneakAttackFormula) : rollExpression(sneakAttackFormula);
             if (sneakAttackResult) {
                 formula += ` + ${sneakAttackFormula} [Sneak Attack]`;
                 total += sneakAttackResult.total;
                 rolls = [...rolls, ...sneakAttackResult.rolls];
             }
+        }
+
+        // Clear cost after consumption
+        if (cunningStrikeCost > 0) {
+            await setRuntimeValue(playerStats.name, '_cunningStrikeCostUsed', 0, campaignName);
         }
 
         // Apply Two Weapon Fighting feat: add ability modifier to bonus action attack damage for light weapons
@@ -126,7 +173,8 @@ export default function useAttackDamageResolution({
         }
 
         // Apply rider damage expressions from targetEffects (e.g., Charger feat damage bonus)
-        const storedEffects = getRuntimeValue(campaignName, 'targetEffects') || [];
+        const rawEffects = getRuntimeValue(campaignName, 'targetEffects');
+        const storedEffects = Array.isArray(rawEffects) ? rawEffects : [];
         const riderDamageEffects = storedEffects.filter(te => te.effect === 'damage_bonus' && te.damageExpression);
         for (const te of riderDamageEffects) {
             const riderResult = rollExpression(te.damageExpression);

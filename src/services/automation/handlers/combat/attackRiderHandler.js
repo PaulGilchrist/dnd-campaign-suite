@@ -3,9 +3,10 @@ import { addEntry } from '../../../ui/logService.js';
 import { getCombatContext, getTargetFromAttacker } from '../../../rules/combat/damageUtils.js';
 import { getDistanceFeet } from '../../../rules/combat/rangeValidation.js';
 import { getCurrentCombatRound } from '../../../../services/encounters/combatData.js';
+import { buildSaveDc, createSaveListener } from '../../../automation/common/savePrompt.js';
 
 export async function handle(action, playerStats, campaignName, _mapName) {
-    const auto = action.automation;
+    const auto = action.automation || action;
     const options = auto.options || [];
 
     const cs = await getCombatContext(campaignName);
@@ -52,7 +53,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 }
 
 export async function applyRiderOption(action, playerStats, campaignName, targetName, optionNames) {
-    const auto = action.automation;
+    const auto = action.automation || action;
     const options = auto.options || [];
 
     const names = Array.isArray(optionNames) ? optionNames : [optionNames];
@@ -84,16 +85,16 @@ export async function applyRiderOption(action, playerStats, campaignName, target
     for (const chosen of chosenOptions) {
         const validation = validateCunningStrikeOption(chosen, targetName, playerStats);
         if (!validation.valid) {
-            return {
-                type: 'popup',
-                payload: {
-                    type: 'automation_info',
-                    name: action.name,
-                    automationType: action.automation.type,
-                    description: `<b>${chosen.name}</b> cannot be used: ${validation.reason}`,
-                    automation: action.automation,
-                },
-            };
+                return {
+                    type: 'popup',
+                    payload: {
+                        type: 'automation_info',
+                        name: action.name,
+                        automationType: auto.type,
+                        description: `<b>${chosen.name}</b> cannot be used: ${validation.reason}`,
+                        automation: auto,
+                    },
+                };
         }
     }
 
@@ -189,23 +190,24 @@ export async function applyRiderOption(action, playerStats, campaignName, target
         payload: {
             type: 'automation_info',
             name: action.name,
-            automationType: action.automation.type,
+            automationType: auto.type,
             description: `Applied to ${targetName || 'target'}:<br/>• ${effectDescriptions.join('<br/>• ')}${costNote}`,
-            automation: action.automation,
+            automation: auto,
         },
     };
 }
 
 async function applyRiderEffect(action, playerStats, campaignName, targetName, option) {
+    const auto = action.automation || action;
     if (!targetName) {
         return {
             type: 'popup',
             payload: {
                 type: 'automation_info',
                 name: action.name,
-                automationType: action.automation.type,
+                automationType: auto.type,
                 description: `${option.name}: ${option.effect}<br/><br/><i>No target selected — effect noted for manual application.</i>`,
-                automation: action.automation,
+                automation: auto,
             },
         };
     }
@@ -218,9 +220,9 @@ async function applyRiderEffect(action, playerStats, campaignName, targetName, o
             payload: {
                 type: 'automation_info',
                 name: action.name,
-                automationType: action.automation.type,
+                automationType: auto.type,
                 description: `Sudden Strike enabled. Make a bonus action attack against a different creature within 5 ft of ${targetName}.`,
-                automation: action.automation,
+                automation: auto,
             },
         };
     }
@@ -264,9 +266,9 @@ async function applyRiderEffect(action, playerStats, campaignName, targetName, o
             payload: {
                 type: 'automation_info',
                 name: action.name,
-                automationType: action.automation.type,
+                automationType: auto.type,
                 description: `Mass Fear applied to ${targetName}. Target and creatures within 10 ft must make a Wisdom save or be Frightened until the start of your next turn.`,
-                automation: action.automation,
+                automation: auto,
             },
         };
     }
@@ -292,12 +294,34 @@ async function applyRiderEffect(action, playerStats, campaignName, targetName, o
         cost: option.cost || null,
         ignoreResistance: !!option.ignoreResistance,
         restoreCost: option.restoreCost || null,
-        damageDoubled: option.damageDoubled || action.automation.damageDoubled || false,
+        damageDoubled: option.damageDoubled || auto.damageDoubled || false,
     };
     const updatedEffects = [...storedEffects, newEffect];
     setRuntimeValue(campaignName, 'targetEffects', updatedEffects, campaignName);
 
     if (option.saveType) {
+        // Trigger saving throw prompt for the target (non-blocking)
+        const saveDc = buildSaveDc(option, playerStats);
+        const { promise } = createSaveListener(campaignName, {
+            targetName,
+            saveType: option.saveType,
+            saveDc,
+            dcSuccess: false,
+            saveAbility: option.saveAbility,
+        });
+
+        // Apply condition on failure (fire and forget)
+        promise.then((saveResult) => {
+            if (saveResult.success === false && option.condition) {
+                const conditions = getRuntimeValue(targetName, 'conditions') || [];
+                const updatedConditions = [...conditions, option.condition];
+                setRuntimeValue(targetName, 'conditions', updatedConditions, campaignName);
+            }
+        }).catch((e) => {
+            console.error('[attackRiderHandler] Save listener error:', e);
+        });
+
+        // Handle Psychic Veil interaction
         const attackerBuffs = getRuntimeValue(playerStats.name, 'activeBuffs', campaignName);
         const attackerBuffArray = Array.isArray(attackerBuffs) ? attackerBuffs : [];
         if (attackerBuffArray.some(b => b.name === 'Psychic Veil')) {
@@ -347,9 +371,9 @@ async function applyRiderEffect(action, playerStats, campaignName, targetName, o
         payload: {
             type: 'automation_info',
             name: action.name,
-            automationType: action.automation.type,
+            automationType: auto.type,
             description: desc,
-            automation: action.automation,
+            automation: auto,
         },
     };
 }
@@ -359,16 +383,25 @@ async function applyRiderEffect(action, playerStats, campaignName, targetName, o
  * Checks prerequisites (e.g., Poisoner's Kit) and size limits.
  */
 function validateCunningStrikeOption(option, targetName, playerStats) {
-    // Check tool requirements (e.g., Poisoner's Kit for Poison option)
+    // Check tool/item requirements (e.g., Poisoner's Kit for Poison option)
     if (option.requires) {
         const toolProficiencies = playerStats?.toolProficiencies || [];
-        const hasTool = toolProficiencies.some(p =>
+        const hasProficiency = toolProficiencies.some(p =>
             p.toLowerCase().includes(option.requires.toLowerCase())
         );
-        if (!hasTool) {
+        const inventory = playerStats?.inventory || {};
+        const allItems = [
+            ...(inventory.equipped || []),
+            ...(inventory.backpack || []),
+        ];
+        const hasItem = allItems.some(item => {
+            const itemName = typeof item === 'string' ? item : item.name;
+            return itemName && itemName.toLowerCase().includes(option.requires.toLowerCase());
+        });
+        if (!hasProficiency && !hasItem) {
             return {
                 valid: false,
-                reason: `Requires ${option.requires} which the character does not have proficiency in.`,
+                reason: `Requires ${option.requires} which the character does not have.`,
             };
         }
     }
