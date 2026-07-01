@@ -58,7 +58,8 @@ export const SHORT_REST_RESOURCES = [
     'actionSurgeUsedThisRound',
     'luckyPoints',
                 'adrenalineRushUses',
-                '_celestialRevelationUses'
+                '_celestialRevelationUses',
+                '_War_Gods_Blessing_active'
        ]
 
 export function getShortRestResources() {
@@ -110,7 +111,8 @@ export const LONG_REST_RESOURCES = [
               'breathWeaponUses',
                'stonecunningUses',
                 'adrenalineRushUses',
-                '_celestialRevelationUses'
+                '_celestialRevelationUses',
+                '_War_Gods_Blessing_active'
         ]
 
 export function getLongRestResources() {

@@ -28,6 +28,9 @@ export default function useInitiativeEffects(playerStats, campaignName, rollDama
             const myName = utils.getName(playerStats.name);
             if (rollingName !== myName) return;
 
+            // Clear War God's Blessing active state on new combat
+            setRuntimeValue(playerStats.name, '_War_Gods_Blessing_active', null, campaignName);
+
             const classLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level);
 
             // Check for Perfect Focus (Monk level 15)

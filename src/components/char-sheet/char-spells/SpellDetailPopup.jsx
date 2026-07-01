@@ -3,6 +3,9 @@ import { sanitizeHtml } from '../../../services/ui/sanitize.js';
 import { getRuntimeValue, setRuntimeValue, useRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js'
 import { getActiveBuffs } from '../../../services/combat/buffs/buffService.js'
 import { getOverchannelNecroticDamage } from '../../../services/automation/handlers/class-wizard/overchannelHandler.js'
+import { getCombatSummary } from '../../../services/encounters/combatData.js';
+import { addConcentration, breakConcentration } from '../../../services/combat/concentration/concentrationService.js';
+import * as storageService from '../../../services/ui/storage.js';
 
 function isFreeCastAuthorized(playerName, spellName, spellLevel, playerStats, campaignName) {
   const naturalRecoveryFreeCast = getRuntimeValue(playerName, 'naturalRecoveryFreeCast');
@@ -79,7 +82,23 @@ function isFreeCastAuthorized(playerName, spellName, spellLevel, playerStats, ca
     if (stored && Array.isArray(stored) && stored.includes(spellName)) return true;
   }
 
+  const wgbActive = getRuntimeValue(playerName, '_War_Gods_Blessing_active');
+  if (wgbActive && ['Shield of Faith', 'Spiritual Weapon'].includes(spellName)) return true;
+
   return false;
+}
+
+function cleanupBuffsByName(casterName, buffName, campaignName) {
+  const cs = getCombatSummary(campaignName);
+  if (!cs || !cs.creatures) return;
+  for (const creature of cs.creatures) {
+    const buffs = getRuntimeValue(creature.name, 'activeBuffs', campaignName) || [];
+    if (!Array.isArray(buffs)) continue;
+    const filtered = buffs.filter(b => b.name !== buffName);
+    if (filtered.length !== buffs.length) {
+      setRuntimeValue(creature.name, 'activeBuffs', filtered, campaignName);
+    }
+  }
 }
 
 function SpellDetailPopup({ spell, playerStats, campaignName, onClose, onCast, upcastLevels = [], playerLevel = 1 }) {
@@ -148,14 +167,51 @@ function SpellDetailPopup({ spell, playerStats, campaignName, onClose, onCast, u
       const profBonus = Math.floor((playerStats.level - 1) / 4 + 2);
       metaCtx.dispelAbilityCheckBonus = profBonus;
     }
+
+    // --- Concentration and WGB management ---
+    const isWgbActive = getRuntimeValue(playerStats.name, '_War_Gods_Blessing_active');
+    const isWgbSpell = isWgbActive && ['Shield of Faith', 'Spiritual Weapon'].includes(spell.name);
+
+    let shouldSetConcentration = false;
+    let oldConcentrationSpell = null;
+    let isSameConcentrationRecast = false;
+
+    if (!isWgbSpell && spell.concentration) {
+      const cs = getCombatSummary(campaignName);
+      if (cs) {
+        const creature = cs.creatures.find(c => c.name === playerStats.name);
+        if (creature && creature.concentration) {
+          if (creature.concentration.spell === spell.name) {
+            isSameConcentrationRecast = true;
+          } else {
+            oldConcentrationSpell = creature.concentration.spell;
+            breakConcentration(cs, playerStats.name);
+            storageService.default.set('combatSummary', cs, campaignName);
+            shouldSetConcentration = true;
+          }
+        } else {
+          shouldSetConcentration = true;
+        }
+      }
+    }
+    // --- End concentration management ---
+
     if (isCantrip) {
       const modifiedSpell = cantripAutoLevel ? { ...spell, level: cantripAutoLevel, baseLevel: 0 } : { ...spell, baseLevel: 0 };
       onCast(modifiedSpell, metaCtx);
       return;
     }
     const isUpcast = isUpcastable && Number(selectedUpcastLvl) !== spell.level;
-    if (isUpcast) {
+
+    let effectiveSpellLevel = spell.level;
+
+    if (isWgbSpell || isSameConcentrationRecast) {
+      if (isWgbSpell && spell.name === 'Spiritual Weapon') {
+        cleanupBuffsByName(playerStats.name, 'Shield of Faith', campaignName);
+      }
+    } else if (isUpcast) {
       const upcastLevel = Number(selectedUpcastLvl);
+      effectiveSpellLevel = upcastLevel;
       const slotKey = `spell_slots_level_${upcastLevel}`;
       const currentSlots = getRuntimeValue(playerStats.name, slotKey);
       const maxSlots = (playerStats.spellAbilities && playerStats.spellAbilities[slotKey]) || 0;
@@ -163,11 +219,7 @@ function SpellDetailPopup({ spell, playerStats, campaignName, onClose, onCast, u
       if (availableSlots > 0) {
         setRuntimeValue(playerStats.name, slotKey, availableSlots - 1, campaignName);
       }
-      const modifiedSpell = { ...spell, level: upcastLevel, baseLevel: spell.level };
-      onCast(modifiedSpell, metaCtx);
-      return;
-    }
-    if (freeCastAuthorized) {
+    } else if (freeCastAuthorized) {
       // Spell Mastery: mark as used (at-will, so no tracking needed beyond the cast)
       const masteryLevel1 = getRuntimeValue(playerStats.name, 'SpellMastery_level1', campaignName);
       const masteryLevel2 = getRuntimeValue(playerStats.name, 'SpellMastery_level2', campaignName);
@@ -240,8 +292,25 @@ function SpellDetailPopup({ spell, playerStats, campaignName, onClose, onCast, u
         setRuntimeValue(playerStats.name, spellSlotKey, availableSlots - 1, campaignName);
       }
     }
+
+    // Cleanup old concentration buffs from all creatures
+    if (oldConcentrationSpell) {
+      cleanupBuffsByName(playerStats.name, oldConcentrationSpell, campaignName);
+    }
+
+    // Set new concentration on combat summary
+    if (shouldSetConcentration) {
+      const cs = getCombatSummary(campaignName);
+      if (cs) {
+        addConcentration(cs, playerStats.name, spell.name, 10);
+        storageService.default.set('combatSummary', cs, campaignName);
+      }
+    }
+
     const modifiedSpell = (() => {
-      let s = { ...spell };
+      let s = effectiveSpellLevel !== spell.level
+        ? { ...spell, level: effectiveSpellLevel, baseLevel: spell.level }
+        : { ...spell };
       if (canChangeDamageType && usePsychicDamage) {
         s._psychicSpellsOverride = true;
       }

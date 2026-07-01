@@ -37,6 +37,23 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         const newCharges = currentCharges - 1;
         await setRuntimeValue(playerStats.name, 'channelDivinityCharges', newCharges, campaignName);
 
+        // War God's Blessing: state-based activation, not per-spell tracking
+        if (auto.noConcentration && auto.spell && Array.isArray(auto.spell) && auto.spell.length > 1) {
+            await setRuntimeValue(playerStats.name, '_War_Gods_Blessing_active', true, campaignName);
+            postLogEntry(campaignName, {
+                type: 'ability_use',
+                characterName: playerStats.name,
+                abilityName: action.name,
+                description: `${playerStats.name} activated ${action.name} for 1 minute. ${auto.spell.join(' and ')} can be cast without expending a spell slot or requiring Concentration.`,
+            }).catch(() => {});
+            return {
+                type: 'popup',
+                payload: {
+                    html: `<b>${action.name}</b><br/>${action.description || ''}<br/><br/><b>Channel Divinity expended.</b><br/>For 1 minute, you can cast <b>${auto.spell.join(' and ')}</b> without expending a spell slot. The spells do not require Concentration.<br/><br/><em>Open your spell sheet and cast them normally — no spell slot will be consumed.</em>`,
+                },
+            };
+        }
+
         // Reset per-spell used flags when activating a channel divinity free_spell
         if (auto.perSpellTracking && auto.spell) {
             const spells = Array.isArray(auto.spell) ? auto.spell : [auto.spell];
