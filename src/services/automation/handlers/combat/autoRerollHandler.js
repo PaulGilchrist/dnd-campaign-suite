@@ -8,6 +8,8 @@ import { resolveMapPositions } from '../../common/targetResolver.js';
 import { getClassFeatures } from '../../../../services/character/classFeatures.js';
 import { evaluateAutoExpression } from '../../../combat/automation/automationService.js';
 import { getCurrentCombatRound } from '../../../../services/encounters/combatData.js';
+import { rollExpression } from '../../../dice/diceRoller.js';
+import { applyDamageToTarget } from '../../../rules/combat/applyDamage.js';
 
 function buildAttackRollDescription(action, attackerName, bonus, attackEvent) {
     const { d20, bonus: atkBonus, targetAc, hit, effectiveAc } = attackEvent;
@@ -334,6 +336,35 @@ export async function handle(action, playerStats, campaignName, mapName) {
             await setRuntimeValue(playerName, trackingKey, currentRound, campaignName);
         }
 
+        const damageFormula = lastAttack.damageFormula;
+        if (damageFormula) {
+            const damageResult = rollExpression(damageFormula);
+            if (damageResult && damageResult.total > 0) {
+                const cs = await getCombatContext(campaignName);
+                const characters = [playerStats];
+                try {
+                    const appliedDmg = applyDamageToTarget(cs, lastAttack.targetName, damageResult.total, [lastAttack.damageType || 'unknown'], campaignName, characters, false, playerName);
+                    if (appliedDmg) {
+                        addEntry(campaignName, {
+                            type: 'roll',
+                            characterName: playerName,
+                            rollType: 'damage',
+                            name: action.name,
+                            formula: damageFormula,
+                            rolls: damageResult.rolls,
+                            total: damageResult.total,
+                            modifier: damageResult.modifier,
+                            damageType: lastAttack.damageType || 'unknown',
+                            targetName: lastAttack.targetName,
+                            finalDamage: appliedDmg.finalDamage,
+                        }).catch((e) => { console.error("[autoReroll] Damage log error:", e); });
+                    }
+                } catch (e) {
+                    console.error('[autoReroll] applyDamageToTarget failed:', e);
+                }
+            }
+        }
+
         addEntry(campaignName, {
             type: 'ability_use',
             characterName: playerName,
@@ -362,6 +393,42 @@ export async function handle(action, playerStats, campaignName, mapName) {
         const abilityFresh = isCheck && isPlayerCheck;
 
         if (attackFresh) {
+            const ac = lastAttack.effectiveAc ?? lastAttack.targetAc;
+            const modifiedD20 = lastAttack.d20 + bonus;
+            const modifiedTotal = modifiedD20 + lastAttack.bonus;
+            const modifiedHit = ac != null ? (modifiedTotal >= ac) : lastAttack.hit;
+
+            if (lastAttack.hit === false && modifiedHit === true) {
+                const damageFormula = lastAttack.damageFormula;
+                if (damageFormula) {
+                    const damageResult = rollExpression(damageFormula);
+                    if (damageResult && damageResult.total > 0) {
+                        const cs = await getCombatContext(campaignName);
+                        const characters = [playerStats];
+                        try {
+                            const appliedDmg = applyDamageToTarget(cs, lastAttack.targetName, damageResult.total, [lastAttack.damageType || 'unknown'], campaignName, characters, false, playerName);
+                            if (appliedDmg) {
+                                addEntry(campaignName, {
+                                    type: 'roll',
+                                    characterName: playerName,
+                                    rollType: 'damage',
+                                    name: action.name,
+                                    formula: damageFormula,
+                                    rolls: damageResult.rolls,
+                                    total: damageResult.total,
+                                    modifier: damageResult.modifier,
+                                    damageType: lastAttack.damageType || 'unknown',
+                                    targetName: lastAttack.targetName,
+                                    finalDamage: appliedDmg.finalDamage,
+                                }).catch((e) => { console.error("[autoReroll] Damage log error:", e); });
+                            }
+                        } catch (e) {
+                            console.error('[autoReroll] applyDamageToTarget failed:', e);
+                        }
+                    }
+                }
+            }
+
             const result = handleAttackRoll(action, bonus, lastAttack);
             addEntry(campaignName, {
                 type: 'ability_use',
@@ -388,7 +455,44 @@ export async function handle(action, playerStats, campaignName, mapName) {
             const rangeFt = rangeToFeet(auto.range);
             const ally = await findAllyMissedAttack(playerStats, campaignName, mapName, rangeFt);
             if (ally) {
-                const result = handleAttackRoll(action, bonus, ally.attackEvent);
+                const attackEvent = ally.attackEvent;
+                const ac = attackEvent.effectiveAc ?? attackEvent.targetAc;
+                const modifiedD20 = attackEvent.d20 + bonus;
+                const modifiedTotal = modifiedD20 + attackEvent.bonus;
+                const modifiedHit = ac != null ? (modifiedTotal >= ac) : attackEvent.hit;
+
+                if (attackEvent.hit === false && modifiedHit === true) {
+                    const damageFormula = attackEvent.damageFormula;
+                    if (damageFormula) {
+                        const damageResult = rollExpression(damageFormula);
+                        if (damageResult && damageResult.total > 0) {
+                            const cs = await getCombatContext(campaignName);
+                            const characters = [playerStats];
+                            try {
+                                const appliedDmg = applyDamageToTarget(cs, attackEvent.targetName, damageResult.total, [attackEvent.damageType || 'unknown'], campaignName, characters, false, ally.name);
+                                if (appliedDmg) {
+                                    addEntry(campaignName, {
+                                        type: 'roll',
+                                        characterName: ally.name,
+                                        rollType: 'damage',
+                                        name: attackEvent.attackName || attackEvent.name || 'Attack',
+                                        formula: damageFormula,
+                                        rolls: damageResult.rolls,
+                                        total: damageResult.total,
+                                        modifier: damageResult.modifier,
+                                        damageType: attackEvent.damageType || 'unknown',
+                                        targetName: attackEvent.targetName,
+                                        finalDamage: appliedDmg.finalDamage,
+                                    }).catch((e) => { console.error("[autoReroll] Damage log error:", e); });
+                                }
+                            } catch (e) {
+                                console.error('[autoReroll] applyDamageToTarget failed:', e);
+                            }
+                        }
+                    }
+                }
+
+                const result = handleAttackRoll(action, bonus, attackEvent);
                 addEntry(campaignName, {
                     type: 'ability_use',
                     characterName: playerName,
