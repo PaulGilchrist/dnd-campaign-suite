@@ -103,14 +103,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
     const displayCreatures = React.useMemo(() => {
         if (!combatSummary || !combatSummary.creatures) return []
         return combatSummary.creatures.map(c => {
-            if (c.type !== 'player') return c
-            const character = characters.find(ch => utils.getName(ch.name) === c.name)
-            const stats = character?.computedStats || character
-            const maxHp = getRuntimeValue(c.name, 'hitPoints') ?? stats?.hitPoints ?? 0
-            const currentHp = getRuntimeValue(c.name, 'currentHitPoints') ?? maxHp
             const runtimeConditions = getRuntimeValue(c.name, 'activeConditions') || []
-            const activeBuffs = getRuntimeValue(c.name, 'activeBuffs') || []
-            const shieldOfFaithBonus = Array.isArray(activeBuffs) && activeBuffs.some(b => b.effect === 'shield_of_faith') ? 2 : 0
             const conditions = runtimeConditions.map((key, i) => ({
                 id: `runtime-${key}-${i}`,
                 key,
@@ -118,6 +111,18 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
                 dc: 0,
                 ability: 'con',
             }))
+            if (c.type !== 'player') {
+                return {
+                    ...c,
+                    conditions,
+                }
+            }
+            const character = characters.find(ch => utils.getName(ch.name) === c.name)
+            const stats = character?.computedStats || character
+            const maxHp = getRuntimeValue(c.name, 'hitPoints') ?? stats?.hitPoints ?? 0
+            const currentHp = getRuntimeValue(c.name, 'currentHitPoints') ?? maxHp
+            const activeBuffs = getRuntimeValue(c.name, 'activeBuffs') || []
+            const shieldOfFaithBonus = Array.isArray(activeBuffs) && activeBuffs.some(b => b.effect === 'shield_of_faith') ? 2 : 0
             return {
                 ...c,
                 imagePath: character?.imagePath || '',
