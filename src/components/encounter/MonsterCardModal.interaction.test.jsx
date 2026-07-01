@@ -98,6 +98,7 @@ vi.mock('../../services/maps/mapsService.js', () => ({
 
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
   useRuntimeValue: vi.fn((_characterKey, _propertyName, _campaignName) => null),
+  getRuntimeValue: vi.fn((_characterKey, _propertyName) => null),
 }));
 
 // ── Re-import mocked modules ----

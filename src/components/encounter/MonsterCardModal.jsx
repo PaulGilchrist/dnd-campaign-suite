@@ -59,6 +59,8 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
   const monsterCharacter = characters?.find(c => c.name === monsterName);
   const speedyOpportunityDisadvantage = monsterCharacter?.computedStats?.automation?.passives?.some(p => p.type === 'passive_rule' && p.effect === 'opportunity_attacks_disadvantage');
   const speedyDifficultTerrainIgnore = monsterCharacter?.computedStats?.automation?.passives?.some(p => p.type === 'passive_rule' && p.effect === 'ignore_difficult_terrain_on_dash');
+  const monsterActiveBuffs = getRuntimeValue(monsterName, 'activeBuffs') || [];
+  const shieldOfFaithBonus = Array.isArray(monsterActiveBuffs) && monsterActiveBuffs.some(b => b.effect === 'shield_of_faith') ? 2 : 0;
 
   const { popupHtml, setPopupHtml, rollAttack, rollDamage, rollAbilityCheck, rollSavingThrow, rollSkillCheck, rollInitiative, quickRollPlayerSave } = useLoggedDiceRoll(
     monsterName,
@@ -400,7 +402,7 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
           <div className="mc-stats">
             <div className="mc-stat">
               <span className="mc-stat-label">Armor Class</span>
-              <span className="mc-stat-value">{monster.armor_class}</span>
+              <span className="mc-stat-value">{monster.armor_class + shieldOfFaithBonus}{shieldOfFaithBonus > 0 && ' (+' + shieldOfFaithBonus + ' Shield of Faith)'}</span>
             </div>
             <div className="mc-stat">
               <span className="mc-stat-label">Hit Points</span>

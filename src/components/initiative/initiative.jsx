@@ -109,6 +109,8 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
             const maxHp = getRuntimeValue(c.name, 'hitPoints') ?? stats?.hitPoints ?? 0
             const currentHp = getRuntimeValue(c.name, 'currentHitPoints') ?? maxHp
             const runtimeConditions = getRuntimeValue(c.name, 'activeConditions') || []
+            const activeBuffs = getRuntimeValue(c.name, 'activeBuffs') || []
+            const shieldOfFaithBonus = Array.isArray(activeBuffs) && activeBuffs.some(b => b.effect === 'shield_of_faith') ? 2 : 0
             const conditions = runtimeConditions.map((key, i) => ({
                 id: `runtime-${key}-${i}`,
                 key,
@@ -119,7 +121,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
             return {
                 ...c,
                 imagePath: character?.imagePath || '',
-                ac: stats?.armorClass ?? 10,
+                ac: (stats?.armorClass ?? 10) + shieldOfFaithBonus,
                 resistances: stats?.resistances || [],
                 immunities: stats?.immunities || [],
                 currentHp,

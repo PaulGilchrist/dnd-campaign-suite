@@ -75,6 +75,7 @@ vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
         if (key === 'remarkableAthleteNoOA') return false;
         return null;
     }),
+    getRuntimeValue: vi.fn((_characterKey, _propertyName) => null),
 }));
 
 const baseMonster = {
