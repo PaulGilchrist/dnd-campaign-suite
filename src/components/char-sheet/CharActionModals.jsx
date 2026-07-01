@@ -63,16 +63,12 @@ function buildHealingIllusionTargets(playerStats, characters, combatSummary) {
             const creature = allCreatures.find(c => c.name === name);
             return { name: creature.name, type: creature.type, size: creature.size, currentHp: creature.currentHp, maxHp: creature.maxHp };
         });
-    console.log('[HealingIllusion] characters:', (characters || []).map(c => c.name));
-    console.log('[HealingIllusion] combatSummary.creatures:', (combatSummary?.creatures || []).map(c => c.name));
-    console.log('[HealingIllusion] final targets:', result.map(c => c.name));
     return result;
 }
 
-async function handleHealingIllusionConfirm(targetName, payload, characters, campaignName, onClose) {
+async function handleHealingIllusionConfirm(targetName, payload, characters, campaignName, combatSummary, onClose) {
     const { action, playerStats } = payload;
     const casterName = playerStats.name;
-    console.log('[HealingIllusion] Confirm heal:', { targetName, caster: casterName });
     const stored = getRuntimeValue(casterName, 'activeBuffs', campaignName);
     const activeBuffs = Array.isArray(stored) ? stored : [];
     const newBuffs = activeBuffs.filter(b => b.name !== action.name);
@@ -80,12 +76,10 @@ async function handleHealingIllusionConfirm(targetName, payload, characters, cam
     const healAmount = playerStats.level || 1;
     const maxHp = targetName === playerStats.name
         ? playerStats.hitPoints
-        : (Number(getRuntimeValue(targetName, 'hitPoints', campaignName)) || 0);
-    const currentHp = Number(getRuntimeValue(targetName, 'currentHitPoints', campaignName)) || 0;
-    console.log('[HealingIllusion] HP before heal:', { targetName, currentHp, maxHp, healAmount });
+        : (Number(getRuntimeValue(targetName, 'hitPoints', campaignName)) || findCreatureMaxHp(targetName, combatSummary, characters) || 0);
+    const currentHp = Number(getRuntimeValue(targetName, 'currentHitPoints', campaignName)) || findCreatureCurrentHp(targetName, combatSummary) || 0;
     const newHp = Math.min(maxHp, currentHp + healAmount);
     await setRuntimeValue(targetName, 'currentHitPoints', newHp, campaignName);
-    console.log('[HealingIllusion] HP after heal:', { targetName, newHp });
     logHealingToSSE(campaignName, {
         targetName,
         sourceName: action.name,
@@ -97,6 +91,18 @@ async function handleHealingIllusionConfirm(targetName, payload, characters, cam
     onClose();
 }
 
+function findCreatureMaxHp(targetName, combatSummary, characters) {
+    const creature = combatSummary?.creatures?.find(c => c.name === targetName);
+    if (creature?.maxHp) return creature.maxHp;
+    const char = characters?.find(c => c.name === targetName);
+    return char?.maxHp;
+}
+
+function findCreatureCurrentHp(targetName, combatSummary) {
+    const creature = combatSummary?.creatures?.find(c => c.name === targetName);
+    return creature?.currentHp;
+}
+
 function buildInvokeDuplicityTargets(playerStats, characters, combatSummary) {
     const allCreatures = [...(characters || []), ...(combatSummary?.creatures || [])];
     const names = new Set(allCreatures.map(c => c.name));
@@ -106,22 +112,16 @@ function buildInvokeDuplicityTargets(playerStats, characters, combatSummary) {
             const creature = allCreatures.find(c => c.name === name);
             return { name: creature.name, type: creature.type, currentHp: creature.currentHp, maxHp: creature.maxHp };
         });
-    console.log('[InvokeDuplicity] characters:', (characters || []).map(c => c.name));
-    console.log('[InvokeDuplicity] combatSummary.creatures:', (combatSummary?.creatures || []).map(c => c.name));
-    console.log('[InvokeDuplicity] final targets:', result.map(c => c.name));
     return result;
 }
 
 async function handleInvokeDuplicityConfirm(selectedAllyNames, payload, campaignName, onClose) {
     const { playerStats } = payload;
-    console.log('[ImprovedDuplicity] Modal confirm:', { selectedAllyNames, caster: playerStats.name });
     if (selectedAllyNames.length === 0) {
-        console.log('[ImprovedDuplicity] No allies selected, skipping');
         onClose();
         return;
     }
     await setRuntimeValue(playerStats.name, 'invokeDuplicityAdvantageTargets', selectedAllyNames, campaignName);
-    console.log('[ImprovedDuplicity] Stored advantage targets:', selectedAllyNames);
     await addEntry(campaignName, {
         type: 'ability_use',
         characterName: playerStats.name,
@@ -383,7 +383,7 @@ export default function CharActionModals({
                     title="Healing Illusion"
                     targets={buildHealingIllusionTargets(playerStats, characters, combatSummary)}
                     description={`The illusion has ended. Choose a creature within 5 feet to regain ${playerStats.level || 1} HP:`}
-                    onTargetSelected={(targetName) => handleHealingIllusionConfirm(targetName, healingIllusionModal, characters, campaignName, () => { setHealingIllusionModal(null); window.dispatchEvent(new CustomEvent('buffs-updated')); })}
+                    onTargetSelected={(targetName) => handleHealingIllusionConfirm(targetName, healingIllusionModal, characters, campaignName, combatSummary, () => { setHealingIllusionModal(null); window.dispatchEvent(new CustomEvent('buffs-updated')); })}
                     onSkip={() => { setHealingIllusionModal(null); window.dispatchEvent(new CustomEvent('buffs-updated')); }}
                     confirmLabel="Heal"
                     confirmIcon="fa-heart"

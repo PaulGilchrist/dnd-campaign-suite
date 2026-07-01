@@ -177,7 +177,22 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
     }
 
     const attackRange = action?.reach ? rangeToFeet(action.reach) : (action?.range ? rangeToFeet(action.range) : 30);
-    const forcedMode = combineAttackModes(attackerEffects, targetEffectData, attackRange, target?.name)
+
+    // Check Improved Duplicity advantage for monster attackers
+    let duplicityAdvantage = false;
+    const clericNames = (characters || []).filter(c => c.computedStats?.automation?.passives?.some(p => p.effect === 'enhanced_distraction_and_healing'));
+    for (const cleric of clericNames) {
+      const clericBuffs = getRuntimeValue(cleric.name, 'activeBuffs', campaignName) || [];
+      const hasBuff = Array.isArray(clericBuffs) && clericBuffs.some(b => b.effect === 'create_illusion' && b.isImprovedDuplicity);
+      if (!hasBuff) continue;
+      const advantageTargets = getRuntimeValue(cleric.name, 'invokeDuplicityAdvantageTargets', campaignName) || [];
+      if (advantageTargets.includes(monsterName)) {
+        duplicityAdvantage = true;
+        break;
+      }
+    }
+
+    const forcedMode = combineAttackModes(attackerEffects, targetEffectData, attackRange, target?.name);
 
     const isMelee = attackRange <= 5
     const isAutoCrit = isMelee && targetEffectData.autoCritWithin5ft
@@ -234,7 +249,7 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
     rollAttack(name, bonus, {
       damageType: formatDamageTypes(primaryDamageType),
       resistanceNotice,
-      forcedMode: rangeForcedMode || (forcedMode !== 'normal' ? forcedMode : undefined),
+      forcedMode: rangeForcedMode || (forcedMode !== 'normal' ? forcedMode : (duplicityAdvantage ? 'advantage' : undefined)),
       isAutoCrit,
       isAutoMiss,
       rangeReason,

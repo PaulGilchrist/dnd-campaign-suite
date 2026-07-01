@@ -13,34 +13,27 @@ function getPlayersList(mapData, campaignName) {
                 }
             }
         }
-        console.log('[Duplicity] getPlayersList from mapData:', all.map(c => c.name));
         return all;
     }
     const combatSummary = getCombatSummary(campaignName);
     const creatures = combatSummary?.creatures || [];
-    console.log('[Duplicity] getPlayersList from combatSummary:', creatures.map(c => c.name));
     return creatures;
 }
 
 export function getDuplicityAdvantageAgainst({ targetPos, attackerName, campaignName, mapData, skipRangeCheck }) {
-    console.log('[Duplicity] getDuplicityAdvantageAgainst:', { attackerName, skipRangeCheck, targetPos: !!targetPos, mapData: !!mapData });
-
     if (!skipRangeCheck && (!targetPos || !mapData)) return { advantage: false };
 
     const allCreatures = getPlayersList(mapData, campaignName);
-    console.log('[Duplicity] allCreatures:', allCreatures.map(c => c.name));
 
     if (!allCreatures.length) return { advantage: false };
 
     const clericHasBuff = allCreatures.some(c => {
         const buffs = getRuntimeValue(c.name, 'activeBuffs', campaignName) || [];
         const has = Array.isArray(buffs) && buffs.some(b => b.effect === 'create_illusion' && b.isImprovedDuplicity);
-        if (has) console.log('[Duplicity] Found cleric with buff:', c.name);
         return has;
     });
 
     if (!clericHasBuff) {
-        console.log('[Duplicity] No cleric with buff found');
         return { advantage: false };
     }
 
@@ -55,9 +48,7 @@ export function getDuplicityAdvantageAgainst({ targetPos, attackerName, campaign
                 { gridX: creature.gridX, gridY: creature.gridY },
                 { gridX: targetPos.gridX, gridY: targetPos.gridY }
             );
-            console.log('[Duplicity] Checking creature', creature.name, 'distance:', dist);
             if (dist !== null && dist <= 5) {
-                console.log('[Duplicity] Granting advantage to', creature.name, 'from', creature.name);
                 return { advantage: true, source: creature.name };
             }
         }
@@ -67,11 +58,9 @@ export function getDuplicityAdvantageAgainst({ targetPos, attackerName, campaign
             const buffs = getRuntimeValue(creature.name, 'activeBuffs', campaignName) || [];
             const illusionBuff = Array.isArray(buffs) ? buffs.find(b => b.effect === 'create_illusion' && b.isImprovedDuplicity) : null;
             if (illusionBuff) {
-                console.log('[Duplicity] Granting advantage to', creature.name, '(skipRangeCheck)');
                 return { advantage: true, source: creature.name };
             }
         }
     }
-    console.log('[Duplicity] No advantage granted');
     return { advantage: false };
 }
