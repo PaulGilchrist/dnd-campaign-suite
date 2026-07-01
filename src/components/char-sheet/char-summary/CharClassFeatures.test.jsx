@@ -296,6 +296,7 @@ describe('CharClassFeatures', () => {
         it('renders expertise when playerStats.class.expertise exists', () => {
             const stats = bardStats({
                 class: { ...basePlayerStats.class, name: 'Bard', expertise: ['Stealth', 'Athletics'] },
+                expertise: ['Stealth', 'Athletics'],
             });
             renderComponent(stats);
             expect(screen.getByText(/Expertise:/)).toBeInTheDocument();

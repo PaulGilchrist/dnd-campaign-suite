@@ -190,12 +190,12 @@ const classRules = {
                      extraAttacks
                  };
               },
-              getRogueFeatures: (playerStats) => {
-                  // 5e Rules: Get Rogue class features
-                  const sneakAttack = classRules.getRogueSneakAttack(playerStats);
-                  const expertise = playerStats.class?.expertise || [];
-                  return { sneakAttack, expertise };
-              },
+               getRogueFeatures: (playerStats) => {
+                   // 5e Rules: Get Rogue class features
+                   const sneakAttack = classRules.getRogueSneakAttack(playerStats);
+                   const expertise = playerStats.expertise || [];
+                   return { sneakAttack, expertise };
+               },
               getBardFeatures: (playerStats) => {
          // 5e Rules: Get Bard class features
           const classLevel = playerStats.class?.class_levels?.find(cl => cl.level === playerStats.level);

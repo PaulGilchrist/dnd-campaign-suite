@@ -368,7 +368,7 @@ const classRules = {
            },
            getRogueFeatures(playerStats) {
                const sneakAttack = this.getRogueSneakAttack(playerStats);
-               const expertise = playerStats.class?.expertise || [];
+               const expertise = playerStats.expertise || [];
                return { sneakAttack, expertise };
            },
            getBardFeatures: (playerStats) => {

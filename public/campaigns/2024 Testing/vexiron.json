@@ -7,57 +7,65 @@
       "name": "Strength",
       "baseScore": 10,
       "featIncrease": 0,
-      "miscIncrease": 0,
-      "backgroundIncrease": 0
+      "backgroundIncrease": 0,
+      "miscIncrease": 0
     },
     {
       "name": "Dexterity",
       "baseScore": 15,
       "featIncrease": 0,
-      "miscIncrease": 1,
-      "backgroundIncrease": 0
+      "backgroundIncrease": 0,
+      "miscIncrease": 1
     },
     {
       "name": "Constitution",
       "baseScore": 14,
       "featIncrease": 0,
-      "miscIncrease": 0,
-      "backgroundIncrease": 0
+      "backgroundIncrease": 1,
+      "miscIncrease": 0
     },
     {
       "name": "Intelligence",
       "baseScore": 12,
       "featIncrease": 0,
-      "miscIncrease": 0,
-      "backgroundIncrease": 0
+      "backgroundIncrease": 0,
+      "miscIncrease": 0
     },
     {
       "name": "Wisdom",
       "baseScore": 13,
       "featIncrease": 0,
-      "miscIncrease": 1,
-      "backgroundIncrease": 0
+      "backgroundIncrease": 1,
+      "miscIncrease": 1
     },
     {
       "name": "Charisma",
       "baseScore": 8,
       "featIncrease": 0,
-      "miscIncrease": 0,
-      "backgroundIncrease": 0
+      "backgroundIncrease": 1,
+      "miscIncrease": 0
     }
   ],
   "background": "Hermit",
   "class": {
     "name": "Rogue",
     "subclass": {
-      "name": "Thief"
+      "name": "Arcane Trickster",
+      "type": ""
     },
+    "divineOrder": "",
+    "primalOrder": "",
     "expertise": [
       "Sleight of Hand",
       "Thieves' Tools"
     ]
   },
-  "expertSkills": [],
+  "expertSkills": [
+    "Stealth",
+    "Perception",
+    "Deception",
+    "Sleight of Hand"
+  ],
   "feats": [],
   "fightingStyles": [],
   "race": {
@@ -95,13 +103,9 @@
   "languages": [],
   "resistances": [],
   "skillProficiencies": [
-    "Acrobatics",
-    "Athletics",
-    "Deception",
-    "Insight",
-    "Investigation",
-    "Perception",
     "Sleight of Hand",
+    "Deception",
+    "Perception",
     "Stealth"
   ],
   "specialActions": [],

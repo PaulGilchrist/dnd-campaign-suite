@@ -1307,6 +1307,7 @@ describe('classRules2024', () => {
           expertise: ['Stealth', 'Persuasion'],
         },
         level: 5,
+        expertise: ['Stealth', 'Persuasion'],
       };
       const result = classRules.getRogueFeatures(playerStats);
       expect(result.sneakAttack).toEqual({ dice_count: 3, dice_value: 6 });

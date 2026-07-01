@@ -971,6 +971,7 @@ describe('classRules', () => {
           ],
         },
         level: 5,
+        expertise: ['Stealth', 'Persuasion'],
       };
       const result = classRules.getRogueFeatures(playerStats);
 
@@ -981,7 +982,7 @@ describe('classRules', () => {
     });
 
     it('should return default sneakAttack when class_levels is missing', () => {
-      const playerStats = { class: { name: 'Rogue', expertise: ['Stealth'] }, level: 1 };
+      const playerStats = { class: { name: 'Rogue', expertise: ['Stealth'] }, level: 1, expertise: ['Stealth'] };
       const result = classRules.getRogueFeatures(playerStats);
 
       expect(result).toEqual({

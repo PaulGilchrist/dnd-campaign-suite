@@ -39,9 +39,9 @@ function CharAbilities({ allAbilityScores, playerStats, campaignName, exhaustion
                if (primalSkills.includes(skill.name)) {
                    const strengthAbility = playerStats?.abilities?.find(a => a.name === 'Strength');
                    if (strengthAbility) {
-                       const proficiency = Math.floor((playerStats.level - 1) / 4 + 2);
-                       const proficient = playerStats.skillProficiencies?.includes(skill.name);
-                       const expertise = playerStats.expertise?.includes(skill.name);
+                        const proficiency = Math.floor((playerStats.level - 1) / 4 + 2);
+                        const proficient = playerStats.skillProficiencies?.includes(skill.name);
+                        const expertise = playerStats.expertise?.includes(skill.name);
                        let strengthBonus = strengthAbility.bonus;
                        if (proficient) {
                            strengthBonus += proficiency;

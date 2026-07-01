@@ -865,6 +865,9 @@ const rules = {
         playerStats.specialActions = playerStats.specialActions || [];
         playerStats.characterAdvancement = playerStats.characterAdvancement || [];
         playerStats.expertise = playerStats.expertise || [];
+        if (playerStats.class?.expertise) {
+            playerStats.expertise = [...playerStats.expertise, ...playerStats.class.expertise];
+        }
 
             [playerStats.actions, playerStats.bonusActions, playerStats.reactions, playerStats.specialActions, playerStats.characterAdvancement] = rules.getActions(playerStats, playerSummary);
 
@@ -1194,6 +1197,14 @@ const rules = {
         // Apply expertise feat buffs (e.g., Keen Mind Lore Knowledge, Observant's Keen Observer)
         // When a player has a proficiency choice from a feat that grants expertise,
         // mark any selected skill from that choice list as expertise
+        // Also support expertSkills field (wizard form field name) for both 5e and 2024
+        if (playerStats.expertSkills && Array.isArray(playerStats.expertSkills)) {
+            playerStats.expertSkills.forEach(s => {
+                if (typeof s === 'string' && s.length > 0 && playerStats.expertise) {
+                    playerStats.expertise.push(s);
+                }
+            });
+        }
         if (is2024(playerStats, playerSummary)) {
             let expertiseProfs = playerStats.expertise;
             if (!Array.isArray(expertiseProfs)) {
@@ -1201,12 +1212,6 @@ const rules = {
                 throw new Error('Missing array: expertise for ' + playerStats.name);
             }
             const expertiseSkills = new Set(expertiseProfs);
-            // Also support expertSkills field (wizard form field name)
-            if (playerStats.expertSkills && Array.isArray(playerStats.expertSkills)) {
-                playerStats.expertSkills.forEach(s => {
-                    if (typeof s === 'string' && s.length > 0) expertiseSkills.add(s);
-                });
-            }
             featProficiencyChoices.forEach(fp => {
                 if (!fp.grantsExpertise) return;
                 if (fp.from) {

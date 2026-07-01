@@ -60,6 +60,7 @@ export function getSpellAbilities(allSpells, playerStats, playerSummary) {
     // Arcane Trickster: Mage Hand Legerdemain - adds Mage Hand to known spells and adds +3 cantrips known
     if (playerStats.class?.major?.name === 'Arcane Trickster') {
         spellAbilities = spellAbilities || {};
+        spellAbilities.spells = spellAbilities.spells || [];
         if (playerStats.spells) {
             spellAbilities.spells = [...new Set([...spellAbilities.spells, ...['Mage Hand']])];
             spellAbilities.cantrips_known += 3;
