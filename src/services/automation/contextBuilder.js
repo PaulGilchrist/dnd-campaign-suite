@@ -186,6 +186,7 @@ export function buildAttackContextSync(attack, playerStats, campaignName, condit
                 skipRangeCheck: true,
             });
             if (noMapDuplicity.advantage) {
+                console.log('[ContextBuilder] Duplicity (initial noMap) granted advantage for', playerName, 'source:', noMapDuplicity.source);
                 forcedMode = 'advantage';
             }
         }
@@ -392,6 +393,7 @@ export function buildAttackContext(attack, playerStats, campaignName, mapName, c
                         mapData,
                     });
                     if (duplicityResult.advantage) {
+                        console.log('[ContextBuilder] Duplicity granted advantage for', playerStats.name, 'vs', base.targetName, 'source:', duplicityResult.source);
                         base.forcedMode = 'advantage';
                     }
                 }
@@ -433,6 +435,7 @@ export function buildAttackContext(attack, playerStats, campaignName, mapName, c
                         skipRangeCheck: true,
                     });
                     if (noMapDuplicity.advantage) {
+                        console.log('[ContextBuilder] Duplicity (noMap) granted advantage for', playerStats.name, 'vs', base.targetName, 'source:', noMapDuplicity.source);
                         base.forcedMode = 'advantage';
                     }
                 }
@@ -613,6 +616,7 @@ export function buildAttackContext(attack, playerStats, campaignName, mapName, c
                 }
             }
 
+            console.log('[ContextBuilder] Final attack context:', { attacker: playerStats.name, target: base.targetName, forcedMode, damageType: base.damageType });
             return base;
         });
     })

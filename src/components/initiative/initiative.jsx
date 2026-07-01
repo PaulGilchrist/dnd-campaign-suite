@@ -389,6 +389,12 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
                 combatSummaryRef.current = summary
                 setCombatSummary(summary)
             }
+            for (const creature of (summary?.creatures || [])) {
+                if (creature.type === 'player') {
+                    setRuntimeValue(creature.name, 'activeBuffs', [], campaignName)
+                    setRuntimeValue(creature.name, 'invokeDuplicityAdvantageTargets', [], campaignName)
+                }
+            }
         }
         window.addEventListener('initiative-rolled', handler)
         window.addEventListener('combat-summary-updated', handler)

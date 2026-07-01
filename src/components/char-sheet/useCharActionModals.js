@@ -70,6 +70,7 @@ export default function useCharActionModals({
     const [radianceOfDawnModal, setRadianceOfDawnModal] = useState(null);
     const [tricksterBlessingModal, setTricksterBlessingModal] = useState(null);
     const [secondaryTargetModal, setSecondaryTargetModal] = useState(null);
+    const [invokeDuplicityModal, setInvokeDuplicityModal] = useState(null);
 
     const pendingDamageRef = useRef(null);
 
@@ -185,6 +186,7 @@ export default function useCharActionModals({
         radianceOfDawnModal, setRadianceOfDawnModal,
         tricksterBlessingModal, setTricksterBlessingModal,
         secondaryTargetModal, setSecondaryTargetModal,
+        invokeDuplicityModal, setInvokeDuplicityModal,
         resolveAttackDamage,
         handleMasteryClose,
         handleWeaponMasteryChoice,

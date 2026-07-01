@@ -515,6 +515,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         combatStanceModal, setCombatStanceModal,
         teleportModal, setTeleportModal,
         healingIllusionModal, setHealingIllusionModal,
+        invokeDuplicityModal, setInvokeDuplicityModal,
         saveAttackHealModal, setSaveAttackHealModal,
         divineSparkModal, setDivineSparkModal,
         divineInterventionModal, setDivineInterventionModal,
@@ -1100,6 +1101,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     case 'combatStance': setCombatStanceModal(result.payload); break;
                     case 'teleport': setTeleportModal(result.payload); break;
                     case 'healingIllusion': setHealingIllusionModal(result.payload); break;
+                    case 'invokeDuplicity': setInvokeDuplicityModal(result.payload); break;
                     case 'saveAttackHeal': setSaveAttackHealModal(result.payload); break;
                     case 'divineSpark': setDivineSparkModal(result.payload); break;
                     case 'divineIntervention':
@@ -1465,6 +1467,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     combatStanceModal={combatStanceModal} setCombatStanceModal={setCombatStanceModal}
                     teleportModal={teleportModal} setTeleportModal={setTeleportModal}
                     healingIllusionModal={healingIllusionModal} setHealingIllusionModal={setHealingIllusionModal}
+                    invokeDuplicityModal={invokeDuplicityModal} setInvokeDuplicityModal={setInvokeDuplicityModal}
                     saveAttackHealModal={saveAttackHealModal} setSaveAttackHealModal={setSaveAttackHealModal}
                     divineSparkModal={divineSparkModal} setDivineSparkModal={setDivineSparkModal}
                     divineInterventionModal={divineInterventionModal} setDivineInterventionModal={setDivineInterventionModal}

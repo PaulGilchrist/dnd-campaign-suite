@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import HealingPoolModal from './modals/divine/HealingPoolModal.jsx'
 import HandOfHealingModal from './modals/shared/HandOfHealingModal.jsx'
 import FontOfMagicModal from './modals/FontOfMagicModal.jsx'
@@ -43,28 +44,48 @@ import ConstellationSelectionModal from './modals/ConstellationSelectionModal.js
 import CombatSuperiorityModal from './modals/CombatSuperiorityModal.jsx'
 import AttackRiderManeuverPrompt from './modals/AttackRiderManeuverPrompt.jsx'
 import SecondaryTargetModal from './modals/shared/SecondaryTargetModal.jsx'
+import CreatureSelectionModal from './modals/shared/CreatureSelectionModal.jsx'
 import BulwarkOfForceModal from './modals/BulwarkOfForceModal.jsx'
 import CoronaEnemySelectionModal from './modals/CoronaEnemySelectionModal.jsx'
 import RadianceOfDawnModal from './modals/RadianceOfDawnModal.jsx'
 import { handleClearWard, handleSpendDice, handleApply } from '../../services/automation/handlers/class-cleric-paladin/bastionOfLawHandler.js'
+import { getCombatContext } from '../../services/rules/combat/damageUtils.js'
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js'
 import { logHealingToSSE } from '../../services/automation/common/healingRoll.js'
+import { addEntry } from '../../services/ui/logService.js'
 
-function buildHealingIllusionTargets(playerStats, characters) {
-    return (characters || [])
-        .filter(c => c.name !== playerStats.name)
-        .map(c => ({ name: c.name, type: c.type, size: c.size, currentHp: c.currentHp, maxHp: c.maxHp }));
+function buildHealingIllusionTargets(playerStats, characters, combatSummary) {
+    const allCreatures = [...(characters || []), ...(combatSummary?.creatures || [])];
+    const names = new Set(allCreatures.map(c => c.name));
+    const result = Array.from(names)
+        .filter(name => name !== playerStats.name)
+        .map(name => {
+            const creature = allCreatures.find(c => c.name === name);
+            return { name: creature.name, type: creature.type, size: creature.size, currentHp: creature.currentHp, maxHp: creature.maxHp };
+        });
+    console.log('[HealingIllusion] characters:', (characters || []).map(c => c.name));
+    console.log('[HealingIllusion] combatSummary.creatures:', (combatSummary?.creatures || []).map(c => c.name));
+    console.log('[HealingIllusion] final targets:', result.map(c => c.name));
+    return result;
 }
 
 async function handleHealingIllusionConfirm(targetName, payload, characters, campaignName, onClose) {
     const { action, playerStats } = payload;
+    const casterName = playerStats.name;
+    console.log('[HealingIllusion] Confirm heal:', { targetName, caster: casterName });
+    const stored = getRuntimeValue(casterName, 'activeBuffs', campaignName);
+    const activeBuffs = Array.isArray(stored) ? stored : [];
+    const newBuffs = activeBuffs.filter(b => b.name !== action.name);
+    setRuntimeValue(casterName, 'activeBuffs', newBuffs, campaignName);
     const healAmount = playerStats.level || 1;
     const maxHp = targetName === playerStats.name
         ? playerStats.hitPoints
         : (Number(getRuntimeValue(targetName, 'hitPoints', campaignName)) || 0);
     const currentHp = Number(getRuntimeValue(targetName, 'currentHitPoints', campaignName)) || 0;
+    console.log('[HealingIllusion] HP before heal:', { targetName, currentHp, maxHp, healAmount });
     const newHp = Math.min(maxHp, currentHp + healAmount);
     await setRuntimeValue(targetName, 'currentHitPoints', newHp, campaignName);
+    console.log('[HealingIllusion] HP after heal:', { targetName, newHp });
     logHealingToSSE(campaignName, {
         targetName,
         sourceName: action.name,
@@ -73,6 +94,41 @@ async function handleHealingIllusionConfirm(targetName, payload, characters, cam
         maxHp,
         healingName: 'Healing Illusion',
     });
+    onClose();
+}
+
+function buildInvokeDuplicityTargets(playerStats, characters, combatSummary) {
+    const allCreatures = [...(characters || []), ...(combatSummary?.creatures || [])];
+    const names = new Set(allCreatures.map(c => c.name));
+    const result = Array.from(names)
+        .filter(name => name !== playerStats.name)
+        .map(name => {
+            const creature = allCreatures.find(c => c.name === name);
+            return { name: creature.name, type: creature.type, currentHp: creature.currentHp, maxHp: creature.maxHp };
+        });
+    console.log('[InvokeDuplicity] characters:', (characters || []).map(c => c.name));
+    console.log('[InvokeDuplicity] combatSummary.creatures:', (combatSummary?.creatures || []).map(c => c.name));
+    console.log('[InvokeDuplicity] final targets:', result.map(c => c.name));
+    return result;
+}
+
+async function handleInvokeDuplicityConfirm(selectedAllyNames, payload, campaignName, onClose) {
+    const { playerStats } = payload;
+    console.log('[ImprovedDuplicity] Modal confirm:', { selectedAllyNames, caster: playerStats.name });
+    if (selectedAllyNames.length === 0) {
+        console.log('[ImprovedDuplicity] No allies selected, skipping');
+        onClose();
+        return;
+    }
+    await setRuntimeValue(playerStats.name, 'invokeDuplicityAdvantageTargets', selectedAllyNames, campaignName);
+    console.log('[ImprovedDuplicity] Stored advantage targets:', selectedAllyNames);
+    await addEntry(campaignName, {
+        type: 'ability_use',
+        characterName: playerStats.name,
+        abilityName: 'Improved Duplicity',
+        description: `${playerStats.name} used Improved Duplicity, granting Advantage to ${selectedAllyNames.join(', ')}.`,
+    }).catch(() => {});
+    window.dispatchEvent(new CustomEvent('buffs-updated'));
     onClose();
 }
 
@@ -94,6 +150,7 @@ export default function CharActionModals({
     combatStanceModal, setCombatStanceModal,
     teleportModal, setTeleportModal,
     healingIllusionModal, setHealingIllusionModal,
+    invokeDuplicityModal, setInvokeDuplicityModal,
     saveAttackHealModal, setSaveAttackHealModal,
     divineSparkModal, setDivineSparkModal,
     divineInterventionModal, setDivineInterventionModal,
@@ -167,6 +224,14 @@ export default function CharActionModals({
     handleDivineInterventionCast,
     pendingDamageRef,
 }) {
+    const [combatSummary, setCombatSummary] = useState(null);
+
+    useEffect(() => {
+        getCombatContext(campaignName).then(cs => {
+            if (cs) setCombatSummary(cs);
+        });
+    }, [campaignName]);
+
     return (
         <>
             {healingPoolModal && (
@@ -316,14 +381,27 @@ export default function CharActionModals({
             {healingIllusionModal && (
                 <SecondaryTargetModal
                     title="Healing Illusion"
-                    targets={buildHealingIllusionTargets(playerStats, characters)}
+                    targets={buildHealingIllusionTargets(playerStats, characters, combatSummary)}
                     description={`The illusion has ended. Choose a creature within 5 feet to regain ${playerStats.level || 1} HP:`}
-                    onTargetSelected={(targetName) => handleHealingIllusionConfirm(targetName, healingIllusionModal.payload, characters, campaignName, () => { setHealingIllusionModal(null); window.dispatchEvent(new CustomEvent('buffs-updated')); })}
+                    onTargetSelected={(targetName) => handleHealingIllusionConfirm(targetName, healingIllusionModal, characters, campaignName, () => { setHealingIllusionModal(null); window.dispatchEvent(new CustomEvent('buffs-updated')); })}
                     onSkip={() => { setHealingIllusionModal(null); window.dispatchEvent(new CustomEvent('buffs-updated')); }}
                     confirmLabel="Heal"
                     confirmIcon="fa-heart"
                     showHp={true}
                     showSize={false}
+                />
+            )}
+            {invokeDuplicityModal && (
+                <CreatureSelectionModal
+                    title="Improved Duplicity — Choose Allies"
+                    icon="fa-people-arrows"
+                    targets={buildInvokeDuplicityTargets(playerStats, characters, combatSummary)}
+                    description="When you and your illusion are within 5 feet of a creature, your allies have Advantage on attack rolls against that creature."
+                    note="Select all allies who should gain Advantage from the Improved Duplicity."
+                    confirmLabel="Grant Advantage"
+                    confirmIcon="fa-shield-halved"
+                    onConfirm={(selected) => handleInvokeDuplicityConfirm(selected, invokeDuplicityModal, campaignName, () => { setInvokeDuplicityModal(null); window.dispatchEvent(new CustomEvent('buffs-updated')); })}
+                    onSkip={() => { setInvokeDuplicityModal(null); window.dispatchEvent(new CustomEvent('buffs-updated')); }}
                 />
             )}
             {saveAttackHealModal && (

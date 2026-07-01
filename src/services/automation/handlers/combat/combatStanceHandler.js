@@ -30,17 +30,17 @@ export async function handle(action, playerStats, campaignName, mapName) {
     const wasActive = activeBuffs.some(b => b.name === action.name);
 
     if (wasActive) {
-        const newBuffs = activeBuffs.filter(b => b.name !== action.name);
-        setRuntimeValue(playerName, 'activeBuffs', newBuffs, campaignName);
-        if (action.name === 'Rage') {
-            clearExtendedFlag(playerName, campaignName);
-        }
         if (auto.effect === 'create_illusion' && playerStats.automation?.passives?.some(p => p.effect === 'enhanced_distraction_and_healing')) {
             return {
                 type: 'modal',
                 modalName: 'healingIllusion',
                 payload: { action, playerStats, campaignName, mapName },
             };
+        }
+        const newBuffs = activeBuffs.filter(b => b.name !== action.name);
+        setRuntimeValue(playerName, 'activeBuffs', newBuffs, campaignName);
+        if (action.name === 'Rage') {
+            clearExtendedFlag(playerName, campaignName);
         }
         return {
             type: 'popup',
@@ -246,6 +246,13 @@ async function activateStance(action, playerStats, campaignName, chosenOption) {
     }
 
     if (auto.effect === 'create_illusion') {
+        if (isImprovedDuplicity) {
+            return {
+                type: 'modal',
+                modalName: 'invokeDuplicity',
+                payload: { action, playerStats, campaignName },
+            };
+        }
         const illusionTeleport = (playerStats.automation?.specialActions || []).find(sa => sa.effect === 'teleport_swap_with_illusion');
         if (illusionTeleport) {
             return {

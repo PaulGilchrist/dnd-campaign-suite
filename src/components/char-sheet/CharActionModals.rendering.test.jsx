@@ -196,6 +196,7 @@ vi.mock('./modals/MoonlightStepResourceModal.jsx', () => ({
   default: function TestModal() { return <div data-testid="moonlight-step-resource-modal">MoonlightStepResourceModal</div>; },
 }));
 vi.mock('../../services/automation/handlers/class-cleric-paladin/bastionOfLawHandler.js', () => ({
+  handle: vi.fn().mockResolvedValue(undefined),
   handleClearWard: vi.fn().mockResolvedValue(undefined),
   handleSpendDice: vi.fn().mockResolvedValue(undefined),
   handleApply: vi.fn().mockResolvedValue(undefined),
