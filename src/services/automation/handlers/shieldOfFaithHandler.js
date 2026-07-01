@@ -73,12 +73,17 @@ export async function applyShieldOfFaith(action, playerStats, campaignName, mapN
         }).catch((e) => { console.error("[shieldOfFaith] Error:", e); });
     }
 
+    const targetsList = targetNames.length === 1 ? targetNames[0] : targetNames.join(', ');
+    const description = targetNames.length === 1
+        ? `${targetNames[0]} gained +2 AC from ${action.name}.`
+        : `${targetNames.length} targets gained +2 AC from ${action.name}: ${targetsList}.`;
+
     return {
         type: 'popup',
         payload: {
             type: 'automation_info',
             name: action.name,
-            description: `${targetNames.length} target(s) gained +2 AC from ${action.name}.`,
+            description,
         },
     };
 }

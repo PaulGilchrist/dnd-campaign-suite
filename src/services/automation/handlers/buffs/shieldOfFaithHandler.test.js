@@ -254,8 +254,7 @@ describe('shieldOfFaithHandler', () => {
             const result = await applyShieldOfFaith(action, MOCK_PLAYER, MOCK_CAMPAIGN, null, ['Ally1']);
 
             expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('1 target(s)');
-            expect(result.payload.description).toContain('+2 AC');
+            expect(result.payload.description).toContain('Ally1 gained +2 AC from Shield of Faith.');
 
             expect(setRuntimeValue).toHaveBeenCalledWith(
                 'Ally1',
@@ -382,7 +381,7 @@ describe('shieldOfFaithHandler', () => {
 
             const result = await applyShieldOfFaith(action, MOCK_PLAYER, MOCK_CAMPAIGN, null, ['A', 'B', 'C']);
 
-            expect(result.payload.description).toContain('3 target(s)');
+            expect(result.payload.description).toContain('3 targets gained +2 AC from Shield of Faith: A, B, C.');
             expect(setRuntimeValue).toHaveBeenCalledTimes(3);
         });
     });
