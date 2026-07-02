@@ -210,6 +210,7 @@ const categories2024 = {
         "Dwarven Toughness",
         "Elfish Lineage",
         "Expertise",
+        "Fiendish Legacy",
         "Gnomish Lineage",
         "Halfling Nimbleness",
         "Fiendish Legacies",
