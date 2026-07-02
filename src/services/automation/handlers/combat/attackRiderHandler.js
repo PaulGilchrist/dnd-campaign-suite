@@ -4,6 +4,8 @@ import { getCombatContext, getTargetFromAttacker } from '../../../rules/combat/d
 import { getDistanceFeet } from '../../../rules/combat/rangeValidation.js';
 import { getCurrentCombatRound } from '../../../../services/encounters/combatData.js';
 import { buildSaveDc, createSaveListener } from '../../../automation/common/savePrompt.js';
+import { applyDamageToTarget } from '../../../rules/combat/applyDamage.js';
+import { rollExpression } from '../../../dice/diceRoller.js';
 
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation || action;
@@ -234,7 +236,7 @@ async function applyRiderEffect(action, playerStats, campaignName, targetName, o
         const storedEffects = getRuntimeValue(campaignName, 'targetEffects') || [];
         const newEffect = {
             target: targetName,
-            source: action.name,
+            source: playerStats.name,
             option: option.name,
             effect: 'mass_fear',
             saveType: option.saveType || 'WIS',
@@ -279,7 +281,7 @@ async function applyRiderEffect(action, playerStats, campaignName, targetName, o
     const storedEffects = getRuntimeValue(campaignName, 'targetEffects') || [];
     const newEffect = {
         target: targetName,
-        source: action.name,
+        source: playerStats.name,
         option: option.name,
         effect: option.effect,
         value: option.value || null,
@@ -318,6 +320,42 @@ async function applyRiderEffect(action, playerStats, campaignName, targetName, o
             const filtered = conditions.filter(c => String(c).toLowerCase() !== option.condition.toLowerCase());
             const updatedConditions = [...filtered, option.condition];
             setRuntimeValue(targetName, 'activeConditions', updatedConditions, campaignName);
+        }
+
+        // Envenom Weapons: when Poison option of Cunning Strike fails, apply 2d6 Poison damage ignoring resistance
+        if (saveResult.success === false && option.effect === 'poisoned' && option.saveType === 'CON') {
+            const passives = playerStats.automation?.passives || [];
+            const envenomPassive = passives.find(p =>
+                p.type === 'damage_bonus' &&
+                p.trigger === 'cunning_strike_poison_save_fail' &&
+                p.name === 'Envenom Weapons'
+            );
+            if (envenomPassive) {
+                const rollResult = rollExpression(envenomPassive.automation?.damageExpression || '2d6');
+                const poisonDamage = rollResult?.total || 7;
+                if (poisonDamage > 0) {
+                    const combatSummary = await getCombatContext(campaignName);
+                    if (combatSummary) {
+                        const characters = getRuntimeValue('characters', 'characters', campaignName) || [];
+                        await applyDamageToTarget(
+                            combatSummary,
+                            targetName,
+                            poisonDamage,
+                            [envenomPassive.automation?.damageType || 'Poison'],
+                            campaignName,
+                            characters,
+                            true,
+                            playerStats.name
+                        );
+                        addEntry(campaignName, {
+                            type: 'ability_use',
+                            characterName: playerStats.name,
+                            abilityName: 'Envenom Weapons',
+                            description: `2d6 Poison damage (${poisonDamage}) applied to ${targetName} on failed Cunning Strike poison save`,
+                        }).catch(() => {});
+                    }
+                }
+            }
         }
 
         addEntry(campaignName, {

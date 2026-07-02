@@ -5,7 +5,6 @@ import utils from '../../services/ui/utils.js'
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js'
 import storage from '../../services/ui/storage.js'
 import { clearDeathSavePrompt } from '../../services/combat/conditions/savePromptService.js'
-import { rollExpression } from '../../services/dice/diceRoller.js'
 import { getMonsterImageUrl, getMonsterData } from '../../services/npcs/monsterUtils.js'
 import { getAbilityLabel, CONDITIONS } from '../../services/combat/conditions/conditionUtils.js'
 import { loadNPCs } from '../../services/npcs/npcsService.js'
@@ -32,7 +31,6 @@ import {
     addCondition,
     buildConditionPopup,
 } from '../../services/combat/conditions/conditionSaveService.js'
-import { applyDamageToTarget } from '../../services/rules/combat/applyDamage.js'
 import {
     rollConcentrationSave,
     breakConcentration,
@@ -584,30 +582,6 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
         setConditionPopup(buildConditionPopup(r1, bonus, bonusDetail, getAbilityLabel(condition.ability), condition.label, condition.dc, success))
 
         logConditionSave(campaignName, creatureName, r1, bonus, bonusDetail, condition.label, getAbilityLabel(condition.ability), condition.dc, success)
-
-        // Envenom Weapons: when target fails Poison save from Cunning Strike, apply 2d6 Poison damage ignoring resistance
-        if (!success && condition.label?.toLowerCase() === 'poisoned' && condition.ability?.toLowerCase() === 'con') {
-            const allTargetEffects = getRuntimeValue(campaignName, 'targetEffects') || []
-            const poisonEffect = allTargetEffects.find(te =>
-                te.target === creatureName &&
-                te.condition === 'poisoned' &&
-                te.saveType === 'CON' &&
-                te.saveDc === condition.dc
-            )
-            if (poisonEffect) {
-                const attackerName = poisonEffect.source
-                const attackerCharacter = characters.find(c => utils.getName(c.name) === utils.getName(attackerName))
-                const allFeatures = attackerCharacter?.computedStats?.allFeatures || attackerCharacter?.allFeatures || []
-                const hasEnvenomWeapons = allFeatures.some(f => f?.name === 'Envenom Weapons')
-                if (hasEnvenomWeapons) {
-                    const rollResult = rollExpression('2d6')
-                    const poisonDamage = rollResult?.total || 7
-                    if (poisonDamage > 0) {
-                        applyDamageToTarget(combatSummary, creatureName, poisonDamage, ['Poison'], campaignName, null, true, attackerName)
-                    }
-                }
-            }
-        }
     }
 
     const openConcentrationPicker = (creature) => {

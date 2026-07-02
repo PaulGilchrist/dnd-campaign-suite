@@ -335,7 +335,7 @@ export function collectAutomationFromFeatures(features, playerStats) {
             case 'healing_pool':
             case 'self_healing':
             case 'damage_bonus':
-                if (info.trigger && (info.trigger.includes('_crit') || info.trigger.includes('_critical'))) {
+                if (info.trigger && (info.trigger.includes('_crit') || info.trigger.includes('_critical') || info.trigger === 'cunning_strike_poison_save_fail')) {
                     result.passives.push(info)
                 } else if (info.action === 'bonus_action') {
                     result.bonusActions.push(info)

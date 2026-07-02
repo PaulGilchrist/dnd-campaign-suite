@@ -124,7 +124,7 @@ describe('sentinelHaltHandler.handle', () => {
         expect.arrayContaining([
           expect.objectContaining({
             target: 'Goblin',
-            source: 'Sentinel - Halt',
+            source: 'TestFighter',
             option: 'Halt',
             effect: 'speed_zero',
             value: null,

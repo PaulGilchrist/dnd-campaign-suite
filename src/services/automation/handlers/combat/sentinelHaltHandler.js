@@ -32,7 +32,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     const storedEffects = getRuntimeValue(campaignName, 'targetEffects') || [];
     const newEffect = {
         target: targetName,
-        source: action.name,
+        source: playerName,
         option: 'Halt',
         effect: 'speed_zero',
         value: null,
