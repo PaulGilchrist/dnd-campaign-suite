@@ -2,47 +2,29 @@
 
 ## Summary
 
-| Metric | Count |
-|--------|------:|
-| Total Source Files | 919 |
-| Total Lines | 392,744 |
+| Metric | Value |
+|--------|-------|
+| Total source files | 1,820 |
+| Total lines of code | 773,539 |
 
 ## Language Breakdown
 
-| Extension | Files | Lines | Category |
-|-----------|------:|------:|----------|
-| `.js` | 522 | 133,265 | Source |
-| `.jsx` | 310 | 81,891 | Source |
-| `.json` | 87 | 177,588 | Config/Data |
-| **Total** | **919** | **392,744** | |
+| Language | Files | Lines |
+|----------|-------|-------|
+| JavaScript | 1,734 | 593,211 |
+| Config | 86 | 180,328 |
 
-## Largest Files
+## Largest Files (Top 10)
 
-| # | Lines | File |
-|--:|------:|------|
-| 1 | 63,517 | `public/data/monsters.json` |
-| 2 | 15,036 | `public/data/2024/spells.json` |
-| 3 | 13,091 | `public/data/classes.json` |
-| 4 | 10,868 | `public/data/2024/classes.json` |
-| 5 | 10,193 | `public/data/spells.json` |
-| 6 | 8,827 | `public/data/magic-items.json` |
-| 7 | 7,950 | `public/campaigns/Testing G3/maps/monstrosity.json` |
-| 8 | 6,758 | `package-lock.json` |
-| 9 | 4,638 | `public/data/equipment.json` |
-| 10 | 3,381 | `public/data/settlement-names.json` |
-
-## Largest Source Files (`.js`/`.jsx` only)
-
-| # | Lines | File |
-|--:|------:|------|
-| 1 | 1,810 | `src/services/maps/dungeonGenerator.js` |
-| 2 | 1,346 | `src/components/char-sheet/CharActions.jsx` |
-| 3 | 1,341 | `src/services/rules/expirations.test.js` |
-| 4 | 1,291 | `src/services/automation/contextBuilder.test.js` |
-| 5 | 1,267 | `src/components/char-sheet/CharBonusActions.test.jsx` |
-| 6 | 1,229 | `src/services/automation/handlers/multiTargetHandler.test.js` |
-| 7 | 1,208 | `src/services/automation/handlers/saveAttackHandler.test.js` |
-| 8 | 1,195 | `src/services/automation/handlers/countercharmHandler.test.js` |
-| 9 | 1,176 | `src/components/npcs/NPCs.test.jsx` |
-| 10 | 1,176 | `src/components/encounter/MonsterCardModal.test.jsx` |
-
+| # | File | Lines |
+|---|------|-------|
+| 1 | `public/data/monsters.json` | 62,970 |
+| 2 | `public/data/2024/spells.json` | 14,273 |
+| 3 | `public/data/classes.json` | 13,220 |
+| 4 | `public/data/2024/classes.json` | 12,803 |
+| 5 | `public/data/spells.json` | 10,299 |
+| 6 | `public/data/magic-items.json` | 8,827 |
+| 7 | `public/campaigns/Testing G3/maps/monstrosity.json` | 7,950 |
+| 8 | `package-lock.json` | 6,818 |
+| 9 | `public/data/equipment.json` | 4,638 |
+| 10 | `public/data/2024/feats.json` | 3,476 |
