@@ -1,15 +1,16 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import utils from '../../services/ui/utils.js';
 import { rollD20 } from '../../services/dice/diceRoller.js';
 import { sendSaveResult, clearSavePrompt } from '../../services/combat/conditions/savePromptService.js';
 import Subscriber from './Subscriber.jsx';
 import { computeAuraBonus } from '../../services/combat/auras/auraOfProtection.js';
 import { getAbilitySaveBonus } from '../../services/combat/conditions/conditionUtils.js';
-import { getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import './savePromptModal.css';
 
 function SavePromptModal({ campaignName, characters, activeMapName }) {
   const [prompts, setPrompts] = useState([]);
+  const forceRollTo20Ref = useRef(false);
 
   const current = prompts.length > 0 ? prompts[0] : null;
 
@@ -51,8 +52,9 @@ function SavePromptModal({ campaignName, characters, activeMapName }) {
     let saveBonus = 0;
     let saveModifiers = null;
     let activeConditions = [];
+    let character = null;
     try {
-      const character = (characters || []).find(c => {
+      character = (characters || []).find(c => {
         const name = typeof c === 'string' ? c : c.name;
         return name && utils.getName(name) === utils.getName(current.targetName);
       });
@@ -85,7 +87,7 @@ function SavePromptModal({ campaignName, characters, activeMapName }) {
       }
     }
 
-    const roll1 = rollD20();
+    const roll1 = forceRollTo20Ref.current ? 20 : rollD20();
     const roll2 = current.disadvantage ? rollD20() : roll1;
     const finalRoll = current.disadvantage ? Math.min(roll1, roll2) : hasAdvantage ? Math.max(roll1, roll2) : roll1;
     const total = finalRoll + saveBonus + auraBonus;
@@ -128,6 +130,7 @@ function SavePromptModal({ campaignName, characters, activeMapName }) {
         : p
     ));
 
+    forceRollTo20Ref.current = false;
     clearSavePrompt(campaignName, current.targetName);
   }, [campaignName, current, characters, activeMapName]);
 
@@ -138,6 +141,24 @@ function SavePromptModal({ campaignName, characters, activeMapName }) {
   const abilityLabel = current ? (current.saveType || '').toUpperCase() : '';
   const queueCount = prompts.length;
   const hasResult = current?.result != null;
+
+  const targetCharacter = current && (characters || []).find(c => {
+    const name = typeof c === 'string' ? c : c.name;
+    return name && utils.getName(name) === utils.getName(current.targetName);
+  });
+
+  const hasStrokeOfLuck = targetCharacter && targetCharacter.computedStats?.automation?.passives?.some(
+    p => p.type === 'stroke_of_luck'
+  );
+  const strokeOfLuckUsed = current && hasStrokeOfLuck ? getRuntimeValue(current.targetName, 'strokeOfLuckUsed', campaignName) : false;
+  const strokeOfLuckAvailable = hasStrokeOfLuck && !strokeOfLuckUsed;
+
+  const handleStrokeOfLuck = useCallback(async () => {
+    if (!strokeOfLuckAvailable || !current) return;
+    forceRollTo20Ref.current = true;
+    await handleRollSave();
+    setRuntimeValue(current.targetName, 'strokeOfLuckUsed', true, campaignName);
+  }, [strokeOfLuckAvailable, handleRollSave, current, campaignName]);
 
   return (
     <>
@@ -196,6 +217,11 @@ function SavePromptModal({ campaignName, characters, activeMapName }) {
                   <button className="sp-roll-btn" onClick={handleRollSave} type="button">
                     <i className="fa-solid fa-dice-d20"></i> Roll Save
                   </button>
+                  {strokeOfLuckAvailable && (
+                    <button className="sp-stroke-btn" onClick={handleStrokeOfLuck} type="button">
+                      <i className="fa-solid fa-star"></i> Stroke of Luck
+                    </button>
+                  )}
                   <button className="sp-dismiss-btn" onClick={handleDismiss} type="button">
                     Dismiss
                   </button>

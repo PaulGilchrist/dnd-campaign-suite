@@ -121,6 +121,24 @@
   opacity: 0.8;
 }
 
+.sp-stroke-btn {
+  background-color: var(--color-link);
+  color: #fff;
+  border: 2px solid #ffd700;
+  border-radius: 6px;
+  padding: 10px 20px;
+  font-size: 1em;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sp-stroke-btn:hover {
+  opacity: 0.9;
+  border-color: #ffec80;
+}
+
 .sp-result {
   margin: 16px 0;
   padding: 14px;

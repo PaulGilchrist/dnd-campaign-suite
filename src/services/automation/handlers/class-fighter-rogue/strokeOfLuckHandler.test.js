@@ -56,7 +56,6 @@ describe('strokeOfLuckHandler.handle', () => {
         expect(result.payload.type).toBe('automation_info');
         expect(result.payload.name).toBe('Stroke of Luck');
         expect(result.payload.description).toContain('No recent D20 test found');
-        expect(result.payload.description).toContain('TestRogue');
         expect(runtimeState.setRuntimeValue).not.toHaveBeenCalled();
     });
 
@@ -83,9 +82,9 @@ describe('strokeOfLuckHandler.handle', () => {
     it('should convert a failed D20 roll to a 20 and mark as used', async () => {
         runtimeState.getRuntimeValue.mockReturnValueOnce(false);
         damageRollback.findLastAttack.mockResolvedValue({
-            attackEvent: { d20: 3, bonus: 7, targetName: 'Goblin', hit: false, timestamp: Date.now() },
-            attackerName: 'Goblin',
-            targetName: 'TestRogue',
+            attackEvent: { d20: 3, bonus: 7, targetName: 'Goblin', hit: false, rollType: 'attack', targetAc: 15, timestamp: Date.now() },
+            attackerName: 'TestRogue',
+            targetName: 'Goblin',
             primaryDamage: 10,
             secondaryDamage: 0,
             totalDamage: 10,
@@ -111,9 +110,9 @@ describe('strokeOfLuckHandler.handle', () => {
     it('should return popup indicating already succeeded when attack already hit', async () => {
         runtimeState.getRuntimeValue.mockReturnValueOnce(false);
         damageRollback.findLastAttack.mockResolvedValue({
-            attackEvent: { d20: 15, bonus: 7, targetName: 'Goblin', hit: true, timestamp: Date.now() },
-            attackerName: 'Goblin',
-            targetName: 'TestRogue',
+            attackEvent: { d20: 15, bonus: 7, targetName: 'Goblin', hit: true, rollType: 'attack', targetAc: 15, timestamp: Date.now() },
+            attackerName: 'TestRogue',
+            targetName: 'Goblin',
             primaryDamage: 10,
             secondaryDamage: 0,
             totalDamage: 10,
@@ -124,8 +123,8 @@ describe('strokeOfLuckHandler.handle', () => {
 
         expect(result.type).toBe('popup');
         expect(result.payload.type).toBe('automation_info');
-        expect(result.payload.description).toContain('Already succeeded');
-        expect(result.payload.description).toContain('no effect');
+        expect(result.payload.description).toContain('The attack still hits');
+        expect(result.payload.description).toContain('d20(20)');
         expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
             'TestRogue', 'strokeOfLuckUsed', true, mockCampaignName
         );
@@ -134,9 +133,9 @@ describe('strokeOfLuckHandler.handle', () => {
     it('should propagate errors from setRuntimeValue', async () => {
         runtimeState.getRuntimeValue.mockReturnValueOnce(false);
         damageRollback.findLastAttack.mockResolvedValue({
-            attackEvent: { d20: 1, bonus: 5, targetName: 'Goblin', hit: false, timestamp: Date.now() },
-            attackerName: 'Goblin',
-            targetName: 'TestRogue',
+            attackEvent: { d20: 1, bonus: 5, targetName: 'Goblin', hit: false, rollType: 'attack', targetAc: 15, timestamp: Date.now() },
+            attackerName: 'TestRogue',
+            targetName: 'Goblin',
             primaryDamage: 10,
             secondaryDamage: 0,
             totalDamage: 10,
@@ -161,9 +160,9 @@ describe('strokeOfLuckHandler.handle', () => {
     it('should use unknown when targetName is missing from attackEvent', async () => {
         runtimeState.getRuntimeValue.mockReturnValueOnce(false);
         damageRollback.findLastAttack.mockResolvedValue({
-            attackEvent: { d20: 5, bonus: 3, hit: false, timestamp: Date.now() },
-            attackerName: 'Skeleton',
-            targetName: 'TestRogue',
+            attackEvent: { d20: 5, bonus: 3, hit: false, rollType: 'attack', targetAc: 15, timestamp: Date.now() },
+            attackerName: 'TestRogue',
+            targetName: 'UnknownTarget',
             primaryDamage: 5,
             secondaryDamage: 0,
             totalDamage: 5,

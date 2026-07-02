@@ -348,6 +348,7 @@ export function createLogAndShow(deps) {
             d20Floor10: context?.d20Floor10,
             tacticalMind: context?.tacticalMind,
             tacticalMindBonus: context?.tacticalMindBonus,
+            strokeOfLuck: context?.strokeOfLuck,
             characterName,
             campaignName,
             availableSuperiorityManeuvers,
@@ -873,6 +874,7 @@ export function createLogAndShow(deps) {
                 campaignName,
                 availableSuperiorityManeuvers,
                 forcedMode: context?.forcedMode,
+                strokeOfLuck: context?.strokeOfLuck,
             });
             window.dispatchEvent(new CustomEvent('initiative-rolled', { detail: { characterName: firstName, roll: r1 + totalBonus } }));
         }

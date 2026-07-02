@@ -7,7 +7,7 @@ import { rollD20 } from '../../services/dice/diceRoller.js';
 import { sendSaveResult, clearSavePrompt } from '../../services/combat/conditions/savePromptService.js';
 import { computeAuraBonus } from '../../services/combat/auras/auraOfProtection.js';
 import { getAbilitySaveBonus } from '../../services/combat/conditions/conditionUtils.js';
-import { getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 
 // ── Mock dependencies ──
 
@@ -36,6 +36,7 @@ vi.mock('../../services/combat/conditions/conditionUtils.js', () => ({
 
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(() => null),
+  setRuntimeValue: vi.fn(),
 }));
 
 vi.mock('./Subscriber.jsx', () => {
@@ -1255,5 +1256,230 @@ describe('SavePromptModal', () => {
     await waitFor(() => {
       expect(screen.getByText(/Disadvantage/)).toBeInTheDocument();
     });
+  });
+
+  // ── Stroke of Luck ──
+
+  it('does not show Stroke of Luck button when target character has no stroke_of_luck passive', async () => {
+    const targetChar = createCharacter('testTarget');
+    render(
+      <SavePromptModal
+        campaignName="test-campaign"
+        characters={[targetChar]}
+        activeMapName={null}
+      />
+    );
+
+    const trigger = screen.getByTestId('subscriber-trigger');
+    fireEvent.click(trigger);
+
+    await waitFor(() => {
+      expect(screen.getByText(/must make a/i)).toBeInTheDocument();
+    });
+
+    expect(screen.queryByRole('button', { name: 'Stroke of Luck' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Roll Save' })).toBeInTheDocument();
+  });
+
+  it('shows Stroke of Luck button when target character has stroke_of_luck passive and it is available', async () => {
+    const targetChar = {
+      name: 'testTarget',
+      computedStats: {
+        abilities: [
+          { name: 'Constitution', bonus: 3 },
+        ],
+        evasionEffects: [],
+        automation: { passives: [{ type: 'stroke_of_luck' }] },
+      },
+      saveModifiers: [],
+    };
+    getRuntimeValue.mockImplementation((key, prop, _campaign) => {
+      if (key === 'testTarget' && prop === 'strokeOfLuckUsed') return false;
+      return null;
+    });
+
+    render(
+      <SavePromptModal
+        campaignName="test-campaign"
+        characters={[targetChar]}
+        activeMapName={null}
+      />
+    );
+
+    const trigger = screen.getByTestId('subscriber-trigger');
+    fireEvent.click(trigger);
+
+    await waitFor(() => {
+      expect(screen.getByText(/must make a/i)).toBeInTheDocument();
+    });
+
+    expect(screen.getByRole('button', { name: 'Stroke of Luck' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Roll Save' })).toBeInTheDocument();
+  });
+
+  it('does not show Stroke of Luck button when target character has stroke_of_luck but it is already used', async () => {
+    const targetChar = {
+      name: 'testTarget',
+      computedStats: {
+        abilities: [
+          { name: 'Constitution', bonus: 3 },
+        ],
+        evasionEffects: [],
+        automation: { passives: [{ type: 'stroke_of_luck' }] },
+      },
+      saveModifiers: [],
+    };
+    getRuntimeValue.mockImplementation((key, prop, _campaign) => {
+      if (key === 'testTarget' && prop === 'strokeOfLuckUsed') return true;
+      return null;
+    });
+
+    render(
+      <SavePromptModal
+        campaignName="test-campaign"
+        characters={[targetChar]}
+        activeMapName={null}
+      />
+    );
+
+    const trigger = screen.getByTestId('subscriber-trigger');
+    fireEvent.click(trigger);
+
+    await waitFor(() => {
+      expect(screen.getByText(/must make a/i)).toBeInTheDocument();
+    });
+
+    expect(screen.queryByRole('button', { name: 'Stroke of Luck' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Roll Save' })).toBeInTheDocument();
+  });
+
+  it('rolls d20 as 20 when Stroke of Luck button is clicked', async () => {
+    const targetChar = {
+      name: 'testTarget',
+      computedStats: {
+        abilities: [
+          { name: 'Constitution', bonus: 3 },
+        ],
+        evasionEffects: [],
+        automation: { passives: [{ type: 'stroke_of_luck' }] },
+      },
+      saveModifiers: [],
+    };
+    getRuntimeValue.mockImplementation((key, prop, _campaign) => {
+      if (key === 'testTarget' && prop === 'strokeOfLuckUsed') return false;
+      return null;
+    });
+
+    render(
+      <SavePromptModal
+        campaignName="test-campaign"
+        characters={[targetChar]}
+        activeMapName={null}
+      />
+    );
+
+    const trigger = screen.getByTestId('subscriber-trigger');
+    fireEvent.click(trigger);
+
+    await waitFor(() => {
+      expect(screen.getByText(/must make a/i)).toBeInTheDocument();
+    });
+
+    const strokeBtn = screen.getByRole('button', { name: 'Stroke of Luck' });
+    fireEvent.click(strokeBtn);
+
+    await waitFor(() => {
+      expect(screen.getByText(/SAVE SUCCESS/)).toBeInTheDocument();
+    });
+
+    expect(rollD20).not.toHaveBeenCalled();
+  });
+
+  it('sets strokeOfLuckUsed to true when Stroke of Luck is used', async () => {
+    const targetChar = {
+      name: 'testTarget',
+      computedStats: {
+        abilities: [
+          { name: 'Constitution', bonus: 3 },
+        ],
+        evasionEffects: [],
+        automation: { passives: [{ type: 'stroke_of_luck' }] },
+      },
+      saveModifiers: [],
+    };
+    getRuntimeValue.mockImplementation((key, prop, _campaign) => {
+      if (key === 'testTarget' && prop === 'strokeOfLuckUsed') return false;
+      return null;
+    });
+
+    render(
+      <SavePromptModal
+        campaignName="test-campaign"
+        characters={[targetChar]}
+        activeMapName={null}
+      />
+    );
+
+    const trigger = screen.getByTestId('subscriber-trigger');
+    fireEvent.click(trigger);
+
+    await waitFor(() => {
+      expect(screen.getByText(/must make a/i)).toBeInTheDocument();
+    });
+
+    const strokeBtn = screen.getByRole('button', { name: 'Stroke of Luck' });
+    fireEvent.click(strokeBtn);
+
+    await waitFor(() => {
+      expect(screen.getByText(/SAVE SUCCESS/)).toBeInTheDocument();
+    });
+
+    expect(setRuntimeValue).toHaveBeenCalledWith('testTarget', 'strokeOfLuckUsed', true, 'test-campaign');
+  });
+
+  it('sends save result with roll of 20 when Stroke of Luck is used', async () => {
+    const targetChar = {
+      name: 'testTarget',
+      computedStats: {
+        abilities: [
+          { name: 'Constitution', bonus: 3 },
+        ],
+        evasionEffects: [],
+        automation: { passives: [{ type: 'stroke_of_luck' }] },
+      },
+      saveModifiers: [],
+    };
+    getRuntimeValue.mockImplementation((key, prop, _campaign) => {
+      if (key === 'testTarget' && prop === 'strokeOfLuckUsed') return false;
+      return null;
+    });
+
+    render(
+      <SavePromptModal
+        campaignName="test-campaign"
+        characters={[targetChar]}
+        activeMapName={null}
+      />
+    );
+
+    const trigger = screen.getByTestId('subscriber-trigger');
+    fireEvent.click(trigger);
+
+    await waitFor(() => {
+      expect(screen.getByText(/must make a/i)).toBeInTheDocument();
+    });
+
+    const strokeBtn = screen.getByRole('button', { name: 'Stroke of Luck' });
+    fireEvent.click(strokeBtn);
+
+    await waitFor(() => {
+      expect(sendSaveResult).toHaveBeenCalled();
+    });
+
+    expect(sendSaveResult).toHaveBeenCalledWith('test-campaign', 'testTarget', expect.objectContaining({
+      promptId: 'test-prompt-1',
+      roll: 20,
+      success: true,
+    }));
   });
 });
