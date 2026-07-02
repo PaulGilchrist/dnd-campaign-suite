@@ -281,7 +281,7 @@ describe('MonsterCardModal - handleDamage with save DC context', () => {
     damageUtils.__setFindCreatureReturn(null);
   });
 
-  it('passes saveDc, saveType, and dcSuccess to rollDamage context when action has save_dc', () => {
+  it('passes saveDc, saveType, and dcSuccess to rollSavingThrow context when action has save_dc', () => {
     damageUtils.__setFindCreatureReturn({
       name: 'Goblin',
       conditions: [],
@@ -303,6 +303,6 @@ describe('MonsterCardModal - handleDamage with save DC context', () => {
     }
     expect(dmgLink).toBeTruthy();
     fireEvent.click(dmgLink);
-    expect(useLoggedDiceRoll._rollDamage).toHaveBeenCalled();
+    expect(useLoggedDiceRoll._rollSavingThrow).toHaveBeenCalled();
   });
 });

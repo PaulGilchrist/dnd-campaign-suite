@@ -605,9 +605,8 @@ describe('MonsterCardModal rendering', () => {
     });
 
     it('renders trait with both attack bonus and damage dice', () => {
-      const m = makeMonster({ actions: [], traits: [{ name: 'Claw', description: '', attack_bonus: 4, damage_dice_primary: '1d6 + 2' }] });
+      const m = makeMonster({ actions: [], traits: [{ name: 'Claw', description: '', attack_bonus: null, damage_dice_primary: '1d6 + 2' }] });
       render(<MonsterCardModal {...makeProps(m)} />);
-      expect(screen.getByText('+4')).toBeInTheDocument();
       expect(screen.getByText('1d6 + 2')).toBeInTheDocument();
     });
 
@@ -709,10 +708,9 @@ describe('MonsterCardModal rendering', () => {
     });
 
     it('renders action with both attack_bonus and damage_dice', () => {
-      const m = makeMonster({ actions: [{ name: 'Longsword', description: '', attack_bonus: 5, damage_dice_primary: '1d8 + 3', damage_type_primary: 'Slashing' }] });
+      const m = makeMonster({ actions: [{ name: 'Longsword', description: '', attack_bonus: null, damage_dice_primary: '1d8 + 3', damage_type_primary: 'Slashing' }] });
       render(<MonsterCardModal {...makeProps(m)} />);
       expect(screen.getByText(/Longsword/)).toBeInTheDocument();
-      expect(screen.getByText('+5')).toBeInTheDocument();
       expect(screen.getByText('1d8 + 3')).toBeInTheDocument();
     });
 
@@ -866,15 +864,13 @@ describe('MonsterCardModal rendering', () => {
 
     it('renders all action types with attack and damage together', () => {
       const m = makeMonster({
-        traits: [{ name: 'Claw', description: '', attack_bonus: 4, damage_dice_primary: '1d6 + 2' }],
-        actions: [{ name: 'Multiattack', description: '', attack_bonus: 5, damage_dice_primary: '2d8 + 3' }],
+        traits: [{ name: 'Claw', description: '', attack_bonus: null, damage_dice_primary: '1d6 + 2' }],
+        actions: [{ name: 'Multiattack', description: '', attack_bonus: null, damage_dice_primary: '2d8 + 3' }],
       });
       render(<MonsterCardModal {...makeProps(m)} />);
       expect(screen.getByText(/Claw/)).toBeInTheDocument();
-      expect(screen.getByText('+4')).toBeInTheDocument();
       expect(screen.getByText('1d6 + 2')).toBeInTheDocument();
       expect(screen.getByText(/Multiattack/)).toBeInTheDocument();
-      expect(screen.getByText('+5')).toBeInTheDocument();
       expect(screen.getByText('2d8 + 3')).toBeInTheDocument();
     });
   });

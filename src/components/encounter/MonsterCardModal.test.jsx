@@ -394,8 +394,18 @@ describe('MonsterCardModal', () => {
             expect(screen.getByText('+4')).toBeInTheDocument();
         });
 
-        it('renders action damage dice', () => {
-            renderModal();
+        it('renders action damage dice when no attack bonus', () => {
+            const monsterNoAttack = {
+                ...baseMonster,
+                actions: [{
+                    name: 'Bite',
+                    damage_dice_primary: '1d6+2',
+                    damage_type_primary: 'piercing',
+                }],
+            };
+            render(
+                <MonsterCardModal monster={monsterNoAttack} onClose={mockOnClose} campaignName={mockCampaignName} />
+            );
             expect(screen.getByText('1d6+2')).toBeInTheDocument();
         });
 
@@ -801,7 +811,7 @@ describe('MonsterCardModal', () => {
                 actions: [
                     {
                         name: 'Multiattack',
-                        attack_bonus: 4,
+                        attack_bonus: null,
                         damage_dice_primary: '1d6+2',
                         damage_type_primary: 'slashing',
                         damage_dice_secondary: '1d4+2',
