@@ -18,6 +18,8 @@ export const CONDITION_DESCRIPTIONS = {
     'Restrained': 'Your Speed is 0. Attack rolls against you have Advantage, and your attack rolls have Disadvantage. You have Disadvantage on Dexterity saving throws.',
     'Stunned': 'You have the Incapacitated condition. You automatically fail Strength and Dexterity saving throws. Attack rolls against you have Advantage.',
     'Unconscious': 'You have the Incapacitated and Prone conditions. Your Speed is 0. You automatically fail Strength and Dexterity saving throws. Attack rolls that hit you are Critical Hits if the attacker is within 5 feet. You are unaware of your surroundings.',
+    'Cursed': 'You have disadvantage on attack rolls and ability checks.',
+    'Dazed': 'On next turn, the creature can only do one of: move OR take action OR use a Bonus Action.',
 }
 
 // Effect badge descriptions for badges not covered by conditions
@@ -35,6 +37,7 @@ export const EFFECT_DESCRIPTIONS = {
     'No OA (Crit)': 'Remarkable Athlete: the creature does not provoke opportunity attacks on critical hits.',
     'OA Disadv': 'Opportunity attacks against this creature have disadvantage.',
     'No Difficult Terrain on Dash': 'Can ignore difficult terrain when taking the Dash action.',
+    'Disadv Fire/Radiant': 'Has disadvantage on saving throws against Fire and Radiant damage.',
 }
 
 // HP status descriptions
