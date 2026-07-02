@@ -418,47 +418,87 @@ describe('saveModifierApplies — first_round_target_no_turn', () => {
   const modifier = { target: 'saving_throw', condition: 'first_round_target_no_turn' };
   const baseArgs = ['DEX', 'STR', false, false, false, false];
 
-  it('returns true on round 1 when attacker has not acted', () => {
+  it('returns true on round 1 when target has lower or equal initiative (to the right)', () => {
     const combatContext = {
       round: 1,
-      creatures: [{ name: 'Player', hasActed: false }],
-      attackerName: 'Player',
+      creatures: [
+        { name: 'Ally', targetName: 'Goblin' },
+        { name: 'Player', targetName: 'Goblin' },
+        { name: 'Goblin' },
+      ],
     };
-    expect(saveModifierApplies(modifier, ...baseArgs, combatContext, [])).toBe(true);
+    expect(saveModifierApplies(modifier, ...baseArgs, combatContext, [], 'Player')).toBe(true);
+  });
+
+  it('returns false on round 1 when target has higher initiative (to the left)', () => {
+    const combatContext = {
+      round: 1,
+      creatures: [
+        { name: 'Goblin' },
+        { name: 'Player', targetName: 'Goblin' },
+      ],
+    };
+    expect(saveModifierApplies(modifier, ...baseArgs, combatContext, [], 'Player')).toBe(false);
+  });
+
+  it('returns false when target has same initiative as attacker (same index)', () => {
+    const combatContext = {
+      round: 1,
+      creatures: [
+        { name: 'Player', targetName: 'Player' },
+      ],
+    };
+    expect(saveModifierApplies(modifier, ...baseArgs, combatContext, [], 'Player')).toBe(false);
   });
 
   it('returns false on round 2', () => {
     const combatContext = {
       round: 2,
-      creatures: [{ name: 'Player' }],
-      attackerName: 'Player',
+      creatures: [
+        { name: 'Player', targetName: 'Goblin' },
+        { name: 'Goblin' },
+      ],
     };
-    expect(saveModifierApplies(modifier, ...baseArgs, combatContext, [])).toBe(false);
-  });
-
-  it('returns false when attacker has already acted on round 1', () => {
-    const combatContext = {
-      round: 1,
-      creatures: [{ name: 'Player', hasActed: true }],
-      attackerName: 'Player',
-    };
-    expect(saveModifierApplies(modifier, ...baseArgs, combatContext, [])).toBe(false);
+    expect(saveModifierApplies(modifier, ...baseArgs, combatContext, [], 'Player')).toBe(false);
   });
 
   it('returns false when combatContext is null', () => {
-    expect(saveModifierApplies(modifier, ...baseArgs, null, [])).toBe(false);
+    expect(saveModifierApplies(modifier, ...baseArgs, null, [], 'Player')).toBe(false);
   });
 
   it('returns false when combatContext has no creatures', () => {
-    expect(saveModifierApplies(modifier, ...baseArgs, {}, [])).toBe(false);
+    expect(saveModifierApplies(modifier, ...baseArgs, {}, [], 'Player')).toBe(false);
   });
 
-  it('returns true when round is missing (defaults to 1) and player has not acted', () => {
+  it('returns true when round is missing (defaults to 1) and target is to the right', () => {
     const combatContext = {
-      creatures: [{ name: 'Player', hasActed: false }],
-      attackerName: 'Player',
+      creatures: [
+        { name: 'Player', targetName: 'Goblin' },
+        { name: 'Goblin' },
+      ],
     };
-    expect(saveModifierApplies(modifier, ...baseArgs, combatContext, [])).toBe(true);
+    expect(saveModifierApplies(modifier, ...baseArgs, combatContext, [], 'Player')).toBe(true);
+  });
+
+  it('returns true when targetName is missing', () => {
+    const combatContext = {
+      round: 1,
+      creatures: [
+        { name: 'Player' },
+      ],
+    };
+    expect(saveModifierApplies(modifier, ...baseArgs, combatContext, [], 'Player')).toBe(true);
+  });
+
+  it('returns true when attackerName is missing', () => {
+    const combatContext = {
+      round: 1,
+      creatures: [
+        { name: 'Player', targetName: 'Goblin' },
+        { name: 'Goblin' },
+      ],
+    };
+    expect(saveModifierApplies(modifier, ...baseArgs, combatContext, [], null)).toBe(true);
   });
 });
 

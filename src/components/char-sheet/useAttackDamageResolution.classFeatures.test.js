@@ -327,7 +327,8 @@ describe('useAttackDamageResolution - class features', () => {
         function makeDeathStrikeStats() {
             return createMockPlayerStats({
                 automation: {
-                    actions: [
+                    actions: [],
+                    passives: [
                         {
                             type: 'attack_rider',
                             trigger: 'first_round_sneak_attack_hit',
@@ -336,7 +337,6 @@ describe('useAttackDamageResolution - class features', () => {
                             damageDoubled: true,
                         },
                     ],
-                    passives: [],
                 },
             });
         }
@@ -448,7 +448,8 @@ describe('useAttackDamageResolution - class features', () => {
         function makeRendMindStats(overrides = {}) {
             return createMockPlayerStats({
                 automation: {
-                    actions: [
+                    actions: [],
+                    passives: [
                         {
                             type: 'attack_rider',
                             trigger: 'psychic_blade_sneak_attack_hit',
@@ -460,7 +461,6 @@ describe('useAttackDamageResolution - class features', () => {
                             ...overrides,
                         },
                     ],
-                    passives: [],
                 },
             });
         }

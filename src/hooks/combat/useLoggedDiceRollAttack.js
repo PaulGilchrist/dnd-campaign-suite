@@ -113,16 +113,18 @@ export function createLogAndShow(deps) {
         const coverAcBonus = context?.coverAcBonus || 0;
 
         let targetAc;
-        if (target?.type === 'player') {
-            const playerChar = (characters || []).find(c => c.name === target.name);
-            const playerComputed = playerChar?.computedStats || playerChar;
-            targetAc = playerComputed?.armorClass;
-        } else {
-            targetAc = target?.ac;
-        }
+        if (rollType === 'attack') {
+            if (target?.type === 'player') {
+                const playerChar = (characters || []).find(c => c.name === target.name);
+                const playerComputed = playerChar?.computedStats || playerChar;
+                targetAc = playerComputed?.armorClass ?? playerChar?.armorClass;
+            } else {
+                targetAc = target?.ac;
+            }
 
-        if (target && typeof targetAc !== 'number') {
-            throw new Error(`[AC] Target "${target.name}" has no AC defined.`);
+            if (target && typeof targetAc !== 'number') {
+                throw new Error(`[AC] Target "${target.name}" has no AC defined.`);
+            }
         }
 
         const effectiveAc = target ? targetAc + coverAcBonus + (context?.gloriousDefenseBonus || 0) + (context?.defensiveDuelistBonus || 0) + (context?.baitAndSwitchBonus || 0) + getShieldAcBonus(target.name, campaignName) + getShieldOfFaithAcBonus(target.name, campaignName) : undefined;

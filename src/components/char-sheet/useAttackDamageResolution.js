@@ -538,9 +538,12 @@ export default function useAttackDamageResolution({
             }
 
             // Apply Death Strike attack_rider (Rogue Assassin level 17) — forces CON save, doubles damage on fail
-            const deathStrike = playerStats.automation.actions.find(
+            const allPassives = playerStats.automation?.passives || [];
+            console.log('[DeathStrike debug] playerStats.name:', playerStats.name, 'rules:', playerStats.rules, 'level:', playerStats.level, 'subclass:', playerStats.class?.subclass?.name, 'passives count:', allPassives.length, 'allPassiveTypes:', allPassives.map(p => p.type + ':' + (p.trigger || p.name || '')));
+            const deathStrike = allPassives.find(
                 a => a.type === 'attack_rider' && a.trigger === 'first_round_sneak_attack_hit' && a.saveType
             );
+            console.log('[DeathStrike debug] deathStrike found:', !!deathStrike, deathStrike ? JSON.stringify({name: deathStrike.name, trigger: deathStrike.trigger, saveType: deathStrike.saveType, saveAbility: deathStrike.saveAbility}) : null);
             if (deathStrike) {
                 const cs2 = await getCombatContext(campaignName);
                 const currentRound2 = getCurrentCombatRound();
@@ -572,7 +575,7 @@ export default function useAttackDamageResolution({
         }
 
         // Apply Rend Mind attack_rider (Soulknife level 17) — forces WIS save, Stunned on fail
-        const rendMind = playerStats.automation.actions.find(
+        const rendMind = playerStats.automation.passives.find(
             a => a.type === 'attack_rider' && a.trigger === 'psychic_blade_sneak_attack_hit' && a.saveType
         );
         if (rendMind) {

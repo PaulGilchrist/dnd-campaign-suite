@@ -1115,6 +1115,7 @@ export function createLogDamageAndShow(deps) {
 
         const storedEffects = getRuntimeValue(campaignName, 'targetEffects') || [];
         const deathStrikeEffect = storedEffects.find(te => te.effect === 'death_strike' && te.target === target?.name);
+        console.log('[DeathStrike damage] characterName:', characterName, 'target:', target?.name, 'targetEffects:', JSON.stringify(storedEffects.map(e => ({effect: e.effect, target: e.target}))), 'deathStrikeEffect found:', !!deathStrikeEffect);
         if (deathStrikeEffect && target) {
             const dsSaveDc = deathStrikeEffect.saveDc;
             const dsSaveType = deathStrikeEffect.saveType;

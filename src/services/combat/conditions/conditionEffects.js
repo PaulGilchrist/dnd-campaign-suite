@@ -8,7 +8,7 @@ const CONDITIONS_THAT_SPEED_ZERO = new Set([
 
 const CONDITION_KEYWORDS = new Set(['charmed', 'frightened', 'poison', 'magic'])
 
-function saveModifierApplies(modifier, saveType, abilityName, isRaging = false, shapeShiftActive = false, isPeerlessAthlete = false, isLargeFormActive = false, combatContext = null, conditions = []) {
+function saveModifierApplies(modifier, saveType, abilityName, isRaging = false, shapeShiftActive = false, isPeerlessAthlete = false, isLargeFormActive = false, combatContext = null, conditions = [], attackerName = null) {
   const conditionSet = new Set(conditions);
   if (modifier.effect === 'replacement') return true;
   if (modifier.effect === 'reliable_talent') return true;
@@ -86,9 +86,27 @@ function saveModifierApplies(modifier, saveType, abilityName, isRaging = false, 
     if (!combatContext || !combatContext.creatures) return false;
     const currentRound = combatContext.round || 1;
     if (currentRound !== 1) return false;
-    const playerCreature = combatContext.creatures.find(c => c.name === combatContext.attackerName);
-    if (playerCreature && playerCreature.hasActed) return false;
-    return true;
+    const attacker = combatContext.creatures.find(c => c.name === attackerName);
+    if (!attacker) return true;
+    const targetName = attacker.targetName;
+    if (!targetName) return true;
+    const targetCreature = combatContext.creatures.find(c => c.name === targetName);
+    if (!targetCreature) return true;
+    const attackerIndex = combatContext.creatures.indexOf(attacker);
+    const targetIndex = combatContext.creatures.indexOf(targetCreature);
+    return targetIndex > attackerIndex;
+  }
+  if (modifier.condition === 'target_hasnt_taken_turn') {
+    if (!combatContext || !combatContext.creatures) return false;
+    const attacker = combatContext.creatures.find(c => c.name === attackerName);
+    if (!attacker) return true;
+    const targetName = attacker.targetName;
+    if (!targetName) return true;
+    const targetCreature = combatContext.creatures.find(c => c.name === targetName);
+    if (!targetCreature) return true;
+    const attackerIndex = combatContext.creatures.indexOf(attacker);
+    const targetIndex = combatContext.creatures.indexOf(targetCreature);
+    return targetIndex > attackerIndex;
   }
   if (modifier.condition === 'concentration_breaker') return true;
   if (modifier.condition === 'pfeag_save_advantage') return true;
@@ -104,10 +122,10 @@ function saveModifierApplies(modifier, saveType, abilityName, isRaging = false, 
   return true;
 }
 
-function applySaveModifiers(effects, modifiers, saveType, abilityName, isRaging = false, shapeShiftActive = false, isPeerlessAthlete = false, isLargeFormActive = false, combatContext = null, conditions = []) {
+function applySaveModifiers(effects, modifiers, saveType, abilityName, isRaging = false, shapeShiftActive = false, isPeerlessAthlete = false, isLargeFormActive = false, combatContext = null, conditions = [], attackerName = null) {
   if (!modifiers || modifiers.length === 0) return;
   for (const mod of modifiers) {
-    if (!saveModifierApplies(mod, saveType, abilityName, isRaging, shapeShiftActive, isPeerlessAthlete, isLargeFormActive, combatContext, conditions)) continue;
+    if (!saveModifierApplies(mod, saveType, abilityName, isRaging, shapeShiftActive, isPeerlessAthlete, isLargeFormActive, combatContext, conditions, attackerName)) continue;
     if (mod.target === 'ability_check' || mod.target === 'check') {
       if (mod.effect === 'advantage') {
         if (mod.abilities && mod.abilities.length > 0) {
@@ -262,7 +280,7 @@ function applySaveModifiers(effects, modifiers, saveType, abilityName, isRaging 
   }
 }
 
-function computeConditionEffects(conditions = [], saveModifiers = [], targetEffects = [], isRaging = false, shapeShiftActive = false, isPeerlessAthlete = false, isLargeFormActive = false, combatContext = null, seeInvisibilityActive = false) {
+function computeConditionEffects(conditions = [], saveModifiers = [], targetEffects = [], isRaging = false, shapeShiftActive = false, isPeerlessAthlete = false, isLargeFormActive = false, combatContext = null, seeInvisibilityActive = false, attackerName = null) {
   const effects = {
     attackAdvantageCount: 0,
     attackDisadvantageCount: 0,
@@ -381,7 +399,7 @@ function computeConditionEffects(conditions = [], saveModifiers = [], targetEffe
   const activeSaveModifiers = isIncapacitated
     ? saveModifiers.filter(mod => mod.condition !== 'visible_effect')
     : saveModifiers;
-  applySaveModifiers(effects, activeSaveModifiers, null, null, isRaging, shapeShiftActive, isPeerlessAthlete, isLargeFormActive, combatContext, conditions);
+  applySaveModifiers(effects, activeSaveModifiers, null, null, isRaging, shapeShiftActive, isPeerlessAthlete, isLargeFormActive, combatContext, conditions, attackerName);
 
   for (const key of conditionSet) {
     switch (key) {
