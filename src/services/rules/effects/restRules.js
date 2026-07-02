@@ -21,6 +21,7 @@ const SHORT_REST_RESOURCE_LABELS = [
     { key: 'actionSurgeUses', label: 'Action Surge', classes: ['Fighter'] },
     { key: 'focusPoints', label: 'Focus Points', classes: ['Monk'] },
     { key: 'psionicEnergy', label: 'Psionic Energy', classes: ['Fighter'], subclasses: ['Psi Warrior'] },
+    { key: 'psionicEnergy', label: 'Psionic Energy', classes: ['Rogue'], subclasses: ['Soulknife'] },
     { key: 'superiorityDice', label: 'Superiority Dice', classes: ['Fighter'], subclasses: ['Battle Master'] },
     { key: 'naturalRecoverySlots', label: 'Natural Recovery (Spell Slots)', classes: ['Druid'], subclasses: ['Circle of the Land'] },
     { key: 'arcaneRecoveryLevels', label: 'Arcane Recovery (Spell Slots)', classes: ['Wizard'] }

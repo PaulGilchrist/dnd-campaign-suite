@@ -392,10 +392,18 @@ const RogueFeatures = function RogueFeatures({ playerStats, campaignName }) {
     const rogueFeatures = getClassFeatures(playerStats);
     const stealthAttackCost = useRuntimeValue(playerStats.name, 'stealthAttackCost', campaignName);
     const stealthAttackActive = (stealthAttackCost ?? 0) > 0;
-
+    const classLevel = playerStats.class?.class_levels?.[playerStats.level - 1];
+    const majorName = playerStats.class.major?.name || playerStats.class.subclass?.name;
+    const hasEnergy = classLevel?.energy && classLevel.energy.required_major === majorName;
     return (
           <div data-testid="char-class-rogue">
               {rogueFeatures?.expertise && <div><b>Expertise: </b>{rogueFeatures.expertise.join(', ')}</div>}
+              {hasEnergy && (
+                  <div>
+                      <TrackedResourceInput label="Energy Dice" resourceKey="psionicEnergy" playerName={playerStats.name} getMax={() => classLevel?.energy?.energy_die_num || 0} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
+                      <div><b>Energy Die Type: </b>d{classLevel.energy.energy_die_type}</div>
+                  </div>
+              )}
               <div className="automation-actions">
                   <button className="automation-btn" title="Sneak Attack: Extra damage when you have advantage or ally adjacent">
                       <i className="fas fa-user-ninja"></i> Sneak Attack ({rogueFeatures?.sneakAttack?.dice_count || 0}d{rogueFeatures?.sneakAttack?.dice_value || 0})
