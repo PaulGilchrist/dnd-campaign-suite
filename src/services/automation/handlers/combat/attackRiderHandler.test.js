@@ -50,6 +50,7 @@ function makeAction(overrides = {}) {
                 { name: 'Push 15ft', effect: 'push_15ft', value: 15 },
                 { name: 'Disadvantage on Save', effect: 'disadvantage_on_next_save' },
                 { name: 'No Opportunity Attacks', effect: 'no_opportunity_attacks', movement: true },
+                { name: 'Withdraw', effect: 'no_opportunity_attacks', movement: 'half_speed', noOAs: true },
                 { name: 'Sudden Strike', effect: 'sudden_strike' },
                 { name: 'Mass Fear', effect: 'mass_fear', saveType: 'WIS', saveAbility: 'WIS' },
                 { name: 'Damage Bonus', effect: 'damage_bonus', damageExpression: '2d6' },
@@ -331,6 +332,19 @@ describe('attackRiderHandler', () => {
 
             expect(result.type).toBe('popup');
             expect(result.payload.description).toContain('No Opportunity Attacks');
+        });
+
+        it('should log Withdraw to campaign log', async () => {
+            getRuntimeValue.mockReturnValue([]);
+            const action = makeAction();
+            await applyRiderOption(action, makePlayerStats(), 'campaign', 'Goblin', ['Withdraw']);
+
+            expect(addEntry).toHaveBeenCalledWith('campaign', {
+                type: 'ability_use',
+                characterName: 'TestHero',
+                abilityName: 'Cunning Strike',
+                description: 'Withdraw — TestHero can move up to half Speed without provoking Opportunity Attacks.',
+            });
         });
 
         it('should apply Damage Bonus effect with expression', async () => {

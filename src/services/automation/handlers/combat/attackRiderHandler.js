@@ -352,6 +352,12 @@ async function applyRiderEffect(action, playerStats, campaignName, targetName, o
         desc += ' — target must make a Dexterity save or gain the Prone condition';
     } else if (option.effect === 'no_opportunity_attacks' && option.movement) {
         desc += ' — move up to half Speed without provoking Opportunity Attacks';
+        addEntry(campaignName, {
+            type: 'ability_use',
+            characterName: playerStats.name,
+            abilityName: 'Cunning Strike',
+            description: `${option.name} — ${playerStats.name} can move up to half Speed without provoking Opportunity Attacks.`,
+        }).catch(() => {});
     } else if (option.effect === 'ally_movement' && option.movement) {
         desc += ' — ally moves up to half Speed without provoking Opportunity Attacks';
     } else if (option.effect === 'daze') {
