@@ -30,11 +30,11 @@ function createMockRouter(entityName) {
         const key = `${campaign}:${entityName}`;
         const data = MOCK_STORE.get(key);
         const entities = Array.isArray(data) ? data : [];
-        
+
         // Apply transformList logic: only localhost sees data
         const isLocalhost = req.hostname === 'localhost' || req.hostname === '127.0.0.1';
         const result = isLocalhost ? entities : [];
-        
+
         res.json({ [entityName]: result });
     });
 
@@ -52,24 +52,24 @@ function createMockRouter(entityName) {
         const id = decodeURIComponent(req.params.id);
         const key = `${campaign}:${entityName}`;
         const data = MOCK_STORE.get(key);
-        
+
         if (!MOCK_STORE.has(key)) {
             return res.status(404).json({ error: `${capitalizedSingular} not found` });
         }
-        
+
         const entities = Array.isArray(data) ? data : [];
         const entity = entities.find(e => e.id === id);
-        
+
         if (!entity) {
             return res.status(404).json({ error: `${capitalizedSingular} not found` });
         }
-        
+
         // authorizeRead: only localhost
         const isLocalhost = req.hostname === 'localhost' || req.hostname === '127.0.0.1';
         if (!isLocalhost) {
             return res.status(403).json({ error: 'Access denied: GM-only feature' });
         }
-        
+
         res.json({ [singular]: entity });
     });
 
@@ -78,15 +78,15 @@ function createMockRouter(entityName) {
         const campaign = req.params.campaign;
         const id = decodeURIComponent(req.params.id);
         const key = `${campaign}:${entityName}`;
-        
+
         if (!MOCK_STORE.has(key)) {
             return res.status(404).json({ error: `${capitalizedSingular} not found` });
         }
-        
+
         const data = MOCK_STORE.get(key);
         const entities = Array.isArray(data) ? data : [];
         const filtered = entities.filter(e => e.id !== id);
-        
+
         setupMock(entityName, campaign, filtered);
         res.json({ success: true });
     });
@@ -116,7 +116,7 @@ afterEach(() => {
 // ─── GET /api/campaigns/:campaign/quests ─────────────────────────────────────
 
 describe('quests - GET /api/campaigns/:campaign/quests', () => {
-    it('should return empty quests list when no quests.json exists and user is localhost', async () => {
+    it('should return empty quests list when no quests exist and user is localhost', async () => {
         const app = createTestApp();
         const res = await request(app)
             .get('/api/campaigns/test-campaign/quests')
@@ -128,7 +128,7 @@ describe('quests - GET /api/campaigns/:campaign/quests', () => {
         expect(res.body.quests).toEqual([]);
     });
 
-    it('should return empty quests list when no quests.json exists and user is 127.0.0.1', async () => {
+    it('should return empty quests list when no quests exist and user is 127.0.0.1', async () => {
         const app = createTestApp();
         const res = await request(app)
             .get('/api/campaigns/test-campaign/quests')
@@ -138,7 +138,7 @@ describe('quests - GET /api/campaigns/:campaign/quests', () => {
         expect(res.body.quests).toEqual([]);
     });
 
-    it('should return empty quests list for non-localhost users even when file exists', async () => {
+    it('should return empty quests list for non-localhost users even when quests exist', async () => {
         const questsData = [
             { id: 'quest-1', title: 'Slay the Dragon', description: 'Defeat the red dragon', stage: 'active', objectives: ['Find the lair', 'Defeat the dragon'] },
             { id: 'quest-2', title: 'Rescue the Villager', description: 'Save the captured villager', stage: 'completed', objectives: ['Locate the captors', 'Rescue the villager'] },
@@ -214,45 +214,17 @@ describe('quests - GET /api/campaigns/:campaign/quests', () => {
         expect(res.body.quests[0]).toEqual(questData);
     });
 
-    it('should handle quests.json containing non-array data and return empty array', async () => {
+    it('should return 403 for any non-localhost hostname', async () => {
+        const questsData = [
+            { id: 'quest-1', title: 'Quest One', description: 'Content', stage: 'active', objectives: [] },
+        ];
+        setupMock('quests', 'test-campaign', questsData);
+
         const app = createTestApp();
         const res = await request(app)
             .get('/api/campaigns/test-campaign/quests')
-            .set('Host', 'localhost');
+            .set('Host', 'example.com');
 
-        expect(res.status).toBe(200);
-        expect(res.body.quests).toEqual([]);
-    });
-
-    it('should handle invalid JSON in quests.json and return 500', async () => {
-        const app = createTestApp();
-        const res = await request(app)
-            .get('/api/campaigns/test-campaign/quests')
-            .set('Host', 'localhost');
-
-        // Since we're mocking, we can't test filesystem errors directly
-        // The mock returns empty array for non-existent data
-        expect(res.status).toBe(200);
-        expect(res.body.quests).toEqual([]);
-    });
-
-    it('should handle quests.json containing null and return empty array', async () => {
-        const app = createTestApp();
-        const res = await request(app)
-            .get('/api/campaigns/test-campaign/quests')
-            .set('Host', 'localhost');
-
-        expect(res.status).toBe(200);
-        expect(res.body.quests).toEqual([]);
-    });
-
-    it('should return 500 on filesystem read error', async () => {
-        const app = createTestApp();
-        const res = await request(app)
-            .get('/api/campaigns/test-campaign/quests')
-            .set('Host', 'localhost');
-
-        // Mock returns empty array
         expect(res.status).toBe(200);
         expect(res.body.quests).toEqual([]);
     });
@@ -274,6 +246,11 @@ describe('quests - POST /api/campaigns/:campaign/quests', () => {
 
         expect(res.status).toBe(200);
         expect(res.body).toHaveProperty('success', true);
+
+        const stored = MOCK_STORE.get('test-campaign:quests');
+        expect(stored).toHaveLength(2);
+        expect(stored[0].title).toBe('Slay the Dragon');
+        expect(stored[1].title).toBe('Rescue the Villager');
     });
 
     it('should save an empty array of quests', async () => {
@@ -284,6 +261,9 @@ describe('quests - POST /api/campaigns/:campaign/quests', () => {
 
         expect(res.status).toBe(200);
         expect(res.body).toHaveProperty('success', true);
+
+        const stored = MOCK_STORE.get('test-campaign:quests');
+        expect(stored).toEqual([]);
     });
 
     it('should overwrite existing quests with the new array', async () => {
@@ -301,9 +281,13 @@ describe('quests - POST /api/campaigns/:campaign/quests', () => {
 
         expect(res.status).toBe(200);
         expect(res.body).toHaveProperty('success', true);
+
+        const stored = MOCK_STORE.get('test-campaign:quests');
+        expect(stored).toHaveLength(1);
+        expect(stored[0].title).toBe('New Quest');
     });
 
-    it('should handle quests with complex nested data', async () => {
+    it('should handle quests with complex nested objectives and rewards', async () => {
         const questsData = [
             {
                 id: 'quest-1',
@@ -325,27 +309,65 @@ describe('quests - POST /api/campaigns/:campaign/quests', () => {
 
         expect(res.status).toBe(200);
         expect(res.body).toHaveProperty('success', true);
+
+        const stored = MOCK_STORE.get('test-campaign:quests');
+        expect(stored).toHaveLength(1);
+        expect(stored[0].objectives[0].completed).toBe(true);
+        expect(stored[0].rewards.xp).toBe(500);
+        expect(stored[0].rewards.items).toEqual(['Ancient Sword']);
     });
 
-    it('should return 500 on filesystem write error', async () => {
+    it('should handle missing quests in request body and save empty array', async () => {
+        const existingData = [
+            { id: 'old-1', title: 'Old Quest', description: 'Old', stage: 'completed', objectives: [] },
+        ];
+        setupMock('quests', 'test-campaign', existingData);
+
         const app = createTestApp();
         const res = await request(app)
             .post('/api/campaigns/test-campaign/quests')
-            .send({ quests: [{ id: 'x', title: 'y', description: 'z', stage: 'active', objectives: [] }] });
+            .send({});
 
-        // Mock doesn't throw, so this returns success
         expect(res.status).toBe(200);
         expect(res.body).toHaveProperty('success', true);
+
+        const stored = MOCK_STORE.get('test-campaign:quests');
+        expect(stored).toEqual([]);
     });
 
-    it('should return 500 on filesystem error during directory creation', async () => {
+    it('should save quests with string objectives (array of strings)', async () => {
+        const questsData = [
+            { id: 'quest-1', title: 'Simple Objectives', description: 'Test', stage: 'active', objectives: ['Step 1', 'Step 2', 'Step 3'] },
+        ];
+
         const app = createTestApp();
         const res = await request(app)
             .post('/api/campaigns/test-campaign/quests')
-            .send({ quests: [{ id: 'x', title: 'y', description: 'z', stage: 'active', objectives: [] }] });
+            .send({ quests: questsData });
 
         expect(res.status).toBe(200);
         expect(res.body).toHaveProperty('success', true);
+
+        const stored = MOCK_STORE.get('test-campaign:quests');
+        expect(stored[0].objectives).toEqual(['Step 1', 'Step 2', 'Step 3']);
+    });
+
+    it('should save quests with empty description and objectives', async () => {
+        const questsData = [
+            { id: 'quest-1', title: 'Minimal Quest', description: '', stage: 'inactive', objectives: [] },
+        ];
+
+        const app = createTestApp();
+        const res = await request(app)
+            .post('/api/campaigns/test-campaign/quests')
+            .send({ quests: questsData });
+
+        expect(res.status).toBe(200);
+        expect(res.body).toHaveProperty('success', true);
+
+        const stored = MOCK_STORE.get('test-campaign:quests');
+        expect(stored[0].description).toBe('');
+        expect(stored[0].objectives).toEqual([]);
     });
 });
 
@@ -358,8 +380,7 @@ describe('quests - GET /api/campaigns/:campaign/quests/:questId', () => {
             .get('/api/campaigns/test-campaign/quests/quest-1');
 
         expect(res.status).toBe(404);
-        expect(res.body).toHaveProperty('error');
-        expect(res.body.error).toBe('Quest not found');
+        expect(res.body).toHaveProperty('error', 'Quest not found');
     });
 
     it('should return 404 when quest with given id does not exist', async () => {
@@ -467,34 +488,84 @@ describe('quests - GET /api/campaigns/:campaign/quests/:questId', () => {
         expect(res.body.quest.objectives).toEqual(['Step 1']);
     });
 
-    it('should handle quests.json containing non-array data and return 404', async () => {
+    it('should return quest with complex nested objectives and rewards', async () => {
+        const questData = {
+            id: 'quest-42',
+            title: 'The Lost Kingdom',
+            description: 'Find the lost kingdom of old',
+            stage: 'active',
+            objectives: [
+                { description: 'Speak to the elder', completed: true },
+                { description: 'Enter the cave', completed: false },
+                { description: 'Defeat the guardian', completed: false },
+            ],
+            rewards: { xp: 500, gold: 100, items: ['Ancient Sword', 'Magic Shield'] },
+        };
+        setupMock('quests', 'test-campaign', [questData]);
+
         const app = createTestApp();
         const res = await request(app)
-            .get('/api/campaigns/test-campaign/quests/any-id')
+            .get('/api/campaigns/test-campaign/quests/quest-42')
             .set('Host', 'localhost');
 
-        expect(res.status).toBe(404);
-        expect(res.body.error).toBe('Quest not found');
+        expect(res.status).toBe(200);
+        expect(res.body.quest).toEqual(questData);
+        expect(res.body.quest.objectives[0].completed).toBe(true);
+        expect(res.body.quest.rewards.items).toEqual(['Ancient Sword', 'Magic Shield']);
     });
 
-    it('should return 500 on filesystem read error', async () => {
+    it('should handle quest ids with special characters via URL encoding', async () => {
+        const questData = {
+            id: 'quest/with/slashes',
+            title: 'Special ID Quest',
+            description: 'Has slashes in id',
+            stage: 'active',
+            objectives: [],
+        };
+        setupMock('quests', 'test-campaign', [questData]);
+
         const app = createTestApp();
         const res = await request(app)
-            .get('/api/campaigns/test-campaign/quests/any-id')
+            .get('/api/campaigns/test-campaign/quests/quest%2Fwith%2Fslashes')
             .set('Host', 'localhost');
 
-        expect(res.status).toBe(404);
-        expect(res.body.error).toBe('Quest not found');
+        expect(res.status).toBe(200);
+        expect(res.body.quest.title).toBe('Special ID Quest');
     });
 
-    it('should return 404 when existsSync returns false', async () => {
+    it('should handle UUID-style quest ids', async () => {
+        const questData = {
+            id: 'a1b2c3d4-e5f6-a7b8-c9d0-e1f2a3b4c5d6',
+            title: 'UUID Quest',
+            description: 'UUID style id',
+            stage: 'active',
+            objectives: [],
+        };
+        setupMock('quests', 'test-campaign', [questData]);
+
         const app = createTestApp();
         const res = await request(app)
-            .get('/api/campaigns/test-campaign/quests/any-id')
+            .get('/api/campaigns/test-campaign/quests/a1b2c3d4-e5f6-a7b8-c9d0-e1f2a3b4c5d6')
             .set('Host', 'localhost');
 
-        expect(res.status).toBe(404);
-        expect(res.body.error).toBe('Quest not found');
+        expect(res.status).toBe(200);
+        expect(res.body.quest.title).toBe('UUID Quest');
+    });
+
+    it('should return quest with all stage values', async () => {
+        const stages = ['inactive', 'active', 'completed', 'abandoned'];
+        for (const stage of stages) {
+            const questData = { id: `quest-${stage}`, title: `${stage} quest`, description: 'Test', stage, objectives: [] };
+            setupMock('quests', 'test-campaign', [questData]);
+
+            const app = createTestApp();
+            const res = await request(app)
+                .get(`/api/campaigns/test-campaign/quests/quest-${stage}`)
+                .set('Host', 'localhost');
+
+            expect(res.status).toBe(200);
+            expect(res.body.quest.stage).toBe(stage);
+        }
     });
 });
 
@@ -507,8 +578,7 @@ describe('quests - DELETE /api/campaigns/:campaign/quests/:questId', () => {
             .delete('/api/campaigns/test-campaign/quests/quest-1');
 
         expect(res.status).toBe(404);
-        expect(res.body).toHaveProperty('error');
-        expect(res.body.error).toBe('Quest not found');
+        expect(res.body).toHaveProperty('error', 'Quest not found');
     });
 
     it('should return 200 and succeed when quest does not exist (no-op delete)', async () => {
@@ -523,6 +593,10 @@ describe('quests - DELETE /api/campaigns/:campaign/quests/:questId', () => {
 
         expect(res.status).toBe(200);
         expect(res.body).toHaveProperty('success', true);
+
+        const stored = MOCK_STORE.get('test-campaign:quests');
+        expect(stored).toHaveLength(1);
+        expect(stored[0].title).toBe('Keep Me');
     });
 
     it('should delete a quest and return success', async () => {
@@ -538,6 +612,10 @@ describe('quests - DELETE /api/campaigns/:campaign/quests/:questId', () => {
 
         expect(res.status).toBe(200);
         expect(res.body).toHaveProperty('success', true);
+
+        const stored = MOCK_STORE.get('test-campaign:quests');
+        expect(stored).toHaveLength(1);
+        expect(stored[0].title).toBe('Keep Me');
     });
 
     it('should remove only the specified quest when multiple exist', async () => {
@@ -553,6 +631,10 @@ describe('quests - DELETE /api/campaigns/:campaign/quests/:questId', () => {
             .delete('/api/campaigns/test-campaign/quests/quest-2');
 
         expect(res.status).toBe(200);
+
+        const stored = MOCK_STORE.get('test-campaign:quests');
+        expect(stored).toHaveLength(2);
+        expect(stored.map(q => q.title)).toEqual(['First', 'Third']);
     });
 
     it('should handle deleting the only quest', async () => {
@@ -566,49 +648,13 @@ describe('quests - DELETE /api/campaigns/:campaign/quests/:questId', () => {
             .delete('/api/campaigns/test-campaign/quests/quest-1');
 
         expect(res.status).toBe(200);
+
+        const stored = MOCK_STORE.get('test-campaign:quests');
+        expect(stored).toHaveLength(0);
     });
 
     it('should handle deleting from an empty quests list (no-op delete)', async () => {
         setupMock('quests', 'test-campaign', []);
-
-        const app = createTestApp();
-        const res = await request(app)
-            .delete('/api/campaigns/test-campaign/quests/quest-1');
-
-        expect(res.status).toBe(200);
-        expect(res.body).toHaveProperty('success', true);
-    });
-
-    it('should handle quests.json containing non-array data', async () => {
-        setupMock('quests', 'test-campaign', []);
-
-        const app = createTestApp();
-        const res = await request(app)
-            .delete('/api/campaigns/test-campaign/quests/any-id');
-
-        expect(res.status).toBe(200);
-        expect(res.body).toHaveProperty('success', true);
-    });
-
-    it('should return 500 on filesystem write error', async () => {
-        const questsData = [
-            { id: 'quest-1', title: 'Quest', description: 'Content', stage: 'active', objectives: [] },
-        ];
-        setupMock('quests', 'test-campaign', questsData);
-
-        const app = createTestApp();
-        const res = await request(app)
-            .delete('/api/campaigns/test-campaign/quests/quest-1');
-
-        expect(res.status).toBe(200);
-        expect(res.body).toHaveProperty('success', true);
-    });
-
-    it('should return 500 on filesystem read error', async () => {
-        const questsData = [
-            { id: 'quest-1', title: 'Quest', description: 'Content', stage: 'active', objectives: [] },
-        ];
-        setupMock('quests', 'test-campaign', questsData);
 
         const app = createTestApp();
         const res = await request(app)
@@ -646,14 +692,45 @@ describe('quests - DELETE /api/campaigns/:campaign/quests/:questId', () => {
             .delete('/api/campaigns/test-campaign/quests/quest-1');
 
         expect(res.status).toBe(200);
+
+        const stored = MOCK_STORE.get('test-campaign:quests');
+        expect(stored).toHaveLength(1);
+        expect(stored[0].title).toBe('Simple Quest');
     });
 
-    it('should return 404 when existsSync returns false', async () => {
+    it('should delete quest with UUID-style id', async () => {
+        const questsData = [
+            { id: 'a1b2c3d4-e5f6-a7b8-c9d0-e1f2a3b4c5d6', title: 'Delete Me', description: 'Content', stage: 'active', objectives: [] },
+            { id: 'b2c3d4e5-f6a7-b8c9-d0e1-f2a3b4c5d6e7', title: 'Keep Me', description: 'Content', stage: 'active', objectives: [] },
+        ];
+        setupMock('quests', 'test-campaign', questsData);
+
         const app = createTestApp();
         const res = await request(app)
-            .delete('/api/campaigns/test-campaign/quests/any-id');
+            .delete('/api/campaigns/test-campaign/quests/a1b2c3d4-e5f6-a7b8-c9d0-e1f2a3b4c5d6');
 
-        expect(res.status).toBe(404);
-        expect(res.body.error).toBe('Quest not found');
+        expect(res.status).toBe(200);
+
+        const stored = MOCK_STORE.get('test-campaign:quests');
+        expect(stored).toHaveLength(1);
+        expect(stored[0].title).toBe('Keep Me');
+    });
+
+    it('should delete quest with special characters in id', async () => {
+        const questsData = [
+            { id: 'quest/with/slashes', title: 'Delete Me', description: 'Content', stage: 'active', objectives: [] },
+            { id: 'quest/keep/this', title: 'Keep Me', description: 'Content', stage: 'active', objectives: [] },
+        ];
+        setupMock('quests', 'test-campaign', questsData);
+
+        const app = createTestApp();
+        const res = await request(app)
+            .delete('/api/campaigns/test-campaign/quests/quest%2Fwith%2Fslashes');
+
+        expect(res.status).toBe(200);
+
+        const stored = MOCK_STORE.get('test-campaign:quests');
+        expect(stored).toHaveLength(1);
+        expect(stored[0].id).toBe('quest/keep/this');
     });
 });

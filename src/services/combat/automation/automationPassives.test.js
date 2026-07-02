@@ -356,6 +356,72 @@ describe('collectWeaponMastery', () => {
     expect(result.extraMasteries).toEqual(expect.arrayContaining(['shove', 'topple']))
     expect(result.replaceMasteryOptions).toEqual(['trip'])
   })
+
+  it('returns null baseMastery when weapon_kind_mastery has meleeOnly=true and weapon is ranged', () => {
+    parseMagicItemName.mockReturnValue({ baseName: 'Longbow', magicBonus: 0 })
+    getRuntimeValue.mockReturnValue(['Longbow'])
+    const playerStats = {
+      equipment: [{ name: 'Longbow', mastery: 'range', weapon_range: 'Ranged' }],
+      automation: { passives: [{ type: 'weapon_kind_mastery', meleeOnly: true }] },
+    }
+    const result = collectWeaponMastery('Longbow', playerStats)
+    expect(result.baseMastery).toBeNull()
+  })
+
+  it('returns baseMastery when weapon_kind_mastery has meleeOnly=true and weapon is melee', () => {
+    parseMagicItemName.mockReturnValue({ baseName: 'Shortsword', magicBonus: 0 })
+    getRuntimeValue.mockReturnValue(['Shortsword'])
+    const playerStats = {
+      equipment: [{ name: 'Shortsword', mastery: 'push', weapon_range: 'Melee' }],
+      automation: { passives: [{ type: 'weapon_kind_mastery', meleeOnly: true }] },
+    }
+    const result = collectWeaponMastery('Shortsword', playerStats)
+    expect(result.baseMastery).toBe('push')
+  })
+
+  it('returns baseMastery when weapon_kind_mastery has meleeOnly=false and weapon is melee', () => {
+    parseMagicItemName.mockReturnValue({ baseName: 'Maul', magicBonus: 0 })
+    getRuntimeValue.mockReturnValue(['Maul'])
+    const playerStats = {
+      equipment: [{ name: 'Maul', mastery: 'topple', weapon_range: 'Melee' }],
+      automation: { passives: [{ type: 'weapon_kind_mastery', meleeOnly: false }] },
+    }
+    const result = collectWeaponMastery('Maul', playerStats)
+    expect(result.baseMastery).toBe('topple')
+  })
+
+  it('returns baseMastery when weapon_kind_mastery has meleeOnly=false and weapon is ranged', () => {
+    parseMagicItemName.mockReturnValue({ baseName: 'Crossbow', magicBonus: 0 })
+    getRuntimeValue.mockReturnValue(['Crossbow'])
+    const playerStats = {
+      equipment: [{ name: 'Crossbow', mastery: 'range', weapon_range: 'Ranged' }],
+      automation: { passives: [{ type: 'weapon_kind_mastery', meleeOnly: false }] },
+    }
+    const result = collectWeaponMastery('Crossbow', playerStats)
+    expect(result.baseMastery).toBe('range')
+  })
+
+  it('returns null baseMastery when weapon_kind_mastery has meleeOnly=true and weapon has no weapon_range', () => {
+    parseMagicItemName.mockReturnValue({ baseName: 'Dagger', magicBonus: 0 })
+    getRuntimeValue.mockReturnValue(['Dagger'])
+    const playerStats = {
+      equipment: [{ name: 'Dagger', mastery: 'push' }],
+      automation: { passives: [{ type: 'weapon_kind_mastery', meleeOnly: true }] },
+    }
+    const result = collectWeaponMastery('Dagger', playerStats)
+    expect(result.baseMastery).toBeNull()
+  })
+
+  it('returns null baseMastery when weapon_kind_mastery chosenWeapons does not include baseName', () => {
+    parseMagicItemName.mockReturnValue({ baseName: 'Longsword', magicBonus: 0 })
+    getRuntimeValue.mockReturnValue(['Shortsword'])
+    const playerStats = {
+      equipment: [{ name: 'Longsword', mastery: 'push' }],
+      automation: { passives: [{ type: 'weapon_kind_mastery' }] },
+    }
+    const result = collectWeaponMastery('Longsword', playerStats)
+    expect(result.baseMastery).toBeNull()
+  })
 })
 
 // ── resolveHealingBonuses ─────────────────────────────────────────
@@ -966,5 +1032,63 @@ describe('getDamageReduction', () => {
   it('combines passives, reactions, and specialActions', () => {
     const playerStats = { automation: { passives: [{ type: 'damage_reduction', damageTypes: ['fire'], reduction: 2 }], reactions: [{ type: 'damage_reduction', damageTypes: ['fire'], reduction: 3 }], specialActions: [{ type: 'damage_reduction', damageTypes: ['fire'], reduction: 1 }] } }
     expect(getDamageReduction(playerStats, 'fire', false)).toBe(6)
+  })
+
+  it('applies damage_reduction when trigger is damage_taken_of_chosen_resistance_type and chosen type matches', () => {
+    getRuntimeValue.mockImplementation((name, key) => {
+      if (key === 'resistanceChosenDamageType') return 'fire'
+      if (key === 'resistanceUsedThisTurn') return false
+      return undefined
+    })
+    const playerStats = {
+      name: 'TestChar',
+      campaignName: 'test-campaign',
+      automation: { passives: [{ type: 'damage_reduction', damageTypes: ['fire'], reduction: 5, trigger: 'damage_taken_of_chosen_resistance_type' }] },
+    }
+    expect(getDamageReduction(playerStats, 'fire', false)).toBe(5)
+  })
+
+  it('skips damage_reduction when trigger is damage_taken_of_chosen_resistance_type but chosen type does not match', () => {
+    getRuntimeValue.mockImplementation((name, key) => {
+      if (key === 'resistanceChosenDamageType') return 'cold'
+      return undefined
+    })
+    const playerStats = {
+      name: 'TestChar',
+      campaignName: 'test-campaign',
+      automation: { passives: [{ type: 'damage_reduction', damageTypes: ['fire'], reduction: 5, trigger: 'damage_taken_of_chosen_resistance_type' }] },
+    }
+    expect(getDamageReduction(playerStats, 'fire', false)).toBeNull()
+  })
+
+  it('skips damage_reduction when trigger is damage_taken_of_chosen_resistance_type and resistanceUsedThisTurn is true', () => {
+    getRuntimeValue.mockImplementation((name, key) => {
+      if (key === 'resistanceChosenDamageType') return 'fire'
+      if (key === 'resistanceUsedThisTurn') return true
+      return undefined
+    })
+    const playerStats = {
+      name: 'TestChar',
+      campaignName: 'test-campaign',
+      automation: { passives: [{ type: 'damage_reduction', damageTypes: ['fire'], reduction: 5, trigger: 'damage_taken_of_chosen_resistance_type' }] },
+    }
+    expect(getDamageReduction(playerStats, 'fire', false)).toBeNull()
+  })
+
+  it('handles damage_reduction with empty string reductionExpression', () => {
+    const playerStats = { automation: { passives: [{ type: 'damage_reduction', damageTypes: ['fire'], reductionExpression: '' }] } }
+    expect(getDamageReduction(playerStats, 'fire', false)).toBeNull()
+  })
+
+  it('handles damage_reduction with undefined reduction and undefined reductionExpression', () => {
+    const playerStats = { automation: { passives: [{ type: 'damage_reduction', damageTypes: ['fire'] }] } }
+    expect(getDamageReduction(playerStats, 'fire', false)).toBeNull()
+  })
+
+  it('evaluates reductionExpression when reduction is not a number', () => {
+    evaluateAutoExpression.mockReturnValue(10)
+    const playerStats = { automation: { passives: [{ type: 'damage_reduction', damageTypes: ['fire'], reduction: 'not a number', reductionExpression: '5 + 5' }] } }
+    expect(getDamageReduction(playerStats, 'fire', false)).toBe(10)
+    expect(evaluateAutoExpression).toHaveBeenCalledWith('5 + 5', expect.any(Object))
   })
 })

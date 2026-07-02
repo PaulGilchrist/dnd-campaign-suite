@@ -273,6 +273,62 @@ describe('useLoggedDiceRoll', () => {
       rerender();
       expect(mockAutoDamage).not.toHaveBeenCalled();
     });
+
+    it('triggers autoDamage when hit is true, autoDamage exists, and source matches', async () => {
+      const mockAutoDamage = vi.fn();
+      const autoDamageData = { formula: '2d6+3', damageType: 'fire', source: 'TestFighter' };
+      useDiceRoll.mockReturnValue({
+        popupHtml: { hit: true, autoDamage: autoDamageData },
+        setPopupHtml: vi.fn(),
+      });
+      vi.useFakeTimers();
+      renderHook(
+        () => useLoggedDiceRoll(characterName, campaignName, { autoDamageRoll: mockAutoDamage, autoDamageSource: 'TestFighter' })
+      );
+      await vi.runAllTimersAsync();
+      vi.useRealTimers();
+      expect(mockAutoDamage).toHaveBeenCalledWith(autoDamageData, undefined);
+    });
+
+    it('passes isCrit to autoDamageRoll when present', async () => {
+      const mockAutoDamage = vi.fn();
+      const autoDamageData = { formula: '2d6+3', damageType: 'fire', source: 'TestFighter' };
+      useDiceRoll.mockReturnValue({
+        popupHtml: { hit: true, autoDamage: autoDamageData, isCrit: true },
+        setPopupHtml: vi.fn(),
+      });
+      vi.useFakeTimers();
+      renderHook(
+        () => useLoggedDiceRoll(characterName, campaignName, { autoDamageRoll: mockAutoDamage, autoDamageSource: 'TestFighter' })
+      );
+      await vi.runAllTimersAsync();
+      vi.useRealTimers();
+      expect(mockAutoDamage).toHaveBeenCalledWith(autoDamageData, true);
+    });
+
+    it('does not trigger autoDamage when autoDamageRoll is not provided', () => {
+      useDiceRoll.mockReturnValue({
+        popupHtml: { hit: true, autoDamage: { formula: '2d6', source: 'TestFighter' } },
+        setPopupHtml: vi.fn(),
+      });
+      const { result } = renderHook(
+        () => useLoggedDiceRoll(characterName, campaignName)
+      );
+      expect(result.current).toHaveProperty('rollAbilityCheck');
+    });
+
+    it('clears timeout on unmount', () => {
+      const mockAutoDamage = vi.fn();
+      const clearTimeoutSpy = vi.spyOn(globalThis, 'clearTimeout');
+      useDiceRoll.mockReturnValue({
+        popupHtml: { hit: true, autoDamage: { formula: '2d6', source: 'TestFighter' } },
+        setPopupHtml: vi.fn(),
+      });
+      renderHook(
+        () => useLoggedDiceRoll(characterName, campaignName, { autoDamageRoll: mockAutoDamage, autoDamageSource: 'TestFighter' })
+      );
+      clearTimeoutSpy.mockRestore();
+    });
   });
 
   describe('shared context (_isShared)', () => {

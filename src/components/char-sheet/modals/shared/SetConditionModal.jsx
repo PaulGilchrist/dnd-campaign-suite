@@ -36,7 +36,7 @@ function SetConditionModal({ combatSummary, attackerName, attackerPos, saveDc, c
             const filtered = conditions.filter(c => String(c).toLowerCase() !== condKey);
             setRuntimeValue(creature.name, 'activeConditions', [...filtered, condKey], campaignName);
         }
-    }, [campaignName, characters, saveType]);
+    }, [campaignName, characters]);
 
     const addConditionToCreature = useCallback((targetName, saveDcValue, ctx) => {
         applyConditionToCreature(targetName, saveDcValue, conditionName, ctx);

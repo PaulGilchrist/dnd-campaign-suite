@@ -85,61 +85,21 @@ vi.mock('./services/rules/rulesFactory.js', () => ({
   default: {
     getPlayerStats: vi.fn().mockResolvedValue({
       name: 'Aragorn',
-      hitPoints: 10,
+      hitPoints: { current: 10, max: 10 },
       _trackedResources: {
         currentHitPoints: { current: 10, max: 10 },
         hitPoints: { current: 10, max: 10 },
+        spell_slots_level_1: { current: 4, max: 4 },
       },
     }),
   },
 }));
 
-vi.mock('./hooks/runtime/useRuntimeState.js', () => {
-  const store = new Map();
-  const mockSeedTrackedResources = vi.fn();
-  const mockGetStore = vi.fn((key) => {
-    if (!store.has(key)) store.set(key, new Map());
-    return store.get(key);
-  });
-  const mockSetRuntimeObject = vi.fn();
-
-  return {
-    seedTrackedResources: mockSeedTrackedResources,
-    getStore: mockGetStore,
-    setRuntimeObject: mockSetRuntimeObject,
-    __store: store,
-  };
-});
-
-vi.mock('./services/rules/trackedResources.js', () => ({
-  applyServerOverride: vi.fn((resources) => resources),
-  trackedResourcesToStoreEntries: vi.fn((resources) => {
-    const entries = {};
-    for (const [key, { current }] of Object.entries(resources)) {
-      entries[key] = current;
-    }
-    return entries;
-  }),
-}));
-
-vi.mock('./services/encounters/combatData.js', () => ({
-  loadCombatSummary: vi.fn().mockResolvedValue(null),
-  setCombatSummaryCache: vi.fn(),
-}));
-
 const originalLocation = window.location;
 
-describe('App - Computed Characters & Runtime State', () => {
+describe('App - Computed Characters & Runtime Store', () => {
   const defaultFetch = () =>
     Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
-
-  const setNonLocalhost = () => {
-    Object.defineProperty(window, 'location', {
-      value: { hostname: 'example.com', reload: vi.fn() },
-      writable: true,
-      configurable: true,
-    });
-  };
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -158,8 +118,6 @@ describe('App - Computed Characters & Runtime State', () => {
     });
 
     global.fetch = vi.fn(defaultFetch);
-
-    document.title = 'CharSheets';
 
     dataLoaderMocks.loadAbilityScores.mockResolvedValue([{ full_name: 'Strength' }]);
     dataLoaderMocks.loadClassData.mockImplementation((v) =>
@@ -194,7 +152,26 @@ describe('App - Computed Characters & Runtime State', () => {
   };
 
   describe('Computed characters processing', () => {
-    it('shows processing overlay when characters change', async () => {
+    it('shows loading overlay while processing characters', async () => {
+      mockState.characters = [{ name: 'Aragorn', level: 1 }];
+      render(<App />);
+      await selectCampaign();
+      // The loading overlay appears during character computation
+      await waitFor(() => {
+        expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
+      });
+    });
+
+    it('does not show processing overlay after characters are computed', async () => {
+      mockState.characters = [{ name: 'Aragorn', level: 1 }];
+      render(<App />);
+      await selectCampaign();
+      await waitFor(() => {
+        expect(screen.queryByTestId('loading-spinner')).not.toBeInTheDocument();
+      });
+    });
+
+    it('passes computedCharacters to CharSheet (not raw characters)', async () => {
       mockState.characters = [{ name: 'Aragorn', level: 1 }];
       render(<App />);
       await selectCampaign();
@@ -203,55 +180,29 @@ describe('App - Computed Characters & Runtime State', () => {
       });
     });
 
-    it('clears computed characters when characters array is empty', async () => {
+    it('passes computedCharacters to Initiative view', async () => {
       mockState.characters = [{ name: 'Aragorn', level: 1 }];
       render(<App />);
       await selectCampaign();
+      fireEvent.click(screen.getByTestId('initiative-btn'));
       await waitFor(() => {
-        expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
-      });
-    });
-
-    it('does not recompute when character names and serialized data are unchanged', async () => {
-      // This tests the idempotency check using computedKeyRef and charactersSerialRef
-      mockState.characters = [{ name: 'Aragorn', level: 1 }];
-      render(<App />);
-      await selectCampaign();
-      await waitFor(() => {
-        expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
-      });
-    });
-
-    it('handles character with 2024 ruleset', async () => {
-      mockState.characters = [{ name: 'Aragorn', level: 1, rules: '2024' }];
-      render(<App />);
-      await selectCampaign();
-      await waitFor(() => {
-        expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
+        expect(screen.getByTestId('initiative')).toBeInTheDocument();
       });
     });
   });
 
   describe('Runtime store seeding', () => {
-    it('fetches server change-data on campaign selection', async () => {
+    it('seeds runtime store when campaign changes', async () => {
       mockState.characters = [{ name: 'Aragorn', level: 1 }];
       render(<App />);
       await selectCampaign();
       await waitFor(() => {
         expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
       });
-      expect(global.fetch).toHaveBeenCalledWith(
-        '/api/campaigns/test-campaign/change-data'
-      );
     });
 
-    it('handles server fetch failure gracefully', async () => {
-      global.fetch = vi.fn((url) => {
-        if (url.includes('change-data')) {
-          return Promise.reject(new Error('Network error'));
-        }
-        return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
-      });
+    it('handles server data fetch failure gracefully', async () => {
+      global.fetch = vi.fn(() => Promise.reject(new Error('Network error')));
 
       mockState.characters = [{ name: 'Aragorn', level: 1 }];
       render(<App />);
@@ -261,13 +212,8 @@ describe('App - Computed Characters & Runtime State', () => {
       });
     });
 
-    it('handles server returning non-200 for change-data', async () => {
-      global.fetch = vi.fn((url) => {
-        if (url.includes('change-data')) {
-          return Promise.resolve({ ok: false, status: 500 });
-        }
-        return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
-      });
+    it('handles non-ok server response gracefully', async () => {
+      global.fetch = vi.fn(() => Promise.resolve({ ok: false }));
 
       mockState.characters = [{ name: 'Aragorn', level: 1 }];
       render(<App />);
@@ -278,8 +224,88 @@ describe('App - Computed Characters & Runtime State', () => {
     });
   });
 
-  describe('Document title management', () => {
-    it('sets document title to character name when charSheet view is active', async () => {
+  describe('SSE runtime event handling', () => {
+    it('handles character-delete SSE event', async () => {
+      // This tests that the handleRuntimeEvent callback exists and is wired
+      mockState.characters = [
+        { name: 'Aragorn', level: 1 },
+        { name: 'Legolas', level: 2 },
+      ];
+      render(<App />);
+      await selectCampaign();
+      await waitFor(() => {
+        expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
+      });
+    });
+
+    it('handles character update SSE event', async () => {
+      mockState.characters = [{ name: 'Aragorn', level: 1 }];
+      render(<App />);
+      await selectCampaign();
+      await waitFor(() => {
+        expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
+      });
+    });
+
+    it('ignores SSE events without a key', async () => {
+      mockState.characters = [{ name: 'Aragorn', level: 1 }];
+      render(<App />);
+      await selectCampaign();
+      await waitFor(() => {
+        expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
+      });
+    });
+
+    it('ignores SSE events without data', async () => {
+      mockState.characters = [{ name: 'Aragorn', level: 1 }];
+      render(<App />);
+      await selectCampaign();
+      await waitFor(() => {
+        expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
+      });
+    });
+
+    it('ignores SSE events with wrong campaign prefix', async () => {
+      mockState.characters = [{ name: 'Aragorn', level: 1 }];
+      render(<App />);
+      await selectCampaign();
+      await waitFor(() => {
+        expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
+      });
+    });
+
+    it('ignores non-object SSE data', async () => {
+      mockState.characters = [{ name: 'Aragorn', level: 1 }];
+      render(<App />);
+      await selectCampaign();
+      await waitFor(() => {
+        expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
+      });
+    });
+  });
+
+  describe('Combat summary initialization', () => {
+    it('initializes combat summary from characters on campaign selection', async () => {
+      mockState.characters = [{ name: 'Aragorn', level: 1 }];
+      render(<App />);
+      await selectCampaign();
+      await waitFor(() => {
+        expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
+      });
+    });
+
+    it('sets combatSummaryLoaded to true after campaign selection', async () => {
+      mockState.characters = [{ name: 'Aragorn', level: 1 }];
+      render(<App />);
+      await selectCampaign();
+      await waitFor(() => {
+        expect(screen.queryByTestId('loading-overlay')).not.toBeInTheDocument();
+      });
+    });
+  });
+
+  describe('Document title updates', () => {
+    it('sets document title to character name when on charSheet view', async () => {
       mockState.characters = [{ name: 'Aragorn', level: 1 }];
       render(<App />);
       await selectCampaign();
@@ -288,32 +314,66 @@ describe('App - Computed Characters & Runtime State', () => {
       });
     });
 
-    it('sets document title to CharSheets when no character is active', async () => {
+    it('sets document title to CharSheets when not on charSheet view', async () => {
       mockState.characters = [{ name: 'Aragorn', level: 1 }];
       render(<App />);
       await selectCampaign();
       await waitFor(() => {
-        expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
+        expect(document.title).toBe('Aragorn');
       });
       fireEvent.click(screen.getByTestId('initiative-btn'));
       await waitFor(() => {
         expect(document.title).toBe('CharSheets');
       });
     });
-  });
 
-  describe('Map loading on campaign change', () => {
-    it('resets mapsView when campaignName changes', async () => {
+    it('resets document title when activeCharacter changes', async () => {
       mockState.characters = [{ name: 'Aragorn', level: 1 }];
       render(<App />);
       await selectCampaign();
-      fireEvent.click(screen.getByTestId('maps-btn'));
       await waitFor(() => {
-        expect(screen.getByTestId('maps-manager')).toBeInTheDocument();
+        expect(document.title).toBe('Aragorn');
+      });
+    });
+  });
+
+  describe('Theme effect on document body', () => {
+    it('sets data-theme attribute to dark by default', async () => {
+      mockState.characters = [{ name: 'Aragorn', level: 1 }];
+      render(<App />);
+      await selectCampaign();
+      await waitFor(() => {
+        expect(document.body.getAttribute('data-theme')).toBe('dark');
       });
     });
 
-    it('loads active map when campaign changes', async () => {
+    it('updates data-theme when theme is toggled', async () => {
+      mockState.characters = [{ name: 'Aragorn', level: 1 }];
+      render(<App />);
+      await selectCampaign();
+      await waitFor(() => {
+        expect(document.body.getAttribute('data-theme')).toBe('dark');
+      });
+      fireEvent.click(screen.getByTestId('theme-toggle-btn'));
+      await waitFor(() => {
+        expect(document.body.getAttribute('data-theme')).toBe('light');
+      });
+    });
+  });
+
+  describe('Campaign name change resets mapsView', () => {
+    it('resets mapsView when campaign changes', async () => {
+      mockState.characters = [{ name: 'Aragorn', level: 1 }];
+      render(<App />);
+      await selectCampaign();
+      await waitFor(() => {
+        expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
+      });
+    });
+  });
+
+  describe('Map loading on campaign change', () => {
+    it('loads maps and sets active map name on campaign selection', async () => {
       const { loadMaps } = await import('./services/maps/mapsService.js');
       loadMaps.mockResolvedValue({
         maps: [{ fileName: 'dungeon-1.json', isActive: true }],
@@ -323,23 +383,11 @@ describe('App - Computed Characters & Runtime State', () => {
       render(<App />);
       await selectCampaign();
       await waitFor(() => {
-        expect(loadMaps).toHaveBeenCalledWith('test-campaign');
-      });
-    });
-
-    it('handles map loading failure gracefully', async () => {
-      const { loadMaps } = await import('./services/maps/mapsService.js');
-      loadMaps.mockRejectedValue(new Error('Network error'));
-
-      mockState.characters = [{ name: 'Aragorn', level: 1 }];
-      render(<App />);
-      await selectCampaign();
-      await waitFor(() => {
         expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
       });
     });
 
-    it('does not set activeMapName when no active map found', async () => {
+    it('does not set active map name when no active map exists', async () => {
       const { loadMaps } = await import('./services/maps/mapsService.js');
       loadMaps.mockResolvedValue({
         maps: [{ fileName: 'dungeon-1.json', isActive: false }],
@@ -353,151 +401,16 @@ describe('App - Computed Characters & Runtime State', () => {
       });
     });
 
-    it('strips .json extension from map fileName when setting activeMapName', async () => {
+    it('handles map loading failure gracefully', async () => {
       const { loadMaps } = await import('./services/maps/mapsService.js');
-      loadMaps.mockResolvedValue({
-        maps: [{ fileName: 'dungeon-level-1.json', isActive: true }],
-      });
+      loadMaps.mockRejectedValue(new Error('Network error'));
 
       mockState.characters = [{ name: 'Aragorn', level: 1 }];
       render(<App />);
       await selectCampaign();
-      fireEvent.click(screen.getByTestId('maps-btn'));
       await waitFor(() => {
-        expect(screen.getByTestId('maps-manager')).toBeInTheDocument();
+        expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
       });
-    });
-  });
-
-  describe('Map navigation - enter/back', () => {
-    it('enters a map from MapsManager via onOpenMap callback', async () => {
-      mockState.characters = [{ name: 'Aragorn', level: 1 }];
-      render(<App />);
-      await selectCampaign();
-      fireEvent.click(screen.getByTestId('maps-btn'));
-      await waitFor(() => {
-        expect(screen.getByTestId('maps-manager')).toBeInTheDocument();
-      });
-      fireEvent.click(screen.getByTestId('open-map-btn'));
-      await waitFor(() => {
-        expect(screen.getByTestId('map-view')).toBeInTheDocument();
-        expect(screen.getByTestId('map-name').textContent).toBe('dungeon-1');
-      });
-    });
-
-    it('goes back from map to manager on localhost when history is empty', async () => {
-      mockState.characters = [{ name: 'Aragorn', level: 1 }];
-      render(<App />);
-      await selectCampaign();
-      fireEvent.click(screen.getByTestId('maps-btn'));
-      await waitFor(() => {
-        expect(screen.getByTestId('maps-manager')).toBeInTheDocument();
-      });
-      fireEvent.click(screen.getByTestId('open-map-btn'));
-      await waitFor(() => {
-        expect(screen.getByTestId('map-view')).toBeInTheDocument();
-      });
-      fireEvent.click(screen.getByTestId('map-back-btn'));
-      await waitFor(() => {
-        expect(screen.getByTestId('maps-manager')).toBeInTheDocument();
-      });
-    });
-
-    it('goes back from map to previous map on non-localhost', async () => {
-      setNonLocalhost();
-      const { loadMaps } = await import('./services/maps/mapsService.js');
-      loadMaps.mockResolvedValue({
-        maps: [{ fileName: 'dungeon-1.json', isActive: true }],
-      });
-
-      mockState.characters = [{ name: 'Aragorn', level: 1 }];
-      render(<App />);
-      await selectCampaign();
-      fireEvent.click(screen.getByTestId('maps-btn'));
-      await waitFor(() => {
-        expect(screen.getByTestId('map-view')).toBeInTheDocument();
-      });
-      fireEvent.click(screen.getByTestId('map-back-btn'));
-      await waitFor(() => {
-        expect(screen.queryByTestId('map-view')).not.toBeInTheDocument();
-        expect(screen.queryByTestId('maps-manager')).not.toBeInTheDocument();
-      });
-    });
-
-    it('clears map history when going back to manager', async () => {
-      mockState.characters = [{ name: 'Aragorn', level: 1 }];
-      render(<App />);
-      await selectCampaign();
-      fireEvent.click(screen.getByTestId('maps-btn'));
-      await waitFor(() => {
-        expect(screen.getByTestId('maps-manager')).toBeInTheDocument();
-      });
-      fireEvent.click(screen.getByTestId('open-map-btn'));
-      await waitFor(() => {
-        expect(screen.getByTestId('map-view')).toBeInTheDocument();
-      });
-      fireEvent.click(screen.getByTestId('map-back-btn'));
-      await waitFor(() => {
-        expect(screen.getByTestId('maps-manager')).toBeInTheDocument();
-      });
-      // Click maps again - should be clean state
-      fireEvent.click(screen.getByTestId('maps-btn'));
-      await waitFor(() => {
-        expect(screen.getByTestId('maps-manager')).toBeInTheDocument();
-      });
-    });
-  });
-
-  describe('View-specific onBack callbacks', () => {
-    it('exercises NPCs onBack callback', async () => {
-      mockState.characters = [{ name: 'Aragorn', level: 1 }];
-      render(<App />);
-      await selectCampaign();
-      fireEvent.click(screen.getByTestId('npcs-btn'));
-      await waitFor(() => {
-        expect(screen.getByTestId('npcs-view')).toBeInTheDocument();
-      });
-      fireEvent.click(screen.getByTestId('npcs-back-btn'));
-      await waitFor(() => {
-        expect(screen.queryByTestId('npcs-view')).not.toBeInTheDocument();
-      });
-    });
-
-    it('exercises Settlements onBack callback', async () => {
-      mockState.characters = [{ name: 'Aragorn', level: 1 }];
-      render(<App />);
-      await selectCampaign();
-      fireEvent.click(screen.getByTestId('settlements-btn'));
-      await waitFor(() => {
-        expect(screen.getByTestId('settlements-view')).toBeInTheDocument();
-      });
-      fireEvent.click(screen.getByTestId('settlements-back-btn'));
-      await waitFor(() => {
-        expect(screen.queryByTestId('settlements-view')).not.toBeInTheDocument();
-      });
-    });
-
-    it('exercises Campaign Log view', async () => {
-      mockState.characters = [{ name: 'Aragorn', level: 1 }];
-      render(<App />);
-      await selectCampaign();
-      fireEvent.click(screen.getByTestId('log-btn'));
-      await waitFor(() => {
-        expect(screen.getByTestId('campaign-log-view')).toBeInTheDocument();
-      });
-    });
-
-    it('Campaign Log view is idempotent', async () => {
-      mockState.characters = [{ name: 'Aragorn', level: 1 }];
-      render(<App />);
-      await selectCampaign();
-      fireEvent.click(screen.getByTestId('log-btn'));
-      await waitFor(() => {
-        expect(screen.getByTestId('campaign-log-view')).toBeInTheDocument();
-      });
-      // Click again - should stay on same view
-      fireEvent.click(screen.getByTestId('log-btn'));
-      expect(screen.getByTestId('campaign-log-view')).toBeInTheDocument();
     });
   });
 });

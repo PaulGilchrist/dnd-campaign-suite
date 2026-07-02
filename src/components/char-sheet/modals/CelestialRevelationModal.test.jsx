@@ -264,6 +264,51 @@ describe('CelestialRevelationModal', () => {
     });
   });
 
+  describe('setCondition response path', () => {
+    it('calls onClose and onSetConditionModal when confirmCelestialRevelation returns setCondition type', async () => {
+      const onClose = vi.fn();
+      const onSetConditionModal = vi.fn();
+      celestialRevelationHandler.confirmCelestialRevelation.mockResolvedValue({
+        type: 'setCondition',
+        payload: {
+          type: 'setCondition',
+          name: 'Necrotic Shroud',
+          automation: {
+            type: 'set_condition',
+            saveType: 'CHA',
+            saveDc: 'ability',
+            condition: 'frightened',
+            range: '10 ft',
+            duration: 'until_end_of_next_turn',
+          },
+        },
+      });
+      render(<CelestialRevelationModal {...createProps({ onClose, onSetConditionModal })} />);
+      fireEvent.click(screen.getByText('Necrotic Shroud'));
+      fireEvent.click(screen.getByRole('button', { name: /Transform/ }));
+      await waitFor(() => {
+        expect(onClose).toHaveBeenCalledTimes(1);
+        expect(onSetConditionModal).toHaveBeenCalledTimes(1);
+      });
+    });
+
+    it('does not show the result screen when setCondition is returned', async () => {
+      const onClose = vi.fn();
+      const onSetConditionModal = vi.fn();
+      celestialRevelationHandler.confirmCelestialRevelation.mockResolvedValue({
+        type: 'setCondition',
+        payload: { type: 'setCondition' },
+      });
+      render(<CelestialRevelationModal {...createProps({ onClose, onSetConditionModal })} />);
+      fireEvent.click(screen.getByText('Necrotic Shroud'));
+      fireEvent.click(screen.getByRole('button', { name: /Transform/ }));
+      await waitFor(() => {
+        expect(screen.queryByText(/Transforming into/)).not.toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: 'Done' })).not.toBeInTheDocument();
+      });
+    });
+  });
+
   describe('edge cases', () => {
     it('renders correctly when playerStats is minimal (empty object)', () => {
       render(<CelestialRevelationModal {...createProps({ playerStats: {} })} />);

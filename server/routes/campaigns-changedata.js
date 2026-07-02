@@ -63,10 +63,6 @@ router.get('/api/campaigns/:campaign/:key', asyncHandler((req, res, next) => {
 router.post('/api/campaigns/:campaign/:key', asyncHandler((req, res, next) => {
     const { campaign, key } = req.params;
     if (key === 'log') return next();
-    if (campaign === 'undefined' || campaign === 'null') {
-        console.error('Rejecting change data write for invalid campaign name', { campaign, key, body: req.body, url: req.originalUrl, ip: req.ip });
-        return res.status(400).json({ error: 'Invalid campaign name' });
-    }
     const value = req.body.value || req.body;
 
     if (!characterChangeData.has(campaign)) {

@@ -99,6 +99,21 @@ vi.mock('./handlers/combat/extraActionHandler.js', () => ({
 vi.mock('./handlers/spells/eyebiteHandler.js', () => ({
   handle: vi.fn().mockResolvedValue({ result: 'eyebite' }),
 }));
+vi.mock('./handlers/combat/damageReductionHandler.js', () => ({
+  handle: vi.fn().mockResolvedValue({ result: 'damage_reduction' }),
+}));
+vi.mock('./handlers/class-sorcerer/protectiveFieldHandler.js', () => ({
+  handle: vi.fn().mockResolvedValue({ result: 'protective_field' }),
+}));
+vi.mock('./handlers/class-wizard/SavantHandler.js', () => ({
+  handle: vi.fn().mockResolvedValue({ result: 'savant' }),
+}));
+vi.mock('./handlers/buffs/encouragingSongHandler.js', () => ({
+  handle: vi.fn().mockResolvedValue({ result: 'encouraging_song' }),
+}));
+vi.mock('../../../shared/popupResponse.js', () => ({
+  automationInfoPopup: vi.fn().mockReturnValue({ type: 'popup', payload: { type: 'automation_info', description: 'test' } }),
+}));
 
 // ── Helpers ─────────────────────────────────────────────────────
 
@@ -317,6 +332,214 @@ describe('executeHandler', () => {
       const result = await executeHandler(action, makePlayerStats(), campaignName, mapName);
 
       expect(result).toBe(expectedReturn);
+    });
+  });
+
+  describe('spell_modifier handler', () => {
+    it('returns automation_info popup for non-Metamagic types', async () => {
+      const action = makeAction({ type: 'spell_modifier' });
+      action.name = 'Quickened Spell';
+
+      const result = await executeHandler(action, makePlayerStats(), campaignName, mapName);
+
+      expect(result.type).toBe('popup');
+      expect(result.payload.type).toBe('automation_info');
+      expect(result.payload.name).toBe('Quickened Spell');
+    });
+
+    it('returns null for Metamagic type', async () => {
+      const action = makeAction({ type: 'spell_modifier' });
+      action.name = 'Metamagic';
+
+      const result = await executeHandler(action, makePlayerStats(), campaignName, mapName);
+
+      expect(result).toBeNull();
+    });
+  });
+
+  describe('damage_reduction handler', () => {
+    it('routes to protectiveField when automation.cost.resource is psionicEnergy', async () => {
+      const action = makeAction({
+        type: 'damage_reduction',
+        cost: { resource: 'psionicEnergy' },
+      });
+
+      const result = await executeHandler(action, makePlayerStats(), campaignName, mapName);
+
+      expect(result.result).toBe('protective_field');
+    });
+
+    it('routes to damageReduction for other resource types', async () => {
+      const action = makeAction({
+        type: 'damage_reduction',
+        cost: { resource: 'something_else' },
+      });
+
+      const result = await executeHandler(action, makePlayerStats(), campaignName, mapName);
+
+      expect(result.result).toBe('damage_reduction');
+    });
+
+    it('routes to damageReduction when cost is missing', async () => {
+      const action = makeAction({ type: 'damage_reduction' });
+
+      const result = await executeHandler(action, makePlayerStats(), campaignName, mapName);
+
+      expect(result.result).toBe('damage_reduction');
+    });
+
+    it('routes to damageReduction when cost.resource is undefined', async () => {
+      const action = makeAction({ type: 'damage_reduction', cost: {} });
+
+      const result = await executeHandler(action, makePlayerStats(), campaignName, mapName);
+
+      expect(result.result).toBe('damage_reduction');
+    });
+  });
+
+  describe('auto array handling', () => {
+    it('selects passive_rule entry when it has a registered handler', async () => {
+      const action = {
+        name: 'Guarded Mind',
+        automation: [
+          { type: 'passive_rule', effect: 'abjuration_savant' },
+          { type: 'auto_reroll' },
+        ],
+      };
+
+      const result = await executeHandler(action, makePlayerStats(), campaignName, mapName);
+
+      expect(result).toEqual({ result: 'savant' });
+    });
+
+    it('selects first entry with a registered handler when no passive_rule present', async () => {
+      const action = {
+        name: 'Test',
+        automation: [
+          { type: 'auto_reroll', action: 'Bonus Action' },
+          { type: 'auto_reroll' },
+        ],
+      };
+
+      const { handle: autoRerollHandle } = await import('./handlers/combat/autoRerollHandler.js');
+      autoRerollHandle.mockResolvedValue({ result: 'auto_reroll' });
+
+      const result = await executeHandler(action, makePlayerStats(), campaignName, mapName);
+
+      expect(result).toEqual({ result: 'auto_reroll' });
+    });
+
+    it('returns null when auto array has no actionable entries', async () => {
+      const action = {
+        name: 'Test',
+        automation: [
+          { type: 'passive_rule', effect: 'unknown_savant' },
+          { type: 'unknown_type' },
+        ],
+      };
+
+      const result = await executeHandler(action, makePlayerStats(), campaignName, mapName);
+
+      expect(result).toBeNull();
+    });
+
+    it('returns null when auto array is empty', async () => {
+      const action = {
+        name: 'Test',
+        automation: [],
+      };
+
+      const result = await executeHandler(action, makePlayerStats(), campaignName, mapName);
+
+      expect(result).toBeNull();
+    });
+
+    it('returns null when auto array contains null entries', async () => {
+      const action = {
+        name: 'Test',
+        automation: [null, null],
+      };
+
+      const result = await executeHandler(action, makePlayerStats(), campaignName, mapName);
+
+      expect(result).toBeNull();
+    });
+
+    it('passes characters 5th argument to handler when provided', async () => {
+      const action = makeAction({ type: 'auto_reroll' });
+      const characters = [{ name: 'Char1' }, { name: 'Char2' }];
+
+      const { handle: autoRerollHandle } = await import('./handlers/combat/autoRerollHandler.js');
+      autoRerollHandle.mockResolvedValue({ result: 'auto_reroll' });
+
+      await executeHandler(action, makePlayerStats(), campaignName, mapName, characters);
+
+      expect(autoRerollHandle).toHaveBeenCalledWith(
+        expect.any(Object), makePlayerStats(), campaignName, mapName, characters,
+      );
+    });
+
+    it('passes undefined as 5th argument when characters is not provided', async () => {
+      const action = makeAction({ type: 'auto_reroll' });
+
+      const { handle: autoRerollHandle } = await import('./handlers/combat/autoRerollHandler.js');
+      autoRerollHandle.mockResolvedValue({ result: 'auto_reroll' });
+
+      await executeHandler(action, makePlayerStats(), campaignName, mapName);
+
+      expect(autoRerollHandle).toHaveBeenCalledWith(
+        expect.any(Object), makePlayerStats(), campaignName, mapName, undefined,
+      );
+    });
+  });
+
+  describe('passive_rule handler', () => {
+    it('routes abjuration_savant passive_rule to savant handler', async () => {
+      const action = makeAction({ type: 'passive_rule', effect: 'abjuration_savant' });
+
+      const result = await executeHandler(action, makePlayerStats(), campaignName, mapName);
+
+      expect(result).toEqual({ result: 'savant' });
+    });
+
+    it('routes divination_savant passive_rule to savant handler', async () => {
+      const action = makeAction({ type: 'passive_rule', effect: 'divination_savant' });
+
+      const result = await executeHandler(action, makePlayerStats(), campaignName, mapName);
+
+      expect(result).toEqual({ result: 'savant' });
+    });
+
+    it('routes evocation_savant passive_rule to savant handler', async () => {
+      const action = makeAction({ type: 'passive_rule', effect: 'evocation_savant' });
+
+      const result = await executeHandler(action, makePlayerStats(), campaignName, mapName);
+
+      expect(result).toEqual({ result: 'savant' });
+    });
+
+    it('routes illusion_savant passive_rule to savant handler', async () => {
+      const action = makeAction({ type: 'passive_rule', effect: 'illusion_savant' });
+
+      const result = await executeHandler(action, makePlayerStats(), campaignName, mapName);
+
+      expect(result).toEqual({ result: 'savant' });
+    });
+
+    it('returns null for unknown passive_rule effect', async () => {
+      const action = makeAction({ type: 'passive_rule', effect: 'unknown_savant' });
+
+      const result = await executeHandler(action, makePlayerStats(), campaignName, mapName);
+
+      expect(result).toBeNull();
+    });
+
+    it('returns null for passive_rule with no effect field', async () => {
+      const action = makeAction({ type: 'passive_rule' });
+
+      const result = await executeHandler(action, makePlayerStats(), campaignName, mapName);
+
+      expect(result).toBeNull();
     });
   });
 });

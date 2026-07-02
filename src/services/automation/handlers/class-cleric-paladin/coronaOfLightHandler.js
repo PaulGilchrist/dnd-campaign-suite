@@ -30,7 +30,7 @@ export async function activateCoronaOfLight(action, playerStats, campaignName, s
         type: 'ability_use',
         characterName: playerName,
         abilityName: action.name,
-        description: `${playerName} activated Corona of Light. Enemies: ${selectedEnemies.join(', ') || 'none selected (all enemies affected)'}.`,
+        description: `${playerName} activated Corona of Light. Enemies: ${(selectedEnemies || []).join(', ') || 'none selected (all enemies affected)'}.`,
         timestamp: Date.now(),
     }).catch((e) => { console.error('[coronaOfLight] Error:', e); });
 
@@ -40,7 +40,7 @@ export async function activateCoronaOfLight(action, playerStats, campaignName, s
             type: 'automation_info',
             name: action.name,
             automationType: auto.type,
-            description: `${action.name} activated! Enemies with disadvantage on saves vs Fire/Radiant: ${selectedEnemies.join(', ') || 'all other creatures'}.`,
+            description: `${action.name} activated! Enemies with disadvantage on saves vs Fire/Radiant: ${(selectedEnemies || []).join(', ') || 'all other creatures'}.`,
             automation: auto,
         },
     };

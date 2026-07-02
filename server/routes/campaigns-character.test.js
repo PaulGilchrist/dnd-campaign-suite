@@ -1,6 +1,8 @@
 import request from 'supertest';
 import express from 'express';
 import campaignsCharacter from './campaigns-character.js';
+import { processImageUpload, deleteCharacterImage } from '../utils/imageUtils.js';
+import { publish, removeChangeDataKey } from '../utils/changeData.js';
 
 // vi.mock factory creates mock fs inline — no helper needed
 
@@ -47,12 +49,19 @@ function getMockFs() {
 function resetMockFs() {
     const mfs = getMockFs();
     if (mfs) {
-        mfs.existsSync.mockReset();
+        mfs.existsSync.mockReset().mockReturnValue(true);
         mfs.readFileSync.mockReset();
         mfs.writeFileSync.mockReset();
         mfs.unlinkSync.mockReset();
         mfs.renameSync.mockReset();
     }
+}
+
+function resetModuleMocks() {
+    vi.mocked(processImageUpload).mockClear();
+    vi.mocked(deleteCharacterImage).mockClear();
+    vi.mocked(publish).mockClear();
+    vi.mocked(removeChangeDataKey).mockClear();
 }
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
@@ -69,6 +78,7 @@ function createTestApp() {
 describe('campaignsCharacter - GET /api/campaigns/:campaign/:file', () => {
     afterEach(() => {
         resetMockFs();
+        resetModuleMocks();
         vi.restoreAllMocks();
     });
 
@@ -131,6 +141,7 @@ describe('campaignsCharacter - GET /api/campaigns/:campaign/:file', () => {
 describe('campaignsCharacter - PUT /api/campaigns/:campaign/:file', () => {
     afterEach(() => {
         resetMockFs();
+        resetModuleMocks();
         vi.restoreAllMocks();
     });
 
@@ -304,6 +315,175 @@ describe('campaignsCharacter - PUT /api/campaigns/:campaign/:file', () => {
         expect(res.status).toBe(200);
         expect(res.body).toHaveProperty('message');
     });
+
+    it('should delete original image and set imagePath to empty during rename when image is cleared', async () => {
+        const mfs = getMockFs();
+        mfs.existsSync.mockReturnValue(true);
+        mfs.readFileSync.mockReturnValue(JSON.stringify({
+            name: 'OldName',
+            class: 'Fighter',
+            imagePath: 'campaigns/test-campaign/images/oldname.png'
+        }));
+
+        const renamedData = {
+            name: 'NewName',
+            class: 'Fighter',
+            originalFileName: 'OldName.json'
+        };
+
+        const app = createTestApp();
+        const res = await request(app)
+            .put('/api/campaigns/test-campaign/NewName.json')
+            .send(renamedData);
+
+        expect(res.status).toBe(200);
+        expect(deleteCharacterImage).toHaveBeenCalledWith('campaigns/test-campaign/images/oldname.png');
+    });
+
+    it('should call processImageUpload during rename when image and imageName are present', async () => {
+        const mfs = getMockFs();
+        mfs.existsSync.mockReturnValue(true);
+        mfs.readFileSync.mockReturnValue(JSON.stringify({
+            name: 'OldName',
+            class: 'Fighter',
+            imagePath: 'campaigns/test-campaign/images/oldname.png'
+        }));
+
+        const renamedData = {
+            name: 'NewName',
+            class: 'Fighter',
+            originalFileName: 'OldName.json',
+            imagePath: 'campaigns/test-campaign/images/oldname.png',
+            image: 'data:image/png;base64,newimage',
+            imageName: 'newname.png'
+        };
+
+        const app = createTestApp();
+        const res = await request(app)
+            .put('/api/campaigns/test-campaign/NewName.json')
+            .send(renamedData);
+
+        expect(res.status).toBe(200);
+        expect(processImageUpload).toHaveBeenCalledWith('test-campaign', 'NewName', expect.any(Object), 'campaigns/test-campaign/images/oldname.png');
+    });
+
+    it('should rename the image file when character is renamed and image is unchanged', async () => {
+        const mfs = getMockFs();
+        mfs.existsSync
+            .mockReturnValueOnce(true)
+            .mockReturnValueOnce(true);
+        mfs.readFileSync.mockReturnValue(JSON.stringify({
+            name: 'OldName',
+            class: 'Fighter',
+            imagePath: 'campaigns/test-campaign/images/oldname.png'
+        }));
+
+        const renamedData = {
+            name: 'NewName',
+            class: 'Fighter',
+            originalFileName: 'OldName.json',
+            imagePath: 'campaigns/test-campaign/images/oldname.png'
+        };
+
+        const app = createTestApp();
+        const res = await request(app)
+            .put('/api/campaigns/test-campaign/NewName.json')
+            .send(renamedData);
+
+        expect(res.status).toBe(200);
+        expect(mfs.renameSync).toHaveBeenCalledWith(
+            expect.any(String),
+            '/mock/campaigns/test-campaign/images/NewName.png'
+        );
+        expect(mfs.writeFileSync).toHaveBeenCalled();
+    });
+
+    it('should not rename image file when old and new paths are identical', async () => {
+        const mfs = getMockFs();
+        mfs.existsSync.mockReturnValue(true);
+        mfs.readFileSync.mockReturnValue(JSON.stringify({
+            name: 'SameName',
+            class: 'Fighter',
+            imagePath: 'campaigns/test-campaign/images/SameName.png'
+        }));
+
+        const sameNameData = {
+            name: 'SameName',
+            class: 'Fighter',
+            imagePath: 'campaigns/test-campaign/images/SameName.png'
+        };
+
+        const app = createTestApp();
+        const res = await request(app)
+            .put('/api/campaigns/test-campaign/SameName.json')
+            .send(sameNameData);
+
+        expect(res.status).toBe(200);
+        expect(mfs.renameSync).not.toHaveBeenCalled();
+    });
+
+    it('should handle rename when original image file does not exist on disk', async () => {
+        const mfs = getMockFs();
+        mfs.existsSync
+            .mockReturnValueOnce(true)
+            .mockReturnValueOnce(false);
+        mfs.readFileSync.mockReturnValue(JSON.stringify({
+            name: 'OldName',
+            class: 'Fighter',
+            imagePath: 'campaigns/test-campaign/images/oldname.png'
+        }));
+
+        const renamedData = {
+            name: 'NewName',
+            class: 'Fighter',
+            originalFileName: 'OldName.json',
+            imagePath: 'campaigns/test-campaign/images/oldname.png'
+        };
+
+        const app = createTestApp();
+        const res = await request(app)
+            .put('/api/campaigns/test-campaign/NewName.json')
+            .send(renamedData);
+
+        expect(res.status).toBe(200);
+        expect(mfs.renameSync).not.toHaveBeenCalled();
+    });
+
+    it('should call removeChangeDataKey with original character name after rename', async () => {
+        const mfs = getMockFs();
+        mfs.existsSync.mockReturnValue(true);
+        mfs.readFileSync.mockReturnValue(JSON.stringify({
+            name: 'OldCharacterName',
+            class: 'Fighter',
+            imagePath: ''
+        }));
+
+        const renamedData = {
+            name: 'NewName',
+            class: 'Fighter',
+            originalFileName: 'OldName.json'
+        };
+
+        const app = createTestApp();
+        await request(app)
+            .put('/api/campaigns/test-campaign/NewName.json')
+            .send(renamedData);
+
+        expect(removeChangeDataKey).toHaveBeenCalledWith('test-campaign', 'OldCharacterName');
+    });
+
+    it('should call publish with correct key after update', async () => {
+        const mfs = getMockFs();
+        mfs.existsSync.mockReturnValue(true);
+        mfs.readFileSync.mockReturnValue(JSON.stringify({ name: 'Thorin', class: 'Fighter' }));
+
+        const app = createTestApp();
+        await request(app)
+            .put('/api/campaigns/test-campaign/Thorin.json')
+            .send({ name: 'Thorin', class: 'Fighter', level: 10 });
+
+        expect(publish).toHaveBeenCalledWith('character-test-campaign-Thorin.json', expect.any(Object));
+    });
 });
 
 // ─── DELETE /api/campaigns/:campaign/:file ───────────────────────────────────
@@ -311,6 +491,7 @@ describe('campaignsCharacter - PUT /api/campaigns/:campaign/:file', () => {
 describe('campaignsCharacter - DELETE /api/campaigns/:campaign/:file', () => {
     afterEach(() => {
         resetMockFs();
+        resetModuleMocks();
         vi.restoreAllMocks();
     });
 
@@ -396,6 +577,32 @@ describe('campaignsCharacter - DELETE /api/campaigns/:campaign/:file', () => {
         expect(res.body).toHaveProperty('error');
         expect(res.body.error).toBe('EACCES');
     });
+
+    it('should call removeChangeDataKey with character name after delete', async () => {
+        const mfs = getMockFs();
+        mfs.existsSync.mockReturnValue(true);
+        mfs.readFileSync.mockReturnValue(JSON.stringify({
+            name: 'DeleteMe',
+            class: 'Rogue',
+            imagePath: ''
+        }));
+
+        const app = createTestApp();
+        await request(app).delete('/api/campaigns/test-campaign/DeleteMe.json');
+
+        expect(removeChangeDataKey).toHaveBeenCalledWith('test-campaign', 'DeleteMe');
+    });
+
+    it('should call publish with delete key after delete', async () => {
+        const mfs = getMockFs();
+        mfs.existsSync.mockReturnValue(true);
+        mfs.readFileSync.mockReturnValue(JSON.stringify({ name: 'Thorin', class: 'Fighter' }));
+
+        const app = createTestApp();
+        await request(app).delete('/api/campaigns/test-campaign/Thorin.json');
+
+        expect(publish).toHaveBeenCalledWith('character-delete-test-campaign-Thorin.json', { file: 'Thorin.json' });
+    });
 });
 
 // ─── POST /api/campaigns/:campaign ───────────────────────────────────────────
@@ -403,6 +610,7 @@ describe('campaignsCharacter - DELETE /api/campaigns/:campaign/:file', () => {
 describe('campaignsCharacter - POST /api/campaigns/:campaign', () => {
     afterEach(() => {
         resetMockFs();
+        resetModuleMocks();
         vi.restoreAllMocks();
     });
 
@@ -507,5 +715,51 @@ describe('campaignsCharacter - POST /api/campaigns/:campaign', () => {
         expect(res.status).toBe(500);
         expect(res.body).toHaveProperty('error');
         expect(res.body.error).toBe('EACCES');
+    });
+
+    it('should return character data with nested object in response', async () => {
+        const mfs = getMockFs();
+        mfs.existsSync.mockReturnValue(true);
+
+        const characterData = { name: 'Thorin', class: 'Fighter', level: 5 };
+
+        const app = createTestApp();
+        const res = await request(app)
+            .post('/api/campaigns/test-campaign')
+            .send({ character: characterData });
+
+        expect(res.status).toBe(201);
+        expect(res.body.character).toEqual({ name: 'Thorin', class: 'Fighter', level: 5, _fileName: 'Thorin.json' });
+        expect(res.body.fileName).toBe('Thorin.json');
+    });
+
+    it('should sanitize spaces and special chars in character name for filename', async () => {
+        const mfs = getMockFs();
+        mfs.existsSync.mockReturnValue(true);
+
+        const characterData = { name: 'Lady Moonshadow von Lightbringer', class: 'Wizard' };
+
+        const app = createTestApp();
+        const res = await request(app)
+            .post('/api/campaigns/test-campaign')
+            .send({ character: characterData });
+
+        expect(res.status).toBe(201);
+        expect(res.body.fileName).toBe('Lady_Moonshadow_von_Lightbringer.json');
+    });
+
+    it('should sanitize numeric-only names', async () => {
+        const mfs = getMockFs();
+        mfs.existsSync.mockReturnValue(true);
+
+        const characterData = { name: '123', class: 'Fighter' };
+
+        const app = createTestApp();
+        const res = await request(app)
+            .post('/api/campaigns/test-campaign')
+            .send({ character: characterData });
+
+        expect(res.status).toBe(201);
+        expect(res.body.fileName).toBe('123.json');
     });
 });

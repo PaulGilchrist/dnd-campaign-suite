@@ -171,34 +171,7 @@ describe('settlements - GET /api/campaigns/:campaign/settlements', () => {
         expect(res.body.settlements[1].name).toBe('Whiterun');
     });
 
-    it('should handle settlements.json containing non-array data and return empty array', async () => {
-        const app = createTestApp();
-        const res = await request(app)
-            .get('/api/campaigns/test-campaign/settlements');
-
-        expect(res.status).toBe(200);
-        expect(res.body.settlements).toEqual([]);
-    });
-
-    it('should handle invalid JSON in settlements.json and return 500', async () => {
-        const app = createTestApp();
-        const res = await request(app)
-            .get('/api/campaigns/test-campaign/settlements');
-
-        expect(res.status).toBe(200);
-        expect(res.body.settlements).toEqual([]);
-    });
-
-    it('should handle settlements.json containing null and return empty array', async () => {
-        const app = createTestApp();
-        const res = await request(app)
-            .get('/api/campaigns/test-campaign/settlements');
-
-        expect(res.status).toBe(200);
-        expect(res.body.settlements).toEqual([]);
-    });
-
-    it('should return 500 on filesystem read error', async () => {
+    it('should handle non-array and null data gracefully, returning empty array', async () => {
         const app = createTestApp();
         const res = await request(app)
             .get('/api/campaigns/test-campaign/settlements');
@@ -273,21 +246,16 @@ describe('settlements - POST /api/campaigns/:campaign/settlements', () => {
         expect(res.body).toHaveProperty('success', true);
     });
 
-    it('should return 500 on filesystem write error', async () => {
+    it('should handle settlements with missing optional fields', async () => {
+        const settlementsData = [
+            { name: 'Minimal Settlement' },
+            { name: 'Partial Settlement', type: 'village' },
+        ];
+
         const app = createTestApp();
         const res = await request(app)
             .post('/api/campaigns/test-campaign/settlements')
-            .send({ settlements: [{ name: 'x', type: 'y', population: 1, description: 'z' }] });
-
-        expect(res.status).toBe(200);
-        expect(res.body).toHaveProperty('success', true);
-    });
-
-    it('should return 500 on filesystem error during directory creation', async () => {
-        const app = createTestApp();
-        const res = await request(app)
-            .post('/api/campaigns/test-campaign/settlements')
-            .send({ settlements: [{ name: 'x', type: 'y', population: 1, description: 'z' }] });
+            .send({ settlements: settlementsData });
 
         expect(res.status).toBe(200);
         expect(res.body).toHaveProperty('success', true);
@@ -356,28 +324,29 @@ describe('settlements - GET /api/campaigns/:campaign/settlements/:settlementName
         expect(res.body.settlement.population).toBe(5000);
     });
 
-    it('should handle settlements.json containing non-array data and return 404', async () => {
+    it('should return 404 when settlement name contains URL-encoded characters and does not match', async () => {
+        const settlementsData = [
+            { name: 'Riverwood', type: 'village', population: 100, description: 'A small village' },
+        ];
+        setupMock('test-campaign', settlementsData);
+
         const app = createTestApp();
         const res = await request(app)
-            .get('/api/campaigns/test-campaign/settlements/any-name');
+            .get('/api/campaigns/test-campaign/settlements/%20nonexistent%20');
 
         expect(res.status).toBe(404);
         expect(res.body.error).toBe('Settlement not found');
     });
 
-    it('should return 500 on filesystem read error', async () => {
+    it('should use strict equality for name matching (case-sensitive)', async () => {
+        const settlementsData = [
+            { name: 'Whiterun', type: 'city', population: 5000, description: 'A large city' },
+        ];
+        setupMock('test-campaign', settlementsData);
+
         const app = createTestApp();
         const res = await request(app)
-            .get('/api/campaigns/test-campaign/settlements/any-name');
-
-        expect(res.status).toBe(404);
-        expect(res.body.error).toBe('Settlement not found');
-    });
-
-    it('should return 404 when existsSync returns false', async () => {
-        const app = createTestApp();
-        const res = await request(app)
-            .get('/api/campaigns/test-campaign/settlements/any-name');
+            .get('/api/campaigns/test-campaign/settlements/whiterun');
 
         expect(res.status).toBe(404);
         expect(res.body.error).toBe('Settlement not found');
@@ -465,46 +434,7 @@ describe('settlements - DELETE /api/campaigns/:campaign/settlements/:settlementN
         expect(res.body).toHaveProperty('success', true);
     });
 
-    it('should handle settlements.json containing non-array data', async () => {
-        setupMock('test-campaign', []);
-
-        const app = createTestApp();
-        const res = await request(app)
-            .delete('/api/campaigns/test-campaign/settlements/any-name');
-
-        expect(res.status).toBe(200);
-        expect(res.body).toHaveProperty('success', true);
-    });
-
-    it('should return 500 on filesystem write error', async () => {
-        const settlementsData = [
-            { name: 'Riverwood', type: 'village', population: 100, description: 'Content' },
-        ];
-        setupMock('test-campaign', settlementsData);
-
-        const app = createTestApp();
-        const res = await request(app)
-            .delete('/api/campaigns/test-campaign/settlements/Riverwood');
-
-        expect(res.status).toBe(200);
-        expect(res.body).toHaveProperty('success', true);
-    });
-
-    it('should return 500 on filesystem read error', async () => {
-        const settlementsData = [
-            { name: 'Riverwood', type: 'village', population: 100, description: 'Content' },
-        ];
-        setupMock('test-campaign', settlementsData);
-
-        const app = createTestApp();
-        const res = await request(app)
-            .delete('/api/campaigns/test-campaign/settlements/Riverwood');
-
-        expect(res.status).toBe(200);
-        expect(res.body).toHaveProperty('success', true);
-    });
-
-    it('should delete settlement with complex nested data', async () => {
+    it('should delete settlement with complex nested data and leave other settlements intact', async () => {
         const settlementsData = [
             {
                 name: 'Whiterun',
@@ -528,15 +458,27 @@ describe('settlements - DELETE /api/campaigns/:campaign/settlements/:settlementN
             .delete('/api/campaigns/test-campaign/settlements/Whiterun');
 
         expect(res.status).toBe(200);
+
+        const stored = MOCK_STORE.get('test-campaign:settlements');
+        expect(stored).toHaveLength(1);
+        expect(stored[0].name).toBe('Riverwood');
     });
 
-    it('should return 404 when existsSync returns false', async () => {
+    it('should use strict equality for name matching (case-sensitive delete)', async () => {
+        const settlementsData = [
+            { name: 'Whiterun', type: 'city', population: 5000, description: 'A large city' },
+        ];
+        setupMock('test-campaign', settlementsData);
+
         const app = createTestApp();
         const res = await request(app)
-            .delete('/api/campaigns/test-campaign/settlements/any-name');
+            .delete('/api/campaigns/test-campaign/settlements/whiterun');
 
-        expect(res.status).toBe(404);
-        expect(res.body.error).toBe('Settlement not found');
+        expect(res.status).toBe(200);
+
+        const stored = MOCK_STORE.get('test-campaign:settlements');
+        expect(stored).toHaveLength(1);
+        expect(stored[0].name).toBe('Whiterun');
     });
 });
 
@@ -621,20 +563,47 @@ describe('settlements - PUT /api/campaigns/:campaign/settlements/:settlementName
         expect(res.body).toHaveProperty('success', true);
     });
 
-    it('should return 500 on filesystem write error', async () => {
-        const settlementData = {
+    it('should fully replace existing settlement (not merge)', async () => {
+        const existingData = [
+            { name: 'Riverwood', type: 'village', population: 100, description: 'A small village', extraField: 'should-be-removed' },
+        ];
+        setupMock('test-campaign', existingData);
+
+        const updatedData = {
             name: 'Riverwood',
-            type: 'village',
-            population: 100,
-            description: 'A small village',
+            type: 'town',
+            population: 250,
+            description: 'A growing town',
         };
 
         const app = createTestApp();
         const res = await request(app)
             .put('/api/campaigns/test-campaign/settlements/Riverwood')
-            .send(settlementData);
+            .send(updatedData);
 
         expect(res.status).toBe(200);
         expect(res.body).toHaveProperty('success', true);
+
+        const stored = MOCK_STORE.get('test-campaign:settlements');
+        expect(stored).toHaveLength(1);
+        expect(stored[0]).toEqual(updatedData);
+        expect(stored[0]).not.toHaveProperty('extraField');
+    });
+
+    it('should handle settlement name with URL-encoded characters in PUT', async () => {
+        const settlementData = {
+            name: 'New Settlement',
+            type: 'town',
+            population: 200,
+            description: 'A new place',
+        };
+
+        const app = createTestApp();
+        const res = await request(app)
+            .put('/api/campaigns/test-campaign/settlements/New%20Settlement')
+            .send(settlementData);
+
+        expect(res.status).toBe(200);
+        expect(res.body.settlement).toEqual(settlementData);
     });
 });

@@ -681,6 +681,32 @@ describe('processFeatureAutomation', () => {
     expect(actionNames).toContain('Action Reaction')
     expect(actionNames).toContain('Action Special')
   })
+
+  it('wraps specialActions-categorized features into allSpecialActions when not already present', () => {
+    const actions = [{ name: 'Stance Feature', automation: { type: 'combat_stance' } }]
+    const bonusActions = []
+    const reactions = []
+    const specialActions = []
+
+    processFeatureAutomation(actions, bonusActions, reactions, specialActions, {})
+
+    expect(specialActions.length).toBe(1)
+    expect(specialActions[0].name).toBe('Stance Feature')
+    expect(specialActions[0].description).toBe('')
+    expect(specialActions[0].hasAutomation).toBe(true)
+    expect(specialActions[0].automation.type).toBe('combat_stance')
+  })
+
+  it('does not duplicate specialActions wrapper when feature already exists', () => {
+    const actions = []
+    const bonusActions = []
+    const reactions = []
+    const specialActions = [{ name: 'Existing Stance', automation: { type: 'combat_stance' } }]
+
+    processFeatureAutomation(actions, bonusActions, reactions, specialActions, {})
+
+    expect(specialActions.length).toBe(1)
+  })
 })
 
 /* ------------------------------------------------------------------ */

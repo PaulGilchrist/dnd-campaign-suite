@@ -115,7 +115,7 @@ function EncounterBuilder({ characters, campaignName, onStartCombat }) {
       const saved = loadSavedFilter();
       const playerLevels = (characters && characters.length > 0)
         ? characters.map(c => c.level || 1)
-        : (saved ? saved.playerLevels : [1]);
+        : (saved && saved.playerLevels ? saved.playerLevels : [1]);
      return {
        difficulty: saved ? saved.difficulty : ENCOUNTER_CONFIG.defaultDifficulty,
        playerLevels,

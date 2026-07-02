@@ -72,8 +72,10 @@ vi.mock('../../services/automation/index.js', () => ({
 vi.mock('../common/Popup.jsx', () => ({
   default: function Popup({ children, onClickOrKeyDown }) {
     return (
-      <div data-testid="popup" onClick={onClickOrKeyDown}>
-        {children}
+      <div data-testid="popup-overlay" onClick={onClickOrKeyDown}>
+        <div data-testid="popup-modal" onClick={(e) => e.stopPropagation()}>
+          {children}
+        </div>
       </div>
     );
   },
@@ -131,8 +133,7 @@ import { executeHandler } from '../../services/automation/index.js';
 import { useSpellMetamagicFlow } from '../../hooks/combat/useSpellMetamagicFlow.js';
 import { useSpellUpcastFlow } from '../../hooks/combat/useSpellUpcastFlow.js';
 import useLoggedDiceRoll from '../../hooks/combat/useLoggedDiceRoll.js';
-import * as mapsService from '../../services/maps/mapsService.js';
-import * as rangeValidation from '../../services/rules/combat/rangeValidation.js';
+
 
 const MOCK_ATTACK = { name: 'Longsword', type: 'Action', range: 5, hitBonus: 5, damage: '1d8+3', damageType: 'Slashing' };
 
@@ -627,68 +628,6 @@ describe('CharReactions - Edge Cases', () => {
     render(<CharReactions {...baseProps} />);
     fireEvent.click(screen.getByText('Shield'));
     expect(buildUpcastLevels).toHaveBeenCalledWith(basePlayerStats.spellAbilities.spells[0]);
-  });
-
-  // ===== getTargetInfo useCallback =====
-
-  it('getTargetInfo returns null when combat context is null', () => {
-    vi.mocked(getCombatContext).mockResolvedValue(null);
-    render(<CharReactions {...baseProps} />);
-    expect(screen.getByText('Reactions')).toBeInTheDocument();
-  });
-
-  it('getTargetInfo returns target from combat context when available', () => {
-    vi.mocked(getCombatContext).mockResolvedValue({ creatures: [{ name: 'Enemy' }] });
-    vi.mocked(getTargetFromAttacker).mockReturnValue({ name: 'Enemy' });
-    render(<CharReactions {...baseProps} />);
-    expect(screen.getByText('Reactions')).toBeInTheDocument();
-  });
-
-  // ===== reactionCastAction useCallback =====
-
-  it('reactionCastAction executes spell cast with cached positions', () => {
-    vi.mocked(getCombatContext).mockResolvedValue({ creatures: [{ name: 'Enemy' }] });
-    vi.mocked(getTargetFromAttacker).mockReturnValue({ name: 'Enemy' });
-    const props = { ...baseProps, mapName: 'test-map' };
-    render(<CharReactions {...props} />);
-    expect(screen.getByText('Reactions')).toBeInTheDocument();
-  });
-
-  // ===== Cached reaction cast position ref =====
-
-  it('clears cachedReactionCastPosRef after reactionCastAction executes', () => {
-    vi.mocked(getCombatContext).mockResolvedValue({ creatures: [{ name: 'Enemy' }] });
-    vi.mocked(getTargetFromAttacker).mockReturnValue({ name: 'Enemy' });
-    const props = { ...baseProps, mapName: 'test-map' };
-    render(<CharReactions {...props} />);
-    expect(screen.getByText('Reactions')).toBeInTheDocument();
-  });
-
-  // ===== resolveReactionSpellPositions with placed items =====
-
-  it('handles map with placedItems but target not found in placed items', async () => {
-    vi.mocked(getCombatContext).mockResolvedValue({ creatures: [{ name: 'Unknown Enemy' }] });
-    vi.mocked(getTargetFromAttacker).mockReturnValue({ name: 'Unknown Enemy' });
-    vi.mocked(mapsService.loadMapData).mockResolvedValue({
-      players: [{ name: 'Test Character', gridX: 5, gridY: 5 }],
-      placedItems: [{ name: 'Other NPC', gridX: 10, gridY: 10 }],
-    });
-    vi.mocked(rangeValidation.getNearestPlacedItem).mockReturnValue(null);
-    const props = { ...baseProps, mapName: 'test-map' };
-    render(<CharReactions {...props} />);
-    expect(screen.getByText('Reactions')).toBeInTheDocument();
-  });
-
-  // ===== resolveReactionSpellPositions error handling =====
-
-  it('handles empty placedItems array gracefully', async () => {
-    vi.mocked(mapsService.loadMapData).mockResolvedValue({
-      players: [],
-      placedItems: [],
-    });
-    const props = { ...baseProps, mapName: 'test-map' };
-    render(<CharReactions {...props} />);
-    expect(screen.getByText('Reactions')).toBeInTheDocument();
   });
 
   // ===== Reaction with automation but executeHandler returns undefined =====

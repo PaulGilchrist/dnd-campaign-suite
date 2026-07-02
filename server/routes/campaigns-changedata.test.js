@@ -8,7 +8,7 @@ vi.mock('../utils/changeData.js', () => ({
     debouncedSave: vi.fn(),
 }));
 
-import { characterChangeData } from '../utils/changeData.js';
+import { characterChangeData, publish, saveFile, debouncedSave } from '../utils/changeData.js';
 import campaignsChangedata from './campaigns-changedata.js';
 
 // Create a test app with the routes
@@ -274,5 +274,147 @@ describe('campaignsChangedata - DELETE /api/campaigns/:campaign/:key', () => {
         expect(data).not.toHaveProperty('character1');
         expect(data.character2).toEqual({ hp: 10 });
         expect(data.combatSummary).toEqual({ rounds: 5 });
+    });
+});
+
+describe('campaignsChangedata - GET /api/campaigns/:campaign/positioning', () => {
+    afterEach(clearChangeData);
+
+    it('should return empty positioning when campaign has no data', async () => {
+        const app = createTestApp();
+        const res = await request(app).get('/api/campaigns/test-campaign/positioning');
+        expect(res.status).toBe(200);
+        expect(res.body).toEqual({ positioning: {} });
+    });
+
+    it('should return empty positioning when campaign is not in store', async () => {
+        const app = createTestApp();
+        expect(characterChangeData.has('unknown-campaign')).toBe(false);
+        const res = await request(app).get('/api/campaigns/unknown-campaign/positioning');
+        expect(res.status).toBe(200);
+        expect(res.body).toEqual({ positioning: {} });
+    });
+
+    it('should return existing positioning data', async () => {
+        const positioningData = {
+            creature1: { x: 10, y: 20 },
+            creature2: { x: 30, y: 40 },
+        };
+        characterChangeData.set('test-campaign', { positioning: positioningData });
+        const app = createTestApp();
+        const res = await request(app).get('/api/campaigns/test-campaign/positioning');
+        expect(res.status).toBe(200);
+        expect(res.body).toEqual({ positioning: positioningData });
+    });
+
+    it('should return only positioning key even when campaign has other data', async () => {
+        characterChangeData.set('test-campaign', {
+            character1: { hp: 25 },
+            positioning: { grid: { cellSize: 50 } },
+        });
+        const app = createTestApp();
+        const res = await request(app).get('/api/campaigns/test-campaign/positioning');
+        expect(res.status).toBe(200);
+        expect(res.body).toEqual({ positioning: { grid: { cellSize: 50 } } });
+        expect(res.body).not.toHaveProperty('character1');
+    });
+});
+
+describe('campaignsChangedata - POST /api/campaigns/:campaign/positioning', () => {
+    afterEach(clearChangeData);
+
+    it('should save positioning data', async () => {
+        const positioningData = {
+            creature1: { x: 10, y: 20 },
+            creature2: { x: 30, y: 40 },
+        };
+        const app = createTestApp();
+        const res = await request(app).post('/api/campaigns/test-campaign/positioning').send({ positioning: positioningData });
+        expect(res.status).toBe(200);
+        expect(res.body.message).toBe('Positioning saved successfully');
+        expect(characterChangeData.get('test-campaign').positioning).toEqual(positioningData);
+    });
+
+    it('should create the campaign entry if it does not exist', async () => {
+        const positioningData = { grid: { cellSize: 50 } };
+        const app = createTestApp();
+        expect(characterChangeData.has('test-campaign')).toBe(false);
+        const res = await request(app).post('/api/campaigns/test-campaign/positioning').send({ positioning: positioningData });
+        expect(res.status).toBe(200);
+        expect(characterChangeData.has('test-campaign')).toBe(true);
+        expect(characterChangeData.get('test-campaign').positioning).toEqual(positioningData);
+    });
+
+    it('should overwrite existing positioning data', async () => {
+        characterChangeData.set('test-campaign', {
+            positioning: { old: 'data' },
+        });
+        const positioningData = { new: 'data' };
+        const app = createTestApp();
+        const res = await request(app).post('/api/campaigns/test-campaign/positioning').send({ positioning: positioningData });
+        expect(res.status).toBe(200);
+        expect(characterChangeData.get('test-campaign').positioning).toEqual(positioningData);
+    });
+
+    it('should call debouncedSave after saving positioning', async () => {
+        const positioningData = { creature1: { x: 10, y: 20 } };
+        const app = createTestApp();
+        await request(app).post('/api/campaigns/test-campaign/positioning').send({ positioning: positioningData });
+        expect(debouncedSave).toHaveBeenCalled();
+    });
+
+    it('should broadcast positioning change via publish', async () => {
+        const positioningData = { creature1: { x: 10, y: 20 } };
+        const app = createTestApp();
+        await request(app).post('/api/campaigns/test-campaign/positioning').send({ positioning: positioningData });
+        expect(publish).toHaveBeenCalledWith('positioning-test-campaign', positioningData);
+    });
+});
+
+describe('campaignsChangedata - POST /api/campaigns/:campaign/:key calls saveFile and publish', () => {
+    beforeEach(() => {
+        vi.mocked(saveFile).mockClear();
+        vi.mocked(publish).mockClear();
+    });
+    afterEach(clearChangeData);
+
+    it('should call saveFile after saving data', async () => {
+        const app = createTestApp();
+        await request(app).post('/api/campaigns/test-campaign/character1').send({ value: { hp: 20 } });
+        expect(saveFile).toHaveBeenCalled();
+    });
+
+    it('should broadcast change via publish after saving', async () => {
+        const app = createTestApp();
+        await request(app).post('/api/campaigns/test-campaign/character1').send({ value: { hp: 20 } });
+        expect(publish).toHaveBeenCalledWith('change-test-campaign-character1', { hp: 20 });
+    });
+});
+
+describe('campaignsChangedata - DELETE /api/campaigns/:campaign/:key calls saveFile and publish', () => {
+    beforeEach(() => {
+        vi.mocked(saveFile).mockClear();
+        vi.mocked(publish).mockClear();
+    });
+    afterEach(clearChangeData);
+
+    it('should call saveFile after deleting data', async () => {
+        characterChangeData.set('test-campaign', { character1: { hp: 25 } });
+        const app = createTestApp();
+        await request(app).delete('/api/campaigns/test-campaign/character1');
+        expect(saveFile).toHaveBeenCalled();
+    });
+
+    it('should broadcast null via publish after deleting', async () => {
+        characterChangeData.set('test-campaign', { character1: { hp: 25 } });
+        const app = createTestApp();
+        await request(app).delete('/api/campaigns/test-campaign/character1');
+        expect(publish).toHaveBeenCalledWith('change-test-campaign-character1', null);
+    });
+
+    it('should not call saveFile when campaign does not exist', async () => {
+        const app = createTestApp();
+        await request(app).delete('/api/campaigns/nonexistent-campaign/somekey');
+        expect(saveFile).not.toHaveBeenCalled();
     });
 });

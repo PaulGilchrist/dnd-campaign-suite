@@ -110,6 +110,8 @@ function makeCombatSummary() {
     };
 }
 
+// ── Tests ───────────────────────────────────────────────────────
+
 describe('interceptionHandler', () => {
     beforeEach(() => {
         vi.clearAllMocks();
@@ -150,12 +152,47 @@ describe('interceptionHandler', () => {
             const result = await handle(action, ps, campaignName, mapName);
 
             expect(result.type).toBe('popup');
+            expect(result.payload.type).toBe('automation_info');
             expect(result.payload.description).toContain('No recent attack found');
+            expect(result.payload.description).toContain('Can only be used after an attack roll');
+            // Shield check should NOT run when no attack found
+            expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
+            expect(damageUtils.getCombatContext).not.toHaveBeenCalled();
+        });
+
+        it('uses action.name as feature name in error message', async () => {
+            const action = makeAction({ name: 'CustomFeature' });
+            const ps = makePlayerStats();
+            damageRollback.findLastAttack.mockResolvedValue({
+                attackEvent: null,
+                attackerName: null,
+                targetName: null,
+                totalDamage: 0,
+            });
+
+            const result = await handle(action, ps, campaignName, mapName);
+
+            expect(result.payload.description).toContain('CustomFeature: No recent attack found');
+        });
+
+        it('uses "Feature" as fallback when action has no name', async () => {
+            const action = { automation: { type: 'interception' } };
+            const ps = makePlayerStats();
+            damageRollback.findLastAttack.mockResolvedValue({
+                attackEvent: null,
+                attackerName: null,
+                targetName: null,
+                totalDamage: 0,
+            });
+
+            const result = await handle(action, ps, campaignName, mapName);
+
+            expect(result.payload.description).toContain('Feature: No recent attack found');
         });
     });
 
-    describe('shield requirement', () => {
-        it('returns error popup when no shield equipped', async () => {
+    describe('shield or weapon requirement', () => {
+        it('returns error popup when no shield or weapon equipped', async () => {
             const action = makeAction();
             const ps = makePlayerStats();
 
@@ -163,6 +200,10 @@ describe('interceptionHandler', () => {
 
             expect(result.type).toBe('popup');
             expect(result.payload.description).toContain('You must be holding a Shield');
+            expect(result.payload.description).toContain('Simple or Martial weapon');
+            // Should short-circuit: no range check, no state update, no combat context
+            expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
+            expect(damageUtils.getCombatContext).not.toHaveBeenCalled();
         });
 
         it('proceeds when shield is equipped', async () => {
@@ -176,11 +217,105 @@ describe('interceptionHandler', () => {
 
             expect(result.type).toBe('popup');
             expect(result.payload.description).not.toContain('You must be holding a Shield');
+            expect(result.payload.description).toContain('interpose yourself');
+        });
+
+        it('proceeds when a weapon is equipped', async () => {
+            const action = makeAction();
+            const ps = makePlayerStats({
+                inventory: { equipped: ['Longsword'] },
+                equipment: [{ name: 'Longsword', equipment_category: 'Weapon' }],
+            });
+
+            const result = await handle(action, ps, campaignName, mapName);
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).not.toContain('You must be holding a Shield');
+            expect(result.payload.description).toContain('interpose yourself');
+        });
+
+        it('proceeds when both shield and weapon are equipped', async () => {
+            const action = makeAction();
+            const ps = makePlayerStats({
+                inventory: { equipped: ['Shield', 'Shortsword'] },
+                equipment: [
+                    { name: 'Shield', armor_category: 'Shield' },
+                    { name: 'Shortsword', equipment_category: 'Weapon' },
+                ],
+            });
+
+            const result = await handle(action, ps, campaignName, mapName);
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).not.toContain('You must be holding a Shield');
+            expect(result.payload.description).toContain('interpose yourself');
+        });
+
+        it('skips null or non-string inventory items', async () => {
+            const action = makeAction();
+            const ps = makePlayerStats({
+                inventory: { equipped: [null, 'Shield', undefined] },
+                equipment: [{ name: 'Shield', armor_category: 'Shield' }],
+            });
+
+            const result = await handle(action, ps, campaignName, mapName);
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).not.toContain('You must be holding a Shield');
+            expect(result.payload.description).toContain('interpose yourself');
+        });
+
+        it('handles magic items with + prefix', async () => {
+            const action = makeAction();
+            const ps = makePlayerStats({
+                inventory: { equipped: ['+1 Shield'] },
+                equipment: [{ name: 'Shield', armor_category: 'Shield' }],
+            });
+
+            const result = await handle(action, ps, campaignName, mapName);
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).not.toContain('You must be holding a Shield');
+            expect(result.payload.description).toContain('interpose yourself');
+        });
+
+        it('proceeds when magic item matches a weapon in equipment', async () => {
+            const action = makeAction();
+            const ps = makePlayerStats({
+                inventory: { equipped: ['+1 Mace'] },
+                equipment: [{ name: 'Mace', equipment_category: 'Weapon' }],
+            });
+
+            const result = await handle(action, ps, campaignName, mapName);
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).not.toContain('You must be holding a Shield');
+            expect(result.payload.description).toContain('interpose yourself');
+        });
+
+        it('handles empty equipped array', async () => {
+            const action = makeAction();
+            const ps = makePlayerStats({ inventory: { equipped: [] } });
+
+            const result = await handle(action, ps, campaignName, mapName);
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain('You must be holding a Shield');
+        });
+
+        it('handles missing inventory object', async () => {
+            const action = makeAction();
+            const ps = makePlayerStats({ inventory: null });
+
+            const result = await handle(action, ps, campaignName, mapName);
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain('You must be holding a Shield');
         });
     });
 
     describe('range check', () => {
-        it('returns error popup when attacker is out of range', async () => {
+        it('returns error popup when attacker is out of range on a map', async () => {
             const action = makeAction();
             const ps = makePlayerStats({
                 inventory: { equipped: ['Shield'] },
@@ -192,11 +327,145 @@ describe('interceptionHandler', () => {
 
             expect(result.type).toBe('popup');
             expect(result.payload.description).toContain('out of range');
+            expect(result.payload.description).toContain('10 ft');
+            // Should short-circuit: no state update, no combat context
+            expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
+            expect(damageUtils.getCombatContext).not.toHaveBeenCalled();
+        });
+
+        it('passes range check when attacker is within range', async () => {
+            const action = makeAction();
+            const ps = makePlayerStats({
+                inventory: { equipped: ['Shield'] },
+                equipment: [{ name: 'Shield', armor_category: 'Shield' }],
+            });
+            rangeValidation.getDistanceFeet.mockReturnValue(5);
+
+            const result = await handle(action, ps, campaignName, mapName);
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).not.toContain('out of range');
+            expect(result.payload.description).toContain('interpose yourself');
+        });
+
+        it('skips range check when no mapName', async () => {
+            const action = makeAction();
+            const ps = makePlayerStats({
+                inventory: { equipped: ['Shield'] },
+                equipment: [{ name: 'Shield', armor_category: 'Shield' }],
+            });
+
+            const result = await handle(action, ps, campaignName, null);
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).not.toContain('out of range');
+            expect(rangeValidation.getDistanceFeet).not.toHaveBeenCalled();
+            expect(targetResolver.resolveMapPositions).not.toHaveBeenCalled();
+        });
+
+        it('skips range check when rangeToFeet returns null', async () => {
+            const action = makeAction();
+            const ps = makePlayerStats({
+                inventory: { equipped: ['Shield'] },
+                equipment: [{ name: 'Shield', armor_category: 'Shield' }],
+            });
+            rangeValidation.rangeToFeet.mockReturnValue(null);
+
+            const result = await handle(action, ps, campaignName, mapName);
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).not.toContain('out of range');
+            expect(rangeValidation.getDistanceFeet).not.toHaveBeenCalled();
+        });
+
+        it('skips range check when map positions unavailable', async () => {
+            const action = makeAction();
+            const ps = makePlayerStats({
+                inventory: { equipped: ['Shield'] },
+                equipment: [{ name: 'Shield', armor_category: 'Shield' }],
+            });
+            targetResolver.resolveMapPositions.mockResolvedValue(null);
+
+            const result = await handle(action, ps, campaignName, mapName);
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).not.toContain('out of range');
+            expect(rangeValidation.getDistanceFeet).not.toHaveBeenCalled();
+        });
+
+        it('skips range check when only attacker position available', async () => {
+            const action = makeAction();
+            const ps = makePlayerStats({
+                inventory: { equipped: ['Shield'] },
+                equipment: [{ name: 'Shield', armor_category: 'Shield' }],
+            });
+            targetResolver.resolveMapPositions.mockResolvedValue({
+                attackerPos: { x: 0, y: 0 },
+                targetPos: null,
+            });
+
+            const result = await handle(action, ps, campaignName, mapName);
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).not.toContain('out of range');
+            expect(rangeValidation.getDistanceFeet).not.toHaveBeenCalled();
+        });
+
+        it('skips range check when only target position available', async () => {
+            const action = makeAction();
+            const ps = makePlayerStats({
+                inventory: { equipped: ['Shield'] },
+                equipment: [{ name: 'Shield', armor_category: 'Shield' }],
+            });
+            targetResolver.resolveMapPositions.mockResolvedValue({
+                attackerPos: null,
+                targetPos: { x: 1, y: 0 },
+            });
+
+            const result = await handle(action, ps, campaignName, mapName);
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).not.toContain('out of range');
+            expect(rangeValidation.getDistanceFeet).not.toHaveBeenCalled();
+        });
+
+        it('uses custom range from automation config', async () => {
+            const action = makeAction({
+                automation: {
+                    ...makeAction().automation,
+                    range: '10_ft',
+                },
+            });
+            const ps = makePlayerStats({
+                inventory: { equipped: ['Shield'] },
+                equipment: [{ name: 'Shield', armor_category: 'Shield' }],
+            });
+            rangeValidation.rangeToFeet.mockReturnValue(10);
+            rangeValidation.getDistanceFeet.mockReturnValue(15);
+
+            const result = await handle(action, ps, campaignName, mapName);
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain('out of range');
+            expect(result.payload.description).toContain('15 ft > 10 ft');
+        });
+
+        it('rounds distance in range error message', async () => {
+            const action = makeAction();
+            const ps = makePlayerStats({
+                inventory: { equipped: ['Shield'] },
+                equipment: [{ name: 'Shield', armor_category: 'Shield' }],
+            });
+            rangeValidation.getDistanceFeet.mockReturnValue(7.8);
+
+            const result = await handle(action, ps, campaignName, mapName);
+
+            expect(result.payload.description).toContain('8 ft');
         });
     });
 
-    describe('disadvantage buff', () => {
-        it('sets targetEffects protection effect on the defender', async () => {
+    describe('targetEffects protection', () => {
+        it('pushes new protection effect when none exists', async () => {
             const action = makeAction();
             const ps = makePlayerStats({
                 inventory: { equipped: ['Shield'] },
@@ -214,15 +483,84 @@ describe('interceptionHandler', () => {
                         target: defenderName,
                         source: playerName,
                         duration: 'until_start_of_next_turn',
+                        timestamp: expect.any(Number),
                     }),
                 ]),
                 campaignName
             );
         });
+
+        it('updates existing protection effect for the same defender', async () => {
+            const action = makeAction();
+            const ps = makePlayerStats({
+                inventory: { equipped: ['Shield'] },
+                equipment: [{ name: 'Shield', armor_category: 'Shield' }],
+            });
+            const existingEffects = [
+                {
+                    effect: 'protection',
+                    target: defenderName,
+                    source: 'OldSource',
+                    duration: 'until_start_of_next_turn',
+                    timestamp: 100,
+                },
+                {
+                    effect: 'something_else',
+                    target: 'Other',
+                    source: 'OtherSource',
+                    duration: '1_round',
+                    timestamp: 200,
+                },
+            ];
+            useRuntimeState.getRuntimeValue.mockReturnValue(existingEffects);
+
+            await handle(action, ps, campaignName, mapName);
+
+            // Should have been called once with the updated array
+            const callArgs = useRuntimeState.setRuntimeValue.mock.calls[0];
+            const updatedEffects = callArgs[2];
+            const protectionEffect = updatedEffects.find(
+                te => te.effect === 'protection' && te.target === defenderName
+            );
+            expect(protectionEffect.source).toBe(playerName);
+            expect(protectionEffect.timestamp).not.toBe(100);
+            // The other effect should still be there
+            const otherEffect = updatedEffects.find(te => te.effect === 'something_else');
+            expect(otherEffect).toBeDefined();
+        });
+
+        it('does not add protection effect for different defender', async () => {
+            const action = makeAction();
+            const ps = makePlayerStats({
+                inventory: { equipped: ['Shield'] },
+                equipment: [{ name: 'Shield', armor_category: 'Shield' }],
+            });
+            const existingEffects = [
+                {
+                    effect: 'protection',
+                    target: 'OtherDefender',
+                    source: 'OtherSource',
+                    duration: 'until_start_of_next_turn',
+                    timestamp: 100,
+                },
+            ];
+            useRuntimeState.getRuntimeValue.mockReturnValue(existingEffects);
+
+            await handle(action, ps, campaignName, mapName);
+
+            const callArgs = useRuntimeState.setRuntimeValue.mock.calls[0];
+            const updatedEffects = callArgs[2];
+            // Should have 2 effects: the old one for OtherDefender and new one for defenderName
+            expect(updatedEffects.length).toBe(2);
+            const newProtection = updatedEffects.find(
+                te => te.effect === 'protection' && te.target === defenderName
+            );
+            expect(newProtection.source).toBe(playerName);
+        });
     });
 
-    describe('damage reduction', () => {
-        it('reduces damage by 1d10 + proficiency when attack hit', async () => {
+    describe('damage reduction calculation', () => {
+        it('reduces damage by 1d10 + proficiency when attack hits', async () => {
             const action = makeAction();
             const ps = makePlayerStats({
                 inventory: { equipped: ['Shield'] },
@@ -242,7 +580,7 @@ describe('interceptionHandler', () => {
             const action = makeAction();
             const ps = makePlayerStats({
                 inventory: { equipped: ['Shield'] },
-                equipment: [{ name: 'Shield', armor_category: 'Shield' }],
+                equipment: [{ name: 'Shield', armor_category: 'Shield' }, { name: 'Shield', armor_category: 'Shield' }],
                 proficiency: 6,
             });
             diceRoller.rollExpression.mockReturnValue({ total: 3, rolls: [3], modifier: 0 });
@@ -252,7 +590,100 @@ describe('interceptionHandler', () => {
             expect(result.payload.description).toContain('Interception damage reduction: 1d10(3) + 6');
         });
 
-        it('clamps damage reduction to original damage', async () => {
+        it('uses numeric damageBonusExpression value', async () => {
+            const action = makeAction({
+                automation: {
+                    ...makeAction().automation,
+                    damageBonusExpression: '5',
+                },
+            });
+            const ps = makePlayerStats({
+                inventory: { equipped: ['Shield'] },
+                equipment: [{ name: 'Shield', armor_category: 'Shield' }],
+            });
+            diceRoller.rollExpression.mockReturnValue({ total: 4, rolls: [4], modifier: 0 });
+
+            const result = await handle(action, ps, campaignName, mapName);
+
+            expect(result.payload.description).toContain('Interception damage reduction: 1d10(4) + 5');
+        });
+
+        it('ignores invalid damageBonusExpression', async () => {
+            const action = makeAction({
+                automation: {
+                    ...makeAction().automation,
+                    damageBonusExpression: 'not_a_number',
+                },
+            });
+            const ps = makePlayerStats({
+                inventory: { equipped: ['Shield'] },
+                equipment: [{ name: 'Shield', armor_category: 'Shield' }],
+            });
+            diceRoller.rollExpression.mockReturnValue({ total: 6, rolls: [6], modifier: 0 });
+
+            const result = await handle(action, ps, campaignName, mapName);
+
+            expect(result.payload.description).toContain('Interception damage reduction: 1d10(6) + 0');
+        });
+
+        it('uses pre-computed damageBonus from automation when present', async () => {
+            const action = makeAction({
+                automation: {
+                    ...makeAction().automation,
+                    damageBonus: 10,
+                    damageBonusExpression: 'proficiency_bonus',
+                },
+            });
+            const ps = makePlayerStats({
+                inventory: { equipped: ['Shield'] },
+                equipment: [{ name: 'Shield', armor_category: 'Shield' }],
+            });
+            diceRoller.rollExpression.mockReturnValue({ total: 4, rolls: [4], modifier: 0 });
+
+            const result = await handle(action, ps, campaignName, mapName);
+
+            expect(result.payload.description).toContain('Interception damage reduction: 1d10(4) + 10');
+        });
+
+        it('uses custom damageExpression from automation (dice roll reflected)', async () => {
+            const action = makeAction({
+                automation: {
+                    ...makeAction().automation,
+                    damageExpression: '2d8',
+                },
+            });
+            const ps = makePlayerStats({
+                inventory: { equipped: ['Shield'] },
+                equipment: [{ name: 'Shield', armor_category: 'Shield' }],
+            });
+            diceRoller.rollExpression.mockReturnValue({ total: 9, rolls: [4, 5], modifier: 0 });
+
+            const result = await handle(action, ps, campaignName, mapName);
+
+            // Production code hardcodes "1d10" in the description string regardless of actual expression
+            // but the dice roll value (9) should be reflected
+            expect(result.payload.description).toContain('1d10(9)');
+        });
+
+        it('defaults to 1d10 when no damageExpression', async () => {
+            const action = makeAction({
+                automation: {
+                    ...makeAction().automation,
+                    damageExpression: null,
+                },
+            });
+            const ps = makePlayerStats({
+                inventory: { equipped: ['Shield'] },
+                equipment: [{ name: 'Shield', armor_category: 'Shield' }],
+            });
+            diceRoller.rollExpression.mockReturnValue({ total: 3, rolls: [3], modifier: 0 });
+
+            const result = await handle(action, ps, campaignName, mapName);
+
+            expect(result.payload.description).toContain('Interception damage reduction: 1d10(3)');
+        });
+
+        it('clamps reduced damage to minimum 0', async () => {
             const action = makeAction();
             const ps = makePlayerStats({
                 inventory: { equipped: ['Shield'] },
@@ -262,10 +693,58 @@ describe('interceptionHandler', () => {
 
             const result = await handle(action, ps, campaignName, mapName);
 
-            expect(result.payload.description).toContain('Reduced damage:');
+            expect(result.payload.description).toContain('Reduced damage: <b>0</b>');
         });
 
-        it('applies healing to target for reduced damage', async () => {
+        it('handles zero original damage', async () => {
+            const action = makeAction();
+            const ps = makePlayerStats({
+                inventory: { equipped: ['Shield'] },
+                equipment: [{ name: 'Shield', armor_category: 'Shield' }],
+            });
+            damageRollback.findLastAttack.mockResolvedValue({
+                attackEvent: { ...makeCombatSummary().lastAttack, primaryDamage: 0, rawDamage: 0, actualDamage: 0 },
+                attackerName,
+                targetName: defenderName,
+                primaryDamage: 0,
+                secondaryDamage: 0,
+                totalDamage: 0,
+                damageTypes: [],
+            });
+            diceRoller.rollExpression.mockReturnValue({ total: 5, rolls: [5], modifier: 0 });
+
+            const result = await handle(action, ps, campaignName, mapName);
+
+            expect(result.payload.description).toContain('Original damage: 0');
+            expect(result.payload.description).toContain('Reduced damage: <b>0</b>');
+            // actualHeal = min(8, 0) = 0, so no healing
+            expect(applyHealing.applyHealingToTarget).not.toHaveBeenCalled();
+        });
+
+        it('handles null damage roll result', async () => {
+            const action = makeAction();
+            const ps = makePlayerStats({
+                inventory: { equipped: ['Shield'] },
+                equipment: [{ name: 'Shield', armor_category: 'Shield' }],
+            });
+            diceRoller.rollExpression.mockReturnValue(null);
+
+            const result = await handle(action, ps, campaignName, mapName);
+
+            expect(result.payload.description).toContain('1d10(0)');
+            // damageBonus is still 3 (proficiency), so reduction = 0 + 3 = 3, reduced = 12 - 3 = 9
+            expect(result.payload.description).toContain('Reduced damage: <b>9</b>');
+            expect(applyHealing.applyHealingToTarget).toHaveBeenCalledWith(
+                expect.anything(),
+                defenderName,
+                3,
+                campaignName
+            );
+        });
+    });
+
+    describe('healing application', () => {
+        it('applies healing to target equal to reduction amount (capped at original damage)', async () => {
             const action = makeAction();
             const ps = makePlayerStats({
                 inventory: { equipped: ['Shield'] },
@@ -275,6 +754,7 @@ describe('interceptionHandler', () => {
 
             await handle(action, ps, campaignName, mapName);
 
+            // reduction = 8 + 3 = 11, originalDamage = 12, actualHeal = min(11, 12) = 11
             expect(applyHealing.applyHealingToTarget).toHaveBeenCalledWith(
                 expect.anything(),
                 defenderName,
@@ -283,33 +763,243 @@ describe('interceptionHandler', () => {
             );
         });
 
-        it('uses damageBonus 0 when no damageBonusExpression and no pre-computed damageBonus', async () => {
-            const action = makeAction({
-                automation: {
-                    type: 'interception',
-                    trigger: 'ally_within_5ft_attacked',
-                    range: '5_ft',
-                    damageExpression: '1d10',
-                    damageType: '',
-                    requiresShield: true,
-                    casting_time: '1 reaction',
-                    hasAutomation: true,
-                },
-            });
+        it('still applies healing from damageBonus even when dice roll is 0', async () => {
+            const action = makeAction();
             const ps = makePlayerStats({
                 inventory: { equipped: ['Shield'] },
                 equipment: [{ name: 'Shield', armor_category: 'Shield' }],
             });
-            diceRoller.rollExpression.mockReturnValue({ total: 4, rolls: [4], modifier: 0 });
+            diceRoller.rollExpression.mockReturnValue({ total: 0, rolls: [0], modifier: 0 });
 
             await handle(action, ps, campaignName, mapName);
 
+            // damageBonus is 3 (proficiency), so reduction = 0 + 3 = 3, actualHeal = min(3, 12) = 3
             expect(applyHealing.applyHealingToTarget).toHaveBeenCalledWith(
                 expect.anything(),
                 defenderName,
-                4,
+                3,
                 campaignName
             );
+        });
+
+        it('does not apply healing when defenderName is null', async () => {
+            const action = makeAction();
+            const ps = makePlayerStats({
+                inventory: { equipped: ['Shield'] },
+                equipment: [{ name: 'Shield', armor_category: 'Shield' }],
+            });
+            damageRollback.findLastAttack.mockResolvedValue({
+                attackEvent: { ...makeCombatSummary().lastAttack, targetName: null },
+                attackerName,
+                targetName: null,
+                primaryDamage: 12,
+                secondaryDamage: 0,
+                totalDamage: 12,
+                damageTypes: ['slashing'],
+            });
+            diceRoller.rollExpression.mockReturnValue({ total: 5, rolls: [5], modifier: 0 });
+
+            await handle(action, ps, campaignName, mapName);
+
+            expect(applyHealing.applyHealingToTarget).not.toHaveBeenCalled();
+        });
+
+        it('uses reduced originalDamage when attack missed (totalDamage from findLastAttack)', async () => {
+            const action = makeAction();
+            const ps = makePlayerStats({
+                inventory: { equipped: ['Shield'] },
+                equipment: [{ name: 'Shield', armor_category: 'Shield' }],
+            });
+            damageRollback.findLastAttack.mockResolvedValue({
+                attackEvent: { ...makeCombatSummary().lastAttack, hit: false },
+                attackerName,
+                targetName: defenderName,
+                primaryDamage: 0,
+                secondaryDamage: 0,
+                totalDamage: 0,
+                damageTypes: [],
+            });
+            diceRoller.rollExpression.mockReturnValue({ total: 5, rolls: [5], modifier: 0 });
+
+            const result = await handle(action, ps, campaignName, mapName);
+
+            expect(result.payload.description).toContain('Original damage: 0');
+            expect(applyHealing.applyHealingToTarget).not.toHaveBeenCalled();
+        });
+    });
+
+    describe('description generation', () => {
+        it('includes base description with attacker and defender names', async () => {
+            const action = makeAction();
+            const ps = makePlayerStats({
+                inventory: { equipped: ['Shield'] },
+                equipment: [{ name: 'Shield', armor_category: 'Shield' }],
+            });
+
+            const result = await handle(action, ps, campaignName, mapName);
+
+            expect(result.payload.description).toContain('interpose yourself between');
+            expect(result.payload.description).toContain(attackerName);
+            expect(result.payload.description).toContain(defenderName);
+            expect(result.payload.description).toContain('Disadvantage');
+            expect(result.payload.description).toContain('until the start of your next turn');
+        });
+
+        it('includes attack roll details when attack event exists', async () => {
+            const action = makeAction();
+            const ps = makePlayerStats({
+                inventory: { equipped: ['Shield'] },
+                equipment: [{ name: 'Shield', armor_category: 'Shield' }],
+            });
+
+            const result = await handle(action, ps, campaignName, mapName);
+
+            expect(result.payload.description).toContain('Attack roll:');
+            expect(result.payload.description).toContain('d20(15)');
+            expect(result.payload.description).toContain('+ 5');
+            expect(result.payload.description).toContain('vs AC 16');
+            expect(result.payload.description).toContain('HIT');
+        });
+
+        it('includes original damage in description', async () => {
+            const action = makeAction();
+            const ps = makePlayerStats({
+                inventory: { equipped: ['Shield'] },
+                equipment: [{ name: 'Shield', armor_category: 'Shield' }],
+            });
+
+            const result = await handle(action, ps, campaignName, mapName);
+
+            expect(result.payload.description).toContain('Original damage: 12');
+        });
+
+        it('includes damage reduction breakdown in description', async () => {
+            const action = makeAction();
+            const ps = makePlayerStats({
+                inventory: { equipped: ['Shield'] },
+                equipment: [{ name: 'Shield', armor_category: 'Shield' }],
+            });
+
+            const result = await handle(action, ps, campaignName, mapName);
+
+            expect(result.payload.description).toContain('Interception damage reduction:');
+            expect(result.payload.description).toContain('Reduced damage:');
+        });
+
+        it('includes heal note when actual heal > 0', async () => {
+            const action = makeAction();
+            const ps = makePlayerStats({
+                inventory: { equipped: ['Shield'] },
+                equipment: [{ name: 'Shield', armor_category: 'Shield' }],
+            });
+
+            const result = await handle(action, ps, campaignName, mapName);
+
+            expect(result.payload.description).toContain('healed for');
+            expect(result.payload.description).toContain('HP');
+        });
+
+        it('uses action.name in popup name and description heading', async () => {
+            const action = makeAction({ name: 'MyInterception' });
+            const ps = makePlayerStats({
+                inventory: { equipped: ['Shield'] },
+                equipment: [{ name: 'Shield', armor_category: 'Shield' }],
+            });
+
+            const result = await handle(action, ps, campaignName, mapName);
+
+            expect(result.payload.name).toBe('MyInterception');
+            expect(result.payload.description).toContain('<b>MyInterception</b>');
+        });
+
+        it('returns popup with basic description when combatSummary is null', async () => {
+            const action = makeAction();
+            const ps = makePlayerStats({
+                inventory: { equipped: ['Shield'] },
+                equipment: [{ name: 'Shield', armor_category: 'Shield' }],
+            });
+            damageUtils.getCombatContext.mockResolvedValue(null);
+
+            const result = await handle(action, ps, campaignName, mapName);
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.type).toBe('automation_info');
+            expect(result.payload.description).toContain('interpose yourself between');
+            expect(result.payload.description).not.toContain('Attack roll:');
+            expect(result.payload.description).not.toContain('Original damage:');
+            expect(result.payload.description).not.toContain('Interception damage reduction:');
+        });
+
+        it('handles attack event with missing targetAc', async () => {
+            const action = makeAction();
+            const ps = makePlayerStats({
+                inventory: { equipped: ['Shield'] },
+                equipment: [{ name: 'Shield', armor_category: 'Shield' }],
+            });
+            damageRollback.findLastAttack.mockResolvedValue({
+                attackEvent: {
+                    ...makeCombatSummary().lastAttack,
+                    targetAc: null,
+                },
+                attackerName,
+                targetName: defenderName,
+                primaryDamage: 12,
+                secondaryDamage: 0,
+                totalDamage: 12,
+                damageTypes: ['slashing'],
+            });
+
+            const result = await handle(action, ps, campaignName, mapName);
+
+            expect(result.payload.description).toContain('vs AC —');
+        });
+
+        it('handles attack event with missing bonus', async () => {
+            const action = makeAction();
+            const ps = makePlayerStats({
+                inventory: { equipped: ['Shield'] },
+                equipment: [{ name: 'Shield', armor_category: 'Shield' }],
+            });
+            damageRollback.findLastAttack.mockResolvedValue({
+                attackEvent: {
+                    ...makeCombatSummary().lastAttack,
+                    bonus: null,
+                },
+                attackerName,
+                targetName: defenderName,
+                primaryDamage: 12,
+                secondaryDamage: 0,
+                totalDamage: 12,
+                damageTypes: ['slashing'],
+            });
+
+            const result = await handle(action, ps, campaignName, mapName);
+
+            expect(result.payload.description).toContain('+ 0');
+        });
+
+        it('handles attack event with missing hit field', async () => {
+            const action = makeAction();
+            const ps = makePlayerStats({
+                inventory: { equipped: ['Shield'] },
+                equipment: [{ name: 'Shield', armor_category: 'Shield' }],
+            });
+            damageRollback.findLastAttack.mockResolvedValue({
+                attackEvent: {
+                    ...makeCombatSummary().lastAttack,
+                    hit: undefined,
+                },
+                attackerName,
+                targetName: defenderName,
+                primaryDamage: 12,
+                secondaryDamage: 0,
+                totalDamage: 12,
+                damageTypes: ['slashing'],
+            });
+
+            const result = await handle(action, ps, campaignName, mapName);
+
+            expect(result.payload.description).toContain('MISS');
         });
     });
 
@@ -330,57 +1020,285 @@ describe('interceptionHandler', () => {
                     characterName: playerName,
                     abilityName: 'Interception',
                     targetName: defenderName,
+                    timestamp: expect.any(Number),
                 })
             );
         });
+
+        it('includes feature name and attacker/target in log description', async () => {
+            const action = makeAction();
+            const ps = makePlayerStats({
+                inventory: { equipped: ['Shield'] },
+                equipment: [{ name: 'Shield', armor_category: 'Shield' }],
+            });
+
+            await handle(action, ps, campaignName, mapName);
+
+            const logEntry = logService.addEntry.mock.calls[0][1];
+            expect(logEntry.description).toContain(playerName);
+            expect(logEntry.description).toContain('Interception');
+            expect(logEntry.description).toContain('Disadvantage');
+            expect(logEntry.description).toContain(attackerName);
+            expect(logEntry.description).toContain(defenderName);
+        });
+
+        it('logs with custom ability name', async () => {
+            const action = makeAction({ name: 'CustomIntercept' });
+            const ps = makePlayerStats({
+                inventory: { equipped: ['Shield'] },
+                equipment: [{ name: 'Shield', armor_category: 'Shield' }],
+            });
+
+            await handle(action, ps, campaignName, mapName);
+
+            const logEntry = logService.addEntry.mock.calls[0][1];
+            expect(logEntry.abilityName).toBe('CustomIntercept');
+            expect(logEntry.description).toContain('CustomIntercept');
+        });
+
+        it('handles logService.addEntry rejection gracefully', async () => {
+            const action = makeAction();
+            const ps = makePlayerStats({
+                inventory: { equipped: ['Shield'] },
+                equipment: [{ name: 'Shield', armor_category: 'Shield' }],
+            });
+            const logError = new Error('Log service unavailable');
+            logService.addEntry.mockRejectedValue(logError);
+
+            const result = await handle(action, ps, campaignName, mapName);
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.type).toBe('automation_info');
+            expect(logService.addEntry).toHaveBeenCalled();
+        });
     });
 
-    describe('no shield or weapon', () => {
-        it('returns error popup when requiresShieldOrWeapon and no shield or weapon', async () => {
-            const action = makeAction({
-                automation: {
-                    type: 'interception',
-                    trigger: 'creature_hits_ally_within_5ft',
-                    range: '5_ft',
-                    damageExpression: '1d10',
-                    damageType: '',
-                    damageBonusExpression: 'proficiency_bonus',
-                    requiresShieldOrWeapon: true,
-                    casting_time: '1 reaction',
-                    hasAutomation: true,
-                },
+    describe('return value structure', () => {
+        it('returns popup with automation_info payload type', async () => {
+            const action = makeAction();
+            const ps = makePlayerStats({
+                inventory: { equipped: ['Shield'] },
+                equipment: [{ name: 'Shield', armor_category: 'Shield' }],
             });
+
+            const result = await handle(action, ps, campaignName, mapName);
+
+            expect(result).toEqual({
+                type: 'popup',
+                payload: expect.objectContaining({
+                    type: 'automation_info',
+                    name: 'Interception',
+                    description: expect.any(String),
+                    automation: expect.objectContaining({
+                        type: 'interception',
+                    }),
+                }),
+            });
+        });
+
+        it('includes the full automation object in the payload', async () => {
+            const action = makeAction();
+            const ps = makePlayerStats({
+                inventory: { equipped: ['Shield'] },
+                equipment: [{ name: 'Shield', armor_category: 'Shield' }],
+            });
+
+            const result = await handle(action, ps, campaignName, mapName);
+
+            expect(result.payload.automation).toEqual(action.automation);
+        });
+
+        it('returns error popup with automation object when no attack', async () => {
+            const action = makeAction();
+            const ps = makePlayerStats();
+            damageRollback.findLastAttack.mockResolvedValue({
+                attackEvent: null,
+                attackerName: null,
+                targetName: null,
+                totalDamage: 0,
+            });
+
+            const result = await handle(action, ps, campaignName, mapName);
+
+            expect(result.payload.automation).toEqual(action.automation);
+        });
+
+        it('returns error popup with automation object when no shield/weapon', async () => {
+            const action = makeAction();
             const ps = makePlayerStats();
 
             const result = await handle(action, ps, campaignName, mapName);
 
-            expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('Shield or a Simple or Martial weapon');
+            expect(result.payload.automation).toEqual(action.automation);
         });
 
-        it('proceeds when hasShieldOrWeapon', async () => {
-            const action = makeAction({
-                automation: {
-                    type: 'interception',
-                    trigger: 'creature_hits_ally_within_5ft',
-                    range: '5_ft',
-                    damageExpression: '1d10',
-                    damageType: '',
-                    damageBonusExpression: 'proficiency_bonus',
-                    requiresShieldOrWeapon: true,
-                    casting_time: '1 reaction',
-                    hasAutomation: true,
-                },
-            });
+        it('returns error popup with automation object when out of range', async () => {
+            const action = makeAction();
             const ps = makePlayerStats({
-                inventory: { equipped: ['Longsword'] },
-                equipment: [{ name: 'Longsword', equipment_category: 'Weapon' }],
+                inventory: { equipped: ['Shield'] },
+                equipment: [{ name: 'Shield', armor_category: 'Shield' }],
+            });
+            rangeValidation.getDistanceFeet.mockReturnValue(10);
+
+            const result = await handle(action, ps, campaignName, mapName);
+
+            expect(result.payload.automation).toEqual(action.automation);
+        });
+    });
+
+    describe('edge cases', () => {
+        it('handles missing automation range by defaulting to 5_ft', async () => {
+            const action = { name: 'Interception', automation: { type: 'interception' } };
+            const ps = makePlayerStats({
+                inventory: { equipped: ['Shield'] },
+                equipment: [{ name: 'Shield', armor_category: 'Shield' }],
             });
 
             const result = await handle(action, ps, campaignName, mapName);
 
             expect(result.type).toBe('popup');
-            expect(result.payload.description).not.toContain('Shield or a Simple or Martial weapon');
+            expect(rangeValidation.rangeToFeet).toHaveBeenCalledWith('5_ft');
+        });
+
+        it('handles missing playerStats.inventory gracefully', async () => {
+            const action = makeAction();
+            const ps = { name: playerName, proficiency: 3 };
+
+            const result = await handle(action, ps, campaignName, mapName);
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain('You must be holding a Shield');
+        });
+
+        it('handles missing playerStats.equipment gracefully', async () => {
+            const action = makeAction();
+            const ps = makePlayerStats({ equipment: null });
+
+            const result = await handle(action, ps, campaignName, mapName);
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain('You must be holding a Shield');
+        });
+
+        it('handles attackEvent with missing d20', async () => {
+            const action = makeAction();
+            const ps = makePlayerStats({
+                inventory: { equipped: ['Shield'] },
+                equipment: [{ name: 'Shield', armor_category: 'Shield' }],
+            });
+            damageRollback.findLastAttack.mockResolvedValue({
+                attackEvent: {
+                    attackerName,
+                    targetName: defenderName,
+                    bonus: 5,
+                    hit: true,
+                    targetAc: 16,
+                    primaryDamage: 12,
+                    rawDamage: 12,
+                    actualDamage: 12,
+                    damageTypes: ['slashing'],
+                },
+                attackerName,
+                targetName: defenderName,
+                primaryDamage: 12,
+                secondaryDamage: 0,
+                totalDamage: 12,
+                damageTypes: ['slashing'],
+            });
+
+            const result = await handle(action, ps, campaignName, mapName);
+
+            expect(result.payload.description).toContain('d20(undefined)');
+        });
+
+        it('handles attackEvent with missing bonus as 0', async () => {
+            const action = makeAction();
+            const ps = makePlayerStats({
+                inventory: { equipped: ['Shield'] },
+                equipment: [{ name: 'Shield', armor_category: 'Shield' }],
+            });
+            damageRollback.findLastAttack.mockResolvedValue({
+                attackEvent: {
+                    attackerName,
+                    targetName: defenderName,
+                    d20: 15,
+                    hit: true,
+                    targetAc: 16,
+                    primaryDamage: 12,
+                    rawDamage: 12,
+                    actualDamage: 12,
+                    damageTypes: ['slashing'],
+                },
+                attackerName,
+                targetName: defenderName,
+                primaryDamage: 12,
+                secondaryDamage: 0,
+                totalDamage: 12,
+                damageTypes: ['slashing'],
+            });
+
+            const result = await handle(action, ps, campaignName, mapName);
+
+            expect(result.payload.description).toContain('+ 0');
+        });
+
+        it('handles attackEvent with undefined hit as MISS', async () => {
+            const action = makeAction();
+            const ps = makePlayerStats({
+                inventory: { equipped: ['Shield'] },
+                equipment: [{ name: 'Shield', armor_category: 'Shield' }],
+            });
+            damageRollback.findLastAttack.mockResolvedValue({
+                attackEvent: {
+                    attackerName,
+                    targetName: defenderName,
+                    d20: 15,
+                    bonus: 5,
+                    targetAc: 16,
+                    primaryDamage: 12,
+                    rawDamage: 12,
+                    actualDamage: 12,
+                    damageTypes: ['slashing'],
+                },
+                attackerName,
+                targetName: defenderName,
+                primaryDamage: 12,
+                secondaryDamage: 0,
+                totalDamage: 12,
+                damageTypes: ['slashing'],
+            });
+
+            const result = await handle(action, ps, campaignName, mapName);
+
+            expect(result.payload.description).toContain('MISS');
+        });
+
+        it('uses proficiency 0 when playerStats.proficiency is missing', async () => {
+            const action = makeAction();
+            const ps = makePlayerStats({
+                inventory: { equipped: ['Shield'] },
+                equipment: [{ name: 'Shield', armor_category: 'Shield' }],
+                proficiency: undefined,
+            });
+            diceRoller.rollExpression.mockReturnValue({ total: 5, rolls: [5], modifier: 0 });
+
+            const result = await handle(action, ps, campaignName, mapName);
+
+            expect(result.payload.description).toContain('+ 0');
+        });
+
+        it('uses proficiency 0 when playerStats.proficiency is null', async () => {
+            const action = makeAction();
+            const ps = makePlayerStats({
+                inventory: { equipped: ['Shield'] },
+                equipment: [{ name: 'Shield', armor_category: 'Shield' }],
+                proficiency: null,
+            });
+            diceRoller.rollExpression.mockReturnValue({ total: 5, rolls: [5], modifier: 0 });
+
+            const result = await handle(action, ps, campaignName, mapName);
+
+            expect(result.payload.description).toContain('+ 0');
         });
     });
 });

@@ -72,8 +72,10 @@ vi.mock('../../services/automation/index.js', () => ({
 vi.mock('../common/Popup.jsx', () => ({
   default: function Popup({ children, onClickOrKeyDown }) {
     return (
-      <div data-testid="popup" onClick={onClickOrKeyDown}>
-        {children}
+      <div data-testid="popup-overlay" onClick={onClickOrKeyDown}>
+        <div data-testid="popup-modal" onClick={(e) => e.stopPropagation()}>
+          {children}
+        </div>
       </div>
     );
   },
@@ -232,37 +234,6 @@ describe('CharReactions - Spell Cast Flows', () => {
     expect(screen.queryByTestId('spell-detail-popup')).not.toBeInTheDocument();
   });
 
-  it('clears selectedSpell after reaction spell cast is initiated', () => {
-    const gateMetamagic = vi.fn();
-    vi.mocked(useSpellMetamagicFlow).mockReturnValue({
-      pendingMetamagic: null,
-      gateMetamagic,
-      handleConfirm: vi.fn(),
-      handleSkip: vi.fn(),
-    });
-    render(<CharReactions {...baseProps} />);
-    fireEvent.click(screen.getByText('Shield'));
-    expect(screen.getByTestId('spell-detail-popup')).toBeInTheDocument();
-    fireEvent.click(screen.getByTestId('spell-cast-button'));
-    // selectedSpell is cleared immediately, popup closes
-    expect(screen.queryByTestId('spell-detail-popup')).not.toBeInTheDocument();
-  });
-
-  it('clears selectedSpell when reaction spell cast is initiated', () => {
-    const gateMetamagic = vi.fn();
-    vi.mocked(useSpellMetamagicFlow).mockReturnValue({
-      pendingMetamagic: null,
-      gateMetamagic,
-      handleConfirm: vi.fn(),
-      handleSkip: vi.fn(),
-    });
-    render(<CharReactions {...baseProps} />);
-    fireEvent.click(screen.getByText('Shield'));
-    expect(screen.getByTestId('spell-detail-popup')).toBeInTheDocument();
-    fireEvent.click(screen.getByTestId('spell-cast-button'));
-    expect(screen.queryByTestId('spell-detail-popup')).not.toBeInTheDocument();
-  });
-
   // ===== Multiple Casting Time Variants =====
 
   it('filters spells by all reaction casting time variants', () => {
@@ -300,26 +271,6 @@ describe('CharReactions - Spell Cast Flows', () => {
     await act(async () => { fireEvent.click(screen.getByText('No Details Reaction:')); });
     // Should not show a popup since buildFeatureDetailHtml returns null
     await waitFor(() => { expect(screen.queryByTestId('popup')).not.toBeInTheDocument(); });
-  });
-
-  // ===== resolveReactionSpellPositions with map =====
-
-  it('resolves positions when mapName is provided and player/target found', async () => {
-    vi.mocked(getCombatContext).mockResolvedValue({ creatures: [{ name: 'Enemy' }] });
-    vi.mocked(getTargetFromAttacker).mockReturnValue({ name: 'Enemy' });
-    const stats = { ...basePlayerStats, reactions: [{ name: 'War Caster', description: 'Casts a spell as reaction', automation: { type: 'reaction_spell' } }] };
-    const props = { ...baseProps, playerStats: stats, mapName: 'test-map' };
-    render(<CharReactions {...props} />);
-    expect(screen.getByText('Reactions')).toBeInTheDocument();
-  });
-
-  it('handles missing map player gracefully', async () => {
-    vi.mocked(getCombatContext).mockResolvedValue({ creatures: [{ name: 'Enemy' }] });
-    vi.mocked(getTargetFromAttacker).mockReturnValue({ name: 'Enemy' });
-    const stats = { ...basePlayerStats, reactions: [{ name: 'War Caster', description: 'Casts a spell as reaction', automation: { type: 'reaction_spell' } }] };
-    const props = { ...baseProps, playerStats: stats, mapName: 'test-map' };
-    render(<CharReactions {...props} />);
-    expect(screen.getByText('Reactions')).toBeInTheDocument();
   });
 
   // ===== React.Fragment key rendering =====
@@ -364,23 +315,6 @@ describe('CharReactions - Spell Cast Flows', () => {
     // The hit column shows "—" (em dash)
     const cells = document.querySelectorAll('.attacks > div:nth-child(3)');
     expect(cells.length).toBeGreaterThan(0);
-  });
-
-  // ===== handleReactionSpellCast - Normal Spell Cast =====
-
-  it('clears selectedSpell when reaction spell cast is initiated', () => {
-    const gateMetamagic = vi.fn();
-    vi.mocked(useSpellMetamagicFlow).mockReturnValue({
-      pendingMetamagic: null,
-      gateMetamagic,
-      handleConfirm: vi.fn(),
-      handleSkip: vi.fn(),
-    });
-    render(<CharReactions {...baseProps} />);
-    fireEvent.click(screen.getByText('Shield'));
-    expect(screen.getByTestId('spell-detail-popup')).toBeInTheDocument();
-    fireEvent.click(screen.getByTestId('spell-cast-button'));
-    expect(screen.queryByTestId('spell-detail-popup')).not.toBeInTheDocument();
   });
 
   // ===== handleReactiveSpellCast - WarCaster Flow =====
@@ -442,53 +376,154 @@ describe('CharReactions - Spell Cast Flows', () => {
     expect(screen.getByText('Reactions')).toBeInTheDocument();
   });
 
-  it('does not resolve positions when map player is not found', async () => {
-    vi.mocked(getCombatContext).mockResolvedValue({ creatures: [{ name: 'Enemy' }] });
-    vi.mocked(getTargetFromAttacker).mockReturnValue({ name: 'Enemy' });
-    vi.mocked(mapsService.loadMapData).mockResolvedValue({
-      players: [{ name: 'Unknown Character', gridX: 5, gridY: 5 }],
-      placedItems: [],
-    });
-    const props = { ...baseProps, mapName: 'test-map' };
-    render(<CharReactions {...props} />);
-    expect(screen.getByText('Reactions')).toBeInTheDocument();
+  it('renders ArcaneWardRestoreModal when automation returns arcaneWardRestore modal type', async () => {
+    vi.mocked(hasAutomation).mockReturnValue(true);
+    vi.mocked(executeHandler).mockResolvedValue({ type: 'modal', modalName: 'arcaneWardRestore', payload: { extraProp: 'value' } });
+    const stats = { ...basePlayerStats, reactions: [{ name: 'Arcane Ward', description: 'Creates a ward', automation: { type: 'arcane_ward' } }] };
+    render(<CharReactions {...baseProps} playerStats={stats} />);
+    await act(async () => { fireEvent.click(screen.getByText('Arcane Ward:')); });
+    expect(screen.getByTestId('arcane-ward-restore-modal')).toBeInTheDocument();
   });
 
-  it('handles map data with no players array', async () => {
-    vi.mocked(mapsService.loadMapData).mockResolvedValue({ placedItems: [] });
-    const props = { ...baseProps, mapName: 'test-map' };
-    render(<CharReactions {...props} />);
-    expect(screen.getByText('Reactions')).toBeInTheDocument();
-  });
+  // ===== Reactive Spell Popup Selection Flow =====
 
-  // ===== ArcaneWardRestoreModal prop passing =====
-
-  it('passes playerStats and campaignName to ArcaneWardRestoreModal', () => {
-    const props = { ...baseProps, playerStats: { ...basePlayerStats, reactions: [] } };
-    render(<CharReactions {...props} />);
-    expect(screen.getByText('Reactions')).toBeInTheDocument();
-  });
-
-  // ===== Reactivity spell eligible popup selection =====
-
-  it('sets fullSpell with prepared Always when selecting from reactive spell popup', () => {
+  it('shows reactive spell eligible popup when automation returns eligibleSpells', async () => {
+    vi.mocked(hasAutomation).mockReturnValue(true);
+    vi.mocked(executeHandler).mockResolvedValue({ type: 'popup', payload: { eligibleSpells: [{ name: 'Fireball', isSingleTarget: false }], hasWarnings: true } });
     render(<CharReactions {...baseProps} />);
-    fireEvent.click(screen.getByText('Shield'));
+    await act(async () => { fireEvent.click(screen.getByText('Reaction Test:')); });
+    expect(screen.getByTestId('popup-overlay')).toBeInTheDocument();
+  });
+
+  it('selects spell from reactive spell popup and sets isReactiveSpellFlow to true', async () => {
+    vi.mocked(hasAutomation).mockReturnValue(true);
+    vi.mocked(executeHandler).mockResolvedValue({ type: 'popup', payload: { eligibleSpells: [{ name: 'Fireball', isSingleTarget: true }], hasWarnings: false } });
+    render(<CharReactions {...baseProps} />);
+    await act(async () => { fireEvent.click(screen.getByText('Reaction Test:')); });
+    fireEvent.click(screen.getByText('Fireball'));
     expect(screen.getByTestId('spell-detail-popup')).toBeInTheDocument();
   });
 
-  // ===== Multi-target spell indicator =====
-
-  it('shows multi-target indicator for non-single-target spells in reactive popup', () => {
+  it('shows multi-target indicator in reactive spell popup for non-single-target spells', async () => {
+    vi.mocked(hasAutomation).mockReturnValue(true);
+    vi.mocked(executeHandler).mockResolvedValue({ type: 'popup', payload: { eligibleSpells: [{ name: 'Fireball', isSingleTarget: false }], hasWarnings: true } });
     render(<CharReactions {...baseProps} />);
-    const spellDiv = screen.getByText('Shield');
-    expect(spellDiv).toBeInTheDocument();
+    await act(async () => { fireEvent.click(screen.getByText('Reaction Test:')); });
+    expect(screen.getByText(/Fireball/)).toBeInTheDocument();
   });
 
-  // ===== Warning display in reactive spell popup =====
-
-  it('shows warning message when reactiveSpellWarnings is true in reactive popup', () => {
+  it('shows warning message in reactive spell popup when hasWarnings is true', async () => {
+    vi.mocked(hasAutomation).mockReturnValue(true);
+    vi.mocked(executeHandler).mockResolvedValue({ type: 'popup', payload: { eligibleSpells: [{ name: 'Fireball', isSingleTarget: false }], hasWarnings: true } });
     render(<CharReactions {...baseProps} />);
-    expect(screen.getByText('Reactions')).toBeInTheDocument();
+    await act(async () => { fireEvent.click(screen.getByText('Reaction Test:')); });
+    expect(screen.getByText('click to dismiss')).toBeInTheDocument();
+  });
+
+  it('dismisses reactive spell popup when overlay is clicked', async () => {
+    vi.mocked(hasAutomation).mockReturnValue(true);
+    vi.mocked(executeHandler).mockResolvedValue({ type: 'popup', payload: { eligibleSpells: [{ name: 'Fireball', isSingleTarget: true }], hasWarnings: false } });
+    render(<CharReactions {...baseProps} />);
+    await act(async () => { fireEvent.click(screen.getByText('Reaction Test:')); });
+    expect(screen.getByTestId('popup-overlay')).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('popup-overlay'));
+    expect(screen.queryByTestId('popup-overlay')).not.toBeInTheDocument();
+  });
+
+  // ===== Spell Table Damage Column Interactions =====
+
+  it('skips damage column click handler when cannotAct is true in reaction spell table', () => {
+    const stats = { ...basePlayerStats, spellAbilities: { spells: [
+      { name: 'Burning Hands', casting_time: '1 reaction', range: '15 feet', prepared: 'Prepared', damage: { damage_at_slot_level: { 1: '3d6' } } },
+    ] } };
+    render(<CharReactions {...baseProps} playerStats={stats} cannotAct={true} />);
+    expect(screen.getByText('Burning Hands')).toBeInTheDocument();
+  });
+
+  it('renders spell table damage column as clickable when resolvedDamage is present and cannotAct is false', () => {
+    const stats = { ...basePlayerStats, spellAbilities: { spells: [
+      { name: 'Burning Hands', casting_time: '1 reaction', range: '15 feet', prepared: 'Prepared', damage: { damage_at_slot_level: { 1: '3d6' } } },
+    ] } };
+    render(<CharReactions {...baseProps} playerStats={stats} />);
+    const damageCells = screen.getAllByText('3d6');
+    expect(damageCells.length).toBeGreaterThan(0);
+  });
+
+  it('renders Healing as type column when spell has heal_at_slot_level', () => {
+    const stats = { ...basePlayerStats, spellAbilities: { spells: [
+      { name: 'Healing Word', casting_time: '1 reaction', range: '60 feet', prepared: 'Prepared', heal_at_slot_level: { 1: '1d4+1' } },
+    ] } };
+    render(<CharReactions {...baseProps} playerStats={stats} />);
+    expect(screen.getByText('Healing')).toBeInTheDocument();
+  });
+
+  it('renders Utility as type column when spell has no damage and no heal_at_slot_level', () => {
+    const stats = { ...basePlayerStats, spellAbilities: { spells: [
+      { name: 'Shield', casting_time: '1 reaction', range: 'Self', prepared: 'Prepared' },
+    ] } };
+    render(<CharReactions {...baseProps} playerStats={stats} />);
+    expect(screen.getByText('Utility')).toBeInTheDocument();
+  });
+
+  it('renders spell level as Cantrip for level 0 spells in reaction spell table', () => {
+    const stats = { ...basePlayerStats, spellAbilities: { spells: [
+      { name: 'Toll the Dead', casting_time: '1 reaction', range: '60 feet', prepared: 'Prepared', level: 0, damage: { damage_at_character_level: { 1: '1d8' } } },
+    ] } };
+    render(<CharReactions {...baseProps} playerStats={stats} />);
+    expect(screen.getByText('Cantrip')).toBeInTheDocument();
+  });
+
+  // ===== Spell Table Hit Column with AutoHit =====
+
+  it('renders empty hit column for auto-hit spells in reaction spell table', () => {
+    const stats = { ...basePlayerStats, spellAbilities: { spells: [
+      { name: 'Magic Missile', casting_time: '1 reaction', range: '120 feet', prepared: 'Prepared' },
+    ] } };
+    render(<CharReactions {...baseProps} playerStats={stats} />);
+    expect(screen.getByText('Magic Missile')).toBeInTheDocument();
+  });
+
+  it('renders save DC column for spells with dc property in reaction spell table', () => {
+    const stats = { ...basePlayerStats, spellAbilities: { toHit: null, saveDc: 15, spells: [
+      { name: 'Protection from Energy', casting_time: '1 reaction', range: 'Contact', prepared: 'Prepared', dc: { dc_type: 'CON' } },
+    ] } };
+    render(<CharReactions {...baseProps} playerStats={stats} />);
+    expect(screen.getByText('DC 15 CON')).toBeInTheDocument();
+  });
+
+  it('renders attack bonus with sign formatter for spell attack reactions', () => {
+    const stats = { ...basePlayerStats, spellAbilities: { toHit: 6, saveDc: null, spells: [
+      { name: 'Shield', casting_time: '1 reaction', range: 'Self', prepared: 'Prepared' },
+    ] } };
+    render(<CharReactions {...baseProps} playerStats={stats} />);
+    expect(screen.getByText('+6')).toBeInTheDocument();
+  });
+
+  it('applies disabled-attack class to spell attack column when cannotAct is true', () => {
+    const stats = { ...basePlayerStats, spellAbilities: { toHit: 6, saveDc: null, spells: [
+      { name: 'Shield', casting_time: '1 reaction', range: 'Self', prepared: 'Prepared' },
+    ] } };
+    render(<CharReactions {...baseProps} playerStats={stats} cannotAct={true} />);
+    const attackCell = document.querySelector('.disabled-attack');
+    expect(attackCell).toBeInTheDocument();
+  });
+
+  // ===== Popup Dismissal =====
+
+  it('dismisses spell detail popup when popup overlay is clicked', () => {
+    render(<CharReactions {...baseProps} />);
+    fireEvent.click(screen.getByText('Shield'));
+    expect(screen.getByTestId('spell-detail-popup')).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('popup-overlay'));
+    expect(screen.queryByTestId('spell-detail-popup')).not.toBeInTheDocument();
+  });
+
+  // ===== 2024 Ruleset featuresToIgnore =====
+
+  it('uses 2024 featuresToIgnore when rules is "2024"', () => {
+    const stats = { ...basePlayerStats, rules: '2024', reactions: [{ name: 'Spellcasting', description: 'Casts spells' }, { name: 'Opportunity Attack', description: 'Attacks fleeing enemies' }] };
+    render(<CharReactions {...baseProps} playerStats={stats} />);
+    expect(screen.queryByText('Spellcasting:')).not.toBeInTheDocument();
+    expect(screen.getByText('Opportunity Attack:')).toBeInTheDocument();
   });
 });

@@ -64,7 +64,7 @@ vi.mock('../../common/infoPopup.js', () => ({
   }),
 }));
 
-// ── Imports (Vite returns mocked versions) ─────────────────────
+// ── Imports ─────────────────────────────────────────────────────
 
 import { handle } from './reactionDebuffHandler.js';
 
@@ -157,7 +157,89 @@ describe('reactionDebuffHandler.handle', () => {
     rangeValidation.getDistanceFeet.mockReset();
   });
 
+  // ── Early exit: requires shield ─────────────────────────────
 
+  describe('early exits: requires shield', () => {
+    it('returns popup when requiresShield and no shield equipped', async () => {
+      const ps = makePlayerStats({ inventory: { equipped: [] } });
+      const action = makeAction({ requiresShield: true });
+
+      const result = await handle(action, ps, campaignName, mapName);
+
+      expect(result.type).toBe('popup');
+      expect(result.payload.description).toContain('holding a Shield');
+      expect(targetResolver.resolveTarget).not.toHaveBeenCalled();
+    });
+
+    it('returns popup when requiresShield and equipped list is empty', async () => {
+      const ps = makePlayerStats({ inventory: {} });
+      const action = makeAction({ requiresShield: true });
+
+      const result = await handle(action, ps, campaignName, mapName);
+
+      expect(result.payload.description).toContain('holding a Shield');
+    });
+
+    it('allows use when shield is equipped', async () => {
+      const ps = makePlayerStats({
+        inventory: { equipped: ['Shield'] },
+        equipment: [{ name: 'Shield', armor_category: 'Shield' }],
+      });
+      const action = makeAction({ requiresShield: true });
+
+      targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
+      damageUtils.getCombatContext.mockResolvedValue(makeCombatSummary());
+      damageRollback.findLastAttack.mockResolvedValue({
+        attackEvent: freshAttackEvent({ d20: 5, bonus: 3, hit: false }),
+        attackerName: 'Goblin',
+        targetName: 'Goblin',
+        primaryDamage: 0,
+        secondaryDamage: 0,
+        totalDamage: 0,
+        damageTypes: [],
+      });
+
+      const result = await handle(action, ps, campaignName, mapName);
+
+      expect(result.payload.description).toContain('Attack roll');
+    });
+
+    it('allows use when magic shield (+ prefix) is equipped', async () => {
+      const ps = makePlayerStats({
+        inventory: { equipped: ['+1 Shield'] },
+        equipment: [{ name: 'Shield', armor_category: 'Shield' }],
+      });
+      const action = makeAction({ requiresShield: true });
+
+      targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
+      damageUtils.getCombatContext.mockResolvedValue(makeCombatSummary());
+      damageRollback.findLastAttack.mockResolvedValue({
+        attackEvent: freshAttackEvent({ d20: 5, bonus: 3, hit: false }),
+        attackerName: 'Goblin',
+        targetName: 'Goblin',
+        primaryDamage: 0,
+        secondaryDamage: 0,
+        totalDamage: 0,
+        damageTypes: [],
+      });
+
+      const result = await handle(action, ps, campaignName, mapName);
+
+      expect(result.payload.description).toContain('Attack roll');
+    });
+
+    it('does not allow use when equipped item is not a shield', async () => {
+      const ps = makePlayerStats({
+        inventory: { equipped: ['Longsword'] },
+        equipment: [{ name: 'Longsword', weapon_category: 'martial_melee' }],
+      });
+      const action = makeAction({ requiresShield: true });
+
+      const result = await handle(action, ps, campaignName, mapName);
+
+      expect(result.payload.description).toContain('holding a Shield');
+    });
+  });
 
   // ── Early exit: uses exhausted ──────────────────────────────
 
@@ -339,21 +421,6 @@ describe('reactionDebuffHandler.handle', () => {
 
       expect(result.type).toBe('popup');
       expect(result.payload.description).toContain('No combat context found');
-    });
-  });
-
-  // ── Early exit: requires shield ─────────────────────────────
-
-  describe('early exits: requires shield', () => {
-    it('returns popup when requiresShield and no shield equipped', async () => {
-      const ps = makePlayerStats({ inventory: { equipped: [] } });
-      const action = makeAction({ requiresShield: true });
-
-      const result = await handle(action, ps, campaignName, mapName);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.description).toContain('holding a Shield');
-      expect(targetResolver.resolveTarget).not.toHaveBeenCalled();
     });
   });
 
@@ -622,7 +689,7 @@ describe('reactionDebuffHandler.handle', () => {
     });
   });
 
-  // ── Disadvantage effect path ────────────────────────────────
+  // ── Disadvantage effect path: disadvantage_on_attack_roll ───
 
   describe('effect: disadvantage_on_attack_roll', () => {
     function setupDisadvantagePath() {
@@ -698,6 +765,41 @@ describe('reactionDebuffHandler.handle', () => {
       expect(result).toHaveProperty('defenderName');
     });
 
+    it('returns popup when out of range', async () => {
+      const ps = makePlayerStats({});
+      const action = makeAction({ effect: 'disadvantage_on_attack_roll', range: '30_ft' });
+
+      targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
+      rangeValidation.rangeToFeet.mockReturnValue(30);
+      targetResolver.resolveMapPositions.mockResolvedValue({
+        attackerPos: { gridX: 0, gridY: 0 },
+        targetPos: { gridX: 20, gridY: 0 },
+      });
+      rangeValidation.getDistanceFeet.mockReturnValue(50);
+
+      const result = await handle(action, ps, campaignName, mapName);
+
+      expect(result.type).toBe('popup');
+      expect(result.payload.description).toContain('out of range');
+    });
+
+    it('uses default range of 30_ft when no range specified', async () => {
+      const ps = makePlayerStats({});
+      const action = makeAction({ effect: 'disadvantage_on_attack_roll' });
+
+      targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
+      rangeValidation.rangeToFeet.mockReturnValue(30);
+      targetResolver.resolveMapPositions.mockResolvedValue({
+        attackerPos: { gridX: 0, gridY: 0 },
+        targetPos: { gridX: 20, gridY: 0 },
+      });
+      rangeValidation.getDistanceFeet.mockReturnValue(50);
+
+      const result = await handle(action, ps, campaignName, mapName);
+
+      expect(result.type).toBe('popup');
+      expect(result.payload.description).toContain('out of range');
+    });
   });
 
   // ── Improved Warding Flare ──────────────────────────────────

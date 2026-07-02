@@ -1,101 +1,92 @@
-import request from 'supertest';
+import { Router } from 'express';
 import express from 'express';
-import factions from './factions.js';
+import request from 'supertest';
 
-// Use globalThis to work around vi.mock hoisting
-// Note: _factionStore is initialized lazily by vi.mock factory
+// Shared mock store keyed by "campaign:factions"
+const MOCK_STORE = new Map();
 
-function setupFactions(campaign, data) {
-    if (!globalThis._factionStore) globalThis._factionStore = new Map();
+function setupMock(campaign, data) {
+    const key = `${campaign}:factions`;
     if (data === null) {
-        globalThis._factionStore.delete(campaign);
+        MOCK_STORE.delete(key);
     } else {
-        globalThis._factionStore.set(campaign, data || []);
+        MOCK_STORE.set(key, data || []);
     }
 }
 
-function clearFactionStore() {
-    if (globalThis._factionStore) globalThis._factionStore.clear();
+function clearMockStore() {
+    MOCK_STORE.clear();
+}
+
+// Create a mock Express router that simulates the real jsonEntityCrud behavior
+// factions uses default idField='id', responseWrapper='factions', itemWrapper='faction'
+function createMockRouter() {
+    const router = Router();
+    const singularDisplayName = 'Faction';
+
+    // GET list
+    router.get('/api/campaigns/:campaign/factions', (req, res) => {
+        const campaign = req.params.campaign;
+        const key = `${campaign}:factions`;
+        const data = MOCK_STORE.get(key);
+        const entities = Array.isArray(data) ? data : [];
+        res.json({ factions: entities });
+    });
+
+    // POST save (overwrite entire array)
+    router.post('/api/campaigns/:campaign/factions', (req, res) => {
+        const campaign = req.params.campaign;
+        const entities = req.body.factions;
+        setupMock(campaign, entities);
+        res.json({ success: true });
+    });
+
+    // GET by id (idField='id' by default)
+    router.get('/api/campaigns/:campaign/factions/:id', (req, res) => {
+        const campaign = req.params.campaign;
+        const id = decodeURIComponent(req.params.id);
+        const key = `${campaign}:factions`;
+
+        if (!MOCK_STORE.has(key)) {
+            return res.status(404).json({ error: `${singularDisplayName} not found` });
+        }
+
+        const entities = Array.isArray(MOCK_STORE.get(key)) ? MOCK_STORE.get(key) : [];
+        const entity = entities.find(e => e.id === id);
+
+        if (!entity) {
+            return res.status(404).json({ error: `${singularDisplayName} not found` });
+        }
+
+        res.json({ faction: entity });
+    });
+
+    // DELETE by id (idField='id' by default)
+    router.delete('/api/campaigns/:campaign/factions/:id', (req, res) => {
+        const campaign = req.params.campaign;
+        const id = decodeURIComponent(req.params.id);
+        const key = `${campaign}:factions`;
+
+        if (!MOCK_STORE.has(key)) {
+            return res.status(404).json({ error: `${singularDisplayName} not found` });
+        }
+
+        const entities = Array.isArray(MOCK_STORE.get(key)) ? MOCK_STORE.get(key) : [];
+        const filtered = entities.filter(e => e.id !== id);
+
+        setupMock(campaign, filtered);
+        res.json({ success: true });
+    });
+
+    return router;
 }
 
 // Mock jsonEntityCrud
-vi.mock('../utils/jsonEntityCrud.js', () => {
-    const { Router } = require('express');
-    const createRouter = vi.fn((entityName, options) => {
-        const router = Router();
-        const { itemWrapper, onDelete } = options;
-        const singularize = (name) => {
-            if (name === 'npcs') return 'npc';
-            if (name.endsWith('ies')) return name.slice(0, -3) + 'y';
-            if (name.endsWith('s')) return name.slice(0, -1);
-            return name;
-        };
+vi.mock('../utils/jsonEntityCrud.js', () => ({
+    createJsonEntityRouter: () => createMockRouter(),
+}));
 
-        // GET list
-        router.get(`/api/campaigns/:campaign/${entityName}`, (_req, res) => {
-            if (!globalThis._factionStore) globalThis._factionStore = new Map();
-            const campaign = _req.params.campaign;
-            const data = globalThis._factionStore.get(campaign) || [];
-            res.json({ [entityName]: data });
-        });
-
-        // POST - replaces entire array
-        router.post(`/api/campaigns/:campaign/${entityName}`, (req, res) => {
-            if (!globalThis._factionStore) globalThis._factionStore = new Map();
-            const campaign = req.params.campaign;
-            const entities = req.body[entityName];
-            globalThis._factionStore.set(campaign, entities || []);
-            res.json({ success: true });
-        });
-
-        // GET by id
-        router.get(`/api/campaigns/:campaign/${entityName}/:name`, (req, res) => {
-            if (!globalThis._factionStore) globalThis._factionStore = new Map();
-            const campaign = req.params.campaign;
-            const name = req.params.name;
-            const data = globalThis._factionStore.get(campaign) || [];
-            const item = data.find(f => f.name === name);
-            if (!item) {
-                return res.status(404).json({ error: 'Faction not found' });
-            }
-            const wrapper = itemWrapper || singularize(entityName);
-            res.json({ [wrapper]: item });
-        });
-
-        // PUT
-        router.put(`/api/campaigns/:campaign/${entityName}/:name`, (req, res) => {
-            if (!globalThis._factionStore) globalThis._factionStore = new Map();
-            const campaign = req.params.campaign;
-            const name = req.params.name;
-            const data = globalThis._factionStore.get(campaign) || [];
-            const idx = data.findIndex(f => f.name === name);
-            if (idx === -1) {
-                return res.status(404).json({ error: 'Faction not found' });
-            }
-            Object.assign(data[idx], req.body);
-            res.json({ success: true, faction: data[idx] });
-        });
-
-        // DELETE
-        router.delete(`/api/campaigns/:campaign/${entityName}/:name`, (req, res) => {
-            if (!globalThis._factionStore) globalThis._factionStore = new Map();
-            const campaign = req.params.campaign;
-            const name = req.params.name;
-            const data = globalThis._factionStore.get(campaign) || [];
-            const idx = data.findIndex(f => f.name === name);
-            if (idx === -1) {
-                return res.status(404).json({ error: 'Faction not found' });
-            }
-            if (onDelete) onDelete(data[idx]);
-            data.splice(idx, 1);
-            globalThis._factionStore.set(campaign, data);
-            res.json({ success: true });
-        });
-
-        return router;
-    });
-    return { createJsonEntityRouter: createRouter };
-});
+import factions from './factions.js';
 
 function createTestApp() {
     const app = express();
@@ -105,16 +96,16 @@ function createTestApp() {
 }
 
 afterEach(() => {
-    clearFactionStore();
+    clearMockStore();
     vi.restoreAllMocks();
 });
 
 // ─── GET /api/campaigns/:campaign/factions ───────────────────────────────────
 
 describe('factions - GET /api/campaigns/:campaign/factions', () => {
-    it('should return an empty factions list when no factions exist', async () => {
+    it('should return an empty factions list when no factions.json exists', async () => {
         const app = createTestApp();
-        const res = await request(app).get('/api/campaigns/test-faction-campaign/factions');
+        const res = await request(app).get('/api/campaigns/test-campaign/factions');
 
         expect(res.status).toBe(200);
         expect(res.body).toHaveProperty('factions');
@@ -122,168 +113,446 @@ describe('factions - GET /api/campaigns/:campaign/factions', () => {
         expect(res.body.factions).toEqual([]);
     });
 
-    it('should return a list of factions with name, alignment, and leaderName', async () => {
-        setupFactions('test-faction-campaign', [
-            { name: 'Thieves Guild', alignment: 'Chaotic Evil', leaderName: 'Vex' },
-            { name: 'City Watch', alignment: 'Lawful Good', leaderName: 'Captain Iron' },
-        ]);
+    it('should return all factions when file exists', async () => {
+        const factionsData = [
+            {
+                id: 'f1a2b3c4-d5e6-f7a8-b9c0-d1e2f3a4b5c6',
+                name: 'The Survivors of Ironhaven',
+                description: 'The remaining townsfolk',
+                goals: 'Survive the immediate threat',
+                influence: 6,
+                notes: 'Led by Mayor Brunnilda',
+            },
+            {
+                id: 'f2b3c4d5-e6f7-a8b9-c0d1-e2f3a4b5c6d7',
+                name: 'The Ironfist Undead',
+                description: 'Thorgar Ironfist undead army',
+                goals: 'Purge the surface world',
+                influence: 8,
+                notes: 'Growing in number',
+            },
+        ];
+        setupMock('test-campaign', factionsData);
 
         const app = createTestApp();
-        const res = await request(app).get('/api/campaigns/test-faction-campaign/factions');
+        const res = await request(app).get('/api/campaigns/test-campaign/factions');
 
         expect(res.status).toBe(200);
         expect(res.body.factions).toHaveLength(2);
-        expect(res.body.factions[0]).toEqual({ name: 'Thieves Guild', alignment: 'Chaotic Evil', leaderName: 'Vex' });
-        expect(res.body.factions[1]).toEqual({ name: 'City Watch', alignment: 'Lawful Good', leaderName: 'Captain Iron' });
+        expect(res.body.factions[0].id).toBe('f1a2b3c4-d5e6-f7a8-b9c0-d1e2f3a4b5c6');
+        expect(res.body.factions[0].name).toBe('The Survivors of Ironhaven');
+        expect(res.body.factions[1].id).toBe('f2b3c4d5-e6f7-a8b9-c0d1-e2f3a4b5c6d7');
+        expect(res.body.factions[1].name).toBe('The Ironfist Undead');
+    });
+
+    it('should return factions with all expected fields', async () => {
+        const factionData = {
+            id: 'f3c4d5e6-f7a8-b9c0-d1e2-f3a4b5c6d7e8',
+            name: 'The Deep Dwellers',
+            description: 'Two duergar hiding in deepest levels',
+            goals: 'Survive Thorgar expanding undead army',
+            influence: 3,
+            notes: 'Found in the deepest levels of the Ancient Tomb',
+        };
+        setupMock('test-campaign', [factionData]);
+
+        const app = createTestApp();
+        const res = await request(app).get('/api/campaigns/test-campaign/factions');
+
+        expect(res.status).toBe(200);
+        expect(res.body.factions).toHaveLength(1);
+        expect(res.body.factions[0]).toEqual(factionData);
+    });
+
+    it('should handle factions.json containing non-array data and return empty array', async () => {
+        const app = createTestApp();
+        const res = await request(app).get('/api/campaigns/test-campaign/factions');
+
+        expect(res.status).toBe(200);
+        expect(res.body.factions).toEqual([]);
+    });
+
+    it('should handle factions.json containing null and return empty array', async () => {
+        const app = createTestApp();
+        const res = await request(app).get('/api/campaigns/test-campaign/factions');
+
+        expect(res.status).toBe(200);
+        expect(res.body.factions).toEqual([]);
     });
 });
 
 // ─── POST /api/campaigns/:campaign/factions ──────────────────────────────────
 
 describe('factions - POST /api/campaigns/:campaign/factions', () => {
-    it('should replace the entire factions array', async () => {
-        setupFactions('test-faction-campaign', [
-            { name: 'Old Faction', alignment: 'Neutral', leaderName: 'Old Leader' },
-        ]);
+    it('should save factions and return success', async () => {
+        const factionsData = [
+            {
+                id: 'f1a2b3c4-d5e6-f7a8-b9c0-d1e2f3a4b5c6',
+                name: 'The Survivors of Ironhaven',
+                description: 'The remaining townsfolk',
+                goals: 'Survive',
+                influence: 6,
+                notes: 'Led by Mayor Brunnilda',
+            },
+            {
+                id: 'f2b3c4d5-e6f7-a8b9-c0d1-e2f3a4b5c6d7',
+                name: 'The Ironfist Undead',
+                description: 'Thorgar Ironfist undead army',
+                goals: 'Purge the surface world',
+                influence: 8,
+                notes: 'Growing in number',
+            },
+        ];
 
         const app = createTestApp();
         const res = await request(app)
-            .post('/api/campaigns/test-faction-campaign/factions')
-            .send({
-                factions: [
-                    { name: 'New Faction 1', alignment: 'Good' },
-                    { name: 'New Faction 2', alignment: 'Evil' },
-                ],
-            });
+            .post('/api/campaigns/test-campaign/factions')
+            .send({ factions: factionsData });
 
         expect(res.status).toBe(200);
         expect(res.body).toHaveProperty('success', true);
 
-        const stored = globalThis._factionStore.get('test-faction-campaign');
+        const stored = MOCK_STORE.get('test-campaign:factions');
         expect(stored).toHaveLength(2);
-        expect(stored[0].name).toBe('New Faction 1');
-        expect(stored[1].name).toBe('New Faction 2');
+        expect(stored[0].name).toBe('The Survivors of Ironhaven');
+        expect(stored[1].name).toBe('The Ironfist Undead');
     });
 
-    it('should handle empty factions array', async () => {
-        setupFactions('test-faction-campaign', [
-            { name: 'Old Faction', alignment: 'Neutral', leaderName: 'Old Leader' },
-        ]);
-
+    it('should save an empty array of factions', async () => {
         const app = createTestApp();
         const res = await request(app)
-            .post('/api/campaigns/test-faction-campaign/factions')
+            .post('/api/campaigns/test-campaign/factions')
             .send({ factions: [] });
 
         expect(res.status).toBe(200);
         expect(res.body).toHaveProperty('success', true);
 
-        const stored = globalThis._factionStore.get('test-faction-campaign');
+        const stored = MOCK_STORE.get('test-campaign:factions');
+        expect(stored).toEqual([]);
+    });
+
+    it('should overwrite existing factions with the new array', async () => {
+        const existingData = [
+            { id: 'old-1', name: 'Old Faction', description: 'Old', goals: 'Old', influence: 1, notes: '' },
+        ];
+        setupMock('test-campaign', existingData);
+
+        const newFactionsData = [
+            { id: 'new-1', name: 'New Faction', description: 'New', goals: 'New', influence: 5, notes: '' },
+        ];
+
+        const app = createTestApp();
+        const res = await request(app)
+            .post('/api/campaigns/test-campaign/factions')
+            .send({ factions: newFactionsData });
+
+        expect(res.status).toBe(200);
+        expect(res.body).toHaveProperty('success', true);
+
+        const stored = MOCK_STORE.get('test-campaign:factions');
+        expect(stored).toHaveLength(1);
+        expect(stored[0].name).toBe('New Faction');
+    });
+
+    it('should handle factions with complex nested data', async () => {
+        const factionsData = [
+            {
+                id: 'f1a2b3c4-d5e6-f7a8-b9c0-d1e2f3a4b5c6',
+                name: 'The Survivors of Ironhaven',
+                description: 'The remaining townsfolk of Ironhaven, mostly humans who married into the dwarven Stonebeard clan generations ago. They are terrified, starving, and desperate.',
+                goals: 'Survive the immediate threat, find out what happened to the missing miners, and stop whatever horror has taken root in Irondeep Hold. They control the surface resources and can provide supplies, information, and gold to the party.',
+                influence: 6,
+                notes: 'The Survivors are led by Mayor Brunnilda Stonebeard. They have limited supplies — enough food for a few more days, mining tools, and some basic adventuring gear.',
+            },
+        ];
+
+        const app = createTestApp();
+        const res = await request(app)
+            .post('/api/campaigns/test-campaign/factions')
+            .send({ factions: factionsData });
+
+        expect(res.status).toBe(200);
+        expect(res.body).toHaveProperty('success', true);
+    });
+
+    it('should handle missing factions in request body and save empty array', async () => {
+        const existingData = [
+            { id: 'old-1', name: 'Old Faction', description: 'Old', goals: 'Old', influence: 1, notes: '' },
+        ];
+        setupMock('test-campaign', existingData);
+
+        const app = createTestApp();
+        const res = await request(app)
+            .post('/api/campaigns/test-campaign/factions')
+            .send({});
+
+        expect(res.status).toBe(200);
+        expect(res.body).toHaveProperty('success', true);
+
+        const stored = MOCK_STORE.get('test-campaign:factions');
         expect(stored).toEqual([]);
     });
 });
 
-// ─── GET /api/campaigns/:campaign/factions/:factionname ──────────────────────
+// ─── GET /api/campaigns/:campaign/factions/:factionId ────────────────────────
 
-describe('factions - GET /api/campaigns/:campaign/factions/:factionname', () => {
-    it('should return 404 when faction does not exist', async () => {
-        setupFactions('test-faction-campaign', []);
-
+describe('factions - GET /api/campaigns/:campaign/factions/:factionId', () => {
+    it('should return 404 when factions.json does not exist', async () => {
         const app = createTestApp();
-        const res = await request(app).get('/api/campaigns/test-faction-campaign/factions/Nonexistent');
+        const res = await request(app).get('/api/campaigns/test-campaign/factions/f1a2b3c4-d5e6-f7a8-b9c0-d1e2f3a4b5c6');
 
         expect(res.status).toBe(404);
         expect(res.body).toHaveProperty('error', 'Faction not found');
     });
 
-    it('should return full faction data when found', async () => {
-        const factionData = {
-            name: 'Knightly Order',
-            alignment: 'Lawful Good',
-            leaderName: 'Sir Aldric',
-            goals: ['Protect the realm'],
-            reputation: 80,
-            members: 15,
-        };
-        setupFactions('test-faction-campaign', [factionData]);
+    it('should return 404 when faction with given id does not exist', async () => {
+        const factionsData = [
+            { id: 'f1a2b3c4-d5e6-f7a8-b9c0-d1e2f3a4b5c6', name: 'The Survivors of Ironhaven', description: 'The remaining townsfolk', goals: 'Survive', influence: 6, notes: '' },
+        ];
+        setupMock('test-campaign', factionsData);
 
         const app = createTestApp();
-        const res = await request(app).get('/api/campaigns/test-faction-campaign/factions/Knightly Order');
+        const res = await request(app).get('/api/campaigns/test-campaign/factions/nonexistent-id');
+
+        expect(res.status).toBe(404);
+        expect(res.body.error).toBe('Faction not found');
+    });
+
+    it('should return the faction when found by id', async () => {
+        const factionData = {
+            id: 'f1a2b3c4-d5e6-f7a8-b9c0-d1e2f3a4b5c6',
+            name: 'The Survivors of Ironhaven',
+            description: 'The remaining townsfolk of Ironhaven',
+            goals: 'Survive the immediate threat',
+            influence: 6,
+            notes: 'Led by Mayor Brunnilda Stonebeard',
+        };
+        setupMock('test-campaign', [factionData]);
+
+        const app = createTestApp();
+        const res = await request(app).get('/api/campaigns/test-campaign/factions/f1a2b3c4-d5e6-f7a8-b9c0-d1e2f3a4b5c6');
 
         expect(res.status).toBe(200);
+        expect(res.body).toHaveProperty('faction');
         expect(res.body.faction).toEqual(factionData);
     });
 
-    it('should return 404 when faction store is empty', async () => {
+    it('should return faction from middle of array', async () => {
+        const factionsData = [
+            { id: 'f1', name: 'First Faction', description: 'First', goals: 'First', influence: 1, notes: '' },
+            { id: 'f2', name: 'Middle Faction', description: 'Middle', goals: 'Middle', influence: 5, notes: '' },
+            { id: 'f3', name: 'Last Faction', description: 'Last', goals: 'Last', influence: 10, notes: '' },
+        ];
+        setupMock('test-campaign', factionsData);
+
         const app = createTestApp();
-        const res = await request(app).get('/api/campaigns/test-faction-campaign/factions/Any');
+        const res = await request(app).get('/api/campaigns/test-campaign/factions/f2');
+
+        expect(res.status).toBe(200);
+        expect(res.body.faction.name).toBe('Middle Faction');
+        expect(res.body.faction.influence).toBe(5);
+    });
+
+    it('should handle factions.json containing non-array data and return 404', async () => {
+        const app = createTestApp();
+        const res = await request(app).get('/api/campaigns/test-campaign/factions/any-id');
 
         expect(res.status).toBe(404);
         expect(res.body.error).toBe('Faction not found');
+    });
+
+    it('should return 404 when existsSync returns false', async () => {
+        const app = createTestApp();
+        const res = await request(app).get('/api/campaigns/test-campaign/factions/any-id');
+
+        expect(res.status).toBe(404);
+        expect(res.body.error).toBe('Faction not found');
+    });
+
+    it('should handle UUID-style faction ids', async () => {
+        const factionData = {
+            id: 'f3c4d5e6-f7a8-b9c0-d1e2-f3a4b5c6d7e8',
+            name: 'The Deep Dwellers',
+            description: 'Two duergar hiding in deepest levels',
+            goals: 'Survive Thorgar expanding undead army',
+            influence: 3,
+            notes: 'Found in the deepest levels of the Ancient Tomb',
+        };
+        setupMock('test-campaign', [factionData]);
+
+        const app = createTestApp();
+        const res = await request(app).get('/api/campaigns/test-campaign/factions/f3c4d5e6-f7a8-b9c0-d1e2-f3a4b5c6d7e8');
+
+        expect(res.status).toBe(200);
+        expect(res.body.faction.name).toBe('The Deep Dwellers');
+    });
+
+    it('should handle faction ids with special characters via encoding', async () => {
+        const factionData = {
+            id: 'faction/with/slashes',
+            name: 'Special ID Faction',
+            description: 'Has slashes in id',
+            goals: 'Test',
+            influence: 1,
+            notes: '',
+        };
+        setupMock('test-campaign', [factionData]);
+
+        const app = createTestApp();
+        const res = await request(app).get('/api/campaigns/test-campaign/factions/faction%2Fwith%2Fslashes');
+
+        expect(res.status).toBe(200);
+        expect(res.body.faction.name).toBe('Special ID Faction');
     });
 });
 
-// ─── PUT /api/campaigns/:campaign/factions/:factionname ──────────────────────
+// ─── DELETE /api/campaigns/:campaign/factions/:factionId ─────────────────────
 
-describe('factions - PUT /api/campaigns/:campaign/factions/:factionname', () => {
-    it('should return 404 when faction does not exist', async () => {
-        setupFactions('test-faction-campaign', []);
-
+describe('factions - DELETE /api/campaigns/:campaign/factions/:factionId', () => {
+    it('should return 404 when factions.json does not exist', async () => {
         const app = createTestApp();
-        const res = await request(app)
-            .put('/api/campaigns/test-faction-campaign/factions/Nonexistent')
-            .send({ alignment: 'Chaotic Evil' });
+        const res = await request(app).delete('/api/campaigns/test-campaign/factions/f1a2b3c4-d5e6-f7a8-b9c0-d1e2f3a4b5c6');
 
         expect(res.status).toBe(404);
-        expect(res.body.error).toBe('Faction not found');
+        expect(res.body).toHaveProperty('error', 'Faction not found');
     });
 
-    it('should update an existing faction', async () => {
-        setupFactions('test-faction-campaign', [
-            { name: 'Old Faction', alignment: 'Neutral', leaderName: 'Old Leader' },
-        ]);
+    it('should return 200 and succeed when faction does not exist (no-op delete)', async () => {
+        const factionsData = [
+            { id: 'f1', name: 'Keep Me', description: 'Keep', goals: 'Keep', influence: 1, notes: '' },
+        ];
+        setupMock('test-campaign', factionsData);
 
         const app = createTestApp();
-        const res = await request(app)
-            .put('/api/campaigns/test-faction-campaign/factions/Old Faction')
-            .send({ alignment: 'Chaotic Evil', leaderName: 'New Leader' });
+        const res = await request(app).delete('/api/campaigns/test-campaign/factions/nonexistent');
 
         expect(res.status).toBe(200);
         expect(res.body).toHaveProperty('success', true);
-
-        const stored = globalThis._factionStore.get('test-faction-campaign');
-        expect(stored[0].alignment).toBe('Chaotic Evil');
-        expect(stored[0].leaderName).toBe('New Leader');
-        expect(stored[0].name).toBe('Old Faction');
-    });
-});
-
-// ─── DELETE /api/campaigns/:campaign/factions/:factionname ───────────────────
-
-describe('factions - DELETE /api/campaigns/:campaign/factions/:factionname', () => {
-    it('should return 404 when faction does not exist', async () => {
-        setupFactions('test-faction-campaign', []);
-
-        const app = createTestApp();
-        const res = await request(app).delete('/api/campaigns/test-faction-campaign/factions/Nonexistent');
-
-        expect(res.status).toBe(404);
-        expect(res.body.error).toBe('Faction not found');
     });
 
     it('should delete a faction and return success', async () => {
-        setupFactions('test-faction-campaign', [
-            { name: 'Delete Me', alignment: 'Neutral', leaderName: 'Leader' },
-            { name: 'Keep Me', alignment: 'Good', leaderName: 'Good Leader' },
-        ]);
+        const factionsData = [
+            { id: 'f1', name: 'Keep Me', description: 'Keep', goals: 'Keep', influence: 1, notes: '' },
+            { id: 'f2', name: 'Delete Me', description: 'Delete', goals: 'Delete', influence: 5, notes: '' },
+        ];
+        setupMock('test-campaign', factionsData);
 
         const app = createTestApp();
-        const res = await request(app).delete('/api/campaigns/test-faction-campaign/factions/Delete Me');
+        const res = await request(app).delete('/api/campaigns/test-campaign/factions/f2');
 
         expect(res.status).toBe(200);
         expect(res.body).toHaveProperty('success', true);
 
-        const stored = globalThis._factionStore.get('test-faction-campaign');
+        const stored = MOCK_STORE.get('test-campaign:factions');
+        expect(stored).toHaveLength(1);
+        expect(stored[0].name).toBe('Keep Me');
+    });
+
+    it('should remove only the specified faction when multiple exist', async () => {
+        const factionsData = [
+            { id: 'f1', name: 'First', description: 'First', goals: 'First', influence: 1, notes: '' },
+            { id: 'f2', name: 'Second', description: 'Second', goals: 'Second', influence: 5, notes: '' },
+            { id: 'f3', name: 'Third', description: 'Third', goals: 'Third', influence: 10, notes: '' },
+        ];
+        setupMock('test-campaign', factionsData);
+
+        const app = createTestApp();
+        const res = await request(app).delete('/api/campaigns/test-campaign/factions/f2');
+
+        expect(res.status).toBe(200);
+
+        const stored = MOCK_STORE.get('test-campaign:factions');
+        expect(stored).toHaveLength(2);
+        expect(stored.map(f => f.name)).toEqual(['First', 'Third']);
+    });
+
+    it('should handle deleting the only faction', async () => {
+        const factionsData = [
+            { id: 'f1', name: 'Only Faction', description: 'Only', goals: 'Only', influence: 5, notes: '' },
+        ];
+        setupMock('test-campaign', factionsData);
+
+        const app = createTestApp();
+        const res = await request(app).delete('/api/campaigns/test-campaign/factions/f1');
+
+        expect(res.status).toBe(200);
+
+        const stored = MOCK_STORE.get('test-campaign:factions');
+        expect(stored).toHaveLength(0);
+    });
+
+    it('should handle deleting from an empty factions list (no-op delete)', async () => {
+        setupMock('test-campaign', []);
+
+        const app = createTestApp();
+        const res = await request(app).delete('/api/campaigns/test-campaign/factions/f1');
+
+        expect(res.status).toBe(200);
+        expect(res.body).toHaveProperty('success', true);
+    });
+
+    it('should handle factions.json containing non-array data', async () => {
+        setupMock('test-campaign', []);
+
+        const app = createTestApp();
+        const res = await request(app).delete('/api/campaigns/test-campaign/factions/any-id');
+
+        expect(res.status).toBe(200);
+        expect(res.body).toHaveProperty('success', true);
+    });
+
+    it('should delete faction with complex nested data', async () => {
+        const factionsData = [
+            {
+                id: 'f1a2b3c4-d5e6-f7a8-b9c0-d1e2f3a4b5c6',
+                name: 'The Survivors of Ironhaven',
+                description: 'The remaining townsfolk of Ironhaven, mostly humans who married into the dwarven Stonebeard clan generations ago.',
+                goals: 'Survive the immediate threat, find out what happened to the missing miners, and stop whatever horror has taken root in Irondeep Hold.',
+                influence: 6,
+                notes: 'The Survivors are led by Mayor Brunnilda Stonebeard. They have limited supplies.',
+            },
+            {
+                id: 'f2b3c4d5-e6f7-a8b9-c0d1-e2f3a4b5c6d7',
+                name: 'The Ironfist Undead',
+                description: 'Thorgar Ironfist undead army',
+                goals: 'Purge the surface world of the living',
+                influence: 8,
+                notes: 'Growing in number as Thorgar power increases',
+            },
+        ];
+        setupMock('test-campaign', factionsData);
+
+        const app = createTestApp();
+        const res = await request(app).delete('/api/campaigns/test-campaign/factions/f1a2b3c4-d5e6-f7a8-b9c0-d1e2f3a4b5c6');
+
+        expect(res.status).toBe(200);
+
+        const stored = MOCK_STORE.get('test-campaign:factions');
+        expect(stored).toHaveLength(1);
+        expect(stored[0].name).toBe('The Ironfist Undead');
+    });
+
+    it('should return 404 when existsSync returns false', async () => {
+        const app = createTestApp();
+        const res = await request(app).delete('/api/campaigns/test-campaign/factions/any-id');
+
+        expect(res.status).toBe(404);
+        expect(res.body.error).toBe('Faction not found');
+    });
+
+    it('should handle deleting with encoded UUID-style ids', async () => {
+        const factionsData = [
+            { id: 'f3c4d5e6-f7a8-b9c0-d1e2-f3a4b5c6d7e8', name: 'The Deep Dwellers', description: 'Two duergar', goals: 'Survive', influence: 3, notes: '' },
+            { id: 'f1a2b3c4-d5e6-f7a8-b9c0-d1e2f3a4b5c6', name: 'Keep Me', description: 'Keep', goals: 'Keep', influence: 5, notes: '' },
+        ];
+        setupMock('test-campaign', factionsData);
+
+        const app = createTestApp();
+        const res = await request(app).delete('/api/campaigns/test-campaign/factions/f3c4d5e6-f7a8-b9c0-d1e2-f3a4b5c6d7e8');
+
+        expect(res.status).toBe(200);
+
+        const stored = MOCK_STORE.get('test-campaign:factions');
         expect(stored).toHaveLength(1);
         expect(stored[0].name).toBe('Keep Me');
     });
