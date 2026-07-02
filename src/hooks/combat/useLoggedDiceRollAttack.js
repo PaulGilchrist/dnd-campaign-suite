@@ -15,7 +15,7 @@ import {
     markAttackerTriggeredMajesty,
 } from '../../services/combat/auras/unbreakableMajesty.js';
 import { getEmpoweredEvocationFeatures, getEmpoweredEvocationIntModifier } from '../../services/rules/spells/postCastRiderService.js';
-import { hasIgnoreResistance } from '../../services/combat/automation/automationService.js';
+import { hasIgnoreResistance, playerIsImmuneToCondition } from '../../services/combat/automation/automationService.js';
 import { addEntry } from '../../services/ui/logService.js';
 import {
     dispatchUnbreakableMajestySave,
@@ -846,6 +846,100 @@ export function createLogAndShow(deps) {
                 timestamp: Date.now(),
                 id: utils.guid(),
             });
+
+            if (context?.autoDamageFormula && saveDc != null) {
+                const damageFormula = context.autoDamageFormula;
+                const damageType = context?.autoDamageDamageType || 'Slashing';
+                const saveConditions = context?.saveConditions || [];
+                const damageResult = rollExpression(damageFormula);
+                if (damageResult) {
+                    let finalDamage;
+                    if (saveSuccess) {
+                        if (context?.dcSuccess === 'half') {
+                            finalDamage = Math.floor(damageResult.total / 2);
+                        } else {
+                            finalDamage = 0;
+                        }
+                    } else {
+                        finalDamage = damageResult.total;
+                    }
+
+                    const attackerChar = (characters || []).find(c => c.name === attackerName);
+                    const ignoreResistance = (attackerChar?.computedStats && hasIgnoreResistance(attackerChar.computedStats, damageType)) || false;
+                    const applyTarget = targetName || characterName;
+                    const combatSummaryForSave = await loadCombatSummary(campaignName);
+                    const applyResult = applyDamageToTarget(combatSummaryForSave, applyTarget, finalDamage, [damageType], campaignName, characters, ignoreResistance, attackerName);
+
+                    logEntry({
+                        type: 'roll',
+                        characterName: attackerName,
+                        rollType: 'save-damage',
+                        name: actionName,
+                        formula: damageFormula,
+                        rolls: damageResult.rolls,
+                        total: finalDamage,
+                        modifier: damageResult.modifier,
+                        damageType: damageType,
+                        targetName: applyTarget,
+                        finalDamage: applyResult?.finalDamage,
+                        saveSuccess,
+                        timestamp: Date.now(),
+                        id: utils.guid(),
+                    });
+
+                    setPopupHtml({
+                        type: 'save-damage',
+                        name: actionName,
+                        formula: damageFormula,
+                        rolls: damageResult.rolls,
+                        total: applyResult?.finalDamage,
+                        bonus: 0,
+                        modifier: damageResult.modifier,
+                        damageType: damageType,
+                        targetName: applyTarget,
+                        targetCurrentHp: applyResult?.newHp,
+                        targetMaxHp: targetName ? (target?.type === 'player' ? (getRuntimeValue(targetName, 'hitPoints') ?? 0) : target?.maxHp ?? 0) : undefined,
+                        saveDc,
+                        saveType,
+                        dcSuccess: context?.dcSuccess,
+                        saveResult: saveSuccess ? 'success' : 'failure',
+                        finalDamage: applyResult?.finalDamage,
+                        damageApplied: true,
+                        damageReduced: applyResult?.damageReduced,
+                    });
+
+                    if (saveConditions.length > 0 && !saveSuccess) {
+                        const targetChar = (characters || []).find(c => c.name === applyTarget);
+                        const targetStats = targetChar?.computedStats || targetChar;
+                        const isImmune = targetStats && playerIsImmuneToCondition({
+                            conditionKey: saveConditions[0],
+                            playerStats: targetStats,
+                            getRuntimeValue,
+                            campaignName,
+                        });
+                        if (!isImmune) {
+                            const currentConditions = getRuntimeValue(applyTarget, 'activeConditions') || [];
+                            const newConditions = [...currentConditions];
+                            for (const cond of saveConditions) {
+                                if (!newConditions.some(c => String(c).toLowerCase() === cond)) {
+                                    newConditions.push(cond);
+                                }
+                            }
+                            setRuntimeValue(applyTarget, 'activeConditions', newConditions, campaignName);
+                            const conditionNames = saveConditions.map(c => c.charAt(0).toUpperCase() + c.slice(1));
+                            addEntry(campaignName, {
+                                type: 'condition',
+                                action: 'applied',
+                                characterName: applyTarget,
+                                condition: conditionNames.join(', '),
+                                sourceName: attackerName,
+                                sourceAbility: actionName,
+                                timestamp: Date.now(),
+                            }).catch(() => { });
+                        }
+                    }
+                }
+            }
         }
 
         if (rollType === 'initiative') {

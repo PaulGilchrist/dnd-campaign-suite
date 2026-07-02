@@ -24,8 +24,22 @@ function toAbbr(name) {
 function extractDamageDiceFromDescription(description, existingDamageDice) {
   if (existingDamageDice) return existingDamageDice;
   if (!description) return null;
-  const hitMatch = description.match(/Hit:\s*\d+\s*\((\d+d\d+(?:\s*[+-]\s*\d+)?)\)/i);
+  const hitMatch = description.match(/(?:Hit|Failure|Success):\s*\d+\s*\((\d+d\d+(?:\s*[+-]\s*\d+)?)\)/i);
   return hitMatch ? hitMatch[1].replace(/\s+/g, ' ').trim() : null;
+}
+
+const CONDITIONS = ['blinded', 'charmed', 'cursed', 'deafened', 'frightened', 'grappled', 'incapacitated', 'paralyzed', 'petrified', 'poisoned', 'prone', 'restrained', 'stunned', 'unconscious'];
+
+function extractConditionsFromDescription(description) {
+  if (!description || typeof description !== 'string') return [];
+  const found = [];
+  for (const condition of CONDITIONS) {
+    const regex = new RegExp(`\\b${condition}\\b`, 'i');
+    if (regex.test(description)) {
+      found.push(condition);
+    }
+  }
+  return found;
 }
 
 function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureName, mapName, characters }) {
@@ -306,39 +320,40 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
   const handleInitiative = (bonus) => rollInitiative(bonus);
 
   const renderAction = (action, i) => {
-    const damageTypes = getDamageTypesForAction(action);
-    const effectiveDamageDice = extractDamageDiceFromDescription(action?.description, action?.damage_dice_primary);
-    const damageOptions = effectiveDamageDice ? effectiveDamageDice.split(/\s+or\s+/) : null;
-    const hasDamageOptions = damageOptions && damageOptions.length > 1;
-
-    const renderDamageDice = (formula, type) => {
-      return (
-        <span className="mc-dice-link" onClick={() => handleDamage(action.name, formula, type, action)} role="button" tabIndex={0}>
-          <i className="fa-solid fa-dice" /> {formula}
-        </span>
-      );
-    };
+    const actionHasSave = action.save_dc != null;
+    const actionHasAttack = action.attack_bonus != null;
+    const actionDamageFormula = extractDamageDiceFromDescription(action?.description, action?.damage_dice_primary);
+    const actionDamageType = getDamageTypesForAction(action)[0] || null;
+    const actionHasSecondaryDamage = action.damage_dice_secondary != null;
 
     return (
     <div key={i} className={`mc-action ${attackerCannotAct ? 'mc-action-disabled' : ''}`}>
       <strong>{action.name}.</strong>{' '}
       {attackerCannotAct && <span className="mc-incapacitated-label">(Incapacitated)</span>}
-      {action.attack_bonus != null && !attackerCannotAct && (
+      {actionHasAttack && !attackerCannotAct && (
         <span className="mc-dice-link" onClick={() => handleAttack(action.name, action.attack_bonus, action)} role="button" tabIndex={0}>
           <i className="fa-solid fa-dice-d20" /> +{action.attack_bonus}
         </span>
       )}
-      {hasDamageOptions ? (
-        damageOptions.map((option, idx) => (
-          <span key={idx} className="mc-dice-link" onClick={() => handleDamage(action.name, option.trim(), formatDamageTypes(damageTypes), action)} role="button" tabIndex={0}>
-            <i className="fa-solid fa-dice" /> {option.trim()}
-          </span>
-        ))
-      ) : null}
-      {effectiveDamageDice && !hasDamageOptions ? renderDamageDice(effectiveDamageDice, formatDamageTypes([action.damage_type_primary || ''])) : null}
-      {action.damage_dice_secondary ? renderDamageDice(action.damage_dice_secondary, formatDamageTypes([action.damage_type_secondary || ''])) : null}
-      {action.save_dc != null && (
-        <span className={`mc-dice-link ${!action.attack_bonus && !attackerCannotAct ? 'mc-dice-link-save mc-dice-link-save-clickable' : 'mc-dice-link-save'}`} onClick={!action.attack_bonus && !attackerCannotAct ? () => {
+      {!actionHasAttack && !actionHasSave && (actionDamageFormula || actionHasSecondaryDamage) && (
+        <>
+          {actionDamageFormula && (
+            <span className="mc-dice-link" onClick={() => handleDamage(action.name, actionDamageFormula, actionDamageType ? formatDamageTypes([actionDamageType]) : '', action)} role="button" tabIndex={0}>
+              <i className="fa-solid fa-dice" /> {actionDamageFormula}
+            </span>
+          )}
+          {actionHasSecondaryDamage && (
+            <span className="mc-dice-link" onClick={() => handleDamage(action.name, action.damage_dice_secondary, action.damage_type_primary ? formatDamageTypes([action.damage_type_primary]) : '', action)} role="button" tabIndex={0}>
+              <i className="fa-solid fa-dice" /> {action.damage_dice_secondary}
+            </span>
+          )}
+        </>
+      )}
+      {actionHasSave && (() => {
+        const saveDamageFormula = extractDamageDiceFromDescription(action?.description, action?.damage_dice_primary);
+        const saveDamageType = getDamageTypesForAction(action)[0] || null;
+        const saveConditions = extractConditionsFromDescription(action?.description);
+        const handleSaveRoll = () => {
           const target = getTarget();
           const saveMod = getSaveModifierForSaveType(action.save_type, target, characters, creatures);
           rollSavingThrow(saveAbilityAbbr(action.save_type), saveMod, {
@@ -348,11 +363,24 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
             saveDc: action.save_dc,
             saveType: action.save_type,
             dcSuccess: action.save_dc != null ? 'half' : null,
+            autoDamageFormula: saveDamageFormula,
+            autoDamageDamageType: saveDamageType ? formatDamageTypes([saveDamageType]) : null,
+            autoDamageName: action.name,
+            saveConditions: saveConditions,
           });
-        } : undefined} role="button" tabIndex={0}>
-          DC {action.save_dc} {action.save_type}
-        </span>
-      )}
+        };
+        return (
+          saveDamageFormula ? (
+            <span className="mc-dice-link" role="button" tabIndex={0} onClick={handleSaveRoll}>
+              <i className="fa-solid fa-dice" /> {saveDamageFormula}
+            </span>
+          ) : (
+            <span className={`mc-dice-link ${!action.attack_bonus && !attackerCannotAct ? 'mc-dice-link-save mc-dice-link-save-clickable' : 'mc-dice-link-save'}`} onClick={!action.attack_bonus && !attackerCannotAct ? handleSaveRoll : undefined} role="button" tabIndex={0}>
+              DC {action.save_dc} {action.save_type}
+            </span>
+          )
+        );
+      })()}
       <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(action.description) }} />
       {action.usage && <em> ({action.usage})</em>}
       {action.recharge && <em> ({action.recharge})</em>}
