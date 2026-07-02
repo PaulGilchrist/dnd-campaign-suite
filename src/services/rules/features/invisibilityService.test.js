@@ -1,6 +1,7 @@
 // @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { endInvisibilityOnHostileAction } from './invisibilityService.js';
+import { getActiveBuffs } from '../../automation/common/buffToggle.js';
 
 vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
     getRuntimeValue: vi.fn(),
@@ -16,7 +17,6 @@ vi.mock('../../ui/logService.js', () => ({
 }));
 
 const { getRuntimeValue, setRuntimeValue } = await import('../../../hooks/runtime/useRuntimeState.js');
-const { getActiveBuffs } = await import('../../automation/common/buffToggle.js');
 const { addEntry } = await import('../../ui/logService.js');
 
 describe('invisibilityService', () => {

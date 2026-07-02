@@ -7,6 +7,7 @@ import { hasIgnoreResistance } from '../../../combat/automation/automationServic
 import { endInvisibilityOnHostileAction } from '../../../rules/features/invisibilityService.js';
 import { getCombatSummary } from '../../../encounters/combatData.js';
 import { buildSaveDc } from '../../common/savePrompt.js';
+import storage from '../../../../services/ui/storage.js';
 
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
@@ -263,8 +264,7 @@ export async function confirmRadianceOfDawn(action, playerStats, campaignName, s
 
     // Save combat summary and notify
     if (combatSummary) {
-        const storage = await import('../../../../services/ui/storage.js');
-        storage.default.set('combatSummary', combatSummary, campaignName);
+        storage.set('combatSummary', combatSummary, campaignName);
         window.dispatchEvent(new CustomEvent('combat-summary-updated'));
     }
 

@@ -17,6 +17,7 @@ import { computeFeatRangeEffects } from '../../services/character/featRangeServi
 import { hasAutomation } from '../../services/combat/automation/automationService.js'
 import { isExhausted } from '../../services/automation/handlers/combat/saveAttackHandler.js'
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
+import { toggleBuff } from '../../services/automation/common/buffToggle.js';
 import { postLogEntry } from '../../services/shared/logPoster.js';
 import { SHOW_DICE_ROLL_DELAY } from '../../config/ui-config.js';
 import CharActionModals from './CharActionModals.jsx'
@@ -1025,7 +1026,6 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
 
         const resolvedTarget = targetName || playerStats.name;
 
-        const { toggleBuff } = await import('../../services/automation/common/buffToggle.js');
         const { wasActive } = toggleBuff(
             resolvedTarget,
             featureName,

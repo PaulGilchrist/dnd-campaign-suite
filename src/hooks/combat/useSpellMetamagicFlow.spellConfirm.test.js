@@ -7,6 +7,7 @@ import { getCombatSummary } from '../../services/encounters/combatData.js';
 import { getMultiTargetSpreadForSpell } from '../../services/rules/spells/postCastRiderService.js';
 import { isPsionicSpell, hasPsionicSorcery } from '../../services/rules/spells/metamagicRules.js';
 import { confirmRemoveCurse } from '../../services/rules/features/removeCurseService.js';
+import { confirmGreaterRestoration } from '../../services/rules/features/greaterRestorationService.js';
 import { spendSorceryPoints } from './useMetamagic.js';
 
 vi.mock('./useMetamagic.js', () => ({
@@ -414,7 +415,6 @@ describe('useSpellMetamagicFlow — handleGreaterRestoration', () => {
 
   it('applies greater restoration effect, logs entry, and clears pending on confirm', async () => {
     const { result, onExecute } = setup();
-    const restorationService = await import('../../services/rules/features/greaterRestorationService.js');
 
     await act(async () => {
       await result.current.handleGreaterRestorationConfirm({ targetName: 'Goblin A' });
@@ -430,7 +430,7 @@ describe('useSpellMetamagicFlow — handleGreaterRestoration', () => {
       spCost: 0,
       timestamp: expect.any(Number),
     });
-    expect(restorationService.confirmGreaterRestoration).toHaveBeenCalled();
+    expect(confirmGreaterRestoration).toHaveBeenCalled();
     expect(onExecute).not.toHaveBeenCalled();
     expect(result.current.pendingGreaterRestoration).toBeNull();
   });
@@ -451,8 +451,7 @@ describe('useSpellMetamagicFlow — handleGreaterRestoration', () => {
 
   it('re-throws when confirmGreaterRestoration rejects', async () => {
     const { result } = setup();
-    const restorationService = await import('../../services/rules/features/greaterRestorationService.js');
-    restorationService.confirmGreaterRestoration.mockRejectedValueOnce(new Error('boom'));
+    confirmGreaterRestoration.mockRejectedValueOnce(new Error('boom'));
 
     await expect(
       act(async () => {
