@@ -146,10 +146,11 @@ export const WIZARD_STEPS = [
     step: 10,
     title: 'Magic Items',
     component: WizardStepMagicItems,
-    getProps: ({ formData, allMagicItems, ruleset, onArrayFieldChange }) => ({
+    getProps: ({ formData, allMagicItems, ruleset, classSubtypes, onArrayFieldChange }) => ({
       formData,
       allMagicItems,
       ruleset,
+      classSubtypes,
       onArrayFieldChange,
     }),
   },

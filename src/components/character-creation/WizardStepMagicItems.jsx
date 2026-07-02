@@ -1,14 +1,54 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import SelectableList from './SelectableList.jsx';
 import WarningList from '../common/WarningList.jsx';
 import { sanitizeHtml } from '../../services/ui/sanitize.js';
 import './WizardStepMagicItems.css';
-function WizardStepMagicItems({ formData, allMagicItems, onArrayFieldChange }) {
-  const [warnings, setWarnings] = useState([]);
-    // Check for attunement limit warnings
+
+const BASE_ATTUNEMENT_LIMIT = 3;
+
+function calculateAttunementLimit(formData, classSubtypes) {
+    if (!formData?.class?.name || !classSubtypes) {
+        return BASE_ATTUNEMENT_LIMIT;
+    }
+
+    const selectedClass = classSubtypes.find(cs => cs.className === formData.class.name);
+    if (!selectedClass) {
+        return BASE_ATTUNEMENT_LIMIT;
+    }
+
+    const subclassName = formData.class.subclass?.name;
+    if (!subclassName) {
+        return BASE_ATTUNEMENT_LIMIT;
+    }
+
+    const subclass = selectedClass.subtypes?.find(s => s.name === subclassName);
+    if (!subclass) {
+        return BASE_ATTUNEMENT_LIMIT;
+    }
+
+    const characterLevel = formData.level || 1;
+
+    const hasUseMagicDevice = subclass.class_levels?.some(cl => {
+        return cl.features?.some(f => f.name === 'Use Magic Device' && cl.level <= characterLevel);
+    });
+
+    if (hasUseMagicDevice) {
+        return BASE_ATTUNEMENT_LIMIT + 1;
+    }
+
+    return BASE_ATTUNEMENT_LIMIT;
+}
+
+function WizardStepMagicItems({ formData, allMagicItems, classSubtypes, onArrayFieldChange }) {
+    const [warnings, setWarnings] = useState([]);
+
+    const maxAttunement = useMemo(() => {
+        return calculateAttunementLimit(formData, classSubtypes);
+    }, [formData, classSubtypes]);
+
     useEffect(() => {
         const warnings = [];
-	const selectedItems = formData.inventory?.magicItems || [];
+        const selectedItems = formData.inventory?.magicItems || [];
 
         if (selectedItems.length > 0 && allMagicItems) {
             const attunementItems = selectedItems.filter(itemName => {
@@ -16,19 +56,18 @@ function WizardStepMagicItems({ formData, allMagicItems, onArrayFieldChange }) {
                 return item && item.requiresAttunement;
             });
 
-            if (attunementItems.length > 3) {
+            if (attunementItems.length > maxAttunement) {
                 warnings.push({
-                    message: `You have selected ${attunementItems.length} items requiring attunement, but a character can only attune to a maximum of 3 items.`,
+                    message: `You have selected ${attunementItems.length} items requiring attunement, but a character can only attune to a maximum of ${maxAttunement} items.`,
                     type: 'warning'
                 });
             }
         }
 
         setWarnings(warnings);
-	}, [formData.inventory?.magicItems, allMagicItems]);
+    }, [formData.inventory?.magicItems, allMagicItems, maxAttunement]);
 
-      // Render item function
-  const renderItem = (item, index, { isSelected, isExpanded, onToggle, onToggleExpand }) => {
+    const renderItem = (item, index, { isSelected, isExpanded, onToggle, onToggleExpand }) => {
         const uniqueKey = item.index || index;
 
         return (
@@ -46,6 +85,7 @@ function WizardStepMagicItems({ formData, allMagicItems, onArrayFieldChange }) {
                         <div className="list-item-name">{item.name}</div>
                         {item.type && <span className="magic-item-type">{item.type}</span>}
                         {item.rarity && <span className="magic-item-rarity">{item.rarity}</span>}
+                        {item.requiresAttunement && <span className="magic-item-attunement">requires attunement</span>}
                         <div
                             className={`list-item-checkbox ${isSelected ? 'checked' : ''} list-item-checkbox-trigger`}
                             onClick={(e) => {
@@ -96,10 +136,9 @@ function WizardStepMagicItems({ formData, allMagicItems, onArrayFieldChange }) {
         );
     };
 
-     // Filter configuration
-   const filters = [
-           { label: 'Item Type', field: 'type', className: 'magic-item-type-filter' }
-         ];
+    const filters = [
+            { label: 'Item Type', field: 'type', className: 'magic-item-type-filter' }
+          ];
 
     return (
              <SelectableList
@@ -120,4 +159,3 @@ function WizardStepMagicItems({ formData, allMagicItems, onArrayFieldChange }) {
 }
 
 export default WizardStepMagicItems;
-

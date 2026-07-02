@@ -73,6 +73,7 @@ const WizardStepRenderer = React.memo(({
   featAbilityChoices,
   featAbilityAssignments,
   handleFeatAbilityChoice,
+  allClasses: _allClasses,
 }) => {
   const stepConfig = WIZARD_STEPS.find((step) => step.step === currentStep);
   if (!stepConfig) {
@@ -86,7 +87,7 @@ const WizardStepRenderer = React.memo(({
     formData,
     backgrounds,
     racesData,
-    classSubtypes,
+    classSubtypes: classSubtypes,
     allClasses,
     feats,
     magicItems,

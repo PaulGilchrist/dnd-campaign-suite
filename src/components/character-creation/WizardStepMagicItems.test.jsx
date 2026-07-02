@@ -501,6 +501,249 @@ describe('WizardStepMagicItems', () => {
         screen.getByText(/You have selected 5 items requiring attunement/),
       ).toBeInTheDocument();
     });
+
+    it('displays a warning with limit of 4 when character is Thief Rogue level 13+ and exceeds limit', () => {
+      const thiefClassSubtypes = [
+        {
+          className: 'Rogue',
+          subtypes: [
+            {
+              name: 'Thief',
+              class_levels: [
+                { level: 3, features: [{ name: 'Fast Hands' }] },
+                { level: 9, features: [{ name: 'Supreme Sneak' }] },
+                { level: 13, features: [{ name: 'Use Magic Device' }] },
+                { level: 17, features: [{ name: "Thief's Reflexes" }] },
+              ],
+            },
+          ],
+        },
+      ];
+
+      const attunedItems = [
+        { name: 'Boots', requiresAttunement: true },
+        { name: 'Cloak', requiresAttunement: true },
+        { name: 'Gloves', requiresAttunement: true },
+        { name: 'Ring', requiresAttunement: true },
+        { name: 'Amulet', requiresAttunement: true },
+      ];
+
+      render(
+        <WizardStepMagicItems
+          {...createProps({
+            formData: {
+              class: { name: 'Rogue', subclass: { name: 'Thief' } },
+              level: 13,
+              inventory: {
+                magicItems: ['Boots', 'Cloak', 'Gloves', 'Ring', 'Amulet'],
+              },
+            },
+            allMagicItems: attunedItems,
+            classSubtypes: thiefClassSubtypes,
+          })}
+        />,
+      );
+
+      const warningText =
+        'You have selected 5 items requiring attunement, but a character can only attune to a maximum of 4 items.';
+      expect(screen.getByText(warningText)).toBeInTheDocument();
+    });
+
+    it('does not display a warning when 4 attuned items are selected for Thief Rogue level 13+', () => {
+      const thiefClassSubtypes = [
+        {
+          className: 'Rogue',
+          subtypes: [
+            {
+              name: 'Thief',
+              class_levels: [
+                { level: 13, features: [{ name: 'Use Magic Device' }] },
+              ],
+            },
+          ],
+        },
+      ];
+
+      const attunedItems = [
+        { name: 'Boots', requiresAttunement: true },
+        { name: 'Cloak', requiresAttunement: true },
+        { name: 'Gloves', requiresAttunement: true },
+        { name: 'Ring', requiresAttunement: true },
+      ];
+
+      render(
+        <WizardStepMagicItems
+          {...createProps({
+            formData: {
+              class: { name: 'Rogue', subclass: { name: 'Thief' } },
+              level: 13,
+              inventory: {
+                magicItems: ['Boots', 'Cloak', 'Gloves', 'Ring'],
+              },
+            },
+            allMagicItems: attunedItems,
+            classSubtypes: thiefClassSubtypes,
+          })}
+        />,
+      );
+
+      expect(
+        screen.queryByText(/maximum of 4 items/),
+      ).not.toBeInTheDocument();
+    });
+
+    it('uses limit of 3 for non-Thief subclasses', () => {
+      const assassinClassSubtypes = [
+        {
+          className: 'Rogue',
+          subtypes: [
+            {
+              name: 'Assassin',
+              class_levels: [
+                { level: 3, features: [{ name: 'Assassinate' }] },
+                { level: 9, features: [{ name: 'Infiltration Attacks' }] },
+                { level: 13, features: [{ name: 'Impostor' }] },
+                { level: 17, features: [{ name: 'Operation: Syke' }] },
+              ],
+            },
+          ],
+        },
+      ];
+
+      const attunedItems = [
+        { name: 'Boots', requiresAttunement: true },
+        { name: 'Cloak', requiresAttunement: true },
+        { name: 'Gloves', requiresAttunement: true },
+        { name: 'Ring', requiresAttunement: true },
+      ];
+
+      render(
+        <WizardStepMagicItems
+          {...createProps({
+            formData: {
+              class: { name: 'Rogue', subclass: { name: 'Assassin' } },
+              level: 13,
+              inventory: {
+                magicItems: ['Boots', 'Cloak', 'Gloves', 'Ring'],
+              },
+            },
+            allMagicItems: attunedItems,
+            classSubtypes: assassinClassSubtypes,
+          })}
+        />,
+      );
+
+      const warningText =
+        'You have selected 4 items requiring attunement, but a character can only attune to a maximum of 3 items.';
+      expect(screen.getByText(warningText)).toBeInTheDocument();
+    });
+
+    it('uses limit of 3 when classSubtypes is not provided', () => {
+      const attunedItems = [
+        { name: 'Boots', requiresAttunement: true },
+        { name: 'Cloak', requiresAttunement: true },
+        { name: 'Gloves', requiresAttunement: true },
+        { name: 'Ring', requiresAttunement: true },
+      ];
+
+      render(
+        <WizardStepMagicItems
+          {...createProps({
+            formData: {
+              class: { name: 'Rogue', subclass: { name: 'Thief' } },
+              level: 13,
+              inventory: {
+                magicItems: ['Boots', 'Cloak', 'Gloves', 'Ring'],
+              },
+            },
+            allMagicItems: attunedItems,
+            classSubtypes: null,
+          })}
+        />,
+      );
+
+      const warningText =
+        'You have selected 4 items requiring attunement, but a character can only attune to a maximum of 3 items.';
+      expect(screen.getByText(warningText)).toBeInTheDocument();
+    });
+
+    it('uses limit of 3 when character level is below 13 for Thief', () => {
+      const thiefClassSubtypes = [
+        {
+          className: 'Rogue',
+          subtypes: [
+            {
+              name: 'Thief',
+              class_levels: [
+                { level: 13, features: [{ name: 'Use Magic Device' }] },
+              ],
+            },
+          ],
+        },
+      ];
+
+      const attunedItems = [
+        { name: 'Boots', requiresAttunement: true },
+        { name: 'Cloak', requiresAttunement: true },
+        { name: 'Gloves', requiresAttunement: true },
+        { name: 'Ring', requiresAttunement: true },
+      ];
+
+      render(
+        <WizardStepMagicItems
+          {...createProps({
+            formData: {
+              class: { name: 'Rogue', subclass: { name: 'Thief' } },
+              level: 9,
+              inventory: {
+                magicItems: ['Boots', 'Cloak', 'Gloves', 'Ring'],
+              },
+            },
+            allMagicItems: attunedItems,
+            classSubtypes: thiefClassSubtypes,
+          })}
+        />,
+      );
+
+      const warningText =
+        'You have selected 4 items requiring attunement, but a character can only attune to a maximum of 3 items.';
+      expect(screen.getByText(warningText)).toBeInTheDocument();
+    });
+  });
+
+  describe('attunement badge', () => {
+    it('renders attunement badge on items that require attunement', () => {
+      render(<WizardStepMagicItems {...createProps()} />);
+      expect(screen.getByText('requires attunement')).toBeInTheDocument();
+    });
+
+    it('does not render attunement badge on items that do not require attunement', () => {
+      const nonAttunedItems = [
+        {
+          name: 'Wand of Magic',
+          index: 'wand',
+          type: 'Rod',
+          rarity: 'Uncommon',
+          description: '<p>A magic wand.</p>',
+          requiresAttunement: false,
+        },
+      ];
+
+      render(
+        <WizardStepMagicItems
+          {...createProps({
+            formData: {
+              inventory: {
+                magicItems: ['Wand of Magic'],
+              },
+            },
+            allMagicItems: nonAttunedItems,
+          })}
+        />,
+      );
+
+      expect(screen.queryByText('requires attunement')).not.toBeInTheDocument();
+    });
   });
 
   describe('item selection', () => {

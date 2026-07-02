@@ -89,6 +89,7 @@ html {
     --background-color-feat-type: #6c757d;
     --background-color-magic-item-type: #8b9bb4;
     --background-color-magic-item-rarity: #a67c52;
+    --background-color-magic-item-attunement: #6f42c1;
     --background-color-item-tag: #e9ecef;
     --background-color-item-tag-more: #ffc107;
     --background-color-category-filter: #333;
@@ -345,6 +346,7 @@ th {
     --background-color-feat-type: #6c757d;
     --background-color-magic-item-type: #8b758d;
     --background-color-magic-item-rarity: #8b5a2b;
+    --background-color-magic-item-attunement: #9b59b6;
     --background-color-item-tag: #e9ecef;
     --background-color-item-tag-more: #ffc107;
     --background-color-category-filter: #e9ecef;

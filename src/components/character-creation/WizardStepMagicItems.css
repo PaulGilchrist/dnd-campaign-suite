@@ -47,6 +47,18 @@
     margin-left: 0.25rem;
 }
 
+/* Magic Item Attunement Badge */
+.wizard-step-magic-items .magic-item-attunement {
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    margin-right: 0.5rem;
+    background-color: var(--background-color-magic-item-attunement);
+    color: var(--color-text-inverse);
+    margin-left: 0.25rem;
+}
+
 /* Magic Item Description */
 .wizard-step-magic-items .magic-item-description {
     font-size: 0.9rem;
@@ -115,11 +127,12 @@
 
 @media (max-width: 768px) {
      .wizard-step-magic-items .magic-item-type,
-     .wizard-step-magic-items .magic-item-rarity {
-        display: inline-block;
-        margin-right: 0.5rem;
-        margin-left: 0;
-    }
+     .wizard-step-magic-items .magic-item-rarity,
+     .wizard-step-magic-items .magic-item-attunement {
+         display: inline-block;
+         margin-right: 0.5rem;
+         margin-left: 0;
+     }
 }
 /* ===== MIN-HEIGHT OVERRIDE FOR MAGIC ITEMS STEP ===== */
 /* Removed: min-height override was causing layout issues */
