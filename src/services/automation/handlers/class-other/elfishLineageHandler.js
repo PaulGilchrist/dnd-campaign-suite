@@ -8,9 +8,9 @@ const LINEAGE_ABILITY_KEY = '_elfishLineageAbility';
 const LINEAGE_WIZARD_CANTRIP_KEY = '_elfishLineageWizardCantrip';
 
 const ELVEN_LINEAGES = [
-    { name: 'Drow', description: 'Darkvision 120 ft. + Dancing Lights cantrip. Level 3: Faerie Fire. Level 5: Darkness.', spellcastingAbility: 'Charisma', icon: 'fa-d' },
-    { name: 'High Elf', description: 'Prestidigitation cantrip (swappable with Wizard cantrips on Long Rest). Level 3: Detect Magic. Level 5: Misty Step.', spellcastingAbility: 'Intelligence', icon: 'fa-star' },
-    { name: 'Wood Elf', description: 'Speed 35 ft. + Druidcraft cantrip. Level 3: Longstrider. Level 5: Pass Without Trace.', spellcastingAbility: 'Wisdom', icon: 'fa-tree' },
+    { name: 'Drow', description: 'Darkvision 120 ft. + Dancing Lights cantrip. Level 3: Faerie Fire. Level 5: Darkness.', spellcastingAbility: 'Charisma', icon: 'fa-d', cantrip: 'Dancing Lights', level3Spell: 'Faerie Fire', level5Spell: 'Darkness' },
+    { name: 'High Elf', description: 'Prestidigitation cantrip (swappable with Wizard cantrips on Long Rest). Level 3: Detect Magic. Level 5: Misty Step.', spellcastingAbility: 'Intelligence', icon: 'fa-star', cantrip: 'Prestidigitation', level3Spell: 'Detect Magic', level5Spell: 'Misty Step', wizardCantripSwap: true },
+    { name: 'Wood Elf', description: 'Speed 35 ft. + Druidcraft cantrip. Level 3: Longstrider. Level 5: Pass Without Trace.', spellcastingAbility: 'Wisdom', icon: 'fa-tree', cantrip: 'Druidcraft', level3Spell: 'Longstrider', level5Spell: 'Pass Without Trace' },
 ];
 
 export async function handle(action, playerStats, campaignName, _mapName) {

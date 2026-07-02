@@ -111,9 +111,27 @@ describe('elfishLineageHandler', () => {
                 'Charisma',
                 'test-campaign'
             );
+            expect(setRuntimeValue).toHaveBeenCalledWith(
+                'TestHero',
+                '_elfishLineageCantrip',
+                'Dancing Lights',
+                'test-campaign'
+            );
+            expect(setRuntimeValue).toHaveBeenCalledWith(
+                'TestHero',
+                '_elfishLineageLevel3',
+                'Faerie Fire',
+                'test-campaign'
+            );
+            expect(setRuntimeValue).toHaveBeenCalledWith(
+                'TestHero',
+                '_elfishLineageLevel5',
+                'Darkness',
+                'test-campaign'
+            );
         });
 
-        it('stores High Elf lineage and sets Intelligence ability (no wizard cantrip swap since wizardCantripSwap is not set)', async () => {
+        it('stores High Elf lineage and sets Intelligence ability with wizard cantrip swap', async () => {
             const result = await confirmElfisLineage(makePlayerStats(), 'High Elf', 'test-campaign');
 
             expect(result.type).toBe('popup');
@@ -132,10 +150,28 @@ describe('elfishLineageHandler', () => {
                 'Intelligence',
                 'test-campaign'
             );
-            expect(setRuntimeValue).not.toHaveBeenCalledWith(
+            expect(setRuntimeValue).toHaveBeenCalledWith(
+                'TestHero',
+                '_elfishLineageCantrip',
+                'Prestidigitation',
+                'test-campaign'
+            );
+            expect(setRuntimeValue).toHaveBeenCalledWith(
+                'TestHero',
+                '_elfishLineageLevel3',
+                'Detect Magic',
+                'test-campaign'
+            );
+            expect(setRuntimeValue).toHaveBeenCalledWith(
+                'TestHero',
+                '_elfishLineageLevel5',
+                'Misty Step',
+                'test-campaign'
+            );
+            expect(setRuntimeValue).toHaveBeenCalledWith(
                 'TestHero',
                 '_elfishLineageWizardCantrip',
-                expect.anything(),
+                'Prestidigitation',
                 'test-campaign'
             );
         });
@@ -157,6 +193,24 @@ describe('elfishLineageHandler', () => {
                 'TestHero',
                 '_elfishLineageAbility',
                 'Wisdom',
+                'test-campaign'
+            );
+            expect(setRuntimeValue).toHaveBeenCalledWith(
+                'TestHero',
+                '_elfishLineageCantrip',
+                'Druidcraft',
+                'test-campaign'
+            );
+            expect(setRuntimeValue).toHaveBeenCalledWith(
+                'TestHero',
+                '_elfishLineageLevel3',
+                'Longstrider',
+                'test-campaign'
+            );
+            expect(setRuntimeValue).toHaveBeenCalledWith(
+                'TestHero',
+                '_elfishLineageLevel5',
+                'Pass Without Trace',
                 'test-campaign'
             );
         });
@@ -183,48 +237,48 @@ describe('elfishLineageHandler', () => {
             expect(result.payload.description).toBe('No lineage selected.');
         });
 
-        it('stores cantrip, level 3 spell, and level 5 spell (all undefined since lineage data lacks these fields)', async () => {
+        it('stores cantrip, level 3 spell, and level 5 spell for Drow lineage', async () => {
             await confirmElfisLineage(makePlayerStats(), 'Drow', 'test-campaign');
 
             expect(setRuntimeValue).toHaveBeenCalledWith(
                 'TestHero',
                 '_elfishLineageCantrip',
-                undefined,
+                'Dancing Lights',
                 'test-campaign'
             );
             expect(setRuntimeValue).toHaveBeenCalledWith(
                 'TestHero',
                 '_elfishLineageLevel3',
-                undefined,
+                'Faerie Fire',
                 'test-campaign'
             );
             expect(setRuntimeValue).toHaveBeenCalledWith(
                 'TestHero',
                 '_elfishLineageLevel5',
-                undefined,
+                'Darkness',
                 'test-campaign'
             );
         });
 
-        it('stores cantrip, level 3 spell, and level 5 spell as undefined for High Elf lineage', async () => {
+        it('stores cantrip, level 3 spell, and level 5 spell for High Elf lineage', async () => {
             await confirmElfisLineage(makePlayerStats(), 'High Elf', 'test-campaign');
 
             expect(setRuntimeValue).toHaveBeenCalledWith(
                 'TestHero',
                 '_elfishLineageCantrip',
-                undefined,
+                'Prestidigitation',
                 'test-campaign'
             );
             expect(setRuntimeValue).toHaveBeenCalledWith(
                 'TestHero',
                 '_elfishLineageLevel3',
-                undefined,
+                'Detect Magic',
                 'test-campaign'
             );
             expect(setRuntimeValue).toHaveBeenCalledWith(
                 'TestHero',
                 '_elfishLineageLevel5',
-                undefined,
+                'Misty Step',
                 'test-campaign'
             );
         });

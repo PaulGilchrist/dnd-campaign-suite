@@ -7,9 +7,9 @@ const LINEAGE_LEVEL5_KEY = '_gnomishLineageLevel5';
 const LINEAGE_ABILITY_KEY = '_gnomishLineageAbility';
 
 const GNOME_LINEAGES = [
-    { name: 'Deep Gnome', description: 'Darkvision 120 ft. + Magic Stone cantrip. Level 3: Nondetection. Level 5: Passwall.', spellcastingAbility: 'Intelligence', icon: 'fa-eye' },
-    { name: 'Forest Gnome', description: 'Hide behind larger creatures + Minor Illusion cantrip. Level 3: Speak with Animals. Level 5: Call Lightning.', spellcastingAbility: 'Intelligence', icon: 'fa-tree' },
-    { name: 'Rock Gnome', description: 'Move through larger creatures\' space + Mending cantrip. Level 3: Prestidigitation. Level 5: Protection from Energy.', spellcastingAbility: 'Intelligence', icon: 'fa-hammer' },
+    { name: 'Deep Gnome', description: 'Darkvision 120 ft. + Magic Stone cantrip. Level 3: Nondetection. Level 5: Passwall.', spellcastingAbility: 'Intelligence', icon: 'fa-eye', cantrip: 'Magic Stone', level3Spell: 'Nondetection', level5Spell: 'Passwall' },
+    { name: 'Forest Gnome', description: 'Hide behind larger creatures + Minor Illusion cantrip. Level 3: Speak with Animals. Level 5: Call Lightning.', spellcastingAbility: 'Intelligence', icon: 'fa-tree', cantrip: 'Minor Illusion', level3Spell: 'Speak with Animals', level5Spell: 'Call Lightning' },
+    { name: 'Rock Gnome', description: 'Move through larger creatures\' space + Mending cantrip. Level 3: Prestidigitation. Level 5: Protection from Energy.', spellcastingAbility: 'Intelligence', icon: 'fa-hammer', cantrip: 'Mending', level3Spell: 'Prestidigitation', level5Spell: 'Protection from Energy' },
 ];
 
 export async function handle(action, playerStats, campaignName, _mapName) {

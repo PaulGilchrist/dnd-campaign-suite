@@ -2,13 +2,10 @@ import { cloneDeep } from 'lodash';
 import { getCategories } from '../featureCategories.js'
 import { mergeCategorizedFeatures, categorizeFeatures } from '../featureCategorizationUtils.js'
 import utils from '../../ui/utils.js';
-import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import { computePassiveSkills } from '../../shared/computePassiveSkills.js';
 import { deduplicateAndSort } from '../../shared/deduplicateAndSort.js';
 
 const featureCategories = getCategories('2024');
-
-const LEGACY_KEY = '_fiendishLegacySelection';
 
 const raceRules = {
     getImmunities: (playerSummary) => {
@@ -98,26 +95,30 @@ const raceRules = {
             resistances.push(playerSummary.race.subrace.damage_resistance);
         }
 
-        // Fiendish Legacy: resistance is determined by runtime selection
-        const campaignName = playerSummary?.campaignName;
-        const fiendishLegacy = getRuntimeValue(playerSummary?.name, LEGACY_KEY, campaignName);
+        // Fiendish Legacy: resistance is determined by subrace name
+        const raceName = playerSummary?.race?.name;
+        const subraceName = playerSummary?.race?.subrace?.name;
+        let fiendishLegacyName = null;
+        if (subraceName && raceName === 'Tiefling') {
+            fiendishLegacyName = subraceName.replace(' Tiefling', '');
+        }
         const fiendishLegacyResistanceMap = {
             'Abyssal': 'Poison',
             'Chthonic': 'Necrotic',
             'Infernal': 'Fire',
         };
+        if (fiendishLegacyName) {
+            const legResist = fiendishLegacyResistanceMap[fiendishLegacyName];
+            if (legResist && !resistances.includes(legResist)) {
+                resistances.push(legResist);
+            }
+        }
 
         if (playerSummary.race && playerSummary.race.traits) {
             playerSummary.race.traits.forEach(trait => {
                 if (trait.description) {
-                    // Skip Fiendish Legacies table — its resistances are runtime-dependent
-                    if (trait.name === 'Fiendish Legacies' && fiendishLegacy) {
-                        const legResist = fiendishLegacyResistanceMap[fiendishLegacy];
-                        if (legResist && !resistances.includes(legResist)) {
-                            resistances.push(legResist);
-                        }
-                        return;
-                    }
+                    // Skip Fiendish Legacies table when Tiefling subrace provides the resistance
+                    if (trait.name === 'Fiendish Legacies' && fiendishLegacyName) return;
                     const matches = [...trait.description.matchAll(/Resistance to ([^\s.]+)/gi)];
                     matches.forEach(match => {
                         if (match[1].toLowerCase() !== 'the') {
@@ -184,8 +185,7 @@ const raceRules = {
           }
 
           // Elfish Lineage: Drow lineage overrides Darkvision to 120 ft.
-          const campaignName = playerStats.campaignName;
-          const elfisLineage = playerStats.race?.lineage || getRuntimeValue(playerStats.name, '_elfishLineageSelection', campaignName);
+          const elfisLineage = playerStats.race?.lineage || playerStats.race?.subrace?.name;
           if (elfisLineage === 'Drow') {
              const darkvisionIndex = passiveSenses.findIndex(s => s.name === 'Darkvision');
              if (darkvisionIndex !== -1) {
@@ -198,9 +198,9 @@ const raceRules = {
              }
          }
 
-         // Gnomish Lineage: Deep Gnome lineage overrides Darkvision to 120 ft.
-         const gnomishLineage = playerStats.race?.lineage || getRuntimeValue(playerStats.name, '_gnomishLineageSelection', campaignName);
-         if (gnomishLineage === 'Deep Gnome') {
+          // Gnomish Lineage: Deep Gnome lineage overrides Darkvision to 120 ft.
+          const gnomishLineage = playerStats.race?.lineage || playerStats.race?.subrace?.name;
+          if (gnomishLineage === 'Deep Gnome') {
              const darkvisionIndex = passiveSenses.findIndex(s => s.name === 'Darkvision');
              if (darkvisionIndex !== -1) {
                  const currentFeet = extractDarkvisionFeet(passiveSenses[darkvisionIndex].value);

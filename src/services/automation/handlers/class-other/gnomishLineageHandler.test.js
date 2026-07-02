@@ -124,9 +124,9 @@ describe('gnomishLineageHandler', () => {
 
             expect(calls[0]).toEqual(['GnomeBoy', '_gnomishLineageSelection', 'Deep Gnome', 'test-campaign']);
             expect(calls[1]).toEqual(['GnomeBoy', '_gnomishLineageAbility', 'Intelligence', 'test-campaign']);
-            expect(calls[2]).toEqual(['GnomeBoy', '_gnomishLineageCantrip', undefined, 'test-campaign']);
-            expect(calls[3]).toEqual(['GnomeBoy', '_gnomishLineageLevel3', undefined, 'test-campaign']);
-            expect(calls[4]).toEqual(['GnomeBoy', '_gnomishLineageLevel5', undefined, 'test-campaign']);
+            expect(calls[2]).toEqual(['GnomeBoy', '_gnomishLineageCantrip', 'Magic Stone', 'test-campaign']);
+            expect(calls[3]).toEqual(['GnomeBoy', '_gnomishLineageLevel3', 'Nondetection', 'test-campaign']);
+            expect(calls[4]).toEqual(['GnomeBoy', '_gnomishLineageLevel5', 'Passwall', 'test-campaign']);
         });
 
         it('stores correct lineage name for each lineage type', async () => {

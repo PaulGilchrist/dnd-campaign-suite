@@ -221,45 +221,43 @@ describe('raceRules 2024 (direct module)', () => {
       expect(raceRules.getResistances(input)).toEqual([]);
     });
 
-    it('returns Fiendish Legacy resistance for Abyssal selection', () => {
-      vi.mocked(getRuntimeValue).mockReturnValue('Abyssal');
-
+    it('returns Fiendish Legacy resistance for Abyssal Tiefling subrace', () => {
       const input = {
         name: 'TestChar',
         race: {
+          name: 'Tiefling',
+          subrace: { name: 'Abyssal Tiefling' },
           traits: [{ name: 'Fiendish Legacies', description: 'Abyssal: Resistance to Poison damage.' }]
         }
       };
       expect(raceRules.getResistances(input)).toContain('Poison');
     });
 
-    it('returns Fiendish Legacy resistance for Chthonic selection', () => {
-      vi.mocked(getRuntimeValue).mockReturnValue('Chthonic');
-
+    it('returns Fiendish Legacy resistance for Chthonic Tiefling subrace', () => {
       const input = {
         name: 'TestChar',
         race: {
+          name: 'Tiefling',
+          subrace: { name: 'Chthonic Tiefling' },
           traits: [{ name: 'Fiendish Legacies', description: 'Chthonic: Resistance to Necrotic damage.' }]
         }
       };
       expect(raceRules.getResistances(input)).toContain('Necrotic');
     });
 
-    it('returns Fiendish Legacy resistance for Infernal selection', () => {
-      vi.mocked(getRuntimeValue).mockReturnValue('Infernal');
-
+    it('returns Fiendish Legacy resistance for Infernal Tiefling subrace', () => {
       const input = {
         name: 'TestChar',
         race: {
+          name: 'Tiefling',
+          subrace: { name: 'Infernal Tiefling' },
           traits: [{ name: 'Fiendish Legacies', description: 'Infernal: Resistance to Fire damage.' }]
         }
       };
       expect(raceRules.getResistances(input)).toContain('Fire');
     });
 
-    it('falls back to regex extraction when no Fiendish Legacy selected', () => {
-      vi.mocked(getRuntimeValue).mockReturnValue(null);
-
+    it('falls back to regex extraction when no Tiefling subrace', () => {
       const input = {
         race: {
           traits: [{ name: 'Fiendish Legacies', description: 'Abyssal: Resistance to Poison damage.' }]
@@ -268,12 +266,12 @@ describe('raceRules 2024 (direct module)', () => {
       expect(raceRules.getResistances(input)).toContain('Poison');
     });
 
-    it('skips Fiendish Legacies trait from regex when legacy is selected', () => {
-      vi.mocked(getRuntimeValue).mockReturnValue('Abyssal');
-
+    it('skips Fiendish Legacies trait from regex when Tiefling subrace is selected', () => {
       const input = {
         name: 'TestChar',
         race: {
+          name: 'Tiefling',
+          subrace: { name: 'Abyssal Tiefling' },
           traits: [{ name: 'Fiendish Legacies', description: 'Abyssal: Resistance to Poison damage.' }]
         }
       };
@@ -282,7 +280,6 @@ describe('raceRules 2024 (direct module)', () => {
     });
 
     it('handles missing campaignName gracefully', () => {
-      vi.mocked(getRuntimeValue).mockReturnValue(null);
 
       const input = {
         race: { traits: [{ description: 'You have resistance to fire.' }] }

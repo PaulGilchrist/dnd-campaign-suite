@@ -69,18 +69,6 @@ describe('spellCalc2024', () => {
   // References to mocked functions (set in beforeEach via dynamic import)
   let mockGetHighestMajorLevel;
   let mockGetRuntimeValue;
-  let mockElfisLineageSelection;
-  let mockElfisLineageCantrip;
-  let mockElfisLineageLevel3Spell;
-  let mockElfisLineageLevel5Spell;
-  let mockGnomishLineageSelection;
-  let mockGnomishLineageCantrip;
-  let mockGnomishLineageLevel3Spell;
-  let mockGnomishLineageLevel5Spell;
-  let mockFiendishLegacySelection;
-  let mockFiendishLegacyCantrip;
-  let mockFiendishLegacyLevel3Spell;
-  let mockFiendishLegacyLevel5Spell;
   let mockMagicInitiateCantrips;
   let mockMagicInitiateLevel1Spell;
 
@@ -88,25 +76,10 @@ describe('spellCalc2024', () => {
     vi.resetAllMocks();
     const classRules = await import('../../character/classRules2024.js');
     const runtimeState = await import('../../../hooks/runtime/useRuntimeState.js');
-    const elfishLineage = await import('../../automation/handlers/class-other/elfishLineageHandler.js');
-    const gnomishLineage = await import('../../automation/handlers/class-other/gnomishLineageHandler.js');
-    const fiendishLegacy = await import('../../automation/handlers/class-other/fiendishLegacyHandler.js');
     const magicInitiate = await import('../../automation/handlers/feats/magicInitiateHandler.js');
 
     mockGetHighestMajorLevel = classRules.default.getHighestMajorLevel;
     mockGetRuntimeValue = runtimeState.getRuntimeValue;
-    mockElfisLineageSelection = elfishLineage.getElfisLineageSelection;
-    mockElfisLineageCantrip = elfishLineage.getElfisLineageCantrip;
-    mockElfisLineageLevel3Spell = elfishLineage.getElfisLineageLevel3Spell;
-    mockElfisLineageLevel5Spell = elfishLineage.getElfisLineageLevel5Spell;
-    mockGnomishLineageSelection = gnomishLineage.getGnomishLineageSelection;
-    mockGnomishLineageCantrip = gnomishLineage.getGnomishLineageCantrip;
-    mockGnomishLineageLevel3Spell = gnomishLineage.getGnomishLineageLevel3Spell;
-    mockGnomishLineageLevel5Spell = gnomishLineage.getGnomishLineageLevel5Spell;
-    mockFiendishLegacySelection = fiendishLegacy.getFiendishLegacySelection;
-    mockFiendishLegacyCantrip = fiendishLegacy.getFiendishLegacyCantrip;
-    mockFiendishLegacyLevel3Spell = fiendishLegacy.getFiendishLegacyLevel3Spell;
-    mockFiendishLegacyLevel5Spell = fiendishLegacy.getFiendishLegacyLevel5Spell;
     mockMagicInitiateCantrips = magicInitiate.getMagicInitiateCantrips;
     mockMagicInitiateLevel1Spell = magicInitiate.getMagicInitiateLevel1Spell;
   });
@@ -712,20 +685,16 @@ describe('spellCalc2024', () => {
         makeSpell('Burning Hands', 1),
         makeSpell('Crown of Madness', 1),
       ];
-      mockElfisLineageSelection.mockReturnValue('Shadow Magic');
-      mockElfisLineageCantrip.mockReturnValue('Blade Ward');
-      mockElfisLineageLevel3Spell.mockReturnValue('Burning Hands');
-      mockElfisLineageLevel5Spell.mockReturnValue('Crown of Madness');
 
       const stats = makePlayerStats();
       stats.automation = {
         passives: [{
           type: 'elfish_lineage',
-          options: [{ name: 'Shadow Magic', spellcastingAbility: 'Charisma' }],
+          options: [{ name: 'Shadow Magic', spellcastingAbility: 'Charisma', cantrip: 'Blade Ward', level3Spell: 'Burning Hands', level5Spell: 'Crown of Madness' }],
         }],
       };
 
-      const result = getSpellAbilities(allSpells, stats, { campaignName: 'TestCampaign' });
+      const result = getSpellAbilities(allSpells, stats, { campaignName: 'TestCampaign', race: { name: 'Elf', subrace: { name: 'Shadow Magic' } } });
 
       const names = result.spells.map(s => s.name);
       expect(names).toContain('Blade Ward');
@@ -734,17 +703,15 @@ describe('spellCalc2024', () => {
     });
 
     it('does not add elfish lineage spells when lineage does not match', () => {
-      mockElfisLineageSelection.mockReturnValue('Nonexistent');
-
       const stats = makePlayerStats();
       stats.automation = {
         passives: [{
           type: 'elfish_lineage',
-          options: [{ name: 'Shadow Magic', spellcastingAbility: 'Charisma' }],
+          options: [{ name: 'Shadow Magic', spellcastingAbility: 'Charisma', cantrip: 'Blade Ward' }],
         }],
       };
 
-      const result = getSpellAbilities([], stats, { campaignName: 'TestCampaign' });
+      const result = getSpellAbilities([], stats, { campaignName: 'TestCampaign', race: { name: 'Elf', subrace: { name: 'Wood Elf' } } });
 
       expect(result.spells).toHaveLength(0);
     });
@@ -757,20 +724,16 @@ describe('spellCalc2024', () => {
         makeSpell('Web', 1),
         makeSpell('Hold Monster', 1),
       ];
-      mockGnomishLineageSelection.mockReturnValue('Deep Gnome');
-      mockGnomishLineageCantrip.mockReturnValue('Friends');
-      mockGnomishLineageLevel3Spell.mockReturnValue('Web');
-      mockGnomishLineageLevel5Spell.mockReturnValue('Hold Monster');
 
       const stats = makePlayerStats();
       stats.automation = {
         passives: [{
           type: 'gnomish_lineage',
-          options: [{ name: 'Deep Gnome', spellcastingAbility: 'Intelligence' }],
+          options: [{ name: 'Deep Gnome', spellcastingAbility: 'Intelligence', cantrip: 'Friends', level3Spell: 'Web', level5Spell: 'Hold Monster' }],
         }],
       };
 
-      const result = getSpellAbilities(allSpells, stats, { campaignName: 'TestCampaign' });
+      const result = getSpellAbilities(allSpells, stats, { campaignName: 'TestCampaign', race: { name: 'Gnome', subrace: { name: 'Deep Gnome' } } });
 
       const names = result.spells.map(s => s.name);
       expect(names).toContain('Friends');
@@ -786,20 +749,16 @@ describe('spellCalc2024', () => {
         makeSpell('Scorching Ray', 1),
         makeSpell('Dominate Person', 1),
       ];
-      mockFiendishLegacySelection.mockReturnValue('Fiend');
-      mockFiendishLegacyCantrip.mockReturnValue('Infestation');
-      mockFiendishLegacyLevel3Spell.mockReturnValue('Scorching Ray');
-      mockFiendishLegacyLevel5Spell.mockReturnValue('Dominate Person');
 
       const stats = makePlayerStats();
       stats.automation = {
         passives: [{
           type: 'fiendish_legacy',
-          options: [{ name: 'Fiend', spellcastingAbility: 'Charisma' }],
+          options: [{ name: 'Fiend', spellcastingAbility: 'Charisma', cantrip: 'Infestation', level3Spell: 'Scorching Ray', level5Spell: 'Dominate Person' }],
         }],
       };
 
-      const result = getSpellAbilities(allSpells, stats, { campaignName: 'TestCampaign' });
+      const result = getSpellAbilities(allSpells, stats, { campaignName: 'TestCampaign', race: { name: 'Tiefling', subrace: { name: 'Fiend Tiefling' } } });
 
       const names = result.spells.map(s => s.name);
       expect(names).toContain('Infestation');
@@ -827,6 +786,44 @@ describe('spellCalc2024', () => {
       const names = result.spells.map(s => s.name);
       expect(names).toContain('Minor Illusion');
       expect(names).toContain('Shield');
+    });
+
+    it('creates spellAbilities for non-spellcasting character with fiendish legacy', () => {
+      const allSpells = [
+        makeSpell('Fire Bolt', 0),
+        makeSpell('Hellish Rebuke', 1),
+        makeSpell('Darkness', 2),
+      ];
+
+      const stats = makePlayerStats({
+        class: {
+          name: 'Fighter',
+          class_levels: [{ level: 3 }],
+        },
+        abilities: [
+          { name: 'Charisma', baseScore: 16, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0, bonus: 3 },
+        ],
+        automation: {
+          specialActions: [{
+            type: 'fiendish_legacy',
+            options: [{ name: 'Infernal', spellcastingAbility: 'Charisma', cantrip: 'Fire Bolt', level3Spell: 'Hellish Rebuke', level5Spell: 'Darkness' }],
+          }],
+        },
+      });
+
+      const result = getSpellAbilities(allSpells, stats, { campaignName: 'TestCampaign', race: { name: 'Tiefling', subrace: { name: 'Infernal Tiefling' } } });
+
+      expect(result).not.toBeNull();
+      const names = result.spells.map(s => s.name);
+      expect(names).toContain('Fire Bolt');
+      expect(names).toContain('Hellish Rebuke');
+      expect(names).toContain('Darkness');
+      expect(result.spellCastingAbility).toBe('Charisma');
+      expect(result.cantrips_known).toBe(1);
+      expect(result.spells_known).toBe(2);
+      expect(result.modifier).toBe(3);
+      expect(result.toHit).toBe(5);
+      expect(result.saveDc).toBe(13);
     });
 
     it('handles magic_initiate with multiple cantrips', () => {

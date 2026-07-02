@@ -1,27 +1,9 @@
 import classRules from '../../character/classRules2024.js';
 import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import {
-    getElfisLineageSelection,
-    getElfisLineageCantrip,
-    getElfisLineageLevel3Spell,
-    getElfisLineageLevel5Spell,
-} from '../../automation/handlers/class-other/elfishLineageHandler.js';
-import {
-    getGnomishLineageSelection,
-    getGnomishLineageCantrip,
-    getGnomishLineageLevel3Spell,
-    getGnomishLineageLevel5Spell,
-} from '../../automation/handlers/class-other/gnomishLineageHandler.js';
-import {
     getMagicInitiateCantrips,
     getMagicInitiateLevel1Spell,
 } from '../../automation/handlers/feats/magicInitiateHandler.js';
-import {
-    getFiendishLegacySelection,
-    getFiendishLegacyCantrip,
-    getFiendishLegacyLevel3Spell,
-    getFiendishLegacyLevel5Spell,
-} from '../../automation/handlers/class-other/fiendishLegacyHandler.js';
 
 export function getSpellAbilities(allSpells, playerStats, playerSummary) {
     let spellAbilities = null;
@@ -65,6 +47,19 @@ export function getSpellAbilities(allSpells, playerStats, playerSummary) {
             spellAbilities.spells = [...new Set([...spellAbilities.spells, ...['Mage Hand']])];
             spellAbilities.cantrips_known += 3;
         }
+    }
+
+    // Create spellAbilities for non-spellcasting characters who gain spells from race/feat
+    const lineageTypes = ['elfish_lineage', 'gnomish_lineage', 'fiendish_legacy', 'magic_initiate'];
+    const hasLineageOrFeatSpells = playerStats.automation?.specialActions?.some(
+        f => lineageTypes.includes(f.type)
+    );
+    if (!spellAbilities && hasLineageOrFeatSpells) {
+        spellAbilities = {
+            cantrips_known: 0,
+            spells: [],
+            spells_known: 0,
+        };
     }
 
     if (spellAbilities) {
@@ -141,97 +136,49 @@ export function getSpellAbilities(allSpells, playerStats, playerSummary) {
                         });
                     }
                 }
-                if (feature.type === 'elfish_lineage') {
-                    const lineage = getElfisLineageSelection(playerStats, playerSummary?.campaignName);
-                    if (lineage) {
-                        const lineageData = feature.options?.find(o => o.name === lineage);
+                if (feature.type === 'elfish_lineage' || feature.type === 'gnomish_lineage' || feature.type === 'fiendish_legacy') {
+                    const raceName = playerSummary?.race?.name;
+                    const subraceName = playerSummary?.race?.subrace?.name;
+                    let lineageName = null;
+                    if (subraceName && raceName === 'Tiefling') {
+                        lineageName = subraceName.replace(' Tiefling', '');
+                    } else if (subraceName) {
+                        lineageName = subraceName;
+                    }
+                    if (lineageName) {
+                        const lineageData = feature.options?.find(o => o.name === lineageName);
                         if (lineageData) {
-                            // Add lineage cantrip
-                            const cantripName = getElfisLineageCantrip(playerStats, playerSummary?.campaignName);
+                            // Track cantrips and level spells for counters
+                            let cantripCount = 0;
+                            let levelSpellCount = 0;
+
+                            // Add cantrip
+                            const cantripName = lineageData.cantrip;
                             if (cantripName) {
-                                const cantripEntry = spellAbilities.spells.find(s => s.name === cantripName);
-                                if (cantripEntry) {
-                                    cantripEntry.spellCastingAbility = lineageData.spellcastingAbility;
-                                } else {
-                                    spellAbilities.spells.push({ name: cantripName, prepared: 'Always', spellCastingAbility: lineageData.spellcastingAbility });
+                                cantripCount++;
+                                if (!spellAbilities.spells.find(s => s.name === cantripName)) {
+                                    spellAbilities.spells.push({ name: cantripName, prepared: 'Always' });
                                 }
                             }
                             // Add level 3 spell
-                            const level3Spell = getElfisLineageLevel3Spell(playerStats, playerSummary?.campaignName);
+                            const level3Spell = lineageData.level3Spell;
                             if (level3Spell) {
+                                levelSpellCount++;
                                 if (!spellAbilities.spells.find(s => s.name === level3Spell)) {
                                     spellAbilities.spells.push({ name: level3Spell, prepared: 'Always' });
                                 }
                             }
                             // Add level 5 spell
-                            const level5Spell = getElfisLineageLevel5Spell(playerStats, playerSummary?.campaignName);
+                            const level5Spell = lineageData.level5Spell;
                             if (level5Spell) {
+                                levelSpellCount++;
                                 if (!spellAbilities.spells.find(s => s.name === level5Spell)) {
                                     spellAbilities.spells.push({ name: level5Spell, prepared: 'Always' });
                                 }
                             }
-                        }
-                    }
-                }
-                if (feature.type === 'gnomish_lineage') {
-                    const lineage = getGnomishLineageSelection(playerStats, playerSummary?.campaignName);
-                    if (lineage) {
-                        const lineageData = feature.options?.find(o => o.name === lineage);
-                        if (lineageData) {
-                            // Add lineage cantrip
-                            const cantripName = getGnomishLineageCantrip(playerStats, playerSummary?.campaignName);
-                            if (cantripName) {
-                                const cantripEntry = spellAbilities.spells.find(s => s.name === cantripName);
-                                if (cantripEntry) {
-                                    cantripEntry.spellCastingAbility = lineageData.spellcastingAbility;
-                                } else {
-                                    spellAbilities.spells.push({ name: cantripName, prepared: 'Always', spellCastingAbility: lineageData.spellcastingAbility });
-                                }
-                            }
-                            // Add level 3 spell
-                            const level3Spell = getGnomishLineageLevel3Spell(playerStats, playerSummary?.campaignName);
-                            if (level3Spell) {
-                                if (!spellAbilities.spells.find(s => s.name === level3Spell)) {
-                                    spellAbilities.spells.push({ name: level3Spell, prepared: 'Always' });
-                                }
-                            }
-                            // Add level 5 spell
-                            const level5Spell = getGnomishLineageLevel5Spell(playerStats, playerSummary?.campaignName);
-                            if (level5Spell) {
-                                if (!spellAbilities.spells.find(s => s.name === level5Spell)) {
-                                    spellAbilities.spells.push({ name: level5Spell, prepared: 'Always' });
-                                }
-                            }
-                        }
-                    }
-                }
-                if (feature.type === 'fiendish_legacy') {
-                    const campaignName = playerSummary?.campaignName;
-                    const legacy = getFiendishLegacySelection(playerStats, campaignName);
-                    if (legacy) {
-                        const legacyData = feature.options?.find(o => o.name === legacy);
-                        if (legacyData) {
-                            const cantripName = getFiendishLegacyCantrip(playerStats, campaignName);
-                            if (cantripName) {
-                                const cantripEntry = spellAbilities.spells.find(s => s.name === cantripName);
-                                if (cantripEntry) {
-                                    cantripEntry.spellCastingAbility = legacyData.spellcastingAbility;
-                                } else {
-                                    spellAbilities.spells.push({ name: cantripName, prepared: 'Always', spellCastingAbility: legacyData.spellcastingAbility });
-                                }
-                            }
-                            const level3Spell = getFiendishLegacyLevel3Spell(playerStats, campaignName);
-                            if (level3Spell) {
-                                if (!spellAbilities.spells.find(s => s.name === level3Spell)) {
-                                    spellAbilities.spells.push({ name: level3Spell, prepared: 'Always' });
-                                }
-                            }
-                            const level5Spell = getFiendishLegacyLevel5Spell(playerStats, campaignName);
-                            if (level5Spell) {
-                                if (!spellAbilities.spells.find(s => s.name === level5Spell)) {
-                                    spellAbilities.spells.push({ name: level5Spell, prepared: 'Always' });
-                                }
-                            }
+
+                            spellAbilities.cantrips_known += cantripCount;
+                            spellAbilities.spells_known += levelSpellCount;
                         }
                     }
                 }
@@ -405,6 +352,30 @@ export function getSpellAbilities(allSpells, playerStats, playerSummary) {
                         }
                     });
                 });
+            }
+        }
+
+        // For non-spellcasting characters, set spellCastingAbility to the character's primary ability (highest bonus)
+        if (!playerStats.class.spell_casting_ability && !playerStats.class.major?.spell_casting_ability) {
+            const primaryAbility = playerStats.abilities.reduce((best, ability) => {
+                return (ability.bonus || 0) > (best.bonus || 0) ? ability : best;
+            }, playerStats.abilities[0]);
+            if (primaryAbility) {
+                spellAbilities.spellCastingAbility = primaryAbility.name;
+            }
+        }
+
+        // Recalculate spellcasting ability stats if lineage/feat set it after the initial calculation
+        if (spellAbilities.spellCastingAbility) {
+            const spellAbility = playerStats.abilities.find(ability => ability.name === spellAbilities.spellCastingAbility);
+            if (!spellAbility) {
+                spellAbilities.modifier = 0;
+                spellAbilities.toHit = playerStats.proficiency;
+                spellAbilities.saveDc = 8 + playerStats.proficiency;
+            } else {
+                spellAbilities.modifier = spellAbility.bonus;
+                spellAbilities.toHit = spellAbility.bonus + playerStats.proficiency;
+                spellAbilities.saveDc = 8 + spellAbility.bonus + playerStats.proficiency;
             }
         }
 

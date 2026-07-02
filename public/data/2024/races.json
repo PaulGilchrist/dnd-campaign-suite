@@ -841,15 +841,21 @@
                     "options": [
                         {
                             "name": "Abyssal",
-                            "spellcastingAbility": "Charisma"
+                            "cantrip": "Poison Spray",
+                            "level3Spell": "Ray of Sickness",
+                            "level5Spell": "Hold Person"
                         },
                         {
                             "name": "Chthonic",
-                            "spellcastingAbility": "Charisma"
+                            "cantrip": "Chill Touch",
+                            "level3Spell": "False Life",
+                            "level5Spell": "Ray of Enfeeblement"
                         },
                         {
                             "name": "Infernal",
-                            "spellcastingAbility": "Charisma"
+                            "cantrip": "Fire Bolt",
+                            "level3Spell": "Hellish Rebuke",
+                            "level5Spell": "Darkness"
                         }
                     ]
                 }
