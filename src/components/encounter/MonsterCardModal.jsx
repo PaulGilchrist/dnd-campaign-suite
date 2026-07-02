@@ -174,7 +174,7 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
       ].some(a => a.name === 'Elusive')
       const isIncapacitated = targetConditions.some(c => CONDITIONS_THAT_CANNOT_ACT.has(c))
       if (hasElusive && !isIncapacitated) {
-        targetEffectData.targetDisadvantageCount = (targetEffectData.targetDisadvantageCount || 0) + 1
+        targetEffectData.noAdvantageAgainst = true
       }
     }
 
@@ -375,7 +375,8 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
     const condEffects = computeConditionEffects(condKeys, [], monsterTargetEffects);
     const condEffectBadges = [];
     if (condEffects) {
-      if (condEffects.targetDisadvantageCount > 0) condEffectBadges.push({ label: 'Disadv vs', cls: 'effect-target-disadv', icon: 'fa-arrow-down' });
+      if (condEffects.noAdvantageAgainst) condEffectBadges.push({ label: 'No Adv vs', cls: 'effect-target-disadv', icon: 'fa-arrow-down' });
+      if (condEffects.targetDisadvantageCount > 0 && !condEffects.noAdvantageAgainst) condEffectBadges.push({ label: 'Disadv vs', cls: 'effect-target-disadv', icon: 'fa-arrow-down' });
       if (condEffects.riderSaveDisadvantage) condEffectBadges.push({ label: 'Save Disadv', cls: 'effect-disadvantage', icon: 'fa-shield' });
       if (condEffects.riderAttackBonus > 0) condEffectBadges.push({ label: `+${condEffects.riderAttackBonus} to hit`, cls: 'effect-target-adv', icon: 'fa-bullseye' });
       if (condEffects.riderCannotOpportunityAttack) condEffectBadges.push({ label: 'No OA', cls: 'effect-cannot-act', icon: 'fa-ban' });

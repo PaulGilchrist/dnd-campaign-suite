@@ -145,6 +145,20 @@ describe('ConditionEffectBadges', () => {
             expect(badge).toBeInTheDocument();
             expect(badge.closest('.condition-effect-badge')).toHaveClass('effect-target-disadv');
         });
+
+        it('should render No Adv vs badge when noAdvantageAgainst is true', () => {
+            computeConditionEffects.mockReturnValue(makeEffects({ noAdvantageAgainst: true }));
+            render(<ConditionEffectBadges conditions={[]} targetEffects={[]} creatureName="Alice" campaignName="test" />);
+            const badge = screen.getByText('No Adv vs');
+            expect(badge).toBeInTheDocument();
+            expect(badge.closest('.condition-effect-badge')).toHaveClass('effect-target-disadv');
+        });
+
+        it('should not render Disadv vs when noAdvantageAgainst is true', () => {
+            computeConditionEffects.mockReturnValue(makeEffects({ noAdvantageAgainst: true, targetDisadvantageCount: 3 }));
+            render(<ConditionEffectBadges conditions={[]} targetEffects={[]} creatureName="Alice" campaignName="test" />);
+            expect(screen.queryByText('Disadv vs')).not.toBeInTheDocument();
+        });
     });
 
     describe('rider effects', () => {

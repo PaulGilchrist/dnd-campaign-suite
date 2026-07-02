@@ -450,7 +450,7 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
         ].some(a => a.name === 'Elusive');
         const isIncapacitated = activeConditions.some(c => CONDITIONS_THAT_CANNOT_ACT.has(c));
         if (hasElusive && !isIncapacitated) {
-            conditionEffects.targetDisadvantageCount = (conditionEffects.targetDisadvantageCount || 0) + 1;
+            conditionEffects.noAdvantageAgainst = true;
         }
     }
 

@@ -14,7 +14,8 @@ function ConditionEffectBadges({ conditions, targetEffects = [], creatureName, c
     const effects = computeConditionEffects(condKeys, [], targetEffects)
     const badges = []
     if (effects.speedReduction) badges.push({ label: `Speed -${effects.speedReduction}`, cls: 'effect-speed-zero', icon: 'fa-minus', removable: false })
-    if (effects.targetDisadvantageCount > 0) badges.push({ label: 'Disadv vs', cls: 'effect-target-disadv', icon: 'fa-arrow-down', removable: false })
+    if (effects.noAdvantageAgainst) badges.push({ label: 'No Adv vs', cls: 'effect-target-disadv', icon: 'fa-arrow-down', removable: false })
+    if (effects.targetDisadvantageCount > 0 && !effects.noAdvantageAgainst) badges.push({ label: 'Disadv vs', cls: 'effect-target-disadv', icon: 'fa-arrow-down', removable: false })
     if (effects.riderSaveDisadvantage) badges.push({ label: 'Save Disadv', cls: 'effect-disadvantage', icon: 'fa-shield', removable: false })
     if (effects.riderAttackBonus > 0) badges.push({ label: `+${effects.riderAttackBonus} to hit`, cls: 'effect-target-adv', icon: 'fa-bullseye', removable: true, effectType: 'damage_bonus' })
     if (effects.riderCannotOpportunityAttack) badges.push({ label: 'No OA', cls: 'effect-cannot-act', icon: 'fa-ban', removable: true, effectType: 'no_opportunity_attacks' })
