@@ -47,13 +47,9 @@ async function rollConditionSave(creature, condition, characters, campaignNpcs, 
 function removeCondition(combatSummary, creatureName, condition, getRuntimeValue, setRuntimeValue, campaignName) {
     const creature = combatSummary.creatures.find(c => c.name === creatureName)
     if (!creature) return
-    if (creature.type === 'player') {
-        const conditions = getRuntimeValue(creature.name, 'activeConditions') || []
-        const filtered = conditions.filter(c => String(c).toLowerCase() !== (condition.key || condition).toLowerCase())
-        setRuntimeValue(creature.name, 'activeConditions', filtered, campaignName)
-    } else {
-        creature.conditions = creature.conditions.filter(c => c.id !== condition.id)
-    }
+    const conditions = getRuntimeValue(creature.name, 'activeConditions') || []
+    const filtered = conditions.filter(c => String(c).toLowerCase() !== (condition.key || condition).toLowerCase())
+    setRuntimeValue(creature.name, 'activeConditions', filtered, campaignName)
 }
 
 function addCondition(combatSummary, creatureName, conditionDef, dc, ability, getRuntimeValue, setRuntimeValue, campaignName, playerStats) {
@@ -71,20 +67,9 @@ function addCondition(combatSummary, creatureName, conditionDef, dc, ability, ge
         }
     }
 
-    if (creature.type === 'player') {
-        const conditions = getRuntimeValue(creature.name, 'activeConditions') || []
-        const filtered = conditions.filter(c => String(c).toLowerCase() !== conditionDef.key.toLowerCase())
-        setRuntimeValue(creature.name, 'activeConditions', [...filtered, conditionDef.key], campaignName)
-    } else {
-        creature.conditions = creature.conditions.filter(c => c.key !== conditionDef.key)
-        creature.conditions.push({
-            id: crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`,
-            key: conditionDef.key,
-            label: conditionDef.label,
-            dc,
-            ability,
-        })
-    }
+    const conditions = getRuntimeValue(creature.name, 'activeConditions') || []
+    const filtered = conditions.filter(c => String(c).toLowerCase() !== conditionDef.key.toLowerCase())
+    setRuntimeValue(creature.name, 'activeConditions', [...filtered, conditionDef.key], campaignName)
 }
 
 function buildConditionPopup(roll, bonus, bonusDetail, abilityLabel, conditionLabel, dc, success) {

@@ -10,18 +10,13 @@ import { addExpiration } from '../../../rules/effects/expirations.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { getDistanceFeet, rangeToFeet } from '../../../rules/combat/rangeValidation.js';
 import { applyDamageToTarget } from '../../../rules/combat/applyDamage.js';
-import storage from '../../../ui/storage.js';
 
 function applyConditionToTarget(targetName, conditionKey, campaignName, combatSummary) {
     if (!combatSummary) return;
-    const creature = combatSummary.creatures.find(c => c.name === targetName);
-    if (!creature) return;
-    if (creature.type === 'player') return;
-    const conditions = creature.conditions || [];
-    const existing = conditions.find(c => String(c.key).toLowerCase() === conditionKey.toLowerCase());
+    const conditions = getRuntimeValue(targetName, 'activeConditions', campaignName) || [];
+    const existing = conditions.find(c => String(c).toLowerCase() === conditionKey.toLowerCase());
     if (existing) return;
-    creature.conditions = [...conditions, { id: `${Date.now()}-${Math.random()}`, key: conditionKey, label: conditionKey.charAt(0).toUpperCase() + conditionKey.slice(1) }];
-    storage.set('combatSummary', combatSummary, campaignName);
+    setRuntimeValue(targetName, 'activeConditions', [...conditions, conditionKey], campaignName);
 }
 
 const SELECTION_KEY = 'BattleMasterManeuvers_selection';

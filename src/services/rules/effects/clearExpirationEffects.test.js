@@ -858,13 +858,12 @@ describe('clearExpirationEffects effect types (via clearAllExpirationEffects)', 
       );
 
       // remove_feign_death_buff removes blinded, incapacitated, speed_zero one by one
-      // Each call reads from the same mock, so the final state reflects only
-      // the last removal (speed_zero). The test verifies the function was called
-      // for all three conditions by checking the last activeConditions call.
+      // Each condition removal calls both removeActiveCondition and removeNpcCondition,
+      // each of which calls setRuntimeValue for 'activeConditions', giving 6 total calls.
       const condCalls = setRuntimeValue.mock.calls.filter(
         (c) => c[0] === 'Human' && c[1] === 'activeConditions',
       );
-      expect(condCalls.length).toBe(3);
+      expect(condCalls.length).toBe(6);
     });
   });
 

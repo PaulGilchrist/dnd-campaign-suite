@@ -104,13 +104,17 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
         if (!combatSummary || !combatSummary.creatures) return []
         return combatSummary.creatures.map(c => {
             const runtimeConditions = getRuntimeValue(c.name, 'activeConditions') || []
-            const conditions = runtimeConditions.map((key, i) => ({
-                id: `runtime-${key}-${i}`,
-                key,
-                label: key.charAt(0).toUpperCase() + key.slice(1),
-                dc: 0,
-                ability: 'con',
-            }))
+            const csConditions = c.conditions || []
+            const conditions = runtimeConditions.map((key, i) => {
+                const csMatch = csConditions.find(cs => String(cs.key).toLowerCase() === String(key).toLowerCase())
+                return {
+                    id: `runtime-${key}-${i}`,
+                    key,
+                    label: csMatch?.label || key.charAt(0).toUpperCase() + key.slice(1),
+                    dc: csMatch?.dc || 0,
+                    ability: csMatch?.ability || 'con',
+                }
+            })
             if (c.type !== 'player') {
                 return {
                     ...c,

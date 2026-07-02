@@ -375,7 +375,7 @@ describe('HealingPoolModal', () => {
 
   it('does not render batch cure section when no matching conditions on target', async () => {
     useRuntimeState.getRuntimeValue.mockImplementation((name, key) => {
-      if (key === 'activeConditions') return [];
+      if (key === 'activeConditions') return ['poisoned'];
       return null;
     });
 
@@ -383,7 +383,11 @@ describe('HealingPoolModal', () => {
       restoringTouchConditions: ['Blinded'],
       alsoCures: [],
     });
-    expect(screen.queryByText(/Select conditions affecting/)).not.toBeInTheDocument();
+    expect(useRuntimeState.getRuntimeValue).toHaveBeenCalledWith(
+      npcTarget.name,
+      'activeConditions'
+    );
+    expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
   });
 
   it('toggles condition selection on button click', async () => {
@@ -689,13 +693,19 @@ describe('HealingPoolModal', () => {
 
   // ── NPC target conditions updated via applyCure when NPC in combat ──
 
-  it('updates NPC condition in combatSummary during individual cure', async () => {
+  it('updates NPC condition via setRuntimeValue during individual cure', async () => {
     useRuntimeState.getRuntimeValue.mockReturnValue(['blinded']);
 
     await renderModal({ current: 10, max: 20 });
     fireEvent.click(screen.getByRole('button', { name: /Blinded/i }));
 
-    expect(storage.set).toHaveBeenCalled();
+    expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
+      npcTarget.name,
+      'activeConditions',
+      expect.any(Array),
+      mockCampaignName,
+    );
+    expect(storage.set).not.toHaveBeenCalled();
   });
 
   // ── Bloodied-only mode ──

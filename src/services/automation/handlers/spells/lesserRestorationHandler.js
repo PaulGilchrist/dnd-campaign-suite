@@ -1,7 +1,6 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../ui/logService.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
-import storage from '../../../ui/storage.js';
 
 const ALLOWED_CONDITIONS = ['blinded', 'deafened', 'paralyzed', 'poisoned'];
 
@@ -95,15 +94,6 @@ export async function applyLesserRestoration(action, playerStats, campaignName, 
     }
 
     setRuntimeValue(targetName, 'activeConditions', filtered, campaignName);
-
-    const combatSummary = await getCombatContext(campaignName);
-    if (combatSummary) {
-        const creature = combatSummary.creatures?.find(c => c.name === targetName);
-        if (creature && Array.isArray(creature.conditions)) {
-            creature.conditions = creature.conditions.filter(c => !conditionMatches(String(c.key), conditionToRemove));
-            storage.set('combatSummary', combatSummary, campaignName);
-        }
-    }
 
     await addEntry(campaignName, {
         type: 'ability_use',

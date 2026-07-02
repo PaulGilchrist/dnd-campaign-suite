@@ -144,17 +144,9 @@ describe('relentlessAvengerHandler', () => {
             await handle(makeAction(), makePlayerStats(), CAMPAIGN_NAME, null);
 
             expect(setRuntimeValue).toHaveBeenCalledWith(
-                CAMPAIGN_NAME,
-                'combatContext',
-                expect.objectContaining({
-                    creatures: expect.arrayContaining([
-                        expect.objectContaining({
-                            conditions: expect.arrayContaining([
-                                expect.objectContaining({ key: 'speed_zero' }),
-                            ]),
-                        }),
-                    ]),
-                }),
+                'Goblin',
+                'activeConditions',
+                ['speed_zero'],
                 CAMPAIGN_NAME
             );
         });
@@ -164,19 +156,19 @@ describe('relentlessAvengerHandler', () => {
                 creatures: [{ name: 'Goblin', conditions: [{ key: 'speed_zero' }] }],
             });
             getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
-            getRuntimeValue.mockReturnValue([]);
+            getRuntimeValue.mockReturnValue(['speed_zero']);
 
             const result = await handle(makeAction(), makePlayerStats(), CAMPAIGN_NAME, null);
 
-            // targetEffects should still be set; combatContext should not
+            // targetEffects should still be set; activeConditions should not be modified
             const targetEffectCalls = setRuntimeValue.mock.calls.filter(
                 (c) => c[1] === 'targetEffects'
             );
-            const combatContextCalls = setRuntimeValue.mock.calls.filter(
-                (c) => c[1] === 'combatContext'
+            const conditionCalls = setRuntimeValue.mock.calls.filter(
+                (c) => c[1] === 'activeConditions'
             );
             expect(targetEffectCalls.length).toBe(1);
-            expect(combatContextCalls.length).toBe(0);
+            expect(conditionCalls.length).toBe(0);
             expect(result.type).toBe('popup');
             expect(result.payload.description).toContain("Goblin's Speed is reduced to 0");
         });
@@ -247,25 +239,27 @@ describe('relentlessAvengerHandler', () => {
 
             await handle(makeAction(), makePlayerStats(), CAMPAIGN_NAME, null);
 
-            const combatContextCalls = setRuntimeValue.mock.calls.filter(
-                (c) => c[1] === 'combatContext'
+            const conditionCalls = setRuntimeValue.mock.calls.filter(
+                (c) => c[1] === 'activeConditions'
             );
-            expect(combatContextCalls.length).toBe(0);
+            expect(conditionCalls.length).toBe(0);
         });
 
         it('does not add condition when creature not found in combat context', async () => {
             getCombatContext.mockResolvedValue({
                 creatures: [{ name: 'OtherCreature', conditions: [] }],
             });
-            getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
+            getTargetFromAttacker.mockReturnValue({ name: 'OtherCreature' });
             getRuntimeValue.mockReturnValue([]);
 
             await handle(makeAction(), makePlayerStats(), CAMPAIGN_NAME, null);
 
-            const combatContextCalls = setRuntimeValue.mock.calls.filter(
-                (c) => c[1] === 'combatContext'
+            const conditionCalls = setRuntimeValue.mock.calls.filter(
+                (c) => c[1] === 'activeConditions'
             );
-            expect(combatContextCalls.length).toBe(0);
+            expect(conditionCalls.length).toBe(1);
+            expect(conditionCalls[0][1]).toBe('activeConditions');
+            expect(conditionCalls[0][2]).toContain('speed_zero');
         });
 
         it('appends to existing target effects', async () => {

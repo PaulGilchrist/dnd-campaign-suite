@@ -74,15 +74,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 
     // Remove conditions from target (including "Pending" — unstable at 0 HP state)
     if (target) {
-        const creature = cs.creatures?.find(c => c.name === targetName);
-        if (creature && creature.conditions) {
-            // Remove all non-lethal conditions (the "Pending" death state)
-            creature.conditions = [];
-            const updatedCs2 = await getCombatContext(campaignName);
-            if (updatedCs2) {
-                storage.set('combatSummary', updatedCs2, campaignName);
-            }
-        }
+        setRuntimeValue(targetName, 'activeConditions', [], campaignName);
     }
 
     // Apply AoE radiant damage to creatures within 30 feet

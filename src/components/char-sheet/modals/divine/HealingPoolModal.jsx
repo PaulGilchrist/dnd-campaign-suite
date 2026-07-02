@@ -2,7 +2,6 @@
 import React from 'react'
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js'
 import useTrackedResource from '../../../../hooks/runtime/useTrackedResource.js'
-import storage from '../../../../services/ui/storage.js'
 import { addEntry } from '../../../../services/ui/logService.js'
 import { getTargetFromAttacker, getCombatContext } from '../../../../services/rules/combat/damageUtils.js'
 import { applyHealingToTarget } from '../../../../services/rules/combat/applyHealing.js'
@@ -238,28 +237,28 @@ function HealingPoolModal({ playerStats, campaignName, name: featureName = 'Lay 
         const filtered = conditions.filter(c => !conditionMatches(c, condition));
         setRuntimeValue(targetName, 'activeConditions', filtered, campaignName);
 
-        if (combatSummary && target && target.type === 'npc') {
-            const creature = combatSummary.creatures?.find(c => c.name === targetName);
-            if (creature && Array.isArray(creature.conditions)) {
-                creature.conditions = creature.conditions.filter(c => !conditionMatches(c.key, condition));
-                storage.set('combatSummary', combatSummary, campaignName);
-                window.dispatchEvent(new CustomEvent('combat-summary-updated'));
+            if (combatSummary && target && target.type === 'npc') {
+                const creature = combatSummary.creatures?.find(c => c.name === targetName);
+                if (creature && Array.isArray(creature.conditions)) {
+                    const conditions = getRuntimeValue(targetName, 'activeConditions') || [];
+                    const filtered = conditions.filter(c => !conditionMatches(String(c).toLowerCase(), condition.toLowerCase()));
+                    setRuntimeValue(targetName, 'activeConditions', filtered, campaignName);
+                }
             }
-        }
 
-        addEntry(campaignName, {
-            type: 'condition',
-            characterName: targetName,
-            condition: condition,
-            action: 'broken',
-            sourceName: playerStats.name,
-            featureName,
-            timestamp: Date.now(),
-          }).catch((e) => { console.error("[HealingPoolModal] Error:", e); });
+            addEntry(campaignName, {
+                type: 'condition',
+                characterName: targetName,
+                condition: condition,
+                action: 'broken',
+                sourceName: playerStats.name,
+                featureName,
+                timestamp: Date.now(),
+              }).catch((e) => { console.error("[HealingPoolModal] Error:", e); });
 
-        setLog(prev => [...prev, { action: `Cure ${condition}`, target: targetName, amount: cureCost, poolAfter: newPool }]);
-        setHealAmount(Math.min(healAmount, newPool));
-     };
+            setLog(prev => [...prev, { action: `Cure ${condition}`, target: targetName, amount: cureCost, poolAfter: newPool }]);
+            setHealAmount(Math.min(healAmount, newPool));
+         };
 
     const applyBatchCure = () => {
         if (selectedConditions.length === 0) return;
@@ -276,9 +275,9 @@ function HealingPoolModal({ playerStats, campaignName, name: featureName = 'Lay 
             if (combatSummary && target && target.type === 'npc') {
                 const creature = combatSummary.creatures?.find(c => c.name === targetName);
                 if (creature && Array.isArray(creature.conditions)) {
-                    creature.conditions = creature.conditions.filter(c => !conditionMatches(c.key, condition));
-                    storage.set('combatSummary', combatSummary, campaignName);
-                    window.dispatchEvent(new CustomEvent('combat-summary-updated'));
+                    const conditions = getRuntimeValue(targetName, 'activeConditions') || [];
+                    const filtered = conditions.filter(c => !conditionMatches(String(c).toLowerCase(), condition.toLowerCase()));
+                    setRuntimeValue(targetName, 'activeConditions', filtered, campaignName);
                 }
             }
 

@@ -177,7 +177,6 @@ describe('npcCombatService - addNPCToInitiative', () => {
       expect(creature.type).toBe('npc');
       expect(creature.name).toBe('Goblin');
       expect(creature.targetName).toBeNull();
-      expect(creature.conditions).toEqual([]);
       expect(creature.concentration).toBeNull();
       expect(creature.saveBonuses).toEqual({});
     });

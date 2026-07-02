@@ -34,7 +34,6 @@ export async function addNPCToInitiative(campaignName, npc, onViewInitiative) {
       : (console.error(`[AC] NPC "${npc.name}" has no AC defined. Defaulting to 10.`), 10),
     resistances: npc.damageResistances || [],
     immunities: npc.damageImmunities || [],
-    conditions: [],
     concentration: null,
     imagePath: npc.imagePath || npc.image || '',
     initiativeBonus: initBonus,

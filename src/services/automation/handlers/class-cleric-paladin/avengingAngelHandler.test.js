@@ -810,117 +810,128 @@ describe('avengingAngelHandler.isActive', () => {
   });
 });
 
-describe('avengingAngelHandler.removeFrightenedOnDamage', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    getRuntimeValue.mockReset();
-    getCombatContext.mockReset();
-    storage.set.mockReset();
-    setRuntimeValue.mockReset();
-  });
-
-  it('should remove frightened from creature in combat context', async () => {
-    getRuntimeValue.mockImplementation((name, key) => {
-      if (key === 'avengingAngelAuraTargets') return ['Goblin'];
-      return null;
-    });
-    getCombatContext.mockResolvedValue({
-      creatures: [{
-        name: 'Goblin',
-        conditions: [{ key: 'frightened' }, { key: 'blinded' }],
-      }],
+  describe('avengingAngelHandler.removeFrightenedOnDamage', () => {
+    beforeEach(() => {
+      vi.clearAllMocks();
+      getRuntimeValue.mockReset();
+      getCombatContext.mockReset();
+      storage.set.mockReset();
+      setRuntimeValue.mockReset();
     });
 
-    await removeFrightenedOnDamage('TestPaladin', 'Goblin', campaignName);
+    it('should remove frightened from creature in combat context', async () => {
+      getRuntimeValue.mockImplementation((name, key) => {
+        if (key === 'avengingAngelAuraTargets') return ['Goblin'];
+        if (key === 'activeConditions') return ['frightened', 'blinded'];
+        return null;
+      });
+      getCombatContext.mockResolvedValue({
+        creatures: [{
+          name: 'Goblin',
+          conditions: [{ key: 'frightened' }, { key: 'blinded' }],
+        }],
+      });
 
-    expect(setRuntimeValue).toHaveBeenCalledWith('TestPaladin', 'avengingAngelAuraTargets', [], campaignName);
-    expect(storage.set).toHaveBeenCalledWith('combatSummary', expect.any(Object), campaignName);
-  });
+      await removeFrightenedOnDamage('TestPaladin', 'Goblin', campaignName);
 
-  it('should not call storage.set when combat context is null', async () => {
-    getRuntimeValue.mockReset().mockImplementation((name, key) => {
-      if (key === 'avengingAngelAuraTargets') return ['Goblin'];
-      return null;
-    });
-    getCombatContext.mockReset().mockImplementation(() => Promise.resolve(null));
-
-    await removeFrightenedOnDamage('TestPaladin', 'Goblin', campaignName);
-
-    expect(setRuntimeValue).toHaveBeenCalledWith('TestPaladin', 'avengingAngelAuraTargets', [], campaignName);
-    expect(storage.set).not.toHaveBeenCalled();
-  });
-
-  it('should handle creature without conditions', async () => {
-    getRuntimeValue.mockReturnValue(['Goblin']);
-    getCombatContext.mockResolvedValue({
-      creatures: [{ name: 'Goblin', conditions: undefined }],
+      expect(setRuntimeValue).toHaveBeenCalledWith('Goblin', 'activeConditions', ['blinded'], campaignName);
+      expect(setRuntimeValue).toHaveBeenCalledWith('TestPaladin', 'avengingAngelAuraTargets', [], campaignName);
+      expect(storage.set).not.toHaveBeenCalled();
     });
 
-    await removeFrightenedOnDamage('TestPaladin', 'Goblin', campaignName);
+    it('should not call storage.set when combat context is null', async () => {
+      getRuntimeValue.mockReset().mockImplementation((name, key) => {
+        if (key === 'avengingAngelAuraTargets') return ['Goblin'];
+        if (key === 'activeConditions') return ['frightened'];
+        return null;
+      });
+      getCombatContext.mockReset().mockImplementation(() => Promise.resolve(null));
 
-    expect(setRuntimeValue).toHaveBeenCalledWith('TestPaladin', 'avengingAngelAuraTargets', [], campaignName);
-  });
+      await removeFrightenedOnDamage('TestPaladin', 'Goblin', campaignName);
 
-  it('should only remove frightened condition, not others', async () => {
-    getRuntimeValue.mockReturnValue(['Goblin']);
-    let cs = {
-      creatures: [{
-        name: 'Goblin',
-        conditions: [{ key: 'frightened' }, { key: 'blinded' }, { key: 'poisoned' }],
-      }],
-    };
-    getCombatContext.mockResolvedValue(cs);
-
-    await removeFrightenedOnDamage('TestPaladin', 'Goblin', campaignName);
-
-    expect(cs.creatures[0].conditions).toEqual([
-      { key: 'blinded' },
-      { key: 'poisoned' },
-    ]);
-    expect(setRuntimeValue).toHaveBeenCalledWith('TestPaladin', 'avengingAngelAuraTargets', [], campaignName);
-  });
-
-  it('should not modify creature if target not in aura targets', async () => {
-    getRuntimeValue.mockReset().mockImplementation((name, key) => {
-      if (key === 'avengingAngelAuraTargets') return ['OtherCreature'];
-      return null;
-    });
-    getCombatContext.mockResolvedValue({
-      creatures: [{
-        name: 'Goblin',
-        conditions: [{ key: 'frightened' }],
-      }],
+      expect(setRuntimeValue).toHaveBeenCalledWith('TestPaladin', 'avengingAngelAuraTargets', [], campaignName);
+      expect(storage.set).not.toHaveBeenCalled();
     });
 
-    await removeFrightenedOnDamage('TestPaladin', 'Goblin', campaignName);
+    it('should handle creature without conditions', async () => {
+      getRuntimeValue.mockImplementation((name, key) => {
+        if (key === 'avengingAngelAuraTargets') return ['Goblin'];
+        if (key === 'activeConditions') return undefined;
+        return null;
+      });
+      getCombatContext.mockResolvedValue({
+        creatures: [{ name: 'Goblin', conditions: undefined }],
+      });
 
-    expect(setRuntimeValue).not.toHaveBeenCalled();
-    expect(storage.set).not.toHaveBeenCalled();
-  });
+      await removeFrightenedOnDamage('TestPaladin', 'Goblin', campaignName);
 
-  it('should not call storage.set when creature not found in combat context', async () => {
-    getRuntimeValue.mockReset().mockReturnValue(['Goblin']);
-    getCombatContext.mockResolvedValue({
-      creatures: [{ name: 'OtherCreature', conditions: [{ key: 'frightened' }] }],
+      expect(setRuntimeValue).toHaveBeenCalledWith('TestPaladin', 'avengingAngelAuraTargets', [], campaignName);
     });
 
-    await removeFrightenedOnDamage('TestPaladin', 'Goblin', campaignName);
+    it('should only remove frightened condition, not others', async () => {
+      getRuntimeValue.mockImplementation((name, key) => {
+        if (key === 'avengingAngelAuraTargets') return ['Goblin'];
+        if (key === 'activeConditions') return ['frightened', 'blinded', 'poisoned'];
+        return null;
+      });
+      getCombatContext.mockResolvedValue({
+        creatures: [{
+          name: 'Goblin',
+          conditions: [{ key: 'frightened' }, { key: 'blinded' }, { key: 'poisoned' }],
+        }],
+      });
 
-    expect(storage.set).not.toHaveBeenCalled();
-    expect(setRuntimeValue).toHaveBeenCalledWith('TestPaladin', 'avengingAngelAuraTargets', [], campaignName);
-  });
+      await removeFrightenedOnDamage('TestPaladin', 'Goblin', campaignName);
 
-  it('should remove target from aura targets list', async () => {
-    getRuntimeValue.mockReturnValue(['Goblin1', 'Goblin2', 'Goblin3']);
-    getCombatContext.mockResolvedValue({
-      creatures: [{ name: 'Goblin2', conditions: [{ key: 'frightened' }] }],
+      expect(setRuntimeValue).toHaveBeenCalledWith('Goblin', 'activeConditions', ['blinded', 'poisoned'], campaignName);
+      expect(setRuntimeValue).toHaveBeenCalledWith('TestPaladin', 'avengingAngelAuraTargets', [], campaignName);
     });
 
-    await removeFrightenedOnDamage('TestPaladin', 'Goblin2', campaignName);
+    it('should not modify creature if target not in aura targets', async () => {
+      getRuntimeValue.mockReset().mockImplementation((name, key) => {
+        if (key === 'avengingAngelAuraTargets') return ['OtherCreature'];
+        return null;
+      });
+      getCombatContext.mockResolvedValue({
+        creatures: [{
+          name: 'Goblin',
+          conditions: [{ key: 'frightened' }],
+        }],
+      });
 
-    expect(setRuntimeValue).toHaveBeenCalledWith('TestPaladin', 'avengingAngelAuraTargets', ['Goblin1', 'Goblin3'], campaignName);
+      await removeFrightenedOnDamage('TestPaladin', 'Goblin', campaignName);
+
+      expect(setRuntimeValue).not.toHaveBeenCalled();
+      expect(storage.set).not.toHaveBeenCalled();
+    });
+
+    it('should not call storage.set when creature not found in combat context', async () => {
+      getRuntimeValue.mockReset().mockReturnValue(['Goblin']);
+      getCombatContext.mockResolvedValue({
+        creatures: [{ name: 'OtherCreature', conditions: [{ key: 'frightened' }] }],
+      });
+
+      await removeFrightenedOnDamage('TestPaladin', 'Goblin', campaignName);
+
+      expect(storage.set).not.toHaveBeenCalled();
+      expect(setRuntimeValue).toHaveBeenCalledWith('TestPaladin', 'avengingAngelAuraTargets', [], campaignName);
+    });
+
+    it('should remove target from aura targets list', async () => {
+      getRuntimeValue.mockImplementation((name, key) => {
+        if (key === 'avengingAngelAuraTargets') return ['Goblin1', 'Goblin2', 'Goblin3'];
+        if (key === 'activeConditions') return ['frightened'];
+        return null;
+      });
+      getCombatContext.mockResolvedValue({
+        creatures: [{ name: 'Goblin2', conditions: [{ key: 'frightened' }] }],
+      });
+
+      await removeFrightenedOnDamage('TestPaladin', 'Goblin2', campaignName);
+
+      expect(setRuntimeValue).toHaveBeenCalledWith('TestPaladin', 'avengingAngelAuraTargets', ['Goblin1', 'Goblin3'], campaignName);
+    });
   });
-});
 
 describe('avengingAngelHandler.handleSaveResult', () => {
   it('should do nothing when event has no detail', () => {

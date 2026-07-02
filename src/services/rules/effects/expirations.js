@@ -1100,16 +1100,9 @@ function clearExpirationEffects(effects, targetName, attackerName, campaignName)
 
 function removeNpcCondition(targetName, conditionName, campaignName) {
     try {
-        const combatData = getCombatSummary(campaignName);
-        if (!combatData || typeof combatData !== 'object') return;
-        const creatures = combatData.creatures;
-        if (!Array.isArray(creatures)) return;
-        const creature = creatures.find(c => utils.getName(c.name) === utils.getName(targetName));
-        if (creature && creature.conditions) {
-            creature.conditions = creature.conditions.filter(c => c.key !== conditionName);
-            storage.set('combatSummary', combatData, campaignName);
-            window.dispatchEvent(new CustomEvent('combat-summary-updated'));
-        }
+        const conditions = getRuntimeValue(targetName, 'activeConditions') || [];
+        const filtered = conditions.filter(c => String(c).toLowerCase() !== conditionName.toLowerCase());
+        setRuntimeValue(targetName, 'activeConditions', filtered, campaignName);
     } catch (_e) { /* ignore */ }
 }
 

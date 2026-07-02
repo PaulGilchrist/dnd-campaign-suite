@@ -163,7 +163,7 @@ describe('SetConditionModal - Side Effects & Edge Cases', () => {
 
   // ── NPC conditions mutation ──
 
-  it('mutates NPC conditions array on failure with proper structure', () => {
+  it('sets NPC conditions via setRuntimeValue on failure with proper structure', () => {
     diceRoller.rollD20.mockReturnValue(5);
 
     const summary = {
@@ -177,16 +177,15 @@ describe('SetConditionModal - Side Effects & Edge Cases', () => {
     fireEvent.click(screen.getAllByRole('checkbox')[0]); // Orc
     fireEvent.click(screen.getByRole('button', { name: /Abjure Foes \(1 target\)/ }));
 
-    const orcConditions = summary.creatures.find(c => c.name === 'Orc').conditions;
-    expect(orcConditions).toHaveLength(1);
-    expect(orcConditions[0].key).toBe('frightened');
-    expect(orcConditions[0].dc).toBe(14);
-    expect(orcConditions[0].ability).toBe('wis');
-    expect(orcConditions[0].label).toBe('Frightened');
-    expect(orcConditions[0].id).toBeDefined();
+    expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
+      'Orc',
+      'activeConditions',
+      expect.arrayContaining(['frightened']),
+      'test-campaign'
+    );
   });
 
-  it('replaces existing condition of same type on NPC', () => {
+  it('replaces existing condition of same type on NPC via setRuntimeValue', () => {
     diceRoller.rollD20.mockReturnValue(5);
 
     const summary = {
@@ -196,13 +195,18 @@ describe('SetConditionModal - Side Effects & Edge Cases', () => {
       ],
     };
 
+    useRuntimeState.getRuntimeValue.mockReturnValue(['frightened']);
+
     render(<SetConditionModal {...makeProps({ combatSummary: summary })} />);
     fireEvent.click(screen.getAllByRole('checkbox')[0]); // Orc
     fireEvent.click(screen.getByRole('button', { name: /Abjure Foes \(1 target\)/ }));
 
-    const orcConditions = summary.creatures.find(c => c.name === 'Orc').conditions;
-    expect(orcConditions).toHaveLength(1);
-    expect(orcConditions[0].id).not.toBe('old-id');
+    expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
+      'Orc',
+      'activeConditions',
+      ['frightened'],
+      'test-campaign'
+    );
   });
 
   it('does not mutate NPC conditions on success', () => {
@@ -285,20 +289,22 @@ describe('SetConditionModal - Side Effects & Edge Cases', () => {
 
   // ── Additional condition with different DC types ──
 
-  it('applies both conditions with correct ability type to NPC', () => {
+  it('applies both conditions with correct ability type to NPC via setRuntimeValue', () => {
     diceRoller.rollD20.mockReturnValue(5);
 
     render(<SetConditionModal {...makeProps({ conditionName: 'frightened', additionalCondition: 'blinded', saveType: 'WIS' })} />);
     fireEvent.click(screen.getAllByRole('checkbox')[0]); // Goblin A
     fireEvent.click(screen.getByRole('button', { name: /Abjure Foes \(1 target\)/ }));
 
-    // The modal uses the mockCombatSummary which has Goblin A
-    const goblinConditions = mockCombatSummary.creatures.find(c => c.name === 'Goblin A').conditions;
-    expect(goblinConditions).toHaveLength(2);
-    expect(goblinConditions.find(c => c.key === 'frightened')).toBeDefined();
-    expect(goblinConditions.find(c => c.key === 'blinded')).toBeDefined();
-    expect(goblinConditions[0].ability).toBe('wis');
-    expect(goblinConditions[1].ability).toBe('wis');
+    // The component calls setRuntimeValue twice (once for each condition)
+    expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledTimes(2);
+    const calls = useRuntimeState.setRuntimeValue.mock.calls;
+    expect(calls[0][0]).toBe('Goblin A');
+    expect(calls[0][1]).toBe('activeConditions');
+    expect(calls[0][2]).toContain('frightened');
+    expect(calls[1][0]).toBe('Goblin A');
+    expect(calls[1][1]).toBe('activeConditions');
+    expect(calls[1][2]).toContain('blinded');
   });
 
   // ── Log condition fetch body validation ──

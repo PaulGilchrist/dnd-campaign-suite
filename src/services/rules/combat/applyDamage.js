@@ -329,10 +329,11 @@ export function applyDamageToTarget(combatSummary, targetName, rawDamage, damage
         });
       }
     } else {
-      const rawConditions = creature.conditions || [];
-      const hadFrightened = rawConditions.some(c => c.key === 'frightened');
+      const rawConditions = getRuntimeValue(creature.name, 'activeConditions') || [];
+      const hadFrightened = rawConditions.some(c => String(c).toLowerCase() === 'frightened');
       if (hadFrightened) {
-        creature.conditions = rawConditions.filter(c => c.key !== 'frightened');
+        const filtered = rawConditions.filter(c => String(c).toLowerCase() !== 'frightened');
+        setRuntimeValue(creature.name, 'activeConditions', filtered, campaignName);
         postLogEntry(campaignName, {
           type: 'condition',
           action: 'removed',
@@ -342,9 +343,10 @@ export function applyDamageToTarget(combatSummary, targetName, rawDamage, damage
           timestamp: Date.now(),
         });
       }
-      const charmedOnDamage = rawConditions.find(c => c.key === 'charmed' && c.endsOnDamage);
-      if (charmedOnDamage) {
-        creature.conditions = rawConditions.filter(c => c.key !== 'charmed');
+      const hadCharmed = rawConditions.some(c => String(c).toLowerCase() === 'charmed');
+      if (hadCharmed) {
+        const filtered = rawConditions.filter(c => String(c).toLowerCase() !== 'charmed');
+        setRuntimeValue(creature.name, 'activeConditions', filtered, campaignName);
         postLogEntry(campaignName, {
           type: 'condition',
           action: 'removed',

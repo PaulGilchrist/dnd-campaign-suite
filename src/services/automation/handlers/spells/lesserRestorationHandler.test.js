@@ -383,7 +383,7 @@ describe('lesserRestorationHandler.applyLesserRestoration', () => {
       expect(addEntry).not.toHaveBeenCalled();
     });
 
-    it('should update combatSummary creature conditions via storage', async () => {
+    it('should update creature conditions via setRuntimeValue and not persist via storage', async () => {
       getCombatContext.mockResolvedValue({
         creatures: [{ name: 'Ally1', conditions: [{ key: 'Blinded' }, { key: 'Poisoned' }] }],
       });
@@ -397,20 +397,8 @@ describe('lesserRestorationHandler.applyLesserRestoration', () => {
         { targetName: 'Ally1', condition: 'Blinded' },
       );
 
-      expect(storage.set).toHaveBeenCalledWith(
-        'combatSummary',
-        expect.objectContaining({
-          creatures: expect.arrayContaining([
-            expect.objectContaining({
-              name: 'Ally1',
-              conditions: expect.arrayContaining([
-                expect.objectContaining({ key: 'Poisoned' }),
-              ]),
-            }),
-          ]),
-        }),
-        campaignName,
-      );
+      expect(setRuntimeValue).toHaveBeenCalledWith('Ally1', 'activeConditions', ['Poisoned'], campaignName);
+      expect(storage.set).not.toHaveBeenCalled();
     });
 
     it('should not call storage.set when combatSummary is missing', async () => {

@@ -2,7 +2,6 @@ import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useR
 import { addEntry } from '../../../ui/logService.js';
 import { addExpiration } from '../../../rules/effects/expirations.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
-import storage from '../../../ui/storage.js';
 
 import { rollD20 } from '../../../dice/diceRoller.js';
 import { getAbilityModifier } from '../../../shared/abilityLookup.js';
@@ -133,7 +132,7 @@ async function resolveFrightfulAura(action, playerStats, campaignName) {
 
             if (!success) {
                 // Apply frightened condition
-                applyFrightenedToCreature(creature, saveDc);
+                await applyFrightenedToCreature(creature.name, saveDc, campaignName);
                 auraTargets.push(creature.name);
 
                 // Add expiration - 1 minute (10 rounds) or until taking damage
@@ -164,20 +163,11 @@ async function resolveFrightfulAura(action, playerStats, campaignName) {
     await setRuntimeValue(playerName, AVENGING_ANGEL_AURA_KEY, auraTargets, campaignName);
 }
 
-function applyFrightenedToCreature(creature, saveDc) {
-    const conditions = creature.conditions || [];
+async function applyFrightenedToCreature(targetName, saveDc, campaignName) {
+    const conditions = getRuntimeValue(targetName, 'activeConditions', campaignName) || [];
     // Don't duplicate
-    if (conditions.some(c => c.key === 'frightened')) return;
-
-    conditions.push({
-        id: utils.guid(),
-        key: 'frightened',
-        label: 'Frightened',
-        dc: saveDc,
-        ability: 'wisdom',
-        source: 'Avenging Angel',
-    });
-    creature.conditions = conditions;
+    if (conditions.some(c => String(c).toLowerCase() === 'frightened')) return;
+    setRuntimeValue(targetName, 'activeConditions', [...conditions, 'frightened'], campaignName);
 }
 
 export async function handleSaveResult(event) {
@@ -211,14 +201,11 @@ export async function removeFrightenedOnDamage(playerName, targetName, campaignN
     const auraTargets = getRuntimeValue(playerName, AVENGING_ANGEL_AURA_KEY, campaignName) || [];
     if (!auraTargets.includes(targetName)) return;
 
-    // Remove frightened condition from the creature in combat context
-    const combatSummary = await getCombatContext(campaignName);
-    if (combatSummary && combatSummary.creatures) {
-        const creature = combatSummary.creatures.find(c => c.name === targetName);
-        if (creature && creature.conditions) {
-            creature.conditions = creature.conditions.filter(c => c.key !== 'frightened');
-            storage.set('combatSummary', combatSummary, campaignName);
-        }
+    // Remove frightened condition from the target
+    const conditions = getRuntimeValue(targetName, 'activeConditions', campaignName) || [];
+    const filtered = conditions.filter(c => String(c).toLowerCase() !== 'frightened');
+    if (filtered.length !== conditions.length) {
+        setRuntimeValue(targetName, 'activeConditions', filtered, campaignName);
     }
 
     // Remove from aura targets

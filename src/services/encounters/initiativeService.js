@@ -30,7 +30,6 @@ function setupCreatures(characters, npcCount, getName) {
             ac: 10,
             resistances: [],
             immunities: [],
-            conditions: [],
             concentration: null,
             maxHp: 10,
             currentHp: 10,
@@ -56,7 +55,6 @@ function addNpc(combatSummary) {
         ac: 10,
         resistances: [],
         immunities: [],
-        conditions: [],
         concentration: null,
         maxHp: 10,
         currentHp: 10,
@@ -179,7 +177,7 @@ function mergeCombatSummaryWithCharacters(initialSummary, characters, getName) {
                 return { ...c, initiative: c.initiative ?? '', targetName: c.targetName ?? null, concentration: c.concentration ?? null }
             }
         }
-        return { ...c, conditions: c.conditions || [], concentration: c.concentration ?? null, currentHp: c.currentHp ?? c.maxHp ?? 10, maxHp: c.maxHp ?? 10, saveBonuses: c.saveBonuses || {} }
+        return { ...c, concentration: c.concentration ?? null, currentHp: c.currentHp ?? c.maxHp ?? 10, maxHp: c.maxHp ?? 10, saveBonuses: c.saveBonuses || {} }
     })
     const newPlayerCreatures = characters
         .filter(ch => !creatureNameSet.has(getName(ch.name)))

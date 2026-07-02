@@ -42,17 +42,10 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     const updatedEffects = [...storedEffects, newEffect];
     setRuntimeValue(campaignName, 'targetEffects', updatedEffects, campaignName);
 
-    const combatContext = await getCombatContext(campaignName);
-    if (combatContext && combatContext.creatures) {
-        const targetCreature = combatContext.creatures.find(c => c.name === targetName);
-        if (targetCreature) {
-            const conditions = targetCreature.conditions || [];
-            const speedZeroAlready = conditions.some(c => c.key === 'speed_zero');
-            if (!speedZeroAlready) {
-                conditions.push({ key: 'speed_zero', source: action.name });
-                setRuntimeValue(campaignName, 'combatContext', combatContext, campaignName);
-            }
-        }
+    const conditions = getRuntimeValue(targetName, 'activeConditions', campaignName) || [];
+    const speedZeroAlready = conditions.some(c => String(c).toLowerCase() === 'speed_zero');
+    if (!speedZeroAlready) {
+        setRuntimeValue(targetName, 'activeConditions', [...conditions, 'speed_zero'], campaignName);
     }
 
     return {

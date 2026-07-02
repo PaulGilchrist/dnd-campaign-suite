@@ -221,7 +221,7 @@ describe('searingVengeanceHandler.handle', () => {
   });
 
   describe('condition clearing', () => {
-    it('clears all conditions from the creature in combatSummary', async () => {
+    it('clears all conditions from the creature via setRuntimeValue', async () => {
       mockRuntimeValues({ searingvengeanceUses: 1 });
       const cs = {
         creatures: [{
@@ -238,8 +238,12 @@ describe('searingVengeanceHandler.handle', () => {
 
       await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-      expect(cs.creatures[0].conditions).toEqual([]);
-      expect(storage.set).toHaveBeenCalledWith('combatSummary', cs, campaignName);
+      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
+        'Ally',
+        'activeConditions',
+        [],
+        campaignName
+      );
     });
 
     it('does not error when creature has no conditions array', async () => {
@@ -258,7 +262,7 @@ describe('searingVengeanceHandler.handle', () => {
 
       await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-      // No storage.set for conditions since creature.conditions is undefined
+      // No direct mutation since creature.conditions is undefined
       // but healing and damage should still proceed
       expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
         'Ally',

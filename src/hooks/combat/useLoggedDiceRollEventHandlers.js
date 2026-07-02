@@ -222,15 +222,9 @@ export function setupEventListeners(deps) {
                         setRuntimeValue(targetName, 'activeConditions', [...filtered, condKey], pending.campaignName);
                         effectsToExpire.push({ type: 'condition', condition: condKey });
                     } else if (targetCreature) {
-                        targetCreature.conditions = (targetCreature.conditions || []).filter(c => c.key !== condKey);
-                        targetCreature.conditions.push({
-                            id: utils.guid(),
-                            key: condKey,
-                            label: effect.charAt(0).toUpperCase() + effect.slice(1),
-                            dc: pending.saveDc,
-                            ability: pending.saveType.toLowerCase(),
-                            endsOnDamage: true,
-                        });
+                        const conditions = getRuntimeValue(targetName, 'activeConditions') || [];
+                        const filtered = conditions.filter(c => String(c).toLowerCase() !== condKey);
+                        setRuntimeValue(targetName, 'activeConditions', [...filtered, condKey], pending.campaignName);
                         effectsToExpire.push({ type: 'condition', condition: condKey });
                     }
                 }

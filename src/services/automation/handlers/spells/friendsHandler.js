@@ -3,18 +3,11 @@ import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useR
 import { addEntry } from '../../../ui/logService.js';
 import { addExpiration } from '../../../rules/effects/expirations.js';
 import { postLogEntry } from '../../../shared/logPoster.js';
-import { getCombatContext } from '../../../rules/combat/damageUtils.js';
-import storage from '../../../ui/storage.js';
 
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation || {};
     const dc = buildSaveDc(auto, playerStats);
     const targetName = auto.targetName || 'Unknown';
-
-    // Check target is in combat context (player or NPC)
-    const combatSummary = await getCombatContext(campaignName);
-    const targetCreature = combatSummary?.creatures?.find(c => c.name === targetName);
-    const isPlayerTarget = targetCreature?.type === 'player';
 
     // Track active Friends for early-end conditions
     const activeKey = `_activeFriends_${playerStats.name}`;
@@ -65,23 +58,9 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     // ── Failed save: apply Charmed ──
 
     const condKey = 'charmed';
-
-    if (isPlayerTarget) {
-        const conditions = getRuntimeValue(targetName, 'activeConditions', campaignName) || [];
-        const filtered = conditions.filter(c => String(c).toLowerCase() !== condKey);
-        setRuntimeValue(targetName, 'activeConditions', [...filtered, condKey], campaignName);
-    } else if (targetCreature) {
-        targetCreature.conditions = (targetCreature.conditions || []).filter(c => c.key !== condKey);
-        targetCreature.conditions.push({
-            id: crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`,
-            key: condKey,
-            label: 'Charmed',
-            dc: dc,
-            ability: 'wis',
-            endsOnDamage: true,
-        });
-        storage.set('combatSummary', combatSummary, campaignName);
-    }
+    const conditions = getRuntimeValue(targetName, 'activeConditions', campaignName) || [];
+    const filtered = conditions.filter(c => String(c).toLowerCase() !== condKey);
+    setRuntimeValue(targetName, 'activeConditions', [...filtered, condKey], campaignName);
 
     // Apply expiration (2 rounds = 12 seconds minimum; concentration handles the rest)
     addExpiration(playerStats.name, targetName, [

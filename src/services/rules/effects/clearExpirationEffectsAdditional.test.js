@@ -98,17 +98,19 @@ describe('removeNpcCondition (via condition effect type)', () => {
 
     clearAllExpirationEffects('Goblin', 'MyCampaign');
 
-    expect(storage.set).toHaveBeenCalledWith(
-      'combatSummary',
-      {
-        creatures: [
-          { name: 'Goblin', conditions: [] },
-          { name: 'Orc', conditions: [{ key: 'exhausted' }] },
-        ],
-      },
+    // removeNpcCondition reads from runtime store (['poisoned']), filters out 'poisoned' → []
+    expect(setRuntimeValue).toHaveBeenCalledWith(
+      'Orc',
+      'activeConditions',
+      [],
       'MyCampaign',
     );
-    expect(window.dispatchEvent).toHaveBeenCalled();
+    expect(setRuntimeValue).toHaveBeenCalledWith(
+      'Goblin',
+      'pendingExpirations',
+      [],
+      'MyCampaign',
+    );
   });
 
   it('does nothing when NPC not found in combat summary', () => {

@@ -524,15 +524,9 @@ export function createLogDamageAndShow(deps) {
                     const filtered = conditions.filter(c => String(c).toLowerCase() !== condKey);
                     setRuntimeValue(target.name, 'activeConditions', [...filtered, condKey], campaignName);
                 } else {
-                    target.conditions = (target.conditions || []).filter(c => c.key !== condKey);
-                    target.conditions.push({
-                        id: utils.guid(),
-                        key: condKey,
-                        label: effect.charAt(0).toUpperCase() + effect.slice(1),
-                        dc: saveDc,
-                        ability: saveType.toLowerCase(),
-                        endsOnDamage: true,
-                    });
+                    const conditions = getRuntimeValue(target.name, 'activeConditions') || [];
+                    const filtered = conditions.filter(c => String(c).toLowerCase() !== condKey);
+                    setRuntimeValue(target.name, 'activeConditions', [...filtered, condKey], campaignName);
                 }
             }
         }
@@ -1202,9 +1196,9 @@ export function createLogDamageAndShow(deps) {
                         setRuntimeValue(target.name, 'activeConditions', [...conditions, 'Prone'], campaignName);
                     }
                 } else {
-                    target.conditions = target.conditions || [];
-                    if (!target.conditions.some(c => String(c.key).toLowerCase() === 'prone')) {
-                        target.conditions.push({ key: 'prone' });
+                    const conditions = getRuntimeValue(target.name, 'activeConditions') || [];
+                    if (!conditions.some(c => String(c).toLowerCase() === 'prone')) {
+                        setRuntimeValue(target.name, 'activeConditions', [...conditions, 'Prone'], campaignName);
                     }
                 }
                 logEntry({

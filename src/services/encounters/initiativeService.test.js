@@ -87,7 +87,6 @@ describe('initiativeService', () => {
       expect(npc.currentHp).toBe(10);
       expect(npc.resistances).toEqual([]);
       expect(npc.immunities).toEqual([]);
-      expect(npc.conditions).toEqual([]);
       expect(npc.saveBonuses).toEqual({});
     });
 
@@ -670,20 +669,12 @@ describe('initiativeService', () => {
       expect(result.round).toBe(3);
     });
 
-    it('merges NPC conditions when present', () => {
+    it('preserves NPC conditions when present', () => {
       const initialSummary = makeSummary([
         { name: 'NPC 1', type: 'npc', conditions: ['poisoned', 'blinded'] },
       ]);
       const result = mergeCombatSummaryWithCharacters(initialSummary, [], getName);
       expect(result.creatures[0].conditions).toEqual(['poisoned', 'blinded']);
-    });
-
-    it('defaults NPC conditions to empty array when not present', () => {
-      const initialSummary = makeSummary([
-        { name: 'NPC 1', type: 'npc' },
-      ]);
-      const result = mergeCombatSummaryWithCharacters(initialSummary, [], getName);
-      expect(result.creatures[0].conditions).toEqual([]);
     });
   });
 });

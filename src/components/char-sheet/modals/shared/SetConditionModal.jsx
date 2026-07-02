@@ -32,14 +32,9 @@ function SetConditionModal({ combatSummary, attackerName, attackerPos, saveDc, c
             const filtered = conditions.filter(c => String(c).toLowerCase() !== condKey);
             setRuntimeValue(creature.name, 'activeConditions', [...filtered, condKey], campaignName);
         } else {
-            creature.conditions = (creature.conditions || []).filter(c => c.key !== condKey);
-            creature.conditions.push({
-                id: utils.guid(),
-                key: condKey,
-                label: condName.charAt(0).toUpperCase() + condName.slice(1),
-                dc: saveDcValue,
-                ability: saveType.toLowerCase(),
-            });
+            const conditions = getRuntimeValue(creature.name, 'activeConditions') || [];
+            const filtered = conditions.filter(c => String(c).toLowerCase() !== condKey);
+            setRuntimeValue(creature.name, 'activeConditions', [...filtered, condKey], campaignName);
         }
     }, [campaignName, characters, saveType]);
 

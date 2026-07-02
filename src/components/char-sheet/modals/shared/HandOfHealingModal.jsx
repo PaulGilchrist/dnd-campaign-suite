@@ -1,7 +1,6 @@
 import React, { useCallback } from 'react'
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js'
 import utils from '../../../../services/ui/utils.js'
-import storage from '../../../../services/ui/storage.js'
 import { addEntry } from '../../../../services/ui/logService.js'
 import { getCombatSummary } from '../../../../services/encounters/combatData.js'
 import '../../CharSheet.css'
@@ -64,9 +63,9 @@ function HandOfHealingModal({ healName, formula, rolls, bonus, healAmount, monkN
             if (combatSummary) {
                 const creature = combatSummary.creatures?.find(c => utils.getName(c.name) === utils.getName(targetName));
                 if (creature && Array.isArray(creature.conditions)) {
-                    creature.conditions = creature.conditions.filter(c => !conditionMatches(String(c.key).toLowerCase(), conditionName.toLowerCase()));
-                    storage.set('combatSummary', combatSummary, campaignName);
-                    window.dispatchEvent(new CustomEvent('combat-summary-updated'));
+                    const conditions = getRuntimeValue(targetName, 'activeConditions') || [];
+                    const filtered = conditions.filter(c => !conditionMatches(String(c).toLowerCase(), conditionName.toLowerCase()));
+                    setRuntimeValue(targetName, 'activeConditions', filtered, campaignName);
                  }
              }
          } catch { /* ignore */ }

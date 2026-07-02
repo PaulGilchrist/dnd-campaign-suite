@@ -3,7 +3,6 @@ import { addEntry } from '../../../ui/logService.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { getDistanceFeet, rangeToFeet } from '../../../rules/combat/rangeValidation.js';
 import { resolveMapPositions } from '../../common/targetResolver.js';
-import storage from '../../../ui/storage.js';
 import { postLogEntry } from '../../../shared/logPoster.js';
 
 export async function handle(action, playerStats, campaignName, mapName) {
@@ -122,13 +121,17 @@ export async function handleConfirm(action, playerStats, campaignName, _mapName,
             }
         }
     } else if (creature) {
-        const hadCharmed = (creature.conditions || []).some(c => c.key === 'charmed');
-        const hadIncapacitated = (creature.conditions || []).some(c => c.key === 'incapacitated');
-        creature.conditions = (creature.conditions || []).filter(c => {
-            const cl = String(c.key).toLowerCase();
+        const conditions = getRuntimeValue(targetName, 'activeConditions', campaignName) || [];
+        const condArray = Array.isArray(conditions) ? conditions : [];
+        const hadCharmed = condArray.some(c => String(c).toLowerCase() === 'charmed');
+        const hadIncapacitated = condArray.some(c => String(c).toLowerCase() === 'incapacitated');
+        const filtered = condArray.filter(c => {
+            const cl = String(c).toLowerCase();
             return cl !== 'charmed' && cl !== 'incapacitated' && cl !== 'speed_zero';
         });
-        storage.set('combatSummary', combatSummary, campaignName);
+        if (filtered.length !== condArray.length) {
+            setRuntimeValue(targetName, 'activeConditions', filtered, campaignName);
+        }
         if (hadCharmed) {
             postLogEntry(campaignName, {
                 type: 'condition',

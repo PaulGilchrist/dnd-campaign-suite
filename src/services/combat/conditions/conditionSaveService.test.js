@@ -725,28 +725,58 @@ describe('removeCondition', () => {
   });
 
   describe('monster creatures', () => {
-    it('removes condition by id from monster conditions array', () => {
-      const combatSummary = {
-        creatures: [
-          { type: 'monster', name: 'Orc', conditions: [{ id: 'a', key: 'blinded' }, { id: 'b', key: 'charmed' }] },
-        ],
-      };
+    it('removes condition by key from activeConditions array', () => {
+      const getRV = makeGetRuntimeValue({
+        'Orc:activeConditions': ['blinded', 'charmed'],
+      });
+      const setRV = makeSetRuntimeValue();
 
-      removeCondition(combatSummary, 'Orc', { id: 'a' }, null, null, '');
+      removeCondition(
+        { creatures: [{ type: 'monster', name: 'Orc' }] },
+        'Orc',
+        { key: 'blinded' },
+        getRV,
+        setRV,
+        '',
+      );
 
-      expect(combatSummary.creatures[0].conditions).toEqual([{ id: 'b', key: 'charmed' }]);
+      expect(setRV).toHaveBeenCalledWith('Orc', 'activeConditions', ['charmed'], '');
     });
 
-    it('leaves monster conditions unchanged when id does not match', () => {
-      const combatSummary = {
-        creatures: [
-          { type: 'monster', name: 'Orc', conditions: [{ id: 'c', key: 'grappled' }] },
-        ],
-      };
+    it('removes condition when condition is passed as a plain string', () => {
+      const getRV = makeGetRuntimeValue({
+        'Orc:activeConditions': ['frightened', 'grappled'],
+      });
+      const setRV = makeSetRuntimeValue();
 
-      removeCondition(combatSummary, 'Orc', { id: 'x' }, null, null, '');
+      removeCondition(
+        { creatures: [{ type: 'monster', name: 'Orc' }] },
+        'Orc',
+        'Frightened',
+        getRV,
+        setRV,
+        '',
+      );
 
-      expect(combatSummary.creatures[0].conditions).toEqual([{ id: 'c', key: 'grappled' }]);
+      expect(setRV).toHaveBeenCalledWith('Orc', 'activeConditions', ['grappled'], '');
+    });
+
+    it('leaves monster conditions unchanged when key does not match', () => {
+      const getRV = makeGetRuntimeValue({
+        'Orc:activeConditions': ['blinded'],
+      });
+      const setRV = makeSetRuntimeValue();
+
+      removeCondition(
+        { creatures: [{ type: 'monster', name: 'Orc' }] },
+        'Orc',
+        { key: 'paralyzed' },
+        getRV,
+        setRV,
+        '',
+      );
+
+      expect(setRV).toHaveBeenCalledWith('Orc', 'activeConditions', ['blinded'], '');
     });
   });
 
@@ -766,12 +796,19 @@ describe('removeCondition', () => {
       expect(setRV).not.toHaveBeenCalled();
     });
 
-    it('does not mutate combatSummary when monster creature is not found', () => {
-      const combatSummary = { creatures: [{ type: 'monster', name: 'Orc' }] };
+    it('does not call setRuntimeValue when monster creature is not found', () => {
+      const setRV = makeSetRuntimeValue();
 
-      removeCondition(combatSummary, 'Ghost', { id: 'x' }, vi.fn(), vi.fn(), '');
+      removeCondition(
+        { creatures: [{ type: 'monster', name: 'Orc' }] },
+        'Ghost',
+        { key: 'blinded' },
+        vi.fn(),
+        setRV,
+        '',
+      );
 
-      expect(combatSummary.creatures).toEqual([{ type: 'monster', name: 'Orc' }]);
+      expect(setRV).not.toHaveBeenCalled();
     });
   });
 });
@@ -929,116 +966,65 @@ describe('addCondition', () => {
     });
   });
 
-  describe('monster creature — add inline condition object', () => {
-    it('adds a new condition object to the monster conditions array', () => {
+  describe('monster creature — add to activeConditions', () => {
+    it('appends new condition key to existing conditions', () => {
       playerIsImmuneToCondition.mockReturnValue(false);
-      const combatSummary = {
-        creatures: [
-          { type: 'npc', name: 'Goblin', conditions: [] },
-        ],
-      };
+      const getRV = makeGetRuntimeValue({ 'Goblin:activeConditions': ['blinded'] });
+      const setRV = makeSetRuntimeValue();
 
       addCondition(
-        combatSummary,
+        { creatures: [{ type: 'npc', name: 'Goblin' }] },
         'Goblin',
         { key: 'frightened', label: 'Frightened' },
         13,
         'wis',
-        vi.fn(),
-        vi.fn(),
+        getRV,
+        setRV,
         '',
         null,
       );
 
-      const condition = combatSummary.creatures[0].conditions[0];
-      expect(condition.key).toBe('frightened');
-      expect(condition.label).toBe('Frightened');
-      expect(condition.dc).toBe(13);
-      expect(condition.ability).toBe('wis');
-      expect(condition.id).toBeDefined();
+      expect(setRV).toHaveBeenCalledWith('Goblin', 'activeConditions', ['blinded', 'frightened'], '');
     });
 
-    it('replaces existing condition with matching key before adding', () => {
+    it('replaces existing condition with matching key (case-insensitive)', () => {
       playerIsImmuneToCondition.mockReturnValue(false);
-      const combatSummary = {
-        creatures: [
-          { type: 'npc', name: 'Goblin', conditions: [{ id: 'x', key: 'blinded' }] },
-        ],
-      };
+      const getRV = makeGetRuntimeValue({ 'Goblin:activeConditions': ['Blinded'] });
+      const setRV = makeSetRuntimeValue();
 
       addCondition(
-        combatSummary,
+        { creatures: [{ type: 'npc', name: 'Goblin' }] },
         'Goblin',
         { key: 'blinded', label: 'Blinded' },
         10,
         'null',
-        vi.fn(),
-        vi.fn(),
+        getRV,
+        setRV,
         '',
         null,
       );
 
-      const conditions = combatSummary.creatures[0].conditions;
-      expect(conditions.length).toBe(1);
-      expect(conditions[0].key).toBe('blinded');
+      expect(setRV).toHaveBeenCalledWith('Goblin', 'activeConditions', ['blinded'], '');
     });
 
-    it('generates a string id using crypto.randomUUID when available', () => {
+    it('handles null activeConditions by treating as empty array', () => {
       playerIsImmuneToCondition.mockReturnValue(false);
-      const combatSummary = {
-        creatures: [
-          { type: 'npc', name: 'Orc', conditions: [] },
-        ],
-      };
+      const getRV = vi.fn(() => null);
+      const setRV = makeSetRuntimeValue();
 
       addCondition(
-        combatSummary,
+        { creatures: [{ type: 'npc', name: 'Orc' }] },
         'Orc',
         { key: 'stunned', label: 'Stunned' },
         10,
         'con',
-        vi.fn(),
-        vi.fn(),
+        getRV,
+        setRV,
         '',
         null,
       );
 
-      expect(typeof combatSummary.creatures[0].conditions[0].id).toBe('string');
-    });
-
-    it('falls back to timestamp-based id when crypto.randomUUID is unavailable', () => {
-      playerIsImmuneToCondition.mockReturnValue(false);
-
-      const originalDescriptor = Object.getOwnPropertyDescriptor(globalThis.crypto, 'randomUUID');
-      Object.defineProperty(globalThis.crypto, 'randomUUID', { value: undefined, configurable: true });
-
-      try {
-        const combatSummary = {
-          creatures: [
-            { type: 'npc', name: 'Orc', conditions: [] },
-          ],
-        };
-
-        addCondition(
-          combatSummary,
-          'Orc',
-          { key: 'stunned', label: 'Stunned' },
-          10,
-          'con',
-          vi.fn(),
-          vi.fn(),
-          '',
-          null,
-        );
-
-        const id = combatSummary.creatures[0].conditions[0].id;
-        expect(typeof id).toBe('string');
-        expect(id).toMatch(/^\d+-/);
-      } finally {
-        if (originalDescriptor) {
-          Object.defineProperty(globalThis.crypto, 'randomUUID', originalDescriptor);
-        }
-      }
+      expect(setRV).toHaveBeenCalledWith('Orc', 'activeConditions', ['stunned'], '');
     });
   });
 
@@ -1062,21 +1048,21 @@ describe('addCondition', () => {
     });
 
     it('does nothing for monster when creature name is not in combatSummary', () => {
-      const combatSummary = { creatures: [{ type: 'npc', name: 'Orc' }] };
+      const setRV = makeSetRuntimeValue();
 
       addCondition(
-        combatSummary,
+        { creatures: [{ type: 'npc', name: 'Orc' }] },
         'NonExistent',
         { key: 'blinded', label: 'Blinded' },
         10,
         'null',
         vi.fn(),
-        vi.fn(),
+        setRV,
         '',
         null,
       );
 
-      expect(combatSummary.creatures).toEqual([{ type: 'npc', name: 'Orc' }]);
+      expect(setRV).not.toHaveBeenCalled();
     });
   });
 });

@@ -261,7 +261,7 @@ describe('greaterRestorationHandler.applyGreaterRestoration', () => {
       expect(result.payload.description).toContain('No removable effects found');
     });
 
-    it('should update combat summary creature conditions and persist via storage', async () => {
+    it('should update creature conditions via setRuntimeValue and not persist via storage', async () => {
       getRuntimeValue.mockImplementation((target, prop) => {
         if (prop === 'activeConditions') return ['Paralyzed'];
         return null;
@@ -276,7 +276,8 @@ describe('greaterRestorationHandler.applyGreaterRestoration', () => {
         { targetName: 'Goblin', selections: [{ type: 'condition', condition: 'Paralyzed' }] },
       );
 
-      expect(storage.set).toHaveBeenCalledWith('combatSummary', expect.any(Object), campaignName);
+      expect(setRuntimeValue).toHaveBeenCalledWith('Goblin', 'activeConditions', [], campaignName);
+      expect(storage.set).not.toHaveBeenCalled();
     });
 
     it('should handle missing creature in combat summary gracefully', async () => {

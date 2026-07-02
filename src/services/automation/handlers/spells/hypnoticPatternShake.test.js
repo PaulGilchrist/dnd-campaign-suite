@@ -39,7 +39,6 @@ import { handle, handleConfirm } from './hypnoticPatternShake.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { postLogEntry } from '../../../shared/logPoster.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
-import storage from '../../../ui/storage.js';
 import { addEntry } from '../../../ui/logService.js';
 import { resolveMapPositions } from '../../common/targetResolver.js';
 
@@ -464,17 +463,24 @@ describe('handleConfirm', () => {
         getCombatContext.mockResolvedValue({
             creatures: [{ name: 'Goblin', type: 'npc', conditions: [{ key: 'charmed' }, { key: 'incapacitated' }, { key: 'poisoned' }] }],
         });
+        getRuntimeValue.mockReturnValue(['charmed', 'incapacitated', 'poisoned']);
 
         const result = await handleConfirm(makeAction(), makePlayerStats(), campaignName, mapName, 'Goblin');
 
         expect(result.type).toBe('popup');
-        expect(storage.set).toHaveBeenCalledWith('combatSummary', expect.any(Object), campaignName);
+        expect(setRuntimeValue).toHaveBeenCalledWith(
+            'Goblin',
+            'activeConditions',
+            ['poisoned'],
+            campaignName,
+        );
     });
 
     it('posts condition log entries for npc with charmed and incapacitated', async () => {
         getCombatContext.mockResolvedValue({
             creatures: [{ name: 'Goblin', type: 'npc', conditions: [{ key: 'charmed' }, { key: 'incapacitated' }] }],
         });
+        getRuntimeValue.mockReturnValue(['charmed', 'incapacitated']);
 
         await handleConfirm(makeAction(), makePlayerStats(), campaignName, mapName, 'Goblin');
 
@@ -493,10 +499,12 @@ describe('handleConfirm', () => {
         getCombatContext.mockResolvedValue({
             creatures: [{ name: 'Goblin', type: 'npc', conditions: [{ key: 'poisoned' }] }],
         });
+        getRuntimeValue.mockReturnValue(['poisoned']);
 
         const result = await handleConfirm(makeAction(), makePlayerStats(), campaignName, mapName, 'Goblin');
 
         expect(result.type).toBe('popup');
+        expect(setRuntimeValue).not.toHaveBeenCalled();
         expect(postLogEntry).not.toHaveBeenCalled();
     });
 
@@ -504,16 +512,14 @@ describe('handleConfirm', () => {
         getCombatContext.mockResolvedValue({
             creatures: [{ name: 'Goblin', type: 'npc', conditions: [{ key: 'speed_zero' }, { key: 'poisoned' }] }],
         });
+        getRuntimeValue.mockReturnValue(['speed_zero', 'poisoned']);
 
         await handleConfirm(makeAction(), makePlayerStats(), campaignName, mapName, 'Goblin');
 
-        expect(storage.set).toHaveBeenCalledWith(
-            'combatSummary',
-            expect.objectContaining({
-                creatures: [expect.objectContaining({
-                    conditions: [{ key: 'poisoned' }]
-                })]
-            }),
+        expect(setRuntimeValue).toHaveBeenCalledWith(
+            'Goblin',
+            'activeConditions',
+            ['poisoned'],
             campaignName,
         );
     });

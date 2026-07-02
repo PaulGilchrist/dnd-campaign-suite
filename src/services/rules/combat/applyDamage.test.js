@@ -429,17 +429,18 @@ describe('applyDamageToTarget', () => {
       });
       const cs = makeCombatSummary([npc]);
       applyDamageToTarget(cs, 'Wolf', 3, ['Bludgeoning'], 'TestCampaign', [createMinimalCharacter('Wolf')]);
-      expect(npc.conditions).toEqual([]);
+      expect(setRuntimeValue).toHaveBeenCalledWith('Wolf', 'activeConditions', [], 'TestCampaign');
     });
 
     it('removes frightened condition on NPC monster when taking damage > 0', () => {
+      stubNpcRuntime(10, ['frightened']);
       const npc = createNpcCreature('Goblin', 10, 10, {
         type: 'monster',
         conditions: [{ key: 'frightened' }],
       });
       const cs = makeCombatSummary([npc]);
       applyDamageToTarget(cs, 'Goblin', 3, ['Bludgeoning'], 'TestCampaign', [createMinimalCharacter('Goblin')]);
-      expect(npc.conditions).toEqual([]);
+      expect(setRuntimeValue).toHaveBeenCalledWith('Goblin', 'activeConditions', [], 'TestCampaign');
     });
 
     it('updates concentration DC on NPC when damage > 0', () => {

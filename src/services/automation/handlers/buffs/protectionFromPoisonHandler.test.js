@@ -303,7 +303,7 @@ describe('protectionFromPoisonHandler', () => {
             expect(result.type).toBe('popup');
         });
 
-        it('updates combat context creature conditions when combat context exists', async () => {
+        it('updates creature conditions via setRuntimeValue when combat context exists', async () => {
             useRuntimeState.getRuntimeValue
                 .mockReturnValueOnce(['poisoned'])
                 .mockReturnValueOnce([]);
@@ -322,11 +322,13 @@ describe('protectionFromPoisonHandler', () => {
                 { targetName: PLAYER_NAME }
             );
 
-            expect(storage.set).toHaveBeenCalledWith(
-                'combatSummary',
-                expect.any(Object),
+            expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
+                PLAYER_NAME,
+                'activeConditions',
+                [],
                 CAMPAIGN_NAME
             );
+            expect(storage.set).not.toHaveBeenCalled();
             expect(result.payload.description).toContain('Protection from Poison');
         });
 

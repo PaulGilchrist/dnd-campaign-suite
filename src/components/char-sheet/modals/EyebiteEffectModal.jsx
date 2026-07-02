@@ -35,14 +35,9 @@ function EyebiteEffectModal({ combatSummary, attackerName, attackerPos, saveDc, 
             const filtered = conditions.filter(c => String(c).toLowerCase() !== condKey);
             setRuntimeValue(creature.name, 'activeConditions', [...filtered, condKey], campaignName);
         } else {
-            creature.conditions = (creature.conditions || []).filter(c => c.key !== condKey);
-            creature.conditions.push({
-                id: utils.guid(),
-                key: condKey,
-                label: condKey.charAt(0).toUpperCase() + condKey.slice(1),
-                dc: saveDcValue,
-                ability: 'wis',
-            });
+            const conditions = getRuntimeValue(creature.name, 'activeConditions') || [];
+            const filtered = conditions.filter(c => String(c).toLowerCase() !== condKey);
+            setRuntimeValue(creature.name, 'activeConditions', [...filtered, condKey], campaignName);
         }
     }, [campaignName, characters]);
 
