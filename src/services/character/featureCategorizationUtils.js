@@ -72,9 +72,6 @@ export const categorizeFeatures = (items, categories, options = {}) => {
         categorized.characterAdvancement.push(itemSummary);
       } else if (ct === 'passive' && !categorized.specialActions.some(f => f.name === item.name)) {
         categorized.specialActions.push(itemSummary);
-        if (item.name === 'Death Strike' || item.name === 'Rend Mind') {
-          console.log(`[FeatureCategorization] ${item.name} categorized into specialActions (casting_time: ${castingTime})`)
-        }
       } else if (!categorized.specialActions.some(f => f.name === item.name)) {
         categorized.specialActions.push(itemSummary);
       }
