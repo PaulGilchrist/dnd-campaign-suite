@@ -1,18 +1,47 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { applyBonusActionChoice } from '../../../../services/automation/handlers/combat/bonusActionChoiceHandler.js';
+import { addEntry } from '../../../../services/ui/logService.js';
 import '../../CharSheet.css';
 
-function BonusActionChoiceModal({ action, playerStats, campaignName, onClose }) {
+const INTERNAL_SKILL_CHECK_EVENT = 'internal-skill-check';
+
+function BonusActionChoiceModal({ action, options: optionsProp, playerStats, campaignName, onClose }) {
     const [selected, setSelected] = useState(null);
     const [applied, setApplied] = useState(false);
     const [result, setResult] = useState(null);
 
-    const handleApply = () => {
+    const handleApply = async () => {
         if (!selected) return;
-        const res = applyBonusActionChoice(action, playerStats, campaignName, selected);
+        const res = await applyBonusActionChoice(action, playerStats, campaignName, selected);
         setResult(res);
         setApplied(true);
+
+        await addEntry(campaignName, {
+            type: 'ability_use',
+            characterName: playerStats.name,
+            abilityName: action.name,
+            description: `${selected} selected — ${selected === 'Sleight of Hand' ? 'Dexterity (Sleight of Hand) check initiated' : selected === 'Thieves\' Tools' ? 'Thieves\' Tools check initiated' : 'Object use'}`,
+        }).catch(() => {});
+
+        if (selected === 'Sleight of Hand') {
+            window.dispatchEvent(new CustomEvent(INTERNAL_SKILL_CHECK_EVENT, {
+                detail: { skillName: 'Sleight of Hand', checkType: 'skill' },
+            }));
+        }
+        else if (selected === 'Thieves\' Tools') {
+            window.dispatchEvent(new CustomEvent(INTERNAL_SKILL_CHECK_EVENT, {
+                detail: { skillName: 'Thieves\' Tools', checkType: 'check' },
+            }));
+        }
     };
+
+    useEffect(() => {
+        return () => {
+            setApplied(false);
+            setResult(null);
+            setSelected(null);
+        };
+    }, []);
 
     if (applied && result) {
         return (
@@ -21,7 +50,7 @@ function BonusActionChoiceModal({ action, playerStats, campaignName, onClose }) 
                     <div className="sp-header">
                         <i className="fa-solid fa-hand"></i> {action.name}
                     </div>
-                    <div className="sp-body" dangerouslySetInnerHTML={{ __html: result.payload.description }}>
+                    <div className="sp-body" dangerouslySetInnerHTML={{ __html: result.payload?.description || '' }}>
                     </div>
                     <div className="sp-actions">
                         <button className="sp-roll-btn" onClick={onClose}>Done</button>
@@ -31,7 +60,7 @@ function BonusActionChoiceModal({ action, playerStats, campaignName, onClose }) 
         );
     }
 
-    const options = action.automation?.options || [];
+    const options = optionsProp || action.automation?.options || [];
 
     return (
         <div className="sp-overlay" onClick={onClose}>

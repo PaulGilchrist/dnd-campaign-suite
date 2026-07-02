@@ -1,5 +1,6 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { getCurrentCombatRound } from '../../../../services/encounters/combatData.js';
+import { addEntry } from '../../../ui/logService.js';
 
 export async function handle(action, playerStats, campaignName) {
     const auto = action.automation;
@@ -46,7 +47,7 @@ export async function handle(action, playerStats, campaignName) {
     };
 }
 
-export function applyBonusActionChoice(action, playerStats, campaignName, chosenOption) {
+export async function applyBonusActionChoice(action, playerStats, campaignName, chosenOption) {
     const auto = action.automation;
     const option = auto.options?.find(o => o.name === chosenOption);
     if (!option) {
@@ -67,6 +68,13 @@ export function applyBonusActionChoice(action, playerStats, campaignName, chosen
         const trackingKey = action.name === 'Fast Hands' ? '_FastHands_usedRound' : '_CunningAction_usedRound';
         setRuntimeValue(playerStats.name, trackingKey, currentRound, campaignName, true);
     }
+
+    await addEntry(campaignName, {
+        type: 'ability_use',
+        characterName: playerStats.name,
+        abilityName: action.name,
+        description: `${chosenOption} selected`,
+    }).catch(() => {});
 
     // Apply the chosen effect
     let description;

@@ -88,7 +88,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
             .catch(error => console.error('Error loading actions:', error));
     }, []);
 
-    const { rollAttack, rollDamage } = useLoggedDiceRoll(playerStats.name, campaignName, {
+    const { rollAttack, rollDamage, rollSkillCheck, rollAbilityCheck } = useLoggedDiceRoll(playerStats.name, campaignName, {
         characters,
         autoDamageSource: 'char-actions',
         autoDamageRoll: async (autoDamage, isCrit) => {

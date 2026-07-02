@@ -140,6 +140,8 @@ export default function CharActionModals({
     playerStats,
     campaignName,
     characters,
+    rollSkillCheck,
+    rollAbilityCheck,
     healingPoolModal, setHealingPoolModal,
     handOfHealingModal, setHandOfHealingModal,
     fontOfMagicModal, setFontOfMagicModal,
@@ -564,7 +566,10 @@ export default function CharActionModals({
             )}
             {bonusActionChoiceModal && (
                 <BonusActionChoiceModal
-                    {...bonusActionChoiceModal}
+                    action={bonusActionChoiceModal.action}
+                    options={bonusActionChoiceModal.options}
+                    playerStats={playerStats}
+                    campaignName={campaignName}
                     onClose={() => setBonusActionChoiceModal(null)}
                 />
             )}

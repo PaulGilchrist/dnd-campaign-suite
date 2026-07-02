@@ -10,6 +10,10 @@ vi.mock('../../../../services/encounters/combatData.js', () => ({
     getCurrentCombatRound: vi.fn(),
 }));
 
+vi.mock('../../../ui/logService.js', () => ({
+    addEntry: vi.fn(() => Promise.resolve()),
+}));
+
 const { getRuntimeValue, setRuntimeValue } = await import(
     '../../../../hooks/runtime/useRuntimeState.js'
 );
@@ -18,6 +22,7 @@ const { getCurrentCombatRound } = await import(
 );
 
 import { handle, applyFastHands } from './fastHandsHandler.js';
+import * as logService from '../../../ui/logService.js';
 
 beforeEach(() => {
     vi.clearAllMocks();
@@ -143,9 +148,9 @@ describe('fastHandsHandler', () => {
     });
 
     describe('applyFastHands', () => {
-        it('handles Sleight of Hand option', () => {
+        it('handles Sleight of Hand option', async () => {
             const action = makeAction();
-            const result = applyFastHands(action, makePlayerStats(), 'test-campaign', 'Sleight of Hand');
+            const result = await applyFastHands(action, makePlayerStats(), 'test-campaign', 'Sleight of Hand');
 
             expect(result.type).toBe('popup');
             expect(result.payload.type).toBe('automation_info');
@@ -154,27 +159,27 @@ describe('fastHandsHandler', () => {
             expect(result.payload.description).toContain('Sleight of Hand');
         });
 
-        it('handles Thieves Tools option', () => {
+        it('handles Thieves Tools option', async () => {
             const action = makeAction();
-            const result = applyFastHands(action, makePlayerStats(), 'test-campaign', "Thieves' Tools");
+            const result = await applyFastHands(action, makePlayerStats(), 'test-campaign', "Thieves' Tools");
 
             expect(result.type).toBe('popup');
             expect(result.payload.description).toContain("Thieves' Tools selected");
             expect(result.payload.description).toContain("pick a lock");
         });
 
-        it('handles Use an Object option', () => {
+        it('handles Use an Object option', async () => {
             const action = makeAction();
-            const result = applyFastHands(action, makePlayerStats(), 'test-campaign', 'Use an Object');
+            const result = await applyFastHands(action, makePlayerStats(), 'test-campaign', 'Use an Object');
 
             expect(result.type).toBe('popup');
             expect(result.payload.description).toContain('Use an Object selected');
             expect(result.payload.description).toContain('Utilize action');
         });
 
-        it('returns error for unknown option not in list', () => {
+        it('returns error for unknown option not in list', async () => {
             const action = makeAction();
-            const result = applyFastHands(action, makePlayerStats(), 'test-campaign', 'Nonexistent');
+            const result = await applyFastHands(action, makePlayerStats(), 'test-campaign', 'Nonexistent');
 
             expect(result.type).toBe('popup');
             expect(result.payload.type).toBe('automation_info');
@@ -183,18 +188,18 @@ describe('fastHandsHandler', () => {
             expect(result.payload.description).toContain('Nonexistent');
         });
 
-        it('includes automation in payload', () => {
+        it('includes automation in payload', async () => {
             const action = makeAction({ automation: { type: 'fast_hands', custom: true } });
-            const result = applyFastHands(action, makePlayerStats(), 'test-campaign', 'Sleight of Hand');
+            const result = await applyFastHands(action, makePlayerStats(), 'test-campaign', 'Sleight of Hand');
 
             expect(result.payload.automation).toEqual(action.automation);
         });
 
-        it('tracks oncePerTurn usage by calling setRuntimeValue', () => {
+        it('tracks oncePerTurn usage by calling setRuntimeValue', async () => {
             getCurrentCombatRound.mockReturnValue(7);
 
             const action = makeAction({ automation: { oncePerTurn: true } });
-            applyFastHands(action, makePlayerStats(), 'test-campaign', 'Sleight of Hand');
+            await applyFastHands(action, makePlayerStats(), 'test-campaign', 'Sleight of Hand');
 
             expect(setRuntimeValue).toHaveBeenCalledWith(
                 'TestRogue',
@@ -205,40 +210,90 @@ describe('fastHandsHandler', () => {
             );
         });
 
-        it('does not call setRuntimeValue when oncePerTurn is false', () => {
+        it('does not call setRuntimeValue when oncePerTurn is false', async () => {
             const action = makeAction({ automation: { oncePerTurn: false } });
-            applyFastHands(action, makePlayerStats(), 'test-campaign', 'Sleight of Hand');
+            await applyFastHands(action, makePlayerStats(), 'test-campaign', 'Sleight of Hand');
 
             expect(setRuntimeValue).not.toHaveBeenCalled();
         });
 
-        it('does not call setRuntimeValue when oncePerTurn is not set', () => {
+        it('does not call setRuntimeValue when oncePerTurn is not set', async () => {
             const action = makeAction({ automation: {} });
-            applyFastHands(action, makePlayerStats(), 'test-campaign', 'Sleight of Hand');
+            await applyFastHands(action, makePlayerStats(), 'test-campaign', 'Sleight of Hand');
 
             expect(setRuntimeValue).not.toHaveBeenCalled();
         });
 
-        it('uses option description for custom option names', () => {
+        it('uses option description for custom option names', async () => {
             const action = makeAction({
                 automation: {
                     type: 'fast_hands',
                     options: [{ name: 'Custom Option', description: 'A custom description.' }],
                 },
             });
-            const result = applyFastHands(action, makePlayerStats(), 'test-campaign', 'Custom Option');
+            const result = await applyFastHands(action, makePlayerStats(), 'test-campaign', 'Custom Option');
 
             expect(result.type).toBe('popup');
             expect(result.payload.description).toContain('Custom Option selected');
             expect(result.payload.description).toContain('A custom description.');
         });
 
-        it('preserves action name in payload for unknown option', () => {
+        it('preserves action name in payload for unknown option', async () => {
             const action = makeAction({ name: 'My Fast Hands' });
-            const result = applyFastHands(action, makePlayerStats(), 'test-campaign', 'Nonexistent');
+            const result = await applyFastHands(action, makePlayerStats(), 'test-campaign', 'Nonexistent');
 
             expect(result.payload.name).toBe('My Fast Hands');
             expect(result.payload.description).toContain('Unknown option: Nonexistent');
+        });
+    });
+});
+
+// ── applyFastHands: campaign logging ────────────────────────────
+
+describe('applyFastHands — campaign logging', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+    });
+
+    it('logs campaign entry when Sleight of Hand is selected', () => {
+        const action = makeAction();
+        const ps = makePlayerStats();
+
+        applyFastHands(action, ps, 'test-campaign', 'Sleight of Hand');
+
+        expect(logService.addEntry).toHaveBeenCalledWith('test-campaign', {
+            type: 'ability_use',
+            characterName: ps.name,
+            abilityName: 'Fast Hands',
+            description: 'Sleight of Hand selected',
+        });
+    });
+
+    it('logs campaign entry when Thieves\' Tools is selected', () => {
+        const action = makeAction();
+        const ps = makePlayerStats();
+
+        applyFastHands(action, ps, 'test-campaign', "Thieves' Tools");
+
+        expect(logService.addEntry).toHaveBeenCalledWith('test-campaign', {
+            type: 'ability_use',
+            characterName: ps.name,
+            abilityName: 'Fast Hands',
+            description: "Thieves' Tools selected",
+        });
+    });
+
+    it('logs campaign entry when Use an Object is selected', () => {
+        const action = makeAction();
+        const ps = makePlayerStats();
+
+        applyFastHands(action, ps, 'test-campaign', 'Use an Object');
+
+        expect(logService.addEntry).toHaveBeenCalledWith('test-campaign', {
+            type: 'ability_use',
+            characterName: ps.name,
+            abilityName: 'Fast Hands',
+            description: 'Use an Object selected',
         });
     });
 });

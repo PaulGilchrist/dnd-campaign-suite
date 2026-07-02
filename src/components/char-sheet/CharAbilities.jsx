@@ -1,9 +1,12 @@
 
+import { useState, useEffect } from 'react';
 import useLoggedDiceRoll from '../../hooks/combat/useLoggedDiceRoll.js'
 import { useDiceRollPopup } from '../../hooks/combat/DiceRollContext.js'
 import { buildAbilityDetailHtml } from '../../hooks/combat/useActionPopup.js';
 import { getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import './CharAbilities.css'
+
+const INTERNAL_SKILL_CHECK_EVENT = 'internal-skill-check';
 
 const signFormatter = new Intl.NumberFormat('en-US', { signDisplay: 'always' });
 
@@ -181,8 +184,28 @@ function CharAbilities({ allAbilityScores, playerStats, campaignName, exhaustion
             const mods = saveModifiers.filter(mod => mod.target === 'saving_throw' && mod.effect === 'advantage' && mod.condition !== 'against_spell');
             if (mods.length > 0) return mods.map(m => m.source).join(', ');
           }
-          return null;
-        }
+           return null;
+         }
+
+         useEffect(() => {
+             const handler = (e) => {
+                 const { skillName, checkType } = e.detail || {};
+                 if (!skillName) return;
+                 if (checkType === 'check') {
+                     const ability = playerStats?.abilities?.find(a => a.name === skillName);
+                     if (ability) {
+                         rollAbilityCheck(skillName, ability.bonus - exhaustionPenalty + getCosmicOmenBonus(), makeCheckContext(skillName));
+                     }
+                 } else {
+                     const skill = playerStats?.abilities?.flatMap(a => a.skills || []).find(s => s.name === skillName);
+                     if (skill) {
+                         rollSkillCheck(skillName, getSkillBonus(skill) + getCosmicOmenBonus(), makeCheckContext(skillName));
+                     }
+                 }
+             };
+             window.addEventListener(INTERNAL_SKILL_CHECK_EVENT, handler);
+             return () => window.removeEventListener(INTERNAL_SKILL_CHECK_EVENT, handler);
+         }, [playerStats, campaignName, exhaustionPenalty, conditionEffects, isRaging, rollSkillCheck, rollAbilityCheck]);
 
     return (
         <div className='char-abilities'>

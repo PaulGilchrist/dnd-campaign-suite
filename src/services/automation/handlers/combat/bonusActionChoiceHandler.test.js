@@ -12,11 +12,16 @@ vi.mock('../../../../services/encounters/combatData.js', () => ({
     getCurrentCombatRound: vi.fn(() => 1),
 }));
 
+vi.mock('../../../ui/logService.js', () => ({
+    addEntry: vi.fn(() => Promise.resolve()),
+}));
+
 // ── Imports ────────────────────────────────────────────────────
 
 import { handle, applyBonusActionChoice } from './bonusActionChoiceHandler.js';
 import * as useRuntimeState from '../../../../hooks/runtime/useRuntimeState.js';
 import * as combatData from '../../../../services/encounters/combatData.js';
+import * as logService from '../../../ui/logService.js';
 
 // ── Helpers ────────────────────────────────────────────────────
 
@@ -219,11 +224,11 @@ describe('applyBonusActionChoice — known options', () => {
         vi.clearAllMocks();
     });
 
-    it('returns popup with Dash description', () => {
+    it('returns popup with Dash description', async () => {
         const ps = makePlayerStats();
         const action = makeAction();
 
-        const result = applyBonusActionChoice(action, ps, campaignName, 'Dash');
+        const result = await applyBonusActionChoice(action, ps, campaignName, 'Dash');
 
         expect(result).toEqual({
             type: 'popup',
@@ -236,47 +241,47 @@ describe('applyBonusActionChoice — known options', () => {
         });
     });
 
-    it('returns popup with Disengage description', () => {
+    it('returns popup with Disengage description', async () => {
         const ps = makePlayerStats();
         const action = makeAction();
 
-        const result = applyBonusActionChoice(action, ps, campaignName, 'Disengage');
+        const result = await applyBonusActionChoice(action, ps, campaignName, 'Disengage');
 
         expect(result.payload.description).toBe('Disengage selected: You take the Disengage bonus action. Your movement doesn\'t provoke opportunity attacks until the end of the turn.');
     });
 
-    it('returns popup with Hide description', () => {
+    it('returns popup with Hide description', async () => {
         const ps = makePlayerStats();
         const action = makeAction();
 
-        const result = applyBonusActionChoice(action, ps, campaignName, 'Hide');
+        const result = await applyBonusActionChoice(action, ps, campaignName, 'Hide');
 
         expect(result.payload.description).toBe('Hide selected: You attempt to Hide. Make a Dexterity (Stealth) check to try to become hidden from creatures until the end of the turn.');
     });
 
-    it('returns popup with Sleight of Hand description', () => {
+    it('returns popup with Sleight of Hand description', async () => {
         const ps = makePlayerStats();
         const action = makeFastHandsAction();
 
-        const result = applyBonusActionChoice(action, ps, campaignName, 'Sleight of Hand');
+        const result = await applyBonusActionChoice(action, ps, campaignName, 'Sleight of Hand');
 
         expect(result.payload.description).toBe('Sleight of Hand selected: You use Fast Hands to make a Dexterity (Sleight of Hand) check — pick pocket, palming a small object, hiding a small item, etc.');
     });
 
-    it('returns popup with Thieves\' Tools description', () => {
+    it('returns popup with Thieves\' Tools description', async () => {
         const ps = makePlayerStats();
         const action = makeFastHandsAction();
 
-        const result = applyBonusActionChoice(action, ps, campaignName, 'Thieves\' Tools');
+        const result = await applyBonusActionChoice(action, ps, campaignName, 'Thieves\' Tools');
 
         expect(result.payload.description).toBe('Thieves\' Tools selected: You use Fast Hands to use thieves\' tools to pick a lock or disarm a trap.');
     });
 
-    it('returns popup with Use an Object description', () => {
+    it('returns popup with Use an Object description', async () => {
         const ps = makePlayerStats();
         const action = makeFastHandsAction();
 
-        const result = applyBonusActionChoice(action, ps, campaignName, 'Use an Object');
+        const result = await applyBonusActionChoice(action, ps, campaignName, 'Use an Object');
 
         expect(result.payload.description).toBe('Use an Object selected: You use Fast Hands to use an object. Using a magic item that requires an action uses the Utilize action. Normal objects use the standard Action.');
     });
@@ -289,11 +294,11 @@ describe('applyBonusActionChoice — unknown option', () => {
         vi.clearAllMocks();
     });
 
-    it('returns popup with unknown option message for unrecognized option', () => {
+    it('returns popup with unknown option message for unrecognized option', async () => {
         const ps = makePlayerStats();
         const action = makeAction();
 
-        const result = applyBonusActionChoice(action, ps, campaignName, 'Foo');
+        const result = await applyBonusActionChoice(action, ps, campaignName, 'Foo');
 
         expect(result).toEqual({
             type: 'popup',
@@ -306,20 +311,20 @@ describe('applyBonusActionChoice — unknown option', () => {
         });
     });
 
-    it('returns popup with unknown option message when options array is empty', () => {
+    it('returns popup with unknown option message when options array is empty', async () => {
         const ps = makePlayerStats();
         const action = makeAction({ options: [] });
 
-        const result = applyBonusActionChoice(action, ps, campaignName, 'Dash');
+        const result = await applyBonusActionChoice(action, ps, campaignName, 'Dash');
 
         expect(result.payload.description).toBe('Unknown option: Dash');
     });
 
-    it('returns popup with unknown option message when options is undefined', () => {
+    it('returns popup with unknown option message when options is undefined', async () => {
         const ps = makePlayerStats();
         const action = makeAction({ options: undefined });
 
-        const result = applyBonusActionChoice(action, ps, campaignName, 'Dash');
+        const result = await applyBonusActionChoice(action, ps, campaignName, 'Dash');
 
         expect(result.payload.description).toBe('Unknown option: Dash');
     });
@@ -332,12 +337,12 @@ describe('applyBonusActionChoice — once-per-turn tracking', () => {
         vi.clearAllMocks();
     });
 
-    it('tracks once-per-turn usage with Cunning Action key when set', () => {
+    it('tracks once-per-turn usage with Cunning Action key when set', async () => {
         const ps = makePlayerStats();
         const action = makeAction({ oncePerTurn: true });
         combatData.getCurrentCombatRound.mockReturnValue(3);
 
-        applyBonusActionChoice(action, ps, campaignName, 'Dash');
+        await applyBonusActionChoice(action, ps, campaignName, 'Dash');
 
         expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
             ps.name,
@@ -348,12 +353,12 @@ describe('applyBonusActionChoice — once-per-turn tracking', () => {
         );
     });
 
-    it('tracks once-per-turn usage with Fast Hands key when action name is Fast Hands', () => {
+    it('tracks once-per-turn usage with Fast Hands key when action name is Fast Hands', async () => {
         const ps = makePlayerStats();
         const action = makeFastHandsAction({ oncePerTurn: true });
         combatData.getCurrentCombatRound.mockReturnValue(5);
 
-        applyBonusActionChoice(action, ps, campaignName, 'Sleight of Hand');
+        await applyBonusActionChoice(action, ps, campaignName, 'Sleight of Hand');
 
         expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
             ps.name,
@@ -364,21 +369,71 @@ describe('applyBonusActionChoice — once-per-turn tracking', () => {
         );
     });
 
-    it('does not track when oncePerTurn is false', () => {
+    it('does not track when oncePerTurn is false', async () => {
         const ps = makePlayerStats();
         const action = makeAction({ oncePerTurn: false });
 
-        applyBonusActionChoice(action, ps, campaignName, 'Dash');
+        await applyBonusActionChoice(action, ps, campaignName, 'Dash');
 
         expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
     });
 
-    it('does not track when oncePerTurn is undefined', () => {
+    it('does not track when oncePerTurn is undefined', async () => {
         const ps = makePlayerStats();
         const action = makeAction();
 
-        applyBonusActionChoice(action, ps, campaignName, 'Dash');
+        await applyBonusActionChoice(action, ps, campaignName, 'Dash');
 
         expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
+    });
+});
+
+// ── applyBonusActionChoice: campaign logging ────────────────────
+
+describe('applyBonusActionChoice — campaign logging', async () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+    });
+
+    it('logs campaign entry when Fast Hands Sleight of Hand is selected', async () => {
+        const ps = makePlayerStats();
+        const action = makeFastHandsAction();
+
+        await applyBonusActionChoice(action, ps, campaignName, 'Sleight of Hand');
+
+        expect(logService.addEntry).toHaveBeenCalledWith(campaignName, {
+            type: 'ability_use',
+            characterName: ps.name,
+            abilityName: 'Fast Hands',
+            description: 'Sleight of Hand selected',
+        });
+    });
+
+    it('logs campaign entry when Fast Hands Thieves\' Tools is selected', async () => {
+        const ps = makePlayerStats();
+        const action = makeFastHandsAction();
+
+        await applyBonusActionChoice(action, ps, campaignName, 'Thieves\' Tools');
+
+        expect(logService.addEntry).toHaveBeenCalledWith(campaignName, {
+            type: 'ability_use',
+            characterName: ps.name,
+            abilityName: 'Fast Hands',
+            description: 'Thieves\' Tools selected',
+        });
+    });
+
+    it('logs campaign entry when Cunning Action Dash is selected', async () => {
+        const ps = makePlayerStats();
+        const action = makeAction();
+
+        await applyBonusActionChoice(action, ps, campaignName, 'Dash');
+
+        expect(logService.addEntry).toHaveBeenCalledWith(campaignName, {
+            type: 'ability_use',
+            characterName: ps.name,
+            abilityName: 'Cunning Action',
+            description: 'Dash selected',
+        });
     });
 });

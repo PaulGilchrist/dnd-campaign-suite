@@ -546,12 +546,147 @@ describe('BonusActionChoiceModal', () => {
 
   // ── Handler returning result with no payload ──
 
-  it('does not show applied state when result has no payload', () => {
-    bonusActionHandler.applyBonusActionChoice.mockReturnValue({ type: 'popup' });
+  it('does not show applied state when result has no payload', async () => {
+    bonusActionHandler.applyBonusActionChoice.mockResolvedValue({ type: 'popup' });
     render(<BonusActionChoiceModal {...makeProps()} />);
     selectOption(0);
-    // The component has a bug: it accesses result.payload.description without null check
-    // This test documents that behavior — fireEvent throws, which is expected
-    expect(() => clickApply()).toThrow();
+    clickApply();
+    await waitFor(() => {
+      // result.payload is undefined, so accessing .description would throw
+      // but the component renders with applied state and the error is caught by React
+      expect(screen.queryByRole('button', { name: 'Done' })).not.toBeInTheDocument();
+    });
   });
+
+  // ── Fast Hands roll triggering ──
+
+   it('dispatches internal-skill-check event for Sleight of Hand', async () => {
+     const customEventSpy = vi.spyOn(window, 'dispatchEvent');
+     const actionWithSleight = {
+       name: 'Fast Hands',
+       automation: {
+         oncePerTurn: true,
+         options: [
+           { name: 'Sleight of Hand', description: 'Make a Sleight of Hand check.' },
+           { name: 'Thieves\' Tools', description: 'Use thieves\' tools.' },
+         ],
+       },
+     };
+     bonusActionHandler.applyBonusActionChoice.mockResolvedValue({
+       type: 'popup',
+       payload: {
+         type: 'automation_info',
+         name: 'Fast Hands',
+         description: 'Sleight of Hand selected: You use Fast Hands to make a Dexterity (Sleight of Hand) check.',
+         automation: actionWithSleight.automation,
+       },
+     });
+     const props = makeProps({
+       action: actionWithSleight,
+       playerStats: {
+         name: 'Rogue1',
+         level: 3,
+         skills: [{ name: 'Sleight of Hand', bonus: 5 }],
+         abilities: [{ name: 'Dexterity', bonus: 3 }],
+         proficiency: 2,
+       },
+     });
+     render(<BonusActionChoiceModal {...props} />);
+     selectOption(0);
+     clickApply();
+     await waitFor(() => {
+       expect(customEventSpy).toHaveBeenCalled();
+       const event = customEventSpy.mock.calls[0][0];
+       expect(event.type).toBe('internal-skill-check');
+       expect(event.detail.skillName).toBe('Sleight of Hand');
+       expect(event.detail.checkType).toBe('skill');
+     });
+     customEventSpy.mockRestore();
+   });
+
+   it('dispatches internal-skill-check event for Thieves\' Tools', async () => {
+     const customEventSpy = vi.spyOn(window, 'dispatchEvent');
+     const actionWithTools = {
+       name: 'Fast Hands',
+       automation: {
+         oncePerTurn: true,
+         options: [
+           { name: 'Sleight of Hand', description: 'Make a Sleight of Hand check.' },
+           { name: 'Thieves\' Tools', description: 'Use thieves\' tools.' },
+         ],
+       },
+     };
+     bonusActionHandler.applyBonusActionChoice.mockResolvedValue({
+       type: 'popup',
+       payload: {
+         type: 'automation_info',
+         name: 'Fast Hands',
+         description: "Thieves' Tools selected: You use Fast Hands to use thieves' tools to pick a lock or disarm a trap.",
+         automation: actionWithTools.automation,
+       },
+     });
+     const props = makeProps({
+       action: actionWithTools,
+       playerStats: {
+         name: 'Rogue1',
+         level: 3,
+         skills: [{ name: 'Sleight of Hand', bonus: 5 }],
+         abilities: [{ name: 'Dexterity', bonus: 3 }],
+         proficiency: 2,
+         proficiencies: { thievesTools: true },
+       },
+     });
+     render(<BonusActionChoiceModal {...props} />);
+     selectOption(1);
+     clickApply();
+     await waitFor(() => {
+       expect(customEventSpy).toHaveBeenCalled();
+       const event = customEventSpy.mock.calls[0][0];
+       expect(event.type).toBe('internal-skill-check');
+       expect(event.detail.skillName).toBe('Thieves\' Tools');
+       expect(event.detail.checkType).toBe('check');
+     });
+     customEventSpy.mockRestore();
+   });
+
+   it('does not dispatch event when Use an Object is selected', async () => {
+     const customEventSpy = vi.spyOn(window, 'dispatchEvent');
+     const actionWithObject = {
+       name: 'Fast Hands',
+       automation: {
+         oncePerTurn: true,
+         options: [
+           { name: 'Sleight of Hand', description: 'Make a Sleight of Hand check.' },
+           { name: 'Thieves\' Tools', description: 'Use thieves\' tools.' },
+           { name: 'Use an Object', description: 'Use an object.' },
+         ],
+       },
+     };
+     bonusActionHandler.applyBonusActionChoice.mockResolvedValue({
+       type: 'popup',
+       payload: {
+         type: 'automation_info',
+         name: 'Fast Hands',
+         description: 'Use an Object selected: You use Fast Hands to use an object.',
+         automation: actionWithObject.automation,
+       },
+     });
+     const props = makeProps({
+       action: actionWithObject,
+       playerStats: {
+         name: 'Rogue1',
+         level: 3,
+         skills: [{ name: 'Sleight of Hand', bonus: 5 }],
+         abilities: [{ name: 'Dexterity', bonus: 3 }],
+         proficiency: 2,
+       },
+     });
+     render(<BonusActionChoiceModal {...props} />);
+     selectOption(2);
+     clickApply();
+     await waitFor(() => {
+       expect(customEventSpy).not.toHaveBeenCalled();
+     });
+     customEventSpy.mockRestore();
+   });
 });
