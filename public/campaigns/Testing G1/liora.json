@@ -1,20 +1,20 @@
 {
-  "name": "Maribelle",
+  "name": "Liora",
   "level": 20,
   "alignment": "Neutral Good",
   "abilities": [
     {
       "name": "Strength",
-      "baseScore": 8,
+      "baseScore": 14,
       "featIncrease": 0,
       "backgroundIncrease": 0,
       "miscIncrease": 0
     },
     {
       "name": "Dexterity",
-      "baseScore": 13,
+      "baseScore": 9,
       "featIncrease": 0,
-      "backgroundIncrease": 0,
+      "backgroundIncrease": 1,
       "miscIncrease": 0
     },
     {
@@ -33,98 +33,95 @@
     },
     {
       "name": "Wisdom",
-      "baseScore": 15,
+      "baseScore": 14,
       "featIncrease": 0,
-      "backgroundIncrease": 1,
+      "backgroundIncrease": 2,
       "miscIncrease": 0
     },
     {
       "name": "Charisma",
-      "baseScore": 11,
+      "baseScore": 9,
       "featIncrease": 0,
       "backgroundIncrease": 1,
       "miscIncrease": 0
     }
   ],
-  "background": "Hermit",
+  "background": "Acolyte",
   "class": {
-    "name": "Druid",
+    "name": "Cleric",
     "subclass": {
-      "name": "Circle of the Moon",
+      "name": "War Domain",
       "type": ""
     },
-    "divineOrder": "",
-    "primalOrder": "Magician"
+    "divineOrder": "Protector",
+    "primalOrder": ""
   },
   "expertSkills": [],
   "feats": [],
   "fightingStyles": [],
   "race": {
-    "name": "Halfling",
+    "name": "Aasimar",
     "subrace": {
-      "name": "Lightfoot Halfling",
-      "description": ""
+      "name": ""
     }
   },
-  "immunities": [],
+  "immunities": [
+    "Magical Sleep"
+  ],
   "inventory": {
     "backpack": [
       "Mess Kit",
       "Playing Card Set",
       "Rations (5 days)",
       "Rope, Silk (50 feet)",
-      "Small Knife",
       "Tinderbox",
       "Torch",
-      "Totem",
       "Waterskin"
     ],
     "equipped": [
-      "Cloak of Elvenkind",
-      "Leather",
+      "Arrows",
+      "Chain Mail",
+      "Holy Symbol",
       "Longbow",
-      "Scimitar",
-      "Dagger"
+      "Longsword",
+      "Shield"
     ],
-    "gold": 30,
+    "gold": 10,
     "magicItems": []
   },
   "languages": [
-    "Sylvan"
+    "Common"
   ],
-  "resistances": [],
+  "resistances": [
+    "Necrotic",
+    "Radiant"
+  ],
   "skillProficiencies": [
-    "Animal Handling",
     "Insight",
-    "Nature",
-    "Nature",
-    "Stealth"
+    "Medicine",
+    "Religion",
+    "Survival"
   ],
   "specialActions": [],
   "spells": [
+    "Detect Magic",
     "Guidance",
+    "Guiding Bolt",
+    "Healing Word",
+    "Inflict Wounds",
+    "Sacred Flame",
+    "Spare the Dying",
     "Mending",
-    "Produce Flame",
-    "Shocking Grasp",
-    "Entangle",
-    "Ice Knife",
-    "Speak with Animals",
-    "Thunderwave",
-    "Hold Person",
-    "Moonbeam",
-    "Pass Without Trace",
-    "Call Lightning",
-    "Conjure Animals",
-    "Speak with Plants",
-    "Ice Storm",
-    "Polymorph",
-    "Giant Insect",
-    "Scrying",
-    "Insect Plague"
+    "Prayer of Healing",
+    "Spiritual Weapon",
+    "Aid",
+    "Spirit Guardians",
+    "Revivify",
+    "Resistance"
   ],
   "rules": "2024",
   "xp": 0,
   "xpMode": "milestone",
-  "originalFileName": "Maribelle.json",
-  "imagePath": "campaigns/2024 Testing G2/images/Maribelle.png"
+  "imagePath": "campaigns/Testing G1/images/Liora.png",
+  "originalFileName": "Liora.json"
 }

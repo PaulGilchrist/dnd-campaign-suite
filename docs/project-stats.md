@@ -26,7 +26,7 @@
 | 4 | 10,868 | `public/data/2024/classes.json` |
 | 5 | 10,193 | `public/data/spells.json` |
 | 6 | 8,827 | `public/data/magic-items.json` |
-| 7 | 7,950 | `public/campaigns/General Testing/maps/monstrosity.json` |
+| 7 | 7,950 | `public/campaigns/Testing G3/maps/monstrosity.json` |
 | 8 | 6,758 | `package-lock.json` |
 | 9 | 4,638 | `public/data/equipment.json` |
 | 10 | 3,381 | `public/data/settlement-names.json` |

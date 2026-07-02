@@ -1,18 +1,18 @@
 {
-  "name": "Arjhan",
+  "name": "Selthara",
   "level": 20,
-  "alignment": "Lawful Good",
+  "alignment": "Neutral Good",
   "abilities": [
     {
       "name": "Strength",
-      "baseScore": 14,
+      "baseScore": 8,
       "featIncrease": 0,
       "miscIncrease": 0,
       "backgroundIncrease": 0
     },
     {
       "name": "Dexterity",
-      "baseScore": 10,
+      "baseScore": 14,
       "featIncrease": 0,
       "miscIncrease": 0,
       "backgroundIncrease": 0
@@ -21,12 +21,12 @@
       "name": "Constitution",
       "baseScore": 14,
       "featIncrease": 0,
-      "miscIncrease": 0,
+      "miscIncrease": 2,
       "backgroundIncrease": 0
     },
     {
       "name": "Intelligence",
-      "baseScore": 8,
+      "baseScore": 10,
       "featIncrease": 0,
       "miscIncrease": 0,
       "backgroundIncrease": 0
@@ -46,68 +46,73 @@
       "backgroundIncrease": 0
     }
   ],
-  "background": "Guard",
+  "background": "Merchant",
   "class": {
-    "name": "Paladin",
+    "name": "Sorcerer",
     "subclass": {
-      "name": "Oath of the Ancients",
+      "name": "Wild Magic Sorcery",
       "type": ""
-    },
-    "fightingStyles": [
-      "Defense"
-    ]
+    }
   },
   "expertSkills": [],
   "feats": [],
   "fightingStyles": [],
   "race": {
-    "name": "Dragonborn",
+    "name": "Elf",
     "subrace": {
-      "name": "Blue Dragonborn",
+      "name": "Wood Elf",
       "description": ""
     }
   },
   "immunities": [],
   "inventory": {
     "backpack": [
-      "Bedroll",
-      "Light Hammer",
-      "Mess Kit",
-      "Rations (10 days)",
-      "Rope, Hempen (50 feet)",
-      "Tinderbox",
-      "Torch",
+      "Blanket",
+      "Case,Map or Scroll",
+      "Fishing Tackle",
+      "Grappling Hook",
+      "Ink (4, 1 oz bottles)",
+      "Ink Pens (2)",
+      "Parchment (20 sheets)",
+      "Playing Card Set",
+      "Rations (5 days)",
+      "Rope, Silk (50 feet)",
+      "String",
       "Waterskin"
     ],
     "equipped": [
-      "Chain Mail",
-      "Shield",
-      "Crossbow, heavy",
-      "Longsword",
+      "Quarterstaff",
       "Dagger"
     ],
-    "gold": 25,
+    "gold": 10,
     "magicItems": []
   },
-  "languages": [
-    "Elvish"
-  ],
+  "languages": [],
   "resistances": [],
   "skillProficiencies": [
-    "Athletics",
+    "Arcana",
     "History",
-    "Intimidation",
-    "Persuasion"
+    "Insight",
+    "Investigation",
+    "Perception",
+    "Survival"
   ],
   "specialActions": [],
   "spells": [
-    "Bless",
-    "Command",
-    "Searing Smite"
+    "Chill Touch",
+    "Fire Bolt",
+    "Mage Hand",
+    "Magic Missile",
+    "Shield",
+    "Shocking Grasp",
+    "Burning Hands",
+    "Feather Fall",
+    "Invisibility",
+    "Misty Step"
   ],
   "rules": "2024",
   "xp": 0,
   "xpMode": "milestone",
-  "imagePath": "campaigns/General Testing/images/Arjhan.png",
-  "originalFileName": "Arjhan.json"
+  "imagePath": "campaigns/Testing G3/images/Selthara.png",
+  "originalFileName": "Selthara.json"
 }

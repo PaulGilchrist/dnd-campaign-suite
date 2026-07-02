@@ -132,9 +132,9 @@ describe('Subscriber', () => {
     });
 
     it('should URL-encode the campaign name', () => {
-        render(<Subscriber handleEvent={handleEventMock} campaignName="General Testing" />);
+        render(<Subscriber handleEvent={handleEventMock} campaignName="Testing G3" />);
 
-        const instance = MockEventSource.getInstance(urlWithCampaign('General Testing'));
+        const instance = MockEventSource.getInstance(urlWithCampaign('Testing G3'));
         expect(instance).toBeDefined();
     });
 

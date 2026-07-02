@@ -1,5 +1,5 @@
 {
-  "name": "Selthara",
+  "name": "Zivri",
   "level": 20,
   "alignment": "Neutral Good",
   "abilities": [
@@ -12,16 +12,16 @@
     },
     {
       "name": "Dexterity",
-      "baseScore": 14,
+      "baseScore": 12,
       "featIncrease": 0,
       "miscIncrease": 0,
       "backgroundIncrease": 0
     },
     {
       "name": "Constitution",
-      "baseScore": 14,
+      "baseScore": 15,
       "featIncrease": 0,
-      "miscIncrease": 2,
+      "miscIncrease": 1,
       "backgroundIncrease": 0
     },
     {
@@ -33,9 +33,9 @@
     },
     {
       "name": "Wisdom",
-      "baseScore": 12,
+      "baseScore": 13,
       "featIncrease": 0,
-      "miscIncrease": 0,
+      "miscIncrease": 1,
       "backgroundIncrease": 0
     },
     {
@@ -46,21 +46,29 @@
       "backgroundIncrease": 0
     }
   ],
-  "background": "Merchant",
+  "background": "Noble",
   "class": {
-    "name": "Sorcerer",
+    "name": "Warlock",
     "subclass": {
-      "name": "Wild Magic Sorcery",
+      "name": "Archfey Patron",
       "type": ""
-    }
+    },
+    "arcanums": [
+      "Conjure Fey"
+    ],
+    "invocations": [
+      "Agonizing Blast",
+      "Mask of Many Faces"
+    ],
+    "pactBoon": "Tome"
   },
   "expertSkills": [],
   "feats": [],
   "fightingStyles": [],
   "race": {
-    "name": "Elf",
+    "name": "Gnome",
     "subrace": {
-      "name": "Wood Elf",
+      "name": "Rock Gnome",
       "description": ""
     }
   },
@@ -91,28 +99,24 @@
   "resistances": [],
   "skillProficiencies": [
     "Arcana",
-    "History",
     "Insight",
     "Investigation",
     "Perception",
+    "Nature",
     "Survival"
   ],
   "specialActions": [],
   "spells": [
-    "Chill Touch",
-    "Fire Bolt",
+    "Charm Person",
+    "Eldritch Blast",
+    "Hellish Rebuke",
     "Mage Hand",
-    "Magic Missile",
-    "Shield",
-    "Shocking Grasp",
-    "Burning Hands",
-    "Feather Fall",
-    "Invisibility",
-    "Misty Step"
+    "Misty Step",
+    "Invisibility"
   ],
   "rules": "2024",
   "xp": 0,
   "xpMode": "milestone",
-  "imagePath": "campaigns/General Testing/images/Selthara.png",
-  "originalFileName": "Selthara.json"
+  "imagePath": "campaigns/Testing G3/images/Zivri.png",
+  "originalFileName": "Zivri.json"
 }

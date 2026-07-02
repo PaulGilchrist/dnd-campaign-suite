@@ -1,7 +1,7 @@
 {
-  "name": "Vexiron",
+  "name": "Aeralyn",
   "level": 20,
-  "alignment": "Chaotic Good",
+  "alignment": "Neutral Good",
   "abilities": [
     {
       "name": "Strength",
@@ -15,105 +15,115 @@
       "baseScore": 15,
       "featIncrease": 0,
       "backgroundIncrease": 0,
-      "miscIncrease": 1
-    },
-    {
-      "name": "Constitution",
-      "baseScore": 14,
-      "featIncrease": 0,
-      "backgroundIncrease": 1,
       "miscIncrease": 0
     },
     {
-      "name": "Intelligence",
+      "name": "Constitution",
       "baseScore": 12,
       "featIncrease": 0,
       "backgroundIncrease": 0,
       "miscIncrease": 0
     },
     {
-      "name": "Wisdom",
-      "baseScore": 13,
+      "name": "Intelligence",
+      "baseScore": 9,
       "featIncrease": 0,
       "backgroundIncrease": 1,
-      "miscIncrease": 1
+      "miscIncrease": 0
+    },
+    {
+      "name": "Wisdom",
+      "baseScore": 11,
+      "featIncrease": 0,
+      "backgroundIncrease": 1,
+      "miscIncrease": 0
     },
     {
       "name": "Charisma",
-      "baseScore": 8,
+      "baseScore": 14,
       "featIncrease": 0,
       "backgroundIncrease": 1,
       "miscIncrease": 0
     }
   ],
-  "background": "Hermit",
+  "background": "Acolyte",
   "class": {
-    "name": "Rogue",
+    "name": "Bard",
     "subclass": {
-      "name": "Soulknife",
+      "name": "College of Dance",
       "type": ""
     },
     "divineOrder": "",
     "primalOrder": "",
     "expertise": [
-      "Sleight of Hand",
-      "Thieves' Tools"
+      "Performance",
+      "Persuasion"
     ]
   },
-  "expertSkills": [
-    "Stealth",
-    "Perception",
-    "Deception",
-    "Sleight of Hand"
-  ],
+  "expertSkills": [],
   "feats": [],
   "fightingStyles": [],
   "race": {
-    "name": "Tiefling",
-    "subrace": {
-      "name": "Abyssal Tiefling",
-      "description": ""
-    }
+    "name": "Halfling"
   },
   "immunities": [],
   "inventory": {
     "backpack": [
-      "Crowbar",
-      "Dice Set",
+      "Fishing Tackle",
+      "Grappling Hook",
       "Playing Card Set",
-      "Forgery Kit",
-      "Piton",
       "Rations (5 days)",
-      "Thieves' Tools",
-      "Tinderbox",
-      "Torch",
-      "Waterskin",
-      "Poisoner's Kit"
+      "Rope, Silk (50 feet)",
+      "String",
+      "Waterskin"
     ],
     "equipped": [
-      "Arrows",
       "Studded Leather",
       "Crossbow, hand",
-      "Shortsword",
-      "Shortsword",
-      "Thieves' Tools"
+      "Rapier",
+      "Dagger"
     ],
     "gold": 10,
     "magicItems": []
   },
   "languages": [],
-  "resistances": [],
+  "resistances": [
+    "Fire",
+    "Lightning"
+  ],
   "skillProficiencies": [
-    "Sleight of Hand",
-    "Deception",
+    "Insight",
+    "Performance",
     "Perception",
-    "Stealth"
+    "Persuasion",
+    "Deception",
+    "Choose any 3 (see chapter 1)"
   ],
   "specialActions": [],
-  "spells": [],
+  "spells": [
+    "Charm Person",
+    "Disguise Self",
+    "Hideous Laughter",
+    "Mage Hand",
+    "Minor Illusion",
+    "Sleep",
+    "Vicious Mockery",
+    "Message",
+    "Invisibility",
+    "Knock",
+    "See Invisibility",
+    "Speak with Dead",
+    "Tiny Hut",
+    "Fear",
+    "Greater Invisibility",
+    "Freedom of Movement",
+    "Polymorph",
+    "Greater Restoration",
+    "Hold Monster"
+  ],
   "rules": "2024",
   "xp": 0,
   "xpMode": "milestone",
-  "imagePath": "campaigns/2024 Testing/images/Vexiron.png",
-  "originalFileName": "Vexiron.json"
+  "originalFileName": "Aeralyn.json",
+  "imagePath": "campaigns/Testing G2/images/Aeralyn.png"
 }

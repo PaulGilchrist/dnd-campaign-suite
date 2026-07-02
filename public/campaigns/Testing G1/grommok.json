@@ -112,7 +112,7 @@
   "rules": "2024",
   "xp": 0,
   "xpMode": "milestone",
-  "imagePath": "campaigns/2024 Testing/images/Grommok.png",
+  "imagePath": "campaigns/Testing G1/images/Grommok.png",
   "originalFileName": "Grommok.json",
   "featAbilityChoices": {
     "0": "Strength",

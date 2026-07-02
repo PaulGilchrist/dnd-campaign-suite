@@ -1,41 +1,41 @@
 {
-  "name": "Zivri",
+  "name": "Arjhan",
   "level": 20,
-  "alignment": "Neutral Good",
+  "alignment": "Lawful Good",
   "abilities": [
     {
       "name": "Strength",
-      "baseScore": 8,
+      "baseScore": 14,
       "featIncrease": 0,
       "miscIncrease": 0,
       "backgroundIncrease": 0
     },
     {
       "name": "Dexterity",
-      "baseScore": 12,
-      "featIncrease": 0,
-      "miscIncrease": 0,
-      "backgroundIncrease": 0
-    },
-    {
-      "name": "Constitution",
-      "baseScore": 15,
-      "featIncrease": 0,
-      "miscIncrease": 1,
-      "backgroundIncrease": 0
-    },
-    {
-      "name": "Intelligence",
       "baseScore": 10,
       "featIncrease": 0,
       "miscIncrease": 0,
       "backgroundIncrease": 0
     },
     {
-      "name": "Wisdom",
-      "baseScore": 13,
+      "name": "Constitution",
+      "baseScore": 14,
       "featIncrease": 0,
-      "miscIncrease": 1,
+      "miscIncrease": 0,
+      "backgroundIncrease": 0
+    },
+    {
+      "name": "Intelligence",
+      "baseScore": 8,
+      "featIncrease": 0,
+      "miscIncrease": 0,
+      "backgroundIncrease": 0
+    },
+    {
+      "name": "Wisdom",
+      "baseScore": 12,
+      "featIncrease": 0,
+      "miscIncrease": 0,
       "backgroundIncrease": 0
     },
     {
@@ -46,77 +46,68 @@
       "backgroundIncrease": 0
     }
   ],
-  "background": "Noble",
+  "background": "Guard",
   "class": {
-    "name": "Warlock",
+    "name": "Paladin",
     "subclass": {
-      "name": "Archfey Patron",
+      "name": "Oath of the Ancients",
       "type": ""
     },
-    "arcanums": [
-      "Conjure Fey"
-    ],
-    "invocations": [
-      "Agonizing Blast",
-      "Mask of Many Faces"
-    ],
-    "pactBoon": "Tome"
+    "fightingStyles": [
+      "Defense"
+    ]
   },
   "expertSkills": [],
   "feats": [],
   "fightingStyles": [],
   "race": {
-    "name": "Gnome",
+    "name": "Dragonborn",
     "subrace": {
-      "name": "Rock Gnome",
+      "name": "Blue Dragonborn",
       "description": ""
     }
   },
   "immunities": [],
   "inventory": {
     "backpack": [
-      "Blanket",
-      "Case,Map or Scroll",
-      "Fishing Tackle",
-      "Grappling Hook",
-      "Ink (4, 1 oz bottles)",
-      "Ink Pens (2)",
-      "Parchment (20 sheets)",
-      "Playing Card Set",
-      "Rations (5 days)",
-      "Rope, Silk (50 feet)",
-      "String",
+      "Bedroll",
+      "Light Hammer",
+      "Mess Kit",
+      "Rations (10 days)",
+      "Rope, Hempen (50 feet)",
+      "Tinderbox",
+      "Torch",
       "Waterskin"
     ],
     "equipped": [
-      "Quarterstaff",
+      "Chain Mail",
+      "Shield",
+      "Crossbow, heavy",
+      "Longsword",
       "Dagger"
     ],
-    "gold": 10,
+    "gold": 25,
     "magicItems": []
   },
-  "languages": [],
+  "languages": [
+    "Elvish"
+  ],
   "resistances": [],
   "skillProficiencies": [
-    "Arcana",
-    "Insight",
-    "Investigation",
-    "Perception",
-    "Nature",
-    "Survival"
+    "Athletics",
+    "History",
+    "Intimidation",
+    "Persuasion"
   ],
   "specialActions": [],
   "spells": [
-    "Charm Person",
-    "Eldritch Blast",
-    "Hellish Rebuke",
-    "Mage Hand",
-    "Misty Step",
-    "Invisibility"
+    "Bless",
+    "Command",
+    "Searing Smite"
   ],
   "rules": "2024",
   "xp": 0,
   "xpMode": "milestone",
-  "imagePath": "campaigns/General Testing/images/Zivri.png",
-  "originalFileName": "Zivri.json"
+  "imagePath": "campaigns/Testing G3/images/Arjhan.png",
+  "originalFileName": "Arjhan.json"
 }
