@@ -259,6 +259,20 @@ export function collectAutomationFromFeatures(features, playerStats) {
 
     if (!features) return result
 
+    // Debug: log all features with automation
+    const featuresWithAuto = features.filter(f => f?.automation)
+    if (featuresWithAuto.length > 0 && playerStats?.name) {
+        console.log(`[AutomationCollector] ${playerStats.name}: ${featuresWithAuto.length} features with automation`)
+        featuresWithAuto.forEach(f => {
+            const automations = Array.isArray(f.automation) ? f.automation : [f.automation]
+            automations.forEach(a => {
+                if (a?.type === 'attack_rider') {
+                    console.log(`[AutomationCollector] attack_rider feature: ${f.name}, casting_time: ${a.casting_time}, trigger: ${a.trigger}, saveType: ${a.saveType}, damageDoubled: ${a.damageDoubled}`)
+                }
+            })
+        })
+    }
+
     features.forEach(feature => {
         if (!feature?.automation) return
         const automations = Array.isArray(feature.automation) ? feature.automation : [feature.automation]

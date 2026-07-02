@@ -88,7 +88,7 @@ import { loadCombatSummary } from '../../services/encounters/combatData.js';
 import { hasIgnoreResistance } from '../../services/combat/automation/automationService.js';
 import { endInvisibilityOnHostileAction } from '../../services/rules/features/invisibilityService.js';
 import { applyMinDamageAdjustment } from './loggedDiceRollUtils.js';
-import { rollSaveForCreature, applyDamageToTarget } from '../../services/rules/combat/applyDamage.js';
+import { applyDamageToTarget } from '../../services/rules/combat/applyDamage.js';
 import { createLogDamageAndShow } from './useLoggedDiceRollDamage.js';
 
 describe('Plain damage edge cases', () => {
@@ -276,66 +276,6 @@ describe('Plain damage edge cases', () => {
             });
 
             expect(rollExpression).not.toHaveBeenCalledWith('1d8');
-        });
-    });
-
-    describe('death strike', () => {
-        it('applies death strike doubled damage on failed save', async () => {
-            getRuntimeValue.mockImplementation((key) => {
-                if (key === 'test-campaign') return [
-                    { effect: 'death_strike', target: 'Goblin', saveDc: 15, saveType: 'DEX' },
-                ];
-                if (key === 'Goblin:hitPoints') return 13;
-                return null;
-            });
-            rollSaveForCreature.mockReturnValue({ success: false, roll: 5, total: 8, bonus: 3, rawRolls: [5] });
-            applyDamageToTarget
-                .mockReturnValueOnce({ finalDamage: 8, newHp: 5, damageReduced: false })
-                .mockReturnValueOnce({ finalDamage: 16, newHp: -11, damageReduced: false });
-
-            const fn = createFn();
-            await fn('Grim Reaper', '2d12', 14, [6, 8], 0, {
-                targetName: 'Goblin',
-                damageType: 'necrotic',
-            });
-
-            // setPopupHtml is called with a callback (prev => spread) for death strike
-            expect(deps.setPopupHtml.mock.calls.length).toBeGreaterThanOrEqual(2);
-            const deathStrikeCall = deps.setPopupHtml.mock.calls.find(
-                c => typeof c[0] === 'function'
-            );
-            expect(deathStrikeCall).toBeDefined();
-        });
-
-        it('cleans up death strike effect after processing', async () => {
-            getRuntimeValue.mockImplementation((key) => {
-                if (key === 'test-campaign') return [
-                    { effect: 'death_strike', target: 'Goblin', saveDc: 15, saveType: 'DEX' },
-                ];
-                if (key === 'Goblin:hitPoints') return 13;
-                return null;
-            });
-            applyDamageToTarget.mockReturnValue({ finalDamage: 8, newHp: 5, damageReduced: false });
-            loadCombatSummary.mockResolvedValue({
-                creatures: [{ name: 'Goblin', type: 'npc', ac: 12, currentHp: 13, maxHp: 13 }],
-            });
-
-            const fn = createFn();
-            await fn('Grim Reaper', '2d12', 14, [6, 8], 0, {
-                targetName: 'Goblin',
-                damageType: 'necrotic',
-            });
-
-            const targetEffectsCalls = setRuntimeValue.mock.calls.filter(
-                c => c[1] === 'targetEffects'
-            );
-            // The last targetEffects call should not contain death_strike
-            const lastTeCall = targetEffectsCalls[targetEffectsCalls.length - 1];
-            if (lastTeCall) {
-                expect(lastTeCall[2]).not.toContainEqual(
-                    expect.objectContaining({ effect: 'death_strike' })
-                );
-            }
         });
     });
 

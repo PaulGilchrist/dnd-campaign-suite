@@ -537,44 +537,9 @@ export default function useAttackDamageResolution({
                 }
             }
 
-            // Apply Death Strike attack_rider (Rogue Assassin level 17) — forces CON save, doubles damage on fail
-            const allPassives = playerStats.automation?.passives || [];
-            console.log('[DeathStrike debug] playerStats.name:', playerStats.name, 'rules:', playerStats.rules, 'level:', playerStats.level, 'subclass:', playerStats.class?.subclass?.name, 'passives count:', allPassives.length, 'allPassiveTypes:', allPassives.map(p => p.type + ':' + (p.trigger || p.name || '')));
-            const deathStrike = allPassives.find(
-                a => a.type === 'attack_rider' && a.trigger === 'first_round_sneak_attack_hit' && a.saveType
-            );
-            console.log('[DeathStrike debug] deathStrike found:', !!deathStrike, deathStrike ? JSON.stringify({name: deathStrike.name, trigger: deathStrike.trigger, saveType: deathStrike.saveType, saveAbility: deathStrike.saveAbility}) : null);
-            if (deathStrike) {
-                const cs2 = await getCombatContext(campaignName);
-                const currentRound2 = getCurrentCombatRound();
-                if (cs2 && currentRound2 === 1) {
-                    const playerCreature2 = cs2.creatures?.find(c => c.name === playerStats.name);
-                    if (!playerCreature2 || !playerCreature2.hasActed) {
-                        const targetName2 = getTargetFromAttacker(cs2, playerStats.name)?.name || null;
-                        if (targetName2) {
-                            const prof = playerStats.proficiency || 0;
-                            const dexAbility = playerStats.abilities?.find(a => a.name === 'Dexterity');
-                            const dexMod = dexAbility?.bonus || 0;
-                            const saveDc = 8 + dexMod + prof;
-                            const storedEffects = getRuntimeValue(campaignName, 'targetEffects') || [];
-                            const newEffect = {
-                                target: targetName2,
-                                source: deathStrike.name,
-                                effect: 'death_strike',
-                                saveType: 'CON',
-                                saveDc: saveDc,
-                                saveAbility: 'DEX',
-                                damageDoubled: deathStrike.damageDoubled || true,
-                            };
-                            const updatedEffects = [...storedEffects, newEffect];
-                            setRuntimeValue(campaignName, 'targetEffects', updatedEffects, campaignName);
-                        }
-                    }
-                }
-            }
+            // Apply Rend Mind attack_rider (Soulknife level 17) — forces WIS save, Stunned on fail
         }
 
-        // Apply Rend Mind attack_rider (Soulknife level 17) — forces WIS save, Stunned on fail
         const rendMind = playerStats.automation.passives.find(
             a => a.type === 'attack_rider' && a.trigger === 'psychic_blade_sneak_attack_hit' && a.saveType
         );

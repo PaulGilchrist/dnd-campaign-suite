@@ -1,13 +1,13 @@
 import { rollD20, rollExpression } from '../../services/dice/diceRoller.js';
 import utils from '../../services/ui/utils.js';
 import storage from '../../services/ui/storage.js';
-import { getTargetFromAttacker, findCreatureByName } from '../../services/rules/combat/damageUtils.js';
+import { getTargetFromAttacker, findCreatureByName, getCombatContext } from '../../services/rules/combat/damageUtils.js';
 import {
     applyDamageToTarget,
 } from '../../services/rules/combat/applyDamage.js';
 import { getRuntimeValue, setRuntimeValue } from '../runtime/useRuntimeState.js';
 import { clearAllExpirationEffects } from '../../services/rules/effects/expirations.js';
-import { loadCombatSummary } from '../../services/encounters/combatData.js';
+import { loadCombatSummary, getCurrentCombatRound } from '../../services/encounters/combatData.js';
 import {
     isUnbreakableMajestyActive,
     getUnbreakableMajestySaveDc,
@@ -295,6 +295,37 @@ export function createLogAndShow(deps) {
             isAutoCrit: isCrit,
             sneakAttackDice: context?.sneakAttackDice || 0,
         } : undefined;
+
+        // Apply Death Strike attack_rider (Rogue Assassin level 17) — forces CON save, doubles damage on fail
+        if (hit && context?.sneakAttackDice && context?.sneakAttackDice > 0) {
+            const cs2 = await getCombatContext(campaignName);
+            const currentRound2 = getCurrentCombatRound(campaignName);
+            if (cs2 && currentRound2 === 1) {
+                const playerCreature2 = cs2.creatures?.find(c => c.name === characterName);
+                if (!playerCreature2 || !playerCreature2.hasActed) {
+                    const targetName2 = targetName || getTargetFromAttacker(cs2, characterName)?.name;
+                    if (targetName2) {
+                        const ps = context?.playerStats;
+                        const prof = ps?.proficiency || 0;
+                        const dexAbility = ps?.abilities?.find(a => a.name === 'Dexterity');
+                        const dexMod = dexAbility?.bonus || 0;
+                        const saveDc = 8 + dexMod + prof;
+                        const storedEffects = getRuntimeValue(campaignName, 'targetEffects') || [];
+                        const deathStrikeEffect = {
+                            target: targetName2,
+                            source: 'Death Strike',
+                            effect: 'death_strike',
+                            saveType: 'CON',
+                            saveDc: saveDc,
+                            saveAbility: 'DEX',
+                            damageDoubled: true,
+                        };
+                        const updatedEffects = [...storedEffects, deathStrikeEffect];
+                        setRuntimeValue(campaignName, 'targetEffects', updatedEffects, campaignName);
+                    }
+                }
+            }
+        }
 
         logEntry({
             type: 'roll',

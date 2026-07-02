@@ -1115,15 +1115,29 @@ export function createLogDamageAndShow(deps) {
 
         const storedEffects = getRuntimeValue(campaignName, 'targetEffects') || [];
         const deathStrikeEffect = storedEffects.find(te => te.effect === 'death_strike' && te.target === target?.name);
-        console.log('[DeathStrike damage] characterName:', characterName, 'target:', target?.name, 'targetEffects:', JSON.stringify(storedEffects.map(e => ({effect: e.effect, target: e.target}))), 'deathStrikeEffect found:', !!deathStrikeEffect);
         if (deathStrikeEffect && target) {
             const dsSaveDc = deathStrikeEffect.saveDc;
             const dsSaveType = deathStrikeEffect.saveType;
             if (dsSaveDc && dsSaveType) {
-                const dsCharacter = (characters || []).find(c => utils.getName(c.name) === target.name);
-                const dsSaveModifiers = dsCharacter?.saveModifiers || dsCharacter?.computedStats?.saveModifiers || [];
-                const dsAdvantage = dsSaveModifiers.some(mod => mod.target === 'saving_throw' && mod.effect === 'advantage' && mod.condition === 'against_spell');
-                const dsSaveResult = rollSaveForCreature(target, dsSaveType, dsSaveDc, false, dsAdvantage);
+                const promptId = utils.guid();
+                sendSavePrompt(campaignName, {
+                    promptId,
+                    targetName: target.name,
+                    saveType: dsSaveType,
+                    saveDc: dsSaveDc,
+                    dcSuccess: false,
+                    advantage: false,
+                    disadvantage: false,
+                });
+                const saveResultPromise = new Promise(resolve => {
+                    const handler = (event) => {
+                        if (event.detail.promptId !== promptId) return;
+                        window.removeEventListener('save-result', handler);
+                        resolve(event.detail);
+                    };
+                    window.addEventListener('save-result', handler);
+                });
+                const dsSaveResult = await saveResultPromise;
                 if (!dsSaveResult.success) {
                     const doubledTotal = adjustedTotal * 2;
                     const ignoreResistance = (context?.playerStats && hasIgnoreResistance(context.playerStats, damageType)) || false;
@@ -1141,7 +1155,7 @@ export function createLogDamageAndShow(deps) {
                         targetName: target.name,
                         saveType: dsSaveType,
                         saveDc: dsSaveDc,
-                        saveResult: 'failure',
+                        saveResult: dsSaveResult.success ? 'success' : 'failure',
                         saveRoll: dsSaveResult.roll,
                         saveBonus: dsSaveResult.bonus,
                         saveRawRolls: dsSaveResult.rawRolls,
@@ -1151,7 +1165,7 @@ export function createLogDamageAndShow(deps) {
 
                     await new Promise(resolve => setTimeout(resolve, 500));
 
-                    const dsApplyResult = applyDamageToTarget(combatSummary, target.name, doubledTotal, [damageType], campaignName, null, ignoreResistance || false, characterName);
+                    const dsApplyResult = applyDamageToTarget(combatSummary, target.name, doubledTotal, [damageType], campaignName, characters, ignoreResistance || false, characterName);
 
                     if (!applyResult) {
                         applyResult = dsApplyResult;
