@@ -120,3 +120,4 @@ npm run test:coverage                             # Vitest with coverage (v8, ou
 - If a map is active, use position on map, but if no map is active, assume all creatures are within range.
 - There's no "out of combat" — there are always creatures.  There is always a combatSummary
 - use getCombatSummary as the primary source of all creatures
+- EVERY automation needs to log to the cmapaign log when trigged with details of the event.  If you are working on any automation, check to ensure it is logging, and add logging if it is not.
