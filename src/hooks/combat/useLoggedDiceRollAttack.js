@@ -27,6 +27,7 @@ import {
 import { loadManeuvers } from '../../services/ui/dataLoader.js';
 import { SHOW_DICE_ROLL_DELAY } from '../../config/ui-config.js';
 import { getManeuversForRules } from '../../services/automation/handlers/class-fighter-rogue/combatSuperiorityHandler.js';
+import { createSaveListener } from '../../services/automation/common/savePrompt.js';
 
 const SELECTION_KEY = 'BattleMasterManeuvers_selection';
 
@@ -317,47 +318,51 @@ export function createLogAndShow(deps) {
             coverAcBonus: context?.coverAcBonus,
             coverReason: context?.coverReason,
         });
-        setPopupHtml({
-            type: 'd20',
-            rollType,
-            name,
-            rolls: [r1, r2],
-            bonus,
-            targetName,
-            targetAc,
-            hit,
-            isAutoMiss,
-            rangeReason: context?.rangeReason,
-            resistanceNotice: context?.resistanceNotice,
-            hunterLoreNotice: context?.hunterLoreNotice,
-            coverLevel: context?.coverLevel,
-            coverAcBonus: context?.coverAcBonus,
-            coverReason: context?.coverReason,
-            forcedMode: context?.forcedMode,
-            isAutoCrit: context?.isAutoCrit,
-            isCrit,
-            isNatural20: effectiveD20Roll === 20,
-            isNatural1: effectiveD20Roll === 1,
-            autoDamage,
-            autoReroll: context?.autoReroll,
-            autoRerollBonus: context?.autoRerollBonus,
-            strSaveReplace: context?.strSaveReplace,
-            strScore: context?.strScore,
-            strCheckReplace: context?.strCheckReplace,
-            reliableTalent: context?.reliableTalent,
-            wisCheckReplace: context?.wisCheckReplace,
-            wisCheckMinBonus: context?.wisCheckMinBonus,
-            gloriousDefenseBonus: context?.gloriousDefenseBonus || 0,
-            defensiveDuelistBonus: context?.defensiveDuelistBonus || 0,
-            baitAndSwitchBonus: context?.baitAndSwitchBonus || 0,
-            d20Floor10: context?.d20Floor10,
-            tacticalMind: context?.tacticalMind,
-            tacticalMindBonus: context?.tacticalMindBonus,
-            strokeOfLuck,
-            characterName,
-            campaignName,
-            availableSuperiorityManeuvers,
-        });
+
+        const shouldSkipPopup = rollType === 'save' && target?.type === 'player';
+        if (!shouldSkipPopup) {
+            setPopupHtml({
+                type: 'd20',
+                rollType,
+                name,
+                rolls: [r1, r2],
+                bonus,
+                targetName,
+                targetAc,
+                hit,
+                isAutoMiss,
+                rangeReason: context?.rangeReason,
+                resistanceNotice: context?.resistanceNotice,
+                hunterLoreNotice: context?.hunterLoreNotice,
+                coverLevel: context?.coverLevel,
+                coverAcBonus: context?.coverAcBonus,
+                coverReason: context?.coverReason,
+                forcedMode: context?.forcedMode,
+                isAutoCrit: context?.isAutoCrit,
+                isCrit,
+                isNatural20: effectiveD20Roll === 20,
+                isNatural1: effectiveD20Roll === 1,
+                autoDamage,
+                autoReroll: context?.autoReroll,
+                autoRerollBonus: context?.autoRerollBonus,
+                strSaveReplace: context?.strSaveReplace,
+                strScore: context?.strScore,
+                strCheckReplace: context?.strCheckReplace,
+                reliableTalent: context?.reliableTalent,
+                wisCheckReplace: context?.wisCheckReplace,
+                wisCheckMinBonus: context?.wisCheckMinBonus,
+                gloriousDefenseBonus: context?.gloriousDefenseBonus || 0,
+                defensiveDuelistBonus: context?.defensiveDuelistBonus || 0,
+                baitAndSwitchBonus: context?.baitAndSwitchBonus || 0,
+                d20Floor10: context?.d20Floor10,
+                tacticalMind: context?.tacticalMind,
+                tacticalMindBonus: context?.tacticalMindBonus,
+                strokeOfLuck,
+                characterName,
+                campaignName,
+                availableSuperiorityManeuvers,
+            });
+        }
 
         if (rollType === 'attack') {
             setRuntimeValue(characterName, 'lastAttackRoll', {
@@ -784,68 +789,150 @@ export function createLogAndShow(deps) {
             const saveType = context?.saveType;
             const attackerName = context?.attackerName || characterName;
             const actionName = context?.actionName || name;
-            const saveTotal = effectiveD20 + bonus;
-            const saveSuccess = saveDc != null ? (saveTotal >= saveDc) : null;
+            const targetIsPlayer = target?.type === 'player';
+            let saveTotal;
+            let saveSuccess;
+            let effectiveD20ForSave;
+            let saveResultData;
 
-            setRuntimeValue(characterName, 'lastSaveRoll', {
-                d20: effectiveD20,
-                bonus,
-                saveType: context?.saveType || null,
-                targetName,
-                timestamp: Date.now(),
-            }, campaignName);
-
-            setRuntimeValue(characterName, '_lastRollContext', {
-                type: 'save',
-                saveType: context?.saveType || null,
-                saveDc: context?.saveDc || null,
-                actionName: context?.actionName || name,
-                targetName,
-                oldTotal: effectiveD20 + bonus,
-                oldSuccess: context?.saveDc != null ? (effectiveD20 + bonus >= context.saveDc) : null,
-                timestamp: Date.now(),
-            }, campaignName);
-
-            if (saveDc != null && combatSummary) {
-                combatSummary.lastAttack = {
-                    attackerName,
-                    targetName: characterName,
-                    d20: effectiveD20,
-                    d20Rolls: [r1, r2],
-                    bonus,
-                    total: saveTotal,
-                    saveType,
+            if (targetIsPlayer && saveDc != null) {
+                const { promise } = createSaveListener(campaignName, {
+                    targetName,
+                    saveType: saveType || 'CON',
                     saveDc,
-                    saveResult: saveSuccess ? 'success' : 'failure',
-                    isNatural20: r1 === 20,
-                    isNatural1: r1 === 1,
-                    actionName,
-                    rollType: 'save',
-                    timestamp: Date.now(),
-                };
-                storage.set('combatSummary', combatSummary, campaignName);
-            }
+                    dcSuccess: context?.dcSuccess || 'half',
+                });
 
-            logEntry({
-                type: 'roll',
-                characterName: targetName || characterName,
-                rollType: 'save',
-                name: actionName,
-                rolls: [effectiveD20],
-                mode: 'normal',
-                total: saveTotal,
-                bonus,
-                isNatural20: effectiveD20 === 20,
-                isNatural1: effectiveD20 === 1,
-                targetName: targetName,
-                saveType: saveType,
-                saveDc: saveDc,
-                saveResult: saveSuccess ? 'success' : 'failure',
-                attackerName: attackerName,
-                dcSuccess: context?.dcSuccess,
-                timestamp: Date.now(),
-                id: utils.guid(),
-            });
+                const saveResult = await promise;
+                saveSuccess = saveResult.success;
+                effectiveD20ForSave = saveResult.roll;
+                saveTotal = saveResult.total;
+                saveResultData = saveResult;
+
+                setRuntimeValue(characterName, 'lastSaveRoll', {
+                    d20: effectiveD20ForSave,
+                    bonus: saveResult.saveBonus,
+                    saveType: saveType || null,
+                    targetName,
+                    timestamp: Date.now(),
+                }, campaignName);
+
+                setRuntimeValue(characterName, '_lastRollContext', {
+                    type: 'save',
+                    saveType: saveType || null,
+                    saveDc,
+                    actionName,
+                    targetName,
+                    oldTotal: saveResult.total,
+                    oldSuccess: saveResult.total >= saveDc,
+                    timestamp: Date.now(),
+                }, campaignName);
+
+                if (combatSummary) {
+                    combatSummary.lastAttack = {
+                        attackerName,
+                        targetName: characterName,
+                        d20: effectiveD20ForSave,
+                        d20Rolls: [saveResult.roll, ...(saveResult.rawRolls || [])],
+                        bonus: saveResult.saveBonus,
+                        total: saveResult.total,
+                        saveType,
+                        saveDc,
+                        saveResult: saveSuccess ? 'success' : 'failure',
+                        isNatural20: saveResult.roll === 20,
+                        isNatural1: saveResult.roll === 1,
+                        actionName,
+                        rollType: 'save',
+                        timestamp: Date.now(),
+                    };
+                    storage.set('combatSummary', combatSummary, campaignName);
+                }
+
+                logEntry({
+                    type: 'roll',
+                    characterName: targetName || characterName,
+                    rollType: 'save',
+                    name: actionName,
+                    rolls: [effectiveD20ForSave],
+                    mode: saveResult.mode || 'normal',
+                    total: saveResult.total,
+                    bonus: saveResult.saveBonus,
+                    isNatural20: effectiveD20ForSave === 20,
+                    isNatural1: effectiveD20ForSave === 1,
+                    targetName: targetName,
+                    saveType: saveType,
+                    saveDc: saveDc,
+                    saveResult: saveSuccess ? 'success' : 'failure',
+                    attackerName: attackerName,
+                    dcSuccess: context?.dcSuccess,
+                    timestamp: Date.now(),
+                    id: utils.guid(),
+                });
+            } else {
+                saveTotal = effectiveD20 + bonus;
+                saveSuccess = saveDc != null ? (saveTotal >= saveDc) : null;
+                effectiveD20ForSave = effectiveD20;
+
+                setRuntimeValue(characterName, 'lastSaveRoll', {
+                    d20: effectiveD20ForSave,
+                    bonus,
+                    saveType: context?.saveType || null,
+                    targetName,
+                    timestamp: Date.now(),
+                }, campaignName);
+
+                setRuntimeValue(characterName, '_lastRollContext', {
+                    type: 'save',
+                    saveType: context?.saveType || null,
+                    saveDc: context?.saveDc || null,
+                    actionName: context?.actionName || name,
+                    targetName,
+                    oldTotal: effectiveD20 + bonus,
+                    oldSuccess: context?.saveDc != null ? (effectiveD20 + bonus >= context.saveDc) : null,
+                    timestamp: Date.now(),
+                }, campaignName);
+
+                if (saveDc != null && combatSummary) {
+                    combatSummary.lastAttack = {
+                        attackerName,
+                        targetName: characterName,
+                        d20: effectiveD20ForSave,
+                        d20Rolls: [r1, r2],
+                        bonus,
+                        total: saveTotal,
+                        saveType,
+                        saveDc,
+                        saveResult: saveSuccess ? 'success' : 'failure',
+                        isNatural20: r1 === 20,
+                        isNatural1: r1 === 1,
+                        actionName,
+                        rollType: 'save',
+                        timestamp: Date.now(),
+                    };
+                    storage.set('combatSummary', combatSummary, campaignName);
+                }
+
+                logEntry({
+                    type: 'roll',
+                    characterName: targetName || characterName,
+                    rollType: 'save',
+                    name: actionName,
+                    rolls: [effectiveD20ForSave],
+                    mode: 'normal',
+                    total: saveTotal,
+                    bonus,
+                    isNatural20: effectiveD20ForSave === 20,
+                    isNatural1: effectiveD20ForSave === 1,
+                    targetName: targetName,
+                    saveType: saveType,
+                    saveDc: saveDc,
+                    saveResult: saveSuccess ? 'success' : 'failure',
+                    attackerName: attackerName,
+                    dcSuccess: context?.dcSuccess,
+                    timestamp: Date.now(),
+                    id: utils.guid(),
+                });
+            }
 
             if (context?.autoDamageFormula && saveDc != null) {
                 const damageFormula = context.autoDamageFormula;
@@ -902,7 +989,7 @@ export function createLogAndShow(deps) {
                         saveDc,
                         saveType,
                         dcSuccess: context?.dcSuccess,
-                        saveResult: saveSuccess ? 'success' : 'failure',
+                        saveResult: { roll: effectiveD20ForSave, total: saveTotal, bonus: saveResultData?.saveBonus ?? bonus, success: saveSuccess },
                         finalDamage: applyResult?.finalDamage,
                         damageApplied: true,
                         damageReduced: applyResult?.damageReduced,
