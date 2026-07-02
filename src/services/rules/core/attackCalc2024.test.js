@@ -613,13 +613,20 @@ describe('attackCalc2024', () => {
 
       const result = getAttacks([], [], playerStats);
 
-      expect(result).toHaveLength(3);
+      expect(result).toHaveLength(2);
       expect(result[0].name).toBe('Psychic Blade');
-      expect(result[1].name).toBe('Psychic Blade (Ranged)');
-      expect(result[2].name).toBe('Psychic Blade (Bonus Action)');
+      expect(result[1].name).toBe('Psychic Blade (Secondary)');
       expect(result[0].damageType).toBe('Psychic');
-      expect(result[1].isRanged).toBe(true);
-      expect(result[2].isBonusActionBlade).toBe(true);
+      expect(result[0].type).toBe('Bonus Action');
+      expect(result[1].type).toBe('Bonus Action');
+      expect(result[0].mastery).toBe('Vex');
+      expect(result[1].mastery).toBe('Vex');
+      expect(result[0].properties).toContain('Finesse');
+      expect(result[0].properties).toContain('Thrown (60/120)');
+      expect(result[1].properties).toContain('Finesse');
+      expect(result[1].properties).toContain('Thrown (60/120)');
+      expect(result[0].isPsychicBlade).toBe(true);
+      expect(result[1].isPsychicBlade).toBe(true);
     });
 
     it('does not add Soulknife attacks for Rogue below level 3', () => {
@@ -1022,8 +1029,9 @@ describe('attackCalc2024', () => {
       expect(attack).toHaveProperty('damage');
       expect(attack).toHaveProperty('damageType');
       expect(attack).toHaveProperty('abilityName');
-      expect(attack).toHaveProperty('actionType');
+      expect(attack).toHaveProperty('type');
       expect(attack).toHaveProperty('properties');
+      expect(attack).toHaveProperty('mastery');
       expect(attack).toHaveProperty('isPsychicBlade');
     });
 

@@ -355,7 +355,9 @@ describe('createLogAndShow - Potent Cantrip & Soulknife', () => {
                 class: { name: 'Rogue', major: { name: 'Soulknife' } },
                 level: 9,
                 class_levels: [{ level: 9, energy: { energy_die: 6 } }],
+                _trackedResources: { psionicEnergy: { max: 6 } },
             };
+            getRuntimeValue.mockImplementation((name, key) => key === 'psionicEnergy' ? 6 : null);
             // d20=15, bonus=3 → total=18, ac=20 → miss, but psychic bonus of 6 makes it 24 → hit
             getTargetFromAttacker.mockReturnValue({ name: 'Goblin', ac: 20 });
             const spyRandom = vi.spyOn(Math, 'random').mockReturnValue(1); // max roll = 6

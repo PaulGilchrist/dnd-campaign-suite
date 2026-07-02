@@ -497,18 +497,30 @@ export function createLogAndShow(deps) {
                 const newTotal = effectiveD20 + bonus + psionicBonus;
                 const newHit = targetAc ? (newTotal >= targetAc) : null;
                 if (newHit === true) {
-                    setRuntimeValue(characterName, 'lastAttackRoll', {
-                        d20: effectiveD20,
-                        bonus: bonus + psionicBonus,
-                        targetName,
-                        targetAc,
-                        hit: true,
-                        isCrit: false,
-                        effectiveAc,
-                        coverAcBonus,
-                        timestamp: Date.now(),
-                        homingStrikesBonus: psionicBonus,
-                    }, campaignName);
+                    const defaultMax = ps?._trackedResources?.psionicEnergy?.max || 0;
+                    const currentEnergy = Number(getRuntimeValue(characterName, 'psionicEnergy', campaignName) ?? defaultMax);
+                    if (currentEnergy > 0) {
+                        setRuntimeValue(characterName, 'psionicEnergy', currentEnergy - 1, campaignName);
+                        setRuntimeValue(characterName, 'lastAttackRoll', {
+                            d20: effectiveD20,
+                            bonus: bonus + psionicBonus,
+                            targetName,
+                            targetAc,
+                            hit: true,
+                            isCrit: false,
+                            effectiveAc,
+                            coverAcBonus,
+                            timestamp: Date.now(),
+                            homingStrikesBonus: psionicBonus,
+                        }, campaignName);
+                        addEntry(campaignName, {
+                            type: 'ability_use',
+                            characterName,
+                            abilityName: 'Soul Blades',
+                            description: `${characterName} used Soul Blades (Homing Strikes) to turn a miss into a hit, consuming 1 Psionic Energy. Psionic Energy: ${currentEnergy - 1}/${defaultMax}.`,
+                            timestamp: Date.now(),
+                        }).catch((e) => { console.error('[homingStrikes] Log error:', e); });
+                    }
                 }
             }
 

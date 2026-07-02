@@ -184,7 +184,7 @@ export function getAttacks(allEquipment, allSpells, playerStats) {
         })));
     }
 
-    // Soulknife (2024): Psychic Blade attacks
+    // Soulknife (2024): Psychic Blade bonus action weapons
     if (playerStats.class?.name === 'Rogue' && playerStats.class?.major?.name === 'Soulknife' && playerStats.level >= 3) {
         const dexAbility = dexterity;
         const dexMod = dexAbility?.bonus || 0;
@@ -194,68 +194,44 @@ export function getAttacks(allEquipment, allSpells, playerStats) {
         const abilityBonus = Math.max(dexMod, intMod);
         const abilityName = dexMod >= intMod ? 'Dexterity' : 'Intelligence';
 
-        // Primary Psychic Blade (1d6 Psychic, Finesse, Thrown 60/120)
+        // Psychic Blade (1d6 Psychic, Finesse, Thrown 60/120, Vex)
         attacks.push({
             name: 'Psychic Blade',
-            attackType: 'melee',
-            isRanged: false,
-            range: '5_ft',
-            toHit: abilityBonus + prof,
-            hitBonusFormula: `To Hit Bonus = ${abilityName} Modifier (${abilityBonus}) + Proficiency (${prof})`,
-            damageFormula: `Damage Formula = 1d6 + ${abilityName} Modifier (${abilityBonus})`,
-            damage: {
-                damage_dice: '1d6',
-                damage_type: 'Psychic',
-                damage_at_character_level: { [playerStats.level]: `1d6 + ${abilityBonus}` },
-            },
-            abilityName,
-            actionType: 'Action',
-            properties: ['Finesse', 'Thrown (60/120)'],
-            damageType: 'Psychic',
-            isPsychicBlade: true,
-        });
-
-        // Ranged Psychic Blade variant
-        attacks.push({
-            name: 'Psychic Blade (Ranged)',
-            attackType: 'ranged',
-            isRanged: true,
-            range: '60_ft',
-            toHit: abilityBonus + prof,
-            hitBonusFormula: `To Hit Bonus = ${abilityName} Modifier (${abilityBonus}) + Proficiency (${prof})`,
-            damageFormula: `Damage Formula = 1d6 + ${abilityName} Modifier (${abilityBonus})`,
-            damage: {
-                damage_dice: '1d6',
-                damage_type: 'Psychic',
-                damage_at_character_level: { [playerStats.level]: `1d6 + ${abilityBonus}` },
-            },
-            abilityName,
-            actionType: 'Action',
-            properties: ['Finesse', 'Thrown (60/120)'],
-            damageType: 'Psychic',
-            isPsychicBlade: true,
-        });
-
-        // Bonus Action Psychic Blade (1d4 Psychic)
-        attacks.push({
-            name: 'Psychic Blade (Bonus Action)',
-            attackType: 'melee',
-            isRanged: false,
-            range: '5_ft',
-            toHit: abilityBonus + prof,
-            hitBonusFormula: `To Hit Bonus = ${abilityName} Modifier (${abilityBonus}) + Proficiency (${prof})`,
-            damageFormula: `Damage Formula = 1d4 + ${abilityName} Modifier (${abilityBonus})`,
-            damage: {
-                damage_dice: '1d4',
-                damage_type: 'Psychic',
-                damage_at_character_level: { [playerStats.level]: `1d4 + ${abilityBonus}` },
-            },
-            abilityName,
+            type: 'Bonus Action',
             actionType: 'Bonus Action',
-            properties: ['Finesse'],
+            attackType: 'melee',
+            isRanged: false,
+            range: '5 ft',
+            toHit: abilityBonus + prof,
+            hitBonus: abilityBonus + prof,
+            hitBonusFormula: `To Hit Bonus = ${abilityName} Modifier (${abilityBonus}) + Proficiency (${prof})`,
+            damageFormula: `Damage Formula = 1d6 + ${abilityName} Modifier (${abilityBonus})`,
+            damage: `1d6+${abilityBonus}`,
+            abilityName,
+            properties: ['Finesse', 'Thrown (60/120)'],
             damageType: 'Psychic',
+            mastery: 'Vex',
             isPsychicBlade: true,
-            isBonusActionBlade: true,
+        });
+
+        // Psychic Blade (Secondary) (1d4 Psychic, Finesse, Thrown 60/120, Vex)
+        attacks.push({
+            name: 'Psychic Blade (Secondary)',
+            type: 'Bonus Action',
+            actionType: 'Bonus Action',
+            attackType: 'melee',
+            isRanged: false,
+            range: '60 ft',
+            toHit: abilityBonus + prof,
+            hitBonus: abilityBonus + prof,
+            hitBonusFormula: `To Hit Bonus = ${abilityName} Modifier (${abilityBonus}) + Proficiency (${prof})`,
+            damageFormula: 'Damage Formula = 1d4',
+            damage: '1d4',
+            abilityName,
+            properties: ['Finesse', 'Thrown (60/120)'],
+            damageType: 'Psychic',
+            mastery: 'Vex',
+            isPsychicBlade: true,
         });
     }
 
