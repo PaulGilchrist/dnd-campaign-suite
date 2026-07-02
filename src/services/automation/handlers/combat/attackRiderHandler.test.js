@@ -416,7 +416,7 @@ describe('attackRiderHandler', () => {
             const result = await applyRiderOption(action, makePlayerStats(), 'campaign', 'Goblin', ['Cunning Strike']);
 
             expect(result.type).toBe('popup');
-            expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', '_Cunning_Strike_usedRound', 1, 'campaign');
+            expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', '_CunningStrike_usedRound', 1, 'campaign');
         });
 
         it('should clear pendingRiderChoice on apply', async () => {
@@ -471,6 +471,103 @@ describe('attackRiderHandler', () => {
             await applyRiderOption(action, makePlayerStats(), 'campaign', 'Goblin', ['Trip']);
 
             expect(setRuntimeValue).not.toHaveBeenCalledWith('TestHero', 'versatileTricksterSecondaryTargets', expect.any(Array), 'campaign');
+        });
+
+        it('should sum costs for multiple Cunning Strike options', async () => {
+            getRuntimeValue.mockReturnValue(0);
+            const action = {
+                name: 'Improved Cunning Strike',
+                automation: {
+                    type: 'attack_rider',
+                    oncePerTurn: true,
+                    maxEffects: 2,
+                    options: [
+                        { name: 'Poison', cost: '1d6', effect: 'poisoned' },
+                        { name: 'Trip', cost: '1d6', effect: 'prone' },
+                    ],
+                },
+            };
+            await applyRiderOption(action, makePlayerStats(), 'campaign', 'Goblin', ['Poison', 'Trip']);
+
+            expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', '_cunningStrikeCostUsed', 2, 'campaign');
+        });
+
+        it('should use unified _CunningStrike_usedRound key for Improved Cunning Strike', async () => {
+            getRuntimeValue.mockReturnValue(0);
+            const action = {
+                name: 'Improved Cunning Strike',
+                automation: {
+                    type: 'attack_rider',
+                    oncePerTurn: true,
+                    maxEffects: 2,
+                    options: [
+                        { name: 'Poison', cost: '1d6', effect: 'poisoned' },
+                    ],
+                },
+            };
+            await applyRiderOption(action, makePlayerStats(), 'campaign', 'Goblin', ['Poison']);
+
+            expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', '_CunningStrike_usedRound', expect.any(Number), 'campaign');
+        });
+
+        it('should use unified _CunningStrike_usedRound key for Devious Strikes', async () => {
+            getRuntimeValue.mockReturnValue(0);
+            const action = {
+                name: 'Devious Strikes',
+                automation: {
+                    type: 'attack_rider',
+                    oncePerTurn: true,
+                    maxEffects: 2,
+                    options: [
+                        { name: 'Poison', cost: '1d6', effect: 'poisoned' },
+                        { name: 'Daze', cost: '2d6', effect: 'daze' },
+                    ],
+                },
+            };
+            await applyRiderOption(action, makePlayerStats(), 'campaign', 'Goblin', ['Poison', 'Daze']);
+
+            expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', '_CunningStrike_usedRound', expect.any(Number), 'campaign');
+        });
+
+        it('should reject Improved Cunning Strike once per turn using unified key', async () => {
+            getRuntimeValue.mockReturnValue(1);
+            const action = {
+                name: 'Improved Cunning Strike',
+                automation: {
+                    type: 'attack_rider',
+                    oncePerTurn: true,
+                    maxEffects: 2,
+                    options: [
+                        { name: 'Trip', cost: '1d6', effect: 'prone' },
+                    ],
+                },
+            };
+            const result = await applyRiderOption(action, makePlayerStats(), 'campaign', 'Goblin', ['Trip']);
+
+            expect(result.payload.description).toContain('once per turn');
+            expect(setRuntimeValue).not.toHaveBeenCalledWith('TestHero', '_CunningStrike_usedRound', expect.any(Number), 'campaign');
+        });
+
+        it('should apply multiple effects and return combined description', async () => {
+            getRuntimeValue.mockReturnValue([]);
+            const action = {
+                name: 'Improved Cunning Strike',
+                automation: {
+                    type: 'attack_rider',
+                    oncePerTurn: true,
+                    maxEffects: 2,
+                    options: [
+                        { name: 'Poison', cost: '1d6', effect: 'poisoned' },
+                        { name: 'Trip', cost: '1d6', effect: 'prone' },
+                    ],
+                },
+            };
+            const result = await applyRiderOption(action, makePlayerStats(), 'campaign', 'Goblin', ['Poison', 'Trip']);
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain('Poison');
+            expect(result.payload.description).toContain('Trip');
+            expect(result.payload.description).toContain('Forgoing 2d6 Sneak Attack damage dice');
         });
     });
 });

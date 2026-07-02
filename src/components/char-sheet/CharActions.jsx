@@ -179,9 +179,14 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
             // Add Sneak Attack damage for Rogue class feature
             const sneakAttackDice = autoDamage.sneakAttackDice || 0;
             if (sneakAttackDice > 0 && overchannelResult) {
-                const hasCunningStrike = (playerStats.automation?.passives || []).some(
+                const cunningStrikePassive = (playerStats.automation?.passives || []).find(
+                    p => p.name === 'Devious Strikes' && p.type === 'attack_rider'
+                ) || (playerStats.automation?.passives || []).find(
+                    p => p.name === 'Improved Cunning Strike' && p.type === 'attack_rider'
+                ) || (playerStats.automation?.passives || []).find(
                     p => p.name === 'Cunning Strike' && p.type === 'attack_rider'
                 );
+                const hasCunningStrike = !!cunningStrikePassive;
                 if (hasCunningStrike) {
                     const currentRound = getCurrentCombatRound();
                     const oncePerRound = getRuntimeValue(playerStats.name, '_CunningStrike_usedRound', campaignName);
@@ -189,7 +194,6 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     if (oncePerRound !== currentRound && skipRound !== currentRound) {
                         const cs = await getCombatContext(campaignName);
                         const target = cs ? getTargetFromAttacker(cs, playerStats.name) : null;
-                        const cunningStrikeAction = playerStats.automation.passives.find(p => p.name === 'Cunning Strike');
                         autoDamageRollContext.current = {
                             formula: autoFormula,
                             total: overchannelResult.total,
@@ -210,7 +214,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                             sneakAttackDice: sneakAttackDice,
                         };
                         setAttackRiderModal({
-                            action: cunningStrikeAction,
+                            action: cunningStrikePassive,
                             playerStats,
                             campaignName,
                             targetName: target?.name || null,

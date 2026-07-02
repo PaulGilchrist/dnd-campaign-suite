@@ -596,7 +596,7 @@ describe('attackRiderHandler - oncePerTurn marks used round', () => {
         });
         await applyRiderOption(action, makePlayerStats(), 'campaign', 'Goblin', ['Cleave']);
 
-        expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', '_Cunning_Strike_usedRound', 1, 'campaign');
+        expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', '_CunningStrike_usedRound', 1, 'campaign');
     });
 });
 

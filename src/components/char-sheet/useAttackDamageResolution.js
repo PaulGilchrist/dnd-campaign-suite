@@ -91,9 +91,14 @@ export default function useAttackDamageResolution({
         if (attackHit) {
             const ctx = mapName ? await buildCtx(attack) : await buildCtxSync(attack);
             const sneakDice = ctx?.sneakAttackDice || 0;
-            const hasCunningStrike = (playerStats.automation?.passives || []).some(
+            const cunningStrikePassive = (playerStats.automation?.passives || []).find(
+                p => p.name === 'Devious Strikes' && p.type === 'attack_rider'
+            ) || (playerStats.automation?.passives || []).find(
+                p => p.name === 'Improved Cunning Strike' && p.type === 'attack_rider'
+            ) || (playerStats.automation?.passives || []).find(
                 p => p.name === 'Cunning Strike' && p.type === 'attack_rider'
             );
+            const hasCunningStrike = !!cunningStrikePassive;
             if (hasCunningStrike && sneakDice > 0) {
                 const currentRound = getCurrentCombatRound();
                 const oncePerRound = getRuntimeValue(playerStats.name, '_CunningStrike_usedRound', campaignName);
@@ -101,14 +106,13 @@ export default function useAttackDamageResolution({
                 if (oncePerRound !== currentRound && skipRound !== currentRound) {
                     const cs = await getCombatContext(campaignName);
                     const target = cs ? getTargetFromAttacker(cs, playerStats.name) : null;
-                    const cunningStrikeAction = playerStats.automation.passives.find(p => p.name === 'Cunning Strike');
                     pendingDamageRef.current = {
                         _cunningStrike: true,
                         attack,
                         popupHtml,
                     };
                     setAttackRiderModal({
-                        action: cunningStrikeAction,
+                        action: cunningStrikePassive,
                         playerStats,
                         campaignName,
                         targetName: target?.name || null,

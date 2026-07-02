@@ -318,7 +318,8 @@ export default function CharActionModals({
                     onClose={() => {
                         setAttackRiderModal(null);
                         window.dispatchEvent(new CustomEvent('target-effects-updated'));
-                        if (attackRiderModal?.action?.name === 'Cunning Strike') {
+                        const isCunningStrikeVariant = ['Cunning Strike', 'Improved Cunning Strike', 'Devious Strikes'].includes(attackRiderModal?.action?.name);
+                        if (isCunningStrikeVariant) {
                             const costUsed = getRuntimeValue(attackRiderModal.playerStats.name, '_cunningStrikeCostUsed', attackRiderModal.campaignName);
                             if (!costUsed || costUsed === 0) {
                                 if (autoDamageContext?.current) {

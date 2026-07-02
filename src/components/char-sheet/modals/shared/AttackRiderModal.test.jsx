@@ -819,4 +819,100 @@ describe('AttackRiderModal', () => {
       });
     });
   });
+
+  // ── Improved Cunning Strike multi-select ──
+
+  describe('Improved Cunning Strike multi-select', () => {
+    const cunningStrikeAction = {
+      name: 'Improved Cunning Strike',
+      automation: {
+        type: 'attack_rider',
+        oncePerTurn: true,
+        chooseOne: true,
+        maxEffects: 2,
+        options: [
+          {
+            name: 'Poison',
+            cost: '1d6',
+            effect: 'poisoned',
+            saveType: 'CON',
+            saveDc: 'ability',
+            saveAbility: 'DEX',
+            condition: 'poisoned',
+            duration: '1_minute',
+            repeatingSave: true,
+            requires: "Poisoner's Kit",
+          },
+          {
+            name: 'Trip',
+            cost: '1d6',
+            effect: 'prone',
+            saveType: 'DEX',
+            saveDc: 'ability',
+            saveAbility: 'DEX',
+            condition: 'prone',
+            sizeLimit: 'large_or_smaller',
+          },
+          {
+            name: 'Withdraw',
+            cost: '1d6',
+            effect: 'no_opportunity_attacks',
+            movement: 'half_speed',
+            noOAs: true,
+          },
+        ],
+      },
+    };
+
+    it('renders checkbox inputs for Improved Cunning Strike', () => {
+      render(<AttackRiderModal {...makeProps({ action: cunningStrikeAction })} />);
+      expect(document.querySelectorAll('input[type="checkbox"]')).toHaveLength(3);
+      expect(document.querySelectorAll('input[type="radio"]')).toHaveLength(0);
+    });
+
+    it('shows label with max count of 2', () => {
+      render(<AttackRiderModal {...makeProps({ action: cunningStrikeAction })} />);
+      const bodyDiv = document.querySelector('.sp-body');
+      expect(bodyDiv.textContent).toMatch(/Choose up to 2 effects/);
+    });
+
+    it('shows selected count starting at 0/2', () => {
+      render(<AttackRiderModal {...makeProps({ action: cunningStrikeAction })} />);
+      expect(screen.getByText(/0\/2 selected/)).toBeInTheDocument();
+    });
+
+    it('limits selection to maxEffects (2)', () => {
+      render(<AttackRiderModal {...makeProps({ action: cunningStrikeAction })} />);
+      clickCheckbox(0);
+      clickCheckbox(1);
+      expect(screen.getByText(/2\/2 selected/)).toBeInTheDocument();
+      // Third checkbox should not be selectable
+      clickCheckbox(2);
+      expect(screen.getByText(/2\/2 selected/)).toBeInTheDocument();
+    });
+
+    it('calls applyRiderOption with multiple selected options', async () => {
+      applyRiderOption.mockResolvedValue(defaultResult);
+      render(<AttackRiderModal {...makeProps({ action: cunningStrikeAction })} />);
+      clickCheckbox(0);
+      clickCheckbox(1);
+      clickApplyMulti();
+
+      await waitFor(() => {
+        expect(applyRiderOption).toHaveBeenCalledWith(
+          cunningStrikeAction,
+          expect.any(Object),
+          defaultCampaignName,
+          defaultTargetName,
+          ['Poison', 'Trip']
+        );
+      });
+    });
+
+    it('shows cost for each option', () => {
+      render(<AttackRiderModal {...makeProps({ action: cunningStrikeAction })} />);
+      const bodyDiv = document.querySelector('.sp-body');
+      expect(bodyDiv.textContent).toContain('Cost: 1d6 Sneak Attack dice');
+    });
+  });
 });

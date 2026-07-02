@@ -63,7 +63,8 @@ export async function applyRiderOption(action, playerStats, campaignName, target
     // Check oncePerTurn for Charger feat
     if (auto.oncePerTurn) {
         const currentRound = getCurrentCombatRound();
-        const usedKey = `_${action.name.replace(/\s+/g, '_')}_usedRound`;
+        const isCsFeature = ['Cunning Strike', 'Improved Cunning Strike', 'Devious Strikes'].includes(action.name);
+        const usedKey = isCsFeature ? '_CunningStrike_usedRound' : `_${action.name.replace(/\s+/g, '_')}_usedRound`;
         const usedRound = getRuntimeValue(playerStats.name, usedKey, campaignName);
         if (usedRound === currentRound) {
             return {
@@ -101,7 +102,8 @@ export async function applyRiderOption(action, playerStats, campaignName, target
     // Mark oncePerTurn as used
     if (auto.oncePerTurn) {
         const currentRound = getCurrentCombatRound();
-        const usedKey = `_${action.name.replace(/\s+/g, '_')}_usedRound`;
+        const isCsFeature = ['Cunning Strike', 'Improved Cunning Strike', 'Devious Strikes'].includes(action.name);
+        const usedKey = isCsFeature ? '_CunningStrike_usedRound' : `_${action.name.replace(/\s+/g, '_')}_usedRound`;
         await setRuntimeValue(playerStats.name, usedKey, currentRound, campaignName);
     }
 
