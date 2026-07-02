@@ -567,6 +567,32 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
         }
     }, [playerStats, campaignName, setPopupHtml, popupHtml]);
 
+    const handlePsiBolsteredKnack = React.useCallback(async ({ dieValue, dieSize, success }) => {
+        if (!playerStats) return;
+        const name = playerStats.name;
+        const popupName = popupHtml?.name || 'Ability Check';
+        const oldRoll = popupHtml?.rolls?.[0] || 0;
+        const bonus = popupHtml?.bonus || 0;
+        const oldTotal = oldRoll + bonus;
+        const newTotal = oldTotal + dieValue;
+
+        if (success) {
+            const currentEnergy = Number(getRuntimeValue(name, 'psionicEnergy', campaignName) ?? 0);
+            if (currentEnergy > 0) {
+                await setRuntimeValue(name, 'psionicEnergy', currentEnergy - 1, campaignName);
+            }
+        }
+
+        const desc = `<b>Psi-Bolstered Knack</b><br/>Rolled d${dieSize} for ${dieValue}.<br/>${popupName}: ${oldTotal} → <b>${newTotal}</b> (+${dieValue})${success ? ' — Succeeded, energy expended' : ' — Still failed, energy not expended'}`;
+        addEntry(campaignName, {
+            type: 'ability_use',
+            characterName: name,
+            abilityName: 'Psi-Bolstered Knack',
+            description: desc,
+            timestamp: Date.now(),
+        }).catch((e) => { console.error('[CharSheet] Error logging Psi-Bolstered Knack:', e); });
+    }, [playerStats, campaignName, popupHtml]);
+
     React.useEffect(() => {
         if (!playerStats) return;
         if (!isRaging) {
@@ -678,7 +704,7 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
                                 ) : null}
                                 <div className="dice-roll-hint">click to dismiss</div>
                             </div> :
-                            <DiceRollResult {...popupHtml} onSuperiorityManeuver={popupHtml?.availableSuperiorityManeuvers ? handleSuperiorityManeuver : undefined} onTacticalMind={popupHtml?.tacticalMind ? handleTacticalMind : undefined} />
+                            <DiceRollResult {...popupHtml} onSuperiorityManeuver={popupHtml?.availableSuperiorityManeuvers ? handleSuperiorityManeuver : undefined} onTacticalMind={popupHtml?.tacticalMind ? handleTacticalMind : undefined} onPsiBolsteredKnack={popupHtml?.psiBolsteredKnack ? handlePsiBolsteredKnack : undefined} />
                 }
             </Popup>
         )}

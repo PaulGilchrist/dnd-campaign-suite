@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import './diceRollResult.css';
 
-function DiceRollResult({ name, type, rolls, rollType, bonus = 0, bonusDetail, formula = '', modifier = 0, total = 0, targetName, targetAc, hit, resistanceNotice, hunterLoreNotice, forcedMode, isAutoMiss, rangeReason, coverReason, isAutoCrit, isCrit, isNatural1, dc, success, dcType, dcSuccess, waitingForPlayerSave, saveDc, saveType, saveResult, finalDamage, damageApplied, targetCurrentHp, damageReduced, damageType, onQuickRoll, autoDamage, coverLevel, coverAcBonus, autoReroll, autoRerollBonus, strSaveReplace, strCheckReplace, strScore, wisCheckReplace, wisCheckMinBonus, reliableTalent, onReroll, tacticalMind, tacticalMindBonus, gloriousDefenseBonus, onCounterAttack, strokeOfLuck, onStrokeOfLuck, defensiveDuelistBonus, baitAndSwitchBonus, isPotentCantrip, luckyAdvantage, luckyDisadvantage, onLuckyAdvantage, onLuckyDisadvantage, secondaryFormula, secondaryRolls, secondaryTotal, secondaryModifier, secondaryDamageType, secondaryFinalDamage, secondarySaveResult, availableSuperiorityManeuvers, onSuperiorityManeuver, onTacticalMind, gwfApplied, gwfOriginalRolls, gwfDisplayRolls, types, baseFormula, baseTotal, baseRolls, bonusFormula, bonusTotal, bonusRolls, finalHeal, healReduced, bonusHeal, bonusHealDetail }) {
+function DiceRollResult({ name, type, rolls, rollType, bonus = 0, bonusDetail, formula = '', modifier = 0, total = 0, targetName, targetAc, hit, resistanceNotice, hunterLoreNotice, forcedMode, isAutoMiss, rangeReason, coverReason, isAutoCrit, isCrit, isNatural1, dc, success, dcType, dcSuccess, waitingForPlayerSave, saveDc, saveType, saveResult, finalDamage, damageApplied, targetCurrentHp, damageReduced, damageType, onQuickRoll, autoDamage, coverLevel, coverAcBonus, autoReroll, autoRerollBonus, strSaveReplace, strCheckReplace, strScore, wisCheckReplace, wisCheckMinBonus, reliableTalent, onReroll, tacticalMind, tacticalMindBonus, gloriousDefenseBonus, onCounterAttack, strokeOfLuck, onStrokeOfLuck, defensiveDuelistBonus, baitAndSwitchBonus, isPotentCantrip, luckyAdvantage, luckyDisadvantage, onLuckyAdvantage, onLuckyDisadvantage, secondaryFormula, secondaryRolls, secondaryTotal, secondaryModifier, secondaryDamageType, secondaryFinalDamage, secondarySaveResult, availableSuperiorityManeuvers, onSuperiorityManeuver, onTacticalMind, gwfApplied, gwfOriginalRolls, gwfDisplayRolls, types, baseFormula, baseTotal, baseRolls, bonusFormula, bonusTotal, bonusRolls, finalHeal, healReduced, bonusHeal, bonusHealDetail, psiBolsteredKnack, onPsiBolsteredKnack, psiBolsteredKnackDieSize }) {
     const [mode, setMode] = useState(forcedMode || 'normal');
     const [rerollUsed, setRerollUsed] = useState(false);
     const [rerollResult, setRerollResult] = useState(null);
@@ -13,6 +13,9 @@ function DiceRollResult({ name, type, rolls, rollType, bonus = 0, bonusDetail, f
     const [luckyDisadvantageUsed, setLuckyDisadvantageUsed] = useState(false);
     const [superiorityUsed, setSuperiorityUsed] = useState(false);
     const [superiorityResult, setSuperiorityResult] = useState(null);
+    const [psiKnackClicked, setPsiKnackClicked] = useState(false);
+    const [psiKnackResult, setPsiKnackResult] = useState(null);
+    const [psiKnackConsumed, setPsiKnackConsumed] = useState(false);
 
     const isD20 = type === 'd20';
 
@@ -321,6 +324,46 @@ function DiceRollResult({ name, type, rolls, rollType, bonus = 0, bonusDetail, f
                     <i className="fa-solid fa-bolt"></i> {m.name} (Superiority Die)
                   </button>
                 ))}
+              </div>
+            )}
+
+            {psiBolsteredKnack && !psiKnackClicked && (rollType === 'check' || rollType === 'skill') && (
+              <div className="dice-roll-reroll">
+                <button className="dice-roll-reroll-btn" onClick={() => {
+                  const dieSize = psiBolsteredKnackDieSize || 6;
+                  const dieValue = Math.floor(Math.random() * dieSize) + 1;
+                  const currentTotal = strokeResult !== null ? 20 + bonus + modifier : (rerollResult !== null ? rerollResult.total : (finalRoll + bonus + modifier));
+                  setPsiKnackResult({ dieValue, dieSize, newTotal: currentTotal + dieValue });
+                  setPsiKnackClicked(true);
+                }} type="button">
+                  <i className="fa-solid fa-brain"></i> Psi-Bolstered Knack (d{psiBolsteredKnackDieSize || 6})
+                </button>
+              </div>
+            )}
+
+            {psiKnackClicked && !psiKnackConsumed && psiKnackResult !== null && (
+              <div className="dice-roll-reroll-result">
+                <i className="fa-solid fa-brain"></i> Psi-Bolstered Knack: +{psiKnackResult.dieValue} (d{psiKnackResult.dieSize}) → <strong>{psiKnackResult.newTotal}</strong>
+                <div className="dice-roll-reroll" style={{ marginTop: '8px' }}>
+                  <button className="dice-roll-reroll-btn" onClick={() => {
+                    setPsiKnackConsumed(true);
+                    if (onPsiBolsteredKnack) onPsiBolsteredKnack({ dieValue: psiKnackResult.dieValue, dieSize: psiKnackResult.dieSize, success: true });
+                  }} type="button">
+                    <i className="fa-solid fa-check"></i> Succeeded
+                  </button>
+                  <button className="dice-roll-reroll-btn" onClick={() => {
+                    setPsiKnackConsumed(true);
+                    if (onPsiBolsteredKnack) onPsiBolsteredKnack({ dieValue: psiKnackResult.dieValue, dieSize: psiKnackResult.dieSize, success: false });
+                  }} type="button">
+                    <i className="fa-solid fa-xmark"></i> Still Failed
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {psiKnackClicked && psiKnackConsumed && psiKnackResult !== null && (
+              <div className="dice-roll-reroll-result">
+                <i className="fa-solid fa-brain"></i> Psi-Bolstered Knack: +{psiKnackResult.dieValue} (d{psiKnackResult.dieSize}) → <strong>{psiKnackResult.newTotal}</strong>
               </div>
             )}
 

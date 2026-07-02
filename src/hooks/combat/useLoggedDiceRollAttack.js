@@ -132,11 +132,6 @@ export function createLogAndShow(deps) {
         const targetName = target?.name || context?.targetName;
         const attackerName = context?.attackerName || characterName;
 
-        const targetChar = (characters || []).find(c => c.name === targetName);
-        const strokeOfLuckUsed = targetChar ? getRuntimeValue(targetName, 'strokeOfLuckUsed', campaignName) : false;
-        const hasStrokeOfLuckPassive = targetChar?.computedStats?.automation?.passives?.some(p => p.type === 'stroke_of_luck');
-        const strokeOfLuck = hasStrokeOfLuckPassive && !strokeOfLuckUsed;
-
         if (!hit && !isAutoMiss && rollType === 'attack' && context?.isWeaponAttack) {
             const livingLegendActive = getRuntimeValue(characterName, 'livingLegendActive', campaignName);
             if (livingLegendActive) {
@@ -390,7 +385,9 @@ export function createLogAndShow(deps) {
                 d20Floor10: context?.d20Floor10,
                 tacticalMind: context?.tacticalMind,
                 tacticalMindBonus: context?.tacticalMindBonus,
-                strokeOfLuck,
+                strokeOfLuck: context?.strokeOfLuck,
+                psiBolsteredKnack: context?.psiBolsteredKnack,
+                psiBolsteredKnackDieSize: context?.psiBolsteredKnackDieSize,
                 characterName,
                 campaignName,
                 availableSuperiorityManeuvers,
@@ -1093,7 +1090,7 @@ export function createLogAndShow(deps) {
                 campaignName,
                 availableSuperiorityManeuvers,
                 forcedMode: context?.forcedMode,
-                strokeOfLuck,
+                strokeOfLuck: context?.strokeOfLuck,
             });
             window.dispatchEvent(new CustomEvent('initiative-rolled', { detail: { characterName: firstName, roll: r1 + totalBonus } }));
         }

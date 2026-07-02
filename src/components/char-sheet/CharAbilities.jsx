@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from 'react';
+import { useEffect } from 'react';
 import useLoggedDiceRoll from '../../hooks/combat/useLoggedDiceRoll.js'
 import { useDiceRollPopup } from '../../hooks/combat/DiceRollContext.js'
 import { buildAbilityDetailHtml } from '../../hooks/combat/useActionPopup.js';
@@ -128,10 +128,17 @@ function CharAbilities({ allAbilityScores, playerStats, campaignName, exhaustion
                if (conditionEffects?.luckyDisadvantage) {
                  ctx.luckyDisadvantage = true; ctx.luckyDisadvantageType = 'disadvantage'
                }
-               if (conditionEffects?.d20Floor10) {
-                ctx.d20Floor10 = true
-              }
-              return Object.keys(ctx).length > 0 ? ctx : undefined
+              if (conditionEffects?.d20Floor10) {
+                 ctx.d20Floor10 = true
+               }
+               const isSoulknife = playerStats?.class?.name === 'Rogue' && playerStats?.class?.major?.name === 'Soulknife';
+               const hasPsiBolsteredKnack = isSoulknife && (playerStats?.level || 0) >= 3;
+               if (hasPsiBolsteredKnack) {
+                 const classLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level);
+                 ctx.psiBolsteredKnack = true;
+                 ctx.psiBolsteredKnackDieSize = classLevel?.energy?.energy_die_type || 6;
+               }
+               return Object.keys(ctx).length > 0 ? ctx : undefined
          }
 
        const makeSaveContext = (abilityName) => {
