@@ -38,6 +38,7 @@ export const EFFECT_DESCRIPTIONS = {
     'OA Disadv': 'Opportunity attacks against this creature have disadvantage.',
     'No Difficult Terrain on Dash': 'Can ignore difficult terrain when taking the Dash action.',
     'Disadv Fire/Radiant': 'Has disadvantage on saving throws against Fire and Radiant damage.',
+    'Stealth Attack': 'Supreme Sneak active — next attack costs Sneak Attack dice, Invisible condition is preserved with cover.',
 }
 
 // HP status descriptions

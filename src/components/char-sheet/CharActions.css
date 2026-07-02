@@ -70,6 +70,11 @@
     vertical-align: middle;
 }
 
+.automation-badge--active {
+    background: rgba(148, 109, 238, 0.25);
+    color: #a78bfa;
+}
+
 .automation-actions {
     margin-top: 6px;
     display: flex;

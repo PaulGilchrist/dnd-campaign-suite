@@ -592,6 +592,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         primalCompanionBonusActionModal, setPrimalCompanionBonusActionModal,
         mistyWandererModal, setMistyWandererModal,
         bonusActionChoiceModal, setBonusActionChoiceModal,
+        stealthAttackModal, setStealthAttackModal,
         revelationInFleshModal, setRevelationInFleshModal,
         bastionOfLawModal, setBastionOfLawModal,
         elementalAffinityModal, setElementalAffinityModal,
@@ -1179,6 +1180,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     case 'primalCompanionBonusActionCommand': setPrimalCompanionBonusActionModal(result.payload); break;
                     case 'mistyWanderer': setMistyWandererModal(result.payload); break;
                     case 'bonusActionChoice': setBonusActionChoiceModal(result.payload); break;
+                    case 'stealthAttack': setStealthAttackModal(result.payload); break;
                     case 'revelationInFlesh': setRevelationInFleshModal(result.payload); break;
                     case 'bastionOfLaw': setBastionOfLawModal(result.payload); break;
                     case 'elementalAffinity': {
@@ -1543,6 +1545,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     primalCompanionBonusActionModal={primalCompanionBonusActionModal} setPrimalCompanionBonusActionModal={setPrimalCompanionBonusActionModal}
                     mistyWandererModal={mistyWandererModal} setMistyWandererModal={setMistyWandererModal}
                     bonusActionChoiceModal={bonusActionChoiceModal} setBonusActionChoiceModal={setBonusActionChoiceModal}
+                    stealthAttackModal={stealthAttackModal} setStealthAttackModal={setStealthAttackModal}
                     revelationInFleshModal={revelationInFleshModal} setRevelationInFleshModal={setRevelationInFleshModal}
                     bastionOfLawModal={bastionOfLawModal} setBastionOfLawModal={setBastionOfLawModal}
                     elementalAffinityModal={elementalAffinityModal} setElementalAffinityModal={setElementalAffinityModal}
@@ -1664,7 +1667,38 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                         {exhausted && isRageExpendable && <span className="automation-badge clickable" onClick={renderRageRestore}><i className="fa-solid fa-fire-flame-curved"></i> Restore with Rage</span>}
                     </div>
                 })}
-                <div><b>Base Actions:</b> {actions.join(', ')}</div>
+                <div><b>Base Actions:</b> {actions.map((actionName, idx) => {
+                    if (actionName === 'Hide') {
+                        return (
+                            <React.Fragment key={idx}>
+                                {idx > 0 && ', '}
+                                <span className="clickable" onClick={async () => {
+                                    if (cannotAct) return;
+                                    const currentConditions = getRuntimeValue(playerStats.name, 'activeConditions', campaignName) || [];
+                                    const isAlreadyInvisible = currentConditions.some(c => String(c).toLowerCase() === 'invisible');
+                                    if (isAlreadyInvisible) {
+                                        setPopupHtml({ type: 'automation_info', name: 'Hide', description: 'You are already hidden (Invisible condition active).' });
+                                        return;
+                                    }
+                                    const newConditions = [...currentConditions, 'invisible'];
+                                    await setRuntimeValue(playerStats.name, 'activeConditions', newConditions, campaignName);
+                                    const activeBuffs = getRuntimeValue(playerStats.name, 'activeBuffs', campaignName) || [];
+                                    const hasAdvantageOnStealth = activeBuffs.some(b => b.effect === 'advantage_on_stealth');
+                                    const newBuffs = hasAdvantageOnStealth ? activeBuffs : [...activeBuffs, { name: 'Hide', effect: 'advantage_on_stealth' }];
+                                    await setRuntimeValue(playerStats.name, 'activeBuffs', newBuffs, campaignName);
+                                    setPopupHtml({ type: 'automation_info', name: 'Hide', description: 'You attempt to Hide. You gain the Invisible condition and advantage on Dexterity (Stealth) checks until you attack, take damage, or use Lesser Restoration to remove the condition.' });
+                                    await addEntry(campaignName, {
+                                        type: 'ability_use',
+                                        characterName: playerStats.name,
+                                        abilityName: 'Hide',
+                                        description: 'Gained Invisible condition and advantage on Stealth checks.',
+                                    }).catch(() => {});
+                                }}>{actionName}</span>
+                            </React.Fragment>
+                        );
+                    }
+                    return <React.Fragment key={idx}>{idx > 0 && ', '}{actionName}</React.Fragment>;
+                })}</div>
             </div>
             <CharBonusActions
                 playerStats={playerStats}

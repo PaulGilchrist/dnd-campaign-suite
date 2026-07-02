@@ -13,6 +13,10 @@ function ConditionEffectBadges({ conditions, targetEffects = [], creatureName, c
     const condKeys = (conditions || []).map(c => c.key)
     const effects = computeConditionEffects(condKeys, [], targetEffects)
     const badges = []
+    const stealthAttackCost = creatureName && campaignName ? (getRuntimeValue(creatureName, 'stealthAttackCost', campaignName) ?? 0) : 0
+    if (stealthAttackCost > 0) {
+        badges.push({ label: 'Stealth Attack', cls: 'effect-stealth-attack', icon: 'fa-eye-slash', removable: false })
+    }
     if (effects.speedReduction) badges.push({ label: `Speed -${effects.speedReduction}`, cls: 'effect-speed-zero', icon: 'fa-minus', removable: false })
     if (effects.noAdvantageAgainst) badges.push({ label: 'No Adv vs', cls: 'effect-target-disadv', icon: 'fa-arrow-down', removable: false })
     if (effects.targetDisadvantageCount > 0 && !effects.noAdvantageAgainst) badges.push({ label: 'Disadv vs', cls: 'effect-target-disadv', icon: 'fa-arrow-down', removable: false })

@@ -71,6 +71,7 @@ export default function useCharActionModals({
     const [tricksterBlessingModal, setTricksterBlessingModal] = useState(null);
     const [secondaryTargetModal, setSecondaryTargetModal] = useState(null);
     const [invokeDuplicityModal, setInvokeDuplicityModal] = useState(null);
+    const [stealthAttackModal, setStealthAttackModal] = useState(null);
 
     const pendingDamageRef = useRef(null);
 
@@ -189,6 +190,7 @@ export default function useCharActionModals({
         tricksterBlessingModal, setTricksterBlessingModal,
         secondaryTargetModal, setSecondaryTargetModal,
         invokeDuplicityModal, setInvokeDuplicityModal,
+        stealthAttackModal, setStealthAttackModal,
         resolveAttackDamage,
         handleMasteryClose,
         handleWeaponMasteryChoice,

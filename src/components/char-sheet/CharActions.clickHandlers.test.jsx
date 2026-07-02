@@ -164,6 +164,8 @@ vi.mock('../../hooks/combat/useLoggedDiceRoll.js', () => {
 vi.mock('./useCharActionModals.js', () => ({
   default: vi.fn(() => ({
     resolveAttackDamage: vi.fn(),
+    stealthAttackModal: null,
+    setStealthAttackModal: vi.fn(),
   })),
 }));
 

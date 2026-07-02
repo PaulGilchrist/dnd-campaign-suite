@@ -399,6 +399,12 @@
     color: #ef4444;
 }
 
+.initiative .effect-stealth-attack {
+    background-color: rgba(139, 92, 246, 0.2);
+    border-color: rgba(139, 92, 246, 0.5);
+    color: #8b5cf6;
+}
+
 /* Condition picker modal */
 .initiative .condition-picker-overlay {
     position: fixed;

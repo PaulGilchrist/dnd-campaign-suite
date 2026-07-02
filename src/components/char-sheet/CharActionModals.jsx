@@ -8,6 +8,7 @@ import WildCompanionModal from './modals/WildCompanionModal.jsx'
 import SetConditionModal from './modals/shared/SetConditionModal.jsx'
 import EyebiteEffectModal from './modals/EyebiteEffectModal.jsx'
 import AttackRiderModal from './modals/shared/AttackRiderModal.jsx'
+import StealthAttackModal from './modals/shared/StealthAttackModal.jsx'
 import OpenHandTechniqueModal from './modals/OpenHandTechniqueModal.jsx'
 import WeaponMasteryModal from './modals/WeaponMasteryModal.jsx'
 import WeaponMasteryChoiceModal from './modals/WeaponMasteryChoiceModal.jsx'
@@ -188,6 +189,7 @@ export default function CharActionModals({
     combatSuperiorityModal, setCombatSuperiorityModal,
     attackRiderManeuverPrompt,
     sweepingAttackTargetModal, setSweepingAttackTargetModal,
+    stealthAttackModal, setStealthAttackModal,
     divineFuryChoice,
     damageTypeChoice,
     featureChoice,
@@ -564,6 +566,12 @@ export default function CharActionModals({
                 <BonusActionChoiceModal
                     {...bonusActionChoiceModal}
                     onClose={() => setBonusActionChoiceModal(null)}
+                />
+            )}
+            {stealthAttackModal && (
+                <StealthAttackModal
+                    {...stealthAttackModal}
+                    onClose={() => setStealthAttackModal(null)}
                 />
             )}
             {bastionOfLawModal && (

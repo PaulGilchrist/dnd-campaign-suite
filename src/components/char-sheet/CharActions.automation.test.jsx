@@ -231,6 +231,7 @@ vi.mock('./useCharActionModals.js', () => ({
     handleCleaveSkip: vi.fn(),
     hypnoticPatternShakeModal: null, setHypnoticPatternShakeModal: vi.fn(),
     arcaneWardRestoreModal: null, setArcaneWardRestoreModal: vi.fn(),
+    stealthAttackModal: null, setStealthAttackModal: vi.fn(),
   })),
 }));
 

@@ -390,39 +390,24 @@ const RangerFeatures = function RangerFeatures({ playerStats }) {
 /* ─── Rogue ─── */
 const RogueFeatures = function RogueFeatures({ playerStats, campaignName }) {
     const rogueFeatures = getClassFeatures(playerStats);
-    const stealthAttackActive = getRuntimeValue(playerStats.name, 'stealthAttackCost', campaignName) > 0;
-
-    const handleSupremeSneak = async () => {
-        if (stealthAttackActive) {
-            await setRuntimeValue(playerStats.name, 'stealthAttackCost', 0, campaignName);
-            return;
-        }
-        const sneakAttackDice = rogueFeatures?.sneakAttack?.dice_count || 0;
-        if (sneakAttackDice < 1) {
-            return;
-        }
-        await setRuntimeValue(playerStats.name, 'stealthAttackCost', 1, campaignName);
-    };
+    const stealthAttackCost = useRuntimeValue(playerStats.name, 'stealthAttackCost', campaignName);
+    const stealthAttackActive = (stealthAttackCost ?? 0) > 0;
 
     return (
-         <div data-testid="char-class-rogue">
-             {rogueFeatures?.expertise && <div><b>Expertise: </b>{rogueFeatures.expertise.join(', ')}</div>}
-             <div className="automation-actions">
-                 <button className="automation-btn" title="Sneak Attack: Extra damage when you have advantage or ally adjacent">
-                     <i className="fas fa-user-ninja"></i> Sneak Attack ({rogueFeatures?.sneakAttack?.dice_count || 0}d{rogueFeatures?.sneakAttack?.dice_value || 0})
-                 </button>
-                 {playerStats.level >= 9 && (
-                     <button
-                         className={'automation-btn' + (stealthAttackActive ? ' automation-btn--active' : '')}
-                         onClick={handleSupremeSneak}
-                         title={stealthAttackActive ? "Supreme Sneak: Stealth Attack active — next attack costs 1d6 Sneak Attack, Invisible preserved with cover" : "Supreme Sneak: Activate Stealth Attack (costs 1d6 Sneak Attack, preserves Invisible with cover)"}
-                     >
-                         <i className="fas fa-eye-slash"></i> Supreme Sneak
-                     </button>
-                 )}
-             </div>
-             <div><b>Sneak Attack Damage: </b>+{rogueFeatures?.sneakAttack?.dice_count || 0}d{rogueFeatures?.sneakAttack?.dice_value || 0}</div>
-         </div>
+          <div data-testid="char-class-rogue">
+              {rogueFeatures?.expertise && <div><b>Expertise: </b>{rogueFeatures.expertise.join(', ')}</div>}
+              <div className="automation-actions">
+                  <button className="automation-btn" title="Sneak Attack: Extra damage when you have advantage or ally adjacent">
+                      <i className="fas fa-user-ninja"></i> Sneak Attack ({rogueFeatures?.sneakAttack?.dice_count || 0}d{rogueFeatures?.sneakAttack?.dice_value || 0})
+                  </button>
+                  {playerStats.level >= 9 && (
+                      <span className={'automation-badge' + (stealthAttackActive ? ' automation-badge--active' : '')} title={stealthAttackActive ? "Supreme Sneak: Stealth Attack active — next attack costs 1d6 Sneak Attack, Invisible preserved with cover" : "Supreme Sneak: Available at Rogue level 9 — activate from Actions section"}>
+                          <i className="fas fa-eye-slash"></i> Supreme Sneak
+                      </span>
+                  )}
+              </div>
+              <div><b>Sneak Attack Damage: </b>+{rogueFeatures?.sneakAttack?.dice_count || 0}d{rogueFeatures?.sneakAttack?.dice_value || 0}</div>
+          </div>
     );
 };
 

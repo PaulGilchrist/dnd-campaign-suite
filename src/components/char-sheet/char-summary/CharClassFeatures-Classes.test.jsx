@@ -92,7 +92,7 @@ vi.mock('../../../services/ui/dataLoader.js', () => ({
     loadFightingStyles: vi.fn(() => Promise.resolve([])),
 }));
 
-import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
+import { getRuntimeValue, useRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 
 const basePlayerStats = {
     name: 'Thorin',
@@ -707,23 +707,23 @@ describe('CharClassFeatures', () => {
         });
 
         it('renders supreme sneak as active when stealth attack cost > 0', () => {
-            vi.mocked(getRuntimeValue).mockImplementation((_name, key) => {
+            vi.mocked(useRuntimeValue).mockImplementation((_name, key) => {
                 if (key === 'stealthAttackCost') return 1;
                 return null;
             });
             renderComponent(rogueStats(9));
             const btn = screen.getByTitle(/Supreme Sneak/);
-            expect(btn).toHaveClass('automation-btn--active');
+            expect(btn).toHaveClass('automation-badge--active');
         });
 
         it('does not render supreme sneak when stealth attack cost is 0', () => {
-            vi.mocked(getRuntimeValue).mockImplementation((_name, key) => {
+            vi.mocked(useRuntimeValue).mockImplementation((_name, key) => {
                 if (key === 'stealthAttackCost') return 0;
                 return null;
             });
             renderComponent(rogueStats(9));
             const btn = screen.getByTitle(/Supreme Sneak/);
-            expect(btn).not.toHaveClass('automation-btn--active');
+            expect(btn).not.toHaveClass('automation-badge--active');
         });
 
         it('renders sneak attack dice from class features', () => {

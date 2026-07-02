@@ -9479,6 +9479,11 @@
                                 "type": "passive_rule",
                                 "effect": "supreme_sneak",
                                 "casting_time": "1 action"
+                            },
+                            {
+                                "type": "stealth_attack",
+                                "cost": "1d6",
+                                "casting_time": "1 action"
                             }
                         ]
                     },
