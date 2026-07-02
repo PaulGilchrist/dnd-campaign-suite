@@ -343,7 +343,7 @@ export default function CharActionModals({
                             } else if (autoDamageContext) {
                                 const ctx = autoDamageContext.current;
                                 if (ctx) {
-                                    const cunningStrikeCost = Number(getRuntimeValue(playerStats.name, '_cunningStrikeCostUsed', attackRiderModal.campaignName) ?? 0);
+                                    const cunningStrikeCost = Number(getRuntimeValue(attackRiderModal.playerStats.name, '_cunningStrikeCostUsed', attackRiderModal.campaignName) ?? 0);
                                     const effectiveSneakDice = Math.max(0, ctx.sneakAttackDice - cunningStrikeCost);
                                     let formula = ctx.formula;
                                     let total = ctx.total;

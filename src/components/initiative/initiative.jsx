@@ -289,9 +289,13 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
                setCombatSummary(cloneDeep(cs))
                storage.set('activeCreatureName', newActiveName, campaignName)
                setActiveCreatureName(newActiveName)
-               for (const creature of cs.creatures) {
-                   clearPerRoundMajestyTrackers(creature.name, campaignName)
-               }
+                for (const creature of cs.creatures) {
+                    clearPerRoundMajestyTrackers(creature.name, campaignName)
+                    if (creature.type === 'player') {
+                        setRuntimeValue(creature.name, '_cunningStrikeCostUsed', 0, campaignName);
+                        setRuntimeValue(creature.name, '_CunningStrike_usedRound', null, campaignName);
+                    }
+                }
              }
              expireStaleEffects(campaignName)
            }, [activeCreatureName, campaignName])
