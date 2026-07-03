@@ -6,10 +6,23 @@
       "savedAt": "2026-05-21T00:00:00Z",
       "rulesVersion": "5e",
       "difficulty": 1,
-      "playerLevels": [10, 10, 10, 10],
+      "playerLevels": [
+        10,
+        10,
+        10,
+        10
+      ],
       "selectedMonsters": [
-        { "index": "skeleton", "name": "Skeleton", "qty": 4 },
-        { "index": "zombie", "name": "Zombie", "qty": 2 }
+        {
+          "index": "skeleton",
+          "name": "Skeleton",
+          "qty": 4
+        },
+        {
+          "index": "zombie",
+          "name": "Zombie",
+          "qty": 2
+        }
       ]
     },
     {
@@ -18,11 +31,28 @@
       "savedAt": "2026-05-21T00:00:00Z",
       "rulesVersion": "5e",
       "difficulty": 2,
-      "playerLevels": [10, 10, 10, 10],
+      "playerLevels": [
+        10,
+        10,
+        10,
+        10
+      ],
       "selectedMonsters": [
-        { "index": "death-knight", "name": "Death Knight", "qty": 1 },
-        { "index": "wight", "name": "Wight", "qty": 2 },
-        { "index": "skeleton", "name": "Skeleton", "qty": 4 }
+        {
+          "index": "death-knight",
+          "name": "Death Knight",
+          "qty": 1
+        },
+        {
+          "index": "wight",
+          "name": "Wight",
+          "qty": 2
+        },
+        {
+          "index": "skeleton",
+          "name": "Skeleton",
+          "qty": 4
+        }
       ]
     },
     {
@@ -31,12 +61,52 @@
       "savedAt": "2026-05-21T00:00:00Z",
       "rulesVersion": "5e",
       "difficulty": 3,
-      "playerLevels": [10, 10, 10, 10],
+      "playerLevels": [
+        10,
+        10,
+        10,
+        10
+      ],
       "selectedMonsters": [
-        { "index": "death-knight", "name": "Death Knight", "qty": 1 },
-        { "index": "wight", "name": "Wight", "qty": 4 },
-        { "index": "wraith", "name": "Wraith", "qty": 2 }
+        {
+          "index": "death-knight",
+          "name": "Death Knight",
+          "qty": 1
+        },
+        {
+          "index": "wight",
+          "name": "Wight",
+          "qty": 4
+        },
+        {
+          "index": "wraith",
+          "name": "Wraith",
+          "qty": 2
+        }
       ]
+    },
+    {
+      "name": "Charm",
+      "savedAt": "2026-07-03T12:27:27.504Z",
+      "selectedMonsters": [
+        {
+          "index": "aboleth",
+          "name": "Aboleth",
+          "qty": 1
+        },
+        {
+          "index": "solar",
+          "name": "Solar",
+          "qty": 1
+        }
+      ],
+      "description": "",
+      "lootData": {
+        "lootEntries": [],
+        "totalEncounterXp": 0
+      },
+      "encounterCompleted": false,
+      "effectiveXP": 38900
     }
   ]
 }

@@ -17,7 +17,7 @@ export const spellOverlayData = new Map();
 // Debounce timer for saveFile()
 let saveTimer = null;
 
-const persistDataDebounceMilliseconds = 30000; // 30 seconds in milliseconds
+const persistDataDebounceMilliseconds = 15000; // 15 seconds in milliseconds
 
 /**
  * Loads all campaign change data from disk into characterChangeData Map at startup

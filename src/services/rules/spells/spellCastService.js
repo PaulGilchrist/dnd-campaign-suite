@@ -33,6 +33,7 @@ import { triggerForesight } from '../features/foresightService.js';
 import { triggerResilientSphere } from '../features/resilientSphereService.js';
 import { triggerOttoDance } from '../features/ottoDanceService.js';
 import { triggerFriends, endFriendsOnHostileAction } from '../features/friendsService.js';
+import { triggerCharmPerson } from '../features/charmPersonService.js';
 import { triggerRayOfEnfeeblement } from '../features/rayOfEnfeeblementService.js';
 import { endInvisibilityOnHostileAction } from '../features/invisibilityService.js';
 import { triggerGlobeOfInvulnerability } from '../features/globeOfInvulnerabilityService.js';
@@ -307,6 +308,13 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
             const friendsTarget = await getTargetInfo();
             const friendsMetaCtx = { ...metaCtx, spellSaveDc, targetName: friendsTarget?.name };
             await triggerFriends(spell, friendsMetaCtx, playerStats, campaignName, mapName);
+            return;
+        }
+
+        // Charm Person — single humanoid target WIS save or Charmed
+        if (spell.name && spell.name.toLowerCase() === 'charm person') {
+            const charmTarget = await getTargetInfo();
+            await triggerCharmPerson(spell, { ...metaCtx, spellSaveDc, targetName: charmTarget?.name }, playerStats, campaignName, mapName);
             return;
         }
 

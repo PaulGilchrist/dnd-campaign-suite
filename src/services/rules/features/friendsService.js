@@ -32,27 +32,6 @@ async function isTargetHumanoid(targetName, campaignName) {
 }
 
 /**
- * Check whether the caster and target are currently fighting each other.
- * "Fighting" means they are in combat and the target is an enemy of the caster.
- */
-async function isFighting(casterName, targetName, campaignName) {
-    const cs = await getCombatContext(campaignName);
-    if (!cs?.creatures) return false;
-
-    // If there's an active combat round, creatures are in combat
-    // We check both are in the combat and the target is not the caster
-    const casterInCombat = cs.creatures.some(c => c.name === casterName);
-    const targetInCombat = cs.creatures.some(c => c.name === targetName);
-
-    if (casterInCombat && targetInCombat && casterName !== targetName) {
-        // They're in the same combat — caster is fighting the target
-        return true;
-    }
-
-    return false;
-}
-
-/**
  * Check whether the caster has cast Friends on this target.
  */
 function hasRecentFriendsCast(casterName, targetName, campaignName) {
@@ -101,19 +80,7 @@ export async function triggerFriends(spell, metaCtx, playerStats, campaignName, 
         return { type: 'popup', payload: { type: 'automation_info', name: 'Friends', description: `No effect. ${targetName} is not a Humanoid.` } };
     }
 
-    // Check 2: Caster is fighting the target
-    const fighting = await isFighting(playerStats.name, targetName, campaignName);
-    if (fighting) {
-        addEntry(campaignName, {
-            type: 'ability_use',
-            characterName: playerStats.name,
-            abilityName: 'Friends',
-            description: `${playerStats.name} casts Friends on ${targetName} but it has no effect — ${playerStats.name} is fighting ${targetName}.`,
-        }).catch(() => {});
-        return { type: 'popup', payload: { type: 'automation_info', name: 'Friends', description: `No effect. You are fighting ${targetName}.` } };
-    }
-
-    // Check 3: Cast within 24 hours
+    // Check 2: Cast within 24 hours
     if (hasRecentFriendsCast(playerStats.name, targetName, campaignName)) {
         addEntry(campaignName, {
             type: 'ability_use',
