@@ -452,7 +452,7 @@ describe('changeData - debouncedSave', () => {
         debouncedSave();
 
         expect(setTimeoutSpy).toHaveBeenCalled();
-        expect(setTimeoutSpy.mock.calls[0][1]).toBe(30000);
+        expect(setTimeoutSpy.mock.calls[0][1]).toBe(15000);
 
         setTimeoutSpy.mockRestore();
     });

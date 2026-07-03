@@ -185,8 +185,7 @@ const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells
         await resolveSpellPositions();
 
         gateMetamagic(spell, metaCtx);
-        castAction(spell, metaCtx);
-    }, [gateMetamagic, castAction, resolveSpellPositions]);
+    }, [gateMetamagic, resolveSpellPositions]);
 
     const handleDamageRoll = (formula, spellName, spell) => {
       let targetSpell = { ...spell, baseLevel: spell.level };

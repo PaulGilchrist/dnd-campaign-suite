@@ -51,8 +51,7 @@ function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, condit
 
       await resolveBonusSpellPositions();
       gateMetamagic(spell, metaCtx);
-      bonusCastAction(spell, metaCtx);
-    }, [gateMetamagic, bonusCastAction, resolveBonusSpellPositions]);
+    }, [gateMetamagic, resolveBonusSpellPositions]);
 
     const bonusActionAttacks = playerStats.attacks.filter((attack) => {
         if (attack.type !== 'Bonus Action') return false;
