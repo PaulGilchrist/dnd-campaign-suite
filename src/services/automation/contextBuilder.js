@@ -324,18 +324,12 @@ export function buildAttackContextSync(attack, playerStats, campaignName, condit
             const hasDisadvantage = forcedMode === 'disadvantage';
             const hasAdvantage = forcedMode === 'advantage';
             if (hasSneakAttack && isSneakAttackWeapon && !hasDisadvantage) {
-                // Once-per-round enforcement
                 const sneakUsedRound = getRuntimeValue(playerStats.name, '_SneakAttack_usedRound', campaignName);
-                console.log('[ContextBuilder] sneakAttack check: attack:', attack.name, 'hasSneakAttack:', hasSneakAttack, 'isSneakAttackWeapon:', isSneakAttackWeapon, 'sneakUsedRound:', sneakUsedRound, 'currentRound:', getCurrentCombatRound(campaignName));
                 if (sneakUsedRound === getCurrentCombatRound(campaignName)) {
                     sneakAttackDice = 0;
-                    console.log('[ContextBuilder] sneakAttack set to 0 (already used this round)');
                 } else if (hasAdvantage) {
                     sneakAttackDice = sneakAttackNumD6;
-                    console.log('[ContextBuilder] sneakAttack set to', sneakAttackNumD6, '(advantage)');
                 } else {
-                    // Check for ally within 5ft of target
-                    console.log('[ContextBuilder] no advantage, checking for ally within 5ft');
                     const combatSummary = await getCombatContext(campaignName);
                     if (combatSummary) {
                         const targetCreature = combatSummary.creatures?.find(c => c.name === targetName);
@@ -356,9 +350,6 @@ export function buildAttackContextSync(attack, playerStats, campaignName, condit
                             });
                             if (hasAllyInRange) {
                                 sneakAttackDice = sneakAttackNumD6;
-                                console.log('[ContextBuilder] sneakAttack set to', sneakAttackNumD6, '(ally within 5ft)');
-                            } else {
-                                console.log('[ContextBuilder] sneakAttack stays 0 (no ally within 5ft)');
                             }
                         }
                     }
