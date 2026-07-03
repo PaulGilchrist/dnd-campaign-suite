@@ -14,7 +14,7 @@ const STATUS_COLORS = {
 };
 
 function Quests({ campaignName, isLocalhost, onBack }) {
-  const { items: quests, loading, saveItems: saveQuestsList, deleteItem: deleteQuestAction } = useEntityManagement(campaignName, { load: loadQuests, save: saveQuests, delete: deleteQuest }, { responseKey: 'quests' });
+  const { items: quests, loading, saveItems: saveQuestsList, deleteItem: deleteQuestAction } = useEntityManagement(campaignName, { load: loadQuests, save: saveQuests, delete: deleteQuest });
   const {
     searchQuery, setSearchQuery, filteredItems: filteredQuests,
     modalOpen, editingItem: editingQuest, formData, setFormData,

@@ -255,6 +255,54 @@ export function createLogAndShow(deps) {
             }
         }
 
+        // Soul Blades (Soulknife level 9) — Homing Strikes: reroll miss with psionic energy die
+        const ps = context?.playerStats;
+        const isSoulknife = ps?.class?.name === 'Rogue' && ps?.class?.major?.name === 'Soulknife';
+        const hasSoulBlades = isSoulknife && ps?.level >= 9;
+        const isPsychicBlade = context?.isPsychicBlade === true;
+        let homingStrikesUsed = false;
+        let homingStrikesBonus = 0;
+        if (hasSoulBlades && isPsychicBlade && hit === false && !isAutoMiss) {
+            const classLevel = ps?.class?.class_levels?.find(cl => cl.level === ps?.level);
+            const psionicDieSize = classLevel?.energy?.energy_die || 6;
+            const psionicBonus = Math.floor(Math.random() * psionicDieSize) + 1;
+            const newTotal = effectiveD20 + bonus + psionicBonus;
+            const newHit = targetAc ? (newTotal >= targetAc) : null;
+            if (newHit === true) {
+                const defaultMax = ps?._trackedResources?.psionicEnergy?.max || 0;
+                const currentEnergy = Number(getRuntimeValue(characterName, 'psionicEnergy', campaignName) ?? defaultMax);
+                if (currentEnergy > 0) {
+                    setRuntimeValue(characterName, 'psionicEnergy', currentEnergy - 1, campaignName);
+                    hit = true;
+                    homingStrikesUsed = true;
+                    homingStrikesBonus = psionicBonus;
+                    addEntry(campaignName, {
+                        type: 'ability_use',
+                        characterName,
+                        abilityName: 'Soul Blades',
+                        description: `${characterName} used Soul Blades (Homing Strikes) to turn a miss into a hit, consuming 1 Psionic Energy. Psionic Energy: ${currentEnergy - 1}/${defaultMax}.`,
+                        timestamp: Date.now(),
+                    }).catch((e) => { console.error('[homingStrikes] Log error:', e); });
+                }
+            } else if (newHit !== null) {
+                addEntry(campaignName, {
+                    type: 'ability_use',
+                    characterName,
+                    abilityName: 'Soul Blades',
+                    description: `${characterName} tried Soul Blades (Homing Strikes) but even with the psionic die roll of ${psionicBonus}, the attack still missed (total: ${newTotal} vs AC: ${targetAc}).`,
+                    timestamp: Date.now(),
+                }).catch((e) => { console.error('[homingStrikes] Log error:', e); });
+            }
+        } else if (isPsychicBlade && hit === false && !isAutoMiss) {
+            addEntry(campaignName, {
+                type: 'ability_use',
+                characterName,
+                abilityName: 'Soul Blades',
+                description: `Soul Blades (Homing Strikes) check: isSoulknife=${isSoulknife}, hasSoulBlades=${hasSoulBlades}, isPsychicBlade=${isPsychicBlade}, hit=${hit}. ps.class=${ps?.class?.name}, ps.major=${ps?.class?.major?.name}, level=${ps?.level}.`,
+                timestamp: Date.now(),
+            }).catch((e) => { console.error('[homingStrikes] Log error:', e); });
+        }
+
         const criticalRange = context?.criticalRange;
         let rollsInCriticalRange = false;
         if (criticalRange) {
@@ -397,13 +445,14 @@ export function createLogAndShow(deps) {
         if (rollType === 'attack') {
             setRuntimeValue(characterName, 'lastAttackRoll', {
                 d20: effectiveD20,
-                bonus,
+                bonus: homingStrikesUsed ? (bonus + homingStrikesBonus) : bonus,
                 targetName,
                 targetAc,
                 hit,
                 isCrit,
                 effectiveAc,
                 coverAcBonus,
+                homingStrikesBonus: homingStrikesUsed ? homingStrikesBonus : undefined,
                 timestamp: Date.now(),
             }, campaignName);
 
@@ -485,44 +534,6 @@ export function createLogAndShow(deps) {
                 },
                 timestamp: Date.now(),
             }, campaignName);
-
-            const ps = context?.playerStats;
-            const isSoulknife = ps?.class?.name === 'Rogue' && ps?.class?.major?.name === 'Soulknife';
-            const hasSoulBlades = isSoulknife && ps?.level >= 9;
-            const isPsychicBlade = context?.isPsychicBlade === true;
-            if (hasSoulBlades && isPsychicBlade && hit === false && !isAutoMiss) {
-                const classLevel = ps?.class?.class_levels?.find(cl => cl.level === ps?.level);
-                const psionicDieSize = classLevel?.energy?.energy_die || 6;
-                const psionicBonus = Math.floor(Math.random() * psionicDieSize) + 1;
-                const newTotal = effectiveD20 + bonus + psionicBonus;
-                const newHit = targetAc ? (newTotal >= targetAc) : null;
-                if (newHit === true) {
-                    const defaultMax = ps?._trackedResources?.psionicEnergy?.max || 0;
-                    const currentEnergy = Number(getRuntimeValue(characterName, 'psionicEnergy', campaignName) ?? defaultMax);
-                    if (currentEnergy > 0) {
-                        setRuntimeValue(characterName, 'psionicEnergy', currentEnergy - 1, campaignName);
-                        setRuntimeValue(characterName, 'lastAttackRoll', {
-                            d20: effectiveD20,
-                            bonus: bonus + psionicBonus,
-                            targetName,
-                            targetAc,
-                            hit: true,
-                            isCrit: false,
-                            effectiveAc,
-                            coverAcBonus,
-                            timestamp: Date.now(),
-                            homingStrikesBonus: psionicBonus,
-                        }, campaignName);
-                        addEntry(campaignName, {
-                            type: 'ability_use',
-                            characterName,
-                            abilityName: 'Soul Blades',
-                            description: `${characterName} used Soul Blades (Homing Strikes) to turn a miss into a hit, consuming 1 Psionic Energy. Psionic Energy: ${currentEnergy - 1}/${defaultMax}.`,
-                            timestamp: Date.now(),
-                        }).catch((e) => { console.error('[homingStrikes] Log error:', e); });
-                    }
-                }
-            }
 
             if (!hit && !isAutoMiss && targetName && ps?.automation?.passives) {
                 const missEffects = ps.automation.passives.filter(

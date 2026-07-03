@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useCrudList } from '../../hooks/useCrudList.js';
 import { useEntityManagement } from '../../hooks/useEntityManagement.js';
-import { loadNPCs, saveNPCs, deleteNPC } from '../../services/npcs/npcsService.js';
+import { loadNPCs, saveNPC, saveNPCs, deleteNPC } from '../../services/npcs/npcsService.js';
 import NPCListItem from './NPCListItem.jsx';
 import NPCFormModal from './NPCFormModal.jsx';
 import { getDefaultFormData, cleanNPCData } from '../../services/npcs/npcFormUtils.js';
@@ -10,7 +10,7 @@ import { generateNPC } from '../../services/npcs/npcGenerator.js';
 import './NPCs.css';
 
 function NPCs({ campaignName, onBack, onViewInitiative }) {
-  const { items: npcs, loading, loadItems: loadNPCsList, saveItems: saveNPCAction, deleteItem: deleteNPCAction } =
+  const { items: npcs, loading, loadItems: loadNPCsList, deleteItem: deleteNPCAction } =
     useEntityManagement(campaignName, { load: loadNPCs, save: saveNPCs, delete: deleteNPC }, { responseKey: 'npcs', loadOnMount: false });
 
   const {
@@ -45,7 +45,9 @@ function NPCs({ campaignName, onBack, onViewInitiative }) {
     if (!formData || !formData.name.trim()) return;
     setSaving(true);
     try {
-      await saveNPCAction(cleanNPCData(formData), editingNPC?.name);
+      const cleaned = cleanNPCData(formData);
+      await saveNPC(campaignName, cleaned, editingNPC?.name);
+      await loadNPCsList();
       handleCloseModal();
     } catch (error) {
       console.error('Failed to save NPC:', error);
@@ -78,7 +80,7 @@ function NPCs({ campaignName, onBack, onViewInitiative }) {
     try {
       const snapshot = { ...formData };
       const cleaned = cleanNPCData(snapshot);
-      const result = await saveNPCAction(cleaned, editingNPC?.name);
+      const result = await saveNPC(campaignName, cleaned, editingNPC?.name);
       const savedNpc = result?.npc || snapshot;
       const npcForInitiative = {
         ...savedNpc,

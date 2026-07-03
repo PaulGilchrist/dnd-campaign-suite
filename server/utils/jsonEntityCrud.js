@@ -56,6 +56,9 @@ export function createJsonEntityRouter(entityName, options = {}) {
     try {
       const { campaign } = req.params;
       const entities = req.body[entityName];
+      if (!Array.isArray(entities)) {
+        return res.status(400).json({ error: `Expected an array for ${entityName}` });
+      }
       const filePath = getFilePath(campaign);
       ensureDataDir(campaign);
       fs.writeFileSync(filePath, JSON.stringify(entities, null, 2));
