@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import { handle } from './autoRerollHandler.js';
@@ -102,7 +102,7 @@ describe('autoRerollHandler', () => {
         getCurrentCombatRound.mockReturnValue(1);
     });
 
-    // ── No combat context / no recent roll ──────────────────────
+    // ── No recent roll ──────────────────────────────────────────
 
     describe('no recent roll', () => {
         it('should return info popup when combat context has no lastAttack', async () => {
@@ -113,6 +113,32 @@ describe('autoRerollHandler', () => {
             expect(result.type).toBe('popup');
             expect(result.payload.type).toBe('automation_info');
             expect(result.payload.description).toContain('No recent failed attack roll or ability check');
+        });
+
+        it('should return automationInfoPopup when no automation type matches', async () => {
+            getCombatContext.mockResolvedValue({ lastAttack: null });
+
+            const action = makeAction({
+                automation: { type: 'auto_reroll' },
+            });
+            const result = await handle(action, makePlayerStats(), 'campaign', 'map');
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.type).toBe('automation_info');
+        });
+
+        it('should fall through to automationInfoPopup when bonusExpression is unrecognized', async () => {
+            getCombatContext.mockResolvedValue({
+                lastAttack: { rollType: 'attack', attackerName: 'TestHero', d20: 5, bonus: 5, targetAc: 15, hit: false }
+            });
+
+            const action = makeAction({
+                automation: { bonusExpression: 'unknown_expression', bonus: undefined },
+            });
+            const result = await handle(action, makePlayerStats(), 'campaign', 'map');
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.type).toBe('automation_info');
         });
     });
 
@@ -161,6 +187,18 @@ describe('autoRerollHandler', () => {
             expect(result.type).toBe('popup');
             expect(result.payload.description).toContain('No recent failed attack roll or ability check');
         });
+
+        it('should return info when last roll is not a failed attack or check for player', async () => {
+            getCombatContext.mockResolvedValue({
+                lastAttack: { rollType: 'attack', attackerName: 'TestHero', d20: 18, bonus: 5, targetAc: 15, hit: true }
+            });
+
+            const result = await handle(makeAction(), makePlayerStats(), 'campaign', 'map');
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain('No recent failed attack roll or ability check');
+            expect(addEntry).not.toHaveBeenCalled();
+        });
     });
 
     // ── Ally missed attack with range ───────────────────────────
@@ -202,7 +240,7 @@ describe('autoRerollHandler', () => {
             expect(result.payload.description).toContain('No recent failed attack roll or ability check');
         });
 
-        it('should skip ally attack if ally already hit', async () => {
+        it('should skip ally attack that already hit', async () => {
             getCombatContext.mockResolvedValue({
                 lastAttack: { rollType: 'attack', attackerName: 'Ally', d20: 18, bonus: 5, targetAc: 15, hit: true }
             });
@@ -282,6 +320,25 @@ describe('autoRerollHandler', () => {
             );
         });
 
+        it('should accept abbreviated save type (INT)', async () => {
+            getRuntimeValue.mockReturnValue(null);
+            getCombatContext.mockResolvedValue({
+                lastAttack: { rollType: 'save', targetName: 'TestHero', d20: 3, bonus: 2, saveType: 'INT' }
+            });
+
+            const action = makeAction({
+                automation: {
+                    target: 'saving_throw',
+                    effect: 'override_fail_to_success',
+                    oncePer: 'short_rest',
+                },
+            });
+            const result = await handle(action, makePlayerStats(), 'campaign', 'map');
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain('SUCCESS');
+        });
+
         it('should reject if already used this rest', async () => {
             getRuntimeValue.mockReturnValue('rest');
             getCombatContext.mockResolvedValue({
@@ -335,25 +392,6 @@ describe('autoRerollHandler', () => {
             const result = await handle(action, makePlayerStats(), 'campaign', 'map');
 
             expect(result.payload.description).toContain('Intelligence, Wisdom, or Charisma');
-        });
-
-        it('should accept abbreviated save type (INT)', async () => {
-            getRuntimeValue.mockReturnValue(null);
-            getCombatContext.mockResolvedValue({
-                lastAttack: { rollType: 'save', targetName: 'TestHero', d20: 3, bonus: 2, saveType: 'INT' }
-            });
-
-            const action = makeAction({
-                automation: {
-                    target: 'saving_throw',
-                    effect: 'override_fail_to_success',
-                    oncePer: 'short_rest',
-                },
-            });
-            const result = await handle(action, makePlayerStats(), 'campaign', 'map');
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('SUCCESS');
         });
 
         it('should reject if lastAttack is not a save', async () => {
@@ -501,6 +539,21 @@ describe('autoRerollHandler', () => {
             expect(result.payload.description).toContain('Athletics');
         });
 
+        it('should decrement bardic inspiration uses after applying', async () => {
+            getCombatContext.mockResolvedValue({
+                lastAttack: { rollType: 'attack', attackerName: 'TestHero', d20: 5, bonus: 5, targetAc: 15, hit: false }
+            });
+            getRuntimeValue.mockReturnValue(3);
+
+            const stats = makePlayerStatsForLevel(1, { bardic_inspiration_uses: 3, bardic_die: 6 });
+            const action = makeAction({
+                automation: { bonusExpression: 'bardic_inspiration_die' },
+            });
+            await handle(action, stats, 'campaign', 'map');
+
+            expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', 'bardicInspirationUses', 2, 'campaign');
+        });
+
         it('should return info when bardic inspiration has no uses remaining', async () => {
             getCombatContext.mockResolvedValue({
                 lastAttack: { rollType: 'attack', attackerName: 'TestHero', d20: 5, bonus: 5, targetAc: 15, hit: false }
@@ -517,36 +570,6 @@ describe('autoRerollHandler', () => {
             expect(addEntry).not.toHaveBeenCalled();
         });
 
-        it('should return info when last roll is not a failed attack or check for player', async () => {
-            getCombatContext.mockResolvedValue({
-                lastAttack: { rollType: 'attack', attackerName: 'TestHero', d20: 18, bonus: 5, targetAc: 15, hit: true }
-            });
-
-            const stats = makePlayerStatsForLevel(1, { bardic_inspiration_uses: 3, bardic_die: 6 });
-            const action = makeAction({
-                automation: { bonusExpression: 'bardic_inspiration_die' },
-            });
-            const result = await handle(action, stats, 'campaign', 'map');
-
-            expect(result.payload.description).toContain('No recent failed ability check or attack roll');
-            expect(addEntry).not.toHaveBeenCalled();
-        });
-
-        it('should decrement bardic inspiration uses after applying', async () => {
-            getCombatContext.mockResolvedValue({
-                lastAttack: { rollType: 'attack', attackerName: 'TestHero', d20: 5, bonus: 5, targetAc: 15, hit: false }
-            });
-            getRuntimeValue.mockReturnValue(3);
-
-            const stats = makePlayerStatsForLevel(1, { bardic_inspiration_uses: 3, bardic_die: 6 });
-            const action = makeAction({
-                automation: { bonusExpression: 'bardic_inspiration_die' },
-            });
-            await handle(action, stats, 'campaign', 'map');
-
-            expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', 'bardicInspirationUses', 2, 'campaign');
-        });
-
         it('should skip bardic die if player has no bardic class levels', async () => {
             getCombatContext.mockResolvedValue({
                 lastAttack: { rollType: 'attack', attackerName: 'TestHero', d20: 5, bonus: 5, targetAc: 15, hit: false }
@@ -558,7 +581,6 @@ describe('autoRerollHandler', () => {
             });
             const result = await handle(action, stats, 'campaign', 'map');
 
-            // No bardic_die means bardic die path is skipped, falls through to automationInfoPopup
             expect(result.type).toBe('popup');
             expect(result.payload.type).toBe('automation_info');
         });
@@ -605,6 +627,22 @@ describe('autoRerollHandler', () => {
             expect(result.payload.description).toContain('Perception');
         });
 
+        it('should decrement psionic energy after applying', async () => {
+            getCombatContext.mockResolvedValue({
+                lastAttack: { rollType: 'attack', attackerName: 'TestHero', d20: 5, bonus: 5, targetAc: 15, hit: false }
+            });
+            vi.mocked(evaluateAutoExpression).mockReturnValue(6);
+            getRuntimeValue.mockReturnValue(4);
+
+            const action = makeAction({
+                automation: { bonusExpression: 'psionic_energy_die' },
+            });
+            const stats = makePlayerStats({ level: 1, _trackedResources: { psionicEnergy: { max: 6 } } });
+            await handle(action, stats, 'campaign', 'map');
+
+            expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', 'psionicEnergy', 3, 'campaign');
+        });
+
         it('should return info when no psionic energy remaining', async () => {
             getRuntimeValue.mockReturnValue(0);
             getCombatContext.mockResolvedValue({
@@ -634,22 +672,6 @@ describe('autoRerollHandler', () => {
 
             expect(result.payload.description).toContain('No recent failed ability check or attack roll');
             expect(addEntry).not.toHaveBeenCalled();
-        });
-
-        it('should decrement psionic energy after applying', async () => {
-            getCombatContext.mockResolvedValue({
-                lastAttack: { rollType: 'attack', attackerName: 'TestHero', d20: 5, bonus: 5, targetAc: 15, hit: false }
-            });
-            vi.mocked(evaluateAutoExpression).mockReturnValue(6);
-            getRuntimeValue.mockReturnValue(4);
-
-            const action = makeAction({
-                automation: { bonusExpression: 'psionic_energy_die' },
-            });
-            const stats = makePlayerStats({ level: 1, _trackedResources: { psionicEnergy: { max: 6 } } });
-            await handle(action, stats, 'campaign', 'map');
-
-            expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', 'psionicEnergy', 3, 'campaign');
         });
     });
 
@@ -745,40 +767,6 @@ describe('autoRerollHandler', () => {
 
             expect(result.payload.description).toContain('once per turn');
             expect(addEntry).not.toHaveBeenCalled();
-        });
-    });
-
-    // ── Fallback: no matching automation type ───────────────────
-
-    describe('fallback when no automation matches', () => {
-        it('should return automationInfoPopup when no bonus, effect, or expression matches', async () => {
-            getCombatContext.mockResolvedValue({ lastAttack: null });
-
-            const action = makeAction({
-                automation: { type: 'auto_reroll' },
-            });
-            const result = await handle(action, makePlayerStats(), 'campaign', 'map');
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.type).toBe('automation_info');
-        });
-    });
-
-    // ── Bonus expression with unknown value ─────────────────────
-
-    describe('unknown bonusExpression', () => {
-        it('should fall through to automationInfoPopup when bonusExpression is unrecognized and no bonus', async () => {
-            getCombatContext.mockResolvedValue({
-                lastAttack: { rollType: 'attack', attackerName: 'TestHero', d20: 5, bonus: 5, targetAc: 15, hit: false }
-            });
-
-            const action = makeAction({
-                automation: { bonusExpression: 'unknown_expression', bonus: undefined },
-            });
-            const result = await handle(action, makePlayerStats(), 'campaign', 'map');
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.type).toBe('automation_info');
         });
     });
 });

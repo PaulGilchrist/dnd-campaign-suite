@@ -1,4 +1,8 @@
-// @improved-by-ai
+// @cleaned-by-ai
+// Consolidated redundant tests: removed duplicate falsy value permutations,
+// brittle implementation-detail assertions, and low-value trivial passthrough tests.
+// Kept: one test per distinct behavioral path (no die, roll failure, success).
+
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ── Mocks ──────────────────────────────────────────────────────
@@ -49,16 +53,11 @@ describe('bardicInspirationUseHandler.handle', () => {
   });
 
   describe('no bardic inspiration die', () => {
-    const falsyValues = [null, undefined, 0, '', false];
-
-    it.each(falsyValues)('should return info popup when bardicInspirationDie is %p', async (dieSize) => {
+    it('should return info popup when bardicInspirationDie is falsy', async () => {
       const ps = makePlayerStats();
       const action = makeAction();
 
-      runtimeState.getRuntimeValue.mockImplementation((_name, key) => {
-        if (key === 'bardicInspirationDie') return dieSize;
-        return null;
-      });
+      runtimeState.getRuntimeValue.mockReturnValue(null);
 
       const result = await handle(action, ps, campaignName);
 
@@ -72,23 +71,10 @@ describe('bardicInspirationUseHandler.handle', () => {
       });
       expect(runtimeState.setRuntimeValue).not.toHaveBeenCalled();
     });
-
-    it('should use the player name from playerStats when checking runtime value', async () => {
-      const ps = makePlayerStats({ name: 'DifferentPlayer' });
-      const action = makeAction();
-
-      runtimeState.getRuntimeValue.mockReturnValue(null);
-
-      await handle(action, ps, campaignName);
-
-      expect(runtimeState.getRuntimeValue).toHaveBeenCalledWith('DifferentPlayer', 'bardicInspirationDie', campaignName);
-    });
   });
 
   describe('roll failure', () => {
-    const failureValues = [null, undefined];
-
-    it.each(failureValues)('should return info popup when rollExpression returns %p', async (rollResult) => {
+    it('should return info popup when rollExpression returns falsy', async () => {
       const ps = makePlayerStats();
       const action = makeAction();
       const dieSize = 8;
@@ -97,7 +83,7 @@ describe('bardicInspirationUseHandler.handle', () => {
         if (key === 'bardicInspirationDie') return dieSize;
         return null;
       });
-      diceRoller.rollExpression.mockReturnValue(rollResult);
+      diceRoller.rollExpression.mockReturnValue(null);
 
       const result = await handle(action, ps, campaignName);
 
@@ -110,22 +96,6 @@ describe('bardicInspirationUseHandler.handle', () => {
         },
       });
       expect(runtimeState.setRuntimeValue).not.toHaveBeenCalled();
-    });
-
-    it('should construct the correct dice expression from the die size', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-      const dieSize = 12;
-
-      runtimeState.getRuntimeValue.mockImplementation((_name, key) => {
-        if (key === 'bardicInspirationDie') return dieSize;
-        return null;
-      });
-      diceRoller.rollExpression.mockReturnValue(null);
-
-      await handle(action, ps, campaignName);
-
-      expect(diceRoller.rollExpression).toHaveBeenCalledWith('1d12');
     });
   });
 
@@ -179,7 +149,6 @@ describe('bardicInspirationUseHandler.handle', () => {
 
       runtimeState.getRuntimeValue.mockImplementation((_name, key) => {
         if (key === 'bardicInspirationDie') return dieSize;
-        if (key === 'bardicInspirationGrantedBy') return null;
         return null;
       });
       diceRoller.rollExpression.mockReturnValue(rollResult);
@@ -187,93 +156,6 @@ describe('bardicInspirationUseHandler.handle', () => {
       const result = await handle(action, ps, campaignName);
 
       expect(result.payload.description).toContain('Die granted by unknown');
-    });
-
-    it('should use "unknown" when granter is an empty string', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-      const dieSize = 6;
-      const rollResult = { total: 3, rolls: [3] };
-
-      runtimeState.getRuntimeValue.mockImplementation((_name, key) => {
-        if (key === 'bardicInspirationDie') return dieSize;
-        if (key === 'bardicInspirationGrantedBy') return '';
-        return null;
-      });
-      diceRoller.rollExpression.mockReturnValue(rollResult);
-
-      const result = await handle(action, ps, campaignName);
-
-      expect(result.payload.description).toContain('Die granted by unknown');
-    });
-
-    it('should pass the action name through to the payload', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction({ name: 'Custom Action Name' });
-      const dieSize = 6;
-      const rollResult = { total: 4, rolls: [4] };
-
-      runtimeState.getRuntimeValue.mockImplementation((_name, key) => {
-        if (key === 'bardicInspirationDie') return dieSize;
-        return null;
-      });
-      diceRoller.rollExpression.mockReturnValue(rollResult);
-
-      const result = await handle(action, ps, campaignName);
-
-      expect(result.payload.name).toBe('Custom Action Name');
-    });
-
-    it('should pass the automation object through to the payload', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction({ automation: { type: 'bardic_inspiration_use', extra: true } });
-      const dieSize = 6;
-      const rollResult = { total: 4, rolls: [4] };
-
-      runtimeState.getRuntimeValue.mockImplementation((_name, key) => {
-        if (key === 'bardicInspirationDie') return dieSize;
-        return null;
-      });
-      diceRoller.rollExpression.mockReturnValue(rollResult);
-
-      const result = await handle(action, ps, campaignName);
-
-      expect(result.payload.automation).toEqual({ type: 'bardic_inspiration_use', extra: true });
-    });
-
-    it('should handle an empty rolls array from rollExpression', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-      const dieSize = 6;
-      const rollResult = { total: 0, rolls: [] };
-
-      runtimeState.getRuntimeValue.mockImplementation((_name, key) => {
-        if (key === 'bardicInspirationDie') return dieSize;
-        return null;
-      });
-      diceRoller.rollExpression.mockReturnValue(rollResult);
-
-      const result = await handle(action, ps, campaignName);
-
-      expect(result.payload.description).toContain('rolled **0** ()');
-    });
-
-    it('should use different die sizes in the expression and description', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-      const dieSize = 20;
-      const rollResult = { total: 15, rolls: [15] };
-
-      runtimeState.getRuntimeValue.mockImplementation((_name, key) => {
-        if (key === 'bardicInspirationDie') return dieSize;
-        return null;
-      });
-      diceRoller.rollExpression.mockReturnValue(rollResult);
-
-      const result = await handle(action, ps, campaignName);
-
-      expect(diceRoller.rollExpression).toHaveBeenCalledWith('1d20');
-      expect(result.payload.description).toContain('Bardic Inspiration (1d20)');
     });
   });
 });

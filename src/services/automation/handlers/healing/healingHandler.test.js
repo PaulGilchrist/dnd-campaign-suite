@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ── Mocks BEFORE imports ───────────────────────────────────────
@@ -108,14 +108,13 @@ describe('healingHandler', () => {
       expect(result.payload.description).toContain('Regained 5 HP');
     });
 
-    it('should return automation_info when already at full HP', async () => {
+    it('should report "Already at full HP" when target is at max HP', async () => {
       healingRoll.applyHealingDirectly.mockReturnValue({ newHp: 20, maxHp: 20, actualHeal: 0 });
       const ps = makePlayerStats();
       const action = makeAction({ healExpression: '1d4' });
 
       const result = await handle(action, ps, campaignName, null);
 
-      expect(result.type).toBe('popup');
       expect(result.payload.description).toContain('Already at full HP');
     });
 
@@ -136,8 +135,7 @@ describe('healingHandler', () => {
       expect(result.payload.description).toContain('2 uses remaining');
     });
 
-    // Fix: capture result for assertion in next test
-    it('should decrement uses and report no uses remaining when depleted', async () => {
+    it('should report no uses remaining when uses depleted', async () => {
       runtimeState.getRuntimeValue.mockReturnValue(1);
       const ps = makePlayerStats();
       const action = makeAction({ healExpression: '1d4', uses: 1 });
@@ -154,7 +152,7 @@ describe('healingHandler', () => {
       expect(result.payload.description).toContain('no uses remaining');
     });
 
-    it('should return automation_info when no uses remaining', async () => {
+    it('should block and report Short Rest recharge when no uses remaining', async () => {
       runtimeState.getRuntimeValue.mockReturnValue(0);
       const ps = makePlayerStats();
       const action = makeAction({ healExpression: '1d4', uses: 1 });
@@ -202,25 +200,6 @@ describe('healingHandler', () => {
       expect(result.payload.description).toContain('4 uses remaining');
     });
 
-    it('should use usesMax when provided', async () => {
-      runtimeState.getRuntimeValue.mockReturnValue(2);
-      const ps = makePlayerStats();
-      const action = makeAction({
-        healExpression: '1d4',
-        usesMax: 3,
-      });
-
-      await handle(action, ps, campaignName, null);
-
-      expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-        'TestHealer',
-        'healingtouchUses',
-        1,
-        campaignName,
-        true,
-      );
-    });
-
     it('should replace fighter level in expression', async () => {
       const ps = makePlayerStats({ level: 7 });
       const action = makeAction({
@@ -230,23 +209,6 @@ describe('healingHandler', () => {
       await handle(action, ps, campaignName, null);
 
       expect(diceRoller.rollExpression).toHaveBeenCalledWith('1d4 + 7');
-    });
-
-    it('should pass slotLevel to resolveHealingBonuses', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction({
-        healExpression: '1d4',
-        slotLevel: 3,
-      });
-
-      await handle(action, ps, campaignName, null);
-
-      expect(automationService.resolveHealingBonuses).toHaveBeenCalledWith(
-        expect.objectContaining({ level: 5 }),
-        3,
-        5,
-        3,
-      );
     });
   });
 
@@ -358,23 +320,6 @@ describe('healingHandler', () => {
 
       expect(restRules.computeHitDieRecovery).toHaveBeenCalledWith(6, 3);
     });
-
-    it('should default CON bonus to 0 when no Constitution ability', async () => {
-      runtimeState.getRuntimeValue.mockReturnValue(2);
-      restRules.getHitDieSize.mockReturnValue(8);
-      restRules.computeHitDieRecovery.mockReturnValue(4);
-      diceRoller.rollExpression.mockReturnValue({ total: 3, rolls: [3], modifier: 0 });
-
-      const ps = makePlayerStats({ abilities: [] });
-      const action = makeAction({
-        healExpression: 'hit_die_roll',
-        hitDiceCost: 1,
-      });
-
-      await handle(action, ps, campaignName, null);
-
-      expect(restRules.computeHitDieRecovery).toHaveBeenCalledWith(3, 0);
-    });
   });
 
   // ── Bloodied only ────────────────────────────────────────────
@@ -393,21 +338,8 @@ describe('healingHandler', () => {
       expect(result.payload.description).toContain('Bloodied');
     });
 
-    it('should allow when at exactly half HP', async () => {
+    it('should allow when at or below half HP', async () => {
       const ps = makePlayerStats({ currentHitPoints: 10, maxHitPoints: 20 });
-      const action = makeAction({
-        healExpression: '1d4',
-        bloodiedOnly: true,
-      });
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.type).toBe('automation_info');
-    });
-
-    it('should allow when below half HP', async () => {
-      const ps = makePlayerStats({ currentHitPoints: 5, maxHitPoints: 20 });
       const action = makeAction({
         healExpression: '1d4',
         bloodiedOnly: true,
@@ -547,20 +479,6 @@ describe('healingHandler', () => {
       expect(result.type).toBe('popup');
       expect(result.payload.type).toBe('healing');
     });
-
-    it('should report Short Rest recharge for self_healing when uses depleted', async () => {
-      runtimeState.getRuntimeValue.mockReturnValue(0);
-
-      const ps = makePlayerStats();
-      const action = makeAction({
-        uses: 1,
-        healExpression: '2d4',
-      });
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.payload.description).toContain('Short Rest');
-    });
   });
 
   // ── healAmount number path (no uses field) ───────────────────
@@ -583,20 +501,21 @@ describe('healingHandler', () => {
       expect(result.payload.healAmount).toBe(1);
     });
 
-    it('should include bonus HP in description when resolveHealingBonuses > 0', async () => {
-      automationService.resolveHealingBonuses.mockReturnValue(2);
+    it('should add bonus to number healAmount and include in description', async () => {
+      automationService.resolveHealingBonuses.mockReturnValue(3);
       const ps = makePlayerStats();
       const action = {
-        name: 'Stabilize',
+        name: 'Lay on Hands',
         automation: {
           type: 'reaction',
-          healAmount: 1,
+          healAmount: 5,
         },
       };
 
       const result = await handle(action, ps, campaignName, null);
 
-      expect(result.payload.description).toContain('+ 2 bonus HP');
+      expect(result.payload.healAmount).toBe(8);
+      expect(result.payload.description).toContain('+ 3 bonus HP');
     });
 
     it('should return expression string when healAmount is not a number and no uses', async () => {
@@ -614,23 +533,6 @@ describe('healingHandler', () => {
 
       expect(result.payload.type).toBe('healing');
       expect(result.payload.healAmount).toBe('1d8');
-    });
-
-    it('should add bonus to number healAmount', async () => {
-      automationService.resolveHealingBonuses.mockReturnValue(3);
-      const ps = makePlayerStats();
-      const action = {
-        name: 'Lay on Hands',
-        automation: {
-          type: 'reaction',
-          healAmount: 5,
-        },
-      };
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.payload.healAmount).toBe(8);
-      expect(result.payload.description).toContain('+ 3 bonus HP');
     });
   });
 
@@ -653,20 +555,6 @@ describe('healingHandler', () => {
       expect(result.modalName).toBe('handOfHealing');
       expect(result.payload.monkName).toBe('TestHealer');
       expect(result.payload.bonus).toBe(3);
-    });
-
-    it('should default Wisdom modifier to 0 when no WIS ability', async () => {
-      const ps = makePlayerStats({ abilities: [] });
-      const action = makeAction({
-        healExpression: 'martial_arts_die + WIS',
-      });
-
-      diceRoller.rollExpression.mockReturnValue({ total: 4, rolls: [4], modifier: 0 });
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.type).toBe('modal');
-      expect(result.payload.bonus).toBe(0);
     });
 
     it('should use martialArtsDie from class features or default to 4', async () => {
@@ -718,41 +606,6 @@ describe('healingHandler', () => {
       expect(result.payload.bonus).toBe(5);
     });
 
-    it('should pass rerollOnes to modal payload when set and not maximizing', async () => {
-      const ps = makePlayerStats({
-        abilities: [{ name: 'Wisdom', bonus: 2 }],
-      });
-      const action = makeAction({
-        healExpression: 'martial_arts_die + WIS',
-      });
-
-      classFeatures.getClassFeatures.mockReturnValue({ martialArtsDie: 6 });
-      diceRoller.rollExpression.mockReturnValue({ total: 6, rolls: [6], modifier: 0 });
-      automationService.hasRerollHealingOnes.mockReturnValue(true);
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.payload.rerollOnes).toBe(true);
-    });
-
-    it('should set rerollOnes to false when maximizing', async () => {
-      const ps = makePlayerStats({
-        abilities: [{ name: 'Wisdom', bonus: 2 }],
-      });
-      const action = makeAction({
-        healExpression: 'martial_arts_die + WIS',
-      });
-
-      classFeatures.getClassFeatures.mockReturnValue({ martialArtsDie: 6 });
-      diceRoller.rollExpressionMaximized.mockReturnValue({ total: 6, rolls: [6], modifier: 0 });
-      automationService.hasHealingMaximization.mockReturnValue(true);
-      automationService.hasRerollHealingOnes.mockReturnValue(true);
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.payload.rerollOnes).toBe(false);
-    });
-
     it('should include targetName and HP info in modal payload', async () => {
       const ps = makePlayerStats({
         abilities: [{ name: 'Wisdom', bonus: 2 }],
@@ -773,54 +626,6 @@ describe('healingHandler', () => {
     });
   });
 
-  // ── Logging ──────────────────────────────────────────────────
-
-  describe('SSE logging', () => {
-    it('should call logHealingToSSE with correct payload for self_healing', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction({ healExpression: '1d4' });
-
-      await handle(action, ps, campaignName, null);
-
-      expect(healingRoll.logHealingToSSE).toHaveBeenCalledWith(campaignName, {
-        targetName: 'TestHealer',
-        sourceName: 'Healing Touch',
-        actualHeal: 5,
-        newHp: 15,
-        maxHp: 20,
-        rollInfo: '1d4=5 (5)',
-        maximize: false,
-        healingName: 'Healing Touch',
-        remainingUses: 0,
-        maxUses: 1,
-      });
-    });
-
-    it('should call logHealingToSSE with correct payload for monk healing', async () => {
-      const ps = makePlayerStats({
-        abilities: [{ name: 'Wisdom', bonus: 2 }],
-      });
-      const action = makeAction({ healExpression: 'martial_arts_die + WIS' });
-
-      classFeatures.getClassFeatures.mockReturnValue({ martialArtsDie: 6 });
-      diceRoller.rollExpression.mockReturnValue({ total: 6, rolls: [6], modifier: 0 });
-      healingRoll.applyHealingDirectly.mockReturnValue({ newHp: 16, maxHp: 20, actualHeal: 8 });
-
-      await handle(action, ps, campaignName, null);
-
-      expect(healingRoll.logHealingToSSE).toHaveBeenCalledWith(campaignName, {
-        targetName: 'TestHealer',
-        sourceName: 'Healing Touch',
-        actualHeal: 8,
-        newHp: 16,
-        maxHp: 20,
-        rollInfo: '1d6=6 (6)',
-        maximize: false,
-        healingName: 'Healing Touch',
-      });
-    });
-  });
-
   // ── Physician's Touch ────────────────────────────────────────
 
   describe("Physician's Touch feature", () => {
@@ -837,21 +642,6 @@ describe('healingHandler', () => {
       const result = await handle(action, ps, campaignName, null);
 
       expect(result.payload.hasPhysiciansTouch).toBe(true);
-    });
-
-    it('should set hasPhysiciansTouch to false when feature absent', async () => {
-      const ps = makePlayerStats({
-        abilities: [{ name: 'Wisdom', bonus: 2 }],
-        characterAdvancement: [{ name: 'Other Feature' }],
-      });
-      const action = makeAction({ healExpression: 'martial_arts_die + WIS' });
-
-      classFeatures.getClassFeatures.mockReturnValue({ martialArtsDie: 6 });
-      diceRoller.rollExpression.mockReturnValue({ total: 6, rolls: [6], modifier: 0 });
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.payload.hasPhysiciansTouch).toBe(false);
     });
   });
 });

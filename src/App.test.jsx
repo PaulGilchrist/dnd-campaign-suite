@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import App from './App.jsx';
@@ -160,7 +160,7 @@ describe('App', () => {
       expect(screen.queryByTestId('campaign-selection')).not.toBeInTheDocument();
     });
 
-    it('renders CharSheet when activeView is charSheet and activeCharacter exists', async () => {
+    it('renders CharSheet when campaign has characters', async () => {
       mockState.characters = [{ name: 'Aragorn', level: 1 }];
       render(<App />);
       await selectCampaign();
@@ -271,7 +271,7 @@ describe('App', () => {
       return { toggleBtn: screen.getByTestId('theme-toggle-btn'), localStorageMock };
     };
 
-    it('initializes from localStorage as dark', async () => {
+    it('initializes from localStorage as dark and toggles to light', async () => {
       const { toggleBtn, localStorageMock } = await renderWithTheme('dark');
       fireEvent.click(toggleBtn);
       await waitFor(() => {
@@ -280,7 +280,7 @@ describe('App', () => {
       expect(localStorageMock.setItem).toHaveBeenCalledWith('theme', 'light');
     });
 
-    it('initializes from localStorage as light', async () => {
+    it('initializes from localStorage as light and toggles to dark', async () => {
       const { toggleBtn, localStorageMock } = await renderWithTheme('light');
       fireEvent.click(toggleBtn);
       await waitFor(() => {
@@ -396,64 +396,6 @@ describe('App', () => {
       });
     });
 
-    it('passes correct props to Map component', async () => {
-      mockState.characters = [{ name: 'Aragorn', level: 1 }];
-      render(<App />);
-      await selectCampaign();
-      fireEvent.click(screen.getByTestId('maps-btn'));
-      await waitFor(() => expect(screen.getByTestId('maps-manager')).toBeInTheDocument());
-      fireEvent.click(screen.getByTestId('open-map-btn'));
-      await waitFor(() => {
-        expect(screen.getByTestId('map-campaign').textContent).toBe('test-campaign');
-        expect(screen.getByTestId('map-char-count').textContent).toBe('1');
-        expect(screen.getByTestId('map-localhost').textContent).toBe('true');
-      });
-    });
-
-    it('passes correct props to EncounterBuilder', async () => {
-      mockState.characters = [{ name: 'Aragorn', level: 1 }];
-      render(<App />);
-      await selectCampaign();
-      fireEvent.click(screen.getByTestId('encounter-btn'));
-      await waitFor(() => {
-        expect(screen.getByTestId('eb-campaign').textContent).toBe('test-campaign');
-        expect(screen.getByTestId('eb-char-count').textContent).toBe('1');
-      });
-    });
-
-    it('passes correct props to Notes', async () => {
-      mockState.characters = [{ name: 'Aragorn', level: 1 }];
-      render(<App />);
-      await selectCampaign();
-      fireEvent.click(screen.getByTestId('notes-btn'));
-      await waitFor(() => {
-        expect(screen.getByTestId('notes-campaign').textContent).toBe('test-campaign');
-        expect(screen.getByTestId('notes-localhost').textContent).toBe('true');
-      });
-    });
-
-    it('passes correct props to NPCs', async () => {
-      mockState.characters = [{ name: 'Aragorn', level: 1 }];
-      render(<App />);
-      await selectCampaign();
-      fireEvent.click(screen.getByTestId('npcs-btn'));
-      await waitFor(() => {
-        expect(screen.getByTestId('npcs-campaign').textContent).toBe('test-campaign');
-        expect(screen.getByTestId('npcs-char-count').textContent).toBe('1');
-      });
-    });
-
-    it('passes correct props to Factions', async () => {
-      mockState.characters = [{ name: 'Aragorn', level: 1 }];
-      render(<App />);
-      await selectCampaign();
-      fireEvent.click(screen.getByTestId('factions-btn'));
-      await waitFor(() => {
-        expect(screen.getByTestId('factions-campaign').textContent).toBe('test-campaign');
-        expect(screen.getByTestId('factions-localhost').textContent).toBe('true');
-      });
-    });
-
     it('exercises MapsManager onBack callback', async () => {
       mockState.characters = [{ name: 'Aragorn', level: 1 }];
       render(<App />);
@@ -566,15 +508,6 @@ describe('App', () => {
         expect(screen.getByTestId('character-wizard')).toBeInTheDocument();
       });
       expect(screen.queryByTestId('char-sheet')).not.toBeInTheDocument();
-    });
-
-    it('shows char sheet when campaign has characters', async () => {
-      mockState.characters = [{ name: 'Aragorn', level: 1 }];
-      render(<App />);
-      await selectCampaign();
-      await waitFor(() => {
-        expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
-      });
     });
 
     it('switches active character when character button clicked in sidebar', async () => {

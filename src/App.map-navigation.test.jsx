@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import App from './App.jsx';
@@ -146,20 +146,6 @@ describe('App - Map Navigation & Settlements/NPCs Back', () => {
   };
 
   describe('Map navigation stack', () => {
-    it('pushes current map to history when entering a new map from another map', async () => {
-      mockState.characters = [{ name: 'Aragorn', level: 1 }];
-      render(<App />);
-      await selectCampaign();
-      fireEvent.click(screen.getByTestId('maps-btn'));
-      await waitFor(() => {
-        expect(screen.getByTestId('maps-manager')).toBeInTheDocument();
-      });
-      fireEvent.click(screen.getByTestId('open-map-btn'));
-      await waitFor(() => {
-        expect(screen.getByTestId('map-view')).toBeInTheDocument();
-      });
-    });
-
     it('navigates back to previous map when history has entries', async () => {
       mockState.characters = [{ name: 'Aragorn', level: 1 }];
       render(<App />);
@@ -176,22 +162,6 @@ describe('App - Map Navigation & Settlements/NPCs Back', () => {
       await waitFor(() => {
         expect(screen.getByTestId('maps-manager')).toBeInTheDocument();
       });
-    });
-
-    it('goes back to manager when map history is empty on localhost', async () => {
-      mockState.characters = [{ name: 'Aragorn', level: 1 }];
-      render(<App />);
-      await selectCampaign();
-      fireEvent.click(screen.getByTestId('maps-btn'));
-      await waitFor(() => {
-        expect(screen.getByTestId('maps-manager')).toBeInTheDocument();
-      });
-      fireEvent.click(screen.getByTestId('open-map-btn'));
-      await waitFor(() => {
-        expect(screen.getByTestId('map-view')).toBeInTheDocument();
-      });
-      // Clear the manager from DOM to simulate going back from a sub-map
-      // The handleBackFromMap should go to manager when history is empty
     });
 
     it('goes back to none (not manager) when history is empty on non-localhost', async () => {
@@ -217,16 +187,6 @@ describe('App - Map Navigation & Settlements/NPCs Back', () => {
   });
 
   describe('Settlements view', () => {
-    it('renders Settlements view when settlements button clicked', async () => {
-      mockState.characters = [{ name: 'Aragorn', level: 1 }];
-      render(<App />);
-      await selectCampaign();
-      fireEvent.click(screen.getByTestId('settlements-btn'));
-      await waitFor(() => {
-        expect(screen.getByTestId('settlements-view')).toBeInTheDocument();
-      });
-    });
-
     it('renders Settlements above char-sheet', async () => {
       mockState.characters = [{ name: 'Aragorn', level: 1 }];
       render(<App />);
@@ -299,16 +259,6 @@ describe('App - Map Navigation & Settlements/NPCs Back', () => {
   });
 
   describe('Campaign Log view', () => {
-    it('renders Campaign Log view when log button clicked', async () => {
-      mockState.characters = [{ name: 'Aragorn', level: 1 }];
-      render(<App />);
-      await selectCampaign();
-      fireEvent.click(screen.getByTestId('log-btn'));
-      await waitFor(() => {
-        expect(screen.getByTestId('campaign-log-view')).toBeInTheDocument();
-      });
-    });
-
     it('renders Campaign Log above char-sheet', async () => {
       mockState.characters = [{ name: 'Aragorn', level: 1 }];
       render(<App />);
@@ -416,7 +366,7 @@ describe('App - Map Navigation & Settlements/NPCs Back', () => {
       });
     });
 
-    it('transitions from map to manager on localhost when maps button clicked', async () => {
+    it('does not transition when already on manager', async () => {
       mockState.characters = [{ name: 'Aragorn', level: 1 }];
       render(<App />);
       await selectCampaign();
@@ -424,90 +374,12 @@ describe('App - Map Navigation & Settlements/NPCs Back', () => {
       await waitFor(() => {
         expect(screen.getByTestId('maps-manager')).toBeInTheDocument();
       });
-      fireEvent.click(screen.getByTestId('open-map-btn'));
-      await waitFor(() => {
-        expect(screen.getByTestId('map-view')).toBeInTheDocument();
-      });
-      // Clicking maps button again from map view goes back to manager
-      // (This is handled by handleMapsClick -> handleBackFromMap)
-    });
-
-    it('does not transition to manager when already on manager', async () => {
-      mockState.characters = [{ name: 'Aragorn', level: 1 }];
-      render(<App />);
-      await selectCampaign();
-      fireEvent.click(screen.getByTestId('maps-btn'));
-      await waitFor(() => {
-        expect(screen.getByTestId('maps-manager')).toBeInTheDocument();
-      });
-      // Clicking maps button again should be idempotent
       fireEvent.click(screen.getByTestId('maps-btn'));
       expect(screen.getByTestId('maps-manager')).toBeInTheDocument();
     });
   });
 
-  describe('Modal overlays coexistence', () => {
-    it('SavePromptModal renders with campaignName and characters', async () => {
-      mockState.characters = [{ name: 'Aragorn', level: 1 }];
-      render(<App />);
-      await selectCampaign();
-      await waitFor(() => {
-        expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
-      });
-    });
-
-    it('DeathSavePromptModal renders with campaignName and characters', async () => {
-      mockState.characters = [{ name: 'Aragorn', level: 1 }];
-      render(<App />);
-      await selectCampaign();
-      await waitFor(() => {
-        expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
-      });
-    });
-
-    it('ConcentrationPromptModal renders with campaignName, characters, and activeMapName', async () => {
-      mockState.characters = [{ name: 'Aragorn', level: 1 }];
-      render(<App />);
-      await selectCampaign();
-      await waitFor(() => {
-        expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
-      });
-    });
-  });
-
-  describe('Loading overlay states', () => {
-    it('shows loading overlay while campaign data loads', async () => {
-      mockState.characters = [{ name: 'Aragorn', level: 1 }];
-      render(<App />);
-      await selectCampaign();
-      // After campaign selection, loading overlay should disappear
-      await waitFor(() => {
-        expect(screen.queryByTestId('loading-overlay')).not.toBeInTheDocument();
-      });
-    });
-  });
-
-  describe('File upload input', () => {
-    it('renders hidden file input for character upload', async () => {
-      mockState.characters = [{ name: 'Aragorn', level: 1 }];
-      render(<App />);
-      await selectCampaign();
-      await waitFor(() => {
-        expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
-      });
-    });
-  });
-
   describe('View rendering conditions', () => {
-    it('does not render CharSheet when activeView is charSheet but no activeCharacter', async () => {
-      mockState.characters = [{ name: 'Aragorn', level: 1 }];
-      render(<App />);
-      await selectCampaign();
-      await waitFor(() => {
-        expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
-      });
-    });
-
     it('renders only one view at a time (charSheet vs initiative)', async () => {
       mockState.characters = [{ name: 'Aragorn', level: 1 }];
       render(<App />);

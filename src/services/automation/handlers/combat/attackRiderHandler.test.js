@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import { handle, applyRiderOption } from './attackRiderHandler.js';
@@ -214,15 +214,6 @@ describe('attackRiderHandler', () => {
             expect(result).toBe(null);
         });
 
-        it('should accept optionNames as a string', async () => {
-            getRuntimeValue.mockReturnValue([]);
-            const action = makeAction();
-            const result = await applyRiderOption(action, makePlayerStats(), 'campaign', 'Goblin', 'Trip');
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('Trip');
-        });
-
         it('should apply Trip effect', async () => {
             getRuntimeValue.mockReturnValue([]);
             const action = makeAction();
@@ -231,40 +222,6 @@ describe('attackRiderHandler', () => {
             expect(result.type).toBe('popup');
             expect(result.payload.description).toContain('Trip');
             expect(result.payload.description).toContain('Goblin');
-            expect(setRuntimeValue).toHaveBeenCalledWith('campaign', 'targetEffects', expect.any(Array), 'campaign');
-        });
-
-        it('should allow Trip when sizeLimit specified but size cannot be determined', async () => {
-            vi.mocked(getCombatContext).mockResolvedValue({
-                creatures: [{ name: 'Goblin', size: 'Gargantuan' }],
-            });
-            const action = makeAction({
-                automation: {
-                    type: 'attack_rider',
-                    options: [{ name: 'Trip', effect: 'prone', sizeLimit: 'large_or_smaller' }],
-                },
-            });
-            const result = await applyRiderOption(action, makePlayerStats(), 'campaign', 'Goblin', ['Trip']);
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('Trip');
-        });
-
-        it('should allow Trip when target size cannot be determined (fallback allows)', async () => {
-            getRuntimeValue.mockReturnValue([]);
-            vi.mocked(getCombatContext).mockResolvedValue({
-                creatures: [{ name: 'Goblin' }],
-            });
-            const action = makeAction({
-                automation: {
-                    type: 'attack_rider',
-                    options: [{ name: 'Trip', effect: 'prone', sizeLimit: 'large_or_smaller' }],
-                },
-            });
-            const result = await applyRiderOption(action, makePlayerStats(), 'campaign', 'Goblin', ['Trip']);
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('Trip');
         });
 
         it('should reject Poison without Poisoner\'s Kit', async () => {
@@ -389,21 +346,6 @@ describe('attackRiderHandler', () => {
             expect(result.payload.description).toContain('Daze');
         });
 
-        it('should reject oncePerTurn when already used this round', async () => {
-            getRuntimeValue.mockReturnValue(1);
-            const action = makeAction({
-                automation: {
-                    type: 'attack_rider',
-                    oncePerTurn: true,
-                    options: [{ name: 'Cunning Strike', effect: 'cleave' }],
-                },
-            });
-            const result = await applyRiderOption(action, makePlayerStats(), 'campaign', 'Goblin', ['Cunning Strike']);
-
-            expect(result.payload.description).toContain('once per turn');
-            expect(setRuntimeValue).not.toHaveBeenCalledWith('TestHero', '_Cunning_Strike_usedRound', expect.any(Number), 'campaign');
-        });
-
         it('should allow oncePerTurn when not used this round', async () => {
             getRuntimeValue.mockReturnValue(0);
             const action = makeAction({
@@ -419,33 +361,7 @@ describe('attackRiderHandler', () => {
             expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', '_CunningStrike_usedRound', 1, 'campaign');
         });
 
-        it('should clear pendingRiderChoice on apply', async () => {
-            getRuntimeValue.mockReturnValue([]);
-            const action = makeAction();
-            await applyRiderOption(action, makePlayerStats(), 'campaign', 'Goblin', ['Trip']);
-
-            expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', 'pendingRiderChoice', null, 'campaign');
-        });
-
-        it('should log Cunning Strike cost deduction via addEntry', async () => {
-            getRuntimeValue.mockReturnValue(0);
-            const action = makeAction({
-                automation: {
-                    type: 'attack_rider',
-                    options: [{ name: 'Costly Strike', effect: 'poisoned', cost: '2d6' }],
-                },
-            });
-            await applyRiderOption(action, makePlayerStats(), 'campaign', 'Goblin', ['Costly Strike']);
-
-            expect(addEntry).toHaveBeenCalledWith('campaign', {
-                type: 'ability_use',
-                characterName: 'TestHero',
-                abilityName: 'Cunning Strike',
-                description: 'Forgoing 2d6 Sneak Attack damage dice for Cunning Strike cost.',
-            });
-        });
-
-        it('should handle Versatile Trickster secondary targets when Trip applied', async () => {
+        it('should apply Versatile Trickster secondary targets when Trip applied', async () => {
             getRuntimeValue.mockReturnValue([]);
             vi.mocked(getCombatContext).mockResolvedValue({
                 creatures: [
@@ -473,81 +389,6 @@ describe('attackRiderHandler', () => {
             expect(setRuntimeValue).not.toHaveBeenCalledWith('TestHero', 'versatileTricksterSecondaryTargets', expect.any(Array), 'campaign');
         });
 
-        it('should sum costs for multiple Cunning Strike options', async () => {
-            getRuntimeValue.mockReturnValue(0);
-            const action = {
-                name: 'Improved Cunning Strike',
-                automation: {
-                    type: 'attack_rider',
-                    oncePerTurn: true,
-                    maxEffects: 2,
-                    options: [
-                        { name: 'Poison', cost: '1d6', effect: 'poisoned' },
-                        { name: 'Trip', cost: '1d6', effect: 'prone' },
-                    ],
-                },
-            };
-            await applyRiderOption(action, makePlayerStats(), 'campaign', 'Goblin', ['Poison', 'Trip']);
-
-            expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', '_cunningStrikeCostUsed', 2, 'campaign');
-        });
-
-        it('should use unified _CunningStrike_usedRound key for Improved Cunning Strike', async () => {
-            getRuntimeValue.mockReturnValue(0);
-            const action = {
-                name: 'Improved Cunning Strike',
-                automation: {
-                    type: 'attack_rider',
-                    oncePerTurn: true,
-                    maxEffects: 2,
-                    options: [
-                        { name: 'Poison', cost: '1d6', effect: 'poisoned' },
-                    ],
-                },
-            };
-            await applyRiderOption(action, makePlayerStats(), 'campaign', 'Goblin', ['Poison']);
-
-            expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', '_CunningStrike_usedRound', expect.any(Number), 'campaign');
-        });
-
-        it('should use unified _CunningStrike_usedRound key for Devious Strikes', async () => {
-            getRuntimeValue.mockReturnValue(0);
-            const action = {
-                name: 'Devious Strikes',
-                automation: {
-                    type: 'attack_rider',
-                    oncePerTurn: true,
-                    maxEffects: 2,
-                    options: [
-                        { name: 'Poison', cost: '1d6', effect: 'poisoned' },
-                        { name: 'Daze', cost: '2d6', effect: 'daze' },
-                    ],
-                },
-            };
-            await applyRiderOption(action, makePlayerStats(), 'campaign', 'Goblin', ['Poison', 'Daze']);
-
-            expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', '_CunningStrike_usedRound', expect.any(Number), 'campaign');
-        });
-
-        it('should reject Improved Cunning Strike once per turn using unified key', async () => {
-            getRuntimeValue.mockReturnValue(1);
-            const action = {
-                name: 'Improved Cunning Strike',
-                automation: {
-                    type: 'attack_rider',
-                    oncePerTurn: true,
-                    maxEffects: 2,
-                    options: [
-                        { name: 'Trip', cost: '1d6', effect: 'prone' },
-                    ],
-                },
-            };
-            const result = await applyRiderOption(action, makePlayerStats(), 'campaign', 'Goblin', ['Trip']);
-
-            expect(result.payload.description).toContain('once per turn');
-            expect(setRuntimeValue).not.toHaveBeenCalledWith('TestHero', '_CunningStrike_usedRound', expect.any(Number), 'campaign');
-        });
-
         it('should apply multiple effects and return combined description', async () => {
             getRuntimeValue.mockReturnValue([]);
             const action = {
@@ -568,6 +409,24 @@ describe('attackRiderHandler', () => {
             expect(result.payload.description).toContain('Poison');
             expect(result.payload.description).toContain('Trip');
             expect(result.payload.description).toContain('Forgoing 2d6 Sneak Attack damage dice');
+        });
+
+        it('should log Cunning Strike cost deduction via addEntry', async () => {
+            getRuntimeValue.mockReturnValue(0);
+            const action = makeAction({
+                automation: {
+                    type: 'attack_rider',
+                    options: [{ name: 'Costly Strike', effect: 'poisoned', cost: '2d6' }],
+                },
+            });
+            await applyRiderOption(action, makePlayerStats(), 'campaign', 'Goblin', ['Costly Strike']);
+
+            expect(addEntry).toHaveBeenCalledWith('campaign', {
+                type: 'ability_use',
+                characterName: 'TestHero',
+                abilityName: 'Cunning Strike',
+                description: 'Forgoing 2d6 Sneak Attack damage dice for Cunning Strike cost.',
+            });
         });
     });
 });

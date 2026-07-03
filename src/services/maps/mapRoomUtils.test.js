@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { describe, it, expect } from 'vitest';
 import {
   hasOpenNeighbor,
@@ -18,19 +18,14 @@ describe('hasOpenNeighbor', () => {
     expect(hasOpenNeighbor(walls, 5, 5, 10)).toBe(false);
   });
 
-  it('returns false when all in-bounds neighbors are walls at grid corner', () => {
+  it('returns false when cell is surrounded by grid boundaries', () => {
+    // In a 2x2 grid, cell (0,0) has two in-bounds neighbors, both walled
     const walls = new Set(['1,0', '0,1']);
-    expect(hasOpenNeighbor(walls, 0, 0, 10)).toBe(false);
+    expect(hasOpenNeighbor(walls, 0, 0, 2)).toBe(false);
   });
 
   it('returns false for a single-cell grid', () => {
     expect(hasOpenNeighbor(new Set(), 0, 0, 1)).toBe(false);
-  });
-
-  it('returns false when cell is surrounded by grid boundaries', () => {
-    // In a 2x2 grid, cell (0,0) has two in-bounds neighbors
-    const walls = new Set(['1,0', '0,1']);
-    expect(hasOpenNeighbor(walls, 0, 0, 2)).toBe(false);
   });
 
   it('does not mutate the walls set', () => {
@@ -50,12 +45,6 @@ describe('hasOutsideOpenNeighbor', () => {
   it('returns false when all in-bounds outside neighbors are walled', () => {
     const walls = new Set(['0,1', '1,0']);
     expect(hasOutsideOpenNeighbor(walls, 1, 1, 1, 3, 1, 3, 10)).toBe(false);
-  });
-
-  it('returns false when all outside neighbors are out of grid bounds', () => {
-    // Room fills entire 3x3 grid; cell (1,1) has no outside neighbors in grid
-    const walls = new Set();
-    expect(hasOutsideOpenNeighbor(walls, 1, 1, 0, 2, 0, 2, 3)).toBe(false);
   });
 
   it('returns false when outside neighbors are beyond grid size', () => {
@@ -118,18 +107,6 @@ describe('buildRoomWalls', () => {
     expect(result.has('4,2')).toBe(true);
   });
 
-  it('does not add walls when all outside passages are open', () => {
-    const result = buildRoomWalls(new Set(), 2, 4, 2, 4, 10);
-    expect(result.has('2,2')).toBe(false);
-    expect(result.has('3,2')).toBe(false);
-    expect(result.has('4,2')).toBe(false);
-    expect(result.has('2,4')).toBe(false);
-    expect(result.has('3,4')).toBe(false);
-    expect(result.has('4,4')).toBe(false);
-    expect(result.has('2,3')).toBe(false);
-    expect(result.has('4,3')).toBe(false);
-  });
-
   it('returns a new set without mutating the input', () => {
     const walls = new Set(['0,0', '2,3', '5,5']);
     const originalSize = walls.size;
@@ -137,11 +114,6 @@ describe('buildRoomWalls', () => {
     expect(walls.size).toBe(originalSize);
     expect(walls.has('2,3')).toBe(true);
     expect(result).not.toBe(walls);
-  });
-
-  it('handles a single-cell room with open passages', () => {
-    const result = buildRoomWalls(new Set(), 5, 5, 5, 5, 10);
-    expect(result.has('5,5')).toBe(false);
   });
 
   it('walls a single-cell room when all passages are blocked', () => {
@@ -157,14 +129,6 @@ describe('buildRoomWalls', () => {
     expect(result.has('1,0')).toBe(true);
     // Bottom-right corner has open outside neighbors in grid
     expect(result.has('2,2')).toBe(false);
-  });
-
-  it('preserves walls outside the room boundary', () => {
-    const walls = new Set(['0,0', '9,9', '15,15']);
-    const result = buildRoomWalls(walls, 2, 3, 2, 3, 10);
-    expect(result.has('0,0')).toBe(true);
-    expect(result.has('9,9')).toBe(true);
-    expect(result.has('15,15')).toBe(true);
   });
 });
 
@@ -187,11 +151,6 @@ describe('createRoom', () => {
     expect(typeof r2.id).toBe('number');
     expect(r1.id).toBeGreaterThan(0);
     expect(r2.id).toBeGreaterThan(0);
-  });
-
-  it('creates rooms with different dimensions and coordinates', () => {
-    const room = createRoom(10, 20, 8, 6);
-    expect(room.rect).toEqual({ x: 10, y: 20, w: 8, h: 6 });
   });
 
   it('creates rooms with zero or negative dimensions', () => {

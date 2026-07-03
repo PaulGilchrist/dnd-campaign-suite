@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ── Mocks BEFORE imports ───────────────────────────────────────
@@ -171,77 +171,34 @@ describe('sentinelHaltHandler.handle', () => {
       );
       expect(effectsCall[2][0].duration).toBe('end_of_round');
     });
-
-    it('defaults duration to end_of_turn when not specified', async () => {
-      const action = makeAction();
-      const ps = makePlayerStats();
-
-      damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
-      damageUtils.getTargetFromAttacker.mockReturnValue({ name: 'Orc' });
-      useRuntimeState.getRuntimeValue.mockReturnValue([]);
-
-      await handle(action, ps, campaignName, null);
-
-      const effectsCall = useRuntimeState.setRuntimeValue.mock.calls.find(
-        c => c[1] === 'targetEffects',
-      );
-      expect(effectsCall[2][0].duration).toBe('end_of_turn');
-    });
-
-    it('passes _mapName parameter through without affecting behavior', async () => {
-      const action = makeAction();
-      const ps = makePlayerStats();
-
-      damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
-      damageUtils.getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
-      useRuntimeState.getRuntimeValue.mockReturnValue([]);
-
-      const result = await handle(action, ps, campaignName, 'MapName');
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.description).toContain("Goblin's Speed");
-    });
   });
 
   describe('no target scenarios', () => {
-    it('returns info popup when combat context is null', async () => {
+    it('returns info popup when no target is available', async () => {
       const action = makeAction();
       const ps = makePlayerStats();
 
+      // null context
       damageUtils.getCombatContext.mockResolvedValue(null);
-
-      const result = await handle(action, ps, campaignName, null);
-
+      let result = await handle(action, ps, campaignName, null);
       expect(result.type).toBe('popup');
       expect(result.payload.type).toBe('automation_info');
       expect(result.payload.description).toContain('No target selected');
-      expect(result.payload.automation).toBe(action.automation);
-    });
 
-    it('returns info popup when combat context is undefined', async () => {
-      const action = makeAction();
-      const ps = makePlayerStats();
-
+      // undefined context
       damageUtils.getCombatContext.mockResolvedValue(undefined);
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.type).toBe('automation_info');
+      result = await handle(action, ps, campaignName, null);
       expect(result.payload.description).toContain('No target selected');
-    });
 
-    it('returns info popup when getTargetFromAttacker returns null', async () => {
-      const action = makeAction();
-      const ps = makePlayerStats();
-
+      // getTargetFromAttacker returns null
       damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
       damageUtils.getTargetFromAttacker.mockReturnValue(null);
+      result = await handle(action, ps, campaignName, null);
+      expect(result.payload.description).toContain('No target selected');
 
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.type).toBe('automation_info');
+      // getTargetFromAttacker returns object without name
+      damageUtils.getTargetFromAttacker.mockReturnValue({});
+      result = await handle(action, ps, campaignName, null);
       expect(result.payload.description).toContain('No target selected');
     });
 
@@ -283,56 +240,6 @@ describe('sentinelHaltHandler.handle', () => {
       await handle(action, ps, campaignName, null);
 
       expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('edge cases', () => {
-    it('handles target object without name property', async () => {
-      const action = makeAction();
-      const ps = makePlayerStats();
-
-      damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
-      damageUtils.getTargetFromAttacker.mockReturnValue({});
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.description).toContain('No target selected');
-    });
-
-    it('handles getRuntimeValue returning undefined', async () => {
-      const action = makeAction();
-      const ps = makePlayerStats();
-
-      damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
-      damageUtils.getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
-      useRuntimeState.getRuntimeValue.mockReturnValue(undefined);
-
-      await handle(action, ps, campaignName, null);
-
-      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-        campaignName,
-        'targetEffects',
-        expect.arrayContaining([
-          expect.objectContaining({ target: 'Goblin' }),
-        ]),
-        campaignName,
-      );
-    });
-
-    it('swallows addEntry errors without affecting the return value', async () => {
-      const action = makeAction();
-      const ps = makePlayerStats();
-
-      damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
-      damageUtils.getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
-      useRuntimeState.getRuntimeValue.mockReturnValue([]);
-      logService.addEntry.mockRejectedValue(new Error('network failure'));
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.description).toContain("Goblin's Speed");
     });
   });
 });

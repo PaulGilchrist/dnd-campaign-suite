@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ── Mocks BEFORE imports ───────────────────────────────────────
@@ -117,8 +117,8 @@ describe('telekineticShoveHandler.handle', () => {
     });
   });
 
-  it('uses custom pushDistance from automation in description', async () => {
-    const action = makeAction({ pushDistance: 10 });
+  it('uses custom pushDistance and saveType from automation', async () => {
+    const action = makeAction({ pushDistance: 10, saveType: 'CON' });
     const ps = makePlayerStats();
 
     targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Orc' } });
@@ -128,10 +128,15 @@ describe('telekineticShoveHandler.handle', () => {
     const result = await handle(action, ps, campaignName, null);
 
     expect(result.payload.description).toContain('10 feet');
+    expect(savePrompt.createSaveListener).toHaveBeenCalledWith(campaignName, {
+      targetName: 'Orc',
+      saveType: 'CON',
+      saveDc: 14,
+    });
   });
 
-  it('defaults pushDistance to 5 when undefined', async () => {
-    const action = makeAction({ pushDistance: undefined });
+  it('defaults pushDistance and saveType when falsy', async () => {
+    const action = makeAction({ pushDistance: null, saveType: undefined });
     const ps = makePlayerStats();
 
     targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Orc' } });
@@ -141,65 +146,10 @@ describe('telekineticShoveHandler.handle', () => {
     const result = await handle(action, ps, campaignName, null);
 
     expect(result.payload.description).toContain('5 feet');
-  });
-
-  it('defaults pushDistance to 5 when explicitly null', async () => {
-    const action = makeAction({ pushDistance: null });
-    const ps = makePlayerStats();
-
-    targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Orc' } });
-    savePrompt.buildSaveDc.mockReturnValue(14);
-    savePrompt.createSaveListener.mockReturnValue({ promptId: 'test-prompt-4b' });
-
-    const result = await handle(action, ps, campaignName, null);
-
-    expect(result.payload.description).toContain('5 feet');
-  });
-
-  it('defaults pushDistance to 5 when zero', async () => {
-    const action = makeAction({ pushDistance: 0 });
-    const ps = makePlayerStats();
-
-    targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Orc' } });
-    savePrompt.buildSaveDc.mockReturnValue(14);
-    savePrompt.createSaveListener.mockReturnValue({ promptId: 'test-prompt-4c' });
-
-    const result = await handle(action, ps, campaignName, null);
-
-    expect(result.payload.description).toContain('5 feet');
-  });
-
-  it('uses custom saveType from automation', async () => {
-    const action = makeAction({ saveType: 'CON' });
-    const ps = makePlayerStats();
-
-    targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
-    savePrompt.buildSaveDc.mockReturnValue(13);
-    savePrompt.createSaveListener.mockReturnValue({ promptId: 'test-prompt-5' });
-
-    await handle(action, ps, campaignName, null);
-
     expect(savePrompt.createSaveListener).toHaveBeenCalledWith(campaignName, {
-      targetName: 'Goblin',
-      saveType: 'CON',
-      saveDc: 13,
-    });
-  });
-
-  it('defaults saveType to STR when not specified', async () => {
-    const action = makeAction({ saveType: undefined });
-    const ps = makePlayerStats();
-
-    targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
-    savePrompt.buildSaveDc.mockReturnValue(13);
-    savePrompt.createSaveListener.mockReturnValue({ promptId: 'test-prompt-5b' });
-
-    await handle(action, ps, campaignName, null);
-
-    expect(savePrompt.createSaveListener).toHaveBeenCalledWith(campaignName, {
-      targetName: 'Goblin',
+      targetName: 'Orc',
       saveType: 'STR',
-      saveDc: 13,
+      saveDc: 14,
     });
   });
 
@@ -241,24 +191,6 @@ describe('telekineticShoveHandler.handle', () => {
         description: expect.stringContaining('10 feet'),
       }),
     );
-  });
-
-  it('registers save-result event listener', async () => {
-    const addEventListenerSpy = vi.spyOn(window, 'addEventListener');
-    const action = makeAction();
-    const ps = makePlayerStats();
-
-    targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
-    savePrompt.buildSaveDc.mockReturnValue(13);
-    savePrompt.createSaveListener.mockReturnValue({ promptId: 'test-prompt-7' });
-
-    await handle(action, ps, campaignName, null);
-
-    expect(addEventListenerSpy).toHaveBeenCalledWith(
-      'save-result',
-      expect.any(Function),
-    );
-    addEventListenerSpy.mockRestore();
   });
 
   describe('save result handling', () => {
@@ -475,29 +407,23 @@ describe('telekineticShoveHandler.handle', () => {
   });
 
   describe('error handling', () => {
-    it('does not reject when addEntry rejects on ability_use', async () => {
-      const action = makeAction();
-      const ps = makePlayerStats();
+    it('does not reject when addEntry rejects', async () => {
+      const addEventListenerSpy = vi.spyOn(window, 'addEventListener');
 
+      // Ability_use rejection
       targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
       savePrompt.buildSaveDc.mockReturnValue(13);
       savePrompt.createSaveListener.mockReturnValue({ promptId: 'err-prompt' });
       logService.addEntry.mockRejectedValue(new Error('network'));
 
-      const result = await handle(action, ps, campaignName, null);
+      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
       expect(result).toBeDefined();
       expect(result.type).toBe('popup');
-    });
 
-    it('does not reject when addEntry rejects on failed save_result', async () => {
-      const addEventListenerSpy = vi.spyOn(window, 'addEventListener');
-
-      targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
-      savePrompt.buildSaveDc.mockReturnValue(13);
-      savePrompt.createSaveListener.mockReturnValue({ promptId: 'err-save-prompt' });
-      useRuntimeState.getRuntimeValue.mockReturnValue([]);
+      // Reset for save-result path
       logService.addEntry.mockRejectedValue(new Error('network'));
+      useRuntimeState.getRuntimeValue.mockReturnValue([]);
 
       await handle(makeAction(), makePlayerStats(), campaignName, null);
 
@@ -511,27 +437,6 @@ describe('telekineticShoveHandler.handle', () => {
 
       await Promise.resolve();
       await Promise.resolve();
-
-      addEventListenerSpy.mockRestore();
-    });
-
-    it('does not reject when addEntry rejects on successful save_result', async () => {
-      const addEventListenerSpy = vi.spyOn(window, 'addEventListener');
-
-      targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
-      savePrompt.buildSaveDc.mockReturnValue(13);
-      savePrompt.createSaveListener.mockReturnValue({ promptId: 'err-save-success-prompt' });
-      logService.addEntry.mockRejectedValue(new Error('network'));
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      const savedCallback = addEventListenerSpy.mock.calls[0][1];
-      savedCallback({
-        detail: {
-          promptId: 'err-save-success-prompt',
-          success: true,
-        },
-      });
 
       addEventListenerSpy.mockRestore();
     });

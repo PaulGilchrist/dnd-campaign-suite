@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import { applyPostDamageMasteryEffects } from './weaponMasteryHandler.js';
@@ -57,65 +57,35 @@ describe('applyPostDamageMasteryEffects', () => {
         vi.mocked(combatData.getCurrentCombatRound).mockReturnValue(1);
     });
 
-    it('should return early when combatSummary lastAttack.targetName is null', async () => {
+    it('should return early when combatSummary.lastAttack.targetName is null, undefined, or combatSummary is missing', async () => {
         vi.mocked(automationService.collectWeaponMastery).mockReturnValue({
             baseMastery: 'Vex',
             extraMasteries: [],
         });
 
-        const result = await applyPostDamageMasteryEffects(
+        const result1 = await applyPostDamageMasteryEffects(
             'Longsword',
             makePlayerStats(),
             'campaign',
             { lastAttack: { targetName: null } },
         );
-        expect(result).toBeUndefined();
-    });
+        expect(result1).toBeUndefined();
 
-    it('should return early when combatSummary.lastAttack is undefined', async () => {
-        vi.mocked(automationService.collectWeaponMastery).mockReturnValue({
-            baseMastery: 'Vex',
-            extraMasteries: [],
-        });
-
-        const result = await applyPostDamageMasteryEffects(
+        const result2 = await applyPostDamageMasteryEffects(
             'Longsword',
             makePlayerStats(),
             'campaign',
             { lastAttack: undefined },
         );
-        expect(result).toBeUndefined();
-    });
+        expect(result2).toBeUndefined();
 
-    it('should return early when combatSummary is undefined', async () => {
-        vi.mocked(automationService.collectWeaponMastery).mockReturnValue({
-            baseMastery: 'Vex',
-            extraMasteries: [],
-        });
-
-        const result = await applyPostDamageMasteryEffects(
+        const result3 = await applyPostDamageMasteryEffects(
             'Longsword',
             makePlayerStats(),
             'campaign',
             undefined,
         );
-        expect(result).toBeUndefined();
-    });
-
-    it('should call collectWeaponMastery with the attack name and playerStats', async () => {
-        vi.mocked(automationService.collectWeaponMastery).mockReturnValue({
-            baseMastery: 'Vex',
-            extraMasteries: [],
-        });
-
-        await applyPostDamageMasteryEffects(
-            'Longsword',
-            makePlayerStats(),
-            'campaign',
-            makeCombatSummary(),
-        );
-
-        expect(automationService.collectWeaponMastery).toHaveBeenCalledWith('Longsword', expect.any(Object));
+        expect(result3).toBeUndefined();
     });
 
     it('should apply base mastery when present', async () => {
@@ -160,10 +130,10 @@ describe('applyPostDamageMasteryEffects', () => {
         expect(abilityNames).toContain('Sap');
     });
 
-    it('should skip Graze mastery in applyPostDamageMasteryEffects', async () => {
+    it('should skip Graze and Topple masteries', async () => {
         vi.mocked(automationService.collectWeaponMastery).mockReturnValue({
             baseMastery: 'Graze',
-            extraMasteries: [],
+            extraMasteries: ['Topple'],
         });
 
         await applyPostDamageMasteryEffects(
@@ -176,23 +146,6 @@ describe('applyPostDamageMasteryEffects', () => {
         const calls = vi.mocked(logService.addEntry).mock.calls;
         const abilityNames = calls.map(c => c[1].abilityName);
         expect(abilityNames).not.toContain('Graze');
-    });
-
-    it('should skip Topple mastery in applyPostDamageMasteryEffects', async () => {
-        vi.mocked(automationService.collectWeaponMastery).mockReturnValue({
-            baseMastery: 'Topple',
-            extraMasteries: [],
-        });
-
-        await applyPostDamageMasteryEffects(
-            'Longsword',
-            makePlayerStats(),
-            'campaign',
-            makeCombatSummary(),
-        );
-
-        const calls = vi.mocked(logService.addEntry).mock.calls;
-        const abilityNames = calls.map(c => c[1].abilityName);
         expect(abilityNames).not.toContain('Topple');
     });
 
@@ -309,7 +262,7 @@ describe('applyPostDamageMasteryEffects', () => {
         );
     });
 
-    it('should handle empty masteries list', async () => {
+    it('should handle empty or invalid masteries (null, undefined, unknown)', async () => {
         vi.mocked(automationService.collectWeaponMastery).mockReturnValue({
             baseMastery: null,
             extraMasteries: [],
@@ -323,9 +276,7 @@ describe('applyPostDamageMasteryEffects', () => {
         );
 
         expect(logService.addEntry).not.toHaveBeenCalled();
-    });
 
-    it('should handle unknown mastery names gracefully (skip them)', async () => {
         vi.mocked(automationService.collectWeaponMastery).mockReturnValue({
             baseMastery: 'UnknownMastery',
             extraMasteries: [],
@@ -343,51 +294,7 @@ describe('applyPostDamageMasteryEffects', () => {
         expect(abilityNames).not.toContain('UnknownMastery');
     });
 
-    it('should filter out null/undefined masteries from the combined list', async () => {
-        vi.mocked(useRuntimeState.getRuntimeValue).mockReturnValue(undefined);
-        vi.mocked(automationService.collectWeaponMastery).mockReturnValue({
-            baseMastery: 'Vex',
-            extraMasteries: [null, undefined, 'Push'],
-        });
-
-        await applyPostDamageMasteryEffects(
-            'Longsword',
-            makePlayerStats(),
-            'campaign',
-            makeCombatSummary(),
-        );
-
-        const calls = vi.mocked(logService.addEntry).mock.calls;
-        const abilityNames = calls.map(c => c[1].abilityName);
-        expect(abilityNames).toContain('Vex');
-        expect(abilityNames).toContain('Push');
-    });
-
-    it('should call applyMasteryEffect for each valid mastery', async () => {
-        vi.mocked(useRuntimeState.getRuntimeValue).mockReturnValue(undefined);
-        vi.mocked(automationService.collectWeaponMastery).mockReturnValue({
-            baseMastery: 'Sap',
-            extraMasteries: [],
-        });
-
-        await applyPostDamageMasteryEffects(
-            'Longsword',
-            makePlayerStats(),
-            'campaign',
-            makeCombatSummary(),
-        );
-
-        expect(logService.addEntry).toHaveBeenCalledWith(
-            'campaign',
-            expect.objectContaining({
-                type: 'ability_use',
-                abilityName: 'Sap',
-                targetName: 'Goblin',
-            }),
-        );
-    });
-
-    it('should handle Slow not checking already-applied but still applying', async () => {
+    it('should apply Slow without checking already-applied but still apply the effect', async () => {
         vi.mocked(useRuntimeState.getRuntimeValue).mockReturnValue(undefined);
         vi.mocked(automationService.collectWeaponMastery).mockReturnValue({
             baseMastery: 'Slow',

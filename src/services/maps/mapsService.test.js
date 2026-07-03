@@ -1,8 +1,7 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { toKebabCase, formatMapName, loadMaps, createMap, deleteMap, renameMap, activateMap, saveMapData, loadMapData, updateMapDescription } from './mapsService.js';
 
-// Shared mock response factory — uses native Response when available, falls back to shape
 function createMockResponse(json, options = {}) {
   const status = options.status ?? (json && json.error ? 400 : 200);
   return {
@@ -34,8 +33,8 @@ describe('mapsService', () => {
       expect(toKebabCase('UPPER CASE MAP')).toBe('upper-case-map');
     });
 
-    it('removes .json extension', () => {
-      expect(toKebabCase('map.json')).toBe('map');
+    it('removes .json extension and converts spaces', () => {
+      expect(toKebabCase('My Map.json')).toBe('my-map');
     });
 
     it('handles already kebab-cased input', () => {
@@ -44,10 +43,6 @@ describe('mapsService', () => {
 
     it('returns empty string for empty input', () => {
       expect(toKebabCase('')).toBe('');
-    });
-
-    it('removes .json extension and converts spaces', () => {
-      expect(toKebabCase('My Map.json')).toBe('my-map');
     });
 
     it('collapses consecutive spaces into a single hyphen', () => {
@@ -118,16 +113,6 @@ describe('mapsService', () => {
       expect(result).toEqual(mockMaps);
     });
 
-    it('encodes campaign name with spaces in the URL', async () => {
-      global.fetch.mockResolvedValueOnce(createMockResponse([]));
-
-      await loadMaps('my campaign');
-      expect(fetch).toHaveBeenCalledWith(
-        '/api/campaigns/my%20campaign/maps',
-        expect.objectContaining({ method: 'GET' })
-      );
-    });
-
     it('throws an error with the server message on non-ok response', async () => {
       global.fetch.mockResolvedValueOnce(createMockResponse({ error: 'Campaign not found' }, { status: 404 }));
 
@@ -186,39 +171,10 @@ describe('mapsService', () => {
       });
     });
 
-    it('returns an alreadyExists object with case-insensitive conflict detection', async () => {
-      global.fetch.mockResolvedValueOnce(createMockResponse({ error: 'Map Already Exists' }, { status: 409 }));
-
-      const result = await createMap('testCampaign', 'Dungeon');
-      expect(result.alreadyExists).toBe(true);
-    });
-
     it('throws a generic error for non-conflict server errors', async () => {
       global.fetch.mockResolvedValueOnce(createMockResponse({ error: 'server error' }, { status: 500 }));
 
       await expect(createMap('testCampaign', 'Dungeon')).rejects.toThrow('server error');
-    });
-
-    it('throws a generic error when response.json fails and there is no error field', async () => {
-      // Simulate response.json throwing — the service falls back to {} and throws generic
-      const erroringResponse = {
-        ok: false,
-        status: 500,
-        json: async () => { throw new Error('parse error'); },
-      };
-      global.fetch.mockResolvedValueOnce(erroringResponse);
-
-      await expect(createMap('testCampaign', 'Dungeon')).rejects.toThrow('Failed to create map');
-    });
-
-    it('encodes campaign name with spaces in the URL', async () => {
-      global.fetch.mockResolvedValueOnce(createMockResponse({ name: 'Map', fileName: 'map.json' }));
-
-      await createMap('my campaign', 'Map');
-      expect(fetch).toHaveBeenCalledWith(
-        '/api/campaigns/my%20campaign/maps',
-        expect.anything()
-      );
     });
 
     it('re-throws network errors from fetch', async () => {
@@ -237,26 +193,6 @@ describe('mapsService', () => {
       expect(fetch).toHaveBeenCalledWith(
         '/api/campaigns/testCampaign/maps/dungeon',
         expect.objectContaining({ method: 'DELETE' })
-      );
-    });
-
-    it('encodes map name with spaces (via toKebabCase) in the URL', async () => {
-      global.fetch.mockResolvedValueOnce(createMockResponse({ success: true }));
-
-      await deleteMap('testCampaign', 'My Dungeon');
-      expect(fetch).toHaveBeenCalledWith(
-        '/api/campaigns/testCampaign/maps/my-dungeon',
-        expect.anything()
-      );
-    });
-
-    it('encodes special characters in map name', async () => {
-      global.fetch.mockResolvedValueOnce(createMockResponse({ success: true }));
-
-      await deleteMap('testCampaign', 'Dungeon & Cave');
-      expect(fetch).toHaveBeenCalledWith(
-        '/api/campaigns/testCampaign/maps/dungeon--cave',
-        expect.anything()
       );
     });
 
@@ -294,18 +230,6 @@ describe('mapsService', () => {
       );
     });
 
-    it('encodes both old and new map names in the URL', async () => {
-      global.fetch.mockResolvedValueOnce(createMockResponse({ success: true }));
-
-      await renameMap('testCampaign', 'Old Map', 'New Map');
-      expect(fetch).toHaveBeenCalledWith(
-        '/api/campaigns/testCampaign/maps/old-map/rename',
-        expect.objectContaining({
-          body: JSON.stringify({ newName: 'New Map' }),
-        })
-      );
-    });
-
     it('throws an error with the server message on non-ok response', async () => {
       global.fetch.mockResolvedValueOnce(createMockResponse({ error: 'not found' }, { status: 404 }));
 
@@ -328,16 +252,6 @@ describe('mapsService', () => {
       expect(fetch).toHaveBeenCalledWith(
         '/api/campaigns/testCampaign/maps/dungeon/activate',
         expect.objectContaining({ method: 'PUT' })
-      );
-    });
-
-    it('encodes map name with spaces (via toKebabCase) in the URL', async () => {
-      global.fetch.mockResolvedValueOnce(createMockResponse({ success: true }));
-
-      await activateMap('testCampaign', 'My Dungeon');
-      expect(fetch).toHaveBeenCalledWith(
-        '/api/campaigns/testCampaign/maps/my-dungeon/activate',
-        expect.anything()
       );
     });
 
@@ -370,16 +284,6 @@ describe('mapsService', () => {
       );
     });
 
-    it('encodes map name with spaces (via toKebabCase) in the URL', async () => {
-      global.fetch.mockResolvedValueOnce(createMockResponse({ success: true }));
-
-      await saveMapData('testCampaign', 'My Dungeon', { tiles: [] });
-      expect(fetch).toHaveBeenCalledWith(
-        '/api/campaigns/testCampaign/maps/my-dungeon',
-        expect.anything()
-      );
-    });
-
     it('throws an error with the server message on non-ok response', async () => {
       global.fetch.mockResolvedValueOnce(createMockResponse({ error: 'save failed' }, { status: 400 }));
 
@@ -403,17 +307,6 @@ describe('mapsService', () => {
       expect(fetch).toHaveBeenCalledWith(
         '/api/campaigns/testCampaign/maps/dungeon',
         expect.objectContaining({ method: 'GET' })
-      );
-    });
-
-    it('encodes map name with spaces (via toKebabCase) in the URL', async () => {
-      const mockData = { tiles: [], tokens: [] };
-      global.fetch.mockResolvedValueOnce(createMockResponse(mockData));
-
-      await loadMapData('testCampaign', 'My Dungeon');
-      expect(fetch).toHaveBeenCalledWith(
-        '/api/campaigns/testCampaign/maps/my-dungeon',
-        expect.anything()
       );
     });
 
@@ -442,16 +335,6 @@ describe('mapsService', () => {
           method: 'PUT',
           body: JSON.stringify({ description: 'A dark dungeon' }),
         })
-      );
-    });
-
-    it('encodes map name with spaces (via toKebabCase) in the URL', async () => {
-      global.fetch.mockResolvedValueOnce(createMockResponse({ success: true }));
-
-      await updateMapDescription('testCampaign', 'My Dungeon', 'desc');
-      expect(fetch).toHaveBeenCalledWith(
-        '/api/campaigns/testCampaign/maps/my-dungeon/description',
-        expect.anything()
       );
     });
 

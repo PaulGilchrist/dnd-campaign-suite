@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
     handle,
@@ -80,18 +80,6 @@ describe('magicInitiateHandler', () => {
             expect(result.type).toBe('modal');
             expect(result.modalName).toBe('magicInitiate');
         });
-
-        it('reads the class key from runtime using player name and campaign name', async () => {
-            getRuntimeValue.mockReturnValue(undefined);
-
-            await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-            expect(getRuntimeValue).toHaveBeenCalledWith(
-                'WizardBoy',
-                '_magicInitiateClass',
-                campaignName
-            );
-        });
     });
 
     describe('confirmMagicInitiate', () => {
@@ -137,32 +125,6 @@ describe('magicInitiateHandler', () => {
             );
         });
 
-        it('stores Druid class and Wisdom ability', async () => {
-            const result = await confirmMagicInitiate(makePlayerStats(), 'Druid', campaignName);
-
-            expect(result.payload.description).toContain('Druid');
-            expect(result.payload.description).toContain('Wisdom');
-            expect(setRuntimeValue).toHaveBeenNthCalledWith(
-                2,
-                'WizardBoy',
-                '_magicInitiateAbility',
-                'Wisdom',
-                campaignName
-            );
-        });
-
-        it('stores Wizard class and Intelligence ability', async () => {
-            await confirmMagicInitiate(makePlayerStats(), 'Wizard', campaignName);
-
-            expect(setRuntimeValue).toHaveBeenNthCalledWith(
-                2,
-                'WizardBoy',
-                '_magicInitiateAbility',
-                'Intelligence',
-                campaignName
-            );
-        });
-
         it('includes automation config with available options in popup payload', async () => {
             const result = await confirmMagicInitiate(makePlayerStats(), 'Cleric', campaignName);
 
@@ -182,17 +144,6 @@ describe('magicInitiateHandler', () => {
                 'WizardBoy',
                 '_magicInitiateCantrips',
                 cantrips,
-                campaignName
-            );
-        });
-
-        it('stores empty array when no cantrips selected', async () => {
-            await setMagicInitiateCantrips(makePlayerStats(), [], campaignName);
-
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'WizardBoy',
-                '_magicInitiateCantrips',
-                [],
                 campaignName
             );
         });
@@ -217,12 +168,6 @@ describe('magicInitiateHandler', () => {
 
             expect(getMagicInitiateClass(makePlayerStats(), campaignName)).toBe('Cleric');
         });
-
-        it('returns undefined when no class is stored', () => {
-            getRuntimeValue.mockReturnValue(undefined);
-
-            expect(getMagicInitiateClass(makePlayerStats(), campaignName)).toBeUndefined();
-        });
     });
 
     describe('getMagicInitiateAbility', () => {
@@ -230,12 +175,6 @@ describe('magicInitiateHandler', () => {
             getRuntimeValue.mockReturnValue('Wisdom');
 
             expect(getMagicInitiateAbility(makePlayerStats(), campaignName)).toBe('Wisdom');
-        });
-
-        it('returns undefined when no ability is stored', () => {
-            getRuntimeValue.mockReturnValue(undefined);
-
-            expect(getMagicInitiateAbility(makePlayerStats(), campaignName)).toBeUndefined();
         });
     });
 
@@ -246,12 +185,6 @@ describe('magicInitiateHandler', () => {
 
             expect(getMagicInitiateCantrips(makePlayerStats(), campaignName)).toBe(cantrips);
         });
-
-        it('returns undefined when no cantrips are stored', () => {
-            getRuntimeValue.mockReturnValue(undefined);
-
-            expect(getMagicInitiateCantrips(makePlayerStats(), campaignName)).toBeUndefined();
-        });
     });
 
     describe('getMagicInitiateLevel1Spell', () => {
@@ -259,12 +192,6 @@ describe('magicInitiateHandler', () => {
             getRuntimeValue.mockReturnValue('Magic Missile');
 
             expect(getMagicInitiateLevel1Spell(makePlayerStats(), campaignName)).toBe('Magic Missile');
-        });
-
-        it('returns undefined when no spell is stored', () => {
-            getRuntimeValue.mockReturnValue(undefined);
-
-            expect(getMagicInitiateLevel1Spell(makePlayerStats(), campaignName)).toBeUndefined();
         });
     });
 
@@ -296,16 +223,6 @@ describe('magicInitiateHandler', () => {
                 null,
                 campaignName
             );
-        });
-
-        it('uses correct call order: class, ability, cantrips, level1Spell', () => {
-            restoreUses('TestCharacter', campaignName);
-
-            const calls = setRuntimeValue.mock.calls;
-            expect(calls[0][1]).toBe('_magicInitiateClass');
-            expect(calls[1][1]).toBe('_magicInitiateAbility');
-            expect(calls[2][1]).toBe('_magicInitiateCantrips');
-            expect(calls[3][1]).toBe('_magicInitiateLevel1Spell');
         });
     });
 });

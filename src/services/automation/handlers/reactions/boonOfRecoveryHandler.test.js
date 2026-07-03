@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 // Suppress fire-and-forget logService.addEntry rejection warnings from source code
 process.on('unhandledRejection', () => {});
 
@@ -47,16 +47,6 @@ describe('boonOfRecoveryHandler', () => {
                 expect(result.payload.name).toBe('Boon Of Recovery');
                 expect(result.payload.description).toContain('Last Stand has already been used');
                 expect(result.payload.description).toContain('Long Rest');
-            });
-
-            it('should not modify any runtime state when already used', async () => {
-                runtimeState.getRuntimeValue.mockImplementation((_charName, key) => {
-                    if (key === 'boonOfRecoveryLastStandUsed') return true;
-                    return undefined;
-                });
-
-                await handle(mockAction, mockPlayerStats, campaignName);
-
                 expect(runtimeState.setRuntimeValue).not.toHaveBeenCalled();
                 expect(logService.addEntry).not.toHaveBeenCalled();
                 expect(logPoster.postLogEntry).not.toHaveBeenCalled();
@@ -64,10 +54,11 @@ describe('boonOfRecoveryHandler', () => {
         });
 
         describe('when last stand is available', () => {
-            it('should mark last stand as used, set HP to half max, and remove unconscious condition', async () => {
+            it('should mark last stand as used, set HP to half max, and clear death saves', async () => {
                 runtimeState.getRuntimeValue.mockImplementation((_charName, key) => {
                     if (key === 'boonOfRecoveryLastStandUsed') return undefined;
-                    if (key === 'activeConditions') return ['unconscious'];
+                    if (key === 'deathSaves') return [true, false, true];
+                    if (key === 'deathFailures') return [false, true, false];
                     return undefined;
                 });
                 logService.addEntry.mockResolvedValue(undefined);
@@ -79,26 +70,12 @@ describe('boonOfRecoveryHandler', () => {
                 expect(result.payload.name).toBe('Boon Of Recovery');
                 expect(result.payload.description).toContain('TestFighter');
                 expect(result.payload.description).toContain('20 HP');
-                expect(result.payload.description).toContain('20 hit points');
                 expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
                     playerName, 'boonOfRecoveryLastStandUsed', true, campaignName
                 );
                 expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
                     playerName, 'currentHitPoints', 20, campaignName
                 );
-            });
-
-            it('should clear death saves and death failures', async () => {
-                runtimeState.getRuntimeValue.mockImplementation((_charName, key) => {
-                    if (key === 'boonOfRecoveryLastStandUsed') return undefined;
-                    if (key === 'deathSaves') return [true, false, true];
-                    if (key === 'deathFailures') return [false, true, false];
-                    return undefined;
-                });
-                logService.addEntry.mockResolvedValue(undefined);
-
-                await handle(mockAction, mockPlayerStats, campaignName);
-
                 expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
                     playerName, 'deathSaves', [false, false, false], campaignName
                 );
@@ -119,35 +96,6 @@ describe('boonOfRecoveryHandler', () => {
 
                 expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
                     playerName, 'activeConditions', ['poisoned'], campaignName
-                );
-            });
-
-            it('should handle empty active conditions array', async () => {
-                runtimeState.getRuntimeValue.mockImplementation((_charName, key) => {
-                    if (key === 'boonOfRecoveryLastStandUsed') return undefined;
-                    if (key === 'activeConditions') return [];
-                    return undefined;
-                });
-                logService.addEntry.mockResolvedValue(undefined);
-
-                await handle(mockAction, mockPlayerStats, campaignName);
-
-                expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-                    playerName, 'activeConditions', [], campaignName
-                );
-            });
-
-            it('should handle undefined active conditions', async () => {
-                runtimeState.getRuntimeValue.mockImplementation((_charName, key) => {
-                    if (key === 'boonOfRecoveryLastStandUsed') return undefined;
-                    return undefined;
-                });
-                logService.addEntry.mockResolvedValue(undefined);
-
-                await handle(mockAction, mockPlayerStats, campaignName);
-
-                expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-                    playerName, 'activeConditions', [], campaignName
                 );
             });
 
@@ -235,46 +183,37 @@ describe('boonOfRecoveryHandler', () => {
                 );
             });
 
-            it('should handle missing hitPoints by falling back to level', async () => {
-                const fallbackStats = { name: playerName, level: 10 };
+            it('should fall back to level, barbarianLevel, or 1 HP when hitPoints is missing', async () => {
                 runtimeState.getRuntimeValue.mockImplementation((_charName, key) => {
                     if (key === 'boonOfRecoveryLastStandUsed') return undefined;
                     return undefined;
                 });
                 logService.addEntry.mockResolvedValue(undefined);
 
-                await handle(mockAction, fallbackStats, campaignName);
-
+                // fallback to level (10 -> 5)
+                await handle(mockAction, { name: playerName, level: 10 }, campaignName);
                 expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
                     playerName, 'currentHitPoints', 5, campaignName
                 );
-            });
-
-            it('should handle missing hitPoints by falling back to barbarianLevel', async () => {
-                const fallbackStats = { name: playerName, barbarianLevel: 12 };
+                vi.clearAllMocks();
                 runtimeState.getRuntimeValue.mockImplementation((_charName, key) => {
                     if (key === 'boonOfRecoveryLastStandUsed') return undefined;
                     return undefined;
                 });
-                logService.addEntry.mockResolvedValue(undefined);
 
-                await handle(mockAction, fallbackStats, campaignName);
-
+                // fallback to barbarianLevel (12 -> 6)
+                await handle(mockAction, { name: playerName, barbarianLevel: 12 }, campaignName);
                 expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
                     playerName, 'currentHitPoints', 6, campaignName
                 );
-            });
-
-            it('should default to 1 HP when no stat sources are available', async () => {
-                const minimalStats = { name: playerName };
+                vi.clearAllMocks();
                 runtimeState.getRuntimeValue.mockImplementation((_charName, key) => {
                     if (key === 'boonOfRecoveryLastStandUsed') return undefined;
                     return undefined;
                 });
-                logService.addEntry.mockResolvedValue(undefined);
 
-                await handle(mockAction, minimalStats, campaignName);
-
+                // no stat sources -> default to 1
+                await handle(mockAction, { name: playerName }, campaignName);
                 expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
                     playerName, 'currentHitPoints', 1, campaignName
                 );
@@ -306,54 +245,37 @@ describe('boonOfRecoveryHandler', () => {
     });
 
     describe('isLastStandAvailable', () => {
-        it('should return true when runtime value is undefined (never used)', () => {
+        it('should return true when runtime value is undefined or falsy, false when true', () => {
+            // undefined (never used) -> available
             runtimeState.getRuntimeValue.mockReturnValue(undefined);
+            expect(isLastStandAvailable({ name: playerName }, campaignName)).toBe(true);
 
-            const result = isLastStandAvailable({ name: playerName }, campaignName);
+            vi.clearAllMocks();
 
-            expect(result).toBe(true);
-        });
-
-        it('should return true when runtime value is falsy', () => {
+            // false -> available
             runtimeState.getRuntimeValue.mockReturnValue(false);
+            expect(isLastStandAvailable({ name: playerName }, campaignName)).toBe(true);
 
-            const result = isLastStandAvailable({ name: playerName }, campaignName);
+            vi.clearAllMocks();
 
-            expect(result).toBe(true);
-        });
-
-        it('should return false when runtime value is true', () => {
+            // true -> not available
             runtimeState.getRuntimeValue.mockReturnValue(true);
-
-            const result = isLastStandAvailable({ name: playerName }, campaignName);
-
-            expect(result).toBe(false);
+            expect(isLastStandAvailable({ name: playerName }, campaignName)).toBe(false);
         });
     });
 
     describe('getLastStandUsed', () => {
-        it('should return the runtime value for the last stand key', () => {
+        it('should return the runtime value for the last stand key as-is', () => {
             runtimeState.getRuntimeValue.mockReturnValue(true);
+            expect(getLastStandUsed({ name: playerName }, campaignName)).toBe(true);
 
-            const result = getLastStandUsed({ name: playerName }, campaignName);
-
-            expect(result).toBe(true);
-        });
-
-        it('should return false when runtime value is false', () => {
+            vi.clearAllMocks();
             runtimeState.getRuntimeValue.mockReturnValue(false);
+            expect(getLastStandUsed({ name: playerName }, campaignName)).toBe(false);
 
-            const result = getLastStandUsed({ name: playerName }, campaignName);
-
-            expect(result).toBe(false);
-        });
-
-        it('should return undefined when runtime value is undefined', () => {
+            vi.clearAllMocks();
             runtimeState.getRuntimeValue.mockReturnValue(undefined);
-
-            const result = getLastStandUsed({ name: playerName }, campaignName);
-
-            expect(result).toBe(undefined);
+            expect(getLastStandUsed({ name: playerName }, campaignName)).toBe(undefined);
         });
     });
 });

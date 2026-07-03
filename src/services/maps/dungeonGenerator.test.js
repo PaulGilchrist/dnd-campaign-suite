@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { describe, it, expect } from 'vitest';
 import { generateDungeon, generateAdjacentDungeon, visualize } from './dungeonGenerator.js';
 
@@ -6,20 +6,24 @@ describe('dungeonGenerator', () => {
   describe('generateDungeon', () => {
     it('should return a map object with all required top-level fields', () => {
       const map = generateDungeon({ gridSize: 20, seed: 42 });
-      const expectedKeys = ['name', 'description', 'gridSize', 'seed', 'walls', 'placedItems', 'players', 'zoom', 'panX', 'panY'];
-      for (const key of expectedKeys) {
-        expect(map).toHaveProperty(key);
-      }
+      expect(map).toHaveProperty('name');
+      expect(map).toHaveProperty('description');
+      expect(map).toHaveProperty('gridSize');
+      expect(map).toHaveProperty('seed');
+      expect(map).toHaveProperty('walls');
+      expect(map).toHaveProperty('placedItems');
+      expect(map).toHaveProperty('players');
+      expect(map).toHaveProperty('zoom');
+      expect(map).toHaveProperty('panX');
+      expect(map).toHaveProperty('panY');
     });
 
-    it('should default gridSize to 30 when omitted', () => {
-      const map = generateDungeon({ seed: 42 });
-      expect(map.gridSize).toBe(30);
-    });
+    it('should default gridSize to 30 and accept custom values', () => {
+      const defaultMap = generateDungeon({ seed: 42 });
+      expect(defaultMap.gridSize).toBe(30);
 
-    it('should accept and preserve a custom gridSize', () => {
-      const map = generateDungeon({ gridSize: 25, seed: 42 });
-      expect(map.gridSize).toBe(25);
+      const customMap = generateDungeon({ gridSize: 25, seed: 42 });
+      expect(customMap.gridSize).toBe(25);
     });
 
     it('should return the seed used for generation', () => {
@@ -27,14 +31,10 @@ describe('dungeonGenerator', () => {
       expect(map.seed).toBe(12345);
     });
 
-    it('should generate a non-empty deterministic name', () => {
+    it('should generate non-empty name and description strings', () => {
       const map = generateDungeon({ gridSize: 20, seed: 42 });
       expect(typeof map.name).toBe('string');
       expect(map.name.length).toBeGreaterThan(0);
-    });
-
-    it('should generate a non-empty description', () => {
-      const map = generateDungeon({ gridSize: 20, seed: 42 });
       expect(typeof map.description).toBe('string');
       expect(map.description.length).toBeGreaterThan(0);
     });
@@ -51,22 +51,11 @@ describe('dungeonGenerator', () => {
       expect(map1).not.toEqual(map2);
     });
 
-    it('should generate walls as coordinate strings when no seed is provided', () => {
-      const map = generateDungeon({ gridSize: 20 });
+    it('should generate walls as coordinate strings within grid bounds', () => {
+      const map = generateDungeon({ gridSize: 20, seed: 42 });
       expect(map.walls.length).toBeGreaterThan(0);
       for (const wall of map.walls) {
         expect(wall).toMatch(/^\d+,\d+$/);
-      }
-    });
-
-    it('should not fill the entire grid with walls', () => {
-      const map = generateDungeon({ gridSize: 20, seed: 42 });
-      expect(map.walls.length).toBeLessThan(map.gridSize * map.gridSize);
-    });
-
-    it('should place all walls within grid bounds', () => {
-      const map = generateDungeon({ gridSize: 20, seed: 42 });
-      for (const wall of map.walls) {
         const [x, y] = wall.split(',').map(Number);
         expect(x).toBeGreaterThanOrEqual(0);
         expect(x).toBeLessThan(map.gridSize);
@@ -75,7 +64,12 @@ describe('dungeonGenerator', () => {
       }
     });
 
-    it('should generate placedItems with required fields', () => {
+    it('should not fill the entire grid with walls', () => {
+      const map = generateDungeon({ gridSize: 20, seed: 42 });
+      expect(map.walls.length).toBeLessThan(map.gridSize * map.gridSize);
+    });
+
+    it('should generate placedItems with required fields within bounds', () => {
       const map = generateDungeon({ gridSize: 20, seed: 42 });
       expect(Array.isArray(map.placedItems)).toBe(true);
       expect(map.placedItems.length).toBeGreaterThan(0);
@@ -85,12 +79,6 @@ describe('dungeonGenerator', () => {
         expect(item).toHaveProperty('gridY');
         expect(item).toHaveProperty('type');
         expect(item).toHaveProperty('visible');
-      }
-    });
-
-    it('should place all items within grid bounds', () => {
-      const map = generateDungeon({ gridSize: 20, seed: 42 });
-      for (const item of map.placedItems) {
         expect(item.gridX).toBeGreaterThanOrEqual(0);
         expect(item.gridX).toBeLessThan(map.gridSize);
         expect(item.gridY).toBeGreaterThanOrEqual(0);
@@ -134,13 +122,9 @@ describe('dungeonGenerator', () => {
       }
     });
 
-    it('should have players as an empty array', () => {
+    it('should have players as an empty array and default zoom/pan', () => {
       const map = generateDungeon({ seed: 42 });
       expect(map.players).toEqual([]);
-    });
-
-    it('should default zoom to 1 and pan to 0,0', () => {
-      const map = generateDungeon({ seed: 42 });
       expect(map.zoom).toBe(1);
       expect(map.panX).toBe(0);
       expect(map.panY).toBe(0);
@@ -164,21 +148,17 @@ describe('dungeonGenerator', () => {
       }
     });
 
-    it('should handle small grid sizes', () => {
-      const map = generateDungeon({ gridSize: 10, seed: 42 });
-      expect(map.gridSize).toBe(10);
-      expect(map.walls.length).toBeGreaterThan(0);
-      expect(map.placedItems.length).toBeGreaterThan(0);
-    });
+    it('should handle small grids, large grids, and density extremes', () => {
+      const small = generateDungeon({ gridSize: 10, seed: 42 });
+      expect(small.gridSize).toBe(10);
+      expect(small.walls.length).toBeGreaterThan(0);
+      expect(small.placedItems.length).toBeGreaterThan(0);
 
-    it('should handle large grid sizes', () => {
-      const map = generateDungeon({ gridSize: 40, seed: 42 });
-      expect(map.gridSize).toBe(40);
-      expect(map.walls.length).toBeGreaterThan(0);
-      expect(map.placedItems.length).toBeGreaterThan(0);
-    });
+      const large = generateDungeon({ gridSize: 40, seed: 42 });
+      expect(large.gridSize).toBe(40);
+      expect(large.walls.length).toBeGreaterThan(0);
+      expect(large.placedItems.length).toBeGreaterThan(0);
 
-    it('should handle density extremes', () => {
       const lowDensity = generateDungeon({ gridSize: 30, seed: 42, density: 0 });
       expect(lowDensity.walls.length).toBeGreaterThan(0);
 
@@ -188,54 +168,22 @@ describe('dungeonGenerator', () => {
   });
 
   describe('visualize', () => {
-    it('should return a string', () => {
+    it('should return a string matching the map grid dimensions', () => {
       const map = generateDungeon({ gridSize: 10, seed: 42 });
       const output = visualize(map);
       expect(typeof output).toBe('string');
-    });
-
-    it('should have gridSize lines', () => {
-      const map = generateDungeon({ gridSize: 10, seed: 42 });
-      const lines = visualize(map).split('\n');
+      const lines = output.split('\n');
       expect(lines.length).toBe(10);
-    });
-
-    it('should have each line be gridSize characters long', () => {
-      const map = generateDungeon({ gridSize: 10, seed: 42 });
-      const lines = visualize(map).split('\n');
       for (const line of lines) {
         expect(line.length).toBe(10);
       }
     });
 
-    it('should show open floor as middle dot', () => {
+    it('should show open floor as middle dot and walls as block', () => {
       const map = generateDungeon({ gridSize: 20, seed: 42 });
       const output = visualize(map);
       expect(output).toContain('\u00b7');
-    });
-
-    it('should show walls as block', () => {
-      const map = generateDungeon({ gridSize: 20, seed: 42 });
-      const output = visualize(map);
       expect(output).toContain('\u2588');
-    });
-
-    it('should show doors as plus sign', () => {
-      const map = generateDungeon({ gridSize: 20, seed: 42 });
-      const hasDoors = map.placedItems.some(i => i.type === 'door');
-      if (hasDoors) {
-        const output = visualize(map);
-        expect(output).toContain('+');
-      }
-    });
-
-    it('should show secret doors as s', () => {
-      const map = generateDungeon({ gridSize: 30, seed: 42 });
-      const hasSecret = map.placedItems.some(i => i.type === 'secretDoor');
-      if (hasSecret) {
-        const output = visualize(map);
-        expect(output).toContain('s');
-      }
     });
 
     it('should show stairs as greater-than', () => {
@@ -244,40 +192,27 @@ describe('dungeonGenerator', () => {
       expect(output).toContain('>');
     });
 
-    it('should show chests as equals', () => {
+    it('should show conditional items when present', () => {
       const map = generateDungeon({ gridSize: 30, seed: 42 });
+      const output = visualize(map);
+
+      const hasDoors = map.placedItems.some(i => i.type === 'door');
+      if (hasDoors) expect(output).toContain('+');
+
+      const hasSecret = map.placedItems.some(i => i.type === 'secretDoor');
+      if (hasSecret) expect(output).toContain('s');
+
       const hasChest = map.placedItems.some(i => i.type === 'chest');
-      if (hasChest) {
-        const output = visualize(map);
-        expect(output).toContain('=');
-      }
-    });
+      if (hasChest) expect(output).toContain('=');
 
-    it('should show traps as caret', () => {
-      const map = generateDungeon({ gridSize: 30, seed: 42 });
       const hasTrap = map.placedItems.some(i => i.type === 'trap');
-      if (hasTrap) {
-        const output = visualize(map);
-        expect(output).toContain('^');
-      }
-    });
+      if (hasTrap) expect(output).toContain('^');
 
-    it('should show NPCs as at-sign', () => {
-      const map = generateDungeon({ gridSize: 30, seed: 42 });
       const hasNPC = map.placedItems.some(i => i.type === 'npc');
-      if (hasNPC) {
-        const output = visualize(map);
-        expect(output).toContain('@');
-      }
-    });
+      if (hasNPC) expect(output).toContain('@');
 
-    it('should show altars as A', () => {
-      const map = generateDungeon({ gridSize: 30, seed: 42 });
       const hasAltar = map.placedItems.some(i => i.type === 'altar');
-      if (hasAltar) {
-        const output = visualize(map);
-        expect(output).toContain('A');
-      }
+      if (hasAltar) expect(output).toContain('A');
     });
 
     it('should handle small grids', () => {
@@ -294,28 +229,29 @@ describe('dungeonGenerator', () => {
   describe('generateAdjacentDungeon', () => {
     it('should return a map object with all required fields including rooms', () => {
       const map = generateAdjacentDungeon({ gridSize: 20, seed: 42 });
-      const expectedKeys = ['name', 'description', 'gridSize', 'walls', 'placedItems', 'players', 'zoom', 'panX', 'panY', 'rooms', 'generationMode'];
-      for (const key of expectedKeys) {
-        expect(map).toHaveProperty(key);
-      }
+      expect(map).toHaveProperty('name');
+      expect(map).toHaveProperty('description');
+      expect(map).toHaveProperty('gridSize');
+      expect(map).toHaveProperty('walls');
+      expect(map).toHaveProperty('placedItems');
+      expect(map).toHaveProperty('players');
+      expect(map).toHaveProperty('zoom');
+      expect(map).toHaveProperty('panX');
+      expect(map).toHaveProperty('panY');
+      expect(map).toHaveProperty('rooms');
+      expect(map).toHaveProperty('generationMode');
     });
 
-    it('should set generationMode to adjacent', () => {
-      const map = generateAdjacentDungeon({ gridSize: 20, seed: 42 });
-      expect(map.generationMode).toBe('adjacent');
-    });
-
-    it('should default gridSize to 30', () => {
+    it('should set generationMode to adjacent and default gridSize to 30', () => {
       const map = generateAdjacentDungeon({ seed: 42 });
+      expect(map.generationMode).toBe('adjacent');
       expect(map.gridSize).toBe(30);
+
+      const custom = generateAdjacentDungeon({ gridSize: 25, seed: 42 });
+      expect(custom.gridSize).toBe(25);
     });
 
-    it('should accept and preserve a custom gridSize', () => {
-      const map = generateAdjacentDungeon({ gridSize: 25, seed: 42 });
-      expect(map.gridSize).toBe(25);
-    });
-
-    it('should generate a non-empty name and description', () => {
+    it('should generate non-empty name and description', () => {
       const map = generateAdjacentDungeon({ seed: 42 });
       expect(typeof map.name).toBe('string');
       expect(map.name.length).toBeGreaterThan(0);
@@ -335,12 +271,12 @@ describe('dungeonGenerator', () => {
       expect(map1).not.toEqual(map2);
     });
 
-    it('should generate walls as coordinate strings within bounds', () => {
+    it('should generate walls as coordinate strings within grid bounds', () => {
       const map = generateAdjacentDungeon({ gridSize: 20, seed: 42 });
       expect(map.walls.length).toBeGreaterThan(0);
       for (const wall of map.walls) {
-        const [x, y] = wall.split(',').map(Number);
         expect(wall).toMatch(/^\d+,\d+$/);
+        const [x, y] = wall.split(',').map(Number);
         expect(x).toBeGreaterThanOrEqual(0);
         expect(x).toBeLessThan(map.gridSize);
         expect(y).toBeGreaterThanOrEqual(0);
@@ -376,32 +312,22 @@ describe('dungeonGenerator', () => {
       expect(new Set(positions).size).toBe(positions.length);
     });
 
-    it('should include entrance stairs', () => {
+    it('should include entrance stairs, torches, and doors', () => {
       const map = generateAdjacentDungeon({ gridSize: 20, seed: 42 });
       const stairs = map.placedItems.filter(i => i.type === 'stairs');
       expect(stairs.length).toBeGreaterThanOrEqual(1);
       expect(stairs[0].id).toBe('entrance-stairs');
-    });
 
-    it('should include torches', () => {
-      const map = generateAdjacentDungeon({ gridSize: 20, seed: 42 });
       const torches = map.placedItems.filter(i => i.type === 'torch');
       expect(torches.length).toBeGreaterThan(0);
-    });
 
-    it('should include doors between rooms', () => {
-      const map = generateAdjacentDungeon({ gridSize: 20, seed: 42 });
       const doors = map.placedItems.filter(i => i.type === 'door');
       expect(doors.length).toBeGreaterThan(0);
     });
 
-    it('should have players as an empty array', () => {
+    it('should have players as an empty array and default zoom/pan', () => {
       const map = generateAdjacentDungeon({ seed: 42 });
       expect(map.players).toEqual([]);
-    });
-
-    it('should default zoom to 1 and pan to 0,0', () => {
-      const map = generateAdjacentDungeon({ seed: 42 });
       expect(map.zoom).toBe(1);
       expect(map.panX).toBe(0);
       expect(map.panY).toBe(0);
@@ -418,7 +344,7 @@ describe('dungeonGenerator', () => {
       }
     });
 
-    it('should return rooms array with required room fields', () => {
+    it('should return rooms array with required fields', () => {
       const map = generateAdjacentDungeon({ gridSize: 20, seed: 42 });
       expect(Array.isArray(map.rooms)).toBe(true);
       expect(map.rooms.length).toBeGreaterThan(0);
@@ -432,17 +358,11 @@ describe('dungeonGenerator', () => {
       }
     });
 
-    it('should have valid room types', () => {
+    it('should have valid room types and non-empty labels', () => {
       const map = generateAdjacentDungeon({ gridSize: 30, seed: 42 });
       const validTypes = ['entrance', 'common', 'utility', 'private', 'grand', 'hall'];
       for (const room of map.rooms) {
         expect(validTypes).toContain(room.type);
-      }
-    });
-
-    it('should have non-empty labels for all rooms', () => {
-      const map = generateAdjacentDungeon({ gridSize: 30, seed: 42 });
-      for (const room of map.rooms) {
         expect(typeof room.label).toBe('string');
         expect(room.label.length).toBeGreaterThan(0);
       }
@@ -453,14 +373,11 @@ describe('dungeonGenerator', () => {
       expect(map.rooms[0].type).toBe('entrance');
     });
 
-    it('should have non-empty connectedTo arrays for connectivity', () => {
+    it('should have valid room connectivity', () => {
       const map = generateAdjacentDungeon({ gridSize: 20, seed: 42 });
       const totalConnections = map.rooms.reduce((sum, r) => sum + r.connectedTo.length, 0);
       expect(totalConnections).toBeGreaterThan(0);
-    });
 
-    it('should have connectedTo referencing valid room ids', () => {
-      const map = generateAdjacentDungeon({ gridSize: 20, seed: 42 });
       const roomIds = new Set(map.rooms.map(r => r.id));
       for (const room of map.rooms) {
         for (const connId of room.connectedTo) {
@@ -481,7 +398,7 @@ describe('dungeonGenerator', () => {
       }
     });
 
-    it('should not have overlapping rooms', () => {
+    it('should not have overlapping rooms within grid bounds', () => {
       const map = generateAdjacentDungeon({ gridSize: 20, seed: 42 });
       for (let i = 0; i < map.rooms.length; i++) {
         for (let j = i + 1; j < map.rooms.length; j++) {
@@ -490,10 +407,6 @@ describe('dungeonGenerator', () => {
           expect(a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y).toBe(false);
         }
       }
-    });
-
-    it('should have all rooms within grid bounds', () => {
-      const map = generateAdjacentDungeon({ gridSize: 20, seed: 42 });
       for (const room of map.rooms) {
         expect(room.rect.x).toBeGreaterThanOrEqual(0);
         expect(room.rect.y).toBeGreaterThanOrEqual(0);
@@ -516,15 +429,13 @@ describe('dungeonGenerator', () => {
       expect(map.rooms.length).toBeGreaterThanOrEqual(1);
     });
 
-    it('should handle density extremes', () => {
+    it('should handle density extremes and grid size extremes', () => {
       const lowDensity = generateAdjacentDungeon({ gridSize: 30, seed: 42, density: 0 });
       expect(lowDensity.rooms.length).toBeGreaterThan(0);
 
       const highDensity = generateAdjacentDungeon({ gridSize: 30, seed: 42, density: 1 });
       expect(highDensity.rooms.length).toBeGreaterThan(0);
-    });
 
-    it('should handle small and large grid sizes', () => {
       const small = generateAdjacentDungeon({ gridSize: 15, seed: 42 });
       expect(small.gridSize).toBe(15);
       expect(small.walls.length).toBeGreaterThan(0);

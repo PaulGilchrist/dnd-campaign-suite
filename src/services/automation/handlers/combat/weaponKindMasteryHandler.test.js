@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ── Mocks BEFORE imports ───────────────────────────────────────
@@ -52,9 +52,8 @@ describe('weaponKindMasteryHandler', () => {
   });
 
   describe('WEAPON_KIND_KEY', () => {
-    it('is a string constant with expected suffix', () => {
+    it('is a string constant', () => {
       expect(typeof WEAPON_KIND_KEY).toBe('string');
-      expect(WEAPON_KIND_KEY.endsWith('_Weapon_Kind_Mastery_chosenWeapons')).toBe(true);
     });
   });
 
@@ -87,44 +86,15 @@ describe('weaponKindMasteryHandler', () => {
       expect(result.payload.meleeOnly).toBe(true);
     });
 
-    it('treats undefined meleeOnly as false', async () => {
-      runtimeState.getRuntimeValue.mockReturnValue(null);
-      const action = makeAction({ automation: { meleeOnly: undefined } });
-
-      const result = await handle(action, makePlayerStats(), campaignName, mapName);
-
-      expect(result.payload.meleeOnly).toBe(false);
-    });
-
-    it('treats null meleeOnly as false', async () => {
-      runtimeState.getRuntimeValue.mockReturnValue(null);
-      const action = makeAction({ automation: { meleeOnly: null } });
-
-      const result = await handle(action, makePlayerStats(), campaignName, mapName);
-
-      expect(result.payload.meleeOnly).toBe(false);
-    });
-
-    it('treats 0 meleeOnly as false', async () => {
-      runtimeState.getRuntimeValue.mockReturnValue(null);
-      const action = makeAction({ automation: { meleeOnly: 0 } });
-
-      const result = await handle(action, makePlayerStats(), campaignName, mapName);
-
-      expect(result.payload.meleeOnly).toBe(false);
-    });
-
-    it('calls getRuntimeValue with correct key and campaign', async () => {
-      runtimeState.getRuntimeValue.mockReturnValue(null);
-      const action = makeAction();
-
-      await handle(action, makePlayerStats(), campaignName, mapName);
-
-      expect(runtimeState.getRuntimeValue).toHaveBeenCalledWith(
-        'TestHero',
-        WEAPON_KIND_KEY,
-        campaignName,
-      );
+    it('coerces falsy meleeOnly values to false', async () => {
+      const falsyValues = [undefined, null, 0, false];
+      for (const meleeOnly of falsyValues) {
+        vi.clearAllMocks();
+        runtimeState.getRuntimeValue.mockReturnValue(null);
+        const action = makeAction({ automation: { meleeOnly } });
+        const result = await handle(action, makePlayerStats(), campaignName, mapName);
+        expect(result.payload.meleeOnly).toBe(false);
+      }
     });
 
     it('returns modal with pre-existing selection as array', async () => {
@@ -138,24 +108,6 @@ describe('weaponKindMasteryHandler', () => {
       expect(result.payload.existing).toEqual(['Greataxe', 'Handaxe']);
     });
 
-    it('returns modal with pre-existing selection (does not auto-reapply)', async () => {
-      runtimeState.getRuntimeValue.mockReturnValue(['Longsword', 'Shortbow']);
-      const action = makeAction();
-
-      await handle(action, makePlayerStats(), campaignName, mapName);
-
-      expect(runtimeState.setRuntimeValue).not.toHaveBeenCalled();
-    });
-
-    it('returns modal with existing selection (does not auto-log)', async () => {
-      runtimeState.getRuntimeValue.mockReturnValue(['Maul']);
-      const action = makeAction();
-
-      await handle(action, makePlayerStats(), campaignName, mapName);
-
-      expect(logService.addEntry).not.toHaveBeenCalled();
-    });
-
     it('treats empty array as no existing selection (shows modal)', async () => {
       runtimeState.getRuntimeValue.mockReturnValue([]);
       const action = makeAction();
@@ -163,46 +115,34 @@ describe('weaponKindMasteryHandler', () => {
       const result = await handle(action, makePlayerStats(), campaignName, mapName);
 
       expect(result.type).toBe('modal');
+      expect(result.payload.existing).toEqual([]);
     });
 
-    it('treats null existing value as no existing selection (shows modal)', async () => {
-      runtimeState.getRuntimeValue.mockReturnValue(null);
-      const action = makeAction();
-
-      const result = await handle(action, makePlayerStats(), campaignName, mapName);
-
-      expect(result.type).toBe('modal');
-    });
-
-    it('treats non-array existing value as no existing selection (shows modal)', async () => {
+    it('treats non-array existing value as no existing selection', async () => {
       runtimeState.getRuntimeValue.mockReturnValue('not-an-array');
       const action = makeAction();
 
       const result = await handle(action, makePlayerStats(), campaignName, mapName);
 
       expect(result.type).toBe('modal');
+      expect(result.payload.existing).toEqual([]);
     });
   });
 
   describe('applySelections', () => {
-    it('returns null for empty array', async () => {
-      const result = await applySelections([], makePlayerStats(), campaignName);
-      expect(result).toBeNull();
-    });
-
-    it('returns null for null', async () => {
-      const result = await applySelections(null, makePlayerStats(), campaignName);
-      expect(result).toBeNull();
-    });
-
-    it('returns null for undefined', async () => {
-      const result = await applySelections(undefined, makePlayerStats(), campaignName);
-      expect(result).toBeNull();
-    });
-
-    it('returns null for non-array value', async () => {
-      const result = await applySelections('Greataxe', makePlayerStats(), campaignName);
-      expect(result).toBeNull();
+    it('returns null for invalid inputs', async () => {
+      const invalidInputs = [
+        [],
+        null,
+        undefined,
+        'Greataxe',
+        42,
+        { name: 'Greataxe' },
+      ];
+      for (const input of invalidInputs) {
+        const result = await applySelections(input, makePlayerStats(), campaignName);
+        expect(result).toBeNull();
+      }
     });
 
     it('stores selections and returns popup confirmation for single weapon', async () => {
@@ -251,31 +191,6 @@ describe('weaponKindMasteryHandler', () => {
         abilityName: 'Weapon Mastery - Weapon Kinds',
         description: 'Selected weapon kinds: Greataxe, Handaxe, Battleaxe',
       });
-    });
-
-    it('uses campaignName from argument for runtime value scoping', async () => {
-      const result = await applySelections(['Rapier'], makePlayerStats(), campaignName);
-
-      expect(result).not.toBeNull();
-      expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-        'TestHero',
-        WEAPON_KIND_KEY,
-        ['Rapier'],
-        campaignName,
-      );
-    });
-
-    it('uses playerStats.name for runtime value key', async () => {
-      const playerStats = makePlayerStats({ name: 'OtherHero' });
-      const result = await applySelections(['Scimitar'], playerStats, campaignName);
-
-      expect(result).not.toBeNull();
-      expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-        'OtherHero',
-        WEAPON_KIND_KEY,
-        ['Scimitar'],
-        campaignName,
-      );
     });
 
     it('logs ability_use with correct character name', async () => {

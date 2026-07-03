@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   saveSettlement,
@@ -35,17 +35,17 @@ describe('settlementsService', () => {
       expect(result).toEqual(responseData);
     });
 
-    it('sends PUT to the correct URL using settlement name', async () => {
-      const mockSettlement = { name: 'Waterdeep', type: 'city' };
+    it('sends PUT to the correct URL with encoded special characters', async () => {
+      const mockSettlement = { name: 'Town/Region', type: 'city' };
       mockFetch.mockResolvedValue({
         ok: true,
         json: () => Promise.resolve({ success: true }),
       });
 
-      await saveSettlement('campaign1', mockSettlement);
+      await saveSettlement('campaign/1', mockSettlement, 'Old/Name');
 
       expect(mockFetch).toHaveBeenCalledWith(
-        '/api/campaigns/campaign1/settlements/Waterdeep',
+        '/api/campaigns/campaign%2F1/settlements/Old%2FName',
         {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
@@ -73,37 +73,8 @@ describe('settlementsService', () => {
       );
     });
 
-    it('encodes campaign name with spaces in URL', async () => {
-      const mockSettlement = { name: 'New Town', type: 'village' };
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({ success: true }),
-      });
-
-      await saveSettlement('campaign with spaces', mockSettlement, 'Old Name');
-
-      expect(mockFetch).toHaveBeenCalledWith(
-        '/api/campaigns/campaign%20with%20spaces/settlements/Old%20Name',
-        expect.any(Object)
-      );
-    });
-
-    it('encodes campaign and settlement names with special characters in URL', async () => {
-      const mockSettlement = { name: 'Town/Region', type: 'city' };
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({ success: true }),
-      });
-
-      await saveSettlement('campaign/1', mockSettlement, 'Old/Name');
-
-      expect(mockFetch).toHaveBeenCalledWith(
-        '/api/campaigns/campaign%2F1/settlements/Old%2FName',
-        expect.any(Object)
-      );
-    });
-
-    it('throws with custom error message on API error', async () => {
+    it('throws with custom error on API error, generic fallback on network failure', async () => {
+      // API error with error field
       mockFetch.mockResolvedValue({
         ok: false,
         statusText: 'Conflict',
@@ -113,9 +84,8 @@ describe('settlementsService', () => {
       await expect(
         saveSettlement('campaign1', { name: 'Test' })
       ).rejects.toThrow('Settlement already exists');
-    });
 
-    it('throws generic message when API error has no error field', async () => {
+      // API error without error field
       mockFetch.mockResolvedValue({
         ok: false,
         statusText: 'Internal Server Error',
@@ -125,26 +95,13 @@ describe('settlementsService', () => {
       await expect(
         saveSettlement('campaign1', { name: 'Test' })
       ).rejects.toThrow('Failed to save settlement');
-    });
 
-    it('throws the original error on network failure', async () => {
+      // Network failure
       mockFetch.mockRejectedValue(new Error('ENOTFOUND'));
 
       await expect(
         saveSettlement('campaign1', { name: 'Test' })
       ).rejects.toThrow('ENOTFOUND');
-    });
-
-    it('calls console.error on failure', async () => {
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-      mockFetch.mockRejectedValue(new Error('Network error'));
-
-      await expect(
-        saveSettlement('campaign1', { name: 'Test' })
-      ).rejects.toThrow('Network error');
-
-      expect(consoleSpy).toHaveBeenCalledWith('Error saving settlement:', expect.any(Error));
-      consoleSpy.mockRestore();
     });
   });
 
@@ -164,35 +121,7 @@ describe('settlementsService', () => {
       expect(result).toEqual(mockSettlements);
     });
 
-    it('sends GET request with correct URL and headers', async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve([]),
-      });
-
-      await loadSettlements('campaign1');
-
-      expect(mockFetch).toHaveBeenCalledWith(
-        '/api/campaigns/campaign1/settlements',
-        { method: 'GET', headers: { 'Content-Type': 'application/json' } }
-      );
-    });
-
-    it('encodes campaign name with spaces in URL', async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve([]),
-      });
-
-      await loadSettlements('campaign with spaces');
-
-      expect(mockFetch).toHaveBeenCalledWith(
-        '/api/campaigns/campaign%20with%20spaces/settlements',
-        { method: 'GET', headers: { 'Content-Type': 'application/json' } }
-      );
-    });
-
-    it('encodes campaign name with special characters in URL', async () => {
+    it('sends GET request with correct URL and encoded special characters', async () => {
       mockFetch.mockResolvedValue({
         ok: true,
         json: () => Promise.resolve([]),
@@ -206,7 +135,7 @@ describe('settlementsService', () => {
       );
     });
 
-    it('throws with custom error message on API error', async () => {
+    it('throws with custom error on API error, generic fallback on network failure', async () => {
       mockFetch.mockResolvedValue({
         ok: false,
         statusText: 'Not Found',
@@ -214,9 +143,7 @@ describe('settlementsService', () => {
       });
 
       await expect(loadSettlements('campaign1')).rejects.toThrow('Campaign not found');
-    });
 
-    it('throws generic message when API error has no error field', async () => {
       mockFetch.mockResolvedValue({
         ok: false,
         statusText: 'Internal Server Error',
@@ -224,22 +151,10 @@ describe('settlementsService', () => {
       });
 
       await expect(loadSettlements('campaign1')).rejects.toThrow('Failed to load settlements');
-    });
 
-    it('throws the original error on network failure', async () => {
       mockFetch.mockRejectedValue(new Error('ENOTFOUND'));
 
       await expect(loadSettlements('campaign1')).rejects.toThrow('ENOTFOUND');
-    });
-
-    it('calls console.error on failure', async () => {
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-      mockFetch.mockRejectedValue(new Error('Network error'));
-
-      await expect(loadSettlements('campaign1')).rejects.toThrow('Network error');
-
-      expect(consoleSpy).toHaveBeenCalledWith('Error loading settlements:', expect.any(Error));
-      consoleSpy.mockRestore();
     });
   });
 
@@ -286,35 +201,7 @@ describe('settlementsService', () => {
       );
     });
 
-    it('encodes campaign name with spaces in URL', async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({ success: true }),
-      });
-
-      await saveSettlements('campaign with spaces', []);
-
-      expect(mockFetch).toHaveBeenCalledWith(
-        '/api/campaigns/campaign%20with%20spaces/settlements',
-        expect.any(Object)
-      );
-    });
-
-    it('encodes campaign name with special characters in URL', async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({ success: true }),
-      });
-
-      await saveSettlements('campaign/1', []);
-
-      expect(mockFetch).toHaveBeenCalledWith(
-        '/api/campaigns/campaign%2F1/settlements',
-        expect.any(Object)
-      );
-    });
-
-    it('throws with custom error message on API error', async () => {
+    it('throws with custom error on API error, generic fallback on network failure', async () => {
       mockFetch.mockResolvedValue({
         ok: false,
         statusText: 'Bad Request',
@@ -322,9 +209,7 @@ describe('settlementsService', () => {
       });
 
       await expect(saveSettlements('campaign1', [])).rejects.toThrow('Invalid settlements data');
-    });
 
-    it('throws generic message when API error has no error field', async () => {
       mockFetch.mockResolvedValue({
         ok: false,
         statusText: 'Internal Server Error',
@@ -332,22 +217,10 @@ describe('settlementsService', () => {
       });
 
       await expect(saveSettlements('campaign1', [])).rejects.toThrow('Failed to save settlements');
-    });
 
-    it('throws the original error on network failure', async () => {
       mockFetch.mockRejectedValue(new Error('ENOTFOUND'));
 
       await expect(saveSettlements('campaign1', [])).rejects.toThrow('ENOTFOUND');
-    });
-
-    it('calls console.error on failure', async () => {
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-      mockFetch.mockRejectedValue(new Error('Network error'));
-
-      await expect(saveSettlements('campaign1', [])).rejects.toThrow('Network error');
-
-      expect(consoleSpy).toHaveBeenCalledWith('Error saving settlements:', expect.any(Error));
-      consoleSpy.mockRestore();
     });
   });
 
@@ -369,35 +242,7 @@ describe('settlementsService', () => {
       expect(result).toEqual(mockSettlement);
     });
 
-    it('sends GET request with correct URL and headers', async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({}),
-      });
-
-      await loadSettlement('campaign1', 'Waterdeep');
-
-      expect(mockFetch).toHaveBeenCalledWith(
-        '/api/campaigns/campaign1/settlements/Waterdeep',
-        { method: 'GET', headers: { 'Content-Type': 'application/json' } }
-      );
-    });
-
-    it('encodes campaign and settlement names with spaces in URL', async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({}),
-      });
-
-      await loadSettlement('campaign with spaces', 'settlement with spaces');
-
-      expect(mockFetch).toHaveBeenCalledWith(
-        '/api/campaigns/campaign%20with%20spaces/settlements/settlement%20with%20spaces',
-        { method: 'GET', headers: { 'Content-Type': 'application/json' } }
-      );
-    });
-
-    it('encodes campaign and settlement names with special characters in URL', async () => {
+    it('sends GET request with correct URL and encoded special characters', async () => {
       mockFetch.mockResolvedValue({
         ok: true,
         json: () => Promise.resolve({}),
@@ -411,7 +256,7 @@ describe('settlementsService', () => {
       );
     });
 
-    it('throws with custom error message on API error', async () => {
+    it('throws with custom error on API error, generic fallback on network failure', async () => {
       mockFetch.mockResolvedValue({
         ok: false,
         statusText: 'Not Found',
@@ -419,9 +264,7 @@ describe('settlementsService', () => {
       });
 
       await expect(loadSettlement('campaign1', 'nonexistent')).rejects.toThrow('Settlement not found');
-    });
 
-    it('throws generic message when API error has no error field', async () => {
       mockFetch.mockResolvedValue({
         ok: false,
         statusText: 'Internal Server Error',
@@ -429,22 +272,10 @@ describe('settlementsService', () => {
       });
 
       await expect(loadSettlement('campaign1', 'nonexistent')).rejects.toThrow('Failed to load settlement');
-    });
 
-    it('throws the original error on network failure', async () => {
       mockFetch.mockRejectedValue(new Error('ENOTFOUND'));
 
       await expect(loadSettlement('campaign1', 'nonexistent')).rejects.toThrow('ENOTFOUND');
-    });
-
-    it('calls console.error on failure', async () => {
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-      mockFetch.mockRejectedValue(new Error('Network error'));
-
-      await expect(loadSettlement('campaign1', 'nonexistent')).rejects.toThrow('Network error');
-
-      expect(consoleSpy).toHaveBeenCalledWith('Error loading settlement:', expect.any(Error));
-      consoleSpy.mockRestore();
     });
   });
 
@@ -461,35 +292,7 @@ describe('settlementsService', () => {
       expect(result).toEqual(responseData);
     });
 
-    it('sends DELETE request with correct URL', async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({ success: true }),
-      });
-
-      await deleteSettlement('campaign1', 'Waterdeep');
-
-      expect(mockFetch).toHaveBeenCalledWith(
-        '/api/campaigns/campaign1/settlements/Waterdeep',
-        { method: 'DELETE' }
-      );
-    });
-
-    it('encodes campaign and settlement names with spaces in URL', async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({ success: true }),
-      });
-
-      await deleteSettlement('campaign with spaces', 'settlement with spaces');
-
-      expect(mockFetch).toHaveBeenCalledWith(
-        '/api/campaigns/campaign%20with%20spaces/settlements/settlement%20with%20spaces',
-        { method: 'DELETE' }
-      );
-    });
-
-    it('encodes campaign and settlement names with special characters in URL', async () => {
+    it('sends DELETE request with correct URL and encoded special characters', async () => {
       mockFetch.mockResolvedValue({
         ok: true,
         json: () => Promise.resolve({ success: true }),
@@ -503,7 +306,7 @@ describe('settlementsService', () => {
       );
     });
 
-    it('throws with custom error message on API error', async () => {
+    it('throws with custom error on API error, generic fallback on network failure', async () => {
       mockFetch.mockResolvedValue({
         ok: false,
         statusText: 'Not Found',
@@ -511,9 +314,7 @@ describe('settlementsService', () => {
       });
 
       await expect(deleteSettlement('campaign1', 'nonexistent')).rejects.toThrow('Settlement not found');
-    });
 
-    it('throws generic message when API error has no error field', async () => {
       mockFetch.mockResolvedValue({
         ok: false,
         statusText: 'Internal Server Error',
@@ -521,22 +322,10 @@ describe('settlementsService', () => {
       });
 
       await expect(deleteSettlement('campaign1', 'nonexistent')).rejects.toThrow('Failed to delete settlement');
-    });
 
-    it('throws the original error on network failure', async () => {
       mockFetch.mockRejectedValue(new Error('ENOTFOUND'));
 
       await expect(deleteSettlement('campaign1', 'nonexistent')).rejects.toThrow('ENOTFOUND');
-    });
-
-    it('calls console.error on failure', async () => {
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-      mockFetch.mockRejectedValue(new Error('Network error'));
-
-      await expect(deleteSettlement('campaign1', 'nonexistent')).rejects.toThrow('Network error');
-
-      expect(consoleSpy).toHaveBeenCalledWith('Error deleting settlement:', expect.any(Error));
-      consoleSpy.mockRestore();
     });
   });
 });

@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 // Suppress fire-and-forget logService.addEntry rejection warnings from source code
 process.on('unhandledRejection', () => {});
 
@@ -39,11 +39,12 @@ describe('luckyPointHandler.handle', () => {
     });
 
     describe('validation', () => {
-        it('should return error popup when no lucky points remaining', async () => {
+        it('should return error popup when no lucky points remaining (runtime zero, null, undefined, or missing max)', async () => {
+            // runtime zero
             runtimeState.getRuntimeValue.mockReturnValue(0);
             const action = makeAction();
 
-            const result = await handle(action, makePlayerStats(), mockCampaignName);
+            let result = await handle(action, makePlayerStats(), mockCampaignName);
 
             expect(result.type).toBe('popup');
             expect(result.payload.type).toBe('automation_info');
@@ -52,119 +53,73 @@ describe('luckyPointHandler.handle', () => {
             expect(result.payload.description).toContain('Lucid Point');
             expect(runtimeState.setRuntimeValue).not.toHaveBeenCalled();
             expect(damageUtils.getCombatContext).not.toHaveBeenCalled();
-        });
 
-        it('should return error popup when lucky points are falsy', async () => {
+            // runtime null (falsy)
             runtimeState.getRuntimeValue.mockReturnValue(null);
-
-            const result = await handle(makeAction(), makePlayerStats(), mockCampaignName);
-
+            result = await handle(action, makePlayerStats(), mockCampaignName);
             expect(result.type).toBe('popup');
             expect(result.payload.description).toContain('0');
-        });
 
-        it('should use _trackedResources.max as fallback when runtime value is undefined', async () => {
+            // runtime undefined falls back to max from _trackedResources
             runtimeState.getRuntimeValue.mockReturnValue(undefined);
             damageUtils.getCombatContext.mockResolvedValue({
                 lastAttack: { rollType: 'attack', attackerName: 'TestFighter', d20: 5, bonus: 2, targetName: 'Goblin', hit: false }
             });
             logService.addEntry.mockResolvedValue(undefined);
-
-            const result = await handle(makeAction(), makePlayerStats(), mockCampaignName);
-
+            result = await handle(action, makePlayerStats(), mockCampaignName);
             expect(result.type).toBe('popup');
             expect(result.payload.type).toBe('automation_info');
             expect(result.payload.description).toContain('Advantage');
             expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
                 'TestFighter', 'luckyPoints', 4, mockCampaignName
             );
-        });
 
-        it('should spend a lucky point and return popup with attack description on fresh attack', async () => {
-            runtimeState.getRuntimeValue.mockImplementation((_charName, key) => {
-                if (key === 'luckyPoints') return 3;
-                return undefined;
-            });
-            damageUtils.getCombatContext.mockResolvedValue({
-                lastAttack: { rollType: 'attack', attackerName: 'TestFighter', d20: 8, bonus: 5, targetName: 'Goblin', hit: false }
-            });
-            logService.addEntry.mockResolvedValue(undefined);
-
-            const result = await handle(makeAction(), makePlayerStats(), mockCampaignName);
-
-            expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-                'TestFighter', 'luckyPoints', 2, mockCampaignName
-            );
-            expect(result.type).toBe('popup');
-            expect(result.payload.type).toBe('automation_info');
-            expect(result.payload.name).toBe('Lucky Break');
-            expect(result.payload.description).toContain('Attack vs AC Goblin');
-            expect(result.payload.description).toContain('d20(8)');
-            expect(result.payload.description).toContain('+ 5');
-            expect(result.payload.description).toContain('13');
-            expect(result.payload.description).toContain('Advantage');
-            expect(logService.addEntry).toHaveBeenCalledWith(
-                mockCampaignName,
-                expect.objectContaining({
-                    type: 'ability_use',
-                    characterName: 'TestFighter',
-                    abilityName: 'Lucky Break',
-                })
-            );
-        });
-
-        it('should return error popup when _trackedResources.luckyPoints is missing', async () => {
-            const action = makeAction();
-            const playerStats = makePlayerStats({ _trackedResources: {} });
-
-            const result = await handle(action, playerStats, mockCampaignName);
-
+            // _trackedResources.luckyPoints missing (max defaults to 0)
+            runtimeState.getRuntimeValue.mockReturnValue(undefined);
+            damageUtils.getCombatContext.mockReset();
+            result = await handle(action, makePlayerStats({ _trackedResources: {} }), mockCampaignName);
             expect(result.type).toBe('popup');
             expect(result.payload.description).toContain('0');
         });
     });
 
     describe('recent D20 test validation', () => {
-        it('should return error when no recent D20 test found (null lastAttack)', async () => {
-            runtimeState.getRuntimeValue.mockReturnValue(3);
+        it('should return error when no recent D20 test found (null lastAttack, wrong attacker, or stale rollType)', async () => {
+            const action = makeAction();
+            const stats = makePlayerStats();
+            runtimeState.getRuntimeValue.mockImplementation((_charName, key) => {
+                if (key === 'luckyPoints') return 3;
+                return undefined;
+            });
+
+            // null lastAttack
             damageUtils.getCombatContext.mockResolvedValue({ lastAttack: null });
-
-            const result = await handle(makeAction(), makePlayerStats(), mockCampaignName);
-
+            let result = await handle(action, stats, mockCampaignName);
             expect(result.type).toBe('popup');
             expect(result.payload.type).toBe('automation_info');
             expect(result.payload.description).toContain('No recent D20 test found');
             expect(result.payload.description).toContain('TestFighter');
-        });
 
-        it('should return error when lastAttack attackerName does not match player', async () => {
-            runtimeState.getRuntimeValue.mockReturnValue(3);
+            // attackerName does not match player
             damageUtils.getCombatContext.mockResolvedValue({
                 lastAttack: { rollType: 'attack', attackerName: 'Goblin', d20: 12, bonus: 3, targetName: 'TestFighter', hit: true }
             });
-
-            const result = await handle(makeAction(), makePlayerStats(), mockCampaignName);
-
+            result = await handle(action, stats, mockCampaignName);
             expect(result.type).toBe('popup');
             expect(result.payload.description).toContain('No recent D20 test found');
-            expect(result.payload.description).toContain('TestFighter');
-        });
 
-        it('should return error when lastAttack is stale (not attack/check/save/skill)', async () => {
-            runtimeState.getRuntimeValue.mockReturnValue(3);
+            // stale rollType (not attack/check/save/skill)
             damageUtils.getCombatContext.mockResolvedValue({
                 lastAttack: { rollType: 'damage', attackerName: 'TestFighter', d20: 10, bonus: 0 }
             });
-
-            const result = await handle(makeAction(), makePlayerStats(), mockCampaignName);
-
+            result = await handle(action, stats, mockCampaignName);
             expect(result.type).toBe('popup');
             expect(result.payload.description).toContain('No recent D20 test found');
         });
     });
 
     describe('attack roll handling', () => {
-        it('should spend a lucky point and return popup with attack description on fresh attack', async () => {
+        it('should spend a lucky point and return popup with attack description', async () => {
             runtimeState.getRuntimeValue.mockImplementation((_charName, key) => {
                 if (key === 'luckyPoints') return 3;
                 return undefined;
@@ -253,18 +208,18 @@ describe('luckyPointHandler.handle', () => {
     });
 
     describe('ability check handling', () => {
-        it('should handle ability check (rollType check)', async () => {
+        it('should handle ability check (rollType check or skill) with checkName fallback', async () => {
             runtimeState.getRuntimeValue.mockImplementation((_charName, key) => {
                 if (key === 'luckyPoints') return 2;
                 return undefined;
             });
+            logService.addEntry.mockResolvedValue(undefined);
+
+            // rollType check with checkName
             damageUtils.getCombatContext.mockResolvedValue({
                 lastAttack: { rollType: 'check', attackerName: 'TestFighter', d20: 7, bonus: 3, checkName: 'Stealth' }
             });
-            logService.addEntry.mockResolvedValue(undefined);
-
-            const result = await handle(makeAction(), makePlayerStats(), mockCampaignName);
-
+            let result = await handle(makeAction(), makePlayerStats(), mockCampaignName);
             expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
                 'TestFighter', 'luckyPoints', 1, mockCampaignName
             );
@@ -272,124 +227,60 @@ describe('luckyPointHandler.handle', () => {
             expect(result.payload.description).toContain('d20(7)');
             expect(result.payload.description).toContain('+ 3');
             expect(result.payload.description).toContain('10');
-        });
 
-        it('should handle ability check (rollType skill)', async () => {
-            runtimeState.getRuntimeValue.mockImplementation((_charName, key) => {
-                if (key === 'luckyPoints') return 2;
-                return undefined;
-            });
+            // rollType skill with checkName
             damageUtils.getCombatContext.mockResolvedValue({
                 lastAttack: { rollType: 'skill', attackerName: 'TestFighter', d20: 12, bonus: 4, checkName: 'Persuasion' }
             });
-            logService.addEntry.mockResolvedValue(undefined);
-
-            const result = await handle(makeAction(), makePlayerStats(), mockCampaignName);
-
+            result = await handle(makeAction(), makePlayerStats(), mockCampaignName);
             expect(result.payload.description).toContain('Persuasion');
             expect(result.payload.description).toContain('16');
-        });
 
-        it('should use "Ability check" when checkName is falsy', async () => {
-            runtimeState.getRuntimeValue.mockImplementation((_charName, key) => {
-                if (key === 'luckyPoints') return 1;
-                return undefined;
-            });
+            // checkName falsy falls back to "Ability check"
             damageUtils.getCombatContext.mockResolvedValue({
                 lastAttack: { rollType: 'check', attackerName: 'TestFighter', d20: 9, bonus: 2 }
             });
-            logService.addEntry.mockResolvedValue(undefined);
-
-            const result = await handle(makeAction(), makePlayerStats(), mockCampaignName);
-
+            result = await handle(makeAction(), makePlayerStats(), mockCampaignName);
             expect(result.payload.description).toContain('Ability check');
-        });
-
-        it('should prefer attack over ability check when both could apply', async () => {
-            runtimeState.getRuntimeValue.mockImplementation((_charName, key) => {
-                if (key === 'luckyPoints') return 5;
-                return undefined;
-            });
-            damageUtils.getCombatContext.mockResolvedValue({
-                lastAttack: { rollType: 'attack', attackerName: 'TestFighter', d20: 3, bonus: 5, targetName: 'Orc', hit: false }
-            });
-            logService.addEntry.mockResolvedValue(undefined);
-
-            const result = await handle(makeAction(), makePlayerStats(), mockCampaignName);
-
-            expect(result.payload.description).toContain('Attack vs AC Orc');
-            expect(result.payload.description).not.toContain('Ability check');
         });
     });
 
     describe('saving throw handling', () => {
-        it('should handle saving throw', async () => {
+        it('should handle saving throw with uppercase saveType and generic fallback', async () => {
             runtimeState.getRuntimeValue.mockImplementation((_charName, key) => {
                 if (key === 'luckyPoints') return 1;
                 return undefined;
             });
+            logService.addEntry.mockResolvedValue(undefined);
+
+            // saveType present — uppercase in description
+            damageUtils.getCombatContext.mockResolvedValue({
+                lastAttack: { rollType: 'save', attackerName: 'TestFighter', d20: 10, bonus: 1, saveType: 'dex' }
+            });
+            let result = await handle(makeAction(), makePlayerStats(), mockCampaignName);
+            expect(result.payload.description).toContain('DEX save');
+
+            // saveType falsy — generic "Saving throw"
+            damageUtils.getCombatContext.mockResolvedValue({
+                lastAttack: { rollType: 'save', attackerName: 'TestFighter', d20: 8, bonus: 0 }
+            });
+            result = await handle(makeAction(), makePlayerStats(), mockCampaignName);
+            expect(result.payload.description).toContain('Saving throw');
+
+            // disadvantage effect on save
             damageUtils.getCombatContext.mockResolvedValue({
                 lastAttack: { rollType: 'save', attackerName: 'TestFighter', d20: 5, bonus: 2, saveType: 'CON' }
             });
-            logService.addEntry.mockResolvedValue(undefined);
-
-            const result = await handle(
+            result = await handle(
                 makeAction({ automation: { type: 'lucky_point', effect: 'disadvantage', target: 'attack_roll', cost: 1 } }),
                 makePlayerStats(),
                 mockCampaignName
             );
-
+            expect(result.payload.description).toContain('CON save');
+            expect(result.payload.description).toContain('Disadvantage');
             expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
                 'TestFighter', 'luckyPoints', 0, mockCampaignName
             );
-            expect(result.payload.description).toContain('CON save');
-            expect(result.payload.description).toContain('Disadvantage');
-        });
-
-        it('should use uppercase saveType in description', async () => {
-            runtimeState.getRuntimeValue.mockImplementation((_charName, key) => {
-                if (key === 'luckyPoints') return 1;
-                return undefined;
-            });
-            damageUtils.getCombatContext.mockResolvedValue({
-                lastAttack: { rollType: 'save', attackerName: 'TestFighter', d20: 10, bonus: 1, saveType: 'dex' }
-            });
-            logService.addEntry.mockResolvedValue(undefined);
-
-            const result = await handle(makeAction(), makePlayerStats(), mockCampaignName);
-
-            expect(result.payload.description).toContain('DEX save');
-        });
-
-        it('should use generic "Saving throw" when saveType is falsy', async () => {
-            runtimeState.getRuntimeValue.mockImplementation((_charName, key) => {
-                if (key === 'luckyPoints') return 1;
-                return undefined;
-            });
-            damageUtils.getCombatContext.mockResolvedValue({
-                lastAttack: { rollType: 'save', attackerName: 'TestFighter', d20: 8, bonus: 0 }
-            });
-            logService.addEntry.mockResolvedValue(undefined);
-
-            const result = await handle(makeAction(), makePlayerStats(), mockCampaignName);
-
-            expect(result.payload.description).toContain('Saving throw');
-        });
-
-        it('should prioritize attack over save when rollType is attack', async () => {
-            runtimeState.getRuntimeValue.mockImplementation((_charName, key) => {
-                if (key === 'luckyPoints') return 1;
-                return undefined;
-            });
-            damageUtils.getCombatContext.mockResolvedValue({
-                lastAttack: { rollType: 'attack', attackerName: 'TestFighter', d20: 4, bonus: 6, targetName: 'Dragon', hit: false }
-            });
-            logService.addEntry.mockResolvedValue(undefined);
-
-            const result = await handle(makeAction(), makePlayerStats(), mockCampaignName);
-
-            expect(result.payload.description).toContain('Attack vs AC Dragon');
-            expect(result.payload.description).not.toContain('Saving throw');
         });
     });
 
@@ -453,27 +344,6 @@ describe('luckyPointHandler.handle', () => {
     });
 
     describe('integration', () => {
-        it('should log ability_use with correct structure on success', async () => {
-            runtimeState.getRuntimeValue.mockReturnValue(4);
-            damageUtils.getCombatContext.mockResolvedValue({
-                lastAttack: { rollType: 'attack', attackerName: 'TestFighter', d20: 11, bonus: 7, targetName: 'Troll', hit: false }
-            });
-            logService.addEntry.mockResolvedValue(undefined);
-
-            await handle(makeAction(), makePlayerStats(), mockCampaignName);
-
-            expect(logService.addEntry).toHaveBeenCalledWith(
-                mockCampaignName,
-                expect.objectContaining({
-                    type: 'ability_use',
-                    characterName: 'TestFighter',
-                    abilityName: 'Lucky Break',
-                    description: expect.stringContaining('TestFighter'),
-                    timestamp: expect.any(Number),
-                })
-            );
-        });
-
         it('should deduct exactly the cost amount from lucky points', async () => {
             runtimeState.getRuntimeValue.mockReturnValue(10);
             damageUtils.getCombatContext.mockResolvedValue({

@@ -1,12 +1,8 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { describe, it, expect } from 'vitest';
 import {
   generateWeather,
 } from './weatherService.js';
-
-const KNOWN_CONDITIONS = [
-  'clear', 'cloudy', 'rain', 'storm', 'fog', 'wind', 'snow', 'mist', 'extreme',
-];
 
 describe('weatherService', () => {
   describe('generateWeather', () => {
@@ -65,18 +61,6 @@ describe('weatherService', () => {
       }
       const expected = new Set(['clear', 'cloudy', 'rain', 'fog', 'storm']);
       expect(seen).toEqual(expected);
-    });
-  });
-
-  describe('known conditions completeness', () => {
-    it('every known condition produces a valid weather object from generateWeather', () => {
-      KNOWN_CONDITIONS.forEach(() => {
-        const weather = generateWeather('plains');
-        expect(weather.condition).toBeDefined();
-        expect(weather.label).toBeDefined();
-        expect(weather.icon).toBeDefined();
-        expect(weather.description).toBeDefined();
-      });
     });
   });
 });

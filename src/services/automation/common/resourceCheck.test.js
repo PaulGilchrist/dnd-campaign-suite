@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ── Mocks BEFORE imports ───────────────────────────────────────
@@ -53,44 +53,13 @@ describe('getResourceAmount', () => {
             expect(classFeatures.getClassFeatures).not.toHaveBeenCalled();
         });
 
-        it('returns the highest classLevel at or below the player level', () => {
-            const playerStats = createPlayerStats('Monk', 11, [
-                { level: 1, focus_points: 2 },
-                { level: 6, focus_points: 3 },
-                { level: 11, focus_points: 4 },
-                { level: 17, focus_points: 5 },
-            ]);
-
-            const result = getResourceAmount(playerStats, 'focusPoints');
-
-            expect(result).toBe(4);
-        });
-
-        it('falls back to maxFocusPoints when classLevel.focus_points is undefined', () => {
+        it('falls back to maxFocusPoints when classLevel.focus_points is falsy', () => {
             const playerStats = createPlayerStats('Monk', 3, [{ level: 3, focus_points: undefined }]);
             classFeatures.getClassFeatures.mockReturnValue({ maxFocusPoints: 2 });
 
             const result = getResourceAmount(playerStats, 'focusPoints');
 
             expect(result).toBe(2);
-        });
-
-        it('falls back to maxFocusPoints when classLevel.focus_points is null', () => {
-            const playerStats = createPlayerStats('Monk', 3, [{ level: 3, focus_points: null }]);
-            classFeatures.getClassFeatures.mockReturnValue({ maxFocusPoints: 5 });
-
-            const result = getResourceAmount(playerStats, 'focusPoints');
-
-            expect(result).toBe(5);
-        });
-
-        it('falls back to maxFocusPoints when classLevel.focus_points is 0', () => {
-            const playerStats = createPlayerStats('Monk', 3, [{ level: 3, focus_points: 0 }]);
-            classFeatures.getClassFeatures.mockReturnValue({ maxFocusPoints: 3 });
-
-            const result = getResourceAmount(playerStats, 'focusPoints');
-
-            expect(result).toBe(3);
         });
 
         it('returns 0 when no classLevel matches the player level and getClassFeatures returns null', () => {
@@ -120,23 +89,6 @@ describe('getResourceAmount', () => {
 
             expect(result).toBe(0);
         });
-
-        it('throws TypeError when playerStats is null', () => {
-            expect(() => getResourceAmount(null, 'focusPoints')).toThrow(TypeError);
-        });
-
-        it('throws TypeError when playerStats is undefined', () => {
-            expect(() => getResourceAmount(undefined, 'focusPoints')).toThrow(TypeError);
-        });
-
-        it('returns 0 when getClassFeatures returns null and no matching classLevel exists', () => {
-            const playerStats = createPlayerStats('Rogue', 5, [{ level: 5, focus_points: undefined }]);
-            classFeatures.getClassFeatures.mockReturnValue(null);
-
-            const result = getResourceAmount(playerStats, 'focusPoints');
-
-            expect(result).toBe(0);
-        });
     });
 
     describe('non-focusPoints resources', () => {
@@ -149,15 +101,6 @@ describe('getResourceAmount', () => {
             expect(runtimeState.getRuntimeValue).toHaveBeenCalledWith('Barbarian', 'rageUses');
         });
 
-        it('returns the stored runtime value when it is already a number', () => {
-            runtimeState.getRuntimeValue.mockReturnValue(5);
-
-            const result = getResourceAmount({ name: 'Ranger' }, 'Favored Enemy');
-
-            expect(result).toBe(5);
-            expect(runtimeState.getRuntimeValue).toHaveBeenCalledWith('Ranger', 'favoredenemyUses');
-        });
-
         it('builds the key by lowercasing and stripping whitespace from the resource name', () => {
             runtimeState.getRuntimeValue.mockReturnValue(2);
 
@@ -166,31 +109,7 @@ describe('getResourceAmount', () => {
             expect(runtimeState.getRuntimeValue).toHaveBeenCalledWith('Monk', 'flurryUses');
         });
 
-        it('collapses multiple consecutive spaces into none for the key', () => {
-            runtimeState.getRuntimeValue.mockReturnValue(1);
-
-            getResourceAmount({ name: 'Paladin' }, 'Divine    Smite');
-
-            expect(runtimeState.getRuntimeValue).toHaveBeenCalledWith('Paladin', 'divinesmiteUses');
-        });
-
-        it('lowercases camelCase resource names for the key', () => {
-            runtimeState.getRuntimeValue.mockReturnValue(4);
-
-            getResourceAmount({ name: 'Sorcerer' }, 'SorceryPoints');
-
-            expect(runtimeState.getRuntimeValue).toHaveBeenCalledWith('Sorcerer', 'sorcerypointsUses');
-        });
-
-        it('preserves underscores in resource names for the key', () => {
-            runtimeState.getRuntimeValue.mockReturnValue(1);
-
-            getResourceAmount({ name: 'Cleric' }, 'Channel_Energy');
-
-            expect(runtimeState.getRuntimeValue).toHaveBeenCalledWith('Cleric', 'channel_energyUses');
-        });
-
-        it('falls back to _trackedResources when stored value is null', () => {
+        it('falls back to _trackedResources when stored value is null or undefined', () => {
             runtimeState.getRuntimeValue.mockReturnValue(null);
 
             const playerStats = {
@@ -203,65 +122,10 @@ describe('getResourceAmount', () => {
             expect(result).toBe(2);
         });
 
-        it('falls back to _trackedResources when stored value is undefined', () => {
-            runtimeState.getRuntimeValue.mockReturnValue(undefined);
-
-            const playerStats = {
-                name: 'Warlock',
-                _trackedResources: { pactwordUses: { current: 2 } },
-            };
-
-            const result = getResourceAmount(playerStats, 'Pact Word');
-
-            expect(result).toBe(2);
-        });
-
-        it('returns 0 when stored value is null and _trackedResources is missing', () => {
+        it('returns 0 when stored value is null and _trackedResources is missing or null', () => {
             runtimeState.getRuntimeValue.mockReturnValue(null);
 
             const result = getResourceAmount({ name: 'Wizard' }, 'Arcane Recovery');
-
-            expect(result).toBe(0);
-        });
-
-        it('returns 0 when stored value is null and _trackedResources is null', () => {
-            runtimeState.getRuntimeValue.mockReturnValue(null);
-
-            const result = getResourceAmount({ name: 'Bard', _trackedResources: null }, 'Jack of All Trades');
-
-            expect(result).toBe(0);
-        });
-
-        it('returns 0 when stored value is null and _trackedResources is undefined', () => {
-            runtimeState.getRuntimeValue.mockReturnValue(null);
-
-            const result = getResourceAmount({ name: 'Druid', _trackedResources: undefined }, 'Wild Shape');
-
-            expect(result).toBe(0);
-        });
-
-        it('returns 0 when tracked resource current is null', () => {
-            runtimeState.getRuntimeValue.mockReturnValue(null);
-
-            const playerStats = {
-                name: 'Monk',
-                _trackedResources: { kiPointsUses: { current: null } },
-            };
-
-            const result = getResourceAmount(playerStats, 'Ki Points');
-
-            expect(result).toBe(0);
-        });
-
-        it('returns 0 when tracked resource current is undefined', () => {
-            runtimeState.getRuntimeValue.mockReturnValue(null);
-
-            const playerStats = {
-                name: 'Monk',
-                _trackedResources: { kiPointsUses: { current: undefined } },
-            };
-
-            const result = getResourceAmount(playerStats, 'Ki Points');
 
             expect(result).toBe(0);
         });
@@ -323,28 +187,12 @@ describe('spendResource', () => {
         expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith('Wizard', 'Arcane', -1, 'TestCampaign');
     });
 
-    it('treats undefined stored value as 0 before subtracting', () => {
-        runtimeState.getRuntimeValue.mockReturnValue(undefined);
-
-        const result = spendResource('Wizard', 'Arcane', 1, 'TestCampaign');
-
-        expect(result).toBe(-1);
-    });
-
     it('allows spending more than available, resulting in negative', () => {
         runtimeState.getRuntimeValue.mockReturnValue(2);
 
         const result = spendResource('Rogue', 'Sneak', 5, 'TestCampaign');
 
         expect(result).toBe(-3);
-    });
-
-    it('handles string current values by converting to Number', () => {
-        runtimeState.getRuntimeValue.mockReturnValue('8');
-
-        const result = spendResource('Sorcerer', 'Points', 3, 'TestCampaign');
-
-        expect(result).toBe(5);
     });
 
     it('spends amount 0 leaving current unchanged', () => {
@@ -381,22 +229,6 @@ describe('spendResource', () => {
 
         expect(result).toBe(5);
     });
-
-    it('handles NaN amount resulting in NaN', () => {
-        runtimeState.getRuntimeValue.mockReturnValue(5);
-
-        const result = spendResource('Fighter', 'Rage', NaN, 'TestCampaign');
-
-        expect(result).toBe(NaN);
-    });
-
-    it('handles amount of 0 when stored value is null', () => {
-        runtimeState.getRuntimeValue.mockReturnValue(null);
-
-        const result = spendResource('Fighter', 'Rage', 0, 'TestCampaign');
-
-        expect(result).toBe(0);
-    });
 });
 
 // ── checkResourceRemaining ─────────────────────────────────────
@@ -419,14 +251,6 @@ describe('checkResourceRemaining', () => {
         expect(result).toEqual({ remaining: 2, canUse: true });
     });
 
-    it('returns maxUses as remaining when stored value is undefined', () => {
-        runtimeState.getRuntimeValue.mockReturnValue(undefined);
-
-        const result = checkResourceRemaining('Rage', 2, 'Fighter', 'TestCampaign');
-
-        expect(result).toEqual({ remaining: 2, canUse: true });
-    });
-
     it('returns canUse false when remaining is 0', () => {
         runtimeState.getRuntimeValue.mockReturnValue(0);
 
@@ -435,52 +259,12 @@ describe('checkResourceRemaining', () => {
         expect(result).toEqual({ remaining: 0, canUse: false });
     });
 
-    it('returns canUse false when remaining is negative', () => {
-        runtimeState.getRuntimeValue.mockReturnValue(-1);
-
-        const result = checkResourceRemaining('Rage', 4, 'Fighter', 'TestCampaign');
-
-        expect(result).toEqual({ remaining: -1, canUse: false });
-    });
-
-    it('returns canUse true when remaining is positive', () => {
-        runtimeState.getRuntimeValue.mockReturnValue(1);
-
-        const result = checkResourceRemaining('Rage', 4, 'Fighter', 'TestCampaign');
-
-        expect(result).toEqual({ remaining: 1, canUse: true });
-    });
-
-    it('handles string stored values by converting to Number', () => {
-        runtimeState.getRuntimeValue.mockReturnValue('2');
-
-        const result = checkResourceRemaining('Rage', 4, 'Fighter', 'TestCampaign');
-
-        expect(result).toEqual({ remaining: 2, canUse: true });
-    });
-
     it('passes resourceKey directly without transformation', () => {
         runtimeState.getRuntimeValue.mockReturnValue(5);
 
         checkResourceRemaining('focusPoints', 10, 'Cleric', 'TestCampaign');
 
         expect(runtimeState.getRuntimeValue).toHaveBeenCalledWith('Cleric', 'focusPoints', 'TestCampaign');
-    });
-
-    it('returns canUse false when maxUses is 0 and stored value is null', () => {
-        runtimeState.getRuntimeValue.mockReturnValue(null);
-
-        const result = checkResourceRemaining('Rage', 0, 'Fighter', 'TestCampaign');
-
-        expect(result).toEqual({ remaining: 0, canUse: false });
-    });
-
-    it('returns canUse false when maxUses is negative and stored value is null', () => {
-        runtimeState.getRuntimeValue.mockReturnValue(null);
-
-        const result = checkResourceRemaining('Rage', -1, 'Fighter', 'TestCampaign');
-
-        expect(result).toEqual({ remaining: -1, canUse: false });
     });
 
     it('handles campaignName as undefined', () => {

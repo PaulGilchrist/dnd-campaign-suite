@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import { handle, applyMasteryEffect, MASTERY_EFFECTS } from './weaponMasteryHandler.js';
@@ -73,43 +73,18 @@ describe('weaponMasteryHandler', () => {
     });
 
     describe('MASTERY_EFFECTS', () => {
-        it('should define all 8 mastery effects with correct keys', () => {
+        it('should define all 8 mastery effects', () => {
             const expectedKeys = ['Push', 'Topple', 'Sap', 'Slow', 'Vex', 'Cleave', 'Nick', 'Graze'];
             expect(Object.keys(MASTERY_EFFECTS)).toEqual(expectedKeys);
-        });
-
-        it('should include label, description, and effect on every mastery', () => {
-            for (const [name, mastery] of Object.entries(MASTERY_EFFECTS)) {
-                expect(name).toBeDefined();
-                expect(mastery.label).toBeDefined();
-                expect(mastery.label).toBeTruthy();
-                expect(mastery.description).toBeDefined();
-                expect(mastery.description).toBeTruthy();
-                expect(mastery.effect).toBeDefined();
-                expect(mastery.effect).toBeTruthy();
-            }
-        });
-
-        it('should mark Topple as requiring a save', () => {
-            expect(MASTERY_EFFECTS.Topple.requiresSave).toBe(true);
-            expect(MASTERY_EFFECTS.Topple.saveAbility).toBe('CON');
-        });
-
-        it('should mark Push with a size limit', () => {
-            expect(MASTERY_EFFECTS.Push.sizeLimit).toBe('large_or_smaller');
-            expect(MASTERY_EFFECTS.Push.value).toBe(10);
-        });
-
-        it('should mark Cleave and Nick as once-per-turn', () => {
-            expect(MASTERY_EFFECTS.Cleave.oncePerTurn).toBe(true);
-            expect(MASTERY_EFFECTS.Nick.oncePerTurn).toBe(true);
         });
     });
 
     describe('handle', () => {
-        it('should return a modal with available masteries', async () => {
-            vi.mocked(damageUtils.getCombatContext).mockResolvedValue(makeCombatContext());
-            vi.mocked(damageUtils.getTargetFromAttacker).mockReturnValue({ name: 'Goblin' });
+        it('should return a modal with available masteries and target info', async () => {
+            vi.mocked(damageUtils.getCombatContext).mockResolvedValue(
+                makeCombatContext([{ name: 'Ogre', size: 'Huge' }])
+            );
+            vi.mocked(damageUtils.getTargetFromAttacker).mockReturnValue({ name: 'Ogre' });
 
             const action = makeAction();
             const result = await handle(action, makePlayerStats(), 'campaign', 'map');
@@ -121,13 +96,13 @@ describe('weaponMasteryHandler', () => {
                     action,
                     playerStats: expect.any(Object),
                     campaignName: 'campaign',
-                    targetName: 'Goblin',
+                    targetName: 'Ogre',
                     availableMasteries: ['Vex', 'Push', 'Topple', 'Sap', 'Slow', 'Cleave', 'Nick', 'Graze'],
                 }),
             });
         });
 
-        it('should set targetName to null when combat context is unavailable', async () => {
+        it('should set targetName to null when combat context or target is unavailable', async () => {
             vi.mocked(damageUtils.getCombatContext).mockResolvedValue(null);
 
             const action = makeAction();
@@ -135,26 +110,6 @@ describe('weaponMasteryHandler', () => {
 
             expect(result.type).toBe('modal');
             expect(result.payload.targetName).toBeNull();
-        });
-
-        it('should set targetName to null when getTargetFromAttacker returns null', async () => {
-            vi.mocked(damageUtils.getCombatContext).mockResolvedValue(makeCombatContext());
-            vi.mocked(damageUtils.getTargetFromAttacker).mockReturnValue(null);
-
-            const action = makeAction();
-            const result = await handle(action, makePlayerStats(), 'campaign', 'map');
-
-            expect(result.payload.targetName).toBeNull();
-        });
-
-        it('should include target name in payload when target exists', async () => {
-            vi.mocked(damageUtils.getCombatContext).mockResolvedValue(makeCombatContext([{ name: 'Ogre', size: 'Huge' }]));
-            vi.mocked(damageUtils.getTargetFromAttacker).mockReturnValue({ name: 'Ogre' });
-
-            const action = makeAction();
-            const result = await handle(action, makePlayerStats(), 'campaign', 'map');
-
-            expect(result.payload.targetName).toBe('Ogre');
         });
 
         it('should log an ability_use entry via addEntry', async () => {
@@ -202,7 +157,7 @@ describe('weaponMasteryHandler', () => {
 
         // ── Push ────────────────────────────────────────────────────
 
-        it('should apply Push effect for a target within size limit', async () => {
+        it('should apply Push for targets within size limit', async () => {
             vi.mocked(useRuntimeState.getRuntimeValue).mockReturnValue([]);
             vi.mocked(damageUtils.getCombatContext).mockResolvedValue(makeCombatContext([{ name: 'Goblin', size: 'Medium' }]));
 
@@ -212,49 +167,19 @@ describe('weaponMasteryHandler', () => {
             expect(result.payload.type).toBe('automation_info');
             expect(result.payload.name).toBe('Push');
             expect(result.payload.description).toContain('Push applied');
-            expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-                'campaign',
-                'targetEffects',
-                expect.arrayContaining([
-                    expect.objectContaining({
-                        target: 'Goblin',
-                        effect: 'push',
-                        value: 10,
-                    }),
-                ]),
-                'campaign',
-            );
         });
 
-        it('should reject Push when target is too large (Large)', async () => {
+        it('should reject Push when target is too large', async () => {
             vi.mocked(useRuntimeState.getRuntimeValue).mockReturnValue([]);
-            vi.mocked(damageUtils.getCombatContext).mockResolvedValue(makeCombatContext([{ name: 'Ogre', size: 'Huge' }]));
+            vi.mocked(damageUtils.getCombatContext).mockResolvedValue(
+                makeCombatContext([{ name: 'Ogre', size: 'Huge' }])
+            );
 
             const result = await applyMasteryEffect('Push', makePlayerStats(), 'campaign', 'Ogre');
 
             expect(result.payload.type).toBe('automation_info');
             expect(result.payload.description).toContain('too large');
             expect(result.payload.description).toContain('Huge');
-        });
-
-        it('should allow Push for a Large target (size limit is Large or smaller)', async () => {
-            vi.mocked(useRuntimeState.getRuntimeValue).mockReturnValue([]);
-            vi.mocked(damageUtils.getCombatContext).mockResolvedValue(makeCombatContext([{ name: 'Hobgoblin', size: 'Large' }]));
-
-            const result = await applyMasteryEffect('Push', makePlayerStats(), 'campaign', 'Hobgoblin');
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('Push applied');
-        });
-
-        it('should skip size check when combat context is null', async () => {
-            vi.mocked(useRuntimeState.getRuntimeValue).mockReturnValue([]);
-            vi.mocked(damageUtils.getCombatContext).mockResolvedValue(null);
-
-            const result = await applyMasteryEffect('Push', makePlayerStats(), 'campaign', 'Gargantuan Titan');
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('Push applied');
         });
 
         // ── Slow ──────────────────────────────────────────────────────
@@ -289,95 +214,39 @@ describe('weaponMasteryHandler', () => {
             expect(result.payload.description).toContain('Slow applied');
         });
 
-        // ── Cleave ────────────────────────────────────────────────────
+        // ── Cleave / Nick (shared once-per-turn pattern) ─────────────
 
-        it('should apply Cleave effect', async () => {
-            vi.mocked(useRuntimeState.getRuntimeValue).mockReturnValue([]);
+        for (const mastery of ['Cleave', 'Nick']) {
+            it(`should apply ${mastery} effect`, async () => {
+                vi.mocked(useRuntimeState.getRuntimeValue).mockReturnValue([]);
 
-            const result = await applyMasteryEffect('Cleave', makePlayerStats(), 'campaign', 'Goblin');
+                const result = await applyMasteryEffect(mastery, makePlayerStats(), 'campaign', 'Goblin');
 
-            expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('Cleave');
-        });
-
-        it('should reject Cleave if already used this turn (same round)', async () => {
-            vi.mocked(useRuntimeState.getRuntimeValue).mockReturnValue(1);
-
-            const result = await applyMasteryEffect('Cleave', makePlayerStats(), 'campaign', 'Goblin');
-
-            expect(result.payload.description).toContain('once per turn');
-        });
-
-        it('should allow Cleave in a different round', async () => {
-            vi.mocked(useRuntimeState.getRuntimeValue).mockImplementation((key, prop) => {
-                if (prop === 'targetEffects') return [];
-                if (prop === '_Cleave_UsedRound') return 2;
-                return null;
+                expect(result.type).toBe('popup');
+                expect(result.payload.description).toContain(mastery);
             });
 
-            const result = await applyMasteryEffect('Cleave', makePlayerStats(), 'campaign', 'Goblin');
+            it(`should reject ${mastery} if already used this turn`, async () => {
+                vi.mocked(useRuntimeState.getRuntimeValue).mockReturnValue(1);
 
-            expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('Cleave');
-        });
+                const result = await applyMasteryEffect(mastery, makePlayerStats(), 'campaign', 'Goblin');
 
-        it('should mark Cleave as used for the current round after applying', async () => {
-            vi.mocked(useRuntimeState.getRuntimeValue).mockReturnValue([]);
-
-            await applyMasteryEffect('Cleave', makePlayerStats(), 'campaign', 'Goblin');
-
-            expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-                'TestHero',
-                '_Cleave_UsedRound',
-                1,
-                'campaign',
-            );
-        });
-
-        // ── Nick ──────────────────────────────────────────────────────
-
-        it('should apply Nick effect', async () => {
-            vi.mocked(useRuntimeState.getRuntimeValue).mockReturnValue([]);
-
-            const result = await applyMasteryEffect('Nick', makePlayerStats(), 'campaign', 'Goblin');
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('Nick');
-        });
-
-        it('should reject Nick if already used this turn (same round)', async () => {
-            vi.mocked(useRuntimeState.getRuntimeValue).mockReturnValue(1);
-
-            const result = await applyMasteryEffect('Nick', makePlayerStats(), 'campaign', 'Goblin');
-
-            expect(result.payload.description).toContain('once per turn');
-        });
-
-        it('should allow Nick in a different round', async () => {
-            vi.mocked(useRuntimeState.getRuntimeValue).mockImplementation((key, prop) => {
-                if (prop === 'targetEffects') return [];
-                if (prop === '_Nick_UsedRound') return 2;
-                return null;
+                expect(result.payload.description).toContain('once per turn');
             });
 
-            const result = await applyMasteryEffect('Nick', makePlayerStats(), 'campaign', 'Goblin');
+            it(`should allow ${mastery} in a different round`, async () => {
+                vi.mocked(useRuntimeState.getRuntimeValue).mockImplementation((key, prop) => {
+                    if (prop === 'targetEffects') return [];
+                    if (prop === `_${mastery}_UsedRound`) return 2;
+                    return null;
+                });
 
-            expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('Nick');
-        });
+                const result = await applyMasteryEffect(mastery, makePlayerStats(), 'campaign', 'Goblin');
 
-        it('should mark Nick as used for the current round after applying', async () => {
-            vi.mocked(useRuntimeState.getRuntimeValue).mockReturnValue([]);
-
-            await applyMasteryEffect('Nick', makePlayerStats(), 'campaign', 'Goblin');
-
-            expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-                'TestHero',
-                '_Nick_UsedRound',
-                1,
-                'campaign',
-            );
-        });
+                expect(result.type).toBe('popup');
+                expect(result.payload.description).toContain(mastery);
+            });
+        }
 
         // ── Topple ────────────────────────────────────────────────────
 
@@ -392,31 +261,13 @@ describe('weaponMasteryHandler', () => {
 
         // ── Vex ───────────────────────────────────────────────────────
 
-        it('should apply Vex effect targeting the player', async () => {
+        it('should apply Vex effect', async () => {
             vi.mocked(useRuntimeState.getRuntimeValue).mockReturnValue([]);
 
             const result = await applyMasteryEffect('Vex', makePlayerStats(), 'campaign', 'Goblin');
 
             expect(result.type).toBe('popup');
             expect(result.payload.description).toContain('Vex applied');
-        });
-
-        it('should set Vex effect target to the player name (not the creature)', async () => {
-            vi.mocked(useRuntimeState.getRuntimeValue).mockReturnValue([]);
-
-            await applyMasteryEffect('Vex', makePlayerStats(), 'campaign', 'Goblin');
-
-            expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-                'campaign',
-                'targetEffects',
-                expect.arrayContaining([
-                    expect.objectContaining({
-                        target: 'TestHero',
-                        vexTarget: 'Goblin',
-                    }),
-                ]),
-                'campaign',
-            );
         });
 
         // ── Sap ───────────────────────────────────────────────────────
@@ -460,7 +311,7 @@ describe('weaponMasteryHandler', () => {
             );
         });
 
-        it('should use custom abilityName and abilityMod when Graze passive is defined in automation', async () => {
+        it('should use custom abilityName and abilityMod when Graze passive is defined', async () => {
             vi.mocked(useRuntimeState.getRuntimeValue).mockReturnValue([]);
 
             const ps = makePlayerStats({

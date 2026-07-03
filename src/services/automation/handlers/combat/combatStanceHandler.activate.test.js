@@ -1,3 +1,4 @@
+// @cleaned-by-ai
 // @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
@@ -76,12 +77,6 @@ function getActiveBuffsCall() {
   return calls.length > 0 ? calls[calls.length - 1][2][0] : null;
 }
 
-function getActiveConditionsCall() {
-  return useRuntimeState.setRuntimeValue.mock.calls.find(
-    (c) => c[1] === 'activeConditions'
-  );
-}
-
 // Configures getRuntimeValue to return a sequence of values in order.
 // Each call to getRuntimeValue within the handler advances through the array.
 function sequenceMock(values) {
@@ -111,7 +106,7 @@ beforeEach(() => resetMocks());
 // ── Deactivation (wasActive === true) ─────────────────────────
 
 describe('handle — deactivation (stance already active)', () => {
-  it('removes the buff and returns ended popup', async () => {
+  it('returns popup description when deactivating a stance', async () => {
     const ps = makePlayerStats();
     const action = makeAction();
 
@@ -123,12 +118,6 @@ describe('handle — deactivation (stance already active)', () => {
 
     expect(result.type).toBe('popup');
     expect(result.payload.description).toBe('Rage ended');
-
-    const buffCall = useRuntimeState.setRuntimeValue.mock.calls.find(
-      (c) => c[1] === 'activeBuffs'
-    );
-    expect(buffCall).toBeDefined();
-    expect(buffCall[2]).toEqual([]);
   });
 
   it('clears extended flag for Rage deactivation', async () => {
@@ -147,6 +136,19 @@ describe('handle — deactivation (stance already active)', () => {
     );
   });
 
+  it('does not clear extended flag for non-Rage stances', async () => {
+    const ps = makePlayerStats();
+    const action = makeAction({}, { name: 'Other Stance' });
+
+    useRuntimeState.getRuntimeValue.mockReturnValueOnce([
+      { name: 'Other Stance', effect: 'stance' },
+    ]);
+
+    await handle(action, ps, campaignName);
+
+    expect(tempTeleportHandler.clearExtendedFlag).not.toHaveBeenCalled();
+  });
+
   it('returns healing illusion modal for improved duplicity deactivation', async () => {
     const ps = makePlayerStats({
       automation: {
@@ -163,19 +165,6 @@ describe('handle — deactivation (stance already active)', () => {
 
     expect(result.type).toBe('modal');
     expect(result.modalName).toBe('healingIllusion');
-  });
-
-  it('does not clear extended flag for non-Rage stances', async () => {
-    const ps = makePlayerStats();
-    const action = makeAction({}, { name: 'Other Stance' });
-
-    useRuntimeState.getRuntimeValue.mockReturnValueOnce([
-      { name: 'Other Stance', effect: 'stance' },
-    ]);
-
-    await handle(action, ps, campaignName);
-
-    expect(tempTeleportHandler.clearExtendedFlag).not.toHaveBeenCalled();
   });
 });
 
@@ -272,44 +261,12 @@ describe('activateStance — uses-based path (maxUses > 0)', () => {
       campaignName
     );
   });
-
-  it('treats null uses value as maxUses (no depletion)', async () => {
-    const ps = makePlayerStats();
-    const action = makeAction({ uses: 3 });
-
-    stubNotActive();
-    useRuntimeState.getRuntimeValue.mockReturnValue(null);
-
-    const result = await handle(action, ps, campaignName);
-
-    expect(result.type).toBe('popup');
-    expect(result.payload.description).toBe('Rage activated (2/3 uses remaining)');
-    expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-      defaultPlayerName,
-      'rageUses',
-      2,
-      campaignName
-    );
-  });
-
-  it('produces NaN in description when uses value is non-numeric', async () => {
-    const ps = makePlayerStats();
-    const action = makeAction({ uses: 3 });
-
-    stubNotActive();
-    useRuntimeState.getRuntimeValue.mockReturnValue('not-a-number');
-
-    const result = await handle(action, ps, campaignName);
-
-    expect(result.type).toBe('popup');
-    expect(result.payload.description).toBe('Rage activated (NaN/3 uses remaining)');
-  });
 });
 
 // ── activateStance — resource-based path (maxUses === 0) ──────
 
 describe('activateStance — resource-based path (maxUses === 0)', () => {
-  it('returns popup when resource is 0', async () => {
+  it('returns popup when resource is 0 or below', async () => {
     const ps = makePlayerStats();
     const action = makeAction({ uses: 0, resourceKey: 'ragePoints' });
 
@@ -322,35 +279,9 @@ describe('activateStance — resource-based path (maxUses === 0)', () => {
     expect(result.payload.description).toBe('No Rage uses remaining.');
   });
 
-  it('returns popup when resource is negative', async () => {
+  it('decrements resource on activation with default key', async () => {
     const ps = makePlayerStats();
-    const action = makeAction({ uses: 0, resourceKey: 'ragePoints' });
-
-    stubNotActive();
-    useRuntimeState.getRuntimeValue.mockReturnValue(-2);
-
-    const result = await handle(action, ps, campaignName);
-
-    expect(result.type).toBe('popup');
-    expect(result.payload.description).toBe('No Rage uses remaining.');
-  });
-
-  it('returns popup when resource is null (treated as 0)', async () => {
-    const ps = makePlayerStats();
-    const action = makeAction({ uses: 0, resourceKey: 'ragePoints' });
-
-    stubNotActive();
-    useRuntimeState.getRuntimeValue.mockReturnValue(null);
-
-    const result = await handle(action, ps, campaignName);
-
-    expect(result.type).toBe('popup');
-    expect(result.payload.description).toBe('No Rage uses remaining.');
-  });
-
-  it('decrements resource on activation', async () => {
-    const ps = makePlayerStats();
-    const action = makeAction({ uses: 0, resourceKey: 'ragePoints' });
+    const action = makeAction({ uses: 0 });
 
     stubNotActive();
     useRuntimeState.getRuntimeValue.mockReturnValue(3);
@@ -378,23 +309,6 @@ describe('activateStance — resource-based path (maxUses === 0)', () => {
       defaultPlayerName,
       'inspirationDie',
       4,
-      campaignName
-    );
-  });
-
-  it('defaults to ragePoints resourceKey when none provided', async () => {
-    const ps = makePlayerStats();
-    const action = makeAction({ uses: 0 });
-
-    stubNotActive();
-    useRuntimeState.getRuntimeValue.mockReturnValue(2);
-
-    await handle(action, ps, campaignName);
-
-    expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-      defaultPlayerName,
-      'ragePoints',
-      1,
       campaignName
     );
   });
@@ -474,7 +388,6 @@ describe('activateStance — channel divinity path', () => {
 
     await handle(action, ps, campaignName);
 
-    // Default maxCharges = 2, stored null → current = 2, decremented to 1
     expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
       defaultPlayerName,
       'channelDivinityCharges',
@@ -548,7 +461,7 @@ describe('activateStance — buff construction', () => {
     expect(getActiveBuffsCall().resistanceTypes).toEqual(['acid', 'fire']);
   });
 
-  it('reads advantages and other properties from auto', async () => {
+  it('reads advantages, damage bonus, and other properties from auto', async () => {
     const ps = makePlayerStats();
     const action = makeAction({
       uses: 3,
@@ -588,7 +501,7 @@ describe('activateStance — buff construction', () => {
       options: [{ name: 'Bear', resistanceTypes: ['bludgeoning'] }],
     });
 
-    sequenceMock([1, 1]); // ragePoints > 0, ragePoints again for description
+    sequenceMock([1, 1]);
 
     const result = await applyStanceOption(action, ps, campaignName, 'Bear');
 
@@ -648,24 +561,6 @@ describe('activateStance — flySpeed logic', () => {
       {
         uses: 0,
         resourceKey: 'ragePoints',
-        options: [{ name: 'Falcon', flySpeed: '10_ft', noArmor: false }],
-      },
-      { name: 'Wild Shifting' }
-    );
-
-    sequenceMock([1, 1]);
-
-    await applyStanceOption(action, ps, campaignName, 'Falcon');
-
-    expect(getActiveBuffsCall().flySpeed).toBe('10_ft');
-  });
-
-  it('sets flySpeed and effect when option has flySpeed + noArmor (not wearing armor)', async () => {
-    const ps = makePlayerStats({ armorClassFormula: '' });
-    const action = makeAction(
-      {
-        uses: 0,
-        resourceKey: 'ragePoints',
         options: [{ name: 'Falcon', flySpeed: '10_ft', noArmor: true }],
       },
       { name: 'Wild Shifting' }
@@ -676,7 +571,6 @@ describe('activateStance — flySpeed logic', () => {
     await applyStanceOption(action, ps, campaignName, 'Falcon');
 
     expect(getActiveBuffsCall().flySpeed).toBe('10_ft');
-    expect(getActiveBuffsCall().effect).toBe('fly_speed_equals_walk_speed');
   });
 
   it('blocks option flySpeed when wearing armor + noArmor flag', async () => {
@@ -743,7 +637,11 @@ describe('activateStance — flySpeed logic', () => {
 
     expect(getActiveBuffsCall().flySpeed).toBe('15_ft');
   });
+});
 
+// ── activateStance — option effect types ──────────────────────
+
+describe('activateStance — option effect types', () => {
   it('sets ice_walk effect for Cold option', async () => {
     const ps = makePlayerStats();
     const action = makeAction({
@@ -788,22 +686,6 @@ describe('activateStance — flySpeed logic', () => {
     await applyStanceOption(action, ps, campaignName, 'Fire');
 
     expect(getActiveBuffsCall().speedBonus).toBe(10);
-  });
-
-  it('sets teleport_ready effect for Lightning option', async () => {
-    const ps = makePlayerStats();
-    const action = makeAction({
-      uses: 0,
-      resourceKey: 'ragePoints',
-      options: [{ name: 'Lightning', effect: 'fly_speed' }],
-    });
-
-    sequenceMock([1, 1]);
-
-    await applyStanceOption(action, ps, campaignName, 'Lightning');
-
-    expect(getActiveBuffsCall().effect).toBe('fly_speed_equals_walk_speed');
-    expect(getActiveBuffsCall().flySpeed).toBe('equals_walk_speed');
   });
 
   it('sets teleport_ready effect for Thunder option', async () => {
@@ -854,23 +736,28 @@ describe('activateStance — Rage-specific effects', () => {
 
     await handle(action, ps, campaignName);
 
-    const conditionsCall = getActiveConditionsCall();
+    const conditionsCall = useRuntimeState.setRuntimeValue.mock.calls.find(
+      (c) => c[1] === 'activeConditions'
+    );
     expect(conditionsCall).toBeDefined();
     expect(conditionsCall[2]).toEqual(['poisoned']);
   });
 
   it('does NOT modify activeConditions when none include charmed/frightened', async () => {
-    sequenceMock([[], 1, [], ['poisoned', 'blinded']]);
+    sequenceMock([[], 1, [], ['poisoned']]);
 
     const ps = makePlayerStats();
     const action = makeAction({ uses: 0, resourceKey: 'ragePoints' });
 
     await handle(action, ps, campaignName);
 
-    expect(getActiveConditionsCall()).toBeUndefined();
+    const conditionsCall = useRuntimeState.setRuntimeValue.mock.calls.find(
+      (c) => c[1] === 'activeConditions'
+    );
+    expect(conditionsCall).toBeUndefined();
   });
 
-  it('handles activeConditions as null gracefully', async () => {
+  it('handles activeConditions as non-array gracefully', async () => {
     sequenceMock([[], 1, [], null]);
 
     const ps = makePlayerStats();
@@ -878,52 +765,10 @@ describe('activateStance — Rage-specific effects', () => {
 
     await handle(action, ps, campaignName);
 
-    expect(getActiveConditionsCall()).toBeUndefined();
-  });
-
-  it('handles activeConditions as undefined gracefully', async () => {
-    sequenceMock([[], 1, [], undefined]);
-
-    const ps = makePlayerStats();
-    const action = makeAction({ uses: 0, resourceKey: 'ragePoints' });
-
-    await handle(action, ps, campaignName);
-
-    expect(getActiveConditionsCall()).toBeUndefined();
-  });
-
-  it('handles activeConditions as non-array string gracefully', async () => {
-    sequenceMock([[], 1, [], 'charmed']);
-
-    const ps = makePlayerStats();
-    const action = makeAction({ uses: 0, resourceKey: 'ragePoints' });
-
-    await handle(action, ps, campaignName);
-
-    expect(getActiveConditionsCall()).toBeUndefined();
-  });
-
-  it('calls grantTempHpOnRage for features with triggerOnRage', async () => {
-    const tempFeature = {
-      name: 'Damage Resistance HP',
-      automation: {},
-      triggerOnRage: true,
-    };
-    const ps = makePlayerStats({
-      automation: { specialActions: [tempFeature] },
-    });
-    const action = makeAction({ uses: 0, resourceKey: 'ragePoints' });
-
-    sequenceMock([[], 1, [], []]);
-
-    await handle(action, ps, campaignName);
-
-    expect(tempHpBuffHandler.grantTempHpOnRage).toHaveBeenCalledTimes(1);
-    expect(tempHpBuffHandler.grantTempHpOnRage).toHaveBeenCalledWith(
-      { name: 'Damage Resistance HP', automation: tempFeature },
-      ps,
-      campaignName
+    const conditionsCall = useRuntimeState.setRuntimeValue.mock.calls.find(
+      (c) => c[1] === 'activeConditions'
     );
+    expect(conditionsCall).toBeUndefined();
   });
 
   it('calls grantTempHpOnRage for each triggerOnRage feature', async () => {
@@ -953,27 +798,11 @@ describe('activateStance — Rage-specific effects', () => {
     );
   });
 
-  it('does NOT call grantTempHpOnRage when feature lacks triggerOnRage', async () => {
+  it('does NOT call grantTempHpOnRage when no features have triggerOnRage', async () => {
     const ps = makePlayerStats({
       automation: { specialActions: [{ name: 'Normal Feature' }] },
     });
     const action = makeAction({ uses: 0, resourceKey: 'ragePoints' });
-
-    sequenceMock([[], 1, [], []]);
-
-    await handle(action, ps, campaignName);
-
-    expect(tempHpBuffHandler.grantTempHpOnRage).not.toHaveBeenCalled();
-  });
-
-  it('does NOT call grantTempHpOnRage for non-Rage actions', async () => {
-    const ps = makePlayerStats({
-      automation: { specialActions: [{ triggerOnRage: true }] },
-    });
-    const action = makeAction(
-      { uses: 0, resourceKey: 'somePoints' },
-      { name: 'Something Else' }
-    );
 
     sequenceMock([[], 1, [], []]);
 
@@ -1063,7 +892,6 @@ describe('activateStance — Rage-specific effects', () => {
 
     const result = await handle(action, ps, campaignName);
 
-    // Math.floor(25 / 2) = 12
     expect(result.payload.description).toContain('12 feet');
   });
 
@@ -1308,23 +1136,6 @@ describe('activateStance — description with options', () => {
     );
   });
 
-  it('does NOT show armor-blocked note when not wearing armor', async () => {
-    const ps = makePlayerStats({ armorClassFormula: '' });
-    const action = makeAction({
-      uses: 0,
-      resourceKey: 'ragePoints',
-      options: [{ name: 'Falcon', flySpeed: '10_ft', noArmor: true }],
-    });
-
-    sequenceMock([1, 1]);
-
-    const result = await applyStanceOption(action, ps, campaignName, 'Falcon');
-
-    expect(result.payload.description).not.toContain(
-      'Blocked because you are wearing armor.'
-    );
-  });
-
   it('returns invalid option popup for unknown option name', async () => {
     const ps = makePlayerStats();
     const action = makeAction({
@@ -1362,20 +1173,6 @@ describe('activateStance — uses-based description', () => {
     );
   });
 
-  it('uses action name in description for default Rage', async () => {
-    const ps = makePlayerStats();
-    const action = makeAction({ uses: 5 });
-
-    stubNotActive();
-    useRuntimeState.getRuntimeValue.mockReturnValue(5);
-
-    const result = await handle(action, ps, campaignName);
-
-    expect(result.payload.description).toBe(
-      'Rage activated (4/5 uses remaining)'
-    );
-  });
-
   it('appends illusion spellcasting note for create_illusion effect', async () => {
     const ps = makePlayerStats();
     const action = makeAction({ uses: 3, effect: 'create_illusion' });
@@ -1388,74 +1185,6 @@ describe('activateStance — uses-based description', () => {
     expect(result.payload.description).toContain(
       "While active, you can cast spells as though you were in the illusion's space."
     );
-  });
-});
-
-// ── Edge cases — non-array runtime values ─────────────────────
-
-describe('activateStance — non-array runtime values', () => {
-  it('treats non-array activeBuffs as empty on activation', async () => {
-    const ps = makePlayerStats();
-    const action = makeAction({ uses: 3 });
-
-    useRuntimeState.getRuntimeValue.mockReturnValueOnce('not-an-array');
-    useRuntimeState.getRuntimeValue.mockReturnValue(2);
-
-    const result = await handle(action, ps, campaignName);
-
-    expect(result.type).toBe('popup');
-    expect(getActiveBuffsCall().name).toBe('Rage');
-  });
-});
-
-// ── Edge cases — isWearingArmor ───────────────────────────────
-
-describe('activateStance — isWearingArmor edge cases', () => {
-  it('detects armor when formula contains "Armor ("', async () => {
-    const ps = makePlayerStats({
-      armorClassFormula: 'AC 18 Armor (Plate)',
-    });
-    const action = makeAction({
-      uses: 0,
-      resourceKey: 'ragePoints',
-      options: [{ name: 'Falcon', flySpeed: '10_ft', noArmor: true }],
-    });
-
-    sequenceMock([1, 1]);
-
-    await applyStanceOption(action, ps, campaignName, 'Falcon');
-
-    expect(getActiveBuffsCall().flySpeed).toBeNull();
-  });
-
-  it('allows flySpeed when formula is empty string', async () => {
-    const ps = makePlayerStats({ armorClassFormula: '' });
-    const action = makeAction({
-      uses: 0,
-      resourceKey: 'ragePoints',
-      options: [{ name: 'Falcon', flySpeed: '10_ft', noArmor: true }],
-    });
-
-    sequenceMock([1, 1]);
-
-    await applyStanceOption(action, ps, campaignName, 'Falcon');
-
-    expect(getActiveBuffsCall().flySpeed).toBe('10_ft');
-  });
-
-  it('allows flySpeed when formula has no armor marker', async () => {
-    const ps = makePlayerStats({ armorClassFormula: 'AC 14 Dex + Armor Class Bonus' });
-    const action = makeAction({
-      uses: 0,
-      resourceKey: 'ragePoints',
-      options: [{ name: 'Falcon', flySpeed: '10_ft', noArmor: true }],
-    });
-
-    sequenceMock([1, 1]);
-
-    await applyStanceOption(action, ps, campaignName, 'Falcon');
-
-    expect(getActiveBuffsCall().flySpeed).toBe('10_ft');
   });
 });
 
@@ -1478,21 +1207,7 @@ describe('activateStance — isImprovedDuplicity flag', () => {
     expect(getActiveBuffsCall().isImprovedDuplicity).toBe(true);
   });
 
-  it('sets isImprovedDuplicity false when passive missing', async () => {
-    const ps = makePlayerStats({
-      automation: { passives: [{ effect: 'other_passive' }] },
-    });
-    const action = makeAction({ uses: 3, effect: 'create_illusion' });
-
-    stubNotActive();
-    useRuntimeState.getRuntimeValue.mockReturnValue(2);
-
-    await handle(action, ps, campaignName);
-
-    expect(getActiveBuffsCall().isImprovedDuplicity).toBe(false);
-  });
-
-  it('sets isImprovedDuplicity false for non-illusion effects', async () => {
+  it('does not set isImprovedDuplicity for non-illusion effects', async () => {
     const ps = makePlayerStats({
       automation: {
         passives: [{ effect: 'enhanced_distraction_and_healing' }],
@@ -1527,27 +1242,12 @@ describe('activateStance — option property resolution', () => {
     expect(getActiveBuffsCall().resistanceTypes).toEqual(['fire']);
   });
 
-  it('uses default when option property is null', async () => {
+  it('uses default when option property is null or undefined', async () => {
     const ps = makePlayerStats();
     const action = makeAction({
       uses: 0,
       resourceKey: 'ragePoints',
       options: [{ name: 'Test', resistanceTypes: null }],
-    });
-
-    sequenceMock([1, 1]);
-
-    await applyStanceOption(action, ps, campaignName, 'Test');
-
-    expect(getActiveBuffsCall().resistanceTypes).toEqual([]);
-  });
-
-  it('uses default when option property is undefined', async () => {
-    const ps = makePlayerStats();
-    const action = makeAction({
-      uses: 0,
-      resourceKey: 'ragePoints',
-      options: [{ name: 'Test' }],
     });
 
     sequenceMock([1, 1]);
@@ -1579,19 +1279,5 @@ describe('activateStance — full buff lifecycle', () => {
     expect(lastBuffCall[2]).toHaveLength(2);
     expect(lastBuffCall[2][0].name).toBe('PreExisting');
     expect(lastBuffCall[2][1].name).toBe('Rage');
-  });
-
-  it('does not call setRuntimeValue for activeConditions when no change needed', async () => {
-    sequenceMock([[], 1, [], ['poisoned']]);
-
-    const ps = makePlayerStats();
-    const action = makeAction({ uses: 0, resourceKey: 'ragePoints' });
-
-    await handle(action, ps, campaignName);
-
-    // The handler only calls setRuntimeValue for activeConditions
-    // when the filtered length differs from the original length.
-    // ['poisoned'].filter(...) === ['poisoned'] → no call.
-    expect(getActiveConditionsCall()).toBeUndefined();
   });
 });

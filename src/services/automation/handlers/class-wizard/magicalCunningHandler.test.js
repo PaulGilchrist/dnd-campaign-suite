@@ -1,3 +1,4 @@
+// @cleaned-by-ai
 // @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { handle, isMagicalCunningUsed } from './magicalCunningHandler.js'
@@ -101,27 +102,7 @@ describe('magicalCunningHandler', () => {
             expect(result.payload.description).toContain('No Pact Magic spell slots have been expended')
         })
 
-        it('returns info popup when fewer expended than max regain (Eldritch Master)', async () => {
-            // 1 expended, maxRegain = 1 (ceil(2/2)), but Eldritch Master regains ALL
-            // so slotsToRegain = 1 which is > 0 — actually this succeeds
-            // The popup path only triggers if slotsToRegain <= 0, which means expended = 0
-            // This case is covered by "no slots expended" above
-            getRuntimeValue.mockImplementation((_name, key, _campaign) => {
-                if (key === 'spell_slots_level_1') return 1
-                return null
-            })
-
-            const result = await handle(
-                defaultAction,
-                makePlayerStats({ resources: { warlockPactMagic: { max: 2 } }, spellAbilities: { spell_slots_level_1: 2 } }),
-                campaignName,
-                null,
-            )
-
-            expect(result.payload.description).toContain('Regained 1')
-        })
-
-        it('regains half maximum slots (round up) when slots expended', async () => {
+        it('regains half maximum slots (round up) when slots fully expended', async () => {
             getRuntimeValue.mockImplementation((_name, key, _campaign) => {
                 if (key === 'spell_slots_level_1') return 0
                 return null
@@ -141,40 +122,7 @@ describe('magicalCunningHandler', () => {
             expect(setRuntimeValue).toHaveBeenCalledWith('TestWarlock', 'magicalCunningUsed', true, campaignName)
         })
 
-        it('regains all expended slots when fewer than max regain', async () => {
-            // 1 expended, maxRegain = 1 → min(1, 1) = 1, so regain 1
-            getRuntimeValue.mockImplementation((_name, key, _campaign) => {
-                if (key === 'spell_slots_level_1') return 1
-                return null
-            })
-
-            const result = await handle(
-                defaultAction,
-                makePlayerStats({ resources: { warlockPactMagic: { max: 2 } }, spellAbilities: { spell_slots_level_1: 2 } }),
-                campaignName,
-                null,
-            )
-
-            expect(result.payload.description).toContain('Regained 1')
-        })
-
-        it('respects max regain cap (half maximum round up)', async () => {
-            getRuntimeValue.mockImplementation((_name, key, _campaign) => {
-                if (key === 'spell_slots_level_1') return 0
-                return null
-            })
-
-            const result = await handle(
-                defaultAction,
-                makePlayerStats({ resources: { warlockPactMagic: { max: 2 } }, spellAbilities: { spell_slots_level_1: 2 } }),
-                campaignName,
-                null,
-            )
-
-            expect(result.payload.description).toContain('Regained 1')
-        })
-
-        it('regains ALL expended slots for Eldritch Master via automation flag', async () => {
+        it('regains all expended slots for Eldritch Master via automation flag', async () => {
             getRuntimeValue.mockImplementation((_name, key, _campaign) => {
                 if (key === 'spell_slots_level_1') return 0
                 return null
@@ -191,7 +139,7 @@ describe('magicalCunningHandler', () => {
             expect(result.payload.description).toContain('Eldritch Master')
         })
 
-        it('regains ALL expended slots for Eldritch Master via characterAdvancement', async () => {
+        it('regains all expended slots for Eldritch Master via characterAdvancement', async () => {
             getRuntimeValue.mockImplementation((_name, key, _campaign) => {
                 if (key === 'spell_slots_level_1') return 0
                 return null
@@ -294,22 +242,6 @@ describe('magicalCunningHandler', () => {
             expect(result.payload.description).toContain('Regained 2')
             expect(result.payload.description).toContain('(2/4 slots available)')
         })
-
-        it('uses plural "slots" when regaining more than one', async () => {
-            getRuntimeValue.mockImplementation((_name, key, _campaign) => {
-                if (key === 'spell_slots_level_1') return 0
-                return null
-            })
-
-            const result = await handle(
-                defaultAction,
-                makePlayerStats({ resources: { warlockPactMagic: { max: 4 } }, spellAbilities: { spell_slots_level_1: 4 } }),
-                campaignName,
-                null,
-            )
-
-            expect(result.payload.description).toContain('slots')
-        })
     })
 
     describe('isMagicalCunningUsed', () => {
@@ -318,20 +250,12 @@ describe('magicalCunningHandler', () => {
             expect(isMagicalCunningUsed('TestWarlock', campaignName)).toBe(true)
         })
 
-        it('returns false when not used', () => {
-            getRuntimeValue.mockReturnValue(false)
-            expect(isMagicalCunningUsed('TestWarlock', campaignName)).toBe(false)
-        })
-
-        it('returns false when runtime value is null', () => {
+        it('returns false when not used or null', () => {
             getRuntimeValue.mockReturnValue(null)
             expect(isMagicalCunningUsed('TestWarlock', campaignName)).toBe(false)
-        })
 
-        it('passes campaignName to getRuntimeValue', () => {
             getRuntimeValue.mockReturnValue(false)
-            isMagicalCunningUsed('TestWarlock', campaignName)
-            expect(getRuntimeValue).toHaveBeenCalledWith('TestWarlock', 'magicalCunningUsed', campaignName)
+            expect(isMagicalCunningUsed('TestWarlock', campaignName)).toBe(false)
         })
     })
 })

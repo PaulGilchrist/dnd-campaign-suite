@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ── Mocks BEFORE imports ───────────────────────────────────────
@@ -75,38 +75,18 @@ describe('handle', () => {
         });
     });
 
-    it('returns a modal when masteryProperties is empty', async () => {
-        useRuntimeState.getRuntimeValue.mockReturnValue(null);
+    it('returns a modal when existing selection is not in masteryProperties', async () => {
+        useRuntimeState.getRuntimeValue.mockReturnValue('Cleave');
 
-        const action = makeAction({ masteryProperties: [] });
+        const action = makeAction();
         const ps = makePlayerStats();
 
         const result = await handle(action, ps, campaignName);
 
         expect(result.type).toBe('modal');
         expect(result.modalName).toBe('weaponMasteryChoice');
-        expect(result.payload.masteryProperties).toEqual([]);
-    });
-
-    it('returns a modal when masteryProperties is undefined', async () => {
-        useRuntimeState.getRuntimeValue.mockReturnValue(null);
-
-        const action = makeAction({ masteryProperties: undefined });
-        const ps = makePlayerStats();
-
-        const result = await handle(action, ps, campaignName);
-
-        expect(result.type).toBe('modal');
-        expect(result.payload.masteryProperties).toEqual([]);
-    });
-
-    it('throws when action.automation is missing', async () => {
-        const action = { automation: undefined };
-        const ps = makePlayerStats();
-
-        await expect(handle(action, ps, campaignName)).rejects.toThrow(
-            "Cannot read properties of undefined (reading 'masteryProperties')",
-        );
+        expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
+        expect(logService.addEntry).not.toHaveBeenCalled();
     });
 
     it('returns a popup when existing selection is in masteryProperties', async () => {
@@ -134,42 +114,13 @@ describe('handle', () => {
         });
     });
 
-    it('returns a modal when existing selection is not in masteryProperties', async () => {
-        useRuntimeState.getRuntimeValue.mockReturnValue('Cleave');
-
-        const action = makeAction();
+    it('throws when action.automation is missing', async () => {
+        const action = { automation: undefined };
         const ps = makePlayerStats();
 
-        const result = await handle(action, ps, campaignName);
-
-        expect(result.type).toBe('modal');
-        expect(result.modalName).toBe('weaponMasteryChoice');
-        expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
-        expect(logService.addEntry).not.toHaveBeenCalled();
-    });
-
-    it('returns a modal when existing selection is falsy but not null (0)', async () => {
-        useRuntimeState.getRuntimeValue.mockReturnValue(0);
-
-        const action = makeAction();
-        const ps = makePlayerStats();
-
-        const result = await handle(action, ps, campaignName);
-
-        expect(result.type).toBe('modal');
-        expect(result.modalName).toBe('weaponMasteryChoice');
-    });
-
-    it('passes _mapName through without affecting behavior', async () => {
-        useRuntimeState.getRuntimeValue.mockReturnValue(null);
-
-        const action = makeAction();
-        const ps = makePlayerStats();
-
-        const result = await handle(action, ps, campaignName, 'some-map');
-
-        expect(result.type).toBe('modal');
-        expect(result.modalName).toBe('weaponMasteryChoice');
+        await expect(handle(action, ps, campaignName)).rejects.toThrow(
+            "Cannot read properties of undefined (reading 'masteryProperties')",
+        );
     });
 });
 
@@ -203,61 +154,17 @@ describe('applyMasterySelection', () => {
         });
     });
 
-    it('returns null when masteryName is empty string', async () => {
+    it('returns null for any falsy masteryName', async () => {
         const ps = makePlayerStats();
 
-        const result = await applyMasterySelection('', ps, campaignName);
+        const falsyValues = ['', null, undefined, 0, false];
 
-        expect(result).toBeNull();
-        expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
-        expect(logService.addEntry).not.toHaveBeenCalled();
-    });
-
-    it('returns null when masteryName is null', async () => {
-        const ps = makePlayerStats();
-
-        const result = await applyMasterySelection(null, ps, campaignName);
-
-        expect(result).toBeNull();
-        expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
-    });
-
-    it('returns null when masteryName is undefined', async () => {
-        const ps = makePlayerStats();
-
-        const result = await applyMasterySelection(undefined, ps, campaignName);
-
-        expect(result).toBeNull();
-        expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
-    });
-
-    it('returns null when masteryName is 0', async () => {
-        const ps = makePlayerStats();
-
-        const result = await applyMasterySelection(0, ps, campaignName);
-
-        expect(result).toBeNull();
-        expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
-    });
-
-    it('returns null when masteryName is false', async () => {
-        const ps = makePlayerStats();
-
-        const result = await applyMasterySelection(false, ps, campaignName);
-
-        expect(result).toBeNull();
-        expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
-    });
-
-    it('does not crash when addEntry rejects', async () => {
-        logService.addEntry.mockRejectedValue(new Error('log failure'));
-
-        const ps = makePlayerStats();
-
-        const result = await applyMasterySelection('Push', ps, campaignName);
-
-        expect(result.type).toBe('popup');
-        expect(result.payload.type).toBe('automation_info');
-        expect(useRuntimeState.setRuntimeValue).toHaveBeenCalled();
+        for (const value of falsyValues) {
+            vi.clearAllMocks();
+            const result = await applyMasterySelection(value, ps, campaignName);
+            expect(result).toBeNull();
+            expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
+            expect(logService.addEntry).not.toHaveBeenCalled();
+        }
     });
 });

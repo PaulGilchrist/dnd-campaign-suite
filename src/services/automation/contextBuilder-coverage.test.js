@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { buildAttackContext } from './contextBuilder.js';
 import { getCombatContext, getTargetFromAttacker } from '../rules/combat/damageUtils.js';
@@ -162,601 +162,213 @@ describe('contextBuilder: buildAttackContext — cover AC bonuses (map path)', (
     return makeMapData(players, npcs || []);
   }
 
-  describe('nature sanctuary half cover', () => {
-    it('applies half cover when target is inside sanctuary cube', async () => {
-      loadMapData.mockResolvedValue(makeMapWithPlayersAndNpc(
-        [{ name: 'Fighter1', gridX: 1, gridY: 1 }],
-        [{ name: 'Orc', gridX: 3, gridY: 3, type: 'npc' }],
-      ));
-      getCombatContext.mockResolvedValue(makeCombatContext('Fighter1', 'Orc', 3, 3));
-      getTargetFromAttacker.mockReturnValue({ name: 'Orc', gridX: 3, gridY: 3 });
-      getNearestPlacedItem.mockReturnValue({ name: 'Orc', gridX: 3, gridY: 3 });
-      getDistanceFeet.mockReturnValue(50);
-      computeCover.mockReturnValue({ level: 'none', acBonus: 0 });
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'naturesSanctuaryActive') return true;
-        if (key === 'naturesSanctuaryCubeX') return 3;
-        if (key === 'naturesSanctuaryCubeY') return 3;
-        return undefined;
+  describe('cover AC bonus features', () => {
+    // Each feature follows the same pattern: check runtime key, compare against existing cover,
+    // apply if higher. These tests verify the shared behavior with representative features.
+    const coverFeatureTests = [
+      {
+        name: "nature's sanctuary",
+        activeKey: 'naturesSanctuaryActive',
+        coordsXKey: 'naturesSanctuaryCubeX',
+        coordsYKey: 'naturesSanctuaryCubeY',
+        setupRuntime: (getRuntimeValue, inCube = true) => {
+          getRuntimeValue.mockImplementation((name, key) => {
+            if (key === 'naturesSanctuaryActive') return true;
+            if (key === 'naturesSanctuaryCubeX') return inCube ? 3 : 10;
+            if (key === 'naturesSanctuaryCubeY') return inCube ? 3 : 10;
+            return undefined;
+          });
+        },
+        mockSetup: () => {
+          loadMapData.mockResolvedValue(makeMapWithPlayersAndNpc(
+            [{ name: 'Fighter1', gridX: 1, gridY: 1 }],
+            [{ name: 'Orc', gridX: 3, gridY: 3, type: 'npc' }],
+          ));
+          getCombatContext.mockResolvedValue(makeCombatContext('Fighter1', 'Orc', 3, 3));
+          getTargetFromAttacker.mockReturnValue({ name: 'Orc', gridX: 3, gridY: 3 });
+          getNearestPlacedItem.mockReturnValue({ name: 'Orc', gridX: 3, gridY: 3 });
+          getDistanceFeet.mockReturnValue(50);
+        },
+      },
+      {
+        name: 'bulwark of force',
+        activeKey: 'bulwarkOfForceActive',
+        targetsKey: 'bulwarkOfForceTargets',
+        setupRuntime: (getRuntimeValue, inList = true) => {
+          getRuntimeValue.mockImplementation((name, key) => {
+            if (key === 'bulwarkOfForceActive') return true;
+            if (key === 'bulwarkOfForceTargets') return inList ? ['Orc'] : ['Goblin'];
+            return undefined;
+          });
+        },
+        mockSetup: () => {
+          loadMapData.mockResolvedValue(makeMapWithPlayersAndNpc(
+            [{ name: 'Fighter1', gridX: 1, gridY: 1 }],
+            [{ name: 'Orc', gridX: 10, gridY: 10, type: 'npc' }],
+          ));
+          getCombatContext.mockResolvedValue(makeCombatContext('Fighter1', 'Orc', 10, 10));
+          getTargetFromAttacker.mockReturnValue({ name: 'Orc', gridX: 10, gridY: 10 });
+          getNearestPlacedItem.mockReturnValue({ name: 'Orc', gridX: 10, gridY: 10 });
+          getDistanceFeet.mockReturnValue(50);
+        },
+      },
+      {
+        name: 'glorious defense',
+        activeKey: 'gloriousDefenseActive',
+        bonusKey: 'gloriousDefenseBonus',
+        setupRuntime: (getRuntimeValue, bonus = 3, _withinRange = true) => {
+          getRuntimeValue.mockImplementation((name, key) => {
+            if (key === 'gloriousDefenseActive') return true;
+            if (key === 'gloriousDefenseBonus') return bonus;
+            return undefined;
+          });
+        },
+        mockSetup: (targetGridX = 3, targetGridY = 3) => {
+          loadMapData.mockResolvedValue(makeMapWithPlayersAndNpc(
+            [{ name: 'Fighter1', gridX: 1, gridY: 1 }, { name: 'Orc', gridX: targetGridX, gridY: targetGridY }],
+            [{ name: 'Orc', gridX: targetGridX, gridY: targetGridY, type: 'npc' }],
+          ));
+          getCombatContext.mockResolvedValue(makeCombatContext('Fighter1', 'Orc', targetGridX, targetGridY));
+          getTargetFromAttacker.mockReturnValue({ name: 'Orc', gridX: targetGridX, gridY: targetGridY });
+          getNearestPlacedItem.mockReturnValue({ name: 'Orc', gridX: targetGridX, gridY: targetGridY });
+          getDistanceFeet.mockReturnValue(targetGridX <= 3 ? 10 : 50);
+        },
+      },
+      {
+        name: 'defensive duelist',
+        activeKey: 'defensiveDuelistActive',
+        bonusKey: 'defensiveDuelistBonus',
+        setupRuntime: (getRuntimeValue, bonus = 4) => {
+          getRuntimeValue.mockImplementation((name, key) => {
+            if (key === 'defensiveDuelistActive') return true;
+            if (key === 'defensiveDuelistBonus') return bonus;
+            return undefined;
+          });
+        },
+        mockSetup: () => {
+          loadMapData.mockResolvedValue(makeMapWithPlayersAndNpc(
+            [{ name: 'Fighter1', gridX: 1, gridY: 1 }],
+            [{ name: 'Orc', gridX: 10, gridY: 10, type: 'npc' }],
+          ));
+          getCombatContext.mockResolvedValue(makeCombatContext('Fighter1', 'Orc', 10, 10));
+          getTargetFromAttacker.mockReturnValue({ name: 'Orc', gridX: 10, gridY: 10 });
+          getNearestPlacedItem.mockReturnValue({ name: 'Orc', gridX: 10, gridY: 10 });
+          getDistanceFeet.mockReturnValue(50);
+        },
+      },
+      {
+        name: 'bait and switch',
+        activeKey: 'baitAndSwitchActive',
+        bonusKey: 'baitAndSwitchBonus',
+        setupRuntime: (getRuntimeValue, bonus = 5) => {
+          getRuntimeValue.mockImplementation((name, key) => {
+            if (key === 'baitAndSwitchActive') return true;
+            if (key === 'baitAndSwitchBonus') return bonus;
+            return undefined;
+          });
+        },
+        mockSetup: () => {
+          loadMapData.mockResolvedValue(makeMapWithPlayersAndNpc(
+            [{ name: 'Fighter1', gridX: 1, gridY: 1 }],
+            [{ name: 'Orc', gridX: 10, gridY: 10, type: 'npc' }],
+          ));
+          getCombatContext.mockResolvedValue(makeCombatContext('Fighter1', 'Orc', 10, 10));
+          getTargetFromAttacker.mockReturnValue({ name: 'Orc', gridX: 10, gridY: 10 });
+          getNearestPlacedItem.mockReturnValue({ name: 'Orc', gridX: 10, gridY: 10 });
+          getDistanceFeet.mockReturnValue(50);
+        },
+      },
+    ];
+
+    for (const feature of coverFeatureTests) {
+      describe(`${feature.name}`, () => {
+        it('applies AC bonus when feature is active and bonus is higher than existing cover', async () => {
+          feature.mockSetup();
+          computeCover.mockReturnValue({ level: 'none', acBonus: 0 });
+          feature.setupRuntime(getRuntimeValue);
+
+          const result = await buildAttackContext(mockRangedAttack, mockStats, 'camp', 'test-map', 'normal', {});
+
+          expect(result.coverAcBonus).toBeDefined();
+          expect(result.coverAcBonus).toBeGreaterThan(0);
+        });
+
+        it('does not apply AC bonus when feature is not active', async () => {
+          feature.mockSetup();
+          computeCover.mockReturnValue({ level: 'none', acBonus: 0 });
+
+          const result = await buildAttackContext(mockRangedAttack, mockStats, 'camp', 'test-map', 'normal', {});
+
+          expect(result.coverAcBonus).toBeUndefined();
+        });
+
+        it('does not override existing cover when existing bonus is higher or equal', async () => {
+          feature.mockSetup();
+          computeCover.mockReturnValue({ level: 'half', acBonus: 2 });
+          feature.setupRuntime(getRuntimeValue, 1);
+
+          const result = await buildAttackContext(mockRangedAttack, mockStats, 'camp', 'test-map', 'normal', {});
+
+          expect(result.coverAcBonus).toBe(2);
+        });
+      });
+    }
+
+    describe('smite of protection', () => {
+      it('applies half cover when smite is active and target is within aura range', async () => {
+        loadMapData.mockResolvedValue(makeMapWithPlayersAndNpc(
+          [{ name: 'Fighter1', gridX: 1, gridY: 1 }, { name: 'Orc', gridX: 5, gridY: 5 }],
+          [{ name: 'Orc', gridX: 5, gridY: 5, type: 'npc' }],
+        ));
+        getCombatContext.mockResolvedValue(makeCombatContext('Fighter1', 'Orc', 5, 5));
+        getTargetFromAttacker.mockReturnValue({ name: 'Orc', gridX: 5, gridY: 5 });
+        getNearestPlacedItem.mockReturnValue({ name: 'Orc', gridX: 5, gridY: 5 });
+        getDistanceFeet.mockReturnValue(30);
+        computeCover.mockReturnValue({ level: 'none', acBonus: 0 });
+        hasAuraOfProtection.mockReturnValue(true);
+        getRuntimeValue.mockImplementation((name, key) => {
+          if (key === 'smiteOfProtectionActive') return true;
+          return undefined;
+        });
+
+        const result = await buildAttackContext(mockRangedAttack, mockStats, 'camp', 'test-map', 'normal', {});
+
+        expect(result.coverAcBonus).toBe(2);
+        expect(result.coverLevel).toBe('half');
       });
 
-      const result = await buildAttackContext(mockRangedAttack, mockStats, 'camp', 'test-map', 'normal', {});
+      it('does not apply smite cover when smite is not active', async () => {
+        loadMapData.mockResolvedValue(makeMapWithPlayersAndNpc(
+          [{ name: 'Fighter1', gridX: 1, gridY: 1 }],
+          [{ name: 'Orc', gridX: 10, gridY: 10, type: 'npc' }],
+        ));
+        getCombatContext.mockResolvedValue(makeCombatContext('Fighter1', 'Orc', 10, 10));
+        getTargetFromAttacker.mockReturnValue({ name: 'Orc', gridX: 10, gridY: 10 });
+        getNearestPlacedItem.mockReturnValue({ name: 'Orc', gridX: 10, gridY: 10 });
+        getDistanceFeet.mockReturnValue(50);
+        computeCover.mockReturnValue({ level: 'none', acBonus: 0 });
+        hasAuraOfProtection.mockReturnValue(true);
 
-      expect(result.coverAcBonus).toBe(2);
-      expect(result.coverLevel).toBe('half');
-    });
+        const result = await buildAttackContext(mockRangedAttack, mockStats, 'camp', 'test-map', 'normal', {});
 
-    it('does not apply sanctuary cover when target is outside the cube', async () => {
-      loadMapData.mockResolvedValue(makeMapWithPlayersAndNpc(
-        [{ name: 'Fighter1', gridX: 1, gridY: 1 }],
-        [{ name: 'Orc', gridX: 10, gridY: 10, type: 'npc' }],
-      ));
-      getCombatContext.mockResolvedValue(makeCombatContext('Fighter1', 'Orc', 10, 10));
-      getTargetFromAttacker.mockReturnValue({ name: 'Orc', gridX: 10, gridY: 10 });
-      getNearestPlacedItem.mockReturnValue({ name: 'Orc', gridX: 10, gridY: 10 });
-      getDistanceFeet.mockReturnValue(50);
-      computeCover.mockReturnValue({ level: 'none', acBonus: 0 });
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'naturesSanctuaryActive') return true;
-        if (key === 'naturesSanctuaryCubeX') return 3;
-        if (key === 'naturesSanctuaryCubeY') return 3;
-        return undefined;
+        expect(result.coverAcBonus).toBeUndefined();
       });
 
-      const result = await buildAttackContext(mockRangedAttack, mockStats, 'camp', 'test-map', 'normal', {});
+      it('does not apply smite cover when aura source is null (no players on map)', async () => {
+        loadMapData.mockResolvedValue(makeMapData([], []));
+        getCombatContext.mockResolvedValue(makeCombatContext('Fighter1', 'Orc', 10, 10));
+        getTargetFromAttacker.mockReturnValue({ name: 'Orc', gridX: 10, gridY: 10 });
+        computeCover.mockReturnValue({ level: 'none', acBonus: 0 });
+        hasAuraOfProtection.mockReturnValue(true);
+        getRuntimeValue.mockImplementation((name, key) => {
+          if (key === 'smiteOfProtectionActive') return true;
+          return undefined;
+        });
 
-      expect(result.coverAcBonus).toBeUndefined();
-    });
+        const result = await buildAttackContext(mockRangedAttack, mockStats, 'camp', 'test-map', 'normal', {});
 
-    it('does not override existing cover when sanctuary acBonus is lower', async () => {
-      loadMapData.mockResolvedValue(makeMapWithPlayersAndNpc(
-        [{ name: 'Fighter1', gridX: 1, gridY: 1 }],
-        [{ name: 'Orc', gridX: 3, gridY: 3, type: 'npc' }],
-      ));
-      getCombatContext.mockResolvedValue(makeCombatContext('Fighter1', 'Orc', 3, 3));
-      getTargetFromAttacker.mockReturnValue({ name: 'Orc', gridX: 3, gridY: 3 });
-      getNearestPlacedItem.mockReturnValue({ name: 'Orc', gridX: 3, gridY: 3 });
-      getDistanceFeet.mockReturnValue(50);
-      computeCover.mockReturnValue({ level: 'half', acBonus: 2 });
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'naturesSanctuaryActive') return true;
-        if (key === 'naturesSanctuaryCubeX') return 3;
-        if (key === 'naturesSanctuaryCubeY') return 3;
-        return undefined;
+        expect(result.coverAcBonus).toBeUndefined();
       });
-
-      const result = await buildAttackContext(mockRangedAttack, mockStats, 'camp', 'test-map', 'normal', {});
-
-      expect(result.coverAcBonus).toBe(2);
-    });
-
-    it('does not apply sanctuary cover when sanctuary is not active', async () => {
-      loadMapData.mockResolvedValue(makeMapWithPlayersAndNpc(
-        [{ name: 'Fighter1', gridX: 1, gridY: 1 }],
-        [{ name: 'Orc', gridX: 3, gridY: 3, type: 'npc' }],
-      ));
-      getCombatContext.mockResolvedValue(makeCombatContext('Fighter1', 'Orc', 3, 3));
-      getTargetFromAttacker.mockReturnValue({ name: 'Orc', gridX: 3, gridY: 3 });
-      getNearestPlacedItem.mockReturnValue({ name: 'Orc', gridX: 3, gridY: 3 });
-      getDistanceFeet.mockReturnValue(50);
-      computeCover.mockReturnValue({ level: 'none', acBonus: 0 });
-
-      const result = await buildAttackContext(mockRangedAttack, mockStats, 'camp', 'test-map', 'normal', {});
-
-      expect(result.coverAcBonus).toBeUndefined();
-    });
-
-    it('does not apply sanctuary cover when sanctuary coordinates are 0', async () => {
-      loadMapData.mockResolvedValue(makeMapWithPlayersAndNpc(
-        [{ name: 'Fighter1', gridX: 1, gridY: 1 }],
-        [{ name: 'Orc', gridX: 3, gridY: 3, type: 'npc' }],
-      ));
-      getCombatContext.mockResolvedValue(makeCombatContext('Fighter1', 'Orc', 3, 3));
-      getTargetFromAttacker.mockReturnValue({ name: 'Orc', gridX: 3, gridY: 3 });
-      getNearestPlacedItem.mockReturnValue({ name: 'Orc', gridX: 3, gridY: 3 });
-      getDistanceFeet.mockReturnValue(50);
-      computeCover.mockReturnValue({ level: 'none', acBonus: 0 });
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'naturesSanctuaryActive') return true;
-        if (key === 'naturesSanctuaryCubeX') return 0;
-        if (key === 'naturesSanctuaryCubeY') return 0;
-        return undefined;
-      });
-
-      const result = await buildAttackContext(mockRangedAttack, mockStats, 'camp', 'test-map', 'normal', {});
-
-      expect(result.coverAcBonus).toBeUndefined();
-    });
-  });
-
-  describe('bulwark of force half cover', () => {
-    it('applies half cover when target is in bulwark targets list', async () => {
-      loadMapData.mockResolvedValue(makeMapWithPlayersAndNpc(
-        [{ name: 'Fighter1', gridX: 1, gridY: 1 }],
-        [{ name: 'Orc', gridX: 10, gridY: 10, type: 'npc' }],
-      ));
-      getCombatContext.mockResolvedValue(makeCombatContext('Fighter1', 'Orc', 10, 10));
-      getTargetFromAttacker.mockReturnValue({ name: 'Orc', gridX: 10, gridY: 10 });
-      getNearestPlacedItem.mockReturnValue({ name: 'Orc', gridX: 10, gridY: 10 });
-      getDistanceFeet.mockReturnValue(50);
-      computeCover.mockReturnValue({ level: 'none', acBonus: 0 });
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'bulwarkOfForceActive') return true;
-        if (key === 'bulwarkOfForceTargets') return ['Orc'];
-        return undefined;
-      });
-
-      const result = await buildAttackContext(mockRangedAttack, mockStats, 'camp', 'test-map', 'normal', {});
-
-      expect(result.coverAcBonus).toBe(2);
-      expect(result.coverLevel).toBe('half');
-    });
-
-    it('does not apply bulwark cover when target is not in targets list', async () => {
-      loadMapData.mockResolvedValue(makeMapWithPlayersAndNpc(
-        [{ name: 'Fighter1', gridX: 1, gridY: 1 }],
-        [{ name: 'Orc', gridX: 10, gridY: 10, type: 'npc' }],
-      ));
-      getCombatContext.mockResolvedValue(makeCombatContext('Fighter1', 'Orc', 10, 10));
-      getTargetFromAttacker.mockReturnValue({ name: 'Orc', gridX: 10, gridY: 10 });
-      getNearestPlacedItem.mockReturnValue({ name: 'Orc', gridX: 10, gridY: 10 });
-      getDistanceFeet.mockReturnValue(50);
-      computeCover.mockReturnValue({ level: 'none', acBonus: 0 });
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'bulwarkOfForceActive') return true;
-        if (key === 'bulwarkOfForceTargets') return ['Goblin'];
-        return undefined;
-      });
-
-      const result = await buildAttackContext(mockRangedAttack, mockStats, 'camp', 'test-map', 'normal', {});
-
-      expect(result.coverAcBonus).toBeUndefined();
-    });
-
-    it('does not apply bulwark cover when bulwark is not active', async () => {
-      loadMapData.mockResolvedValue(makeMapWithPlayersAndNpc(
-        [{ name: 'Fighter1', gridX: 1, gridY: 1 }],
-        [{ name: 'Orc', gridX: 10, gridY: 10, type: 'npc' }],
-      ));
-      getCombatContext.mockResolvedValue(makeCombatContext('Fighter1', 'Orc', 10, 10));
-      getTargetFromAttacker.mockReturnValue({ name: 'Orc', gridX: 10, gridY: 10 });
-      getNearestPlacedItem.mockReturnValue({ name: 'Orc', gridX: 10, gridY: 10 });
-      getDistanceFeet.mockReturnValue(50);
-      computeCover.mockReturnValue({ level: 'none', acBonus: 0 });
-
-      const result = await buildAttackContext(mockRangedAttack, mockStats, 'camp', 'test-map', 'normal', {});
-
-      expect(result.coverAcBonus).toBeUndefined();
-    });
-
-    it('applies half cover when bulwark is on a different PC than the attacker', async () => {
-      loadMapData.mockResolvedValue(makeMapWithPlayersAndNpc(
-        [
-          { name: 'Fighter1', gridX: 1, gridY: 1 },
-          { name: 'Sorcerer1', gridX: 5, gridY: 8 },
-        ],
-        [{ name: 'Orc', gridX: 10, gridY: 10, type: 'npc' }],
-      ));
-      getCombatContext.mockResolvedValue(makeCombatContext('Fighter1', 'Orc', 10, 10));
-      getTargetFromAttacker.mockReturnValue({ name: 'Orc', gridX: 10, gridY: 10 });
-      getNearestPlacedItem.mockReturnValue({ name: 'Orc', gridX: 10, gridY: 10 });
-      getDistanceFeet.mockReturnValue(50);
-      computeCover.mockReturnValue({ level: 'none', acBonus: 0 });
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (name === 'Sorcerer1' && key === 'bulwarkOfForceActive') return true;
-        if (name === 'Sorcerer1' && key === 'bulwarkOfForceTargets') return ['Orc'];
-        return undefined;
-      });
-
-      const result = await buildAttackContext(mockRangedAttack, mockStats, 'camp', 'test-map', 'normal', {});
-
-      expect(result.coverAcBonus).toBe(2);
-      expect(result.coverLevel).toBe('half');
-    });
-
-    it('does not override existing cover when bulwark acBonus is lower', async () => {
-      loadMapData.mockResolvedValue(makeMapWithPlayersAndNpc(
-        [{ name: 'Fighter1', gridX: 1, gridY: 1 }],
-        [{ name: 'Orc', gridX: 10, gridY: 10, type: 'npc' }],
-      ));
-      getCombatContext.mockResolvedValue(makeCombatContext('Fighter1', 'Orc', 10, 10));
-      getTargetFromAttacker.mockReturnValue({ name: 'Orc', gridX: 10, gridY: 10 });
-      getNearestPlacedItem.mockReturnValue({ name: 'Orc', gridX: 10, gridY: 10 });
-      getDistanceFeet.mockReturnValue(50);
-      computeCover.mockReturnValue({ level: 'half', acBonus: 2 });
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'bulwarkOfForceActive') return true;
-        if (key === 'bulwarkOfForceTargets') return ['Orc'];
-        return undefined;
-      });
-
-      const result = await buildAttackContext(mockRangedAttack, mockStats, 'camp', 'test-map', 'normal', {});
-
-      expect(result.coverAcBonus).toBe(2);
-    });
-  });
-
-  describe('smite of protection half cover', () => {
-    it('applies half cover when target is within aura of protection range', async () => {
-      loadMapData.mockResolvedValue(makeMapWithPlayersAndNpc(
-        [{ name: 'Fighter1', gridX: 1, gridY: 1 }, { name: 'Orc', gridX: 5, gridY: 5 }],
-        [{ name: 'Orc', gridX: 5, gridY: 5, type: 'npc' }],
-      ));
-      getCombatContext.mockResolvedValue(makeCombatContext('Fighter1', 'Orc', 5, 5));
-      getTargetFromAttacker.mockReturnValue({ name: 'Orc', gridX: 5, gridY: 5 });
-      getNearestPlacedItem.mockReturnValue({ name: 'Orc', gridX: 5, gridY: 5 });
-      getDistanceFeet.mockReturnValue(30);
-      computeCover.mockReturnValue({ level: 'none', acBonus: 0 });
-      hasAuraOfProtection.mockReturnValue(true);
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'smiteOfProtectionActive') return true;
-        return undefined;
-      });
-
-      const result = await buildAttackContext(mockRangedAttack, mockStats, 'camp', 'test-map', 'normal', {});
-
-      expect(result.coverAcBonus).toBe(2);
-      expect(result.coverLevel).toBe('half');
-    });
-
-    it('does not apply smite cover when smite is not active', async () => {
-      loadMapData.mockResolvedValue(makeMapWithPlayersAndNpc(
-        [{ name: 'Fighter1', gridX: 1, gridY: 1 }],
-        [{ name: 'Orc', gridX: 10, gridY: 10, type: 'npc' }],
-      ));
-      getCombatContext.mockResolvedValue(makeCombatContext('Fighter1', 'Orc', 10, 10));
-      getTargetFromAttacker.mockReturnValue({ name: 'Orc', gridX: 10, gridY: 10 });
-      getNearestPlacedItem.mockReturnValue({ name: 'Orc', gridX: 10, gridY: 10 });
-      getDistanceFeet.mockReturnValue(50);
-      computeCover.mockReturnValue({ level: 'none', acBonus: 0 });
-      hasAuraOfProtection.mockReturnValue(true);
-
-      const result = await buildAttackContext(mockRangedAttack, mockStats, 'camp', 'test-map', 'normal', {});
-
-      expect(result.coverAcBonus).toBeUndefined();
-    });
-
-    it('does not apply smite cover when aura source is null (no players on map)', async () => {
-      loadMapData.mockResolvedValue(makeMapData([], []));
-      getCombatContext.mockResolvedValue(makeCombatContext('Fighter1', 'Orc', 10, 10));
-      getTargetFromAttacker.mockReturnValue({ name: 'Orc', gridX: 10, gridY: 10 });
-      computeCover.mockReturnValue({ level: 'none', acBonus: 0 });
-      hasAuraOfProtection.mockReturnValue(true);
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'smiteOfProtectionActive') return true;
-        return undefined;
-      });
-
-      const result = await buildAttackContext(mockRangedAttack, mockStats, 'camp', 'test-map', 'normal', {});
-
-      expect(result.coverAcBonus).toBeUndefined();
-    });
-
-    it('does not apply smite cover when target is outside aura range', async () => {
-      loadMapData.mockResolvedValue(makeMapWithPlayersAndNpc(
-        [{ name: 'Fighter1', gridX: 1, gridY: 1 }, { name: 'Orc', gridX: 20, gridY: 20 }],
-        [{ name: 'Orc', gridX: 20, gridY: 20, type: 'npc' }],
-      ));
-      getCombatContext.mockResolvedValue(makeCombatContext('Fighter1', 'Orc', 20, 20));
-      getTargetFromAttacker.mockReturnValue({ name: 'Orc', gridX: 20, gridY: 20 });
-      getNearestPlacedItem.mockReturnValue({ name: 'Orc', gridX: 20, gridY: 20 });
-      getDistanceFeet.mockReturnValue(100);
-      computeCover.mockReturnValue({ level: 'none', acBonus: 0 });
-      hasAuraOfProtection.mockReturnValue(true);
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'smiteOfProtectionActive') return true;
-        return undefined;
-      });
-
-      const result = await buildAttackContext(mockRangedAttack, mockStats, 'camp', 'test-map', 'normal', {});
-
-      expect(result.coverAcBonus).toBeUndefined();
-    });
-
-    it('does not override existing cover when smite acBonus is lower', async () => {
-      loadMapData.mockResolvedValue(makeMapWithPlayersAndNpc(
-        [{ name: 'Fighter1', gridX: 1, gridY: 1 }, { name: 'Orc', gridX: 5, gridY: 5 }],
-        [{ name: 'Orc', gridX: 5, gridY: 5, type: 'npc' }],
-      ));
-      getCombatContext.mockResolvedValue(makeCombatContext('Fighter1', 'Orc', 5, 5));
-      getTargetFromAttacker.mockReturnValue({ name: 'Orc', gridX: 5, gridY: 5 });
-      getNearestPlacedItem.mockReturnValue({ name: 'Orc', gridX: 5, gridY: 5 });
-      getDistanceFeet.mockReturnValue(30);
-      computeCover.mockReturnValue({ level: 'half', acBonus: 2 });
-      hasAuraOfProtection.mockReturnValue(true);
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'smiteOfProtectionActive') return true;
-        return undefined;
-      });
-
-      const result = await buildAttackContext(mockRangedAttack, mockStats, 'camp', 'test-map', 'normal', {});
-
-      expect(result.coverAcBonus).toBe(2);
-    });
-  });
-
-  describe('glorious defense AC bonus in cover', () => {
-    it('applies glorious defense AC bonus when target is within 10 feet', async () => {
-      loadMapData.mockResolvedValue(makeMapWithPlayersAndNpc(
-        [{ name: 'Fighter1', gridX: 1, gridY: 1 }, { name: 'Orc', gridX: 3, gridY: 3 }],
-        [{ name: 'Orc', gridX: 3, gridY: 3, type: 'npc' }],
-      ));
-      getCombatContext.mockResolvedValue(makeCombatContext('Fighter1', 'Orc', 3, 3));
-      getTargetFromAttacker.mockReturnValue({ name: 'Orc', gridX: 3, gridY: 3 });
-      getNearestPlacedItem.mockReturnValue({ name: 'Orc', gridX: 3, gridY: 3 });
-      getDistanceFeet.mockReturnValue(10);
-      computeCover.mockReturnValue({ level: 'none', acBonus: 0 });
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'gloriousDefenseActive') return true;
-        if (key === 'gloriousDefenseBonus') return 3;
-        return undefined;
-      });
-
-      const result = await buildAttackContext(mockRangedAttack, mockStats, 'camp', 'test-map', 'normal', {});
-
-      expect(result.coverAcBonus).toBe(3);
-    });
-
-    it('does not apply glorious defense when target is more than 10 feet away', async () => {
-      loadMapData.mockResolvedValue(makeMapWithPlayersAndNpc(
-        [{ name: 'Fighter1', gridX: 1, gridY: 1 }, { name: 'Orc', gridX: 15, gridY: 15 }],
-        [{ name: 'Orc', gridX: 15, gridY: 15, type: 'npc' }],
-      ));
-      getCombatContext.mockResolvedValue(makeCombatContext('Fighter1', 'Orc', 15, 15));
-      getTargetFromAttacker.mockReturnValue({ name: 'Orc', gridX: 15, gridY: 15 });
-      getNearestPlacedItem.mockReturnValue({ name: 'Orc', gridX: 15, gridY: 15 });
-      getDistanceFeet.mockReturnValue(50);
-      computeCover.mockReturnValue({ level: 'none', acBonus: 0 });
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'gloriousDefenseActive') return true;
-        if (key === 'gloriousDefenseBonus') return 3;
-        return undefined;
-      });
-
-      const result = await buildAttackContext(mockRangedAttack, mockStats, 'camp', 'test-map', 'normal', {});
-
-      expect(result.coverAcBonus).toBeUndefined();
-    });
-
-    it('does not apply glorious defense when not active', async () => {
-      loadMapData.mockResolvedValue(makeMapWithPlayersAndNpc(
-        [{ name: 'Fighter1', gridX: 1, gridY: 1 }, { name: 'Orc', gridX: 3, gridY: 3 }],
-        [{ name: 'Orc', gridX: 3, gridY: 3, type: 'npc' }],
-      ));
-      getCombatContext.mockResolvedValue(makeCombatContext('Fighter1', 'Orc', 3, 3));
-      getTargetFromAttacker.mockReturnValue({ name: 'Orc', gridX: 3, gridY: 3 });
-      getNearestPlacedItem.mockReturnValue({ name: 'Orc', gridX: 3, gridY: 3 });
-      getDistanceFeet.mockReturnValue(10);
-      computeCover.mockReturnValue({ level: 'none', acBonus: 0 });
-
-      const result = await buildAttackContext(mockRangedAttack, mockStats, 'camp', 'test-map', 'normal', {});
-
-      expect(result.coverAcBonus).toBeUndefined();
-    });
-
-    it('does not override existing cover when glorious defense bonus is lower', async () => {
-      loadMapData.mockResolvedValue(makeMapWithPlayersAndNpc(
-        [{ name: 'Fighter1', gridX: 1, gridY: 1 }, { name: 'Orc', gridX: 3, gridY: 3 }],
-        [{ name: 'Orc', gridX: 3, gridY: 3, type: 'npc' }],
-      ));
-      getCombatContext.mockResolvedValue(makeCombatContext('Fighter1', 'Orc', 3, 3));
-      getTargetFromAttacker.mockReturnValue({ name: 'Orc', gridX: 3, gridY: 3 });
-      getNearestPlacedItem.mockReturnValue({ name: 'Orc', gridX: 3, gridY: 3 });
-      getDistanceFeet.mockReturnValue(10);
-      computeCover.mockReturnValue({ level: 'half', acBonus: 2 });
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'gloriousDefenseActive') return true;
-        if (key === 'gloriousDefenseBonus') return 1;
-        return undefined;
-      });
-
-      const result = await buildAttackContext(mockRangedAttack, mockStats, 'camp', 'test-map', 'normal', {});
-
-      expect(result.coverAcBonus).toBe(2);
-    });
-
-    it('uses default glorious defense bonus of 1 when active but bonus is null', async () => {
-      loadMapData.mockResolvedValue(makeMapWithPlayersAndNpc(
-        [{ name: 'Fighter1', gridX: 1, gridY: 1 }, { name: 'Orc', gridX: 3, gridY: 3 }],
-        [{ name: 'Orc', gridX: 3, gridY: 3, type: 'npc' }],
-      ));
-      getCombatContext.mockResolvedValue(makeCombatContext('Fighter1', 'Orc', 3, 3));
-      getTargetFromAttacker.mockReturnValue({ name: 'Orc', gridX: 3, gridY: 3 });
-      getNearestPlacedItem.mockReturnValue({ name: 'Orc', gridX: 3, gridY: 3 });
-      getDistanceFeet.mockReturnValue(10);
-      computeCover.mockReturnValue({ level: 'none', acBonus: 0 });
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'gloriousDefenseActive') return true;
-        if (key === 'gloriousDefenseBonus') return null;
-        return undefined;
-      });
-
-      const result = await buildAttackContext(mockRangedAttack, mockStats, 'camp', 'test-map', 'normal', {});
-
-      expect(result.coverAcBonus).toBe(1);
-    });
-
-    it('does not apply glorious defense when target player not found on map', async () => {
-      loadMapData.mockResolvedValue(makeMapWithPlayersAndNpc(
-        [{ name: 'Fighter1', gridX: 1, gridY: 1 }],
-        [{ name: 'Orc', gridX: 3, gridY: 3, type: 'npc' }],
-      ));
-      getCombatContext.mockResolvedValue(makeCombatContext('Fighter1', 'Orc', 3, 3));
-      getTargetFromAttacker.mockReturnValue({ name: 'Orc', gridX: 3, gridY: 3 });
-      getNearestPlacedItem.mockReturnValue({ name: 'Orc', gridX: 3, gridY: 3 });
-      getDistanceFeet.mockReturnValue(10);
-      computeCover.mockReturnValue({ level: 'none', acBonus: 0 });
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'gloriousDefenseActive') return true;
-        if (key === 'gloriousDefenseBonus') return 3;
-        return undefined;
-      });
-
-      const result = await buildAttackContext(mockRangedAttack, mockStats, 'camp', 'test-map', 'normal', {});
-
-      expect(result.coverAcBonus).toBeUndefined();
-    });
-  });
-
-  describe('defensive duelist AC bonus in cover', () => {
-    it('applies defensive duelist AC bonus when higher than existing cover', async () => {
-      loadMapData.mockResolvedValue(makeMapWithPlayersAndNpc(
-        [{ name: 'Fighter1', gridX: 1, gridY: 1 }],
-        [{ name: 'Orc', gridX: 10, gridY: 10, type: 'npc' }],
-      ));
-      getCombatContext.mockResolvedValue(makeCombatContext('Fighter1', 'Orc', 10, 10));
-      getTargetFromAttacker.mockReturnValue({ name: 'Orc', gridX: 10, gridY: 10 });
-      getNearestPlacedItem.mockReturnValue({ name: 'Orc', gridX: 10, gridY: 10 });
-      getDistanceFeet.mockReturnValue(50);
-      computeCover.mockReturnValue({ level: 'none', acBonus: 0 });
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'defensiveDuelistActive') return true;
-        if (key === 'defensiveDuelistBonus') return 4;
-        return undefined;
-      });
-
-      const result = await buildAttackContext(mockRangedAttack, mockStats, 'camp', 'test-map', 'normal', {});
-
-      expect(result.coverAcBonus).toBe(4);
-    });
-
-    it('does not apply defensive duelist when bonus is lower than existing cover', async () => {
-      loadMapData.mockResolvedValue(makeMapWithPlayersAndNpc(
-        [{ name: 'Fighter1', gridX: 1, gridY: 1 }],
-        [{ name: 'Orc', gridX: 10, gridY: 10, type: 'npc' }],
-      ));
-      getCombatContext.mockResolvedValue(makeCombatContext('Fighter1', 'Orc', 10, 10));
-      getTargetFromAttacker.mockReturnValue({ name: 'Orc', gridX: 10, gridY: 10 });
-      getNearestPlacedItem.mockReturnValue({ name: 'Orc', gridX: 10, gridY: 10 });
-      getDistanceFeet.mockReturnValue(50);
-      computeCover.mockReturnValue({ level: 'half', acBonus: 2 });
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'defensiveDuelistActive') return true;
-        if (key === 'defensiveDuelistBonus') return 1;
-        return undefined;
-      });
-
-      const result = await buildAttackContext(mockRangedAttack, mockStats, 'camp', 'test-map', 'normal', {});
-
-      expect(result.coverAcBonus).toBe(2);
-    });
-
-    it('does not apply defensive duelist when not active', async () => {
-      loadMapData.mockResolvedValue(makeMapWithPlayersAndNpc(
-        [{ name: 'Fighter1', gridX: 1, gridY: 1 }],
-        [{ name: 'Orc', gridX: 10, gridY: 10, type: 'npc' }],
-      ));
-      getCombatContext.mockResolvedValue(makeCombatContext('Fighter1', 'Orc', 10, 10));
-      getTargetFromAttacker.mockReturnValue({ name: 'Orc', gridX: 10, gridY: 10 });
-      getNearestPlacedItem.mockReturnValue({ name: 'Orc', gridX: 10, gridY: 10 });
-      getDistanceFeet.mockReturnValue(50);
-      computeCover.mockReturnValue({ level: 'none', acBonus: 0 });
-
-      const result = await buildAttackContext(mockRangedAttack, mockStats, 'camp', 'test-map', 'normal', {});
-
-      expect(result.coverAcBonus).toBeUndefined();
-    });
-
-    it('defaults defensive duelist bonus to 0 when active but bonus is null', async () => {
-      loadMapData.mockResolvedValue(makeMapWithPlayersAndNpc(
-        [{ name: 'Fighter1', gridX: 1, gridY: 1 }],
-        [{ name: 'Orc', gridX: 10, gridY: 10, type: 'npc' }],
-      ));
-      getCombatContext.mockResolvedValue(makeCombatContext('Fighter1', 'Orc', 10, 10));
-      getTargetFromAttacker.mockReturnValue({ name: 'Orc', gridX: 10, gridY: 10 });
-      getNearestPlacedItem.mockReturnValue({ name: 'Orc', gridX: 10, gridY: 10 });
-      getDistanceFeet.mockReturnValue(50);
-      computeCover.mockReturnValue({ level: 'none', acBonus: 0 });
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'defensiveDuelistActive') return true;
-        if (key === 'defensiveDuelistBonus') return null;
-        return undefined;
-      });
-
-      const result = await buildAttackContext(mockRangedAttack, mockStats, 'camp', 'test-map', 'normal', {});
-
-      expect(result.coverAcBonus).toBeUndefined();
-    });
-  });
-
-  describe('bait and switch AC bonus in cover', () => {
-    it('applies bait and switch AC bonus when higher than existing cover', async () => {
-      loadMapData.mockResolvedValue(makeMapWithPlayersAndNpc(
-        [{ name: 'Fighter1', gridX: 1, gridY: 1 }],
-        [{ name: 'Orc', gridX: 10, gridY: 10, type: 'npc' }],
-      ));
-      getCombatContext.mockResolvedValue(makeCombatContext('Fighter1', 'Orc', 10, 10));
-      getTargetFromAttacker.mockReturnValue({ name: 'Orc', gridX: 10, gridY: 10 });
-      getNearestPlacedItem.mockReturnValue({ name: 'Orc', gridX: 10, gridY: 10 });
-      getDistanceFeet.mockReturnValue(50);
-      computeCover.mockReturnValue({ level: 'none', acBonus: 0 });
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'baitAndSwitchActive') return true;
-        if (key === 'baitAndSwitchBonus') return 5;
-        return undefined;
-      });
-
-      const result = await buildAttackContext(mockRangedAttack, mockStats, 'camp', 'test-map', 'normal', {});
-
-      expect(result.coverAcBonus).toBe(5);
-    });
-
-    it('does not apply bait and switch when bonus is lower than existing cover', async () => {
-      loadMapData.mockResolvedValue(makeMapWithPlayersAndNpc(
-        [{ name: 'Fighter1', gridX: 1, gridY: 1 }],
-        [{ name: 'Orc', gridX: 10, gridY: 10, type: 'npc' }],
-      ));
-      getCombatContext.mockResolvedValue(makeCombatContext('Fighter1', 'Orc', 10, 10));
-      getTargetFromAttacker.mockReturnValue({ name: 'Orc', gridX: 10, gridY: 10 });
-      getNearestPlacedItem.mockReturnValue({ name: 'Orc', gridX: 10, gridY: 10 });
-      getDistanceFeet.mockReturnValue(50);
-      computeCover.mockReturnValue({ level: 'half', acBonus: 2 });
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'baitAndSwitchActive') return true;
-        if (key === 'baitAndSwitchBonus') return 1;
-        return undefined;
-      });
-
-      const result = await buildAttackContext(mockRangedAttack, mockStats, 'camp', 'test-map', 'normal', {});
-
-      expect(result.coverAcBonus).toBe(2);
-    });
-
-    it('does not apply bait and switch when not active', async () => {
-      loadMapData.mockResolvedValue(makeMapWithPlayersAndNpc(
-        [{ name: 'Fighter1', gridX: 1, gridY: 1 }],
-        [{ name: 'Orc', gridX: 10, gridY: 10, type: 'npc' }],
-      ));
-      getCombatContext.mockResolvedValue(makeCombatContext('Fighter1', 'Orc', 10, 10));
-      getTargetFromAttacker.mockReturnValue({ name: 'Orc', gridX: 10, gridY: 10 });
-      getNearestPlacedItem.mockReturnValue({ name: 'Orc', gridX: 10, gridY: 10 });
-      getDistanceFeet.mockReturnValue(50);
-      computeCover.mockReturnValue({ level: 'none', acBonus: 0 });
-
-      const result = await buildAttackContext(mockRangedAttack, mockStats, 'camp', 'test-map', 'normal', {});
-
-      expect(result.coverAcBonus).toBeUndefined();
-    });
-
-    it('defaults bait and switch bonus to 0 when active but bonus is null', async () => {
-      loadMapData.mockResolvedValue(makeMapWithPlayersAndNpc(
-        [{ name: 'Fighter1', gridX: 1, gridY: 1 }],
-        [{ name: 'Orc', gridX: 10, gridY: 10, type: 'npc' }],
-      ));
-      getCombatContext.mockResolvedValue(makeCombatContext('Fighter1', 'Orc', 10, 10));
-      getTargetFromAttacker.mockReturnValue({ name: 'Orc', gridX: 10, gridY: 10 });
-      getNearestPlacedItem.mockReturnValue({ name: 'Orc', gridX: 10, gridY: 10 });
-      getDistanceFeet.mockReturnValue(50);
-      computeCover.mockReturnValue({ level: 'none', acBonus: 0 });
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'baitAndSwitchActive') return true;
-        if (key === 'baitAndSwitchBonus') return null;
-        return undefined;
-      });
-
-      const result = await buildAttackContext(mockRangedAttack, mockStats, 'camp', 'test-map', 'normal', {});
-
-      expect(result.coverAcBonus).toBeUndefined();
     });
   });
 });

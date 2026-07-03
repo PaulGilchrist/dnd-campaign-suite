@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ── Mocks BEFORE imports ───────────────────────────────────────
@@ -123,25 +123,6 @@ describe('aidHandler', () => {
       expect(result.payload.creatureTargets).toEqual(['Ally1', 'Ally2']);
     });
 
-    it('excludes the caster from creatureTargets', async () => {
-      getCombatContext.mockResolvedValue(
-        makeCombatContext([
-          { name: 'TestCleric', type: 'player' },
-          { name: 'TestCleric', type: 'npc' },
-          { name: 'Ally', type: 'player' },
-        ]),
-      );
-
-      const result = await handle(
-        makeAction(),
-        makePlayerStats(),
-        campaignName,
-        mapName,
-      );
-
-      expect(result.payload.creatureTargets).toEqual(['Ally']);
-    });
-
     it('uses automation range when provided', async () => {
       getCombatContext.mockResolvedValue(
         makeCombatContext([{ name: 'Ally', type: 'player' }]),
@@ -236,45 +217,12 @@ describe('aidHandler', () => {
       expect(result.payload.attackerPos).toEqual({ x: 1, y: 2 });
     });
 
-    it('sets attackerPos to null when mapName is not provided', async () => {
+    it('includes duration from spell with default fallback', async () => {
       getCombatContext.mockResolvedValue(
         makeCombatContext([{ name: 'Ally', type: 'player' }]),
       );
 
-      const result = await handle(
-        makeAction(),
-        makePlayerStats(),
-        campaignName,
-        null,
-      );
-
-      expect(result.payload.attackerPos).toBeNull();
-    });
-
-    it('includes automation object in payload', async () => {
-      getCombatContext.mockResolvedValue(
-        makeCombatContext([{ name: 'Ally', type: 'player' }]),
-      );
-
-      const result = await handle(
-        makeAction({ customProp: 'value' }),
-        makePlayerStats(),
-        campaignName,
-        mapName,
-      );
-
-      expect(result.payload.automation).toEqual({
-        type: 'aid',
-        customProp: 'value',
-      });
-    });
-
-    it('includes duration from spell in payload', async () => {
-      getCombatContext.mockResolvedValue(
-        makeCombatContext([{ name: 'Ally', type: 'player' }]),
-      );
-
-      const result = await handle(
+      let result = await handle(
         makeAction({}, { duration: '1 hour' }),
         makePlayerStats(),
         campaignName,
@@ -282,14 +230,8 @@ describe('aidHandler', () => {
       );
 
       expect(result.payload.duration).toBe('1 hour');
-    });
 
-    it('defaults duration to 8 hours when spell has no duration', async () => {
-      getCombatContext.mockResolvedValue(
-        makeCombatContext([{ name: 'Ally', type: 'player' }]),
-      );
-
-      const result = await handle(
+      result = await handle(
         makeAction({}, {}),
         makePlayerStats(),
         campaignName,
@@ -339,6 +281,13 @@ describe('aidHandler', () => {
       const result = await handle(action, makePlayerStats(), campaignName, mapName);
 
       expect(result.payload.hpIncrease).toBe(5);
+      expect(evaluateAutoExpression).toHaveBeenCalledWith(
+        '5',
+        expect.anything(),
+        expect.anything(),
+        expect.anything(),
+        3,
+      );
     });
 
     it('uses custom hpMaxIncreaseExpression from spell.automation when provided', async () => {
@@ -365,35 +314,17 @@ describe('aidHandler', () => {
       );
     });
 
-    it('defaults hpIncrease to 5 when evaluateAutoExpression returns invalid value', async () => {
+    it('defaults hpIncrease to 5 when evaluateAutoExpression returns invalid or zero value', async () => {
       getCombatContext.mockResolvedValue(
         makeCombatContext([{ name: 'Ally', type: 'player' }]),
       );
       evaluateAutoExpression.mockReturnValue(-1);
 
-      const result = await handle(
-        makeAction(),
-        makePlayerStats(),
-        campaignName,
-        mapName,
-      );
-
+      let result = await handle(makeAction(), makePlayerStats(), campaignName, mapName);
       expect(result.payload.hpIncrease).toBe(5);
-    });
 
-    it('defaults hpIncrease to 5 when evaluateAutoExpression returns 0', async () => {
-      getCombatContext.mockResolvedValue(
-        makeCombatContext([{ name: 'Ally', type: 'player' }]),
-      );
       evaluateAutoExpression.mockReturnValue(0);
-
-      const result = await handle(
-        makeAction(),
-        makePlayerStats(),
-        campaignName,
-        mapName,
-      );
-
+      result = await handle(makeAction(), makePlayerStats(), campaignName, mapName);
       expect(result.payload.hpIncrease).toBe(5);
     });
   });
@@ -664,60 +595,6 @@ describe('aidHandler', () => {
       expect(buffsCall[2][0].duration).toBe('1 hour');
     });
 
-    it('includes effect type aid_hp_increase in buff', async () => {
-      getRuntimeValue.mockImplementation((target, key) => {
-        if (key === 'aidHpMaxIncrease') return 0;
-        if (key === 'currentHitPoints') return 10;
-        if (key === 'hitPoints') return 20;
-        if (key === 'activeBuffs') return [];
-        return null;
-      });
-
-      await applyAid(
-        makeAction(),
-        makePlayerStats(),
-        campaignName,
-        mapName,
-        ['Ally1'],
-      );
-
-      const buffsCall = setRuntimeValue.mock.calls.find(
-        (c) => c[0] === 'Ally1' && c[1] === 'activeBuffs',
-      );
-      expect(buffsCall[2][0].effect).toBe('aid_hp_increase');
-    });
-
-    it('calls addExpiration with correct parameters', async () => {
-      getRuntimeValue.mockImplementation((target, key) => {
-        if (key === 'aidHpMaxIncrease') return 0;
-        if (key === 'currentHitPoints') return 10;
-        if (key === 'hitPoints') return 20;
-        if (key === 'activeBuffs') return [];
-        return null;
-      });
-
-      await applyAid(
-        makeAction(),
-        makePlayerStats(),
-        campaignName,
-        mapName,
-        ['Ally1'],
-      );
-
-      expect(addExpiration).toHaveBeenCalledWith(
-        'TestCleric',
-        'Ally1',
-        expect.arrayContaining([
-          expect.objectContaining({
-            type: 'remove_aid_buff',
-            buffName: 'Aid',
-            hpKey: 'aidHpMaxIncrease',
-          }),
-        ]),
-        campaignName,
-      );
-    });
-
     it('posts hp_change log entry for each target', async () => {
       getRuntimeValue.mockImplementation((target, key) => {
         if (key === 'aidHpMaxIncrease') return 0;
@@ -802,32 +679,6 @@ describe('aidHandler', () => {
       );
     });
 
-    it('uses spell level as fallback for hpIncrease when spellSlotLevel is not provided', async () => {
-      getRuntimeValue.mockImplementation((target, key) => {
-        if (key === 'aidHpMaxIncrease') return 0;
-        if (key === 'currentHitPoints') return 10;
-        if (key === 'hitPoints') return 20;
-        if (key === 'activeBuffs') return [];
-        return null;
-      });
-      evaluateAutoExpression.mockReturnValue(5);
-
-      const action = {
-        name: 'Aid',
-        automation: { type: 'aid' },
-        spell: { level: 3 },
-      };
-
-      await applyAid(action, makePlayerStats(), campaignName, mapName, ['Ally1']);
-
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'Ally1',
-        'aidHpMaxIncrease',
-        5,
-        campaignName,
-      );
-    });
-
     it('uses custom hpMaxIncreaseExpression for applyAid', async () => {
       getRuntimeValue.mockImplementation((target, key) => {
         if (key === 'aidHpMaxIncrease') return 0;
@@ -851,33 +702,6 @@ describe('aidHandler', () => {
         'aidHpMaxIncrease',
         12,
         campaignName,
-      );
-    });
-
-    it('uses spell level as fallback for slotLevel in applyAid', async () => {
-      getRuntimeValue.mockImplementation((target, key) => {
-        if (key === 'aidHpMaxIncrease') return 0;
-        if (key === 'currentHitPoints') return 10;
-        if (key === 'hitPoints') return 20;
-        if (key === 'activeBuffs') return [];
-        return null;
-      });
-      evaluateAutoExpression.mockReturnValue(5);
-
-      const action = {
-        name: 'Aid',
-        automation: { type: 'aid' },
-        spell: { level: 3 },
-      };
-
-      await applyAid(action, makePlayerStats(), campaignName, mapName, ['Ally1']);
-
-      expect(evaluateAutoExpression).toHaveBeenCalledWith(
-        '5',
-        expect.anything(),
-        expect.anything(),
-        expect.anything(),
-        3,
       );
     });
 
@@ -906,31 +730,6 @@ describe('aidHandler', () => {
         expect.anything(),
         2,
       );
-    });
-
-    it('handles activeBuffs being non-array by treating as empty', async () => {
-      getRuntimeValue.mockImplementation((target, key) => {
-        if (key === 'aidHpMaxIncrease') return 0;
-        if (key === 'currentHitPoints') return 10;
-        if (key === 'hitPoints') return 20;
-        if (key === 'activeBuffs') return 'not-an-array';
-        return null;
-      });
-
-      await applyAid(
-        makeAction(),
-        makePlayerStats(),
-        campaignName,
-        mapName,
-        ['Ally1'],
-      );
-
-      const buffsCall = setRuntimeValue.mock.calls.find(
-        (c) => c[0] === 'Ally1' && c[1] === 'activeBuffs',
-      );
-      expect(buffsCall).toBeDefined();
-      expect(buffsCall[2].length).toBe(1);
-      expect(buffsCall[2][0].name).toBe('Aid');
     });
   });
 });

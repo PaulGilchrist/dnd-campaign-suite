@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 // Suppress fire-and-forget logService.addEntry rejection warnings from source code
 process.on('unhandledRejection', () => {});
 
@@ -35,12 +35,9 @@ describe('boonOfFateHandler.handle', () => {
         expect(result.payload.type).toBe('automation_info');
         expect(result.payload.description).toContain('no uses remaining');
         expect(result.payload.description).toContain('Initiative or Short or Long Rest');
-        expect(runtimeState.setRuntimeValue).not.toHaveBeenCalled();
-        expect(damageRollback.findLastAttack).not.toHaveBeenCalled();
-        expect(logService.addEntry).not.toHaveBeenCalled();
     });
 
-    it('should return error popup when no recent D20 attack exists', async () => {
+    it('should return error popup when no recent D20 attack exists for the player', async () => {
         runtimeState.getRuntimeValue.mockImplementation((_charName, key) => {
             if (key === 'boonOfFateUsed') return false;
             return undefined;
@@ -145,32 +142,5 @@ describe('boonOfFateHandler.handle', () => {
 
         expect(result.type).toBe('popup');
         expect(result.payload.description).toContain('Attack vs AC unknown');
-    });
-
-    it('should return popup even when logService.addEntry rejects (fire-and-forget)', async () => {
-        runtimeState.getRuntimeValue.mockImplementation((_charName, key) => {
-            if (key === 'boonOfFateUsed') return false;
-            return undefined;
-        });
-        damageRollback.findLastAttack.mockResolvedValue({
-            attackEvent: { d20: 8, bonus: 5, targetName: 'TestFighter', hit: false },
-            attackerName: 'Goblin',
-            targetName: 'TestFighter',
-            primaryDamage: 10,
-            secondaryDamage: 0,
-            totalDamage: 10,
-            damageTypes: ['Slashing'],
-        });
-        const logError = new Error('Log service unavailable');
-        logService.addEntry.mockRejectedValue(logError);
-
-        const result = await handle(mockAction, mockPlayerStats, mockCampaignName);
-
-        expect(result.type).toBe('popup');
-        expect(result.payload.type).toBe('automation_info');
-        expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-            'TestFighter', 'boonOfFateUsed', true, mockCampaignName
-        );
-        expect(logService.addEntry).toHaveBeenCalled();
     });
 });

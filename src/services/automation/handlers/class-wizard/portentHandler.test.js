@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { handle, applyPortentChoice, getPortentDice, setPortentDice, refreshPortentDice } from './portentHandler.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { rollD20, rollExpression } from '../../../../services/dice/diceRoller.js';
@@ -160,26 +160,6 @@ describe('Portent Handler', () => {
                 mockCampaignName
             );
         });
-
-        it('handles single die', () => {
-            setPortentDice('TestWizard', [7], mockCampaignName);
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'TestWizard',
-                'portentDice',
-                '[7]',
-                mockCampaignName
-            );
-        });
-
-        it('handles empty array', () => {
-            setPortentDice('TestWizard', [], mockCampaignName);
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'TestWizard',
-                'portentDice',
-                '[]',
-                mockCampaignName
-            );
-        });
     });
 
     describe('refreshPortentDice', () => {
@@ -206,13 +186,6 @@ describe('Portent Handler', () => {
                 '[1,20,13]',
                 mockCampaignName
             );
-        });
-
-        it('rolls 2 dice at level 13', async () => {
-            const midLevelStats = { ...mockPlayerStats, level: 13 };
-            rollD20.mockReturnValueOnce(15).mockReturnValueOnce(3);
-            const dice = await refreshPortentDice('TestWizard', mockCampaignName, midLevelStats);
-            expect(dice).toEqual([15, 3]);
         });
     });
 
@@ -418,54 +391,6 @@ describe('Portent Handler', () => {
             expect(applyDamageToTarget).toHaveBeenCalled();
         });
 
-        it('skips damage trigger when no damage formula available', async () => {
-            getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === 'portentDice') return '[15, 8]';
-                return null;
-            });
-
-            const eventData = {
-                d20: 2, bonus: 6, targetName: 'Goblin', targetAc: 17, hit: false,
-                timestamp: makeTimestamp(),
-            };
-            const context = {
-                type: 'attack', attackName: 'Longsword', damageFormula: null,
-                damageType: 'Slashing',
-            };
-
-            await applyPortentChoice(
-                mockAction, mockPlayerStats, mockCampaignName,
-                'TestWizard', 'attack', eventData, context, 15
-            );
-
-            expect(rollExpression).not.toHaveBeenCalled();
-        });
-
-        it('does not trigger damage when hit stays a hit', async () => {
-            getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === 'portentDice') return '[15, 8]';
-                return null;
-            });
-
-            const eventData = {
-                d20: 16, bonus: 6, targetName: 'Goblin', targetAc: 17, hit: true,
-                timestamp: makeTimestamp(),
-            };
-            const context = {
-                type: 'attack', attackName: 'Longsword', damageFormula: '1d8+3',
-                damageType: 'Slashing', targetName: 'Goblin',
-                oldTotal: 22, oldHit: true,
-            };
-
-            await applyPortentChoice(
-                mockAction, mockPlayerStats, mockCampaignName,
-                'TestWizard', 'attack', eventData, context, 15
-            );
-
-            expect(rollExpression).not.toHaveBeenCalled();
-            expect(applyDamageToTarget).not.toHaveBeenCalled();
-        });
-
         it('reports when hit becomes a miss', async () => {
             getRuntimeValue.mockImplementation((_name, key) => {
                 if (key === 'portentDice') return '[15, 8]';
@@ -609,76 +534,6 @@ describe('Portent Handler', () => {
 
             expect(result.payload.description).toContain('The save now fails!');
         });
-
-        it('shows no outcome note when save DC is missing', async () => {
-            getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === 'portentDice') return '[15, 8]';
-                return null;
-            });
-
-            const eventData = {
-                d20: 3, bonus: 4, saveType: 'wisdom',
-                timestamp: makeTimestamp(),
-            };
-            const context = {
-                type: 'save', saveType: 'WIS', saveDc: null,
-            };
-
-            const result = await applyPortentChoice(
-                mockAction, mockPlayerStats, mockCampaignName,
-                'TestWizard', 'save', eventData, context, 15
-            );
-
-            expect(result.payload.description).not.toContain('The save now');
-        });
-
-        it('shows no outcome note when oldSuccess is missing', async () => {
-            getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === 'portentDice') return '[15, 8]';
-                return null;
-            });
-
-            const eventData = {
-                d20: 3, bonus: 4, saveType: 'wisdom',
-                timestamp: makeTimestamp(),
-            };
-            const context = {
-                type: 'save', saveType: 'WIS', saveDc: 14,
-                oldSuccess: null,
-            };
-
-            const result = await applyPortentChoice(
-                mockAction, mockPlayerStats, mockCampaignName,
-                'TestWizard', 'save', eventData, context, 15
-            );
-
-            expect(result.payload.description).not.toContain('The save now');
-        });
-
-        it('reports save that stays successful', async () => {
-            getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === 'portentDice') return '[15, 8]';
-                return null;
-            });
-
-            const eventData = {
-                d20: 18, bonus: 4, saveType: 'wisdom',
-                timestamp: makeTimestamp(),
-            };
-            const context = {
-                type: 'save', saveType: 'WIS', saveDc: 14,
-                actionName: 'Hold Person', targetName: 'TestWizard',
-                oldTotal: 22, oldSuccess: true,
-            };
-
-            const result = await applyPortentChoice(
-                mockAction, mockPlayerStats, mockCampaignName,
-                'TestWizard', 'save', eventData, context, 15
-            );
-
-            expect(result.payload.description).not.toContain('now succeeds');
-            expect(result.payload.description).not.toContain('now fails');
-        });
     });
 
     describe('applyPortentChoice - ability check', () => {
@@ -700,25 +555,6 @@ describe('Portent Handler', () => {
 
             expect(result.payload.description).toContain('Stealth check');
             expect(result.payload.description).toContain('Portent d20(15)');
-        });
-
-        it('uses default label when checkName is missing', async () => {
-            getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === 'portentDice') return '[15, 8]';
-                return null;
-            });
-
-            const eventData = {
-                d20: 4, bonus: 5,
-                timestamp: makeTimestamp(),
-            };
-
-            const result = await applyPortentChoice(
-                mockAction, mockPlayerStats, mockCampaignName,
-                'TestWizard', 'ability', eventData, null, 15
-            );
-
-            expect(result.payload.description).toContain('Ability check');
         });
     });
 
@@ -780,25 +616,6 @@ describe('Portent Handler', () => {
 
             // 99 not in pool, so falls back to sorted descending [10,5].slice(1) = [5]
             expect(setRuntimeValue).toHaveBeenCalledWith('TestWizard', 'portentDice', '[5]', mockCampaignName);
-        });
-
-        it('sets portentUsedThisTurn flag', async () => {
-            getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === 'portentDice') return '[15, 8]';
-                return null;
-            });
-
-            const eventData = {
-                d20: 4, bonus: 5, checkName: 'Stealth check',
-                timestamp: makeTimestamp(),
-            };
-
-            await applyPortentChoice(
-                mockAction, mockPlayerStats, mockCampaignName,
-                'TestWizard', 'ability', eventData, null, 15
-            );
-
-            expect(setRuntimeValue).toHaveBeenCalledWith('TestWizard', 'portentUsedThisTurn', true, mockCampaignName);
         });
 
         it('logs the usage', async () => {

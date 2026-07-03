@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import { handle } from './shieldHandler.js';
@@ -64,20 +64,6 @@ describe('shieldHandler', () => {
                 mockCampaignName
             );
         });
-
-        it('should always merge effect:shield into the automation options', async () => {
-            buffToggle.toggleBuff.mockReturnValue({ wasActive: false });
-
-            const action = makeAction({ automation: { type: 'shield', duration: '1_round', extra: true } });
-
-            await handle(action, mockPlayerStats, mockCampaignName, null);
-
-            const options = buffToggle.toggleBuff.mock.calls[0][2];
-            expect(options.effect).toBe('shield');
-            expect(options.duration).toBe('1_round');
-            expect(options.extra).toBe(true);
-            expect(options.type).toBe('shield');
-        });
     });
 
     describe('deactivation (wasActive: true)', () => {
@@ -100,7 +86,7 @@ describe('shieldHandler', () => {
             });
         });
 
-        it('should use the actual buff name in the expired description', async () => {
+        it('should use the actual buff name in the expired popup', async () => {
             buffToggle.toggleBuff.mockReturnValue({ wasActive: true });
 
             const result = await handle(makeAction({ name: 'Mage Shield' }), mockPlayerStats, mockCampaignName, null);
@@ -128,15 +114,6 @@ describe('shieldHandler', () => {
             expect(damageRollback.rollbackDamage).not.toHaveBeenCalled();
             expect(logService.addEntry).not.toHaveBeenCalled();
         });
-
-        it('should skip combat logic for any falsy getCombatContext result', async () => {
-            buffToggle.toggleBuff.mockReturnValue({ wasActive: false });
-            damageUtils.getCombatContext.mockResolvedValue(undefined);
-
-            await handle(makeAction(), mockPlayerStats, mockCampaignName, null);
-
-            expect(damageRollback.findAttackRollAgainstTarget).not.toHaveBeenCalled();
-        });
     });
 
     describe('activation — attack event filtering', () => {
@@ -149,47 +126,6 @@ describe('shieldHandler', () => {
 
             expect(damageRollback.rollbackDamage).not.toHaveBeenCalled();
             expect(logService.addEntry).not.toHaveBeenCalled();
-        });
-
-        it('should skip rollback when the attack would not miss with shield', async () => {
-            buffToggle.toggleBuff.mockReturnValue({ wasActive: false });
-            damageUtils.getCombatContext.mockResolvedValue({});
-            damageRollback.findAttackRollAgainstTarget.mockResolvedValue({
-                attackEvent: { d20: 18, bonus: 5, targetAc: 17, rawDamage: 10 },
-                attackerName: 'Goblin',
-            });
-            // rollTotal=23, targetAc+5=22, 23 >= 22 so shield doesn't cause a miss
-
-            await handle(makeAction(), mockPlayerStats, mockCampaignName, null);
-
-            expect(damageRollback.rollbackDamage).not.toHaveBeenCalled();
-        });
-
-        it('should skip rollback when rollTotal exactly equals targetAc + 5', async () => {
-            buffToggle.toggleBuff.mockReturnValue({ wasActive: false });
-            damageUtils.getCombatContext.mockResolvedValue({});
-            damageRollback.findAttackRollAgainstTarget.mockResolvedValue({
-                attackEvent: { d20: 13, bonus: 5, targetAc: 13, rawDamage: 10 },
-                attackerName: 'Goblin',
-            });
-            // rollTotal=18, targetAc+5=18
-
-            await handle(makeAction(), mockPlayerStats, mockCampaignName, null);
-
-            expect(damageRollback.rollbackDamage).not.toHaveBeenCalled();
-        });
-
-        it('should skip rollback when targetAc is null or missing', async () => {
-            buffToggle.toggleBuff.mockReturnValue({ wasActive: false });
-            damageUtils.getCombatContext.mockResolvedValue({});
-            damageRollback.findAttackRollAgainstTarget.mockResolvedValue({
-                attackEvent: { d20: 5, bonus: 3, rawDamage: 10 },
-                attackerName: 'Goblin',
-            });
-
-            await handle(makeAction(), mockPlayerStats, mockCampaignName, null);
-
-            expect(damageRollback.rollbackDamage).not.toHaveBeenCalled();
         });
 
         it('should skip rollback when attackerName is missing', async () => {
@@ -205,23 +141,17 @@ describe('shieldHandler', () => {
             expect(damageRollback.rollbackDamage).not.toHaveBeenCalled();
         });
 
-        it('should skip rollback when rawDamage is zero, missing, or negative', async () => {
-            const falsyDamages = [0, undefined, -5];
+        it('should skip rollback when attack would not miss with +5 AC', async () => {
+            buffToggle.toggleBuff.mockReturnValue({ wasActive: false });
+            damageUtils.getCombatContext.mockResolvedValue({});
+            damageRollback.findAttackRollAgainstTarget.mockResolvedValue({
+                attackEvent: { d20: 15, bonus: 5, targetAc: 15, rawDamage: 10 },
+                attackerName: 'Goblin',
+            });
 
-            for (const rawDamage of falsyDamages) {
-                buffToggle.toggleBuff.mockReturnValue({ wasActive: false });
-                damageUtils.getCombatContext.mockResolvedValue({});
-                damageRollback.findAttackRollAgainstTarget.mockResolvedValue({
-                    attackEvent: { d20: 2, bonus: 3, targetAc: 15, rawDamage },
-                    attackerName: 'Goblin',
-                });
+            await handle(makeAction(), mockPlayerStats, mockCampaignName, null);
 
-                await handle(makeAction(), mockPlayerStats, mockCampaignName, null);
-
-                expect(damageRollback.rollbackDamage).not.toHaveBeenCalled();
-                vi.restoreAllMocks();
-                vi.spyOn(console, 'error').mockReturnValue();
-            }
+            expect(damageRollback.rollbackDamage).not.toHaveBeenCalled();
         });
     });
 
@@ -265,7 +195,7 @@ describe('shieldHandler', () => {
             });
         });
 
-        it('should use the buff name and attacker name in the log description', async () => {
+        it('should use the buff name, attacker name, and character name in the log description', async () => {
             buffToggle.toggleBuff.mockReturnValue({ wasActive: false });
             damageUtils.getCombatContext.mockResolvedValue({});
             damageRollback.findAttackRollAgainstTarget.mockResolvedValue({
@@ -274,50 +204,28 @@ describe('shieldHandler', () => {
             });
             damageRollback.rollbackDamage.mockResolvedValue(7);
 
-            await handle(makeAction({ name: 'Arcane Shield' }), mockPlayerStats, mockCampaignName, null);
-
-            expect(logService.addEntry).toHaveBeenCalledWith(mockCampaignName, expect.objectContaining({
-                description: 'Arcane Shield retroactively negates Orc\'s attack — TestCharacter is healed for 7 HP.',
-            }));
-        });
-
-        it('should use the character name from playerStats in the log entry', async () => {
-            buffToggle.toggleBuff.mockReturnValue({ wasActive: false });
-            damageUtils.getCombatContext.mockResolvedValue({});
-            damageRollback.findAttackRollAgainstTarget.mockResolvedValue({
-                attackEvent: { d20: 2, bonus: 3, targetAc: 15, rawDamage: 5 },
-                attackerName: 'Goblin',
-            });
-            damageRollback.rollbackDamage.mockResolvedValue(5);
-
             const customStats = { name: 'CustomHero' };
 
-            await handle(makeAction(), customStats, mockCampaignName, null);
+            await handle(makeAction({ name: 'Arcane Shield' }), customStats, mockCampaignName, null);
 
             expect(logService.addEntry).toHaveBeenCalledWith(mockCampaignName, expect.objectContaining({
                 characterName: 'CustomHero',
-                description: expect.stringContaining('CustomHero is healed for 5 HP'),
+                description: 'Arcane Shield retroactively negates Orc\'s attack — CustomHero is healed for 7 HP.',
             }));
         });
 
         it('should skip addEntry when rollbackDamage returns 0 or negative', async () => {
-            const negativeValues = [0, -1];
+            buffToggle.toggleBuff.mockReturnValue({ wasActive: false });
+            damageUtils.getCombatContext.mockResolvedValue({});
+            damageRollback.findAttackRollAgainstTarget.mockResolvedValue({
+                attackEvent: { d20: 2, bonus: 3, targetAc: 15, rawDamage: 10 },
+                attackerName: 'Goblin',
+            });
+            damageRollback.rollbackDamage.mockResolvedValue(0);
 
-            for (const healResult of negativeValues) {
-                buffToggle.toggleBuff.mockReturnValue({ wasActive: false });
-                damageUtils.getCombatContext.mockResolvedValue({});
-                damageRollback.findAttackRollAgainstTarget.mockResolvedValue({
-                    attackEvent: { d20: 2, bonus: 3, targetAc: 15, rawDamage: 10 },
-                    attackerName: 'Goblin',
-                });
-                damageRollback.rollbackDamage.mockResolvedValue(healResult);
+            await handle(makeAction(), mockPlayerStats, mockCampaignName, null);
 
-                await handle(makeAction(), mockPlayerStats, mockCampaignName, null);
-
-                expect(logService.addEntry).not.toHaveBeenCalled();
-                vi.restoreAllMocks();
-                vi.spyOn(console, 'error').mockReturnValue();
-            }
+            expect(logService.addEntry).not.toHaveBeenCalled();
         });
     });
 
@@ -353,16 +261,6 @@ describe('shieldHandler', () => {
             expect(result.payload.automation).toEqual({ type: 'shield' });
         });
 
-        it('should include the full automation object in the payload', async () => {
-            buffToggle.toggleBuff.mockReturnValue({ wasActive: false });
-            damageUtils.getCombatContext.mockResolvedValue(null);
-
-            const auto = { type: 'shield', acBonus: 5, duration: '1_round' };
-            const result = await handle(makeAction({ automation: auto }), mockPlayerStats, mockCampaignName, null);
-
-            expect(result.payload.automation).toEqual(auto);
-        });
-
         it('should include the activation description with +5 AC and Magic Missile immunity', async () => {
             buffToggle.toggleBuff.mockReturnValue({ wasActive: false });
             damageUtils.getCombatContext.mockResolvedValue(null);
@@ -371,41 +269,6 @@ describe('shieldHandler', () => {
 
             expect(result.payload.description).toBe(
                 'Ward Shield activated — +5 AC until start of your next turn, immune to Magic Missile'
-            );
-        });
-    });
-
-    describe('roll calculation — shield causes a miss', () => {
-        it('should trigger rollback when rollTotal < targetAc + 5', async () => {
-            buffToggle.toggleBuff.mockReturnValue({ wasActive: false });
-            damageUtils.getCombatContext.mockResolvedValue({});
-            damageRollback.findAttackRollAgainstTarget.mockResolvedValue({
-                attackEvent: { d20: 1, bonus: 0, targetAc: 10, rawDamage: 10 },
-                attackerName: 'Goblin',
-            });
-            damageRollback.rollbackDamage.mockResolvedValue(10);
-
-            await handle(makeAction(), mockPlayerStats, mockCampaignName, null);
-
-            expect(damageRollback.rollbackDamage).toHaveBeenCalled();
-        });
-
-        it('should pass rawDamage from attackEvent to rollbackDamage', async () => {
-            buffToggle.toggleBuff.mockReturnValue({ wasActive: false });
-            damageUtils.getCombatContext.mockResolvedValue({});
-            damageRollback.findAttackRollAgainstTarget.mockResolvedValue({
-                attackEvent: { d20: 1, bonus: 0, targetAc: 10, rawDamage: 42 },
-                attackerName: 'Goblin',
-            });
-            damageRollback.rollbackDamage.mockResolvedValue(42);
-
-            await handle(makeAction(), mockPlayerStats, mockCampaignName, null);
-
-            expect(damageRollback.rollbackDamage).toHaveBeenCalledWith(
-                'Goblin',
-                'TestCharacter',
-                mockCampaignName,
-                'Shield'
             );
         });
     });

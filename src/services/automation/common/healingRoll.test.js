@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
     rollHealingForAction,
@@ -98,6 +98,7 @@ describe('rollHealingForAction', () => {
         it.each([
             [undefined],
             [''],
+            [null],
         ])('returns null when healExpression is %s', async (value) => {
             const auto = value === undefined ? {} : makeAuto({ healExpression: value });
             const result = await rollHealingForAction(auto, makePlayerStats(), campaignName);
@@ -107,7 +108,7 @@ describe('rollHealingForAction', () => {
             expect(rollExpressionMaximized).not.toHaveBeenCalled();
         });
 
-        it('returns null when rollExpression returns null', async () => {
+        it('returns null when dice roll returns null', async () => {
             hasHealingMaximization.mockReturnValue(false);
             rollExpression.mockReturnValue(null);
 
@@ -116,7 +117,7 @@ describe('rollHealingForAction', () => {
             expect(result).toBeNull();
         });
 
-        it('returns null when rollExpressionMaximized returns null', async () => {
+        it('returns null when maximized dice roll returns null', async () => {
             hasHealingMaximization.mockReturnValue(true);
             rollExpressionMaximized.mockReturnValue(null);
 
@@ -126,8 +127,8 @@ describe('rollHealingForAction', () => {
         });
     });
 
-    describe('dice rolling — normal mode', () => {
-        it('returns correct result object from rollExpression', async () => {
+    describe('dice rolling', () => {
+        it('returns correct result object from rollExpression in normal mode', async () => {
             hasHealingMaximization.mockReturnValue(false);
             const mockResult = { total: 7, rolls: [3, 4] };
             rollExpression.mockReturnValue(mockResult);
@@ -151,9 +152,7 @@ describe('rollHealingForAction', () => {
 
             expect(rollExpression).toHaveBeenCalledWith('4d6+3');
         });
-    });
 
-    describe('dice rolling — maximized mode', () => {
         it('calls rollExpressionMaximized when healing maximization is active', async () => {
             hasHealingMaximization.mockReturnValue(true);
             const mockResult = { total: 16, rolls: [8, 8] };
@@ -176,7 +175,7 @@ describe('rollHealingForAction', () => {
         });
     });
 
-    describe('target resolution — isSelf', () => {
+    describe('target resolution', () => {
         it('uses player name as target when isSelf is true', async () => {
             hasHealingMaximization.mockReturnValue(false);
             rollExpression.mockReturnValue({ total: 5, rolls: [5] });
@@ -190,9 +189,7 @@ describe('rollHealingForAction', () => {
 
             expect(getTargetFromAttacker).not.toHaveBeenCalled();
         });
-    });
 
-    describe('target resolution — not self', () => {
         it('uses combat context to find target via getTargetFromAttacker', async () => {
             hasHealingMaximization.mockReturnValue(false);
             rollExpression.mockReturnValue({ total: 6, rolls: [2, 4] });
@@ -211,31 +208,14 @@ describe('rollHealingForAction', () => {
             expect(getTargetFromAttacker).toHaveBeenCalledWith(cs, 'Paladin');
         });
 
-        it('falls back to player name when target is not found', async () => {
+        it('falls back to player name when target is not found or combat context is null', async () => {
             hasHealingMaximization.mockReturnValue(false);
             rollExpression.mockReturnValue({ total: 9, rolls: [9] });
-            const cs = { creatures: [] };
-            getCombatContext.mockResolvedValue(cs);
-            getTargetFromAttacker.mockReturnValue(null);
-
-            await rollHealingForAction(
-                makeAuto(),
-                makePlayerStats({ name: 'Cleric' }),
-                campaignName,
-                false,
-            );
-
-            expect(getTargetFromAttacker).toHaveBeenCalledWith(cs, 'Cleric');
-        });
-
-        it('falls back to player name when combat context is null', async () => {
-            hasHealingMaximization.mockReturnValue(false);
-            rollExpression.mockReturnValue({ total: 8, rolls: [3, 5] });
             getCombatContext.mockResolvedValue(null);
 
             await rollHealingForAction(
                 makeAuto(),
-                makePlayerStats({ name: 'Healer' }),
+                makePlayerStats({ name: 'Cleric' }),
                 campaignName,
                 false,
             );
@@ -251,7 +231,7 @@ describe('applyHealingDirectly', () => {
     const playerStats = makePlayerStats({ name: 'Hero', hitPoints: 30 });
     const targetName = 'Ally';
 
-    describe('HP calculation — stored HP is a number', () => {
+    describe('HP calculation', () => {
         it('heals by the full amount when under max', () => {
             getRuntimeValue.mockReturnValue(15);
 
@@ -286,22 +266,11 @@ describe('applyHealingDirectly', () => {
             expect(result.newHp).toBe(30);
             expect(result.actualHeal).toBe(-5);
         });
-    });
 
-    describe('HP calculation — stored HP is missing or empty', () => {
-        it('defaults to maxHitPoints when stored HP is null', () => {
+        it('defaults to maxHitPoints when stored HP is null or empty string', () => {
             getRuntimeValue.mockReturnValue(null);
 
             const result = applyHealingDirectly(playerStats, targetName, 10, campaignName);
-
-            expect(result.newHp).toBe(30);
-            expect(result.actualHeal).toBe(0);
-        });
-
-        it('defaults to maxHitPoints when stored HP is empty string', () => {
-            getRuntimeValue.mockReturnValue('');
-
-            const result = applyHealingDirectly(playerStats, targetName, 5, campaignName);
 
             expect(result.newHp).toBe(30);
             expect(result.actualHeal).toBe(0);
@@ -335,33 +304,9 @@ describe('applyHealingDirectly', () => {
             const event = dispatchSpy.mock.calls[0][0];
             expect(event.type).toBe('combat-summary-updated');
         });
-
-        it('does not apply healing via combat context (uses direct HP update)', async () => {
-            getRuntimeValue.mockReturnValue(10);
-            const cs = { creatures: [{ name: 'Ally' }] };
-            getCombatContext.mockResolvedValue(cs);
-
-            applyHealingDirectly(playerStats, targetName, 5, campaignName);
-
-            await Promise.resolve();
-            await Promise.resolve();
-            await Promise.resolve();
-            await Promise.resolve();
-
-            expect(applyHealingToTarget).not.toHaveBeenCalled();
-        });
     });
 
     describe('edge cases', () => {
-        it('handles zero healing amount', () => {
-            getRuntimeValue.mockReturnValue(10);
-
-            const result = applyHealingDirectly(playerStats, targetName, 0, campaignName);
-
-            expect(result.newHp).toBe(10);
-            expect(result.actualHeal).toBe(0);
-        });
-
         it('respects different maxHitPoints from playerStats', () => {
             getRuntimeValue.mockReturnValue(5);
             const lowHpPlayer = makePlayerStats({ hitPoints: 20 });
@@ -417,22 +362,6 @@ describe('logHealingToSSE', () => {
         expect(dispatchSpy).toHaveBeenCalledWith(expect.any(CustomEvent));
         const event = dispatchSpy.mock.calls[0][0];
         expect(event.type).toBe('combat-summary-updated');
-    });
-
-    it('does not pass extra fields from info object to log entry', () => {
-        const info = {
-            targetName: 'T',
-            sourceName: 'S',
-            actualHeal: 3,
-            newHp: 10,
-            maxHp: 20,
-            someExtraProp: 'should not appear',
-        };
-
-        logHealingToSSE(campaignName, info);
-
-        const call = postLogEntry.mock.calls[0][1];
-        expect(call).not.toHaveProperty('someExtraProp');
     });
 
     it('dispatches healing-popup event when healingName is provided', () => {

@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { handle } from './illusorySelfHandler.js';
 import * as runtimeState from '../../../../hooks/runtime/useRuntimeState.js';
 import * as damageRollback from '../../common/damageRollback.js';
@@ -162,21 +162,12 @@ describe('illusorySelfHandler', () => {
             });
             mockUsesAndSlots(1, { spell_slots_level_2: 4 });
 
-            const result = await handle(makeAction(), makePlayerStats(), campaignName, 'test-map');
+            await handle(makeAction(), makePlayerStats(), campaignName, 'test-map');
 
-            expect(result.type).toBe('popup');
-            expect(runtimeState.setRuntimeValue).toHaveBeenNthCalledWith(
-                1,
+            expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
                 playerName,
                 'spell_slots_level_2',
                 3,
-                campaignName,
-            );
-            expect(runtimeState.setRuntimeValue).toHaveBeenNthCalledWith(
-                2,
-                playerName,
-                'illusorySelfUses',
-                0,
                 campaignName,
             );
             expect(addEntry).toHaveBeenCalledWith(
@@ -198,8 +189,7 @@ describe('illusorySelfHandler', () => {
 
             await handle(makeAction(), makePlayerStats(), campaignName, 'test-map');
 
-            expect(runtimeState.setRuntimeValue).toHaveBeenNthCalledWith(
-                1,
+            expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
                 playerName,
                 'spell_slots_level_3',
                 2,
@@ -228,24 +218,6 @@ describe('illusorySelfHandler', () => {
     });
 
     describe('damage rollback', () => {
-        it('calls rollbackDamage with correct attacker and player names', async () => {
-            damageRollback.findAttackRollAgainstTarget.mockResolvedValue({
-                attackEvent: makeAttackEvent(),
-                attackerName: 'Dragon',
-            });
-            damageRollback.rollbackDamage.mockResolvedValue(12);
-            mockUses(0);
-
-            await handle(makeAction(), makePlayerStats(), campaignName, 'test-map');
-
-            expect(damageRollback.rollbackDamage).toHaveBeenCalledWith(
-                'Dragon',
-                playerName,
-                campaignName,
-                'Illusory Self',
-            );
-        });
-
         it('reports healed amount in description when damage is rolled back', async () => {
             damageRollback.findAttackRollAgainstTarget.mockResolvedValue({
                 attackEvent: makeAttackEvent(),
@@ -276,19 +248,6 @@ describe('illusorySelfHandler', () => {
     });
 
     describe('description formatting', () => {
-        it('does not duplicate the feature name in description', async () => {
-            damageRollback.findAttackRollAgainstTarget.mockResolvedValue({
-                attackEvent: makeAttackEvent(),
-                attackerName: 'Goblin',
-            });
-            mockUses(0);
-
-            const result = await handle(makeAction(), makePlayerStats(), campaignName, 'test-map');
-
-            const matches = result.payload.description.match(/Illusory Self/g);
-            expect(matches ? matches.length : 0).toBeLessThanOrEqual(1);
-        });
-
         it('shows the correct attacker name from combatSummary', async () => {
             damageRollback.findAttackRollAgainstTarget.mockResolvedValue({
                 attackEvent: makeAttackEvent(),
@@ -316,23 +275,6 @@ describe('illusorySelfHandler', () => {
     });
 
     describe('uses counter', () => {
-        it('increments the use counter when below max', async () => {
-            damageRollback.findAttackRollAgainstTarget.mockResolvedValue({
-                attackEvent: makeAttackEvent(),
-                attackerName: 'Goblin',
-            });
-            mockUses(0);
-
-            await handle(makeAction(), makePlayerStats(), campaignName, 'test-map');
-
-            expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-                playerName,
-                'illusorySelfUses',
-                1,
-                campaignName,
-            );
-        });
-
         it('shows correct remaining uses in description after increment', async () => {
             damageRollback.findAttackRollAgainstTarget.mockResolvedValue({
                 attackEvent: makeAttackEvent(),

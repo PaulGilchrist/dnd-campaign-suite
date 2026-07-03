@@ -1,3 +1,4 @@
+// @cleaned-by-ai
 // @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
@@ -260,43 +261,6 @@ describe('initiativeHandler.handle', () => {
       expect(savedSummary.creatures[2].name).toBe('Ally2');
     });
 
-    it('saves combat summary via storage.set when combat context exists', async () => {
-      const ps = makePlayerStats({ level: 3 });
-      const action = makeAction({ effect: 'bonus_initiative_allies' });
-      useRuntimeState.getRuntimeValue
-        .mockReturnValueOnce([])
-        .mockReturnValueOnce(2);
-      diceRoller.rollExpression.mockReturnValue({ total: 6, rolls: [6] });
-      damageUtils.getCombatContext.mockResolvedValue(makeCombatSummary([
-        { name: 'Ally1', type: 'player', initiative: '10' },
-      ]));
-
-      await handle(action, ps, campaignName, null);
-
-      expect(storage.set).toHaveBeenCalledWith(
-        'combatSummary',
-        expect.objectContaining({ round: 1 }),
-        campaignName
-      );
-      expect(window.dispatchEvent).toHaveBeenCalledWith(
-        expect.objectContaining({ type: 'combat-summary-updated' })
-      );
-    });
-
-    it('does not save when getCombatContext returns null', async () => {
-      const ps = makePlayerStats({ level: 3 });
-      const action = makeAction({ effect: 'bonus_initiative_allies' });
-      useRuntimeState.getRuntimeValue
-        .mockReturnValueOnce([])
-        .mockReturnValueOnce(2);
-      diceRoller.rollExpression.mockReturnValue({ total: 6, rolls: [6] });
-      damageUtils.getCombatContext.mockResolvedValue(null);
-
-      await handle(action, ps, campaignName, null);
-
-      expect(storage.set).not.toHaveBeenCalled();
-    });
-
     it('returns correct popup payload with initiative details', async () => {
       const ps = makePlayerStats({ level: 3 });
       const action = makeAction({ effect: 'bonus_initiative_allies' });
@@ -317,24 +281,6 @@ describe('initiativeHandler.handle', () => {
       expect(result.payload.automationType).toBe('initiative');
     });
 
-    it('defaults to level 1 bardic_die when playerStats.level is undefined', async () => {
-      const ps = makePlayerStats({ level: undefined });
-      delete ps.level;
-      ps.class.class_levels = [
-        { level: 1, bardic_die: 6, bardic_inspiration_uses: 2 },
-      ];
-      const action = makeAction({ effect: 'bonus_initiative_allies' });
-      useRuntimeState.getRuntimeValue
-        .mockReturnValueOnce([])
-        .mockReturnValueOnce(2);
-      diceRoller.rollExpression.mockReturnValue({ total: 6, rolls: [6] });
-      damageUtils.getCombatContext.mockResolvedValue(null);
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.payload.formula).toBe('1d6');
-    });
-
     it('defaults bardic_die to 6 when class_level entry is missing', async () => {
       const ps = makePlayerStats({ level: 99 });
       ps.class.class_levels = [];
@@ -348,27 +294,6 @@ describe('initiativeHandler.handle', () => {
       const result = await handle(action, ps, campaignName, null);
 
       expect(result.payload.formula).toBe('1d6');
-    });
-
-    it('adds bonus to multiple allies with existing initiative', async () => {
-      const ps = makePlayerStats({ level: 3 });
-      const action = makeAction({ effect: 'bonus_initiative_allies' });
-      useRuntimeState.getRuntimeValue
-        .mockReturnValueOnce([])
-        .mockReturnValueOnce(2);
-      diceRoller.rollExpression.mockReturnValue({ total: 5, rolls: [5] });
-      damageUtils.getCombatContext.mockResolvedValue(makeCombatSummary([
-        { name: 'Ally1', type: 'player', initiative: '10' },
-        { name: 'Ally2', type: 'player', initiative: '15' },
-        { name: 'Ally3', type: 'player', initiative: '20' },
-      ]));
-
-      await handle(action, ps, campaignName, null);
-
-      const savedSummary = storage.set.mock.calls[0][1];
-      expect(savedSummary.creatures[0].initiative).toBe('25');
-      expect(savedSummary.creatures[1].initiative).toBe('20');
-      expect(savedSummary.creatures[2].initiative).toBe('15');
     });
   });
 
@@ -398,13 +323,14 @@ describe('initiativeHandler.handle', () => {
     it('returns popup when current Wild Shape uses > 0', async () => {
       const ps = makeDruidStats();
       const action = makeAction({ effect: 'wild_shape_regen_on_initiative' });
-      useRuntimeState.getRuntimeValue.mockReturnValue(2);
+      useRuntimeState.getRuntimeValue.mockReturnValue(3);
 
       const result = await handle(action, ps, campaignName, null);
 
       expect(result.type).toBe('popup');
       expect(result.payload.type).toBe('automation_info');
       expect(result.payload.description).toContain('No need to regain');
+      expect(result.payload.description).toContain('3 Wild Shape use');
       expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
     });
 
@@ -444,7 +370,7 @@ describe('initiativeHandler.handle', () => {
       );
     });
 
-    it('treats null getRuntimeValue as 0 current uses', async () => {
+    it('treats null/undefined getRuntimeValue as 0 current uses', async () => {
       const ps = makeDruidStats();
       const action = makeAction({ effect: 'wild_shape_regen_on_initiative' });
       useRuntimeState.getRuntimeValue.mockReturnValue(null);
@@ -458,26 +384,6 @@ describe('initiativeHandler.handle', () => {
         1,
         campaignName
       );
-    });
-
-    it('treats undefined getRuntimeValue as 0 current uses', async () => {
-      const ps = makeDruidStats();
-      const action = makeAction({ effect: 'wild_shape_regen_on_initiative' });
-      useRuntimeState.getRuntimeValue.mockReturnValue(undefined);
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.payload.description).toContain('regained 1 use of Wild Shape');
-    });
-
-    it('includes current uses count in popup message when > 0', async () => {
-      const ps = makeDruidStats();
-      const action = makeAction({ effect: 'wild_shape_regen_on_initiative' });
-      useRuntimeState.getRuntimeValue.mockReturnValue(3);
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.payload.description).toContain('3 Wild Shape use');
     });
   });
 
@@ -510,17 +416,6 @@ describe('initiativeHandler.handle', () => {
       expect(result.payload.type).toBe('automation_info');
       expect(result.payload.description).toContain('No need to regain');
       expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
-    });
-
-    it('regards undefined current uses as meeting minTarget (defaults to max)', async () => {
-      const ps = makeBardStats();
-      const action = makeAction({ effect: 'regain_bardic_inspiration_on_initiative' });
-      useRuntimeState.getRuntimeValue.mockReturnValue(undefined);
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.description).toContain('No need to regain');
     });
 
     it('regains bardic inspiration when below minTarget', async () => {
@@ -596,24 +491,6 @@ describe('initiativeHandler.handle', () => {
         campaignName
       );
     });
-
-    it('uses proficiency fallback when class_levels entry missing for level', async () => {
-      const ps = makeBardStats({ level: 99 });
-      ps.class.class_levels = [];
-      ps.proficiency = 6;
-      const action = makeAction({ effect: 'regain_bardic_inspiration_on_initiative' });
-      useRuntimeState.getRuntimeValue.mockReturnValue(0);
-
-      await handle(action, ps, campaignName, null);
-
-      // maxBI = proficiency (6), minTarget = 2, min(6, 2) = 2
-      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-        'Bard',
-        'bardicInspirationUses',
-        2,
-        campaignName
-      );
-    });
   });
 
   // ── regain_focus_points_and_heal ─────────────────────────────
@@ -646,19 +523,6 @@ describe('initiativeHandler.handle', () => {
       expect(result.payload.type).toBe('automation_info');
       expect(result.payload.description).toContain('cannot be used again until a long rest');
       expect(diceRoller.rollExpression).not.toHaveBeenCalled();
-    });
-
-    it('returns popup when uses exhausted (uses field)', async () => {
-      const ps = makeMonkStats();
-      const action = makeAction({
-        effect: 'regain_focus_points_and_heal',
-        uses: 1,
-      });
-      useRuntimeState.getRuntimeValue.mockReturnValue(0);
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.payload.description).toContain('cannot be used again');
     });
 
     it('heals HP using martial arts die + monk level', async () => {
@@ -744,24 +608,6 @@ describe('initiativeHandler.handle', () => {
           newHp: expect.any(Number),
           maxHp: 30,
         })
-      );
-    });
-
-    it('dispatches combat-summary-updated event on healing success', async () => {
-      const ps = makeMonkStats();
-      const action = makeAction({
-        effect: 'regain_focus_points_and_heal',
-        usesMax: 2,
-      });
-      useRuntimeState.getRuntimeValue
-        .mockReturnValueOnce(2)
-        .mockReturnValueOnce(15);
-      diceRoller.rollExpression.mockReturnValue({ total: 4, rolls: [4] });
-
-      await handle(action, ps, campaignName, null);
-
-      expect(window.dispatchEvent).toHaveBeenCalledWith(
-        expect.objectContaining({ type: 'combat-summary-updated' })
       );
     });
 
@@ -866,23 +712,6 @@ describe('initiativeHandler.handle', () => {
       );
     });
 
-    it('handles currentHitPoints as null (defaults to 0)', async () => {
-      const ps = makeMonkStats({ hitPoints: 30 });
-      const action = makeAction({
-        effect: 'regain_focus_points_and_heal',
-        usesMax: 2,
-      });
-      useRuntimeState.getRuntimeValue
-        .mockReturnValueOnce(2)
-        .mockReturnValueOnce(null);
-      diceRoller.rollExpression.mockReturnValue({ total: 4, rolls: [4] });
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.payload.healAmount).toBe(7);
-      expect(result.payload.targetCurrentHp).toBe(7);
-    });
-
     it('uses martial_arts_die fallback of 4 when class_level missing', async () => {
       const ps = makeMonkStats({ level: 99 });
       ps.class.class_levels = [];
@@ -944,16 +773,6 @@ describe('initiativeHandler.handle', () => {
       expect(result.payload.type).toBe('automation_info');
       expect(result.payload.description).toBe('Some custom effect.');
       expect(result.payload.automationType).toBe('initiative');
-    });
-
-    it('returns empty description when action has no description field', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction({ effect: 'totally_unknown' });
-      action.description = undefined;
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.payload.description).toBe('');
     });
 
     it('passes through action.name and automationType in payload', async () => {

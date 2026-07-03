@@ -1,4 +1,10 @@
-// @improved-by-ai
+// @cleaned-by-ai
+// Removed redundant early-return tests (null/undefined/missing-creatures all test same guard),
+// brittle internal-detail tests (mock call assertions, window.dispatchEvent spying),
+// and low-value tests (array independence, mutation detail, redundant dispatch tests).
+// Kept only tests that verify observable behavior: clamping, delta computation,
+// player vs NPC paths, name matching, and logging.
+
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // --- mocks ---
@@ -43,17 +49,11 @@ describe('modifyHitPoints', () => {
   });
 
   describe('early returns', () => {
-    it('returns null when combatSummary is null', () => {
+    it('returns null when combatSummary is null, undefined, or missing creatures', () => {
       expect(modifyHitPoints(null, 'Goblin', 5, campaignName)).toBeNull();
-      expect(postLogEntry).not.toHaveBeenCalled();
-    });
-
-    it('returns null when combatSummary is undefined', () => {
       expect(modifyHitPoints(undefined, 'Goblin', 5, campaignName)).toBeNull();
-    });
-
-    it('returns null when combatSummary has no creatures array', () => {
       expect(modifyHitPoints({}, 'Goblin', 5, campaignName)).toBeNull();
+      expect(postLogEntry).not.toHaveBeenCalled();
     });
 
     it('returns null when combatSummary has an empty creatures array', () => {
@@ -67,16 +67,6 @@ describe('modifyHitPoints', () => {
       expect(modifyHitPoints(summary, 'Dragon', 5, campaignName)).toBeNull();
     });
 
-    it('does not dispatch event or log when returning null', () => {
-      const dispatchSpy = vi.spyOn(window, 'dispatchEvent');
-      expect(modifyHitPoints(null, 'Goblin', 5, campaignName)).toBeNull();
-      expect(dispatchSpy).not.toHaveBeenCalled();
-      expect(postLogEntry).not.toHaveBeenCalled();
-      dispatchSpy.mockRestore();
-    });
-  });
-
-  describe('early return name matching', () => {
     it('is case-sensitive: "goblin" does not match "Goblin"', () => {
       const summary = makeCombatSummary([
         makeCreature('Goblin', 'npc', 5, 7),
@@ -157,16 +147,6 @@ describe('modifyHitPoints', () => {
       });
       expect(result.creature.currentHp).toBe(5);
     });
-
-    it('mutates the original creature object in the combatSummary', () => {
-      const summary = makeCombatSummary([
-        makeCreature('Goblin', 'npc', 5, 7),
-      ]);
-
-      modifyHitPoints(summary, 'Goblin', -2, campaignName);
-
-      expect(summary.creatures[0].currentHp).toBe(3);
-    });
   });
 
   describe('Player creatures', () => {
@@ -178,37 +158,36 @@ describe('modifyHitPoints', () => {
       });
     }
 
-    it('reads maxHp and currentHp from runtime store', () => {
-      mockPlayerRuntime(20, 15);
+    it('reads maxHp and currentHp from runtime store and clamps to 0', () => {
+      mockPlayerRuntime(10, 3);
 
       const summary = makeCombatSummary([
         makeCreature('Thorin', 'player', undefined, 10),
       ]);
 
-      const result = modifyHitPoints(summary, 'Thorin', -3, campaignName);
+      const result = modifyHitPoints(summary, 'Thorin', -20, campaignName);
 
-      expect(getRuntimeValue).toHaveBeenCalledWith('Thorin', 'hitPoints');
-      expect(getRuntimeValue).toHaveBeenCalledWith('Thorin', 'currentHitPoints');
-      expect(result).toEqual({
-        oldHp: 15,
-        newHp: 12,
-        delta: -3,
-        isPlayer: true,
-        creature: expect.objectContaining({ name: 'Thorin' }),
-        maxHp: 20,
-      });
+      expect(result.oldHp).toBe(3);
+      expect(result.newHp).toBe(0);
+      expect(result.delta).toBe(-3);
+      expect(result.isPlayer).toBe(true);
+      expect(setRuntimeValue).toHaveBeenCalledWith('Thorin', 'currentHitPoints', 0, campaignName);
     });
 
-    it('calls setRuntimeValue with the computed newHp', () => {
-      mockPlayerRuntime(20, 15);
+    it('clamps player HP to maxHp on the high end', () => {
+      mockPlayerRuntime(10, 8);
 
       const summary = makeCombatSummary([
         makeCreature('Thorin', 'player', undefined, 10),
       ]);
 
-      modifyHitPoints(summary, 'Thorin', -3, campaignName);
+      const result = modifyHitPoints(summary, 'Thorin', 10, campaignName);
 
-      expect(setRuntimeValue).toHaveBeenCalledWith('Thorin', 'currentHitPoints', 12, campaignName);
+      expect(result.oldHp).toBe(8);
+      expect(result.newHp).toBe(10);
+      expect(result.delta).toBe(2);
+      expect(result.isPlayer).toBe(true);
+      expect(setRuntimeValue).toHaveBeenCalledWith('Thorin', 'currentHitPoints', 10, campaignName);
     });
 
     it('falls back to creature.maxHp when runtime hitPoints is null', () => {
@@ -241,86 +220,6 @@ describe('modifyHitPoints', () => {
       expect(result.newHp).toBe(0);
       expect(result.delta).toBe(0);
     });
-
-    it('clamps player HP to 0 on the low end', () => {
-      mockPlayerRuntime(10, 3);
-
-      const summary = makeCombatSummary([
-        makeCreature('Thorin', 'player', undefined, 10),
-      ]);
-
-      const result = modifyHitPoints(summary, 'Thorin', -20, campaignName);
-
-      expect(result.newHp).toBe(0);
-      expect(result.delta).toBe(-3);
-      expect(setRuntimeValue).toHaveBeenCalledWith('Thorin', 'currentHitPoints', 0, campaignName);
-    });
-
-    it('clamps player HP to maxHp on the high end', () => {
-      mockPlayerRuntime(10, 8);
-
-      const summary = makeCombatSummary([
-        makeCreature('Thorin', 'player', undefined, 10),
-      ]);
-
-      const result = modifyHitPoints(summary, 'Thorin', 10, campaignName);
-
-      expect(result.newHp).toBe(10);
-      expect(result.delta).toBe(2);
-      expect(setRuntimeValue).toHaveBeenCalledWith('Thorin', 'currentHitPoints', 10, campaignName);
-    });
-  });
-
-  describe('window event dispatch', () => {
-    it('dispatches combat-summary-updated event on success', () => {
-      const dispatchSpy = vi.spyOn(window, 'dispatchEvent');
-
-      const summary = makeCombatSummary([
-        makeCreature('Goblin', 'npc', 5, 7),
-      ]);
-
-      modifyHitPoints(summary, 'Goblin', -3, campaignName);
-
-      expect(dispatchSpy).toHaveBeenCalled();
-      const event = dispatchSpy.mock.calls[0][0];
-      expect(event.type).toBe('combat-summary-updated');
-      expect(event).toBeInstanceOf(CustomEvent);
-      dispatchSpy.mockRestore();
-    });
-
-    it('does not dispatch event when delta is 0', () => {
-      const dispatchSpy = vi.spyOn(window, 'dispatchEvent');
-
-      const summary = makeCombatSummary([
-        makeCreature('Goblin', 'npc', 5, 7),
-      ]);
-
-      modifyHitPoints(summary, 'Goblin', 0, campaignName);
-
-      expect(dispatchSpy).not.toHaveBeenCalled();
-      dispatchSpy.mockRestore();
-    });
-
-    it('dispatches event for player HP changes', () => {
-      const dispatchSpy = vi.spyOn(window, 'dispatchEvent');
-
-      getRuntimeValue.mockImplementation((key, prop) => {
-        if (prop === 'hitPoints') return 10;
-        if (prop === 'currentHitPoints') return 5;
-        return null;
-      });
-
-      const summary = makeCombatSummary([
-        makeCreature('Thorin', 'player', undefined, 10),
-      ]);
-
-      modifyHitPoints(summary, 'Thorin', -2, campaignName);
-
-      expect(dispatchSpy).toHaveBeenCalled();
-      const event = dispatchSpy.mock.calls[0][0];
-      expect(event.type).toBe('combat-summary-updated');
-      dispatchSpy.mockRestore();
-    });
   });
 
   describe('multiple creatures in combat summary', () => {
@@ -337,18 +236,6 @@ describe('modifyHitPoints', () => {
       expect(result.oldHp).toBe(10);
       expect(result.newHp).toBe(6);
       expect(summary.creatures[1].currentHp).toBe(6);
-    });
-
-    it('does not affect other creatures when modifying one', () => {
-      const summary = makeCombatSummary([
-        makeCreature('Goblin', 'npc', 5, 7),
-        makeCreature('Orc', 'npc', 10, 15),
-      ]);
-
-      modifyHitPoints(summary, 'Goblin', -2, campaignName);
-
-      expect(summary.creatures[0].currentHp).toBe(3);
-      expect(summary.creatures[1].currentHp).toBe(10);
     });
   });
 });

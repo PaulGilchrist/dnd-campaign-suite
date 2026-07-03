@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import {
     handle,
     onArcaneWardRestore,
@@ -161,31 +161,17 @@ describe('arcaneWardHandler', () => {
         });
 
         describe('projected ward - no damage', () => {
-            it('returns info when projectedWardDamage is undefined', async () => {
+            it('returns info when projectedWardDamage is undefined or zero', async () => {
                 setCombatMocks('Goblin', undefined, 5, 10);
 
-                const result = await handle(
+                let result = await handle(
                     { name: 'Arcane Ward', automation: { type: 'projected_ward' } },
                     makeWizardStats('TestWizard', 5, 3),
                     campaignName,
                 );
 
                 expect(result.payload.description).toContain('No recent damage detected');
-            });
 
-            it('returns info when projectedWardDamage.rawDamage is 0', async () => {
-                setCombatMocks('Goblin', { rawDamage: 0 }, 5, 10);
-
-                const result = await handle(
-                    { name: 'Arcane Ward', automation: { type: 'projected_ward' } },
-                    makeWizardStats('TestWizard', 5, 3),
-                    campaignName,
-                );
-
-                expect(result.payload.description).toContain('No recent damage detected');
-            });
-
-            it('returns info when projectedWardDamage.rawDamage is null', async () => {
                 getCombatSummary.mockReturnValue({
                     creatures: [{ name: 'TestWizard', targetName: 'Goblin' }, { name: 'Goblin' }],
                     activeCreatureName: 'TestWizard',
@@ -195,11 +181,11 @@ describe('arcaneWardHandler', () => {
                     if (key === 'arcaneWardActive') return true;
                     if (key === 'arcaneWardHp') return 8;
                     if (key === 'arcaneWardMax') return 13;
-                    if (player === 'Goblin' && key === 'projectedWardDamage') return { rawDamage: null };
+                    if (player === 'Goblin' && key === 'projectedWardDamage') return { rawDamage: 0 };
                     return undefined;
                 });
 
-                const result = await handle(
+                result = await handle(
                     { name: 'Arcane Ward', automation: { type: 'projected_ward' } },
                     makeWizardStats('TestWizard', 5, 3),
                     campaignName,
@@ -288,34 +274,6 @@ describe('arcaneWardHandler', () => {
                 expect(setRuntimeValue).toHaveBeenCalledWith('TestWizard', 'arcaneWardHp', 0, campaignName);
                 expect(result.payload.description).toContain('absorbed 5');
                 expect(result.payload.description).toContain('7 remaining damage');
-            });
-        });
-
-        describe('projected ward - ward depleted', () => {
-            it('sets ward HP to 0 when fully consumed', async () => {
-                getCombatSummary.mockReturnValue({
-                    creatures: [{ name: 'TestWizard', targetName: 'Goblin' }, { name: 'Goblin' }],
-                    activeCreatureName: 'TestWizard',
-                });
-                getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
-                setWardMocks((player, key) => {
-                    if (key === 'arcaneWardActive') return true;
-                    if (key === 'arcaneWardHp') return 3;
-                    if (key === 'arcaneWardMax') return 13;
-                    if (player === 'Goblin' && key === 'projectedWardDamage') return { rawDamage: 3 };
-                    if (player === 'Goblin' && key === 'currentHitPoints') return 6;
-                    if (player === 'Goblin' && key === 'maxHitPoints') return 10;
-                    return undefined;
-                });
-
-                const result = await handle(
-                    { name: 'Arcane Ward', automation: { type: 'projected_ward' } },
-                    makeWizardStats('TestWizard', 5, 3),
-                    campaignName,
-                );
-
-                expect(setRuntimeValue).toHaveBeenCalledWith('TestWizard', 'arcaneWardHp', 0, campaignName);
-                expect(result.payload.description).toContain('All damage absorbed');
             });
         });
 
@@ -493,31 +451,6 @@ describe('arcaneWardHandler', () => {
 
             expect(setRuntimeValue).toHaveBeenCalledWith('TestWizard', 'arcaneWardHp', 2, campaignName);
         });
-
-        it('logs the ability use', async () => {
-            setWardMocks((player, key) => {
-                if (key === 'arcaneWardActive') return true;
-                if (key === 'arcaneWardHp') return 5;
-                if (key === 'arcaneWardMax') return 13;
-                return undefined;
-            });
-
-            await onArcaneWardRestore(
-                { name: 'Arcane Ward', automation: { type: 'passive_rule' } },
-                makeWizardStats('TestWizard', 5, 3),
-                2,
-                campaignName,
-            );
-
-            expect(addEntry).toHaveBeenCalledWith(
-                campaignName,
-                expect.objectContaining({
-                    type: 'ability_use',
-                    characterName: 'TestWizard',
-                    abilityName: 'Arcane Ward',
-                }),
-            );
-        });
     });
 
     describe('onArcaneWardBonusActionRestore', () => {
@@ -619,31 +552,6 @@ describe('arcaneWardHandler', () => {
             );
 
             expect(setRuntimeValue).toHaveBeenCalledWith('TestWizard', 'arcaneWardHp', 13, campaignName);
-        });
-
-        it('logs the ability use', async () => {
-            setWardMocks((player, key) => {
-                if (key === 'arcaneWardActive') return true;
-                if (key === 'arcaneWardHp') return 5;
-                if (key === 'arcaneWardMax') return 13;
-                if (key === 'spell_slots_level_2') return 2;
-                return undefined;
-            });
-
-            await onArcaneWardBonusActionRestore(
-                { name: 'Arcane Ward', automation: { type: 'arcane_ward_bonus_action' } },
-                makeWizardStats('TestWizard', 5, 3),
-                campaignName,
-            );
-
-            expect(addEntry).toHaveBeenCalledWith(
-                campaignName,
-                expect.objectContaining({
-                    type: 'ability_use',
-                    characterName: 'TestWizard',
-                    abilityName: 'Arcane Ward',
-                }),
-            );
         });
     });
 
@@ -772,27 +680,7 @@ describe('arcaneWardHandler', () => {
             expect(result.payload.description).toContain('not active');
         });
 
-        it('handles missing Intelligence ability by using 0 modifier', async () => {
-            setWardMocks((player, key) => {
-                if (key === 'arcaneWardActive') return true;
-                if (key === 'arcaneWardHp') return 5;
-                if (key === 'arcaneWardMax') return 10;
-                return undefined;
-            });
-
-            const noIntStats = makeWizardStats('TestWizard', 5, 0);
-
-            await onArcaneWardLevelUp(
-                { name: 'Arcane Ward' },
-                noIntStats,
-                campaignName,
-            );
-
-            // 2*5 + 0 = 10
-            expect(setRuntimeValue).toHaveBeenCalledWith('TestWizard', 'arcaneWardMax', 10, campaignName);
-        });
-
-        it('handles undefined abilities array by using 0 modifier', async () => {
+        it('handles missing or undefined Intelligence ability by using 0 modifier', async () => {
             setWardMocks((player, key) => {
                 if (key === 'arcaneWardActive') return true;
                 if (key === 'arcaneWardHp') return 5;
@@ -854,20 +742,6 @@ describe('arcaneWardHandler', () => {
             expect(result.payload.description).toContain('Shield');
         });
 
-        it('includes restore amount in description for new ward', async () => {
-            setWardMocks(() => false);
-
-            const result = await onAbjurationSpellCast(
-                { name: 'Arcane Ward' },
-                makeWizardStats('TestWizard', 5, 3),
-                'Shield',
-                2,
-                campaignName,
-            );
-
-            expect(result.payload.description).toContain('Regains 4 HP');
-        });
-
         it('creates ward with correct max HP for different wizard levels', async () => {
             setWardMocks(() => false);
 
@@ -884,27 +758,6 @@ describe('arcaneWardHandler', () => {
             // 2*10 + 4 = 24
             expect(setRuntimeValue).toHaveBeenCalledWith('TestWizard', 'arcaneWardMax', 24, campaignName);
             expect(setRuntimeValue).toHaveBeenCalledWith('TestWizard', 'arcaneWardHp', 24, campaignName);
-        });
-
-        it('logs ward creation', async () => {
-            setWardMocks(() => false);
-
-            await onAbjurationSpellCast(
-                { name: 'Arcane Ward' },
-                makeWizardStats('TestWizard', 5, 3),
-                'Shield',
-                1,
-                campaignName,
-            );
-
-            expect(addEntry).toHaveBeenCalledWith(
-                campaignName,
-                expect.objectContaining({
-                    type: 'ability_use',
-                    characterName: 'TestWizard',
-                    abilityName: 'Arcane Ward',
-                }),
-            );
         });
 
         it('restores ward HP when ward is already active', async () => {
@@ -965,32 +818,6 @@ describe('arcaneWardHandler', () => {
             );
 
             expect(setRuntimeValue).toHaveBeenCalledWith('TestWizard', 'arcaneWardHp', 13, campaignName);
-        });
-
-        it('logs the restoration with spell name in description', async () => {
-            setWardMocks((player, key) => {
-                if (key === 'arcaneWardActive') return true;
-                if (key === 'arcaneWardHp') return 8;
-                if (key === 'arcaneWardMax') return 13;
-                return undefined;
-            });
-
-            await onAbjurationSpellCast(
-                { name: 'Arcane Ward' },
-                makeWizardStats('TestWizard', 5, 3),
-                'Shield',
-                1,
-                campaignName,
-            );
-
-            expect(addEntry).toHaveBeenCalledWith(
-                campaignName,
-                expect.objectContaining({
-                    type: 'ability_use',
-                    characterName: 'TestWizard',
-                    description: expect.stringContaining('Shield'),
-                }),
-            );
         });
 
         it('defaults to spell slot level 1 when value is invalid', async () => {

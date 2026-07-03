@@ -1,4 +1,12 @@
-// @improved-by-ai
+// @cleaned-by-ai
+// Redundant, brittle, and low-value tests removed:
+// - Consolidated null/undefined/empty targetName fallback into single test
+// - Consolidated unknown mastery default case into single test
+// - Removed loop tests asserting trivial properties (truthy, string type, length > 0)
+// - Removed loop test asserting mastery name appears in every description (obvious from switch)
+// - Removed loop test asserting target name presence in specific descriptions (overly implementation-specific)
+// - Removed negative assertion tests for Topple/Cleave/Graze/Nick (already proven by exact string assertions)
+
 import { describe, it, expect } from 'vitest';
 
 import { buildMasteryDescription } from './weaponMasteryHandler.js';
@@ -46,78 +54,14 @@ describe('buildMasteryDescription', () => {
         expect(result).toBe('Nick — make Light weapon extra attack as part of Attack action.');
     });
 
-    it('should use lowercase "target" when targetName is null', () => {
-        const result = buildMasteryDescription('Push', null);
-        expect(result).toBe('Push applied to target — pushed up to 10 ft away.');
+    it('should use lowercase "target" when targetName is falsy', () => {
+        expect(buildMasteryDescription('Push', null)).toBe('Push applied to target — pushed up to 10 ft away.');
+        expect(buildMasteryDescription('Sap', undefined)).toBe('Sap applied to target — Disadvantage on next attack roll.');
+        expect(buildMasteryDescription('Slow', '')).toBe('Slow applied to target — Speed reduced by 10 ft.');
     });
 
-    it('should use lowercase "target" when targetName is undefined', () => {
-        const result = buildMasteryDescription('Sap', undefined);
-        expect(result).toBe('Sap applied to target — Disadvantage on next attack roll.');
-    });
-
-    it('should use lowercase "target" for unknown mastery names (default case)', () => {
-        const result = buildMasteryDescription('UnknownEffect', 'Goblin');
-        expect(result).toBe('UnknownEffect applied to Goblin.');
-    });
-
-    it('should use lowercase "target" for unknown mastery when targetName is null', () => {
-        const result = buildMasteryDescription('UnknownEffect', null);
-        expect(result).toBe('UnknownEffect applied to target.');
-    });
-
-    it('should use "target" as fallback when targetName is empty string', () => {
-        const result = buildMasteryDescription('Push', '');
-        expect(result).toBe('Push applied to target — pushed up to 10 ft away.');
-    });
-
-    it('should handle all known mastery names', () => {
-        const knownMasteries = ['Push', 'Topple', 'Sap', 'Slow', 'Vex', 'Cleave', 'Graze', 'Nick'];
-        for (const mastery of knownMasteries) {
-            const result = buildMasteryDescription(mastery, 'Target');
-            expect(result).toBeTruthy();
-            expect(typeof result).toBe('string');
-            expect(result.length).toBeGreaterThan(0);
-        }
-    });
-
-    it('should include mastery name in every description', () => {
-        const masteries = ['Push', 'Topple', 'Sap', 'Slow', 'Vex', 'Cleave', 'Graze', 'Nick', 'Fake'];
-        for (const mastery of masteries) {
-            const result = buildMasteryDescription(mastery, 'Target');
-            expect(result).toContain(mastery);
-        }
-    });
-
-    it('should include target in descriptions for known masteries that use the target', () => {
-        const targetMasteries = ['Push', 'Sap', 'Slow', 'Vex'];
-        for (const mastery of targetMasteries) {
-            const result = buildMasteryDescription(mastery, 'Dragon');
-            expect(result).toContain('Dragon');
-        }
-    });
-
-    it('should NOT include target in Topple description (it uses different format)', () => {
-        const result = buildMasteryDescription('Topple', 'Goblin');
-        expect(result).toBe('Topple: ready to force a CON save vs Prone.');
-        expect(result).not.toContain('Goblin');
-    });
-
-    it('should NOT include target in Cleave description (it uses different format)', () => {
-        const result = buildMasteryDescription('Cleave', 'Ogre');
-        expect(result).toBe('Cleave — make an extra attack against a second creature within 5 ft.');
-        expect(result).not.toContain('Ogre');
-    });
-
-    it('should NOT include target in Graze description (it uses different format)', () => {
-        const result = buildMasteryDescription('Graze', 'Bugbear');
-        expect(result).toBe('Graze — deal damage equal to ability modifier on a miss.');
-        expect(result).not.toContain('Bugbear');
-    });
-
-    it('should NOT include target in Nick description (it uses different format)', () => {
-        const result = buildMasteryDescription('Nick', 'Hobgoblin');
-        expect(result).toBe('Nick — make Light weapon extra attack as part of Attack action.');
-        expect(result).not.toContain('Hobgoblin');
+    it('should use default description for unknown mastery names', () => {
+        expect(buildMasteryDescription('UnknownEffect', 'Goblin')).toBe('UnknownEffect applied to Goblin.');
+        expect(buildMasteryDescription('UnknownEffect', null)).toBe('UnknownEffect applied to target.');
     });
 });

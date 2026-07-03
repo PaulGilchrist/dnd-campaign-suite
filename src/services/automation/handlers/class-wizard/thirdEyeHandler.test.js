@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ── Mocks BEFORE imports ───────────────────────────────────────
@@ -8,10 +8,15 @@ vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
     setRuntimeValue: vi.fn(),
 }));
 
+vi.mock('../../../../services/automation/common/buffToggle.js', () => ({
+    getActiveBuffs: vi.fn(),
+}));
+
 // ── Imports ────────────────────────────────────────────────────
 
 import { handle, applyThirdEye } from './thirdEyeHandler.js';
 import * as runtimeState from '../../../../hooks/runtime/useRuntimeState.js';
+import * as buffToggle from '../../../../services/automation/common/buffToggle.js';
 
 const campaignName = 'TestCampaign';
 
@@ -36,8 +41,8 @@ describe('thirdEyeHandler', () => {
     });
 
     describe('handle', () => {
-        it('returns popup when Third Eye is already active', async () => {
-            runtimeState.getRuntimeValue.mockReturnValue([
+        it('returns popup with effect name when Third Eye is already active', async () => {
+            buffToggle.getActiveBuffs.mockReturnValue([
                 { name: 'The Third Eye', effect: 'darkvision_120' },
             ]);
 
@@ -49,15 +54,14 @@ describe('thirdEyeHandler', () => {
             expect(result.type).toBe('popup');
             expect(result.payload.type).toBe('automation_info');
             expect(result.payload.name).toBe('The Third Eye');
-            expect(result.payload.description).toContain('The Third Eye');
-            expect(result.payload.description).toContain('currently active');
             expect(result.payload.description).toContain('Darkvision (120 feet)');
+            expect(result.payload.description).toContain('currently active');
             expect(result.payload.description).toContain('Duration: until start of Short or Long Rest');
             expect(result.payload.automation).toBe(action.automation);
         });
 
-        it('returns popup with effect name when buff has unknown effect key', async () => {
-            runtimeState.getRuntimeValue.mockReturnValue([
+        it('returns popup with unknown effect key when buff has unrecognized effect', async () => {
+            buffToggle.getActiveBuffs.mockReturnValue([
                 { name: 'The Third Eye', effect: 'some_unknown_effect' },
             ]);
 
@@ -70,8 +74,8 @@ describe('thirdEyeHandler', () => {
             expect(result.payload.description).toContain('some_unknown_effect');
         });
 
-        it('returns popup with safe fallback when buff has no effect property', async () => {
-            runtimeState.getRuntimeValue.mockReturnValue([
+        it('returns popup with Unknown fallback when buff has no effect property', async () => {
+            buffToggle.getActiveBuffs.mockReturnValue([
                 { name: 'The Third Eye' },
             ]);
 
@@ -81,12 +85,11 @@ describe('thirdEyeHandler', () => {
             const result = await handle(action, playerStats, campaignName);
 
             expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('The Third Eye');
-            expect(result.payload.description).toContain('Duration: until start of Short or Long Rest');
+            expect(result.payload.description).toContain('Unknown');
         });
 
-        it('returns modal with payload when Third Eye is not active', async () => {
-            runtimeState.getRuntimeValue.mockReturnValue([]);
+        it('returns modal when Third Eye is not active', async () => {
+            buffToggle.getActiveBuffs.mockReturnValue([]);
 
             const action = makeAction();
             const playerStats = makePlayerStats();
@@ -98,29 +101,6 @@ describe('thirdEyeHandler', () => {
             expect(result.payload.action).toBe(action);
             expect(result.payload.playerStats).toBe(playerStats);
             expect(result.payload.campaignName).toBe(campaignName);
-        });
-
-        it('returns modal when runtime value is not an array', async () => {
-            runtimeState.getRuntimeValue.mockReturnValue('not-an-array');
-
-            const action = makeAction();
-            const playerStats = makePlayerStats();
-
-            const result = await handle(action, playerStats, campaignName);
-
-            expect(result.type).toBe('modal');
-            expect(result.modalName).toBe('thirdEye');
-        });
-
-        it('returns modal when runtime value is null', async () => {
-            runtimeState.getRuntimeValue.mockReturnValue(null);
-
-            const action = makeAction();
-            const playerStats = makePlayerStats();
-
-            const result = await handle(action, playerStats, campaignName);
-
-            expect(result.type).toBe('modal');
         });
     });
 

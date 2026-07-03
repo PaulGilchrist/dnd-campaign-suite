@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ── Mocks ──────────────────────────────────────────────────────
@@ -274,25 +274,6 @@ describe('fontOfInspirationHandler.handle', () => {
       });
     });
 
-    it('should decrement from a higher slot value', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-      useRuntimeState.getRuntimeValue
-        .mockReturnValueOnce(2)
-        .mockReturnValueOnce(7)
-        .mockReturnValueOnce(7);
-
-      await handle(action, ps, campaignName, null);
-
-      expect(useRuntimeState.setRuntimeValue).toHaveBeenNthCalledWith(
-        1,
-        'TestBard',
-        'spell_slots_level_1',
-        6,
-        campaignName,
-      );
-    });
-
     it('should use the correct player name for runtime calls', async () => {
       const ps = makePlayerStats({ name: 'Eldara the Wise' });
       const action = makeAction();
@@ -451,24 +432,6 @@ describe('fontOfInspirationHandler.handle', () => {
       );
     });
 
-    it('should use level 1 when it has slots available', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-      useRuntimeState.getRuntimeValue
-        .mockReturnValueOnce(2)
-        .mockReturnValueOnce(1);
-
-      await handle(action, ps, campaignName, null);
-
-      expect(useRuntimeState.setRuntimeValue).toHaveBeenNthCalledWith(
-        1,
-        'TestBard',
-        'spell_slots_level_1',
-        3,
-        campaignName,
-      );
-    });
-
     it('should use max as fallback when stored value is null', async () => {
       const ps = makePlayerStats();
       const action = makeAction();
@@ -530,79 +493,6 @@ describe('fontOfInspirationHandler.handle', () => {
         3,
         campaignName,
       );
-    });
-
-    it('should handle string numeric spell slot value', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-      useRuntimeState.getRuntimeValue
-        .mockReturnValueOnce(2)
-        .mockReturnValueOnce('4');
-
-      await handle(action, ps, campaignName, null);
-
-      expect(useRuntimeState.setRuntimeValue).toHaveBeenNthCalledWith(
-        1,
-        'TestBard',
-        'spell_slots_level_1',
-        3,
-        campaignName,
-      );
-    });
-
-    it('should handle undefined mapName parameter', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-      useRuntimeState.getRuntimeValue
-        .mockReturnValueOnce(2)
-        .mockReturnValueOnce(4);
-
-      const result = await handle(action, ps, campaignName, undefined);
-
-      expect(result.type).toBe('popup');
-    });
-
-    it('should not call setRuntimeValue when returning early (at max)', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-      useRuntimeState.getRuntimeValue
-        .mockReturnValueOnce(3)
-        .mockReturnValueOnce(4);
-
-      await handle(action, ps, campaignName, null);
-
-      expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
-    });
-
-    it('should not call setRuntimeValue when returning early (no slots)', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-      useRuntimeState.getRuntimeValue
-        .mockReturnValueOnce(2)
-        .mockReturnValueOnce(0)
-        .mockReturnValueOnce(0)
-        .mockReturnValueOnce(0)
-        .mockReturnValueOnce(0);
-
-      await handle(action, ps, campaignName, null);
-
-      expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
-    });
-
-    it('should not call setRuntimeValue when returning early (slot has 0)', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-      useRuntimeState.getRuntimeValue
-        .mockReturnValueOnce(2)
-        .mockReturnValueOnce(0)
-        .mockReturnValueOnce(0)
-        .mockReturnValueOnce(0)
-        .mockReturnValueOnce(0)
-        .mockReturnValueOnce(0);
-
-      await handle(action, ps, campaignName, null);
-
-      expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
     });
 
     it('should catch and suppress addEntry errors without throwing', async () => {

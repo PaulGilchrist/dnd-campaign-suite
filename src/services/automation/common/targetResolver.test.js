@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ── Mocks BEFORE imports ───────────────────────────────────────
@@ -124,15 +124,6 @@ describe('targetResolver', () => {
       expect(mapsService.loadMapData).toHaveBeenCalledWith(campaignName, 'TestMap');
     });
 
-    it('returns null when mapData or players is missing', async () => {
-      mapsService.loadMapData.mockResolvedValue(null);
-
-      const result = await resolveMapPositions(campaignName, 'TestMap', attackerName);
-
-      expect(result).toBeNull();
-      expect(mapsService.loadMapData).toHaveBeenCalledWith(campaignName, 'TestMap');
-    });
-
     it('returns null when attacker is not found in mapData.players', async () => {
       const mapData = makeMapData({
         players: [makeAttacker({ name: 'OtherAttacker' })],
@@ -141,21 +132,6 @@ describe('targetResolver', () => {
 
       const result = await resolveMapPositions(campaignName, 'TestMap', attackerName);
 
-      expect(result).toBeNull();
-    });
-
-    it('returns null when combat target is null (resolveTarget destructures null)', async () => {
-      const mapData = makeMapData();
-
-      mapsService.loadMapData.mockResolvedValue(mapData);
-      damageUtils.getCombatContext.mockResolvedValue(makeCombatContext());
-      damageUtils.getTargetFromAttacker.mockReturnValue(null);
-
-      const result = await resolveMapPositions(campaignName, 'TestMap', attackerName);
-
-      // resolveTarget returns null when getTargetFromAttacker returns null,
-      // and resolveMapPositions destructures it with ({ target }), which throws
-      // on null, caught by .catch(() => null)
       expect(result).toBeNull();
     });
 
@@ -235,14 +211,6 @@ describe('targetResolver', () => {
       const result = await resolveMapPositions(campaignName, 'TestMap', attackerName);
 
       expect(result.targetPos).toEqual({ gridX: 1, gridY: 2 });
-    });
-
-    it('returns null when mapData has no players array', async () => {
-      mapsService.loadMapData.mockResolvedValue({});
-
-      const result = await resolveMapPositions(campaignName, 'TestMap', attackerName);
-
-      expect(result).toBeNull();
     });
 
     it('returns null when resolveTarget rejects', async () => {

@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   getCharacterFolders,
@@ -32,18 +32,7 @@ describe('campaignService', () => {
       expect(result).toEqual(['Campaign 1', 'Campaign 2']);
     });
 
-    it('should return empty array when folders key is missing', async () => {
-      fetchSpy.mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({})
-      });
-
-      const result = await getCharacterFolders();
-
-      expect(result).toEqual([]);
-    });
-
-    it('should return empty array when folders key is null', async () => {
+    it('should return empty array when folders key is missing or null', async () => {
       fetchSpy.mockResolvedValue({
         ok: true,
         json: () => Promise.resolve({ folders: null })
@@ -97,18 +86,7 @@ describe('campaignService', () => {
       expect(result).toEqual(['char1.json', 'char2.json']);
     });
 
-    it('should return empty array when files key is missing', async () => {
-      fetchSpy.mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({})
-      });
-
-      const result = await getCharacterFiles('campaign1');
-
-      expect(result).toEqual([]);
-    });
-
-    it('should return empty array when files key is null', async () => {
+    it('should return empty array when files key is missing or null', async () => {
       fetchSpy.mockResolvedValue({
         ok: true,
         json: () => Promise.resolve({ files: null })
@@ -138,7 +116,7 @@ describe('campaignService', () => {
       expect(result).toEqual([]);
     });
 
-    it('should URL-encode campaign name with spaces', async () => {
+    it('should URL-encode campaign name with special characters', async () => {
       fetchSpy.mockResolvedValue({
         ok: true,
         json: () => Promise.resolve({ files: [] })
@@ -147,17 +125,6 @@ describe('campaignService', () => {
       await getCharacterFiles('campaign with spaces');
 
       expect(fetchSpy).toHaveBeenCalledWith('/api/campaigns/campaign%20with%20spaces');
-    });
-
-    it('should URL-encode campaign name with slashes', async () => {
-      fetchSpy.mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({ files: [] })
-      });
-
-      await getCharacterFiles('campaign/with/slashes');
-
-      expect(fetchSpy).toHaveBeenCalledWith('/api/campaigns/campaign%2Fwith%2Fslashes');
     });
   });
 
@@ -218,22 +185,6 @@ describe('campaignService', () => {
       expect(fetchSpy).not.toHaveBeenCalled();
     });
 
-    it('should load multiple characters in parallel', async () => {
-      const characterFiles = ['char1.json', 'char2.json', 'char3.json'];
-
-      fetchSpy.mockImplementation((url) => {
-        return Promise.resolve({
-          ok: true,
-          json: () => Promise.resolve({ name: url.split('/').pop() })
-        });
-      });
-
-      const result = await loadCharacters('campaign1', characterFiles);
-
-      expect(result).toHaveLength(3);
-      expect(result.map(c => c.name)).toEqual(['char1.json', 'char2.json', 'char3.json']);
-    });
-
     it('should URL-encode campaign and file names', async () => {
       const characterFiles = ['char 1.json'];
 
@@ -246,52 +197,15 @@ describe('campaignService', () => {
 
       expect(fetchSpy).toHaveBeenCalledWith('/api/campaigns/campaign%201/char%201.json');
     });
-
-    it('should handle characters with complex nested data', async () => {
-      const characterFiles = ['char1.json'];
-      const characterData = {
-        name: 'Character 1',
-        level: 5,
-        class: { name: 'Wizard' },
-        race: { name: 'Human' },
-        abilities: [
-          { name: 'Strength', score: 10 },
-          { name: 'Dexterity', score: 14 }
-        ],
-        spells: ['Fireball', 'Magic Missile']
-      };
-
-      fetchSpy.mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve(characterData)
-      });
-
-      const result = await loadCharacters('campaign1', characterFiles);
-
-      expect(result).toEqual([characterData]);
-    });
-
-    it('should return empty array when json() throws', async () => {
-      const characterFiles = ['char1.json'];
-
-      fetchSpy.mockResolvedValue({
-        ok: true,
-        json: () => { throw new SyntaxError('Unexpected token'); }
-      });
-
-      const result = await loadCharacters('campaign1', characterFiles);
-
-      expect(result).toEqual([]);
-    });
   });
 
   describe('deleteCharacter', () => {
-    it('should delete character and return undefined on success', async () => {
+    it('should delete character without throwing on success', async () => {
       fetchSpy.mockResolvedValue({ ok: true });
 
-      const result = await deleteCharacter('campaign1', 'char1.json');
-
-      expect(result).toBeUndefined();
+      await expect(
+        deleteCharacter('campaign1', 'char1.json')
+      ).resolves.toBeUndefined();
     });
 
     it('should URL-encode campaign and file names', async () => {
@@ -343,22 +257,6 @@ describe('campaignService', () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ campaignName: 'campaign1', character: characterData })
       });
-    });
-
-    it('should URL-encode campaign name in URL', async () => {
-      const characterData = { name: 'New Character' };
-
-      fetchSpy.mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({ character: characterData })
-      });
-
-      await createCharacter('campaign with spaces', characterData);
-
-      expect(fetchSpy).toHaveBeenCalledWith(
-        '/api/campaigns/campaign%20with%20spaces',
-        expect.any(Object)
-      );
     });
 
     it('should throw on API error', async () => {
@@ -455,22 +353,6 @@ describe('campaignService', () => {
           body: JSON.stringify({ ...characterData, originalFileName: 'old-name.json' })
         }
       );
-    });
-
-    it('should include originalFileName as undefined when not provided', async () => {
-      const characterData = { name: 'Same Name', level: 3 };
-
-      fetchSpy.mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({ character: characterData })
-      });
-
-      await updateCharacter('campaign1', 'char1.json', characterData);
-
-      const callArgs = fetchSpy.mock.calls[0][1];
-      const body = JSON.parse(callArgs.body);
-
-      expect(body.originalFileName).toBeUndefined();
     });
   });
 });

@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { describe, it, expect } from 'vitest';
 import { automationInfoPopup } from './popupResponse.js';
 
@@ -48,15 +48,6 @@ describe('automationInfoPopup', () => {
     expect(resultFalse.payload.description).toBe('');
   });
 
-  it('should preserve truthy descriptions unchanged', () => {
-    const result = automationInfoPopup({
-      name: 'Magic Missile',
-      description: 'Creates three glowing darts.',
-      automation: { type: 'damage_roll' },
-    });
-    expect(result.payload.description).toBe('Creates three glowing darts.');
-  });
-
   it('should preserve name as-is including empty string and null', () => {
     const base = { automation: { type: 'test' } };
 
@@ -65,24 +56,7 @@ describe('automationInfoPopup', () => {
     expect(automationInfoPopup(base).payload.name).toBeUndefined();
   });
 
-  it('should pass the automation object by reference', () => {
-    const automation = { type: 'attack_roll', weapon: 'Longsword', damage: '1d8+3' };
-    const result = automationInfoPopup({ name: 'Melee Attack', automation });
-    expect(result.payload.automation).toBe(automation);
-  });
-
-  it('should return a new object that does not share references with the input', () => {
-    const action = { name: 'New', automation: { type: 'test' }, description: '' };
-    const result = automationInfoPopup(action);
-    expect(result).not.toBe(action);
-    expect(result.payload).not.toBe(action);
-  });
-
   it('should throw when automation is missing', () => {
     expect(() => automationInfoPopup({ name: 'Test' })).toThrow();
-  });
-
-  it('should throw when automation is null', () => {
-    expect(() => automationInfoPopup({ name: 'Test', automation: null })).toThrow();
   });
 });

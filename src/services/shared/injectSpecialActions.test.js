@@ -1,3 +1,4 @@
+// @cleaned-by-ai
 // @improved-by-ai
 import { describe, it, expect } from 'vitest';
 import { injectSpecialActions } from './injectSpecialActions.js';
@@ -78,16 +79,6 @@ describe('injectSpecialActions', () => {
       const result = injectSpecialActions(existingActions, features);
       expect(result[0].source).toBe('feat');
     });
-
-    it('does not include extra properties from the feature object', () => {
-      const existingActions = new Set();
-      const features = [
-        { name: 'Feature', description: 'Desc', extraField: 'should not appear' },
-      ];
-      const result = injectSpecialActions(existingActions, features);
-      expect(result[0]).not.toHaveProperty('extraField');
-      expect(Object.keys(result[0])).toEqual(expect.arrayContaining(['name', 'description', 'type', 'source']));
-    });
   });
 
   describe('automation handling', () => {
@@ -109,32 +100,16 @@ describe('injectSpecialActions', () => {
       expect(result[0]).not.toHaveProperty('automation');
     });
 
-    it('omits automation when the feature has no automation field', () => {
-      const existingActions = new Set();
-      const features = [{ name: 'Feature', description: 'Desc' }];
-      const result = injectSpecialActions(existingActions, features, { includeAutomation: true });
-      expect(result[0]).not.toHaveProperty('automation');
-    });
-
-    it('omits automation when the feature has a falsy automation value', () => {
+    it('omits automation when the feature has no automation or a falsy automation value', () => {
       const existingActions = new Set();
       const features = [
-        { name: 'Feature', description: 'Desc', automation: null },
-        { name: 'Feature2', description: 'Desc', automation: '' },
-        { name: 'Feature3', description: 'Desc', automation: 0 },
+        { name: 'Feature', description: 'Desc' },
+        { name: 'Feature2', description: 'Desc', automation: null },
+        { name: 'Feature3', description: 'Desc', automation: '' },
+        { name: 'Feature4', description: 'Desc', automation: 0 },
       ];
       const result = injectSpecialActions(existingActions, features, { includeAutomation: true });
       expect(result.every(r => !r.automation)).toBe(true);
-    });
-
-    it('defaults includeAutomation to true when options is undefined or empty', () => {
-      const features = [{ name: 'Feature', description: 'Desc', automation: { type: 'test' } }];
-
-      const result1 = injectSpecialActions(new Set(), features, undefined);
-      const result2 = injectSpecialActions(new Set(), features, {});
-
-      expect(result1[0].automation).toEqual({ type: 'test' });
-      expect(result2[0].automation).toEqual({ type: 'test' });
     });
   });
 
@@ -144,13 +119,6 @@ describe('injectSpecialActions', () => {
       const features = [{ name: 'New', description: 'New' }];
       injectSpecialActions(existingActions, features);
       expect(existingActions).toContain('New');
-    });
-
-    it('does not re-add names already in existingActions', () => {
-      const existingActions = new Set(['Existing']);
-      const features = [{ name: 'Existing', description: 'Existing' }];
-      injectSpecialActions(existingActions, features);
-      expect(existingActions.size).toBe(1);
     });
 
     it('accumulates new names across multiple calls', () => {

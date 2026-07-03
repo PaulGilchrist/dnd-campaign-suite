@@ -1,8 +1,8 @@
-// @improved-by-ai
-import { describe, it, expect } from 'vitest';
+// @cleaned-by-ai
+import { describe, it } from 'vitest';
 
 describe('saveDc', () => {
-  it('placeholder — computeSaveDc was removed from source', () => {
-    expect(true).toBe(true);
-  });
+  // All tests removed — computeSaveDc was removed from source.
+  // This file is kept as a placeholder to avoid import errors.
+  it.skip('placeholder — no tests to run', () => {});
 });

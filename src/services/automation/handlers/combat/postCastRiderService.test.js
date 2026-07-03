@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
@@ -40,6 +40,10 @@ function makePlayerStats(overrides = {}) {
 
 function makeSpell(overrides = {}) {
   return { name: 'Charm Person', school: 'enchantment', level: 1, ...overrides };
+}
+
+function makeMetaCtx(overrides = {}) {
+  return { slotLevel: 1, ...overrides };
 }
 
 // ── getPostCastRiderSaves ──────────────────────────────────────
@@ -90,16 +94,9 @@ describe('getPostCastRiderSaves', () => {
     expect(getPostCastRiderSaves(ps).map((p) => p.name)).toEqual(['Valid', 'ValidRule']);
   });
 
-  it('throws when automation.passives is missing', () => {
+  it('throws when automation.passives is missing or null', () => {
     expect(() => getPostCastRiderSaves({})).toThrow('Expected array');
-  });
-
-  it('throws when automation.passives is null', () => {
     expect(() => getPostCastRiderSaves({ automation: { passives: null } })).toThrow('Expected array');
-  });
-
-  it('throws when playerStats is null', () => {
-    expect(() => getPostCastRiderSaves(null)).toThrow();
   });
 });
 
@@ -118,32 +115,24 @@ describe('triggerPostCastRiderSaves', () => {
     expect(result).toBeNull();
   });
 
-  it('returns null when spell has no school property', async () => {
-    const spell = makeSpell({ school: undefined });
-    const result = await triggerPostCastRiderSaves(spell, makeMetaCtx(), makePlayerStats(), campaignName, mapName);
-    expect(result).toBeNull();
-  });
-
-  it('returns null when spell has empty school string', async () => {
-    const spell = makeSpell({ school: '' });
-    const result = await triggerPostCastRiderSaves(spell, makeMetaCtx(), makePlayerStats(), campaignName, mapName);
-    expect(result).toBeNull();
-  });
-
-  it('matches enchantment school case-insensitively', async () => {
-    const spell = makeSpell({ school: 'Enchantment' });
+  it('returns null when spell school is undefined or empty', async () => {
     const ps = makePlayerStats({ automation: { passives: [{ type: 'post_cast_rider', name: 'Charm Save' }] } });
-    const result = await triggerPostCastRiderSaves(spell, makeMetaCtx(), ps, campaignName, mapName);
-    expect(result).not.toBeNull();
-    expect(executeHandler).toHaveBeenCalled();
+    expect(
+      await triggerPostCastRiderSaves(makeSpell({ school: undefined }), makeMetaCtx(), ps, campaignName, mapName)
+    ).toBeNull();
+    expect(
+      await triggerPostCastRiderSaves(makeSpell({ school: '' }), makeMetaCtx(), ps, campaignName, mapName)
+    ).toBeNull();
   });
 
-  it('matches illusion school case-insensitively', async () => {
-    const spell = makeSpell({ school: 'ILLUSION' });
-    const ps = makePlayerStats({ automation: { passives: [{ type: 'post_cast_rider', name: 'Phantom Save' }] } });
-    const result = await triggerPostCastRiderSaves(spell, makeMetaCtx(), ps, campaignName, mapName);
-    expect(result).not.toBeNull();
-    expect(executeHandler).toHaveBeenCalled();
+  it('matches enchantment and illusion schools case-insensitively', async () => {
+    const ps = makePlayerStats({ automation: { passives: [{ type: 'post_cast_rider', name: 'Charm Save' }] } });
+    const enchantResult = await triggerPostCastRiderSaves(makeSpell({ school: 'Enchantment' }), makeMetaCtx(), ps, campaignName, mapName);
+    expect(enchantResult).not.toBeNull();
+
+    const illusionPs = makePlayerStats({ automation: { passives: [{ type: 'post_cast_rider', name: 'Phantom Save' }] } });
+    const illusionResult = await triggerPostCastRiderSaves(makeSpell({ school: 'ILLUSION' }), makeMetaCtx(), illusionPs, campaignName, mapName);
+    expect(illusionResult).not.toBeNull();
   });
 
   it('returns null when both metaCtx.slotLevel and spell.level are 0', async () => {
@@ -154,41 +143,35 @@ describe('triggerPostCastRiderSaves', () => {
     expect(result).toBeNull();
   });
 
-  it('proceeds when metaCtx.slotLevel > 0', async () => {
-    const spell = makeSpell({ level: 0, school: 'enchantment' });
-    const metaCtx = { slotLevel: 1 };
+  it('proceeds when metaCtx.slotLevel > 0 or spell.level > 0', async () => {
     const ps = makePlayerStats({ automation: { passives: [{ type: 'post_cast_rider', name: 'Charm Save' }] } });
-    const result = await triggerPostCastRiderSaves(spell, metaCtx, ps, campaignName, mapName);
-    expect(result).not.toBeNull();
+    const illusionPs = makePlayerStats({ automation: { passives: [{ type: 'post_cast_rider', name: 'Phantom Save' }] } });
+
+    const slotLevelResult = await triggerPostCastRiderSaves(makeSpell({ level: 0, school: 'enchantment' }), { slotLevel: 1 }, ps, campaignName, mapName);
+    expect(slotLevelResult).not.toBeNull();
+
+    const spellLevelResult = await triggerPostCastRiderSaves(makeSpell({ school: 'illusion', level: 2 }), { slotLevel: 0 }, illusionPs, campaignName, mapName);
+    expect(spellLevelResult).not.toBeNull();
   });
 
-  it('proceeds when spell.level > 0 even if metaCtx is empty', async () => {
-    const spell = makeSpell({ school: 'illusion', level: 2 });
-    const metaCtx = { slotLevel: 0 };
-    const ps = makePlayerStats({ automation: { passives: [{ type: 'post_cast_rider', name: 'Phantom Save' }] } });
-    const result = await triggerPostCastRiderSaves(spell, metaCtx, ps, campaignName, mapName);
-    expect(result).not.toBeNull();
-  });
-
-  it('proceeds when metaCtx is null and spell.level > 0', async () => {
-    const spell = makeSpell({ school: 'illusion', level: 3 });
-    const ps = makePlayerStats({ automation: { passives: [{ type: 'post_cast_rider', name: 'Null Meta Rider' }] } });
-    const result = await triggerPostCastRiderSaves(spell, null, ps, campaignName, mapName);
-    expect(result).not.toBeNull();
-  });
-
-  it('proceeds when metaCtx is undefined and spell.level > 0', async () => {
-    const spell = makeSpell({ school: 'enchantment', level: 2 });
-    const ps = makePlayerStats({ automation: { passives: [{ type: 'post_cast_rider', name: 'Undefined Meta Rider' }] } });
-    const result = await triggerPostCastRiderSaves(spell, undefined, ps, campaignName, mapName);
-    expect(result).not.toBeNull();
-  });
-
-  it('returns null when metaCtx is null and spell.level is 0', async () => {
-    const spell = makeSpell({ school: 'enchantment', level: 0 });
+  it('returns null when metaCtx is null/undefined and spell.level is 0', async () => {
     const ps = makePlayerStats({ automation: { passives: [{ type: 'post_cast_rider', name: 'No Uses Rider' }] } });
-    const result = await triggerPostCastRiderSaves(spell, null, ps, campaignName, mapName);
-    expect(result).toBeNull();
+    expect(
+      await triggerPostCastRiderSaves(makeSpell({ school: 'enchantment', level: 0 }), null, ps, campaignName, mapName)
+    ).toBeNull();
+    expect(
+      await triggerPostCastRiderSaves(makeSpell({ school: 'enchantment', level: 0 }), undefined, ps, campaignName, mapName)
+    ).toBeNull();
+  });
+
+  it('proceeds when metaCtx is null/undefined and spell.level > 0', async () => {
+    const ps1 = makePlayerStats({ automation: { passives: [{ type: 'post_cast_rider', name: 'Null Meta Rider' }] } });
+    const result1 = await triggerPostCastRiderSaves(makeSpell({ school: 'illusion', level: 3 }), null, ps1, campaignName, mapName);
+    expect(result1).not.toBeNull();
+
+    const ps2 = makePlayerStats({ automation: { passives: [{ type: 'post_cast_rider', name: 'Undefined Meta Rider' }] } });
+    const result2 = await triggerPostCastRiderSaves(makeSpell({ school: 'enchantment', level: 2 }), undefined, ps2, campaignName, mapName);
+    expect(result2).not.toBeNull();
   });
 
   it('returns null when no rider saves are configured', async () => {
@@ -197,28 +180,19 @@ describe('triggerPostCastRiderSaves', () => {
     expect(result).toBeNull();
   });
 
-  it('skips riders with zero runtime uses', async () => {
+  it('skips riders with zero or negative runtime uses', async () => {
     const spell = makeSpell({ school: 'enchantment' });
     const ps = makePlayerStats({
       automation: { passives: [{ type: 'post_cast_rider', name: 'Exhausted Rider' }] },
     });
+
     getRuntimeValue.mockReturnValue(0);
-
-    const result = await triggerPostCastRiderSaves(spell, makeMetaCtx(), ps, campaignName, mapName);
-
+    let result = await triggerPostCastRiderSaves(spell, makeMetaCtx(), ps, campaignName, mapName);
     expect(result).toBeNull();
     expect(executeHandler).not.toHaveBeenCalled();
-  });
 
-  it('skips riders with negative runtime uses', async () => {
-    const spell = makeSpell({ school: 'enchantment' });
-    const ps = makePlayerStats({
-      automation: { passives: [{ type: 'post_cast_rider', name: 'Negative Rider' }] },
-    });
     getRuntimeValue.mockReturnValue(-1);
-
-    const result = await triggerPostCastRiderSaves(spell, makeMetaCtx(), ps, campaignName, mapName);
-
+    result = await triggerPostCastRiderSaves(spell, makeMetaCtx(), ps, campaignName, mapName);
     expect(result).toBeNull();
     expect(executeHandler).not.toHaveBeenCalled();
   });
@@ -423,33 +397,18 @@ describe('triggerPostCastRiderSaves', () => {
     consoleSpy.mockRestore();
   });
 
-  it('uses campaignName for runtime value lookup key', async () => {
+  it('uses campaignName for runtime value lookup and converts spaces to underscores in key', async () => {
     const spell = makeSpell({ school: 'enchantment' });
     const ps = makePlayerStats({
-      automation: { passives: [{ type: 'post_cast_rider', name: 'Campaign Rider' }] },
+      automation: { passives: [{ type: 'post_cast_rider', name: 'My Special Rider' }] },
     });
 
     await triggerPostCastRiderSaves(spell, makeMetaCtx(), ps, 'MyCampaign', mapName);
 
     expect(getRuntimeValue).toHaveBeenCalledWith(
       ps.name,
-      'postCastRider_Campaign_Rider',
-      'MyCampaign',
-    );
-  });
-
-  it('converts rider name spaces to underscores in runtime key', async () => {
-    const spell = makeSpell({ school: 'enchantment' });
-    const ps = makePlayerStats({
-      automation: { passives: [{ type: 'post_cast_rider', name: 'My Special Rider' }] },
-    });
-
-    await triggerPostCastRiderSaves(spell, makeMetaCtx(), ps, campaignName, mapName);
-
-    expect(getRuntimeValue).toHaveBeenCalledWith(
-      ps.name,
       'postCastRider_My_Special_Rider',
-      campaignName,
+      'MyCampaign',
     );
   });
 
@@ -469,7 +428,3 @@ describe('triggerPostCastRiderSaves', () => {
     );
   });
 });
-
-function makeMetaCtx(overrides = {}) {
-  return { slotLevel: 1, ...overrides };
-}

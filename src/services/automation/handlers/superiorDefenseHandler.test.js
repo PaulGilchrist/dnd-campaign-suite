@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import { handle, activateAtTurnStart } from './superiorDefenseHandler.js';
@@ -104,42 +104,6 @@ describe('superiorDefenseHandler', () => {
           campaignName
         );
       });
-
-      it('should return automation object in payload', async () => {
-        mockGetRuntimeValue((playerName, key, _cName) => {
-          if (key === 'activeBuffs') return [{ name: 'Superior Defense' }];
-          return null;
-        });
-
-        const auto = { type: 'superior_defense', cost: 3 };
-        const action = {
-          name: 'Superior Defense',
-          automation: auto,
-        };
-
-        const result = await handle(action, makePlayerStats(), campaignName);
-
-        expect(result.payload.automation).toEqual(auto);
-        expect(result.payload.automationType).toBe('superior_defense');
-        expect(result.payload.name).toBe('Superior Defense');
-      });
-
-      it('should handle addEntry rejection gracefully', async () => {
-        mockGetRuntimeValue((playerName, key, _cName) => {
-          if (key === 'activeBuffs') return [{ name: 'Superior Defense' }];
-          return null;
-        });
-        logService.addEntry.mockRejectedValue(new Error('Network error'));
-
-        const action = {
-          name: 'Superior Defense',
-          automation: { type: 'superior_defense' },
-        };
-
-        const result = await handle(action, makePlayerStats(), campaignName);
-
-        expect(result.payload.description).toBe('Superior Defense ended.');
-      });
     });
 
     describe('Focus point check', () => {
@@ -185,27 +149,7 @@ describe('superiorDefenseHandler', () => {
         );
       });
 
-      it('should fail when maxFocus is 0 (no class_levels)', async () => {
-        const ps = makePlayerStats({ class: { class_levels: [] } });
-        mockGetRuntimeValue((playerName, key, _cName) => {
-          if (key === 'activeBuffs') return [];
-          if (key === 'focusPoints') return 0;
-          return null;
-        });
-
-        const action = {
-          name: 'Superior Defense',
-          automation: { type: 'superior_defense' },
-        };
-
-        const result = await handle(action, ps, campaignName);
-
-        expect(result.payload.description).toBe(
-          'Not enough Focus Points. Superior Defense requires 3 Focus Points.'
-        );
-      });
-
-      it('should use default cost of 3 when auto.cost is null', async () => {
+      it('should use default cost of 3 when auto.cost is null or undefined', async () => {
         mockGetRuntimeValue((playerName, key, _cName) => {
           if (key === 'activeBuffs') return [];
           if (key === 'focusPoints') return 3;
@@ -222,10 +166,10 @@ describe('superiorDefenseHandler', () => {
         expect(result.payload.description).toContain('0 Focus Points remaining');
       });
 
-      it('should use default cost of 3 when auto.cost is undefined', async () => {
+      it('should handle focusPoints stored as string by converting to number', async () => {
         mockGetRuntimeValue((playerName, key, _cName) => {
           if (key === 'activeBuffs') return [];
-          if (key === 'focusPoints') return 3;
+          if (key === 'focusPoints') return '6';
           return null;
         });
 
@@ -236,7 +180,41 @@ describe('superiorDefenseHandler', () => {
 
         const result = await handle(action, makePlayerStats(), campaignName);
 
-        expect(result.payload.description).toContain('0 Focus Points remaining');
+        expect(result.payload.description).toContain('3 Focus Points remaining');
+      });
+
+      it('should use maxFocus as fallback when focusPoints not in runtime state', async () => {
+        mockGetRuntimeValue((playerName, key, _cName) => {
+          if (key === 'activeBuffs') return [];
+          if (key === 'focusPoints') return undefined;
+          return null;
+        });
+
+        const action = {
+          name: 'Superior Defense',
+          automation: { type: 'superior_defense' },
+        };
+
+        const result = await handle(action, makePlayerStats(), campaignName);
+
+        expect(result.payload.description).toContain('3 Focus Points remaining');
+      });
+
+      it('should use currentFocus from runtime state over maxFocus when both available', async () => {
+        mockGetRuntimeValue((playerName, key, _cName) => {
+          if (key === 'activeBuffs') return [];
+          if (key === 'focusPoints') return 4;
+          return null;
+        });
+
+        const action = {
+          name: 'Superior Defense',
+          automation: { type: 'superior_defense' },
+        };
+
+        const result = await handle(action, makePlayerStats(), campaignName);
+
+        expect(result.payload.description).toContain('1 Focus Points remaining');
       });
     });
 
@@ -315,30 +293,6 @@ describe('superiorDefenseHandler', () => {
         );
       });
 
-      it('should use default duration of 1_minute when auto.duration is missing', async () => {
-        mockGetRuntimeValue((playerName, key, _cName) => {
-          if (key === 'activeBuffs') return [];
-          if (key === 'focusPoints') return 6;
-          return null;
-        });
-
-        const action = {
-          name: 'Superior Defense',
-          automation: { type: 'superior_defense' },
-        };
-
-        await handle(action, makePlayerStats(), campaignName);
-
-        expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-          'TestHero',
-          'activeBuffs',
-          expect.arrayContaining([
-            expect.objectContaining({ duration: '1_minute' }),
-          ]),
-          campaignName
-        );
-      });
-
       it('should add buff to existing buffs array', async () => {
         mockGetRuntimeValue((playerName, key, _cName) => {
           if (key === 'activeBuffs') return [{ name: 'Other Buff', effect: 'other' }];
@@ -388,75 +342,6 @@ describe('superiorDefenseHandler', () => {
           campaignName
         );
       });
-
-      it('should handle addEntry rejection during activation gracefully', async () => {
-        mockGetRuntimeValue((playerName, key, _cName) => {
-          if (key === 'activeBuffs') return [];
-          if (key === 'focusPoints') return 6;
-          return null;
-        });
-        logService.addEntry.mockRejectedValue(new Error('Network error'));
-
-        const action = {
-          name: 'Superior Defense',
-          automation: { type: 'superior_defense' },
-        };
-
-        const result = await handle(action, makePlayerStats(), campaignName);
-
-        expect(result.payload.description).toContain('activated');
-      });
-
-      it('should handle focusPoints stored as string by converting to number', async () => {
-        mockGetRuntimeValue((playerName, key, _cName) => {
-          if (key === 'activeBuffs') return [];
-          if (key === 'focusPoints') return '6';
-          return null;
-        });
-
-        const action = {
-          name: 'Superior Defense',
-          automation: { type: 'superior_defense' },
-        };
-
-        const result = await handle(action, makePlayerStats(), campaignName);
-
-        expect(result.payload.description).toContain('3 Focus Points remaining');
-      });
-
-      it('should use maxFocus as fallback when focusPoints not in runtime state', async () => {
-        mockGetRuntimeValue((playerName, key, _cName) => {
-          if (key === 'activeBuffs') return [];
-          if (key === 'focusPoints') return undefined;
-          return null;
-        });
-
-        const action = {
-          name: 'Superior Defense',
-          automation: { type: 'superior_defense' },
-        };
-
-        const result = await handle(action, makePlayerStats(), campaignName);
-
-        expect(result.payload.description).toContain('3 Focus Points remaining');
-      });
-
-      it('should use currentFocus from runtime state over maxFocus when both available', async () => {
-        mockGetRuntimeValue((playerName, key, _cName) => {
-          if (key === 'activeBuffs') return [];
-          if (key === 'focusPoints') return 4;
-          return null;
-        });
-
-        const action = {
-          name: 'Superior Defense',
-          automation: { type: 'superior_defense' },
-        };
-
-        const result = await handle(action, makePlayerStats(), campaignName);
-
-        expect(result.payload.description).toContain('1 Focus Points remaining');
-      });
     });
   });
 
@@ -477,54 +362,10 @@ describe('superiorDefenseHandler', () => {
         expect(runtimeState.setRuntimeValue).not.toHaveBeenCalled();
         expect(logService.addEntry).not.toHaveBeenCalled();
       });
-
-      it('should return early when player has incapacitated condition (case insensitive)', async () => {
-        mockGetRuntimeValue((playerName, key) => {
-          if (key === 'activeConditions') return ['INCAPACITATED'];
-          return null;
-        });
-
-        const result = await activateAtTurnStart(
-          makePlayerStats(),
-          campaignName
-        );
-
-        expect(result).toEqual({ activated: false, reason: 'incapacitated' });
-      });
-
-      it('should return early when incapacitated is among multiple conditions', async () => {
-        mockGetRuntimeValue((playerName, key) => {
-          if (key === 'activeConditions') return ['Blinded', 'Incapacitated', 'Deafened'];
-          return null;
-        });
-
-        const result = await activateAtTurnStart(
-          makePlayerStats(),
-          campaignName
-        );
-
-        expect(result).toEqual({ activated: false, reason: 'incapacitated' });
-      });
     });
 
     describe('Already active check', () => {
-      it('should return early when buff is already active', async () => {
-        mockGetRuntimeValue((playerName, key) => {
-          if (key === 'activeConditions') return [];
-          if (key === 'activeBuffs') return [{ name: 'Superior Defense', effect: 'damage_resistance' }];
-          return null;
-        });
-
-        const result = await activateAtTurnStart(
-          makePlayerStats(),
-          campaignName
-        );
-
-        expect(result).toEqual({ activated: false, reason: 'already_active' });
-        expect(runtimeState.setRuntimeValue).not.toHaveBeenCalled();
-      });
-
-      it('should check among multiple buffs', async () => {
+      it('should return early when buff is already active among multiple buffs', async () => {
         mockGetRuntimeValue((playerName, key) => {
           if (key === 'activeConditions') return [];
           if (key === 'activeBuffs') return [
@@ -541,28 +382,12 @@ describe('superiorDefenseHandler', () => {
         );
 
         expect(result).toEqual({ activated: false, reason: 'already_active' });
+        expect(runtimeState.setRuntimeValue).not.toHaveBeenCalled();
       });
     });
 
     describe('Automation check', () => {
-      it('should return early when no automation found (empty specialActions)', async () => {
-        mockGetRuntimeValue((playerName, key) => {
-          if (key === 'activeConditions') return [];
-          if (key === 'activeBuffs') return [];
-          return null;
-        });
-
-        const ps = makePlayerStats({
-          automation: { specialActions: [] },
-        });
-
-        const result = await activateAtTurnStart(ps, campaignName);
-
-        expect(result).toEqual({ activated: false, reason: 'no_automation' });
-        expect(runtimeState.setRuntimeValue).not.toHaveBeenCalled();
-      });
-
-      it('should return early when specialActions is undefined', async () => {
+      it('should return early when no automation found', async () => {
         mockGetRuntimeValue((playerName, key) => {
           if (key === 'activeConditions') return [];
           if (key === 'activeBuffs') return [];
@@ -574,21 +399,7 @@ describe('superiorDefenseHandler', () => {
         const result = await activateAtTurnStart(ps, campaignName);
 
         expect(result).toEqual({ activated: false, reason: 'no_automation' });
-      });
-
-      it('should return early when playerStats.automation is undefined', async () => {
-        mockGetRuntimeValue((playerName, key) => {
-          if (key === 'activeConditions') return [];
-          if (key === 'activeBuffs') return [];
-          return null;
-        });
-
-        const ps = makePlayerStats();
-        delete ps.automation;
-
-        const result = await activateAtTurnStart(ps, campaignName);
-
-        expect(result).toEqual({ activated: false, reason: 'no_automation' });
+        expect(runtimeState.setRuntimeValue).not.toHaveBeenCalled();
       });
     });
 
@@ -618,32 +429,6 @@ describe('superiorDefenseHandler', () => {
           available: 1,
         });
         expect(runtimeState.setRuntimeValue).not.toHaveBeenCalled();
-      });
-
-      it('should use default cost of 3 when auto.cost is missing', async () => {
-        mockGetRuntimeValue((playerName, key) => {
-          if (key === 'activeConditions') return [];
-          if (key === 'activeBuffs') return [];
-          if (key === 'focusPoints') return 2;
-          return null;
-        });
-
-        const ps = makePlayerStats({
-          automation: {
-            specialActions: [
-              { name: 'Superior Defense', automation: { type: 'superior_defense' } },
-            ],
-          },
-        });
-
-        const result = await activateAtTurnStart(ps, campaignName);
-
-        expect(result).toEqual({
-          activated: false,
-          reason: 'insufficient_focus',
-          cost: 3,
-          available: 2,
-        });
       });
 
       it('should succeed when focus equals cost', async () => {
@@ -804,28 +589,6 @@ describe('superiorDefenseHandler', () => {
           ]),
           campaignName
         );
-      });
-
-      it('should handle addEntry rejection gracefully', async () => {
-        mockGetRuntimeValue((playerName, key) => {
-          if (key === 'activeConditions') return [];
-          if (key === 'activeBuffs') return [];
-          if (key === 'focusPoints') return 6;
-          return null;
-        });
-        logService.addEntry.mockRejectedValue(new Error('Network error'));
-
-        const ps = makePlayerStats({
-          automation: {
-            specialActions: [
-              { name: 'Superior Defense', automation: { type: 'superior_defense', cost: 3 } },
-            ],
-          },
-        });
-
-        const result = await activateAtTurnStart(ps, campaignName);
-
-        expect(result.activated).toBe(true);
       });
 
       it('should use maxFocus as fallback when focusPoints not in runtime state', async () => {

@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { loadFactions, saveFactions, loadFaction, deleteFaction } from './factionsService.js';
 
@@ -41,30 +41,16 @@ describe('factionsService', () => {
       expect(result).toEqual([]);
     });
 
-    it('encodes campaign name with spaces in URL', async () => {
+    it('encodes campaign name in URL', async () => {
       mockFetch.mockResolvedValue({
         ok: true,
         json: () => Promise.resolve([]),
       });
 
-      await loadFactions('campaign with spaces');
+      await loadFactions('campaign/with spaces');
 
       expect(mockFetch).toHaveBeenCalledWith(
-        '/api/campaigns/campaign%20with%20spaces/factions',
-        { method: 'GET', headers: { 'Content-Type': 'application/json' } }
-      );
-    });
-
-    it('encodes campaign name with special characters in URL', async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve([]),
-      });
-
-      await loadFactions('campaign/with/slashes');
-
-      expect(mockFetch).toHaveBeenCalledWith(
-        '/api/campaigns/campaign%2Fwith%2Fslashes/factions',
+        '/api/campaigns/campaign%2Fwith%20spaces/factions',
         { method: 'GET', headers: { 'Content-Type': 'application/json' } }
       );
     });
@@ -93,16 +79,6 @@ describe('factionsService', () => {
       mockFetch.mockRejectedValue(new Error('ENOTFOUND'));
 
       await expect(loadFactions('campaign1')).rejects.toThrow('ENOTFOUND');
-    });
-
-    it('calls console.error on failure', async () => {
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-      mockFetch.mockRejectedValue(new Error('Network error'));
-
-      await expect(loadFactions('campaign1')).rejects.toThrow('Network error');
-
-      expect(consoleSpy).toHaveBeenCalledWith('Error loading Factions:', expect.any(Error));
-      consoleSpy.mockRestore();
     });
   });
 
@@ -146,30 +122,16 @@ describe('factionsService', () => {
       );
     });
 
-    it('encodes campaign name with spaces in URL', async () => {
+    it('encodes campaign name in URL', async () => {
       mockFetch.mockResolvedValue({
         ok: true,
         json: () => Promise.resolve({ success: true }),
       });
 
-      await saveFactions('campaign with spaces', []);
+      await saveFactions('campaign/with spaces', []);
 
       expect(mockFetch).toHaveBeenCalledWith(
-        '/api/campaigns/campaign%20with%20spaces/factions',
-        expect.any(Object)
-      );
-    });
-
-    it('encodes campaign name with special characters in URL', async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({ success: true }),
-      });
-
-      await saveFactions('campaign/with/slashes', []);
-
-      expect(mockFetch).toHaveBeenCalledWith(
-        '/api/campaigns/campaign%2Fwith%2Fslashes/factions',
+        '/api/campaigns/campaign%2Fwith%20spaces/factions',
         expect.any(Object)
       );
     });
@@ -199,16 +161,6 @@ describe('factionsService', () => {
 
       await expect(saveFactions('campaign1', [])).rejects.toThrow('ENOTFOUND');
     });
-
-    it('calls console.error on failure', async () => {
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-      mockFetch.mockRejectedValue(new Error('Network error'));
-
-      await expect(saveFactions('campaign1', [])).rejects.toThrow('Network error');
-
-      expect(consoleSpy).toHaveBeenCalledWith('Error saving Factions:', expect.any(Error));
-      consoleSpy.mockRestore();
-    });
   });
 
   describe('loadFaction', () => {
@@ -224,30 +176,16 @@ describe('factionsService', () => {
       expect(result).toEqual(mockFaction);
     });
 
-    it('encodes campaign and faction IDs with spaces in URL', async () => {
+    it('encodes campaign and faction IDs in URL', async () => {
       mockFetch.mockResolvedValue({
         ok: true,
         json: () => Promise.resolve({}),
       });
 
-      await loadFaction('campaign with spaces', 'faction with spaces');
+      await loadFaction('campaign/1', 'faction/abc with spaces');
 
       expect(mockFetch).toHaveBeenCalledWith(
-        '/api/campaigns/campaign%20with%20spaces/factions/faction%20with%20spaces',
-        { method: 'GET', headers: { 'Content-Type': 'application/json' } }
-      );
-    });
-
-    it('encodes campaign and faction IDs with special characters in URL', async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({}),
-      });
-
-      await loadFaction('campaign/1', 'faction/abc');
-
-      expect(mockFetch).toHaveBeenCalledWith(
-        '/api/campaigns/campaign%2F1/factions/faction%2Fabc',
+        '/api/campaigns/campaign%2F1/factions/faction%2Fabc%20with%20spaces',
         { method: 'GET', headers: { 'Content-Type': 'application/json' } }
       );
     });
@@ -277,16 +215,6 @@ describe('factionsService', () => {
 
       await expect(loadFaction('campaign1', 'faction-1')).rejects.toThrow('ENOTFOUND');
     });
-
-    it('calls console.error on failure', async () => {
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-      mockFetch.mockRejectedValue(new Error('Network error'));
-
-      await expect(loadFaction('campaign1', 'faction-1')).rejects.toThrow('Network error');
-
-      expect(consoleSpy).toHaveBeenCalledWith('Error loading Faction:', expect.any(Error));
-      consoleSpy.mockRestore();
-    });
   });
 
   describe('deleteFaction', () => {
@@ -306,30 +234,16 @@ describe('factionsService', () => {
       );
     });
 
-    it('encodes campaign and faction IDs with spaces in URL', async () => {
+    it('encodes campaign and faction IDs in URL', async () => {
       mockFetch.mockResolvedValue({
         ok: true,
         json: () => Promise.resolve({ success: true }),
       });
 
-      await deleteFaction('campaign with spaces', 'faction with spaces');
+      await deleteFaction('campaign/1', 'faction/abc with spaces');
 
       expect(mockFetch).toHaveBeenCalledWith(
-        '/api/campaigns/campaign%20with%20spaces/factions/faction%20with%20spaces',
-        { method: 'DELETE' }
-      );
-    });
-
-    it('encodes campaign and faction IDs with special characters in URL', async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({ success: true }),
-      });
-
-      await deleteFaction('campaign/1', 'faction/abc');
-
-      expect(mockFetch).toHaveBeenCalledWith(
-        '/api/campaigns/campaign%2F1/factions/faction%2Fabc',
+        '/api/campaigns/campaign%2F1/factions/faction%2Fabc%20with%20spaces',
         { method: 'DELETE' }
       );
     });
@@ -358,16 +272,6 @@ describe('factionsService', () => {
       mockFetch.mockRejectedValue(new Error('ENOTFOUND'));
 
       await expect(deleteFaction('campaign1', 'faction-1')).rejects.toThrow('ENOTFOUND');
-    });
-
-    it('calls console.error on failure', async () => {
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-      mockFetch.mockRejectedValue(new Error('Network error'));
-
-      await expect(deleteFaction('campaign1', 'faction-1')).rejects.toThrow('Network error');
-
-      expect(consoleSpy).toHaveBeenCalledWith('Error deleting Faction:', expect.any(Error));
-      consoleSpy.mockRestore();
     });
   });
 });

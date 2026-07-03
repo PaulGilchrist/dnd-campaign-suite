@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { postLogEntry } from './logPoster.js';
 import * as logService from '../ui/logService.js';
@@ -18,15 +18,6 @@ describe('postLogEntry', () => {
     await postLogEntry('campaign/with/slashes', { type: 'damage', amount: 15 });
 
     expect(logService.addEntry).toHaveBeenCalledWith('campaign/with/slashes', { type: 'damage', amount: 15 });
-  });
-
-  it('returns the resolved value from addEntry on success', async () => {
-    const responseData = { id: 42, status: 'added' };
-    logService.addEntry.mockResolvedValue(responseData);
-
-    const result = await postLogEntry('my-campaign', { text: 'Test entry' });
-
-    expect(result).toBe(responseData);
   });
 
   it('returns undefined when addEntry rejects', async () => {

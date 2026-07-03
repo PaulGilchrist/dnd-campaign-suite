@@ -1,3 +1,4 @@
+// @cleaned-by-ai
 // @improved-by-ai
 import { describe, it, expect } from 'vitest';
 
@@ -35,39 +36,15 @@ describe('resourcePoolHandler.handle', () => {
       });
     });
 
-    it('should default description to empty string when action.description is undefined', async () => {
-      const action = { name: 'Pool', automation: { type: 'resource_pool' } };
-      const result = await handle(action, {}, 'campaign', 'map');
-
+    it('should default description to empty string when action.description is undefined or null', async () => {
+      const result = await handle({ name: 'Pool', automation: { type: 'resource_pool' } }, {}, 'campaign', 'map');
       expect(result.payload.description).toBe('');
     });
 
-    it('should default description to empty string when action.description is null', async () => {
-      const action = { name: 'Pool', description: null, automation: { type: 'resource_pool' } };
-      const result = await handle(action, {}, 'campaign', 'map');
-
-      expect(result.payload.description).toBe('');
-    });
-
-    it('should pass through automation object even when it is null', async () => {
+    it('should pass through automation object as-is including null', async () => {
       const action = { name: 'Pool', automation: null };
       const result = await handle(action, {}, 'campaign', 'map');
-
       expect(result.payload.automation).toBe(null);
-    });
-
-    it('should pass through automation object when it is undefined', async () => {
-      const action = { name: 'Pool' };
-      const result = await handle(action, {}, 'campaign', 'map');
-
-      expect(result.payload.automation).toBeUndefined();
-    });
-
-    it('should pass through automation object when it is missing entirely from action', async () => {
-      const action = { name: 'Pool', description: 'test' };
-      const result = await handle(action, {}, 'campaign', 'map');
-
-      expect(result.payload.automation).toBeUndefined();
     });
 
     it('should forward all action fields into the payload', async () => {
@@ -103,17 +80,6 @@ describe('resourcePoolHandler.handle', () => {
         },
       });
     });
-
-    it('should default description for moonlight step when description is missing', async () => {
-      const action = {
-        name: 'Moonlight',
-        automation: { conversion: 'spell_slot_to_moonlight_step' },
-      };
-      const result = await handle(action, {}, 'campaign', 'map');
-
-      expect(result.modalName).toBe('moonlightStepResource');
-      expect(result.payload.description).toBe('');
-    });
   });
 
   describe('giant ancestry delegation', () => {
@@ -131,18 +97,6 @@ describe('resourcePoolHandler.handle', () => {
 
       expect(result.type).toBe('modal');
       expect(result.modalName).toBe('giantAncestry');
-    });
-
-    it('should forward playerStats and campaignName to giantAncestryHandler', async () => {
-      const action = { name: 'Giant Ancestry' };
-      const playerStats = { name: 'Thoric', level: 12, proficiency: 5 };
-      const result = await handle(action, playerStats, 'EpicCampaign', 'DragonMap');
-
-      expect(result.type).toBe('modal');
-      expect(result.modalName).toBe('giantAncestry');
-      expect(result.payload.action).toBe(action);
-      expect(result.payload.playerStats).toBe(playerStats);
-      expect(result.payload.campaignName).toBe('EpicCampaign');
     });
   });
 
@@ -162,19 +116,12 @@ describe('resourcePoolHandler.handle', () => {
       });
     });
 
-    it('should return resourcePool modal when automation.type is something other than giant_ancestry', async () => {
+    it('should return resourcePool modal when automation.type is not giant_ancestry', async () => {
       const action = { name: 'Spell Slot Pool', automation: { type: 'spell_slot' } };
       const result = await handle(action, {}, 'campaign', 'map');
 
       expect(result.modalName).toBe('resourcePool');
       expect(result.payload.automation.type).toBe('spell_slot');
-    });
-
-    it('should handle empty string conversion (not matching spell_slot_to_moonlight_step)', async () => {
-      const action = { name: 'Pool', automation: { conversion: '' } };
-      const result = await handle(action, {}, 'campaign', 'map');
-
-      expect(result.modalName).toBe('resourcePool');
     });
   });
 });

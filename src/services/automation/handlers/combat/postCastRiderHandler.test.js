@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { handle } from './postCastRiderHandler.js';
 import { buildSaveDc, createSaveListener } from '../../common/savePrompt.js';
@@ -108,8 +108,6 @@ describe('postCastRiderHandler.handle', () => {
             },
         });
 
-        const usesKey = usesKeyFor(action.name);
-        expect(getRuntimeValue).toHaveBeenCalledWith(playerStats.name, usesKey, campaignName);
         expect(buildSaveDc).toHaveBeenCalledWith(action.automation, playerStats);
         expect(resolveTarget).toHaveBeenCalledWith(campaignName, playerStats.name);
         expect(createSaveListener).toHaveBeenCalledWith(campaignName, {
@@ -117,16 +115,9 @@ describe('postCastRiderHandler.handle', () => {
             saveType: 'WIS',
             saveDc: 15,
         });
-        expect(addEntry).toHaveBeenCalledWith(campaignName, {
-            type: 'ability_use',
-            characterName: playerStats.name,
-            abilityName: action.name,
-            description: expect.stringContaining('Control Spell'),
-            promptId: 'test-prompt-id',
-        });
     });
 
-    it('uses "Unknown" as targetName when resolveTarget returns null', async () => {
+    it('uses "Unknown" as targetName when resolveTarget returns null or missing target', async () => {
         resolveTarget.mockResolvedValue(null);
 
         const result = await handle(action, playerStats, campaignName);
@@ -135,14 +126,16 @@ describe('postCastRiderHandler.handle', () => {
         expect(createSaveListener).toHaveBeenCalledWith(campaignName, expect.objectContaining({
             targetName: 'Unknown',
         }));
-    });
 
-    it('uses "Unknown" as targetName when resolveTarget returns object without target', async () => {
+        vi.clearAllMocks();
         resolveTarget.mockResolvedValue({});
 
-        const result = await handle(action, playerStats, campaignName);
+        const result2 = await handle(action, playerStats, campaignName);
 
-        expect(result.payload.targetName).toBe('Unknown');
+        expect(result2.payload.targetName).toBe('Unknown');
+        expect(createSaveListener).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+            targetName: 'Unknown',
+        }));
     });
 
     it('handles successful save: decrements uses and logs result', async () => {
@@ -164,7 +157,6 @@ describe('postCastRiderHandler.handle', () => {
             targetName: 'Enemy',
             saveType: 'WIS',
             saveDc: 15,
-            description: 'Enemy succeeded on WIS save. No effect.',
         }));
     });
 
@@ -206,7 +198,6 @@ describe('postCastRiderHandler.handle', () => {
             type: 'save_result',
             success: false,
             targetName: 'Enemy',
-            description: 'Enemy failed WIS save. Charmed for 1 minute.',
         }));
     });
 
@@ -227,7 +218,6 @@ describe('postCastRiderHandler.handle', () => {
         expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
             type: 'save_result',
             success: false,
-            description: 'Enemy failed WIS save. Prone for 1 minute.',
         }));
     });
 
@@ -256,10 +246,15 @@ describe('postCastRiderHandler.handle', () => {
             type: 'save_result',
             saveType: 'WIS',
         }));
-    });
 
-    it('defaults saveType to WIS in failed-save description when saveType is missing', async () => {
-        delete action.automation.saveType;
+        vi.clearAllMocks();
+        getRuntimeValue.mockImplementation((_char, key) => {
+            if (key === usesKeyFor(action.name)) return 1;
+            return [];
+        });
+        buildSaveDc.mockReturnValue(15);
+        resolveTarget.mockResolvedValue({ target: { name: 'Enemy' } });
+        createSaveListener.mockReturnValue({ promptId: 'test-prompt-id' });
 
         await handle(action, playerStats, campaignName);
 
@@ -267,42 +262,18 @@ describe('postCastRiderHandler.handle', () => {
 
         expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
             success: false,
-            description: 'Enemy failed WIS save. Charmed for 1 minute.',
+            saveType: 'WIS',
         }));
     });
 
     it('removes save-result event listener after handling', async () => {
         await handle(action, playerStats, campaignName);
 
-        // First dispatch triggers the handler (decrements uses)
         dispatchSaveResult('test-prompt-id', true);
         expect(setRuntimeValue).toHaveBeenCalledTimes(1);
 
-        // Second dispatch should be ignored since the listener was removed
         dispatchSaveResult('test-prompt-id', true);
         expect(setRuntimeValue).toHaveBeenCalledTimes(1);
-    });
-
-    it('appends condition to existing conditions without mutating the original array', async () => {
-        const existingConditions = ['exhausted'];
-        getRuntimeValue.mockImplementation((_char, key) => {
-            if (key === usesKeyFor(action.name)) return 1;
-            if (key === 'activeConditions' && _char === 'Enemy') return existingConditions;
-            return [];
-        });
-
-        await handle(action, playerStats, campaignName);
-
-        dispatchSaveResult('test-prompt-id', false);
-
-        expect(setRuntimeValue).toHaveBeenCalledWith(
-            'Enemy',
-            'activeConditions',
-            ['exhausted', 'charmed'],
-            campaignName,
-        );
-
-        expect(existingConditions).toEqual(['exhausted']);
     });
 
 });

@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { handle } from './healingPoolHandler.js';
 
@@ -32,37 +32,16 @@ describe('healingPoolHandler.handle', () => {
       expect(result.modalName).toBe('healingPool');
     });
 
-    it('passes the action name into the payload', async () => {
+    it('passes the action name and pool into the payload', async () => {
       const action = {
         name: 'Divine Smite',
-        automation: { pool: 'healing_pool' },
+        automation: { pool: 'life_pool' },
       };
 
       const result = await handle(action, {}, campaignName, mapName);
 
       expect(result.payload.name).toBe('Divine Smite');
-    });
-
-    it('passes the pool value into the payload', async () => {
-      const result = await handle(
-        makeAction({ pool: 'life_pool' }),
-        {},
-        campaignName,
-        mapName,
-      );
-
       expect(result.payload.pool).toBe('life_pool');
-    });
-
-    it('passes resourceKey into the payload', async () => {
-      const result = await handle(
-        makeAction({ resourceKey: 'spell_slot' }),
-        {},
-        campaignName,
-        mapName,
-      );
-
-      expect(result.payload.resourceKey).toBe('spell_slot');
     });
   });
 
@@ -74,6 +53,7 @@ describe('healingPoolHandler.handle', () => {
           isDicePool: true,
           dieType: 'd6',
           maxDicePerUse: '3',
+          resourceKey: 'spell_slot',
         }),
         {},
         campaignName,
@@ -84,20 +64,11 @@ describe('healingPoolHandler.handle', () => {
       expect(result.payload.isDicePool).toBe(true);
       expect(result.payload.dieType).toBe('d6');
       expect(result.payload.maxDicePerUse).toBe('3');
+      expect(result.payload.resourceKey).toBe('spell_slot');
     });
 
-    it('applies default empty string for maxDicePerUse when undefined', async () => {
-      const result = await handle(
-        makeAction({
-          poolExpression: undefined,
-          isDicePool: undefined,
-          dieType: undefined,
-          maxDicePerUse: undefined,
-        }),
-        {},
-        campaignName,
-        mapName,
-      );
+    it('applies defaults for missing optional fields', async () => {
+      const result = await handle(makeAction(), {}, campaignName, mapName);
 
       expect(result.payload.poolExpression).toBeUndefined();
       expect(result.payload.isDicePool).toBeUndefined();
@@ -107,160 +78,68 @@ describe('healingPoolHandler.handle', () => {
   });
 
   describe('default values for missing automation fields', () => {
-    it('defaults alsoCures to empty array when not provided', async () => {
-      const result = await handle(
-        makeAction({ alsoCures: undefined }),
-        {},
-        campaignName,
-        mapName,
-      );
+    it('defaults alsoCures to empty array, cureCost to 5, range/resourceCost to empty strings', async () => {
+      const result = await handle(makeAction(), {}, campaignName, mapName);
 
       expect(result.payload.alsoCures).toEqual([]);
+      expect(result.payload.cureCost).toBe(5);
+      expect(result.payload.range).toBe('');
+      expect(result.payload.resourceCost).toBe('');
     });
 
-    it('uses provided alsoCures when truthy', async () => {
+    it('uses provided alsoCures, cureCost, range, and resourceCost when truthy', async () => {
       const result = await handle(
-        makeAction({ alsoCures: ['Poisoned', 'Stunned'] }),
+        makeAction({
+          alsoCures: ['Poisoned', 'Stunned'],
+          cureCost: 10,
+          range: '30ft',
+          resourceCost: 'channel_divinity',
+        }),
         {},
         campaignName,
         mapName,
       );
 
       expect(result.payload.alsoCures).toEqual(['Poisoned', 'Stunned']);
-    });
-
-    it('defaults cureCost to 5 when not provided', async () => {
-      const result = await handle(
-        makeAction({ cureCost: undefined }),
-        {},
-        campaignName,
-        mapName,
-      );
-
-      expect(result.payload.cureCost).toBe(5);
-    });
-
-    it('uses provided cureCost when truthy', async () => {
-      const result = await handle(
-        makeAction({ cureCost: 10 }),
-        {},
-        campaignName,
-        mapName,
-      );
-
       expect(result.payload.cureCost).toBe(10);
-    });
-
-    it('defaults range to empty string when not provided', async () => {
-      const result = await handle(
-        makeAction({ range: undefined }),
-        {},
-        campaignName,
-        mapName,
-      );
-
-      expect(result.payload.range).toBe('');
-    });
-
-    it('uses provided range when truthy', async () => {
-      const result = await handle(
-        makeAction({ range: '30ft' }),
-        {},
-        campaignName,
-        mapName,
-      );
-
       expect(result.payload.range).toBe('30ft');
-    });
-
-    it('defaults resourceCost to empty string when not provided', async () => {
-      const result = await handle(
-        makeAction({ resourceCost: undefined }),
-        {},
-        campaignName,
-        mapName,
-      );
-
-      expect(result.payload.resourceCost).toBe('');
-    });
-
-    it('uses provided resourceCost when truthy', async () => {
-      const result = await handle(
-        makeAction({ resourceCost: 'channel_divinity' }),
-        {},
-        campaignName,
-        mapName,
-      );
-
       expect(result.payload.resourceCost).toBe('channel_divinity');
-    });
-
-    it('defaults maxDicePerUse to empty string when not provided', async () => {
-      const result = await handle(
-        makeAction({ maxDicePerUse: undefined }),
-        {},
-        campaignName,
-        mapName,
-      );
-
-      expect(result.payload.maxDicePerUse).toBe('');
-    });
-
-    it('uses provided maxDicePerUse when truthy', async () => {
-      const result = await handle(
-        makeAction({ maxDicePerUse: '5' }),
-        {},
-        campaignName,
-        mapName,
-      );
-
-      expect(result.payload.maxDicePerUse).toBe('5');
     });
   });
 
   describe('bloodiedOnly coercion', () => {
-    it('coerces bloodiedOnly to boolean true', async () => {
-      const result = await handle(
+    it('coerces bloodiedOnly to boolean', async () => {
+      const resultTrue = await handle(
         makeAction({ bloodiedOnly: true }),
         {},
         campaignName,
         mapName,
       );
+      expect(resultTrue.payload.bloodiedOnly).toBe(true);
 
-      expect(result.payload.bloodiedOnly).toBe(true);
-    });
-
-    it('coerces bloodiedOnly to boolean false when absent', async () => {
-      const result = await handle(
+      const resultFalse = await handle(
         makeAction({ bloodiedOnly: undefined }),
         {},
         campaignName,
         mapName,
       );
+      expect(resultFalse.payload.bloodiedOnly).toBe(false);
 
-      expect(result.payload.bloodiedOnly).toBe(false);
-    });
-
-    it('coerces truthy bloodiedOnly to boolean true', async () => {
-      const result = await handle(
+      const resultTruthy = await handle(
         makeAction({ bloodiedOnly: 'yes' }),
         {},
         campaignName,
         mapName,
       );
+      expect(resultTruthy.payload.bloodiedOnly).toBe(true);
 
-      expect(result.payload.bloodiedOnly).toBe(true);
-    });
-
-    it('coerces falsy bloodiedOnly to boolean false', async () => {
-      const result = await handle(
+      const resultFalsy = await handle(
         makeAction({ bloodiedOnly: 0 }),
         {},
         campaignName,
         mapName,
       );
-
-      expect(result.payload.bloodiedOnly).toBe(false);
+      expect(resultFalsy.payload.bloodiedOnly).toBe(false);
     });
   });
 
@@ -289,92 +168,54 @@ describe('healingPoolHandler.handle', () => {
       ]);
     });
 
-    it('returns empty array when Restoring Touch is absent', async () => {
-      const playerStats = {
-        characterAdvancement: [{ name: 'Other Feature' }],
-      };
-
-      const result = await handle(
+    it('returns empty array when Restoring Touch is absent or has no cureConditions', async () => {
+      // absent feature
+      const result1 = await handle(
         makeAction(),
-        playerStats,
+        { characterAdvancement: [{ name: 'Other Feature' }] },
         campaignName,
         mapName,
       );
+      expect(result1.payload.restoringTouchConditions).toEqual([]);
 
-      expect(result.payload.restoringTouchConditions).toEqual([]);
-    });
-
-    it('returns empty array when characterAdvancement is undefined', async () => {
-      const result = await handle(
+      // feature with no automation
+      const result2 = await handle(
         makeAction(),
-        {},
+        { characterAdvancement: [{ name: 'Restoring Touch' }] },
         campaignName,
         mapName,
       );
+      expect(result2.payload.restoringTouchConditions).toEqual([]);
 
-      expect(result.payload.restoringTouchConditions).toEqual([]);
-    });
-
-    it('returns empty array when Restoring Touch has no automation', async () => {
-      const playerStats = {
-        characterAdvancement: [{ name: 'Restoring Touch' }],
-      };
-
-      const result = await handle(
+      // feature with automation but no cureConditions
+      const result3 = await handle(
         makeAction(),
-        playerStats,
+        { characterAdvancement: [{ name: 'Restoring Touch', automation: {} }] },
         campaignName,
         mapName,
       );
+      expect(result3.payload.restoringTouchConditions).toEqual([]);
 
-      expect(result.payload.restoringTouchConditions).toEqual([]);
-    });
-
-    it('returns empty array when Restoring Touch automation has no cureConditions', async () => {
-      const playerStats = {
-        characterAdvancement: [
-          { name: 'Restoring Touch', automation: {} },
-        ],
-      };
-
-      const result = await handle(
+      // feature with null automation
+      const result4 = await handle(
         makeAction(),
-        playerStats,
+        { characterAdvancement: [{ name: 'Restoring Touch', automation: null }] },
         campaignName,
         mapName,
       );
+      expect(result4.payload.restoringTouchConditions).toEqual([]);
 
-      expect(result.payload.restoringTouchConditions).toEqual([]);
-    });
+      // null/undefined characterAdvancement
+      const result5 = await handle(makeAction(), {}, campaignName, mapName);
+      expect(result5.payload.restoringTouchConditions).toEqual([]);
 
-    it('returns empty array when Restoring Touch automation is null', async () => {
-      const playerStats = {
-        characterAdvancement: [
-          { name: 'Restoring Touch', automation: null },
-        ],
-      };
-
-      const result = await handle(
+      const result6 = await handle(
         makeAction(),
-        playerStats,
+        { characterAdvancement: null },
         campaignName,
         mapName,
       );
-
-      expect(result.payload.restoringTouchConditions).toEqual([]);
-    });
-
-    it('returns empty array when characterAdvancement is null', async () => {
-      const playerStats = { characterAdvancement: null };
-
-      const result = await handle(
-        makeAction(),
-        playerStats,
-        campaignName,
-        mapName,
-      );
-
-      expect(result.payload.restoringTouchConditions).toEqual([]);
+      expect(result6.payload.restoringTouchConditions).toEqual([]);
     });
 
     it('finds Restoring Touch even when it is not the first feature', async () => {
@@ -400,17 +241,13 @@ describe('healingPoolHandler.handle', () => {
     });
   });
 
-  describe('campaignName and mapName parameters', () => {
-    it('does not throw when campaignName and mapName are null', async () => {
-      const result = await handle(makeAction(), {}, null, null);
+  describe('null/empty campaignName and mapName', () => {
+    it('does not throw when campaignName and mapName are null or empty strings', async () => {
+      const result1 = await handle(makeAction(), {}, null, null);
+      expect(result1.type).toBe('modal');
 
-      expect(result.type).toBe('modal');
-    });
-
-    it('does not throw when campaignName and mapName are empty strings', async () => {
-      const result = await handle(makeAction(), {}, '', '');
-
-      expect(result.type).toBe('modal');
+      const result2 = await handle(makeAction(), {}, '', '');
+      expect(result2.type).toBe('modal');
     });
   });
 });

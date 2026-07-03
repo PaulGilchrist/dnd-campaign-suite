@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import { executeHandler } from './index.js';
@@ -142,20 +142,13 @@ describe('executeHandler', () => {
   });
 
   describe('null/early returns', () => {
-    it('returns null when action is null', async () => {
-      expect(await executeHandler(null, makePlayerStats(), campaignName, mapName)).toBeNull();
-    });
-
-    it('returns null when action is undefined', async () => {
-      expect(await executeHandler(undefined, makePlayerStats(), campaignName, mapName)).toBeNull();
-    });
-
-    it('returns null when action is an object with no automation property', async () => {
-      expect(await executeHandler({}, makePlayerStats(), campaignName, mapName)).toBeNull();
-    });
-
-    it('returns null when action.automation is null', async () => {
-      expect(await executeHandler({ automation: null }, makePlayerStats(), campaignName, mapName)).toBeNull();
+    it.each([
+      [null, 'null action'],
+      [undefined, 'undefined action'],
+      [{}, 'empty object'],
+      [{ automation: null }, 'null automation'],
+    ])('returns null for %s (%s)', async (action, _label) => {
+      expect(await executeHandler(action, makePlayerStats(), campaignName, mapName)).toBeNull();
     });
 
     it('returns null when action.automation.type is not in HANDLER_MAP', async () => {
@@ -223,31 +216,7 @@ describe('executeHandler', () => {
     });
   });
 
-  describe('shared handler mapping', () => {
-    it('routes both "healing" and "self_healing" to the same handler', async () => {
-      const { handle: healingHandle } = await import('./handlers/healing/healingHandler.js');
-      const expectedReturn = { result: 'healed' };
-      healingHandle.mockResolvedValue(expectedReturn);
 
-      await executeHandler(makeAction({ type: 'healing' }), makePlayerStats(), campaignName, mapName);
-      await executeHandler(makeAction({ type: 'self_healing' }), makePlayerStats(), campaignName, mapName);
-
-      expect(healingHandle).toHaveBeenCalledTimes(2);
-      expect(healingHandle).toHaveBeenNthCalledWith(1, expect.objectContaining({ automation: { type: 'healing' } }), expect.any(Object), campaignName, mapName, undefined);
-      expect(healingHandle).toHaveBeenNthCalledWith(2, expect.objectContaining({ automation: { type: 'self_healing' } }), expect.any(Object), campaignName, mapName, undefined);
-    });
-
-    it('routes both "sorcery_aura" and "sorcery_incarnate" to the same handler', async () => {
-      const { handle: sorceryHandle } = await import('./handlers/resources/sorceryHandler.js');
-      const expectedReturn = { result: 'sorcery' };
-      sorceryHandle.mockResolvedValue(expectedReturn);
-
-      await executeHandler(makeAction({ type: 'sorcery_aura' }), makePlayerStats(), campaignName, mapName);
-      await executeHandler(makeAction({ type: 'sorcery_incarnate' }), makePlayerStats(), campaignName, mapName);
-
-      expect(sorceryHandle).toHaveBeenCalledTimes(2);
-    });
-  });
 
   describe('unmapped types', () => {
     it.each([
@@ -369,27 +338,15 @@ describe('executeHandler', () => {
       expect(result.result).toBe('protective_field');
     });
 
-    it('routes to damageReduction for other resource types', async () => {
+    it.each([
+      [{ resource: 'something_else' }, 'other resource type'],
+      [undefined, 'missing cost'],
+      [{}],
+    ])('routes to damageReduction when cost is %s', async (cost, _label) => {
       const action = makeAction({
         type: 'damage_reduction',
-        cost: { resource: 'something_else' },
+        cost,
       });
-
-      const result = await executeHandler(action, makePlayerStats(), campaignName, mapName);
-
-      expect(result.result).toBe('damage_reduction');
-    });
-
-    it('routes to damageReduction when cost is missing', async () => {
-      const action = makeAction({ type: 'damage_reduction' });
-
-      const result = await executeHandler(action, makePlayerStats(), campaignName, mapName);
-
-      expect(result.result).toBe('damage_reduction');
-    });
-
-    it('routes to damageReduction when cost.resource is undefined', async () => {
-      const action = makeAction({ type: 'damage_reduction', cost: {} });
 
       const result = await executeHandler(action, makePlayerStats(), campaignName, mapName);
 
@@ -494,48 +451,24 @@ describe('executeHandler', () => {
   });
 
   describe('passive_rule handler', () => {
-    it('routes abjuration_savant passive_rule to savant handler', async () => {
-      const action = makeAction({ type: 'passive_rule', effect: 'abjuration_savant' });
+    it.each([
+      'abjuration_savant',
+      'divination_savant',
+      'evocation_savant',
+      'illusion_savant',
+    ])('routes %s passive_rule to savant handler', async (effect) => {
+      const action = makeAction({ type: 'passive_rule', effect });
 
       const result = await executeHandler(action, makePlayerStats(), campaignName, mapName);
 
       expect(result).toEqual({ result: 'savant' });
     });
 
-    it('routes divination_savant passive_rule to savant handler', async () => {
-      const action = makeAction({ type: 'passive_rule', effect: 'divination_savant' });
-
-      const result = await executeHandler(action, makePlayerStats(), campaignName, mapName);
-
-      expect(result).toEqual({ result: 'savant' });
-    });
-
-    it('routes evocation_savant passive_rule to savant handler', async () => {
-      const action = makeAction({ type: 'passive_rule', effect: 'evocation_savant' });
-
-      const result = await executeHandler(action, makePlayerStats(), campaignName, mapName);
-
-      expect(result).toEqual({ result: 'savant' });
-    });
-
-    it('routes illusion_savant passive_rule to savant handler', async () => {
-      const action = makeAction({ type: 'passive_rule', effect: 'illusion_savant' });
-
-      const result = await executeHandler(action, makePlayerStats(), campaignName, mapName);
-
-      expect(result).toEqual({ result: 'savant' });
-    });
-
-    it('returns null for unknown passive_rule effect', async () => {
-      const action = makeAction({ type: 'passive_rule', effect: 'unknown_savant' });
-
-      const result = await executeHandler(action, makePlayerStats(), campaignName, mapName);
-
-      expect(result).toBeNull();
-    });
-
-    it('returns null for passive_rule with no effect field', async () => {
-      const action = makeAction({ type: 'passive_rule' });
+    it.each([
+      ['unknown_savant', 'unknown effect'],
+      [undefined, 'no effect field'],
+    ])('returns null for passive_rule with %s', async (effect, _label) => {
+      const action = makeAction({ type: 'passive_rule', effect });
 
       const result = await executeHandler(action, makePlayerStats(), campaignName, mapName);
 

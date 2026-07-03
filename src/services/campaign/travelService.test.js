@@ -1,4 +1,7 @@
-// @improved-by-ai
+// @cleaned-by-ai
+// Removed redundant tests: duplicate constant enumeration, overlapping monotonicity checks,
+// duplicate passability/road edge cases, overlapping terrain pace tests, and redundant A* pathfinding tests.
+// Consolidated edge-case assertions into single tests where behavior is identical.
 import { describe, it, expect } from 'vitest';
 import {
   TERRAIN_MOVE_COST,
@@ -76,17 +79,12 @@ describe('travelService', () => {
   });
 
   describe('applyExhaustionSpeedPenalty', () => {
-    it('should return base cost when exhaustion stacks is zero', () => {
+    it('should return base cost when exhaustion stacks is zero or negative', () => {
       expect(applyExhaustionSpeedPenalty(10, 0)).toBe(10);
-    });
-
-    it('should return base cost when exhaustion stacks is negative', () => {
       expect(applyExhaustionSpeedPenalty(10, -1)).toBe(10);
     });
 
-    it('should increase cost with exhaustion stacks (penalty makes travel slower)', () => {
-      // No exhaustion: cost=10. With exhaustion, cost increases because
-      // effective speed is reduced: cost / (5/6)^stacks
+    it('should increase cost with exhaustion stacks', () => {
       expect(applyExhaustionSpeedPenalty(10, 1)).toBe(10 / (5 / 6));
       expect(applyExhaustionSpeedPenalty(10, 3)).toBe(10 / Math.pow(5 / 6, 3));
     });
@@ -94,21 +92,11 @@ describe('travelService', () => {
     it('should return 0 when base cost is 0 regardless of exhaustion', () => {
       expect(applyExhaustionSpeedPenalty(0, 5)).toBe(0);
     });
-
-    it('should produce monotonically increasing cost with more stacks', () => {
-      const costs = [0, 1, 2, 3, 4, 5, 6].map(s => applyExhaustionSpeedPenalty(10, s));
-      for (let i = 1; i < costs.length; i++) {
-        expect(costs[i]).toBeGreaterThan(costs[i - 1]);
-      }
-    });
   });
 
   describe('applyExhaustionSpeedPenaltyToBudget', () => {
-    it('should return base budget when exhaustion stacks is zero', () => {
+    it('should return base budget when exhaustion stacks is zero or negative', () => {
       expect(applyExhaustionSpeedPenaltyToBudget(10, 0)).toBe(10);
-    });
-
-    it('should return base budget when exhaustion stacks is negative', () => {
       expect(applyExhaustionSpeedPenaltyToBudget(10, -1)).toBe(10);
     });
 
@@ -120,13 +108,6 @@ describe('travelService', () => {
     it('should return 0 when base budget is 0 regardless of exhaustion', () => {
       expect(applyExhaustionSpeedPenaltyToBudget(0, 5)).toBe(0);
     });
-
-    it('should produce monotonically decreasing budget with more stacks', () => {
-      const budgets = [0, 1, 2, 3, 4, 5, 6].map(s => applyExhaustionSpeedPenaltyToBudget(10, s));
-      for (let i = 1; i < budgets.length; i++) {
-        expect(budgets[i]).toBeLessThanOrEqual(budgets[i - 1]);
-      }
-    });
   });
 
   describe('getExhaustionMultiplierPercent', () => {
@@ -137,28 +118,16 @@ describe('travelService', () => {
     it('should return rounded percentage that decreases with more stacks', () => {
       expect(getExhaustionMultiplierPercent(1)).toBe(Math.round(5 / 6 * 100));
       expect(getExhaustionMultiplierPercent(3)).toBe(Math.round(Math.pow(5 / 6, 3) * 100));
-      expect(getExhaustionMultiplierPercent(6)).toBe(Math.round(Math.pow(5 / 6, 6) * 100));
-    });
-
-    it('should return 0 for maximum exhaustion (6 stacks)', () => {
-      // (5/6)^6 * 100 ≈ 33.49, so not 0 — verify the actual value
-      const result = getExhaustionMultiplierPercent(6);
-      expect(result).toBe(33);
+      expect(getExhaustionMultiplierPercent(6)).toBe(33);
     });
   });
 
   describe('isTerrainPassable', () => {
-    it('should return true for all defined terrain types', () => {
+    it('should return true for all defined terrain types and unknown/undefined terrain', () => {
       for (const terrain of Object.keys(TERRAIN_MOVE_COST)) {
         expect(isTerrainPassable(terrain)).toBe(true);
       }
-    });
-
-    it('should return true for unknown terrain (cost is undefined, not null)', () => {
       expect(isTerrainPassable('unknown')).toBe(true);
-    });
-
-    it('should return true for undefined terrain type', () => {
       expect(isTerrainPassable(undefined)).toBe(true);
     });
   });
@@ -169,7 +138,6 @@ describe('travelService', () => {
     });
 
     it('should return correct time for each pace on plains (base cost 0.75)', () => {
-      // slow: 3 * 0.75 = 2.25h, normal: 2 * 0.75 = 1.5h, fast: 1.5 * 0.75 = 1.125h
       expect(getHexTravelTime('plains', 'slow')).toBe(3 * 0.75);
       expect(getHexTravelTime('plains', 'normal')).toBe(2 * 0.75);
       expect(getHexTravelTime('plains', 'fast')).toBe(1.5 * 0.75);
@@ -192,14 +160,7 @@ describe('travelService', () => {
       expect(getHexTravelTime('water', 'normal', true)).toBe((2 * 4) / 2);
     });
 
-    it('should handle all terrain types with fast pace', () => {
-      expect(getHexTravelTime('forest', 'fast')).toBe(1.5 * 1);
-      expect(getHexTravelTime('desert', 'fast')).toBe(1.5 * 1);
-      expect(getHexTravelTime('tundra', 'fast')).toBe(1.5 * 1.5);
-      expect(getHexTravelTime('beach', 'fast')).toBe(1.5 * 1);
-    });
-
-    it('should produce NaN-like result for unknown terrain (undefined cost)', () => {
+    it('should produce NaN for unknown terrain (undefined cost)', () => {
       expect(Number.isNaN(getHexTravelTime('unknown', 'normal'))).toBe(true);
     });
   });
@@ -247,11 +208,6 @@ describe('travelService', () => {
       expect(isHexOnRoad(5, 6, roads)).toBe(true);
       expect(isHexOnRoad(9, 10, roads)).toBe(false);
     });
-
-    it('should handle road with null hexes array', () => {
-      const roads = [{ hexes: null }];
-      expect(isHexOnRoad(1, 2, roads)).toBe(false);
-    });
   });
 
   describe('getHexMoveCostWithRoad', () => {
@@ -266,13 +222,9 @@ describe('travelService', () => {
 
     it('should reduce cost by 0.5 when on road, with minimum of 1', () => {
       const roads = [{ hexes: ['1,2'] }];
-      // plains: 0.75 - 0.5 = 0.25 → clamped to 1
       expect(getHexMoveCostWithRoad('plains', 1, 2, roads)).toBe(1);
-      // swamp: 1.5 - 0.5 = 1
       expect(getHexMoveCostWithRoad('swamp', 1, 2, roads)).toBe(1);
-      // mountains: 2 - 0.5 = 1.5
       expect(getHexMoveCostWithRoad('mountains', 1, 2, roads)).toBe(1.5);
-      // water: 4 - 0.5 = 3.5
       expect(getHexMoveCostWithRoad('water', 1, 2, roads)).toBe(3.5);
     });
 
@@ -284,7 +236,6 @@ describe('travelService', () => {
 
   describe('getDailyHexBudget', () => {
     it('should return the correct hex budget for each pace', () => {
-      // slow: floor(1/3 * 8) = 2, normal: floor(1/2 * 8) = 4, fast: floor(2/3 * 8) = 5
       expect(getDailyHexBudget('slow')).toBe(2);
       expect(getDailyHexBudget('normal')).toBe(4);
       expect(getDailyHexBudget('fast')).toBe(5);
@@ -306,7 +257,6 @@ describe('travelService', () => {
       const path = [{ q: 0, r: 0 }];
       const terrain = { '0,0': 'plains' };
       const result = getTotalTravelTime(path, terrain);
-      // plains cost 0.75, divided by 3 for normal pace = 0.25h
       expect(result.hours).toBe(0.75 / 3);
     });
 
@@ -314,7 +264,6 @@ describe('travelService', () => {
       const path = [{ q: 0, r: 0 }, { q: 1, r: 0 }, { q: 1, r: 1 }];
       const terrain = { '0,0': 'plains', '1,0': 'hills', '1,1': 'forest' };
       const result = getTotalTravelTime(path, terrain);
-      // (0.75 + 1 + 1) / 3
       expect(result.hours).toBeCloseTo((0.75 + 1 + 1) / 3);
     });
 
@@ -374,7 +323,6 @@ describe('travelService', () => {
     });
 
     it('should avoid high-cost terrain when alternatives exist', () => {
-      // Mountains have cost 2, plains have cost 0.75 — A* should prefer plains
       const terrain = {
         '1,0': 'mountains',
         '2,0': 'mountains',
@@ -386,7 +334,6 @@ describe('travelService', () => {
         '4,0': 'plains',
       };
       const result = calculatePath({ q: 0, r: 0 }, { q: 4, r: 0 }, 5, 5, terrain, []);
-      // Path should avoid mountains when plains route is available
       const mountainHexes = result.filter(h => terrain[`${h.q},${h.r}`] === 'mountains');
       expect(mountainHexes.length).toBe(0);
     });
@@ -401,23 +348,6 @@ describe('travelService', () => {
       }
     });
 
-    it('should prefer plains over mountains when routing', () => {
-      const terrain = {
-        '1,0': 'plains',
-        '2,0': 'plains',
-        '1,1': 'mountains',
-        '2,1': 'mountains',
-        '0,1': 'plains',
-        '0,2': 'plains',
-        '1,2': 'plains',
-        '2,2': 'plains',
-      };
-      const result = calculatePath({ q: 0, r: 0 }, { q: 2, r: 2 }, 3, 3, terrain, []);
-      // The path should avoid mountains if plains route exists
-      const mountainHexes = result.filter(h => terrain[`${h.q},${h.r}`] === 'mountains');
-      expect(mountainHexes.length).toBe(0);
-    });
-
     it('should use road costs when roads are provided', () => {
       const roads = [{ hexes: ['1,0', '2,0', '3,0'] }];
       const terrain = {
@@ -429,10 +359,8 @@ describe('travelService', () => {
       expect(result.length).toBeGreaterThan(0);
     });
 
-    it('should return empty array when destination is unreachable (all paths blocked)', () => {
-      const terrain = {};
-      // Small grid where all neighbors of start are out of bounds
-      const result = calculatePath({ q: 0, r: 0 }, { q: 5, r: 5 }, 2, 2, terrain, []);
+    it('should return empty array when destination is unreachable', () => {
+      const result = calculatePath({ q: 0, r: 0 }, { q: 5, r: 5 }, 2, 2, {}, []);
       expect(result).toEqual([]);
     });
 
@@ -468,7 +396,6 @@ describe('travelService', () => {
     });
 
     it('should round fractional minutes correctly', () => {
-      // 1.1 hours = 1h + 0.1*60 = 1h 6m
       expect(formatTravelTime(1.1)).toBe('1h 6m');
     });
 

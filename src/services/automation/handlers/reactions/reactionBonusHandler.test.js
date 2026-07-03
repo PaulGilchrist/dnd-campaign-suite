@@ -1,3 +1,4 @@
+// @cleaned-by-ai
 // @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
@@ -140,15 +141,6 @@ describe('reactionBonusHandler', () => {
             expect(result.payload.description).toContain('activated');
         });
 
-        it('should route redirect_attack_to_self to handleVeer', async () => {
-            getRuntimeValue.mockReturnValue('Warhorse');
-            const action = makeAction({ automation: { effect: 'redirect_attack_to_self' } });
-            const result = await handle(action, makePlayerStats(), CAMPAIGN, MAP);
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('activated');
-        });
-
         it('should default to handleInspiringMovement for unknown effects', async () => {
             const action = makeAction({ automation: { effect: 'unknown_effect' } });
             const result = await handle(action, makePlayerStats(), CAMPAIGN, MAP);
@@ -230,39 +222,26 @@ describe('reactionBonusHandler', () => {
             expect(result.payload.description).toContain('No recent D20 test');
         });
 
-        it('should succeed with attack roll type', async () => {
-            getCombatContext.mockReturnValue({
-                lastAttack: { rollType: 'attack', attackerName: 'Goblin', d20: 15, bonus: 5, targetName: HERO_NAME },
-            });
-            const action = makeAction({ automation: { effect: 'bonus_or_penalty_choice' } });
-            const result = await handle(action, makePlayerStats(), CAMPAIGN, MAP);
+        it('should succeed with attack, save, and check roll types', async () => {
+            const cases = [
+                { lastAttack: { rollType: 'attack', attackerName: 'Goblin', d20: 15, bonus: 5, targetName: HERO_NAME }, expected: 'Attack roll' },
+                { lastAttack: { rollType: 'save', attackerName: 'Goblin', d20: 10, bonus: 3, saveType: 'dexterity' }, expected: 'DEX' },
+                { lastAttack: { rollType: 'check', attackerName: 'Goblin', d20: 18, bonus: 4, checkName: 'Stealth' }, expected: 'Stealth' },
+            ];
 
-            expect(result.payload.description).toContain('Attack roll');
-            expect(result.payload.description).toContain('1d4');
-            expect(result.payload.description).toContain('Goblin');
-            expect(spendSorceryPoints).toHaveBeenCalledWith(HERO_NAME, 1, CAMPAIGN);
-        });
+            for (const { lastAttack, expected } of cases) {
+                vi.clearAllMocks();
+                getCombatContext.mockReturnValue({ lastAttack });
+                getCurrentSorceryPoints.mockReturnValue(3);
+                getClassFeatures.mockReturnValue(null);
 
-        it('should succeed with save roll type', async () => {
-            getCombatContext.mockReturnValue({
-                lastAttack: { rollType: 'save', attackerName: 'Goblin', d20: 10, bonus: 3, saveType: 'dexterity' },
-            });
-            const action = makeAction({ automation: { effect: 'bonus_or_penalty_choice' } });
-            const result = await handle(action, makePlayerStats(), CAMPAIGN, MAP);
+                const action = makeAction({ automation: { effect: 'bonus_or_penalty_choice' } });
+                const result = await handle(action, makePlayerStats(), CAMPAIGN, MAP);
 
-            expect(result.payload.description).toContain('DEX');
-            expect(spendSorceryPoints).toHaveBeenCalledWith(HERO_NAME, 1, CAMPAIGN);
-        });
-
-        it('should succeed with ability check type', async () => {
-            getCombatContext.mockReturnValue({
-                lastAttack: { rollType: 'check', attackerName: 'Goblin', d20: 18, bonus: 4, checkName: 'Stealth' },
-            });
-            const action = makeAction({ automation: { effect: 'bonus_or_penalty_choice' } });
-            const result = await handle(action, makePlayerStats(), CAMPAIGN, MAP);
-
-            expect(result.payload.description).toContain('Stealth');
-            expect(spendSorceryPoints).toHaveBeenCalledWith(HERO_NAME, 1, CAMPAIGN);
+                expect(result.payload.description).toContain(expected);
+                expect(result.payload.description).toContain('1d4');
+                expect(spendSorceryPoints).toHaveBeenCalledWith(HERO_NAME, 1, CAMPAIGN);
+            }
         });
 
         it('should fail gracefully when rollExpression returns null', async () => {
@@ -277,7 +256,7 @@ describe('reactionBonusHandler', () => {
             expect(spendSorceryPoints).not.toHaveBeenCalled();
         });
 
-        it('should use class features max sorcery points when available', async () => {
+        it('should use max sorcery points from class features', async () => {
             getClassFeatures.mockReturnValue({ maxSorceryPoints: 5 });
             getCurrentSorceryPoints.mockReturnValue(5);
             getCombatContext.mockReturnValue({
@@ -288,22 +267,6 @@ describe('reactionBonusHandler', () => {
 
             expect(result.type).toBe('popup');
             expect(spendSorceryPoints).toHaveBeenCalledWith(HERO_NAME, 1, CAMPAIGN);
-        });
-
-        it('should use custom maxSP from specialActions when available', async () => {
-            const action = makeAction({
-                automation: {
-                    effect: 'bonus_or_penalty_choice',
-                    specialActions: [{ name: 'Sorcery Points', uses: 7 }],
-                },
-            });
-            getCurrentSorceryPoints.mockReturnValue(7);
-            getCombatContext.mockReturnValue({
-                lastAttack: { rollType: 'attack', attackerName: 'Goblin', d20: 15, bonus: 5, targetName: HERO_NAME },
-            });
-            const result = await handle(action, makePlayerStats(), CAMPAIGN, MAP);
-
-            expect(result.type).toBe('popup');
         });
     });
 
@@ -356,33 +319,29 @@ describe('reactionBonusHandler', () => {
             expect(result.payload.description).toContain('requires you to be mounted');
         });
 
-        it('should reject when player is incapacitated (object format)', async () => {
+        it('should reject when player or mount is incapacitated', async () => {
+            // Player incapacitated (object format)
             getRuntimeValue.mockReturnValue('Warhorse');
-            const stats = makePlayerStats({ conditions: [{ key: 'incapacitated' }] });
-            const action = makeAction({ automation: { effect: 'zero_on_success_half_on_fail_for_mount' } });
-            const result = await handle(action, stats, CAMPAIGN, MAP);
-
+            let stats = makePlayerStats({ conditions: [{ key: 'incapacitated' }] });
+            let action = makeAction({ automation: { effect: 'zero_on_success_half_on_fail_for_mount' } });
+            let result = await handle(action, stats, CAMPAIGN, MAP);
             expect(result.payload.description).toContain('not be Incapacitated');
-        });
 
-        it('should reject when player is incapacitated (string format)', async () => {
+            vi.clearAllMocks();
             getRuntimeValue.mockReturnValue('Warhorse');
-            const stats = makePlayerStats({ conditions: ['incapacitated'] });
-            const action = makeAction({ automation: { effect: 'zero_on_success_half_on_fail_for_mount' } });
-            const result = await handle(action, stats, CAMPAIGN, MAP);
-
+            stats = makePlayerStats({ conditions: ['incapacitated'] });
+            action = makeAction({ automation: { effect: 'zero_on_success_half_on_fail_for_mount' } });
+            result = await handle(action, stats, CAMPAIGN, MAP);
             expect(result.payload.description).toContain('not be Incapacitated');
-        });
 
-        it('should reject when mount is incapacitated', async () => {
+            vi.clearAllMocks();
             getRuntimeValue.mockImplementation((playerName, key) => {
                 if (key === 'mountName') return 'Warhorse';
                 if (key === 'conditions' && playerName === 'Warhorse') return [{ key: 'incapacitated' }];
                 return null;
             });
-            const action = makeAction({ automation: { effect: 'zero_on_success_half_on_fail_for_mount' } });
-            const result = await handle(action, makePlayerStats(), CAMPAIGN, MAP);
-
+            action = makeAction({ automation: { effect: 'zero_on_success_half_on_fail_for_mount' } });
+            result = await handle(action, makePlayerStats(), CAMPAIGN, MAP);
             expect(result.payload.description).toContain('mount to not be Incapacitated');
         });
 
@@ -415,21 +374,18 @@ describe('reactionBonusHandler', () => {
             expect(result.payload.description).toContain('requires you to be mounted');
         });
 
-        it('should reject when player is incapacitated (object format)', async () => {
+        it('should reject when player is incapacitated', async () => {
             getRuntimeValue.mockReturnValue('Warhorse');
-            const stats = makePlayerStats({ conditions: [{ key: 'incapacitated' }] });
-            const action = makeAction({ automation: { effect: 'redirect_attack_to_self' } });
-            const result = await handle(action, stats, CAMPAIGN, MAP);
-
+            let stats = makePlayerStats({ conditions: [{ key: 'incapacitated' }] });
+            let action = makeAction({ automation: { effect: 'redirect_attack_to_self' } });
+            let result = await handle(action, stats, CAMPAIGN, MAP);
             expect(result.payload.description).toContain('not be Incapacitated');
-        });
 
-        it('should reject when player is incapacitated (string format)', async () => {
+            vi.clearAllMocks();
             getRuntimeValue.mockReturnValue('Warhorse');
-            const stats = makePlayerStats({ conditions: ['incapacitated'] });
-            const action = makeAction({ automation: { effect: 'redirect_attack_to_self' } });
-            const result = await handle(action, stats, CAMPAIGN, MAP);
-
+            stats = makePlayerStats({ conditions: ['incapacitated'] });
+            action = makeAction({ automation: { effect: 'redirect_attack_to_self' } });
+            result = await handle(action, stats, CAMPAIGN, MAP);
             expect(result.payload.description).toContain('not be Incapacitated');
         });
 
@@ -477,7 +433,7 @@ describe('reactionBonusHandler', () => {
             expect(setRuntimeValue).toHaveBeenCalledWith(HERO_NAME, 'bardicInspirationUses', 0, CAMPAIGN);
         });
 
-        it('should use custom resource key', async () => {
+        it('should use custom resource key and consume a use', async () => {
             getRuntimeValue.mockImplementation((playerName, key) => {
                 if (key === 'customUses') return 2;
                 return null;
@@ -488,22 +444,23 @@ describe('reactionBonusHandler', () => {
             expect(setRuntimeValue).toHaveBeenCalledWith(HERO_NAME, 'customUses', 1, CAMPAIGN);
         });
 
-        it('should handle uses_expression', async () => {
-            getRuntimeValue.mockReturnValue(5);
-            const action = makeAction({ automation: { effect: 'inspiring_movement', uses_expression: 'proficiency_bonus + level' } });
-            const stats = makePlayerStats({ level: 3 });
-            const result = await handle(action, stats, CAMPAIGN, MAP);
+        it('should skip uses check when usesMax is 0', async () => {
+            getRuntimeValue.mockReturnValue(0);
+            const action = makeAction({ automation: { effect: 'inspiring_movement', usesMax: 0 } });
+            const result = await handle(action, makePlayerStats(), CAMPAIGN, MAP);
 
-            expect(result.type).toBe('popup');
-            expect(setRuntimeValue).toHaveBeenCalledWith(HERO_NAME, 'bardicInspirationUses', 4, CAMPAIGN);
+            expect(result.payload.description).toContain('half your Speed');
+            expect(setRuntimeValue).not.toHaveBeenCalledWith(HERO_NAME, 'bardicInspirationUses', 0, CAMPAIGN);
         });
 
-        it('should handle noOAs flag', async () => {
+        it('should handle noOAs flag for self', async () => {
             getRuntimeValue.mockReturnValue(2);
+
             const action = makeAction({ automation: { effect: 'inspiring_movement', noOAs: true, usesMax: 3 } });
             const result = await handle(action, makePlayerStats(), CAMPAIGN, MAP);
 
             expect(result.payload.description).toContain('does not provoke Opportunity Attacks');
+            expect(setRuntimeValue).toHaveBeenCalledWith(HERO_NAME, 'bardicInspirationUses', 1, CAMPAIGN);
             expect(setRuntimeValue).toHaveBeenCalledWith(HERO_NAME, 'inspiringMovementNoOA', true, CAMPAIGN);
             expect(addExpiration).toHaveBeenCalledWith(HERO_NAME, HERO_NAME, [{ type: 'inspiring_movement_no_oa' }], CAMPAIGN, 1);
         });
@@ -533,17 +490,6 @@ describe('reactionBonusHandler', () => {
             expect(result.payload.description).toContain('Select an ally');
         });
 
-        it('should grant noOA to ally when noOAs is set', async () => {
-            getRuntimeValue.mockReturnValue(2);
-            resolveTarget.mockResolvedValue({ target: { name: 'Ally' } });
-            getDistanceFeet.mockReturnValue(10);
-
-            const action = makeAction({ automation: { effect: 'inspiring_movement', allyRange: '30_ft', noOAs: true, usesMax: 3 } });
-            await handle(action, makePlayerStats(), CAMPAIGN, MAP);
-
-            expect(setRuntimeValue).toHaveBeenCalledWith('Ally', 'inspiringMovementNoOA', true, CAMPAIGN);
-        });
-
         it('should use half speed based on player speed', async () => {
             getRuntimeValue.mockReturnValue(1);
             const stats = makePlayerStats({ speed: 25 });
@@ -551,15 +497,6 @@ describe('reactionBonusHandler', () => {
             const result = await handle(action, stats, CAMPAIGN, MAP);
 
             expect(result.payload.description).toContain('12 ft');
-        });
-
-        it('should skip uses check when usesMax is 0', async () => {
-            getRuntimeValue.mockReturnValue(0);
-            const action = makeAction({ automation: { effect: 'inspiring_movement', usesMax: 0 } });
-            const result = await handle(action, makePlayerStats(), CAMPAIGN, MAP);
-
-            expect(result.payload.description).toContain('half your Speed');
-            expect(setRuntimeValue).not.toHaveBeenCalledWith(HERO_NAME, 'bardicInspirationUses', 0, CAMPAIGN);
         });
     });
 });

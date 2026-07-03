@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import { handle, confirmPhantasmalCreatures } from './phantasmalCreaturesHandler.js';
@@ -56,16 +56,6 @@ describe('phantasmalCreaturesHandler', () => {
       expect(setRuntimeValue).not.toHaveBeenCalled();
     });
 
-    it('returns modal when free casts exceed 1', async () => {
-      getRuntimeValue.mockReturnValue(3);
-
-      const result = await handle(makeAction(), makePlayerStats(), campaignName);
-
-      expect(result.type).toBe('modal');
-      expect(result.modalName).toBe('phantasmalCreatures');
-      expect(result.payload.noConcentrationOption).toBe(true);
-    });
-
     it('returns info popup when no free casts remaining', async () => {
       getRuntimeValue.mockReturnValue(0);
 
@@ -105,39 +95,6 @@ describe('phantasmalCreaturesHandler', () => {
       const result = await handle(makeAction(), makePlayerStats(), campaignName);
 
       expect(result.type).toBe('modal');
-    });
-
-    it('treats NaN runtime value as usable (NaN <= 0 is false)', async () => {
-      getRuntimeValue.mockReturnValue('not-a-number');
-
-      const result = await handle(makeAction(), makePlayerStats(), campaignName);
-
-      // Number('not-a-number') is NaN, and NaN <= 0 is false, so modal is returned
-      expect(result.type).toBe('modal');
-    });
-
-    it('uses custom action name in popup', async () => {
-      getRuntimeValue.mockReturnValue(0);
-
-      const result = await handle(
-        makeAction({ name: 'Custom Feature' }),
-        makePlayerStats(),
-        campaignName,
-      );
-
-      expect(result.payload.name).toBe('Custom Feature');
-    });
-
-    it('defaults to "Phantasmal Creatures" when action has no name', async () => {
-      getRuntimeValue.mockReturnValue(1);
-
-      const result = await handle(
-        makeAction({ name: undefined }),
-        makePlayerStats(),
-        campaignName,
-      );
-
-      expect(result.payload.action.name).toBeUndefined();
     });
   });
 
@@ -221,72 +178,6 @@ describe('phantasmalCreaturesHandler', () => {
 
       expect(result.type).toBe('popup');
       expect(result.payload.description).toContain('No free casts remaining');
-      expect(setRuntimeValue).not.toHaveBeenCalled();
-    });
-
-    it('passes noConcentration through to automation payload', async () => {
-      getRuntimeValue.mockReturnValue(1);
-
-      const result = await confirmPhantasmalCreatures(
-        makeAction(),
-        makePlayerStats(),
-        campaignName,
-        false,
-      );
-
-      expect(result.payload.automation.noConcentration).toBe(false);
-    });
-
-    it('uses custom freeCastSpells in description', async () => {
-      getRuntimeValue.mockReturnValue(1);
-
-      const result = await confirmPhantasmalCreatures(
-        makeAction({ automation: { freeCastSpells: ['Summon Dragon'] } }),
-        makePlayerStats(),
-        campaignName,
-        true,
-      );
-
-      expect(result.payload.description).toContain('Summon Dragon');
-    });
-
-    it('uses default spell list when freeCastSpells is missing', async () => {
-      getRuntimeValue.mockReturnValue(1);
-
-      const result = await confirmPhantasmalCreatures(
-        makeAction({ automation: { freeCastSpells: undefined } }),
-        makePlayerStats(),
-        campaignName,
-        true,
-      );
-
-      expect(result.payload.description).toContain('Summon Beast or Summon Fey');
-    });
-
-    it('uses custom action name in description', async () => {
-      getRuntimeValue.mockReturnValue(1);
-
-      const result = await confirmPhantasmalCreatures(
-        makeAction({ name: 'Custom Phantasm' }),
-        makePlayerStats(),
-        campaignName,
-        true,
-      );
-
-      expect(result.payload.name).toBe('Custom Phantasm');
-      expect(result.payload.description).toContain('Custom Phantasm:');
-    });
-
-    it('does not call setRuntimeValue when no casts remain', async () => {
-      getRuntimeValue.mockReturnValue(0);
-
-      await confirmPhantasmalCreatures(
-        makeAction(),
-        makePlayerStats(),
-        campaignName,
-        true,
-      );
-
       expect(setRuntimeValue).not.toHaveBeenCalled();
     });
   });

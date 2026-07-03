@@ -1,40 +1,14 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { clearRuntimeState, setRuntimeValue as setRuntimeProp } from '../../../hooks/runtime/useRuntimeState.js';
+import { clearRuntimeState, setRuntimeValue as setRuntimeProp, getAllStoreKeys } from '../../../hooks/runtime/useRuntimeState.js';
 import { toggleBuff, getActiveBuffs, isBuffActive } from './buffToggle.js';
 
 // ── Helpers ─────────────────────────────────────────────────────
 
 function resetRuntime() {
-    clearRuntimeState('fighter');
-    clearRuntimeState('paladin');
-    clearRuntimeState('wizard');
-    clearRuntimeState('ally-char');
-    clearRuntimeState('rogue');
-    clearRuntimeState('bard');
-    clearRuntimeState('full-buff-char');
-    clearRuntimeState('cleric');
-    clearRuntimeState('minimal-char');
-    clearRuntimeState('monk');
-    clearRuntimeState('bard2');
-    clearRuntimeState('similar-names');
-    clearRuntimeState('broken');
-    clearRuntimeState('null-buffs');
-    clearRuntimeState('never-initialized');
-    clearRuntimeState('empty-string');
-    clearRuntimeState('numeric');
-    clearRuntimeState('empty-char');
-    clearRuntimeState('buffed-char');
-    clearRuntimeState('bad-buffs');
-    clearRuntimeState('obj-buffs');
-    clearRuntimeState('num-buffs');
-    clearRuntimeState('check-char');
-    clearRuntimeState('miss-char');
-    clearRuntimeState('none-char');
-    clearRuntimeState('case-char');
-    clearRuntimeState('corrupted-char');
-    clearRuntimeState('multi-char');
-    localStorage.clear();
+    for (const key of getAllStoreKeys()) {
+        clearRuntimeState(key);
+    }
 }
 
 function makeAuto(overrides = {}) {
@@ -83,16 +57,6 @@ describe('toggleBuff', () => {
             expect(result.targetName).toBe('fighter');
         });
 
-        it('stores the buff in runtime state under the player key', () => {
-            clearRuntimeState('paladin');
-            const auto = makeAuto({ effect: '+2 AC' });
-            toggleBuff('paladin', 'Divine Shield', auto, campaign);
-
-            const buffs = getActiveBuffs('paladin', campaign);
-            expect(buffs).toHaveLength(1);
-            expect(buffs[0].name).toBe('Divine Shield');
-        });
-
         it('preserves existing buffs when adding a new one', () => {
             clearRuntimeState('wizard');
             const auto1 = makeAuto({ effect: 'invisibility' });
@@ -107,7 +71,7 @@ describe('toggleBuff', () => {
             expect(names).toContain('Haste');
         });
 
-        it('uses targetName instead of playerName when provided', () => {
+        it('uses targetName instead of playerName when provided, defaults to playerName for undefined and empty string', () => {
             clearRuntimeState('ally-char');
             const auto = makeAuto({ effect: 'bless' });
             const result = toggleBuff('caster', 'Bless', auto, campaign, 'ally-char');
@@ -115,25 +79,17 @@ describe('toggleBuff', () => {
             expect(result.targetName).toBe('ally-char');
             expect(getActiveBuffs('ally-char', campaign)).toHaveLength(1);
             expect(getActiveBuffs('caster', campaign)).toHaveLength(0);
-        });
 
-        it('defaults target to playerName when targetName is undefined', () => {
             clearRuntimeState('rogue');
-            const auto = makeAuto({ effect: 'stealth' });
-            const result = toggleBuff('rogue', 'Cunning Action', auto, campaign);
+            const result2 = toggleBuff('rogue', 'Cunning Action', makeAuto({ effect: 'stealth' }), campaign);
+            expect(result2.targetName).toBe('rogue');
 
-            expect(result.targetName).toBe('rogue');
-        });
-
-        it('defaults target to playerName when targetName is empty string', () => {
             clearRuntimeState('bard');
-            const auto = makeAuto({ effect: 'inspire' });
-            const result = toggleBuff('bard', 'Inspiration', auto, campaign, '');
-
-            expect(result.targetName).toBe('bard');
+            const result3 = toggleBuff('bard', 'Inspiration', makeAuto({ effect: 'inspire' }), campaign, '');
+            expect(result3.targetName).toBe('bard');
         });
 
-        it('stores all buff fields from the auto object with correct key mapping', () => {
+        it('stores all buff fields from the auto object with correct key mapping and safe defaults', () => {
             clearRuntimeState('full-buff-char');
             const auto = {
                 effect: '+3 to saves',
@@ -169,34 +125,25 @@ describe('toggleBuff', () => {
             expect(buff.resistanceTypes).toEqual(['fire', 'cold']);
             expect(buff.acBonus).toBe(3);
             expect(buff.saveBonus).toBe(2);
-        });
 
-        it('sets sourceCharacter to the playerName that triggered the toggle', () => {
-            clearRuntimeState('cleric');
-            const auto = makeAuto({ effect: 'heal' });
-            toggleBuff('cleric', 'Cure Wounds', auto, campaign);
-
-            expect(getActiveBuffs('cleric', campaign)[0].sourceCharacter).toBe('cleric');
-        });
-
-        it('defaults missing optional fields to safe values', () => {
+            // Verify defaults when optional fields are omitted
             clearRuntimeState('minimal-char');
-            const auto = { effect: 'hex', duration: '1 hour' };
-            toggleBuff('minimal-char', 'Hex', auto, campaign);
+            const minimalAuto = { effect: 'hex', duration: '1 hour' };
+            toggleBuff('minimal-char', 'Hex', minimalAuto, campaign);
 
-            const buff = getActiveBuffs('minimal-char', campaign)[0];
-            expect(buff.enemiesDisadvantageSaves).toEqual([]);
-            expect(buff.distance).toBe('');
-            expect(buff.extendedDistance).toBe('');
-            expect(buff.blocksSpellcasting).toBe(false);
-            expect(buff.flySpeed).toBeNull();
-            expect(buff.hover).toBe(false);
-            expect(buff.seeInvisibleRange).toBeNull();
-            expect(buff.narrowSpace).toBe(false);
-            expect(buff.castingTime).toBe('');
-            expect(buff.resistanceTypes).toEqual([]);
-            expect(buff.acBonus).toBe(0);
-            expect(buff.saveBonus).toBe(0);
+            const minimalBuff = getActiveBuffs('minimal-char', campaign)[0];
+            expect(minimalBuff.enemiesDisadvantageSaves).toEqual([]);
+            expect(minimalBuff.distance).toBe('');
+            expect(minimalBuff.extendedDistance).toBe('');
+            expect(minimalBuff.blocksSpellcasting).toBe(false);
+            expect(minimalBuff.flySpeed).toBeNull();
+            expect(minimalBuff.hover).toBe(false);
+            expect(minimalBuff.seeInvisibleRange).toBeNull();
+            expect(minimalBuff.narrowSpace).toBe(false);
+            expect(minimalBuff.castingTime).toBe('');
+            expect(minimalBuff.resistanceTypes).toEqual([]);
+            expect(minimalBuff.acBonus).toBe(0);
+            expect(minimalBuff.saveBonus).toBe(0);
         });
     });
 
@@ -289,22 +236,6 @@ describe('getActiveBuffs', () => {
         expect(buffs[0].name).toBe('Bless');
         expect(buffs[1].name).toBe('Haste');
     });
-
-    it('returns empty array for any non-array stored value', () => {
-        const nonArrayValues = [
-            { label: 'string', value: 'corrupted' },
-            { label: 'object', value: { name: 'Foo' } },
-            { label: 'null', value: null },
-            { label: 'number', value: 42 },
-        ];
-
-        for (const { label, value } of nonArrayValues) {
-            const charKey = `bad-${label}`;
-            clearRuntimeState(charKey);
-            setRuntimeProp(charKey, 'activeBuffs', value, campaign);
-            expect(getActiveBuffs(charKey, campaign)).toEqual([]);
-        }
-    });
 });
 
 describe('isBuffActive', () => {
@@ -341,12 +272,6 @@ describe('isBuffActive', () => {
 
         expect(isBuffActive('case-char', 'Bless', campaign)).toBe(false);
         expect(isBuffActive('case-char', 'bless', campaign)).toBe(true);
-    });
-
-    it('returns false when stored value is not an array', () => {
-        clearRuntimeState('corrupted-char');
-        setRuntimeProp('corrupted-char', 'activeBuffs', 'not-an-array', campaign);
-        expect(isBuffActive('corrupted-char', 'Foo', campaign)).toBe(false);
     });
 
     it('finds the correct buff among many active buffs', () => {

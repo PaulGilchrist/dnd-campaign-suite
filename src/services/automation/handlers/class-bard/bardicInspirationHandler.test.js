@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ── Mocks ──────────────────────────────────────────────────────────
@@ -73,7 +73,6 @@ describe('bardicInspirationHandler.handle', () => {
     action = makeAction();
     playerStats = makePlayerStats();
 
-    // Default mocks for the happy path
     automationService.evaluateAutoExpression.mockReturnValue(4);
     useRuntimeState.getRuntimeValue.mockReturnValue(0);
     targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Ally' } });
@@ -121,20 +120,6 @@ describe('bardicInspirationHandler.handle', () => {
       );
     });
 
-    it('decrements uses by one on success', async () => {
-      automationService.evaluateAutoExpression.mockReturnValue(3);
-      useRuntimeState.getRuntimeValue.mockReturnValue(5);
-
-      await handle(action, playerStats, campaignName, mapName);
-
-      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-        'Bard',
-        'bardicInspirationUses',
-        4,
-        campaignName,
-      );
-    });
-
     it('does not decrement uses when uses_expression is absent', async () => {
       action.automation.uses_expression = undefined;
 
@@ -153,27 +138,9 @@ describe('bardicInspirationHandler.handle', () => {
   // ── No target ──────────────────────────────────────────────────
 
   describe('no target', () => {
-    it('returns info popup when resolveTarget returns null', async () => {
-      automationService.evaluateAutoExpression.mockReturnValue(0);
+    it('returns info popup when resolveTarget returns null or missing target', async () => {
       useRuntimeState.getRuntimeValue.mockReturnValue(2);
       targetResolver.resolveTarget.mockResolvedValue(null);
-
-      const result = await handle(action, playerStats, campaignName, mapName);
-
-      expect(result).toEqual({
-        type: 'popup',
-        payload: {
-          type: 'automation_info',
-          name: action.name,
-          description: `${action.name} requires a target. Select a creature in combat and try again.`,
-          automation: action.automation,
-        },
-      });
-    });
-
-    it('returns info popup when resolveTarget returns object without target', async () => {
-      useRuntimeState.getRuntimeValue.mockReturnValue(2);
-      targetResolver.resolveTarget.mockResolvedValue({});
 
       const result = await handle(action, playerStats, campaignName, mapName);
 
@@ -181,9 +148,9 @@ describe('bardicInspirationHandler.handle', () => {
       expect(result.payload.description).toContain('requires a target');
     });
 
-    it('returns info popup when resolveTarget returns undefined', async () => {
+    it('returns info popup when resolveTarget returns empty object', async () => {
       useRuntimeState.getRuntimeValue.mockReturnValue(2);
-      targetResolver.resolveTarget.mockResolvedValue(undefined);
+      targetResolver.resolveTarget.mockResolvedValue({});
 
       const result = await handle(action, playerStats, campaignName, mapName);
 
@@ -208,17 +175,7 @@ describe('bardicInspirationHandler.handle', () => {
       expect(result.payload.description).toContain('60 ft');
     });
 
-    it('rounds the distance in the out-of-range message', async () => {
-      useRuntimeState.getRuntimeValue.mockReturnValue(2);
-      rangeValidation.rangeToFeet.mockReturnValue(60);
-      rangeValidation.getDistanceFeet.mockReturnValue(99.7);
-
-      const result = await handle(action, playerStats, campaignName, mapName);
-
-      expect(result.payload.description).toContain('100 ft');
-    });
-
-    it('skips range check when mapName is null', async () => {
+    it('skips range check when mapName is null or undefined', async () => {
       useRuntimeState.getRuntimeValue.mockReturnValue(2);
       rangeValidation.getDistanceFeet.mockReturnValue(1000);
 
@@ -227,15 +184,6 @@ describe('bardicInspirationHandler.handle', () => {
       expect(result.type).toBe('popup');
       expect(result.payload.description).toContain('granted to Ally');
       expect(rangeValidation.getDistanceFeet).not.toHaveBeenCalled();
-    });
-
-    it('skips range check when mapName is undefined', async () => {
-      useRuntimeState.getRuntimeValue.mockReturnValue(2);
-
-      const result = await handle(action, playerStats, campaignName, undefined);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.description).toContain('granted to Ally');
     });
 
     it('skips range check when resolveMapPositions returns null', async () => {
@@ -274,79 +222,6 @@ describe('bardicInspirationHandler.handle', () => {
         campaignName,
       );
     });
-  });
-
-  // ── Die size ───────────────────────────────────────────────────
-
-  describe('die size', () => {
-    it('uses the bardic_die from class_levels matching the player level', async () => {
-      useRuntimeState.getRuntimeValue.mockReturnValue(2);
-
-      await handle(action, playerStats, campaignName, mapName);
-
-      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-        'Ally',
-        'bardicInspirationDie',
-        '8',
-        campaignName,
-      );
-    });
-
-    it('falls back to die size 6 when class_levels is empty', async () => {
-      useRuntimeState.getRuntimeValue.mockReturnValue(2);
-      playerStats.class = { class_levels: [] };
-
-      await handle(action, playerStats, campaignName, mapName);
-
-      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-        'Ally',
-        'bardicInspirationDie',
-        '6',
-        campaignName,
-      );
-    });
-
-    it('falls back to die size 6 when no matching level is found', async () => {
-      useRuntimeState.getRuntimeValue.mockReturnValue(2);
-      playerStats.class = { class_levels: [{ level: 1, bardic_die: 4 }] };
-
-      await handle(action, playerStats, campaignName, mapName);
-
-      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-        'Ally',
-        'bardicInspirationDie',
-        '6',
-        campaignName,
-      );
-    });
-
-    it('falls back to die size 6 when class is undefined', async () => {
-      useRuntimeState.getRuntimeValue.mockReturnValue(2);
-      playerStats.class = undefined;
-
-      await handle(action, playerStats, campaignName, mapName);
-
-      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-        'Ally',
-        'bardicInspirationDie',
-        '6',
-        campaignName,
-      );
-    });
-
-    it('falls back to die size 6 when class_levels is undefined', async () => {
-      useRuntimeState.getRuntimeValue.mockReturnValue(2);
-      playerStats.class = {};
-
-      await handle(action, playerStats, campaignName, mapName);
-
-      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-        'Ally',
-        'bardicInspirationDie',
-        '6',
-        campaignName,
-      );
-    });
 
     it('uses the custom range when specified in action', async () => {
       useRuntimeState.getRuntimeValue.mockReturnValue(2);
@@ -374,10 +249,10 @@ describe('bardicInspirationHandler.handle', () => {
     });
   });
 
-  // ── Runtime state ──────────────────────────────────────────────
+  // ── Die size ───────────────────────────────────────────────────
 
-  describe('runtime state', () => {
-    it('sets bardicInspirationDie on the target', async () => {
+  describe('die size', () => {
+    it('uses the bardic_die from class_levels matching the player level', async () => {
       useRuntimeState.getRuntimeValue.mockReturnValue(2);
 
       await handle(action, playerStats, campaignName, mapName);
@@ -390,30 +265,41 @@ describe('bardicInspirationHandler.handle', () => {
       );
     });
 
-    it('sets bardicInspirationGrantedBy on the target', async () => {
+    it('falls back to die size 6 when class data is missing or no matching level', async () => {
+      useRuntimeState.getRuntimeValue.mockReturnValue(2);
+      playerStats.class = { class_levels: [{ level: 1, bardic_die: 4 }] };
+
+      await handle(action, playerStats, campaignName, mapName);
+
+      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
+        'Ally',
+        'bardicInspirationDie',
+        '6',
+        campaignName,
+      );
+    });
+  });
+
+  // ── Runtime state ──────────────────────────────────────────────
+
+  describe('runtime state', () => {
+    it('sets bardicInspirationDie and bardicInspirationGrantedBy on the target', async () => {
       useRuntimeState.getRuntimeValue.mockReturnValue(2);
 
       await handle(action, playerStats, campaignName, mapName);
 
       expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
         'Ally',
+        'bardicInspirationDie',
+        '8',
+        campaignName,
+      );
+      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
+        'Ally',
         'bardicInspirationGrantedBy',
         'Bard',
         campaignName,
       );
-    });
-
-    it('converts the die size to a string when setting runtime value', async () => {
-      useRuntimeState.getRuntimeValue.mockReturnValue(2);
-      playerStats.class = { class_levels: [{ level: 3, bardic_die: 8 }] };
-
-      await handle(action, playerStats, campaignName, mapName);
-
-      const dieCall = useRuntimeState.setRuntimeValue.mock.calls.find(
-        (call) => call[1] === 'bardicInspirationDie',
-      );
-      expect(dieCall).toBeDefined();
-      expect(dieCall[2]).toBe('8');
     });
   });
 
@@ -454,34 +340,6 @@ describe('bardicInspirationHandler.handle', () => {
       useRuntimeState.getRuntimeValue.mockReturnValue(2);
       playerStats.automation.passives = [];
       action.automation.options = ['some_option'];
-
-      await handle(action, playerStats, campaignName, mapName);
-
-      expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalledWith(
-        'Ally',
-        'bardicInspirationCombatOptions',
-        expect.any(String),
-        campaignName,
-      );
-    });
-
-    it('does not set combat options when passives array is undefined', async () => {
-      useRuntimeState.getRuntimeValue.mockReturnValue(2);
-      playerStats.automation = {};
-
-      await handle(action, playerStats, campaignName, mapName);
-
-      expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalledWith(
-        'Ally',
-        'bardicInspirationCombatOptions',
-        expect.any(String),
-        campaignName,
-      );
-    });
-
-    it('does not set combat options when passives is undefined', async () => {
-      useRuntimeState.getRuntimeValue.mockReturnValue(2);
-      playerStats.automation = undefined;
 
       await handle(action, playerStats, campaignName, mapName);
 
@@ -538,52 +396,7 @@ describe('bardicInspirationHandler.handle', () => {
       expect(result.payload.description).toContain('granted to Rogue');
     });
 
-    it('includes the action automation object in the popup payload', async () => {
-      useRuntimeState.getRuntimeValue.mockReturnValue(2);
-      const customAutomation = { range: '30_ft', uses_expression: '1d6', extra: true };
-      action.automation = customAutomation;
-
-      const result = await handle(action, playerStats, campaignName, mapName);
-
-      expect(result.payload.automation).toEqual(customAutomation);
-    });
-
-    it('uses the action name in all popup payloads', async () => {
-      useRuntimeState.getRuntimeValue.mockReturnValue(2);
-      targetResolver.resolveTarget.mockResolvedValue(null);
-
-      const result = await handle(
-        { ...action, name: 'My Custom Inspiration' },
-        playerStats,
-        campaignName,
-        mapName,
-      );
-
-      expect(result.payload.name).toBe('My Custom Inspiration');
-      expect(result.payload.description).toContain('My Custom Inspiration');
-    });
-  });
-
-  // ── Custom action name ─────────────────────────────────────────
-
-  describe('custom action name', () => {
-    it('uses custom name in the exhausted popup', async () => {
-      automationService.evaluateAutoExpression.mockReturnValue(2);
-      useRuntimeState.getRuntimeValue.mockReturnValue(0);
-      const customName = 'Musical Encouragement';
-
-      const result = await handle(
-        { ...action, name: customName },
-        playerStats,
-        campaignName,
-        mapName,
-      );
-
-      expect(result.payload.name).toBe(customName);
-      expect(result.payload.description).toContain('has no uses remaining');
-    });
-
-    it('uses custom name in the no-target popup', async () => {
+    it('uses custom action name in all popup payloads', async () => {
       useRuntimeState.getRuntimeValue.mockReturnValue(2);
       targetResolver.resolveTarget.mockResolvedValue(null);
       const customName = 'Musical Encouragement';

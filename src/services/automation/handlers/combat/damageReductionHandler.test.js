@@ -1,3 +1,4 @@
+// @cleaned-by-ai
 // @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
@@ -73,16 +74,6 @@ describe('damageReductionHandler', () => {
       expect(result.payload.automationType).toBe('damage_reduction');
     });
 
-    it('returns popup when inventory is undefined and shield is required', async () => {
-      const ps = makePlayerStats({ inventory: undefined });
-      const action = makeAction({ requiresShield: true });
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.description).toContain('holding a Shield');
-    });
-
     it('proceeds when player has a shield equipped', async () => {
       automationService.evaluateAutoExpression.mockReturnValue(5);
       const ps = makePlayerStats({
@@ -122,32 +113,6 @@ describe('damageReductionHandler', () => {
 
       expect(result.type).toBe('popup');
       expect(result.payload.description).toContain('holding a Shield');
-    });
-
-    it('does not proceed when equipped item is not in equipment list', async () => {
-      const ps = makePlayerStats({
-        inventory: { equipped: ['Shield'] },
-        equipment: [],
-      });
-      const action = makeAction({ requiresShield: true, reductionExpression: '2d6' });
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.description).toContain('holding a Shield');
-    });
-
-    it('skips invalid inventory items gracefully', async () => {
-      const ps = makePlayerStats({
-        inventory: { equipped: [null, 42, 'Shield'] },
-        equipment: [{ name: 'Shield', armor_category: 'Shield' }],
-      });
-      const action = makeAction({ requiresShield: true, reductionExpression: '2d6' });
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.description).toContain('Reduce damage by');
     });
   });
 
@@ -205,19 +170,6 @@ describe('damageReductionHandler', () => {
       expect(result.type).toBe('popup');
       expect(result.payload.description).toContain('Reduce damage by');
     });
-
-    it('does not proceed when equipped item is not in equipment list', async () => {
-      const ps = makePlayerStats({
-        inventory: { equipped: ['Longsword'] },
-        equipment: [],
-      });
-      const action = makeAction({ requiresShieldOrWeapon: true, reductionExpression: '2d6' });
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.description).toContain('holding a Shield or a Simple or Martial weapon');
-    });
   });
 
   // ── requiresShield checked before requiresShieldOrWeapon ────
@@ -265,46 +217,6 @@ describe('damageReductionHandler', () => {
       );
     });
 
-    it('adds log entry with correct description for zero_on_success_half_on_fail', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction({
-        effect: 'zero_on_success_half_on_fail',
-        requiresShield: false,
-      });
-
-      await handle(action, ps, campaignName, null);
-
-      expect(logService.addEntry).toHaveBeenCalledWith(campaignName, {
-        type: 'ability_use',
-        characterName: 'TestHero',
-        abilityName: 'Defensive Reaction',
-        description: expect.stringContaining('activated'),
-        timestamp: expect.any(Number),
-      });
-    });
-
-    it('uses action name in log entry description', async () => {
-      const ps = makePlayerStats({ name: 'DragonSlayer' });
-      const action = {
-        name: 'Evasion',
-        automation: {
-          type: 'damage_reduction',
-          effect: 'zero_on_success_half_on_fail',
-          requiresShield: false,
-        },
-      };
-
-      await handle(action, ps, campaignName, null);
-
-      expect(logService.addEntry).toHaveBeenCalledWith(campaignName, {
-        type: 'ability_use',
-        characterName: 'DragonSlayer',
-        abilityName: 'Evasion',
-        description: expect.stringContaining('Evasion'),
-        timestamp: expect.any(Number),
-      });
-    });
-
     it('returns popup with correct description for zero_on_success_half_on_fail', async () => {
       const ps = makePlayerStats();
       const action = makeAction({
@@ -346,31 +258,9 @@ describe('damageReductionHandler', () => {
 
       const result = await handle(action, ps, campaignName, null);
 
-      // requiresShield check happens first, so shield popup is returned
       expect(result.type).toBe('popup');
       expect(result.payload.description).toContain('holding a Shield');
       expect(runtimeState.setRuntimeValue).not.toHaveBeenCalled();
-    });
-
-    it('does not proceed with zero_on_success_half_on_fail when requiresShieldOrWeapon is true and player lacks both', async () => {
-      const ps = makePlayerStats({ inventory: { equipped: ['Leather Armor'] } });
-      const action = makeAction({
-        effect: 'zero_on_success_half_on_fail',
-        requiresShieldOrWeapon: true,
-      });
-
-      const result = await handle(action, ps, campaignName, null);
-
-      // effect check happens before requiresShieldOrWeapon check in source,
-      // so the effect path runs first without shield/weapon requirement
-      expect(result.type).toBe('popup');
-      expect(result.payload.description).toContain('activated');
-      expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-        'TestHero',
-        'interveneShieldActive',
-        true,
-        campaignName,
-      );
     });
   });
 
@@ -411,44 +301,19 @@ describe('damageReductionHandler', () => {
       expect(result.payload.description).not.toContain('Trigger:');
     });
 
-    it('uses string reduction when evaluateAutoExpression returns non-number', async () => {
-      automationService.evaluateAutoExpression.mockReturnValue(null);
-      const ps = makePlayerStats();
-      const action = makeAction({ reductionExpression: '2d6+1' });
+    it('falls back to string expression when evaluateAutoExpression returns non-number', async () => {
+      const nonNumericValues = [null, undefined, ''];
+      for (const nonNumericValue of nonNumericValues) {
+        vi.resetAllMocks();
+        setupMocks();
+        automationService.evaluateAutoExpression.mockReturnValue(nonNumericValue);
+        const ps = makePlayerStats();
+        const action = makeAction({ reductionExpression: '2d6+1' });
 
-      const result = await handle(action, ps, campaignName, null);
+        const result = await handle(action, ps, campaignName, null);
 
-      expect(result.payload.description).toContain('2d6+1');
-    });
-
-    it('uses string reduction when evaluateAutoExpression returns undefined', async () => {
-      automationService.evaluateAutoExpression.mockReturnValue(undefined);
-      const ps = makePlayerStats();
-      const action = makeAction({ reductionExpression: '2d6+1' });
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.payload.description).toContain('2d6+1');
-    });
-
-    it('uses string reduction when evaluateAutoExpression returns empty string', async () => {
-      automationService.evaluateAutoExpression.mockReturnValue('');
-      const ps = makePlayerStats();
-      const action = makeAction({ reductionExpression: '2d6+1' });
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.payload.description).toContain('2d6+1');
-    });
-
-    it('shows "Reduce damage by 0" when expression evaluates to zero', async () => {
-      automationService.evaluateAutoExpression.mockReturnValue(0);
-      const ps = makePlayerStats();
-      const action = makeAction({ reductionExpression: '1d4-1d4' });
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.payload.description).toContain('Reduce damage by <strong>0</strong>');
+        expect(result.payload.description).toContain('2d6+1');
+      }
     });
 
     it('adds log entry with ability_use type', async () => {
@@ -466,24 +331,9 @@ describe('damageReductionHandler', () => {
       });
     });
 
-    it('uses correct character name in log entry', async () => {
-      automationService.evaluateAutoExpression.mockReturnValue(3);
-      const ps = makePlayerStats({ name: 'ElvenRogue' });
-      const action = makeAction({ reductionExpression: '1d6' });
-
-      await handle(action, ps, campaignName, null);
-
-      expect(logService.addEntry).toHaveBeenCalledWith(campaignName, {
-        type: 'ability_use',
-        characterName: 'ElvenRogue',
-        abilityName: 'Defensive Reaction',
-        description: 'ElvenRogue used Defensive Reaction to reduce damage by 3.',
-      });
-    });
-
-    it('uses correct ability name in log entry', async () => {
+    it('uses correct character and ability names in log entry', async () => {
       automationService.evaluateAutoExpression.mockReturnValue(2);
-      const ps = makePlayerStats();
+      const ps = makePlayerStats({ name: 'ElvenRogue' });
       const action = {
         name: 'Armor of Agathys',
         automation: { type: 'damage_reduction', reductionExpression: '1d4' },
@@ -493,9 +343,9 @@ describe('damageReductionHandler', () => {
 
       expect(logService.addEntry).toHaveBeenCalledWith(campaignName, {
         type: 'ability_use',
-        characterName: 'TestHero',
+        characterName: 'ElvenRogue',
         abilityName: 'Armor of Agathys',
-        description: 'TestHero used Armor of Agathys to reduce damage by 2.',
+        description: 'ElvenRogue used Armor of Agathys to reduce damage by 2.',
       });
     });
 

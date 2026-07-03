@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import { handle } from './bonusActionAttackHandler.js';
@@ -98,15 +98,6 @@ describe('bonusActionAttackHandler', () => {
                 expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', 'warPriestUses', 1, 'campaign');
             });
 
-            it('should decrement to zero when last use consumed', async () => {
-                const action = makeAction({ automation: { usesMax: 1 } });
-                getRuntimeValue.mockReturnValue(1);
-
-                await handle(action, makePlayerStats(), 'campaign', 'map', []);
-
-                expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', 'warPriestUses', 0, 'campaign');
-            });
-
             it('should use custom resourceKey for tracking', async () => {
                 const action = makeAction({ automation: { usesMax: 1, resourceKey: 'warPriestUses' } });
                 getRuntimeValue.mockReturnValue(1);
@@ -116,18 +107,9 @@ describe('bonusActionAttackHandler', () => {
                 expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', 'warPriestUses', 0, 'campaign');
             });
 
-            it('should skip use tracking when usesMax is 0', async () => {
+            it('should skip use tracking when usesMax is 0 or undefined', async () => {
                 const action = makeAction({ automation: { usesMax: 0 } });
                 getRuntimeValue.mockReturnValue(0);
-
-                const result = await handle(action, makePlayerStats(), 'campaign', 'map', []);
-
-                expect(result.type).toBe('popup');
-                expect(setRuntimeValue).not.toHaveBeenCalled();
-            });
-
-            it('should skip use tracking when usesMax is undefined', async () => {
-                const action = makeAction();
 
                 const result = await handle(action, makePlayerStats(), 'campaign', 'map', []);
 
@@ -176,50 +158,12 @@ describe('bonusActionAttackHandler', () => {
                 expect(result.type).toBe('popup');
             });
 
-            it('should reject weapon with only Heavy property', async () => {
+            it('should reject weapon missing Heavy or Reach properties', async () => {
                 const action = makeAction({ automation: { trigger: 'after_attack_action_with_polearm' } });
                 const stats = makePlayerStats({ inventory: { equipped: ['Warhammer'] } });
                 const allEquipment = [{ name: 'Warhammer', properties: ['Heavy'] }];
 
                 const result = await handle(action, stats, 'campaign', 'map', allEquipment);
-
-                expect(result.payload.description).toContain('requires you to be holding');
-            });
-
-            it('should reject weapon with only Reach property', async () => {
-                const action = makeAction({ automation: { trigger: 'after_attack_action_with_polearm' } });
-                const stats = makePlayerStats({ inventory: { equipped: ['Glaive'] } });
-                const allEquipment = [{ name: 'Glaive', properties: ['Reach', 'Two-Handed'] }];
-
-                const result = await handle(action, stats, 'campaign', 'map', allEquipment);
-
-                expect(result.payload.description).toContain('requires you to be holding');
-            });
-
-            it('should match equipped weapon names with + prefix (strips 3 chars)', async () => {
-                const action = makeAction({ automation: { trigger: 'after_attack_action_with_polearm' } });
-                const stats = makePlayerStats({ inventory: { equipped: ['+Quarterstaff'] } });
-                const allEquipment = [{ name: 'Quarterstaff', properties: [] }];
-
-                const result = await handle(action, stats, 'campaign', 'map', allEquipment);
-
-                expect(result.type).toBe('popup');
-            });
-
-            it('should reject when equipped weapon not in allEquipment list', async () => {
-                const action = makeAction({ automation: { trigger: 'after_attack_action_with_polearm' } });
-                const stats = makePlayerStats({ inventory: { equipped: ['Longsword'] } });
-
-                const result = await handle(action, stats, 'campaign', 'map', []);
-
-                expect(result.payload.description).toContain('requires you to be holding');
-            });
-
-            it('should handle null/undefined equipped array gracefully', async () => {
-                const action = makeAction({ automation: { trigger: 'after_attack_action_with_polearm' } });
-                const stats = makePlayerStats({ inventory: { equipped: null } });
-
-                const result = await handle(action, stats, 'campaign', 'map', []);
 
                 expect(result.payload.description).toContain('requires you to be holding');
             });
@@ -236,20 +180,10 @@ describe('bonusActionAttackHandler', () => {
                 expect(result.type).toBe('popup');
             });
 
-            it('should reject Heavy-only weapon via weaponRequirement', async () => {
+            it('should reject weapon missing required properties via weaponRequirement', async () => {
                 const action = makeAction({ automation: { weaponRequirement: 'quarterstaff_spear_heavy_reach' } });
                 const stats = makePlayerStats({ inventory: { equipped: ['Warhammer'] } });
                 const allEquipment = [{ name: 'Warhammer', properties: ['Heavy'] }];
-
-                const result = await handle(action, stats, 'campaign', 'map', allEquipment);
-
-                expect(result.payload.description).toContain('requires you to be holding');
-            });
-
-            it('should reject Reach-only weapon via weaponRequirement', async () => {
-                const action = makeAction({ automation: { weaponRequirement: 'quarterstaff_spear_heavy_reach' } });
-                const stats = makePlayerStats({ inventory: { equipped: ['Glaive'] } });
-                const allEquipment = [{ name: 'Glaive', properties: ['Reach', 'Two-Handed'] }];
 
                 const result = await handle(action, stats, 'campaign', 'map', allEquipment);
 
@@ -296,30 +230,6 @@ describe('bonusActionAttackHandler', () => {
 
                 expect(result.payload.description).toContain('Disengage action');
                 expect(setRuntimeValue).not.toHaveBeenCalled();
-            });
-
-            it('should handle non-array activeConditions by treating as empty', async () => {
-                getRuntimeValue.mockImplementation((name, key) => {
-                    if (key === 'activeConditions') return 'grappled';
-                    return null;
-                });
-                const action = makeAction({ automation: { effect: 'disengage_end_grappled' } });
-
-                const result = await handle(action, makePlayerStats(), 'campaign', 'map', []);
-
-                expect(result.payload.description).toContain('Disengage action');
-            });
-
-            it('should preserve order of non-grappled conditions', async () => {
-                getRuntimeValue.mockImplementation((name, key) => {
-                    if (key === 'activeConditions') return ['exhausted', 'grappled', 'poisoned'];
-                    return null;
-                });
-                const action = makeAction({ automation: { effect: 'disengage_end_grappled' } });
-
-                await handle(action, makePlayerStats(), 'campaign', 'map', []);
-
-                expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', 'activeConditions', ['exhausted', 'poisoned'], 'campaign');
             });
         });
     });

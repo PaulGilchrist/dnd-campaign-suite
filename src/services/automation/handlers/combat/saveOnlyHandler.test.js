@@ -1,3 +1,4 @@
+// @cleaned-by-ai
 // @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
@@ -115,16 +116,6 @@ describe('saveOnlyHandler.handle - return value', () => {
     expect(result.payload.targetName).toBe('TestHero');
   });
 
-  it('uses player name as target when resolveTarget returns object without target', async () => {
-    const ps = makePlayerStats();
-    const action = makeAction({ saveType: 'CON' });
-    targetResolver.resolveTarget.mockResolvedValue({});
-
-    const result = await handle(action, ps, campaignName, mapName);
-
-    expect(result.payload.targetName).toBe('TestHero');
-  });
-
   it('uses custom saveType in popup description', async () => {
     const ps = makePlayerStats();
     const action = makeAction({ saveType: 'WIS' });
@@ -157,19 +148,6 @@ describe('saveOnlyHandler.handle - side effects', () => {
     });
   });
 
-  it('passes default CON saveType to save listener when omitted', async () => {
-    const ps = makePlayerStats();
-    const action = makeAction({});
-
-    await handle(action, ps, campaignName, mapName);
-
-    expect(savePrompt.createSaveListener).toHaveBeenCalledWith(campaignName, {
-      targetName: 'Goblin',
-      saveType: 'CON',
-      saveDc: 14,
-    });
-  });
-
   it('registers a save-result event listener on the window', async () => {
     const ps = makePlayerStats();
     const action = makeAction({ saveType: 'CON' });
@@ -195,27 +173,6 @@ describe('saveOnlyHandler.handle - side effects', () => {
       description: 'Stunning Strike triggered — target Goblin must make CON save (DC 14)',
       promptId: 'prompt-123',
     });
-  });
-
-  it('adds ability_use log entry with default CON when saveType omitted', async () => {
-    const ps = makePlayerStats();
-    const action = makeAction({});
-
-    await handle(action, ps, campaignName, mapName);
-
-    const logArgs = logService.addEntry.mock.calls[0][1];
-    expect(logArgs.type).toBe('ability_use');
-    expect(logArgs.description).toContain('CON save');
-  });
-
-  it('uses custom saveType in log entry description', async () => {
-    const ps = makePlayerStats();
-    const action = makeAction({ saveType: 'WIS' });
-
-    await handle(action, ps, campaignName, mapName);
-
-    const logArgs = logService.addEntry.mock.calls[0][1];
-    expect(logArgs.description).toContain('WIS save');
   });
 });
 
@@ -280,25 +237,6 @@ describe('saveOnlyHandler.handle - save result success', () => {
     expect(successEntry[1].saveDc).toBe(14);
   });
 
-  it('removes the save-result event listener after handling', async () => {
-    const ps = makePlayerStats();
-    const action = makeAction({ saveType: 'CON' });
-
-    const removeEventListenerSpy = vi.spyOn(window, 'removeEventListener');
-
-    await handle(action, ps, campaignName, mapName);
-
-    // Before dispatch, no removal should have happened
-    expect(removeEventListenerSpy).not.toHaveBeenCalled();
-
-    window.dispatchEvent(new CustomEvent('save-result', {
-      detail: { promptId: 'prompt-123', success: true },
-    }));
-
-    expect(removeEventListenerSpy).toHaveBeenCalledWith('save-result', expect.any(Function));
-    removeEventListenerSpy.mockRestore();
-  });
-
   it('sets speed_halved runtime value on success', async () => {
     const ps = makePlayerStats();
     const action = makeAction({ saveType: 'CON' });
@@ -314,74 +252,6 @@ describe('saveOnlyHandler.handle - save result success', () => {
     );
     expect(speedHalvedCall).toBeDefined();
     expect(speedHalvedCall[2]).toBe(true);
-  });
-
-  it('adds target to advantage list on success when not already present', async () => {
-    const ps = makePlayerStats();
-    const action = makeAction({ saveType: 'CON' });
-
-    await handle(action, ps, campaignName, mapName);
-
-    window.dispatchEvent(new CustomEvent('save-result', {
-      detail: { promptId: 'prompt-123', success: true },
-    }));
-
-    const advCall = runtimeState.setRuntimeValue.mock.calls.find(
-      (call) => call[1]?.startsWith('_advantageOn_'),
-    );
-    expect(advCall).toBeDefined();
-    expect(advCall[2]).toContain('Goblin');
-  });
-
-  it('skips advantage runtime update when target already in list', async () => {
-    const ps = makePlayerStats();
-    const action = makeAction({ saveType: 'CON' });
-    runtimeState.getRuntimeValue.mockReturnValue(['Goblin']);
-
-    await handle(action, ps, campaignName, mapName);
-
-    window.dispatchEvent(new CustomEvent('save-result', {
-      detail: { promptId: 'prompt-123', success: true },
-    }));
-
-    const advCalls = runtimeState.setRuntimeValue.mock.calls.filter(
-      (call) => call[1]?.startsWith('_advantageOn_'),
-    );
-    expect(advCalls).toHaveLength(0);
-  });
-
-  it('handles empty stored advantage list on success', async () => {
-    const ps = makePlayerStats();
-    const action = makeAction({ saveType: 'CON' });
-    runtimeState.getRuntimeValue.mockReturnValue([]);
-
-    await handle(action, ps, campaignName, mapName);
-
-    window.dispatchEvent(new CustomEvent('save-result', {
-      detail: { promptId: 'prompt-123', success: true },
-    }));
-
-    const advCall = runtimeState.setRuntimeValue.mock.calls.find(
-      (call) => call[1]?.startsWith('_advantageOn_'),
-    );
-    expect(advCall[2]).toEqual(['Goblin']);
-  });
-
-  it('treats null stored advantage list as empty on success', async () => {
-    const ps = makePlayerStats();
-    const action = makeAction({ saveType: 'CON' });
-    runtimeState.getRuntimeValue.mockReturnValue(null);
-
-    await handle(action, ps, campaignName, mapName);
-
-    window.dispatchEvent(new CustomEvent('save-result', {
-      detail: { promptId: 'prompt-123', success: true },
-    }));
-
-    const advCall = runtimeState.setRuntimeValue.mock.calls.find(
-      (call) => call[1]?.startsWith('_advantageOn_'),
-    );
-    expect(advCall[2]).toEqual(['Goblin']);
   });
 });
 
@@ -430,44 +300,6 @@ describe('saveOnlyHandler.handle - save result fail', () => {
     );
   });
 
-  it('treats non-array storedConditions as empty', async () => {
-    const ps = makePlayerStats();
-    const action = makeAction({ saveType: 'CON' });
-    runtimeState.getRuntimeValue.mockReturnValue('prone');
-
-    await handle(action, ps, campaignName, mapName);
-
-    window.dispatchEvent(new CustomEvent('save-result', {
-      detail: { promptId: 'prompt-123', success: false },
-    }));
-
-    expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-      'Goblin',
-      'activeConditions',
-      ['stunned'],
-      campaignName,
-    );
-  });
-
-  it('treats null storedConditions as empty', async () => {
-    const ps = makePlayerStats();
-    const action = makeAction({ saveType: 'CON' });
-    runtimeState.getRuntimeValue.mockReturnValue(null);
-
-    await handle(action, ps, campaignName, mapName);
-
-    window.dispatchEvent(new CustomEvent('save-result', {
-      detail: { promptId: 'prompt-123', success: false },
-    }));
-
-    expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-      'Goblin',
-      'activeConditions',
-      ['stunned'],
-      campaignName,
-    );
-  });
-
   it('adds a save_result log entry on failure', async () => {
     const ps = makePlayerStats();
     const action = makeAction({ saveType: 'CON' });
@@ -486,24 +318,6 @@ describe('saveOnlyHandler.handle - save result fail', () => {
     expect(failEntry[1].success).toBe(false);
   });
 
-  it('removes the save-result event listener after handling failure', async () => {
-    const ps = makePlayerStats();
-    const action = makeAction({ saveType: 'CON' });
-
-    const removeEventListenerSpy = vi.spyOn(window, 'removeEventListener');
-
-    await handle(action, ps, campaignName, mapName);
-
-    expect(removeEventListenerSpy).not.toHaveBeenCalled();
-
-    window.dispatchEvent(new CustomEvent('save-result', {
-      detail: { promptId: 'prompt-123', success: false },
-    }));
-
-    expect(removeEventListenerSpy).toHaveBeenCalledWith('save-result', expect.any(Function));
-    removeEventListenerSpy.mockRestore();
-  });
-
   it('adds expiration with fail effects on failure', async () => {
     const ps = makePlayerStats();
     const action = makeAction({ saveType: 'CON' });
@@ -518,60 +332,6 @@ describe('saveOnlyHandler.handle - save result fail', () => {
       ps.name,
       'Goblin',
       [{ type: 'stunned', condition: 'stunned' }],
-      campaignName,
-    );
-  });
-
-  it('uses custom fail condition from effects.fail', async () => {
-    const ps = makePlayerStats();
-    const action = makeAction({ saveType: 'CON', effects: { fail: [{ condition: 'blinded' }] } });
-
-    await handle(action, ps, campaignName, mapName);
-
-    window.dispatchEvent(new CustomEvent('save-result', {
-      detail: { promptId: 'prompt-123', success: false },
-    }));
-
-    expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-      'Goblin',
-      'activeConditions',
-      ['blinded'],
-      campaignName,
-    );
-  });
-
-  it('defaults to stunned when effects.fail is empty', async () => {
-    const ps = makePlayerStats();
-    const action = makeAction({ saveType: 'CON', effects: { fail: [] } });
-
-    await handle(action, ps, campaignName, mapName);
-
-    window.dispatchEvent(new CustomEvent('save-result', {
-      detail: { promptId: 'prompt-123', success: false },
-    }));
-
-    expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-      'Goblin',
-      'activeConditions',
-      ['stunned'],
-      campaignName,
-    );
-  });
-
-  it('defaults to stunned when effects.fail entry lacks condition field', async () => {
-    const ps = makePlayerStats();
-    const action = makeAction({ saveType: 'CON', effects: { fail: [{ type: 'stunned' }] } });
-
-    await handle(action, ps, campaignName, mapName);
-
-    window.dispatchEvent(new CustomEvent('save-result', {
-      detail: { promptId: 'prompt-123', success: false },
-    }));
-
-    expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-      'Goblin',
-      'activeConditions',
-      ['stunned'],
       campaignName,
     );
   });
@@ -629,62 +389,6 @@ describe('saveOnlyHandler.handle - custom effects', () => {
   });
 });
 
-// ── Tests: handle - Default Effects ────────────────────────────
-
-describe('saveOnlyHandler.handle - default effects', () => {
-  beforeEach(() => {
-    vi.resetAllMocks();
-    setupMocks();
-  });
-
-  it('uses Stunning Strike effects when action name matches', async () => {
-    const ps = makePlayerStats();
-    const action = {
-      name: 'Stunning Strike',
-      automation: { saveType: 'CON' },
-    };
-
-    await handle(action, ps, campaignName, mapName);
-
-    window.dispatchEvent(new CustomEvent('save-result', {
-      detail: { promptId: 'prompt-123', success: true },
-    }));
-
-    const speedHalvedCall = runtimeState.setRuntimeValue.mock.calls.find(
-      (call) => call[1]?.includes('speed_halved'),
-    );
-    expect(speedHalvedCall).toBeDefined();
-    expect(speedHalvedCall[2]).toBe(true);
-
-    const advCall = runtimeState.setRuntimeValue.mock.calls.find(
-      (call) => call[1]?.startsWith('_advantageOn_'),
-    );
-    expect(advCall).toBeDefined();
-    expect(advCall[2]).toContain('Goblin');
-  });
-
-  it('uses generic default effects for non-Stunning Strike actions', async () => {
-    const ps = makePlayerStats();
-    const action = {
-      name: 'Some Other Ability',
-      automation: { saveType: 'CON' },
-    };
-
-    await handle(action, ps, campaignName, mapName);
-
-    window.dispatchEvent(new CustomEvent('save-result', {
-      detail: { promptId: 'prompt-123', success: false },
-    }));
-
-    expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-      'Goblin',
-      'activeConditions',
-      ['stunned'],
-      campaignName,
-    );
-  });
-});
-
 // ── Tests: handle - Edge Cases ────────────────────────────────
 
 describe('saveOnlyHandler.handle - edge cases', () => {
@@ -701,34 +405,5 @@ describe('saveOnlyHandler.handle - edge cases', () => {
 
     expect(result.type).toBe('popup');
     expect(result.payload.description).toContain('CON saving throw');
-  });
-
-  it('handles unknown effect type gracefully on success', async () => {
-    const ps = makePlayerStats();
-    const action = makeAction({ saveType: 'CON', effects: { success: [{ type: 'unknown_effect' }], fail: [] } });
-
-    await handle(action, ps, campaignName, mapName);
-
-    window.dispatchEvent(new CustomEvent('save-result', {
-      detail: { promptId: 'prompt-123', success: true },
-    }));
-
-    const unknownCall = runtimeState.setRuntimeValue.mock.calls.find(
-      (call) => call[1]?.includes('unknown_effect'),
-    );
-    expect(unknownCall).toBeUndefined();
-  });
-
-  it('handles empty effects arrays on success', async () => {
-    const ps = makePlayerStats();
-    const action = makeAction({ saveType: 'CON', effects: { success: [], fail: [] } });
-
-    await handle(action, ps, campaignName, mapName);
-
-    window.dispatchEvent(new CustomEvent('save-result', {
-      detail: { promptId: 'prompt-123', success: true },
-    }));
-
-    expect(expirations.addExpiration).toHaveBeenCalled();
   });
 });

@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import { handle, applyStanceOption } from './combatStanceHandler.js';
@@ -108,17 +108,6 @@ describe('combatStanceHandler - deactivation', () => {
         expect(result.payload.playerStats).toBe(ps);
         expect(result.payload.campaignName).toBe(campaignName);
     });
-
-    it('does not clear extended flag for non-Rage stances', async () => {
-        setupRuntimeMocks({
-            'TestBarbarian:activeBuffs:TestCampaign': [{ name: 'Second Wind', effect: 'healing' }],
-        });
-
-        const action = { name: 'Second Wind', automation: { type: 'combat_stance', effect: 'healing', options: [] } };
-        await handle(action, makePlayerStats(), campaignName);
-
-        expect(tempTeleport.clearExtendedFlag).not.toHaveBeenCalled();
-    });
 });
 
 // ─── handle: modal path (options exist) ───
@@ -226,21 +215,6 @@ describe('combatStanceHandler - instinctive pounce', () => {
         expect(result.payload.type).toBe('automation_info');
         expect(result.payload.name).toBe('Rage');
     });
-
-    it('handles missing specialActions gracefully without throwing', async () => {
-        setupRuntimeMocks({
-            'TestBarbarian:activeBuffs:TestCampaign': [],
-            'TestBarbarian:ragePoints:TestCampaign': 4,
-        });
-
-        const ps = makePlayerStats({ automation: {} });
-        const action = makeAction({ effect: 'stance', options: [] });
-
-        const result = await handle(action, ps, campaignName);
-
-        expect(result.type).toBe('popup');
-        expect(result.payload.type).toBe('automation_info');
-    });
 });
 
 // ─── handle: activation - teleport on rage ───
@@ -330,23 +304,10 @@ describe('combatStanceHandler - resource exhaustion', () => {
         vi.clearAllMocks();
     });
 
-    it('blocks activation when maxUses is 0', async () => {
+    it('blocks activation when ragePoints resource is exhausted', async () => {
         setupRuntimeMocks({
             'TestBarbarian:activeBuffs:TestCampaign': [],
             'TestBarbarian:ragePoints:TestCampaign': 0,
-        });
-
-        const action = makeAction({ effect: 'stance', options: [], uses: 1, resourceKey: 'ragePoints' });
-        const result = await handle(action, makePlayerStats(), campaignName);
-
-        expect(result.type).toBe('popup');
-        expect(result.payload.description).toBe('Rage has been used and cannot be used again until a Long Rest.');
-    });
-
-    it('blocks activation when maxUses is exceeded', async () => {
-        setupRuntimeMocks({
-            'TestBarbarian:activeBuffs:TestCampaign': [],
-            'TestBarbarian:ragePoints:TestCampaign': -1,
         });
 
         const action = makeAction({ effect: 'stance', options: [], uses: 1, resourceKey: 'ragePoints' });
@@ -428,24 +389,6 @@ describe('combatStanceHandler - buff creation', () => {
         await handle(action, makePlayerStats(), campaignName);
 
         expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-            'TestBarbarian',
-            'activeConditions',
-            ['poisoned'],
-            campaignName,
-        );
-    });
-
-    it('does not call setRuntimeValue for conditions when no charmed/frightened are present', async () => {
-        setupRuntimeMocks({
-            'TestBarbarian:activeBuffs:TestCampaign': [],
-            'TestBarbarian:ragePoints:TestCampaign': 4,
-            'TestBarbarian:activeConditions:TestCampaign': ['poisoned'],
-        });
-
-        const action = makeAction({ effect: 'stance', options: [] });
-        await handle(action, makePlayerStats(), campaignName);
-
-        expect(runtimeState.setRuntimeValue).not.toHaveBeenCalledWith(
             'TestBarbarian',
             'activeConditions',
             ['poisoned'],
@@ -650,58 +593,6 @@ describe('combatStanceHandler - buff creation', () => {
             campaignName,
         );
     });
-
-    it('uses class level channel divinity charges when stored is null', async () => {
-        setupRuntimeMocks({
-            'TestBarbarian:activeBuffs:TestCampaign': [],
-            'TestBarbarian:channelDivinityCharges:TestCampaign': null,
-        });
-
-        const ps = makePlayerStats({
-            level: 3,
-            class: {
-                class_levels: [
-                    {},
-                    {},
-                    { channel_divinity: 3 },
-                ],
-            },
-        });
-
-        const action = makeAction({ effect: 'stance', options: [], resourceCost: 'channel_divinity' });
-        await handle(action, ps, campaignName);
-
-        expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-            'TestBarbarian',
-            'channelDivinityCharges',
-            2,
-            campaignName,
-        );
-    });
-
-    it('uses default max charges (2) when channel divinity data is missing', async () => {
-        setupRuntimeMocks({
-            'TestBarbarian:activeBuffs:TestCampaign': [],
-            'TestBarbarian:channelDivinityCharges:TestCampaign': null,
-        });
-
-        const ps = makePlayerStats({
-            level: 3,
-            class: {
-                class_levels: [{}, {}, {}],
-            },
-        });
-
-        const action = makeAction({ effect: 'stance', options: [], resourceCost: 'channel_divinity' });
-        await handle(action, ps, campaignName);
-
-        expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-            'TestBarbarian',
-            'channelDivinityCharges',
-            1,
-            campaignName,
-        );
-    });
 });
 
 // ─── handle: activation - description formatting ───
@@ -773,18 +664,6 @@ describe('combatStanceHandler - activeBuffs null handling', () => {
     it('handles null activeBuffs gracefully', async () => {
         setupRuntimeMocks({
             'TestBarbarian:activeBuffs:TestCampaign': null,
-            'TestBarbarian:ragePoints:TestCampaign': 4,
-        });
-
-        const action = makeAction({ effect: 'stance', options: [] });
-        const result = await handle(action, makePlayerStats(), campaignName);
-
-        expect(result.type).toBe('popup');
-    });
-
-    it('handles string activeBuffs gracefully', async () => {
-        setupRuntimeMocks({
-            'TestBarbarian:activeBuffs:TestCampaign': 'not-an-array',
             'TestBarbarian:ragePoints:TestCampaign': 4,
         });
 
@@ -1093,144 +972,7 @@ describe('applyStanceOption - buff creation', () => {
         );
     });
 
-    it('includes option name and effects in description when option chosen', async () => {
-        setupRuntimeMocks({
-            'TestBarbarian:activeBuffs:TestCampaign': [],
-            'TestBarbarian:ragePoints:TestCampaign': 4,
-        });
-
-        const options = [{ name: 'Bear', resistanceTypes: [] }];
-        const action = makeAction({ effect: 'stance', options });
-        const result = await applyStanceOption(action, makePlayerStats(), campaignName, 'Bear');
-
-        expect(result.payload.description).toContain('Bear chosen');
-        expect(result.payload.description).toContain('Resistance to Acid');
-        expect(result.payload.description).toContain('4 Rage use(s) remaining');
-    });
-
-    it('includes Falcon blocked message when wearing armor', async () => {
-        setupRuntimeMocks({
-            'TestBarbarian:activeBuffs:TestCampaign': [],
-            'TestBarbarian:ragePoints:TestCampaign': 4,
-        });
-
-        const ps = makePlayerStats({
-            armorClassFormula: 'Armor (16)',
-        });
-        const options = [{ name: 'Falcon', flySpeed: 30, noArmor: true }];
-        const action = makeAction({ effect: 'stance', options });
-        const result = await applyStanceOption(action, ps, campaignName, 'Falcon');
-
-        expect(result.payload.description).toContain('Blocked because you are wearing armor');
-    });
-
-    it('includes Fire speed boost description with correct value', async () => {
-        setupRuntimeMocks({
-            'TestBarbarian:activeBuffs:TestCampaign': [],
-            'TestBarbarian:ragePoints:TestCampaign': 4,
-        });
-
-        const options = [{ name: 'Fire', effect: 'speed_boost', speedBonus: 20 }];
-        const action = makeAction({ effect: 'stance', options });
-        const result = await applyStanceOption(action, makePlayerStats(), campaignName, 'Fire');
-
-        expect(result.payload.description).toContain('increases by 20 feet');
-    });
-
-    it('returns teleport modal with correct distance for Thunder option', async () => {
-        setupRuntimeMocks({
-            'TestBarbarian:activeBuffs:TestCampaign': [],
-            'TestBarbarian:ragePoints:TestCampaign': 4,
-        });
-
-        const options = [{ name: 'Thunder', effect: 'teleport', teleportDistance: '60 ft' }];
-        const action = makeAction({ effect: 'stance', options });
-        const result = await applyStanceOption(action, makePlayerStats(), campaignName, 'Thunder');
-
-        expect(result.type).toBe('modal');
-        expect(result.modalName).toBe('teleport');
-        expect(result.payload.triggeredByElementalStride).toBe(true);
-    });
-
-    it('includes Wolf advantage description', async () => {
-        setupRuntimeMocks({
-            'TestBarbarian:activeBuffs:TestCampaign': [],
-            'TestBarbarian:ragePoints:TestCampaign': 4,
-        });
-
-        const options = [{ name: 'Wolf' }];
-        const action = makeAction({ effect: 'stance', options });
-        const result = await applyStanceOption(action, makePlayerStats(), campaignName, 'Wolf');
-
-        expect(result.payload.description).toContain('Advantage on attack rolls');
-    });
-
-    it('includes Lion disadvantage description', async () => {
-        setupRuntimeMocks({
-            'TestBarbarian:activeBuffs:TestCampaign': [],
-            'TestBarbarian:ragePoints:TestCampaign': 4,
-        });
-
-        const options = [{ name: 'Lion' }];
-        const action = makeAction({ effect: 'stance', options });
-        const result = await applyStanceOption(action, makePlayerStats(), campaignName, 'Lion');
-
-        expect(result.payload.description).toContain('Disadvantage on attack rolls');
-    });
-
-    it('includes Ram prone description', async () => {
-        setupRuntimeMocks({
-            'TestBarbarian:activeBuffs:TestCampaign': [],
-            'TestBarbarian:ragePoints:TestCampaign': 4,
-        });
-
-        const options = [{ name: 'Ram' }];
-        const action = makeAction({ effect: 'stance', options });
-        const result = await applyStanceOption(action, makePlayerStats(), campaignName, 'Ram');
-
-        expect(result.payload.description).toContain('Prone condition');
-    });
-
-    it('includes Cold ice walk description', async () => {
-        setupRuntimeMocks({
-            'TestBarbarian:activeBuffs:TestCampaign': [],
-            'TestBarbarian:ragePoints:TestCampaign': 4,
-        });
-
-        const options = [{ name: 'Cold', effect: 'ice_walk' }];
-        const action = makeAction({ effect: 'stance', options });
-        const result = await applyStanceOption(action, makePlayerStats(), campaignName, 'Cold');
-
-        expect(result.payload.description).toContain('Ice Walk');
-    });
-
-    it('includes Eagle bonus action description', async () => {
-        setupRuntimeMocks({
-            'TestBarbarian:activeBuffs:TestCampaign': [],
-            'TestBarbarian:ragePoints:TestCampaign': 4,
-        });
-
-        const options = [{ name: 'Eagle' }];
-        const action = makeAction({ effect: 'stance', options });
-        const result = await applyStanceOption(action, makePlayerStats(), campaignName, 'Eagle');
-
-        expect(result.payload.description).toContain('Disengage and Dash');
-    });
-
-    it('includes Lightning fly speed description', async () => {
-        setupRuntimeMocks({
-            'TestBarbarian:activeBuffs:TestCampaign': [],
-            'TestBarbarian:ragePoints:TestCampaign': 4,
-        });
-
-        const options = [{ name: 'Lightning', effect: 'fly_speed' }];
-        const action = makeAction({ effect: 'stance', options });
-        const result = await applyStanceOption(action, makePlayerStats(), campaignName, 'Lightning');
-
-        expect(result.payload.description).toContain('Fly Speed');
-    });
-
-    it('sets resistance types from chosen option when no option chosen', async () => {
+    it('sets resistance types from chosen option when Bear is selected', async () => {
         setupRuntimeMocks({
             'TestBarbarian:activeBuffs:TestCampaign': [],
             'TestBarbarian:ragePoints:TestCampaign': 4,

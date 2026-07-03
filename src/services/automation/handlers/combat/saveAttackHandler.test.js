@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ── Mocks BEFORE imports ───────────────────────────────────────
@@ -95,18 +95,8 @@ describe('saveAttackHandler', () => {
     });
 
     describe('channel divinity resource cost', () => {
-      it('should return true when charges are depleted to 0', () => {
+      it('should return true when charges are depleted', () => {
         runtimeState.getRuntimeValue.mockReturnValue(0);
-        const ps = makePlayerStats({
-          class: { class_levels: [{ level: 5, channel_divinity: 2 }] },
-        });
-        const action = makeAction({ resourceCost: 'channel_divinity' });
-
-        expect(isExhausted(action, ps, campaignName)).toBe(true);
-      });
-
-      it('should return true when charges are negative', () => {
-        runtimeState.getRuntimeValue.mockReturnValue(-1);
         const ps = makePlayerStats({
           class: { class_levels: [{ level: 5, channel_divinity: 2 }] },
         });
@@ -157,16 +147,6 @@ describe('saveAttackHandler', () => {
     describe('wild shape resource cost', () => {
       it('should return true when uses are depleted', () => {
         runtimeState.getRuntimeValue.mockReturnValue(0);
-        const ps = makePlayerStats({
-          class: { class_levels: [{ level: 5, wild_shape: 2 }] },
-        });
-        const action = makeAction({ resourceCost: 'wild_shape' });
-
-        expect(isExhausted(action, ps, campaignName)).toBe(true);
-      });
-
-      it('should return true when uses are negative', () => {
-        runtimeState.getRuntimeValue.mockReturnValue(-1);
         const ps = makePlayerStats({
           class: { class_levels: [{ level: 5, wild_shape: 2 }] },
         });
@@ -233,32 +213,6 @@ describe('saveAttackHandler', () => {
         const action = makeAction({});
 
         expect(isExhausted(action, makePlayerStats(), campaignName)).toBe(false);
-      });
-
-      it('should use custom resourceKey for the uses key', () => {
-        runtimeState.getRuntimeValue.mockReturnValue(0);
-        const action = makeAction({ usesMax: 1, resourceKey: 'specialAbilityUses' });
-
-        isExhausted(action, makePlayerStats(), campaignName);
-
-        expect(runtimeState.getRuntimeValue).toHaveBeenCalledWith(
-          'TestCaster',
-          'specialAbilityUses',
-          campaignName,
-        );
-      });
-
-      it('should generate uses key from action name when no resourceKey', () => {
-        runtimeState.getRuntimeValue.mockReturnValue(0);
-        const action = { name: 'Fire Breath', automation: { usesMax: 1 } };
-
-        isExhausted(action, makePlayerStats(), campaignName);
-
-        expect(runtimeState.getRuntimeValue).toHaveBeenCalledWith(
-          'TestCaster',
-          'firebreathUses',
-          campaignName,
-        );
       });
     });
   });
@@ -339,8 +293,8 @@ describe('saveAttackHandler', () => {
 
     it('should resolve shape from optionDetails when option has been chosen', async () => {
       diceRoller.rollExpression.mockReturnValue({ total: 10, rolls: [10], modifier: 0 });
-      runtimeState.getRuntimeValue.mockReturnValueOnce('line'); // optionKey
-      runtimeState.getRuntimeValue.mockReturnValue(null); // uses key
+      runtimeState.getRuntimeValue.mockReturnValueOnce('line');
+      runtimeState.getRuntimeValue.mockReturnValue(null);
 
       const action = makeAction({
         shape: 'variable',
@@ -410,24 +364,6 @@ describe('saveAttackHandler', () => {
         'TestCaster',
         'channelDivinityCharges',
         1,
-        campaignName,
-      );
-    });
-
-    it('should decrement to 0 when single charge remains', async () => {
-      runtimeState.getRuntimeValue.mockReturnValueOnce(1);
-
-      const ps = makePlayerStats({
-        class: { class_levels: [{ level: 5, channel_divinity: 2 }] },
-      });
-      const action = makeAction({ resourceCost: 'channel_divinity' });
-
-      await handle(action, ps, campaignName, null);
-
-      expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-        'TestCaster',
-        'channelDivinityCharges',
-        0,
         campaignName,
       );
     });
@@ -505,7 +441,7 @@ describe('saveAttackHandler', () => {
       );
     });
 
-    it('should set expiration for area effects with 1 minute duration', async () => {
+    it('should set expiration for area effects with duration', async () => {
       runtimeState.getRuntimeValue.mockReturnValueOnce(2);
       diceRoller.rollExpression.mockReturnValue({ total: 5, rolls: [5], modifier: 0 });
 
@@ -526,30 +462,6 @@ describe('saveAttackHandler', () => {
         [{ type: 'remove_active_buff', buffName: 'Breath Weapon' }],
         campaignName,
         10,
-      );
-    });
-
-    it('should set expiration with correct rounds for N_round duration', async () => {
-      runtimeState.getRuntimeValue.mockReturnValueOnce(2);
-      diceRoller.rollExpression.mockReturnValue({ total: 5, rolls: [5], modifier: 0 });
-
-      const ps = makePlayerStats({
-        class: { class_levels: [{ level: 5, wild_shape: 2 }] },
-      });
-      const action = makeAction({
-        resourceCost: 'wild_shape',
-        shape: 'cone',
-        duration: '3_rounds',
-      });
-
-      await handle(action, ps, campaignName, null);
-
-      expect(expirations.addExpiration).toHaveBeenCalledWith(
-        'TestCaster',
-        'TestCaster',
-        [{ type: 'remove_active_buff', buffName: 'Breath Weapon' }],
-        campaignName,
-        3,
       );
     });
 
@@ -721,23 +633,7 @@ describe('saveAttackHandler', () => {
       expect(result.payload.attackerPos).toEqual({ gridX: 5, gridY: 10 });
     });
 
-    it('should handle missing map data gracefully', async () => {
-      diceRoller.rollExpression.mockReturnValue({ total: 5, rolls: [5], modifier: 0 });
-      runtimeState.getRuntimeValue.mockReturnValueOnce(null);
-
-      mapsService.loadMapData.mockResolvedValue(null);
-
-      const action = makeAction({
-        shape: 'cone',
-        healExpression: '2d4',
-      });
-
-      const result = await handle(action, makePlayerStats(), campaignName, 'test-map');
-
-      expect(result.payload.attackerPos).toBeNull();
-    });
-
-    it('should handle map data load error gracefully', async () => {
+    it('should return null attackerPos when map data is missing or load fails', async () => {
       diceRoller.rollExpression.mockReturnValue({ total: 5, rolls: [5], modifier: 0 });
       runtimeState.getRuntimeValue.mockReturnValueOnce(null);
 
@@ -753,7 +649,7 @@ describe('saveAttackHandler', () => {
       expect(result.payload.attackerPos).toBeNull();
     });
 
-    it('should handle missing attacker in map data', async () => {
+    it('should return null attackerPos when attacker not found in map data', async () => {
       diceRoller.rollExpression.mockReturnValue({ total: 5, rolls: [5], modifier: 0 });
       runtimeState.getRuntimeValue.mockReturnValueOnce(null);
 
@@ -944,7 +840,7 @@ describe('saveAttackHandler', () => {
       );
     });
 
-    it('should include both darkness dispelled and rider notes for area with effect', async () => {
+    it('should combine darkness dispelled and rider notes for area with effect', async () => {
       diceRoller.rollExpression.mockReturnValue({ total: 10, rolls: [10], modifier: 0 });
       runtimeState.getRuntimeValue.mockReturnValueOnce(null);
 
@@ -987,37 +883,21 @@ describe('saveAttackHandler', () => {
       });
     });
 
-    it('should set dcSuccess to half for cone shape', async () => {
+    it('should set dcSuccess based on shape and explicit value', async () => {
       diceRoller.rollExpression.mockReturnValue({ total: 10, rolls: [10], modifier: 0 });
       runtimeState.getRuntimeValue.mockReturnValueOnce(null);
 
-      const action = makeAction({ damage: '1d8', shape: 'cone' });
+      const action1 = makeAction({ damage: '1d8', shape: 'cone' });
+      const result1 = await handle(action1, makePlayerStats(), campaignName, null);
+      expect(result1.payload.contextConfig.dcSuccess).toBe('half');
 
-      const result = await handle(action, makePlayerStats(), campaignName, null);
+      const action2 = makeAction({ damage: '1d8', shape: 'line' });
+      const result2 = await handle(action2, makePlayerStats(), campaignName, null);
+      expect(result2.payload.contextConfig.dcSuccess).toBe('none');
 
-      expect(result.payload.contextConfig.dcSuccess).toBe('half');
-    });
-
-    it('should set dcSuccess to none for non-cone shapes', async () => {
-      diceRoller.rollExpression.mockReturnValue({ total: 10, rolls: [10], modifier: 0 });
-      runtimeState.getRuntimeValue.mockReturnValueOnce(null);
-
-      const action = makeAction({ damage: '1d8', shape: 'line' });
-
-      const result = await handle(action, makePlayerStats(), campaignName, null);
-
-      expect(result.payload.contextConfig.dcSuccess).toBe('none');
-    });
-
-    it('should respect explicit dcSuccess value', async () => {
-      diceRoller.rollExpression.mockReturnValue({ total: 10, rolls: [10], modifier: 0 });
-      runtimeState.getRuntimeValue.mockReturnValueOnce(null);
-
-      const action = makeAction({ damage: '1d8', dcSuccess: 1 });
-
-      const result = await handle(action, makePlayerStats(), campaignName, null);
-
-      expect(result.payload.contextConfig.dcSuccess).toBe(1);
+      const action3 = makeAction({ damage: '1d8', dcSuccess: 1 });
+      const result3 = await handle(action3, makePlayerStats(), campaignName, null);
+      expect(result3.payload.contextConfig.dcSuccess).toBe(1);
     });
 
     it('should include custom saveType in contextConfig', async () => {

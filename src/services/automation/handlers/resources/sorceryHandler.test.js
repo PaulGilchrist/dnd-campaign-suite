@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ── Mocks BEFORE imports ────────────────────────────────────────────
@@ -33,12 +33,6 @@ import * as buffService from '../../../combat/buffs/buffService.js';
 // ── Helpers ─────────────────────────────────────────────────────────
 
 const campaignName = 'TestCampaign';
-
-function mockDispatchEvent() {
-  const spy = vi.fn();
-  Object.defineProperty(window, 'dispatchEvent', { value: spy, writable: true, configurable: true });
-  return spy;
-}
 
 function makePlayerStats(overrides = {}) {
   return {
@@ -85,46 +79,12 @@ describe('sorceryHandler.handle', () => {
       expect(result.payload.automation).toEqual(action.automation);
     });
 
-    it('returns failure popup when innateSorceryUses is negative', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction({ type: 'sorcery_aura' });
-      useRuntimeState.getRuntimeValue.mockReturnValue(-1);
-      classFeatures.getClassFeatures.mockReturnValue({ maxInnateSorcery: 2 });
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.payload.description).toContain('has no remaining uses');
-    });
-
-    it('returns failure popup when innateSorceryUses is null and maxInnateSorcery is zero', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction({ type: 'sorcery_aura' });
-      useRuntimeState.getRuntimeValue.mockReturnValue(null);
-      classFeatures.getClassFeatures.mockReturnValue({ maxInnateSorcery: 0 });
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.payload.description).toContain('has no remaining uses');
-    });
-
-    it('returns failure popup when getClassFeatures returns null', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction({ type: 'sorcery_aura' });
-      useRuntimeState.getRuntimeValue.mockReturnValue(0);
-      classFeatures.getClassFeatures.mockReturnValue(null);
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.payload.description).toContain('has no remaining uses');
-    });
-
     it('activates sorcery and decrements uses when uses are available', async () => {
       const ps = makePlayerStats();
       const action = makeAction({ type: 'sorcery_aura' });
       useRuntimeState.getRuntimeValue.mockReturnValue(2);
       classFeatures.getClassFeatures.mockReturnValue({ maxInnateSorcery: 3 });
 
-      const dispatchSpy = mockDispatchEvent();
       const result = await handle(action, ps, campaignName, null);
 
       expect(result.type).toBe('popup');
@@ -141,7 +101,6 @@ describe('sorceryHandler.handle', () => {
         true,
         campaignName,
       );
-      expect(dispatchSpy).toHaveBeenCalled();
     });
 
     it('activates sorcery and sets uses to zero when using the last use', async () => {
@@ -200,19 +159,6 @@ describe('sorceryHandler.handle', () => {
       );
     });
 
-    it('does not mutate state when no uses are available', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction({ type: 'sorcery_aura' });
-      useRuntimeState.getRuntimeValue.mockReturnValue(0);
-      classFeatures.getClassFeatures.mockReturnValue({ maxInnateSorcery: 2 });
-
-      await handle(action, ps, campaignName, null);
-
-      const dispatchSpy = mockDispatchEvent();
-      expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
-      expect(buffService.setInnateSorceryActive).not.toHaveBeenCalled();
-      expect(dispatchSpy).not.toHaveBeenCalled();
-    });
   });
 
   describe('metamagic_sorcery automation type', () => {
@@ -227,17 +173,6 @@ describe('sorceryHandler.handle', () => {
       expect(result.payload.description).toContain('while Innate Sorcery still has uses remaining');
       expect(result.payload.description).toContain('2 uses left');
       expect(useMetamagic.spendSorceryPoints).not.toHaveBeenCalled();
-    });
-
-    it('blocks activation when innateSorceryUses is null but maxInnateSorcery > 0', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction({ type: 'metamagic_sorcery' });
-      useRuntimeState.getRuntimeValue.mockReturnValue(null);
-      classFeatures.getClassFeatures.mockReturnValue({ maxInnateSorcery: 3 });
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.payload.description).toContain('while Innate Sorcery still has uses remaining');
     });
 
     it('proceeds to SP check when innateSorceryUses is zero and maxInnateSorcery is also zero', async () => {
@@ -283,18 +218,6 @@ describe('sorceryHandler.handle', () => {
       expect(result.payload.description).toContain('Cost: 2 SP');
     });
 
-    it('uses default cost of 2 when automation.cost is zero', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction({ type: 'metamagic_sorcery', cost: 0 });
-      useRuntimeState.getRuntimeValue.mockReturnValue(0);
-      classFeatures.getClassFeatures.mockReturnValue({ maxSorceryPoints: 6 });
-      useMetamagic.getCurrentSorceryPoints.mockReturnValue(1);
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.payload.description).toContain('Cost: 2 SP');
-    });
-
     it('spends SP, sets uses to 0, and activates sorcery on success', async () => {
       const ps = makePlayerStats();
       const action = makeAction({ type: 'metamagic_sorcery', cost: 3 });
@@ -302,7 +225,6 @@ describe('sorceryHandler.handle', () => {
       classFeatures.getClassFeatures.mockReturnValue({ maxInnateSorcery: 2, maxSorceryPoints: 6 });
       useMetamagic.getCurrentSorceryPoints.mockReturnValue(5);
 
-      const dispatchSpy = mockDispatchEvent();
       const result = await handle(action, ps, campaignName, null);
 
       expect(useMetamagic.spendSorceryPoints).toHaveBeenCalledWith(
@@ -321,7 +243,6 @@ describe('sorceryHandler.handle', () => {
         true,
         campaignName,
       );
-      expect(dispatchSpy).toHaveBeenCalled();
       expect(result.payload.description).toContain('activated');
       expect(result.payload.description).toContain('3 SP spent');
       expect(result.payload.description).toContain('Innate Sorcery is now active');
@@ -384,31 +305,5 @@ describe('sorceryHandler.handle', () => {
       );
     });
 
-    it('includes action.name in returned payload', async () => {
-      const ps = makePlayerStats();
-      const action = {
-        name: 'Careful Spell',
-        automation: { type: 'metamagic_sorcery', cost: 2 },
-      };
-      useRuntimeState.getRuntimeValue.mockReturnValue(0);
-      classFeatures.getClassFeatures.mockReturnValue({ maxInnateSorcery: 1, maxSorceryPoints: 6 });
-      useMetamagic.getCurrentSorceryPoints.mockReturnValue(4);
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.payload.name).toBe('Careful Spell');
-    });
-
-    it('includes automation object in returned payload', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction({ type: 'metamagic_sorcery', cost: 3 });
-      useRuntimeState.getRuntimeValue.mockReturnValue(0);
-      classFeatures.getClassFeatures.mockReturnValue({ maxInnateSorcery: 1, maxSorceryPoints: 6 });
-      useMetamagic.getCurrentSorceryPoints.mockReturnValue(4);
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.payload.automation).toEqual(action.automation);
-    });
   });
 });

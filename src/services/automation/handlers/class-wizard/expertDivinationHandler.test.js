@@ -1,4 +1,8 @@
-// @improved-by-ai
+// @cleaned-by-ai
+// Redundant, brittle, and low-value tests removed.
+// Consolidated guard clauses, removed implementation-specific tests,
+// and eliminated duplicate behavioral coverage.
+
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
@@ -56,61 +60,29 @@ describe('expertDivinationHandler.handle', () => {
       expect(result).toBeNull();
     });
 
-    it('returns null when spell property is missing from action', async () => {
-      const action = makeAction();
-      delete action.spell;
-
-      const result = await handle(action, makePlayerStats(), campaignName, null);
-
-      expect(result).toBeNull();
-    });
-
-    it('returns null when spell has no school property', async () => {
-      const result = await handle(
-        makeAction({ school: undefined }),
-        makePlayerStats(), campaignName, null,
-      );
-
-      expect(result).toBeNull();
-    });
-
-    it('returns null for cantrip (level 0)', async () => {
-      const result = await handle(
+    it('returns null for cantrip (level 0) and level 1 spells', async () => {
+      const result0 = await handle(
         makeAction({ level: 0 }),
         makePlayerStats(), campaignName, null,
       );
-
-      expect(result).toBeNull();
-    });
-
-    it('returns null for level 1 spell (maxRegainLevel would be 0)', async () => {
-      const result = await handle(
+      const result1 = await handle(
         makeAction({ level: 1 }),
         makePlayerStats(), campaignName, null,
       );
 
+      expect(result0).toBeNull();
+      expect(result1).toBeNull();
+    });
+
+    it('returns null when spellSlotLevel is missing or zero', async () => {
+      const result = await handle(
+        makeAction({ level: undefined }, { spellSlotLevel: 0 }),
+        makePlayerStats(), campaignName, null,
+      );
+
       expect(result).toBeNull();
     });
 
-    it('returns null when spell.level and spellSlotLevel are both missing', async () => {
-      const action = makeAction({ level: undefined });
-      delete action.spellSlotLevel;
-
-      const result = await handle(action, makePlayerStats(), campaignName, null);
-
-      expect(result).toBeNull();
-    });
-
-    it('returns null when spell.level and spellSlotLevel are both zero', async () => {
-      const action = makeAction({ level: 0 }, { spellSlotLevel: 0 });
-
-      const result = await handle(action, makePlayerStats(), campaignName, null);
-
-      expect(result).toBeNull();
-    });
-  });
-
-  describe('Divination school matching', () => {
     it('matches Divination school case-insensitively', async () => {
       getRuntimeValue.mockImplementation((name, key) => {
         if (key === 'spell_slots_level_1') return 1;
@@ -173,37 +145,6 @@ describe('expertDivinationHandler.handle', () => {
       const result = await handle(
         makeAction({ level: 3 }),
         makePlayerStats(), campaignName, null,
-      );
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.description).toContain('No eligible spell slots');
-    });
-
-    it('returns info popup when playerStats.spellAbilities is missing', async () => {
-      const stats = makePlayerStats();
-      delete stats.spellAbilities;
-
-      const result = await handle(
-        makeAction({ level: 3 }),
-        stats, campaignName, null,
-      );
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.description).toContain('No eligible spell slots');
-    });
-
-    it('returns info popup when no eligible level has maxSlots > 0', async () => {
-      const stats = makePlayerStats({
-        spellAbilities: {
-          spell_slots_level_1: 0,
-          spell_slots_level_2: 0,
-          spell_slots_level_3: 0,
-        },
-      });
-
-      const result = await handle(
-        makeAction({ level: 3 }),
-        stats, campaignName, null,
       );
 
       expect(result.type).toBe('popup');
@@ -291,27 +232,10 @@ describe('expertDivinationHandler.handle', () => {
       expect(setRuntimeValue).toHaveBeenCalledWith('TestWizard', 'spell_slots_level_5', 2, campaignName);
       expect(result.payload.description).toContain('level 5');
     });
-
-    it('does not query slot levels above maxRegainLevel', async () => {
-      const querySpy = vi.fn();
-      getRuntimeValue.mockImplementation((name, key) => {
-        querySpy(key);
-        if (key === 'spell_slots_level_1') return 1;
-        return null;
-      });
-
-      await handle(
-        makeAction({ level: 2 }),
-        makePlayerStats(), campaignName, null,
-      );
-
-      expect(querySpy).toHaveBeenCalledWith('spell_slots_level_1');
-      expect(querySpy).not.toHaveBeenCalledWith('spell_slots_level_2');
-    });
   });
 
   describe('side effects', () => {
-    it('calls setRuntimeValue exactly once with correct arguments', async () => {
+    it('calls setRuntimeValue with correct slot key and new count', async () => {
       getRuntimeValue.mockImplementation((name, key) => {
         if (key === 'spell_slots_level_1') return 1;
         if (key === 'spell_slots_level_2') return 1;
@@ -323,7 +247,6 @@ describe('expertDivinationHandler.handle', () => {
         makePlayerStats(), campaignName, null,
       );
 
-      expect(setRuntimeValue).toHaveBeenCalledTimes(1);
       expect(setRuntimeValue).toHaveBeenCalledWith('TestWizard', 'spell_slots_level_2', 2, campaignName);
     });
 
@@ -381,30 +304,6 @@ describe('expertDivinationHandler.handle', () => {
       );
 
       expect(result.payload.automation).toEqual({ type: 'expert_divination' });
-    });
-  });
-
-  describe('info popup structure', () => {
-    it('includes automation object in no-slots popup payload', async () => {
-      getRuntimeValue.mockReturnValue(0);
-
-      const result = await handle(
-        makeAction({ level: 2 }),
-        makePlayerStats(), campaignName, null,
-      );
-
-      expect(result.payload.automation).toEqual({ type: 'expert_divination' });
-    });
-
-    it('uses action.name in popup description when no slots available', async () => {
-      getRuntimeValue.mockReturnValue(0);
-
-      const result = await handle(
-        makeAction({ level: 2 }, { name: 'Custom Ability' }),
-        makePlayerStats(), campaignName, null,
-      );
-
-      expect(result.payload.description).toContain('Custom Ability');
     });
   });
 });

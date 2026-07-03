@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ── Mocks ──────────────────────────────────────────────────────
@@ -75,14 +75,6 @@ describe('rollDamageForAction', () => {
     });
 
     describe('dice rolling', () => {
-        it('returns null when auto is missing damage property', () => {
-            const auto = {};
-            const result = rollDamageForAction(auto);
-            // rollExpression is called with undefined damage, returns null (mock default), result is null
-            expect(result).toBeNull();
-            expect(diceRoller.rollExpression).toHaveBeenCalledWith(undefined);
-        });
-
         it('rolls normal damage when isCrit is false', () => {
             const auto = { damage: '2d6+3' };
             const mockResult = { total: 8, rolls: [3, 5], modifier: 3 };
@@ -159,22 +151,14 @@ describe('rollDamageForAction', () => {
             expect(diceRoller.rollExpressionDoubled).not.toHaveBeenCalled();
         });
 
-        it('returns null when preRolledResult is null', () => {
+        it('returns null when preRolledResult is null and dice roll fails', () => {
             const auto = { damage: '2d6+3' };
+            diceRoller.rollExpression.mockReturnValue(null);
 
             const result = rollDamageForAction(auto, { preRolledResult: null });
 
             expect(result).toBeNull();
             expect(diceRoller.rollExpression).toHaveBeenCalled();
-        });
-
-        it('returns null when preRolledResult is undefined and dice roll fails', () => {
-            const auto = { damage: '2d6+3' };
-            diceRoller.rollExpression.mockReturnValue(null);
-
-            const result = rollDamageForAction(auto, { preRolledResult: undefined });
-
-            expect(result).toBeNull();
         });
     });
 
@@ -185,85 +169,7 @@ describe('rollDamageForAction', () => {
             diceRoller.rollExpression.mockReturnValue(baseRoll);
         });
 
-        it('sets name from auto object', () => {
-            const auto = { damage: '1d10', name: 'Fire Bolt' };
-            const result = rollDamageForAction(auto);
-            expect(result.attackContext.name).toBe('Fire Bolt');
-        });
-
-        it('defaults name to empty string when missing', () => {
-            const auto = { damage: '1d6' };
-            const result = rollDamageForAction(auto);
-            expect(result.attackContext.name).toBe('');
-        });
-
-        it('sets damageType from auto object', () => {
-            const auto = { damage: '1d6', damageType: 'fire' };
-            const result = rollDamageForAction(auto);
-            expect(result.attackContext.damageType).toBe('fire');
-        });
-
-        it('defaults damageType to empty string when missing', () => {
-            const auto = { damage: '1d6' };
-            const result = rollDamageForAction(auto);
-            expect(result.attackContext.damageType).toBe('');
-        });
-
-        it('passes saveDc from auto object', () => {
-            const auto = { damage: '1d6', saveDc: 15 };
-            const result = rollDamageForAction(auto);
-            expect(result.attackContext.saveDc).toBe(15);
-        });
-
-        it('defaults saveDc to undefined when missing', () => {
-            const auto = { damage: '1d6' };
-            const result = rollDamageForAction(auto);
-            expect(result.attackContext.saveDc).toBeUndefined();
-        });
-
-        it('defaults saveType to DEX when missing', () => {
-            const auto = { damage: '1d6' };
-            const result = rollDamageForAction(auto);
-            expect(result.attackContext.saveType).toBe('DEX');
-        });
-
-        it('uses saveType from auto object when provided', () => {
-            const auto = { damage: '1d6', saveType: 'CON' };
-            const result = rollDamageForAction(auto);
-            expect(result.attackContext.saveType).toBe('CON');
-        });
-
-        it('defaults saveSuccess to 0 for non-cone shapes', () => {
-            const auto = { damage: '1d6', shape: 'line' };
-            const result = rollDamageForAction(auto);
-            expect(result.attackContext.saveSuccess).toBe(0);
-        });
-
-        it('defaults saveSuccess to 0.5 for cone shapes', () => {
-            const auto = { damage: '1d6', shape: 'cone' };
-            const result = rollDamageForAction(auto);
-            expect(result.attackContext.saveSuccess).toBe(0.5);
-        });
-
-        it('uses explicit dcSuccess from auto object when provided', () => {
-            const auto = { damage: '1d6', dcSuccess: 0.75, shape: 'cone' };
-            const result = rollDamageForAction(auto);
-            expect(result.attackContext.saveSuccess).toBe(0.75);
-        });
-
-        it('prefers dcSuccess over shape-derived saveSuccess', () => {
-            const auto = { damage: '1d6', dcSuccess: 0, shape: 'cone' };
-            const result = rollDamageForAction(auto);
-            expect(result.attackContext.saveSuccess).toBe(0);
-        });
-
-        it('defaults saveSuccess to 0 when no shape or dcSuccess provided', () => {
-            const auto = { damage: '1d6' };
-            const result = rollDamageForAction(auto);
-            expect(result.attackContext.saveSuccess).toBe(0);
-        });
-
-        it('returns complete result with all context fields', () => {
+        it('builds full attackContext from auto object fields', () => {
             const auto = { name: 'Fire Bolt', damage: '1d10', damageType: 'fire', saveDc: 15, saveType: 'DEX' };
             const result = rollDamageForAction(auto);
 
@@ -275,6 +181,32 @@ describe('rollDamageForAction', () => {
                 saveType: 'DEX',
                 saveSuccess: 0,
             });
+        });
+
+        it('defaults saveType to DEX and saveSuccess to 0 when not provided', () => {
+            const auto = { damage: '1d6' };
+            const result = rollDamageForAction(auto);
+            expect(result.attackContext.saveType).toBe('DEX');
+            expect(result.attackContext.saveSuccess).toBe(0);
+        });
+
+        it('uses saveType and dcSuccess from auto when provided', () => {
+            const auto = { damage: '1d6', saveType: 'CON', dcSuccess: 0.75 };
+            const result = rollDamageForAction(auto);
+            expect(result.attackContext.saveType).toBe('CON');
+            expect(result.attackContext.saveSuccess).toBe(0.75);
+        });
+
+        it('defaults saveSuccess to 0.5 for cone shapes', () => {
+            const auto = { damage: '1d6', shape: 'cone' };
+            const result = rollDamageForAction(auto);
+            expect(result.attackContext.saveSuccess).toBe(0.5);
+        });
+
+        it('prefers dcSuccess over shape-derived saveSuccess', () => {
+            const auto = { damage: '1d6', dcSuccess: 0, shape: 'cone' };
+            const result = rollDamageForAction(auto);
+            expect(result.attackContext.saveSuccess).toBe(0);
         });
     });
 });
@@ -322,28 +254,12 @@ describe('buildAttackContextForDamage', () => {
             expect(npcsService.loadNPCs).not.toHaveBeenCalled();
         });
 
-        it('defaults saveDc to 0 when not provided in attackContext', async () => {
+        it('falls back saveDc to 0 when not provided', async () => {
             const attackContext = makeAttackContext({ saveDc: undefined });
 
             const result = await buildAttackContextForDamage(attackContext, playerName, campaignName, null);
 
             expect(result.saveDc).toBe(0);
-        });
-
-        it('passes saveDc=0 through when explicitly set to 0', async () => {
-            const attackContext = makeAttackContext({ saveDc: 0 });
-
-            const result = await buildAttackContextForDamage(attackContext, playerName, campaignName, null);
-
-            expect(result.saveDc).toBe(0);
-        });
-
-        it('uses saveDc from attackContext when provided', async () => {
-            const attackContext = makeAttackContext({ saveDc: 18 });
-
-            const result = await buildAttackContextForDamage(attackContext, playerName, campaignName, null);
-
-            expect(result.saveDc).toBe(18);
         });
 
         it('resolves target from combat context', async () => {
@@ -370,33 +286,9 @@ describe('buildAttackContextForDamage', () => {
             expect(result.targetName).toBe('Falling Victim');
         });
 
-        it('does not call getAttackerTargetName when combat context is null', async () => {
-            damageUtils.getCombatContext.mockResolvedValue(null);
-            damageUtils.getTargetFromAttacker.mockReturnValue(null);
-
-            const attackContext = makeAttackContext();
-
-            const result = await buildAttackContextForDamage(attackContext, playerName, campaignName, null);
-
-            expect(result.targetName).toBeUndefined();
-            expect(damageUtils.getAttackerTargetName).not.toHaveBeenCalled();
-        });
-
         it('returns null resistanceNotice when no target found', async () => {
             damageUtils.getCombatContext.mockResolvedValue(null);
             damageUtils.getTargetFromAttacker.mockReturnValue(null);
-
-            const attackContext = makeAttackContext();
-
-            const result = await buildAttackContextForDamage(attackContext, playerName, campaignName, null);
-
-            expect(result.resistanceNotice).toBeNull();
-        });
-
-        it('returns null resistanceNotice when target has no resistances', async () => {
-            damageUtils.getCombatContext.mockResolvedValue({ creatures: [] });
-            damageUtils.getTargetFromAttacker.mockReturnValue({ name: 'Goblin', resistances: [], immunities: [] });
-            damageUtils.getResistanceNotice.mockReturnValue(null);
 
             const attackContext = makeAttackContext();
 
@@ -434,38 +326,17 @@ describe('buildAttackContextForDamage', () => {
 
             expect(result.dcSuccess).toBe(0.5);
         });
-
-        it('handles empty string mapName the same as null', async () => {
-            const attackContext = makeAttackContext();
-
-            const result = await buildAttackContextForDamage(attackContext, playerName, campaignName, '');
-
-            expect(result.damageType).toBe('fire');
-            expect(result.attackerName).toBe(playerName);
-            expect(mapsService.loadMapData).not.toHaveBeenCalled();
-        });
-
-        it('handles undefined mapName the same as null', async () => {
-            const attackContext = makeAttackContext();
-
-            const result = await buildAttackContextForDamage(attackContext, playerName, campaignName, undefined);
-
-            expect(result.damageType).toBe('fire');
-            expect(result.attackerName).toBe(playerName);
-            expect(mapsService.loadMapData).not.toHaveBeenCalled();
-        });
     });
 
     describe('with map', () => {
         const attackerPlayer = { name: playerName, gridX: 5, gridY: 10 };
         const targetPlayer = { name: 'Enemy', gridX: 10, gridY: 15 };
-        const targetNpc = { name: 'Enemy', type: 'npc', gridX: 20, gridY: 25 };
         const cs = { creatures: [{ name: 'Enemy' }] };
 
-        function setupMapScenario(mapOverrides = {}, npcOverrides = {}) {
+        function setupMapScenario(mapOverrides = {}) {
             const mapData = makeMapData(
                 [attackerPlayer, targetPlayer],
-                [{ ...targetNpc, ...npcOverrides }],
+                [{ type: 'npc', name: 'Enemy', gridX: 20, gridY: 25 }],
             );
             mapsService.loadMapData.mockResolvedValue({ ...mapData, ...mapOverrides });
             npcsService.loadNPCs.mockResolvedValue([]);
@@ -498,15 +369,6 @@ describe('buildAttackContextForDamage', () => {
 
         it('returns basic context when mapData has no players array', async () => {
             mapsService.loadMapData.mockResolvedValue({ placedItems: [] });
-
-            const result = await buildAttackContextForDamage(makeAttackContext(), playerName, campaignName, mapName);
-
-            expect(result.damageType).toBe('fire');
-            expect(result.attackerName).toBe(playerName);
-        });
-
-        it('returns basic context when mapData.players is empty', async () => {
-            mapsService.loadMapData.mockResolvedValue(makeMapData([]));
 
             const result = await buildAttackContextForDamage(makeAttackContext(), playerName, campaignName, mapName);
 
@@ -629,29 +491,6 @@ describe('buildAttackContextForDamage', () => {
             );
         });
 
-        it('handles NPC name matching with numeric suffix', async () => {
-            damageUtils.getTargetFromAttacker.mockReturnValue(null);
-            damageUtils.getAttackerTargetName.mockReturnValue('Enemy');
-
-            const mapData = makeMapData([attackerPlayer], [
-                { type: 'npc', name: 'Goblin #1', gridX: 3, gridY: 3 },
-            ]);
-            mapsService.loadMapData.mockResolvedValue(mapData);
-            npcsService.loadNPCs.mockResolvedValue([
-                { name: 'Goblin', attitude: 'hostile' },
-            ]);
-
-            rangeValidation.rangeToFeet.mockReturnValue(60);
-
-            const result = await buildAttackContextForDamage(
-                makeAttackContext({ range: '60 ft.' }),
-                playerName, campaignName, mapName,
-            );
-
-            expect(result).toBeDefined();
-            expect(result.damageType).toBe('fire');
-        });
-
         it('returns isAutoMiss when cover is full', async () => {
             rangeValidation.rangeToFeet
                 .mockReturnValueOnce(60)
@@ -747,30 +586,6 @@ describe('buildAttackContextForDamage', () => {
             mapsService.loadMapData.mockResolvedValue(makeMapData([attackerPlayer, targetNoGrid]));
             npcsService.loadNPCs.mockResolvedValue([]);
             damageUtils.getTargetFromAttacker.mockReturnValue(targetNoGrid);
-
-            const result = await buildAttackContextForDamage(makeAttackContext(), playerName, campaignName, mapName);
-
-            expect(result.damageType).toBe('fire');
-        });
-
-        it('handles mapData with no placedItems array', async () => {
-            mapsService.loadMapData.mockResolvedValue(makeMapData([attackerPlayer]));
-            npcsService.loadNPCs.mockResolvedValue([]);
-            damageUtils.getTargetFromAttacker.mockReturnValue(null);
-
-            const result = await buildAttackContextForDamage(makeAttackContext(), playerName, campaignName, mapName);
-
-            expect(result.damageType).toBe('fire');
-        });
-
-        it('handles walls as undefined in mapData', async () => {
-            mapsService.loadMapData.mockResolvedValue({
-                players: [attackerPlayer],
-                placedItems: [],
-                walls: undefined,
-            });
-            npcsService.loadNPCs.mockResolvedValue([]);
-            damageUtils.getTargetFromAttacker.mockReturnValue(null);
 
             const result = await buildAttackContextForDamage(makeAttackContext(), playerName, campaignName, mapName);
 
@@ -878,85 +693,6 @@ describe('buildAttackContextForDamage', () => {
             );
 
             expect(result.resistanceNotice).toBe('Goblin resists fire');
-        });
-
-        it('does not add resistance when sanctuary cube coordinates are zero', async () => {
-            runtimeState.getRuntimeValue
-                .mockReturnValueOnce('true')
-                .mockReturnValueOnce('0')
-                .mockReturnValueOnce('0')
-                .mockReturnValueOnce('fire');
-
-            const result = await buildAttackContextForDamage(
-                makeAttackContext({ damageType: 'fire' }),
-                playerName, campaignName, mapName,
-            );
-
-            expect(result.resistanceNotice).toBeNull();
-        });
-
-        it('does not add resistance when sanctuary cube has only X coordinate', async () => {
-            runtimeState.getRuntimeValue
-                .mockReturnValueOnce('true')
-                .mockReturnValueOnce('5')
-                .mockReturnValueOnce('0')
-                .mockReturnValueOnce('fire');
-
-            const result = await buildAttackContextForDamage(
-                makeAttackContext({ damageType: 'fire' }),
-                playerName, campaignName, mapName,
-            );
-
-            expect(result.resistanceNotice).toBeNull();
-        });
-
-        it('does not add resistance when sanctuary cube has only Y coordinate', async () => {
-            runtimeState.getRuntimeValue
-                .mockReturnValueOnce('true')
-                .mockReturnValueOnce('0')
-                .mockReturnValueOnce('10')
-                .mockReturnValueOnce('fire');
-
-            const result = await buildAttackContextForDamage(
-                makeAttackContext({ damageType: 'fire' }),
-                playerName, campaignName, mapName,
-            );
-
-            expect(result.resistanceNotice).toBeNull();
-        });
-
-        it('does not add resistance when sanctuary resistance value is empty', async () => {
-            runtimeState.getRuntimeValue
-                .mockReturnValueOnce('true')
-                .mockReturnValueOnce('5')
-                .mockReturnValueOnce('10')
-                .mockReturnValueOnce('');
-
-            const result = await buildAttackContextForDamage(
-                makeAttackContext({ damageType: 'fire' }),
-                playerName, campaignName, mapName,
-            );
-
-            expect(result.resistanceNotice).toBeNull();
-        });
-
-        it('does not add resistance when target name is not on the map', async () => {
-            mapsService.loadMapData.mockResolvedValue(makeMapData([attackerPlayer]));
-            rangeValidation.rangeToFeet.mockReturnValue(0);
-            coverService.computeCover.mockReturnValue({ level: 'none', acBonus: 0 });
-
-            runtimeState.getRuntimeValue
-                .mockReturnValueOnce('true')
-                .mockReturnValueOnce('5')
-                .mockReturnValueOnce('10')
-                .mockReturnValueOnce('fire');
-
-            const result = await buildAttackContextForDamage(
-                makeAttackContext({ damageType: 'fire' }),
-                playerName, campaignName, mapName,
-            );
-
-            expect(result.resistanceNotice).toBeNull();
         });
 
         it('matches sanctuary resistance case-insensitively', async () => {

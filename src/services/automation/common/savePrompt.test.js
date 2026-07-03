@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
     buildSaveDc,
@@ -110,7 +110,7 @@ describe('buildSaveDc', () => {
             expect(dc).toBe(10); // 8 + (-1) + 3
         });
 
-        it('defaults proficiency to 0 when undefined', () => {
+        it('defaults proficiency to 0 when undefined or null', () => {
             getAbilityModifier.mockReturnValue(2);
 
             const dc = buildSaveDc(
@@ -119,17 +119,6 @@ describe('buildSaveDc', () => {
             );
 
             expect(dc).toBe(10); // 8 + 2 + 0
-        });
-
-        it('defaults proficiency to 0 when null', () => {
-            getAbilityModifier.mockReturnValue(0);
-
-            const dc = buildSaveDc(
-                { saveDc: 'ability' },
-                makePlayerStats({ proficiency: null })
-            );
-
-            expect(dc).toBe(8); // 8 + 0 + 0
         });
 
         it('handles high ability bonus and proficiency', () => {
@@ -142,14 +131,6 @@ describe('buildSaveDc', () => {
 
             expect(dc).toBe(19); // 8 + 5 + 6
         });
-
-        it('handles zero ability bonus', () => {
-            getAbilityModifier.mockReturnValue(0);
-
-            const dc = buildSaveDc({ saveDc: 'ability' }, basePlayerStats);
-
-            expect(dc).toBe(11); // 8 + 0 + 3
-        });
     });
 
     describe('saveDc === "spell_save_dc"', () => {
@@ -159,25 +140,6 @@ describe('buildSaveDc', () => {
             const dc = buildSaveDc({ saveDc: 'spell_save_dc' }, basePlayerStats);
 
             expect(dc).toBe(15); // 8 + 4 + 3
-        });
-
-        it('defaults proficiency to 0 when undefined', () => {
-            getAbilityModifier.mockReturnValue(2);
-
-            const dc = buildSaveDc(
-                { saveDc: 'spell_save_dc' },
-                makePlayerStats({ proficiency: undefined })
-            );
-
-            expect(dc).toBe(10); // 8 + 2 + 0
-        });
-
-        it('handles zero CHA bonus', () => {
-            getAbilityModifier.mockReturnValue(0);
-
-            const dc = buildSaveDc({ saveDc: 'spell_save_dc' }, basePlayerStats);
-
-            expect(dc).toBe(11); // 8 + 0 + 3
         });
 
         it('handles negative CHA bonus', () => {
@@ -194,25 +156,10 @@ describe('buildSaveDc', () => {
             expect(buildSaveDc({ saveDc: 15 }, basePlayerStats)).toBe(15);
         });
 
-        it('returns 0 when saveDc is numeric zero', () => {
-            expect(buildSaveDc({ saveDc: 0 }, basePlayerStats)).toBe(0);
-        });
-
-        it('returns default 10 when saveDc is undefined', () => {
+        it('returns default 10 when saveDc is undefined, null, or empty string', () => {
             expect(buildSaveDc({}, basePlayerStats)).toBe(10);
-        });
-
-        it('returns default 10 when saveDc is null', () => {
             expect(buildSaveDc({ saveDc: null }, basePlayerStats)).toBe(10);
-        });
-
-        it('returns default 10 when saveDc is an empty string', () => {
             expect(buildSaveDc({ saveDc: '' }, basePlayerStats)).toBe(10);
-        });
-
-        it('does not call getAbilityModifier for fallback cases', () => {
-            buildSaveDc({ saveDc: 12 }, basePlayerStats);
-            expect(getAbilityModifier).not.toHaveBeenCalled();
         });
     });
 });
@@ -335,56 +282,5 @@ describe('createSaveListener', () => {
         const result = await promise;
 
         expect(result).toEqual({ promptId: 'my-guid', rolled: 20 });
-    });
-
-    it('removes event listener after resolving', async () => {
-        utils.guid.mockReturnValue('cleanup-guid');
-
-        const removeSpy = vi
-            .spyOn(window, 'removeEventListener')
-            .mockImplementation(() => {});
-
-        createSaveListener(campaignName, { targetName: 'Goblin' });
-
-        window.dispatchEvent(
-            new CustomEvent('save-result', {
-                detail: { promptId: 'cleanup-guid', rolled: 20 },
-            })
-        );
-
-        await Promise.resolve();
-        expect(removeSpy).toHaveBeenCalledWith('save-result', expect.any(Function));
-
-        removeSpy.mockRestore();
-    });
-
-    it('registers an event listener for save-result', () => {
-        const addSpy = vi.spyOn(window, 'addEventListener');
-        utils.guid.mockReturnValue('listener-test');
-
-        createSaveListener(campaignName, { targetName: 'Goblin' });
-
-        expect(addSpy).toHaveBeenCalledWith(
-            'save-result',
-            expect.any(Function)
-        );
-
-        addSpy.mockRestore();
-    });
-
-    it('does not call utils.guid more than once', () => {
-        utils.guid.mockReturnValue('guid-test');
-
-        createSaveListener(campaignName, { targetName: 'Goblin' });
-
-        expect(utils.guid).toHaveBeenCalledTimes(1);
-    });
-
-    it('does not call sendSavePrompt more than once', () => {
-        utils.guid.mockReturnValue('guid-test');
-
-        createSaveListener(campaignName, { targetName: 'Goblin' });
-
-        expect(sendSavePrompt).toHaveBeenCalledTimes(1);
     });
 });

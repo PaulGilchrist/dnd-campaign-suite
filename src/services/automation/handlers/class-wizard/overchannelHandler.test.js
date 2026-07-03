@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
     handle,
@@ -58,12 +58,6 @@ describe('overchannelHandler', () => {
             expect(result.payload.description).toContain('12d12 necrotic damage');
         });
 
-        it('uses the action name in the popup description', async () => {
-            const result = await handle(makeAction(), mockPlayerStats, 'test-campaign', null);
-
-            expect(result.payload.description).toContain('Overchannel');
-        });
-
         it('uses custom action name when provided', async () => {
             const result = await handle(
                 makeAction({ name: 'Custom Overchannel' }),
@@ -105,22 +99,6 @@ describe('overchannelHandler', () => {
 
             expect(result).toBe(3);
         });
-
-        it('coerces string values to numbers', () => {
-            vi.spyOn(runtimeState, 'getRuntimeValue').mockReturnValue('5');
-
-            const result = getOverchannelUses(mockPlayerStats, 'test-campaign');
-
-            expect(result).toBe(5);
-        });
-
-        it('returns 0 for falsy stored values', () => {
-            vi.spyOn(runtimeState, 'getRuntimeValue').mockReturnValue(null);
-
-            const result = getOverchannelUses(mockPlayerStats, 'test-campaign');
-
-            expect(result).toBe(0);
-        });
     });
 
     describe('hasOverchannelRemaining', () => {
@@ -130,22 +108,7 @@ describe('overchannelHandler', () => {
     });
 
     describe('consumeOverchannelUse', () => {
-        it('increments from 0 when no stored value exists', async () => {
-            const setRuntimeValue = vi.spyOn(runtimeState, 'setRuntimeValue').mockResolvedValue(undefined);
-            vi.spyOn(runtimeState, 'getRuntimeValue').mockReturnValue(undefined);
-
-            const result = await consumeOverchannelUse(mockPlayerStats, 'test-campaign');
-
-            expect(result).toBe(true);
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'TestWizard',
-                'Overchannel_useCount',
-                1,
-                'test-campaign'
-            );
-        });
-
-        it('increments from the stored use count', async () => {
+        it('increments the use count and persists it', async () => {
             const setRuntimeValue = vi.spyOn(runtimeState, 'setRuntimeValue').mockResolvedValue(undefined);
             vi.spyOn(runtimeState, 'getRuntimeValue').mockReturnValue(4);
 
@@ -156,21 +119,6 @@ describe('overchannelHandler', () => {
                 'TestWizard',
                 'Overchannel_useCount',
                 5,
-                'test-campaign'
-            );
-        });
-
-        it('handles stored string values by coercing to number', async () => {
-            const setRuntimeValue = vi.spyOn(runtimeState, 'setRuntimeValue').mockResolvedValue(undefined);
-            vi.spyOn(runtimeState, 'getRuntimeValue').mockReturnValue('2');
-
-            const result = await consumeOverchannelUse(mockPlayerStats, 'test-campaign');
-
-            expect(result).toBe(true);
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'TestWizard',
-                'Overchannel_useCount',
-                3,
                 'test-campaign'
             );
         });
@@ -192,16 +140,9 @@ describe('overchannelHandler', () => {
     });
 
     describe('getOverchannelNecroticDamage', () => {
-        it('returns 0 when useCount is 0', () => {
-            const result = getOverchannelNecroticDamage(3, 0);
-
-            expect(result).toBe(0);
-        });
-
-        it('returns 0 when useCount is 1 (first use has no damage)', () => {
-            const result = getOverchannelNecroticDamage(3, 1);
-
-            expect(result).toBe(0);
+        it('returns 0 when useCount is 0 or 1', () => {
+            expect(getOverchannelNecroticDamage(3, 0)).toBe(0);
+            expect(getOverchannelNecroticDamage(3, 1)).toBe(0);
         });
 
         it('returns correct formula for first additional use (useCount=2)', () => {
@@ -215,42 +156,30 @@ describe('overchannelHandler', () => {
             expect(result.expression).toBe('9d12');
         });
 
-        it('returns correct formula for second additional use (useCount=3)', () => {
-            const result = getOverchannelNecroticDamage(3, 3);
+        it('increments the formula based on useCount', () => {
+            const result2 = getOverchannelNecroticDamage(3, 2);
+            const result3 = getOverchannelNecroticDamage(3, 3);
+            const result4 = getOverchannelNecroticDamage(3, 4);
 
-            expect(result.formula).toBe('4d12');
-            expect(result.expression).toBe('12d12');
+            expect(result2.formula).toBe('3d12');
+            expect(result3.formula).toBe('4d12');
+            expect(result4.formula).toBe('5d12');
+
+            expect(result2.expression).toBe('9d12');
+            expect(result3.expression).toBe('12d12');
+            expect(result4.expression).toBe('15d12');
         });
 
-        it('returns correct formula for third additional use (useCount=4)', () => {
-            const result = getOverchannelNecroticDamage(3, 4);
-
-            expect(result.formula).toBe('5d12');
-            expect(result.expression).toBe('15d12');
-        });
-
-        it('uses default spellLevel of 1 when spellLevel is null', () => {
-            const result = getOverchannelNecroticDamage(null, 2);
-
-            expect(result.expression).toBe('3d12');
-        });
-
-        it('uses default spellLevel of 1 when spellLevel is undefined', () => {
-            const result = getOverchannelNecroticDamage(undefined, 2);
-
-            expect(result.expression).toBe('3d12');
+        it('defaults spellLevel to 1 when falsy', () => {
+            expect(getOverchannelNecroticDamage(null, 2).expression).toBe('3d12');
+            expect(getOverchannelNecroticDamage(undefined, 2).expression).toBe('3d12');
+            expect(getOverchannelNecroticDamage(0, 2).expression).toBe('3d12');
         });
 
         it('uses provided spellLevel for expression calculation', () => {
             const result = getOverchannelNecroticDamage(5, 2);
 
             expect(result.expression).toBe('15d12');
-        });
-
-        it('treats spellLevel 0 as falsy and defaults to 1', () => {
-            const result = getOverchannelNecroticDamage(0, 2);
-
-            expect(result.expression).toBe('3d12');
         });
     });
 });

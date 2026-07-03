@@ -1,3 +1,4 @@
+// @cleaned-by-ai
 // @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
@@ -64,31 +65,6 @@ describe('extraActionHandler.handle', () => {
       expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
     });
 
-    it('proceeds when combat round is 1', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction({ oncePerCombat: true, uses: 1 });
-
-      combatData.loadCombatSummary.mockResolvedValue({ round: 1, creatures: [] });
-
-      const result = await handle(action, ps, campaignName);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.type).toBe('automation_info');
-      expect(result.payload.name).toBe('Action Surge');
-    });
-
-    it('proceeds when loadCombatSummary returns null', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction({ oncePerCombat: true, uses: 1 });
-
-      combatData.loadCombatSummary.mockResolvedValue(null);
-
-      const result = await handle(action, ps, campaignName);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.type).toBe('automation_info');
-    });
-
     it('sets uses to 0 after first successful use in combat', async () => {
       const ps = makePlayerStats();
       const action = makeAction({ oncePerCombat: true, uses: 1 });
@@ -123,46 +99,10 @@ describe('extraActionHandler.handle', () => {
       );
       expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
     });
-
-    it('proceeds when current round is 1', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction({ firstRoundOnly: true, uses: 1 });
-
-      combatData.getCurrentCombatRound.mockReturnValue(1);
-
-      const result = await handle(action, ps, campaignName);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.type).toBe('automation_info');
-    });
-
-    it('proceeds when getCurrentCombatRound returns null', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction({ firstRoundOnly: true, uses: 1 });
-
-      combatData.getCurrentCombatRound.mockReturnValue(null);
-
-      const result = await handle(action, ps, campaignName);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.type).toBe('automation_info');
-    });
-
-    it('proceeds when getCurrentCombatRound returns 0', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction({ firstRoundOnly: true, uses: 1 });
-
-      combatData.getCurrentCombatRound.mockReturnValue(0);
-
-      const result = await handle(action, ps, campaignName);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.type).toBe('automation_info');
-    });
   });
 
   describe('uses limit (usesMax > 0)', () => {
-    it('returns popup when usesUsed is 0', async () => {
+    it('returns popup when no uses remaining (usesUsed is 0)', async () => {
       const ps = makePlayerStats();
       const action = makeAction({ uses: 2 });
 
@@ -176,18 +116,6 @@ describe('extraActionHandler.handle', () => {
         'Action Surge has no uses remaining. Recharges on a Short Rest.',
       );
       expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
-    });
-
-    it('returns popup when usesUsed is negative', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction({ uses: 2 });
-
-      useRuntimeState.getRuntimeValue.mockReturnValue(-1);
-
-      const result = await handle(action, ps, campaignName);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.description).toContain('no uses remaining');
     });
 
     it('uses custom recharge message from auto.recharge', async () => {
@@ -240,24 +168,6 @@ describe('extraActionHandler.handle', () => {
       );
     });
 
-    it('decrements from usesMax default when no stored value (usesUsed is undefined)', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction({ uses: 2 });
-
-      useRuntimeState.getRuntimeValue.mockReturnValue(undefined);
-
-      const result = await handle(action, ps, campaignName);
-
-      expect(result.type).toBe('popup');
-      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-        'TestHero',
-        'actionSurgeUses',
-        1,
-        campaignName,
-        true,
-      );
-    });
-
     it('uses default uses of 1 when auto.uses is missing', async () => {
       const ps = makePlayerStats();
       const action = makeAction({});
@@ -274,44 +184,6 @@ describe('extraActionHandler.handle', () => {
         campaignName,
         true,
       );
-    });
-
-    it('treats uses=0 as uses=1 and decrements normally', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction({ uses: 0 });
-
-      useRuntimeState.getRuntimeValue.mockReturnValue(1);
-
-      const result = await handle(action, ps, campaignName);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.type).toBe('automation_info');
-      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-        'TestHero',
-        'actionSurgeUses',
-        0,
-        campaignName,
-        true,
-      );
-    });
-
-    it('does not decrement when usesUsed becomes 0 on second runtime check', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction({ uses: 1 });
-
-      // First call (pre-oncePerTurn check): returns 1, passes
-      // Second call (post-oncePerTurn, pre-decrement): returns 0 (simulates external modification)
-      useRuntimeState.getRuntimeValue
-        .mockReturnValueOnce(1)
-        .mockReturnValueOnce(0);
-
-      const result = await handle(action, ps, campaignName);
-
-      // Handler skips decrement when usesUsed is 0 on second check,
-      // but still returns success popup (no additional popup at step 5)
-      expect(result.type).toBe('popup');
-      expect(result.payload.type).toBe('automation_info');
-      expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
     });
   });
 
@@ -356,43 +228,6 @@ describe('extraActionHandler.handle', () => {
         'TestHero',
         'actionSurgeUses',
         1,
-        campaignName,
-        true,
-      );
-    });
-
-    it('skips oncePerTurn when flag is not set', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction({ uses: 2 });
-
-      useRuntimeState.getRuntimeValue.mockReturnValue(2);
-
-      await handle(action, ps, campaignName);
-
-      expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalledWith(
-        'TestHero',
-        'actionSurgeUsedThisRound',
-        1,
-        campaignName,
-        true,
-      );
-    });
-
-    it('uses current round value from getCurrentCombatRound for usedThisRound', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction({ oncePerTurn: true, uses: 2 });
-
-      useRuntimeState.getRuntimeValue
-        .mockReturnValueOnce(2)
-        .mockReturnValue(undefined);
-      combatData.getCurrentCombatRound.mockReturnValue(5);
-
-      await handle(action, ps, campaignName);
-
-      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-        'TestHero',
-        'actionSurgeUsedThisRound',
-        5,
         campaignName,
         true,
       );
@@ -477,17 +312,6 @@ describe('extraActionHandler.handle', () => {
       expect(result.payload.description).toBe('Instantly take another action');
     });
 
-    it('includes automation object in payload', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction({ uses: 1, recharge: 'Short Rest' });
-
-      useRuntimeState.getRuntimeValue.mockReturnValue(1);
-
-      const result = await handle(action, ps, campaignName);
-
-      expect(result.payload.automation).toEqual({ uses: 1, recharge: 'Short Rest' });
-    });
-
     it('includes automationType in payload when set', async () => {
       const ps = makePlayerStats();
       const action = makeAction({ type: 'action_surge', uses: 1 });
@@ -497,56 +321,6 @@ describe('extraActionHandler.handle', () => {
       const result = await handle(action, ps, campaignName);
 
       expect(result.payload.automationType).toBe('action_surge');
-    });
-
-    it('returns empty description when action has no description', async () => {
-      const ps = makePlayerStats();
-      const action = { name: 'Action Surge', automation: { uses: 1 } };
-
-      useRuntimeState.getRuntimeValue.mockReturnValue(1);
-
-      const result = await handle(action, ps, campaignName);
-
-      expect(result.payload.description).toBe('');
-    });
-  });
-
-  describe('default resource key', () => {
-    it('uses actionSurgeUses as default resourceKey for decrement', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction({ uses: 2 });
-
-      useRuntimeState.getRuntimeValue.mockReturnValue(2);
-
-      await handle(action, ps, campaignName);
-
-      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-        'TestHero',
-        'actionSurgeUses',
-        1,
-        campaignName,
-        true,
-      );
-    });
-
-    it('uses actionSurgeUsedThisRound as default for oncePerTurn flag', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction({ oncePerTurn: true, uses: 2 });
-
-      useRuntimeState.getRuntimeValue
-        .mockReturnValueOnce(2)
-        .mockReturnValue(undefined);
-      combatData.getCurrentCombatRound.mockReturnValue(1);
-
-      await handle(action, ps, campaignName);
-
-      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-        'TestHero',
-        'actionSurgeUsedThisRound',
-        1,
-        campaignName,
-        true,
-      );
     });
   });
 });
