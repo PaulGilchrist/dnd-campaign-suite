@@ -8,6 +8,7 @@ import { evaluateAutoExpression, hasTwoWeaponFighting } from '../../services/com
 import { applyDamageToTarget } from '../../services/rules/combat/applyDamage.js';
 import { parseMagicItemName } from '../../services/rules/core/attackCalc.js';
 import { addEntry } from '../../services/ui/logService.js';
+import { createSaveListener } from '../../services/automation/common/savePrompt.js';
 import { getAttackRiderOptions, getAttackRiderOptionsByContext, executeAttackRiderManeuver as executeAttackRiderManeuverService } from '../../services/automation/handlers/class-fighter-rogue/combatSuperiorityHandler.js';
 
 export default function useAttackDamageResolution({
@@ -153,6 +154,7 @@ export default function useAttackDamageResolution({
                 formula += ` + ${sneakAttackFormula} [Sneak Attack]`;
                 total += sneakAttackResult.total;
                 rolls = [...rolls, ...sneakAttackResult.rolls];
+                await setRuntimeValue(playerStats.name, '_SneakAttack_usedRound', getCurrentCombatRound(), campaignName);
             }
         }
 
@@ -537,52 +539,56 @@ export default function useAttackDamageResolution({
                 }
             }
 
-            // Apply Rend Mind attack_rider (Soulknife level 17) — forces WIS save, Stunned on fail
         }
 
-        const rendMind = playerStats.automation.passives.find(
-            a => a.type === 'attack_rider' && a.trigger === 'psychic_blade_sneak_attack_hit' && a.saveType
-        );
-        if (rendMind) {
-            const rendMindUsedKey = '_RendMind_Used';
-            const rendMindUsed = getRuntimeValue(playerStats.name, rendMindUsedKey, campaignName);
-            if (rendMindUsed) {
-                const lastLongRest = getRuntimeValue(playerStats.name, '_LastLongRest', campaignName);
-                const currentLongRest = getRuntimeValue(playerStats.name, '_CurrentLongRest', campaignName);
-                if (lastLongRest !== currentLongRest) {
-                    await setRuntimeValue(playerStats.name, rendMindUsedKey, false, campaignName);
+        // Rend Mind (Soulknife level 17) — WIS save or Stunned on Psychic Blade sneak attack hit
+        const isPsychicBlade = attack.name?.includes('Psychic Blade');
+        const targetName = ctx?.targetName || null;
+        console.log('[Rend Mind] attack:', attack.name, 'effectiveSneakDice:', effectiveSneakDice, 'isPsychicBlade:', isPsychicBlade, 'targetName:', targetName);
+        if (effectiveSneakDice > 0 && isPsychicBlade && targetName) {
+            const passives = playerStats.automation?.passives || [];
+            console.log('[Rend Mind] passives count:', passives.length, 'automation:', !!playerStats.automation);
+            const rendMind = passives.find(
+                a => a.type === 'attack_rider' && a.trigger === 'psychic_blade_sneak_attack_hit' && a.saveType
+            );
+            console.log('[Rend Mind] rendMind found:', !!rendMind);
+            if (rendMind) {
+                const rendMindUsedKey = '_RendMind_Used';
+                let rendMindActive = getRuntimeValue(playerStats.name, rendMindUsedKey, campaignName);
+                console.log('[Rend Mind] rendMindActive:', rendMindActive);
+                if (rendMindActive) {
+                    const lastLongRest = getRuntimeValue(playerStats.name, '_LastLongRest', campaignName);
+                    const currentLongRest = getRuntimeValue(playerStats.name, '_CurrentLongRest', campaignName);
+                    if (lastLongRest !== currentLongRest) {
+                        await setRuntimeValue(playerStats.name, rendMindUsedKey, false, campaignName);
+                        rendMindActive = false;
+                    }
                 }
-            }
-            const rendMindActive = getRuntimeValue(playerStats.name, rendMindUsedKey, campaignName);
-            if (!rendMindActive) {
-                const cs3 = await getCombatContext(campaignName);
-                if (cs3) {
-                    const playerCreature3 = cs3.creatures?.find(c => c.name === playerStats.name);
-                    if (!playerCreature3 || !playerCreature3.hasActed) {
-                        const targetName3 = getTargetFromAttacker(cs3, playerStats.name)?.name || null;
-                        if (targetName3) {
-                            const prof = playerStats.proficiency || 0;
-                            const dexAbility = playerStats.abilities?.find(a => a.name === 'Dexterity');
-                            const dexMod = dexAbility?.bonus || 0;
-                            const saveDc = 8 + dexMod + prof;
-                            const storedEffects3 = getRuntimeValue(campaignName, 'targetEffects') || [];
-                            const newEffect3 = {
-                                target: targetName3,
-                                source: rendMind.name,
-                                effect: rendMind.condition || 'stunned',
-                                saveType: rendMind.saveType,
-                                saveDc: saveDc,
-                                saveAbility: rendMind.saveAbility || 'DEX',
-                                condition: rendMind.condition || 'stunned',
-                                duration: rendMind.duration || '1_minute',
-                                repeatingSave: rendMind.repeatingSave || true,
-                                restoreCost: rendMind.restoreCost || null,
-                            };
-                            const updatedEffects3 = [...storedEffects3, newEffect3];
-                            setRuntimeValue(campaignName, 'targetEffects', updatedEffects3, campaignName);
-                            await setRuntimeValue(playerStats.name, rendMindUsedKey, true, campaignName);
+                if (!rendMindActive) {
+                    const dexAbility = playerStats.abilities?.find(a => a.name === 'Dexterity');
+                    const dexMod = dexAbility?.bonus || 0;
+                    const prof = playerStats.proficiency || 0;
+                    const saveDc = 8 + dexMod + prof;
+                    const { promise } = createSaveListener(campaignName, {
+                        targetName,
+                        saveType: 'WIS',
+                        saveDc,
+                    });
+                    await setRuntimeValue(playerStats.name, rendMindUsedKey, true, campaignName);
+                    const saveResult = await promise;
+                    if (!saveResult.success) {
+                        const conditions = getRuntimeValue(targetName, 'activeConditions') || [];
+                        if (!conditions.some(c => String(c).toLowerCase() === 'stunned')) {
+                            await setRuntimeValue(targetName, 'activeConditions', [...conditions, 'stunned'], campaignName);
                         }
                     }
+                    addEntry(campaignName, {
+                        type: 'ability_use',
+                        characterName: playerStats.name,
+                        abilityName: 'Rend Mind',
+                        description: `Rend Mind triggered on ${targetName} — ${saveResult?.success ? 'succeeded' : 'failed'} WIS save (DC ${saveDc})${saveResult?.success ? '' : ' — Stunned condition applied'}`,
+                        targetName,
+                    }).catch(() => {});
                 }
             }
         }

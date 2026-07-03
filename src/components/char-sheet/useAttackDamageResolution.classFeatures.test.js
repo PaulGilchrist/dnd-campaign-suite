@@ -40,6 +40,10 @@ vi.mock('../../services/rules/core/attackCalc.js', () => ({
     parseMagicItemName: vi.fn((name) => ({ baseName: name })),
 }));
 
+vi.mock('../../services/automation/common/savePrompt.js', () => ({
+    createSaveListener: vi.fn(),
+}));
+
 vi.mock('../../services/ui/logService.js', () => ({
     addEntry: vi.fn(() => Promise.resolve()),
 }));
@@ -52,6 +56,7 @@ import { getActiveBuffs } from '../../services/automation/common/buffToggle.js';
 import { collectWeaponMastery, evaluateAutoExpression, hasTwoWeaponFighting } from '../../services/combat/automation/automationService.js';
 import { applyDamageToTarget } from '../../services/rules/combat/applyDamage.js';
 import { addEntry } from '../../services/ui/logService.js';
+import { createSaveListener } from '../../services/automation/common/savePrompt.js';
 
 const defaultRollResult = { total: 5, rolls: [5], modifier: 0 };
 
@@ -150,6 +155,7 @@ describe('useAttackDamageResolution - class features', () => {
         getCurrentCombatRound.mockReturnValue(1);
         loadCombatSummary.mockResolvedValue(null);
         applyDamageToTarget.mockResolvedValue({ finalDamage: 10, newHp: 50 });
+        createSaveListener.mockReturnValue({ promise: Promise.resolve({ success: false }) });
         mockBuildCtx.mockReturnValue(Promise.resolve({ targetName: 'Goblin' }));
         mockBuildCtxSync.mockReturnValue(Promise.resolve({ targetName: 'Goblin' }));
         mockPendingDamageRef.current = null;
@@ -324,6 +330,10 @@ describe('useAttackDamageResolution - class features', () => {
     });
 
     describe('Rend Mind (Soulknife level 17)', () => {
+        beforeEach(() => {
+            mockBuildCtxSync.mockResolvedValue({ targetName: 'Goblin', sneakAttackDice: 9 });
+        });
+
         function makeRendMindStats(overrides = {}) {
             return createMockPlayerStats({
                 automation: {
@@ -344,38 +354,59 @@ describe('useAttackDamageResolution - class features', () => {
             });
         }
 
-        it('applies Rend Mind target effect on first use', async () => {
+        it('triggers WIS save via createSaveListener on first use', async () => {
             getRuntimeValue.mockReturnValue(null);
-            getCombatContext.mockResolvedValue({
-                creatures: [
-                    { name: 'TestRogue', hasActed: false, type: 'player' },
-                    { name: 'Mind Flayer', type: 'npc' },
-                ],
+            createSaveListener.mockReturnValue({ promise: Promise.resolve({ success: false }) });
+            const { resolveAttackDamage } = UseAttackDamageResolution({ playerStats: makeRendMindStats() });
+            await resolveAttackDamage(makeAttack({ name: 'Psychic Blade', damage: '1d6+5', damageType: 'Psychic' }));
+            await tick();
+            expect(setRuntimeValue).toHaveBeenCalledWith('TestRogue', '_RendMind_Used', true, 'test-campaign');
+            expect(createSaveListener).toHaveBeenCalledWith('test-campaign', {
+                targetName: 'Goblin',
+                saveType: 'WIS',
+                saveDc: 19,
             });
-            getTargetFromAttacker.mockReturnValue({ name: 'Mind Flayer' });
+            expect(setRuntimeValue).toHaveBeenCalledWith(
+                'Goblin', 'activeConditions', ['stunned'], 'test-campaign',
+            );
+            expect(addEntry).toHaveBeenCalled();
+        });
+
+        it('applies stunned condition on save failure via activeConditions', async () => {
+            getRuntimeValue.mockReturnValue(null);
+            const failurePromise = Promise.resolve({ success: false });
+            createSaveListener.mockReturnValue({ promise: failurePromise });
             const { resolveAttackDamage } = UseAttackDamageResolution({ playerStats: makeRendMindStats() });
             await resolveAttackDamage(makeAttack({ name: 'Psychic Blade', damage: '1d6+5', damageType: 'Psychic' }));
             await tick();
             expect(setRuntimeValue).toHaveBeenCalledWith(
-                'test-campaign',
-                'targetEffects',
-                expect.arrayContaining([
-                    expect.objectContaining({
-                        target: 'Mind Flayer',
-                        source: 'Rend Mind',
-                        effect: 'stunned',
-                        saveType: 'WIS',
-                        saveDc: 19,
-                        saveAbility: 'DEX',
-                        condition: 'stunned',
-                        duration: '1_minute',
-                        repeatingSave: true,
-                        restoreCost: null,
-                    }),
-                ]),
-                'test-campaign',
+                'Goblin', 'activeConditions', ['stunned'], 'test-campaign',
             );
-            expect(setRuntimeValue).toHaveBeenCalledWith('TestRogue', '_RendMind_Used', true, 'test-campaign');
+        });
+
+        it('does not apply stunned condition on save success', async () => {
+            getRuntimeValue.mockReturnValue(null);
+            const successPromise = Promise.resolve({ success: true });
+            createSaveListener.mockReturnValue({ promise: successPromise });
+            const { resolveAttackDamage } = UseAttackDamageResolution({ playerStats: makeRendMindStats() });
+            await resolveAttackDamage(makeAttack({ name: 'Psychic Blade', damage: '1d6+5', damageType: 'Psychic' }));
+            await tick();
+            expect(setRuntimeValue).not.toHaveBeenCalledWith(
+                'Goblin', 'activeConditions', expect.anything(), 'test-campaign',
+            );
+        });
+
+        it('does not duplicate stunned condition if already applied', async () => {
+            getRuntimeValue.mockImplementation((name, key) => {
+                if (key === 'activeConditions') return ['stunned'];
+                return null;
+            });
+            const { resolveAttackDamage } = UseAttackDamageResolution({ playerStats: makeRendMindStats() });
+            await resolveAttackDamage(makeAttack({ name: 'Psychic Blade', damage: '1d6+5', damageType: 'Psychic' }));
+            await tick();
+            expect(setRuntimeValue).not.toHaveBeenCalledWith(
+                'Goblin', 'activeConditions', expect.anything(), 'test-campaign',
+            );
         });
 
         it('resets Rend Mind flag when long rest has changed', async () => {
@@ -385,17 +416,11 @@ describe('useAttackDamageResolution - class features', () => {
                 if (key === '_CurrentLongRest') return 2;
                 return null;
             });
-            getCombatContext.mockResolvedValue({
-                creatures: [
-                    { name: 'TestRogue', hasActed: false, type: 'player' },
-                    { name: 'Mind Flayer', type: 'npc' },
-                ],
-            });
-            getTargetFromAttacker.mockReturnValue({ name: 'Mind Flayer' });
             const { resolveAttackDamage } = UseAttackDamageResolution({ playerStats: makeRendMindStats() });
             await resolveAttackDamage(makeAttack({ name: 'Psychic Blade', damage: '1d6+5', damageType: 'Psychic' }));
             await tick();
             expect(setRuntimeValue).toHaveBeenCalledWith('TestRogue', '_RendMind_Used', false, 'test-campaign');
+            expect(createSaveListener).toHaveBeenCalled();
         });
 
         it('skips Rend Mind when already used this long rest', async () => {
@@ -408,45 +433,33 @@ describe('useAttackDamageResolution - class features', () => {
             const { resolveAttackDamage } = UseAttackDamageResolution({ playerStats: makeRendMindStats() });
             await resolveAttackDamage(makeAttack({ name: 'Psychic Blade', damage: '1d6+5', damageType: 'Psychic' }));
             await tick();
-            expect(setRuntimeValue).not.toHaveBeenCalledWith(
-                'test-campaign',
-                'targetEffects',
-                expect.anything(),
-                'test-campaign',
-            );
+            expect(createSaveListener).not.toHaveBeenCalled();
         });
 
-        it('skips Rend Mind when no combat context', async () => {
+        it('skips Rend Mind when no target in context', async () => {
             getRuntimeValue.mockReturnValue(null);
-            getCombatContext.mockResolvedValue(null);
+            mockBuildCtxSync.mockResolvedValue({ targetName: null });
             const { resolveAttackDamage } = UseAttackDamageResolution({ playerStats: makeRendMindStats() });
             await resolveAttackDamage(makeAttack({ name: 'Psychic Blade', damage: '1d6+5', damageType: 'Psychic' }));
             await tick();
-            expect(setRuntimeValue).not.toHaveBeenCalledWith(
-                'test-campaign',
-                'targetEffects',
-                expect.anything(),
-                'test-campaign',
-            );
+            expect(createSaveListener).not.toHaveBeenCalled();
         });
 
-        it('skips Rend Mind when no target found', async () => {
+        it('skips Rend Mind when attack is not a Psychic Blade', async () => {
             getRuntimeValue.mockReturnValue(null);
-            getCombatContext.mockResolvedValue({
-                creatures: [
-                    { name: 'TestRogue', hasActed: false, type: 'player' },
-                ],
-            });
-            getTargetFromAttacker.mockReturnValue(null);
+            const { resolveAttackDamage } = UseAttackDamageResolution({ playerStats: makeRendMindStats() });
+            await resolveAttackDamage(makeAttack({ name: 'Dagger', damage: '1d4+5', damageType: 'Piercing' }));
+            await tick();
+            expect(createSaveListener).not.toHaveBeenCalled();
+        });
+
+        it('skips Rend Mind when no sneak attack dice applied', async () => {
+            getRuntimeValue.mockReturnValue(null);
+            mockBuildCtxSync.mockResolvedValue({ targetName: 'Goblin', sneakAttackDice: 0 });
             const { resolveAttackDamage } = UseAttackDamageResolution({ playerStats: makeRendMindStats() });
             await resolveAttackDamage(makeAttack({ name: 'Psychic Blade', damage: '1d6+5', damageType: 'Psychic' }));
             await tick();
-            expect(setRuntimeValue).not.toHaveBeenCalledWith(
-                'test-campaign',
-                'targetEffects',
-                expect.anything(),
-                'test-campaign',
-            );
+            expect(createSaveListener).not.toHaveBeenCalled();
         });
     });
 

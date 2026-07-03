@@ -184,7 +184,7 @@ export function getAttacks(allEquipment, allSpells, playerStats) {
         })));
     }
 
-    // Soulknife (2024): Psychic Blade bonus action weapons
+    // Soulknife (2024): Psychic Blade action weapon + bonus action off-hand
     if (playerStats.class?.name === 'Rogue' && playerStats.class?.major?.name === 'Soulknife' && playerStats.level >= 3) {
         const dexAbility = dexterity;
         const dexMod = dexAbility?.bonus || 0;
@@ -194,11 +194,11 @@ export function getAttacks(allEquipment, allSpells, playerStats) {
         const abilityBonus = Math.max(dexMod, intMod);
         const abilityName = dexMod >= intMod ? 'Dexterity' : 'Intelligence';
 
-        // Psychic Blade (1d6 Psychic, Finesse, Thrown 60/120, Vex)
+        // Psychic Blade (1d6 Psychic, Finesse, Thrown 60/120, Vex) — Action
         attacks.push({
             name: 'Psychic Blade',
-            type: 'Bonus Action',
-            actionType: 'Bonus Action',
+            type: 'Action',
+            actionType: 'Action',
             attackType: 'melee',
             isRanged: false,
             range: '5 ft',
@@ -214,9 +214,9 @@ export function getAttacks(allEquipment, allSpells, playerStats) {
             isPsychicBlade: true,
         });
 
-        // Psychic Blade (Secondary) (1d4 Psychic, Finesse, Thrown 60/120, Vex)
+        // Psychic Blade (1d4 Psychic, Finesse, Thrown 60/120, Vex) — Bonus Action (off-hand)
         attacks.push({
-            name: 'Psychic Blade (Secondary)',
+            name: 'Psychic Blade',
             type: 'Bonus Action',
             actionType: 'Bonus Action',
             attackType: 'melee',

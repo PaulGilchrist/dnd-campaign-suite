@@ -6,9 +6,10 @@ vi.mock('../utils/changeData.js', () => ({
     publish: vi.fn(),
     saveFile: vi.fn(),
     debouncedSave: vi.fn(),
+    markDirty: vi.fn(),
 }));
 
-import { characterChangeData, publish, saveFile, debouncedSave } from '../utils/changeData.js';
+import { characterChangeData, publish, markDirty } from '../utils/changeData.js';
 import campaignsChangedata from './campaigns-changedata.js';
 
 // Create a test app with the routes
@@ -356,11 +357,11 @@ describe('campaignsChangedata - POST /api/campaigns/:campaign/positioning', () =
         expect(characterChangeData.get('test-campaign').positioning).toEqual(positioningData);
     });
 
-    it('should call debouncedSave after saving positioning', async () => {
+    it('should call markDirty after saving positioning', async () => {
         const positioningData = { creature1: { x: 10, y: 20 } };
         const app = createTestApp();
         await request(app).post('/api/campaigns/test-campaign/positioning').send({ positioning: positioningData });
-        expect(debouncedSave).toHaveBeenCalled();
+        expect(markDirty).toHaveBeenCalled();
     });
 
     it('should broadcast positioning change via publish', async () => {
@@ -371,17 +372,17 @@ describe('campaignsChangedata - POST /api/campaigns/:campaign/positioning', () =
     });
 });
 
-describe('campaignsChangedata - POST /api/campaigns/:campaign/:key calls saveFile and publish', () => {
+describe('campaignsChangedata - POST /api/campaigns/:campaign/:key calls markDirty and publish', () => {
     beforeEach(() => {
-        vi.mocked(saveFile).mockClear();
+        vi.mocked(markDirty).mockClear();
         vi.mocked(publish).mockClear();
     });
     afterEach(clearChangeData);
 
-    it('should call saveFile after saving data', async () => {
+    it('should call markDirty after saving data', async () => {
         const app = createTestApp();
         await request(app).post('/api/campaigns/test-campaign/character1').send({ value: { hp: 20 } });
-        expect(saveFile).toHaveBeenCalled();
+        expect(markDirty).toHaveBeenCalled();
     });
 
     it('should broadcast change via publish after saving', async () => {
@@ -391,18 +392,18 @@ describe('campaignsChangedata - POST /api/campaigns/:campaign/:key calls saveFil
     });
 });
 
-describe('campaignsChangedata - DELETE /api/campaigns/:campaign/:key calls saveFile and publish', () => {
+describe('campaignsChangedata - DELETE /api/campaigns/:campaign/:key calls markDirty and publish', () => {
     beforeEach(() => {
-        vi.mocked(saveFile).mockClear();
+        vi.mocked(markDirty).mockClear();
         vi.mocked(publish).mockClear();
     });
     afterEach(clearChangeData);
 
-    it('should call saveFile after deleting data', async () => {
+    it('should call markDirty after deleting data', async () => {
         characterChangeData.set('test-campaign', { character1: { hp: 25 } });
         const app = createTestApp();
         await request(app).delete('/api/campaigns/test-campaign/character1');
-        expect(saveFile).toHaveBeenCalled();
+        expect(markDirty).toHaveBeenCalled();
     });
 
     it('should broadcast null via publish after deleting', async () => {
@@ -412,9 +413,9 @@ describe('campaignsChangedata - DELETE /api/campaigns/:campaign/:key calls saveF
         expect(publish).toHaveBeenCalledWith('change-test-campaign-character1', null);
     });
 
-    it('should not call saveFile when campaign does not exist', async () => {
+    it('should not call markDirty when campaign does not exist', async () => {
         const app = createTestApp();
         await request(app).delete('/api/campaigns/nonexistent-campaign/somekey');
-        expect(saveFile).not.toHaveBeenCalled();
+        expect(markDirty).not.toHaveBeenCalled();
     });
 });

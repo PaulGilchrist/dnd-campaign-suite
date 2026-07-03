@@ -615,10 +615,12 @@ describe('attackCalc2024', () => {
 
       expect(result).toHaveLength(2);
       expect(result[0].name).toBe('Psychic Blade');
-      expect(result[1].name).toBe('Psychic Blade (Secondary)');
+      expect(result[1].name).toBe('Psychic Blade');
       expect(result[0].damageType).toBe('Psychic');
-      expect(result[0].type).toBe('Bonus Action');
+      expect(result[0].type).toBe('Action');
       expect(result[1].type).toBe('Bonus Action');
+      expect(result[0].damage).toBe('1d6+3');
+      expect(result[1].damage).toBe('1d4');
       expect(result[0].mastery).toBe('Vex');
       expect(result[1].mastery).toBe('Vex');
       expect(result[0].properties).toContain('Finesse');

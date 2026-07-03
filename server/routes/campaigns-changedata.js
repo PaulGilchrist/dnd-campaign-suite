@@ -1,5 +1,5 @@
 import express from 'express';
-import { publish, characterChangeData, saveFile, debouncedSave } from '../utils/changeData.js';
+import { publish, characterChangeData, markDirty } from '../utils/changeData.js';
 import asyncHandler from '../utils/asyncHandler.js';
 
 const router = express.Router();
@@ -38,7 +38,7 @@ router.post('/api/campaigns/:campaign/positioning', asyncHandler((req, res) => {
     }
 
     characterChangeData.get(campaign).positioning = positioning;
-    debouncedSave();
+    markDirty(campaign);
 
     // Broadcast positioning change
     publish(`positioning-${campaign}`, positioning);
@@ -70,7 +70,7 @@ router.post('/api/campaigns/:campaign/:key', asyncHandler((req, res, next) => {
     }
 
     characterChangeData.get(campaign)[key] = value;
-    saveFile();
+    markDirty(campaign);
 
     // Broadcast change
     publish(`change-${campaign}-${key}`, value);
@@ -84,7 +84,7 @@ router.delete('/api/campaigns/:campaign/:key', asyncHandler((req, res, next) => 
     if (key === 'log') return next();
     if (characterChangeData.has(campaign)) {
         delete characterChangeData.get(campaign)[key];
-        saveFile();
+        markDirty(campaign);
     }
     publish(`change-${campaign}-${key}`, null);
 

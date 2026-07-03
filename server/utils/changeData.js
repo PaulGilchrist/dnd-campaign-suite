@@ -17,6 +17,9 @@ export const spellOverlayData = new Map();
 // Debounce timer for saveFile()
 let saveTimer = null;
 
+// Tracks which campaigns have unsaved in-memory changes
+const dirtyCampaigns = new Set();
+
 const persistDataDebounceMilliseconds = 1 * 60 * 1000; // 1 minute in milliseconds
 
 /**
@@ -49,7 +52,7 @@ export const readFile = () => {
 }
 
 /**
- * Debounced persist: writes all in-memory change data to disk
+ * Persist all in-memory change data to disk
  */
 export const saveFile = () => {
     for (const [campaign, data] of characterChangeData) {
@@ -64,7 +67,38 @@ export const saveFile = () => {
             console.error(`Failed to save character change data for campaign ${campaign}:`, err.message);
         }
     }
-}
+};
+
+/**
+ * Mark a campaign as having unsaved changes (debounced persist)
+ */
+export const markDirty = (campaign) => {
+    if (!campaign || !characterChangeData.has(campaign)) return;
+    dirtyCampaigns.add(campaign);
+    if (saveTimer) {
+        clearTimeout(saveTimer);
+    }
+    saveTimer = setTimeout(() => {
+        // Only write dirty campaigns to avoid redundant writes
+        for (const campaign of [...dirtyCampaigns]) {
+            dirtyCampaigns.delete(campaign);
+        }
+        for (const [campaign, data] of characterChangeData) {
+            if (!dirtyCampaigns.has(campaign)) continue;
+            const filePath = path.join(process.cwd(), 'public', 'campaigns', campaign, 'data', 'character-change-data.json');
+            const dir = path.dirname(filePath);
+            if (!fs.existsSync(dir)) {
+                fs.mkdirSync(dir, { recursive: true });
+            }
+            try {
+                fs.writeFileSync(filePath, JSON.stringify(data));
+            } catch (err) {
+                console.error(`Failed to save character change data for campaign ${campaign}:`, err.message);
+            }
+        }
+        saveTimer = null;
+    }, persistDataDebounceMilliseconds);
+};
 
 /**
  * Debounced wrapper around saveFile
@@ -116,7 +150,7 @@ export const removeChangeDataKey = (campaign, characterName) => {
             delete data[key];
           }
       });
-    debouncedSave();
+    markDirty(campaign);
 }
 
 export const keepAlive = () => {

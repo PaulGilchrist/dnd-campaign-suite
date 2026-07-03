@@ -88,7 +88,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
             .catch(error => console.error('Error loading actions:', error));
     }, []);
 
-    const { rollAttack, rollDamage, rollSkillCheck, rollAbilityCheck } = useLoggedDiceRoll(playerStats.name, campaignName, {
+    const { rollAttack, rollDamage } = useLoggedDiceRoll(playerStats.name, campaignName, {
         characters,
         autoDamageSource: 'char-actions',
         autoDamageRoll: async (autoDamage, isCrit) => {
@@ -179,6 +179,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
 
             // Add Sneak Attack damage for Rogue class feature
             const sneakAttackDice = autoDamage.sneakAttackDice || 0;
+            console.log('[SneakAttack] sneakAttackDice:', sneakAttackDice, 'overchannelResult:', !!overchannelResult);
             if (sneakAttackDice > 0 && overchannelResult) {
                 const cunningStrikePassive = (playerStats.automation?.passives || []).find(
                     p => p.name === 'Devious Strikes' && p.type === 'attack_rider'
@@ -193,6 +194,9 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     const oncePerRound = getRuntimeValue(playerStats.name, '_CunningStrike_usedRound', campaignName);
                     const skipRound = getRuntimeValue(playerStats.name, '_cunningStrikeSkippedRound', campaignName);
                     if (oncePerRound !== currentRound && skipRound !== currentRound) {
+                        console.log('[SneakAttack] setting _SneakAttack_usedRound to', currentRound, 'for', playerStats.name);
+                        await setRuntimeValue(playerStats.name, '_SneakAttack_usedRound', currentRound, campaignName);
+                        console.log('[SneakAttack] _SneakAttack_usedRound set, now reading back:', getRuntimeValue(playerStats.name, '_SneakAttack_usedRound'));
                         const cs = await getCombatContext(campaignName);
                         const target = cs ? getTargetFromAttacker(cs, playerStats.name) : null;
                         autoDamageRollContext.current = {
@@ -228,10 +232,67 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                 }
                 const sneakAttackFormula = `${sneakAttackDice}d6`;
                 const sneakAttackResult = isCrit ? rollExpressionDoubled(sneakAttackFormula) : rollExpression(sneakAttackFormula);
+                console.log('[SneakAttack] formula:', sneakAttackFormula, 'result:', JSON.stringify(sneakAttackResult));
                 if (sneakAttackResult) {
                     autoFormula += ` + ${sneakAttackFormula} [Sneak Attack]`;
                     overchannelResult.total += sneakAttackResult.total;
                     overchannelResult.rolls = [...overchannelResult.rolls, ...sneakAttackResult.rolls];
+                    console.log('[SneakAttack] setting _SneakAttack_usedRound to', getCurrentCombatRound());
+                    await setRuntimeValue(playerStats.name, '_SneakAttack_usedRound', getCurrentCombatRound(), campaignName);
+                }
+            }
+
+            // Rend Mind (Soulknife level 17) — WIS save or Stunned on Psychic Blade sneak attack hit
+            const attackName = autoDamage.name || '';
+            const isPsychicBlade = attackName.includes('Psychic Blade');
+            console.log('[Rend Mind] attackName:', attackName, 'sneakAttackDice:', sneakAttackDice, 'isPsychicBlade:', isPsychicBlade);
+            if (sneakAttackDice > 0 && isPsychicBlade) {
+                const passives = playerStats.automation?.passives || [];
+                console.log('[Rend Mind] passives count:', passives.length, 'automation:', !!playerStats.automation);
+                const rendMind = passives.find(
+                    a => a.type === 'attack_rider' && a.trigger === 'psychic_blade_sneak_attack_hit' && a.saveType
+                );
+                console.log('[Rend Mind] rendMind found:', !!rendMind, JSON.stringify(rendMind, null, 2));
+                if (rendMind) {
+                    const rendMindUsedKey = '_RendMind_Used';
+                    const rendMindUsed = getRuntimeValue(playerStats.name, rendMindUsedKey, campaignName);
+                    console.log('[Rend Mind] rendMindUsed:', rendMindUsed);
+                    if (rendMindUsed) {
+                        const lastLongRest = getRuntimeValue(playerStats.name, '_LastLongRest', campaignName);
+                        const currentLongRest = getRuntimeValue(playerStats.name, '_CurrentLongRest', campaignName);
+                        console.log('[Rend Mind] lastLongRest:', lastLongRest, 'currentLongRest:', currentLongRest);
+                        if (lastLongRest !== currentLongRest) {
+                            await setRuntimeValue(playerStats.name, rendMindUsedKey, false, campaignName);
+                        }
+                    }
+                    const rendMindActive = getRuntimeValue(playerStats.name, rendMindUsedKey, campaignName);
+                    console.log('[Rend Mind] rendMindActive:', rendMindActive, 'targetName:', autoDamage.targetName);
+                    if (!rendMindActive && autoDamage.targetName) {
+                        const dexAbility = playerStats.abilities?.find(a => a.name === 'Dexterity');
+                        const dexMod = dexAbility?.bonus || 0;
+                        const prof = playerStats.proficiency || 0;
+                        const saveDc = 8 + dexMod + prof;
+                        const { promise } = createSaveListener(campaignName, {
+                            targetName: autoDamage.targetName,
+                            saveType: 'WIS',
+                            saveDc,
+                        });
+                        await setRuntimeValue(playerStats.name, rendMindUsedKey, true, campaignName);
+                        const saveResult = await promise;
+                        if (!saveResult.success) {
+                            const conditions = getRuntimeValue(autoDamage.targetName, 'activeConditions') || [];
+                            if (!conditions.some(c => String(c).toLowerCase() === 'stunned')) {
+                                await setRuntimeValue(autoDamage.targetName, 'activeConditions', [...conditions, 'stunned'], campaignName);
+                            }
+                        }
+                        addEntry(campaignName, {
+                            type: 'ability_use',
+                            characterName: playerStats.name,
+                            abilityName: 'Rend Mind',
+                            description: `Rend Mind triggered on ${autoDamage.targetName} — ${saveResult?.success ? 'succeeded' : 'failed'} WIS save (DC ${saveDc})${saveResult?.success ? '' : ' — Stunned condition applied'}`,
+                            targetName: autoDamage.targetName,
+                        }).catch(() => {});
+                    }
                 }
             }
 
