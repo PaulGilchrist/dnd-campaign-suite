@@ -3,8 +3,16 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import Settlements from './Settlements.jsx';
 
+const settlementMockReturn = {
+  items: [],
+  loading: false,
+  loadItems: () => {},
+  saveItems: async () => {},
+  deleteItem: async () => {},
+};
+
 vi.mock('../../hooks/useEntityManagement.js', () => ({
-  useEntityManagement: vi.fn(),
+  useEntityManagement: () => ({ ...settlementMockReturn }),
 }));
 
 vi.mock('../common/PreviewToggle.jsx', () => ({
@@ -40,14 +48,12 @@ vi.mock('../../services/campaign/settlementGenerator.js', () => ({
   }),
 }));
 
-import { useEntityManagement } from '../../hooks/useEntityManagement.js';
 
 describe('Settlements - service, NPC, rumor management', () => {
   const mockUseSettlements = {
     items: [],
-    loading: false,
-    saveItems: vi.fn().mockResolvedValue(undefined),
-    deleteItem: vi.fn().mockResolvedValue(undefined),
+    loading: false,    saveItems: async () => {},
+    deleteItem: async () => {},
   };
 
   beforeEach(() => {
@@ -65,7 +71,8 @@ describe('Settlements - service, NPC, rumor management', () => {
   });
 
   beforeEach(() => {
-    useEntityManagement.mockReturnValue(mockUseSettlements);
+    // Override module mock
+    Object.assign(settlementMockReturn, mockUseSettlements);
   });
 
   it('allows changing a service type after adding', () => {

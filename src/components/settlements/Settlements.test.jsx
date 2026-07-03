@@ -3,14 +3,16 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import Settlements from './Settlements.jsx';
 
+const settlementMockReturn = {
+  items: [],
+  loading: false,
+  loadItems: () => {},
+  saveItems: async () => {},
+  deleteItem: async () => {},
+};
+
 vi.mock('../../hooks/useEntityManagement.js', () => ({
-  useEntityManagement: vi.fn(() => ({
-    items: [],
-    loading: false,
-    loadItems: vi.fn(),
-    saveItems: vi.fn().mockResolvedValue(undefined),
-    deleteItem: vi.fn().mockResolvedValue(undefined),
-  })),
+  useEntityManagement: () => ({ ...settlementMockReturn }),
 }));
 
 vi.mock('../common/PreviewToggle.jsx', () => ({
@@ -46,7 +48,6 @@ vi.mock('../../services/campaign/settlementGenerator.js', () => ({
   }),
 }));
 
-import { useEntityManagement } from '../../hooks/useEntityManagement.js';
 
 describe('Settlements', () => {
   beforeEach(() => {
@@ -66,12 +67,13 @@ describe('Settlements', () => {
   const mockUseSettlements = {
     items: [],
     loading: false,
-    saveItems: vi.fn().mockResolvedValue(undefined),
-    deleteItem: vi.fn().mockResolvedValue(undefined),
+    saveItems: vi.fn(),
+    deleteItem: vi.fn(),
   };
 
   beforeEach(() => {
-    useEntityManagement.mockReturnValue(mockUseSettlements);
+    // Override module mock
+    Object.assign(settlementMockReturn, mockUseSettlements);
   });
 
   describe('header and initial render', () => {
@@ -110,7 +112,7 @@ describe('Settlements', () => {
     });
 
     it('renders loading state when loading', () => {
-      useEntityManagement.mockReturnValue({
+      Object.assign(settlementMockReturn, {
         ...mockUseSettlements,
         loading: true,
       });
@@ -121,7 +123,7 @@ describe('Settlements', () => {
 
   describe('settlements list', () => {
     it('renders settlements list when settlements exist', () => {
-      useEntityManagement.mockReturnValue({
+      Object.assign(settlementMockReturn, {
         ...mockUseSettlements,
         items: [
           {
@@ -140,7 +142,7 @@ describe('Settlements', () => {
     });
 
     it('shows service count in settlement list', () => {
-      useEntityManagement.mockReturnValue({
+      Object.assign(settlementMockReturn, {
         ...mockUseSettlements,
         items: [
           { name: 'Service Town', size: 'town', population: '', tags: '', services: [{ type: 'inn' }, { type: 'tavern' }], description: '' },
@@ -151,7 +153,7 @@ describe('Settlements', () => {
     });
 
     it('shows single service count without plural', () => {
-      useEntityManagement.mockReturnValue({
+      Object.assign(settlementMockReturn, {
         ...mockUseSettlements,
         items: [
           { name: 'Service Town', size: 'town', population: '', tags: '', services: [{ type: 'inn' }], description: '' },
@@ -162,7 +164,7 @@ describe('Settlements', () => {
     });
 
     it('shows tags when present', () => {
-      useEntityManagement.mockReturnValue({
+      Object.assign(settlementMockReturn, {
         ...mockUseSettlements,
         items: [
           { name: 'Tagged Town', size: 'town', population: '', tags: 'coastal, trade', services: [], description: '' },
@@ -173,7 +175,7 @@ describe('Settlements', () => {
     });
 
     it('shows description preview truncated at 120 chars', () => {
-      useEntityManagement.mockReturnValue({
+      Object.assign(settlementMockReturn, {
         ...mockUseSettlements,
         items: [
           { name: 'Long Desc Town', size: 'town', population: '', tags: '', services: [], description: 'A'.repeat(200) },
@@ -185,7 +187,7 @@ describe('Settlements', () => {
     });
 
     it('renders size badge for village', () => {
-      useEntityManagement.mockReturnValue({
+      Object.assign(settlementMockReturn, {
         ...mockUseSettlements,
         items: [
           { name: 'Village', size: 'village', population: '', tags: '', services: [], description: '' },
@@ -196,7 +198,7 @@ describe('Settlements', () => {
     });
 
     it('renders size badge for city', () => {
-      useEntityManagement.mockReturnValue({
+      Object.assign(settlementMockReturn, {
         ...mockUseSettlements,
         items: [
           { name: 'City', size: 'city', population: '', tags: '', services: [], description: '' },
@@ -207,7 +209,7 @@ describe('Settlements', () => {
     });
 
     it('renders size badge for metropolis', () => {
-      useEntityManagement.mockReturnValue({
+      Object.assign(settlementMockReturn, {
         ...mockUseSettlements,
         items: [
           { name: 'Metropolis', size: 'metropolis', population: '', tags: '', services: [], description: '' },
@@ -218,7 +220,7 @@ describe('Settlements', () => {
     });
 
     it('handles settlement with no services gracefully', () => {
-      useEntityManagement.mockReturnValue({
+      Object.assign(settlementMockReturn, {
         ...mockUseSettlements,
         items: [
           { name: 'No Services', size: 'village', population: '', tags: '', services: null, description: '' },
@@ -229,7 +231,7 @@ describe('Settlements', () => {
     });
 
     it('handles settlement with empty services array gracefully', () => {
-      useEntityManagement.mockReturnValue({
+      Object.assign(settlementMockReturn, {
         ...mockUseSettlements,
         items: [
           { name: 'Empty Services', size: 'village', population: '', tags: '', services: [], description: '' },
@@ -240,7 +242,7 @@ describe('Settlements', () => {
     });
 
     it('renders settlement with no population', () => {
-      useEntityManagement.mockReturnValue({
+      Object.assign(settlementMockReturn, {
         ...mockUseSettlements,
         items: [
           { name: 'No Pop', size: 'village', population: null, tags: '', services: [], description: '' },
@@ -251,7 +253,7 @@ describe('Settlements', () => {
     });
 
     it('renders settlement with no description', () => {
-      useEntityManagement.mockReturnValue({
+      Object.assign(settlementMockReturn, {
         ...mockUseSettlements,
         items: [
           { name: 'No Desc', size: 'village', population: '', tags: '', services: [], description: null },
@@ -262,7 +264,7 @@ describe('Settlements', () => {
     });
 
     it('renders settlement with no tags', () => {
-      useEntityManagement.mockReturnValue({
+      Object.assign(settlementMockReturn, {
         ...mockUseSettlements,
         items: [
           { name: 'No Tags', size: 'village', population: '', tags: null, services: [], description: '' },
@@ -275,7 +277,7 @@ describe('Settlements', () => {
 
   describe('filtering', () => {
     it('filters settlements by search query and shows no results for non-matching query', async () => {
-      useEntityManagement.mockReturnValue({
+      Object.assign(settlementMockReturn, {
         ...mockUseSettlements,
         items: [
           { name: 'Fireport', size: 'town', population: '', tags: '', services: [], description: 'A town of fire' },
@@ -289,7 +291,7 @@ describe('Settlements', () => {
     });
 
     it('filters settlements by size', () => {
-      useEntityManagement.mockReturnValue({
+      Object.assign(settlementMockReturn, {
         ...mockUseSettlements,
         items: [
           { name: 'Fireport', size: 'town', population: '', tags: '', services: [], description: '' },
@@ -304,7 +306,7 @@ describe('Settlements', () => {
     });
 
     it('toggles size filter off when clicked again', () => {
-      useEntityManagement.mockReturnValue({
+      Object.assign(settlementMockReturn, {
         ...mockUseSettlements,
         items: [
           { name: 'Fireport', size: 'town', population: '', tags: '', services: [], description: '' },
@@ -320,7 +322,7 @@ describe('Settlements', () => {
     });
 
     it('shows no settlements matching when search yields no results', () => {
-      useEntityManagement.mockReturnValue({
+      Object.assign(settlementMockReturn, {
         ...mockUseSettlements,
         items: [
           { name: 'Fireport', size: 'town', population: '', tags: '', services: [], description: '' },
@@ -333,7 +335,7 @@ describe('Settlements', () => {
     });
 
     it('shows no settlements matching when size filter yields no results', () => {
-      useEntityManagement.mockReturnValue({
+      Object.assign(settlementMockReturn, {
         ...mockUseSettlements,
         items: [
           { name: 'Fireport', size: 'town', population: '', tags: '', services: [], description: '' },
@@ -346,7 +348,7 @@ describe('Settlements', () => {
     });
 
     it('clears search when clear button is clicked', () => {
-      useEntityManagement.mockReturnValue({
+      Object.assign(settlementMockReturn, {
         ...mockUseSettlements,
         items: [
           { name: 'Fireport', size: 'town', population: '', tags: '', services: [], description: '' },
@@ -370,7 +372,7 @@ describe('Settlements', () => {
     });
 
     it('opens edit modal when clicking a settlement', () => {
-      useEntityManagement.mockReturnValue({
+      Object.assign(settlementMockReturn, {
         ...mockUseSettlements,
         items: [
           { name: 'Edit Me', size: 'village', population: '100 souls', tags: '', services: [], description: '', atmosphere: '', government: '', notableNPCs: [], rumors: [], notes: '', threat: '' },
@@ -567,7 +569,7 @@ describe('Settlements', () => {
     });
 
     it('shows delete button when editing a settlement', () => {
-      useEntityManagement.mockReturnValue({
+      Object.assign(settlementMockReturn, {
         ...mockUseSettlements,
         items: [
           { name: 'Delete Me', size: 'village', population: '', tags: '', services: [], description: '', atmosphere: '', government: '', notableNPCs: [], rumors: [], notes: '', threat: '' },
@@ -588,7 +590,7 @@ describe('Settlements', () => {
 
     it('calls deleteSettlementAction when delete is confirmed', async () => {
       global.window.confirm = vi.fn(() => true);
-      useEntityManagement.mockReturnValue({
+      Object.assign(settlementMockReturn, {
         ...mockUseSettlements,
         items: [
           { name: 'Delete Me', size: 'village', population: '', tags: '', services: [], description: '', atmosphere: '', government: '', notableNPCs: [], rumors: [], notes: '', threat: '' },
@@ -606,7 +608,7 @@ describe('Settlements', () => {
 
     it('does not delete when user cancels confirmation', async () => {
       global.window.confirm = vi.fn(() => false);
-      useEntityManagement.mockReturnValue({
+      Object.assign(settlementMockReturn, {
         ...mockUseSettlements,
         items: [
           { name: 'Keep Me', size: 'village', population: '', tags: '', services: [], description: '', atmosphere: '', government: '', notableNPCs: [], rumors: [], notes: '', threat: '' },

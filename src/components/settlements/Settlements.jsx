@@ -44,7 +44,7 @@ const SERVICE_TYPE_LABELS = {
 };
 
 function Settlements({ campaignName, onBack }) {
-  const { items: settlements, loading, loadItems: loadSettlementsList, saveItems: saveSettlementAction, deleteItem: deleteSettlementAction } =
+  const { items: settlements, loading, loadItems, saveItems: saveSettlementAction, deleteItem: deleteSettlementAction } =
     useEntityManagement(campaignName, { load: loadSettlements, save: saveSettlements, delete: deleteSettlement }, { responseKey: 'settlements', loadOnMount: false });
 
   const {
@@ -60,9 +60,9 @@ function Settlements({ campaignName, onBack }) {
 
   useEffect(() => {
     if (campaignName) {
-      loadSettlementsList();
+      loadItems();
     }
-  }, [campaignName, loadSettlementsList]);
+  }, [campaignName, loadItems]);
 
   useEffect(() => {
     fetch('/data/settlement-descriptions.json')

@@ -28,14 +28,14 @@
       "name": "Intelligence",
       "baseScore": 9,
       "featIncrease": 0,
-      "backgroundIncrease": 1,
+      "backgroundIncrease": 0,
       "miscIncrease": 0
     },
     {
       "name": "Wisdom",
       "baseScore": 11,
       "featIncrease": 0,
-      "backgroundIncrease": 1,
+      "backgroundIncrease": 2,
       "miscIncrease": 0
     },
     {
@@ -64,7 +64,10 @@
   "feats": [],
   "fightingStyles": [],
   "race": {
-    "name": "Halfling"
+    "name": "Halfling",
+    "subrace": {
+      "name": ""
+    }
   },
   "immunities": [],
   "inventory": {

@@ -3,14 +3,16 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import Settlements from './Settlements.jsx';
 
+const settlementMockReturn = {
+  items: [],
+  loading: false,
+  loadItems: () => {},
+  saveItems: async () => {},
+  deleteItem: async () => {},
+};
+
 vi.mock('../../hooks/useEntityManagement.js', () => ({
-  useEntityManagement: vi.fn(() => ({
-    items: [],
-    loading: false,
-    loadItems: vi.fn(),
-    saveItems: vi.fn().mockResolvedValue(undefined),
-    deleteItem: vi.fn().mockResolvedValue(undefined),
-  })),
+  useEntityManagement: () => ({ ...settlementMockReturn }),
 }));
 
 vi.mock('../common/PreviewToggle.jsx', () => ({
@@ -46,7 +48,6 @@ vi.mock('../../services/campaign/settlementGenerator.js', () => ({
   }),
 }));
 
-import { useEntityManagement } from '../../hooks/useEntityManagement.js';
 
 describe('Settlements - accessibility and keyboard', () => {
   const mockUseSettlements = {
@@ -54,26 +55,19 @@ describe('Settlements - accessibility and keyboard', () => {
       { name: 'Fireport', size: 'town', population: '1,500 souls', tags: 'coastal', services: [], description: 'A town of fire' },
     ],
     loading: false,
-    saveItems: vi.fn().mockResolvedValue(undefined),
-    deleteItem: vi.fn().mockResolvedValue(undefined),
+    saveItems: async () => {},
+    deleteItem: async () => {},
   };
 
   beforeEach(() => {
-    vi.clearAllMocks();
     vi.spyOn(console, 'error').mockImplementation(() => {});
     vi.spyOn(console, 'log').mockImplementation(() => {});
     vi.spyOn(globalThis, 'fetch').mockResolvedValue({
       ok: true,
       json: () => Promise.resolve({}),
     });
-  });
-
-  afterEach(() => {
-    vi.restoreAllMocks();
-  });
-
-  beforeEach(() => {
-    useEntityManagement.mockReturnValue(mockUseSettlements);
+    // Override the module mock by reassigning the module
+    Object.assign(settlementMockReturn, mockUseSettlements);
   });
 
   it('opens edit modal when settlement item is activated with Enter', () => {

@@ -69,6 +69,16 @@ vi.mock('../../services/npcs/npcGenerator.js', () => ({
   generateNPC: vi.fn().mockResolvedValue({ name: 'Generated NPC', race: 'Humanoid' }),
 }));
 
+const mockSaveNPC = vi.fn().mockResolvedValue({ success: true, npc: {} });
+const mockLoadNPCs = vi.fn().mockResolvedValue({ npcs: [] });
+vi.mock('../../services/npcs/npcsService.js', () => ({
+  loadNPCs: (...args) => mockLoadNPCs(...args),
+  saveNPC: (...args) => mockSaveNPC(...args),
+  saveNPCs: vi.fn(),
+  deleteNPC: vi.fn(),
+  loadNPC: vi.fn(),
+}));
+
 const defaultProps = {
   campaignName: 'test-campaign',
   onBack: vi.fn(),
@@ -81,18 +91,16 @@ const defaultNPCs = [
 ];
 
 function renderWithNPCs(npcs = defaultNPCs) {
-  const mockSave = vi.fn().mockResolvedValue({ npc: { name: 'New NPC' } });
   const mockDelete = vi.fn().mockResolvedValue(undefined);
   mockUseNPCsManagement.mockReturnValue({
     items: npcs,
     loading: false,
     loadItems: vi.fn(),
-    saveItems: mockSave,
+    saveItems: vi.fn(),
     deleteItem: mockDelete,
   });
   return {
     ...render(<NPCs {...defaultProps} />),
-    mockSave,
     mockDelete,
   };
 }
@@ -100,6 +108,10 @@ function renderWithNPCs(npcs = defaultNPCs) {
 describe('NPCs', () => {
   beforeEach(() => {
     mockAddNPCToInitiative.mockResolvedValue(undefined);
+    mockSaveNPC.mockReset();
+    mockSaveNPC.mockResolvedValue({ success: true, npc: {} });
+    mockLoadNPCs.mockReset();
+    mockLoadNPCs.mockResolvedValue({ npcs: [] });
     mockGetDefaultFormData.mockReturnValue({
       name: '', race: '', classRole: '', appearance: '', personality: '',
       goals: '', secrets: '', notes: '', tags: '', attitude: 'neutral',
@@ -117,19 +129,19 @@ describe('NPCs', () => {
 
   describe('save validation', () => {
     it('does not save when form data name is empty', async () => {
-      const { mockSave } = renderWithNPCs();
+      renderWithNPCs();
       fireEvent.click(screen.getByRole('button', { name: /New NPC/i }));
       await waitFor(() => {
         expect(screen.getByTestId('npc-form-modal')).toBeInTheDocument();
       });
       fireEvent.click(screen.getByRole('button', { name: 'Save' }));
       await waitFor(() => {
-        expect(mockSave).not.toHaveBeenCalled();
+        expect(mockSaveNPC).not.toHaveBeenCalled();
       });
     });
 
     it('does not save when form data name is whitespace only', async () => {
-      const { mockSave } = renderWithNPCs();
+      renderWithNPCs();
       mockGetDefaultFormData.mockReturnValueOnce({
         name: '   ', race: '', classRole: '', appearance: '', personality: '',
         goals: '', secrets: '', notes: '', tags: '', attitude: 'neutral',
@@ -145,14 +157,14 @@ describe('NPCs', () => {
       });
       fireEvent.click(screen.getByRole('button', { name: 'Save' }));
       await waitFor(() => {
-        expect(mockSave).not.toHaveBeenCalled();
+        expect(mockSaveNPC).not.toHaveBeenCalled();
       });
     });
   });
 
   describe('save success', () => {
-    it('calls saveNPCAction with cleaned data when save succeeds', async () => {
-      const { mockSave } = renderWithNPCs();
+    it('calls saveNPC with cleaned data when save succeeds', async () => {
+      renderWithNPCs();
       fireEvent.click(screen.getByRole('button', { name: /New NPC/i }));
       await waitFor(() => {
         expect(screen.getByTestId('npc-form-modal')).toBeInTheDocument();
@@ -161,12 +173,12 @@ describe('NPCs', () => {
       fireEvent.change(screen.getByTestId('npc-name-input'), { target: { value: 'Test NPC' } });
       fireEvent.click(screen.getByRole('button', { name: 'Save' }));
       await waitFor(() => {
-        expect(mockSave).toHaveBeenCalled();
+        expect(mockSaveNPC).toHaveBeenCalled();
       });
-      const cleanedData = mockSave.mock.calls[0][0];
+      const cleanedData = mockSaveNPC.mock.calls[0][1];
       expect(cleanedData).toBeDefined();
       expect(cleanedData.name).toBe('Test NPC');
-      expect(mockSave.mock.calls[0][1]).toBeUndefined();
+      expect(mockSaveNPC.mock.calls[0][2]).toBeUndefined();
     });
 
     it('closes modal after successful save', async () => {
@@ -304,12 +316,12 @@ describe('NPCs', () => {
 
   describe('save and add to initiative', () => {
     it('does not save-and-add when form data name is empty', async () => {
-      const mockSave = vi.fn().mockResolvedValue({ npc: { name: 'New NPC' } });
+      mockSaveNPC.mockResolvedValue({ success: true, npc: { name: 'New NPC' } });
       mockUseNPCsManagement.mockReturnValue({
         npcs: [],
         loading: false,
         loadItems: vi.fn(),
-        saveItems: mockSave,
+        saveItems: vi.fn(),
         deleteItem: vi.fn(),
       });
       render(<NPCs {...defaultProps} />);
@@ -319,18 +331,18 @@ describe('NPCs', () => {
       });
       fireEvent.click(screen.getByTestId('save-add-init-btn'));
       await waitFor(() => {
-        expect(mockSave).not.toHaveBeenCalled();
+        expect(mockSaveNPC).not.toHaveBeenCalled();
         expect(mockAddNPCToInitiative).not.toHaveBeenCalled();
       });
     });
 
     it('saves NPC and adds to initiative when save-and-add clicked', async () => {
-      const mockSave = vi.fn().mockResolvedValue({ npc: { name: 'Goblin', armorClass: 15 } });
+      mockSaveNPC.mockResolvedValue({ success: true, npc: { name: 'Goblin', armorClass: 15 } });
       mockUseNPCsManagement.mockReturnValue({
         items: defaultNPCs,
         loading: false,
         loadItems: vi.fn(),
-        saveItems: mockSave,
+        saveItems: vi.fn(),
         deleteItem: vi.fn(),
       });
       render(<NPCs {...defaultProps} />);
@@ -341,7 +353,7 @@ describe('NPCs', () => {
       fireEvent.change(screen.getByTestId('npc-name-input'), { target: { value: 'Goblin' } });
       fireEvent.click(screen.getByTestId('save-add-init-btn'));
       await waitFor(() => {
-        expect(mockSave).toHaveBeenCalled();
+        expect(mockSaveNPC).toHaveBeenCalled();
       });
       await waitFor(() => {
         expect(mockAddNPCToInitiative).toHaveBeenCalled();
@@ -349,12 +361,12 @@ describe('NPCs', () => {
     });
 
     it('closes modal after save-and-add to initiative', async () => {
-      const mockSave = vi.fn().mockResolvedValue({ npc: { name: 'Goblin' } });
+      mockSaveNPC.mockResolvedValue({ success: true, npc: { name: 'Goblin' } });
       mockUseNPCsManagement.mockReturnValue({
         items: defaultNPCs,
         loading: false,
         loadItems: vi.fn(),
-        saveItems: mockSave,
+        saveItems: vi.fn(),
         deleteItem: vi.fn(),
       });
       render(<NPCs {...defaultProps} />);
@@ -370,12 +382,12 @@ describe('NPCs', () => {
     });
 
     it('does not close modal when save-and-add throws error', async () => {
-      const mockSave = vi.fn().mockRejectedValue(new Error('Save failed'));
+      mockSaveNPC.mockRejectedValue(new Error('Save failed'));
       mockUseNPCsManagement.mockReturnValue({
         items: defaultNPCs,
         loading: false,
         loadItems: vi.fn(),
-        saveItems: mockSave,
+        saveItems: vi.fn(),
         deleteItem: vi.fn(),
       });
       render(<NPCs {...defaultProps} />);
@@ -391,12 +403,12 @@ describe('NPCs', () => {
     });
 
     it('passes campaignName to addNPCToInitiative', async () => {
-      const mockSave = vi.fn().mockResolvedValue({ npc: { name: 'Goblin', armorClass: 15 } });
+      mockSaveNPC.mockResolvedValue({ success: true, npc: { name: 'Goblin', armorClass: 15 } });
       mockUseNPCsManagement.mockReturnValue({
         items: defaultNPCs,
         loading: false,
         loadItems: vi.fn(),
-        saveItems: mockSave,
+        saveItems: vi.fn(),
         deleteItem: vi.fn(),
       });
       render(<NPCs {...defaultProps} />);

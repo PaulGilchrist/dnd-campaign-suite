@@ -3,8 +3,16 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import Settlements from './Settlements.jsx';
 
+const settlementMockReturn = {
+  items: [],
+  loading: false,
+  loadItems: () => {},
+  saveItems: async () => {},
+  deleteItem: async () => {},
+};
+
 vi.mock('../../hooks/useEntityManagement.js', () => ({
-  useEntityManagement: vi.fn(),
+  useEntityManagement: () => ({ ...settlementMockReturn }),
 }));
 
 vi.mock('../common/PreviewToggle.jsx', () => ({
@@ -40,7 +48,6 @@ vi.mock('../../services/campaign/settlementGenerator.js', () => ({
   }),
 }));
 
-import { useEntityManagement } from '../../hooks/useEntityManagement.js';
 
 describe('Settlements - filtering', () => {
   const mockUseSettlements = {
@@ -50,12 +57,13 @@ describe('Settlements - filtering', () => {
       { name: 'Goldhaven', size: 'city', population: '', tags: 'trade', services: [], description: 'A wealthy city' },
     ],
     loading: false,
-    saveItems: vi.fn().mockResolvedValue(undefined),
-    deleteItem: vi.fn().mockResolvedValue(undefined),
+    saveItems: async () => {},
+    deleteItem: async () => {},
   };
 
   beforeEach(() => {
-    vi.clearAllMocks();
+    // Override module mock
+    Object.assign(settlementMockReturn, mockUseSettlements);
     vi.spyOn(console, 'error').mockImplementation(() => {});
     vi.spyOn(console, 'log').mockImplementation(() => {});
     vi.spyOn(globalThis, 'fetch').mockResolvedValue({
@@ -69,7 +77,8 @@ describe('Settlements - filtering', () => {
   });
 
   beforeEach(() => {
-    useEntityManagement.mockReturnValue(mockUseSettlements);
+    // Override module mock
+    Object.assign(settlementMockReturn, mockUseSettlements);
   });
 
   it('filters by name case-insensitively', () => {
@@ -103,7 +112,7 @@ describe('Settlements - filtering', () => {
   });
 
   it('combines search and size filter', () => {
-    useEntityManagement.mockReturnValue({
+    Object.assign(settlementMockReturn, {
       ...mockUseSettlements,
       items: [
         { name: 'Fireport', size: 'town', population: '', tags: '', services: [], description: 'A town of fire' },
