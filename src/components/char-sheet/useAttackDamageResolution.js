@@ -544,18 +544,14 @@ export default function useAttackDamageResolution({
         // Rend Mind (Soulknife level 17) — WIS save or Stunned on Psychic Blade sneak attack hit
         const isPsychicBlade = attack.name?.includes('Psychic Blade');
         const targetName = ctx?.targetName || null;
-        console.log('[Rend Mind] attack:', attack.name, 'effectiveSneakDice:', effectiveSneakDice, 'isPsychicBlade:', isPsychicBlade, 'targetName:', targetName);
         if (effectiveSneakDice > 0 && isPsychicBlade && targetName) {
             const passives = playerStats.automation?.passives || [];
-            console.log('[Rend Mind] passives count:', passives.length, 'automation:', !!playerStats.automation);
             const rendMind = passives.find(
                 a => a.type === 'attack_rider' && a.trigger === 'psychic_blade_sneak_attack_hit' && a.saveType
             );
-            console.log('[Rend Mind] rendMind found:', !!rendMind);
             if (rendMind) {
                 const rendMindUsedKey = '_RendMind_Used';
                 let rendMindActive = getRuntimeValue(playerStats.name, rendMindUsedKey, campaignName);
-                console.log('[Rend Mind] rendMindActive:', rendMindActive);
                 if (rendMindActive) {
                     const lastLongRest = getRuntimeValue(playerStats.name, '_LastLongRest', campaignName);
                     const currentLongRest = getRuntimeValue(playerStats.name, '_CurrentLongRest', campaignName);
