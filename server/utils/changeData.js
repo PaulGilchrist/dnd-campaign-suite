@@ -49,7 +49,7 @@ export const readFile = () => {
 }
 
 /**
- * Debounced persist: writes all in-memory change data to disk
+ * Persist all in-memory change data to disk, only writing when content changed
  */
 export const saveFile = () => {
     for (const [campaign, data] of characterChangeData) {
@@ -59,7 +59,12 @@ export const saveFile = () => {
             fs.mkdirSync(dir, { recursive: true });
         }
         try {
-            fs.writeFileSync(filePath, JSON.stringify(data));
+            const serialized = JSON.stringify(data);
+            let current = '';
+            try { current = fs.readFileSync(filePath, 'utf-8'); } catch (_err) { /* file not found */ }
+            if (current !== serialized) {
+                fs.writeFileSync(filePath, serialized);
+            }
         } catch (err) {
             console.error(`Failed to save character change data for campaign ${campaign}:`, err.message);
         }

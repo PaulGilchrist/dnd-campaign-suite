@@ -3,7 +3,7 @@
 import express from 'express';
 import os from 'os';
 import path from 'path';
-import { readFile, keepAlive } from './server/utils/changeData.js';
+import { readFile, keepAlive, saveFile } from './server/utils/changeData.js';
 import sseRoutes from './server/routes/sse.js';
 import mapsRoutes from './server/routes/maps.js';
 import encountersRoutes from './server/routes/encounters.js';
@@ -62,6 +62,9 @@ app.listen(PORT, () => {
 
     // Load character change data from disk at startup
     readFile();
+
+    // Save change data on process exit to prevent loss from 1-min debounce
+    process.on('exit', () => { saveFile(); });
 
     // Start keep-alive health check
     keepAlive();
