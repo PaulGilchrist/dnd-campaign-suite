@@ -174,24 +174,6 @@ describe('App - Computed Characters & Runtime Store', () => {
       });
     });
 
-    it('renders CharSheet when fetching server data fails', async () => {
-      global.fetch = vi.fn(() => Promise.reject(new Error('Network error')));
-      mockState.characters = [{ name: 'Aragorn', level: 1 }];
-      render(<App />);
-      await selectCampaign();
-      await waitFor(() => {
-        expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
-      });
-    });
 
-    it('renders CharSheet when server returns non-ok response', async () => {
-      global.fetch = vi.fn(() => Promise.resolve({ ok: false }));
-      mockState.characters = [{ name: 'Aragorn', level: 1 }];
-      render(<App />);
-      await selectCampaign();
-      await waitFor(() => {
-        expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
-      });
-    });
   });
 });

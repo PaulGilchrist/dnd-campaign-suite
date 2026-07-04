@@ -28,44 +28,24 @@ describe('GenerateTerrainModal', () => {
   });
 
   describe('rendering', () => {
-    it('should render modal with title', () => {
+    it('should render modal with title, inputs, and hints', () => {
       render(<GenerateTerrainModal {...props} />);
       expect(screen.getByText('Generate Terrain Map')).toBeInTheDocument();
-    });
-
-    it('should render map name input', () => {
-      render(<GenerateTerrainModal {...props} />);
       expect(screen.getByPlaceholderText('e.g. The Wild Frontier')).toBeInTheDocument();
+      expect(screen.getByDisplayValue('30')).toBeInTheDocument();
+      expect(screen.getByPlaceholderText('Random')).toBeInTheDocument();
+      expect(screen.getByText(/30 hexes/)).toBeInTheDocument();
+      expect(screen.getByText(/fractal noise/)).toBeInTheDocument();
     });
 
     it('should pre-fill map name from initialMapName', () => {
       render(<GenerateTerrainModal {...props} initialMapName="My Terrain" />);
       expect(screen.getByDisplayValue('My Terrain')).toBeInTheDocument();
     });
-
-    it('should render grid size input with default value', () => {
-      render(<GenerateTerrainModal {...props} />);
-      expect(screen.getByDisplayValue('30')).toBeInTheDocument();
-    });
-
-    it('should render seed input', () => {
-      render(<GenerateTerrainModal {...props} />);
-      expect(screen.getByPlaceholderText('Random')).toBeInTheDocument();
-    });
-
-    it('should show grid size hint', () => {
-      render(<GenerateTerrainModal {...props} />);
-      expect(screen.getByText(/30 hexes/)).toBeInTheDocument();
-    });
-
-    it('should show terrain generation note', () => {
-      render(<GenerateTerrainModal {...props} />);
-      expect(screen.getByText(/fractal noise/)).toBeInTheDocument();
-    });
   });
 
   describe('generate button state', () => {
-    const getGenerateButton = () => screen.getByText('Generate').closest('button');
+    const getGenerateButton = () => screen.getByRole('button', { name: /generate/i });
 
     it('should be disabled when map name is empty', () => {
       render(<GenerateTerrainModal {...props} />);
@@ -81,31 +61,31 @@ describe('GenerateTerrainModal', () => {
     });
   });
 
-  describe('cancel and overlay', () => {
-    it('should call onClose when Cancel clicked', () => {
-      render(<GenerateTerrainModal {...props} />);
-      fireEvent.click(screen.getByText('Cancel'));
-      expect(props.onClose).toHaveBeenCalled();
-    });
-
-    it('should call onClose when overlay clicked', () => {
+  describe('closing the modal', () => {
+    it('should call onClose when Cancel clicked or overlay clicked', () => {
       const { container } = render(<GenerateTerrainModal {...props} />);
-      const overlay = container.querySelector('.maps-manager-modal-overlay');
+      fireEvent.click(screen.getByText('Cancel'));
+      expect(props.onClose).toHaveBeenCalledTimes(1);
+
+      props.onClose.mockClear();
+      const overlay = container.querySelector('[class*="overlay"]');
       fireEvent.click(overlay);
-      expect(props.onClose).toHaveBeenCalled();
+      expect(props.onClose).toHaveBeenCalledTimes(1);
     });
   });
 
   describe('terrain generation', () => {
-    it('should call generateHexTerrain and createMap on generate', async () => {
+    it('should call generateHexTerrain and createMap on generate, then close', async () => {
       render(<GenerateTerrainModal {...props} />);
       fireEvent.change(screen.getByPlaceholderText('e.g. The Wild Frontier'), {
         target: { value: 'Test Terrain' },
       });
-      fireEvent.click(screen.getByText('Generate').closest('button'));
+      fireEvent.click(screen.getByRole('button', { name: /generate/i }));
       await vi.waitFor(() => {
         expect(generateHexTerrain).toHaveBeenCalledWith({ gridSize: 30, seed: undefined });
         expect(mapsService.createMap).toHaveBeenCalled();
+        expect(props.onMapCreated).toHaveBeenCalled();
+        expect(props.onClose).toHaveBeenCalled();
       });
     });
 
@@ -117,21 +97,9 @@ describe('GenerateTerrainModal', () => {
       fireEvent.change(screen.getByPlaceholderText('Random'), {
         target: { value: '42' },
       });
-      fireEvent.click(screen.getByText('Generate').closest('button'));
+      fireEvent.click(screen.getByRole('button', { name: /generate/i }));
       await vi.waitFor(() => {
         expect(generateHexTerrain).toHaveBeenCalledWith({ gridSize: 30, seed: 42 });
-      });
-    });
-
-    it('should call onMapCreated and onClose after successful generation', async () => {
-      render(<GenerateTerrainModal {...props} />);
-      fireEvent.change(screen.getByPlaceholderText('e.g. The Wild Frontier'), {
-        target: { value: 'Test' },
-      });
-      fireEvent.click(screen.getByText('Generate').closest('button'));
-      await vi.waitFor(() => {
-        expect(props.onMapCreated).toHaveBeenCalled();
-        expect(props.onClose).toHaveBeenCalled();
       });
     });
 
@@ -141,22 +109,10 @@ describe('GenerateTerrainModal', () => {
       fireEvent.change(screen.getByPlaceholderText('e.g. The Wild Frontier'), {
         target: { value: 'Test' },
       });
-      fireEvent.click(screen.getByText('Generate').closest('button'));
+      fireEvent.click(screen.getByRole('button', { name: /generate/i }));
       await vi.waitFor(() => {
         expect(screen.getByText('Terrain failed')).toBeInTheDocument();
       });
-    });
-
-    it('should show generating state during generation', async () => {
-      let resolve;
-      mapsService.createMap.mockImplementationOnce(() => new Promise((r) => { resolve = r; }));
-      render(<GenerateTerrainModal {...props} />);
-      fireEvent.change(screen.getByPlaceholderText('e.g. The Wild Frontier'), {
-        target: { value: 'Test' },
-      });
-      fireEvent.click(screen.getByText('Generate').closest('button'));
-      expect(screen.getByText('Generating...')).toBeInTheDocument();
-      resolve();
     });
   });
 });

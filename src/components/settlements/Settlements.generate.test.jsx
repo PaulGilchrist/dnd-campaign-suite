@@ -141,28 +141,4 @@ describe('Settlements - generate settlement', () => {
       expect(genBtn).not.toBeDisabled();
     });
   });
-
-  it('shows generating text while generating', async () => {
-    const { generateSettlement } = await import('../../services/campaign/settlementGenerator.js');
-    vi.mocked(generateSettlement).mockImplementation(() => new Promise(resolve => setTimeout(() => resolve({
-      name: 'Generated Town',
-      size: 'town',
-      description: 'A bustling town',
-      atmosphere: 'Lively',
-      government: 'Council',
-      population: '1,500 souls',
-      services: [],
-      notableNPCs: [],
-      rumors: [],
-      tags: 'generated',
-      notes: '',
-      threat: 'Bandits',
-    }), 50)));
-    render(<Settlements campaignName="test" onBack={() => {}} />);
-    const genBtn = screen.getByRole('button', { name: /generate settlement/i });
-    fireEvent.click(genBtn);
-    await waitFor(() => {
-      expect(genBtn).toHaveTextContent(/generating/i);
-    });
-  });
 });

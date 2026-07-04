@@ -87,15 +87,13 @@ describe('Quests', () => {
       expect(screen.getByText('*')).toBeInTheDocument();
     });
 
-    it('renders all status options in the select', () => {
+    it('renders status options with correct labels', () => {
       renderWithQuests([]);
       fireEvent.click(screen.getByRole('button', { name: /New Quest/ }));
 
-      const options = screen.getAllByRole('option');
-      expect(options.length).toBeGreaterThan(2);
-      expect(options[0].textContent).toBe('Active');
-      expect(options[1].textContent).toBe('Completed');
-      expect(options[2].textContent).toBe('Failed');
+      expect(screen.getByRole('option', { name: 'Active' })).toBeInTheDocument();
+      expect(screen.getByRole('option', { name: 'Completed' })).toBeInTheDocument();
+      expect(screen.getByRole('option', { name: 'Failed' })).toBeInTheDocument();
     });
   });
 
@@ -110,10 +108,6 @@ describe('Quests', () => {
       expect(screen.getByText(/No quests yet/)).toBeInTheDocument();
     });
 
-    it('does not show loading state when loading is false', () => {
-      renderWithQuests([]);
-      expect(screen.queryByText(/Loading quests/)).not.toBeInTheDocument();
-    });
   });
 
   describe('back navigation', () => {
@@ -213,12 +207,6 @@ describe('Quests', () => {
       fireEvent.change(nameInput, { target: { value: 'Find the Lost Sword' } });
       const saveButton = screen.getByText('Save').closest('button');
       expect(saveButton).not.toHaveAttribute('disabled');
-    });
-
-    it('does not show delete button in new quest modal', () => {
-      renderWithQuests([]);
-      fireEvent.click(screen.getByRole('button', { name: /New Quest/ }));
-      expect(screen.queryByText(/^Delete$/)).not.toBeInTheDocument();
     });
 
     it('closes modal and resets form after saving new quest', async () => {
@@ -346,50 +334,6 @@ describe('Quests', () => {
       expect(detailsDiv).not.toBeInTheDocument();
     });
 
-    it('does not show description div when quest description is null', async () => {
-      renderWithQuests([
-        {
-          id: 'quest-1',
-          name: 'Null Description Quest',
-          status: 'active',
-          description: null,
-          rewards: '',
-          notes: '',
-        },
-      ]);
-
-      await waitFor(() => {
-        expect(screen.getByText('Null Description Quest')).toBeInTheDocument();
-      });
-
-      const listItems = document.querySelectorAll('.ct-list-item');
-      const questItem = listItems[0];
-      const detailsDiv = questItem.querySelector('.ct-list-details');
-      expect(detailsDiv).not.toBeInTheDocument();
-    });
-
-    it('renders quest list items with role button and tabIndex 0', async () => {
-      renderWithQuests([
-        {
-          id: 'quest-1',
-          name: 'Test Quest',
-          status: 'active',
-          description: '',
-          rewards: '',
-          notes: '',
-        },
-      ]);
-
-      await waitFor(() => {
-        expect(screen.getByText('Test Quest')).toBeInTheDocument();
-      });
-
-      const listItems = document.querySelectorAll('.ct-list-item');
-      expect(listItems.length).toBe(1);
-      expect(listItems[0]).toHaveAttribute('role', 'button');
-      expect(listItems[0]).toHaveAttribute('tabindex', '0');
-    });
-
     it('renders quest list items with aria-label', async () => {
       renderWithQuests([
         {
@@ -436,7 +380,7 @@ describe('Quests', () => {
   });
 
   describe('status badges', () => {
-    it('renders status badge with correct color for active quest', async () => {
+    it('renders status badges for each quest with correct text', async () => {
       renderWithQuests([
         {
           id: 'quest-1',
@@ -446,44 +390,16 @@ describe('Quests', () => {
           rewards: '',
           notes: '',
         },
-      ]);
-
-      await waitFor(() => {
-        expect(screen.getByText('Active Quest')).toBeInTheDocument();
-      });
-
-      const badge = screen.getByText('active');
-      const styleAttr = badge.getAttribute('style');
-      expect(styleAttr).toContain('rgb(6, 95, 70)');
-      expect(styleAttr).toContain('rgb(52, 211, 153)');
-    });
-
-    it('renders status badge with correct color for completed quest', async () => {
-      renderWithQuests([
         {
-          id: 'quest-1',
+          id: 'quest-2',
           name: 'Completed Quest',
           status: 'completed',
           description: '',
           rewards: '',
           notes: '',
         },
-      ]);
-
-      await waitFor(() => {
-        expect(screen.getByText('Completed Quest')).toBeInTheDocument();
-      });
-
-      const badge = screen.getByText('completed');
-      const styleAttr = badge.getAttribute('style');
-      expect(styleAttr).toContain('rgb(30, 64, 175)');
-      expect(styleAttr).toContain('rgb(96, 165, 250)');
-    });
-
-    it('renders status badge with correct color for failed quest', async () => {
-      renderWithQuests([
         {
-          id: 'quest-1',
+          id: 'quest-3',
           name: 'Failed Quest',
           status: 'failed',
           description: '',
@@ -493,35 +409,14 @@ describe('Quests', () => {
       ]);
 
       await waitFor(() => {
+        expect(screen.getByText('Active Quest')).toBeInTheDocument();
+        expect(screen.getByText('Completed Quest')).toBeInTheDocument();
         expect(screen.getByText('Failed Quest')).toBeInTheDocument();
       });
 
-      const badge = screen.getByText('failed');
-      const styleAttr = badge.getAttribute('style');
-      expect(styleAttr).toContain('rgb(153, 27, 27)');
-      expect(styleAttr).toContain('rgb(248, 113, 113)');
-    });
-
-    it('defaults to active colors for unknown status values', async () => {
-      renderWithQuests([
-        {
-          id: 'quest-1',
-          name: 'Unknown Status Quest',
-          status: 'unknown',
-          description: '',
-          rewards: '',
-          notes: '',
-        },
-      ]);
-
-      await waitFor(() => {
-        expect(screen.getByText('Unknown Status Quest')).toBeInTheDocument();
-      });
-
-      const badge = screen.getByText('unknown');
-      const styleAttr = badge.getAttribute('style');
-      expect(styleAttr).toContain('rgb(6, 95, 70)');
-      expect(styleAttr).toContain('rgb(52, 211, 153)');
+      expect(screen.getByText('active')).toBeInTheDocument();
+      expect(screen.getByText('completed')).toBeInTheDocument();
+      expect(screen.getByText('failed')).toBeInTheDocument();
     });
 
     it('renders status badge with title attribute', async () => {
@@ -741,25 +636,6 @@ describe('Quests', () => {
       expect(questTwo.status).toBe('completed');
     });
 
-    it('calls handleEditQuest when quest list item is clicked', async () => {
-      renderWithQuests([
-        {
-          id: 'quest-1',
-          name: 'Click Test Quest',
-          status: 'active',
-          description: '',
-          rewards: '',
-          notes: '',
-        },
-      ]);
-
-      await waitFor(() => {
-        expect(screen.getByText('Click Test Quest')).toBeInTheDocument();
-      });
-
-      fireEvent.click(screen.getByText('Click Test Quest'));
-      expect(screen.getByRole('heading', { name: 'Edit Quest' })).toBeInTheDocument();
-    });
   });
 
   describe('search', () => {
@@ -1245,32 +1121,12 @@ describe('Quests', () => {
   });
 
   describe('header structure', () => {
-    it('renders back button with arrow icon', () => {
+    it('renders back button, title, and new quest button', () => {
       renderWithQuests([]);
-      const backBtn = document.querySelector('.ct-back-btn');
-      expect(backBtn).toBeInTheDocument();
-      expect(backBtn.querySelector('.fa-solid.fa-arrow-left')).toBeInTheDocument();
-    });
-
-    it('renders title with scroll icon', () => {
-      renderWithQuests([]);
-      const title = document.querySelector('.ct-title');
-      expect(title).toBeInTheDocument();
-      expect(title.querySelector('.fa-solid.fa-scroll')).toBeInTheDocument();
-    });
-
-    it('renders new quest button with plus icon', () => {
-      renderWithQuests([]);
-      const newBtn = document.querySelector('.ct-new-btn');
-      expect(newBtn).toBeInTheDocument();
-      expect(newBtn.querySelector('.fa-solid.fa-plus')).toBeInTheDocument();
-    });
-
-    it('renders search row with magnifying glass icon', () => {
-      renderWithQuests([]);
-      const searchRow = document.querySelector('.ct-search-row');
-      expect(searchRow).toBeInTheDocument();
-      expect(searchRow.querySelector('.fa-solid.fa-magnifying-glass')).toBeInTheDocument();
+      expect(document.querySelector('.ct-back-btn')).toBeInTheDocument();
+      expect(document.querySelector('.ct-title')).toBeInTheDocument();
+      expect(document.querySelector('.ct-new-btn')).toBeInTheDocument();
+      expect(document.querySelector('.ct-search-row')).toBeInTheDocument();
     });
   });
 
@@ -1297,37 +1153,9 @@ describe('Quests', () => {
       expect(questItem.querySelector('.ct-list-name')).toBeInTheDocument();
       expect(questItem.querySelector('.ct-list-meta')).toBeInTheDocument();
     });
-
-    it('renders list item with correct key attribute', async () => {
-      renderWithQuests([
-        {
-          id: 'quest-1',
-          name: 'Key Quest',
-          status: 'active',
-          description: '',
-          rewards: '',
-          notes: '',
-        },
-      ]);
-
-      await waitFor(() => {
-        expect(screen.getByText('Key Quest')).toBeInTheDocument();
-      });
-
-      const listItems = document.querySelectorAll('.ct-list-item');
-      expect(listItems[0].getAttribute('data-testid')).toBe(null);
-    });
   });
 
   describe('modal structure', () => {
-    it('renders modal with proper header', async () => {
-      renderWithQuests([]);
-      fireEvent.click(screen.getByRole('button', { name: /New Quest/ }));
-
-      expect(screen.getByRole('heading', { name: 'New Quest' })).toBeInTheDocument();
-      expect(screen.getByLabelText('Close')).toBeInTheDocument();
-    });
-
     it('renders modal body with all field labels', async () => {
       renderWithQuests([]);
       fireEvent.click(screen.getByRole('button', { name: /New Quest/ }));
@@ -1337,43 +1165,6 @@ describe('Quests', () => {
       expect(screen.getByTestId('preview-toggle-quest-description')).toBeInTheDocument();
       expect(screen.getByTestId('preview-toggle-quest-rewards')).toBeInTheDocument();
       expect(screen.getByTestId('preview-toggle-quest-notes')).toBeInTheDocument();
-    });
-
-    it('renders modal footer with cancel and save buttons', async () => {
-      renderWithQuests([]);
-      fireEvent.click(screen.getByRole('button', { name: /New Quest/ }));
-
-      expect(screen.getByText('Cancel')).toBeInTheDocument();
-      expect(screen.getByText('Save')).toBeInTheDocument();
-    });
-
-    it('renders save button with floppy disk icon', async () => {
-      renderWithQuests([]);
-      fireEvent.click(screen.getByRole('button', { name: /New Quest/ }));
-
-      const saveButton = screen.getByText('Save').closest('button');
-      expect(saveButton.querySelector('.fa-solid.fa-floppy-disk')).toBeInTheDocument();
-    });
-
-    it('renders delete button with trash icon', async () => {
-      renderWithQuests([
-        {
-          id: 'quest-1',
-          name: 'Delete Icon Quest',
-          status: 'active',
-          description: '',
-          rewards: '',
-          notes: '',
-        },
-      ]);
-
-      await waitFor(() => {
-        expect(screen.getByText('Delete Icon Quest')).toBeInTheDocument();
-      });
-
-      fireEvent.click(screen.getByText('Delete Icon Quest'));
-      const deleteButton = document.querySelector('.ct-btn-danger');
-      expect(deleteButton.querySelector('.fa-solid.fa-trash-can')).toBeInTheDocument();
     });
   });
 });

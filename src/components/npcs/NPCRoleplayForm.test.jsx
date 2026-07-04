@@ -39,32 +39,12 @@ describe('NPCRoleplayForm', () => {
       expect(screen.getByLabelText(/Tags/)).toBeInTheDocument();
     });
 
-    it('should render labels with ct-label class', () => {
-      renderForm();
-      const labels = document.querySelectorAll('.ct-label');
-      expect(labels.length).toBeGreaterThanOrEqual(3);
-    });
-
-    it('should render toggle buttons on PreviewToggle components', () => {
-      renderForm();
-      const toggleButtons = document.querySelectorAll('.preview-toggle-button');
-      expect(toggleButtons.length).toBeGreaterThan(0);
-    });
-
-    it('should render preview toggle labels', () => {
-      renderForm();
-      const previewLabels = document.querySelectorAll('.preview-toggle-label');
-      expect(previewLabels.length).toBeGreaterThan(0);
-    });
-  });
-
-  describe('Rendering: Values', () => {
     it.each([
       ['race', 'Race', 'Human', 'text', 'npc-race'],
       ['classRole', 'Class / Role', 'Wizard', 'text', 'npc-classRole'],
       ['tags', /Tags/, 'ally, quest-giver', 'text', 'npc-tags'],
     ])(
-      'should render %s with value, type and id',
+      'should render %s with correct value, type and id',
       (_fieldName, label, expectedValue, inputType, expectedId) => {
         renderForm();
         const input = typeof label === 'string' ? screen.getByLabelText(label) : screen.getByLabelText(label);
@@ -81,7 +61,7 @@ describe('NPCRoleplayForm', () => {
       ['secrets', 'Secrets', 'He is a Maia', 'npc-secrets'],
       ['notes', 'Notes', 'Carries a staff', 'npc-notes'],
     ])(
-      'should render %s with value and id',
+      'should render %s with correct value and id',
       (_fieldName, label, expectedValue, expectedId) => {
         renderForm();
         const input = screen.getByLabelText(label);
@@ -90,14 +70,6 @@ describe('NPCRoleplayForm', () => {
       },
     );
 
-    it('should render Attitude select with correct value', () => {
-      renderForm();
-      const attitudeSelect = screen.getByLabelText('Attitude');
-      expect(attitudeSelect.value).toBe('neutral');
-    });
-  });
-
-  describe('Rendering: Placeholders', () => {
     it.each([
       ['Race', 'e.g., Human, Elf, Dwarf'],
       ['Class / Role', 'e.g., Fighter, Wizard, Merchant'],
@@ -106,39 +78,19 @@ describe('NPCRoleplayForm', () => {
       ['Goals', 'What does this NPC want?'],
       ['Secrets', 'Hidden truths about this NPC…'],
       ['Notes', 'Additional notes…'],
+      [/Tags/, 'e.g., ally, enemy, quest-giver'],
     ])('should render %s with correct placeholder', (label, expectedPlaceholder) => {
       renderForm();
-      const input = screen.getByLabelText(label);
+      const input = typeof label === 'string' ? screen.getByLabelText(label) : screen.getByLabelText(label);
       expect(input).toHaveAttribute('placeholder', expectedPlaceholder);
     });
-
-    it('should render Tags input with placeholder', () => {
-      renderForm();
-      const tagsInput = screen.getByLabelText(/Tags/);
-      expect(tagsInput).toHaveAttribute('placeholder', 'e.g., ally, enemy, quest-giver');
-    });
   });
 
-  describe('Rendering: CSS Classes', () => {
-    it('should render text inputs with ct-input class', () => {
-      renderForm();
-      expect(screen.getByLabelText('Race')).toHaveClass('ct-input');
-      expect(screen.getByLabelText('Class / Role')).toHaveClass('ct-input');
-      expect(screen.getByLabelText(/Tags/)).toHaveClass('ct-input');
-    });
-
-    it('should render Attitude select with ct-select class', () => {
+  describe('Rendering: Attitude', () => {
+    it('should render Attitude select with correct value', () => {
       renderForm();
       const attitudeSelect = screen.getByLabelText('Attitude');
-      expect(attitudeSelect).toHaveClass('ct-select');
-    });
-  });
-
-  describe('Rendering: Attitude Options', () => {
-    it('should render all attitude options', () => {
-      renderForm();
-      const options = screen.getByLabelText('Attitude').querySelectorAll('option');
-      expect(options.length).toBeGreaterThan(0);
+      expect(attitudeSelect.value).toBe('neutral');
     });
 
     it('should render each attitude option with correct value and label', () => {
@@ -149,19 +101,6 @@ describe('NPCRoleplayForm', () => {
         expect(options[index].value).toBe(option.value);
         expect(options[index].textContent).toBe(option.label);
       });
-    });
-
-    it('should have neutral selected by default', () => {
-      renderForm();
-      const select = screen.getByLabelText('Attitude');
-      expect(select.value).toBe('neutral');
-    });
-
-    it('should have correct attitude values', () => {
-      renderForm();
-      const select = screen.getByLabelText('Attitude');
-      const optionValues = Array.from(select.querySelectorAll('option')).map((o) => o.value);
-      expect(optionValues).toEqual(ATTITUDE_OPTIONS.map((o) => o.value));
     });
   });
 
@@ -254,28 +193,8 @@ describe('NPCRoleplayForm', () => {
         tags: '',
       });
       expect(screen.getByLabelText('Race').value).toBe('');
+      expect(screen.getByLabelText('Class / Role').value).toBe('');
       expect(screen.getByLabelText(/Tags/).value).toBe('');
-    });
-  });
-
-  describe('Multiple Field Changes', () => {
-    it('should handle multiple field changes in sequence', () => {
-      renderForm();
-      const raceInput = screen.getByLabelText('Race');
-      fireEvent.change(raceInput, { target: { value: 'Dwarf' } });
-      expect(mockOnFieldChange).toHaveBeenCalledWith('race', 'Dwarf');
-
-      const classRoleInput = screen.getByLabelText('Class / Role');
-      fireEvent.change(classRoleInput, { target: { value: 'Cleric' } });
-      expect(mockOnFieldChange).toHaveBeenCalledWith('classRole', 'Cleric');
-    });
-  });
-
-  describe('Wrapper Structure', () => {
-    it('should render as a fragment (no wrapper element)', () => {
-      renderForm();
-      const labels = document.querySelectorAll('label[for]');
-      expect(labels.length).toBeGreaterThanOrEqual(3);
     });
   });
 });

@@ -40,73 +40,27 @@ const defaultProps = {
 
 describe('GenerateDungeonModal', () => {
   describe('initial render', () => {
-    it('renders modal title', () => {
+    it('renders modal title and form elements', () => {
       render(<GenerateDungeonModal {...defaultProps} />);
       expect(screen.getByText('Generate Dungeon Map')).toBeInTheDocument();
-    });
-
-    it('renders map name input', () => {
-      render(<GenerateDungeonModal {...defaultProps} />);
       expect(screen.getByPlaceholderText('e.g. Goblin Hideout')).toBeInTheDocument();
-    });
-
-    it('renders seed input', () => {
-      render(<GenerateDungeonModal {...defaultProps} />);
       expect(screen.getByPlaceholderText('Random if empty')).toBeInTheDocument();
-    });
-
-    it('renders cancel button', () => {
-      render(<GenerateDungeonModal {...defaultProps} />);
       expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
-    });
-
-    it('renders generate button', () => {
-      render(<GenerateDungeonModal {...defaultProps} />);
       expect(screen.getByRole('button', { name: 'Generate' })).toBeInTheDocument();
-    });
-
-    it('renders note text', () => {
-      render(<GenerateDungeonModal {...defaultProps} />);
       expect(screen.getByText(/starting point/)).toBeInTheDocument();
-    });
-
-    it('renders mode selector with BSP option', () => {
-      render(<GenerateDungeonModal {...defaultProps} />);
       expect(screen.getByText('BSP Dungeon')).toBeInTheDocument();
-    });
-
-    it('renders mode selector with Room Adjacent option', () => {
-      render(<GenerateDungeonModal {...defaultProps} />);
       expect(screen.getByText('Room Adjacent')).toBeInTheDocument();
-    });
-
-    it('renders density slider for BSP mode', () => {
-      render(<GenerateDungeonModal {...defaultProps} />);
       expect(screen.getByRole('slider')).toBeInTheDocument();
-    });
-
-    it('has BSP mode selected by default', () => {
-      render(<GenerateDungeonModal {...defaultProps} />);
-      expect(screen.getByText('BSP Dungeon').closest('button')).toHaveClass('active');
-    });
-
-    it('shows density hint text', () => {
-      render(<GenerateDungeonModal {...defaultProps} />);
       expect(screen.getByText(/Moderate/)).toBeInTheDocument();
-    });
-
-    it('has grid size spinbutton', () => {
-      render(<GenerateDungeonModal {...defaultProps} />);
       expect(screen.getAllByRole('spinbutton').length).toBeGreaterThan(0);
+      expect(screen.getByText('BSP Dungeon').closest('button')).toHaveClass('active');
     });
 
     it('is disabled when map name is empty', () => {
       render(<GenerateDungeonModal {...defaultProps} />);
       expect(screen.getByRole('button', { name: 'Generate' })).toBeDisabled();
     });
-  });
 
-  describe('initialMapName prop', () => {
     it('populates map name input with initial value', () => {
       render(<GenerateDungeonModal {...defaultProps} initialMapName="Pre-filled Name" />);
       expect(screen.getByDisplayValue('Pre-filled Name')).toBeInTheDocument();
@@ -114,87 +68,45 @@ describe('GenerateDungeonModal', () => {
   });
 
   describe('mode switching', () => {
-    it('switches to adjacent mode', () => {
+    it('switches to adjacent mode and shows its controls', () => {
       render(<GenerateDungeonModal {...defaultProps} />);
       fireEvent.click(screen.getByText('Room Adjacent'));
       expect(screen.getByText('Room Adjacent').closest('button')).toHaveClass('active');
-    });
-
-    it('renders room count for adjacent mode', () => {
-      render(<GenerateDungeonModal {...defaultProps} />);
-      fireEvent.click(screen.getByText('Room Adjacent'));
       expect(screen.getByText(/Room Count:/)).toBeInTheDocument();
-    });
-
-    it('renders room size options for adjacent mode', () => {
-      render(<GenerateDungeonModal {...defaultProps} />);
-      fireEvent.click(screen.getByText('Room Adjacent'));
       expect(screen.getByText('Cramped')).toBeInTheDocument();
       expect(screen.getByText('Standard')).toBeInTheDocument();
       expect(screen.getByText('Spacious')).toBeInTheDocument();
-    });
-
-    it('renders corridor length options for adjacent mode', () => {
-      render(<GenerateDungeonModal {...defaultProps} />);
-      fireEvent.click(screen.getByText('Room Adjacent'));
       expect(screen.getByText('Compact (rooms adjacent)')).toBeInTheDocument();
-    });
-
-    it('renders layout style options for adjacent mode', () => {
-      render(<GenerateDungeonModal {...defaultProps} />);
-      fireEvent.click(screen.getByText('Room Adjacent'));
       expect(screen.getByText('Balanced')).toBeInTheDocument();
       expect(screen.getByText('Linear')).toBeInTheDocument();
     });
 
-    it('selects room size option', () => {
+    it('selects room size, corridor length, and layout style options', () => {
       render(<GenerateDungeonModal {...defaultProps} />);
       fireEvent.click(screen.getByText('Room Adjacent'));
       fireEvent.click(screen.getByText('Cramped'));
       expect(screen.getByText('Cramped').closest('button')).toHaveClass('active');
-    });
-
-    it('selects corridor length option', () => {
-      render(<GenerateDungeonModal {...defaultProps} />);
-      fireEvent.click(screen.getByText('Room Adjacent'));
       fireEvent.click(screen.getByText('Compact (rooms adjacent)'));
       expect(screen.getByText('Compact (rooms adjacent)').closest('button')).toHaveClass('active');
-    });
-
-    it('selects layout style option', () => {
-      render(<GenerateDungeonModal {...defaultProps} />);
-      fireEvent.click(screen.getByText('Room Adjacent'));
       fireEvent.click(screen.getByText('Linear'));
       expect(screen.getByText('Linear').closest('button')).toHaveClass('active');
     });
   });
 
   describe('input updates', () => {
-    it('map name input updates state', () => {
+    it('updates map name, seed, grid size, and density state', () => {
       render(<GenerateDungeonModal {...defaultProps} />);
       fireEvent.change(screen.getByPlaceholderText('e.g. Goblin Hideout'), { target: { value: 'New Name' } });
       expect(screen.getByDisplayValue('New Name')).toBeInTheDocument();
-    });
-
-    it('seed input updates state', () => {
-      render(<GenerateDungeonModal {...defaultProps} />);
       fireEvent.change(screen.getByPlaceholderText('Random if empty'), { target: { value: '42' } });
       expect(screen.getByDisplayValue('42')).toBeInTheDocument();
-    });
-
-    it('grid size input updates state', () => {
-      render(<GenerateDungeonModal {...defaultProps} />);
       const gridInputs = screen.getAllByRole('spinbutton');
       fireEvent.change(gridInputs[0], { target: { value: '40' } });
       expect(gridInputs[0]).toHaveValue(40);
-    });
-
-    it('density slider has default value', () => {
-      render(<GenerateDungeonModal {...defaultProps} />);
       expect(screen.getByRole('slider')).toHaveValue('50');
     });
 
-    it('generate button is enabled when map name is provided', () => {
+    it('enables generate button when map name is provided', () => {
       render(<GenerateDungeonModal {...defaultProps} />);
       fireEvent.change(screen.getByPlaceholderText('e.g. Goblin Hideout'), { target: { value: 'My Dungeon' } });
       expect(screen.getByRole('button', { name: 'Generate' })).not.toBeDisabled();
@@ -202,7 +114,7 @@ describe('GenerateDungeonModal', () => {
   });
 
   describe('overlay interaction', () => {
-    it('overlay click calls onClose', () => {
+    it('calls onClose when overlay is clicked', () => {
       const { container } = render(<GenerateDungeonModal {...defaultProps} />);
       const overlay = container.querySelector('.maps-manager-modal-overlay');
       fireEvent.click(overlay);
@@ -219,16 +131,7 @@ describe('GenerateDungeonModal', () => {
   });
 
   describe('generation flow', () => {
-    it('shows generating state on generate click', async () => {
-      render(<GenerateDungeonModal {...defaultProps} />);
-      fireEvent.change(screen.getByPlaceholderText('e.g. Goblin Hideout'), { target: { value: 'My Dungeon' } });
-      fireEvent.click(screen.getByRole('button', { name: 'Generate' }));
-      await waitFor(() => {
-        expect(screen.getByText(/Generating/)).toBeInTheDocument();
-      });
-    });
-
-    it('calls onMapCreated and onClose on successful generation', async () => {
+    it('calls callbacks on successful generation', async () => {
       render(<GenerateDungeonModal {...defaultProps} />);
       fireEvent.change(screen.getByPlaceholderText('e.g. Goblin Hideout'), { target: { value: 'My Dungeon' } });
       fireEvent.click(screen.getByRole('button', { name: 'Generate' }));
@@ -237,23 +140,16 @@ describe('GenerateDungeonModal', () => {
         expect(defaultProps.onClose).toHaveBeenCalled();
       });
     });
-  });
 
-  describe('error handling', () => {
-    it('shows error when map name is empty on generate', () => {
-      render(<GenerateDungeonModal {...defaultProps} />);
-      const generateBtn = screen.getByRole('button', { name: 'Generate' });
-      fireEvent.click(generateBtn);
-      expect(generateBtn).toHaveAttribute('disabled');
-    });
-
-    it('shows generating state during generation', async () => {
+    it('disables buttons during generation', async () => {
       let resolve;
       mapsService.createMap.mockImplementationOnce(() => new Promise((r) => { resolve = r; }));
       render(<GenerateDungeonModal {...defaultProps} />);
       fireEvent.change(screen.getByPlaceholderText('e.g. Goblin Hideout'), { target: { value: 'Test' } });
       fireEvent.click(screen.getByRole('button', { name: 'Generate' }));
       expect(screen.getByText('Generating...')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Generating...' })).toBeDisabled();
+      expect(screen.getByRole('button', { name: 'Cancel' })).toBeDisabled();
       resolve();
     });
 
@@ -269,28 +165,21 @@ describe('GenerateDungeonModal', () => {
     });
   });
 
-  describe('BSP density hint changes', () => {
-    it('shows sparse hint when density is low', () => {
+  describe('BSP density hint', () => {
+    it('shows density hint that changes with slider value', () => {
       render(<GenerateDungeonModal {...defaultProps} />);
+      expect(screen.getByText(/Moderate/)).toBeInTheDocument();
       fireEvent.change(screen.getByRole('slider'), { target: { value: '20' } });
       expect(screen.getByText(/Sparse/)).toBeInTheDocument();
-    });
-
-    it('shows dense hint when density is high', () => {
-      render(<GenerateDungeonModal {...defaultProps} />);
       fireEvent.change(screen.getByRole('slider'), { target: { value: '80' } });
       expect(screen.getByText(/Dense/)).toBeInTheDocument();
     });
   });
 
   describe('grid size hint', () => {
-    it('shows grid size hint with default value', () => {
+    it('shows grid size hint that updates when grid size changes', () => {
       render(<GenerateDungeonModal {...defaultProps} />);
       expect(screen.getByText(/30 ft/)).toBeInTheDocument();
-    });
-
-    it('updates grid size hint when grid size changes', () => {
-      render(<GenerateDungeonModal {...defaultProps} />);
       const gridInputs = screen.getAllByRole('spinbutton');
       fireEvent.change(gridInputs[0], { target: { value: '40' } });
       expect(screen.getByText(/40 ft/)).toBeInTheDocument();
@@ -320,7 +209,7 @@ describe('GenerateDungeonModal', () => {
       expect(callArgs.density).toBe(0.5);
     });
 
-    it('calls generateDungeon with density from slider', async () => {
+    it('passes density from slider to generateDungeon', async () => {
       const { generateDungeon } = await import('../../services/maps/dungeonGenerator.js');
       generateDungeon.mockClear();
       render(<GenerateDungeonModal {...defaultProps} />);
@@ -334,34 +223,29 @@ describe('GenerateDungeonModal', () => {
       expect(callArgs.density).toBe(0.8);
     });
 
-    it('clamps grid size to min 7', async () => {
+    it('clamps grid size to min 7 and max 100', async () => {
       const { generateDungeon } = await import('../../services/maps/dungeonGenerator.js');
       generateDungeon.mockClear();
       render(<GenerateDungeonModal {...defaultProps} />);
       fireEvent.change(screen.getByPlaceholderText('e.g. Goblin Hideout'), { target: { value: 'BSP Dungeon' } });
       const gridInputs = screen.getAllByRole('spinbutton');
+
       fireEvent.change(gridInputs[0], { target: { value: '3' } });
       fireEvent.click(screen.getByRole('button', { name: 'Generate' }));
       await waitFor(() => {
-        expect(generateDungeon).toHaveBeenCalled();
+        expect(generateDungeon).toHaveBeenCalledWith(
+          expect.objectContaining({ gridSize: 7 })
+        );
       });
-      const callArgs = generateDungeon.mock.calls[0][0];
-      expect(callArgs.gridSize).toBe(7);
-    });
-
-    it('clamps grid size to max 100', async () => {
-      const { generateDungeon } = await import('../../services/maps/dungeonGenerator.js');
       generateDungeon.mockClear();
-      render(<GenerateDungeonModal {...defaultProps} />);
-      fireEvent.change(screen.getByPlaceholderText('e.g. Goblin Hideout'), { target: { value: 'BSP Dungeon' } });
-      const gridInputs = screen.getAllByRole('spinbutton');
+
       fireEvent.change(gridInputs[0], { target: { value: '200' } });
       fireEvent.click(screen.getByRole('button', { name: 'Generate' }));
       await waitFor(() => {
-        expect(generateDungeon).toHaveBeenCalled();
+        expect(generateDungeon).toHaveBeenCalledWith(
+          expect.objectContaining({ gridSize: 100 })
+        );
       });
-      const callArgs = generateDungeon.mock.calls[0][0];
-      expect(callArgs.gridSize).toBe(100);
     });
 
     it('shows clamping error when grid size is out of range', () => {
@@ -375,19 +259,7 @@ describe('GenerateDungeonModal', () => {
   });
 
   describe('generate with adjacent mode', () => {
-    it('calls generateAdjacentDungeon when in adjacent mode', async () => {
-      const { generateAdjacentDungeon } = await import('../../services/maps/dungeonGenerator.js');
-      generateAdjacentDungeon.mockClear();
-      render(<GenerateDungeonModal {...defaultProps} />);
-      fireEvent.click(screen.getByText('Room Adjacent'));
-      fireEvent.change(screen.getByPlaceholderText('e.g. Goblin Hideout'), { target: { value: 'Adjacent Dungeon' } });
-      fireEvent.click(screen.getByRole('button', { name: 'Generate' }));
-      await waitFor(() => {
-        expect(generateAdjacentDungeon).toHaveBeenCalled();
-      });
-    });
-
-    it('passes roomCount to generateAdjacentDungeon', async () => {
+    it('calls generateAdjacentDungeon with correct params for each mode option', async () => {
       const { generateAdjacentDungeon } = await import('../../services/maps/dungeonGenerator.js');
       generateAdjacentDungeon.mockClear();
       render(<GenerateDungeonModal {...defaultProps} />);
@@ -399,83 +271,74 @@ describe('GenerateDungeonModal', () => {
       });
       const callArgs = generateAdjacentDungeon.mock.calls[0][0];
       expect(callArgs.roomCount).toBe(8);
+      expect(callArgs.corridorLength).toBe('compact');
+      expect(callArgs.layoutStyle).toBe('balanced');
     });
 
-    it('passes corridorLength to generateAdjacentDungeon', async () => {
+    it('passes corridor length, layout style, and room size multipliers to generateAdjacentDungeon', async () => {
       const { generateAdjacentDungeon } = await import('../../services/maps/dungeonGenerator.js');
       generateAdjacentDungeon.mockClear();
-      render(<GenerateDungeonModal {...defaultProps} />);
-      fireEvent.click(screen.getByText('Room Adjacent'));
-      fireEvent.click(screen.getByText('Sprawling (long halls)'));
-      fireEvent.change(screen.getByPlaceholderText('e.g. Goblin Hideout'), { target: { value: 'Adjacent Dungeon' } });
-      fireEvent.click(screen.getByRole('button', { name: 'Generate' }));
-      await waitFor(() => {
-        expect(generateAdjacentDungeon).toHaveBeenCalled();
-      });
-      const callArgs = generateAdjacentDungeon.mock.calls[0][0];
-      expect(callArgs.corridorLength).toBe('sprawling');
-    });
 
-    it('passes layoutStyle to generateAdjacentDungeon', async () => {
-      const { generateAdjacentDungeon } = await import('../../services/maps/dungeonGenerator.js');
-      generateAdjacentDungeon.mockClear();
-      render(<GenerateDungeonModal {...defaultProps} />);
-      fireEvent.click(screen.getByText('Room Adjacent'));
-      fireEvent.click(screen.getByText('Linear'));
-      fireEvent.change(screen.getByPlaceholderText('e.g. Goblin Hideout'), { target: { value: 'Adjacent Dungeon' } });
-      fireEvent.click(screen.getByRole('button', { name: 'Generate' }));
-      await waitFor(() => {
-        expect(generateAdjacentDungeon).toHaveBeenCalled();
-      });
-      const callArgs = generateAdjacentDungeon.mock.calls[0][0];
-      expect(callArgs.layoutStyle).toBe('linear');
-    });
+      // Spacious room size, sprawling corridor, linear layout test
+      {
+        const { container } = render(<GenerateDungeonModal {...defaultProps} />);
+        const modeBtns = container.querySelectorAll('.dungeon-gen-mode-btn');
+        fireEvent.click(modeBtns[1]); // Room Adjacent
+        const optionGroups = container.querySelectorAll('.dungeon-gen-option-group');
+        const roomSizeBtns = optionGroups[0].querySelectorAll('.dungeon-gen-option-btn');
+        const corridorBtns = optionGroups[1].querySelectorAll('.dungeon-gen-option-btn');
+        const layoutBtns = optionGroups[2].querySelectorAll('.dungeon-gen-option-btn');
+        fireEvent.click(roomSizeBtns[2]); // Spacious
+        fireEvent.click(corridorBtns[2]); // Sprawling (long halls)
+        fireEvent.click(layoutBtns[1]); // Linear
+        fireEvent.change(container.querySelector('input[type="text"]'), { target: { value: 'Adjacent Dungeon' } });
+        fireEvent.click(container.querySelector('.dungeon-gen-generate-btn'));
+        await waitFor(() => {
+          expect(generateAdjacentDungeon).toHaveBeenCalled();
+        });
+        const callArgs = generateAdjacentDungeon.mock.calls[0][0];
+        expect(callArgs.corridorLength).toBe('sprawling');
+        expect(callArgs.layoutStyle).toBe('linear');
+        expect(callArgs.minRoom).toBe(Math.max(3, Math.floor(Math.max(4, Math.floor(30 / 8)) * 1.3)));
+        expect(callArgs.maxRoom).toBe(Math.max(6, Math.floor(Math.max(8, Math.min(18, Math.floor(30 / 2.5))) * 1.3)));
+      }
 
-    it('passes cramped sizeMultiplier to generateAdjacentDungeon', async () => {
-      const { generateAdjacentDungeon } = await import('../../services/maps/dungeonGenerator.js');
       generateAdjacentDungeon.mockClear();
-      render(<GenerateDungeonModal {...defaultProps} />);
-      fireEvent.click(screen.getByText('Room Adjacent'));
-      fireEvent.click(screen.getByText('Cramped'));
-      fireEvent.change(screen.getByPlaceholderText('e.g. Goblin Hideout'), { target: { value: 'Adjacent Dungeon' } });
-      fireEvent.click(screen.getByRole('button', { name: 'Generate' }));
-      await waitFor(() => {
-        expect(generateAdjacentDungeon).toHaveBeenCalled();
-      });
-      const callArgs = generateAdjacentDungeon.mock.calls[0][0];
-      expect(callArgs.minRoom).toBe(Math.max(3, Math.floor(Math.max(4, Math.floor(30 / 8)) * 0.7)));
-      expect(callArgs.maxRoom).toBe(Math.max(6, Math.floor(Math.max(8, Math.min(18, Math.floor(30 / 2.5))) * 0.7)));
-    });
 
-    it('passes spacious sizeMultiplier to generateAdjacentDungeon', async () => {
-      const { generateAdjacentDungeon } = await import('../../services/maps/dungeonGenerator.js');
-      generateAdjacentDungeon.mockClear();
-      render(<GenerateDungeonModal {...defaultProps} />);
-      fireEvent.click(screen.getByText('Room Adjacent'));
-      fireEvent.click(screen.getByText('Spacious'));
-      fireEvent.change(screen.getByPlaceholderText('e.g. Goblin Hideout'), { target: { value: 'Adjacent Dungeon' } });
-      fireEvent.click(screen.getByRole('button', { name: 'Generate' }));
-      await waitFor(() => {
-        expect(generateAdjacentDungeon).toHaveBeenCalled();
-      });
-      const callArgs = generateAdjacentDungeon.mock.calls[0][0];
-      expect(callArgs.minRoom).toBe(Math.max(3, Math.floor(Math.max(4, Math.floor(30 / 8)) * 1.3)));
-      expect(callArgs.maxRoom).toBe(Math.max(6, Math.floor(Math.max(8, Math.min(18, Math.floor(30 / 2.5))) * 1.3)));
-    });
+      // Cramped room size test
+      {
+        const { container } = render(<GenerateDungeonModal {...defaultProps} />);
+        const modeBtns = container.querySelectorAll('.dungeon-gen-mode-btn');
+        fireEvent.click(modeBtns[1]); // Room Adjacent
+        const optionGroups = container.querySelectorAll('.dungeon-gen-option-group');
+        const roomSizeBtns = optionGroups[0].querySelectorAll('.dungeon-gen-option-btn');
+        fireEvent.click(roomSizeBtns[0]); // Cramped
+        fireEvent.change(container.querySelector('input[type="text"]'), { target: { value: 'Adjacent Dungeon' } });
+        fireEvent.click(container.querySelector('.dungeon-gen-generate-btn'));
+        await waitFor(() => {
+          expect(generateAdjacentDungeon).toHaveBeenCalled();
+        });
+        const crampedArgs = generateAdjacentDungeon.mock.calls[0][0];
+        expect(crampedArgs.minRoom).toBe(Math.max(3, Math.floor(Math.max(4, Math.floor(30 / 8)) * 0.7)));
+        expect(crampedArgs.maxRoom).toBe(Math.max(6, Math.floor(Math.max(8, Math.min(18, Math.floor(30 / 2.5))) * 0.7)));
+      }
 
-    it('passes standard sizeMultiplier to generateAdjacentDungeon', async () => {
-      const { generateAdjacentDungeon } = await import('../../services/maps/dungeonGenerator.js');
       generateAdjacentDungeon.mockClear();
-      render(<GenerateDungeonModal {...defaultProps} />);
-      fireEvent.click(screen.getByText('Room Adjacent'));
-      fireEvent.change(screen.getByPlaceholderText('e.g. Goblin Hideout'), { target: { value: 'Adjacent Dungeon' } });
-      fireEvent.click(screen.getByRole('button', { name: 'Generate' }));
-      await waitFor(() => {
-        expect(generateAdjacentDungeon).toHaveBeenCalled();
-      });
-      const callArgs = generateAdjacentDungeon.mock.calls[0][0];
-      expect(callArgs.minRoom).toBe(Math.max(3, Math.floor(Math.max(4, Math.floor(30 / 8)) * 1)));
-      expect(callArgs.maxRoom).toBe(Math.max(6, Math.floor(Math.max(8, Math.min(18, Math.floor(30 / 2.5))) * 1)));
+
+      // Standard (default) room size test
+      {
+        const { container } = render(<GenerateDungeonModal {...defaultProps} />);
+        const modeBtns = container.querySelectorAll('.dungeon-gen-mode-btn');
+        fireEvent.click(modeBtns[1]); // Room Adjacent
+        fireEvent.change(container.querySelector('input[type="text"]'), { target: { value: 'Adjacent Dungeon' } });
+        fireEvent.click(container.querySelector('.dungeon-gen-generate-btn'));
+        await waitFor(() => {
+          expect(generateAdjacentDungeon).toHaveBeenCalled();
+        });
+        const standardArgs = generateAdjacentDungeon.mock.calls[0][0];
+        expect(standardArgs.minRoom).toBe(Math.max(3, Math.floor(Math.max(4, Math.floor(30 / 8)) * 1)));
+        expect(standardArgs.maxRoom).toBe(Math.max(6, Math.floor(Math.max(8, Math.min(18, Math.floor(30 / 2.5))) * 1)));
+      }
     });
   });
 
@@ -511,7 +374,7 @@ describe('GenerateDungeonModal', () => {
   });
 
   describe('mapsService.createMap', () => {
-    it('calls createMap with campaign name and map data', async () => {
+    it('calls createMap with campaign name and map data on success', async () => {
       render(<GenerateDungeonModal {...defaultProps} />);
       fireEvent.change(screen.getByPlaceholderText('e.g. Goblin Hideout'), { target: { value: 'My Dungeon' } });
       fireEvent.click(screen.getByRole('button', { name: 'Generate' }));
@@ -521,29 +384,6 @@ describe('GenerateDungeonModal', () => {
       const callArgs = mapsService.createMap.mock.calls[0];
       expect(callArgs[0]).toBe('test-campaign');
       expect(callArgs[1]).toBe('My Dungeon');
-    });
-  });
-
-  describe('generation disabled states', () => {
-    it('disables generate button during generation', async () => {
-      let resolve;
-      mapsService.createMap.mockImplementationOnce(() => new Promise((r) => { resolve = r; }));
-      render(<GenerateDungeonModal {...defaultProps} />);
-      fireEvent.change(screen.getByPlaceholderText('e.g. Goblin Hideout'), { target: { value: 'Test' } });
-      fireEvent.click(screen.getByRole('button', { name: 'Generate' }));
-      expect(screen.getByText('Generating...')).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'Generating...' })).toBeDisabled();
-      resolve();
-    });
-
-    it('disables cancel button during generation', async () => {
-      let resolve;
-      mapsService.createMap.mockImplementationOnce(() => new Promise((r) => { resolve = r; }));
-      render(<GenerateDungeonModal {...defaultProps} />);
-      fireEvent.change(screen.getByPlaceholderText('e.g. Goblin Hideout'), { target: { value: 'Test' } });
-      fireEvent.click(screen.getByRole('button', { name: 'Generate' }));
-      expect(screen.getByRole('button', { name: 'Cancel' })).toBeDisabled();
-      resolve();
     });
   });
 });

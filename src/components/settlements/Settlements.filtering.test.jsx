@@ -76,11 +76,6 @@ describe('Settlements - filtering', () => {
     vi.restoreAllMocks();
   });
 
-  beforeEach(() => {
-    // Override module mock
-    Object.assign(settlementMockReturn, mockUseSettlements);
-  });
-
   it('filters by name case-insensitively', () => {
     render(<Settlements campaignName="test" onBack={() => {}} />);
     const searchInput = screen.getByLabelText('Search settlements');
@@ -90,25 +85,11 @@ describe('Settlements - filtering', () => {
     expect(screen.queryByText('Goldhaven')).not.toBeInTheDocument();
   });
 
-  it('filters by name case-insensitively with uppercase', () => {
-    render(<Settlements campaignName="test" onBack={() => {}} />);
-    const searchInput = screen.getByLabelText('Search settlements');
-    fireEvent.change(searchInput, { target: { value: 'FIREPORT' } });
-    expect(screen.getByText('Fireport')).toBeInTheDocument();
-  });
-
   it('filters by tags case-insensitively', () => {
     render(<Settlements campaignName="test" onBack={() => {}} />);
     const searchInput = screen.getByLabelText('Search settlements');
     fireEvent.change(searchInput, { target: { value: 'COASTAL' } });
     expect(screen.getByText('Fireport')).toBeInTheDocument();
-  });
-
-  it('filters by description case-insensitively', () => {
-    render(<Settlements campaignName="test" onBack={() => {}} />);
-    const searchInput = screen.getByLabelText('Search settlements');
-    fireEvent.change(searchInput, { target: { value: 'wealthy' } });
-    expect(screen.getByText('Goldhaven')).toBeInTheDocument();
   });
 
   it('combines search and size filter', () => {

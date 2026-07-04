@@ -1,6 +1,6 @@
 // @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, cleanup } from '@testing-library/react';
 import MonsterCardModal from './MonsterCardModal.jsx';
 
 vi.mock('../../services/ui/sanitize.js', () => ({
@@ -152,6 +152,7 @@ describe('MonsterCardModal', () => {
             renderModal();
             expect(screen.getByText(/Small Humanoid \(Goblinoid\), Neutral Evil/)).toBeInTheDocument();
 
+            cleanup();
             const monsterWithoutSubtype = { ...baseMonster, subtype: null };
             render(
                 <MonsterCardModal monster={monsterWithoutSubtype} onClose={mockOnClose} campaignName={mockCampaignName} />
@@ -253,12 +254,14 @@ describe('MonsterCardModal', () => {
             expect(screen.getByText('Legendary Resist.')).toBeInTheDocument();
             expect(screen.getByText('3/day')).toBeInTheDocument();
 
+            cleanup();
             const monsterNullLegendary = { ...baseMonster, legendary_resistance: null };
             render(
                 <MonsterCardModal monster={monsterNullLegendary} onClose={mockOnClose} campaignName={mockCampaignName} />
             );
             expect(screen.queryByText('Legendary Resist.')).not.toBeInTheDocument();
 
+            cleanup();
             const monsterUndefinedLegendary = { ...baseMonster };
             delete monsterUndefinedLegendary.legendary_resistance;
             render(
@@ -427,6 +430,7 @@ describe('MonsterCardModal', () => {
             expect(screen.getByText('A small but vicious creature.')).toBeInTheDocument();
             expect(screen.getByText('Monster Manual (page 310)')).toBeInTheDocument();
 
+            cleanup();
             const monsterWithBook = {
                 ...baseMonster,
                 desc: 'A small but vicious creature.',
@@ -438,6 +442,7 @@ describe('MonsterCardModal', () => {
             expect(screen.getByText('Monster Manual')).toBeInTheDocument();
             expect(screen.queryByText(/page/i)).not.toBeInTheDocument();
 
+            cleanup();
             const monsterNoDesc = { ...baseMonster };
             delete monsterNoDesc.desc;
             render(
@@ -547,6 +552,7 @@ describe('MonsterCardModal', () => {
             );
             expect(screen.getByText(/blindsight 30.*darkvision 60.*truesight 120.*tremorsense 60.*passive Perception 14/)).toBeInTheDocument();
 
+            cleanup();
             const monsterNoSenses = { ...baseMonster, senses: {} };
             render(
                 <MonsterCardModal monster={monsterNoSenses} onClose={mockOnClose} campaignName={mockCampaignName} />
@@ -561,12 +567,14 @@ describe('MonsterCardModal', () => {
             );
             expect(screen.queryByText(/saving throws/i)).not.toBeInTheDocument();
 
+            cleanup();
             const monsterNoSkills = { ...baseMonster, skills: {} };
             render(
                 <MonsterCardModal monster={monsterNoSkills} onClose={mockOnClose} campaignName={mockCampaignName} />
             );
             expect(screen.queryByText(/skills/i)).not.toBeInTheDocument();
 
+            cleanup();
             const monsterNoLang = { ...baseMonster, languages: '' };
             render(
                 <MonsterCardModal monster={monsterNoLang} onClose={mockOnClose} campaignName={mockCampaignName} />
@@ -583,6 +591,7 @@ describe('MonsterCardModal', () => {
             expect(screen.getByText('7')).toBeInTheDocument();
             expect(screen.queryByText('1d6')).not.toBeInTheDocument();
 
+            cleanup();
             const monsterNoInit = { ...baseMonster };
             delete monsterNoInit.initiative_details;
             render(
@@ -595,6 +604,7 @@ describe('MonsterCardModal', () => {
             renderModal();
             expect(screen.getByText('Goblin')).toBeInTheDocument();
 
+            cleanup();
             render(
                 <MonsterCardModal monster={baseMonster} onClose={mockOnClose} campaignName={mockCampaignName} creatureName="" />
             );

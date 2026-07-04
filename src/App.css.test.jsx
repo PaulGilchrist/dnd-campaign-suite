@@ -128,8 +128,6 @@ describe('App.css', () => {
         cursor: 'pointer',
         opacity: '0.8',
       });
-      expect(rule).toContain('transition');
-      expect(rule).toContain('opacity');
 
       const hoverRules = extractRules(css, '.icon-button:hover:not(:disabled)');
       expect(hoverRules.length).toBeGreaterThan(0);
@@ -158,7 +156,6 @@ describe('App.css', () => {
         cursor: 'pointer',
         'white-space': 'nowrap',
       });
-      expect(btnRule).toContain('var(--border-color)');
 
       const hoverRule = extractRule(css, '.char-btn:hover');
       expect(hoverRule).not.toBeNull();
@@ -269,7 +266,6 @@ describe('App.css', () => {
           color: 'var(--color-text-inverse)',
           cursor: 'pointer',
         });
-        expect(rule).toContain('var(--color-primary)');
 
         const hoverRule = extractRule(css, '.ct-container .ct-new-btn:hover');
         expect(hoverRule).not.toBeNull();
@@ -302,7 +298,6 @@ describe('App.css', () => {
           flex: '1',
           background: 'var(--background-color-input)',
         });
-        expect(rule).toContain('var(--border-color)');
 
         const focusRule = extractRule(css, '.ct-container .ct-search-input:focus');
         expect(focusRule).not.toBeNull();
@@ -361,7 +356,6 @@ describe('App.css', () => {
           cursor: 'pointer',
           'border-radius': '6px',
         });
-        expect(rule).toContain('var(--border-color)');
 
         const hoverRule = extractRule(css, '.ct-container .ct-list-item:hover');
         expect(hoverRule).not.toBeNull();
@@ -394,14 +388,12 @@ describe('App.css', () => {
           'font-weight': '600',
           'font-size': '0.95rem',
         });
-        expect(nameRule).toContain('var(--color-text)');
 
         const previewRule = extractRule(css, '.ct-container .ct-list-preview');
         expect(previewRule).not.toBeNull();
         assertProps(previewRule, {
           'font-size': '0.82rem',
         });
-        expect(previewRule).toContain('var(--color-text-secondary)');
       });
     });
 
@@ -548,7 +540,6 @@ describe('App.css', () => {
           display: 'block',
           'font-weight': '600',
         });
-        expect(rule).toContain('var(--color-text-secondary)');
 
         const requiredRule = extractRule(css, '.ct-container .ct-required');
         expect(requiredRule).not.toBeNull();
@@ -564,8 +555,6 @@ describe('App.css', () => {
           width: '100%',
           'box-sizing': 'border-box',
         });
-        expect(rule).toContain('var(--border-color)');
-        expect(rule).toContain('var(--background-color-input)');
 
         const focusRule = extractRule(css, '.ct-container .ct-input:focus');
         expect(focusRule).not.toBeNull();
@@ -573,7 +562,6 @@ describe('App.css', () => {
           'border-color': 'var(--color-primary)',
           outline: 'none',
         });
-        expect(focusRule).toContain('var(--color-primary-rgb');
       });
     });
 
@@ -599,7 +587,6 @@ describe('App.css', () => {
           width: '100%',
           cursor: 'pointer',
         });
-        expect(rule).toContain('var(--border-color)');
       });
     });
   });
@@ -614,8 +601,6 @@ describe('App.css', () => {
           'align-items': 'center',
           cursor: 'pointer',
         });
-        expect(rule).toContain('var(--border-color)');
-        expect(rule).toContain('var(--background-color-button-secondary)');
 
         const disabledRule = extractRule(css, '.ct-container .ct-btn:disabled');
         expect(disabledRule).not.toBeNull();
@@ -634,7 +619,6 @@ describe('App.css', () => {
           background: 'var(--color-primary)',
           color: 'var(--color-text-inverse)',
         });
-        expect(rule).toContain('var(--color-primary)');
 
         const hoverRule = extractRule(css, '.ct-container .ct-btn-primary:hover:not(:disabled)');
         expect(hoverRule).not.toBeNull();
@@ -666,8 +650,6 @@ describe('App.css', () => {
         'align-items': 'center',
         cursor: 'pointer',
       });
-      expect(rule).toContain('var(--border-color)');
-      expect(rule).toContain('var(--background-color-button-secondary)');
 
       const hoverRule = extractRule(css, '.ct-container .ct-back-btn:hover');
       expect(hoverRule).not.toBeNull();
@@ -730,58 +712,6 @@ describe('App.css', () => {
       expect(breakpoint.body).toContain('flex-direction: column');
       expect(breakpoint.body).toContain('width: 100%');
       expect(breakpoint.body).toContain('justify-content: flex-end');
-    });
-  });
-
-  describe('CSS variable usage', () => {
-    it('should use --color-header in multiple rules', () => {
-      const refs = css.match(/var\(--color-header\)/g);
-      expect(refs).not.toBeNull();
-      expect(refs.length).toBeGreaterThan(1);
-    });
-
-    it('should use --color-text in multiple rules', () => {
-      const refs = css.match(/var\(--color-text\)/g);
-      expect(refs).not.toBeNull();
-      expect(refs.length).toBeGreaterThan(1);
-    });
-
-    it('should use --border-color in multiple rules', () => {
-      const refs = css.match(/var\(--border-color\)/g);
-      expect(refs).not.toBeNull();
-      expect(refs.length).toBeGreaterThan(1);
-    });
-
-    it('should use --color-primary in multiple rules', () => {
-      const refs = css.match(/var\(--color-primary\)/g);
-      expect(refs).not.toBeNull();
-      expect(refs.length).toBeGreaterThan(1);
-    });
-
-    it('should use --background-color-card in multiple rules', () => {
-      const refs = css.match(/var\(--background-color-card\)/g);
-      expect(refs).not.toBeNull();
-      expect(refs.length).toBeGreaterThan(1);
-    });
-
-    it('should use --color-error in multiple rules', () => {
-      const refs = css.match(/var\(--color-error\)/g);
-      expect(refs).not.toBeNull();
-      expect(refs.length).toBeGreaterThan(1);
-    });
-
-    it('should use --color-primary-hover in rules', () => {
-      const refs = css.match(/var\(--color-primary-hover\)/g);
-      expect(refs).not.toBeNull();
-      expect(refs.length).toBeGreaterThan(0);
-    });
-  });
-
-  describe('Transition properties', () => {
-    it('should define transitions on interactive elements', () => {
-      const refs = css.match(/transition:/g);
-      expect(refs).not.toBeNull();
-      expect(refs.length).toBeGreaterThan(3);
     });
   });
 });

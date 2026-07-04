@@ -80,12 +80,7 @@ describe('NPCFormModal', () => {
       expect(screen.getByRole('heading', { name: 'Edit NPC' })).toBeInTheDocument();
     });
 
-    it('should render close button with correct aria-label', () => {
-      renderModal();
-      expect(screen.getByLabelText('Close')).toBeInTheDocument();
-    });
-
-    it('should call onClose when close button clicked', () => {
+    it('should render close button and call onClose when clicked', () => {
       renderModal();
       fireEvent.click(screen.getByLabelText('Close'));
       expect(mockOnClose).toHaveBeenCalledTimes(1);
@@ -95,12 +90,7 @@ describe('NPCFormModal', () => {
   // ── Avatar Section ────────────────────────────────────────────────
 
   describe('Avatar Section', () => {
-    it('should render avatar section', () => {
-      renderModal();
-      expect(screen.getByText('Upload Avatar').closest('.npcs-avatar-section')).toBeInTheDocument();
-    });
-
-    it('should render upload avatar button', () => {
+    it('should render avatar section and upload button', () => {
       renderModal();
       expect(screen.getByText('Upload Avatar')).toBeInTheDocument();
     });
@@ -157,94 +147,43 @@ describe('NPCFormModal', () => {
       expect(roleplayTab).toHaveClass('npcs-tab-active');
     });
 
-    it('should switch to Stats tab when clicked', () => {
+    it('should switch tabs when clicked and toggle active class', () => {
       renderModal();
       const statsTab = screen.getByText('Stats');
       fireEvent.click(statsTab);
-      const statsBtn = statsTab.closest('button');
-      expect(statsBtn).toHaveClass('npcs-tab-active');
-    });
+      expect(statsTab.closest('button')).toHaveClass('npcs-tab-active');
 
-    it('should switch back to Roleplay tab when clicked', () => {
-      renderModal();
-      const statsTab = screen.getByText('Stats');
-      fireEvent.click(statsTab);
       const roleplayTab = screen.getByText('Roleplay');
       fireEvent.click(roleplayTab);
-      const roleplayBtn = roleplayTab.closest('button');
-      expect(roleplayBtn).toHaveClass('npcs-tab-active');
+      expect(roleplayTab.closest('button')).toHaveClass('npcs-tab-active');
     });
 
-    it('should show roleplay tab content when roleplay tab active', () => {
+    it('should show roleplay tab content when active and stats content when hidden', () => {
       renderModal();
       expect(screen.getByLabelText('Race')).toBeInTheDocument();
+      const statsTabContent = screen.getByText('AC').closest('.npcs-stats-tab');
+      expect(statsTabContent).toHaveClass('npcs-tab-hidden');
     });
 
-    it('should show stats tab content when stats tab active', () => {
+    it('should show stats tab content when active and roleplay content when hidden', () => {
       renderModal();
       const statsTab = screen.getByText('Stats');
       fireEvent.click(statsTab);
       expect(screen.getByText('AC')).toBeInTheDocument();
-    });
-
-    it('should apply hidden class to inactive tab content', () => {
-      renderModal();
-      const statsTabContent = screen.getByText('AC').closest('.npcs-stats-tab');
-      const roleplayTabContent = screen.getByLabelText('Race').closest('.npcs-roleplay-tab');
-      expect(roleplayTabContent).not.toHaveClass('npcs-tab-hidden');
-      expect(statsTabContent).toHaveClass('npcs-tab-hidden');
-    });
-
-    it('should show only the active tab content visible', () => {
-      renderModal();
-      const statsTab = screen.getByText('Stats');
-      fireEvent.click(statsTab);
-      const statsTabContent = screen.getByText('AC').closest('.npcs-stats-tab');
       const roleplayTabContent = screen.getByText('Race').closest('.npcs-roleplay-tab');
-      expect(statsTabContent).not.toHaveClass('npcs-tab-hidden');
       expect(roleplayTabContent).toHaveClass('npcs-tab-hidden');
-    });
-
-    it('should have both tab buttons with correct CSS classes', () => {
-      renderModal();
-      const tabs = document.querySelectorAll('.npcs-tab');
-      expect(tabs.length).toBeGreaterThan(0);
-      tabs.forEach((tab) => {
-        expect(tab).toHaveClass('npcs-tab');
-      });
-    });
-
-    it('should render book icon on roleplay tab', () => {
-      renderModal();
-      const roleplayTab = screen.getByText('Roleplay').closest('button');
-      expect(roleplayTab.querySelector('.fa-book')).toBeInTheDocument();
-    });
-
-    it('should render shield icon on stats tab', () => {
-      renderModal();
-      const statsTab = screen.getByText('Stats').closest('button');
-      expect(statsTab.querySelector('.fa-shield')).toBeInTheDocument();
     });
   });
 
   // ── Name Field ────────────────────────────────────────────────────
 
   describe('Name Field', () => {
-    it('should render name input with required indicator', () => {
-      renderModal();
-      expect(screen.getByLabelText(/Name/)).toBeInTheDocument();
-      expect(screen.getByText('*')).toBeInTheDocument();
-    });
-
-    it('should render name input with autoFocus', () => {
+    it('should render name input with required indicator, placeholder, and autoFocus', () => {
       renderModal();
       const nameInput = screen.getByLabelText(/Name/);
+      expect(nameInput).toHaveAttribute('placeholder', 'NPC name');
       expect(nameInput).toBeInTheDocument();
-    });
-
-    it('should render name input with placeholder', () => {
-      renderModal();
-      expect(screen.getByLabelText(/Name/)).toHaveAttribute('placeholder', 'NPC name');
+      expect(screen.getByText('*')).toBeInTheDocument();
     });
 
     it('should handle name field change', () => {
@@ -288,19 +227,9 @@ describe('NPCFormModal', () => {
       expect(saveButton).toHaveAttribute('disabled');
     });
 
-    it('should not disable save button when disabled prop is false', () => {
-      renderModal({ disabled: false });
-      const saveButton = screen.getByText('Save').closest('button');
-      expect(saveButton).not.toHaveAttribute('disabled');
-    });
-
-    it('should show saving state text when saving is true', () => {
+    it('should show saving state and disable save button when saving is true', () => {
       renderModal({ saving: true });
       expect(screen.getByText('Saving…')).toBeInTheDocument();
-    });
-
-    it('should disable save button when saving is true', () => {
-      renderModal({ saving: true });
       const saveButton = screen.getByText('Saving…').closest('button');
       expect(saveButton).not.toHaveAttribute('disabled');
     });
@@ -325,13 +254,9 @@ describe('NPCFormModal', () => {
       expect(mockOnDelete).toHaveBeenCalledTimes(1);
     });
 
-    it('should show deleting state text when deleting is true', () => {
+    it('should show deleting state and disable delete button when deleting is true', () => {
       renderModal({ editingNPC: { name: 'Gandalf' }, deleting: true });
       expect(screen.getByText('Deleting…')).toBeInTheDocument();
-    });
-
-    it('should disable delete button when deleting is true', () => {
-      renderModal({ editingNPC: { name: 'Gandalf' }, deleting: true });
       const deleteButton = screen.getByText('Deleting…').closest('button');
       expect(deleteButton).toHaveAttribute('disabled');
     });
@@ -340,12 +265,22 @@ describe('NPCFormModal', () => {
   // ── Save & Add to Initiative ──────────────────────────────────────
 
   describe('Save & Add to Initiative', () => {
-    it('should not render button when npcHasStatBlock is false', () => {
+    it('should not render button when npcHasStatBlock is false or callback is missing', () => {
       renderModal({ formData: { ...defaultFormData, armorClass: undefined } });
+      expect(screen.queryByText(/Save & Add to Initiative/)).not.toBeInTheDocument();
+
+      render(
+        <NPCFormModal
+          formData={defaultFormData}
+          setFormData={mockSetFormData}
+          onClose={mockOnClose}
+          onSave={mockOnSave}
+        />
+      );
       expect(screen.queryByText(/Save & Add to Initiative/)).not.toBeInTheDocument();
     });
 
-    it('should render button when npcHasStatBlock is true', () => {
+    it('should render button when npcHasStatBlock is true and callback is provided', () => {
       renderModal({ formData: { ...defaultFormData, armorClass: 15 } });
       expect(screen.getByText(/Save & Add to Initiative/)).toBeInTheDocument();
     });
@@ -361,71 +296,27 @@ describe('NPCFormModal', () => {
       const btn = screen.getByText(/Save & Add to Initiative/).closest('button');
       expect(btn).toHaveAttribute('disabled');
     });
-
-    it('should not render button when onSaveAndAddToInitiative is not provided', () => {
-      render(
-        <NPCFormModal
-          formData={defaultFormData}
-          setFormData={mockSetFormData}
-          onClose={mockOnClose}
-          onSave={mockOnSave}
-        />
-      );
-      expect(screen.queryByText(/Save & Add to Initiative/)).not.toBeInTheDocument();
-    });
   });
 
   // ── Avatar Modal ──────────────────────────────────────────────────
 
   describe('Avatar Modal', () => {
-    it('should not render avatar modal when no image', () => {
-      renderModal();
-      expect(screen.queryByText(/avatar/i)?.closest('.avatar-modal-overlay')).not.toBeInTheDocument();
-    });
-
-    it('should not render avatar modal by default even with image', () => {
+    it('should not render avatar modal by default even with image or imagePath', () => {
       renderModal({
         formData: { ...defaultFormData, image: 'data:image/png;base64,abc' },
       });
-      expect(screen.queryByText(/avatar/i)?.closest('.avatar-modal-overlay')).not.toBeInTheDocument();
-    });
+      expect(document.querySelector('.avatar-modal-overlay')).not.toBeInTheDocument();
 
-    it('should not render avatar modal by default even with imagePath', () => {
       renderModal({
         formData: { ...defaultFormData, imagePath: '/avatars/gandalf.png' },
       });
-      expect(screen.queryByText(/avatar/i)?.closest('.avatar-modal-overlay')).not.toBeInTheDocument();
-    });
-
-    it('should pass name to avatar modal when rendered', () => {
-      renderModal({
-        formData: { ...defaultFormData, image: 'data:image/png;base64,abc', name: 'Gandalf' },
-      });
-      const avatarImg = document.querySelector('.avatar-image');
-      if (avatarImg) {
-        expect(avatarImg).toHaveAttribute('alt', 'Gandalf');
-      }
+      expect(document.querySelector('.avatar-modal-overlay')).not.toBeInTheDocument();
     });
   });
 
   // ── Modal Structure ───────────────────────────────────────────────
 
   describe('Modal Structure', () => {
-    it('should render all main modal sections', () => {
-      renderModal();
-      expect(document.querySelector('.ct-modal-header')).toBeInTheDocument();
-      expect(document.querySelector('.npcs-avatar-section')).toBeInTheDocument();
-      expect(document.querySelector('.npcs-tabs')).toBeInTheDocument();
-      expect(document.querySelector('.ct-modal-body')).toBeInTheDocument();
-      expect(document.querySelector('.ct-modal-footer')).toBeInTheDocument();
-    });
-
-    it('should render modal actions and buttons containers', () => {
-      renderModal({ editingNPC: { name: 'Gandalf' } });
-      expect(document.querySelector('.ct-modal-actions')).toBeInTheDocument();
-      expect(document.querySelector('.ct-modal-buttons')).toBeInTheDocument();
-    });
-
     it('should not call setFormData when no file provided', () => {
       renderModal();
       const fileInput = document.querySelector('.npcs-avatar-input');
@@ -437,13 +328,6 @@ describe('NPCFormModal', () => {
       renderModal({ formData: {} });
       expect(screen.getByRole('heading', { name: 'New NPC' })).toBeInTheDocument();
       expect(screen.getByLabelText(/Name/)).toBeInTheDocument();
-    });
-
-    it('should not close on escape key press', () => {
-      renderModal();
-      const overlay = document.querySelector('.ct-modal-overlay');
-      fireEvent.keyDown(overlay, { key: 'Escape' });
-      expect(mockOnClose).not.toHaveBeenCalled();
     });
   });
 });

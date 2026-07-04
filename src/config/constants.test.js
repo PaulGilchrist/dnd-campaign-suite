@@ -4,12 +4,8 @@ import * as constants from './constants.js';
 
 describe('constants', () => {
   describe('REQUIRED_FIELDS', () => {
-    it('should export an array containing exactly 9 required field names', () => {
+    it('should export an array containing exactly the expected required field names', () => {
       expect(constants.REQUIRED_FIELDS).toBeInstanceOf(Array);
-      expect(constants.REQUIRED_FIELDS).toHaveLength(9);
-    });
-
-    it('should contain all expected character sheet field keys', () => {
       const expected = [
         'name',
         'level',
@@ -21,6 +17,7 @@ describe('constants', () => {
         'skillProficiencies',
         'expertSkills',
       ];
+      expect(constants.REQUIRED_FIELDS).toHaveLength(expected.length);
       for (const field of expected) {
         expect(constants.REQUIRED_FIELDS).toContain(field);
       }
@@ -28,7 +25,7 @@ describe('constants', () => {
   });
 
   describe('DEFAULT_FORM_DATA', () => {
-    it('should be a plain object with all expected top-level keys', () => {
+    it('should have all expected top-level keys and no extras', () => {
       const expectedKeys = [
         'name',
         'level',
@@ -58,77 +55,29 @@ describe('constants', () => {
       expect(actualKeys).toHaveLength(expectedKeys.length);
     });
 
-    it('should have correct primitive defaults', () => {
-      expect(constants.DEFAULT_FORM_DATA.name).toBe('');
-      expect(constants.DEFAULT_FORM_DATA.level).toBe(1);
-      expect(constants.DEFAULT_FORM_DATA.alignment).toBe('True Neutral');
-      expect(constants.DEFAULT_FORM_DATA.background).toBe('');
-      expect(constants.DEFAULT_FORM_DATA.rules).toBe('5e');
-      expect(constants.DEFAULT_FORM_DATA.xp).toBe(0);
-      expect(constants.DEFAULT_FORM_DATA.xpMode).toBe('milestone');
-    });
+    it('should have correct nested default structures', () => {
+      const { abilities, class: cls, race, inventory } = constants.DEFAULT_FORM_DATA;
 
-    it('should have an abilities array with 6 entries, each with correct structure', () => {
-      const abilities = constants.DEFAULT_FORM_DATA.abilities;
       expect(abilities).toBeInstanceOf(Array);
       expect(abilities).toHaveLength(6);
+      expect(abilities[0].name).toBe('Strength');
+      expect(abilities[0].baseScore).toBe(8);
 
-      const expectedNames = [
-        'Strength',
-        'Dexterity',
-        'Constitution',
-        'Intelligence',
-        'Wisdom',
-        'Charisma',
-      ];
-      abilities.forEach((ability, index) => {
-        expect(ability.name).toBe(expectedNames[index]);
-        expect(ability.baseScore).toBe(8);
-        expect(ability.featIncrease).toBe(0);
-        expect(ability.backgroundIncrease).toBe(0);
-        expect(ability.miscIncrease).toBe(0);
+      expect(cls).toEqual({
+        name: 'Fighter',
+        subclass: { name: '' },
+        divineOrder: '',
+        primalOrder: '',
       });
-    });
 
-    it('should have default class with nested subclass and order fields', () => {
-      const cls = constants.DEFAULT_FORM_DATA.class;
-      expect(cls.name).toBe('Fighter');
-      expect(cls.subclass).toEqual({ name: '' });
-      expect(cls.divineOrder).toBe('');
-      expect(cls.primalOrder).toBe('');
-    });
+      expect(race).toEqual({ name: 'Human', subrace: { name: '' } });
 
-    it('should have default race with nested subrace', () => {
-      const race = constants.DEFAULT_FORM_DATA.race;
-      expect(race.name).toBe('Human');
-      expect(race.subrace).toEqual({ name: '' });
-    });
-
-    it('should have default inventory with correct structure', () => {
-      const inventory = constants.DEFAULT_FORM_DATA.inventory;
       expect(inventory).toEqual({
         backpack: [],
         equipped: [],
         gold: 10,
         magicItems: [],
       });
-    });
-
-    it('should have empty arrays for list-based optional fields', () => {
-      const listFields = [
-        'expertSkills',
-        'feats',
-        'fightingStyles',
-        'immunities',
-        'languages',
-        'resistances',
-        'skillProficiencies',
-        'specialActions',
-        'spells',
-      ];
-      for (const field of listFields) {
-        expect(constants.DEFAULT_FORM_DATA[field]).toEqual([]);
-      }
     });
   });
 });

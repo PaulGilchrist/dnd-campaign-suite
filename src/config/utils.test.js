@@ -49,29 +49,22 @@ describe('character-creation/utils', () => {
       expect(utils.validateFinalFormData(formData)).toEqual({});
     });
 
-    it('returns an error when name is absent', () => {
-      const formData = {
+    it('returns an error when name is absent or whitespace-only', () => {
+      expect(utils.validateFinalFormData({
         level: 1,
         alignment: 'Lawful Good',
         race: { name: 'Human' },
         class: { name: 'Wizard' },
         expertSkills: []
-      };
-      const errors = utils.validateFinalFormData(formData);
-      expect(errors).toHaveProperty('name', 'name is required');
-    });
-
-    it('returns an error when name is blank/whitespace-only', () => {
-      const formData = {
+      })).toHaveProperty('name', 'name is required');
+      expect(utils.validateFinalFormData({
         name: '      ',
         level: 1,
         alignment: 'Lawful Good',
         race: { name: 'Human' },
         class: { name: 'Wizard' },
         expertSkills: []
-      };
-      const errors = utils.validateFinalFormData(formData);
-      expect(errors).toHaveProperty('name', 'name is required');
+      })).toHaveProperty('name', 'name is required');
     });
 
     it('returns errors for every missing required field', () => {
@@ -82,7 +75,7 @@ describe('character-creation/utils', () => {
       }
     });
 
-    it('returns no errors when only abilities, inventory, and skillProficiencies are missing', () => {
+    it('does not flag abilities, inventory, or skillProficiencies as missing', () => {
       const formData = {
         name: 'Test',
         level: 1,
@@ -109,23 +102,15 @@ describe('character-creation/utils', () => {
       vi.restoreAllMocks();
     });
 
-    it('returns no errors for a valid level within range', async () => {
-      expect(await utils.validateLevel(10, '5e')).toEqual({});
-    });
-
-    it('returns no errors for boundary values (1 and 20)', async () => {
+    it('returns no errors for valid levels (boundary and mid-range)', async () => {
       expect(await utils.validateLevel(1, '5e')).toEqual({});
+      expect(await utils.validateLevel(10, '5e')).toEqual({});
       expect(await utils.validateLevel(20, '5e')).toEqual({});
     });
 
-    it('returns an error when level is below the minimum', async () => {
-      const errors = await utils.validateLevel(0, '5e');
-      expect(errors).toHaveProperty('level', 'Level must be between 1 and 20');
-    });
-
-    it('returns an error when level is above the maximum', async () => {
-      const errors = await utils.validateLevel(21, '5e');
-      expect(errors).toHaveProperty('level', 'Level must be between 1 and 20');
+    it('returns an error for out-of-range levels', async () => {
+      expect((await utils.validateLevel(0, '5e')).level).toBe('Level must be between 1 and 20');
+      expect((await utils.validateLevel(21, '5e')).level).toBe('Level must be between 1 and 20');
     });
 
     it('returns an error for falsy level values', async () => {
@@ -153,24 +138,15 @@ describe('character-creation/utils', () => {
       vi.restoreAllMocks();
     });
 
-    it('returns no errors for a valid ability at default level', async () => {
-      const ability = { baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 };
-      expect(await utils.validateAbility(ability, 0, '5e', 1)).toEqual({});
-    });
-
-    it('returns no errors for boundary base scores (8 and 15)', async () => {
+    it('returns no errors for valid base scores (mid-range and boundary)', async () => {
+      expect(await utils.validateAbility({ baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 }, 0, '5e', 1)).toEqual({});
       expect((await utils.validateAbility({ baseScore: 8, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 }, 0, '5e', 1)).baseScore).toBeUndefined();
       expect((await utils.validateAbility({ baseScore: 15, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 }, 0, '5e', 1)).baseScore).toBeUndefined();
     });
 
-    it('returns an error when baseScore is below the minimum', async () => {
-      const errors = await utils.validateAbility({ baseScore: 7, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 }, 0, '5e', 1);
-      expect(errors).toHaveProperty('baseScore', 'Base score must be at least 8');
-    });
-
-    it('returns an error when baseScore exceeds the maximum', async () => {
-      const errors = await utils.validateAbility({ baseScore: 16, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 }, 0, '5e', 1);
-      expect(errors).toHaveProperty('baseScore', 'Base score cannot exceed 15 (point buy max)');
+    it('returns an error when baseScore is below or above the allowed range', async () => {
+      expect((await utils.validateAbility({ baseScore: 7, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 }, 0, '5e', 1)).baseScore).toBe('Base score must be at least 8');
+      expect((await utils.validateAbility({ baseScore: 16, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 }, 0, '5e', 1)).baseScore).toBe('Base score cannot exceed 15 (point buy max)');
     });
 
     it('returns an error when totalScore exceeds the level-1 maximum of 20', async () => {
@@ -183,24 +159,14 @@ describe('character-creation/utils', () => {
       expect(errors).not.toHaveProperty('totalScore');
     });
 
-    it('does not validate featIncrease (source does not check it)', async () => {
+    it('does not validate featIncrease', async () => {
       const errors = await utils.validateAbility({ baseScore: 10, featIncrease: -1, miscIncrease: 0, backgroundIncrease: 0 }, 0, '5e', 1);
       expect(errors).not.toHaveProperty('featIncrease');
     });
 
-    it('returns an error for negative miscIncrease', async () => {
-      const errors = await utils.validateAbility({ baseScore: 10, featIncrease: 0, miscIncrease: -1, backgroundIncrease: 0 }, 0, '5e', 1);
-      expect(errors).toHaveProperty('miscIncrease', 'Misc bonus must be 0 or above');
-    });
-
-    it('does not error when miscIncrease is exactly 0', async () => {
-      const errors = await utils.validateAbility({ baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 }, 0, '5e', 1);
-      expect(errors).not.toHaveProperty('miscIncrease');
-    });
-
-    it('prioritizes the above-minimum error over the below-maximum error when both apply', async () => {
-      const errors = await utils.validateAbility({ baseScore: 5, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 }, 0, '5e', 1);
-      expect(errors).toHaveProperty('baseScore', 'Base score must be at least 8');
+    it('returns an error for negative miscIncrease but not for zero', async () => {
+      expect((await utils.validateAbility({ baseScore: 10, featIncrease: 0, miscIncrease: -1, backgroundIncrease: 0 }, 0, '5e', 1)).miscIncrease).toBe('Misc bonus must be 0 or above');
+      expect((await utils.validateAbility({ baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 }, 0, '5e', 1)).miscIncrease).toBeUndefined();
     });
   });
 
@@ -219,16 +185,14 @@ describe('character-creation/utils', () => {
       expect(await utils.getPointBuyCosts('5e')).toEqual(mockValidationRules.point_buy.costs);
     });
 
-    it('returns an empty object when point_buy is missing', async () => {
+    it('returns an empty object when point_buy or point_buy.costs is missing', async () => {
       vi.spyOn(dataLoader, 'loadValidationRules').mockResolvedValue({ level_range: { min: 1, max: 20 } });
       const freshUtils = await import('./utils.js');
       expect(await freshUtils.getPointBuyCosts('5e')).toEqual({});
-    });
 
-    it('returns an empty object when point_buy.costs is missing', async () => {
       vi.spyOn(dataLoader, 'loadValidationRules').mockResolvedValue({ point_buy: {} });
-      const freshUtils = await import('./utils.js');
-      expect(await freshUtils.getPointBuyCosts('5e')).toEqual({});
+      const freshUtils2 = await import('./utils.js');
+      expect(await freshUtils2.getPointBuyCosts('5e')).toEqual({});
     });
   });
 
@@ -244,15 +208,10 @@ describe('character-creation/utils', () => {
     });
 
     describe('Step 2: Basic Information', () => {
-      it('returns an error when name is missing', async () => {
-        const formData = { level: 1, alignment: 'Good' };
-        const errors = await utils.validateStep(2, formData, {}, [], [], '5e');
+      it('returns an error when name is missing or whitespace-only', async () => {
+        let errors = await utils.validateStep(2, { level: 1, alignment: 'Good' }, {}, [], [], '5e');
         expect(errors).toHaveProperty('name', 'Character name is required');
-      });
-
-      it('returns an error when name is whitespace-only', async () => {
-        const formData = { name: '   ', level: 1, alignment: 'Good' };
-        const errors = await utils.validateStep(2, formData, {}, [], [], '5e');
+        errors = await utils.validateStep(2, { name: '   ', level: 1, alignment: 'Good' }, {}, [], [], '5e');
         expect(errors).toHaveProperty('name', 'Character name is required');
       });
 
@@ -288,27 +247,17 @@ describe('character-creation/utils', () => {
     });
 
     describe('Step 3: Race & Class', () => {
-      it('returns an error when race is missing', async () => {
-        const formData = { class: { name: 'Fighter' } };
-        const errors = await utils.validateStep(3, formData, {}, [], [], '5e');
+      it('returns an error when race is missing or race.name is absent', async () => {
+        let errors = await utils.validateStep(3, { class: { name: 'Fighter' } }, {}, [], [], '5e');
+        expect(errors).toHaveProperty('race', 'Race is required');
+        errors = await utils.validateStep(3, { race: {}, class: { name: 'Fighter' } }, {}, [], [], '5e');
         expect(errors).toHaveProperty('race', 'Race is required');
       });
 
-      it('returns an error when class is missing', async () => {
-        const formData = { race: { name: 'Human' } };
-        const errors = await utils.validateStep(3, formData, {}, [], [], '5e');
+      it('returns an error when class is missing or class.name is absent', async () => {
+        let errors = await utils.validateStep(3, { race: { name: 'Human' } }, {}, [], [], '5e');
         expect(errors).toHaveProperty('class', 'Class is required');
-      });
-
-      it('returns an error when race.name is missing but race object exists', async () => {
-        const formData = { race: {}, class: { name: 'Fighter' } };
-        const errors = await utils.validateStep(3, formData, {}, [], [], '5e');
-        expect(errors).toHaveProperty('race', 'Race is required');
-      });
-
-      it('returns an error when class.name is missing but class object exists', async () => {
-        const formData = { race: { name: 'Human' }, class: {} };
-        const errors = await utils.validateStep(3, formData, {}, [], [], '5e');
+        errors = await utils.validateStep(3, { race: { name: 'Human' }, class: {} }, {}, [], [], '5e');
         expect(errors).toHaveProperty('class', 'Class is required');
       });
 
@@ -354,14 +303,9 @@ describe('character-creation/utils', () => {
     });
 
     describe('Steps 4+', () => {
-      it('returns no errors regardless of missing data for steps beyond 3', async () => {
-        const errors = await utils.validateStep(4, {}, {}, [], [], '5e');
-        expect(errors).toEqual({});
-      });
-
-      it('returns no errors for step 10 with empty form data', async () => {
-        const errors = await utils.validateStep(10, {}, {}, [], [], '5e');
-        expect(errors).toEqual({});
+      it('returns no errors regardless of step number or missing data', async () => {
+        expect(await utils.validateStep(4, {}, {}, [], [], '5e')).toEqual({});
+        expect(await utils.validateStep(10, {}, {}, [], [], '5e')).toEqual({});
       });
     });
   });

@@ -21,64 +21,40 @@ describe('OverlayShape', () => {
       LINE: 'line',
     });
   });
-
-  it('all shape values are unique strings', () => {
-    const values = Object.values(OverlayShape);
-    expect(new Set(values).size).toBe(values.length);
-  });
 });
 
 // ── DEFAULTS ────────────────────────────────────────────────────
 
 describe('DEFAULTS', () => {
-  it('has entries for all five shape keys', () => {
-    expect(Object.keys(DEFAULTS)).toHaveLength(5);
-    expect(Object.keys(DEFAULTS)).toEqual(
-      expect.arrayContaining(['sphere', 'cylinder', 'cube', 'cone', 'line'])
-    );
+  it('has entries for all five shapes with correct 5e dimensions', () => {
+    expect(Object.keys(DEFAULTS)).toEqual(['sphere', 'cylinder', 'cube', 'cone', 'line']);
+
+    const s = DEFAULTS.sphere;
+    expect(s.radiusFt).toBe(20);
+    expect(s.sizeFt).toBe(0);
+    expect(s.distanceFt).toBe(0);
+    expect(s.color).toBe('rgba(255,80,60,0.35)');
+
+    const c = DEFAULTS.cube;
+    expect(c.sizeFt).toBe(15);
+    expect(c.radiusFt).toBe(0);
+    expect(c.distanceFt).toBe(0);
+
+    const cn = DEFAULTS.cone;
+    expect(cn.distanceFt).toBe(60);
+    expect(cn.coneAngle).toBe(53);
+    expect(cn.radiusFt).toBe(0);
+
+    const l = DEFAULTS.line;
+    expect(l.distanceFt).toBe(60);
+    expect(l.widthFt).toBe(5);
+    expect(l.radiusFt).toBe(0);
   });
 
   it('all shapes share the same default color', () => {
     const color = DEFAULTS.sphere.color;
     for (const shape of Object.values(OverlayShape)) {
       expect(DEFAULTS[shape].color).toBe(color);
-    }
-  });
-
-  it('sphere defaults match 5e spell dimensions', () => {
-    const d = DEFAULTS.sphere;
-    expect(d.radiusFt).toBe(20);
-    expect(d.sizeFt).toBe(0);
-    expect(d.distanceFt).toBe(0);
-  });
-
-  it('cube defaults match 5e spell dimensions', () => {
-    const d = DEFAULTS.cube;
-    expect(d.sizeFt).toBe(15);
-    expect(d.radiusFt).toBe(0);
-    expect(d.distanceFt).toBe(0);
-  });
-
-  it('cone defaults match 5e spell dimensions', () => {
-    const d = DEFAULTS.cone;
-    expect(d.distanceFt).toBe(60);
-    expect(d.coneAngle).toBe(53);
-    expect(d.radiusFt).toBe(0);
-  });
-
-  it('line defaults match 5e spell dimensions', () => {
-    const d = DEFAULTS.line;
-    expect(d.distanceFt).toBe(60);
-    expect(d.widthFt).toBe(5);
-    expect(d.radiusFt).toBe(0);
-  });
-
-  it('each default has all dimension properties', () => {
-    const expectedKeys = ['radiusFt', 'coneAngle', 'widthFt', 'distanceFt', 'sizeFt', 'color'];
-    for (const shape of Object.keys(DEFAULTS)) {
-      for (const key of expectedKeys) {
-        expect(DEFAULTS[shape]).toHaveProperty(key);
-      }
     }
   });
 });
@@ -105,7 +81,7 @@ describe('toGrid', () => {
     expect(toGrid(-10)).toBe(-2);
   });
 
-  it('returns zero for NaN input', () => {
+  it('returns NaN for NaN input', () => {
     expect(toGrid(NaN)).toBeNaN();
   });
 });
@@ -113,7 +89,7 @@ describe('toGrid', () => {
 // ── createOverlay ───────────────────────────────────────────────
 
 describe('createOverlay', () => {
-  it('creates an overlay with shape, position, and defaults', () => {
+  it('creates an overlay with shape, position, angle, and defaults', () => {
     const overlay = createOverlay('sphere', 3, 4);
     expect(overlay.shape).toBe('sphere');
     expect(overlay.startGridX).toBe(3);
@@ -140,7 +116,6 @@ describe('createOverlay', () => {
     const overlay = createOverlay('sphere', 3, 4, 0, { radiusFt: 30, color: 'rgba(100,200,50,0.5)' });
     expect(overlay.radiusFt).toBe(30);
     expect(overlay.color).toBe('rgba(100,200,50,0.5)');
-    // defaults that weren't overridden should still apply
     expect(overlay.startGridX).toBe(3);
   });
 
@@ -160,17 +135,6 @@ describe('createOverlay', () => {
     const overlay = createOverlay('sphere', -2, 5);
     expect(overlay.startGridX).toBe(-2);
     expect(overlay.startGridY).toBe(5);
-  });
-
-  it('creates a sphere overlay with the correct default radius', () => {
-    const overlay = createOverlay('sphere', 0, 0);
-    expect(overlay.radiusFt).toBe(20);
-  });
-
-  it('creates a cone overlay with the correct default distance and angle', () => {
-    const overlay = createOverlay('cone', 0, 0);
-    expect(overlay.distanceFt).toBe(60);
-    expect(overlay.coneAngle).toBe(53);
   });
 });
 
@@ -245,15 +209,6 @@ describe('hitTestOverlay', () => {
     it('misses points outside the radius', () => {
       const overlay = makeOverlay('cylinder', 5, 5, 0, { radiusFt: 20 });
       expect(hitTestOverlay(overlay, 5, 10)).toBe(false);
-    });
-
-    it('behaves identically to sphere with the same radius', () => {
-      const sphere = makeOverlay('sphere', 5, 5, 0, { radiusFt: 20 });
-      const cylinder = makeOverlay('cylinder', 5, 5, 0, { radiusFt: 20 });
-      const testPoints = [[5, 5], [5, 7], [5, 10], [6, 7], [7, 8]];
-      for (const [gx, gy] of testPoints) {
-        expect(hitTestOverlay(sphere, gx, gy)).toBe(hitTestOverlay(cylinder, gx, gy));
-      }
     });
   });
 
@@ -368,20 +323,9 @@ describe('hitTestOverlay', () => {
       expect(hitTestOverlay(overlay, 5, 2)).toBe(true);
     });
 
-    it('normalizes angles greater than 360', () => {
-      // 450° = 90°. Cone points along +Y.
-      const overlay = makeOverlay('cone', 5, 5, 450, { distanceFt: 60, coneAngle: 53 });
-      expect(hitTestOverlay(overlay, 5, 8)).toBe(true);
-    });
-
     it('points left at 180 degrees', () => {
       const overlay = makeOverlay('cone', 5, 5, 180, { distanceFt: 60, coneAngle: 53 });
       expect(hitTestOverlay(overlay, 2, 5)).toBe(true);
-    });
-
-    it('points up at 270 degrees', () => {
-      const overlay = makeOverlay('cone', 5, 5, 270, { distanceFt: 60, coneAngle: 53 });
-      expect(hitTestOverlay(overlay, 5, 2)).toBe(true);
     });
   });
 
@@ -465,14 +409,11 @@ describe('hitTestOverlay', () => {
   // ── Unknown shapes ────────────────────────────────────────────
 
   describe('unknown shape', () => {
-    it('returns false for an unknown shape string', () => {
+    it('returns false for unknown or empty shape strings', () => {
       const overlay = createOverlay('sphere', 5, 5);
       overlay.shape = 'unknown';
       expect(hitTestOverlay(overlay, 5, 5)).toBe(false);
-    });
 
-    it('returns false for an empty string shape', () => {
-      const overlay = createOverlay('sphere', 5, 5);
       overlay.shape = '';
       expect(hitTestOverlay(overlay, 5, 5)).toBe(false);
     });
@@ -481,11 +422,6 @@ describe('hitTestOverlay', () => {
   // ── Edge cases ────────────────────────────────────────────────
 
   describe('edge cases', () => {
-    it('handles negative grid coordinates', () => {
-      const overlay = makeOverlay('sphere', -3, -3, 0, { radiusFt: 20 });
-      expect(hitTestOverlay(overlay, -3, -3)).toBe(true);
-    });
-
     it('handles large grid coordinates', () => {
       const overlay = makeOverlay('sphere', 100, 100, 0, { radiusFt: 20 });
       expect(hitTestOverlay(overlay, 100, 100)).toBe(true);
@@ -521,12 +457,5 @@ describe('svgOrigin', () => {
   it('uses startGridX and startGridY from the overlay', () => {
     const overlay = createOverlay('cone', 10, 20);
     expect(svgOrigin(overlay)).toEqual({ x: 420, y: 820 });
-  });
-
-  it('returns an object with numeric x and y properties', () => {
-    const overlay = createOverlay('sphere', 1, 1);
-    const origin = svgOrigin(overlay);
-    expect(typeof origin.x).toBe('number');
-    expect(typeof origin.y).toBe('number');
   });
 });

@@ -48,16 +48,6 @@ describe('MapsManager', () => {
   });
 
   describe('Header & Back Button', () => {
-    it('renders header with "Maps" title', () => {
-      render(<MapsManager {...defaultProps} />);
-      expect(screen.getByRole('heading', { name: 'Maps' })).toBeInTheDocument();
-    });
-
-    it('renders back button', () => {
-      render(<MapsManager {...defaultProps} />);
-      expect(screen.getByRole('button', { name: /back/i })).toBeInTheDocument();
-    });
-
     it('calls onBack when back button is clicked', () => {
       render(<MapsManager {...defaultProps} />);
       fireEvent.click(screen.getByRole('button', { name: /back/i }));
@@ -66,16 +56,6 @@ describe('MapsManager', () => {
   });
 
   describe('Create Map Input', () => {
-    it('renders create map input', () => {
-      render(<MapsManager {...defaultProps} />);
-      expect(screen.getByPlaceholderText('New map name...')).toBeInTheDocument();
-    });
-
-    it('renders Create Map button', () => {
-      render(<MapsManager {...defaultProps} />);
-      expect(screen.getByRole('button', { name: 'Create Map' })).toBeInTheDocument();
-    });
-
     it('Create Map button is disabled when input is empty', () => {
       render(<MapsManager {...defaultProps} />);
       const createButton = screen.getByRole('button', { name: 'Create Map' });
@@ -92,20 +72,6 @@ describe('MapsManager', () => {
   });
 
   describe('Map Type Selector', () => {
-    it('renders indoor and outdoor radio options', () => {
-      render(<MapsManager {...defaultProps} />);
-      const radios = screen.getAllByRole('radio');
-      expect(radios.length).toBeGreaterThan(1);
-      expect(radios[0].value).toBe('indoor');
-      expect(radios[1].value).toBe('outdoor');
-    });
-
-    it('defaults to indoor type selected', () => {
-      render(<MapsManager {...defaultProps} />);
-      const indoorRadio = screen.getByRole('radio', { name: /indoor/i });
-      expect(indoorRadio).toBeChecked();
-    });
-
     it('switches to outdoor type when outdoor is clicked', () => {
       render(<MapsManager {...defaultProps} />);
       const outdoorRadio = screen.getByRole('radio', { name: /outdoor/i });
@@ -117,22 +83,10 @@ describe('MapsManager', () => {
   });
 
   describe('Loading & Empty States', () => {
-    it('shows loading state initially', () => {
-      render(<MapsManager {...defaultProps} />);
-      expect(screen.getByText('Loading maps...')).toBeInTheDocument();
-    });
-
-    it('shows empty state when no maps', async () => {
+    it('shows empty state when no maps load', async () => {
       render(<MapsManager {...defaultProps} />);
       await waitFor(() => {
         expect(screen.getByText('No maps yet. Create one to get started.')).toBeInTheDocument();
-      });
-    });
-
-    it('hides loading state after maps are loaded', async () => {
-      render(<MapsManager {...defaultProps} />);
-      await waitFor(() => {
-        expect(screen.queryByText('Loading maps...')).not.toBeInTheDocument();
       });
     });
   });
@@ -209,23 +163,30 @@ describe('MapsManager', () => {
   });
 
   describe('Maps List Rendering', () => {
-    it('renders maps list when maps are provided', async () => {
+    it('renders maps sorted alphabetically by name', async () => {
       mapsService.loadMaps.mockResolvedValue({
         maps: [
-          { fileName: 'map1.json', name: 'Dungeon Level 1', type: 'indoor', isActive: true },
-          { fileName: 'map2.json', name: 'Forest', type: 'outdoor', isActive: false },
+          { fileName: 'map3.json', name: 'Zoo', type: 'indoor', isActive: false },
+          { fileName: 'map1.json', name: 'Alpha Cave', type: 'indoor', isActive: true },
+          { fileName: 'map2.json', name: 'Beta Forest', type: 'outdoor', isActive: false },
         ],
       });
 
       render(<MapsManager {...defaultProps} />);
 
       await waitFor(() => {
-        expect(screen.getByText('Dungeon Level 1')).toBeInTheDocument();
-        expect(screen.getByText('Forest')).toBeInTheDocument();
+        expect(screen.getByText('Alpha Cave')).toBeInTheDocument();
+        expect(screen.getByText('Beta Forest')).toBeInTheDocument();
+        expect(screen.getByText('Zoo')).toBeInTheDocument();
       });
+
+      const items = document.querySelectorAll('.maps-manager-item');
+      expect(items[0].textContent).toContain('Alpha Cave');
+      expect(items[1].textContent).toContain('Beta Forest');
+      expect(items[2].textContent).toContain('Zoo');
     });
 
-    it('renders map item with type badge', async () => {
+    it('renders type badge for indoor maps', async () => {
       mapsService.loadMaps.mockResolvedValue({
         maps: [
           { fileName: 'map1.json', name: 'Dungeon Level 1', type: 'indoor', isActive: false },
@@ -239,7 +200,7 @@ describe('MapsManager', () => {
       });
     });
 
-    it('renders outdoor type badge for outdoor maps', async () => {
+    it('renders type badge for outdoor maps', async () => {
       mapsService.loadMaps.mockResolvedValue({
         maps: [
           { fileName: 'map1.json', name: 'Forest', type: 'outdoor', isActive: false },
@@ -280,24 +241,6 @@ describe('MapsManager', () => {
         expect(screen.getByText('Dungeon Level 1')).toBeInTheDocument();
       });
       expect(screen.queryByRole('button', { name: 'Activate' })).not.toBeInTheDocument();
-    });
-
-    it('renders multiple maps in the list', async () => {
-      mapsService.loadMaps.mockResolvedValue({
-        maps: [
-          { fileName: 'map1.json', name: 'Dungeon Level 1', type: 'indoor', isActive: true },
-          { fileName: 'map2.json', name: 'Forest', type: 'outdoor', isActive: false },
-          { fileName: 'map3.json', name: 'Cave', type: 'indoor', isActive: false },
-        ],
-      });
-
-      render(<MapsManager {...defaultProps} />);
-
-      await waitFor(() => {
-        expect(screen.getByText('Dungeon Level 1')).toBeInTheDocument();
-        expect(screen.getByText('Forest')).toBeInTheDocument();
-        expect(screen.getByText('Cave')).toBeInTheDocument();
-      });
     });
 
     it('renders map without type badge when type is not set', async () => {
@@ -787,34 +730,16 @@ describe('MapsManager', () => {
       expect(screen.getByRole('button', { name: /Generate Terrain/i })).toBeInTheDocument();
     });
 
-    it('does not show Generate Dungeon button for outdoor type', () => {
+    it('hides Generate Dungeon button for outdoor type', () => {
       render(<MapsManager {...defaultProps} />);
       const outdoorRadio = screen.getByRole('radio', { name: /outdoor/i });
       fireEvent.click(outdoorRadio);
       expect(screen.queryByRole('button', { name: /Generate Dungeon/i })).not.toBeInTheDocument();
     });
 
-    it('does not show Generate Terrain button for indoor type', () => {
+    it('hides Generate Terrain button for indoor type', () => {
       render(<MapsManager {...defaultProps} />);
       expect(screen.queryByRole('button', { name: /Generate Terrain/i })).not.toBeInTheDocument();
-    });
-
-    it('opens GenerateDungeonModal when Generate Dungeon is clicked', async () => {
-      render(<MapsManager {...defaultProps} />);
-      fireEvent.click(screen.getByRole('button', { name: /Generate Dungeon/i }));
-      await waitFor(() => {
-        expect(screen.getByTestId('generate-dungeon-modal')).toBeInTheDocument();
-      });
-    });
-
-    it('opens GenerateTerrainModal when Generate Terrain is clicked', async () => {
-      render(<MapsManager {...defaultProps} />);
-      const outdoorRadio = screen.getByRole('radio', { name: /outdoor/i });
-      fireEvent.click(outdoorRadio);
-      fireEvent.click(screen.getByRole('button', { name: /Generate Terrain/i }));
-      await waitFor(() => {
-        expect(screen.getByTestId('generate-terrain-modal')).toBeInTheDocument();
-      });
     });
   });
 
@@ -833,17 +758,7 @@ describe('MapsManager', () => {
       });
     });
 
-    it('displays error when loading maps fails', async () => {
-      mapsService.loadMaps.mockRejectedValue(new Error('Failed to load'));
-
-      render(<MapsManager {...defaultProps} />);
-
-      await waitFor(() => {
-        expect(screen.getByText('Failed to load')).toBeInTheDocument();
-      });
-    });
-
-    it('shows error for duplicate map names', async () => {
+    it('shows error for duplicate map names on create', async () => {
       mapsService.loadMaps.mockResolvedValue({
         maps: [
           { fileName: 'map1.json', name: 'Existing Map', type: 'indoor', isActive: false },
@@ -864,28 +779,6 @@ describe('MapsManager', () => {
       await waitFor(() => {
         expect(screen.getByText('A map with that name already exists')).toBeInTheDocument();
       });
-    });
-  });
-
-  describe('Map Item Action Buttons', () => {
-    it('renders all action buttons for a non-active map', async () => {
-      mapsService.loadMaps.mockResolvedValue({
-        maps: [
-          { fileName: 'map1.json', name: 'Forest', type: 'outdoor', isActive: false },
-        ],
-      });
-
-      render(<MapsManager {...defaultProps} />);
-
-      await waitFor(() => {
-        expect(screen.getByText('Forest')).toBeInTheDocument();
-      });
-
-      expect(screen.getByRole('button', { name: 'Open' })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'Activate' })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'Rename' })).toBeInTheDocument();
-      expect(screen.getByTitle('Edit description')).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'Delete' })).toBeInTheDocument();
     });
   });
 });

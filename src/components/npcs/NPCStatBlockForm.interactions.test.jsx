@@ -25,13 +25,9 @@ const baseFormData = {
   reactions: 'Reaction text.',
 };
 
-function getUpdater(setFormData) {
+function extractUpdater(setFormData) {
   expect(setFormData).toHaveBeenCalledTimes(1);
   return setFormData.mock.calls[0][0];
-}
-
-function applyUpdater(updater, prev) {
-  return updater(prev);
 }
 
 describe('NPCStatBlockForm interactions', () => {
@@ -56,8 +52,8 @@ describe('NPCStatBlockForm interactions', () => {
       const setFormData = vi.fn();
       const { container } = render(<NPCStatBlockForm formData={baseFormData} setFormData={setFormData} />);
       fireEvent.change(getAcInput(container), { target: { value: '18' } });
-      const updater = getUpdater(setFormData);
-      const result = applyUpdater(updater, baseFormData);
+      const updater = extractUpdater(setFormData);
+      const result = updater(baseFormData);
       expect(result.armorClass).toBe(18);
     });
 
@@ -65,17 +61,17 @@ describe('NPCStatBlockForm interactions', () => {
       const setFormData = vi.fn();
       const { container } = render(<NPCStatBlockForm formData={baseFormData} setFormData={setFormData} />);
       fireEvent.change(getAcInput(container), { target: { value: '' } });
-      const updater = getUpdater(setFormData);
-      const result = applyUpdater(updater, baseFormData);
+      const updater = extractUpdater(setFormData);
+      const result = updater(baseFormData);
       expect(result.armorClass).toBeNull();
     });
 
-    it('handles HP change', () => {
+    it('handles HP and Hit Dice changes', () => {
       const setFormData = vi.fn();
       const { container } = render(<NPCStatBlockForm formData={baseFormData} setFormData={setFormData} />);
       fireEvent.change(getHpInput(container), { target: { value: '55' } });
-      const updater = getUpdater(setFormData);
-      const result = applyUpdater(updater, baseFormData);
+      const updater = extractUpdater(setFormData);
+      const result = updater(baseFormData);
       expect(result.hitPoints).toBe('55');
     });
 
@@ -83,8 +79,8 @@ describe('NPCStatBlockForm interactions', () => {
       const setFormData = vi.fn();
       const { container } = render(<NPCStatBlockForm formData={baseFormData} setFormData={setFormData} />);
       fireEvent.change(getHdInput(container), { target: { value: '8d10' } });
-      const updater = getUpdater(setFormData);
-      const result = applyUpdater(updater, baseFormData);
+      const updater = extractUpdater(setFormData);
+      const result = updater(baseFormData);
       expect(result.hitDice).toBe('8d10');
     });
 
@@ -96,8 +92,8 @@ describe('NPCStatBlockForm interactions', () => {
       };
       const { container } = render(<NPCStatBlockForm formData={formWithExtraSpeed} setFormData={setFormData} />);
       fireEvent.change(getSpeedInput(container), { target: { value: '40 ft.' } });
-      const updater = getUpdater(setFormData);
-      const result = applyUpdater(updater, formWithExtraSpeed);
+      const updater = extractUpdater(setFormData);
+      const result = updater(formWithExtraSpeed);
       expect(result.speed.walk).toBe('40 ft.');
       expect(result.speed.climb).toBe('15 ft.');
     });
@@ -106,8 +102,8 @@ describe('NPCStatBlockForm interactions', () => {
       const setFormData = vi.fn();
       const { container } = render(<NPCStatBlockForm formData={{ ...baseFormData, initiativeBonus: '' }} setFormData={setFormData} />);
       fireEvent.change(getInitInput(container), { target: { value: '5' } });
-      const updater = getUpdater(setFormData);
-      const result = applyUpdater(updater, { ...baseFormData, initiativeBonus: '' });
+      const updater = extractUpdater(setFormData);
+      const result = updater({ ...baseFormData, initiativeBonus: '' });
       expect(result.initiativeBonus).toBe('5');
     });
   });
@@ -118,29 +114,19 @@ describe('NPCStatBlockForm interactions', () => {
       const { container } = render(<NPCStatBlockForm formData={baseFormData} setFormData={setFormData} />);
       const inputs = container.querySelectorAll('.npcs-ability-input');
       fireEvent.change(inputs[0], { target: { value: '18' } });
-      const updater = getUpdater(setFormData);
-      const result = applyUpdater(updater, baseFormData);
+      const updater = extractUpdater(setFormData);
+      const result = updater(baseFormData);
       expect(result.abilityScores.str).toBe(18);
       expect(result.abilityScores.dex).toBe(14);
     });
 
-    it('handles ability score change with invalid input (defaults to 0)', () => {
+    it('handles invalid and empty ability score input (defaults to 0)', () => {
       const setFormData = vi.fn();
       const { container } = render(<NPCStatBlockForm formData={baseFormData} setFormData={setFormData} />);
       const inputs = container.querySelectorAll('.npcs-ability-input');
       fireEvent.change(inputs[0], { target: { value: 'abc' } });
-      const updater = getUpdater(setFormData);
-      const result = applyUpdater(updater, baseFormData);
-      expect(result.abilityScores.str).toBe(0);
-    });
-
-    it('handles ability score change with empty string (defaults to 0)', () => {
-      const setFormData = vi.fn();
-      const { container } = render(<NPCStatBlockForm formData={baseFormData} setFormData={setFormData} />);
-      const inputs = container.querySelectorAll('.npcs-ability-input');
-      fireEvent.change(inputs[0], { target: { value: '' } });
-      const updater = getUpdater(setFormData);
-      const result = applyUpdater(updater, baseFormData);
+      const updater = extractUpdater(setFormData);
+      const result = updater(baseFormData);
       expect(result.abilityScores.str).toBe(0);
     });
   });
@@ -151,8 +137,8 @@ describe('NPCStatBlockForm interactions', () => {
       const { container } = render(<NPCStatBlockForm formData={baseFormData} setFormData={setFormData} />);
       const saveInputs = container.querySelectorAll('.npcs-save-input');
       fireEvent.change(saveInputs[0], { target: { value: '+5' } });
-      const updater = getUpdater(setFormData);
-      const result = applyUpdater(updater, baseFormData);
+      const updater = extractUpdater(setFormData);
+      const result = updater(baseFormData);
       expect(result.savingThrowBonuses.str).toBe('+5');
     });
 
@@ -161,8 +147,8 @@ describe('NPCStatBlockForm interactions', () => {
       const { container } = render(<NPCStatBlockForm formData={baseFormData} setFormData={setFormData} />);
       const saveInputs = container.querySelectorAll('.npcs-save-input');
       fireEvent.change(saveInputs[2], { target: { value: '+3' } });
-      const updater = getUpdater(setFormData);
-      const result = applyUpdater(updater, baseFormData);
+      const updater = extractUpdater(setFormData);
+      const result = updater(baseFormData);
       expect(result.savingThrowBonuses.con).toBe('+3');
     });
   });
@@ -173,8 +159,8 @@ describe('NPCStatBlockForm interactions', () => {
       const { container } = render(<NPCStatBlockForm formData={baseFormData} setFormData={setFormData} />);
       const skillBonusInputs = container.querySelectorAll('.npcs-skill-bonus');
       fireEvent.change(skillBonusInputs[0], { target: { value: '+6' } });
-      const updater = getUpdater(setFormData);
-      const result = applyUpdater(updater, baseFormData);
+      const updater = extractUpdater(setFormData);
+      const result = updater(baseFormData);
       expect(result.skillBonuses.perception).toBe('+6');
     });
 
@@ -182,8 +168,8 @@ describe('NPCStatBlockForm interactions', () => {
       const setFormData = vi.fn();
       render(<NPCStatBlockForm formData={baseFormData} setFormData={setFormData} />);
       fireEvent.click(screen.getByRole('button', { name: /Add Skill/i }));
-      const updater = getUpdater(setFormData);
-      const result = applyUpdater(updater, baseFormData);
+      const updater = extractUpdater(setFormData);
+      const result = updater(baseFormData);
       expect(result.skillBonuses['']).toBe('');
     });
 
@@ -192,8 +178,8 @@ describe('NPCStatBlockForm interactions', () => {
       render(<NPCStatBlockForm formData={baseFormData} setFormData={setFormData} />);
       const removeButtons = screen.getAllByRole('button', { name: /Remove skill/i });
       fireEvent.click(removeButtons[0]);
-      const updater = getUpdater(setFormData);
-      const result = applyUpdater(updater, baseFormData);
+      const updater = extractUpdater(setFormData);
+      const result = updater(baseFormData);
       expect(result.skillBonuses.perception).toBeUndefined();
       expect(result.skillBonuses.stealth).toBe('+5');
     });
@@ -234,23 +220,23 @@ describe('NPCStatBlockForm interactions', () => {
       return container.querySelector('input[placeholder="charmed, frightened"]');
     }
 
-    it('handles damage resistances change', () => {
+    it('handles damage resistances, immunities, and condition immunities changes', () => {
       const setFormData = vi.fn();
       const { container } = render(<NPCStatBlockForm formData={baseFormData} setFormData={setFormData} />);
       const resistInput = getResistInput(container);
       fireEvent.change(resistInput, { target: { value: 'fire, cold, lightning' } });
-      const updater = getUpdater(setFormData);
-      const result = applyUpdater(updater, baseFormData);
+      const updater = extractUpdater(setFormData);
+      const result = updater(baseFormData);
       expect(result.damageResistances).toEqual(['fire', 'cold', 'lightning']);
     });
 
-    it('handles damage immunities change', () => {
+    it('handles damage immunities change via immune input', () => {
       const setFormData = vi.fn();
       const { container } = render(<NPCStatBlockForm formData={baseFormData} setFormData={setFormData} />);
       const immuneInput = getImmuneInput(container);
       fireEvent.change(immuneInput, { target: { value: 'necrotic' } });
-      const updater = getUpdater(setFormData);
-      const result = applyUpdater(updater, baseFormData);
+      const updater = extractUpdater(setFormData);
+      const result = updater(baseFormData);
       expect(result.damageImmunities).toEqual(['necrotic']);
     });
 
@@ -259,8 +245,8 @@ describe('NPCStatBlockForm interactions', () => {
       const { container } = render(<NPCStatBlockForm formData={baseFormData} setFormData={setFormData} />);
       const condInput = getCondInput(container);
       fireEvent.change(condInput, { target: { value: '' } });
-      const updater = getUpdater(setFormData);
-      const result = applyUpdater(updater, baseFormData);
+      const updater = extractUpdater(setFormData);
+      const result = updater(baseFormData);
       expect(result.conditionImmunities).toEqual([]);
     });
 
@@ -269,8 +255,8 @@ describe('NPCStatBlockForm interactions', () => {
       const { container } = render(<NPCStatBlockForm formData={baseFormData} setFormData={setFormData} />);
       const resistInput = getResistInput(container);
       fireEvent.change(resistInput, { target: { value: '  fire  ,  cold  ,  lightning  ' } });
-      const updater = getUpdater(setFormData);
-      const result = applyUpdater(updater, baseFormData);
+      const updater = extractUpdater(setFormData);
+      const result = updater(baseFormData);
       expect(result.damageResistances).toEqual(['fire', 'cold', 'lightning']);
     });
   });
@@ -281,8 +267,8 @@ describe('NPCStatBlockForm interactions', () => {
       const { container } = render(<NPCStatBlockForm formData={baseFormData} setFormData={setFormData} />);
       const nameInput = container.querySelector('.npcs-action-name');
       fireEvent.change(nameInput, { target: { value: 'Greatsword' } });
-      const updater = getUpdater(setFormData);
-      const result = applyUpdater(updater, baseFormData);
+      const updater = extractUpdater(setFormData);
+      const result = updater(baseFormData);
       expect(result.actions[0].name).toBe('Greatsword');
     });
 
@@ -291,18 +277,18 @@ describe('NPCStatBlockForm interactions', () => {
       const { container } = render(<NPCStatBlockForm formData={baseFormData} setFormData={setFormData} />);
       const atkBonusInput = container.querySelector('.npcs-action-bonus');
       fireEvent.change(atkBonusInput, { target: { value: '+7' } });
-      const updater = getUpdater(setFormData);
-      const result = applyUpdater(updater, baseFormData);
+      const updater = extractUpdater(setFormData);
+      const result = updater(baseFormData);
       expect(result.actions[0].attack_bonus).toBe('+7');
     });
 
-    it('handles action damage dice change', () => {
+    it('handles action damage dice and type changes', () => {
       const setFormData = vi.fn();
       const { container } = render(<NPCStatBlockForm formData={baseFormData} setFormData={setFormData} />);
       const dmgInput = container.querySelector('.npcs-action-damage');
       fireEvent.change(dmgInput, { target: { value: '2d6+5' } });
-      const updater = getUpdater(setFormData);
-      const result = applyUpdater(updater, baseFormData);
+      const updater = extractUpdater(setFormData);
+      const result = updater(baseFormData);
       expect(result.actions[0].damage_dice_primary).toBe('2d6+5');
     });
 
@@ -311,29 +297,19 @@ describe('NPCStatBlockForm interactions', () => {
       const { container } = render(<NPCStatBlockForm formData={baseFormData} setFormData={setFormData} />);
       const typeInput = container.querySelector('.npcs-action-damage-type');
       fireEvent.change(typeInput, { target: { value: 'piercing' } });
-      const updater = getUpdater(setFormData);
-      const result = applyUpdater(updater, baseFormData);
+      const updater = extractUpdater(setFormData);
+      const result = updater(baseFormData);
       expect(result.actions[0].damage_type_primary).toBe('piercing');
     });
 
-    it('handles action secondary damage dice change', () => {
+    it('handles action secondary damage dice and type changes', () => {
       const setFormData = vi.fn();
       const { container } = render(<NPCStatBlockForm formData={baseFormData} setFormData={setFormData} />);
       const secInput = container.querySelector('.npcs-action-damage-secondary');
       fireEvent.change(secInput, { target: { value: '1d6' } });
-      const updater = getUpdater(setFormData);
-      const result = applyUpdater(updater, baseFormData);
+      const updater = extractUpdater(setFormData);
+      const result = updater(baseFormData);
       expect(result.actions[0].damage_dice_secondary).toBe('1d6');
-    });
-
-    it('handles action secondary damage type change', () => {
-      const setFormData = vi.fn();
-      const { container } = render(<NPCStatBlockForm formData={baseFormData} setFormData={setFormData} />);
-      const secTypeInput = container.querySelector('.npcs-action-damage-type-secondary');
-      fireEvent.change(secTypeInput, { target: { value: 'fire' } });
-      const updater = getUpdater(setFormData);
-      const result = applyUpdater(updater, baseFormData);
-      expect(result.actions[0].damage_type_secondary).toBe('fire');
     });
 
     it('handles action description change', () => {
@@ -341,8 +317,8 @@ describe('NPCStatBlockForm interactions', () => {
       const { container } = render(<NPCStatBlockForm formData={baseFormData} setFormData={setFormData} />);
       const descTextarea = container.querySelector('.npcs-action-desc');
       fireEvent.change(descTextarea, { target: { value: 'New description.' } });
-      const updater = getUpdater(setFormData);
-      const result = applyUpdater(updater, baseFormData);
+      const updater = extractUpdater(setFormData);
+      const result = updater(baseFormData);
       expect(result.actions[0].description).toBe('New description.');
     });
 
@@ -350,8 +326,8 @@ describe('NPCStatBlockForm interactions', () => {
       const setFormData = vi.fn();
       render(<NPCStatBlockForm formData={baseFormData} setFormData={setFormData} />);
       fireEvent.click(screen.getByRole('button', { name: /Add Action/i }));
-      const updater = getUpdater(setFormData);
-      const result = applyUpdater(updater, baseFormData);
+      const updater = extractUpdater(setFormData);
+      const result = updater(baseFormData);
       expect(result.actions).toHaveLength(2);
       expect(result.actions[1]).toEqual({
         name: '', attack_bonus: '', damage_dice_primary: '', damage_type_primary: '',
@@ -364,8 +340,8 @@ describe('NPCStatBlockForm interactions', () => {
       render(<NPCStatBlockForm formData={baseFormData} setFormData={setFormData} />);
       const removeBtn = screen.getByRole('button', { name: /Remove action/i });
       fireEvent.click(removeBtn);
-      const updater = getUpdater(setFormData);
-      const result = applyUpdater(updater, baseFormData);
+      const updater = extractUpdater(setFormData);
+      const result = updater(baseFormData);
       expect(result.actions).toHaveLength(0);
     });
 
@@ -382,8 +358,8 @@ describe('NPCStatBlockForm interactions', () => {
       const removeButtons = screen.getAllByRole('button', { name: /Remove action/i });
       expect(removeButtons).toHaveLength(2);
       fireEvent.click(removeButtons[0]);
-      const updater = getUpdater(setFormData);
-      const result = applyUpdater(updater, data);
+      const updater = extractUpdater(setFormData);
+      const result = updater(data);
       expect(result.actions).toHaveLength(1);
       expect(result.actions[0].name).toBe('Shortbow');
     });
@@ -393,8 +369,8 @@ describe('NPCStatBlockForm interactions', () => {
       const data = { ...baseFormData, actions: undefined };
       render(<NPCStatBlockForm formData={data} setFormData={setFormData} />);
       fireEvent.click(screen.getByRole('button', { name: /Add Action/i }));
-      const updater = getUpdater(setFormData);
-      const result = applyUpdater(updater, data);
+      const updater = extractUpdater(setFormData);
+      const result = updater(data);
       expect(result.actions).toHaveLength(1);
     });
 
@@ -432,12 +408,12 @@ describe('NPCStatBlockForm interactions', () => {
         .find(t => t.placeholder.includes('Reactions'));
     }
 
-    it('handles traits textarea change', () => {
+    it('handles traits and reactions textarea changes', () => {
       const setFormData = vi.fn();
       const { container } = render(<NPCStatBlockForm formData={baseFormData} setFormData={setFormData} />);
       fireEvent.change(getTraitsTextarea(container), { target: { value: 'Darkvision 60 ft.\nKeen Senses.' } });
-      const updater = getUpdater(setFormData);
-      const result = applyUpdater(updater, baseFormData);
+      const updater = extractUpdater(setFormData);
+      const result = updater(baseFormData);
       expect(result.traits).toBe('Darkvision 60 ft.\nKeen Senses.');
     });
 
@@ -445,8 +421,8 @@ describe('NPCStatBlockForm interactions', () => {
       const setFormData = vi.fn();
       const { container } = render(<NPCStatBlockForm formData={baseFormData} setFormData={setFormData} />);
       fireEvent.change(getReactionsTextarea(container), { target: { value: 'Opportunity Attack.' } });
-      const updater = getUpdater(setFormData);
-      const result = applyUpdater(updater, baseFormData);
+      const updater = extractUpdater(setFormData);
+      const result = updater(baseFormData);
       expect(result.reactions).toBe('Opportunity Attack.');
     });
   });

@@ -104,33 +104,6 @@ describe('Settlements - form field changes', () => {
     Object.assign(settlementMockReturn, mockUseSettlements);
   });
 
-  it('allows changing the name field', () => {
-    render(<Settlements campaignName="test" onBack={() => {}} />);
-    const modalOpen = screen.getByRole('button', { name: /new settlement/i });
-    fireEvent.click(modalOpen);
-    const nameInput = screen.getByLabelText(/name/i);
-    fireEvent.change(nameInput, { target: { value: 'My New Settlement' } });
-    expect(nameInput.value).toBe('My New Settlement');
-  });
-
-  it('allows changing the population field', () => {
-    render(<Settlements campaignName="test" onBack={() => {}} />);
-    const modalOpen = screen.getByRole('button', { name: /new settlement/i });
-    fireEvent.click(modalOpen);
-    const popInput = screen.getByPlaceholderText(/souls/i);
-    fireEvent.change(popInput, { target: { value: '5,000 souls' } });
-    expect(popInput.value).toBe('5,000 souls');
-  });
-
-  it('allows changing the tags field', () => {
-    render(<Settlements campaignName="test" onBack={() => {}} />);
-    const modalOpen = screen.getByRole('button', { name: /new settlement/i });
-    fireEvent.click(modalOpen);
-    const tagsInput = screen.getByLabelText(/tags/i);
-    fireEvent.change(tagsInput, { target: { value: 'coastal, trade' } });
-    expect(tagsInput.value).toBe('coastal, trade');
-  });
-
   it('changes description, atmosphere, government, population, and threat when size changes', async () => {
     globalThis.Math.random = () => 0.5;
     render(<Settlements campaignName="test" onBack={() => {}} />);

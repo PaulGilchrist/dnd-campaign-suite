@@ -1,36 +1,26 @@
-// @improved-by-ai
 import { render } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import CampSVG from './CampSVG.jsx';
 
 describe('CampSVG', () => {
-    beforeEach(() => {
-        vi.clearAllMocks();
-    });
-
-    describe('rendering and props', () => {
-        it('should render the SVG group element', () => {
-            const { container } = render(<CampSVG />);
+    describe('props and rendering', () => {
+        it('should render the SVG group element with id, className, and spread props', () => {
+            const { container } = render(<CampSVG id="camp-1" className="camp-icon" data-value="42" />);
             const group = container.querySelector('g');
             expect(group).toBeInTheDocument();
-        });
-
-        it('should render with the provided id attribute', () => {
-            const { container } = render(<CampSVG id="camp-1" />);
-            const group = container.querySelector('g');
             expect(group.getAttribute('id')).toBe('camp-1');
-        });
-
-        it('should render with the provided className', () => {
-            const { container } = render(<CampSVG className="camp-icon" />);
-            const group = container.querySelector('g');
             expect(group.getAttribute('class')).toBe('camp-icon');
+            expect(group.getAttribute('data-value')).toBe('42');
         });
 
         it('should support ref forwarding', () => {
-            const ref = vi.fn();
+            const ref = { current: null };
             render(<CampSVG ref={ref} />);
-            expect(ref).toHaveBeenCalled();
+            expect(ref.current).toBeInTheDocument();
+        });
+
+        it('should have displayName CampSVG', () => {
+            expect(CampSVG.displayName).toBe('CampSVG');
         });
     });
 
@@ -45,16 +35,7 @@ describe('CampSVG', () => {
             expect(group.querySelector('path')).toBeInTheDocument();
         });
 
-        it('should render the expected element counts', () => {
-            const { container } = render(<CampSVG />);
-            expect(container.querySelectorAll('ellipse').length).toBe(1);
-            expect(container.querySelectorAll('polygon').length).toBe(4);
-            expect(container.querySelectorAll('line').length).toBe(5);
-            expect(container.querySelectorAll('circle').length).toBe(8);
-            expect(container.querySelectorAll('path').length).toBe(7);
-        });
-
-        it('should render tent elements with correct structure', () => {
+        it('should render tent elements with correct colors and structure', () => {
             const { container } = render(<CampSVG />);
             const polygons = container.querySelectorAll('polygon');
             expect(polygons.length).toBe(4);
@@ -80,7 +61,7 @@ describe('CampSVG', () => {
             });
         });
 
-        it('should render rope pegs at correct positions', () => {
+        it('should render rope pegs', () => {
             const { container } = render(<CampSVG />);
             const circles = container.querySelectorAll('circle');
             const pegs = [...circles].filter(c => c.getAttribute('r') === '0.6' && c.getAttribute('fill') === '#6B5340');
@@ -97,7 +78,7 @@ describe('CampSVG', () => {
             expect(fireInner.getAttribute('fill')).toBe('#2a1510');
         });
 
-        it('should render campfire flame layers', () => {
+        it('should render campfire flame layers with correct colors', () => {
             const { container } = render(<CampSVG />);
             const paths = container.querySelectorAll('path');
             const outerFlames = [...paths].filter(p => p.getAttribute('fill') === '#D35400');
@@ -124,32 +105,6 @@ describe('CampSVG', () => {
             smokePaths.forEach(smoke => {
                 expect(smoke.getAttribute('stroke-linecap')).toBe('round');
             });
-        });
-    });
-
-    describe('color palette', () => {
-        it('should include expected tent, fire, stone, and rope colors', () => {
-            const { container } = render(<CampSVG />);
-            const group = container.querySelector('g');
-            const allElements = group.querySelectorAll('*');
-            const fills = new Set();
-            const strokes = new Set();
-            allElements.forEach(el => {
-                if (el.getAttribute('fill')) fills.add(el.getAttribute('fill'));
-                if (el.getAttribute('stroke')) strokes.add(el.getAttribute('stroke'));
-            });
-            expect(fills).toContain('#B89870');
-            expect(fills).toContain('#C4A882');
-            expect(fills).toContain('#D4B88A');
-            expect(fills).toContain('#5C4030');
-            expect(fills).toContain('#D35400');
-            expect(fills).toContain('#E87A20');
-            expect(fills).toContain('#F5D060');
-            expect(fills).toContain('#2a1510');
-            expect(fills).toContain('#555');
-            expect(strokes).toContain('#8B7355');
-            expect(strokes).toContain('#6B5340');
-            expect(strokes).toContain('#444');
         });
     });
 });

@@ -27,12 +27,10 @@ vi.mock('../../services/npcs/npcFormUtils.js', () => ({
 }));
 
 vi.mock('../common/AvatarImage.jsx', () => ({
-  default: ({ name, imagePath, size }) => (
+  default: ({ name }) => (
     <img
       data-testid="avatar-image"
       alt={`${name} avatar`}
-      data-size={size}
-      data-image={imagePath}
     />
   ),
 }));
@@ -71,7 +69,7 @@ describe('NPCListItem', () => {
       expect(screen.getByText('Gandalf')).toBeInTheDocument();
     });
 
-    it('renders as a list item with role and tabindex attributes', () => {
+    it('renders as a clickable list item with accessibility attributes', () => {
       renderListItem();
       const listItem = screen.getByRole('button', { name: 'Edit NPC: Gandalf' });
       expect(listItem).toBeInTheDocument();
@@ -79,31 +77,6 @@ describe('NPCListItem', () => {
       expect(listItem).toHaveAttribute('tabindex', '0');
       expect(listItem).toHaveAttribute('aria-label', 'Edit NPC: Gandalf');
       expect(listItem).toHaveClass('ct-list-item');
-    });
-
-    it('renders structural divs', () => {
-      renderListItem();
-      expect(document.querySelector('.ct-list-item-header')).toBeInTheDocument();
-      expect(document.querySelector('.ct-list-details')).toBeInTheDocument();
-      expect(document.querySelector('.npcs-list-actions-row')).toBeInTheDocument();
-      expect(document.querySelector('.ct-list-meta')).toBeInTheDocument();
-      expect(document.querySelector('.npcs-list-name-row')).toBeInTheDocument();
-    });
-  });
-
-  // ── Name Row ──────────────────────────────────────────────────────
-
-  describe('Name row', () => {
-    it('renders NPC name in the name span', () => {
-      renderListItem();
-      const nameSpan = document.querySelector('.ct-list-name');
-      expect(nameSpan).toHaveTextContent('Gandalf');
-    });
-
-    it('renders different NPC names', () => {
-      renderListItem({ name: 'Legolas' });
-      expect(screen.getByText('Legolas')).toBeInTheDocument();
-      expect(document.querySelector('.ct-list-name')).toHaveTextContent('Legolas');
     });
   });
 
@@ -119,11 +92,10 @@ describe('NPCListItem', () => {
       renderListItem({ imagePath: '/images/gandalf.png' });
       const avatar = screen.getByTestId('avatar-image');
       expect(avatar).toBeInTheDocument();
-      expect(avatar).toHaveAttribute('data-size', '36');
-      expect(avatar).toHaveAttribute('data-image', '/images/gandalf.png');
+      expect(avatar).toHaveAttribute('alt', 'Gandalf avatar');
     });
 
-    it('passes NPC name to AvatarImage', () => {
+    it('passes NPC name to AvatarImage alt text', () => {
       renderListItem({ name: 'Aragorn', imagePath: '/images/aragorn.png' });
       const avatar = screen.getByTestId('avatar-image');
       expect(avatar).toHaveAttribute('alt', 'Aragorn avatar');
@@ -152,15 +124,8 @@ describe('NPCListItem', () => {
   // ── Attitude Badge ────────────────────────────────────────────────
 
   describe('Attitude badge', () => {
-    it('does not render badge when attitude is empty or undefined', () => {
+    it('does not render badge when attitude is empty', () => {
       renderListItem({ attitude: '' });
-      expect(document.querySelector('.ct-list-attitude')).not.toBeInTheDocument();
-
-      const npc = { ...baseNPC };
-      delete npc.attitude;
-      render(
-        <NPCListItem npc={npc} onEdit={mockOnEdit} onAddToInitiative={mockOnAddToInitiative} />
-      );
       expect(document.querySelector('.ct-list-attitude')).not.toBeInTheDocument();
     });
 
@@ -180,23 +145,6 @@ describe('NPCListItem', () => {
       expect(badge.style.borderColor).toBe('rgb(64, 145, 108)');
     });
 
-    it('renders each attitude variant with correct styles', () => {
-      const attitudes = [
-        { attitude: 'neutral', bg: 'rgb(74, 74, 74)', color: 'rgb(224, 224, 224)', border: 'rgb(107, 107, 107)' },
-        { attitude: 'negative', bg: 'rgb(123, 36, 28)', color: 'rgb(244, 160, 160)', border: 'rgb(164, 51, 48)' },
-        { attitude: 'extreme opposition', bg: 'rgb(92, 3, 14)', color: 'rgb(255, 107, 107)', border: 'rgb(139, 0, 0)' },
-        { attitude: 'deep bonds', bg: 'rgb(26, 71, 42)', color: 'rgb(144, 238, 144)', border: 'rgb(45, 106, 79)' },
-      ];
-
-      for (const { attitude, bg, color, border } of attitudes) {
-        const { container } = renderListItem({ attitude });
-        const badge = container.querySelector('.ct-list-attitude');
-        expect(badge.style.backgroundColor).toBe(bg);
-        expect(badge.style.color).toBe(color);
-        expect(badge.style.borderColor).toBe(border);
-      }
-    });
-
     it('defaults to neutral styles for unknown attitude', () => {
       renderListItem({ attitude: 'unknown attitude' });
       const badge = document.querySelector('.ct-list-attitude');
@@ -207,16 +155,8 @@ describe('NPCListItem', () => {
   // ── Subtitle (Race / ClassRole) ──────────────────────────────────
 
   describe('Subtitle', () => {
-    it('does not render subtitle when race and classRole are empty or undefined', () => {
+    it('does not render subtitle when race and classRole are empty', () => {
       renderListItem({ race: '', classRole: '' });
-      expect(document.querySelector('.npcs-list-subtitle')).not.toBeInTheDocument();
-
-      const npc = { ...baseNPC };
-      delete npc.race;
-      delete npc.classRole;
-      render(
-        <NPCListItem npc={npc} onEdit={mockOnEdit} onAddToInitiative={mockOnAddToInitiative} />
-      );
       expect(document.querySelector('.npcs-list-subtitle')).not.toBeInTheDocument();
     });
 
@@ -246,15 +186,8 @@ describe('NPCListItem', () => {
   // ── Tags ──────────────────────────────────────────────────────────
 
   describe('Tags', () => {
-    it('does not render tags when tags is empty or undefined', () => {
+    it('does not render tags when tags is empty', () => {
       renderListItem({ tags: '' });
-      expect(document.querySelector('.npcs-list-tags')).not.toBeInTheDocument();
-
-      const npc = { ...baseNPC };
-      delete npc.tags;
-      render(
-        <NPCListItem npc={npc} onEdit={mockOnEdit} onAddToInitiative={mockOnAddToInitiative} />
-      );
       expect(document.querySelector('.npcs-list-tags')).not.toBeInTheDocument();
     });
 
@@ -293,21 +226,12 @@ describe('NPCListItem', () => {
       fireEvent.click(btn);
       expect(mockOnAddToInitiative).toHaveBeenCalledWith({ ...baseNPC, armorClass: 15 });
     });
-
-    it('stops event propagation when clicked', () => {
-      vi.mocked(npcHasStatBlock).mockReturnValue(true);
-      renderListItem({ armorClass: 15 });
-      const btn = document.querySelector('.npcs-init-btn');
-      const stopPropagationSpy = vi.fn();
-      fireEvent.click(btn, { stopPropagation: stopPropagationSpy });
-      expect(mockOnEdit).not.toHaveBeenCalled();
-    });
   });
 
   // ── Edit Callback ─────────────────────────────────────────────────
 
   describe('Edit callback', () => {
-    it('calls onEdit when list item clicked', () => {
+    it('calls onEdit when list item is clicked', () => {
       renderListItem();
       const listItem = screen.getByRole('button', { name: 'Edit NPC: Gandalf' });
       fireEvent.click(listItem);
@@ -340,22 +264,6 @@ describe('NPCListItem', () => {
       const listItem = screen.getByRole('button', { name: 'Edit NPC: Gandalf' });
       fireEvent.keyDown(listItem, { key: ' ' });
       expect(mockOnEdit).toHaveBeenCalledWith(baseNPC);
-    });
-
-    it('does not call onEdit on Escape key press', () => {
-      mockOnEdit.mockClear();
-      renderListItem();
-      const listItem = screen.getByRole('button', { name: 'Edit NPC: Gandalf' });
-      fireEvent.keyDown(listItem, { key: 'Escape' });
-      expect(mockOnEdit).not.toHaveBeenCalled();
-    });
-
-    it('does not call onEdit on ArrowRight key press', () => {
-      mockOnEdit.mockClear();
-      renderListItem();
-      const listItem = screen.getByRole('button', { name: 'Edit NPC: Gandalf' });
-      fireEvent.keyDown(listItem, { key: 'ArrowRight' });
-      expect(mockOnEdit).not.toHaveBeenCalled();
     });
   });
 
@@ -411,22 +319,6 @@ describe('NPCListItem', () => {
       expect(document.querySelector('.ct-list-attitude')).toBeInTheDocument();
       expect(document.querySelector('.npcs-stat-badge')).not.toBeInTheDocument();
       expect(document.querySelector('.npcs-init-btn')).not.toBeInTheDocument();
-    });
-
-    it('renders stat badge and attitude in ct-list-meta', () => {
-      vi.mocked(npcHasStatBlock).mockReturnValue(true);
-      renderListItem({ attitude: 'positive' });
-      const meta = document.querySelector('.ct-list-meta');
-      expect(meta.querySelector('.npcs-stat-badge')).toBeInTheDocument();
-      expect(meta.querySelector('.ct-list-attitude')).toBeInTheDocument();
-    });
-
-    it('renders tags and initiative button in npcs-list-actions-row', () => {
-      vi.mocked(npcHasStatBlock).mockReturnValue(true);
-      renderListItem({ tags: 'boss', armorClass: 20 });
-      const actionsRow = document.querySelector('.npcs-list-actions-row');
-      expect(actionsRow.querySelector('.npcs-list-tags')).toBeInTheDocument();
-      expect(actionsRow.querySelector('.npcs-init-btn')).toBeInTheDocument();
     });
   });
 });

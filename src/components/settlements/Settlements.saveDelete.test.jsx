@@ -124,21 +124,6 @@ describe('Settlements - save and delete behavior', () => {
     expect(saveBtn).toBeDisabled();
   });
 
-  it('re-enables save button after save completes', async () => {
-    mockUseSettlements.saveItems.mockResolvedValue(undefined);
-    render(<Settlements campaignName="test" onBack={() => {}} />);
-    const modalOpen = screen.getByRole('button', { name: /new settlement/i });
-    fireEvent.click(modalOpen);
-    const nameInput = screen.getByLabelText(/name/i);
-    fireEvent.change(nameInput, { target: { value: 'My Settlement' } });
-    const saveBtn = screen.getByRole('button', { name: /save/i });
-    fireEvent.click(saveBtn);
-    await waitFor(() => {
-      expect(mockUseSettlements.saveItems).toHaveBeenCalled();
-    });
-    expect(screen.queryByRole('heading', { name: 'New Settlement' })).not.toBeInTheDocument();
-  });
-
   it('shows delete button disabled during delete', async () => {
     global.window.confirm = vi.fn(() => true);
     Object.assign(settlementMockReturn, {

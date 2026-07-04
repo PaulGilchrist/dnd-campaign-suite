@@ -35,57 +35,31 @@ describe('Sidebar', () => {
       expect(screen.getByText('Test Campaign')).toBeInTheDocument();
     });
 
-    it('should render Campaigns back button', () => {
+    it('should render all permanent sidebar buttons', () => {
       render(<Sidebar {...defaultProps} />);
       expect(screen.getByText(/Campaigns/)).toBeInTheDocument();
-    });
-
-    it('should render Add Character button', () => {
-      render(<Sidebar {...defaultProps} />);
       expect(screen.getByText(/Add Character/)).toBeInTheDocument();
-    });
-
-    it('should render character names when characters exist', () => {
-      const props = { ...defaultProps, characters: [{ name: 'Aragorn' }, { name: 'Legolas' }] };
-      render(<Sidebar {...props} />);
-      expect(screen.getByText('Aragorn')).toBeInTheDocument();
-      expect(screen.getByText('Legolas')).toBeInTheDocument();
-    });
-
-    it('should render Initiative button', () => {
-      render(<Sidebar {...defaultProps} />);
       expect(screen.getByText(/Initiative/)).toBeInTheDocument();
-    });
-
-    it('should render Notes button', () => {
-      render(<Sidebar {...defaultProps} />);
       expect(screen.getByText(/Notes/)).toBeInTheDocument();
+      expect(screen.getByText(/Rules/)).toBeInTheDocument();
     });
 
-    it('should render Maps button with Maps label on localhost', () => {
+    it('should render Maps label on localhost, Map label on non-localhost', () => {
       render(<Sidebar {...defaultProps} isLocalhost={true} />);
       expect(screen.getByText('Maps')).toBeInTheDocument();
-    });
 
-    it('should render Map button with Map label on non-localhost', () => {
       render(<Sidebar {...defaultProps} isLocalhost={false} />);
       expect(screen.getByText('Map')).toBeInTheDocument();
     });
 
-    it('should render Rules button', () => {
-      render(<Sidebar {...defaultProps} />);
-      expect(screen.getByText(/Rules/)).toBeInTheDocument();
-    });
-  });
-
-  describe('localhost-conditional buttons', () => {
     it.each([
-      { label: /Encounters/, activeView: undefined },
-      { label: /Factions/, activeView: undefined },
-      { label: /NPCs/, activeView: undefined },
-      { label: /Quests/, activeView: undefined },
-    ])('should render %s button on localhost', ({ label }) => {
-      render(<Sidebar {...defaultProps} isLocalhost={true} />);
+      { label: /Encounters/ },
+      { label: /Factions/ },
+      { label: /NPCs/ },
+      { label: /Quests/ },
+    ])('should render %s button on localhost, not on non-localhost', ({ label }) => {
+      const localhostProps = { ...defaultProps, isLocalhost: true };
+      render(<Sidebar {...localhostProps} />);
       expect(screen.getByText(label)).toBeInTheDocument();
     });
 
@@ -95,89 +69,67 @@ describe('Sidebar', () => {
       { label: /NPCs/ },
       { label: /Quests/ },
     ])('should not render %s button on non-localhost', ({ label }) => {
-      render(<Sidebar {...defaultProps} isLocalhost={false} />);
+      const nonLocalhostProps = { ...defaultProps, isLocalhost: false };
+      render(<Sidebar {...nonLocalhostProps} />);
       expect(screen.queryByText(label)).not.toBeInTheDocument();
+    });
+
+    it('should render character names when characters exist', () => {
+      const props = { ...defaultProps, characters: [{ name: 'Aragorn' }, { name: 'Legolas' }] };
+      render(<Sidebar {...props} />);
+      expect(screen.getByText('Aragorn')).toBeInTheDocument();
+      expect(screen.getByText('Legolas')).toBeInTheDocument();
     });
   });
 
   describe('event handlers', () => {
-    it('should call onBackToCampaigns when Campaigns clicked', () => {
+    it('should call handlers when sidebar buttons are clicked', () => {
       render(<Sidebar {...defaultProps} />);
       fireEvent.click(screen.getByText(/Campaigns/));
       expect(defaultProps.onBackToCampaigns).toHaveBeenCalledTimes(1);
-    });
 
-    it('should call onAddCharacter when Add Character clicked', () => {
-      render(<Sidebar {...defaultProps} />);
       fireEvent.click(screen.getByText(/Add Character/));
       expect(defaultProps.onAddCharacter).toHaveBeenCalledTimes(1);
+
+      fireEvent.click(screen.getByText(/Initiative/));
+      expect(defaultProps.onInitiativeClick).toHaveBeenCalledTimes(1);
+
+      fireEvent.click(screen.getByText(/Notes/));
+      expect(defaultProps.onNotesClick).toHaveBeenCalledTimes(1);
+
+      fireEvent.click(screen.getByText(/Map/));
+      expect(defaultProps.onMapsClick).toHaveBeenCalledTimes(1);
+
+      fireEvent.click(screen.getByTitle(/Switch to/));
+      expect(defaultProps.toggleTheme).toHaveBeenCalledTimes(1);
+
+      fireEvent.click(screen.getByTitle('Rename Campaign'));
+      expect(defaultProps.onRenameCampaign).toHaveBeenCalledTimes(1);
+
+      fireEvent.click(screen.getByTitle('Delete Campaign'));
+      expect(defaultProps.onDeleteCampaign).toHaveBeenCalledTimes(1);
     });
 
-    it('should call onCharacterClick when character clicked', () => {
+    it('should call onCharacterClick with character object', () => {
       const props = { ...defaultProps, characters: [{ name: 'Aragorn' }] };
       render(<Sidebar {...props} />);
       fireEvent.click(screen.getByText('Aragorn'));
       expect(defaultProps.onCharacterClick).toHaveBeenCalledWith({ name: 'Aragorn' });
     });
 
-    it('should call onInitiativeClick when Initiative clicked', () => {
-      render(<Sidebar {...defaultProps} />);
-      fireEvent.click(screen.getByText(/Initiative/));
-      expect(defaultProps.onInitiativeClick).toHaveBeenCalledTimes(1);
-    });
-
-    it('should call onNotesClick when Notes clicked', () => {
-      render(<Sidebar {...defaultProps} />);
-      fireEvent.click(screen.getByText(/Notes/));
-      expect(defaultProps.onNotesClick).toHaveBeenCalledTimes(1);
-    });
-
-    it('should call onMapsClick when Maps clicked', () => {
-      render(<Sidebar {...defaultProps} />);
-      fireEvent.click(screen.getByText(/Map/));
-      expect(defaultProps.onMapsClick).toHaveBeenCalledTimes(1);
-    });
-
-    it('should call onEncounterClick when Encounters clicked', () => {
+    it('should call localhost-only handlers when those buttons are clicked', () => {
       render(<Sidebar {...defaultProps} isLocalhost={true} />);
       fireEvent.click(screen.getByText(/Encounters/));
       expect(defaultProps.onEncounterClick).toHaveBeenCalledTimes(1);
-    });
 
-    it('should call onFactionsClick when Factions clicked', () => {
-      render(<Sidebar {...defaultProps} isLocalhost={true} />);
       fireEvent.click(screen.getByText(/Factions/));
       expect(defaultProps.onFactionsClick).toHaveBeenCalledTimes(1);
-    });
 
-    it('should call onNPCsClick when NPCs clicked', () => {
-      render(<Sidebar {...defaultProps} isLocalhost={true} />);
       fireEvent.click(screen.getByText(/NPCs/));
       expect(defaultProps.onNPCsClick).toHaveBeenCalledTimes(1);
-    });
 
-    it('should call onQuestsClick when Quests clicked', () => {
-      render(<Sidebar {...defaultProps} isLocalhost={true} />);
       fireEvent.click(screen.getByText(/Quests/));
       expect(defaultProps.onQuestsClick).toHaveBeenCalledTimes(1);
-    });
-
-    it('should call toggleTheme when theme toggle clicked', () => {
-      render(<Sidebar {...defaultProps} />);
-      fireEvent.click(screen.getByTitle(/Switch to/));
-      expect(defaultProps.toggleTheme).toHaveBeenCalledTimes(1);
-    });
-
-    it('should call onRenameCampaign when rename clicked', () => {
-      render(<Sidebar {...defaultProps} />);
-      fireEvent.click(screen.getByTitle('Rename Campaign'));
-      expect(defaultProps.onRenameCampaign).toHaveBeenCalledTimes(1);
-    });
-
-    it('should call onDeleteCampaign when delete clicked', () => {
-      render(<Sidebar {...defaultProps} />);
-      fireEvent.click(screen.getByTitle('Delete Campaign'));
-      expect(defaultProps.onDeleteCampaign).toHaveBeenCalledTimes(1);
     });
 
     it('should open rules URL in new tab when Rules clicked', () => {
@@ -189,20 +141,16 @@ describe('Sidebar', () => {
     });
   });
 
-  describe('button disabled states', () => {
+  describe('button states', () => {
     it('should disable rename button on non-localhost', () => {
       render(<Sidebar {...defaultProps} isLocalhost={false} />);
       expect(screen.getByTitle('Rename Campaign')).toHaveAttribute('disabled');
     });
 
-    it('should enable rename button on localhost', () => {
-      render(<Sidebar {...defaultProps} isLocalhost={true} />);
-      expect(screen.getByTitle('Rename Campaign')).not.toHaveAttribute('disabled');
-    });
-
-    it('should disable delete campaign button when characters exist', () => {
+    it('should disable delete campaign button when characters exist, enable when empty', () => {
       render(<Sidebar {...defaultProps} characters={[{ name: 'Aragorn' }]} />);
-      expect(screen.getByTitle('Delete Campaign')).toHaveAttribute('disabled');
+      const [disabledBtn] = screen.getAllByTitle('Delete Campaign');
+      expect(disabledBtn).toHaveAttribute('disabled');
     });
 
     it('should enable delete campaign button when no characters', () => {
@@ -211,7 +159,7 @@ describe('Sidebar', () => {
     });
   });
 
-  describe('active character highlighting', () => {
+  describe('active highlighting', () => {
     it('should highlight active character', () => {
       const props = {
         ...defaultProps,
@@ -222,27 +170,19 @@ describe('Sidebar', () => {
       const legolasBtn = screen.getByText('Legolas').closest('button');
       expect(legolasBtn).toHaveClass('active');
     });
-  });
 
-  describe('activeView highlighting', () => {
-    it('should show active class on Factions when activeView is factions', () => {
-      render(<Sidebar {...defaultProps} activeView={{ type: 'factions' }} />);
-      expect(screen.getByText(/Factions/).closest('button')).toHaveClass('active');
-    });
-
-    it('should show active class on NPCs when activeView is npcs', () => {
-      render(<Sidebar {...defaultProps} activeView={{ type: 'npcs' }} />);
-      expect(screen.getByText(/NPCs/).closest('button')).toHaveClass('active');
-    });
-
-    it('should show active class on Quests when activeView is quests', () => {
-      render(<Sidebar {...defaultProps} activeView="quests" />);
-      expect(screen.getByText(/Quests/).closest('button')).toHaveClass('active');
+    it.each([
+      { activeView: { type: 'factions' }, label: /Factions/ },
+      { activeView: { type: 'npcs' }, label: /NPCs/ },
+      { activeView: 'quests', label: /Quests/ },
+    ])('should show active class on %p when activeView is %p', ({ activeView, label }) => {
+      render(<Sidebar {...defaultProps} activeView={activeView} />);
+      expect(screen.getByText(label).closest('button')).toHaveClass('active');
     });
   });
 
   describe('characters section toggle', () => {
-    it('should toggle characters section when header clicked', () => {
+    it('should toggle characters section when header clicked and persist state', () => {
       const props = { ...defaultProps, characters: [{ name: 'Aragorn' }] };
       render(<Sidebar {...props} />);
       expect(screen.getByText('Aragorn')).toBeInTheDocument();
@@ -251,19 +191,10 @@ describe('Sidebar', () => {
       fireEvent.click(charactersHeader);
 
       expect(screen.queryByText('Aragorn')).not.toBeInTheDocument();
-    });
-
-    it('should persist expanded state to localStorage', () => {
-      const props = { ...defaultProps, characters: [{ name: 'Aragorn' }] };
-      render(<Sidebar {...props} />);
-
-      const charactersHeader = screen.getByText('Characters').closest('button');
-      fireEvent.click(charactersHeader);
-
       expect(window.localStorage.getItem('sidebar-characters-expanded')).toBe('false');
     });
 
-    it('should restore expanded state from localStorage', () => {
+    it('should restore collapsed state from localStorage', () => {
       window.localStorage.setItem('sidebar-characters-expanded', 'false');
       const props = { ...defaultProps, characters: [{ name: 'Aragorn' }] };
       render(<Sidebar {...props} />);
