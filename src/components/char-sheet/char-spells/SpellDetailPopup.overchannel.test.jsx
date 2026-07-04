@@ -1,8 +1,8 @@
-/* @improved-by-ai */
+/* @cleaned-by-ai */
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import SpellDetailPopup from './SpellDetailPopup.jsx';
-import { getRuntimeValue, setRuntimeValue, useRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
+import { getRuntimeValue, useRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import { getActiveBuffs } from '../../../services/combat/buffs/buffService.js';
 
 vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
@@ -72,10 +72,8 @@ const renderPopup = (
 describe('SpellDetailPopup - Overchannel', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    localStorage.clear();
     vi.mocked(getRuntimeValue).mockReturnValue(null);
     vi.mocked(getActiveBuffs).mockReturnValue([]);
-    vi.mocked(setRuntimeValue).mockReturnValue();
   });
 
   describe('Overchannel feature', () => {

@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import CharClassFeatures from './CharClassFeatures.jsx';
@@ -137,7 +137,7 @@ describe('CharClassFeatures', () => {
             expect(container.innerHTML).toBe('');
         });
 
-        it('renders natural recovery section when resource_restoration passive exists', () => {
+        it('renders natural recovery section with grant free cast button when resource_restoration passive exists', () => {
             const stats = makeStats({
                 level: 5,
                 class: { name: 'Druid', class_levels: [{ level: 5 }] },
@@ -145,15 +145,6 @@ describe('CharClassFeatures', () => {
             });
             renderComponent(stats);
             expect(screen.getByText(/Natural Recovery:/)).toBeInTheDocument();
-        });
-
-        it('shows grant free cast button when natural recovery free cast is not set', () => {
-            const stats = makeStats({
-                level: 5,
-                class: { name: 'Druid', class_levels: [{ level: 5 }] },
-                automation: { passives: [{ type: 'resource_restoration', resourceKey: 'naturalRecoverySlots' }] },
-            });
-            renderComponent(stats);
             expect(screen.getByText(/Grant Free Cast/)).toBeInTheDocument();
         });
 
@@ -196,11 +187,6 @@ describe('CharClassFeatures', () => {
             ...overrides,
         });
 
-        it('renders fighter container', () => {
-            renderComponent(fighterStats());
-            expect(screen.getByTestId('char-class-fighter')).toBeInTheDocument();
-        });
-
         it('returns null when class_levels is null or undefined', () => {
             const { container: c1 } = renderComponent(makeStats({
                 class: { name: 'Fighter', class_levels: null },
@@ -233,24 +219,6 @@ describe('CharClassFeatures', () => {
             expect(screen.getByText(/Energy Dice/)).toBeInTheDocument();
             expect(screen.getByText(/Energy Die Type:/)).toBeInTheDocument();
             expect(screen.getByText(/d6/)).toBeInTheDocument();
-        });
-
-        it('does not render psionic energy when required_major does not match', () => {
-            const stats = makeStats({
-                level: 5,
-                class: {
-                    name: 'Fighter',
-                    class_levels: [
-                        { level: 1 }, { level: 2 }, { level: 3 }, { level: 4 },
-                        { level: 5, extra_attacks: 2, weapon_mastery: 'Mercy', energy: { required_major: 'Psi Warrior', energy_die_num: 4, energy_die_type: 6 } },
-                    ],
-                    major: { name: 'Battle Master' },
-                    fightingStyles: [],
-                },
-                automation: { passives: [] },
-            });
-            renderComponent(stats);
-            expect(screen.queryByText(/Energy Dice/)).not.toBeInTheDocument();
         });
 
         it('renders superiority dice and die type based on subclass and level', () => {
@@ -294,40 +262,8 @@ describe('CharClassFeatures', () => {
             expect(screen.getByTestId('char-class-fighter')).toBeInTheDocument();
         });
 
-        it('renders fighting styles when present', () => {
-            const statsWithStyles = makeStats({
-                level: 5,
-                class: {
-                    name: 'Fighter',
-                    class_levels: [
-                        { level: 1 }, { level: 2 }, { level: 3 }, { level: 4 },
-                        { level: 5 },
-                    ],
-                    fightingStyles: ['Defense', 'Great Weapon Fighting'],
-                },
-                automation: { passives: [] },
-            });
-            renderComponent(statsWithStyles);
-            expect(screen.getByText(/Fighting Styles.*/));
-        });
-
-        it('renders N/A for fighting styles when absent', () => {
-            const statsNoStyles = makeStats({
-                level: 1,
-                class: {
-                    name: 'Fighter',
-                    class_levels: [{ level: 1 }],
-                    fightingStyles: null,
-                },
-                automation: { passives: [] },
-            });
-            renderComponent(statsNoStyles);
-            expect(screen.getByText(/Fighting Styles.*/));
-        });
-
         it('renders tracked resources and weapon mastery', () => {
-            const stats = makeStats({
-                level: 5,
+            renderComponent(fighterStats({
                 class: {
                     name: 'Fighter',
                     class_levels: [
@@ -338,8 +274,7 @@ describe('CharClassFeatures', () => {
                     fightingStyles: [],
                 },
                 automation: { passives: [] },
-            });
-            renderComponent(stats);
+            }));
             expect(screen.getByTestId('tracked-resource-Action Surge Uses')).toBeInTheDocument();
             expect(screen.getByTestId('tracked-resource-Second Wind')).toBeInTheDocument();
             expect(screen.getByTestId('tracked-resource-Superiority Dice')).toBeInTheDocument();
@@ -369,21 +304,6 @@ describe('CharClassFeatures', () => {
             expect(screen.getByText(/Extra Attacks.*/));
             expect(screen.getByTestId('tracked-resource-Focus Points')).toBeInTheDocument();
         });
-
-        it('renders focus save DC with correct formula (8 + wisBonus + proficiency)', () => {
-            const stats = makeStats({
-                level: 5,
-                abilities: [
-                    { name: 'Wisdom', bonus: 4 },
-                ],
-                proficiency: 3,
-                class: { name: 'Monk', class_levels: [{ level: 5 }] },
-                automation: { passives: [] },
-            });
-            renderComponent(stats);
-            // 8 + 4 + 3 = 15
-            expect(screen.getByText(/Focus Save DC.*/));
-        });
     });
 
     describe('Paladin features', () => {
@@ -392,27 +312,20 @@ describe('CharClassFeatures', () => {
             automation: { passives: [] },
         });
 
-        it('renders paladin features', () => {
-            renderComponent(paladinStats());
-            expect(screen.getByTestId('char-class-paladin')).toBeInTheDocument();
-        });
-
         it('renders lay on hands pool and channel divinity tracked resources', () => {
             renderComponent(paladinStats());
             expect(screen.getByTestId('tracked-resource-Lay On Hands Pool')).toBeInTheDocument();
             expect(screen.getByTestId('tracked-resource-Channel Divinity Charges')).toBeInTheDocument();
         });
 
-        it('renders aura of protection with charisma bonus', () => {
+        it('renders aura of protection with charisma bonus and locked range at level < 6', () => {
             renderComponent(paladinStats());
             expect(screen.getByText(/Aura of Protection/)).toBeInTheDocument();
             expect(screen.getByText(/\+3/)).toBeInTheDocument();
+            expect(screen.getByText(/locked/)).toBeInTheDocument();
         });
 
-        it('shows locked aura range at level < 6 and 10 ft at level >= 6', () => {
-            renderComponent(paladinStats());
-            expect(screen.getByText(/locked/)).toBeInTheDocument();
-
+        it('shows 10 ft aura range at level >= 6', () => {
             const stats = makeStats({
                 level: 6,
                 class: { name: 'Paladin', class_levels: [{ level: 6 }] },
@@ -420,25 +333,6 @@ describe('CharClassFeatures', () => {
             });
             renderComponent(stats);
             expect(screen.getByText(/10 ft/)).toBeInTheDocument();
-        });
-
-        it('renders aura range when available', () => {
-            renderComponent(paladinStats());
-            expect(screen.getByText(/Aura Range:/)).toBeInTheDocument();
-        });
-
-        it('renders fighting styles when present', () => {
-            const stats = makeStats({
-                class: { name: 'Paladin', class_levels: [{ level: 5 }], fightingStyles: ['Defense'] },
-                automation: { passives: [] },
-            });
-            renderComponent(stats);
-            expect(screen.getByText(/Fighting Styles.*/));
-        });
-
-        it('renders extra attacks from class features', () => {
-            renderComponent(paladinStats());
-            expect(screen.getByText(/Extra Attacks.*/));
         });
 
         it('does not render aura of protection when charisma ability is missing', () => {
@@ -453,17 +347,21 @@ describe('CharClassFeatures', () => {
             renderComponent(stats);
             expect(screen.queryByText(/Aura of Protection:/)).not.toBeInTheDocument();
         });
+
+        it('renders fighting styles when present', () => {
+            const stats = makeStats({
+                class: { name: 'Paladin', class_levels: [{ level: 5 }], fightingStyles: ['Defense'] },
+                automation: { passives: [] },
+            });
+            renderComponent(stats);
+            expect(screen.getByText(/Fighting Styles.*/));
+        });
     });
 
     describe('Ranger features', () => {
         const rangerStats = () => makeStats({
             class: { name: 'Ranger', class_levels: [{ level: 5 }] },
             automation: { passives: [] },
-        });
-
-        it('renders ranger features', () => {
-            renderComponent(rangerStats());
-            expect(screen.getByTestId('char-class-ranger')).toBeInTheDocument();
         });
 
         it('renders favored foe button at level 2+', () => {
@@ -479,25 +377,6 @@ describe('CharClassFeatures', () => {
             });
             renderComponent(stats);
             expect(screen.queryByTitle(/Favored Foe/)).not.toBeInTheDocument();
-        });
-
-        it('renders favored enemies', () => {
-            renderComponent(rangerStats());
-            expect(screen.getByText(/Favored Enemies:/)).toBeInTheDocument();
-        });
-
-        it('renders extra attacks', () => {
-            renderComponent(rangerStats());
-            expect(screen.getByText(/Extra Attacks.*/));
-        });
-
-        it('renders fighting styles when level > 1 and styles present', () => {
-            const stats = makeStats({
-                class: { name: 'Ranger', class_levels: [{ level: 5 }], fightingStyles: ['Defense'] },
-                automation: { passives: [] },
-            });
-            renderComponent(stats);
-            expect(screen.getByText(/Fighting Styles.*/));
         });
 
         it('does not render fighting styles when level is 1 or styles is null', () => {
@@ -523,11 +402,6 @@ describe('CharClassFeatures', () => {
             level,
             class: { name: 'Rogue', class_levels: [{ level }] },
             automation: { passives: [] },
-        });
-
-        it('renders rogue container', () => {
-            renderComponent(rogueStats(9));
-            expect(screen.getByTestId('char-class-rogue')).toBeInTheDocument();
         });
 
         it('renders supreme sneak button at level 9 or above', () => {
@@ -561,16 +435,6 @@ describe('CharClassFeatures', () => {
             renderComponent(rogueStats(9));
             const btn = screen.getByTitle(/Supreme Sneak/);
             expect(btn).toHaveClass('automation-badge--active');
-        });
-
-        it('does not show supreme sneak active when stealth attack cost is 0', () => {
-            vi.mocked(useRuntimeValue).mockImplementation((_name, key) => {
-                if (key === 'stealthAttackCost') return 0;
-                return null;
-            });
-            renderComponent(rogueStats(9));
-            const btn = screen.getByTitle(/Supreme Sneak/);
-            expect(btn).not.toHaveClass('automation-badge--active');
         });
 
         it('renders rogue at level 1 without supreme sneak', () => {

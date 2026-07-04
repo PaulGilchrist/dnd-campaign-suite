@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { resolve, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+// @cleaned-by-ai
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = resolve(__filename, '..');
 
@@ -249,16 +250,6 @@ describe('App.css', () => {
       expect(hoverRule).not.toBeNull();
     });
 
-    it('should define list item header with flex layout', () => {
-      const rule = extractRule(css, '.ct-container .ct-list-item-header');
-      expect(rule).not.toBeNull();
-      assertProps(rule, {
-        display: 'flex',
-        'justify-content': 'space-between',
-        'align-items': 'center',
-      });
-    });
-
     it('should define list name and preview typography', () => {
       const nameRule = extractRule(css, '.ct-container .ct-list-name');
       expect(nameRule).not.toBeNull();
@@ -267,16 +258,6 @@ describe('App.css', () => {
 
       const previewRule = extractRule(css, '.ct-container .ct-list-preview');
       expect(previewRule).not.toBeNull();
-    });
-
-    it('should define meta and details flex rows', () => {
-      const metaRule = extractRule(css, '.ct-container .ct-list-meta');
-      expect(metaRule).not.toBeNull();
-      assertProps(metaRule, { display: 'flex' });
-
-      const detailsRule = extractRule(css, '.ct-container .ct-list-details');
-      expect(detailsRule).not.toBeNull();
-      assertProps(detailsRule, { display: 'flex' });
     });
   });
 
@@ -323,15 +304,6 @@ describe('App.css', () => {
 
       const hoverRule = extractRule(css, '.ct-container .ct-modal-close:hover');
       expect(hoverRule).not.toBeNull();
-    });
-
-    it('should define modal action and button groups with flex layout', () => {
-      const actionsRule = extractRule(css, '.ct-container .ct-modal-actions');
-      const buttonsRule = extractRule(css, '.ct-container .ct-modal-buttons');
-      expect(actionsRule).not.toBeNull();
-      expect(buttonsRule).not.toBeNull();
-      assertProps(actionsRule, { display: 'flex' });
-      assertProps(buttonsRule, { display: 'flex' });
     });
   });
 

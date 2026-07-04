@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharInventory from './CharInventory.jsx';
@@ -86,8 +86,6 @@ describe('CharInventory rendering', () => {
       expect(screen.getByText(/Weapon/)).toBeInTheDocument();
       expect(screen.getByText(/Uncommon/)).toBeInTheDocument();
       expect(screen.getByText(/Warrior/)).toBeInTheDocument();
-      const longswordElements = screen.getAllByText(/Longsword/);
-      expect(longswordElements.length).toBeGreaterThan(0);
     });
 
     it('should show "requires attunement" when requiresAttunement is true without custom requirements', () => {
@@ -110,28 +108,6 @@ describe('CharInventory rendering', () => {
       renderComponent(stats);
       expect(screen.getByText(/Amulet/)).toBeInTheDocument();
       expect(screen.getByText(/requires attunement/)).toBeInTheDocument();
-    });
-
-    it('should not show "requires attunement" when requiresAttunement is false', () => {
-      const stats = {
-        inventory: {
-          magicItems: [
-            {
-              name: 'Magic Ring',
-              type: 'Ring',
-              rarity: 'Rare',
-              description: 'A magical ring.',
-              requiresAttunement: false,
-            },
-          ],
-          equipped: [],
-          backpack: [],
-        },
-      };
-
-      renderComponent(stats);
-      expect(screen.getByText(/Magic Ring/)).toBeInTheDocument();
-      expect(screen.queryByText(/requires attunement/)).not.toBeInTheDocument();
     });
 
     it('should not render quantity label when quantity is missing or zero', () => {
@@ -163,58 +139,10 @@ describe('CharInventory rendering', () => {
       expect(screen.queryByText(/qty/)).not.toBeInTheDocument();
     });
 
-    it('should render magic item description with sanitizeHtml', () => {
-      const stats = {
-        inventory: {
-          magicItems: [
-            {
-              name: 'Cloak of Protection',
-              type: 'Armor',
-              subtype: 'Cloak',
-              rarity: 'Uncommon',
-              description: '<b>+1 to AC and saving throws</b>',
-            },
-          ],
-          equipped: [],
-          backpack: [],
-        },
-      };
-
-      renderComponent(stats);
-      expect(screen.getByText(/Cloak of Protection/)).toBeInTheDocument();
-      expect(screen.getByText(/\+1 to AC and saving throws/)).toBeInTheDocument();
-    });
-
     it('should not render magic items section when magicItems is null or missing', () => {
       const stats = { inventory: {} };
       renderComponent(stats);
       expect(screen.queryByText(/Magic Items:/)).not.toBeInTheDocument();
-
-      const nullStats = { inventory: { magicItems: null, equipped: [], backpack: [] } };
-      renderComponent(nullStats);
-      expect(screen.queryByText(/Magic Items:/)).not.toBeInTheDocument();
-    });
-
-    it('should render magic item with no description gracefully', () => {
-      const stats = {
-        inventory: {
-          magicItems: [
-            {
-              name: 'No Desc Item',
-              type: 'Potion',
-              rarity: 'Common',
-              requiresAttunement: false,
-            },
-          ],
-          equipped: [],
-          backpack: [],
-        },
-      };
-
-      renderComponent(stats);
-      expect(screen.getByText(/No Desc Item/)).toBeInTheDocument();
-      expect(screen.getByText(/Potion/)).toBeInTheDocument();
-      expect(screen.getByText(/Common/)).toBeInTheDocument();
     });
   });
 

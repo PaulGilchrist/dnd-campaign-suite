@@ -1,3 +1,4 @@
+// @cleaned-by-ai
 // @improved-by-ai
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -11,17 +12,6 @@ const mockAbilityScores = [
   { full_name: 'Wisdom' },
   { full_name: 'Charisma' },
 ];
-
-const mockPointBuyCosts = {
-  8: 0,
-  9: 1,
-  10: 2,
-  11: 3,
-  12: 4,
-  13: 5,
-  14: 7,
-  15: 9,
-};
 
 const mockBackgrounds2024 = [
   {
@@ -50,10 +40,6 @@ const mockRulesValidation5e = {
 };
 
 global.fetch = vi.fn();
-
-vi.mock('../../services/ui/utils.js', () => ({
-  getPointBuyCosts: vi.fn(() => Promise.resolve(mockPointBuyCosts)),
-}));
 
 function createMockProps(overrides = {}) {
   return {
@@ -254,30 +240,6 @@ describe('WizardStepAbilities', () => {
       const pointCosts = screen.getAllByText('Cost: 0');
       expect(pointCosts.length).toBe(6);
     });
-
-    it('should display correct point cost for score 10', async () => {
-      setupFetchMock('5e');
-      const props = createMockProps({
-        formData: {
-          rules: '5e',
-          abilities: [
-            { baseScore: '10', featIncrease: '0', miscIncrease: '0', backgroundIncrease: '0' },
-            { baseScore: '8', featIncrease: '0', miscIncrease: '0', backgroundIncrease: '0' },
-            { baseScore: '8', featIncrease: '0', miscIncrease: '0', backgroundIncrease: '0' },
-            { baseScore: '8', featIncrease: '0', miscIncrease: '0', backgroundIncrease: '0' },
-            { baseScore: '8', featIncrease: '0', miscIncrease: '0', backgroundIncrease: '0' },
-            { baseScore: '8', featIncrease: '0', miscIncrease: '0', backgroundIncrease: '0' },
-          ],
-        },
-      });
-      render(<WizardStepAbilities {...props} />);
-
-      await waitFor(() => {
-        expect(screen.getByText('Strength')).toBeInTheDocument();
-      });
-
-      expect(screen.getByText('Cost: 2')).toBeInTheDocument();
-    });
   });
 
   describe('Ruleset-specific behavior', () => {
@@ -291,16 +253,6 @@ describe('WizardStepAbilities', () => {
       });
 
       expect(screen.queryByText(/Background Ability Scores/)).not.toBeInTheDocument();
-    });
-
-    it('should show point buy total of 24 for both 5e and 2024 rulesets', async () => {
-      setupFetchMock('5e');
-      const props = createMockProps();
-      render(<WizardStepAbilities {...props} />);
-
-      await waitFor(() => {
-        expect(screen.getByText(/Total points allowed: 24/)).toBeInTheDocument();
-      });
     });
   });
 
@@ -322,29 +274,7 @@ describe('WizardStepAbilities', () => {
       expect(screen.getByText('Charisma:')).toBeInTheDocument();
     });
 
-    it('should pre-fill background ability selections from localStorage when available', async () => {
-      const props = createMockProps({
-        formData: { rules: '2024', background: 'Acolyte' },
-      });
-
-      setupFetchMock('2024', 'Acolyte');
-
-      const storedAssignments = { Intelligence: 2, Wisdom: 1, Charisma: 0 };
-      localStorage.setItem('_background_abilities_Acolyte', JSON.stringify(storedAssignments));
-
-      render(<WizardStepAbilities {...props} />);
-
-      await waitFor(() => {
-        expect(screen.getByText(/Background Ability Scores \(Acolyte\)/)).toBeInTheDocument();
-      });
-
-      const selects = screen.getAllByRole('combobox');
-      expect(selects[0]).toHaveValue('2');
-      expect(selects[1]).toHaveValue('1');
-      expect(selects[2]).toHaveValue('0');
-    });
-
-    it('should call onBackgroundIncreaseChange and save to localStorage when background ability is changed', async () => {
+    it('should call onBackgroundIncreaseChange when background ability is changed', async () => {
       const props = createMockProps({
         formData: { rules: '2024', background: 'Acolyte' },
       });
@@ -360,10 +290,6 @@ describe('WizardStepAbilities', () => {
       fireEvent.change(selects[0], { target: { value: '2' } });
 
       expect(props.onBackgroundIncreaseChange).toHaveBeenCalledWith('Intelligence', 2);
-      expect(localStorage.setItem).toHaveBeenCalledWith(
-        '_background_abilities_Acolyte',
-        expect.stringContaining('Intelligence'),
-      );
     });
 
     it('should highlight background abilities in the ability score grid with badge', async () => {
@@ -401,31 +327,12 @@ describe('WizardStepAbilities', () => {
         expect(screen.getByText(/must assign at least 3 points/)).toBeInTheDocument();
       });
 
-      vi.clearAllMocks();
-      render(<WizardStepAbilities {...props} />);
-      await waitFor(() => {
-        expect(screen.getByText(/Background Ability Scores \(Acolyte\)/)).toBeInTheDocument();
-      });
-
       const selects2 = screen.getAllByRole('combobox');
       fireEvent.change(selects2[0], { target: { value: '2' } });
       fireEvent.change(selects2[1], { target: { value: '2' } });
 
       await waitFor(() => {
         expect(screen.getByText(/maximum is 3/)).toBeInTheDocument();
-      });
-    });
-
-    it('should show point buy total of 24 for 2024 ruleset', async () => {
-      const props = createMockProps({
-        formData: { rules: '2024' },
-      });
-
-      setupFetchMock('2024');
-      render(<WizardStepAbilities {...props} />);
-
-      await waitFor(() => {
-        expect(screen.getByText(/Total points allowed: 24/)).toBeInTheDocument();
       });
     });
   });

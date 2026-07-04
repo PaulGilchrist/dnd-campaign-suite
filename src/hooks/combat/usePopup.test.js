@@ -1,5 +1,5 @@
-// @improved-by-ai
-import { renderHook, act } from '@testing-library/react';
+// @cleaned-by-ai
+import { render, screen, fireEvent, renderHook, act } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import usePopup from './usePopup.js';
 
@@ -147,6 +147,58 @@ describe('usePopup', () => {
         result.current.showPopup({ id: 1 });
       });
       expect(result.current.popupHtml).toBe(longHtml);
+    });
+  });
+
+  describe('DOM rendering', () => {
+    function TestComponent({ buildHtml }) {
+      const { showPopup, popupHtml, setPopupHtml } = usePopup(buildHtml);
+      return (
+        <div>
+          <button onClick={() => showPopup({ name: 'Test' })}>Show Popup</button>
+          <button onClick={() => setPopupHtml('<p>New HTML</p>')}>Set HTML</button>
+          {popupHtml && <div data-testid="popup" dangerouslySetInnerHTML={{ __html: popupHtml }} />}
+        </div>
+      );
+    }
+
+    it('should return showPopup function and render the buttons', () => {
+      const buildHtml = vi.fn(() => '<p>Test HTML</p>');
+      render(<TestComponent buildHtml={buildHtml} />);
+      expect(screen.getByText('Show Popup')).toBeInTheDocument();
+      expect(screen.getByText('Set HTML')).toBeInTheDocument();
+    });
+
+    it('should call buildHtml with the entity and display the popup', () => {
+      const buildHtml = vi.fn(() => '<p>Test HTML</p>');
+      render(<TestComponent buildHtml={buildHtml} />);
+      fireEvent.click(screen.getByText('Show Popup'));
+      expect(buildHtml).toHaveBeenCalledWith({ name: 'Test' });
+      expect(screen.getByTestId('popup')).toBeInTheDocument();
+    });
+
+    it('should not display popup when buildHtml returns null', () => {
+      const buildHtml = vi.fn(() => null);
+      render(<TestComponent buildHtml={buildHtml} />);
+      fireEvent.click(screen.getByText('Show Popup'));
+      expect(buildHtml).toHaveBeenCalled();
+      expect(screen.queryByTestId('popup')).not.toBeInTheDocument();
+    });
+
+    it('should not display popup when buildHtml returns empty string', () => {
+      const buildHtml = vi.fn(() => '');
+      render(<TestComponent buildHtml={buildHtml} />);
+      fireEvent.click(screen.getByText('Show Popup'));
+      expect(buildHtml).toHaveBeenCalled();
+      expect(screen.queryByTestId('popup')).not.toBeInTheDocument();
+    });
+
+    it('should update the popup content with custom HTML', () => {
+      const buildHtml = vi.fn(() => '<p>Test</p>');
+      render(<TestComponent buildHtml={buildHtml} />);
+      fireEvent.click(screen.getByText('Set HTML'));
+      expect(screen.getByTestId('popup')).toBeInTheDocument();
+      expect(screen.getByTestId('popup').innerHTML).toBe('<p>New HTML</p>');
     });
   });
 });

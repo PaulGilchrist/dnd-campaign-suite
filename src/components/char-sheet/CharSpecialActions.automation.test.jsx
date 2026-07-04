@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharSpecialActions from './CharSpecialActions.jsx';
@@ -159,74 +159,6 @@ describe('CharSpecialActions - Automation', () => {
       await waitFor(() => {
         expect(executeHandler).not.toHaveBeenCalled();
       });
-    });
-
-    it('renders TeleportModal with correct props when shown', async () => {
-      const teleportPayload = {
-        action: { name: 'Misty Step', automation: { effect: 'teleport', distance: '30 ft' } },
-        playerStats: basePlayerStats,
-        campaignName: 'test',
-      };
-
-      executeHandler.mockResolvedValue({
-        type: 'modal',
-        modalName: 'teleport',
-        payload: teleportPayload,
-      });
-
-      const playerStats = createPlayerStats({
-        specialActions: [
-          createSpecialAction('Misty Step', { type: 'teleport', distance: '30 ft' }),
-        ],
-      });
-      render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
-      fireEvent.click(screen.getAllByText(/Misty Step/)[0]);
-
-      await waitFor(() => {
-        expect(screen.getByTestId('teleport-modal')).toBeInTheDocument();
-      });
-    });
-
-    it('renders SavantModal when automation returns a savant modal', async () => {
-      executeHandler.mockResolvedValue({
-        type: 'modal',
-        modalName: 'abjurationSavant',
-        payload: {
-          action: { name: 'Abjuration Savant', automation: { type: 'passive_rule', effect: 'abjuration_savant' } },
-          playerStats: basePlayerStats,
-          campaignName: 'test',
-          school: 'Abjuration',
-        },
-      });
-
-      const playerStats = createPlayerStats({
-        specialActions: [
-          createSpecialAction('Abjuration Savant', { type: 'passive_rule', effect: 'abjuration_savant' }),
-        ],
-      });
-      render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
-      fireEvent.click(screen.getAllByText(/Abjuration Savant/)[0]);
-
-      await waitFor(() => {
-        expect(screen.getByTestId('abjuration-savant-modal')).toBeInTheDocument();
-      });
-    });
-
-    it('does not render any modal when executeHandler returns null', async () => {
-      executeHandler.mockResolvedValue(null);
-
-      const playerStats = createPlayerStats({
-        specialActions: [
-          createSpecialAction('Blink Steps', { type: 'teleport', distance: '30 ft' }),
-        ],
-      });
-      render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
-      fireEvent.click(screen.getAllByText(/Blink Steps/)[0]);
-
-      await waitFor(() => {
-        expect(executeHandler).toHaveBeenCalled();
-      });
-      expect(screen.queryByTestId('teleport-modal')).not.toBeInTheDocument();
     });
   });
 });

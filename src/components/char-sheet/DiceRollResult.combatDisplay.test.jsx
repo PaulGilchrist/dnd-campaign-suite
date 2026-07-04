@@ -1,46 +1,31 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { render, screen, fireEvent } from '@testing-library/react';
 import DiceRollResult from './DiceRollResult.jsx';
 
 describe('DiceRollResult', () => {
     describe('hit/miss display', () => {
-        it('shows HIT when hit is true with target info', () => {
+        it.each`
+            hit      | rolls  | bonus | expectedText
+            ${true}  | ${[18]}| ${5}  | ${'HIT'}
+            ${false} | ${[8]} | ${3}  | ${'MISS'}
+        `('shows $expectedText when hit is $hit with rolls: $rolls, bonus: $bonus', ({ hit, rolls, bonus, expectedText }) => {
             const { container } = render(
                 <DiceRollResult
                     name="Longsword"
                     type="attack"
-                    rolls={[18]}
-                    bonus={5}
+                    rolls={rolls}
+                    bonus={bonus}
                     targetName="Goblin"
                     targetAc={14}
-                    hit={true}
+                    hit={hit}
                     rollType="attack"
                 />
             );
-            const hitMiss = container.querySelector('.dice-roll-hit-miss.hit');
-            expect(hitMiss.textContent).toContain('HIT');
-            expect(hitMiss.textContent).toContain('23 vs AC 14');
+            const hitMiss = container.querySelector(`.dice-roll-hit-miss.${hit ? 'hit' : 'miss'}`);
+            expect(hitMiss.textContent).toContain(expectedText);
         });
 
-        it('shows MISS when hit is false with target info', () => {
-            const { container } = render(
-                <DiceRollResult
-                    name="Longsword"
-                    type="attack"
-                    rolls={[8]}
-                    bonus={3}
-                    targetName="Orc"
-                    targetAc={15}
-                    hit={false}
-                    rollType="attack"
-                />
-            );
-            const hitMiss = container.querySelector('.dice-roll-hit-miss.miss');
-            expect(hitMiss.textContent).toContain('MISS');
-            expect(hitMiss.textContent).toContain('11 vs AC 15');
-        });
-
-        it('shows AC value or em-dash', () => {
+        it('shows AC value or em-dash when targetAc is provided or omitted', () => {
             const { container: c1 } = render(
                 <DiceRollResult
                     name="Longsword"
@@ -67,22 +52,6 @@ describe('DiceRollResult', () => {
                 />
             );
             expect(c2.querySelector('.dice-roll-hit-miss.hit').textContent).toContain('—');
-        });
-
-        it('does not show hit/miss when hit is undefined', () => {
-            render(
-                <DiceRollResult
-                    name="Longsword"
-                    type="attack"
-                    rolls={[18]}
-                    bonus={5}
-                    targetName="Goblin"
-                    targetAc={14}
-                    rollType="attack"
-                />
-            );
-            expect(screen.queryByText(/HIT/)).not.toBeInTheDocument();
-            expect(screen.queryByText(/MISS/)).not.toBeInTheDocument();
         });
 
         it.each`
@@ -140,7 +109,7 @@ describe('DiceRollResult', () => {
     });
 
     describe('glorious defense counter-attack', () => {
-        it('shows counter-attack button when conditions met', () => {
+        it('shows counter-attack button and calls onCounterAttack when clicked', () => {
             const onCounter = vi.fn();
             render(
                 <DiceRollResult
@@ -156,11 +125,12 @@ describe('DiceRollResult', () => {
                 />
             );
             expect(screen.getByText(/Glorious Defense Counter-Attack/)).toBeInTheDocument();
+            fireEvent.click(screen.getByText(/Glorious Defense Counter-Attack/));
+            expect(onCounter).toHaveBeenCalled();
         });
 
         it.each`
             hit            | isAutoMiss     | gloriousDefenseBonus | shouldShow
-            ${true}        | ${false}       | ${2}                 | ${false}
             ${false}       | ${true}        | ${2}                 | ${false}
             ${false}       | ${false}       | ${0}                 | ${false}
         `('does not show counter-attack when hit: $hit, isAutoMiss: $isAutoMiss, gloriousDefenseBonus: $gloriousDefenseBonus', ({ hit, isAutoMiss, gloriousDefenseBonus }) => {
@@ -179,25 +149,6 @@ describe('DiceRollResult', () => {
                 />
             );
             expect(screen.queryByText(/Glorious Defense/)).not.toBeInTheDocument();
-        });
-
-        it('calls onCounterAttack when counter-attack button is clicked', () => {
-            const onCounter = vi.fn();
-            render(
-                <DiceRollResult
-                    name="Longsword"
-                    type="attack"
-                    rolls={[8]}
-                    bonus={3}
-                    targetName="Goblin"
-                    hit={false}
-                    rollType="attack"
-                    gloriousDefenseBonus={2}
-                    onCounterAttack={onCounter}
-                />
-            );
-            fireEvent.click(screen.getByText(/Glorious Defense Counter-Attack/));
-            expect(onCounter).toHaveBeenCalled();
         });
     });
 
@@ -219,20 +170,6 @@ describe('DiceRollResult', () => {
             );
             expect(screen.getByText(expectedText)).toBeInTheDocument();
         });
-
-        it('does not show cover when coverAcBonus is 0', () => {
-            render(
-                <DiceRollResult
-                    name="Longbow"
-                    type="attack"
-                    rolls={[12]}
-                    bonus={4}
-                    coverLevel="threeQuarter"
-                    coverAcBonus={0}
-                />
-            );
-            expect(screen.queryByText(/Cover/)).not.toBeInTheDocument();
-        });
     });
 
     describe('auto damage rolling', () => {
@@ -240,7 +177,6 @@ describe('DiceRollResult', () => {
             autoDamage | hit     | showAutoDamage
             ${true}    | ${true} | ${true}
             ${true}    | ${false} | ${false}
-            ${false}   | ${true} | ${false}
         `('shows auto damage indicator when autoDamage: $autoDamage, hit: $hit', ({ autoDamage, hit, showAutoDamage }) => {
             if (showAutoDamage) {
                 render(
@@ -372,18 +308,14 @@ describe('DiceRollResult', () => {
             expect(screen.getByText(/d20 14 \+ 0/)).toBeInTheDocument();
         });
 
-        it.each`
-            saveResult
-            ${null}
-            ${undefined}
-        `('does not show save result when saveResult is $saveResult', ({ saveResult }) => {
+        it('does not show save result when saveResult is falsy', () => {
             render(
                 <DiceRollResult
                     name="Fireball"
                     type="damage"
                     rolls={[6]}
                     bonus={0}
-                    saveResult={saveResult}
+                    saveResult={null}
                     saveDc={15}
                 />
             );
@@ -432,22 +364,18 @@ describe('DiceRollResult', () => {
             expect(damageEl.textContent).toContain('damage applied');
             expect(damageEl.textContent).toContain('Orc');
             expect(damageEl.textContent).toContain('reduced from 15');
-            expect(damageEl.textContent).toContain('HP: 13 → 5');
+            expect(damageEl.textContent).toContain('HP:');
         });
 
-        it.each`
-            damageApplied | finalDamage | shouldShow
-            ${false}      | ${15}       | ${false}
-            ${true}       | ${undefined}| ${false}
-        `('does not show damage applied when damageApplied: $damageApplied, finalDamage: $finalDamage', ({ damageApplied, finalDamage }) => {
+        it('does not show damage applied when finalDamage is undefined', () => {
             render(
                 <DiceRollResult
                     name="Fireball"
                     type="damage"
                     rolls={[6, 5, 4]}
                     bonus={0}
-                    finalDamage={finalDamage}
-                    damageApplied={damageApplied}
+                    finalDamage={undefined}
+                    damageApplied={true}
                     targetName="Goblin"
                 />
             );

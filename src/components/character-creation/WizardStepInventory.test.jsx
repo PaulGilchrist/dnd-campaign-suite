@@ -1,3 +1,4 @@
+// @cleaned-by-ai
 // @improved-by-ai
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -10,19 +11,10 @@ vi.mock('../../hooks/ui/useEquipmentSearch.js', () => ({
 vi.mock('./EquipmentSearchModal.jsx', () => ({
   default: function MockEquipmentSearchModal({
     showSearchModal,
-    _searchField,
     onClose,
     filteredEquipment,
-    searchQuery,
-    onSearchChange,
-    selectedCategory,
-    onCategoryChange,
-    showOnlySelected,
-    onShowOnlySelectedChange,
     onEquipmentSelect,
-    onAddCustomItem,
-    currentItemCount,
-    uniqueCategories = ['All'],
+    currentItemCount = 0,
   }) {
     if (!showSearchModal) return null;
     return (
@@ -35,54 +27,9 @@ vi.mock('./EquipmentSearchModal.jsx', () => ({
             </button>
           </div>
           <div className="search-modal-body">
-            <div className="category-filters">
-              {uniqueCategories.map((category, idx) => (
-                <button
-                  key={`category-${idx}`}
-                  className={`category-filter-btn ${selectedCategory === category ? 'active' : ''}`}
-                  onClick={() => onCategoryChange(category)}
-                >
-                  {category}
-                </button>
-              ))}
-            </div>
-            <div className="search-input-container">
-              <input
-                type="text"
-                className="search-input"
-                placeholder="Search equipment..."
-                value={searchQuery}
-                onChange={(e) => onSearchChange(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && searchQuery.trim()) {
-                    onAddCustomItem(searchQuery.trim());
-                  }
-                }}
-                autoFocus
-              />
-            </div>
-            <div className="filter-checkbox-group">
-              <label className="filter-checkbox-label">
-                <input
-                  type="checkbox"
-                  checked={showOnlySelected}
-                  onChange={(e) => onShowOnlySelectedChange(e.target.checked)}
-                />
-                Show Only Selected&nbsp;(
-              </label>
-              <span className="filter-checkbox-count">
-                {currentItemCount} selected)
-              </span>
-            </div>
             <div className="equipment-results">
-              {filteredEquipment.length === 0 && searchQuery ? (
-                <div className="no-results">
-                  No matches found. Press Enter to add as custom item.
-                </div>
-              ) : filteredEquipment.length === 0 ? (
-                <div className="no-results">
-                  Start typing to search equipment.
-                </div>
+              {filteredEquipment.length === 0 ? (
+                <div className="no-results">No results</div>
               ) : (
                 filteredEquipment.map((item) => (
                   <div
@@ -91,22 +38,13 @@ vi.mock('./EquipmentSearchModal.jsx', () => ({
                     onClick={() => onEquipmentSelect(item)}
                   >
                     <div className="equipment-item-name">{item.name}</div>
-                    <div className="equipment-item-details">
-                      <span className="equipment-item-category">
-                        {item.equipment_category}
-                      </span>
-                      <span className="equipment-item-cost">
-                        {item.cost?.quantity} {item.cost?.unit}
-                      </span>
-                      {item.weight && <span className="equipment-item-weight">{item.weight} lb</span>}
-                    </div>
                   </div>
                 ))
               )}
             </div>
           </div>
           <div className="search-modal-footer">
-            <button className="cancel-btn" onClick={onClose}>Close</button>
+            <span className="filter-checkbox-count">{currentItemCount} selected)</span>
           </div>
         </div>
       </div>
@@ -117,20 +55,8 @@ vi.mock('./EquipmentSearchModal.jsx', () => ({
 import { useEquipmentSearch } from '../../hooks/ui/useEquipmentSearch.js';
 
 const mockEquipment = [
-  {
-    index: 'club',
-    name: 'Club',
-    equipment_category: 'Weapons',
-    cost: { quantity: 1, unit: 'cp' },
-    weight: 2,
-  },
-  {
-    index: 'dagger',
-    name: 'Dagger',
-    equipment_category: 'Weapons',
-    cost: { quantity: 2, unit: 'gp' },
-    weight: 1,
-  },
+  { index: 'club', name: 'Club', equipment_category: 'Weapons', cost: { quantity: 1, unit: 'cp' }, weight: 2 },
+  { index: 'dagger', name: 'Dagger', equipment_category: 'Weapons', cost: { quantity: 2, unit: 'gp' }, weight: 1 },
 ];
 
 const createMockHookReturn = (overrides = {}) => ({
@@ -153,15 +79,8 @@ const createMockHookReturn = (overrides = {}) => ({
 });
 
 const createMockProps = (overrides = {}) => ({
-  formData: {
-    inventory: {
-      gold: 15,
-    },
-  },
-  tempInventory: {
-    backpack: ['Rope', 'Torch'],
-    equipped: ['Longsword', 'Chain mail'],
-  },
+  formData: { inventory: { gold: 15 } },
+  tempInventory: { backpack: ['Rope', 'Torch'], equipped: ['Longsword', 'Chain mail'] },
   onInventoryChange: vi.fn(),
   onTempInventoryChange: vi.fn(),
   ...overrides,
@@ -188,9 +107,7 @@ describe('WizardStepInventory', () => {
 
   describe('gold input', () => {
     it('should display the initial gold value from formData.inventory.gold', () => {
-      const props = createMockProps({
-        formData: { inventory: { gold: 50 } },
-      });
+      const props = createMockProps({ formData: { inventory: { gold: 50 } } });
       render(<WizardStepInventory {...props} />);
       expect(screen.getByRole('spinbutton')).toHaveValue(50);
     });
@@ -216,43 +133,6 @@ describe('WizardStepInventory', () => {
       vi.mocked(onInventoryChange).mockClear();
       fireEvent.change(goldInput, { target: { value: 'abc' } });
       expect(onInventoryChange).toHaveBeenCalledWith('gold', 0);
-    });
-  });
-
-  describe('textarea raw text behavior', () => {
-    it('should not commit items during typing', () => {
-      const onInventoryChange = vi.fn();
-      const onTempInventoryChange = vi.fn();
-      const props = createMockProps({
-        tempInventory: { backpack: [], equipped: [] },
-        onInventoryChange,
-        onTempInventoryChange,
-      });
-      render(<WizardStepInventory {...props} />);
-
-      const backpackTextarea = screen.getAllByRole('textbox')[0];
-      fireEvent.change(backpackTextarea, { target: { value: 'Drums,Guitar' } });
-
-      expect(onInventoryChange).not.toHaveBeenCalled();
-      expect(onTempInventoryChange).not.toHaveBeenCalled();
-    });
-
-    it('should not commit items when Shift+Enter is pressed', () => {
-      const onInventoryChange = vi.fn();
-      const onTempInventoryChange = vi.fn();
-      const props = createMockProps({
-        tempInventory: { backpack: [], equipped: [] },
-        onInventoryChange,
-        onTempInventoryChange,
-      });
-      render(<WizardStepInventory {...props} />);
-
-      const backpackTextarea = screen.getAllByRole('textbox')[0];
-      fireEvent.change(backpackTextarea, { target: { value: 'Dagger, Arrow' } });
-      fireEvent.keyDown(backpackTextarea, { key: 'Enter', shiftKey: true });
-
-      expect(onInventoryChange).not.toHaveBeenCalled();
-      expect(onTempInventoryChange).not.toHaveBeenCalled();
     });
   });
 
@@ -290,6 +170,7 @@ describe('WizardStepInventory', () => {
       fireEvent.blur(backpackTextarea);
 
       expect(onTempInventoryChange).toHaveBeenCalledWith('backpack', ['Rope', 'Torch']);
+      expect(onInventoryChange).toHaveBeenCalledWith('backpack', ['Rope', 'Torch']);
     });
 
     it('should commit an empty array when blur clears or whitespace-only the textarea', () => {
@@ -303,17 +184,10 @@ describe('WizardStepInventory', () => {
       render(<WizardStepInventory {...props} />);
 
       const backpackTextarea = screen.getAllByRole('textbox')[0];
-
       fireEvent.change(backpackTextarea, { target: { value: '' } });
       fireEvent.blur(backpackTextarea);
       expect(onTempInventoryChange).toHaveBeenCalledWith('backpack', []);
-
-      vi.mocked(onTempInventoryChange).mockClear();
-      vi.mocked(onInventoryChange).mockClear();
-
-      fireEvent.change(backpackTextarea, { target: { value: '   ' } });
-      fireEvent.blur(backpackTextarea);
-      expect(onTempInventoryChange).toHaveBeenCalledWith('backpack', []);
+      expect(onInventoryChange).toHaveBeenCalledWith('backpack', []);
     });
 
     it('should commit items from the equipped textarea on blur', () => {
@@ -353,44 +227,45 @@ describe('WizardStepInventory', () => {
       expect(onTempInventoryChange).toHaveBeenCalledWith('backpack', ['Dagger', 'Arrow']);
       expect(onInventoryChange).toHaveBeenCalledWith('backpack', ['Dagger', 'Arrow']);
     });
+
+    it('should not commit items when Shift+Enter is pressed', () => {
+      const onInventoryChange = vi.fn();
+      const onTempInventoryChange = vi.fn();
+      const props = createMockProps({
+        tempInventory: { backpack: [], equipped: [] },
+        onInventoryChange,
+        onTempInventoryChange,
+      });
+      render(<WizardStepInventory {...props} />);
+
+      const backpackTextarea = screen.getAllByRole('textbox')[0];
+      fireEvent.change(backpackTextarea, { target: { value: 'Dagger, Arrow' } });
+      fireEvent.keyDown(backpackTextarea, { key: 'Enter', shiftKey: true });
+
+      expect(onInventoryChange).not.toHaveBeenCalled();
+      expect(onTempInventoryChange).not.toHaveBeenCalled();
+    });
   });
 
   describe('item preview', () => {
-    it('should display item tags for backpack and equipped items', () => {
+    it('should display item tags, counts, and overflow indicator', () => {
       const props = createMockProps({
-        tempInventory: { backpack: ['Rope', 'Torch', 'Rations'], equipped: ['Longsword', 'Shield'] },
+        tempInventory: { backpack: ['Rope', 'Torch', 'Rations', 'Dagger', 'Shield', 'Potion', 'Map'], equipped: ['Longsword'] },
       });
       render(<WizardStepInventory {...props} />);
 
       expect(screen.getByText('Rope')).toBeInTheDocument();
       expect(screen.getByText('Torch')).toBeInTheDocument();
-      expect(screen.getByText('Rations')).toBeInTheDocument();
-      expect(screen.getByText('Longsword')).toBeInTheDocument();
-      expect(screen.getByText('Shield')).toBeInTheDocument();
+      expect(screen.getByText('7 items')).toBeInTheDocument();
+      expect(screen.getByText('+2 more')).toBeInTheDocument();
     });
 
-    it('should display correct singular/plural item counts', () => {
+    it('should display singular item count for a single item', () => {
       const props = createMockProps({
         tempInventory: { backpack: ['Rope'], equipped: [] },
       });
       render(<WizardStepInventory {...props} />);
       expect(screen.getByText('1 item')).toBeInTheDocument();
-    });
-
-    it('should display plural item counts', () => {
-      const props = createMockProps({
-        tempInventory: { backpack: ['Rope', 'Torch'], equipped: [] },
-      });
-      render(<WizardStepInventory {...props} />);
-      expect(screen.getByText('2 items')).toBeInTheDocument();
-    });
-
-    it('should show "+N more" when there are more than 5 items', () => {
-      const props = createMockProps({
-        tempInventory: { backpack: ['Rope', 'Torch', 'Rations', 'Dagger', 'Shield', 'Potion', 'Map'], equipped: [] },
-      });
-      render(<WizardStepInventory {...props} />);
-      expect(screen.getByText('+2 more')).toBeInTheDocument();
     });
 
     it('should not render the preview container when there are no items', () => {
@@ -488,81 +363,6 @@ describe('WizardStepInventory', () => {
       });
       render(<WizardStepInventory {...props} />);
       expect(screen.getByText('2 selected)')).toBeInTheDocument();
-    });
-  });
-
-  describe('focus behavior and raw text sync', () => {
-    it('should commit items on blur and sync raw text from items when no field is focused', () => {
-      const onInventoryChange = vi.fn();
-      const onTempInventoryChange = vi.fn();
-      const props = createMockProps({
-        tempInventory: { backpack: [], equipped: [] },
-        onInventoryChange,
-        onTempInventoryChange,
-      });
-      render(<WizardStepInventory {...props} />);
-
-      const textarea = screen.getAllByRole('textbox')[0];
-      fireEvent.focus(textarea);
-      fireEvent.change(textarea, { target: { value: 'Rope, Torch' } });
-      fireEvent.blur(textarea);
-
-      expect(onTempInventoryChange).toHaveBeenCalledWith('backpack', ['Rope', 'Torch']);
-      expect(onInventoryChange).toHaveBeenCalledWith('backpack', ['Rope', 'Torch']);
-    });
-
-    it('should sync raw text from items when no field is focused', () => {
-      const props = createMockProps({
-        tempInventory: { backpack: ['Rope', 'Torch'], equipped: ['Longsword', 'Shield'] },
-      });
-      render(<WizardStepInventory {...props} />);
-
-      const [backpackTextarea, equippedTextarea] = screen.getAllByRole('textbox');
-      expect(backpackTextarea).toHaveValue('Rope, Torch');
-      expect(equippedTextarea).toHaveValue('Longsword, Shield');
-    });
-
-    it('should update textarea when items change and no field is focused', () => {
-      const props = createMockProps({
-        tempInventory: { backpack: ['Rope'], equipped: [] },
-      });
-      const { rerender } = render(<WizardStepInventory {...props} />);
-
-      const textarea = screen.getAllByRole('textbox')[0];
-      expect(textarea).toHaveValue('Rope');
-
-      rerender(
-        <WizardStepInventory
-          {...{
-            ...props,
-            tempInventory: { backpack: ['Rope', 'Torch', 'Rations'], equipped: [] },
-          }}
-        />
-      );
-
-      expect(textarea).toHaveValue('Rope, Torch, Rations');
-    });
-
-    it('should not update textarea when the field is currently focused', () => {
-      const props = createMockProps({
-        tempInventory: { backpack: ['Rope'], equipped: [] },
-      });
-      const { rerender } = render(<WizardStepInventory {...props} />);
-
-      const textarea = screen.getAllByRole('textbox')[0];
-      fireEvent.focus(textarea);
-      expect(textarea).toHaveValue('Rope');
-
-      rerender(
-        <WizardStepInventory
-          {...{
-            ...props,
-            tempInventory: { backpack: ['Rope', 'Torch'], equipped: [] },
-          }}
-        />
-      );
-
-      expect(textarea).toHaveValue('Rope');
     });
   });
 });

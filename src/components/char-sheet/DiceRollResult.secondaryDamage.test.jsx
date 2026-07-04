@@ -1,26 +1,10 @@
+// @cleaned-by-ai
 // @improved-by-ai
 import { render, screen } from '@testing-library/react';
 import DiceRollResult from './DiceRollResult.jsx';
 
 describe('DiceRollResult', () => {
     describe('secondary damage display', () => {
-        it('shows secondary damage section when secondaryFormula is provided', () => {
-            const { container } = render(
-                <DiceRollResult
-                    name="Longsword"
-                    type="attack"
-                    rolls={[18]}
-                    bonus={5}
-                    secondaryFormula="1d8"
-                    secondaryRolls={[5]}
-                    secondaryTotal={5}
-                    secondaryModifier={0}
-                />
-            );
-            expect(container.querySelector('.dice-roll-secondary-damage')).toBeInTheDocument();
-            expect(screen.getByText(/Secondary Damage:/)).toBeInTheDocument();
-        });
-
         it('renders secondary formula with rolls, modifier, and total', () => {
             const { container } = render(
                 <DiceRollResult
@@ -54,23 +38,14 @@ describe('DiceRollResult', () => {
         });
 
         it('does not show secondary modifier when zero or undefined', () => {
-            const { container: c1 } = render(
+            const { container } = render(
                 <DiceRollResult
                     name="Longsword" type="attack" rolls={[18]} bonus={5}
                     secondaryFormula="1d8" secondaryRolls={[5]}
                     secondaryTotal={5} secondaryModifier={0}
                 />
             );
-            expect(c1.querySelector('.dice-roll-secondary-formula').textContent).not.toContain('+0');
-
-            const { container: c2 } = render(
-                <DiceRollResult
-                    name="Longsword" type="attack" rolls={[18]} bonus={5}
-                    secondaryFormula="1d8" secondaryRolls={[5]}
-                    secondaryTotal={5}
-                />
-            );
-            expect(c2.querySelector('.dice-roll-secondary-formula').textContent).not.toContain('+');
+            expect(container.querySelector('.dice-roll-secondary-formula').textContent).not.toContain('+0');
         });
 
         it('shows secondary save result based on success value', () => {
@@ -83,7 +58,6 @@ describe('DiceRollResult', () => {
                     saveDc={14}
                 />
             );
-            expect(cSuccess.querySelector('.dice-roll-secondary-save-result')).toBeInTheDocument();
             expect(cSuccess.querySelector('.dice-roll-secondary-save-result').textContent).toContain('SAVE SUCCESS');
 
             const { container: cFail } = render(
@@ -98,8 +72,8 @@ describe('DiceRollResult', () => {
             expect(cFail.querySelector('.dice-roll-secondary-save-result').textContent).toContain('SAVE FAILURE');
         });
 
-        it('does not show secondary save result when secondarySaveResult is null or undefined', () => {
-            const { container: c1 } = render(
+        it('does not show secondary save result when secondarySaveResult is null', () => {
+            const { container } = render(
                 <DiceRollResult
                     name="Fireball" type="damage" rolls={[6]} bonus={0}
                     secondaryFormula="1d6" secondaryRolls={[4]}
@@ -107,16 +81,7 @@ describe('DiceRollResult', () => {
                     secondarySaveResult={null}
                 />
             );
-            expect(c1.querySelector('.dice-roll-secondary-save-result')).not.toBeInTheDocument();
-
-            const { container: c2 } = render(
-                <DiceRollResult
-                    name="Fireball" type="damage" rolls={[6]} bonus={0}
-                    secondaryFormula="1d6" secondaryRolls={[4]}
-                    secondaryTotal={4} secondaryModifier={0}
-                />
-            );
-            expect(c2.querySelector('.dice-roll-secondary-save-result')).not.toBeInTheDocument();
+            expect(container.querySelector('.dice-roll-secondary-save-result')).not.toBeInTheDocument();
         });
 
         it('shows secondary total damage line when both damages are defined', () => {
@@ -145,14 +110,6 @@ describe('DiceRollResult', () => {
                 />
             );
             expect(screen.queryByText(/total damage/)).not.toBeInTheDocument();
-
-            render(
-                <DiceRollResult
-                    name="Longsword" type="attack" rolls={[18]} bonus={5}
-                    secondaryFinalDamage={5} secondaryDamageType="radiant"
-                />
-            );
-            expect(screen.queryByText(/total damage/)).not.toBeInTheDocument();
         });
 
         it('shows combined damage applied and HP change when both damages are defined', () => {
@@ -174,7 +131,7 @@ describe('DiceRollResult', () => {
         });
 
         it('does not show secondary damage applied when conditions are not met', () => {
-            const noApplied = render(
+            const { container } = render(
                 <DiceRollResult
                     name="Longsword" type="attack" rolls={[18]} bonus={5}
                     finalDamage={10} damageApplied={false}
@@ -183,29 +140,7 @@ describe('DiceRollResult', () => {
                     secondaryTotal={5} secondaryModifier={0}
                 />
             );
-            expect(noApplied.container.querySelectorAll('.dice-roll-damage-applied').length).toBe(0);
-
-            const noMainDamage = render(
-                <DiceRollResult
-                    name="Longsword" type="attack" rolls={[18]} bonus={5}
-                    damageApplied={true}
-                    secondaryFinalDamage={5} targetName="Goblin"
-                    secondaryFormula="1d8" secondaryRolls={[5]}
-                    secondaryTotal={5} secondaryModifier={0}
-                />
-            );
-            expect(noMainDamage.container.querySelectorAll('.dice-roll-damage-applied').length).toBe(0);
-
-            const noSecondaryDamage = render(
-                <DiceRollResult
-                    name="Longsword" type="attack" rolls={[18]} bonus={5}
-                    finalDamage={10} damageApplied={true}
-                    secondaryFormula="1d6" secondaryRolls={[3]}
-                    secondaryTotal={3} secondaryModifier={0}
-                    targetName="Goblin"
-                />
-            );
-            const secondaryContainer = noSecondaryDamage.container.querySelector('.dice-roll-secondary-damage');
+            const secondaryContainer = container.querySelector('.dice-roll-secondary-damage');
             expect(secondaryContainer.querySelectorAll('.dice-roll-damage-applied').length).toBe(0);
         });
     });

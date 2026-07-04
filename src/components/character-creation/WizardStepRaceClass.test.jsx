@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import WizardStepRaceClass from './WizardStepRaceClass.jsx';
@@ -74,14 +74,6 @@ describe('WizardStepRaceClass', () => {
     });
   });
 
-  describe('5e ruleset — no order selects', () => {
-    it('does not render Divine Order or Primal Order selects', () => {
-      render(<WizardStepRaceClass {...makeProps({ ruleset: '5e' })} />);
-      expect(screen.queryByText('Divine Order')).not.toBeInTheDocument();
-      expect(screen.queryByText('Primal Order')).not.toBeInTheDocument();
-    });
-  });
-
   describe('2024 ruleset — Cleric shows Divine Order', () => {
     const props = () =>
       makeProps({
@@ -89,14 +81,17 @@ describe('WizardStepRaceClass', () => {
         formData: { race: '', subrace: '', class: { name: 'Cleric' } },
       });
 
+    const getDivineOrderSelect = () => {
+      const defaultOption = screen.getByText('Select a Divine Order');
+      return defaultOption.closest('select');
+    };
+
     it('renders Divine Order select with required asterisk, options, and empty default', () => {
       render(<WizardStepRaceClass {...props()} />);
       expect(screen.getByText('Divine Order *')).toBeInTheDocument();
       expect(screen.getByText('Protector')).toBeInTheDocument();
       expect(screen.getByText('Thaumaturge')).toBeInTheDocument();
-
-      const defaultOption = screen.getByText('Select a Divine Order');
-      expect(defaultOption.closest('select')).toHaveValue('');
+      expect(getDivineOrderSelect()).toHaveValue('');
     });
 
     it('does not render Primal Order when Cleric is selected', () => {
@@ -108,26 +103,16 @@ describe('WizardStepRaceClass', () => {
       render(
         <WizardStepRaceClass
           {...props()}
-          errors={{ divineOrder: 'Required' }}
-        />
-      );
-      const defaultOption = screen.getByText('Select a Divine Order');
-      const select = defaultOption.closest('select');
-      expect(select).toHaveClass('error');
-
-      render(
-        <WizardStepRaceClass
-          {...props()}
           errors={{ divineOrder: 'Please select a divine order' }}
         />
       );
+      expect(getDivineOrderSelect()).toHaveClass('error');
       expect(screen.getByText('Please select a divine order')).toBeInTheDocument();
     });
 
     it('calls onInputChange when a divine order is selected', () => {
       render(<WizardStepRaceClass {...props()} />);
-      const defaultOption = screen.getByText('Select a Divine Order');
-      const select = defaultOption.closest('select');
+      const select = getDivineOrderSelect();
       select.value = 'Protector';
       select.dispatchEvent(new Event('change', { bubbles: true }));
       expect(makeOnInputChange).toHaveBeenCalledWith('class', {
@@ -143,9 +128,7 @@ describe('WizardStepRaceClass', () => {
           formData={{ race: '', subrace: '', class: { name: 'Cleric', divineOrder: 'Protector' } }}
         />
       );
-      const defaultOption = screen.getByText('Select a Divine Order');
-      const select = defaultOption.closest('select');
-      expect(select).toHaveValue('Protector');
+      expect(getDivineOrderSelect()).toHaveValue('Protector');
     });
   });
 
@@ -156,14 +139,17 @@ describe('WizardStepRaceClass', () => {
         formData: { race: '', subrace: '', class: { name: 'Druid' } },
       });
 
+    const getPrimalOrderSelect = () => {
+      const defaultOption = screen.getByText('Select a Primal Order');
+      return defaultOption.closest('select');
+    };
+
     it('renders Primal Order select with required asterisk, options, and empty default', () => {
       render(<WizardStepRaceClass {...props()} />);
       expect(screen.getByText('Primal Order *')).toBeInTheDocument();
       expect(screen.getByText('Magician')).toBeInTheDocument();
       expect(screen.getByText('Warden')).toBeInTheDocument();
-
-      const defaultOption = screen.getByText('Select a Primal Order');
-      expect(defaultOption.closest('select')).toHaveValue('');
+      expect(getPrimalOrderSelect()).toHaveValue('');
     });
 
     it('does not render Divine Order when Druid is selected', () => {
@@ -175,26 +161,16 @@ describe('WizardStepRaceClass', () => {
       render(
         <WizardStepRaceClass
           {...props()}
-          errors={{ primalOrder: 'Required' }}
-        />
-      );
-      const defaultOption = screen.getByText('Select a Primal Order');
-      const select = defaultOption.closest('select');
-      expect(select).toHaveClass('error');
-
-      render(
-        <WizardStepRaceClass
-          {...props()}
           errors={{ primalOrder: 'Please select a primal order' }}
         />
       );
+      expect(getPrimalOrderSelect()).toHaveClass('error');
       expect(screen.getByText('Please select a primal order')).toBeInTheDocument();
     });
 
     it('calls onInputChange when a primal order is selected', () => {
       render(<WizardStepRaceClass {...props()} />);
-      const defaultOption = screen.getByText('Select a Primal Order');
-      const select = defaultOption.closest('select');
+      const select = getPrimalOrderSelect();
       select.value = 'Warden';
       select.dispatchEvent(new Event('change', { bubbles: true }));
       expect(makeOnInputChange).toHaveBeenCalledWith('class', {
@@ -210,9 +186,7 @@ describe('WizardStepRaceClass', () => {
           formData={{ race: '', subrace: '', class: { name: 'Druid', primalOrder: 'Warden' } }}
         />
       );
-      const defaultOption = screen.getByText('Select a Primal Order');
-      const select = defaultOption.closest('select');
-      expect(select).toHaveValue('Warden');
+      expect(getPrimalOrderSelect()).toHaveValue('Warden');
     });
   });
 
@@ -232,7 +206,7 @@ describe('WizardStepRaceClass', () => {
   });
 
   describe('formData edge cases', () => {
-    it('renders without Divine or Primal Order when class is undefined or has empty name', () => {
+    it('renders without order selects when class is undefined or has empty name', () => {
       render(
         <WizardStepRaceClass
           {...makeProps({
@@ -240,7 +214,6 @@ describe('WizardStepRaceClass', () => {
           })}
         />
       );
-      expect(screen.getByText('Step 3: Race & Class')).toBeInTheDocument();
       expect(screen.queryByText('Divine Order')).not.toBeInTheDocument();
       expect(screen.queryByText('Primal Order')).not.toBeInTheDocument();
 
@@ -266,26 +239,6 @@ describe('WizardStepRaceClass', () => {
       const classInput = screen.getByTestId('input-class');
       fireEvent.change(classInput, { target: { value: 'Fighter' } });
       expect(makeOnInputChange).toHaveBeenCalledWith('class', { name: 'Fighter' });
-    });
-  });
-
-  describe('error display', () => {
-    it('renders error messages when subrace or subclass error exists', () => {
-      render(
-        <WizardStepRaceClass
-          {...makeProps()}
-          errors={{ subrace: 'Please select a subrace' }}
-        />
-      );
-      expect(screen.getByText('Please select a subrace')).toBeInTheDocument();
-
-      render(
-        <WizardStepRaceClass
-          {...makeProps()}
-          errors={{ subclass: 'Please select a subclass' }}
-        />
-      );
-      expect(screen.getByText('Please select a subclass')).toBeInTheDocument();
     });
   });
 

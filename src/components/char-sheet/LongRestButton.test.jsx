@@ -1,3 +1,4 @@
+// @cleaned-by-ai
 // @improved-by-ai
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -9,9 +10,14 @@ vi.mock('../../services/rules/effects/tranceRules.js', () => ({
   hasTranceTrait: vi.fn(),
 }));
 
+vi.mock('../../services/rules/effects/restRules.js', () => ({
+  applyLongRest: vi.fn(),
+}));
+
 // ── Re-import mocked modules ──
 
 import * as tranceRules from '../../services/rules/effects/tranceRules.js';
+import * as restRules from '../../services/rules/effects/restRules.js';
 
 // ── Test fixtures ──
 
@@ -45,29 +51,18 @@ describe('LongRestButton', () => {
     vi.clearAllMocks();
   });
 
-  // ── Rendering ──
+  it('renders with correct text based on Trance trait and calls onLongRest on click', () => {
+    const onLongRest = vi.fn();
+    tranceRules.hasTranceTrait.mockReturnValue(false);
+    const { rerender } = render(<LongRestButton {...makeProps({ onLongRest })} />);
+    expect(screen.getByText('Long Rest')).toBeInTheDocument();
 
-  describe('rendering', () => {
-    it('renders the button with "Long Rest" text', () => {
-      render(<LongRestButton {...makeProps()} />);
-      expect(screen.getByText('Long Rest')).toBeInTheDocument();
-    });
+    tranceRules.hasTranceTrait.mockReturnValue(true);
+    rerender(<LongRestButton {...makeProps({ playerStats: trancePlayerStats, onLongRest })} />);
+    expect(screen.getByText('Long Rest (4 hours)')).toBeInTheDocument();
 
-    it('appends " (4 hours)" when player has Trance trait', () => {
-      tranceRules.hasTranceTrait.mockReturnValue(true);
-      render(<LongRestButton {...makeProps({ playerStats: trancePlayerStats })} />);
-      expect(screen.getByText('Long Rest (4 hours)')).toBeInTheDocument();
-    });
-  });
-
-  // ── Click behavior ──
-
-  describe('on click', () => {
-    it('calls onLongRest callback when provided', () => {
-      const onLongRest = vi.fn();
-      render(<LongRestButton {...makeProps({ onLongRest })} />);
-      fireEvent.click(screen.getByRole('button'));
-      expect(onLongRest).toHaveBeenCalledTimes(1);
-    });
+    fireEvent.click(screen.getByRole('button'));
+    expect(restRules.applyLongRest).toHaveBeenCalledWith(expect.any(Object), mockCampaignName);
+    expect(onLongRest).toHaveBeenCalledTimes(1);
   });
 });

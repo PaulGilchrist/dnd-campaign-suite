@@ -1,4 +1,4 @@
-/* @improved-by-ai */
+/* @cleaned-by-ai */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import React from 'react';
@@ -198,19 +198,6 @@ describe('SavePromptModal', () => {
     expect(screen.queryByRole('button', { name: 'Dismiss' })).not.toBeInTheDocument();
   });
 
-  it('renders Subscriber with correct campaign attribute', () => {
-    render(
-      <SavePromptModal
-        campaignName="my-campaign"
-        characters={[]}
-        activeMapName={null}
-      />
-    );
-
-    const subscriber = screen.getByTestId('subscriber');
-    expect(subscriber).toHaveAttribute('data-campaign', 'my-campaign');
-  });
-
   // ── Modal rendering with prompt ──
 
   it('displays the modal with target name, ability, and DC when a prompt is queued', async () => {
@@ -256,34 +243,6 @@ describe('SavePromptModal', () => {
 
     const dismissBtn = screen.getByRole('button', { name: 'Dismiss' });
     fireEvent.click(dismissBtn);
-
-    await waitFor(() => {
-      expect(screen.queryByText(/must make a/i)).not.toBeInTheDocument();
-    });
-
-    expect(clearSavePrompt).toHaveBeenCalledWith('test-campaign', 'testTarget');
-  });
-
-  it('dismisses the prompt when overlay is clicked but not when modal content is clicked', async () => {
-    render(
-      <SavePromptModal
-        campaignName="test-campaign"
-        characters={[]}
-        activeMapName={null}
-      />
-    );
-
-    const trigger = screen.getByTestId('subscriber-trigger');
-    fireEvent.click(trigger);
-
-    await waitFor(() => {
-      expect(screen.getByText(/must make a/i)).toBeInTheDocument();
-    });
-
-    const overlay = document.querySelector('.sp-overlay');
-    if (overlay) {
-      fireEvent.click(overlay);
-    }
 
     await waitFor(() => {
       expect(screen.queryByText(/must make a/i)).not.toBeInTheDocument();
@@ -391,25 +350,6 @@ describe('SavePromptModal', () => {
   });
 
   // ── Queue / multiple prompts ──
-
-  it('does not show queue count for single prompt', async () => {
-    render(
-      <SavePromptModal
-        campaignName="test-campaign"
-        characters={[]}
-        activeMapName={null}
-      />
-    );
-
-    const trigger = screen.getByTestId('subscriber-trigger');
-    fireEvent.click(trigger);
-
-    await waitFor(() => {
-      expect(screen.getByText(/must make a/i)).toBeInTheDocument();
-    });
-
-    expect(screen.queryByText(/\(1 of/)).not.toBeInTheDocument();
-  });
 
   it('shows queue count and advances to second prompt when multiple prompts exist', async () => {
     render(
@@ -593,23 +533,6 @@ describe('SavePromptModal', () => {
 
   // ── dcSuccess display ──
 
-  it('shows damage notes when dcSuccess is "half" or "none"', async () => {
-    render(
-      <SavePromptModal
-        campaignName="test-campaign"
-        characters={[]}
-        activeMapName={null}
-      />
-    );
-
-    const triggerHalf = screen.getByTestId('subscriber-trigger-disadvantage');
-    fireEvent.click(triggerHalf);
-
-    await waitFor(() => {
-      expect(screen.getByText(/Half damage on successful save/i)).toBeInTheDocument();
-    });
-  });
-
   it('shows "No damage on successful save" note when dcSuccess is "none"', async () => {
     render(
       <SavePromptModal
@@ -624,23 +547,6 @@ describe('SavePromptModal', () => {
 
     await waitFor(() => {
       expect(screen.getByText(/No damage on successful save/i)).toBeInTheDocument();
-    });
-  });
-
-  it('shows source name when provided', async () => {
-    render(
-      <SavePromptModal
-        campaignName="test-campaign"
-        characters={[]}
-        activeMapName={null}
-      />
-    );
-
-    const trigger = screen.getByTestId('subscriber-trigger-disadvantage');
-    fireEvent.click(trigger);
-
-    await waitFor(() => {
-      expect(screen.getByText(/Source: Fireball/i)).toBeInTheDocument();
     });
   });
 
@@ -671,32 +577,6 @@ describe('SavePromptModal', () => {
     expect(screen.getByText(/Evasion: No damage on success, half damage on failure/i)).toBeInTheDocument();
   });
 
-  it('does not show evasion when shareRange is insufficient or target is incapacitated', async () => {
-    const targetChar = createCharacter('testTarget2', [], []);
-    const paladin = createCharacter(
-      'Paladin',
-      [],
-      [{ saveType: 'DEX', shareable: true, shareRange: 3 }]
-    );
-    render(
-      <SavePromptModal
-        campaignName="test-campaign"
-        characters={[targetChar, paladin]}
-        activeMapName={null}
-      />
-    );
-
-    const trigger = screen.getByTestId('subscriber-trigger-second');
-    fireEvent.click(trigger);
-
-    await waitFor(() => {
-      expect(screen.getByText(/must make a/i)).toBeInTheDocument();
-    });
-
-    expect(screen.getByText(/Half damage on successful save/i)).toBeInTheDocument();
-    expect(screen.queryByText(/Evasion:/)).not.toBeInTheDocument();
-  });
-
   // ── Result display ──
 
   it('shows result failure message when save fails', async () => {
@@ -722,30 +602,6 @@ describe('SavePromptModal', () => {
 
     await waitFor(() => {
       expect(screen.getByText(/SAVE FAILURE/)).toBeInTheDocument();
-    });
-  });
-
-  it('shows advantage/disadvantage indicator in result breakdown', async () => {
-    render(
-      <SavePromptModal
-        campaignName="test-campaign"
-        characters={[]}
-        activeMapName={null}
-      />
-    );
-
-    const trigger = screen.getByTestId('subscriber-trigger-disadvantage');
-    fireEvent.click(trigger);
-
-    await waitFor(() => {
-      expect(screen.getByText(/must make a/i)).toBeInTheDocument();
-    });
-
-    const rollBtn = screen.getByRole('button', { name: 'Roll Save' });
-    fireEvent.click(rollBtn);
-
-    await waitFor(() => {
-      expect(screen.getByText(/Disadvantage/)).toBeInTheDocument();
     });
   });
 

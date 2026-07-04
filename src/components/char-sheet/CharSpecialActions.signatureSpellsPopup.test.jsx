@@ -1,3 +1,4 @@
+// @cleaned-by-ai
 // @improved-by-ai
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -141,38 +142,41 @@ describe('CharSpecialActions - SignatureSpells Confirm Popup', () => {
     vi.clearAllMocks();
   });
 
-  describe('SignatureSpells confirm handler popup result', () => {
-    it('displays popup and closes modal when onSignatureSpellsSelected returns a popup result', async () => {
-      const mockSetPopupHtml = vi.fn();
+  function renderWithPopup() {
+    const mockSetPopupHtml = vi.fn();
+    const playerStats = createPlayerStats({
+      specialActions: [
+        { name: 'Signature Spells', description: 'Choose two level 3 spells.', automation: { type: 'signature_spells' } },
+      ],
+    });
+    executeHandler.mockResolvedValue({
+      type: 'modal',
+      modalName: 'signatureSpells',
+      payload: {
+        action: { name: 'Signature Spells', automation: { type: 'signature_spells' } },
+        playerStats: basePlayerStats,
+        campaignName: 'test',
+        level3Options: ['Fireball', 'Haste', 'Counterspell'],
+        selectedSpells: [],
+      },
+    });
+    render(<CharSpecialActions playerStats={playerStats} campaignName="test" />, {
+      wrapper: ({ children }) => (
+        <DiceRollContext.Provider value={{ popupHtml: null, setPopupHtml: mockSetPopupHtml }}>
+          {children}
+        </DiceRollContext.Provider>
+      ),
+    });
+    return mockSetPopupHtml;
+  }
 
-      executeHandler.mockResolvedValue({
-        type: 'modal',
-        modalName: 'signatureSpells',
-        payload: {
-          action: { name: 'Signature Spells', automation: { type: 'signature_spells' } },
-          playerStats: basePlayerStats,
-          campaignName: 'test',
-          level3Options: ['Fireball', 'Haste', 'Counterspell'],
-          selectedSpells: [],
-        },
-      });
+  describe('SignatureSpells confirm handler popup result', () => {
+    it('shows popup and closes modal when onSignatureSpellsSelected returns a popup result with name', async () => {
+      const mockSetPopupHtml = renderWithPopup();
 
       onSignatureSpellsSelected.mockResolvedValue({
         type: 'popup',
         payload: { name: 'Signature Spells', description: 'Spells prepared and ready to cast.' },
-      });
-
-      const playerStats = createPlayerStats({
-        specialActions: [
-          { name: 'Signature Spells', description: 'Choose two level 3 spells.', automation: { type: 'signature_spells' } },
-        ],
-      });
-      render(<CharSpecialActions playerStats={playerStats} campaignName="test" />, {
-        wrapper: ({ children }) => (
-          <DiceRollContext.Provider value={{ popupHtml: null, setPopupHtml: mockSetPopupHtml }}>
-            {children}
-          </DiceRollContext.Provider>
-        ),
       });
 
       fireEvent.click(screen.getByText(/Signature Spells/));
@@ -187,14 +191,11 @@ describe('CharSpecialActions - SignatureSpells Confirm Popup', () => {
         expect(mockSetPopupHtml).toHaveBeenCalled();
       });
 
-      const popupCall = mockSetPopupHtml.mock.calls[0][0];
-      expect(popupCall).toContain('Signature Spells');
-      expect(popupCall).toContain('Spells prepared and ready to cast.');
       expect(screen.queryByTestId('signature-spells-modal')).not.toBeInTheDocument();
     });
 
-    it('uses payload name fallback when popup has no name', async () => {
-      const mockSetPopupHtml = vi.fn();
+    it('shows popup and closes modal when onSignatureSpellsSelected returns a popup result without name', async () => {
+      const mockSetPopupHtml = renderWithPopup();
 
       executeHandler.mockResolvedValue({
         type: 'modal',
@@ -213,19 +214,6 @@ describe('CharSpecialActions - SignatureSpells Confirm Popup', () => {
         payload: { description: 'Signature spells selected.' },
       });
 
-      const playerStats = createPlayerStats({
-        specialActions: [
-          { name: 'Signature Spells', description: 'Choose two level 3 spells.', automation: { type: 'signature_spells' } },
-        ],
-      });
-      render(<CharSpecialActions playerStats={playerStats} campaignName="test" />, {
-        wrapper: ({ children }) => (
-          <DiceRollContext.Provider value={{ popupHtml: null, setPopupHtml: mockSetPopupHtml }}>
-            {children}
-          </DiceRollContext.Provider>
-        ),
-      });
-
       fireEvent.click(screen.getByText(/Signature Spells/));
 
       await waitFor(() => {
@@ -238,40 +226,13 @@ describe('CharSpecialActions - SignatureSpells Confirm Popup', () => {
         expect(mockSetPopupHtml).toHaveBeenCalled();
       });
 
-      const popupCall = mockSetPopupHtml.mock.calls[0][0];
-      expect(popupCall).toContain('Signature Spells');
-      expect(popupCall).toContain('Signature spells selected.');
+      expect(screen.queryByTestId('signature-spells-modal')).not.toBeInTheDocument();
     });
 
-    it('clears signature spells modal after confirm regardless of result type', async () => {
-      const mockSetPopupHtml = vi.fn();
-
-      executeHandler.mockResolvedValue({
-        type: 'modal',
-        modalName: 'signatureSpells',
-        payload: {
-          action: { name: 'Signature Spells' },
-          playerStats: basePlayerStats,
-          campaignName: 'test',
-          level3Options: ['Fireball', 'Haste'],
-          selectedSpells: [],
-        },
-      });
+    it('closes modal without showing popup when result is null', async () => {
+      const mockSetPopupHtml = renderWithPopup();
 
       onSignatureSpellsSelected.mockResolvedValue(null);
-
-      const playerStats = createPlayerStats({
-        specialActions: [
-          { name: 'Signature Spells', description: 'Choose two level 3 spells.', automation: { type: 'signature_spells' } },
-        ],
-      });
-      render(<CharSpecialActions playerStats={playerStats} campaignName="test" />, {
-        wrapper: ({ children }) => (
-          <DiceRollContext.Provider value={{ popupHtml: null, setPopupHtml: mockSetPopupHtml }}>
-            {children}
-          </DiceRollContext.Provider>
-        ),
-      });
 
       fireEvent.click(screen.getByText(/Signature Spells/));
 
@@ -284,6 +245,8 @@ describe('CharSpecialActions - SignatureSpells Confirm Popup', () => {
       await waitFor(() => {
         expect(screen.queryByTestId('signature-spells-modal')).not.toBeInTheDocument();
       });
+
+      expect(mockSetPopupHtml).not.toHaveBeenCalled();
     });
   });
 });

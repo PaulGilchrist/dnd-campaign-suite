@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharHitPoints from './CharHitPoints.jsx';
@@ -13,17 +13,11 @@ vi.mock('../../../services/combat/conditions/savePromptService.js', () => ({
 }));
 
 vi.mock('./DeathSavingThrows.jsx', () => ({
-  default: vi.fn(({ playerStats, campaignName }) => (
+  default: vi.fn(({ playerStats }) => (
     <div data-testid="death-saving-throws">
-      Death Saving Throws for {playerStats.name} in {campaignName}
+      Death Saving Throws for {playerStats.name}
     </div>
   )),
-}));
-
-vi.mock('../../../services/combat/conditions/deathSaveRules.js', () => ({}));
-
-vi.mock('../../../services/combat/conditions/conditionEffects.js', () => ({
-  hasSaveModifier: vi.fn(() => false),
 }));
 
 vi.mock('../../../components/common/HiddenInput.jsx', () => {
@@ -218,8 +212,6 @@ describe('CharHitPoints', () => {
 
   describe('death save reset', () => {
     it('resets death saves when HP is set above 0', () => {
-      const fetchMock = setupFetchMock();
-
       renderCharHitPoints();
 
       const clickable = getClickable();
@@ -242,8 +234,6 @@ describe('CharHitPoints', () => {
         'test-campaign'
       );
       expect(clearDeathSavePrompt).toHaveBeenCalledWith('test-campaign', 'TestCharacter');
-
-      fetchMock.mockRestore?.();
     });
   });
 

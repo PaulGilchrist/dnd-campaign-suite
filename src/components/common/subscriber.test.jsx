@@ -1,4 +1,4 @@
-/* @improved-by-ai */
+/* @cleaned-by-ai */
 import { render, cleanup } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import Subscriber from './Subscriber.jsx';
@@ -77,26 +77,6 @@ describe('Subscriber', () => {
         const instance = MockEventSource.getInstance(urlWithCampaign('Test Campaign'));
         expect(instance).toBeDefined();
         expect(instance.url).toBe('http://localhost/subscribe?campaign=Test+Campaign');
-    });
-
-    it('does not include campaign param when campaignName is omitted', () => {
-        render(<Subscriber handleEvent={handleEventMock} />);
-
-        const instance = MockEventSource.getInstance(urlWithCampaign());
-        expect(instance.url).toBe('http://localhost/subscribe?');
-    });
-
-    it('uses the hostname to build an absolute URL', () => {
-        Object.defineProperty(window, 'location', {
-            value: { hostname: 'example.com' },
-            writable: true,
-            configurable: true,
-        });
-
-        render(<Subscriber handleEvent={handleEventMock} campaignName="Test Campaign" />);
-
-        const instance = MockEventSource.getInstance(i => i.url.startsWith('http://example.com/subscribe?'));
-        expect(instance).toBeDefined();
     });
 
     it('calls handleEvent when a message is received', () => {

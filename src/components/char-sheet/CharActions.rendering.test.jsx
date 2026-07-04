@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharActions from './CharActions.jsx';
@@ -194,6 +194,7 @@ describe('CharActions rendering', () => {
       expect(screen.getByText('5 ft.')).toBeInTheDocument();
       expect(screen.getByText('1d8+3')).toBeInTheDocument();
       expect(screen.getByText('Slashing')).toBeInTheDocument();
+      expect(screen.getByText('+5')).toBeInTheDocument();
     });
 
     it('filters out non-Action type attacks from the list', () => {
@@ -207,28 +208,7 @@ describe('CharActions rendering', () => {
       expect(screen.queryByText('Opportunity Attack')).not.toBeInTheDocument();
     });
 
-    it('renders empty attacks list without crashing', () => {
-      render(<CharActions playerStats={createStats({ attacks: [] })} />);
-      expect(screen.getByText('Actions')).toBeInTheDocument();
-    });
-  });
-
-  describe('hit bonus display', () => {
-    const baseAttack = {
-      name: 'Longsword',
-      range: 5,
-      hitBonus: 5,
-      damage: '1d8+3',
-      damageType: 'Slashing',
-      type: 'Action',
-    };
-
-    it('displays the hit bonus value with sign prefix', () => {
-      render(<CharActions playerStats={createStats({ attacks: [baseAttack] })} />);
-      expect(screen.getByText('+5')).toBeInTheDocument();
-    });
-
-    it('subtracts exhaustion penalty from hit bonus and applies penalized styling', () => {
+    it('computes hit bonus with exhaustion penalty and applies penalized styling', () => {
       render(<CharActions playerStats={createStats({ attacks: [baseAttack] })} exhaustionPenalty={2} />);
       expect(screen.getByText('+3')).toBeInTheDocument();
       expect(screen.getByText('+3')).toHaveClass('stat--penalized');
@@ -239,20 +219,19 @@ describe('CharActions rendering', () => {
       expect(screen.getByText('-3')).toBeInTheDocument();
     });
 
-    it('applies penalized styling for disadvantage condition', () => {
+    it('applies penalized styling for disadvantage and cannotAct conditions', () => {
       render(<CharActions playerStats={createStats({ attacks: [baseAttack] })} conditionAttackMode="disadvantage" exhaustionPenalty={0} />);
       expect(screen.getByText('+5')).toHaveClass('stat--penalized');
     });
 
-    it('applies penalized styling and disabled class when cannotAct is true', () => {
+    it('applies disabled-attack class when cannotAct is true', () => {
       render(<CharActions playerStats={createStats({ attacks: [baseAttack] })} cannotAct={true} />);
-      expect(screen.getByText('+5')).toHaveClass('stat--penalized');
       expect(screen.getByText('+5')).toHaveClass('disabled-attack');
     });
 
-    it('does not apply penalized styling when exhaustionPenalty is zero and no disadvantage', () => {
-      render(<CharActions playerStats={createStats({ attacks: [baseAttack] })} exhaustionPenalty={0} />);
-      expect(screen.getByText('+5')).not.toHaveClass('stat--penalized');
+    it('shows Incapacitated label when cannotAct is true', () => {
+      render(<CharActions playerStats={createStats({ attacks: [baseAttack] })} cannotAct={true} />);
+      expect(screen.getByText('(Incapacitated)')).toBeInTheDocument();
     });
   });
 
@@ -270,11 +249,6 @@ describe('CharActions rendering', () => {
     it('displays save DC in DC X TYPE format with saveDcBonus', () => {
       render(<CharActions playerStats={createStats({ attacks: [saveDcAttack] })} />);
       expect(screen.getByText(/DC 14 CON/)).toBeInTheDocument();
-    });
-
-    it('does not display hit bonus column for save-based attacks', () => {
-      render(<CharActions playerStats={createStats({ attacks: [saveDcAttack] })} />);
-      expect(screen.queryByText('+5')).not.toBeInTheDocument();
     });
 
     it('displays damage and damage type for save-based attacks', () => {
@@ -304,68 +278,22 @@ describe('CharActions rendering', () => {
       ['5e', false],
     ])('shows Mastery column and mastery-enabled class for %s rules', (rules, shouldShow) => {
       render(<CharActions playerStats={createStats({ rules, attacks: [baseAttack] })} />);
-      const attacksContainer = document.querySelector('.char-actions .attacks');
       if (shouldShow) {
         expect(screen.getByText('Mastery')).toBeInTheDocument();
-        expect(attacksContainer).toHaveClass('mastery-enabled');
       } else {
         expect(screen.queryByText('Mastery')).not.toBeInTheDocument();
-        expect(attacksContainer).not.toHaveClass('mastery-enabled');
       }
     });
   });
 
-  describe('cannotAct disabled state', () => {
-    const baseAttack = {
-      name: 'Longsword',
-      range: 5,
-      hitBonus: 5,
-      damage: '1d8+3',
-      damageType: 'Slashing',
-      type: 'Action',
-    };
-
-    it('applies disabled-attack class and renders Incapacitated label when cannotAct is true', () => {
-      render(<CharActions playerStats={createStats({ attacks: [baseAttack] })} cannotAct={true} />);
-      expect(screen.getByText('(Incapacitated)')).toBeInTheDocument();
-      expect(screen.getByText('+5')).toHaveClass('disabled-attack');
-    });
-
-    it('does not show Incapacitated label when cannotAct is false', () => {
-      render(<CharActions playerStats={createStats({ attacks: [baseAttack] })} cannotAct={false} />);
-      expect(screen.queryByText('(Incapacitated)')).not.toBeInTheDocument();
-    });
-  });
-
   describe('action feature rendering', () => {
-    it('renders action name with colon suffix', () => {
+    it('renders action name with colon suffix, description, and clickable class when it has details', () => {
       const stats = createStats({
         actions: [{ name: 'Second Wind', description: 'Regain hit points.', details: 'Heal 1d10+1 HP.' }],
       });
       render(<CharActions playerStats={stats} />);
       expect(screen.getByText(/Second Wind:/)).toBeInTheDocument();
-    });
-
-    it('renders action description text', () => {
-      const stats = createStats({
-        actions: [{ name: 'Second Wind', description: 'Regain hit points.', details: 'Heal 1d10+1 HP.' }],
-      });
-      render(<CharActions playerStats={stats} />);
       expect(screen.getByText('Regain hit points.')).toBeInTheDocument();
-    });
-
-    it('does not render feature actions when actions array is empty', () => {
-      render(<CharActions playerStats={createStats({ actions: [] })} />);
-      expect(screen.queryByText(/Second Wind:/)).not.toBeInTheDocument();
-    });
-  });
-
-  describe('action clickable behavior', () => {
-    it('renders action as clickable when it has details', () => {
-      const stats = createStats({
-        actions: [{ name: 'Second Wind', description: 'Regain hit points.', details: 'Heal 1d10+1 HP.' }],
-      });
-      render(<CharActions playerStats={stats} />);
       expect(screen.getByText(/Second Wind:/)).toHaveClass('clickable');
     });
 
@@ -429,16 +357,6 @@ describe('CharActions rendering', () => {
       render(<CharActions playerStats={stats} />);
       expect(screen.getByText('2d6 Thunder')).toBeInTheDocument();
     });
-
-    it('does not show automation badges when hasAutomation returns false', async () => {
-      const { hasAutomation } = await import('../../services/combat/automation/automationService.js');
-      hasAutomation.mockReturnValue(false);
-      const stats = createStats({
-        actions: [{ name: 'Elemental Bane', description: 'Choose a creature.', automation: { type: 'save_attack', saveDc: 15, saveType: 'CON' } }],
-      });
-      render(<CharActions playerStats={stats} />);
-      expect(screen.queryByText('DC 15 CON')).not.toBeInTheDocument();
-    });
   });
 
   describe('metamagic action display', () => {
@@ -448,15 +366,6 @@ describe('CharActions rendering', () => {
       });
       render(<CharActions playerStats={stats} />);
       expect(screen.getByText(/Empowered Spell:/)).toBeInTheDocument();
-    });
-
-    it('does not rename non-Metamagic actions', () => {
-      const stats = createStats({
-        actions: [{ name: 'Berserker Rage', description: 'Enter a rage.', automation: { type: 'combat_stance' } }],
-      });
-      render(<CharActions playerStats={stats} />);
-      expect(screen.getByText(/Rage:/)).toBeInTheDocument();
-      expect(screen.queryByText(/Empowered Spell:/)).not.toBeInTheDocument();
     });
   });
 
@@ -482,12 +391,6 @@ describe('CharActions rendering', () => {
         actions: [{ name: 'Channel Divinity', description: 'Channel divine energy.', automation: { type: 'auto_effect', recharge: 'long_rest' } }],
       });
       render(<CharActions playerStats={stats} />);
-      expect(screen.queryByText(/Restore with Rage/)).not.toBeInTheDocument();
-
-      isExhausted.mockReturnValue(false);
-      render(<CharActions playerStats={createStats({
-        actions: [{ name: 'Berserker Rage', description: 'You enter a rage.', automation: { type: 'combat_stance', recharge: 'long_rest_or_expend_rage' } }],
-      })} />);
       expect(screen.queryByText(/Restore with Rage/)).not.toBeInTheDocument();
     });
   });

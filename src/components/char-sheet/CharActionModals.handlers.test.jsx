@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import CharActionModals from './CharActionModals.jsx';
@@ -268,9 +268,6 @@ function createBaseProps(overrides) {
     setHypnoticPatternShakeModal: vi.fn(),
     setEyebiteEffectModal: vi.fn(),
     setWeaponKindMasteryModal: vi.fn(),
-    setArcaneWardRestoreModal: vi.fn(),
-    setCombatSuperiorityModal: vi.fn(),
-    setAttackRiderManeuverPrompt: vi.fn(),
     handleMasteryClose: vi.fn(),
     handleWeaponMasteryChoice: vi.fn(),
     handleWeaponKindMasteryClose: vi.fn(),
@@ -309,6 +306,8 @@ describe('CharActionModals handlers', () => {
   });
 
   // ── Constellation Selection modal ──
+  // These tests verify handler callbacks receive the correct payload — the actual
+  // behavioral contract. Rendering is covered in CharActionModals.rendering.test.jsx.
 
   describe('Constellation Selection modal', () => {
     const constellationCases = [
@@ -317,14 +316,6 @@ describe('CharActionModals handlers', () => {
     ];
 
     for (const { modalProp, closeSetter } of constellationCases) {
-      it(`renders ${modalProp}`, () => {
-        render(<CharActionModals
-          {...createBaseProps()}
-          {...{ [modalProp]: { payload: { action: {}, playerStats: {}, campaignName: 'test' } } }}
-        />);
-        expect(screen.getByTestId('constellation-selection-modal')).toBeInTheDocument();
-      });
-
       it(`${modalProp}: confirm calls handleConstellationSelect with payload and option`, () => {
         const handleConstellationSelect = vi.fn();
         const payload = { action: {}, playerStats: {}, campaignName: 'test' };
@@ -348,33 +339,10 @@ describe('CharActionModals handlers', () => {
     }
   });
 
-  // ── Weapon Mastery modal ──
-
-  describe('Weapon Mastery modal', () => {
-    it('renders WeaponMasteryModal when weaponMasteryModal is set', () => {
-      render(<CharActionModals {...createBaseProps()} weaponMasteryModal={{}} />);
-      expect(screen.getByTestId('weapon-mastery-modal')).toBeInTheDocument();
-    });
-
-    it('calls handleMasteryClose on close button click', () => {
-      const handleMasteryClose = vi.fn();
-      render(<CharActionModals
-        {...createBaseProps({ handleMasteryClose })}
-        weaponMasteryModal={{}}
-      />);
-      fireEvent.click(screen.getByTestId('weapon-mastery-close'));
-      expect(handleMasteryClose).toHaveBeenCalled();
-    });
-  });
-
   // ── Weapon Mastery Choice modal ──
+  // Tests confirm handler callback invocation (not just modal rendering).
 
   describe('Weapon Mastery Choice modal', () => {
-    it('renders WeaponMasteryChoiceModal when set', () => {
-      render(<CharActionModals {...createBaseProps()} weaponMasteryChoiceModal={{}} />);
-      expect(screen.getByTestId('weapon-mastery-choice-modal')).toBeInTheDocument();
-    });
-
     it('calls handleWeaponMasteryChoice on confirm button click', () => {
       const handleWeaponMasteryChoice = vi.fn();
       render(<CharActionModals
@@ -396,33 +364,12 @@ describe('CharActionModals handlers', () => {
     });
   });
 
-  // ── Close/dismiss behavior ──
+  // ── Close/dismiss behavior with distinct handlers ──
+  // Only tests modals whose close behavior calls a unique handler or multiple setters.
+  // The common "close calls setter(null)" pattern for simple modals is covered by
+  // CharActionModals.rendering.test.jsx and adds no unique behavioral confidence here.
 
   describe('modal close/dismiss behavior', () => {
-    const closeTests = [
-      { name: 'HealingPoolModal', prop: 'healingPoolModal', value: { name: 'Test Pool' }, closeBtn: 'healing-close', setter: 'setHealingPoolModal' },
-      { name: 'AttackRiderModal', prop: 'attackRiderModal', value: {}, closeBtn: 'attack-rider-close', setter: 'setAttackRiderModal' },
-      { name: 'OpenHandTechniqueModal', prop: 'openHandTechniqueModal', value: {}, closeBtn: 'open-hand-close', setter: 'setOpenHandTechniqueModal' },
-      { name: 'CombatStanceModal', prop: 'combatStanceModal', value: {}, closeBtn: 'combat-stance-close', setter: 'setCombatStanceModal' },
-      { name: 'RevelationInFleshModal', prop: 'revelationInFleshModal', value: {}, closeBtn: 'revelation-close', setter: 'setRevelationInFleshModal' },
-      { name: 'TeleportModal', prop: 'teleportModal', value: {}, closeBtn: 'teleport-close', setter: 'setTeleportModal' },
-      { name: 'FiendishLegacyModal', prop: 'fiendishLegacyModal', value: {}, closeBtn: 'fiendish-close', setter: 'setFiendishLegacyModal' },
-      { name: 'BreathWeaponShapeModal', prop: 'breathWeaponShapeModal', value: {}, closeBtn: 'breath-close', setter: 'setBreathWeaponShapeModal' },
-      { name: 'HypnoticPatternShakeModal', prop: 'hypnoticPatternShakeModal', value: {}, closeBtn: 'hypnotic-close', setter: 'setHypnoticPatternShakeModal' },
-    ];
-
-    for (const { name, prop, value, closeBtn, setter } of closeTests) {
-      it(`${name}: close button calls ${setter}(null)`, () => {
-        const setterFn = vi.fn();
-        render(<CharActionModals
-          {...createBaseProps({ [setter]: setterFn })}
-          {...{ [prop]: value }}
-        />);
-        fireEvent.click(screen.getByTestId(closeBtn));
-        expect(setterFn).toHaveBeenCalledWith(null);
-      });
-    }
-
     it('WeaponKindMasteryModal: close button calls handleWeaponKindMasteryClose', () => {
       const handleWeaponKindMasteryClose = vi.fn();
       render(<CharActionModals

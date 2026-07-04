@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import React from 'react';
@@ -238,72 +238,33 @@ describe('CharReactions - Spell Cast Flows', () => {
     expect(screen.getByText('Ward')).toBeInTheDocument();
   });
 
+  // ===== Spell table rendering =====
+
+  it('renders spell table columns with correct type labels, level display, and attack/save columns', () => {
+    const stats = { ...basePlayerStats, spellAbilities: { toHit: 6, saveDc: 15, spells: [
+      { name: 'Healing Word', casting_time: '1 reaction', range: '60 feet', prepared: 'Prepared', heal_at_slot_level: { 1: '1d4+1' } },
+      { name: 'Shield', casting_time: '1 reaction', range: 'Self', prepared: 'Prepared' },
+      { name: 'Toll the Dead', casting_time: '1 reaction', range: '60 feet', prepared: 'Prepared', level: 0, damage: { damage_at_character_level: { 1: '1d8' } } },
+      { name: 'Protection from Energy', casting_time: '1 reaction', range: 'Contact', prepared: 'Prepared', dc: { dc_type: 'CON' } },
+    ] } };
+    render(<CharReactions {...baseProps} playerStats={stats} />);
+    expect(screen.getByText('Healing')).toBeInTheDocument();
+    expect(screen.getAllByText('+6').length).toBeGreaterThan(0);
+    expect(screen.getByText('DC 15 CON')).toBeInTheDocument();
+    expect(screen.getByText('Cantrip')).toBeInTheDocument();
+    expect(screen.getAllByText('Utility').length).toBe(3);
+  });
+
   // ===== Automation popup flows =====
 
-  it('shows reactive spell eligible popup when automation returns eligibleSpells', async () => {
+  it('shows reactive spell popup with warnings when automation returns eligibleSpells and hasWarnings', async () => {
     vi.mocked(hasAutomation).mockReturnValue(true);
     vi.mocked(executeHandler).mockResolvedValue({ type: 'popup', payload: { eligibleSpells: [{ name: 'Fireball', isSingleTarget: false }], hasWarnings: true } });
     render(<CharReactions {...baseProps} />);
     await act(async () => { fireEvent.click(screen.getByText('Reaction Test:')); });
     expect(screen.getByTestId('popup-overlay')).toBeInTheDocument();
-  });
-
-  // ===== Spell table rendering =====
-
-  it('renders spell table damage column as clickable when resolvedDamage is present and cannotAct is false', () => {
-    const stats = { ...basePlayerStats, spellAbilities: { spells: [
-      { name: 'Burning Hands', casting_time: '1 reaction', range: '15 feet', prepared: 'Prepared', damage: { damage_at_slot_level: { 1: '3d6' } } },
-    ] } };
-    render(<CharReactions {...baseProps} playerStats={stats} />);
-    const damageCells = screen.getAllByText('3d6');
-    expect(damageCells.length).toBeGreaterThan(0);
-  });
-
-  it('renders spell table columns with correct type labels and level display', () => {
-    const stats = { ...basePlayerStats, spellAbilities: { spells: [
-      { name: 'Healing Word', casting_time: '1 reaction', range: '60 feet', prepared: 'Prepared', heal_at_slot_level: { 1: '1d4+1' } },
-      { name: 'Shield', casting_time: '1 reaction', range: 'Self', prepared: 'Prepared' },
-      { name: 'Toll the Dead', casting_time: '1 reaction', range: '60 feet', prepared: 'Prepared', level: 0, damage: { damage_at_character_level: { 1: '1d8' } } },
-    ] } };
-    render(<CharReactions {...baseProps} playerStats={stats} />);
-    expect(screen.getByText('Healing')).toBeInTheDocument();
-    expect(screen.getAllByText('Utility').length).toBe(2);
-    expect(screen.getByText('Cantrip')).toBeInTheDocument();
-  });
-
-  it('renders spell attack column with sign formatter when spell has toHit but no dc', () => {
-    const stats = { ...basePlayerStats, spellAbilities: { toHit: 6, saveDc: null, spells: [
-      { name: 'Shield', casting_time: '1 reaction', range: 'Self', prepared: 'Prepared' },
-    ] } };
-    render(<CharReactions {...baseProps} playerStats={stats} />);
-    expect(screen.getByText('+6')).toBeInTheDocument();
-  });
-
-  it('renders save DC column for spells with dc property', () => {
-    const stats = { ...basePlayerStats, spellAbilities: { toHit: null, saveDc: 15, spells: [
-      { name: 'Protection from Energy', casting_time: '1 reaction', range: 'Contact', prepared: 'Prepared', dc: { dc_type: 'CON' } },
-    ] } };
-    render(<CharReactions {...baseProps} playerStats={stats} />);
-    expect(screen.getByText('DC 15 CON')).toBeInTheDocument();
-  });
-
-  // ===== 2024 Ruleset featuresToIgnore =====
-
-  it('uses 2024 featuresToIgnore when rules is "2024"', () => {
-    const stats = { ...basePlayerStats, rules: '2024', reactions: [{ name: 'Spellcasting', description: 'Casts spells' }, { name: 'Opportunity Attack', description: 'Attacks fleeing enemies' }] };
-    render(<CharReactions {...baseProps} playerStats={stats} />);
-    expect(screen.queryByText('Spellcasting:')).not.toBeInTheDocument();
-    expect(screen.getByText('Opportunity Attack:')).toBeInTheDocument();
-  });
-
-  // ===== Automation popup flows =====
-
-  it('shows warning message in reactive spell popup when hasWarnings is true', async () => {
-    vi.mocked(hasAutomation).mockReturnValue(true);
-    vi.mocked(executeHandler).mockResolvedValue({ type: 'popup', payload: { eligibleSpells: [{ name: 'Fireball', isSingleTarget: false }], hasWarnings: true } });
-    render(<CharReactions {...baseProps} />);
-    await act(async () => { fireEvent.click(screen.getByText('Reaction Test:')); });
     expect(screen.getByText('click to dismiss')).toBeInTheDocument();
+    expect(screen.getByText(/Some selected spells target more than one creature/)).toBeInTheDocument();
   });
 
   it('dismisses reactive spell popup when overlay is clicked', async () => {
@@ -314,5 +275,14 @@ describe('CharReactions - Spell Cast Flows', () => {
     expect(screen.getByTestId('popup-overlay')).toBeInTheDocument();
     fireEvent.click(screen.getByTestId('popup-overlay'));
     expect(screen.queryByTestId('popup-overlay')).not.toBeInTheDocument();
+  });
+
+  // ===== 2024 Ruleset featuresToIgnore =====
+
+  it('uses 2024 featuresToIgnore when rules is "2024"', () => {
+    const stats = { ...basePlayerStats, rules: '2024', reactions: [{ name: 'Spellcasting', description: 'Casts spells' }, { name: 'Opportunity Attack', description: 'Attacks fleeing enemies' }] };
+    render(<CharReactions {...baseProps} playerStats={stats} />);
+    expect(screen.queryByText('Spellcasting:')).not.toBeInTheDocument();
+    expect(screen.getByText('Opportunity Attack:')).toBeInTheDocument();
   });
 });

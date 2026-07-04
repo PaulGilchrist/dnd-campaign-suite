@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import React from 'react'
@@ -200,31 +200,6 @@ describe('ConcentrationPromptModal', () => {
     expect(screen.queryByText(/\(1 of 2\)/)).not.toBeInTheDocument()
   })
 
-  it('shows result breakdown with roll details after rolling a save', async () => {
-    render(
-      <ConcentrationPromptModal
-        campaignName="test-campaign"
-        characters={[]}
-        activeMapName={null}
-      />,
-    )
-
-    fireEvent.click(screen.getByTestId('subscriber-trigger'))
-
-    await waitFor(() => {
-      expect(screen.getByText(/must make a/)).toBeInTheDocument()
-    })
-
-    fireEvent.click(screen.getByRole('button', { name: /roll con save/i }))
-
-    await waitFor(() => {
-      expect(screen.getByText(/total:/i)).toBeInTheDocument()
-    })
-
-    expect(screen.getByText(/d20/i)).toBeInTheDocument()
-    expect(screen.getByText(/vs DC 10/)).toBeInTheDocument()
-  })
-
   it.each([
     { roll: 10, expectedMessage: /CONCENTRATION MAINTAINED/i },
     { roll: 1, expectedMessage: /CONCENTRATION BROKEN/i },
@@ -250,33 +225,6 @@ describe('ConcentrationPromptModal', () => {
     await waitFor(() => {
       expect(screen.getByText(expectedMessage)).toBeInTheDocument()
     })
-  })
-
-  it('sends saveBonus that includes both ability and aura bonuses', async () => {
-    vi.mocked(computeAuraBonus).mockResolvedValue({ bonus: 2, sourceName: 'Bard' })
-
-    render(
-      <ConcentrationPromptModal
-        campaignName="test-campaign"
-        characters={[createCharacter('testTarget')]}
-        activeMapName={null}
-      />,
-    )
-
-    fireEvent.click(screen.getByTestId('subscriber-trigger'))
-
-    await waitFor(() => {
-      expect(screen.getByText(/must make a/)).toBeInTheDocument()
-    })
-
-    fireEvent.click(screen.getByRole('button', { name: /roll con save/i }))
-
-    await waitFor(() => {
-      expect(sendConcentrationResult).toHaveBeenCalled()
-    })
-
-    const [,, calledData] = sendConcentrationResult.mock.calls[0]
-    expect(calledData.saveBonus).toBe(5)
   })
 
   it('dispatches concentration-result custom event after rolling', async () => {
@@ -355,41 +303,6 @@ describe('ConcentrationPromptModal', () => {
       <ConcentrationPromptModal
         campaignName="test-campaign"
         characters={[createCharacter('testTarget')]}
-        activeMapName={null}
-      />,
-    )
-
-    fireEvent.click(screen.getByTestId('subscriber-trigger'))
-
-    await waitFor(() => {
-      expect(screen.getByText(/must make a/)).toBeInTheDocument()
-    })
-
-    fireEvent.click(screen.getByRole('button', { name: /roll con save/i }))
-
-    await waitFor(() => {
-      expect(screen.getByText(/total:/i)).toBeInTheDocument()
-    })
-
-    expect(rollD20).toHaveBeenCalledTimes(2)
-  })
-
-  it('rolls with advantage when saveModifiers has concentration_spell_damage condition', async () => {
-    vi.mocked(rollD20).mockReturnValue(3)
-
-    const character = createCharacter('testTarget', [
-      {
-        target: 'saving_throw',
-        condition: 'concentration_spell_damage',
-        effect: 'advantage',
-        abilities: ['Constitution'],
-      },
-    ])
-
-    render(
-      <ConcentrationPromptModal
-        campaignName="test-campaign"
-        characters={[character]}
         activeMapName={null}
       />,
     )

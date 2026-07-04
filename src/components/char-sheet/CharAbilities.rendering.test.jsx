@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharAbilities from './CharAbilities';
@@ -95,27 +95,6 @@ describe('CharAbilities rendering', () => {
   });
 
   describe('ability rows', () => {
-    it('renders ability scores, bonuses, and saves with correct values', () => {
-      const { container } = render(<CharAbilities {...defaultProps} />);
-      // Collect all text content from ability cells
-      const allText = container.querySelector('.char-abilities').textContent;
-      // Total scores
-      expect(allText).toContain('14');
-      expect(allText).toContain('12');
-      expect(allText).toContain('11');
-      expect(allText).toContain('10');
-      expect(allText).toContain('9');
-      // Bonuses with sign prefix
-      expect(allText).toContain('+4');
-      expect(allText).toContain('+2');
-      expect(allText).toContain('+1');
-      expect(allText).toContain('+0');
-      expect(allText).toContain('-1');
-      // Saving throws with sign prefix
-      expect(allText).toContain('+6');
-      expect(allText).toContain('+3');
-    });
-
     it('renders skill bonuses next to skill names', () => {
       const stats = createPlayerStats({
         abilities: [

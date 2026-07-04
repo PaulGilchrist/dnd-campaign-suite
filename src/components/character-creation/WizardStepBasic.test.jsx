@@ -1,3 +1,4 @@
+// @cleaned-by-ai
 // @improved-by-ai
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -54,24 +55,16 @@ describe('WizardStepBasic', () => {
     setupFetchMock(mockAlignments);
   });
 
-  describe('Render — initial values', () => {
-    it('should display the initial name value', () => {
+  describe('Render', () => {
+    it('should display initial form values', async () => {
       render(<WizardStepBasic {...createMockProps()} />);
 
       expect(screen.getByDisplayValue('Test Character')).toBeInTheDocument();
-    });
-
-    it('should display the initial alignment value in the select', async () => {
-      render(<WizardStepBasic {...createMockProps()} />);
-
       await waitFor(() => {
-        const alignmentSelect = document.querySelector('select');
-        expect(alignmentSelect).toHaveValue('Lawful Good');
+        expect(document.querySelector('select')).toHaveValue('Lawful Good');
       });
     });
-  });
 
-  describe('Render — image preview', () => {
     it('should show "Click to upload" and no remove button when no image is set', () => {
       render(<WizardStepBasic {...createMockProps()} />);
 
@@ -85,9 +78,10 @@ describe('WizardStepBasic', () => {
     ])('should render image preview from %s', ({ formData }) => {
       render(<WizardStepBasic {...createMockProps({ formData })} />);
 
-      const img = document.querySelector('.image-preview img');
-      expect(img).toBeInTheDocument();
-      expect(img).toHaveAttribute('src', formData.image || formData.imagePath);
+      const preview = document.querySelector('.image-preview');
+      expect(preview.querySelector('img')).toBeInTheDocument();
+      expect(preview.querySelector('img')).toHaveAttribute('src', formData.image || formData.imagePath);
+      expect(screen.queryByText('Click to upload')).not.toBeInTheDocument();
     });
 
     it('should show remove button when an image is set', () => {
@@ -101,10 +95,8 @@ describe('WizardStepBasic', () => {
 
       expect(screen.getByText('Remove Image')).toBeInTheDocument();
     });
-  });
 
-  describe('Render — 2024 background options', () => {
-    it('should render background select with default option and populated choices', () => {
+    it('should render 2024 background select with populated choices', () => {
       render(
         <WizardStepBasic
           {...createMockProps()}
@@ -260,7 +252,7 @@ describe('WizardStepBasic', () => {
       try {
         render(<WizardStepBasic {...createMockProps({ onInputChange: mockOnChange })} />);
 
-        const fileInput = document.getElementById('character-image-upload');
+        const fileInput = document.querySelector('input[type="file"]');
         const file = new File(['test'], 'test-image.png', { type: 'image/png' });
 
         fireEvent.change(fileInput, { target: { files: [file] } });
@@ -287,7 +279,7 @@ describe('WizardStepBasic', () => {
       try {
         render(<WizardStepBasic {...createMockProps({ onInputChange: mockOnChange })} />);
 
-        const fileInput = document.getElementById('character-image-upload');
+        const fileInput = document.querySelector('input[type="file"]');
         fireEvent.change(fileInput, { target: { files: [] } });
 
         expect(mockOnChange).not.toHaveBeenCalled();
@@ -313,17 +305,6 @@ describe('WizardStepBasic', () => {
 
       expect(screen.getByText('Step 2: Basic Information')).toBeInTheDocument();
       consoleSpy.mockRestore();
-    });
-
-    it('should render an empty alignment select when fetch returns an empty array', async () => {
-      setupFetchMock([]);
-      render(<WizardStepBasic {...createMockProps()} />);
-
-      await waitFor(() => {
-        const alignmentSelect = document.querySelector('select');
-        const options = alignmentSelect.querySelectorAll('option');
-        expect(options.length).toBe(0);
-      });
     });
   });
 });

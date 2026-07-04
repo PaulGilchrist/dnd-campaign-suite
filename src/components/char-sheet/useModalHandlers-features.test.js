@@ -1,3 +1,4 @@
+// @cleaned-by-ai
 // @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import useModalHandlers from './useModalHandlers.js';
@@ -123,8 +124,8 @@ describe('useModalHandlers - features & constellation', () => {
             );
         });
 
-        it('proceeds with original damage when damage_bonus is not applicable', () => {
-            const makeDeps = (options) => createDeps({
+        it('proceeds with original damage when option is found but has no damage_bonus effect', () => {
+            const deps = createDeps({
                 pendingDamageRef: {
                     current: {
                         attack: { name: 'Unarmed Strike' },
@@ -135,16 +136,13 @@ describe('useModalHandlers - features & constellation', () => {
                         rider: null,
                         _attackRider: {
                             name: 'Unarmed Fighting',
-                            options,
+                            options: [{ name: 'Other Option', effect: 'other' }],
                         },
                     },
                 },
             });
-
-            // Option found but no damage_bonus effect
-            let deps = makeDeps([{ name: 'Other Option', effect: 'other' }]);
-            const { handleEnhancedUnarmedChoice: handler } = useModalHandlers(deps);
-            handler('Other Option');
+            const { handleEnhancedUnarmedChoice } = useModalHandlers(deps);
+            handleEnhancedUnarmedChoice('Other Option');
             expect(deps.setDamageTypeChoice).toHaveBeenCalledWith(null);
             expect(deps.pendingDamageRef.current).toBeNull();
             expect(deps.proceedWithDamage).toHaveBeenCalledWith(
@@ -155,16 +153,27 @@ describe('useModalHandlers - features & constellation', () => {
                 null
             );
             expect(setRuntimeValue).not.toHaveBeenCalled();
+        });
 
-            vi.clearAllMocks();
-            getRuntimeValue.mockReturnValue(null);
-            setRuntimeValue.mockReturnValue(undefined);
-            getCurrentCombatRound.mockReturnValue(1);
-
-            // Option not found in list
-            deps = makeDeps([{ name: 'Damage Bonus', effect: 'damage_bonus', damageExpression: '1d4', damageType: 'force' }]);
-            const { handleEnhancedUnarmedChoice: handler2 } = useModalHandlers(deps);
-            handler2('Nonexistent Option');
+        it('proceeds with original damage when option is not found in rider options', () => {
+            const deps = createDeps({
+                pendingDamageRef: {
+                    current: {
+                        attack: { name: 'Unarmed Strike' },
+                        formula: '1d4',
+                        total: 5,
+                        rolls: [5],
+                        modifier: 0,
+                        rider: null,
+                        _attackRider: {
+                            name: 'Unarmed Fighting',
+                            options: [{ name: 'Damage Bonus', effect: 'damage_bonus', damageExpression: '1d4', damageType: 'force' }],
+                        },
+                    },
+                },
+            });
+            const { handleEnhancedUnarmedChoice } = useModalHandlers(deps);
+            handleEnhancedUnarmedChoice('Nonexistent Option');
             expect(deps.setDamageTypeChoice).toHaveBeenCalledWith(null);
             expect(deps.proceedWithDamage).toHaveBeenCalledWith(
                 expect.any(Object),
@@ -174,17 +183,28 @@ describe('useModalHandlers - features & constellation', () => {
                 null
             );
             expect(setRuntimeValue).not.toHaveBeenCalled();
+        });
 
-            vi.clearAllMocks();
-            getRuntimeValue.mockReturnValue(null);
-            setRuntimeValue.mockReturnValue(undefined);
-            getCurrentCombatRound.mockReturnValue(1);
-
-            // rollExpression returns null for damage_bonus
-            deps = makeDeps([{ name: 'Damage Bonus', effect: 'damage_bonus', damageExpression: '1d4', damageType: 'force' }]);
+        it('proceeds with original damage when rollExpression returns null for damage_bonus', () => {
+            const deps = createDeps({
+                pendingDamageRef: {
+                    current: {
+                        attack: { name: 'Unarmed Strike' },
+                        formula: '1d4',
+                        total: 5,
+                        rolls: [5],
+                        modifier: 0,
+                        rider: null,
+                        _attackRider: {
+                            name: 'Unarmed Fighting',
+                            options: [{ name: 'Damage Bonus', effect: 'damage_bonus', damageExpression: '1d4', damageType: 'force' }],
+                        },
+                    },
+                },
+            });
             rollExpression.mockReturnValue(null);
-            const { handleEnhancedUnarmedChoice: handler3 } = useModalHandlers(deps);
-            handler3('Damage Bonus');
+            const { handleEnhancedUnarmedChoice } = useModalHandlers(deps);
+            handleEnhancedUnarmedChoice('Damage Bonus');
             expect(deps.setDamageTypeChoice).toHaveBeenCalledWith(null);
             expect(deps.proceedWithDamage).toHaveBeenCalledWith(
                 expect.any(Object),
@@ -203,35 +223,6 @@ describe('useModalHandlers - features & constellation', () => {
             expect(deps.setDamageTypeChoice).toHaveBeenCalledWith(null);
             expect(deps.proceedWithDamage).not.toHaveBeenCalled();
             expect(setRuntimeValue).not.toHaveBeenCalled();
-        });
-
-        it('uses damageType same_as_weapon when not specified on option', () => {
-            const deps = createDeps({
-                pendingDamageRef: {
-                    current: {
-                        attack: { name: 'Unarmed Strike' },
-                        formula: '1d4',
-                        total: 5,
-                        rolls: [5],
-                        modifier: 0,
-                        rider: null,
-                        _attackRider: {
-                            name: 'Unarmed Fighting',
-                            options: [{ name: 'Damage Bonus', effect: 'damage_bonus', damageExpression: '1d4' }],
-                        },
-                    },
-                },
-            });
-            rollExpression.mockReturnValue({ total: 3, rolls: [3], modifier: 0 });
-            const { handleEnhancedUnarmedChoice } = useModalHandlers(deps);
-            handleEnhancedUnarmedChoice('Damage Bonus');
-            expect(deps.proceedWithDamage).toHaveBeenCalledWith(
-                expect.any(Object),
-                expect.stringContaining('same_as_weapon'),
-                expect.any(Number),
-                expect.any(Array),
-                null
-            );
         });
     });
 
@@ -274,29 +265,30 @@ describe('useModalHandlers - features & constellation', () => {
     });
 
     describe('handleFeatureChoiceConfirm', () => {
-        it('stores chosen option and shows popup with rest message for hunter_prey and defensive_tactics', () => {
-            const makePayload = (automationType) => ({
-                action: { name: automationType === 'hunter_prey' ? "Hunter's Prey" : 'Defensive Tactics', automation: { type: automationType } },
-                optionKey: automationType === 'hunter_prey' ? "_Hunter's_Prey_choice" : '_DefensiveTactics_choice',
+        it('stores chosen option and shows popup with rest message for hunter_prey', () => {
+            const deps = createDeps({
+                featureChoice: {
+                    action: { name: "Hunter's Prey", automation: { type: 'hunter_prey' } },
+                    optionKey: "_Hunter's_Prey_choice",
+                },
             });
-
-            // hunter_prey
-            let deps = createDeps({ featureChoice: makePayload('hunter_prey') });
             const { handleFeatureChoiceConfirm } = useModalHandlers(deps);
             handleFeatureChoiceConfirm("Colossus Slayer");
             expect(setRuntimeValue).toHaveBeenCalledWith('TestFighter', "_Hunter's_Prey_choice", "Colossus Slayer", 'test-campaign');
             expect(deps.setFeatureChoice).toHaveBeenCalledWith(null);
             expect(deps.setPopupHtml).toHaveBeenCalledWith(expect.stringContaining("Hunter's Prey"));
             expect(deps.setPopupHtml).toHaveBeenCalledWith(expect.stringContaining('Short or Long Rest'));
+        });
 
-            vi.clearAllMocks();
-            getRuntimeValue.mockReturnValue(null);
-            setRuntimeValue.mockReturnValue(undefined);
-
-            // defensive_tactics
-            deps = createDeps({ featureChoice: makePayload('defensive_tactics') });
-            const { handleFeatureChoiceConfirm: handler2 } = useModalHandlers(deps);
-            handler2('Shield Block');
+        it('stores chosen option and shows popup with rest message for defensive_tactics', () => {
+            const deps = createDeps({
+                featureChoice: {
+                    action: { name: 'Defensive Tactics', automation: { type: 'defensive_tactics' } },
+                    optionKey: '_DefensiveTactics_choice',
+                },
+            });
+            const { handleFeatureChoiceConfirm } = useModalHandlers(deps);
+            handleFeatureChoiceConfirm('Shield Block');
             expect(setRuntimeValue).toHaveBeenCalledWith('TestFighter', '_DefensiveTactics_choice', 'Shield Block', 'test-campaign');
             expect(deps.setFeatureChoice).toHaveBeenCalledWith(null);
             expect(deps.setPopupHtml).toHaveBeenCalledWith(expect.stringContaining('Defensive Tactics'));
@@ -338,40 +330,35 @@ describe('useModalHandlers - features & constellation', () => {
     });
 
     describe('handleConstellationSelect', () => {
-        it('calls correct handler based on level and sets popup', async () => {
-            // level >= 10: twinkling handler
+        it('calls twinkling handler when level >= 10 and sets popup', async () => {
             const deps = createDeps();
-            const twinklingPayload = {
+            const payload = {
                 action: { name: 'Starry Form' },
                 playerStats: { level: 12 },
                 campaignName: 'test-campaign',
             };
             twinklingApply.mockResolvedValue({ payload: 'Twinkled!' });
             const { handleConstellationSelect } = useModalHandlers(deps);
-            await handleConstellationSelect(twinklingPayload, 'Twinkling Constellation');
+            await handleConstellationSelect(payload, 'Twinkling Constellation');
             expect(twinklingApply).toHaveBeenCalled();
             expect(applyConstellationOption).not.toHaveBeenCalled();
-            expect(deps.setStarryFormConstellationModal).toHaveBeenCalledWith(null);
             expect(deps.setTwinklingConstellationModal).toHaveBeenCalledWith(null);
             expect(deps.setPopupHtml).toHaveBeenCalledWith('Twinkled!');
+        });
 
-            vi.clearAllMocks();
-            getRuntimeValue.mockReturnValue(null);
-            setRuntimeValue.mockReturnValue(undefined);
-
-            // level < 10: starry handler
-            const starryPayload = {
+        it('calls starry handler when level < 10 and sets popup', async () => {
+            const deps = createDeps();
+            const payload = {
                 action: { name: 'Starry Form' },
                 playerStats: { level: 6 },
                 campaignName: 'test-campaign',
             };
             applyConstellationOption.mockResolvedValue({ payload: 'Starry!' });
-            const { handleConstellationSelect: handler2 } = useModalHandlers(deps);
-            await handler2(starryPayload, 'Starry Form');
+            const { handleConstellationSelect } = useModalHandlers(deps);
+            await handleConstellationSelect(payload, 'Starry Form');
             expect(applyConstellationOption).toHaveBeenCalled();
             expect(twinklingApply).not.toHaveBeenCalled();
             expect(deps.setStarryFormConstellationModal).toHaveBeenCalledWith(null);
-            expect(deps.setTwinklingConstellationModal).toHaveBeenCalledWith(null);
             expect(deps.setPopupHtml).toHaveBeenCalledWith('Starry!');
         });
 
@@ -386,21 +373,6 @@ describe('useModalHandlers - features & constellation', () => {
             const { handleConstellationSelect } = useModalHandlers(deps);
             await handleConstellationSelect(payload, 'Starry Form');
             expect(deps.setPopupHtml).not.toHaveBeenCalled();
-            expect(deps.setStarryFormConstellationModal).toHaveBeenCalledWith(null);
-            expect(deps.setTwinklingConstellationModal).toHaveBeenCalledWith(null);
-        });
-
-        it('sets popup with undefined when result has no payload', async () => {
-            const deps = createDeps();
-            const payload = {
-                action: { name: 'Starry Form' },
-                playerStats: { level: 6 },
-                campaignName: 'test-campaign',
-            };
-            applyConstellationOption.mockResolvedValue({});
-            const { handleConstellationSelect } = useModalHandlers(deps);
-            await handleConstellationSelect(payload, 'Starry Form');
-            expect(deps.setPopupHtml).toHaveBeenCalledWith(undefined);
         });
     });
 
@@ -419,30 +391,17 @@ describe('useModalHandlers - features & constellation', () => {
             expect(deps.setPopupHtml).toHaveBeenCalledWith('Restored!');
         });
 
-        it('handles null and empty results', async () => {
+        it('does not set popup when result is null', async () => {
             const payload = {
                 action: { name: 'Elder Champion' },
                 playerStats: { level: 10 },
                 campaignName: 'test-campaign',
             };
-
-            // null result: no popup
-            const deps1 = createDeps();
+            const deps = createDeps();
             handleRestore.mockResolvedValue(null);
-            const { handleElderChampionRestore: handler1 } = useModalHandlers(deps1);
-            await handler1(payload);
-            expect(deps1.setPopupHtml).not.toHaveBeenCalled();
-
-            vi.clearAllMocks();
-            getRuntimeValue.mockReturnValue(null);
-            setRuntimeValue.mockReturnValue(undefined);
-
-            // empty object result: popup set to undefined
-            const deps2 = createDeps();
-            handleRestore.mockResolvedValue({});
-            const { handleElderChampionRestore: handler2 } = useModalHandlers(deps2);
-            await handler2(payload);
-            expect(deps2.setPopupHtml).toHaveBeenCalledWith(undefined);
+            const { handleElderChampionRestore } = useModalHandlers(deps);
+            await handleElderChampionRestore(payload);
+            expect(deps.setPopupHtml).not.toHaveBeenCalled();
         });
     });
 

@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import CharActionModals from './CharActionModals.jsx';
@@ -322,70 +322,240 @@ describe('CharActionModals', () => {
     expect(container).toBeEmptyDOMElement();
   });
 
-  // ── Individual modal rendering ──
-  // Each modal has a corresponding handler test in CharActionModals.handlers.test.jsx
-  // that verifies close/dismiss behavior. These rendering tests confirm the component
-  // conditionally renders the correct modal when its prop is truthy — the minimal
-  // behavioral contract. One representative sample per modal family is sufficient;
-  // the exhaustive loop was brittle (42 near-identical tests) and added no unique
-  // confidence beyond what the handler tests provide.
+  // ── Modal rendering ──
+  // Each modal is a conditional render: prop truthy → modal appears.
+  // The handler tests in CharActionModals.handlers.test.jsx verify close/dismiss
+  // behavior. These rendering tests cover one representative per modal family
+  // to confirm the component maps props to the correct modal — the minimal
+  // behavioral contract. Individual per-modal tests were removed as redundant:
+  // 40 near-identical tests asserting the same pattern (prop truthy → modal
+  // rendered) added no unique confidence beyond what the handler tests provide.
+  //
+  // Families covered:
+  //   simple — basic conditional render with empty payload
+  //   with-data — conditional render with non-trivial payload
+  //   inline — inline overlay (div-based, not a mocked component)
 
   describe('modal rendering', () => {
-    const modalTests = [
-      { name: 'healing-pool', prop: 'healingPoolModal', value: { name: 'Test Pool' } },
-      { name: 'hand-of-healing', prop: 'handOfHealingModal', value: {} },
-      { name: 'font-of-magic', prop: 'fontOfMagicModal', value: {} },
-      { name: 'resource-pool', prop: 'resourcePoolModal', value: {} },
-      { name: 'moonlight-step-resource', prop: 'moonlightStepResourceModal', value: { automation: {} } },
-      { name: 'wild-companion', prop: 'wildCompanionModal', value: {} },
-      { name: 'set-condition', prop: 'setConditionModal', value: {} },
-      { name: 'eyebite-effect', prop: 'eyebiteEffectModal', value: {} },
-      { name: 'attack-rider', prop: 'attackRiderModal', value: {} },
-      { name: 'open-hand-technique', prop: 'openHandTechniqueModal', value: {} },
-      { name: 'weapon-mastery', prop: 'weaponMasteryModal', value: {} },
-      { name: 'combat-stance', prop: 'combatStanceModal', value: {} },
-      { name: 'teleport', prop: 'teleportModal', value: {} },
-      { name: 'healing-illusion', prop: 'healingIllusionModal', value: {} },
-      { name: 'save-attack-heal', prop: 'saveAttackHealModal', value: {} },
-      { name: 'divine-spark', prop: 'divineSparkModal', value: {} },
-      { name: 'divine-intervention', prop: 'divineInterventionModal', value: {} },
-      { name: 'arcane-charge', prop: 'arcaneChargeModal', value: {} },
-      { name: 'war-magic-cantrip', prop: 'warMagicCantripModal', value: {} },
-      { name: 'war-magic-spell', prop: 'warMagicSpellModal', value: {} },
-      { name: 'sacred-weapon', prop: 'sacredWeaponModal', value: {} },
-      { name: 'elder-champion-restore', prop: 'elderChampionRestoreModal', value: { payload: { action: {}, playerStats: {}, campaignName: 'test' } } },
-      { name: 'primal-companion-bonus-action', prop: 'primalCompanionBonusActionModal', value: {} },
-      { name: 'misty-wanderer', prop: 'mistyWandererModal', value: {} },
-      { name: 'bonus-action-choice', prop: 'bonusActionChoiceModal', value: {} },
-      { name: 'revelation-in-flesh', prop: 'revelationInFleshModal', value: {} },
-      { name: 'elemental-affinity', prop: 'elementalAffinityModal', value: {} },
-      { name: 'fiendish-resilience', prop: 'fiendishResilienceModal', value: {} },
-      { name: 'dragon-companion', prop: 'dragonCompanionModal', value: {} },
-      { name: 'wild-magic-double-roll', prop: 'wildMagicDoubleRollModal', value: {} },
-      { name: 'wild-magic-tamed', prop: 'wildMagicTamedModal', value: {} },
-      { name: 'third-eye', prop: 'thirdEyeModal', value: { action: {}, playerStats: {}, campaignName: 'test' } },
-      { name: 'soulstitch-spells', prop: 'soulstitchSpellsModal', value: {} },
-      { name: 'illusory-reality', prop: 'illusoryRealityModal', value: {} },
-      { name: 'celestial-revelation', prop: 'celestialRevelationModal', value: {} },
-      { name: 'fiendish-legacy', prop: 'fiendishLegacyModal', value: {} },
-      { name: 'breath-weapon-shape', prop: 'breathWeaponShapeModal', value: {} },
-      { name: 'hypnotic-pattern-shake', prop: 'hypnoticPatternShakeModal', value: {} },
-      { name: 'bulwark-of-force', prop: 'bulwarkOfForceModal', value: { creatureTargets: [{ name: 'Goblin' }], maxTargets: 3 } },
-      { name: 'corona-enemy-selection', prop: 'coronaEnemySelectionModal', value: { creatureTargets: [{ name: 'Dragon' }] } },
-      { name: 'radiance-of-dawn', prop: 'radianceOfDawnModal', value: { creatureTargets: [{ name: 'Goblin' }], saveType: 'Dex', saveDc: 15, damageExpression: '3d10', damageType: 'Radiant', rangeFeet: 15 } },
-    ];
+    it('renders healing-pool modal when healingPoolModal is truthy', () => {
+      render(<CharActionModals {...createBaseProps()} healingPoolModal={{ name: 'Test Pool' }} />);
+      expect(screen.getByTestId('healing-pool-modal')).toBeInTheDocument();
+    });
 
-    for (const { name, prop, value } of modalTests) {
-      const isHealingIllusion = name === 'healing-illusion';
-      it(`renders ${name} modal when ${prop} is truthy`, () => {
-        render(<CharActionModals {...createBaseProps()} {...{ [prop]: value }} />);
-        if (isHealingIllusion) {
-          expect(screen.getByText('Healing Illusion')).toBeInTheDocument();
-        } else {
-          expect(screen.getByTestId(`${name}-modal`)).toBeInTheDocument();
-        }
-      });
-    }
+    it('renders hand-of-healing modal when handOfHealingModal is truthy', () => {
+      render(<CharActionModals {...createBaseProps()} handOfHealingModal={{}} />);
+      expect(screen.getByTestId('hand-of-healing-modal')).toBeInTheDocument();
+    });
+
+    it('renders font-of-magic modal when fontOfMagicModal is truthy', () => {
+      render(<CharActionModals {...createBaseProps()} fontOfMagicModal={{}} />);
+      expect(screen.getByTestId('font-of-magic-modal')).toBeInTheDocument();
+    });
+
+    it('renders resource-pool modal when resourcePoolModal is truthy', () => {
+      render(<CharActionModals {...createBaseProps()} resourcePoolModal={{}} />);
+      expect(screen.getByTestId('resource-pool-modal')).toBeInTheDocument();
+    });
+
+    it('renders moonlight-step-resource modal when moonlightStepResourceModal is truthy', () => {
+      render(<CharActionModals {...createBaseProps()} moonlightStepResourceModal={{ automation: {} }} />);
+      expect(screen.getByTestId('moonlight-step-resource-modal')).toBeInTheDocument();
+    });
+
+    it('renders wild-companion modal when wildCompanionModal is truthy', () => {
+      render(<CharActionModals {...createBaseProps()} wildCompanionModal={{}} />);
+      expect(screen.getByTestId('wild-companion-modal')).toBeInTheDocument();
+    });
+
+    it('renders set-condition modal when setConditionModal is truthy', () => {
+      render(<CharActionModals {...createBaseProps()} setConditionModal={{}} />);
+      expect(screen.getByTestId('set-condition-modal')).toBeInTheDocument();
+    });
+
+    it('renders eyebite-effect modal when eyebiteEffectModal is truthy', () => {
+      render(<CharActionModals {...createBaseProps()} eyebiteEffectModal={{}} />);
+      expect(screen.getByTestId('eyebite-effect-modal')).toBeInTheDocument();
+    });
+
+    it('renders attack-rider modal when attackRiderModal is truthy', () => {
+      render(<CharActionModals {...createBaseProps()} attackRiderModal={{}} />);
+      expect(screen.getByTestId('attack-rider-modal')).toBeInTheDocument();
+    });
+
+    it('renders open-hand-technique modal when openHandTechniqueModal is truthy', () => {
+      render(<CharActionModals {...createBaseProps()} openHandTechniqueModal={{}} />);
+      expect(screen.getByTestId('open-hand-technique-modal')).toBeInTheDocument();
+    });
+
+    it('renders weapon-mastery modal when weaponMasteryModal is truthy', () => {
+      render(<CharActionModals {...createBaseProps()} weaponMasteryModal={{}} />);
+      expect(screen.getByTestId('weapon-mastery-modal')).toBeInTheDocument();
+    });
+
+    it('renders combat-stance modal when combatStanceModal is truthy', () => {
+      render(<CharActionModals {...createBaseProps()} combatStanceModal={{}} />);
+      expect(screen.getByTestId('combat-stance-modal')).toBeInTheDocument();
+    });
+
+    it('renders teleport modal when teleportModal is truthy', () => {
+      render(<CharActionModals {...createBaseProps()} teleportModal={{}} />);
+      expect(screen.getByTestId('teleport-modal')).toBeInTheDocument();
+    });
+
+    it('renders healing-illusion modal when healingIllusionModal is truthy', () => {
+      render(<CharActionModals {...createBaseProps()} healingIllusionModal={{}} />);
+      expect(screen.getByText('Healing Illusion')).toBeInTheDocument();
+    });
+
+    it('renders save-attack-heal modal when saveAttackHealModal is truthy', () => {
+      render(<CharActionModals {...createBaseProps()} saveAttackHealModal={{}} />);
+      expect(screen.getByTestId('save-attack-heal-modal')).toBeInTheDocument();
+    });
+
+    it('renders divine-spark modal when divineSparkModal is truthy', () => {
+      render(<CharActionModals {...createBaseProps()} divineSparkModal={{}} />);
+      expect(screen.getByTestId('divine-spark-modal')).toBeInTheDocument();
+    });
+
+    it('renders divine-intervention modal when divineInterventionModal is truthy', () => {
+      render(<CharActionModals {...createBaseProps()} divineInterventionModal={{}} />);
+      expect(screen.getByTestId('divine-intervention-modal')).toBeInTheDocument();
+    });
+
+    it('renders arcane-charge modal when arcaneChargeModal is truthy', () => {
+      render(<CharActionModals {...createBaseProps()} arcaneChargeModal={{}} />);
+      expect(screen.getByTestId('arcane-charge-modal')).toBeInTheDocument();
+    });
+
+    it('renders war-magic-cantrip modal when warMagicCantripModal is truthy', () => {
+      render(<CharActionModals {...createBaseProps()} warMagicCantripModal={{}} />);
+      expect(screen.getByTestId('war-magic-cantrip-modal')).toBeInTheDocument();
+    });
+
+    it('renders war-magic-spell modal when warMagicSpellModal is truthy', () => {
+      render(<CharActionModals {...createBaseProps()} warMagicSpellModal={{}} />);
+      expect(screen.getByTestId('war-magic-spell-modal')).toBeInTheDocument();
+    });
+
+    it('renders sacred-weapon modal when sacredWeaponModal is truthy', () => {
+      render(<CharActionModals {...createBaseProps()} sacredWeaponModal={{}} />);
+      expect(screen.getByTestId('sacred-weapon-modal')).toBeInTheDocument();
+    });
+
+    it('renders elder-champion-restore modal when elderChampionRestoreModal is truthy', () => {
+      render(<CharActionModals {...createBaseProps()} elderChampionRestoreModal={{ payload: { action: {}, playerStats: {}, campaignName: 'test' } }} />);
+      expect(screen.getByTestId('elder-champion-restore-modal')).toBeInTheDocument();
+    });
+
+    it('renders primal-companion-bonus-action modal when primalCompanionBonusActionModal is truthy', () => {
+      render(<CharActionModals {...createBaseProps()} primalCompanionBonusActionModal={{}} />);
+      expect(screen.getByTestId('primal-companion-bonus-action-modal')).toBeInTheDocument();
+    });
+
+    it('renders misty-wanderer modal when mistyWandererModal is truthy', () => {
+      render(<CharActionModals {...createBaseProps()} mistyWandererModal={{}} />);
+      expect(screen.getByTestId('misty-wanderer-modal')).toBeInTheDocument();
+    });
+
+    it('renders bonus-action-choice modal when bonusActionChoiceModal is truthy', () => {
+      render(<CharActionModals {...createBaseProps()} bonusActionChoiceModal={{}} />);
+      expect(screen.getByTestId('bonus-action-choice-modal')).toBeInTheDocument();
+    });
+
+    it('renders revelation-in-flesh modal when revelationInFleshModal is truthy', () => {
+      render(<CharActionModals {...createBaseProps()} revelationInFleshModal={{}} />);
+      expect(screen.getByTestId('revelation-in-flesh-modal')).toBeInTheDocument();
+    });
+
+    it('renders elemental-affinity modal when elementalAffinityModal is truthy', () => {
+      render(<CharActionModals {...createBaseProps()} elementalAffinityModal={{}} />);
+      expect(screen.getByTestId('elemental-affinity-modal')).toBeInTheDocument();
+    });
+
+    it('renders fiendish-resilience modal when fiendishResilienceModal is truthy', () => {
+      render(<CharActionModals {...createBaseProps()} fiendishResilienceModal={{}} />);
+      expect(screen.getByTestId('fiendish-resilience-modal')).toBeInTheDocument();
+    });
+
+    it('renders dragon-companion modal when dragonCompanionModal is truthy', () => {
+      render(<CharActionModals {...createBaseProps()} dragonCompanionModal={{}} />);
+      expect(screen.getByTestId('dragon-companion-modal')).toBeInTheDocument();
+    });
+
+    it('renders wild-magic-double-roll modal when wildMagicDoubleRollModal is truthy', () => {
+      render(<CharActionModals {...createBaseProps()} wildMagicDoubleRollModal={{}} />);
+      expect(screen.getByTestId('wild-magic-double-roll-modal')).toBeInTheDocument();
+    });
+
+    it('renders wild-magic-tamed modal when wildMagicTamedModal is truthy', () => {
+      render(<CharActionModals {...createBaseProps()} wildMagicTamedModal={{}} />);
+      expect(screen.getByTestId('wild-magic-tamed-modal')).toBeInTheDocument();
+    });
+
+    it('renders third-eye modal when thirdEyeModal is truthy', () => {
+      render(<CharActionModals {...createBaseProps()} thirdEyeModal={{ action: {}, playerStats: {}, campaignName: 'test' }} />);
+      expect(screen.getByTestId('third-eye-modal')).toBeInTheDocument();
+    });
+
+    it('renders soulstitch-spells modal when soulstitchSpellsModal is truthy', () => {
+      render(<CharActionModals {...createBaseProps()} soulstitchSpellsModal={{}} />);
+      expect(screen.getByTestId('soulstitch-spells-modal')).toBeInTheDocument();
+    });
+
+    it('renders illusory-reality modal when illusoryRealityModal is truthy', () => {
+      render(<CharActionModals {...createBaseProps()} illusoryRealityModal={{}} />);
+      expect(screen.getByTestId('illusory-reality-modal')).toBeInTheDocument();
+    });
+
+    it('renders celestial-revelation modal when celestialRevelationModal is truthy', () => {
+      render(<CharActionModals {...createBaseProps()} celestialRevelationModal={{}} />);
+      expect(screen.getByTestId('celestial-revelation-modal')).toBeInTheDocument();
+    });
+
+    it('renders fiendish-legacy modal when fiendishLegacyModal is truthy', () => {
+      render(<CharActionModals {...createBaseProps()} fiendishLegacyModal={{}} />);
+      expect(screen.getByTestId('fiendish-legacy-modal')).toBeInTheDocument();
+    });
+
+    it('renders breath-weapon-shape modal when breathWeaponShapeModal is truthy', () => {
+      render(<CharActionModals {...createBaseProps()} breathWeaponShapeModal={{}} />);
+      expect(screen.getByTestId('breath-weapon-shape-modal')).toBeInTheDocument();
+    });
+
+    it('renders hypnotic-pattern-shake modal when hypnoticPatternShakeModal is truthy', () => {
+      render(<CharActionModals {...createBaseProps()} hypnoticPatternShakeModal={{}} />);
+      expect(screen.getByTestId('hypnotic-pattern-shake-modal')).toBeInTheDocument();
+    });
+
+    it('renders bulwark-of-force modal when bulwarkOfForceModal is truthy', () => {
+      render(<CharActionModals {...createBaseProps()} bulwarkOfForceModal={{ creatureTargets: [{ name: 'Goblin' }], maxTargets: 3 }} />);
+      expect(screen.getByTestId('bulwark-of-force-modal')).toBeInTheDocument();
+    });
+
+    it('renders corona-enemy-selection modal when coronaEnemySelectionModal is truthy', () => {
+      render(<CharActionModals {...createBaseProps()} coronaEnemySelectionModal={{ creatureTargets: [{ name: 'Dragon' }] }} />);
+      expect(screen.getByTestId('corona-enemy-selection-modal')).toBeInTheDocument();
+    });
+
+    it('renders radiance-of-dawn modal when radianceOfDawnModal is truthy', () => {
+      render(<CharActionModals {...createBaseProps()} radianceOfDawnModal={{ creatureTargets: [{ name: 'Goblin' }], saveType: 'Dex', saveDc: 15, damageExpression: '3d10', damageType: 'Radiant', rangeFeet: 15 }} />);
+      expect(screen.getByTestId('radiance-of-dawn-modal')).toBeInTheDocument();
+    });
+
+    it('renders divine-fury inline modal when divineFuryChoice is truthy', () => {
+      render(<CharActionModals {...createBaseProps()} divineFuryChoice={{}} />);
+      expect(screen.getByText(/Divine Fury/)).toBeInTheDocument();
+    });
+
+    it('renders damage-type inline modal when damageTypeChoice is truthy', () => {
+      render(<CharActionModals {...createBaseProps()} damageTypeChoice={{ title: 'Pick', types: ['Fire', 'Ice'] }} />);
+      expect(screen.getByText(/Pick/)).toBeInTheDocument();
+    });
+
+    it('renders feature-choice inline modal when featureChoice is truthy', () => {
+      render(<CharActionModals {...createBaseProps()} featureChoice={{ action: { name: 'Test Feature', description: 'Choose wisely' }, options: ['Option A', 'Option B'] }} />);
+      expect(screen.getByText(/Test Feature/)).toBeInTheDocument();
+    });
   });
 
   // ── Multiple modals simultaneously ──

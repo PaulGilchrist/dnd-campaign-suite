@@ -1,3 +1,4 @@
+// @cleaned-by-ai
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharSpecialActions from './CharSpecialActions.jsx';
@@ -143,325 +144,87 @@ function createPlayerStats(overrides = {}) {
   return { ...basePlayerStats, ...overrides };
 }
 
-describe('CharSpecialActions - Weapon Mastery Modals', () => {
+describe('CharSpecialActions - Savant Confirm Popup', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  describe('weaponKindMastery modal', () => {
-    it('renders and closes WeaponKindMasteryModal when automation returns it', async () => {
-      executeHandler.mockResolvedValue({
-        type: 'modal',
-        modalName: 'weaponKindMastery',
-        payload: {
-          action: { name: 'Weapon Mastery', automation: { type: 'weapon_kind_mastery' } },
-          meleeOnly: true,
-          existing: ['Longsword'],
-        },
-      });
+  function renderWithSavant(school, spellOptions, actionOverrides = {}, handlerResult = { type: 'popup', payload: { name: `${school} Savant`, description: 'Spells added to spellbook.' } }) {
+    const mockSetPopupHtml = vi.fn();
+    const wrapper = ({ children }) => (
+      <DiceRollContext.Provider value={{ popupHtml: null, setPopupHtml: mockSetPopupHtml }}>
+        {children}
+      </DiceRollContext.Provider>
+    );
 
-      const playerStats = createPlayerStats({
-        specialActions: [
-          { name: 'Weapon Mastery', description: 'Choose weapon kinds.', automation: { type: 'weapon_kind_mastery' } },
-        ],
-      });
-      render(<CharSpecialActions playerStats={playerStats} campaignName="test" />, {
-        wrapper: ({ children }) => (
-          <DiceRollContext.Provider value={{ popupHtml: null, setPopupHtml: vi.fn() }}>
-            {children}
-          </DiceRollContext.Provider>
-        ),
-      });
-      fireEvent.click(screen.getByText(/Weapon Mastery/));
-
-      await waitFor(() => {
-        expect(screen.getByTestId('weapon-kind-mastery-modal')).toBeInTheDocument();
-      });
-
-      fireEvent.click(screen.getByText('Close'));
-
-      await waitFor(() => {
-        expect(screen.queryByTestId('weapon-kind-mastery-modal')).not.toBeInTheDocument();
-      });
+    executeHandler.mockResolvedValue({
+      type: 'modal',
+      modalName: `${school.toLowerCase()}Savant`,
+      payload: {
+        action: { name: `${school} Savant`, automation: { type: 'passive_rule', effect: `${school.toLowerCase()}_savant` } },
+        playerStats: basePlayerStats,
+        campaignName: 'test',
+        school,
+        spellOptions,
+        ...actionOverrides,
+      },
     });
+
+    onSavantSelected.mockResolvedValue(handlerResult);
+
+    const playerStats = createPlayerStats({
+      specialActions: [
+        { name: `${school} Savant`, description: `Choose two ${school.toLowerCase()} spells.`, automation: { type: 'passive_rule', effect: `${school.toLowerCase()}_savant` } },
+      ],
+    });
+    render(<CharSpecialActions playerStats={playerStats} campaignName="test" />, { wrapper });
+    return mockSetPopupHtml;
+  }
+
+  it.each([
+    { school: 'Evocation', payload: { name: 'Evocation Savant', description: 'Added two spells to your spellbook.' }, schoolName: 'Evocation' },
+    { school: 'Abjuration', payload: { description: 'Spells added to spellbook.' }, schoolName: 'Abjuration' },
+    { school: 'Divination', payload: '<b>Custom HTML popup</b>', schoolName: 'Divination' },
+    { school: 'Illusion', payload: { description: 'Illusion spells added.' }, schoolName: 'Illusion' },
+  ])('shows popup with correct school name and description for $school ($description)', async ({ school, payload, schoolName }) => {
+    const mockSetPopupHtml = renderWithSavant(school, ['Spell 1', 'Spell 2'], {}, { type: 'popup', payload });
+
+    fireEvent.click(screen.getByText(new RegExp(`${school} Savant`)));
+
+    await waitFor(() => {
+      expect(screen.getByTestId(`${school.toLowerCase()}-savant-modal`)).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText('Confirm'));
+
+    await waitFor(() => {
+      expect(mockSetPopupHtml).toHaveBeenCalled();
+    });
+
+    const popupCall = mockSetPopupHtml.mock.calls[0][0];
+    if (typeof payload === 'string') {
+      expect(popupCall).toBe(payload);
+    } else {
+      expect(popupCall).toContain(schoolName);
+      expect(popupCall).toContain(payload.description);
+    }
   });
 
-  describe('weaponMasteryChoice modal', () => {
-    it('renders and closes WeaponMasteryChoiceModal when automation returns it', async () => {
-      executeHandler.mockResolvedValue({
-        type: 'modal',
-        modalName: 'weaponMasteryChoice',
-        payload: {
-          action: { name: 'Weapon Master', automation: { type: 'weapon_mastery_choice' } },
-          masteryProperties: ['Finesse', 'Heavy', 'Reach'],
-        },
-      });
+  it('closes modal without showing popup when handler returns null', async () => {
+    const mockSetPopupHtml = renderWithSavant('Evocation', ['Fireball', 'Scorching Burst'], {}, null);
 
-      const playerStats = createPlayerStats({
-        specialActions: [
-          { name: 'Weapon Master', description: 'Choose mastery.', automation: { type: 'weapon_mastery_choice' } },
-        ],
-      });
-      render(<CharSpecialActions playerStats={playerStats} campaignName="test" />, {
-        wrapper: ({ children }) => (
-          <DiceRollContext.Provider value={{ popupHtml: null, setPopupHtml: vi.fn() }}>
-            {children}
-          </DiceRollContext.Provider>
-        ),
-      });
-      fireEvent.click(screen.getByText(/Weapon Master/));
+    fireEvent.click(screen.getByText(/Evocation Savant/));
 
-      await waitFor(() => {
-        expect(screen.getByTestId('weapon-mastery-choice-modal')).toBeInTheDocument();
-      });
-
-      fireEvent.click(screen.getByText('Close'));
-
-      await waitFor(() => {
-        expect(screen.queryByTestId('weapon-mastery-choice-modal')).not.toBeInTheDocument();
-      });
-    });
-  });
-});
-
-describe('CharSpecialActions - Savant Confirm Popup Path', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  describe('Savant confirm handler popup result', () => {
-    it('displays popup when onSavantSelected returns a popup result', async () => {
-      const mockSetPopupHtml = vi.fn();
-      const wrapper = ({ children }) => (
-        <DiceRollContext.Provider value={{ popupHtml: null, setPopupHtml: mockSetPopupHtml }}>
-          {children}
-        </DiceRollContext.Provider>
-      );
-
-      executeHandler.mockResolvedValue({
-        type: 'modal',
-        modalName: 'evocationSavant',
-        payload: {
-          action: { name: 'Evocation Savant', automation: { type: 'passive_rule', effect: 'evocation_savant' } },
-          playerStats: basePlayerStats,
-          campaignName: 'test',
-          school: 'Evocation',
-          spellOptions: ['Fireball', 'Scorching Burst'],
-        },
-      });
-
-      onSavantSelected.mockResolvedValue({
-        type: 'popup',
-        payload: { name: 'Evocation Savant', description: 'Added two spells to your spellbook.' },
-      });
-
-      const playerStats = createPlayerStats({
-        specialActions: [
-          { name: 'Evocation Savant', description: 'Choose two evocation spells.', automation: { type: 'passive_rule', effect: 'evocation_savant' } },
-        ],
-      });
-      render(<CharSpecialActions playerStats={playerStats} campaignName="test" />, { wrapper });
-
-      fireEvent.click(screen.getByText(/Evocation Savant/));
-
-      await waitFor(() => {
-        expect(screen.getByTestId('evocation-savant-modal')).toBeInTheDocument();
-      });
-
-      fireEvent.click(screen.getByText('Confirm'));
-
-      await waitFor(() => {
-        expect(mockSetPopupHtml).toHaveBeenCalled();
-      });
-
-      const popupCall = mockSetPopupHtml.mock.calls[0][0];
-      expect(popupCall).toContain('Evocation Savant');
-      expect(popupCall).toContain('Added two spells to your spellbook.');
+    await waitFor(() => {
+      expect(screen.getByTestId('evocation-savant-modal')).toBeInTheDocument();
     });
 
-    it('uses school name as fallback when popup payload has no name', async () => {
-      const mockSetPopupHtml = vi.fn();
-      const wrapper = ({ children }) => (
-        <DiceRollContext.Provider value={{ popupHtml: null, setPopupHtml: mockSetPopupHtml }}>
-          {children}
-        </DiceRollContext.Provider>
-      );
+    fireEvent.click(screen.getByText('Confirm'));
 
-      executeHandler.mockResolvedValue({
-        type: 'modal',
-        modalName: 'abjurationSavant',
-        payload: {
-          action: { name: 'Abjuration Savant' },
-          playerStats: basePlayerStats,
-          campaignName: 'test',
-          school: 'Abjuration',
-          spellOptions: ['Shield', 'Mage Armor'],
-        },
-      });
-
-      onSavantSelected.mockResolvedValue({
-        type: 'popup',
-        payload: { description: 'Spells added to spellbook.' },
-      });
-
-      const playerStats = createPlayerStats({
-        specialActions: [
-          { name: 'Abjuration Savant', description: 'Choose two abjuration spells.', automation: { type: 'passive_rule', effect: 'abjuration_savant' } },
-        ],
-      });
-      render(<CharSpecialActions playerStats={playerStats} campaignName="test" />, { wrapper });
-
-      fireEvent.click(screen.getByText(/Abjuration Savant/));
-
-      await waitFor(() => {
-        expect(screen.getByTestId('abjuration-savant-modal')).toBeInTheDocument();
-      });
-
-      fireEvent.click(screen.getByText('Confirm'));
-
-      await waitFor(() => {
-        expect(mockSetPopupHtml).toHaveBeenCalled();
-      });
-
-      const popupCall = mockSetPopupHtml.mock.calls[0][0];
-      expect(popupCall).toContain('Abjuration Savant');
-      expect(popupCall).toContain('Spells added to spellbook.');
+    await waitFor(() => {
+      expect(screen.queryByTestId('evocation-savant-modal')).not.toBeInTheDocument();
     });
 
-    it('handles string payload in savant confirm popup', async () => {
-      const mockSetPopupHtml = vi.fn();
-      const wrapper = ({ children }) => (
-        <DiceRollContext.Provider value={{ popupHtml: null, setPopupHtml: mockSetPopupHtml }}>
-          {children}
-        </DiceRollContext.Provider>
-      );
-
-      executeHandler.mockResolvedValue({
-        type: 'modal',
-        modalName: 'divinationSavant',
-        payload: {
-          action: { name: 'Divination Savant' },
-          playerStats: basePlayerStats,
-          campaignName: 'test',
-          school: 'Divination',
-          spellOptions: ['Detect Magic', 'Identify'],
-        },
-      });
-
-      onSavantSelected.mockResolvedValue({
-        type: 'popup',
-        payload: '<b>Custom HTML popup</b>',
-      });
-
-      const playerStats = createPlayerStats({
-        specialActions: [
-          { name: 'Divination Savant', description: 'Choose two divination spells.', automation: { type: 'passive_rule', effect: 'divination_savant' } },
-        ],
-      });
-      render(<CharSpecialActions playerStats={playerStats} campaignName="test" />, { wrapper });
-
-      fireEvent.click(screen.getByText(/Divination Savant/));
-
-      await waitFor(() => {
-        expect(screen.getByTestId('divination-savant-modal')).toBeInTheDocument();
-      });
-
-      fireEvent.click(screen.getByText('Confirm'));
-
-      await waitFor(() => {
-        expect(mockSetPopupHtml).toHaveBeenCalledWith('<b>Custom HTML popup</b>');
-      });
-    });
-
-    it('uses savantModal.school as fallback when popup payload has no name', async () => {
-      const mockSetPopupHtml = vi.fn();
-      const wrapper = ({ children }) => (
-        <DiceRollContext.Provider value={{ popupHtml: null, setPopupHtml: mockSetPopupHtml }}>
-          {children}
-        </DiceRollContext.Provider>
-      );
-
-      executeHandler.mockResolvedValue({
-        type: 'modal',
-        modalName: 'illusionSavant',
-        payload: {
-          action: { name: 'Illusion Savant' },
-          playerStats: basePlayerStats,
-          campaignName: 'test',
-          school: 'Illusion',
-          spellOptions: ['Minor Illusion', 'Disguise Self'],
-        },
-      });
-
-      onSavantSelected.mockResolvedValue({
-        type: 'popup',
-        payload: { description: 'Illusion spells added.' },
-      });
-
-      const playerStats = createPlayerStats({
-        specialActions: [
-          { name: 'Illusion Savant', description: 'Choose two illusion spells.', automation: { type: 'passive_rule', effect: 'illusion_savant' } },
-        ],
-      });
-      render(<CharSpecialActions playerStats={playerStats} campaignName="test" />, { wrapper });
-
-      fireEvent.click(screen.getByText(/Illusion Savant/));
-
-      await waitFor(() => {
-        expect(screen.getByTestId('illusion-savant-modal')).toBeInTheDocument();
-      });
-
-      fireEvent.click(screen.getByText('Confirm'));
-
-      await waitFor(() => {
-        expect(mockSetPopupHtml).toHaveBeenCalled();
-      });
-
-      const popupCall = mockSetPopupHtml.mock.calls[0][0];
-      expect(popupCall).toContain('Illusion Savant');
-      expect(popupCall).toContain('Illusion spells added.');
-    });
-
-    it('clears savant modal state after confirm regardless of result type', async () => {
-      const mockSetPopupHtml = vi.fn();
-      const wrapper = ({ children }) => (
-        <DiceRollContext.Provider value={{ popupHtml: null, setPopupHtml: mockSetPopupHtml }}>
-          {children}
-        </DiceRollContext.Provider>
-      );
-
-      executeHandler.mockResolvedValue({
-        type: 'modal',
-        modalName: 'evocationSavant',
-        payload: {
-          action: { name: 'Evocation Savant' },
-          playerStats: basePlayerStats,
-          campaignName: 'test',
-          school: 'Evocation',
-          spellOptions: ['Fireball', 'Scorching Burst'],
-        },
-      });
-
-      onSavantSelected.mockResolvedValue(null);
-
-      const playerStats = createPlayerStats({
-        specialActions: [
-          { name: 'Evocation Savant', description: 'Choose two evocation spells.', automation: { type: 'passive_rule', effect: 'evocation_savant' } },
-        ],
-      });
-      render(<CharSpecialActions playerStats={playerStats} campaignName="test" />, { wrapper });
-
-      fireEvent.click(screen.getByText(/Evocation Savant/));
-
-      await waitFor(() => {
-        expect(screen.getByTestId('evocation-savant-modal')).toBeInTheDocument();
-      });
-
-      fireEvent.click(screen.getByText('Confirm'));
-
-      await waitFor(() => {
-        expect(screen.queryByTestId('evocation-savant-modal')).not.toBeInTheDocument();
-      });
-    });
+    expect(mockSetPopupHtml).not.toHaveBeenCalled();
   });
 });

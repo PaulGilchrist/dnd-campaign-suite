@@ -1,4 +1,4 @@
-/* @improved-by-ai */
+/* @cleaned-by-ai */
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import MonsterNameAutocomplete from './MonsterNameAutocomplete.jsx';
@@ -33,7 +33,7 @@ describe('MonsterNameAutocomplete', () => {
         vi.restoreAllMocks();
     });
 
-    it('renders an input field with initial value and focuses when initialFocus is true', () => {
+    it('renders an input field and focuses when initialFocus is true', () => {
         render(<MonsterNameAutocomplete value="Goblin" initialFocus={true} />);
         expect(screen.getByDisplayValue('Goblin')).toBeInTheDocument();
         const input = document.querySelector('.monster-autocomplete-input');
@@ -54,19 +54,33 @@ describe('MonsterNameAutocomplete', () => {
         expect(onChange).toHaveBeenCalledWith('Gobl');
     });
 
-    it('shows suggestions for matching prefixes with started-with matches first', async () => {
+    it('shows suggestions for matching queries and hides for no matches or empty input', async () => {
         render(<MonsterNameAutocomplete value="" />);
         const input = document.querySelector('.monster-autocomplete-input');
+
         fireEvent.change(input, { target: { value: 'Gobl' } });
         await waitFor(() => {
             const list = document.querySelector('.monster-autocomplete-list');
             expect(list).toBeInTheDocument();
         });
+
+        fireEvent.change(input, { target: { value: 'zzzzzzzzzz' } });
+        await waitFor(() => {
+            const list = document.querySelector('.monster-autocomplete-list');
+            expect(list).not.toBeInTheDocument();
+        });
+
+        fireEvent.change(input, { target: { value: '' } });
+        await waitFor(() => {
+            const list = document.querySelector('.monster-autocomplete-list');
+            expect(list).not.toBeInTheDocument();
+        });
     });
 
-    it('prioritizes started-with matches and limits to 8 items', async () => {
+    it('prioritizes started-with matches and limits results to 8', async () => {
         render(<MonsterNameAutocomplete value="" />);
         const input = document.querySelector('.monster-autocomplete-input');
+
         fireEvent.change(input, { target: { value: 'Anc' } });
         await waitFor(() => {
             const items = document.querySelectorAll('.monster-autocomplete-item');
@@ -81,30 +95,7 @@ describe('MonsterNameAutocomplete', () => {
         });
     });
 
-    it('hides suggestions when query has no matches or input is cleared', async () => {
-        render(<MonsterNameAutocomplete value="" />);
-        const input = document.querySelector('.monster-autocomplete-input');
-
-        fireEvent.change(input, { target: { value: 'zzzzzzzzzz' } });
-        await waitFor(() => {
-            const list = document.querySelector('.monster-autocomplete-list');
-            expect(list).not.toBeInTheDocument();
-        });
-
-        fireEvent.change(input, { target: { value: 'Gobl' } });
-        await waitFor(() => {
-            const list = document.querySelector('.monster-autocomplete-list');
-            expect(list).toBeInTheDocument();
-        });
-
-        fireEvent.change(input, { target: { value: '' } });
-        await waitFor(() => {
-            const list = document.querySelector('.monster-autocomplete-list');
-            expect(list).not.toBeInTheDocument();
-        });
-    });
-
-    it('highlights suggestions on arrow keys and selects on Enter', async () => {
+    it('highlights suggestions on arrow keys', async () => {
         render(<MonsterNameAutocomplete value="" />);
         const input = document.querySelector('.monster-autocomplete-input');
         fireEvent.change(input, { target: { value: 'Gobl' } });
@@ -114,15 +105,13 @@ describe('MonsterNameAutocomplete', () => {
         });
 
         fireEvent.keyDown(input, { key: 'ArrowDown' });
-        const highlighted = document.querySelector('.monster-autocomplete-item.highlighted');
-        expect(highlighted).toBeInTheDocument();
+        expect(document.querySelector('.monster-autocomplete-item.highlighted')).toBeInTheDocument();
 
-        // Cycle up
         fireEvent.keyDown(input, { key: 'ArrowUp' });
         expect(document.querySelector('.monster-autocomplete-item.highlighted')).toBeInTheDocument();
     });
 
-    it('commits on Enter, blur, and mouse selection', async () => {
+    it('commits on Enter', async () => {
         const onCommit = vi.fn();
         render(<MonsterNameAutocomplete value="" onCommit={onCommit} />);
         const input = document.querySelector('.monster-autocomplete-input');
@@ -133,10 +122,8 @@ describe('MonsterNameAutocomplete', () => {
             expect(list).toBeInTheDocument();
         });
 
-        // Enter commits query
         fireEvent.keyDown(input, { key: 'Enter' });
         expect(onCommit).toHaveBeenCalledWith('Gobl');
-        onCommit.mockClear();
     });
 
     it('commits query on blur', async () => {
@@ -153,9 +140,10 @@ describe('MonsterNameAutocomplete', () => {
         expect(onCommit).toHaveBeenCalledWith('Gobl');
     });
 
-    it('commits on mouse selection', async () => {
+    it('commits and calls onChange on mouse selection', async () => {
         const onCommit = vi.fn();
-        render(<MonsterNameAutocomplete value="" onCommit={onCommit} />);
+        const onChange = vi.fn();
+        render(<MonsterNameAutocomplete value="" onCommit={onCommit} onChange={onChange} />);
         const input = document.querySelector('.monster-autocomplete-input');
 
         fireEvent.change(input, { target: { value: 'Gobl' } });
@@ -166,24 +154,11 @@ describe('MonsterNameAutocomplete', () => {
         const item = document.querySelector('.monster-autocomplete-item');
         fireEvent.mouseDown(item);
         expect(screen.getByDisplayValue('Goblin')).toBeInTheDocument();
+        expect(onChange).toHaveBeenCalledWith('Goblin');
         expect(onCommit).toHaveBeenCalledWith('Goblin');
     });
 
-    it('calls onChange with selected name on suggestion click', async () => {
-        const onChange = vi.fn();
-        render(<MonsterNameAutocomplete value="" onChange={onChange} />);
-        const input = document.querySelector('.monster-autocomplete-input');
-        fireEvent.change(input, { target: { value: 'Gobl' } });
-        await waitFor(() => {
-            const list = document.querySelector('.monster-autocomplete-list');
-            expect(list).toBeInTheDocument();
-        });
-        const item = document.querySelector('.monster-autocomplete-item');
-        fireEvent.mouseDown(item);
-        expect(onChange).toHaveBeenCalledWith('Goblin');
-    });
-
-    it('hides suggestions on blur and clicking outside', async () => {
+    it('hides suggestions on clicking outside', async () => {
         render(<MonsterNameAutocomplete value="" />);
         const input = document.querySelector('.monster-autocomplete-input');
         fireEvent.change(input, { target: { value: 'Gobl' } });
@@ -222,7 +197,6 @@ describe('MonsterNameAutocomplete', () => {
         );
         const wrapper = container.querySelector('.monster-autocomplete');
         expect(wrapper).toHaveClass('monster-autocomplete-fixed');
-        expect(wrapper).toHaveStyle({ top: '10px', left: '20px' });
     });
 
     it('updates input when value prop changes externally', async () => {

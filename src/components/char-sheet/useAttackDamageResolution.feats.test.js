@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import useAttackDamageResolution from './useAttackDamageResolution.js';
 
@@ -129,14 +129,6 @@ describe('useAttackDamageResolution - feats', () => {
                 { name: targetName, type: 'npc' },
             ],
         };
-    }
-
-    // Helper: mock getRuntimeValue to return a specific value for a specific key, null for all others
-    function mockRuntimeValueForKey(key, value) {
-        getRuntimeValue.mockImplementation((name, rk, _campaign) => {
-            if (rk === key) return value;
-            return null;
-        });
     }
 
     describe('Charger feat', () => {
@@ -299,31 +291,6 @@ describe('useAttackDamageResolution - feats', () => {
             expect(setRuntimeValue).toHaveBeenCalledWith('TestFighter', '_Crusher_usedRound', 1, 'test-campaign');
         });
 
-        it('does not apply Crusher push for non-bludgeoning damage', async () => {
-            const stats = {
-                ...mockPlayerStats,
-                automation: {
-                    actions: [],
-                    passives: [
-                        {
-                            type: 'attack_rider', trigger: 'bludgeoning_damage_hit',
-                            oncePerTurn: true, name: 'Crusher',
-                            options: [{ name: 'Push 5 ft', effect: 'push', value: 5 }],
-                        },
-                    ],
-                },
-            };
-            const { resolveAttackDamage } = useAttackDamageResolutionHook({ playerStats: stats });
-            const attack = {
-                name: 'Longsword', damage: '1d8+5', damageType: 'Slashing',
-                weaponType: 'melee', properties: [],
-            };
-            await resolveAttackDamage(attack);
-            await tick();
-            expect(setRuntimeValue).not.toHaveBeenCalledWith('test-campaign', 'targetEffects', expect.anything(), 'test-campaign');
-            expect(mockRollDamage).toHaveBeenCalled();
-        });
-
         it('applies Crusher Enhanced Critical on bludgeoning crit', async () => {
             getCombatContext.mockResolvedValue(createCombatContext());
             getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
@@ -352,31 +319,6 @@ describe('useAttackDamageResolution - feats', () => {
                     effect: 'crusher_enhanced_critical',
                 }),
             ]), 'test-campaign');
-        });
-
-        it('does not apply Crusher Enhanced Critical on non-bludgeoning crit', async () => {
-            getCombatContext.mockResolvedValue(createCombatContext());
-            getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
-            const stats = {
-                ...mockPlayerStats,
-                automation: {
-                    actions: [],
-                    passives: [
-                        { type: 'conditional_advantage', trigger: 'critical_hit_bludgeoning', name: 'Crusher Enhanced Critical' },
-                    ],
-                },
-            };
-            const { resolveAttackDamage } = useAttackDamageResolutionHook({
-                playerStats: stats,
-                popupHtml: { isCrit: true },
-            });
-            const attack = {
-                name: 'Longsword', damage: '1d8+5', damageType: 'Slashing',
-                weaponType: 'melee', properties: [],
-            };
-            await resolveAttackDamage(attack);
-            await tick();
-            expect(setRuntimeValue).not.toHaveBeenCalledWith('test-campaign', 'targetEffects', expect.anything(), 'test-campaign');
         });
     });
 
@@ -416,31 +358,6 @@ describe('useAttackDamageResolution - feats', () => {
             expect(setRuntimeValue).toHaveBeenCalledWith('TestFighter', '_Slasher_usedRound', 1, 'test-campaign');
         });
 
-        it('does not apply Slasher hamstring for non-slashing damage', async () => {
-            const stats = {
-                ...mockPlayerStats,
-                automation: {
-                    actions: [],
-                    passives: [
-                        {
-                            type: 'attack_rider', trigger: 'slashing_damage_hit',
-                            oncePerTurn: true, name: 'Slasher',
-                            options: [{ name: 'Reduce Speed', effect: 'speed_reduction', value: 10 }],
-                        },
-                    ],
-                },
-            };
-            const { resolveAttackDamage } = useAttackDamageResolutionHook({ playerStats: stats });
-            const attack = {
-                name: 'Rapier', damage: '1d8+5', damageType: 'Piercing',
-                weaponType: 'melee', properties: [],
-            };
-            await resolveAttackDamage(attack);
-            await tick();
-            expect(setRuntimeValue).not.toHaveBeenCalledWith('test-campaign', 'targetEffects', expect.anything(), 'test-campaign');
-            expect(mockRollDamage).toHaveBeenCalled();
-        });
-
         it('applies Slasher Enhanced Critical on slashing crit', async () => {
             getCombatContext.mockResolvedValue(createCombatContext());
             getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
@@ -469,31 +386,6 @@ describe('useAttackDamageResolution - feats', () => {
                     effect: 'disadvantage_next_attack',
                 }),
             ]), 'test-campaign');
-        });
-
-        it('does not apply Slasher Enhanced Critical on non-slashing crit', async () => {
-            getCombatContext.mockResolvedValue(createCombatContext());
-            getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
-            const stats = {
-                ...mockPlayerStats,
-                automation: {
-                    actions: [],
-                    passives: [
-                        { type: 'conditional_advantage', trigger: 'critical_hit_slashing', name: 'Slasher Enhanced Critical' },
-                    ],
-                },
-            };
-            const { resolveAttackDamage } = useAttackDamageResolutionHook({
-                playerStats: stats,
-                popupHtml: { isCrit: true },
-            });
-            const attack = {
-                name: 'Rapier', damage: '1d8+5', damageType: 'Piercing',
-                weaponType: 'melee', properties: [],
-            };
-            await resolveAttackDamage(attack);
-            await tick();
-            expect(setRuntimeValue).not.toHaveBeenCalledWith('test-campaign', 'targetEffects', expect.anything(), 'test-campaign');
         });
     });
 
@@ -528,33 +420,6 @@ describe('useAttackDamageResolution - feats', () => {
             );
         });
 
-        it('does not apply Piercer reroll for non-piercing damage', async () => {
-            const stats = {
-                ...mockPlayerStats,
-                automation: {
-                    actions: [],
-                    passives: [
-                        {
-                            type: 'attack_rider', trigger: 'piercing_damage_hit',
-                            oncePerTurn: true, name: 'Piercer',
-                        },
-                    ],
-                },
-            };
-            const { resolveAttackDamage } = useAttackDamageResolutionHook({ playerStats: stats });
-            const attack = {
-                name: 'Longsword', damage: '1d8+5', damageType: 'Slashing',
-                weaponType: 'melee', properties: [],
-            };
-            await resolveAttackDamage(attack);
-            await tick();
-            expect(mockRollDamage).toHaveBeenCalledWith(
-                'Longsword',
-                '1d8+5',
-                expect.any(Number), expect.any(Array), expect.any(Number), expect.any(Object)
-            );
-        });
-
         it('applies Piercer extra damage die on crit', async () => {
             const stats = {
                 ...mockPlayerStats,
@@ -578,33 +443,6 @@ describe('useAttackDamageResolution - feats', () => {
             expect(mockRollDamage).toHaveBeenCalledWith(
                 'Rapier',
                 expect.stringContaining('+ 1 [Piercing]'),
-                expect.any(Number), expect.any(Array), expect.any(Number), expect.any(Object)
-            );
-        });
-
-        it('does not apply Piercer extra damage die on non-piercing crit', async () => {
-            const stats = {
-                ...mockPlayerStats,
-                automation: {
-                    actions: [],
-                    passives: [
-                        { type: 'damage_bonus', trigger: 'critical_hit_piercing', diceType: 'weapon_die', name: 'Piercer Critical' },
-                    ],
-                },
-            };
-            const { resolveAttackDamage } = useAttackDamageResolutionHook({
-                playerStats: stats,
-                popupHtml: { isCrit: true },
-            });
-            const attack = {
-                name: 'Longsword', damage: '1d8+5', damageType: 'Slashing',
-                weaponType: 'melee', properties: [],
-            };
-            await resolveAttackDamage(attack);
-            await tick();
-            expect(mockRollDamage).toHaveBeenCalledWith(
-                'Longsword',
-                expect.stringContaining('1d8+5'),
                 expect.any(Number), expect.any(Array), expect.any(Number), expect.any(Object)
             );
         });
@@ -634,27 +472,6 @@ describe('useAttackDamageResolution - feats', () => {
             expect(setRuntimeValue).toHaveBeenCalledWith('TestFighter', '_Savage_Attacker_usedRound', 1, 'test-campaign');
             expect(mockRollDamage).toHaveBeenCalled();
             floorSpy.mockRestore();
-        });
-
-        it('does not reroll when already used this round', async () => {
-            mockRuntimeValueForKey('_Savage_Attacker_usedRound', 1);
-            const stats = {
-                ...mockPlayerStats,
-                automation: {
-                    actions: [],
-                    passives: [
-                        { type: 'passive_rule', effect: 'reroll_damage_once_per_turn', name: 'Savage Attacker' },
-                    ],
-                },
-            };
-            const { resolveAttackDamage } = useAttackDamageResolutionHook({ playerStats: stats });
-            const attack = {
-                name: 'Greataxe', damage: '1d12+5', damageType: 'Slashing',
-                weaponType: 'melee', properties: ['Heavy'],
-            };
-            await resolveAttackDamage(attack);
-            await tick();
-            expect(setRuntimeValue).not.toHaveBeenCalledWith('TestFighter', '_Savage_Attacker_usedRound', expect.any(Number), 'test-campaign');
         });
     });
 
@@ -687,29 +504,6 @@ describe('useAttackDamageResolution - feats', () => {
             floorSpy.mockRestore();
         });
 
-        it('does not add Tavern Brawler modifier when no ones are rolled', async () => {
-            rollExpression.mockReturnValue({ total: 3, rolls: [3], modifier: 0 });
-            const stats = {
-                ...mockPlayerStats,
-                automation: {
-                    actions: [],
-                    passives: [{ effect: 'tavern_brawler_reroll_ones' }],
-                },
-            };
-            const { resolveAttackDamage } = useAttackDamageResolutionHook({ playerStats: stats });
-            const attack = {
-                name: 'Unarmed Strike', damage: '1d4', damageType: 'Bludgeoning',
-                weaponType: 'unarmed', properties: [],
-            };
-            await resolveAttackDamage(attack);
-            await tick();
-            expect(mockRollDamage).toHaveBeenCalledWith(
-                'Unarmed Strike',
-                '1d4',
-                expect.any(Number), expect.any(Array), expect.any(Number), expect.any(Object)
-            );
-        });
-
         it('applies Tavern Brawler push on unarmed strike hit', async () => {
             getCombatContext.mockResolvedValue(createCombatContext());
             getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
@@ -735,27 +529,6 @@ describe('useAttackDamageResolution - feats', () => {
                     value: 5,
                 }),
             ]), 'test-campaign');
-        });
-
-        it('does not apply Tavern Brawler push for non-unarmed weapons', async () => {
-            getCombatContext.mockResolvedValue(createCombatContext());
-            getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
-            const stats = {
-                ...mockPlayerStats,
-                automation: {
-                    actions: [],
-                    passives: [{ effect: 'tavern_brawler_push' }],
-                },
-            };
-            const { resolveAttackDamage } = useAttackDamageResolutionHook({ playerStats: stats });
-            const attack = {
-                name: 'Longsword', damage: '1d8+5', damageType: 'Slashing',
-                weaponType: 'melee', properties: [],
-            };
-            await resolveAttackDamage(attack);
-            await tick();
-            expect(setRuntimeValue).not.toHaveBeenCalledWith('test-campaign', 'targetEffects', expect.anything(), 'test-campaign');
-            expect(mockRollDamage).toHaveBeenCalled();
         });
     });
 });

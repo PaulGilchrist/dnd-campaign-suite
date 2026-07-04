@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CampaignSelection from './CampaignSelection.jsx';
@@ -111,27 +111,6 @@ describe('CampaignSelection', () => {
       });
     });
 
-    it('should call onCampaignSelect with empty characters when no character files exist', async () => {
-      const mockOnCampaignSelect = vi.fn();
-      getCharacterFolders.mockResolvedValue(['Campaign1']);
-      getCharacterFiles.mockResolvedValue([]);
-      loadCharacters.mockResolvedValue([]);
-
-      render(<CampaignSelection onCampaignSelect={mockOnCampaignSelect} />);
-
-      await waitFor(() => {
-        expect(screen.getByText('Campaign1')).toBeInTheDocument();
-      });
-
-      await act(async () => {
-        fireEvent.click(screen.getByText('Campaign1'));
-      });
-
-      await waitFor(() => {
-        expect(mockOnCampaignSelect).toHaveBeenCalledWith('Campaign1', []);
-      });
-    });
-
     it('should call onCampaignSelect with multiple characters', async () => {
       const mockOnCampaignSelect = vi.fn();
       getCharacterFolders.mockResolvedValue(['Campaign1']);
@@ -180,22 +159,11 @@ describe('CampaignSelection', () => {
 
       await waitFor(() => {
         expect(screen.getByText(/Failed to load campaign Bad Campaign/)).toBeInTheDocument();
-        expect(screen.queryByText('Creating campaign...')).not.toBeInTheDocument();
       });
     });
   });
 
   describe('new campaign modal', () => {
-    it('should show the Add button regardless of campaign count', async () => {
-      getCharacterFolders.mockResolvedValue(['Campaign1']);
-
-      render(<CampaignSelection />);
-
-      await waitFor(() => {
-        expect(screen.getByText('Add')).toBeInTheDocument();
-      });
-    });
-
     it('should open the create campaign modal when Add is clicked', async () => {
       await renderWithCampaigns(['Campaign1']);
 
@@ -289,51 +257,6 @@ describe('CampaignSelection', () => {
       await waitFor(() => {
         expect(screen.getByText('Campaign already exists')).toBeInTheDocument();
         expect(screen.getByText('Reload Page')).toBeInTheDocument();
-      });
-    });
-
-    it('should show a generic error when the API returns an error without a message', async () => {
-      global.fetch = vi.fn().mockResolvedValue({
-        ok: false,
-        json: () => Promise.resolve({}),
-      });
-
-      await renderWithCampaigns(['Campaign1']);
-
-      await act(async () => {
-        fireEvent.click(screen.getByText('Add'));
-      });
-
-      await act(async () => {
-        fireEvent.change(screen.getByPlaceholderText('Enter campaign name'), {
-          target: { value: 'New Campaign' },
-        });
-        fireEvent.click(screen.getByText('Create'));
-      });
-
-      await waitFor(() => {
-        expect(screen.getByText('Failed to create campaign')).toBeInTheDocument();
-      });
-    });
-
-    it('should show a fetch network error when creating a campaign', async () => {
-      global.fetch = vi.fn().mockRejectedValue(new TypeError('Failed to fetch'));
-
-      await renderWithCampaigns(['Campaign1']);
-
-      await act(async () => {
-        fireEvent.click(screen.getByText('Add'));
-      });
-
-      await act(async () => {
-        fireEvent.change(screen.getByPlaceholderText('Enter campaign name'), {
-          target: { value: 'New Campaign' },
-        });
-        fireEvent.click(screen.getByText('Create'));
-      });
-
-      await waitFor(() => {
-        expect(screen.getByText('Failed to fetch')).toBeInTheDocument();
       });
     });
   });

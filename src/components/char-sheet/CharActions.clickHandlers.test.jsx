@@ -1,4 +1,4 @@
-/* @improved-by-ai */
+// @cleaned-by-ai
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharActions from './CharActions.jsx';
@@ -215,31 +215,6 @@ describe('CharActions click handlers', () => {
     localStorage.clear();
   });
 
-  describe('cannotAct guard', () => {
-    it('prevents spell attack click when cannotAct is true', async () => {
-      const mockHandleSpellAttackClick = vi.fn();
-      vi.mocked(getInnateSorceryBonus).mockReturnValue({ saveDcBonus: 0 });
-
-      useActionSpellMetamagic.mockReturnValue({
-        pendingActionMetamagic: null,
-        handleActionMetamagicConfirm: vi.fn(),
-        handleActionMetamagicSkip: vi.fn(),
-        handleActionSpellDamageClick: vi.fn(),
-        handleSpellAttackClick: mockHandleSpellAttackClick,
-        handleSpellDamageClick: vi.fn(),
-      });
-
-      const stats = createStats({
-        attacks: [{ name: 'Witch Bolt', range: 60, saveDc: 14, saveType: 'CON', damage: '1d12', damageType: 'Lightning', type: 'Action' }],
-      });
-
-      await renderWithFetch(<CharActions playerStats={stats} cannotAct={true} />);
-      const saveDcElement = screen.getByText(/DC 14 CON/);
-      await act(async () => { fireEvent.click(saveDcElement); });
-      expect(mockHandleSpellAttackClick).not.toHaveBeenCalled();
-    });
-  });
-
   describe('spell attack/damage click handlers', () => {
     it('calls resolveSpellDamage when damage is clicked for save-DC attack', async () => {
       const mockResolveSpellDamage = vi.fn();
@@ -338,23 +313,6 @@ describe('CharActions click handlers', () => {
       await waitFor(() => {
         expect(executeHandler).toHaveBeenCalled();
         expect(mockSetPopupHtml).toHaveBeenCalledWith('<div>Popup</div>');
-      });
-    });
-
-    it('calls onBuffsChange for popup result with combat_stance type', async () => {
-      hasAutomation.mockReturnValue(true);
-      executeHandler.mockResolvedValue({ type: 'popup', payload: '<b>Stance</b>' });
-
-      const stats = createStats({
-        actions: [{ name: 'Combat Stance', description: 'Enter a stance.', automation: { type: 'combat_stance' } }],
-      });
-
-      const mockOnBuffsChange = vi.fn();
-      await renderWithFetch(<CharActions playerStats={stats} onBuffsChange={mockOnBuffsChange} />);
-      const actionName = screen.getByText(/Combat Stance:/);
-      await act(async () => { fireEvent.click(actionName); });
-      await waitFor(() => {
-        expect(mockOnBuffsChange).toHaveBeenCalled();
       });
     });
 

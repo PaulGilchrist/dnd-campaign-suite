@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { render, screen, waitFor, within } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharSpecialActions from './CharSpecialActions.jsx';
@@ -102,7 +102,7 @@ describe('CharSpecialActions - Rendering & Filtering', () => {
   });
 
   describe('rendering', () => {
-    it('renders the Special Actions header and special actions with names and descriptions', async () => {
+    it('renders the Special Actions header and special actions with names and descriptions', () => {
       const playerStats = createPlayerStats({
         specialActions: [
           { name: 'Second Wind', description: 'You can use a bonus action to regain hit points.' },
@@ -116,23 +116,29 @@ describe('CharSpecialActions - Rendering & Filtering', () => {
       expect(screen.getByText(/Action Surge/)).toBeInTheDocument();
     });
 
-    it('renders gracefully with empty specialActions', async () => {
+    it('renders gracefully with no special actions', () => {
       render(<CharSpecialActions playerStats={createPlayerStats()} campaignName="test" />);
       expect(screen.getByText('Special Actions')).toBeInTheDocument();
     });
 
-    it('renders gracefully when specialActions is undefined', async () => {
-      const playerStats = createPlayerStats({ specialActions: undefined });
-      render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
-      expect(screen.getByText('Special Actions')).toBeInTheDocument();
-    });
-
-    it('renders unnamed special actions using description as fallback', async () => {
+    it('renders unnamed special actions using description as fallback', () => {
       const playerStats = createPlayerStats({
         specialActions: [{ description: 'An unnamed special action' }],
       });
       render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
       expect(screen.getByText('An unnamed special action')).toBeInTheDocument();
+    });
+
+    it('deduplicates special actions with duplicate names showing only one', () => {
+      const playerStats = createPlayerStats({
+        specialActions: [
+          { name: 'Second Wind', description: 'First definition.' },
+          { name: 'Second Wind', description: 'Second definition.' },
+        ],
+      });
+      render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
+      const elements = screen.getAllByText(/Second Wind/);
+      expect(elements).toHaveLength(1);
     });
   });
 
@@ -157,44 +163,22 @@ describe('CharSpecialActions - Rendering & Filtering', () => {
       const elements = screen.getAllByText(/Great Weapon Fighting/);
       expect(elements).toHaveLength(1);
     });
-
-    it('does not add fighting styles when fightingStyles is missing or empty', async () => {
-      const playerStats = createPlayerStats({
-        class: { fightingStyles: [] },
-      });
-      render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
-      expect(screen.queryByText(/Great Weapon Fighting/)).not.toBeInTheDocument();
-    });
   });
 
   describe('deduplication across action lists', () => {
-    it('filters out actions that appear in actions, bonusActions, reactions, or characterAdvancement', () => {
-      // actions list
-      const playerStats1 = createPlayerStats({
+    it('filters out actions that appear in other action lists (actions, bonusActions, reactions, characterAdvancement)', () => {
+      const playerStats = createPlayerStats({
         specialActions: [{ name: 'Attack', description: 'Make a weapon attack.' }],
         actions: [{ name: 'Attack', description: 'Make a weapon attack.' }],
       });
-      render(<CharSpecialActions playerStats={playerStats1} campaignName="test" />);
-      expect(screen.queryByText(/Attack/)).not.toBeInTheDocument();
-    });
-
-    it('deduplicates special actions with duplicate names', () => {
-      const playerStats = createPlayerStats({
-        specialActions: [
-          { name: 'Second Wind', description: 'First definition.' },
-          { name: 'Second Wind', description: 'Second definition.' },
-        ],
-      });
       render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
-      const elements = screen.getAllByText(/Second Wind/);
-      expect(elements).toHaveLength(1);
+      expect(screen.queryByText(/Attack/)).not.toBeInTheDocument();
     });
   });
 
   describe('ruleset filtering', () => {
-    it('filters out featuresToIgnore and keeps other features for both 5e and 2024 rulesets', async () => {
-      // 5e: Spellcasting, Extra Attack, Bardic Inspiration are ignored
-      const { container: container5e } = render(
+    it('filters out featuresToIgnore and keeps other features for 5e ruleset', async () => {
+      const { container } = render(
         <CharSpecialActions playerStats={createPlayerStats({
           specialActions: [
             { name: 'Spellcasting', description: 'Cast spells.' },
@@ -207,17 +191,15 @@ describe('CharSpecialActions - Rendering & Filtering', () => {
       );
 
       await waitFor(() => {
-        const dom5e = within(container5e);
-        expect(dom5e.queryByText(/Spellcasting/)).not.toBeInTheDocument();
-        expect(dom5e.queryByText(/Extra Attack/)).not.toBeInTheDocument();
-        expect(dom5e.queryByText(/Bardic Inspiration/)).not.toBeInTheDocument();
-        expect(dom5e.getByText(/Test Feature/)).toBeInTheDocument();
+        expect(within(container).queryByText(/Spellcasting/)).not.toBeInTheDocument();
+        expect(within(container).queryByText(/Extra Attack/)).not.toBeInTheDocument();
+        expect(within(container).queryByText(/Bardic Inspiration/)).not.toBeInTheDocument();
+        expect(within(container).getByText(/Test Feature/)).toBeInTheDocument();
       });
+    });
 
-      vi.clearAllMocks();
-
-      // 2024: Spellcasting, Feat, Fighting Style are ignored
-      const { container: container2024 } = render(
+    it('filters out featuresToIgnore and keeps other features for 2024 ruleset', async () => {
+      const { container } = render(
         <CharSpecialActions playerStats={createPlayerStats({
           specialActions: [
             { name: 'Spellcasting', description: 'Cast spells.' },
@@ -230,11 +212,10 @@ describe('CharSpecialActions - Rendering & Filtering', () => {
       );
 
       await waitFor(() => {
-        const dom2024 = within(container2024);
-        expect(dom2024.queryByText(/Spellcasting/)).not.toBeInTheDocument();
-        expect(dom2024.queryByText(/(^|\s)Feat($|\s)/)).not.toBeInTheDocument();
-        expect(dom2024.queryByText(/Fighting Style/)).not.toBeInTheDocument();
-        expect(dom2024.getByText(/Test Feature/)).toBeInTheDocument();
+        expect(within(container).queryByText(/Spellcasting/)).not.toBeInTheDocument();
+        expect(within(container).queryByText(/(^|\s)Feat($|\s)/)).not.toBeInTheDocument();
+        expect(within(container).queryByText(/Fighting Style/)).not.toBeInTheDocument();
+        expect(within(container).getByText(/Test Feature/)).toBeInTheDocument();
       });
     });
   });

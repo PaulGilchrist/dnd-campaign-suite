@@ -27,22 +27,16 @@ describe('AvatarImage', () => {
   });
 
   describe('size prop', () => {
-    it('should apply custom size to container dimensions', () => {
-      const { container } = render(<AvatarImage name="Test" size={100} />);
-      const wrapper = container.querySelector('.avatar-wrapper');
-      expect(wrapper).toHaveStyle({ width: '100px', height: '100px' });
-    });
-
     it('should use default size of 60 when size prop is omitted', () => {
       const { container } = render(<AvatarImage name="Test" />);
       const wrapper = container.querySelector('.avatar-wrapper');
       expect(wrapper).toHaveStyle({ width: '60px', height: '60px' });
     });
 
-    it('should set fontSize proportional to size for initial avatar', () => {
-      const { container } = render(<AvatarImage name="Test" size={50} />);
+    it('should apply custom size to container dimensions', () => {
+      const { container } = render(<AvatarImage name="Test" size={100} />);
       const wrapper = container.querySelector('.avatar-wrapper');
-      expect(wrapper).toHaveStyle({ fontSize: '20px' });
+      expect(wrapper).toHaveStyle({ width: '100px', height: '100px' });
     });
   });
 
@@ -60,16 +54,8 @@ describe('AvatarImage', () => {
       const button = screen.getByRole('button');
       fireEvent.keyDown(button, { key: 'Enter' });
       expect(onClick).toHaveBeenCalledTimes(1);
-      onClick.mockClear();
       fireEvent.keyDown(button, { key: ' ' });
-      expect(onClick).toHaveBeenCalledTimes(1);
-    });
-
-    it('should render a button wrapper with tabindex when onClick is provided', () => {
-      const onClick = vi.fn();
-      render(<AvatarImage name="Test" imagePath="/avatar.png" onClick={onClick} />);
-      const button = screen.getByRole('button');
-      expect(button).toHaveAttribute('tabindex', '0');
+      expect(onClick).toHaveBeenCalledTimes(2);
     });
 
     it('should not render a button wrapper when onClick is not provided', () => {

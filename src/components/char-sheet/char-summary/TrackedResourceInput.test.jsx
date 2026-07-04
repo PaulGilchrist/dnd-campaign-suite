@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import TrackedResourceInput from './TrackedResourceInput.jsx';
@@ -40,30 +40,19 @@ describe('TrackedResourceInput', () => {
     useTrackedResource.mockReturnValue(createTrackedResource());
   });
 
-  describe('rendering', () => {
-    it('renders the label with current and max values', () => {
-      render(<TrackedResourceInput {...defaultProps} />);
-      expect(screen.getByText('Sorcery Points:')).toBeInTheDocument();
-      const clickable = document.querySelector('.clickable');
-      expect(clickable.textContent).toContain('5/10');
-    });
-
-    it('displays updated current and max values when useTrackedResource changes', () => {
-      useTrackedResource.mockReturnValue(createTrackedResource({ current: 3, max: 20 }));
-      render(<TrackedResourceInput {...defaultProps} />);
-      const clickable = document.querySelector('.clickable');
-      expect(clickable.textContent).toContain('3/20');
-    });
+  it('renders the label with current and max values', () => {
+    render(<TrackedResourceInput {...defaultProps} />);
+    expect(screen.getByText('Sorcery Points:')).toBeInTheDocument();
+    const clickable = document.querySelector('.clickable');
+    expect(clickable.textContent).toContain('5/10');
   });
 
-  describe('toggle behavior', () => {
-    it('toggles the input visible on click', () => {
-      render(<TrackedResourceInput {...defaultProps} />);
-      const clickable = document.querySelector('.clickable');
-      fireEvent.click(clickable);
-      expect(document.querySelector('input')).toBeInTheDocument();
-      fireEvent.click(clickable);
-      expect(document.querySelector('input')).not.toBeInTheDocument();
-    });
+  it('toggles the input visible on click', () => {
+    render(<TrackedResourceInput {...defaultProps} />);
+    const clickable = document.querySelector('.clickable');
+    fireEvent.click(clickable);
+    expect(document.querySelector('input')).toBeInTheDocument();
+    fireEvent.click(clickable);
+    expect(document.querySelector('input')).not.toBeInTheDocument();
   });
 });

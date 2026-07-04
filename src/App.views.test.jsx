@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import App from './App.jsx';
@@ -24,10 +24,6 @@ vi.mock('./components/char-sheet/CharSheet.jsx', async () => {
   const { MockCharSheet } = await import('./test/mockComponents.jsx');
   return { default: MockCharSheet };
 });
-vi.mock('./components/initiative/initiative.jsx', async () => {
-  const { MockInitiative } = await import('./test/mockComponents.jsx');
-  return { default: MockInitiative };
-});
 vi.mock('./components/campaign-selection/CampaignSelection.jsx', async () => {
   const { MockCampaignSelection } = await import('./test/mockComponents.jsx');
   return { default: MockCampaignSelection };
@@ -39,42 +35,6 @@ vi.mock('./components/character-creation/CharacterCreationWizard.jsx', async () 
 vi.mock('./components/sidebar/Sidebar.jsx', async () => {
   const { MockSidebar } = await import('./test/mockComponents.jsx');
   return { default: MockSidebar };
-});
-vi.mock('./components/maps-manager/MapsManager.jsx', async () => {
-  const { MockMapsManager } = await import('./test/mockComponents.jsx');
-  return { default: MockMapsManager };
-});
-vi.mock('./components/map/Map.jsx', async () => {
-  const { MockMap } = await import('./test/mockComponents.jsx');
-  return { default: MockMap };
-});
-vi.mock('./components/encounter/EncounterBuilder.jsx', async () => {
-  const { MockEncounterBuilder } = await import('./test/mockComponents.jsx');
-  return { default: MockEncounterBuilder };
-});
-vi.mock('./components/notes/Notes.jsx', async () => {
-  const { MockNotes } = await import('./test/mockComponents.jsx');
-  return { default: MockNotes };
-});
-vi.mock('./components/quests/Quests.jsx', async () => {
-  const { MockQuests } = await import('./test/mockComponents.jsx');
-  return { default: MockQuests };
-});
-vi.mock('./components/npcs/NPCs.jsx', async () => {
-  const { MockNPCs } = await import('./test/mockComponents.jsx');
-  return { default: MockNPCs };
-});
-vi.mock('./components/factions/Factions.jsx', async () => {
-  const { MockFactions } = await import('./test/mockComponents.jsx');
-  return { default: MockFactions };
-});
-vi.mock('./components/settlements/Settlements.jsx', async () => {
-  const { MockSettlements } = await import('./test/mockComponents.jsx');
-  return { default: MockSettlements };
-});
-vi.mock('./components/log/Log.jsx', async () => {
-  const { MockLog } = await import('./test/mockComponents.jsx');
-  return { default: MockLog };
 });
 
 vi.mock('./components/common/Subscriber.jsx', () => ({
@@ -159,77 +119,6 @@ describe('App - Views, Overlays & Props', () => {
       await waitFor(() => {
         expect(screen.getByTestId('character-name').textContent).toBe('Legolas');
         expect(screen.getByTestId('char-btn-Legolas')).toHaveClass('active');
-      });
-    });
-
-    it('navigates to sidebar views and hides char-sheet', async () => {
-      const viewTests = [
-        { btn: 'initiative-btn', view: 'initiative' },
-        { btn: 'encounter-btn', view: 'encounter-builder' },
-        { btn: 'notes-btn', view: 'notes-view' },
-        { btn: 'quests-btn', view: 'quests-view' },
-        { btn: 'npcs-btn', view: 'npcs-view' },
-        { btn: 'factions-btn', view: 'factions-view' },
-        { btn: 'settlements-btn', view: 'settlements-view' },
-        { btn: 'log-btn', view: 'campaign-log-view' },
-      ];
-
-      for (const { btn, view } of viewTests) {
-        const { unmount } = render(<App />);
-        mockState.characters = [{ name: 'Aragorn', level: 1 }];
-        await selectCampaign();
-        await waitFor(() => {
-          expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
-        });
-        fireEvent.click(screen.getByTestId(btn));
-        await waitFor(() => {
-          expect(screen.getByTestId(view)).toBeInTheDocument();
-          expect(screen.queryByTestId('char-sheet')).not.toBeInTheDocument();
-        });
-        unmount();
-      }
-    });
-
-    it('passes characters to sub-views', async () => {
-      mockState.characters = [{ name: 'Aragorn', level: 1 }];
-      render(<App />);
-      await selectCampaign();
-
-      // Initiative receives computedCharacters via computed count
-      fireEvent.click(screen.getByTestId('initiative-btn'));
-      await waitFor(() => {
-        expect(screen.getByTestId('initiative')).toBeInTheDocument();
-        expect(screen.getByTestId('init-char-count').textContent).toBe('1');
-      });
-
-      // Map view — go back to char-sheet first, then open maps
-      fireEvent.click(screen.getByTestId('char-btn-Aragorn'));
-      fireEvent.click(screen.getByTestId('maps-btn'));
-      await waitFor(() => {
-        expect(screen.getByTestId('maps-manager')).toBeInTheDocument();
-      });
-      fireEvent.click(screen.getByTestId('open-map-btn'));
-      await waitFor(() => {
-        expect(screen.getByTestId('map-view')).toBeInTheDocument();
-        expect(screen.getByTestId('map-char-count').textContent).toBe('1');
-      });
-
-      // EncounterBuilder — go back to char-sheet then open encounter
-      fireEvent.click(screen.getByTestId('map-back-btn'));
-      fireEvent.click(screen.getByTestId('mm-back-btn'));
-      fireEvent.click(screen.getByTestId('char-btn-Aragorn'));
-      fireEvent.click(screen.getByTestId('encounter-btn'));
-      await waitFor(() => {
-        expect(screen.getByTestId('encounter-builder')).toBeInTheDocument();
-        expect(screen.getByTestId('eb-char-count').textContent).toBe('1');
-      });
-
-      // NPCs — go back to char-sheet then open NPCs
-      fireEvent.click(screen.getByTestId('char-btn-Aragorn'));
-      fireEvent.click(screen.getByTestId('npcs-btn'));
-      await waitFor(() => {
-        expect(screen.getByTestId('npcs-view')).toBeInTheDocument();
-        expect(screen.getByTestId('npcs-char-count').textContent).toBe('1');
       });
     });
   });

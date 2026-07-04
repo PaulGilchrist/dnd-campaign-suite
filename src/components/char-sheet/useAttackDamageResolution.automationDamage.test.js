@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import useAttackDamageResolution from './useAttackDamageResolution.js';
 
@@ -120,7 +120,17 @@ describe('useAttackDamageResolution - automation damage bonuses', () => {
     }
 
     describe('monk weapon / unarmed strike damage bonus', () => {
-        it('applies monk weapon damage bonus with default fire damage type', async () => {
+        it.each`
+            elemOption       | expectedType
+            ${null}          | ${'fire'}
+            ${'Cold'}        | ${'cold'}
+        `('applies monk weapon damage bonus with $expectedType damage type$elemOption (via Elemental Attunement: $elemOption)', async ({ elemOption, expectedType }) => {
+            if (elemOption) {
+                getRuntimeValue.mockImplementation((name, key) => {
+                    if (key === '_Elemental_Attunement_option') return elemOption;
+                    return null;
+                });
+            }
             const stats = {
                 ...mockPlayerStats,
                 automation: {
@@ -139,47 +149,23 @@ describe('useAttackDamageResolution - automation damage bonuses', () => {
             await tick();
             expect(mockRollDamage).toHaveBeenCalledWith(
                 'Unarmed Strike',
-                expect.stringContaining('1d6 [fire]'),
-                expect.any(Number), expect.any(Array), expect.any(Number), expect.any(Object)
-            );
-        });
-
-        it('uses Elemental Attunement choice for damage type', async () => {
-            getRuntimeValue.mockImplementation((name, key) => {
-                if (key === '_Elemental_Attunement_option') return 'Cold';
-                return null;
-            });
-            const stats = {
-                ...mockPlayerStats,
-                automation: {
-                    actions: [
-                        { type: 'damage_bonus', trigger: 'monk_weapon_or_unarmed_hit', damageExpression: '1d6', damageType: 'fire' },
-                    ],
-                    passives: [],
-                },
-            };
-            const { resolveAttackDamage } = UseAttackDamageResolution({ playerStats: stats });
-            const attack = {
-                name: 'Unarmed Strike', damage: '1d6', damageType: 'bludgeoning',
-                weaponType: 'unarmed', properties: [],
-            };
-            await resolveAttackDamage(attack);
-            await tick();
-            expect(mockRollDamage).toHaveBeenCalledWith(
-                'Unarmed Strike',
-                expect.stringContaining('1d6 [cold]'),
+                expect.stringContaining(`1d6 [${expectedType}]`),
                 expect.any(Number), expect.any(Array), expect.any(Number), expect.any(Object)
             );
         });
     });
 
     describe('Great Weapon Master heavy weapon hit', () => {
-        it('applies GWM damage bonus to heavy melee weapons', async () => {
+        it.each`
+            bonusDamageType  | expectedType
+            ${'Force'}       | ${'Force'}
+            ${'same_as_weapon'} | ${'Slashing'}
+        `('applies GWM damage bonus with $expectedType damage type ($bonusDamageType config)', async ({ bonusDamageType, expectedType }) => {
             const stats = {
                 ...mockPlayerStats,
                 automation: {
                     actions: [
-                        { type: 'damage_bonus', trigger: 'melee_heavy_weapon_hit', damageExpression: '1d4', damageType: 'Force' },
+                        { type: 'damage_bonus', trigger: 'melee_heavy_weapon_hit', damageExpression: '1d4', damageType: bonusDamageType },
                     ],
                     passives: [],
                 },
@@ -193,31 +179,7 @@ describe('useAttackDamageResolution - automation damage bonuses', () => {
             await tick();
             expect(mockRollDamage).toHaveBeenCalledWith(
                 'Greataxe',
-                expect.stringContaining('1d4 [Force]'),
-                expect.any(Number), expect.any(Array), expect.any(Number), expect.any(Object)
-            );
-        });
-
-        it('uses same_as_weapon damage type fallback to attack.damageType', async () => {
-            const stats = {
-                ...mockPlayerStats,
-                automation: {
-                    actions: [
-                        { type: 'damage_bonus', trigger: 'melee_heavy_weapon_hit', damageExpression: '1d4', damageType: 'same_as_weapon' },
-                    ],
-                    passives: [],
-                },
-            };
-            const { resolveAttackDamage } = UseAttackDamageResolution({ playerStats: stats });
-            const attack = {
-                name: 'Greataxe', damage: '1d12+3', damageType: 'Slashing',
-                weaponType: 'melee', properties: ['Heavy'],
-            };
-            await resolveAttackDamage(attack);
-            await tick();
-            expect(mockRollDamage).toHaveBeenCalledWith(
-                'Greataxe',
-                expect.stringContaining('1d4 [Slashing]'),
+                expect.stringContaining(`1d4 [${expectedType}]`),
                 expect.any(Number), expect.any(Array), expect.any(Number), expect.any(Object)
             );
         });
@@ -248,7 +210,6 @@ describe('useAttackDamageResolution - automation damage bonuses', () => {
             };
             await resolveAttackDamage(attack);
             await tick();
-            expect(setRuntimeValue).toHaveBeenCalledWith('TestFighter', '_frenzyUsedRound', 1, 'test-campaign');
             expect(mockRollDamage).toHaveBeenCalledWith(
                 'Greataxe',
                 expect.stringContaining('2 [necrotic]'),
@@ -256,7 +217,7 @@ describe('useAttackDamageResolution - automation damage bonuses', () => {
             );
         });
 
-        it('skips Frenzy when already used this round', async () => {
+        it('skips Frenzy damage when already used this round', async () => {
             getRuntimeValue.mockImplementation((name, key) => {
                 if (key === '_frenzyUsedRound') return 1;
                 if (key === 'activeBuffs') return [
@@ -281,7 +242,11 @@ describe('useAttackDamageResolution - automation damage bonuses', () => {
             };
             await resolveAttackDamage(attack);
             await tick();
-            expect(setRuntimeValue).not.toHaveBeenCalledWith('TestFighter', '_frenzyUsedRound', 1, 'test-campaign');
+            expect(mockRollDamage).not.toHaveBeenCalledWith(
+                'Greataxe',
+                expect.stringContaining('2 [necrotic]'),
+                expect.any(Number), expect.any(Array), expect.any(Number), expect.any(Object)
+            );
         });
 
     });

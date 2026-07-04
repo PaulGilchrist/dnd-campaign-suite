@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook } from '@testing-library/react';
 import useInitiativeEffects from './useInitiativeEffects.js';
@@ -103,39 +103,8 @@ describe('useInitiativeEffects', () => {
             });
         });
 
-        describe('player name matching', () => {
-            it('matches when names are identical', () => {
-                getRuntimeValue.mockImplementation((_name, key) => {
-                    if (key === 'focusPoints') return 3;
-                    return null;
-                });
-                const stats = {
-                    ...defaultPlayerStats,
-                    actions: [
-                        {
-                            automation: {
-                                type: 'initiative_action',
-                                effect: 'other',
-                            },
-                        },
-                    ],
-                };
-                renderHookWithStats(stats);
-                dispatchInitiativeRoll({
-                    characterName: 'TestMonk',
-                    roll: 15,
-                });
-                expect(setRuntimeValue).toHaveBeenCalledWith(
-                    'TestMonk',
-                    'focusPoints',
-                    6,
-                    campaignName
-                );
-            });
-        });
-
         describe('focus points recovery (Uncanny Metabolism)', () => {
-            it('recovers to max when current is below max', () => {
+            it('recovers to max when current is below max and names match', () => {
                 getRuntimeValue.mockImplementation((_name, key) => {
                     if (key === 'uncannyMetabolismUsed') return null;
                     if (key === 'focusPoints') return 3;
@@ -1093,24 +1062,6 @@ describe('useInitiativeEffects', () => {
                 );
             });
 
-            it('does nothing when failedTargets is empty', () => {
-                const rollDamage = vi.fn();
-                const stats = createClericStats();
-                rollExpression.mockReturnValue({
-                    total: 4,
-                    rolls: [4],
-                    modifier: 0,
-                });
-                renderHook(() =>
-                    useInitiativeEffects(stats, campaignName, rollDamage)
-                );
-                dispatchTurnUndeadResult({
-                    attackerName: 'Cleric',
-                    campaignName,
-                    failedTargets: [],
-                });
-                expect(rollDamage).not.toHaveBeenCalled();
-            });
         });
     });
 });

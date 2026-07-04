@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
@@ -139,15 +139,6 @@ function renderWithHaste(stats, props = {}) {
   return render(<CharActions playerStats={stats} {...props} />, props.wrapper ? { wrapper: props.wrapper } : undefined);
 }
 
-function renderWithHasteUsed(stats, props = {}) {
-  getRuntimeValue.mockImplementation((_name, key) => {
-    if (key === 'activeBuffs') return [{ effect: 'haste', name: 'Haste' }];
-    if (key === 'hasteExtraActionUsed') return true;
-    return null;
-  });
-  return render(<CharActions playerStats={stats} {...props} />, props.wrapper ? { wrapper: props.wrapper } : undefined);
-}
-
 function renderWithDiceRollContext(stats, props = {}) {
   const mockSetPopupHtml = vi.fn();
   const wrapper = ({ children }) => (
@@ -173,40 +164,48 @@ describe('CharActions haste extra action', () => {
       expect(screen.queryByText('Haste Extra Action')).not.toBeInTheDocument();
     });
 
-    it('hides the section when activeBuffs contains non-haste buffs', async () => {
-      getRuntimeValue.mockImplementation((_name, key) => {
-        if (key === 'activeBuffs') return [{ effect: 'invisibility', name: 'Invisibility' }];
-        return null;
-      });
-      await act(async () => { render(<CharActions playerStats={createStats()} />); });
-      expect(screen.queryByText('Haste Extra Action')).not.toBeInTheDocument();
-    });
-
     it('shows the section when haste buff is active', async () => {
       await act(async () => { renderWithHaste(createStats()); });
       expect(screen.getByText('Haste Extra Action')).toBeInTheDocument();
     });
   });
 
-  describe('action buttons', () => {
-    it('renders all five haste actions with correct types', async () => {
-      await act(async () => { renderWithHaste(createStats()); });
-      expect(screen.getByText('Attack')).toBeInTheDocument();
-      expect(screen.getByText('Dash')).toBeInTheDocument();
-      expect(screen.getByText('Disengage')).toBeInTheDocument();
-      expect(screen.getByText('Hide')).toBeInTheDocument();
-      expect(screen.getByText('Use an Object')).toBeInTheDocument();
-      expect(screen.getByText('Melee/Ranged')).toBeInTheDocument();
-      expect(screen.getAllByText('Special').length).toBe(4);
-    });
-  });
-
-  describe('disabled state when haste already used', () => {
-    it('shows the disabled class on action buttons', async () => {
-      await act(async () => { renderWithHasteUsed(createStats()); });
+  describe('action click behavior', () => {
+    it('marks haste as used and shows popup for Attack click', async () => {
+      const { mockSetPopupHtml } = renderWithDiceRollContext(createStats());
 
       const attackBtn = screen.getByText('Attack');
-      expect(attackBtn).toHaveClass('disabled-attack');
+      await act(async () => { fireEvent.click(attackBtn); });
+
+      expect(setRuntimeValue).toHaveBeenCalledWith('TestCharacter', 'hasteExtraActionUsed', true, undefined);
+      expect(mockSetPopupHtml).toHaveBeenCalledWith({
+        type: 'automation_info',
+        name: 'Haste',
+        description: 'Haste extra action: Attack (one weapon attack only).',
+      });
+    });
+
+    it('marks haste as used and shows popup for non-Attack action click', async () => {
+      const { mockSetPopupHtml } = renderWithDiceRollContext(createStats());
+
+      const btn = screen.getByText('Dash');
+      await act(async () => { fireEvent.click(btn); });
+
+      expect(setRuntimeValue).toHaveBeenCalledWith('TestCharacter', 'hasteExtraActionUsed', true, undefined);
+      expect(mockSetPopupHtml).toHaveBeenCalledWith({
+        type: 'automation_info',
+        name: 'Haste',
+        description: 'Haste extra action: Dash.',
+      });
+    });
+
+    it('does not show a popup when an action is clicked while cannotAct', async () => {
+      const { mockSetPopupHtml } = renderWithDiceRollContext(createStats(), { cannotAct: true });
+
+      const dashBtn = screen.getByText('Dash');
+      await act(async () => { fireEvent.click(dashBtn); });
+
+      expect(mockSetPopupHtml).not.toHaveBeenCalled();
     });
 
     it('does not trigger any action when haste was already used', async () => {
@@ -229,53 +228,7 @@ describe('CharActions haste extra action', () => {
       expect(mockSetPopupHtml).not.toHaveBeenCalled();
       expect(setRuntimeValue).not.toHaveBeenCalled();
     });
-  });
 
-  describe('cannotAct guard', () => {
-    it('does not show a popup when an action is clicked while cannotAct', async () => {
-      const { mockSetPopupHtml } = renderWithDiceRollContext(createStats(), { cannotAct: true });
-
-      const dashBtn = screen.getByText('Dash');
-      await act(async () => { fireEvent.click(dashBtn); });
-
-      expect(mockSetPopupHtml).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('action click behavior', () => {
-    it('marks haste as used and shows popup for Attack click', async () => {
-      const { mockSetPopupHtml } = renderWithDiceRollContext(createStats());
-
-      const attackBtn = screen.getByText('Attack');
-      await act(async () => { fireEvent.click(attackBtn); });
-
-      expect(setRuntimeValue).toHaveBeenCalledWith('TestCharacter', 'hasteExtraActionUsed', true, undefined);
-      expect(mockSetPopupHtml).toHaveBeenCalledWith({
-        type: 'automation_info',
-        name: 'Haste',
-        description: 'Haste extra action: Attack (one weapon attack only).',
-      });
-    });
-
-    it.each(['Dash', 'Disengage', 'Hide', 'Use an Object'])(
-      'marks haste as used and shows popup for %s click',
-      async (actionName) => {
-        const { mockSetPopupHtml } = renderWithDiceRollContext(createStats());
-
-        const btn = screen.getByText(actionName);
-        await act(async () => { fireEvent.click(btn); });
-
-        expect(setRuntimeValue).toHaveBeenCalledWith('TestCharacter', 'hasteExtraActionUsed', true, undefined);
-        expect(mockSetPopupHtml).toHaveBeenCalledWith({
-          type: 'automation_info',
-          name: 'Haste',
-          description: `Haste extra action: ${actionName}.`,
-        });
-      }
-    );
-  });
-
-  describe('campaignName propagation', () => {
     it('passes campaignName to setRuntimeValue when provided', async () => {
       const { mockSetPopupHtml } = renderWithDiceRollContext(createStats(), { campaignName: 'my-campaign' });
 

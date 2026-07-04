@@ -1,6 +1,6 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react';
 import CharCharacterAdvancement from './CharCharacterAdvancement.jsx';
 
 const { mockGetRuntimeValue, mockSetRuntimeValue } = vi.hoisted(() => ({
@@ -23,12 +23,12 @@ describe('CharCharacterAdvancement - Choice Options', () => {
     mockGetRuntimeValue.mockReturnValue(null);
   });
 
-  it('renders choice options when feature has automation with multiple options', () => {
-    const playerStats = {
+  it('renders choice options for string and object option arrays', () => {
+    const stringStats = {
       name: 'Test Character',
       characterAdvancement: [
         {
-          name: 'Choose Feature',
+          name: 'String Choices',
           description: 'A choice',
           automation: {
             options: ['Option A', 'Option B', 'Option C'],
@@ -36,19 +36,19 @@ describe('CharCharacterAdvancement - Choice Options', () => {
         },
       ],
     };
-    render(<CharCharacterAdvancement playerStats={playerStats} campaignName="test-campaign" />);
+    render(<CharCharacterAdvancement playerStats={stringStats} campaignName="test-campaign" />);
     expect(screen.getByText('Choice:')).toBeInTheDocument();
     expect(screen.getByText('Option A')).toBeInTheDocument();
     expect(screen.getByText('Option B')).toBeInTheDocument();
     expect(screen.getByText('Option C')).toBeInTheDocument();
-  });
 
-  it('renders choice options for object options', () => {
-    const playerStats = {
+    cleanup();
+
+    const objectStats = {
       name: 'Test Character',
       characterAdvancement: [
         {
-          name: 'Choose Feature',
+          name: 'Object Choices',
           description: 'A choice',
           automation: {
             options: [{ name: 'Opt 1' }, { name: 'Opt 2' }],
@@ -56,7 +56,7 @@ describe('CharCharacterAdvancement - Choice Options', () => {
         },
       ],
     };
-    render(<CharCharacterAdvancement playerStats={playerStats} campaignName="test-campaign" />);
+    render(<CharCharacterAdvancement playerStats={objectStats} campaignName="test-campaign" />);
     expect(screen.getByText('Choice:')).toBeInTheDocument();
     expect(screen.getByText('Opt 1')).toBeInTheDocument();
     expect(screen.getByText('Opt 2')).toBeInTheDocument();
@@ -76,8 +76,7 @@ describe('CharCharacterAdvancement - Choice Options', () => {
     expect(screen.queryByText('Choice:')).not.toBeInTheDocument();
   });
 
-  it('highlights the current runtime-selected option as bold and underlined', () => {
-    mockGetRuntimeValue.mockReturnValue('Option B');
+  it('highlights the selected option as bold and underlined, others with reduced opacity', () => {
     const playerStats = {
       name: 'Test Character',
       characterAdvancement: [
@@ -90,37 +89,22 @@ describe('CharCharacterAdvancement - Choice Options', () => {
         },
       ],
     };
-    render(<CharCharacterAdvancement playerStats={playerStats} campaignName="test-campaign" />);
-    const optionB = screen.getByText('Option B');
-    expect(optionB).toHaveStyle({ fontWeight: 'bold', textDecoration: 'underline' });
-    const optionA = screen.getByText('Option A');
-    expect(optionA).toHaveStyle({ opacity: '0.6' });
-  });
 
-  it('highlights the first option when no runtime value is stored', () => {
+    mockGetRuntimeValue.mockReturnValue('Option B');
+    render(<CharCharacterAdvancement playerStats={playerStats} campaignName="test-campaign" />);
+    expect(screen.getByText('Option B')).toHaveStyle({ fontWeight: 'bold', textDecoration: 'underline' });
+    expect(screen.getByText('Option A')).toHaveStyle({ opacity: '0.6' });
+
+    cleanup();
     mockGetRuntimeValue.mockReturnValue(null);
-    const playerStats = {
-      name: 'Test Character',
-      characterAdvancement: [
-        {
-          name: 'Choose Feature',
-          description: 'A choice',
-          automation: {
-            options: ['Option A', 'Option B'],
-          },
-        },
-      ],
-    };
     render(<CharCharacterAdvancement playerStats={playerStats} campaignName="test-campaign" />);
-    const optionA = screen.getByText('Option A');
-    expect(optionA).toHaveStyle({ fontWeight: 'bold', textDecoration: 'underline' });
-    const optionB = screen.getByText('Option B');
-    expect(optionB).toHaveStyle({ opacity: '0.6' });
+    expect(screen.getByText('Option A')).toHaveStyle({ fontWeight: 'bold', textDecoration: 'underline' });
+    expect(screen.getByText('Option B')).toHaveStyle({ opacity: '0.6' });
   });
 
-  it('calls setRuntimeValue and dispatches buffs-updated when an option is clicked', async () => {
-    const dispatchSpy = vi.spyOn(window, 'dispatchEvent');
-    const playerStats = {
+  it('calls setRuntimeValue and dispatches buffs-updated when an option is clicked (string and object options)', async () => {
+    const dispatchSpy1 = vi.spyOn(window, 'dispatchEvent');
+    const stringStats = {
       name: 'Test Character',
       characterAdvancement: [
         {
@@ -132,7 +116,7 @@ describe('CharCharacterAdvancement - Choice Options', () => {
         },
       ],
     };
-    render(<CharCharacterAdvancement playerStats={playerStats} campaignName="test-campaign" />);
+    render(<CharCharacterAdvancement playerStats={stringStats} campaignName="test-campaign" />);
     fireEvent.click(screen.getByText('Option B'));
     await waitFor(() => {
       expect(mockSetRuntimeValue).toHaveBeenCalledWith(
@@ -141,16 +125,15 @@ describe('CharCharacterAdvancement - Choice Options', () => {
         'Option B',
         'test-campaign'
       );
+      expect(dispatchSpy1).toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'buffs-updated' })
+      );
     });
-    expect(dispatchSpy).toHaveBeenCalledWith(
-      expect.objectContaining({ type: 'buffs-updated' })
-    );
-    dispatchSpy.mockRestore();
-  });
+    dispatchSpy1.mockRestore();
+    cleanup();
 
-  it('calls setRuntimeValue with object option name when an object option is clicked', async () => {
-    const dispatchSpy = vi.spyOn(window, 'dispatchEvent');
-    const playerStats = {
+    const dispatchSpy2 = vi.spyOn(window, 'dispatchEvent');
+    const objectStats = {
       name: 'Test Character',
       characterAdvancement: [
         {
@@ -162,7 +145,7 @@ describe('CharCharacterAdvancement - Choice Options', () => {
         },
       ],
     };
-    render(<CharCharacterAdvancement playerStats={playerStats} campaignName="test-campaign" />);
+    render(<CharCharacterAdvancement playerStats={objectStats} campaignName="test-campaign" />);
     fireEvent.click(screen.getByText('Opt 2'));
     await waitFor(() => {
       expect(mockSetRuntimeValue).toHaveBeenCalledWith(
@@ -171,11 +154,11 @@ describe('CharCharacterAdvancement - Choice Options', () => {
         'Opt 2',
         'test-campaign'
       );
+      expect(dispatchSpy2).toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'buffs-updated' })
+      );
     });
-    expect(dispatchSpy).toHaveBeenCalledWith(
-      expect.objectContaining({ type: 'buffs-updated' })
-    );
-    dispatchSpy.mockRestore();
+    dispatchSpy2.mockRestore();
   });
 
   it('renders choice UI for multiple features with mixed automation', () => {

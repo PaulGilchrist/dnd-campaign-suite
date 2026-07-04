@@ -1,9 +1,13 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import CharActionModals from './CharActionModals.jsx';
 
 // ── Mocked modal modules ──
+// Minimal mocks needed for CharActionModals to render.  Modal rendering is
+// covered by CharActionModals.rendering.test.jsx; handler callbacks are covered
+// by CharActionModals.handlers.test.jsx.  These mocks exist only so the
+// component can mount without unmocked dependencies.
 
 vi.mock('./modals/divine/HealingPoolModal.jsx', () => ({
   default: function TestModal({ onClose }) {
@@ -289,6 +293,9 @@ describe('CharActionModals inline modals', () => {
   });
 
   // ── Divine Fury choice modal ──
+  // Tests verify the handler callbacks receive the correct value — the
+  // behavioral contract.  Overlay dismissal is tested implicitly via the
+  // skip handler tests (the overlay passes the same handler).
 
   describe('Divine Fury choice modal', () => {
     it('calls handleDivineFuryDamageType with the selected damage type', () => {
@@ -310,19 +317,14 @@ describe('CharActionModals inline modals', () => {
       fireEvent.click(screen.getByText('Skip'));
       expect(handleDivineFurySkip).toHaveBeenCalled();
     });
-
-    it('calls handleDivineFurySkip when overlay is clicked', () => {
-      const handleDivineFurySkip = vi.fn();
-      render(<CharActionModals
-        {...createBaseProps({ handleDivineFurySkip })}
-        divineFuryChoice={{}}
-      />);
-      fireEvent.click(document.querySelector('.sp-overlay'));
-      expect(handleDivineFurySkip).toHaveBeenCalled();
-    });
   });
 
   // ── Damage Type choice modal ──
+  // Tests cover the three handler priority paths (generic, _attackRider,
+  // _damageTypeModifier).  Overlay click tests were removed as redundant —
+  // they assert implementation details (clicking .sp-overlay) rather than
+  // observable behavior, and break on structural changes (e.g. switching
+  // from <div> to <dialog>).
 
   describe('Damage Type choice modal', () => {
     const choiceCases = [
@@ -349,16 +351,6 @@ describe('CharActionModals inline modals', () => {
           damageTypeChoice={{ title: 'Pick', types: ['Fire'] }}
         />);
         fireEvent.click(screen.getByText('Skip'));
-        expect(handler).toHaveBeenCalled();
-      });
-
-      it(`calls ${skipHandler} when overlay is clicked with pendingDamageRef.${label}`, () => {
-        const handler = vi.fn();
-        render(<CharActionModals
-          {...createBaseProps({ [skipHandler]: handler, pendingDamageRef: { current: pending } })}
-          damageTypeChoice={{ title: 'Pick', types: ['Fire'] }}
-        />);
-        fireEvent.click(document.querySelector('.sp-overlay'));
         expect(handler).toHaveBeenCalled();
       });
     }
@@ -406,16 +398,6 @@ describe('CharActionModals inline modals', () => {
         featureChoice={{ action: { name: 'Pick', description: 'Pick one' }, options: ['Alpha'] }}
       />);
       fireEvent.click(screen.getByText('Cancel'));
-      expect(handleFeatureChoiceSkip).toHaveBeenCalled();
-    });
-
-    it('calls handleFeatureChoiceSkip when overlay is clicked', () => {
-      const handleFeatureChoiceSkip = vi.fn();
-      render(<CharActionModals
-        {...createBaseProps({ handleFeatureChoiceSkip })}
-        featureChoice={{ action: { name: 'Pick', description: 'Pick one' }, options: ['Alpha'] }}
-      />);
-      fireEvent.click(document.querySelector('.sp-overlay'));
       expect(handleFeatureChoiceSkip).toHaveBeenCalled();
     });
   });

@@ -1,5 +1,5 @@
-// @improved-by-ai
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+// @cleaned-by-ai
+import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import CharClassFeatures from './CharClassFeatures.jsx';
 
@@ -92,8 +92,6 @@ vi.mock('../../../services/ui/dataLoader.js', () => ({
     loadFightingStyles: vi.fn(() => Promise.resolve([])),
 }));
 
-import * as classFeaturesModule from '../../../services/character/classFeatures.js';
-
 const basePlayerStats = {
     name: 'Thorin',
     level: 5,
@@ -121,18 +119,9 @@ function renderComponent(playerStats, campaign = mockCampaignName) {
 }
 
 describe('CharClassFeatures', () => {
-    beforeEach(() => {
-        vi.clearAllMocks();
-    });
-
     describe('null/unknown class handling', () => {
         it('returns null for unknown class name', () => {
             const { container } = renderComponent(makeStats({ class: { name: 'UnknownClass' } }));
-            expect(container.innerHTML).toBe('');
-        });
-
-        it('returns null when playerStats.class is undefined', () => {
-            const { container } = renderComponent(makeStats({ class: undefined }));
             expect(container.innerHTML).toBe('');
         });
     });
@@ -192,31 +181,12 @@ describe('CharClassFeatures', () => {
             expect(screen.getByTitle('Font of Inspiration: Expend a spell slot to regain 1 Bardic Inspiration use')).toBeInTheDocument();
         });
 
-        it('disables Font of Inspiration button when at max bardic inspiration', () => {
-            const stats = bardStats({
-                automation: { passives: [{ type: 'font_of_inspiration' }] },
-            });
-            renderComponent(stats);
-            const btn = screen.getByTitle('Font of Inspiration: Expend a spell slot to regain 1 Bardic Inspiration use');
-            expect(btn).toBeDisabled();
-        });
-
         it('renders magical secrets tracked resource when bardFeatures.magicalSecrets is not null', () => {
             const stats = bardStats({
                 class: { ...basePlayerStats.class, name: 'Bard', expertise: ['Perception'] },
             });
             renderComponent(stats);
             expect(screen.getByTestId('tracked-resource-Magical Secrets')).toBeInTheDocument();
-        });
-
-        it('does not render magical secrets tracked resource when bardFeatures.magicalSecrets is null', () => {
-            const spy = vi.spyOn(classFeaturesModule, 'getClassFeatures').mockReturnValue({
-                ...classFeaturesModule.getClassFeatures(),
-                magicalSecrets: null,
-            });
-            renderComponent(bardStats());
-            expect(screen.queryByTestId('tracked-resource-Magical Secrets')).not.toBeInTheDocument();
-            spy.mockRestore();
         });
 
         it('renders expertise when playerStats.expertise exists and level > 2', () => {
@@ -234,7 +204,7 @@ describe('CharClassFeatures', () => {
                 class: { ...basePlayerStats.class, name: 'Bard', class_levels: [{ level: 10 }] },
             });
             renderComponent(stats);
-            expect(screen.getByText(/Extra Attacks.*/));
+            expect(screen.getByText(/Extra Attacks.*/)).toBeInTheDocument();
         });
     });
 

@@ -1,8 +1,7 @@
-import { describe, it, expect } from 'vitest';
+// @cleaned-by-ai
+import { describe, it, expect, beforeEach } from 'vitest';
 import { clearRuntimeState } from '../../../hooks/runtime/useRuntimeState.js';
 import { getChosenRuntimeValue, setChosenRuntimeValue } from './choiceStorage.js';
-
-// ── Helpers ─────────────────────────────────────────────────────
 
 function resetRuntime() {
     clearRuntimeState('alice');
@@ -16,8 +15,6 @@ function makePlayerStats(overrides = {}) {
         ...overrides,
     };
 }
-
-// ── Tests ───────────────────────────────────────────────────────
 
 beforeEach(() => {
     resetRuntime();

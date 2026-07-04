@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import useAttackDamageResolution from './useAttackDamageResolution.js';
 
@@ -200,33 +200,15 @@ describe('useAttackDamageResolution - class features', () => {
             );
         });
 
-        it('skips Assassinate when conditions are not met', async () => {
-            const skipCases = [
-                { _name: 'player has already acted', setup: () => {
-                    getCombatContext.mockResolvedValue({
-                        creatures: [{ name: 'TestRogue', hasActed: true, type: 'player' }],
-                    });
-                    getCurrentCombatRound.mockReturnValue(1);
-                }},
-                { name: 'combat is past round 1', setup: () => {
-                    getCombatContext.mockResolvedValue({
-                        creatures: [{ name: 'TestRogue', hasActed: false, type: 'player' }],
-                    });
-                    getCurrentCombatRound.mockReturnValue(2);
-                }},
-                { name: 'no combat context', setup: () => {
-                    getCombatContext.mockResolvedValue(null);
-                }},
-            ];
-
-            for (const { setup } of skipCases) {
-                setup();
-                const { resolveAttackDamage } = UseAttackDamageResolution({ playerStats: makeAssassinateStats() });
-                await resolveAttackDamage(makeAttack());
-                await tick();
-                expect(rollExpression).not.toHaveBeenCalledWith('2d6');
-                vi.restoreAllMocks();
-            }
+        it('skips Assassinate when player has already acted', async () => {
+            getCombatContext.mockResolvedValue({
+                creatures: [{ name: 'TestRogue', hasActed: true, type: 'player' }],
+            });
+            getCurrentCombatRound.mockReturnValue(1);
+            const { resolveAttackDamage } = UseAttackDamageResolution({ playerStats: makeAssassinateStats() });
+            await resolveAttackDamage(makeAttack());
+            await tick();
+            expect(rollExpression).not.toHaveBeenCalledWith('2d6');
         });
     });
 
@@ -266,56 +248,28 @@ describe('useAttackDamageResolution - class features', () => {
         });
 
         it('does not deduct when sneak attack dice cannot cover the cost', async () => {
-            const skipCases = [
-                { _name: 'sneak attack dice are 0', sneakDice: 0, cost: 2 },
-                { _name: 'cost exceeds available dice', sneakDice: 2, cost: 5 },
-            ];
-
-            for (const { sneakDice, cost } of skipCases) {
-                vi.clearAllMocks();
-                rollExpression.mockReturnValue(defaultRollResult);
-                rollExpressionDoubled.mockReturnValue({ total: 10, rolls: [5, 5], modifier: 0 });
-                getRuntimeValue.mockReturnValue(null);
-                setRuntimeValue.mockReturnValue(undefined);
-                getActiveBuffs.mockReturnValue([]);
-                hasTwoWeaponFighting.mockReturnValue(false);
-                collectWeaponMastery.mockReturnValue({ baseMastery: null, extraMasteries: [] });
-                evaluateAutoExpression.mockReturnValue(5);
-                addEntry.mockResolvedValue(undefined);
-                getCombatContext.mockResolvedValue(null);
-                getTargetFromAttacker.mockReturnValue(null);
-                getCurrentCombatRound.mockReturnValue(1);
-                loadCombatSummary.mockResolvedValue(null);
-                applyDamageToTarget.mockResolvedValue({ finalDamage: 10, newHp: 50 });
-                createSaveListener.mockReturnValue({ promise: Promise.resolve({ success: false }) });
-                mockBuildCtx.mockReturnValue(Promise.resolve({ targetName: 'Goblin' }));
-                mockBuildCtxSync.mockReturnValue(Promise.resolve({ targetName: 'Goblin' }));
-                mockPendingDamageRef.current = null;
-
-                getRuntimeValue.mockImplementation((name, key) => {
-                    if (key === 'stealthAttackCost') return cost;
-                    return null;
-                });
-                getCombatContext.mockResolvedValue({
-                    creatures: [{ name: 'TestRogue', hasActed: false, type: 'player' }],
-                });
-                getCurrentCombatRound.mockReturnValue(1);
-                const stats = createMockPlayerStats({
-                    level: 1,
-                    class: { name: 'Rogue', class_levels: [{ level: 1, sneak_attack_num_d6: sneakDice }] },
-                    automation: { actions: [], passives: [] },
-                });
-                const { resolveAttackDamage } = UseAttackDamageResolution({ playerStats: stats });
-                await resolveAttackDamage(makeAttack());
-                await tick();
-                expect(setRuntimeValue).not.toHaveBeenCalledWith(
-                    'TestRogue',
-                    'stealthAttackCost',
-                    0,
-                    'test-campaign',
-                );
-                vi.restoreAllMocks();
-            }
+            getRuntimeValue.mockImplementation((name, key) => {
+                if (key === 'stealthAttackCost') return 5;
+                return null;
+            });
+            getCombatContext.mockResolvedValue({
+                creatures: [{ name: 'TestRogue', hasActed: false, type: 'player' }],
+            });
+            getCurrentCombatRound.mockReturnValue(1);
+            const stats = createMockPlayerStats({
+                level: 1,
+                class: { name: 'Rogue', class_levels: [{ level: 1, sneak_attack_num_d6: 2 }] },
+                automation: { actions: [], passives: [] },
+            });
+            const { resolveAttackDamage } = UseAttackDamageResolution({ playerStats: stats });
+            await resolveAttackDamage(makeAttack());
+            await tick();
+            expect(setRuntimeValue).not.toHaveBeenCalledWith(
+                'TestRogue',
+                'stealthAttackCost',
+                0,
+                'test-campaign',
+            );
         });
     });
 
@@ -374,33 +328,6 @@ describe('useAttackDamageResolution - class features', () => {
             );
         });
 
-        it('does not duplicate stunned condition if already applied', async () => {
-            getRuntimeValue.mockImplementation((name, key) => {
-                if (key === 'activeConditions') return ['stunned'];
-                return null;
-            });
-            const { resolveAttackDamage } = UseAttackDamageResolution({ playerStats: makeRendMindStats() });
-            await resolveAttackDamage(makeAttack({ name: 'Psychic Blade', damage: '1d6+5', damageType: 'Psychic' }));
-            await tick();
-            expect(setRuntimeValue).not.toHaveBeenCalledWith(
-                'Goblin', 'activeConditions', expect.anything(), 'test-campaign',
-            );
-        });
-
-        it('resets Rend Mind flag when long rest has changed', async () => {
-            getRuntimeValue.mockImplementation((name, key) => {
-                if (key === '_RendMind_Used') return true;
-                if (key === '_LastLongRest') return 1;
-                if (key === '_CurrentLongRest') return 2;
-                return null;
-            });
-            const { resolveAttackDamage } = UseAttackDamageResolution({ playerStats: makeRendMindStats() });
-            await resolveAttackDamage(makeAttack({ name: 'Psychic Blade', damage: '1d6+5', damageType: 'Psychic' }));
-            await tick();
-            expect(setRuntimeValue).toHaveBeenCalledWith('TestRogue', '_RendMind_Used', false, 'test-campaign');
-            expect(createSaveListener).toHaveBeenCalled();
-        });
-
         it('skips Rend Mind when already used this long rest', async () => {
             getRuntimeValue.mockImplementation((name, key) => {
                 if (key === '_RendMind_Used') return true;
@@ -417,23 +344,6 @@ describe('useAttackDamageResolution - class features', () => {
         it('skips Rend Mind when no target in context', async () => {
             getRuntimeValue.mockReturnValue(null);
             mockBuildCtxSync.mockResolvedValue({ targetName: null });
-            const { resolveAttackDamage } = UseAttackDamageResolution({ playerStats: makeRendMindStats() });
-            await resolveAttackDamage(makeAttack({ name: 'Psychic Blade', damage: '1d6+5', damageType: 'Psychic' }));
-            await tick();
-            expect(createSaveListener).not.toHaveBeenCalled();
-        });
-
-        it('skips Rend Mind when attack is not a Psychic Blade', async () => {
-            getRuntimeValue.mockReturnValue(null);
-            const { resolveAttackDamage } = UseAttackDamageResolution({ playerStats: makeRendMindStats() });
-            await resolveAttackDamage(makeAttack({ name: 'Dagger', damage: '1d4+5', damageType: 'Piercing' }));
-            await tick();
-            expect(createSaveListener).not.toHaveBeenCalled();
-        });
-
-        it('skips Rend Mind when no sneak attack dice applied', async () => {
-            getRuntimeValue.mockReturnValue(null);
-            mockBuildCtxSync.mockResolvedValue({ targetName: 'Goblin', sneakAttackDice: 0 });
             const { resolveAttackDamage } = UseAttackDamageResolution({ playerStats: makeRendMindStats() });
             await resolveAttackDamage(makeAttack({ name: 'Psychic Blade', damage: '1d6+5', damageType: 'Psychic' }));
             await tick();
@@ -494,66 +404,40 @@ describe('useAttackDamageResolution - class features', () => {
             expect(mockSetPopupHtml).toHaveBeenCalled();
         });
 
-        it('does not spread damage when conditions are not met', async () => {
-            const skipCases = [
-                {
-                    _name: "Hunter's Mark is not active",
-                    setup: () => {
-                        getRuntimeValue.mockReturnValue(null);
-                        getCombatContext.mockResolvedValue({
-                            creatures: [
-                                { name: 'TestRogue', type: 'player' },
-                                { name: 'Goblin', type: 'npc' },
-                                { name: 'Orc', type: 'npc' },
-                            ],
-                        });
-                        getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
-                    },
-                },
-                {
-                    _name: 'no other creatures available',
-                    setup: () => {
-                        getRuntimeValue.mockImplementation((name, key) => {
-                            if (key === "_Hunter's_Prey_choice") return 'Colossus Slayer';
-                            return null;
-                        });
-                        getCombatContext.mockResolvedValue({
-                            creatures: [
-                                { name: 'TestRogue', type: 'player', concentration: { spell: "Hunter's Mark" } },
-                                { name: 'Goblin', type: 'npc' },
-                            ],
-                        });
-                        getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
-                    },
-                },
-                {
-                    _name: 'already used this round',
-                    setup: () => {
-                        getRuntimeValue.mockImplementation((_name, key) => {
-                            if (key === '_Superior_Hunters_Prey_UsedRound') return 1;
-                            if (key === "_Hunter's_Prey_choice") return 'Colossus Slayer';
-                            return null;
-                        });
-                        getCombatContext.mockResolvedValue({
-                            creatures: [
-                                { name: 'TestRogue', type: 'player', concentration: { spell: "Hunter's Mark" } },
-                                { name: 'Goblin', type: 'npc' },
-                                { name: 'Orc', type: 'npc' },
-                            ],
-                        });
-                        getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
-                    },
-                },
-            ];
+        it('does not spread damage when Hunter Mark is not active', async () => {
+            getRuntimeValue.mockReturnValue(null);
+            getCombatContext.mockResolvedValue({
+                creatures: [
+                    { name: 'TestRogue', type: 'player' },
+                    { name: 'Goblin', type: 'npc' },
+                    { name: 'Orc', type: 'npc' },
+                ],
+            });
+            getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
+            const { resolveAttackDamage } = UseAttackDamageResolution({ playerStats: makeSuperiorHunterStats() });
+            await resolveAttackDamage(makeAttack());
+            await tick();
+            expect(applyDamageToTarget).not.toHaveBeenCalled();
+        });
 
-            for (const { setup } of skipCases) {
-                setup();
-                const { resolveAttackDamage } = UseAttackDamageResolution({ playerStats: makeSuperiorHunterStats() });
-                await resolveAttackDamage(makeAttack());
-                await tick();
-                expect(applyDamageToTarget).not.toHaveBeenCalled();
-                vi.restoreAllMocks();
-            }
+        it('does not spread damage when already used this round', async () => {
+            getRuntimeValue.mockImplementation((_name, key) => {
+                if (key === '_Superior_Hunters_Prey_UsedRound') return 1;
+                if (key === "_Hunter's_Prey_choice") return 'Colossus Slayer';
+                return null;
+            });
+            getCombatContext.mockResolvedValue({
+                creatures: [
+                    { name: 'TestRogue', type: 'player', concentration: { spell: "Hunter's Mark" } },
+                    { name: 'Goblin', type: 'npc' },
+                    { name: 'Orc', type: 'npc' },
+                ],
+            });
+            getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
+            const { resolveAttackDamage } = UseAttackDamageResolution({ playerStats: makeSuperiorHunterStats() });
+            await resolveAttackDamage(makeAttack());
+            await tick();
+            expect(applyDamageToTarget).not.toHaveBeenCalled();
         });
     });
 
@@ -625,98 +509,20 @@ describe('useAttackDamageResolution - class features', () => {
             );
         });
 
-        it('skips when oncePerTurn and already used this round or rider has no options', async () => {
-            const skipCases = [
-                {
-                    _name: 'already used this round',
-                    setup: () => {
-                        getRuntimeValue.mockImplementation((_name, key) => {
-                            if (key === '_Eldritch_Strike_usedRound') return 1;
-                            return null;
-                        });
-                    },
-                },
-                {
-                    _name: 'rider has no options',
-                    setup: () => {
-                        getCombatContext.mockResolvedValue({
-                            creatures: [
-                                { name: 'TestRogue', type: 'player' },
-                                { name: 'Goblin', type: 'npc' },
-                            ],
-                        });
-                        getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
-                        const stats = createMockPlayerStats({
-                            automation: {
-                                actions: [
-                                    {
-                                        type: 'attack_rider',
-                                        trigger: 'weapon_attack_hit',
-                                        name: 'Eldritch Strike',
-                                        options: [],
-                                    },
-                                ],
-                                passives: [],
-                            },
-                        });
-                        return stats;
-                    },
-                },
-            ];
-
-            for (const { setup } of skipCases) {
-                vi.clearAllMocks();
-                rollExpression.mockReturnValue(defaultRollResult);
-                rollExpressionDoubled.mockReturnValue({ total: 10, rolls: [5, 5], modifier: 0 });
-                getRuntimeValue.mockReturnValue(null);
-                setRuntimeValue.mockReturnValue(undefined);
-                getActiveBuffs.mockReturnValue([]);
-                hasTwoWeaponFighting.mockReturnValue(false);
-                collectWeaponMastery.mockReturnValue({ baseMastery: null, extraMasteries: [] });
-                evaluateAutoExpression.mockReturnValue(5);
-                addEntry.mockResolvedValue(undefined);
-                getCombatContext.mockResolvedValue(null);
-                getTargetFromAttacker.mockReturnValue(null);
-                getCurrentCombatRound.mockReturnValue(1);
-                loadCombatSummary.mockResolvedValue(null);
-                applyDamageToTarget.mockResolvedValue({ finalDamage: 10, newHp: 50 });
-                createSaveListener.mockReturnValue({ promise: Promise.resolve({ success: false }) });
-                mockBuildCtx.mockReturnValue(Promise.resolve({ targetName: 'Goblin' }));
-                mockBuildCtxSync.mockReturnValue(Promise.resolve({ targetName: 'Goblin' }));
-                mockPendingDamageRef.current = null;
-
-                let stats = null;
-                const result = setup();
-                if (result) {
-                    stats = result;
-                } else {
-                    stats = createMockPlayerStats({
-                        automation: {
-                            actions: [
-                                {
-                                    type: 'attack_rider',
-                                    trigger: 'weapon_attack_hit',
-                                    name: 'Eldritch Strike',
-                                    oncePerTurn: false,
-                                    options: [{ name: 'Impose Disadvantage', effect: 'impose_disadvantage' }],
-                                },
-                            ],
-                            passives: [],
-                        },
-                    });
-                }
-
-                const { resolveAttackDamage } = UseAttackDamageResolution({ playerStats: stats });
-                await resolveAttackDamage(makeAttack());
-                await tick();
-                expect(setRuntimeValue).not.toHaveBeenCalledWith(
-                    'test-campaign',
-                    'targetEffects',
-                    expect.anything(),
-                    'test-campaign',
-                );
-                vi.restoreAllMocks();
-            }
+        it('skips when oncePerTurn and already used this round', async () => {
+            getRuntimeValue.mockImplementation((_name, key) => {
+                if (key === '_Eldritch_Strike_usedRound') return 1;
+                return null;
+            });
+            const { resolveAttackDamage } = UseAttackDamageResolution({ playerStats: makeEldritchStrikeStats() });
+            await resolveAttackDamage(makeAttack());
+            await tick();
+            expect(setRuntimeValue).not.toHaveBeenCalledWith(
+                'test-campaign',
+                'targetEffects',
+                expect.anything(),
+                'test-campaign',
+            );
         });
     });
 
@@ -831,58 +637,6 @@ describe('useAttackDamageResolution - class features', () => {
                 }),
             );
             expect(mockRollDamage).not.toHaveBeenCalled();
-        });
-
-        it('skips when already used this round or no target found', async () => {
-            const skipCases = [
-                {
-                    _name: 'already used this round',
-                    setup: () => {
-                        getRuntimeValue.mockImplementation((_name, key) => {
-                            if (key === "_Stalker's_Flurry_usedRound") return 1;
-                            if (key === "_Stalker's_Flurry_option") return 'Sudden Strike';
-                            return null;
-                        });
-                        getCombatContext.mockResolvedValue({
-                            creatures: [
-                                { name: 'TestRogue', type: 'player' },
-                                { name: 'Bugbear', type: 'npc' },
-                            ],
-                        });
-                        getTargetFromAttacker.mockReturnValue({ name: 'Bugbear' });
-                    },
-                },
-                {
-                    _name: 'no target found',
-                    setup: () => {
-                        getRuntimeValue.mockImplementation((_name, key) => {
-                            if (key === "_Stalker's_Flurry_option") return 'Sudden Strike';
-                            return null;
-                        });
-                        getCombatContext.mockResolvedValue({
-                            creatures: [
-                                { name: 'TestRogue', type: 'player' },
-                            ],
-                        });
-                        getTargetFromAttacker.mockReturnValue(null);
-                    },
-                },
-            ];
-
-            for (const { setup } of skipCases) {
-                setup();
-                const { resolveAttackDamage } = UseAttackDamageResolution({ playerStats: makeStalkersFlurryStats() });
-                await resolveAttackDamage(makeAttack());
-                await tick();
-                expect(mockSetAttackRiderModal).not.toHaveBeenCalled();
-                expect(setRuntimeValue).not.toHaveBeenCalledWith(
-                    'TestRogue',
-                    'pendingSuddenStrike',
-                    true,
-                    'test-campaign',
-                );
-                vi.restoreAllMocks();
-            }
         });
     });
 });

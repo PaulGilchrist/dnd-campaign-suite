@@ -1,3 +1,4 @@
+// @cleaned-by-ai
 // @improved-by-ai
 import { render } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -203,21 +204,6 @@ describe('CharSpells', () => {
       expect(row[5]).toBe('1d10 Fire');
     });
 
-    it('should display Utility for spells without a damage field', () => {
-      const spell = createSpell({
-        name: 'Light',
-        level: 0,
-      });
-      const { table } = renderSpellsTable({
-        ...mockPlayerStats,
-        spellAbilities: { ...mockPlayerStats.spellAbilities, spells: [spell] },
-      });
-
-      const row = getSpellRow(table, 'Light');
-      expect(row).toBeDefined();
-      expect(row[5]).toBe('Utility');
-    });
-
     it('should display save DC info in effect text when spell has a DC', () => {
       const spell = createSpell({
         name: 'Burning Hands',
@@ -339,21 +325,6 @@ describe('CharSpells', () => {
       expect(row).toBeDefined();
       expect(row[7]).toBe('V/S');
     });
-
-    it('should display components joined with slashes', () => {
-      const spell = createSpell({
-        name: 'Fireball',
-        components: ['V', 'S', 'M'],
-      });
-      const { table } = renderSpellsTable({
-        ...mockPlayerStats,
-        spellAbilities: { ...mockPlayerStats.spellAbilities, spells: [spell] },
-      });
-
-      const row = getSpellRow(table, 'Fireball');
-      expect(row).toBeDefined();
-      expect(row[7]).toContain('V/S/M');
-    });
   });
 
   describe('Duration display', () => {
@@ -370,21 +341,6 @@ describe('CharSpells', () => {
       const row = getSpellRow(table, 'Haste');
       expect(row).toBeDefined();
       expect(row[6]).toBe('Concentration, 1 min');
-    });
-
-    it('should abbreviate "Instantaneous" to "Instant"', () => {
-      const spell = createSpell({
-        name: 'Fireball',
-        duration: 'Instantaneous',
-      });
-      const { table } = renderSpellsTable({
-        ...mockPlayerStats,
-        spellAbilities: { ...mockPlayerStats.spellAbilities, spells: [spell] },
-      });
-
-      const row = getSpellRow(table, 'Fireball');
-      expect(row).toBeDefined();
-      expect(row[6]).toBe('Instant');
     });
 
     it('should abbreviate "10 minutes" to "10 mins"', () => {

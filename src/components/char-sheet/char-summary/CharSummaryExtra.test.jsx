@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharSummary from './CharSummary.jsx';
@@ -76,7 +76,7 @@ const mockPlayerStats = {
 const mockCampaignName = 'test-campaign';
 
 // ---------------------------------------------------------------------------
-// Bait and Switch AC bonus — unique to this file (not in CharSummary.test.jsx)
+// Bait and Switch AC Bonus — consolidated into parameterized tests
 // ---------------------------------------------------------------------------
 describe('CharSummary - Bait and Switch AC Bonus', () => {
     beforeEach(() => {
@@ -86,36 +86,23 @@ describe('CharSummary - Bait and Switch AC Bonus', () => {
         vi.mocked(useRuntimeValue).mockReturnValue(null);
     });
 
-    it('shows bait and switch AC bonus when active with bonus value', () => {
+    it.each([
+        [3, 'Bait and Switch', /\+3 from Bait and Switch/],
+        [5, 'Trickster', /\+5 from Trickster/],
+    ])('shows bait and switch AC bonus with value %i from %s', (bonus, source, expectedText) => {
         vi.mocked(useRuntimeValue).mockImplementation((_name, key, _campaign) => {
             if (key === 'baitAndSwitchActive') return true;
-            if (key === 'baitAndSwitchBonus') return 3;
-            if (key === 'baitAndSwitchSource') return 'Bait and Switch';
+            if (key === 'baitAndSwitchBonus') return bonus;
+            if (key === 'baitAndSwitchSource') return source;
             return null;
         });
         render(<CharSummary playerStats={mockPlayerStats} campaignName={mockCampaignName} exhaustionLevel={0} />);
-        expect(screen.getByText(/\+3 from Bait and Switch/)).toBeInTheDocument();
-    });
-
-    it('shows bait and switch AC bonus with custom source name', () => {
-        vi.mocked(useRuntimeValue).mockImplementation((_name, key, _campaign) => {
-            if (key === 'baitAndSwitchActive') return true;
-            if (key === 'baitAndSwitchBonus') return 5;
-            if (key === 'baitAndSwitchSource') return 'Trickster';
-            return null;
-        });
-        render(<CharSummary playerStats={mockPlayerStats} campaignName={mockCampaignName} exhaustionLevel={0} />);
-        expect(screen.getByText(/\+5 from Trickster/)).toBeInTheDocument();
-    });
-
-    it('does not show bait and switch AC bonus when not active', () => {
-        render(<CharSummary playerStats={mockPlayerStats} campaignName={mockCampaignName} exhaustionLevel={0} />);
-        expect(screen.queryByText(/from Bait and Switch/)).not.toBeInTheDocument();
+        expect(screen.getByText(new RegExp(expectedText))).toBeInTheDocument();
     });
 });
 
 // ---------------------------------------------------------------------------
-// Warding Bond and Slow spell AC modifiers — unique to this file
+// Warding Bond and Slow spell AC modifiers — consolidated into parameterized tests
 // ---------------------------------------------------------------------------
 describe('CharSummary - Warding Bond and Slow Spell AC Modifiers', () => {
     beforeEach(() => {
@@ -124,24 +111,17 @@ describe('CharSummary - Warding Bond and Slow Spell AC Modifiers', () => {
         getActiveBuffs.mockReturnValue([]);
     });
 
-    it('shows warding bond AC bonus when present in conditionEffects', () => {
+    it.each([
+        [{ wardingBondAcBonus: 2 }, /\+2 from Warding Bond/],
+        [{ acPenalty: 2 }, /\(−2 from Slow\)/],
+    ])('shows AC modifier when conditionEffects %j is present', (effects, expectedRegex) => {
         render(<CharSummary
             playerStats={mockPlayerStats}
             campaignName={mockCampaignName}
             exhaustionLevel={0}
-            conditionEffects={{ wardingBondAcBonus: 2 }}
+            conditionEffects={effects}
         />);
-        expect(screen.getByText(/\+2 from Warding Bond/)).toBeInTheDocument();
-    });
-
-    it('shows slow spell AC penalty when present in conditionEffects', () => {
-        render(<CharSummary
-            playerStats={mockPlayerStats}
-            campaignName={mockCampaignName}
-            exhaustionLevel={0}
-            conditionEffects={{ acPenalty: 2 }}
-        />);
-        expect(screen.getByText(/\(−2 from Slow\)/)).toBeInTheDocument();
+        expect(screen.getByText(expectedRegex)).toBeInTheDocument();
     });
 
     it('shows both warding bond bonus and slow penalty combined', () => {

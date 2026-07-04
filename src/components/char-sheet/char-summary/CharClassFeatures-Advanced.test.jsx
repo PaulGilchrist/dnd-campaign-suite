@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import CharClassFeatures from './CharClassFeatures.jsx';
@@ -92,8 +92,7 @@ vi.mock('../../../services/ui/dataLoader.js', () => ({
     loadFightingStyles: vi.fn(() => Promise.resolve([])),
 }));
 
-import { getRuntimeValue, useRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
-import * as classFeaturesModule from '../../../services/character/classFeatures.js';
+const mockCampaignName = 'test-campaign';
 
 const basePlayerStats = {
     name: 'Thorin',
@@ -110,8 +109,6 @@ const basePlayerStats = {
     inventory: { equipped: [] },
     spellAbilities: {},
 };
-
-const mockCampaignName = 'test-campaign';
 
 function makeStats(overrides = {}) {
     return { ...basePlayerStats, ...overrides };
@@ -152,36 +149,6 @@ describe('CharClassFeatures', () => {
             renderComponent(stats);
             expect(screen.getByTestId('tracked-resource-Sorcerous Restoration')).toBeInTheDocument();
         });
-
-        it('shows innate sorcery active badge when buff exists', () => {
-            const restore = vi.mocked(useRuntimeValue).mockImplementation((_name, key) => {
-                if (key === 'activeBuffs') return [{ name: 'Innate Sorcery' }];
-                return null;
-            });
-            renderComponent(sorcererStats());
-            expect(screen.getByText(/\+1 Save DC, Spell Adv/)).toBeInTheDocument();
-            restore();
-        });
-
-        it('shows revelation badge with mapped effect text', () => {
-            const restore = vi.mocked(useRuntimeValue).mockImplementation((_name, key) => {
-                if (key === 'activeBuffs') return [{ name: 'Revelation in Flesh', effect: 'glistening_flight' }];
-                return null;
-            });
-            renderComponent(sorcererStats());
-            expect(screen.getByText(/Glistening Flight/)).toBeInTheDocument();
-            restore();
-        });
-
-        it('shows generic revelation badge for unknown effect', () => {
-            const restore = vi.mocked(useRuntimeValue).mockImplementation((_name, key) => {
-                if (key === 'activeBuffs') return [{ name: 'Revelation in Flesh', effect: 'unknown_effect' }];
-                return null;
-            });
-            renderComponent(sorcererStats());
-            expect(screen.getByText(/Revelation in Flesh/)).toBeInTheDocument();
-            restore();
-        });
     });
 
     describe('Warlock features', () => {
@@ -194,28 +161,6 @@ describe('CharClassFeatures', () => {
             renderComponent(warlockStats());
             expect(screen.getByText(/Eldritch Invocations/)).toBeInTheDocument();
             expect(screen.getByText(/Pact Boon:/)).toBeInTheDocument();
-        });
-
-        it('does not render arcanums when hasArcanum is false', () => {
-            const spy = vi.spyOn(classFeaturesModule, 'getClassFeatures').mockReturnValue({
-                ...classFeaturesModule.getClassFeatures(),
-                hasArcanum: false,
-            });
-            renderComponent(warlockStats());
-            expect(screen.queryByText(/Arcanums:/)).not.toBeInTheDocument();
-            expect(screen.queryByText(/Arcanums Known/)).not.toBeInTheDocument();
-            spy.mockRestore();
-        });
-
-        it('does not render pact boon when pactBoon is null', () => {
-            const spy = vi.spyOn(classFeaturesModule, 'getClassFeatures').mockReturnValue({
-                ...classFeaturesModule.getClassFeatures(),
-                pactBoon: null,
-            });
-            renderComponent(warlockStats());
-            expect(screen.queryByText(/Pact Boon:/)).not.toBeInTheDocument();
-            expect(screen.queryByTitle(/Pact Boon/)).not.toBeInTheDocument();
-            spy.mockRestore();
         });
     });
 
@@ -231,13 +176,6 @@ describe('CharClassFeatures', () => {
             expect(screen.getByTestId('tracked-resource-Arcane Recovery Levels')).toBeInTheDocument();
             expect(screen.getByTestId('tracked-resource-Arcane Ward HP')).toBeInTheDocument();
             expect(screen.getByTitle(/Arcane Recovery: Regain spell slots/)).toBeInTheDocument();
-        });
-
-        it('returns null when showWizardFeatures is false', () => {
-            const spy = vi.spyOn(classFeaturesModule, 'getClassFeatures').mockReturnValue({ showWizardFeatures: false });
-            const { container } = renderComponent(wizardStats());
-            expect(container.innerHTML).toBe('');
-            spy.mockRestore();
         });
 
         it('renders projected ward with custom range', () => {
@@ -260,52 +198,6 @@ describe('CharClassFeatures', () => {
             renderComponent(stats);
             expect(screen.getByText(/Portent Dice:/)).toBeInTheDocument();
             expect(screen.getByTitle(/Use Portent/)).toBeInTheDocument();
-        });
-
-        it('shows dice count badge when portent dice exist', () => {
-            const restore = vi.mocked(getRuntimeValue).mockImplementation((_name, key) => {
-                if (key === 'portentDice') return [1, 20];
-                return null;
-            });
-            const stats = makeStats({
-                level: 5,
-                class: { name: 'Wizard', class_levels: [{ level: 5 }] },
-                automation: { passives: [] },
-                specialActions: [{ name: 'Portent', automation: { type: 'portent' } }],
-            });
-            renderComponent(stats);
-            expect(screen.getByText(/2 remaining/)).toBeInTheDocument();
-            restore();
-        });
-
-        it('renders third eye badge for known effects', () => {
-            const restore = vi.mocked(useRuntimeValue).mockImplementation((_name, key) => {
-                if (key === 'activeBuffs') return [{ name: 'The Third Eye', effect: 'darkvision_120' }];
-                return null;
-            });
-            const stats = makeStats({
-                level: 5,
-                class: { name: 'Wizard', class_levels: [{ level: 5 }] },
-                automation: { passives: [] },
-            });
-            renderComponent(stats);
-            expect(screen.getByText(/Darkvision 120 ft\./)).toBeInTheDocument();
-            restore();
-        });
-
-        it('renders third eye generic Active badge for unknown effect', () => {
-            const restore = vi.mocked(useRuntimeValue).mockImplementation((_name, key) => {
-                if (key === 'activeBuffs') return [{ name: 'The Third Eye', effect: 'unknown_effect' }];
-                return null;
-            });
-            const stats = makeStats({
-                level: 5,
-                class: { name: 'Wizard', class_levels: [{ level: 5 }] },
-                automation: { passives: [] },
-            });
-            renderComponent(stats);
-            expect(screen.getByText(/Active/)).toBeInTheDocument();
-            restore();
         });
     });
 

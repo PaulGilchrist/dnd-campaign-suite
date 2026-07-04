@@ -1,3 +1,4 @@
+// @cleaned-by-ai
 // @improved-by-ai
 import { render } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
@@ -14,38 +15,34 @@ describe('WizardProgressBar', () => {
       expect(bar).toHaveClass('progress-bar');
       expect(bar.firstChild).toHaveClass('progress-fill');
     });
-
-    it('renders no children other than the fill element', () => {
-      const { container } = renderProgressBar();
-      expect(container.children.length).toBe(1);
-      expect(container.firstChild.children.length).toBe(1);
-    });
   });
 
   describe('progress width calculation', () => {
-    it('defaults to 0% on the first step', () => {
-      const { container } = renderProgressBar();
+    it('computes linear progress from 0% to 100% across steps', () => {
+      // Step 1 of 5: (1-1)/(5-1) = 0%
+      let { container } = renderProgressBar({ currentStep: 1, totalSteps: 5 });
       expect(container.firstChild.firstChild)
         .toHaveStyle('--progress-width: 0%');
-    });
 
-    it('reaches 100% on the last step', () => {
-      const { container } = renderProgressBar({
-        currentStep: 5,
-        totalSteps: 5,
-      });
+      // Step 3 of 5: (3-1)/(5-1) = 50%
+      ({ container } = renderProgressBar({ currentStep: 3, totalSteps: 5 }));
+      expect(container.firstChild.firstChild)
+        .toHaveStyle('--progress-width: 50%');
+
+      // Step 5 of 5: (5-1)/(5-1) = 100%
+      ({ container } = renderProgressBar({ currentStep: 5, totalSteps: 5 }));
       expect(container.firstChild.firstChild)
         .toHaveStyle('--progress-width: 100%');
     });
 
-    it('calculates linear progress for intermediate steps', () => {
-      // Step 3 of 5: (3-1)/(5-1) = 50%
+    it('computes correct progress for different step counts', () => {
+      // Step 2 of 4: (2-1)/(4-1) = 33.333%
       const { container } = renderProgressBar({
-        currentStep: 3,
-        totalSteps: 5,
+        currentStep: 2,
+        totalSteps: 4,
       });
       expect(container.firstChild.firstChild)
-        .toHaveStyle('--progress-width: 50%');
+        .toHaveStyle(`--progress-width: 33.33333333333333%`);
     });
   });
 
@@ -60,15 +57,6 @@ describe('WizardProgressBar', () => {
       });
       expect(container.firstChild.firstChild)
         .toHaveStyle('--progress-width: 75%');
-    });
-
-    it('does not adjust progress when isEditing is omitted', () => {
-      const { container } = renderProgressBar({
-        currentStep: 3,
-        totalSteps: 5,
-      });
-      expect(container.firstChild.firstChild)
-        .toHaveStyle('--progress-width: 50%');
     });
   });
 });

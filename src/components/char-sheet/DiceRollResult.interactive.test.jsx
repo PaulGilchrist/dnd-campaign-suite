@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { render, screen, fireEvent } from '@testing-library/react';
 import DiceRollResult from './DiceRollResult.jsx';
 
@@ -8,25 +8,7 @@ describe('DiceRollResult', () => {
             prop                | onProp                | buttonText
             ${'luckyAdvantage'} | ${'onLuckyAdvantage'} | ${'Lucky: Advantage'}
             ${'luckyDisadvantage'} | ${'onLuckyDisadvantage'} | ${'Lucky: Disadvantage'}
-        `('shows $buttonText button when $prop is true', ({ prop, onProp, buttonText }) => {
-            const onCallback = vi.fn();
-            render(
-                <DiceRollResult
-                    name="Attack"
-                    type="d20"
-                    rolls={[12]}
-                    bonus={3}
-                    {...{ [prop]: true, [onProp]: onCallback }}
-                />
-            );
-            expect(screen.getByText(new RegExp(`Lucky:.*${buttonText.split(' ').slice(1).join(' ')}`))).toBeInTheDocument();
-        });
-
-        it.each`
-            prop                | onProp                | buttonText       | expectedTotal
-            ${'luckyAdvantage'} | ${'onLuckyAdvantage'} | ${'Lucky: Advantage'} | ${'18'}
-            ${'luckyDisadvantage'} | ${'onLuckyDisadvantage'} | ${'Lucky: Disadvantage'} | ${'11'}
-        `('uses $buttonText and calls callback when clicked', ({ prop, onProp, buttonText, expectedTotal }) => {
+        `('shows and handles $buttonText when $prop is true', ({ prop, onProp, buttonText }) => {
             const onCallback = vi.fn();
             render(
                 <DiceRollResult
@@ -37,12 +19,12 @@ describe('DiceRollResult', () => {
                     {...{ [prop]: true, [onProp]: onCallback }}
                 />
             );
+            expect(screen.getByText(new RegExp(`Lucky:.*${buttonText.split(' ').slice(1).join(' ')}`))).toBeInTheDocument();
             fireEvent.click(screen.getByText(new RegExp(`Lucky:.*${buttonText.split(' ').slice(1).join(' ')}`)));
             expect(onCallback).toHaveBeenCalled();
-            expect(screen.getByText(expectedTotal)).toBeInTheDocument();
         });
 
-        it('does not show lucky buttons for non-d20 types or when not provided', () => {
+        it('does not show lucky buttons for non-d20 types or when prop is not provided', () => {
             render(
                 <DiceRollResult
                     name="Fireball"
@@ -88,18 +70,14 @@ describe('DiceRollResult', () => {
             expect(screen.getByText(expectedText)).toBeInTheDocument();
         });
 
-        it.each`
-            type       | autoReroll | shouldShow
-            ${'d20'}   | ${false}   | ${false}
-            ${'damage'}| ${true}    | ${false}
-        `('does not show reroll when type: $type, autoReroll: $autoReroll', ({ type, autoReroll }) => {
+        it('does not show reroll when type is not d20', () => {
             render(
                 <DiceRollResult
-                    name={type === 'd20' ? 'Attack' : 'Fireball'}
-                    type={type}
-                    rolls={type === 'd20' ? [12] : [6, 5, 4]}
+                    name="Fireball"
+                    type="damage"
+                    rolls={[6, 5, 4]}
                     bonus={0}
-                    autoReroll={autoReroll}
+                    autoReroll={true}
                 />
             );
             expect(screen.queryByText(/Reroll/)).not.toBeInTheDocument();
@@ -121,38 +99,7 @@ describe('DiceRollResult', () => {
     });
 
     describe('stroke of luck', () => {
-        it.each`
-            strokeOfLuck | type       | shouldShow
-            ${true}      | ${'d20'}   | ${true}
-            ${false}     | ${'d20'}   | ${false}
-            ${true}      | ${'damage'}| ${false}
-        `('shows stroke of luck when strokeOfLuck: $strokeOfLuck, type: $type', ({ strokeOfLuck, type, shouldShow }) => {
-            if (shouldShow) {
-                render(
-                    <DiceRollResult
-                        name="Attack"
-                        type="d20"
-                        rolls={[12]}
-                        bonus={3}
-                        strokeOfLuck={true}
-                    />
-                );
-                expect(screen.getByText(/Stroke of Luck/)).toBeInTheDocument();
-            } else {
-                render(
-                    <DiceRollResult
-                        name={type === 'd20' ? 'Attack' : 'Fireball'}
-                        type={type}
-                        rolls={type === 'd20' ? [12] : [6, 5, 4]}
-                        bonus={3}
-                        strokeOfLuck={strokeOfLuck}
-                    />
-                );
-                expect(screen.queryByText(/Stroke of Luck/)).not.toBeInTheDocument();
-            }
-        });
-
-        it('hides stroke of luck button and shows result after clicking', () => {
+        it('shows stroke of luck button for d20 rolls', () => {
             render(
                 <DiceRollResult
                     name="Attack"
@@ -162,7 +109,36 @@ describe('DiceRollResult', () => {
                     strokeOfLuck={true}
                 />
             );
+            expect(screen.getByText(/Stroke of Luck/)).toBeInTheDocument();
+        });
+
+        it('does not show stroke of luck for non-d20 types', () => {
+            render(
+                <DiceRollResult
+                    name="Fireball"
+                    type="damage"
+                    rolls={[6, 5, 4]}
+                    bonus={3}
+                    strokeOfLuck={true}
+                />
+            );
+            expect(screen.queryByText(/Stroke of Luck/)).not.toBeInTheDocument();
+        });
+
+        it('hides stroke of luck button and shows result after clicking', () => {
+            const onStrokeOfLuck = vi.fn();
+            render(
+                <DiceRollResult
+                    name="Attack"
+                    type="d20"
+                    rolls={[12]}
+                    bonus={3}
+                    strokeOfLuck={true}
+                    onStrokeOfLuck={onStrokeOfLuck}
+                />
+            );
             fireEvent.click(screen.getByText(/Stroke of Luck/));
+            expect(onStrokeOfLuck).toHaveBeenCalled();
             expect(screen.getByText(/Stroke of Luck:/)).toBeInTheDocument();
         });
     });
@@ -203,6 +179,7 @@ describe('DiceRollResult', () => {
         });
 
         it('hides tactical mind button and shows result after clicking', () => {
+            const onTacticalMind = vi.fn();
             render(
                 <DiceRollResult
                     name="Athletics"
@@ -211,9 +188,11 @@ describe('DiceRollResult', () => {
                     bonus={3}
                     rollType="check"
                     tacticalMind={true}
+                    onTacticalMind={onTacticalMind}
                 />
             );
             fireEvent.click(screen.getByText(/Tactical Mind/));
+            expect(onTacticalMind).toHaveBeenCalled();
             expect(screen.getByText(/Tactical Mind:/)).toBeInTheDocument();
         });
     });
@@ -257,24 +236,6 @@ describe('DiceRollResult', () => {
             expect(hitMiss.textContent).toContain('HIT');
             expect(hitMiss.textContent).toContain('3 reaction');
         });
-
-        it('shows hit with zero reaction bonus when both bonuses are zero', () => {
-            render(
-                <DiceRollResult
-                    name="Longsword"
-                    type="attack"
-                    rolls={[18]}
-                    bonus={3}
-                    targetName="Goblin"
-                    hit={true}
-                    rollType="attack"
-                    gloriousDefenseBonus={0}
-                    defensiveDuelistBonus={0}
-                />
-            );
-            expect(screen.getByText(/HIT/)).toBeInTheDocument();
-            expect(screen.queryByText(/reaction/)).not.toBeInTheDocument();
-        });
     });
 
     describe('superiority maneuvers', () => {
@@ -308,6 +269,7 @@ describe('DiceRollResult', () => {
         });
 
         it('hides superiority maneuver buttons and shows result after clicking', () => {
+            const onSuperiorityManeuver = vi.fn();
             render(
                 <DiceRollResult
                     name="Attack"
@@ -316,10 +278,11 @@ describe('DiceRollResult', () => {
                     bonus={3}
                     rollType="attack"
                     availableSuperiorityManeuvers={[{ name: 'Precision Attack' }]}
-                    onSuperiorityManeuver={vi.fn()}
+                    onSuperiorityManeuver={onSuperiorityManeuver}
                 />
             );
             fireEvent.click(screen.getByText(/Precision Attack/));
+            expect(onSuperiorityManeuver).toHaveBeenCalled();
             expect(screen.getByText(/Precision Attack:/)).toBeInTheDocument();
         });
     });

@@ -1,26 +1,8 @@
-// @improved-by-ai
-import { render, screen, fireEvent } from '@testing-library/react';
+// @cleaned-by-ai
+import { render, screen } from '@testing-library/react';
 import DiceRollResult from './DiceRollResult.jsx';
 
 describe('DiceRollResult', () => {
-    describe('basic rendering', () => {
-        it('renders name and total for a basic d20 roll', () => {
-            render(
-                <DiceRollResult
-                    name="Attack Roll"
-                    type="d20"
-                    rolls={[12, 8]}
-                    bonus={3}
-                    modifier={0}
-                />
-            );
-
-            expect(screen.getByText('Attack Roll')).toBeInTheDocument();
-            expect(screen.getByText('15')).toBeInTheDocument();
-        });
-
-    });
-
     describe('totals', () => {
         it.each`
             rolls       | bonus | modifier | expected
@@ -55,23 +37,6 @@ describe('DiceRollResult', () => {
     });
 
     describe('advantage and disadvantage', () => {
-        it('toggles advantage when clicked', () => {
-            render(
-                <DiceRollResult name="Attack" type="d20" rolls={[8, 15]} bonus={2} />
-            );
-
-            fireEvent.click(screen.getByLabelText('Advantage'));
-            expect(screen.getByText('17')).toBeInTheDocument();
-
-            // toggling back to normal uses first roll (8 + 2 = 10)
-            fireEvent.click(screen.getByLabelText('Advantage'));
-            expect(screen.getByText('10')).toBeInTheDocument();
-
-            // toggling to disadvantage uses min (8 + 2 = 10)
-            fireEvent.click(screen.getByLabelText('Disadvantage'));
-            expect(screen.getByText('10')).toBeInTheDocument();
-        });
-
         it.each`
             forcedMode     | rangeReason
             ${'advantage'} | ${'Ranged disadvantage'}

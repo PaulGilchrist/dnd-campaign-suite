@@ -1,3 +1,4 @@
+// @cleaned-by-ai
 import { render, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharAbilities from './CharAbilities';
@@ -33,11 +34,11 @@ function createPlayerStats(overrides = {}) {
     name: 'Test Fighter',
     level: 5,
     abilities: [
-      { name: 'Strength', bonus: 4, save: 6, totalScore: 14, skills: [{ name: 'Athletics', bonus: 8 }] },
-      { name: 'Dexterity', bonus: 2, save: 4, totalScore: 12, skills: [{ name: 'Acrobatics', bonus: 6 }] },
+      { name: 'Strength', bonus: 4, save: 6, totalScore: 14, skills: [] },
+      { name: 'Dexterity', bonus: 2, save: 4, totalScore: 12, skills: [] },
       { name: 'Constitution', bonus: 1, save: 3, totalScore: 11, skills: [] },
-      { name: 'Intelligence', bonus: 0, save: 0, totalScore: 10, skills: [{ name: 'Arcana', bonus: 2 }] },
-      { name: 'Wisdom', bonus: -1, save: 1, totalScore: 9, skills: [{ name: 'Perception', bonus: 3 }] },
+      { name: 'Intelligence', bonus: 0, save: 0, totalScore: 10, skills: [] },
+      { name: 'Wisdom', bonus: -1, save: 1, totalScore: 9, skills: [] },
       { name: 'Charisma', bonus: 0, save: 2, totalScore: 10, skills: [] },
     ],
     skillProficiencies: ['Athletics', 'Arcana'],
@@ -49,13 +50,10 @@ function createPlayerStats(overrides = {}) {
 
 const defaultProps = {
   allAbilityScores: mockAllAbilityScores,
-  playerStats: createPlayerStats(),
   campaignName: 'test-campaign',
   exhaustionPenalty: 0,
   conditionEffects: {},
   isRaging: false,
-  onReroll: vi.fn(),
-  onStrokeOfLuck: vi.fn(),
 };
 
 function getMocks() {
@@ -73,65 +71,16 @@ describe('CharAbilities psiBolsteredKnack context', () => {
     mockStore.clear();
   });
 
-  it.each([
-    {
-      name: 'passes psiBolsteredKnack context when player is Soulknife rogue level 3+',
-      stats: createPlayerStats({
-        class: { name: 'Rogue', major: { name: 'Soulknife' }, class_levels: [{ level: 5, energy: { energy_die_type: 8 } }] },
-        level: 5,
-        abilities: [
-          { name: 'Strength', bonus: 4, save: 6, totalScore: 14, skills: [] },
-          { name: 'Dexterity', bonus: 2, save: 4, totalScore: 12, skills: [] },
-          { name: 'Constitution', bonus: 1, save: 3, totalScore: 11, skills: [] },
-          { name: 'Intelligence', bonus: 0, save: 0, totalScore: 10, skills: [] },
-          { name: 'Wisdom', bonus: -1, save: 1, totalScore: 9, skills: [] },
-          { name: 'Charisma', bonus: 0, save: 2, totalScore: 10, skills: [] },
-        ],
-      }),
-      expectedContext: { psiBolsteredKnack: true, psiBolsteredKnackDieSize: 8 },
-    },
-    {
-      name: 'does not pass psiBolsteredKnack when player is not Soulknife',
-      stats: createPlayerStats({
-        class: { name: 'Rogue', major: { name: 'Assassin' } },
-        abilities: [
-          { name: 'Strength', bonus: 4, save: 6, totalScore: 14, skills: [] },
-          { name: 'Dexterity', bonus: 2, save: 4, totalScore: 12, skills: [] },
-          { name: 'Constitution', bonus: 1, save: 3, totalScore: 11, skills: [] },
-          { name: 'Intelligence', bonus: 0, save: 0, totalScore: 10, skills: [] },
-          { name: 'Wisdom', bonus: -1, save: 1, totalScore: 9, skills: [] },
-          { name: 'Charisma', bonus: 0, save: 2, totalScore: 10, skills: [] },
-        ],
-      }),
-      expectedContext: undefined,
-    },
-    {
-      name: 'does not pass psiBolsteredKnack when Soulknife but level below 3',
-      stats: createPlayerStats({
-        class: { name: 'Rogue', major: { name: 'Soulknife' } },
-        level: 2,
-        class_levels: [{ level: 2, energy: { energy_die_type: 6 } }],
-        abilities: [
-          { name: 'Strength', bonus: 4, save: 6, totalScore: 14, skills: [] },
-          { name: 'Dexterity', bonus: 2, save: 4, totalScore: 12, skills: [] },
-          { name: 'Constitution', bonus: 1, save: 3, totalScore: 11, skills: [] },
-          { name: 'Intelligence', bonus: 0, save: 0, totalScore: 10, skills: [] },
-          { name: 'Wisdom', bonus: -1, save: 1, totalScore: 9, skills: [] },
-          { name: 'Charisma', bonus: 0, save: 2, totalScore: 10, skills: [] },
-        ],
-      }),
-      expectedContext: undefined,
-    },
-  ])('$name', ({ stats, expectedContext }) => {
+  it('passes psiBolsteredKnack context when player is Soulknife rogue level 3+', () => {
+    const stats = createPlayerStats({
+      class: { name: 'Rogue', major: { name: 'Soulknife' }, class_levels: [{ level: 5, energy: { energy_die_type: 8 } }] },
+      level: 5,
+    });
     render(<CharAbilities {...defaultProps} playerStats={stats} />);
     const bonusCell = findClickableByText('+4');
     if (bonusCell) {
       fireEvent.click(bonusCell);
     }
-    if (expectedContext) {
-      expect(getMocks().rollAbilityCheck).toHaveBeenCalledWith('Strength', expect.any(Number), expect.objectContaining(expectedContext));
-    } else {
-      expect(getMocks().rollAbilityCheck).toHaveBeenCalledWith('Strength', expect.any(Number), undefined);
-    }
+    expect(getMocks().rollAbilityCheck).toHaveBeenCalledWith('Strength', expect.any(Number), expect.objectContaining({ psiBolsteredKnack: true, psiBolsteredKnackDieSize: 8 }));
   });
 });

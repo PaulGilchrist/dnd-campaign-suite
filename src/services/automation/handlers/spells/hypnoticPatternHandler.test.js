@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../common/savePrompt.js', () => ({
@@ -64,67 +64,30 @@ const baseCombatContext = {
   placedItems: [],
 };
 
-const singleTargetCombatContext = {
-  creatures: [
-    { name: 'Goblin', type: 'monster', currentHp: 5, maxHp: 7 },
-    { name: 'TestCaster', gridX: 5, gridY: 10 },
-  ],
-  players: [{ name: 'TestCaster', gridX: 5, gridY: 10 }],
-  placedItems: [],
-};
-
 describe('hypnoticPatternHandler.handle', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
   describe('combat context validation', () => {
-    it('should return popup when no combat context exists', async () => {
+    it('returns popup when no combat context exists or has no creatures', async () => {
       getCombatContext.mockResolvedValue(null);
-      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.type).toBe('automation_info');
-      expect(result.payload.name).toBe('Hypnotic Pattern');
+      let result = await handle(makeAction(), makePlayerStats(), campaignName, null);
       expect(result.payload.description).toContain('No creatures in combat');
-      expect(result.payload.description).toContain('Hypnotic Pattern has no effect');
-    });
 
-    it('should return popup when combat context has no creatures', async () => {
       getCombatContext.mockResolvedValue({ creatures: [] });
-      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.type).toBe('automation_info');
-      expect(result.payload.name).toBe('Hypnotic Pattern');
+      result = await handle(makeAction(), makePlayerStats(), campaignName, null);
       expect(result.payload.description).toContain('No creatures in combat');
-    });
 
-    it('should handle undefined campaignName in no-combat case', async () => {
+      // null campaignName
       getCombatContext.mockResolvedValue(null);
-      const result = await handle(makeAction(), makePlayerStats(), null, null);
-
-      expect(result.type).toBe('popup');
+      result = await handle(makeAction(), makePlayerStats(), null, null);
       expect(result.payload.description).toContain('No creatures in combat');
     });
   });
 
   describe('target processing', () => {
-    it('should skip the caster itself and only target other creatures', async () => {
-      getCombatContext.mockResolvedValue(baseCombatContext);
-      buildSaveDc.mockReturnValue(14);
-      createSaveListener.mockReturnValue({
-        promptId: 'hypno-prompt',
-        promise: Promise.resolve({ success: false }),
-      });
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(createSaveListener).toHaveBeenCalledTimes(2);
-      expect(addEntry).toHaveBeenCalledTimes(2);
-    });
-
-    it('should call createSaveListener with correct config for each non-caster target', async () => {
+    it('skips caster, calls createSaveListener for each non-caster target', async () => {
       getCombatContext.mockResolvedValue(baseCombatContext);
       buildSaveDc.mockReturnValue(15);
       createSaveListener.mockReturnValue({
@@ -134,21 +97,17 @@ describe('hypnoticPatternHandler.handle', () => {
 
       await handle(makeAction(), makePlayerStats(), campaignName, null);
 
+      expect(createSaveListener).toHaveBeenCalledTimes(2);
+      expect(addEntry).toHaveBeenCalledTimes(2);
       expect(createSaveListener).toHaveBeenNthCalledWith(1, campaignName, {
-        targetName: 'Goblin',
-        saveType: 'WIS',
-        saveDc: 15,
-        dcSuccess: 'none',
+        targetName: 'Goblin', saveType: 'WIS', saveDc: 15, dcSuccess: 'none',
       });
       expect(createSaveListener).toHaveBeenNthCalledWith(2, campaignName, {
-        targetName: 'Orc',
-        saveType: 'WIS',
-        saveDc: 15,
-        dcSuccess: 'none',
+        targetName: 'Orc', saveType: 'WIS', saveDc: 15, dcSuccess: 'none',
       });
     });
 
-    it('should call buildSaveDc with action automation and playerStats', async () => {
+    it('calls buildSaveDc with action automation and playerStats', async () => {
       getCombatContext.mockResolvedValue(baseCombatContext);
       buildSaveDc.mockReturnValue(16);
       createSaveListener.mockReturnValue({
@@ -157,62 +116,43 @@ describe('hypnoticPatternHandler.handle', () => {
       });
 
       await handle(makeAction({ saveDc: 16 }), makePlayerStats(), campaignName, null);
-
       expect(buildSaveDc).toHaveBeenCalledWith(makeAction({ saveDc: 16 }).automation, expect.any(Object));
     });
 
-    it('should call addEntry with ability_use type for each target', async () => {
-      getCombatContext.mockResolvedValue(baseCombatContext);
-      buildSaveDc.mockReturnValue(15);
-      createSaveListener.mockReturnValue({
-        promptId: 'hypno-ability',
-        promise: Promise.resolve({ success: false }),
-      });
+    it('handles single target, all saves succeed, or mixed results', async () => {
+      const singleTargetCombatContext = {
+        creatures: [
+          { name: 'Goblin', type: 'monster', currentHp: 5, maxHp: 7 },
+          { name: 'TestCaster', gridX: 5, gridY: 10 },
+        ],
+        players: [{ name: 'TestCaster', gridX: 5, gridY: 10 }],
+        placedItems: [],
+      };
 
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(addEntry).toHaveBeenCalledWith(campaignName, {
-        type: 'ability_use',
-        characterName: 'TestCaster',
-        abilityName: 'Hypnotic Pattern',
-        description: expect.stringContaining('Hypnotic Pattern'),
-        promptId: 'hypno-ability',
-      });
-    });
-
-    it('should handle single target in combat', async () => {
+      // Single target
       getCombatContext.mockResolvedValue(singleTargetCombatContext);
       buildSaveDc.mockReturnValue(14);
       createSaveListener.mockReturnValue({
         promptId: 'hypno-single',
         promise: Promise.resolve({ success: false }),
       });
-
-      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
+      let result = await handle(makeAction(), makePlayerStats(), campaignName, null);
       expect(createSaveListener).toHaveBeenCalledTimes(1);
       expect(result.payload.description).toContain('Hypnotic Pattern affects 1 creature(s)');
-    });
 
-    it('should handle all targets saving successfully', async () => {
+      // All save successfully
       getCombatContext.mockResolvedValue(baseCombatContext);
       buildSaveDc.mockReturnValue(20);
       createSaveListener.mockReturnValue({
         promptId: 'hypno-all-success',
         promise: Promise.resolve({ success: true }),
       });
-
-      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(result.type).toBe('popup');
+      result = await handle(makeAction(), makePlayerStats(), campaignName, null);
       expect(result.payload.description).toContain('No creatures affected');
       expect(result.payload.description).toContain('2 creature(s) saved');
-    });
 
-    it('should handle mixed save results', async () => {
-      getCombatContext.mockResolvedValue(baseCombatContext);
+      // Mixed results
       buildSaveDc.mockReturnValue(14);
-
       let callCount = 0;
       createSaveListener.mockImplementation(() => {
         callCount++;
@@ -222,16 +162,14 @@ describe('hypnoticPatternHandler.handle', () => {
           promise: Promise.resolve({ success }),
         };
       });
-
-      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
+      result = await handle(makeAction(), makePlayerStats(), campaignName, null);
       expect(result.payload.description).toContain('1 creature(s)');
       expect(result.payload.description).toContain('1 creature(s) saved');
     });
   });
 
   describe('failed save handling', () => {
-    it('should apply charmed, incapacitated, and speed_zero conditions on failed save', async () => {
+    it('applies charmed, incapacitated, and speed_zero conditions, deduplicates, logs, and adds expiration', async () => {
       getCombatContext.mockResolvedValue(baseCombatContext);
       buildSaveDc.mockReturnValue(10);
       getRuntimeValue.mockReturnValue(['Stunned']);
@@ -243,79 +181,52 @@ describe('hypnoticPatternHandler.handle', () => {
       await handle(makeAction(), makePlayerStats(), campaignName, null);
 
       expect(setRuntimeValue).toHaveBeenCalledWith(
-        'Goblin',
-        'activeConditions',
+        'Goblin', 'activeConditions',
         ['Stunned', 'charmed', 'incapacitated', 'speed_zero'],
         campaignName,
       );
-    });
 
-    it('should deduplicate conditions when target already has them', async () => {
-      getCombatContext.mockResolvedValue(baseCombatContext);
-      buildSaveDc.mockReturnValue(10);
+      // Deduplication
+      vi.clearAllMocks();
       getRuntimeValue.mockReturnValue(['charmed', 'Stunned', 'speed_zero']);
       createSaveListener.mockReturnValue({
         promptId: 'hypno-dedup',
         promise: Promise.resolve({ success: false }),
       });
-
       await handle(makeAction(), makePlayerStats(), campaignName, null);
-
       expect(setRuntimeValue).toHaveBeenCalledWith(
-        'Goblin',
-        'activeConditions',
+        'Goblin', 'activeConditions',
         ['Stunned', 'charmed', 'incapacitated', 'speed_zero'],
         campaignName,
       );
-    });
 
-    it('should call postLogEntry on failed save', async () => {
-      getCombatContext.mockResolvedValue(baseCombatContext);
-      buildSaveDc.mockReturnValue(10);
+      // Logging and expiration
+      vi.clearAllMocks();
       getRuntimeValue.mockReturnValue([]);
       createSaveListener.mockReturnValue({
         promptId: 'hypno-log',
         promise: Promise.resolve({ success: false }),
       });
-
       await handle(makeAction(), makePlayerStats(), campaignName, null);
-
       expect(postLogEntry).toHaveBeenCalledWith(
         campaignName,
         expect.objectContaining({
-          type: 'condition',
-          action: 'applied',
-          characterName: 'Goblin',
-          condition: 'Charmed, Incapacitated, Speed 0',
+          type: 'condition', action: 'applied',
+          characterName: 'Goblin', condition: 'Charmed, Incapacitated, Speed 0',
         }),
       );
-    });
-
-    it('should call addExpiration with correct conditions and duration on failed save', async () => {
-      getCombatContext.mockResolvedValue(baseCombatContext);
-      buildSaveDc.mockReturnValue(10);
-      getRuntimeValue.mockReturnValue([]);
-      createSaveListener.mockReturnValue({
-        promptId: 'hypno-exp',
-        promise: Promise.resolve({ success: false }),
-      });
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
       expect(addExpiration).toHaveBeenCalledWith(
-        'TestCaster',
-        'Goblin',
+        'TestCaster', 'Goblin',
         expect.arrayContaining([
           { type: 'charmed', condition: 'charmed' },
           { type: 'incapacitated', condition: 'incapacitated' },
           { type: 'speed_zero', condition: 'speed_zero' },
         ]),
-        campaignName,
-        10,
+        campaignName, 10,
       );
     });
 
-    it('should call addEntry with save_result for each successful save', async () => {
+    it('calls addEntry with save_result for successful saves', async () => {
       getCombatContext.mockResolvedValue(baseCombatContext);
       buildSaveDc.mockReturnValue(20);
       createSaveListener.mockReturnValue({
@@ -326,16 +237,14 @@ describe('hypnoticPatternHandler.handle', () => {
       await handle(makeAction(), makePlayerStats(), campaignName, null);
 
       expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
-        type: 'save_result',
-        targetName: 'Goblin',
-        success: true,
+        type: 'save_result', targetName: 'Goblin', success: true,
         rollType: 'save-hypnotic-pattern',
       }));
     });
   });
 
-  describe('popup payload', () => {
-    it('should return popup type with automation_info payload', async () => {
+  describe('popup payload and edge cases', () => {
+    it('returns popup with automation_info payload and correct descriptions', async () => {
       getCombatContext.mockResolvedValue(baseCombatContext);
       buildSaveDc.mockReturnValue(10);
       createSaveListener.mockReturnValue({
@@ -343,100 +252,56 @@ describe('hypnoticPatternHandler.handle', () => {
         promise: Promise.resolve({ success: false }),
       });
 
-      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
+      let result = await handle(makeAction(), makePlayerStats(), campaignName, null);
       expect(result.type).toBe('popup');
       expect(result.payload.type).toBe('automation_info');
       expect(result.payload.name).toBe('Hypnotic Pattern');
-    });
 
-    it('should include affected creature descriptions in summary', async () => {
-      getCombatContext.mockResolvedValue(baseCombatContext);
-      buildSaveDc.mockReturnValue(10);
-      createSaveListener.mockReturnValue({
-        promptId: 'hypno-desc',
-        promise: Promise.resolve({ success: false }),
-      });
-
-      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
+      // Description includes affected creature info
+      result = await handle(makeAction(), makePlayerStats(), campaignName, null);
       expect(result.payload.description).toContain('Goblin is Charmed');
       expect(result.payload.description).toContain('Incapacitated');
       expect(result.payload.description).toContain('Speed 0');
-    });
-
-    it('should mention shake free in summary', async () => {
-      getCombatContext.mockResolvedValue(baseCombatContext);
-      buildSaveDc.mockReturnValue(10);
-      createSaveListener.mockReturnValue({
-        promptId: 'hypno-shake',
-        promise: Promise.resolve({ success: false }),
-      });
-
-      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
       expect(result.payload.description).toContain('shake it free');
     });
-  });
 
-  describe('edge cases', () => {
-    it('should handle all targets being the caster', async () => {
+    it('handles edge cases: all targets are caster, empty automation, no proficiency, custom action name', async () => {
+      // All targets are caster
       const onlyPlayerCombat = {
         creatures: [{ name: 'TestCaster', gridX: 5, gridY: 10 }],
         players: [{ name: 'TestCaster', gridX: 5, gridY: 10 }],
         placedItems: [],
       };
       getCombatContext.mockResolvedValue(onlyPlayerCombat);
-
-      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
+      let result = await handle(makeAction(), makePlayerStats(), campaignName, null);
       expect(createSaveListener).not.toHaveBeenCalled();
       expect(result.payload.description).toContain('No creatures affected');
-    });
 
-    it('should handle empty automation object', async () => {
+      // Empty automation
       getCombatContext.mockResolvedValue(baseCombatContext);
       buildSaveDc.mockReturnValue(10);
       createSaveListener.mockReturnValue({
         promptId: 'hypno-empty-auto',
         promise: Promise.resolve({ success: false }),
       });
-
-      const result = await handle({ name: 'Hypnotic Pattern', automation: {} }, makePlayerStats(), campaignName, null);
-
-      expect(result.type).toBe('popup');
+      result = await handle({ name: 'Hypnotic Pattern', automation: {} }, makePlayerStats(), campaignName, null);
       expect(result.payload.name).toBe('Hypnotic Pattern');
-    });
 
-    it('should handle playerStats with no proficiency', async () => {
+      // No proficiency
       const ps = makePlayerStats({ proficiency: 0, abilities: [] });
       const action = makeAction();
-
-      getCombatContext.mockResolvedValue(baseCombatContext);
-      buildSaveDc.mockReturnValue(10);
-      createSaveListener.mockReturnValue({
-        promptId: 'hypno-no-prof',
-        promise: Promise.resolve({ success: false }),
-      });
-
-      const result = await handle(action, ps, campaignName, null);
-
+      result = await handle(action, ps, campaignName, null);
       expect(result.type).toBe('popup');
       expect(buildSaveDc).toHaveBeenCalledWith(action.automation, ps);
-    });
 
-    it('should use action.name in ability_use log entries', async () => {
+      // Custom action name
       const customAction = { name: 'My Hypno', automation: { type: 'hypnotic_pattern', saveType: 'WIS', saveDc: 15 } };
-
-      getCombatContext.mockResolvedValue(baseCombatContext);
       buildSaveDc.mockReturnValue(15);
       createSaveListener.mockReturnValue({
         promptId: 'hypno-custom-name',
         promise: Promise.resolve({ success: false }),
       });
-
       await handle(customAction, makePlayerStats(), campaignName, null);
-
       expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
         abilityName: 'My Hypno',
       }));

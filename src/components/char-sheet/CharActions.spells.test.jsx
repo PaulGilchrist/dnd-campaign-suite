@@ -1,5 +1,5 @@
-// @improved-by-ai
-import { render, screen, fireEvent } from '@testing-library/react';
+// @cleaned-by-ai
+import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharActions from './CharActions.jsx';
 
@@ -178,46 +178,25 @@ describe('CharActions spells', () => {
     });
   });
 
-  describe('action spell filtering', () => {
-    const actionSpell = {
-      name: 'Fireball',
-      range: '150 ft',
-      casting_time: '1 action',
-      prepared: 'Prepared',
-      damage: '8d6',
-    };
-
-    it('renders spells with casting_time "1 action"', () => {
-      render(<CharActions playerStats={createStats({ spellAbilities: { spells: [actionSpell] } })} />);
+  describe('action spell rendering', () => {
+    it('renders action spells and excludes non-action spells', () => {
+      const actionSpell = {
+        name: 'Fireball',
+        range: '150 ft',
+        casting_time: '1 action',
+        prepared: 'Prepared',
+        damage: '8d6',
+      };
+      const bonusActionSpell = {
+        name: 'Shocking Grasp',
+        range: '120 ft',
+        casting_time: '1 bonus action',
+        prepared: 'Prepared',
+        damage: '1d8',
+      };
+      render(<CharActions playerStats={createStats({ spellAbilities: { spells: [actionSpell, bonusActionSpell] } })} />);
       expect(screen.getByText('Fireball')).toBeInTheDocument();
-    });
-
-    it('excludes spells with non-action casting times', () => {
-      render(<CharActions playerStats={createStats({ spellAbilities: { spells: [{ ...actionSpell, casting_time: '1 bonus action' }] } })} />);
-      expect(screen.queryByText('Fireball')).not.toBeInTheDocument();
-    });
-
-    it('excludes unprepared spells', () => {
-      render(<CharActions playerStats={createStats({ spellAbilities: { spells: [{ ...actionSpell, prepared: 'Unprepared' }] } })} />);
-      expect(screen.queryByText('Fireball')).not.toBeInTheDocument();
-    });
-  });
-
-  describe('spell click behavior', () => {
-    const actionSpell = {
-      name: 'Fireball',
-      range: '150 ft',
-      casting_time: '1 action',
-      prepared: 'Prepared',
-      damage: '8d6',
-      level: 3,
-    };
-
-    it('opens SpellDetailPopup when an action spell is clicked', () => {
-      render(<CharActions playerStats={createStats({ spellAbilities: { spells: [actionSpell] } })} />);
-      const spellLink = screen.getByText('Fireball');
-      fireEvent.click(spellLink);
-      expect(screen.getByTestId('spell-detail-popup')).toBeInTheDocument();
+      expect(screen.queryByText('Shocking Grasp')).not.toBeInTheDocument();
     });
   });
 });

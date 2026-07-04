@@ -1,3 +1,4 @@
+// @cleaned-by-ai
 // @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
@@ -167,7 +168,7 @@ describe('CharActionSpellPopups', () => {
       expect(screen.getByTestId('detail-spell-level')).toHaveTextContent('3');
     });
 
-    it('passes playerStats.name and playerStats.level to SpellDetailPopup', () => {
+    it('passes playerStats to SpellDetailPopup', () => {
       render(
         <CharActionSpellPopups
           {...createBaseProps({ playerStats: { name: 'Grog', level: 12 } })}
@@ -343,7 +344,7 @@ describe('CharActionSpellPopups', () => {
     });
   });
 
-  describe('TargetWithCheckboxesPopup (Greater Restoration)', () => {
+  describe('TargetWithCheckboxesPopup (Greater Restoration and Remove Curse)', () => {
     it('renders when actionPendingGreaterRestoration is truthy', () => {
       render(
         <CharActionSpellPopups
@@ -353,9 +354,7 @@ describe('CharActionSpellPopups', () => {
       );
       expect(screen.getByTestId('checkbox-popup')).toBeInTheDocument();
     });
-  });
 
-  describe('TargetWithCheckboxesPopup (Remove Curse)', () => {
     it('renders when actionPendingRemoveCurse is truthy', () => {
       render(
         <CharActionSpellPopups

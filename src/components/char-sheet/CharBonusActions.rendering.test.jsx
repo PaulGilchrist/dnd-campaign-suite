@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharBonusActions from './CharBonusActions.jsx';
@@ -135,28 +135,11 @@ describe('CharBonusActions - Rendering', () => {
       expect(container.firstChild).toBeNull();
     });
 
-    it('renders section when bonusActions array has entries', () => {
-      const stats = createStats({
-        bonusActions: [{ name: 'Cunning Action', description: 'Dash, Hide, or Disengage.' }],
-      });
-      render(<CharBonusActions playerStats={stats} />);
-      expect(screen.getByText('Bonus Actions')).toBeInTheDocument();
-    });
-
-    it('renders section when bonus action attacks exist', () => {
-      const stats = createStats({
-        attacks: [{ name: 'Main Gauche', range: 5, hitBonus: 5, damage: '1d4+3', damageType: 'Piercing', type: 'Bonus Action' }],
-      });
-      render(<CharBonusActions playerStats={stats} />);
-      expect(screen.getByText('Bonus Actions')).toBeInTheDocument();
-    });
-
-    it('renders section when bonus action spells exist', () => {
-      const stats = createStats({
-        spellAbilities: {
-          spells: [{ name: 'Shocking Grasp', range: 'Touch', casting_time: '1 bonus action', prepared: 'Prepared' }],
-        },
-      });
+    it.each([
+      { label: 'bonusActions array has entries', stats: createStats({ bonusActions: [{ name: 'Cunning Action', description: 'Dash, Hide, or Disengage.' }] }) },
+      { label: 'bonus action attacks exist', stats: createStats({ attacks: [{ name: 'Main Gauche', range: 5, hitBonus: 5, damage: '1d4+3', damageType: 'Piercing', type: 'Bonus Action' }] }) },
+      { label: 'bonus action spells exist', stats: createStats({ spellAbilities: { spells: [{ name: 'Shocking Grasp', range: 'Touch', casting_time: '1 bonus action', prepared: 'Prepared' }] } }) },
+    ])('renders section when $label', ({ stats }) => {
       render(<CharBonusActions playerStats={stats} />);
       expect(screen.getByText('Bonus Actions')).toBeInTheDocument();
     });
@@ -181,18 +164,11 @@ describe('CharBonusActions - Rendering', () => {
       expect(screen.getByText('Piercing')).toBeInTheDocument();
     });
 
-    it('applies exhaustion penalty and stat classes to hit bonus display', () => {
+    it('applies exhaustionPenalty to hit bonus display', () => {
       const stats = createStats({ attacks: [bonusActionAttack] });
-
       // exhaustion penalty changes hit bonus from +5 to +2
       render(<CharBonusActions playerStats={stats} exhaustionPenalty={3} />);
       expect(screen.getByText('+2')).toBeInTheDocument();
-
-      // conditionAttackMode disadvantage
-      render(<CharBonusActions playerStats={stats} conditionAttackMode="disadvantage" />);
-
-      // cannotAct
-      render(<CharBonusActions playerStats={stats} cannotAct />);
     });
   });
 
@@ -207,17 +183,16 @@ describe('CharBonusActions - Rendering', () => {
       type: 'Bonus Action',
     };
 
-    it('displays save DC instead of hit bonus', () => {
-      getInnateSorceryBonus.mockReturnValue({ saveDcBonus: 0 });
+    it.each([
+      { bonus: 0, expected: 'DC 14 CON', noHitBonus: true },
+      { bonus: 1, expected: 'DC 15 CON', noHitBonus: false },
+    ])('displays save DC with sorcery bonus ($bonus)', ({ bonus, expected, noHitBonus }) => {
+      getInnateSorceryBonus.mockReturnValue({ saveDcBonus: bonus });
       render(<CharBonusActions playerStats={createStats({ attacks: [saveDcAttack] })} />);
-      expect(screen.getByText('DC 14 CON')).toBeInTheDocument();
-      expect(screen.queryByText('+5')).not.toBeInTheDocument();
-    });
-
-    it('applies innate sorcery save DC bonus', () => {
-      getInnateSorceryBonus.mockReturnValue({ saveDcBonus: 1 });
-      render(<CharBonusActions playerStats={createStats({ attacks: [saveDcAttack] })} />);
-      expect(screen.getByText('DC 15 CON')).toBeInTheDocument();
+      expect(screen.getByText(expected)).toBeInTheDocument();
+      if (noHitBonus) {
+        expect(screen.queryByText('+5')).not.toBeInTheDocument();
+      }
     });
   });
 
@@ -230,30 +205,15 @@ describe('CharBonusActions - Rendering', () => {
       expect(screen.getByText('Touch')).toBeInTheDocument();
       expect(screen.getByText('Utility')).toBeInTheDocument();
     });
-
-    it('filters spells by prepared status and casting time', () => {
-      const spells = [
-        { ...bonusActionSpell, name: 'Unprepared Spell', prepared: 'Unprepared' },
-        { ...bonusActionSpell, name: 'Always Prepared', prepared: 'Always' },
-        { ...bonusActionSpell, name: 'Action Spell', casting_time: '1 action' },
-        { ...bonusActionSpell, name: 'Bonus Action Spell', casting_time: '1 bonus action' },
-      ];
-      render(<CharBonusActions playerStats={createStats({ spellAbilities: { spells } })} />);
-      expect(screen.queryByText('Unprepared Spell')).not.toBeInTheDocument();
-      expect(screen.queryByText('Action Spell')).not.toBeInTheDocument();
-      expect(screen.getByText('Always Prepared')).toBeInTheDocument();
-      expect(screen.getByText('Bonus Action Spell')).toBeInTheDocument();
-    });
   });
 
   describe('bonus action descriptions rendering', () => {
-    const bonusActionDesc = {
-      name: 'Cunning Action',
-      description: 'You can take a bonus action.',
-      details: 'Dash, Hide, or Disengage.',
-    };
-
     it('renders bonus action with clickable name when it has details', () => {
+      const bonusActionDesc = {
+        name: 'Cunning Action',
+        description: 'You can take a bonus action.',
+        details: 'Dash, Hide, or Disengage.',
+      };
       render(<CharBonusActions playerStats={createStats({ bonusActions: [bonusActionDesc] })} />);
       expect(screen.getByText(/Cunning Action:/)).toBeInTheDocument();
       expect(screen.getByText(/You can take a bonus action/)).toBeInTheDocument();

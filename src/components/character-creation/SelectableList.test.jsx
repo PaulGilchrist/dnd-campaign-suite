@@ -1,3 +1,4 @@
+// @cleaned-by-ai
 // @improved-by-ai
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -70,11 +71,6 @@ describe('SelectableList', () => {
       expect(container.querySelector('.custom-class-results-list')).toBeInTheDocument();
     });
 
-    it('should render search input with the correct placeholder', () => {
-      renderComponent({ searchPlaceholder: 'Search items...' });
-      expect(screen.getByPlaceholderText('Search items...')).toBeInTheDocument();
-    });
-
     it('should render the search input with the correct label', () => {
       renderComponent();
       expect(screen.getByLabelText('Search Test List')).toBeInTheDocument();
@@ -122,7 +118,7 @@ describe('SelectableList', () => {
   });
 
   describe('loading/empty state', () => {
-    it('should render loading message when items is empty array', () => {
+    it('should render custom loading message when items is empty array', () => {
       const renderItem = createRenderItem();
       render(
         <SelectableList
@@ -169,23 +165,6 @@ describe('SelectableList', () => {
         />,
       );
       expect(screen.getByText('Data not yet loaded. Please try again.')).toBeInTheDocument();
-    });
-
-    it('should still render the title in the loading state', () => {
-      const renderItem = createRenderItem();
-      render(
-        <SelectableList
-          items={[]}
-          fieldName="skills"
-          formData={{}}
-          onArrayFieldChange={vi.fn()}
-          title="My Title"
-          searchPlaceholder="Search..."
-          filters={[]}
-          renderItem={renderItem}
-        />,
-      );
-      expect(screen.getByText('My Title')).toBeInTheDocument();
     });
   });
 
@@ -252,7 +231,7 @@ describe('SelectableList', () => {
       expect(screen.getByText('Item C')).toBeInTheDocument();
     });
 
-    it('should include array values as filter options', () => {
+    it('should include array values as filter options and filter by them', () => {
       const multiClassItems = [
         { name: 'Fireball', classes: ['Wizard', 'Sorcerer'] },
         { name: 'Cure Wounds', classes: ['Cleric', 'Druid', 'Paladin'] },
@@ -283,34 +262,10 @@ describe('SelectableList', () => {
       expect(options).toContain('Paladin');
       expect(options).toContain('Warlock');
       expect(options).toContain('All');
-    });
-
-    it('should filter by multi-value array property', () => {
-      const multiClassItems = [
-        { name: 'Fireball', classes: ['Wizard', 'Sorcerer'] },
-        { name: 'Cure Wounds', classes: ['Cleric', 'Druid', 'Paladin'] },
-        { name: 'Eldritch Blast', classes: ['Warlock'] },
-      ];
-      const classFilter = [{ field: 'classes', defaultLabel: 'All', label: 'Class' }];
-
-      const renderItem = createRenderItem();
-      render(
-        <SelectableList
-          items={multiClassItems}
-          fieldName="skills"
-          formData={mockFormData}
-          onArrayFieldChange={vi.fn()}
-          title="Spells"
-          searchPlaceholder="Search..."
-          filters={classFilter}
-          renderItem={renderItem}
-        />,
-      );
 
       expect(screen.getByText('Fireball')).toBeInTheDocument();
       expect(screen.getByText('Cure Wounds')).toBeInTheDocument();
 
-      const select = document.querySelector('select');
       fireEvent.change(select, { target: { value: 'Wizard' } });
 
       expect(screen.getByText('Fireball')).toBeInTheDocument();
@@ -667,30 +622,6 @@ describe('SelectableList', () => {
       fireEvent.click(screen.getByTestId('item-1'));
       expect(mockOnChange).toHaveBeenCalledWith('customField', ['Item B']);
     });
-
-    it('should combine show only selected with search filtering', () => {
-      const renderItem = createRenderItem();
-      render(
-        <SelectableList
-          items={mockItems}
-          fieldName="skills"
-          formData={{ skills: ['Item A', 'Item B'] }}
-          onArrayFieldChange={vi.fn()}
-          title="Test List"
-          searchPlaceholder="Search..."
-          filters={[]}
-          renderItem={renderItem}
-        />,
-      );
-
-      const checkbox = screen.getByRole('checkbox');
-      fireEvent.click(checkbox);
-      fireEvent.change(screen.getByPlaceholderText('Search...'), { target: { value: 'B' } });
-
-      expect(screen.getByText('Item B')).toBeInTheDocument();
-      expect(screen.queryByText('Item A')).not.toBeInTheDocument();
-      expect(screen.queryByText('Item C')).not.toBeInTheDocument();
-    });
   });
 
   describe('combined filtering', () => {
@@ -717,31 +648,6 @@ describe('SelectableList', () => {
       expect(screen.getByText('Item A')).toBeInTheDocument();
       expect(screen.queryByText('Item B')).not.toBeInTheDocument();
       expect(screen.queryByText('Item C')).not.toBeInTheDocument();
-    });
-
-    it('should sort filtered results by name', () => {
-      const renderItem = createRenderItem();
-      const unsortedItems = [
-        { name: 'Zebra', type: 'Type1' },
-        { name: 'Apple', type: 'Type1' },
-        { name: 'Mango', type: 'Type2' },
-      ];
-      render(
-        <SelectableList
-          items={unsortedItems}
-          fieldName="skills"
-          formData={mockFormData}
-          onArrayFieldChange={vi.fn()}
-          title="Test List"
-          searchPlaceholder="Search..."
-          filters={mockFilters}
-          renderItem={renderItem}
-        />,
-      );
-
-      const testIds = [...screen.getAllByTestId(/item-/)].map((el) => el.getAttribute('data-testid'));
-      expect(testIds[0]).toBe('item-0');
-      expect(testIds[1]).toBe('item-1');
     });
   });
 

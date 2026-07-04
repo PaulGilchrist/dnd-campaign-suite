@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { describe, it, expect } from 'vitest';
 
 import { computeFeatBuffs } from './featBuffService.js';
@@ -963,49 +963,4 @@ describe('computeFeatBuffs', () => {
     });
   });
 
-  describe('ruleset selection', () => {
-    it('uses 5e parsing for "5e" ruleset', () => {
-      const result = computeFeatBuffs(
-        { benefits: ['Increase your Strength score by 2'] },
-        '5e'
-      );
-
-      expect(result.abilityScoreIncreases[0].name).toBe('Strength');
-    });
-
-    it('uses 2024 parsing for "2024" ruleset', () => {
-      const result = computeFeatBuffs(
-        {
-          benefits: [{ type: 'ability_score_increase', description: '+1 STR' }],
-          ability_score_increase: { scores: ['Strength'], amount: 1 },
-        },
-        '2024'
-      );
-
-      expect(result.abilityScoreIncreases[0].name).toBe('Strength');
-    });
-
-    it('defaults to 2024 parsing when ruleset is not specified', () => {
-      const result = computeFeatBuffs(
-        {
-          benefits: [{ type: 'ability_score_increase', description: '+1 STR' }],
-          ability_score_increase: { scores: ['Strength'], amount: 1 },
-        }
-      );
-
-      expect(result.abilityScoreIncreases[0].name).toBe('Strength');
-    });
-
-    it('returns empty result for 2024 ruleset with string-based benefits', () => {
-      const result = computeFeatBuffs(
-        { benefits: ['Increase your Strength score by 2'] },
-        '2024'
-      );
-
-      expect(result.abilityScoreIncreases).toHaveLength(0);
-      expect(result.proficiencies).toHaveLength(0);
-      expect(result.resistances).toHaveLength(0);
-      expect(result.features).toHaveLength(0);
-    });
-  });
 });

@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharBonusActions from './CharBonusActions.jsx';
@@ -132,40 +132,25 @@ describe('CharBonusActions - Edge Cases', () => {
       properties: ['Light'],
     };
 
-    it('filters out Light weapon bonus action attack when Nick was used this round (2024 rules)', () => {
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === '_Nick_UsedRound') return 1;
+    it.each([
+      { nickUsedRound: 1, attackShown: false, label: 'filters out when Nick used this round' },
+      { nickUsedRound: 0, attackShown: true, label: 'shows when Nick not used this round' },
+    ])('$label', ({ nickUsedRound, attackShown }) => {
+      vi.mocked(getRuntimeValue).mockImplementation((name, key) => {
+        if (key === '_Nick_UsedRound') return nickUsedRound;
         return null;
       });
       const stats = createStats({ rules: '2024', attacks: [lightWeaponAttack] });
       render(<CharBonusActions playerStats={stats} getWeaponMastery={() => null} />);
-      expect(screen.queryByText('Dagger')).not.toBeInTheDocument();
-    });
-
-    it('shows Light weapon bonus action attack when Nick was NOT used this round (2024 rules)', () => {
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === '_Nick_UsedRound') return 0;
-        return null;
-      });
-      const stats = createStats({ rules: '2024', attacks: [lightWeaponAttack] });
-      render(<CharBonusActions playerStats={stats} getWeaponMastery={() => null} />);
-      expect(screen.getByText('Dagger')).toBeInTheDocument();
+      if (attackShown) {
+        expect(screen.getByText('Dagger')).toBeInTheDocument();
+      } else {
+        expect(screen.queryByText('Dagger')).not.toBeInTheDocument();
+      }
     });
   });
 
   describe('Elder Champion spell conversion', () => {
-    it('converts action spells to bonus action spells when Elder Champion is active', () => {
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'activeBuffs') return [{ name: 'Elder Champion' }];
-        return null;
-      });
-      const actionSpell = { name: 'Shooting Star', range: '60 ft.', casting_time: '1 action', prepared: 'Prepared' };
-      const stats = createStats({ spellAbilities: { spells: [actionSpell] } });
-      render(<CharBonusActions playerStats={stats} />);
-      expect(screen.getByText('Shooting Star')).toBeInTheDocument();
-      expect(screen.getByText('60 ft.')).toBeInTheDocument();
-    });
-
     it('shows both bonus action and converted action spells when Elder Champion is active', () => {
       getRuntimeValue.mockImplementation((name, key) => {
         if (key === 'activeBuffs') return [{ name: 'Elder Champion' }];

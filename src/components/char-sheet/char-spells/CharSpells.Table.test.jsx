@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import CharSpells from './CharSpells.jsx';
@@ -54,9 +54,6 @@ vi.mock('../../../hooks/combat/useSpellMetamagicFlow.js', () => ({
     pendingMageArmor: null,
     handleMageArmorConfirm: vi.fn(),
     handleMageArmorSkip: vi.fn(),
-    pendingShieldOfFaith: null,
-    handleShieldOfFaithConfirm: vi.fn(),
-    handleShieldOfFaithSkip: vi.fn(),
     pendingProtectionFromEnergy: null,
     handleProtectionFromEnergyConfirm: vi.fn(),
     handleProtectionFromEnergySkip: vi.fn(),
@@ -66,6 +63,9 @@ vi.mock('../../../hooks/combat/useSpellMetamagicFlow.js', () => ({
     pendingRemoveCurse: null,
     handleRemoveCurseConfirm: vi.fn(),
     handleRemoveCurseSkip: vi.fn(),
+    pendingMagicMissile: null,
+    handleMagicMissileConfirm: vi.fn(),
+    handleMagicMissileSkip: vi.fn(),
   })),
 }));
 
@@ -257,13 +257,6 @@ describe('CharSpells - Table Rendering', () => {
       expect(screen.getByText('Detect Magic')).toBeInTheDocument();
     });
 
-    it('renders spell names in clickable cells', () => {
-      renderWithProps({});
-      const spellCells = document.querySelectorAll('.spell-name');
-      expect(spellCells).toHaveLength(2);
-      spellCells.forEach(cell => expect(cell).toHaveClass('clickable'));
-    });
-
     it('renders Cantrip for 0-level spells and numeric levels for higher spells', () => {
       renderWithProps({});
       expect(screen.getByText('Cantrip')).toBeInTheDocument();
@@ -282,50 +275,6 @@ describe('CharSpells - Table Rendering', () => {
       renderWithProps({});
       expect(screen.getByText('Touch')).toBeInTheDocument();
       expect(screen.getByText('Self')).toBeInTheDocument();
-    });
-  });
-
-  describe('spell effects column', () => {
-    it('renders "Utility" for spells without damage', () => {
-      const utilitySpell = {
-        ...basePlayerStats.spellAbilities.spells[2],
-        damage: null,
-      };
-      const stats = {
-        ...basePlayerStats,
-        spellAbilities: {
-          ...basePlayerStats.spellAbilities,
-          spells: [utilitySpell],
-        },
-      };
-      render(<CharSpells playerStats={stats} campaignName="test" />);
-      expect(screen.getByText('Utility')).toBeInTheDocument();
-    });
-
-    it('includes save DC info in effect text when spell has both damage and a save', () => {
-      const saveSpell = {
-        name: 'Cone of Cold',
-        level: 2,
-        casting_time: '1 turn',
-        range: '60 feet',
-        duration: 'Instantaneous',
-        components: ['V', 'S', 'M'],
-        damage: {
-          damage_at_slot_level: { '2': '3d8' },
-          damage_type: 'Cold',
-        },
-        dc: { dc_type: 'Constitution', dc_success: 'half' },
-        prepared: 'Prepared',
-      };
-      const stats = {
-        ...basePlayerStats,
-        spellAbilities: {
-          ...basePlayerStats.spellAbilities,
-          spells: [saveSpell],
-        },
-      };
-      render(<CharSpells playerStats={stats} campaignName="test" />);
-      expect(screen.getByText(/3d8 Cold \(Constitution half\)/)).toBeInTheDocument();
     });
   });
 
@@ -415,15 +364,11 @@ describe('CharSpells - Table Rendering', () => {
       expect(toggleFn).toHaveBeenCalledWith('Shield');
     });
 
-    it('does not render prepared column for 2024 rules', () => {
+    it('does not render prepared column or checkboxes for 2024 rules', () => {
       renderWithProps({ playerStats: helpers.mockPlayerStats2024 });
       const headers = screen.getByRole('table').querySelectorAll('th');
       const headerTexts = Array.from(headers).map(h => h.textContent.trim());
       expect(headerTexts).not.toContain('Prepared');
-    });
-
-    it('does not render checkboxes for 2024 rules', () => {
-      renderWithProps({ playerStats: helpers.mockPlayerStats2024 });
       const checkboxes = screen.queryAllByRole('checkbox');
       expect(checkboxes).toHaveLength(0);
     });

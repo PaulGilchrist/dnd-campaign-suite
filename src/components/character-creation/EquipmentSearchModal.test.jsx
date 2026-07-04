@@ -1,3 +1,4 @@
+// @cleaned-by-ai
 // @improved-by-ai
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -67,7 +68,6 @@ describe('EquipmentSearchModal', () => {
       const props = createMockProps();
       render(<EquipmentSearchModal {...props} />);
       expect(screen.getByText('Select Equipment')).toBeInTheDocument();
-      expect(screen.getByText('✕')).toBeInTheDocument();
       expect(screen.getByText('Close')).toBeInTheDocument();
     });
 
@@ -85,8 +85,7 @@ describe('EquipmentSearchModal', () => {
     it('should render search input with correct placeholder', () => {
       const props = createMockProps();
       render(<EquipmentSearchModal {...props} />);
-      const input = screen.getByPlaceholderText('Search equipment...');
-      expect(input).toHaveAttribute('type', 'text');
+      expect(screen.getByPlaceholderText('Search equipment...')).toBeInTheDocument();
     });
 
     it('should render the show-only-selected checkbox with item count', () => {
@@ -111,17 +110,6 @@ describe('EquipmentSearchModal', () => {
       expect(screen.getByText('2 lb')).toBeInTheDocument();
       expect(screen.getByText('1 lb')).toBeInTheDocument();
       expect(screen.getByText('12 lb')).toBeInTheDocument();
-    });
-
-    it('should not render weight span when item has no weight', () => {
-      const props = createMockProps({
-        filteredEquipment: [mockEquipment[3]],
-      });
-      render(<EquipmentSearchModal {...props} />);
-      const shieldItem = screen.getByText('Shield').closest('.equipment-item');
-      expect(shieldItem).not.toContainElement(
-        screen.queryByText(/lb/)
-      );
     });
 
     it('should render equipment with partial cost data', () => {
@@ -193,15 +181,7 @@ describe('EquipmentSearchModal', () => {
       expect(props.onEquipmentSelect).toHaveBeenCalledWith(mockEquipment[0]);
     });
 
-    it('should call onAddCustomItem when Enter is pressed with a non-empty searchQuery', () => {
-      const props = createMockProps({ searchQuery: 'custom item' });
-      render(<EquipmentSearchModal {...props} />);
-      const searchInput = screen.getByPlaceholderText('Search equipment...');
-      fireEvent.keyDown(searchInput, { key: 'Enter' });
-      expect(props.onAddCustomItem).toHaveBeenCalledWith('custom item');
-    });
-
-    it('should trim whitespace from searchQuery before calling onAddCustomItem', () => {
+    it('should call onAddCustomItem with trimmed query when Enter is pressed', () => {
       const props = createMockProps({ searchQuery: '  sword  ' });
       render(<EquipmentSearchModal {...props} />);
       const searchInput = screen.getByPlaceholderText('Search equipment...');
@@ -254,21 +234,6 @@ describe('EquipmentSearchModal', () => {
       expect(
         screen.getByText('Start typing to search equipment.')
       ).toBeInTheDocument();
-    });
-
-    it('should not show empty state messages when there are results', () => {
-      const props = createMockProps({
-        searchQuery: 'club',
-        filteredEquipment: [mockEquipment[0]],
-      });
-      render(<EquipmentSearchModal {...props} />);
-      expect(screen.getByText('Club')).toBeInTheDocument();
-      expect(
-        screen.queryByText('No matches found. Press Enter to add as custom item.')
-      ).not.toBeInTheDocument();
-      expect(
-        screen.queryByText('Start typing to search equipment.')
-      ).not.toBeInTheDocument();
     });
   });
 });

@@ -1,221 +1,7 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import CharActionModals from './CharActionModals.jsx';
-
-// ── Mocked modal modules ──
-
-vi.mock('./modals/divine/HealingPoolModal.jsx', () => ({
-  default: function TestModal({ onClose }) {
-    return <div data-testid="healing-pool-modal"><button data-testid="healing-close" onClick={onClose}>Close</button></div>;
-  },
-}));
-vi.mock('./modals/shared/HandOfHealingModal.jsx', () => ({
-  default: function TestModal() { return <div data-testid="hand-of-healing-modal">HandOfHealingModal</div>; },
-}));
-vi.mock('./modals/FontOfMagicModal.jsx', () => ({
-  default: function TestModal() { return <div data-testid="font-of-magic-modal">FontOfMagicModal</div>; },
-}));
-vi.mock('./modals/ResourcePoolModal.jsx', () => ({
-  default: function TestModal() { return <div data-testid="resource-pool-modal">ResourcePoolModal</div>; },
-}));
-vi.mock('./modals/WildCompanionModal.jsx', () => ({
-  default: function TestModal() { return <div data-testid="wild-companion-modal">WildCompanionModal</div>; },
-}));
-vi.mock('./modals/shared/SetConditionModal.jsx', () => ({
-  default: function TestModal() { return <div data-testid="set-condition-modal">SetConditionModal</div>; },
-}));
-vi.mock('./modals/EyebiteEffectModal.jsx', () => ({
-  default: function TestModal() { return <div data-testid="eyebite-effect-modal">EyebiteEffectModal</div>; },
-}));
-vi.mock('./modals/shared/AttackRiderModal.jsx', () => ({
-  default: function TestModal({ onClose }) {
-    return <div data-testid="attack-rider-modal"><button data-testid="attack-rider-close" onClick={onClose}>Close</button></div>;
-  },
-}));
-vi.mock('./modals/OpenHandTechniqueModal.jsx', () => ({
-  default: function TestModal({ onClose }) {
-    return <div data-testid="open-hand-technique-modal"><button data-testid="open-hand-close" onClick={onClose}>Close</button></div>;
-  },
-}));
-vi.mock('./modals/WeaponMasteryModal.jsx', () => ({
-  default: function TestModal({ onClose }) {
-    return <div data-testid="weapon-mastery-modal"><button data-testid="weapon-mastery-close" onClick={onClose}>Close</button></div>;
-  },
-}));
-vi.mock('./modals/WeaponMasteryChoiceModal.jsx', () => ({
-  default: function TestModal({ onClose, onConfirm }) {
-    return (
-      <div data-testid="weapon-mastery-choice-modal">
-        <button data-testid="weapon-mastery-confirm" onClick={() => onConfirm('test-choice')}>Confirm</button>
-        <button data-testid="weapon-mastery-close" onClick={onClose}>Close</button>
-      </div>
-    );
-  },
-}));
-vi.mock('./modals/WeaponKindMasteryModal.jsx', () => ({
-  default: function TestModal({ onClose }) {
-    return <div data-testid="weapon-kind-mastery-modal"><button data-testid="weapon-kind-mastery-close" onClick={onClose}>Close</button></div>;
-  },
-}));
-vi.mock('./modals/shared/CombatStanceModal.jsx', () => ({
-  default: function TestModal({ onClose }) {
-    return <div data-testid="combat-stance-modal"><button data-testid="combat-stance-close" onClick={onClose}>Close</button></div>;
-  },
-}));
-vi.mock('./modals/TeleportModal.jsx', () => ({
-  default: function TestModal({ onClose }) {
-    return <div data-testid="teleport-modal"><button data-testid="teleport-close" onClick={onClose}>Close</button></div>;
-  },
-}));
-vi.mock('./modals/shared/HealingIllusionModal.jsx', () => ({
-  default: function TestModal({ onClose }) {
-    return <div data-testid="healing-illusion-modal"><button data-testid="healing-illusion-close" onClick={onClose}>Close</button></div>;
-  },
-}));
-vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
-  getRuntimeValue: vi.fn(() => null),
-  setRuntimeValue: vi.fn(),
-}));
-vi.mock('../../services/automation/common/healingRoll.js', () => ({
-  logHealingToSSE: vi.fn(),
-}));
-vi.mock('./modals/shared/SaveAttackHealModal.jsx', () => ({
-  default: function TestModal() { return <div data-testid="save-attack-heal-modal">SaveAttackHealModal</div>; },
-}));
-vi.mock('./modals/divine/DivineSparkModal.jsx', () => ({
-  default: function TestModal() { return <div data-testid="divine-spark-modal">DivineSparkModal</div>; },
-}));
-vi.mock('./modals/divine/DivineInterventionModal.jsx', () => ({
-  default: function TestModal({ onClose }) {
-    return <div data-testid="divine-intervention-modal"><button data-testid="divine-intervention-close" onClick={onClose}>Close</button></div>;
-  },
-}));
-vi.mock('./modals/arcane/ArcaneChargeModal.jsx', () => ({
-  default: function TestModal() { return <div data-testid="arcane-charge-modal">ArcaneChargeModal</div>; },
-}));
-vi.mock('./modals/WarMagicCantripModal.jsx', () => ({
-  default: function TestModal() { return <div data-testid="war-magic-cantrip-modal">WarMagicCantripModal</div>; },
-}));
-vi.mock('./modals/WarMagicSpellModal.jsx', () => ({
-  default: function TestModal() { return <div data-testid="war-magic-spell-modal">WarMagicSpellModal</div>; },
-}));
-vi.mock('./modals/divine/SacredWeaponModal.jsx', () => ({
-  default: function TestModal() { return <div data-testid="sacred-weapon-modal">SacredWeaponModal</div>; },
-}));
-vi.mock('./modals/ElderChampionRestoreModal.jsx', () => ({
-  default: function TestModal({ onClose, onConfirm }) {
-    return (
-      <div data-testid="elder-champion-restore-modal">
-        <button data-testid="elder-close" onClick={onClose}>Close</button>
-        <button data-testid="elder-confirm" onClick={onConfirm}>Confirm</button>
-      </div>
-    );
-  },
-}));
-vi.mock('./modals/PrimalCompanionBonusActionModal.jsx', () => ({
-  default: function TestModal() { return <div data-testid="primal-companion-bonus-action-modal">PrimalCompanionBonusActionModal</div>; },
-}));
-vi.mock('./modals/MistyWandererModal.jsx', () => ({
-  default: function TestModal() { return <div data-testid="misty-wanderer-modal">MistyWandererModal</div>; },
-}));
-vi.mock('./modals/shared/BonusActionChoiceModal.jsx', () => ({
-  default: function TestModal() { return <div data-testid="bonus-action-choice-modal">BonusActionChoiceModal</div>; },
-}));
-vi.mock('./modals/CelestialRevelationModal.jsx', () => ({
-  default: function TestModal() { return <div data-testid="celestial-revelation-modal">CelestialRevelationModal</div>; },
-}));
-vi.mock('./modals/RevelationInFleshModal.jsx', () => ({
-  default: function TestModal({ onClose }) {
-    return <div data-testid="revelation-in-flesh-modal"><button data-testid="revelation-close" onClick={onClose}>Close</button></div>;
-  },
-}));
-vi.mock('./modals/ElementalAffinityModal.jsx', () => ({
-  default: function TestModal() { return <div data-testid="elemental-affinity-modal">ElementalAffinityModal</div>; },
-}));
-vi.mock('./modals/FiendishResilienceModal.jsx', () => ({
-  default: function TestModal() { return <div data-testid="fiendish-resilience-modal">FiendishResilienceModal</div>; },
-}));
-vi.mock('./modals/shared/ChoiceListModal.jsx', () => ({
-  ChoiceListModal: function TestModal() { return <div data-testid="choice-list-modal">ChoiceListModal</div>; },
-}));
-vi.mock('./modals/DragonCompanionModal.jsx', () => ({
-  default: function TestModal() { return <div data-testid="dragon-companion-modal">DragonCompanionModal</div>; },
-}));
-vi.mock('./modals/WildMagicDoubleRollModal.jsx', () => ({
-  default: function TestModal() { return <div data-testid="wild-magic-double-roll-modal">WildMagicDoubleRollModal</div>; },
-}));
-vi.mock('./modals/WildMagicTamedModal.jsx', () => ({
-  default: function TestModal() { return <div data-testid="wild-magic-tamed-modal">WildMagicTamedModal</div>; },
-}));
-vi.mock('./modals/arcane/ThirdEyeModal.jsx', () => ({
-  default: function TestModal() { return <div data-testid="third-eye-modal">ThirdEyeModal</div>; },
-}));
-vi.mock('./modals/arcane/SoulstitchSpellsModal.jsx', () => ({
-  default: function TestModal() { return <div data-testid="soulstitch-spells-modal">SoulstitchSpellsModal</div>; },
-}));
-vi.mock('./modals/arcane/IllusoryRealityModal.jsx', () => ({
-  default: function TestModal() { return <div data-testid="illusory-reality-modal">IllusoryRealityModal</div>; },
-}));
-vi.mock('./modals/arcane/ArcaneWardRestoreModal.jsx', () => ({
-  default: function TestModal({ onClose }) {
-    return <div data-testid="arcane-ward-restore-modal"><button data-testid="arcane-ward-close" onClick={onClose}>Close</button></div>;
-  },
-}));
-vi.mock('./modals/CombatSuperiorityModal.jsx', () => ({
-  default: function TestModal({ onClose }) {
-    return <div data-testid="combat-superiority-modal"><button data-testid="combat-superiority-close" onClick={onClose}>Close</button></div>;
-  },
-}));
-vi.mock('./modals/AttackRiderManeuverPrompt.jsx', () => ({
-  default: function TestModal({ onSkip }) {
-    return <div data-testid="attack-rider-maneuver-prompt"><button data-testid="maneuver-skip" onClick={onSkip}>Skip</button></div>;
-  },
-}));
-vi.mock('./modals/ConstellationSelectionModal.jsx', () => ({
-  default: function TestModal({ onConfirm, onClose }) {
-    return (
-      <div data-testid="constellation-selection-modal">
-        <button data-testid="const-confirm" onClick={() => onConfirm('test-option')}>Confirm</button>
-        <button data-testid="const-close" onClick={onClose}>Close</button>
-      </div>
-    );
-  },
-}));
-vi.mock('./modals/divine/BastionOfLawModal.jsx', () => ({
-  default: function TestModal({ onClose, onConfirm }) {
-    return (
-      <div data-testid="bastion-of-law-modal">
-        <button data-testid="bastion-close" onClick={onClose}>Close</button>
-        {onConfirm && <button data-testid="bastion-confirm" onClick={() => onConfirm(5, 'target', null, false)}>Confirm</button>}
-      </div>
-    );
-  },
-}));
-vi.mock('./modals/MoonlightStepResourceModal.jsx', () => ({
-  default: function TestModal() { return <div data-testid="moonlight-step-resource-modal">MoonlightStepResourceModal</div>; },
-}));
-vi.mock('./modals/FiendishLegacyModal.jsx', () => ({
-  default: function TestModal({ onClose }) {
-    return <div data-testid="fiendish-legacy-modal"><button data-testid="fiendish-close" onClick={onClose}>Close</button></div>;
-  },
-}));
-vi.mock('./modals/racial/BreathWeaponShapeModal.jsx', () => ({
-  default: function TestModal({ onClose }) {
-    return <div data-testid="breath-weapon-shape-modal"><button data-testid="breath-close" onClick={onClose}>Close</button></div>;
-  },
-}));
-vi.mock('./modals/shared/HypnoticPatternShakeModal.jsx', () => ({
-  default: function TestModal({ onClose }) {
-    return <div data-testid="hypnotic-pattern-shake-modal"><button data-testid="hypnotic-close" onClick={onClose}>Close</button></div>;
-  },
-}));
-vi.mock('../../services/automation/handlers/class-cleric-paladin/bastionOfLawHandler.js', () => ({
-  handle: vi.fn().mockResolvedValue(undefined),
-  handleClearWard: vi.fn().mockResolvedValue(undefined),
-  handleSpendDice: vi.fn().mockResolvedValue(undefined),
-  handleApply: vi.fn().mockResolvedValue(undefined),
-}));
 
 // ── Test fixtures ──
 
@@ -242,57 +28,56 @@ describe('CharActionModals inline choice modals', () => {
     vi.clearAllMocks();
   });
 
-  // Sweeping Attack Target — verifies the handler receives the selected target name
-  // and the full modal data object (the actual behavioral contract of CharActionModals).
-  // All other rendering details are the responsibility of SecondaryTargetModal.
-  describe('Sweeping Attack Target modal', () => {
-    it('calls handleSweepingAttackConfirm with target name and modal data on selection', () => {
-      const handleSweepingAttackConfirm = vi.fn();
-      render(<CharActionModals
-        {...baseProps({ handleSweepingAttackConfirm })}
-        sweepingAttackTargetModal={{
-          primaryTarget: 'Goblin',
-          dieValue: 10,
-          secondaryTargets: [{ name: 'Ogre' }, { name: 'Skeleton' }],
-        }}
-      />);
-      fireEvent.click(screen.getByText('Ogre'));
-      fireEvent.click(screen.getByText(/Apply Sweeping Attack/));
-      expect(handleSweepingAttackConfirm).toHaveBeenCalledWith('Ogre', expect.objectContaining({
+  // Inline choice modals (Sweeping Attack, Bait and Switch, Commander's Strike)
+  // all render SecondaryTargetModal and pass the handler as onTargetSelected.
+  // These tests verify that selecting a target triggers the correct handler
+  // with the selected value and full modal data — the behavioral contract.
+  // Rendering details are SecondaryTargetModal's responsibility.
+
+  const inlineChoiceCases = [
+    {
+      name: 'Sweeping Attack Target',
+      modalProp: 'sweepingAttackTargetModal',
+      modalData: {
         primaryTarget: 'Goblin',
-      }));
-    });
-  });
+        dieValue: 10,
+        secondaryTargets: [{ name: 'Ogre' }, { name: 'Skeleton' }],
+      },
+      handlerProp: 'handleSweepingAttackConfirm',
+      optionText: 'Ogre',
+      confirmText: /Apply Sweeping Attack/,
+    },
+    {
+      name: 'Bait and Switch Choice',
+      modalProp: 'baitAndSwitchChoiceModal',
+      modalData: { description: 'Test', options: [{ label: 'Player', value: 'player' }] },
+      handlerProp: 'handleBaitAndSwitchChoiceConfirm',
+      optionText: 'Player',
+      confirmText: /Apply AC Bonus/,
+    },
+    {
+      name: "Commander's Strike Choice",
+      modalProp: 'commanderStrikeChoiceModal',
+      modalData: { description: 'Test', options: [{ label: 'Bard', value: 'bard' }] },
+      handlerProp: 'handleCommanderStrikeChoiceConfirm',
+      optionText: 'Bard',
+      confirmText: /Grant Attack/,
+    },
+  ];
 
-  // Bait and Switch Choice — same behavioral contract: selected option value + full modal data.
-  describe('Bait and Switch Choice modal', () => {
-    it('calls handleBaitAndSwitchChoiceConfirm with option value and modal data on selection', () => {
-      const handleBaitAndSwitchChoiceConfirm = vi.fn();
+  for (const { name, modalProp, modalData, handlerProp, optionText, confirmText } of inlineChoiceCases) {
+    it(`${name}: calls handler with selected value and modal data on selection`, () => {
+      const handler = vi.fn();
       render(<CharActionModals
-        {...baseProps({ handleBaitAndSwitchChoiceConfirm })}
-        baitAndSwitchChoiceModal={{ description: 'Test', options: [{ label: 'Player', value: 'player' }] }}
+        {...baseProps({ [handlerProp]: handler })}
+        {...{ [modalProp]: modalData }}
       />);
-      fireEvent.click(screen.getByText('Player'));
-      fireEvent.click(screen.getByText(/Apply AC Bonus/));
-      expect(handleBaitAndSwitchChoiceConfirm).toHaveBeenCalledWith('player', expect.objectContaining({
-        description: 'Test',
-      }));
+      fireEvent.click(screen.getByText(optionText));
+      fireEvent.click(screen.getByText(confirmText));
+      expect(handler).toHaveBeenCalledWith(
+        optionText === 'Ogre' ? 'Ogre' : optionText.toLowerCase(),
+        expect.objectContaining(modalData)
+      );
     });
-  });
-
-  // Commander's Strike Choice — same behavioral contract.
-  describe("Commander's Strike Choice modal", () => {
-    it('calls handleCommanderStrikeChoiceConfirm with option value and modal data on selection', () => {
-      const handleCommanderStrikeChoiceConfirm = vi.fn();
-      render(<CharActionModals
-        {...baseProps({ handleCommanderStrikeChoiceConfirm })}
-        commanderStrikeChoiceModal={{ description: 'Test', options: [{ label: 'Bard', value: 'bard' }] }}
-      />);
-      fireEvent.click(screen.getByText('Bard'));
-      fireEvent.click(screen.getByText(/Grant Attack/));
-      expect(handleCommanderStrikeChoiceConfirm).toHaveBeenCalledWith('bard', expect.objectContaining({
-        description: 'Test',
-      }));
-    });
-  });
+  }
 });

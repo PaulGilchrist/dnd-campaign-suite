@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { describe, it, expect, vi } from 'vitest'
 import { computeFeatRangeEffects } from './featRangeService.js'
 import * as dataLoader from '../ui/dataLoader.js'
@@ -44,14 +44,11 @@ describe('computeFeatRangeEffects', () => {
     expect(result).toEqual(defaultResult)
   })
 
-  it('returns defaults when featNames is null', async () => {
-    const result = await computeFeatRangeEffects(null, '5e')
-    expect(result).toEqual(defaultResult)
-  })
-
-  it('returns defaults when featNames is undefined', async () => {
-    const result = await computeFeatRangeEffects(undefined, '5e')
-    expect(result).toEqual(defaultResult)
+  it('returns defaults when featNames is null or undefined', async () => {
+    const resultNull = await computeFeatRangeEffects(null, '5e')
+    expect(resultNull).toEqual(defaultResult)
+    const resultUndefined = await computeFeatRangeEffects(undefined, '5e')
+    expect(resultUndefined).toEqual(defaultResult)
   })
 
   it('returns defaults when feat data returns an empty array', async () => {
@@ -224,16 +221,13 @@ describe('computeFeatRangeEffects', () => {
     expect(result.cantripRangeBonus).toBe(0)
   })
 
-  it('handles playerStats being null', async () => {
-    const result = await computeFeatRangeEffects([], '5e', null)
-    expect(result.meleeReachBonus).toBe(0)
-    expect(result.cantripRangeBonus).toBe(0)
-  })
-
-  it('handles playerStats being undefined', async () => {
-    const result = await computeFeatRangeEffects([], '5e')
-    expect(result.meleeReachBonus).toBe(0)
-    expect(result.cantripRangeBonus).toBe(0)
+  it('handles playerStats being null or undefined', async () => {
+    const resultNull = await computeFeatRangeEffects([], '5e', null)
+    expect(resultNull.meleeReachBonus).toBe(0)
+    expect(resultNull.cantripRangeBonus).toBe(0)
+    const resultUndefined = await computeFeatRangeEffects([], '5e')
+    expect(resultUndefined.meleeReachBonus).toBe(0)
+    expect(resultUndefined.cantripRangeBonus).toBe(0)
   })
 
   it('handles playerStats with empty passives array', async () => {

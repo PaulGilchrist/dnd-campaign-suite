@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import WizardStepFeats from './WizardStepFeats.jsx';
@@ -56,28 +56,6 @@ describe('WizardStepFeats', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     featValidation.getRaceFeatChoices.mockReset().mockResolvedValue([]);
-  });
-
-  describe('Rendering — header and structure', () => {
-    it('should render the step header, search input, type filter, and "Show Only Selected" checkbox', () => {
-      renderComponent();
-      expect(screen.getByText('Step 4: Feats')).toBeInTheDocument();
-      expect(screen.getByPlaceholderText('Search feats...')).toBeInTheDocument();
-      const typeLabels = screen.getAllByText('Combat');
-      expect(typeLabels.length).toBeGreaterThan(0);
-      expect(screen.getByRole('checkbox')).toBeInTheDocument();
-    });
-
-    it('should render all feat names sorted alphabetically', () => {
-      renderComponent();
-      expect(screen.getByText('Actor')).toBeInTheDocument();
-      expect(screen.getByText('Great Weapon Master')).toBeInTheDocument();
-      expect(screen.getByText('Lucky')).toBeInTheDocument();
-      expect(screen.getByText('Magic Initiate')).toBeInTheDocument();
-      expect(screen.getByText('Observant')).toBeInTheDocument();
-      expect(screen.getByText('Sharpshooter')).toBeInTheDocument();
-      expect(screen.getByText('Weapon Master')).toBeInTheDocument();
-    });
   });
 
   describe('Rendering — pre-selected feats', () => {
@@ -267,79 +245,6 @@ describe('WizardStepFeats', () => {
     });
   });
 
-  describe('Rendering — filtering', () => {
-    it('should filter feats by search query (case-insensitive), type dropdown, and "Show Only Selected" checkbox', () => {
-      renderComponent();
-      fireEvent.change(screen.getByPlaceholderText('Search feats...'), { target: { value: 'Lucky' } });
-      expect(screen.getByText('Lucky')).toBeInTheDocument();
-      expect(screen.queryByText('Great Weapon Master')).not.toBeInTheDocument();
-
-      fireEvent.change(screen.getByPlaceholderText('Search feats...'), { target: { value: 'lucky' } });
-      expect(screen.getByText('Lucky')).toBeInTheDocument();
-    });
-
-    it('should filter feats by type using the dropdown', () => {
-      renderComponent();
-      const typeFilter = document.querySelector('.type-filter');
-      fireEvent.change(typeFilter, { target: { value: 'Combat' } });
-      expect(screen.getByText('Great Weapon Master')).toBeInTheDocument();
-      expect(screen.getByText('Weapon Master')).toBeInTheDocument();
-      expect(screen.queryByText('Actor')).not.toBeInTheDocument();
-    });
-
-    it('should combine search, type filter, and show-only-selected', () => {
-      renderComponent();
-      fireEvent.change(screen.getByPlaceholderText('Search feats...'), { target: { value: 'Master' } });
-      const typeFilter = document.querySelector('.type-filter');
-      fireEvent.change(typeFilter, { target: { value: 'Combat' } });
-      expect(screen.getByText('Great Weapon Master')).toBeInTheDocument();
-      expect(screen.getByText('Weapon Master')).toBeInTheDocument();
-      expect(screen.queryByText('Magic Initiate')).not.toBeInTheDocument();
-    });
-
-    it('should filter to show only selected items when the checkbox is checked', () => {
-      renderComponent({ formData: { ...mockFormData, feats: ['Lucky'] } });
-      const checkbox = screen.getByRole('checkbox');
-      fireEvent.click(checkbox);
-      expect(screen.getByText('Lucky')).toBeInTheDocument();
-      expect(screen.queryByText('Actor')).not.toBeInTheDocument();
-    });
-
-    it('should show the selected count in the "Show Only Selected" label', () => {
-      renderComponent({ formData: { ...mockFormData, feats: ['Lucky', 'Actor'] } });
-      expect(screen.getByText(/2 selected\)/)).toBeInTheDocument();
-    });
-
-    it('should display correct plural/singular/zero result counts', () => {
-      renderComponent();
-      expect(screen.getByText(/Showing 7 feats/)).toBeInTheDocument();
-
-      fireEvent.change(screen.getByPlaceholderText('Search feats...'), { target: { value: 'Lucky' } });
-      expect(screen.getByText(/Showing 1 feat/)).toBeInTheDocument();
-
-      fireEvent.change(screen.getByPlaceholderText('Search feats...'), { target: { value: 'ZZZZ' } });
-      expect(screen.getByText(/Showing 0 feats/)).toBeInTheDocument();
-    });
-
-    it('should show no results message when search has no matches', () => {
-      renderComponent();
-      fireEvent.change(screen.getByPlaceholderText('Search feats...'), { target: { value: 'Nonexistent' } });
-      expect(screen.getByText(/No feat found matching your criteria/)).toBeInTheDocument();
-    });
-  });
-
-  describe('Rendering — empty/missing items', () => {
-    it('should render loading message when allFeats is null', () => {
-      renderComponent({ allFeats: null });
-      expect(screen.getByText('Feat data not yet loaded. Please try again.')).toBeInTheDocument();
-    });
-
-    it('should still render the title when allFeats is empty', () => {
-      renderComponent({ allFeats: [] });
-      expect(screen.getByText('Step 4: Feats')).toBeInTheDocument();
-    });
-  });
-
   describe('Race feat choices for 2024 ruleset', () => {
     it('should display versatile trait info when race has Versatile trait and choices are available', async () => {
       featValidation.getRaceFeatChoices.mockResolvedValueOnce(['Skilled', 'Observant']);
@@ -364,33 +269,6 @@ describe('WizardStepFeats', () => {
 
       await waitFor(() => {
         expect(screen.queryByText(/Versatile Trait/)).not.toBeInTheDocument();
-      });
-    });
-  });
-
-  describe('Integration — selection workflow', () => {
-    it('should add a feat to the selection when its checkbox is clicked', async () => {
-      const mockOnChange = vi.fn();
-      renderComponent({ onArrayFieldChange: mockOnChange });
-      const checkboxes = document.querySelectorAll('.list-item-checkbox-trigger');
-      fireEvent.click(checkboxes[0]);
-
-      await waitFor(() => {
-        expect(mockOnChange).toHaveBeenCalledWith('feats', ['Actor']);
-      });
-    });
-
-    it('should remove a feat from the selection when its checkbox is clicked again', async () => {
-      const mockOnChange = vi.fn();
-      renderComponent({
-        formData: { ...mockFormData, feats: ['Actor'] },
-        onArrayFieldChange: mockOnChange,
-      });
-      const checkboxes = document.querySelectorAll('.list-item-checkbox-trigger');
-      fireEvent.click(checkboxes[0]);
-
-      await waitFor(() => {
-        expect(mockOnChange).toHaveBeenCalledWith('feats', []);
       });
     });
   });

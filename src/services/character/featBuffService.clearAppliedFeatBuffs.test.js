@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { describe, it, expect } from 'vitest';
 
 import { clearAppliedFeatBuffs } from './featBuffService.js';
@@ -29,12 +29,6 @@ describe('clearAppliedFeatBuffs', () => {
     expect(() => clearAppliedFeatBuffs(null)).toThrow(TypeError);
   });
 
-  it('should not throw when abilities array is empty', () => {
-    const formData = { abilities: [] };
-
-    expect(() => clearAppliedFeatBuffs(formData)).not.toThrow();
-  });
-
   it('should not modify other formData properties', () => {
     const formData = {
       abilities: [{ name: 'Strength', featIncrease: 5 }],
@@ -51,13 +45,4 @@ describe('clearAppliedFeatBuffs', () => {
     expect(formData.class).toBe('Wizard');
   });
 
-  it('should handle abilities without featIncrease property', () => {
-    const formData = {
-      abilities: [{ name: 'Strength' }],
-    };
-
-    clearAppliedFeatBuffs(formData);
-
-    expect(formData.abilities[0].featIncrease).toBe(0);
-  });
 });

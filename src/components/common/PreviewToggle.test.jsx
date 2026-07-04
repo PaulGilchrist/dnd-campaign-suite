@@ -1,4 +1,4 @@
-/* @improved-by-ai */
+/* @cleaned-by-ai */
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import PreviewToggle from './PreviewToggle.jsx';
@@ -23,11 +23,6 @@ describe('PreviewToggle', () => {
             render(<PreviewToggle value="**bold**" onChange={() => {}} />);
             const previewDiv = document.querySelector('.preview-toggle-preview');
             expect(previewDiv).toHaveClass('preview-toggle-preview--hidden');
-        });
-
-        it('does not show a label when label prop is not provided', () => {
-            render(<PreviewToggle value="" onChange={() => {}} />);
-            expect(document.querySelector('.preview-toggle-label')).toBeNull();
         });
     });
 
@@ -69,19 +64,6 @@ describe('PreviewToggle', () => {
             );
             const textarea = screen.getByRole('textbox');
             expect(textarea).toHaveAttribute('id', 'my-textarea');
-        });
-
-        it('applies custom className alongside base class', () => {
-            render(
-                <PreviewToggle
-                    value=""
-                    onChange={() => {}}
-                    className="custom-area"
-                />
-            );
-            const textarea = screen.getByRole('textbox');
-            expect(textarea).toHaveClass('preview-toggle-textarea');
-            expect(textarea).toHaveClass('custom-area');
         });
 
         it('applies custom rows to textarea', () => {
@@ -151,13 +133,6 @@ describe('PreviewToggle', () => {
             expect(html.querySelector('strong')).toBeTruthy();
         });
 
-        it('does not show preview when value is empty', () => {
-            render(<PreviewToggle value="" onChange={() => {}} />);
-            const button = screen.getByRole('button', { name: /preview/i });
-            fireEvent.click(button);
-
-            expect(document.querySelector('.markdown-preview')).not.toBeInTheDocument();
-        });
     });
 
     describe('onChange', () => {

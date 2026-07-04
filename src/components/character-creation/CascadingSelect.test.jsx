@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CascadingSelect from './CascadingSelect.jsx';
@@ -47,60 +47,35 @@ describe('CascadingSelect', () => {
       expect(parentSelect.querySelector('option[value=""]')).toHaveTextContent('Select a race');
     });
 
-    it('should render child dropdown when subOptions exist', () => {
-      const { container } = render(<CascadingSelect {...baseProps} />);
-      const selects = container.querySelectorAll('select');
-      expect(selects[1]).toBeInTheDocument();
+    it('should render child dropdown when subOptions exist and hide it when empty', () => {
+      const { container: withSubs } = render(<CascadingSelect {...baseProps} />);
+      expect(withSubs.querySelectorAll('select').length).toBe(2);
       expect(screen.getByRole('option', { name: 'Hill' })).toBeInTheDocument();
-      expect(screen.getByRole('option', { name: 'High' })).toBeInTheDocument();
+
+      const { container: withoutSubs } = render(<CascadingSelect {...baseProps} formData={{ race: { name: 'Elf' } }} options={[{ name: 'Elf', subraces: [] }]} subOptionsSelector={makeSubOptionsSelector([{ name: 'Elf', subraces: [] }])} />);
+      expect(withoutSubs.querySelectorAll('select').length).toBe(1);
     });
 
-    it('should NOT render child dropdown when subOptions are empty', () => {
-      const props = {
-        ...baseProps,
-        formData: { race: { name: 'Elf' } },
-        options: [{ name: 'Elf', subraces: [] }],
-        subOptionsSelector: makeSubOptionsSelector([{ name: 'Elf', subraces: [] }]),
-      };
-      const { container } = render(<CascadingSelect {...props} />);
-      const selects = container.querySelectorAll('select');
-      expect(selects.length).toBe(1);
-    });
-
-    it('should render loading text in the parent select when options are empty', () => {
-      const { container } = render(<CascadingSelect {...baseProps} options={[]} />);
-      const selects = container.querySelectorAll('select');
-      const options = selects[0].querySelectorAll('option');
-      const loadingOption = options[1];
-      expect(loadingOption).toHaveTextContent('Loading races...');
-    });
-
-    it('should show selected parent and child values', () => {
+    it('should show selected parent and child values, and empty selects when values are undefined', () => {
       const { container } = render(<CascadingSelect {...baseProps} />);
       const selects = container.querySelectorAll('select');
       expect(selects[0].value).toBe('Human');
       expect(selects[1].value).toBe('Hill');
+
+      const { container: emptyRace } = render(<CascadingSelect {...baseProps} formData={{}} />);
+      const emptySelects = emptyRace.querySelectorAll('select');
+      expect(emptySelects[0].value).toBe('');
+
+      const { container: noSubrace } = render(<CascadingSelect {...baseProps} formData={{ race: { name: 'Human' } }} />);
+      const noSubraceSelects = noSubrace.querySelectorAll('select');
+      expect(noSubraceSelects[1].value).toBe('');
     });
 
-    it('should show empty selects when values are undefined', () => {
-      const { container } = render(<CascadingSelect {...baseProps} formData={{ race: { name: 'Human' } }} />);
-      const selects = container.querySelectorAll('select');
-      expect(selects[1].value).toBe('');
-    });
-
-    it('should show empty parent select when formData[fieldName] is undefined', () => {
-      const { container } = render(<CascadingSelect {...baseProps} formData={{}} />);
-      const selects = container.querySelectorAll('select');
-      expect(selects[0].value).toBe('');
-    });
-
-    it('should use (Major) suffix for 2024 ruleset on child label', () => {
+    it('should apply (Major) suffix for 2024 ruleset on child label', () => {
       const { container } = render(<CascadingSelect {...baseProps} ruleset="2024" />);
       const labels = container.querySelectorAll('label');
       expect(labels[1].textContent).toContain('Race (Major)');
-    });
 
-    it('should apply custom childLabelProp with (Major) suffix for 2024 ruleset', () => {
       render(<CascadingSelect {...baseProps} childLabel="Subrace Type" ruleset="2024" />);
       expect(screen.getByText('Subrace Type (Major) *')).toBeInTheDocument();
     });
@@ -139,18 +114,16 @@ describe('CascadingSelect', () => {
     it('should call onInputChange when parent changes', () => {
       const { container } = render(<CascadingSelect {...baseProps} />);
       const selects = container.querySelectorAll('select');
+
       fireEvent.change(selects[0], { target: { value: 'Elf' } });
       expect(baseProps.onInputChange).toHaveBeenCalledWith('race', { name: 'Elf' });
-    });
 
-    it('should call onInputChange with empty string when selecting empty parent option', () => {
-      const { container } = render(<CascadingSelect {...baseProps} />);
-      const selects = container.querySelectorAll('select');
+      baseProps.onInputChange.mockClear();
       fireEvent.change(selects[0], { target: { value: '' } });
       expect(baseProps.onInputChange).toHaveBeenCalledWith('race', { name: '' });
     });
 
-    it('should merge childExtraFields into child selection', () => {
+    it('should handle child change with merged extraFields', () => {
       const options = [
         { name: 'Elf', subraces: [{ index: 'wood', name: 'Wood' }] },
       ];
@@ -171,30 +144,14 @@ describe('CascadingSelect', () => {
         })
       );
     });
-
-    it('should handle child change when formData[fieldName] is undefined', () => {
-      const props = {
-        ...baseProps,
-        formData: {},
-      };
-      const { container } = render(<CascadingSelect {...props} />);
-      const selects = container.querySelectorAll('select');
-      fireEvent.change(selects[0], { target: { value: 'Human' } });
-      expect(baseProps.onInputChange).toHaveBeenCalledWith(
-        'race',
-        { name: 'Human' }
-      );
-    });
   });
 
   describe('error display', () => {
-    it('should display error messages for parent and child', () => {
+    it('should display error messages and apply error class to selects', () => {
       render(<CascadingSelect {...baseProps} errors={{ race: 'Race is required', subrace: 'Subrace is required' }} />);
       expect(screen.getByText('Race is required')).toBeInTheDocument();
       expect(screen.getByText('Subrace is required')).toBeInTheDocument();
-    });
 
-    it('should apply error class to parent and child selects when they have errors', () => {
       const { container } = render(<CascadingSelect {...baseProps} errors={{ race: 'Race is required', subrace: 'Subrace is required' }} />);
       const selects = container.querySelectorAll('select');
       expect(selects[0]).toHaveClass('error');

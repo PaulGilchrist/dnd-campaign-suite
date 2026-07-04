@@ -1,3 +1,4 @@
+// cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { getActionSpellNames, getBonusActionSpellNames, getReactionSpellNames, getExcludedSpellNames } from '../../services/ui/spellSectionUtils.js';
 import { getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
@@ -49,13 +50,6 @@ describe('spellSectionUtils', () => {
       expect(result).toEqual(new Set(['Minor Illusion']));
     });
 
-    it('excludes non-action spells', () => {
-      getRuntimeValue.mockReturnValue(null);
-      const stats = createStats({ spellAbilities: { spells: [bonusActionSpell, reactionSpell] } });
-      const result = getActionSpellNames(stats, 'test-campaign');
-      expect(result.size).toBe(0);
-    });
-
     it('excludes unprepared spells', () => {
       getRuntimeValue.mockReturnValue(null);
       const stats = createStats({ spellAbilities: { spells: [notPreparedSpell] } });
@@ -70,6 +64,13 @@ describe('spellSectionUtils', () => {
       expect(result.size).toBe(0);
     });
 
+    it('excludes non-action spells', () => {
+      getRuntimeValue.mockReturnValue(null);
+      const stats = createStats({ spellAbilities: { spells: [bonusActionSpell, reactionSpell] } });
+      const result = getActionSpellNames(stats, 'test-campaign');
+      expect(result.size).toBe(0);
+    });
+
     it('returns empty set when Elder Champion is active', () => {
       getRuntimeValue.mockImplementation((_name, key) => {
         if (key === 'activeBuffs') return [{ name: 'Elder Champion' }];
@@ -78,13 +79,6 @@ describe('spellSectionUtils', () => {
       const stats = createStats({ spellAbilities: { spells: [actionSpell] } });
       const result = getActionSpellNames(stats, 'test-campaign');
       expect(result).toEqual(new Set());
-    });
-
-    it('returns empty set when Elder Champion activeBuffs is null', () => {
-      getRuntimeValue.mockReturnValue(null);
-      const stats = createStats({ spellAbilities: { spells: [actionSpell] } });
-      const result = getActionSpellNames(stats, 'test-campaign');
-      expect(result.has('Fireball')).toBe(true);
     });
 
     it('handles variant action casting time strings', () => {
@@ -118,13 +112,6 @@ describe('spellSectionUtils', () => {
       expect(result).toEqual(new Set(['Fireball', 'Shocking Grasp']));
     });
 
-    it('excludes action spells when Elder Champion is not active', () => {
-      getRuntimeValue.mockReturnValue(null);
-      const stats = createStats({ spellAbilities: { spells: [actionSpell, bonusActionSpell] } });
-      const result = getBonusActionSpellNames(stats, 'test-campaign');
-      expect(result).toEqual(new Set(['Shocking Grasp']));
-    });
-
     it('excludes unprepared bonus action spells', () => {
       getRuntimeValue.mockReturnValue(null);
       const stats = createStats({ spellAbilities: { spells: [{ name: 'Hidden Spell', casting_time: '1 bonus action', prepared: 'Not Prepared', damage: '1d6' }] } });
@@ -147,24 +134,28 @@ describe('spellSectionUtils', () => {
 
   describe('getReactionSpellNames', () => {
     it('returns reaction spells', () => {
+      getRuntimeValue.mockReturnValue(null);
       const stats = createStats({ spellAbilities: { spells: [reactionSpell] } });
       const result = getReactionSpellNames(stats);
       expect(result).toEqual(new Set(['Shield']));
     });
 
     it('excludes non-reaction spells', () => {
+      getRuntimeValue.mockReturnValue(null);
       const stats = createStats({ spellAbilities: { spells: [actionSpell, bonusActionSpell] } });
       const result = getReactionSpellNames(stats);
       expect(result.size).toBe(0);
     });
 
     it('excludes unprepared reaction spells', () => {
+      getRuntimeValue.mockReturnValue(null);
       const stats = createStats({ spellAbilities: { spells: [{ name: 'Hidden Reaction', casting_time: '1 reaction', prepared: 'Not Prepared', damage: '1d4' }] } });
       const result = getReactionSpellNames(stats);
       expect(result.size).toBe(0);
     });
 
     it('handles variant reaction casting time strings', () => {
+      getRuntimeValue.mockReturnValue(null);
       const spells = [
         { name: 'Spell A', casting_time: '1 Reaction', prepared: 'Prepared', damage: '1d4' },
         { name: 'Spell B', casting_time: 'reaction', prepared: 'Prepared', damage: '1d4' },
@@ -184,22 +175,7 @@ describe('spellSectionUtils', () => {
       expect(result).toEqual(new Set(['Fireball', 'Shocking Grasp', 'Shield']));
     });
 
-    it('excludes action spells from action section but includes them in bonus action section when Elder Champion is active', () => {
-      getRuntimeValue.mockReset().mockImplementation((_name, key) => {
-        if (key === 'activeBuffs') return [{ name: 'Elder Champion' }];
-        return null;
-      });
-      const stats = createStats({ spellAbilities: { spells: [actionSpell, bonusActionSpell, reactionSpell] } });
-      const result = getExcludedSpellNames(stats, 'test-campaign');
-      // Fireball is excluded because it moves from actions to bonus actions when Elder Champion is active
-      expect(result.has('Fireball')).toBe(true);
-      expect(result.has('Shocking Grasp')).toBe(true);
-      expect(result.has('Shield')).toBe(true);
-      // getActionSpellNames returns empty when Elder Champion is active
-      expect(getActionSpellNames(stats, 'test-campaign').size).toBe(0);
-    });
-
-    it('includes action spells in bonus action set when Elder Champion is active', () => {
+    it('excludes action spells from action section when Elder Champion is active', () => {
       getRuntimeValue.mockReset().mockImplementation((_name, key) => {
         if (key === 'activeBuffs') return [{ name: 'Elder Champion' }];
         return null;

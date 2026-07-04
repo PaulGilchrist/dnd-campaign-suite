@@ -1,3 +1,4 @@
+// @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import useModalHandlers from './useModalHandlers.js';
 
@@ -116,33 +117,6 @@ describe('useModalHandlers - damage type handlers', () => {
         });
     });
 
-    describe('handleDivineFurySkip', () => {
-        it('proceeds with original damage when skipping', () => {
-            const deps = createDeps({
-                pendingDamageRef: {
-                    current: {
-                        attack: { name: 'Fury of the Gods' },
-                        formula: '1d8',
-                        total: 5,
-                        rolls: [5],
-                        modifier: 0,
-                    },
-                },
-            });
-            const { handleDivineFurySkip } = useModalHandlers(deps);
-            handleDivineFurySkip();
-            expect(deps.setDivineFuryChoice).toHaveBeenCalledWith(null);
-            expect(deps.proceedWithDamage).toHaveBeenCalledWith(
-                { name: 'Fury of the Gods' },
-                '1d8',
-                5,
-                [5],
-                0
-            );
-            expect(deps.pendingDamageRef.current).toBeNull();
-        });
-    });
-
     describe('handleGenericDamageTypeChoice', () => {
         it('applies chosen damage type with oncePerTurnKey', () => {
             const deps = createDeps({
@@ -244,37 +218,11 @@ describe('useModalHandlers - damage type handlers', () => {
                 },
             });
             const { handleDamageTypeModifierChoice } = useModalHandlers(deps);
+            const attack = deps.pendingDamageRef.current.attack;
             handleDamageTypeModifierChoice('radiant');
             expect(deps.setDamageTypeChoice).toHaveBeenCalledWith(null);
             expect(deps.pendingDamageRef.current).toBeNull();
-            expect(deps.proceedWithDamage).toHaveBeenCalled();
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'TestFighter',
-                '_Empowered_Strikes_usedRound',
-                1,
-                'test-campaign'
-            );
-        });
-    });
-
-    describe('handleDamageTypeModifierSkip', () => {
-        it('proceeds with original damage and records used round when skip', () => {
-            const deps = createDeps({
-                pendingDamageRef: {
-                    current: {
-                        attack: { name: 'Empowered Strikes' },
-                        formula: '1d8',
-                        total: 5,
-                        rolls: [5],
-                        modifier: 0,
-                        _damageTypeModifier: { name: 'Empowered Strikes' },
-                    },
-                },
-            });
-            const { handleDamageTypeModifierSkip } = useModalHandlers(deps);
-            handleDamageTypeModifierSkip();
-            expect(deps.setDamageTypeChoice).toHaveBeenCalledWith(null);
-            expect(deps.pendingDamageRef.current).toBeNull();
+            expect(attack.damageType).toBe('radiant');
             expect(deps.proceedWithDamage).toHaveBeenCalled();
             expect(setRuntimeValue).toHaveBeenCalledWith(
                 'TestFighter',

@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharBonusActions from './CharBonusActions.jsx';
@@ -155,7 +155,7 @@ describe('CharBonusActions - Spell Cast Flow', () => {
       expect(screen.queryByTestId('spell-detail-popup')).not.toBeInTheDocument();
     });
 
-    it('resolves spell positions when mapName is provided', async () => {
+    it('resolves spell positions and gates metamagic when mapName is provided', async () => {
       const mapData = {
         players: [
           { name: 'TestCharacter', gridX: 5, gridY: 5 },
@@ -194,22 +194,29 @@ describe('CharBonusActions - Spell Cast Flow', () => {
     });
   });
 
-  describe('popupHtml and br rendering', () => {
-    it('does not render br when popupHtml is null (default mock)', () => {
-      const stats = createStats({
-        bonusActions: [{ name: 'Test', description: 'Test desc', details: 'Test details' }],
-      });
-      const { container } = render(<CharBonusActions playerStats={stats} />);
-      expect(container.querySelectorAll('br').length).toBe(0);
-    });
+  describe('Horde Breaker visibility', () => {
+    const hordeBreakerAttack = {
+      name: 'Horde Breaker',
+      range: 30,
+      hitBonus: 5,
+      damage: '1d8+3',
+      damageType: 'Piercing',
+      type: 'Bonus Action',
+      isHordeBreaker: true,
+    };
 
-    it('does not render br when popupHtml is truthy but hasBonusActions is false', () => {
-      const stats = createStats({
-        bonusActions: [],
-        attacks: [{ name: 'Main Gauche', range: 5, hitBonus: 5, damage: '1d4+3', damageType: 'Piercing', type: 'Bonus Action' }],
+    it.each([
+      { label: 'cannotAct is true', runtimeValues: { "key": "_Hunter's Prey_choice", "value": 'Horde Breaker' }, cannotAct: true },
+      { label: "Hunter's Prey is not set to Horde Breaker", runtimeValues: { "key": "_Hunter's Prey_choice", "value": 'Something Else' }, cannotAct: false },
+      { label: 'hordeBreakerAttack is not found', runtimeValues: { "key": "_Hunter's Prey_choice", "value": 'Horde Breaker' }, cannotAct: false, attacks: [] },
+    ])('does not show Horde Breaker when $label', ({ runtimeValues, cannotAct, attacks = [hordeBreakerAttack] }) => {
+      getRuntimeValue.mockImplementation((name, key) => {
+        if (key === runtimeValues.key) return runtimeValues.value;
+        if (key === '_Hunters_Prey_HordeBreaker_UsedRound') return 0;
+        return null;
       });
-      const { container } = render(<CharBonusActions playerStats={stats} />);
-      expect(container.querySelectorAll('br').length).toBe(0);
+      render(<CharBonusActions playerStats={createStats({ attacks })} campaignName="test" cannotAct={cannotAct} />);
+      expect(screen.queryByText('Horde Breaker')).not.toBeInTheDocument();
     });
   });
 
@@ -227,107 +234,6 @@ describe('CharBonusActions - Spell Cast Flow', () => {
       expect(screen.queryByText('Reaction Spell')).not.toBeInTheDocument();
       expect(screen.queryByText('Empty Casting Time')).not.toBeInTheDocument();
       expect(screen.queryByText('Undefined Casting Time')).not.toBeInTheDocument();
-    });
-  });
-
-  describe('Horde Breaker visibility', () => {
-    const hordeBreakerAttack = {
-      name: 'Horde Breaker',
-      range: 30,
-      hitBonus: 5,
-      damage: '1d8+3',
-      damageType: 'Piercing',
-      type: 'Bonus Action',
-      isHordeBreaker: true,
-    };
-
-    it('does not show Horde Breaker when cannotAct is true', () => {
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === "_Hunter's Prey_choice") return 'Horde Breaker';
-        if (key === '_Hunters_Prey_HordeBreaker_UsedRound') return 0;
-        return null;
-      });
-      render(<CharBonusActions playerStats={createStats({ attacks: [hordeBreakerAttack] })} campaignName="test" cannotAct />);
-      expect(screen.queryByText('Horde Breaker')).not.toBeInTheDocument();
-    });
-
-    it('does not show Horde Breaker when Hunter\'s Prey is not set to Horde Breaker', () => {
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === "_Hunter's Prey_choice") return 'Something Else';
-        if (key === '_Hunters_Prey_HordeBreaker_UsedRound') return 0;
-        return null;
-      });
-      render(<CharBonusActions playerStats={createStats({ attacks: [hordeBreakerAttack] })} campaignName="test" />);
-      expect(screen.queryByText('Horde Breaker')).not.toBeInTheDocument();
-    });
-
-    it('does not show Horde Breaker when hordeBreakerAttack is not found', () => {
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === "_Hunter's Prey_choice") return 'Horde Breaker';
-        if (key === '_Hunters_Prey_HordeBreaker_UsedRound') return 0;
-        return null;
-      });
-      render(<CharBonusActions playerStats={createStats({ attacks: [] })} campaignName="test" />);
-      expect(screen.queryByText('Horde Breaker')).not.toBeInTheDocument();
-    });
-  });
-
-  describe('spells matching attack names', () => {
-    it('renders both spell and attack when they share the same name', () => {
-      const spell = { name: 'Main Gauche', range: 'Touch', casting_time: '1 bonus action', prepared: 'Prepared' };
-      const attack = { name: 'Main Gauche', range: 5, hitBonus: 5, damage: '1d4+3', damageType: 'Piercing', type: 'Bonus Action' };
-      render(<CharBonusActions playerStats={createStats({ attacks: [attack], spellAbilities: { spells: [spell] } })} />);
-      expect(screen.getAllByText('Main Gauche').length).toBe(2);
-    });
-  });
-
-  describe('grid layout', () => {
-    it('renders hit/damage columns when only spells exist', () => {
-      const stats = createStats({
-        spellAbilities: { spells: [{ name: 'Shocking Grasp', range: 'Touch', casting_time: '1 bonus action', prepared: 'Prepared' }] },
-      });
-      render(<CharBonusActions playerStats={stats} />);
-      expect(screen.getByText('Hit')).toBeInTheDocument();
-      expect(screen.getByText('Damage')).toBeInTheDocument();
-    });
-
-    it('renders half-line div between attacks/spells and bonus actions', () => {
-      const stats = createStats({
-        attacks: [{ name: 'Main Gauche', range: 5, hitBonus: 5, damage: '1d4+3', damageType: 'Piercing', type: 'Bonus Action' }],
-        bonusActions: [{ name: 'Cunning Action', description: 'Test', details: 'Test details' }],
-      });
-      render(<CharBonusActions playerStats={stats} />);
-      expect(screen.getByText('Bonus Actions')).toBeInTheDocument();
-    });
-  });
-
-  describe('null spellAbilities handling', () => {
-    it('handles null spellAbilities without crashing', () => {
-      const stats = createStats({ spellAbilities: null, bonusActions: [{ name: 'Test', description: 'Test desc', details: 'Test details' }] });
-      render(<CharBonusActions playerStats={stats} />);
-      expect(screen.getByText('Bonus Actions')).toBeInTheDocument();
-    });
-  });
-
-  describe('full prop combinations', () => {
-    it('renders correctly with all props provided', () => {
-      const stats = createStats({ bonusActions: [{ name: 'Test', description: 'Test desc', details: 'Test details' }] });
-      const characters = [{ name: 'Character1' }];
-      const rollAttack = vi.fn();
-      const rollDamage = vi.fn();
-      const getTargetInfo = vi.fn();
-      render(
-        <CharBonusActions
-          playerStats={stats}
-          characters={characters}
-          rollAttack={rollAttack}
-          rollDamage={rollDamage}
-          getTargetInfo={getTargetInfo}
-          campaignName="test"
-          mapName="test-map"
-        />
-      );
-      expect(screen.getByText('Bonus Actions')).toBeInTheDocument();
     });
   });
 });

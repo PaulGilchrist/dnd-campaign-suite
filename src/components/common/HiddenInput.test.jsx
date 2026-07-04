@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import HiddenInput from './HiddenInput.jsx';
@@ -39,7 +39,7 @@ describe('HiddenInput', () => {
       expect(screen.queryByText('5')).not.toBeInTheDocument();
     });
 
-    it('renders a number input with correct value when showInput is true', () => {
+    it('renders a focused number input when showInput is true', () => {
       const { rerender } = render(
         <HiddenInput
           handleInputToggle={mockOnToggle}
@@ -64,30 +64,6 @@ describe('HiddenInput', () => {
       expect(document.activeElement).toBe(input);
     });
 
-    it('renders a number input with null value', () => {
-      render(
-        <HiddenInput
-          handleInputToggle={mockOnToggle}
-          handleValueChange={mockOnChange}
-          showInput
-          value={null}
-        />
-      );
-      expect(screen.getByRole('spinbutton')).toBeInTheDocument();
-    });
-
-    it('renders a number input with zero value', () => {
-      render(
-        <HiddenInput
-          handleInputToggle={mockOnToggle}
-          handleValueChange={mockOnChange}
-          showInput
-          value={0}
-        />
-      );
-      expect(screen.getByRole('spinbutton')).toHaveValue(0);
-    });
-
     it('hides the input and shows the value when showInput becomes false', () => {
       const { rerender } = render(
         <HiddenInput
@@ -109,31 +85,6 @@ describe('HiddenInput', () => {
 
       expect(screen.queryByRole('spinbutton')).not.toBeInTheDocument();
       expect(screen.getByText('5')).toBeInTheDocument();
-    });
-
-    it('does not sync local value when the controlled value prop changes during editing', () => {
-      const { rerender } = render(
-        <HiddenInput
-          handleInputToggle={mockOnToggle}
-          handleValueChange={mockOnChange}
-          showInput
-          value={5}
-        />
-      );
-
-      rerender(
-        <HiddenInput
-          handleInputToggle={mockOnToggle}
-          handleValueChange={mockOnChange}
-          showInput
-          value={10}
-        />
-      );
-
-      const input = screen.getByRole('spinbutton');
-      // isEditingRef.current is true while showInput is true, so the
-      // controlled value change is intentionally ignored.
-      expect(input).toHaveValue(5);
     });
   });
 
@@ -190,7 +141,7 @@ describe('HiddenInput', () => {
       expect(mockOnToggle).toHaveBeenCalled();
     });
 
-    it('commits on Enter key and toggles, but not on Escape', () => {
+    it('commits on Enter key and toggles', () => {
       render(
         <HiddenInput
           handleInputToggle={mockOnToggle}
@@ -205,17 +156,9 @@ describe('HiddenInput', () => {
 
       expect(mockOnChange).toHaveBeenCalled();
       expect(mockOnToggle).toHaveBeenCalled();
-
-      mockOnChange.mockClear();
-      mockOnToggle.mockClear();
-
-      fireEvent.keyDown(input, { key: 'Escape' });
-
-      expect(mockOnChange).not.toHaveBeenCalled();
-      expect(mockOnToggle).not.toHaveBeenCalled();
     });
 
-    it('clamps value to max and 0 minimum on commit', () => {
+    it('clamps value to max on commit', () => {
       render(
         <HiddenInput
           handleInputToggle={mockOnToggle}

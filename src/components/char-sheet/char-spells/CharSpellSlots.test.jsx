@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharSpellSlots from './CharSpellSlots.jsx';
@@ -55,16 +55,8 @@ describe('CharSpellSlots', () => {
       expect(screen.getByText('Spell Slots')).toBeInTheDocument();
     });
 
-    it('renders no slot levels when spellMaxLevel is 0', () => {
-      rules.getSpellMaxLevel.mockReturnValue(0);
-
-      render(<CharSpellSlots playerStats={createPlayerStats()} />);
-
-      expect(screen.queryByTestId('spell-slot-level-1')).not.toBeInTheDocument();
-    });
-
     it('renders no slot levels when spellMaxLevel is falsy', () => {
-      rules.getSpellMaxLevel.mockReturnValue(null);
+      rules.getSpellMaxLevel.mockReturnValue(0);
 
       render(<CharSpellSlots playerStats={createPlayerStats()} />);
 

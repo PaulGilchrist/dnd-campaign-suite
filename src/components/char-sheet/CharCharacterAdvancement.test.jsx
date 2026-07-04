@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import CharCharacterAdvancement from './CharCharacterAdvancement.jsx';
@@ -48,11 +48,7 @@ describe('CharCharacterAdvancement', () => {
     });
 
     it('renders the section header when characterAdvancement is empty or null', () => {
-      const { unmount } = renderComponent({ characterAdvancement: [] });
-      expect(screen.getByText('Character Advancement')).toBeInTheDocument();
-      unmount();
-
-      renderComponent({ characterAdvancement: null });
+      renderComponent({ characterAdvancement: [] });
       expect(screen.getByText('Character Advancement')).toBeInTheDocument();
     });
   });

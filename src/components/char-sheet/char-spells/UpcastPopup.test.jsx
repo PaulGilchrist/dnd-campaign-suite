@@ -1,3 +1,4 @@
+// @cleaned-by-ai
 // @improved-by-ai
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -56,29 +57,14 @@ describe('UpcastPopup', () => {
   });
 
   describe('default selection', () => {
-    it('selects the first level with available slots', () => {
-      renderUpcastPopup();
-      const radios = screen.getAllByRole('radio');
-      expect(radios[0]).toBeChecked();
-    });
-
-    it('skips levels with zero available slots when selecting default', () => {
-      const levels = [
-        { level: 3, formula: '+1d6', availableSlots: 0 },
-        { level: 4, formula: '+2d6', availableSlots: 2 },
-      ];
+    it.each([
+      ['first level with available slots', mockLevels, 0],
+      ['skips zero-slot levels', [{ level: 3, formula: '+1d6', availableSlots: 0 }, { level: 4, formula: '+2d6', availableSlots: 2 }], 1],
+      ['falls back to spell base level when all levels have zero slots', [{ level: 3, formula: '+1d6', availableSlots: 0 }], 0],
+    ])('selects %s', (_, levels, expectedIndex) => {
       renderUpcastPopup({ levels });
       const radios = screen.getAllByRole('radio');
-      expect(radios[1]).toBeChecked();
-    });
-
-    it('falls back to spell base level when all levels have zero slots', () => {
-      const levels = [
-        { level: 3, formula: '+1d6', availableSlots: 0 },
-      ];
-      renderUpcastPopup({ levels });
-      const radios = screen.getAllByRole('radio');
-      expect(radios[0]).toBeChecked();
+      expect(radios[expectedIndex]).toBeChecked();
     });
 
     it('disables cast button when levels array is empty', () => {
@@ -98,24 +84,13 @@ describe('UpcastPopup', () => {
       expect(radios[1]).toBeChecked();
     });
 
-    it('does not change selection when clicking a level with no available slots', () => {
-      renderUpcastPopup();
-      const radios = screen.getAllByRole('radio');
-      expect(radios[0]).toBeChecked();
-
-      fireEvent.click(screen.getByText('Level 5'));
-      expect(radios[0]).toBeChecked();
-    });
-
     it('disables radio inputs for levels with no available slots', () => {
       renderUpcastPopup();
       const radios = screen.getAllByRole('radio');
       expect(radios[2]).toBeDisabled();
     });
-  });
 
-  describe('cast button behavior', () => {
-    it('is disabled when no slots available at selected level', () => {
+    it('disables cast button when no slots available at selected level', () => {
       const levels = [
         { level: 3, formula: '+1d6', availableSlots: 0 },
       ];
@@ -123,7 +98,9 @@ describe('UpcastPopup', () => {
       const castButton = screen.getByRole('button', { name: /Cast at Level/ });
       expect(castButton).toBeDisabled();
     });
+  });
 
+  describe('cast button behavior', () => {
     it('calls onConfirm with the newly selected level', () => {
       const onConfirm = vi.fn();
       renderUpcastPopup({ onConfirm });

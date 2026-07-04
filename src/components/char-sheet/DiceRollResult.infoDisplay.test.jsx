@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { render, screen } from '@testing-library/react';
 import DiceRollResult from './DiceRollResult.jsx';
 
@@ -12,20 +12,24 @@ describe('DiceRollResult', () => {
         });
 
         it.each`
-            bonus    | expected
-            ${3}     | ${'+3'}
-            ${-2}    | ${'-2'}
-            ${3}     | ${'+3 proficient'}
-        `('shows bonus $expected in breakdown when bonus is $bonus', ({ bonus, expected }) => {
+            bonus    | bonusDetail      | expected
+            ${3}     | ${undefined}     | ${'+3'}
+            ${-2}    | ${undefined}     | ${'-2'}
+            ${3}     | ${'proficient'}  | ${'+3 proficient'}
+        `('shows bonus $expected in breakdown when bonus is $bonus (bonusDetail: $bonusDetail)', ({ bonus, bonusDetail, expected }) => {
             render(
-                <DiceRollResult name="Test" type="d20" rolls={[10]} bonus={bonus} bonusDetail={expected === '+3 proficient' ? 'proficient' : undefined} />
+                <DiceRollResult name="Test" type="d20" rolls={[10]} bonus={bonus} bonusDetail={bonusDetail} />
             );
             expect(screen.getByText(new RegExp(expected.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')))).toBeInTheDocument();
         });
     });
 
     describe('save info display', () => {
-        it('shows save info when dc and dcType are provided', () => {
+        it.each`
+            dcSuccess | expectedText
+            ${'half'} | ${/half damage on save/}
+            ${'none'} | ${/no damage on save/}
+        `('shows save info with dcSuccess "$dcSuccess" ($expectedText)', ({ dcSuccess, expectedText }) => {
             render(
                 <DiceRollResult
                     name="Fireball"
@@ -34,26 +38,11 @@ describe('DiceRollResult', () => {
                     bonus={0}
                     dc={16}
                     dcType="DEX"
-                    dcSuccess="half"
+                    dcSuccess={dcSuccess}
                 />
             );
             expect(screen.getByText(/Save DC 16 DEX/)).toBeInTheDocument();
-            expect(screen.getByText(/half damage on save/)).toBeInTheDocument();
-        });
-
-        it('shows no damage on save for dcSuccess "none"', () => {
-            render(
-                <DiceRollResult
-                    name="Sacred Flame"
-                    type="damage"
-                    rolls={[4]}
-                    bonus={0}
-                    dc={14}
-                    dcType="DEX"
-                    dcSuccess="none"
-                />
-            );
-            expect(screen.getByText(/no damage on save/)).toBeInTheDocument();
+            expect(screen.getByText(expectedText)).toBeInTheDocument();
         });
 
         it('does not show save info when dc is undefined', () => {
@@ -85,31 +74,22 @@ describe('DiceRollResult', () => {
     });
 
     describe('hunter lore notice', () => {
-        it('shows hunter lore notice when provided', () => {
+        it.each`
+            hunterLoreNotice
+            ${'Favored Enemy: Beast'}
+            ${'Favored Enemy: Beast\nSense Motive: +5'}
+        `('shows hunter lore notice: "$hunterLoreNotice"', ({ hunterLoreNotice }) => {
             render(
                 <DiceRollResult
                     name="Attack"
                     type="attack"
                     rolls={[15]}
                     bonus={3}
-                    hunterLoreNotice="Favored Enemy: Beast"
+                    hunterLoreNotice={hunterLoreNotice}
                 />
             );
-            expect(screen.getByText(/Favored Enemy: Beast/)).toBeInTheDocument();
-        });
-
-        it('shows hunter lore notice with multiple lines', () => {
-            render(
-                <DiceRollResult
-                    name="Attack"
-                    type="attack"
-                    rolls={[15]}
-                    bonus={3}
-                    hunterLoreNotice="Favored Enemy: Beast\nSense Motive: +5"
-                />
-            );
-            expect(screen.getByText(/Favored Enemy: Beast/)).toBeInTheDocument();
-            expect(screen.getByText(/Sense Motive: \+5/)).toBeInTheDocument();
+            const lines = hunterLoreNotice.split('\n');
+            lines.forEach(line => expect(screen.getByText(new RegExp(line.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')))).toBeInTheDocument());
         });
     });
 
@@ -130,49 +110,25 @@ describe('DiceRollResult', () => {
     });
 
     describe('str check/save replace', () => {
-        it('uses strScore when it exceeds display total for strSaveReplace on save', () => {
+        it.each`
+            strSaveReplace | strCheckReplace | rollType | rolls | bonus | strScore | expected | description
+            ${true}        | ${false}        | ${'save'}| ${[3]}| ${1}  | ${15}    | ${'15'}  | ${'strSaveReplace on save uses strScore when higher'}
+            ${false}       | ${true}         | ${'check'}| ${[3]}| ${1}  | ${15}    | ${'15'}  | ${'strCheckReplace on check uses strScore when higher'}
+            ${false}       | ${true}         | ${'check'}| ${[8]}| ${4}  | ${10}    | ${'12'}  | ${'strCheckReplace uses display total when strScore is lower'}
+        `('$description', ({ strSaveReplace, strCheckReplace, rollType, rolls, bonus, strScore, expected }) => {
             render(
                 <DiceRollResult
                     name="Athletics"
                     type="d20"
-                    rolls={[3]}
-                    bonus={1}
-                    rollType="save"
-                    strSaveReplace={true}
-                    strScore={15}
+                    rolls={rolls}
+                    bonus={bonus}
+                    rollType={rollType}
+                    strSaveReplace={strSaveReplace}
+                    strCheckReplace={strCheckReplace}
+                    strScore={strScore}
                 />
             );
-            expect(screen.getByText('15')).toBeInTheDocument();
-        });
-
-        it('uses strScore when it exceeds display total for strCheckReplace on check', () => {
-            render(
-                <DiceRollResult
-                    name="Athletics"
-                    type="d20"
-                    rolls={[3]}
-                    bonus={1}
-                    rollType="check"
-                    strCheckReplace={true}
-                    strScore={15}
-                />
-            );
-            expect(screen.getByText('15')).toBeInTheDocument();
-        });
-
-        it('uses display total when strScore is lower', () => {
-            render(
-                <DiceRollResult
-                    name="Athletics"
-                    type="d20"
-                    rolls={[8]}
-                    bonus={4}
-                    rollType="check"
-                    strCheckReplace={true}
-                    strScore={10}
-                />
-            );
-            expect(screen.getByText('12')).toBeInTheDocument();
+            expect(screen.getByText(expected)).toBeInTheDocument();
         });
     });
 

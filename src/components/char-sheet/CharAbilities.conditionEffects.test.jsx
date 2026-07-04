@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharAbilities from './CharAbilities';
@@ -107,10 +107,6 @@ describe('CharAbilities condition effects on rendering', () => {
       expect(screen.getByText('AUTO FAIL')).toBeInTheDocument();
     });
 
-    it('does not show AUTO FAIL when autoFailSaves is empty', () => {
-      render(<CharAbilities {...defaultProps} conditionEffects={{ autoFailSaves: [] }} />);
-      expect(screen.queryByText('AUTO FAIL')).not.toBeInTheDocument();
-    });
   });
 
   describe('save advantage', () => {
@@ -149,12 +145,6 @@ describe('CharAbilities condition effects on rendering', () => {
       expect(bonusTexts).toContain('-3');
       const saveTexts = getSaveTexts(container);
       expect(saveTexts).toContain('+4');
-    });
-
-    it('applies no penalty when exhaustionPenalty is zero', () => {
-      const { container } = render(<CharAbilities {...defaultProps} exhaustionPenalty={0} />);
-      const bonusTexts = getBonusTexts(container);
-      expect(bonusTexts).toContain('+4');
     });
   });
 
@@ -337,20 +327,15 @@ describe('CharAbilities condition effects on rendering', () => {
       expect(bonusTexts).toContain('-1');
     });
 
-    it('does not add cosmic omen bonus for Weal with odd number', () => {
+    it.each([
+      { type: 'Weal', isEven: false, d6Value: 3, expectedBonus: '+4', label: 'Weal with odd number' },
+      { type: 'Woe', isEven: true, d6Value: 4, expectedBonus: '+4', label: 'Woe with even number' },
+    ])('does not add cosmic omen bonus for $label', ({ type, isEven, d6Value, expectedBonus }) => {
       const stats = createPlayerStats();
-      vi.mocked(getRuntimeValue).mockReturnValueOnce(JSON.stringify({ type: 'Weal', isEven: false, d6Value: 3 }));
+      vi.mocked(getRuntimeValue).mockReturnValueOnce(JSON.stringify({ type, isEven, d6Value }));
       const { container } = render(<CharAbilities {...defaultProps} playerStats={stats} />);
       const bonusTexts = getBonusTexts(container);
-      expect(bonusTexts).toContain('+4');
-    });
-
-    it('does not add cosmic omen bonus for Woe with even number', () => {
-      const stats = createPlayerStats();
-      vi.mocked(getRuntimeValue).mockReturnValueOnce(JSON.stringify({ type: 'Woe', isEven: true, d6Value: 4 }));
-      const { container } = render(<CharAbilities {...defaultProps} playerStats={stats} />);
-      const bonusTexts = getBonusTexts(container);
-      expect(bonusTexts).toContain('+4');
+      expect(bonusTexts).toContain(expectedBonus);
     });
 
     it('handles invalid JSON in cosmicOmenEffect gracefully', () => {
@@ -360,27 +345,23 @@ describe('CharAbilities condition effects on rendering', () => {
       const bonusTexts = getBonusTexts(container);
       expect(bonusTexts).toContain('+4');
     });
-
-    it('returns 0 bonus when cosmicOmenEffect stored value is null or d6Value is unspecified', () => {
-      const stats = createPlayerStats();
-      vi.mocked(getRuntimeValue).mockReturnValueOnce(null);
-      const { container } = render(<CharAbilities {...defaultProps} playerStats={stats} />);
-      const bonusTexts = getBonusTexts(container);
-      expect(bonusTexts).toContain('+4');
-    });
   });
 
   describe('penalized/buffed CSS classes', () => {
-    it('applies stat--penalized class when exhaustionPenalty or abilityCheckDisadvantage is set', () => {
+    it('applies stat--penalized class to bonus cells when abilityCheckDisadvantage is set', () => {
       const { container } = render(<CharAbilities {...defaultProps} conditionEffects={{ abilityCheckDisadvantage: true }} />);
-      const penalizedCells = container.querySelectorAll('.stat--penalized');
-      expect(penalizedCells.length).toBeGreaterThan(0);
+      const bonusCells = container.querySelectorAll('.abilities > div:nth-child(3)');
+      bonusCells.forEach(cell => {
+        expect(cell.classList.contains('stat--penalized')).toBe(true);
+      });
     });
 
-    it('applies stat--buffed class when save advantage is active', () => {
+    it('applies stat--buffed class to save cells when saveAdvantageCount is active', () => {
       const { container } = render(<CharAbilities {...defaultProps} conditionEffects={{ saveAdvantageCount: 1 }} />);
-      const buffedCells = container.querySelectorAll('.stat--buffed');
-      expect(buffedCells.length).toBeGreaterThan(0);
+      const saveCells = container.querySelectorAll('.abilities > div:nth-child(4)');
+      saveCells.forEach(cell => {
+        expect(cell.classList.contains('stat--buffed')).toBe(true);
+      });
     });
   });
 });

@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import WizardStepLanguages from './WizardStepLanguages.jsx';
@@ -162,7 +162,7 @@ describe('WizardStepLanguages', () => {
       });
     });
 
-    it('should not auto-select pre-selected items already in formData or when limits are null', async () => {
+    it('should not auto-select when items are already in formData or limits are null', async () => {
       const mockOnLanguageToggle = vi.fn();
       render(
         <WizardStepLanguages
@@ -205,16 +205,14 @@ describe('WizardStepLanguages', () => {
         />
       );
       await waitFor(() => {
-        expect(document.querySelectorAll('.multi-select-item').length).toBeGreaterThan(0);
+        expect(screen.getByText('Elvish')).toBeInTheDocument();
       });
-      const languageItems = document.querySelectorAll('.multi-select-item');
-      const elvishItem = Array.from(languageItems).find((l) => l.textContent.includes('Elvish'));
-      const checkbox = elvishItem.querySelector('input[type="checkbox"]');
+      const checkbox = screen.getByRole('checkbox', { name: 'Elvish' });
       fireEvent.click(checkbox);
       expect(mockOnLanguageToggle).toHaveBeenCalledWith('Elvish');
     });
 
-    it('should not call onLanguageToggle when a pre-selected already-selected checkbox is clicked', async () => {
+    it('should disable checkboxes for pre-selected items already in formData', async () => {
       setupFetchSuccess();
       const mockOnLanguageToggle = vi.fn();
       const props = {
@@ -230,10 +228,9 @@ describe('WizardStepLanguages', () => {
       };
       render(<WizardStepLanguages {...props} />);
       await waitFor(() => {
-        expect(document.querySelectorAll('.multi-select-item').length).toBeGreaterThan(0);
+        expect(screen.getByText('Common')).toBeInTheDocument();
       });
-      const preSelectedLabel = document.querySelector('.multi-select-item.pre-selected');
-      const checkbox = preSelectedLabel.querySelector('input[type="checkbox"]');
+      const checkbox = screen.getByRole('checkbox', { name: 'Common' });
       expect(checkbox.disabled).toBe(true);
     });
   });
@@ -296,7 +293,7 @@ describe('WizardStepLanguages', () => {
   });
 
   describe('Error handling', () => {
-    it('should log error and continue rendering when language fetch fails', async () => {
+    it('should continue rendering correctly when fetch fails', async () => {
       const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
       global.fetch = vi.fn((url) => {
         if (url.includes('languages.json')) {
@@ -309,14 +306,14 @@ describe('WizardStepLanguages', () => {
       });
       render(<WizardStepLanguages {...createMockProps()} />);
       await waitFor(() => {
-        expect(consoleSpy).toHaveBeenCalledWith('Error loading languages:', expect.any(Error));
+        expect(screen.getByText('Step 7: Languages & Fighting Styles')).toBeInTheDocument();
+        expect(screen.getByText('Fighting Styles')).toBeInTheDocument();
       });
-      expect(screen.getByText('Step 7: Languages & Fighting Styles')).toBeInTheDocument();
-      expect(screen.getByText('Fighting Styles')).toBeInTheDocument();
+      expect(consoleSpy).toHaveBeenCalledWith('Error loading languages:', expect.any(Error));
       consoleSpy.mockRestore();
     });
 
-    it('should log error and continue rendering when fighting styles fetch fails', async () => {
+    it('should continue rendering correctly when fighting styles fetch fails', async () => {
       const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
       global.fetch = vi.fn((url) => {
         if (url.includes('fighting-styles.json')) {
@@ -329,10 +326,10 @@ describe('WizardStepLanguages', () => {
       });
       render(<WizardStepLanguages {...createMockProps()} />);
       await waitFor(() => {
-        expect(consoleSpy).toHaveBeenCalledWith('Error loading fighting styles:', expect.any(Error));
+        expect(screen.getByText('Step 7: Languages & Fighting Styles')).toBeInTheDocument();
+        expect(screen.getByText('Languages')).toBeInTheDocument();
       });
-      expect(screen.getByText('Step 7: Languages & Fighting Styles')).toBeInTheDocument();
-      expect(screen.getByText('Languages')).toBeInTheDocument();
+      expect(consoleSpy).toHaveBeenCalledWith('Error loading fighting styles:', expect.any(Error));
       consoleSpy.mockRestore();
     });
   });

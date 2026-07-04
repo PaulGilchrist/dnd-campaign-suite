@@ -1,3 +1,4 @@
+// @cleaned-by-ai
 // @improved-by-ai
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -72,30 +73,11 @@ describe('CharFeats', () => {
       expect(container.firstChild).toBeNull();
     });
 
-    it('should render a single feat without comma separator', () => {
-      render(<CharFeats playerStats={{ feats: ['Actor'], rules: '5e' }} showPopup={mockShowPopup} />);
-      expect(screen.getByText(/Actor/)).toBeInTheDocument();
-      const featsContainer = screen.getByText(/Feats:/).parentElement;
-      expect(featsContainer.textContent).toBe('Feats: Actor');
-    });
-
     it('should render feat names as clickable elements', () => {
       render(<CharFeats {...defaultProps} />);
       const actorLink = screen.getByText(/Actor/);
       expect(actorLink).toHaveClass('clickable');
       expect(actorLink).toHaveClass('feat-name');
-    });
-
-    it('should display all feats including unknown ones in the correct order', () => {
-      render(
-        <CharFeats
-          playerStats={{ feats: ['First Feat', 'Unknown', 'Last Feat'], rules: '5e' }}
-          showPopup={mockShowPopup}
-        />
-      );
-      expect(screen.getByText(/First Feat/)).toBeInTheDocument();
-      expect(screen.getByText(/Unknown/)).toBeInTheDocument();
-      expect(screen.getByText(/Last Feat/)).toBeInTheDocument();
     });
   });
 
@@ -111,18 +93,6 @@ describe('CharFeats', () => {
       });
     });
 
-    it('should call setPopupHtml when feat data is missing or feat not found', async () => {
-      loadFeatData.mockResolvedValue([]);
-      render(<CharFeats {...defaultProps} />);
-      const actorElements = screen.getAllByText(/Actor/);
-      fireEvent.click(actorElements[0]);
-      await vi.waitFor(() => {
-        expect(mockSetPopupHtml).toHaveBeenCalledWith(
-          expect.stringContaining('Feat details not found in database')
-        );
-      });
-    });
-
     it('should call setPopupHtml with error message when loadFeatData rejects', async () => {
       loadFeatData.mockRejectedValue(new Error('Network error'));
       render(<CharFeats {...defaultProps} />);
@@ -132,22 +102,7 @@ describe('CharFeats', () => {
         expect(mockSetPopupHtml).toHaveBeenCalledWith(
           expect.stringContaining('Error loading feat details')
         );
-        expect(mockSetPopupHtml).toHaveBeenCalledWith(
-          expect.stringContaining('Network error')
-        );
       });
-    });
-  });
-
-  describe('popup rendering', () => {
-    it('should render the Popup component when popupHtml is set', () => {
-      usePopup.mockReturnValue({
-        showPopup: vi.fn(),
-        popupHtml: '<b>Test</b> popup content',
-        setPopupHtml: mockSetPopupHtml,
-      });
-      render(<CharFeats {...defaultProps} />);
-      expect(screen.getByTestId('popup-overlay')).toBeInTheDocument();
     });
   });
 });

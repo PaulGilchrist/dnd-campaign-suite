@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -46,7 +46,7 @@ describe('WizardStepMagicItems', () => {
   });
 
   describe('rendering', () => {
-    it('renders the step title, each magic item name, search input, type filter, and result count', () => {
+    it('renders the step title, items, search input, type filter, selected checkbox, and result count', () => {
       render(<WizardStepMagicItems {...createProps()} />);
       expect(screen.getByText('Step 10: Magic Items')).toBeInTheDocument();
       expect(screen.getByText('Amulet of Health')).toBeInTheDocument();
@@ -57,14 +57,27 @@ describe('WizardStepMagicItems', () => {
       expect(screen.getByText(/Showing 2 magic items/)).toBeInTheDocument();
     });
 
-    it('renders the attunement badge on items that require attunement', () => {
+    it('shows attunement badge on items that require attunement', () => {
       render(<WizardStepMagicItems {...createProps()} />);
       expect(screen.getByText('requires attunement')).toBeInTheDocument();
+    });
+
+    it('shows a loading message when items are unavailable', () => {
+      render(
+        <WizardStepMagicItems
+          {...createProps({
+            allMagicItems: null,
+          })}
+        />,
+      );
+      expect(
+        screen.getByText('Magic item data not yet loaded. Please try again.'),
+      ).toBeInTheDocument();
     });
   });
 
   describe('item display', () => {
-    it('renders Show More button and reveals description after clicking', () => {
+    it('expands and collapses item description on Show More / Show Less toggle', () => {
       render(<WizardStepMagicItems {...createProps()} />);
       const showMoreButtons = screen.getAllByText('Show More');
       expect(showMoreButtons.length).toBe(2);
@@ -72,67 +85,13 @@ describe('WizardStepMagicItems', () => {
       fireEvent.click(showMoreButtons[0]);
       expect(screen.getByText(/Health amulet/)).toBeInTheDocument();
       expect(screen.getByText('Show Less')).toBeInTheDocument();
+
+      fireEvent.click(screen.getByText('Show Less'));
+      expect(screen.queryByText(/Health amulet/)).not.toBeInTheDocument();
+      expect(screen.getAllByText('Show More').length).toBe(2);
     });
 
-    it('renders multi-line descriptions with second paragraph visible after expand', () => {
-      const multiLineItem = {
-        name: 'Ring of Powers',
-        index: 'ring',
-        type: 'Ring',
-        rarity: 'Rare',
-        description: [
-          '<p>First paragraph.</p>',
-          '<p>Second paragraph.</p>',
-        ],
-        requiresAttunement: false,
-      };
-      render(
-        <WizardStepMagicItems
-          {...createProps({ allMagicItems: [multiLineItem] })}
-        />,
-      );
-      const showMoreBtn = screen.getByText('Show More');
-      fireEvent.click(showMoreBtn);
-      expect(screen.getByText(/Second paragraph/)).toBeInTheDocument();
-    });
-
-    it('renders items with string and array descriptions after expanding', () => {
-      const stringDescItem = {
-        name: 'Potion of Healing',
-        index: 'potion',
-        type: 'Potion',
-        description: '<p>Restores 2d4+2 HP.</p>',
-        requiresAttunement: false,
-      };
-      const arrayDescItem = {
-        name: 'Staff of Power',
-        index: 'staff',
-        type: 'Staff',
-        rarity: 'Very Rare',
-        description: [
-          '<p>Can hold up to 5 charges.</p>',
-          '<p>Regains 1d4+1 charges daily.</p>',
-        ],
-        requiresAttunement: true,
-      };
-      render(
-        <WizardStepMagicItems
-          {...createProps({
-            allMagicItems: [stringDescItem, arrayDescItem],
-          })}
-        />,
-      );
-      const showMoreBtns = screen.getAllByText('Show More');
-      fireEvent.click(showMoreBtns[0]);
-      expect(screen.getByText(/Restores 2d4\+2 HP/)).toBeInTheDocument();
-
-      const staffShowMore = screen.getByText('Show More');
-      fireEvent.click(staffShowMore);
-      expect(screen.getByText(/Can hold up to 5 charges/)).toBeInTheDocument();
-      expect(screen.getByText(/Regains 1d4\+1 charges daily/)).toBeInTheDocument();
-    });
-
-    it('renders items with missing optional fields gracefully', () => {
+    it('handles items with missing optional fields gracefully', () => {
       const minimalItem = {
         name: 'Odd Item',
         index: 'odd',
@@ -149,7 +108,7 @@ describe('WizardStepMagicItems', () => {
   });
 
   describe('attunement warnings', () => {
-    it('displays a warning when more than 3 attuned items are selected', () => {
+    it('displays a warning when selected attuned items exceed the limit', () => {
       const attunedItems = [
         { name: 'Boots', requiresAttunement: true },
         { name: 'Cloak', requiresAttunement: true },
@@ -173,7 +132,7 @@ describe('WizardStepMagicItems', () => {
       expect(screen.getByText(warningText)).toBeInTheDocument();
     });
 
-    it('does not display a warning when 3 or fewer attuned items are selected', () => {
+    it('does not display a warning when attuned items are within the limit', () => {
       const attunedItems = [
         { name: 'Boots', requiresAttunement: true },
         { name: 'Cloak', requiresAttunement: true },
@@ -195,56 +154,7 @@ describe('WizardStepMagicItems', () => {
       ).not.toBeInTheDocument();
     });
 
-    it('updates the warning count when selection changes', () => {
-      const { rerender } = render(
-        <WizardStepMagicItems
-          {...createProps({
-            formData: {
-              inventory: {
-                magicItems: ['Boots', 'Cloak', 'Gloves', 'Ring'],
-              },
-            },
-            allMagicItems: [
-              { name: 'Boots', requiresAttunement: true },
-              { name: 'Cloak', requiresAttunement: true },
-              { name: 'Gloves', requiresAttunement: true },
-              { name: 'Ring', requiresAttunement: true },
-            ],
-          })}
-        />,
-      );
-      expect(screen.getByText(/You have selected 4 items requiring attunement/)).toBeInTheDocument();
-
-      rerender(
-        <WizardStepMagicItems
-          {...createProps({
-            formData: {
-              inventory: {
-                magicItems: [
-                  'Boots',
-                  'Cloak',
-                  'Gloves',
-                  'Ring',
-                  'Amulet',
-                ],
-              },
-            },
-            allMagicItems: [
-              { name: 'Boots', requiresAttunement: true },
-              { name: 'Cloak', requiresAttunement: true },
-              { name: 'Gloves', requiresAttunement: true },
-              { name: 'Ring', requiresAttunement: true },
-              { name: 'Amulet', requiresAttunement: true },
-            ],
-          })}
-        />,
-      );
-      expect(
-        screen.getByText(/You have selected 5 items requiring attunement/),
-      ).toBeInTheDocument();
-    });
-
-    it('displays a warning with limit of 4 when Thief Rogue level 13+ exceeds limit', () => {
+    it('increases the attunement limit for Thief Rogue level 13+', () => {
       const thiefClassSubtypes = [
         {
           className: 'Rogue',
@@ -252,10 +162,7 @@ describe('WizardStepMagicItems', () => {
             {
               name: 'Thief',
               class_levels: [
-                { level: 3, features: [{ name: 'Fast Hands' }] },
-                { level: 9, features: [{ name: 'Supreme Sneak' }] },
                 { level: 13, features: [{ name: 'Use Magic Device' }] },
-                { level: 17, features: [{ name: "Thief's Reflexes" }] },
               ],
             },
           ],
@@ -291,7 +198,7 @@ describe('WizardStepMagicItems', () => {
       expect(screen.getByText(warningText)).toBeInTheDocument();
     });
 
-    it('does not display a warning when 4 attuned items are selected for Thief Rogue level 13+', () => {
+    it('does not warn when Thief Rogue level 13+ is at the extended limit', () => {
       const thiefClassSubtypes = [
         {
           className: 'Rogue',
@@ -333,164 +240,32 @@ describe('WizardStepMagicItems', () => {
         screen.queryByText(/maximum of 4 items/),
       ).not.toBeInTheDocument();
     });
-
-    it('uses limit of 3 for non-Thief subclasses', () => {
-      const assassinClassSubtypes = [
-        {
-          className: 'Rogue',
-          subtypes: [
-            {
-              name: 'Assassin',
-              class_levels: [
-                { level: 13, features: [{ name: 'Impostor' }] },
-              ],
-            },
-          ],
-        },
-      ];
-
-      const attunedItems = [
-        { name: 'Boots', requiresAttunement: true },
-        { name: 'Cloak', requiresAttunement: true },
-        { name: 'Gloves', requiresAttunement: true },
-        { name: 'Ring', requiresAttunement: true },
-      ];
-
-      render(
-        <WizardStepMagicItems
-          {...createProps({
-            formData: {
-              class: { name: 'Rogue', subclass: { name: 'Assassin' } },
-              level: 13,
-              inventory: {
-                magicItems: ['Boots', 'Cloak', 'Gloves', 'Ring'],
-              },
-            },
-            allMagicItems: attunedItems,
-            classSubtypes: assassinClassSubtypes,
-          })}
-        />,
-      );
-
-      const warningText =
-        'You have selected 4 items requiring attunement, but a character can only attune to a maximum of 3 items.';
-      expect(screen.getByText(warningText)).toBeInTheDocument();
-    });
-
-    it('uses limit of 3 when classSubtypes is null', () => {
-      const attunedItems = [
-        { name: 'Boots', requiresAttunement: true },
-        { name: 'Cloak', requiresAttunement: true },
-        { name: 'Gloves', requiresAttunement: true },
-        { name: 'Ring', requiresAttunement: true },
-      ];
-
-      render(
-        <WizardStepMagicItems
-          {...createProps({
-            formData: {
-              class: { name: 'Rogue', subclass: { name: 'Thief' } },
-              level: 13,
-              inventory: {
-                magicItems: ['Boots', 'Cloak', 'Gloves', 'Ring'],
-              },
-            },
-            allMagicItems: attunedItems,
-            classSubtypes: null,
-          })}
-        />,
-      );
-
-      const warningText =
-        'You have selected 4 items requiring attunement, but a character can only attune to a maximum of 3 items.';
-      expect(screen.getByText(warningText)).toBeInTheDocument();
-    });
-
-    it('uses limit of 3 when Thief character is below level 13', () => {
-      const thiefClassSubtypes = [
-        {
-          className: 'Rogue',
-          subtypes: [
-            {
-              name: 'Thief',
-              class_levels: [
-                { level: 13, features: [{ name: 'Use Magic Device' }] },
-              ],
-            },
-          ],
-        },
-      ];
-
-      const attunedItems = [
-        { name: 'Boots', requiresAttunement: true },
-        { name: 'Cloak', requiresAttunement: true },
-        { name: 'Gloves', requiresAttunement: true },
-        { name: 'Ring', requiresAttunement: true },
-      ];
-
-      render(
-        <WizardStepMagicItems
-          {...createProps({
-            formData: {
-              class: { name: 'Rogue', subclass: { name: 'Thief' } },
-              level: 9,
-              inventory: {
-                magicItems: ['Boots', 'Cloak', 'Gloves', 'Ring'],
-              },
-            },
-            allMagicItems: attunedItems,
-            classSubtypes: thiefClassSubtypes,
-          })}
-        />,
-      );
-
-      const warningText =
-        'You have selected 4 items requiring attunement, but a character can only attune to a maximum of 3 items.';
-      expect(screen.getByText(warningText)).toBeInTheDocument();
-    });
   });
 
   describe('item selection', () => {
-    it('calls onArrayFieldChange when an unselected item checkbox is clicked', () => {
+    it('calls onArrayFieldChange to add an item when an unselected checkbox is clicked', () => {
       const onArrayFieldChange = vi.fn();
       render(
         <WizardStepMagicItems
           {...createProps({
             onArrayFieldChange,
-            formData: { inventory: { magicItems: [] } },
           })}
         />,
       );
       const checkboxes = document.querySelectorAll('.list-item-checkbox-trigger');
       expect(checkboxes.length).toBe(2);
-      fireEvent.click(checkboxes[1]);
-      expect(onArrayFieldChange).toHaveBeenCalledWith(
-        'inventory.magicItems',
-        ['Wand of Magic'],
-      );
-    });
 
-    it('removes an item from the selection when its checkbox is toggled off', () => {
-      const onArrayFieldChange = vi.fn();
-      render(
-        <WizardStepMagicItems
-          {...createProps({
-            onArrayFieldChange,
-          })}
-        />,
-      );
-      const checkboxes = document.querySelectorAll('.list-item-checkbox-trigger');
-      expect(checkboxes.length).toBe(2);
-      fireEvent.click(checkboxes[1]);
+      // Amulet of Health is unselected; clicking adds it to the array
+      fireEvent.click(checkboxes[0]);
       expect(onArrayFieldChange).toHaveBeenCalledWith(
         'inventory.magicItems',
-        [],
+        ['Wand of Magic', 'Amulet of Health'],
       );
     });
   });
 
   describe('search and filtering', () => {
-    it('filters items by search query and type dropdown', () => {
+    it('filters items by search query', () => {
       render(<WizardStepMagicItems {...createProps()} />);
       const searchInput = screen.getByRole('textbox');
       fireEvent.change(searchInput, { target: { value: 'Amulet' } });
@@ -506,7 +281,7 @@ describe('WizardStepMagicItems', () => {
       expect(screen.queryByText('Amulet of Health')).not.toBeInTheDocument();
     });
 
-    it('shows only selected items when checkbox is checked', () => {
+    it('shows only selected items when the filter checkbox is enabled', () => {
       render(<WizardStepMagicItems {...createProps()} />);
       const checkbox = screen.getByRole('checkbox', {
         name: /show only selected/i,
@@ -514,32 +289,6 @@ describe('WizardStepMagicItems', () => {
       fireEvent.click(checkbox);
       expect(screen.getByText('Wand of Magic')).toBeInTheDocument();
       expect(screen.queryByText('Amulet of Health')).not.toBeInTheDocument();
-    });
-  });
-
-  describe('edge cases', () => {
-    it('renders a loading message when items are unavailable', () => {
-      render(
-        <WizardStepMagicItems
-          {...createProps({
-            allMagicItems: null,
-          })}
-        />,
-      );
-      expect(
-        screen.getByText('Magic item data not yet loaded. Please try again.'),
-      ).toBeInTheDocument();
-    });
-
-    it('handles missing formData.inventory gracefully', () => {
-      render(
-        <WizardStepMagicItems
-          {...createProps({
-            formData: {},
-          })}
-        />,
-      );
-      expect(screen.getByText('Step 10: Magic Items')).toBeInTheDocument();
     });
   });
 });

@@ -1,5 +1,5 @@
-// @improved-by-ai
-import { render, screen, fireEvent, act } from '@testing-library/react';
+// @cleaned-by-ai
+import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharBonusActions from './CharBonusActions.jsx';
 
@@ -101,7 +101,7 @@ vi.mock('../../hooks/combat/DiceRollContext.js', () => ({
 }));
 
 vi.mock('./char-spells/SpellDetailPopup.jsx', () => ({
-  default: vi.fn((props) => <div data-testid="spell-detail-popup"><div data-testid="spell-name">{props.spell?.name}</div><div data-testid="upcast-levels">{JSON.stringify(props.upcastLevels)}</div></div>),
+  default: vi.fn((props) => <div data-testid="spell-detail-popup">{props.spell?.name || 'SpellDetailPopup'}</div>),
 }));
 
 vi.mock('../../services/rules/spells/spellCastService.js', () => ({
@@ -110,7 +110,6 @@ vi.mock('../../services/rules/spells/spellCastService.js', () => ({
 
 import { useSpellMetamagicFlow } from '../../hooks/combat/useSpellMetamagicFlow.js';
 import { addEntry } from '../../services/ui/logService.js';
-import * as mapsService from '../../services/maps/mapsService.js';
 
 const basePlayerStats = {
   name: 'TestCharacter',
@@ -131,28 +130,19 @@ describe('CharBonusActions - Spell Cast Flow', () => {
     localStorage.clear();
   });
 
-  describe('spell cast with map data resolution', () => {
+  describe('spell detail popup', () => {
     const bonusActionSpell = { name: 'Shocking Grasp', range: 'Touch', casting_time: '1 bonus action', prepared: 'Prepared' };
 
-    it('loads map data when mapName is provided and opens spell detail popup', async () => {
-      const mapData = {
-        players: [{ name: 'TestCharacter', gridX: 5, gridY: 5 }],
-        placedItems: [],
-      };
-      mapsService.loadMapData.mockResolvedValue(mapData);
+    it.each([
+      { label: 'with mapName', mapName: 'test-map', campaignName: 'test' },
+      { label: 'without mapName', mapName: null, campaignName: undefined },
+    ])('opens spell detail popup when clicking a spell ($label)', async ({ mapName, campaignName }) => {
+      const renderArgs = { playerStats: createStats({ spellAbilities: { spells: [bonusActionSpell] } }), mapName };
+      if (campaignName) renderArgs.campaignName = campaignName;
 
-      render(<CharBonusActions playerStats={createStats({ spellAbilities: { spells: [bonusActionSpell] } })} mapName="test-map" campaignName="test" />);
-      const spellLink = screen.getByText('Shocking Grasp');
-      fireEvent.click(spellLink);
+      render(<CharBonusActions {...renderArgs} />);
+      fireEvent.click(screen.getByText('Shocking Grasp'));
       expect(screen.getByTestId('spell-detail-popup')).toBeInTheDocument();
-    });
-
-    it('does not resolve positions when mapName is null', async () => {
-      render(<CharBonusActions playerStats={createStats({ spellAbilities: { spells: [bonusActionSpell] } })} mapName={null} />);
-      const spellLink = screen.getByText('Shocking Grasp');
-      fireEvent.click(spellLink);
-      expect(screen.getByTestId('spell-detail-popup')).toBeInTheDocument();
-      expect(mapsService.loadMapData).not.toHaveBeenCalled();
     });
   });
 
@@ -175,39 +165,36 @@ describe('CharBonusActions - Spell Cast Flow', () => {
     });
   });
 
-  describe('cannotAct behavior on damage clicks', () => {
+  describe('damage roll gating by cannotAct', () => {
     const bonusActionAttack = { name: 'Main Gauche', range: 5, hitBonus: 5, damage: '1d4+3', damageType: 'Piercing', type: 'Bonus Action' };
 
-    it('does not call handleSimpleDamageRoll when cannotAct is true', () => {
-      render(<CharBonusActions playerStats={createStats({ attacks: [bonusActionAttack] })} campaignName="test-campaign" cannotAct />);
-      const damageElement = screen.getByText('1d4+3');
-      fireEvent.click(damageElement);
-      expect(vi.mocked(addEntry)).not.toHaveBeenCalled();
-    });
-
-    it('calls handleSimpleDamageRoll when cannotAct is false', async () => {
-      render(<CharBonusActions playerStats={createStats({ attacks: [bonusActionAttack] })} campaignName="test-campaign" cannotAct={false} />);
-      const damageElement = screen.getByText('1d4+3');
-      fireEvent.click(damageElement);
-      await act(async () => { await Promise.resolve(); });
-      expect(vi.mocked(addEntry)).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
-        type: 'roll',
-        rollType: 'damage',
-        name: 'Main Gauche',
-        formula: '1d4+3',
-        note: 'Direct damage roll (no target)',
-      }));
+    it.each([
+      { cannotAct: true, expectLogEntry: false, label: 'blocks' },
+      { cannotAct: false, expectLogEntry: true, label: 'allows' },
+    ])('($label) damage roll log entry when cannotAct is $cannotAct', async ({ cannotAct, expectLogEntry }) => {
+      render(<CharBonusActions playerStats={createStats({ attacks: [bonusActionAttack] })} campaignName="test-campaign" cannotAct={cannotAct} />);
+      fireEvent.click(screen.getByText('1d4+3'));
+      if (expectLogEntry) {
+        expect(vi.mocked(addEntry)).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
+          type: 'roll',
+          rollType: 'damage',
+          name: 'Main Gauche',
+          formula: '1d4+3',
+          note: 'Direct damage roll (no target)',
+        }));
+      } else {
+        expect(vi.mocked(addEntry)).not.toHaveBeenCalled();
+      }
     });
   });
 
-  describe('canAct blocking on attack click', () => {
+  describe('attack click behavior', () => {
     const bonusActionAttack = { name: 'Main Gauche', range: 5, hitBonus: 5, damage: '1d4+3', damageType: 'Piercing', type: 'Bonus Action' };
 
-    it('still calls onAttackClick when cannotAct is true', () => {
+    it('calls onAttackClick even when cannotAct is true', () => {
       const mockOnAttackClick = vi.fn();
       render(<CharBonusActions playerStats={createStats({ attacks: [bonusActionAttack] })} cannotAct={true} exhaustionPenalty={0} onAttackClick={mockOnAttackClick} />);
-      const hitBonusElement = screen.getByText('+5');
-      fireEvent.click(hitBonusElement);
+      fireEvent.click(screen.getByText('+5'));
       expect(mockOnAttackClick).toHaveBeenCalledWith(bonusActionAttack);
     });
   });

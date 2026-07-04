@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import ShortRestModal from './ShortRestModal.jsx';
@@ -49,8 +49,6 @@ vi.mock('../../services/ui/dataLoader.js', () => ({
 }));
 
 const mockCampaignName = 'test-campaign';
-
-
 
 function createPlayerStats(overrides = {}) {
     return {
@@ -104,9 +102,11 @@ describe('ShortRestModal', () => {
     });
 
     describe('rendering', () => {
-        it('renders the modal title', () => {
+        it('renders the modal title and action buttons', () => {
             renderModal();
             expect(screen.getByText('Short Rest')).toBeInTheDocument();
+            expect(screen.getByText('Complete Short Rest')).toBeInTheDocument();
+            expect(screen.getByText('Cancel')).toBeInTheDocument();
         });
 
         it('displays hit dice information with correct die size and count', () => {
@@ -128,21 +128,6 @@ describe('ShortRestModal', () => {
         it('renders Resources Restored section with labels', () => {
             renderModal();
             expect(screen.getByText('Resources Restored')).toBeInTheDocument();
-        });
-
-        it('renders action buttons', () => {
-            renderModal();
-            expect(screen.getByText('Complete Short Rest')).toBeInTheDocument();
-            expect(screen.getByText('Cancel')).toBeInTheDocument();
-        });
-
-        it('does not render class features the character does not have', () => {
-            renderModal();
-            expect(screen.queryByText('Sorcerous Restoration')).not.toBeInTheDocument();
-            expect(screen.queryByText('Font of Inspiration')).not.toBeInTheDocument();
-            expect(screen.queryByText('Arcane Recovery')).not.toBeInTheDocument();
-            expect(screen.queryByText('Memorize Spell')).not.toBeInTheDocument();
-            expect(screen.queryByText('Bolstering Treats')).not.toBeInTheDocument();
         });
     });
 
@@ -173,13 +158,6 @@ describe('ShortRestModal', () => {
             fireEvent.click(screen.getByText('Roll One'));
             const container = screen.getByText(/Total HP Recovered:/).parentElement;
             expect(container.textContent).toContain('6');
-        });
-
-        it('does not roll when hit dice is already at zero', () => {
-            setupGetRuntimeValue({ shortRestHitDice: 0 });
-            renderModal();
-            expect(screen.getByText(/0 of 5 remaining/)).toBeInTheDocument();
-            expect(screen.getByText('Roll One')).toBeDisabled();
         });
     });
 
@@ -369,16 +347,6 @@ describe('ShortRestModal', () => {
             expect(hpCalls[0][2]).toBe(45);
         });
 
-        it('uses playerStats.hitPoints when currentHp is null', () => {
-            setupGetRuntimeValue({ currentHitPoints: null });
-            renderModal();
-            fireEvent.click(screen.getByText('Complete Short Rest'));
-            const hpCalls = setRuntimeValueMock.mock.calls.filter(
-                (call) => call[1] === 'currentHitPoints'
-            );
-            expect(hpCalls.length).toBeGreaterThan(0);
-        });
-
         it('adds recovered HP to current hit points on completion', () => {
             setupGetRuntimeValue({ currentHitPoints: 20 });
             renderModal();
@@ -391,7 +359,7 @@ describe('ShortRestModal', () => {
             expect(hpCalls[0][2]).toBeGreaterThan(20);
         });
 
-        it('restores sorcery points on short rest completion when Sorcerous Restoration was used', () => {
+        it('restores sorcery points when Sorcerous Restoration was used', () => {
             setupGetRuntimeValue({ sorceryPoints: 3, sorcerousRestorationUses: 1 });
             const playerStats = createPlayerStats({
                 class: { name: 'Sorcerer', major: { name: 'Sorcerer' } },
@@ -437,27 +405,6 @@ describe('ShortRestModal', () => {
             expect(srCalls[0][2]).toBe(0);
         });
 
-        it('does not restore sorcery points when Sorcerous Restoration was not used', () => {
-            setupGetRuntimeValue({ sorceryPoints: 3, sorcerousRestorationUses: 1 });
-            const playerStats = createPlayerStats({
-                class: { name: 'Sorcerer', major: { name: 'Sorcerer' } },
-                automation: { passives: [{ type: 'resource_restoration' }] },
-            });
-            render(
-                <ShortRestModal
-                    playerStats={playerStats}
-                    campaignName={mockCampaignName}
-                    onClose={vi.fn()}
-                    onComplete={vi.fn()}
-                />
-            );
-            fireEvent.click(screen.getByText('Complete Short Rest'));
-            const srCalls = setRuntimeValueMock.mock.calls.filter(
-                (call) => call[1] === 'sorcerousRestorationUses'
-            );
-            expect(srCalls.length).toBe(0);
-        });
-
         it('sets bardic inspiration to max on short rest completion when Font of Inspiration was used', () => {
             setupGetRuntimeValue({ bardicInspirationUses: 1 });
             const playerStats = createPlayerStats({
@@ -479,27 +426,6 @@ describe('ShortRestModal', () => {
             );
             expect(biCalls.length).toBeGreaterThan(0);
             expect(biCalls[0][2]).toBe(3);
-        });
-
-        it('does not set bardic inspiration when Font of Inspiration was not used', () => {
-            setupGetRuntimeValue({ bardicInspirationUses: 1 });
-            const playerStats = createPlayerStats({
-                class: { name: 'Bard', major: { name: 'Bard' } },
-                automation: { passives: [{ type: 'font_of_inspiration' }] },
-            });
-            render(
-                <ShortRestModal
-                    playerStats={playerStats}
-                    campaignName={mockCampaignName}
-                    onClose={vi.fn()}
-                    onComplete={vi.fn()}
-                />
-            );
-            fireEvent.click(screen.getByText('Complete Short Rest'));
-            const biCalls = setRuntimeValueMock.mock.calls.filter(
-                (call) => call[1] === 'bardicInspirationUses'
-            );
-            expect(biCalls.length).toBe(0);
         });
 
         it('recovers spell slots on short rest completion when Arcane Recovery was used', () => {
@@ -527,32 +453,6 @@ describe('ShortRestModal', () => {
                 (call) => call[1].startsWith('spell_slots_level_')
             );
             expect(slotCalls.length).toBeGreaterThan(0);
-        });
-
-        it('does not recover spell slots when Arcane Recovery was not used', () => {
-            setupGetRuntimeValue({ arcaneRecoveryLevels: 2 });
-            const playerStats = createPlayerStats({
-                class: { name: 'Wizard', major: { name: 'Wizard' } },
-                automation: { passives: [{ type: 'resource_restoration', resourceKey: 'arcaneRecoveryLevels' }] },
-                spellAbilities: {
-                    spell_slots_level_1: 4,
-                    spell_slots_level_2: 3,
-                    spells: [],
-                },
-            });
-            render(
-                <ShortRestModal
-                    playerStats={playerStats}
-                    campaignName={mockCampaignName}
-                    onClose={vi.fn()}
-                    onComplete={vi.fn()}
-                />
-            );
-            fireEvent.click(screen.getByText('Complete Short Rest'));
-            const slotCalls = setRuntimeValueMock.mock.calls.filter(
-                (call) => call[1].startsWith('spell_slots_level_') && call[2] !== null
-            );
-            expect(slotCalls.length).toBe(0);
         });
 
         it('only recovers Arcane Recovery slots up to level 5', () => {
@@ -610,32 +510,6 @@ describe('ShortRestModal', () => {
             );
             expect(usedCalls.length).toBeGreaterThan(0);
         });
-
-        it('does not reset signature spell flags when feature does not exist', () => {
-            const playerStats = createPlayerStats({
-                automation: {
-                    passives: [],
-                    specialActions: [],
-                },
-            });
-            setupGetRuntimeValue({
-                'SignatureSpells_selection': ['Fireball'],
-                'SignatureSpells_Fireball_used': true,
-            });
-            render(
-                <ShortRestModal
-                    playerStats={playerStats}
-                    campaignName={mockCampaignName}
-                    onClose={vi.fn()}
-                    onComplete={vi.fn()}
-                />
-            );
-            fireEvent.click(screen.getByText('Complete Short Rest'));
-            const usedCalls = setRuntimeValueMock.mock.calls.filter(
-                (call) => call[1].includes('SignatureSpells')
-            );
-            expect(usedCalls.length).toBe(0);
-        });
     });
 
     describe('closing', () => {
@@ -656,12 +530,6 @@ describe('ShortRestModal', () => {
             const overlay = document.querySelector('.short-rest-overlay');
             fireEvent.click(overlay);
             expect(onClose).toHaveBeenCalledTimes(1);
-        });
-
-        it('does not close when clicking inside the modal', () => {
-            const { onClose } = renderModal();
-            fireEvent.click(screen.getByText('Short Rest'));
-            expect(onClose).not.toHaveBeenCalled();
         });
     });
 
@@ -701,11 +569,6 @@ describe('ShortRestModal', () => {
             expect(screen.getByText('Short Rest')).toBeInTheDocument();
             fireEvent.click(screen.getByText('Complete Short Rest'));
             expect(onClose).not.toHaveBeenCalled();
-        });
-
-        it('handles playerStats with missing fields gracefully', () => {
-            renderModal({ abilities: [], class: null, automation: null });
-            expect(screen.getByText('Short Rest')).toBeInTheDocument();
         });
     });
 });

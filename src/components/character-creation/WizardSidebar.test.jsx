@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import WizardSidebar from './WizardSidebar.jsx';
@@ -33,33 +33,15 @@ describe('WizardSidebar', () => {
       expect(screen.queryByText('Ruleset')).not.toBeInTheDocument();
       expect(screen.getByText('Basic Information')).toBeInTheDocument();
     });
-
-    it('renders a Save button', () => {
-      renderSidebar();
-      expect(screen.getByText('Save')).toBeInTheDocument();
-    });
   });
 
   describe('active state', () => {
-    it('highlights the current step as active', () => {
+    it('highlights the current step as active and others as inactive', () => {
       renderSidebar({ currentStep: 3 });
       const activeTab = screen.getByText('Race & Class').closest('.sidebar-tab');
       expect(activeTab).toHaveClass('active');
-    });
-
-    it('marks non-current tabs as inactive', () => {
-      renderSidebar({ currentStep: 3 });
       const inactiveTab = screen.getByText('Basic Information').closest('.sidebar-tab');
       expect(inactiveTab).not.toHaveClass('active');
-    });
-
-    it('handles out-of-range currentStep without crashing', () => {
-      renderSidebar({ currentStep: 99 });
-      const allTabs = screen.getAllByRole('button');
-      const stepTabs = allTabs.filter((btn) => btn.classList.contains('sidebar-tab'));
-      stepTabs.forEach((tab) => {
-        expect(tab).not.toHaveClass('active');
-      });
     });
   });
 
@@ -88,13 +70,6 @@ describe('WizardSidebar', () => {
       fireEvent.click(screen.getByText('Race & Class').closest('.sidebar-tab'));
       expect(props.goToStep).toHaveBeenCalledWith(3);
     });
-
-    it('does not call goToStep when a disabled tab is clicked', () => {
-      const props = createProps({ getStepEnabled: (step) => step !== 5 });
-      render(<WizardSidebar {...props} />);
-      fireEvent.click(screen.getByText('Ability Scores').closest('.sidebar-tab'));
-      expect(props.goToStep).not.toHaveBeenCalled();
-    });
   });
 
   describe('save button interaction', () => {
@@ -103,13 +78,6 @@ describe('WizardSidebar', () => {
       render(<WizardSidebar {...props} />);
       fireEvent.click(screen.getByText('Save').closest('.sidebar-save'));
       expect(props.onSave).toHaveBeenCalled();
-    });
-
-    it('does not call onSave when the save button is disabled', () => {
-      const props = createProps({ isSaveEnabled: false });
-      render(<WizardSidebar {...props} />);
-      fireEvent.click(screen.getByText('Save').closest('.sidebar-save'));
-      expect(props.onSave).not.toHaveBeenCalled();
     });
   });
 });

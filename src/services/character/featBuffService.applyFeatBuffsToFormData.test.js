@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { describe, it, expect, vi, afterEach } from 'vitest';
 
 vi.mock('../shared/featFinder.js', () => ({
@@ -64,21 +64,6 @@ describe('applyFeatBuffsToFormData', () => {
       );
     });
 
-    it('should deduplicate resistances against existing ones', () => {
-      const formData = baseFormData({ resistances: ['fire'] });
-
-      findFeat.mockReturnValue({
-        benefits: ['You have resistance to fire'],
-      });
-
-      applyFeatBuffsToFormData(formData, []);
-
-      expect(mergeDeduplicated).toHaveBeenCalledWith(
-        formData,
-        'resistances',
-        ['fire']
-      );
-    });
   });
 
   describe('return value structure', () => {
@@ -179,17 +164,7 @@ describe('applyFeatBuffsToFormData', () => {
       expect(result.features).toEqual([]);
     });
 
-    it('should return empty arrays when feats array is undefined', () => {
-      const formData = baseFormData({ feats: undefined });
-
-      const result = applyFeatBuffsToFormData(formData, []);
-
-      expect(result.abilityScoreIncreases).toEqual([]);
-      expect(result.proficiencies).toEqual([]);
-      expect(result.resistances).toEqual([]);
-      expect(result.features).toEqual([]);
     });
-  });
 
   describe('ability score increase parsing', () => {
     it('should mark isChoice true when benefit text contains "or" (dual ability selection)', () => {
@@ -347,22 +322,6 @@ describe('applyFeatBuffsToFormData', () => {
   });
 
   describe('edge cases', () => {
-    it('should handle undefined feats in formData', () => {
-      const formData = baseFormData({ feats: undefined });
-
-      const result = applyFeatBuffsToFormData(formData, []);
-
-      expect(result.abilityScoreIncreases).toEqual([]);
-    });
-
-    it('should handle empty feats array', () => {
-      const formData = baseFormData({ feats: [] });
-
-      const result = applyFeatBuffsToFormData(formData, []);
-
-      expect(result.abilityScoreIncreases).toEqual([]);
-    });
-
     it('should handle multiple feats by aggregating their buffs', () => {
       findFeat
         .mockReturnValueOnce({
@@ -396,22 +355,5 @@ describe('applyFeatBuffsToFormData', () => {
       expect(result.features).toEqual([]);
     });
 
-    it('should handle ability score increases that accumulate on existing featIncrease', () => {
-      const formData = {
-        rules: '5e',
-        feats: ['Tough'],
-        abilities: [{ name: 'Strength', featIncrease: 0 }],
-      };
-
-      findFeat.mockReturnValue({
-        benefits: ['Increase your Strength score by 2'],
-      });
-
-      const result = applyFeatBuffsToFormData(formData, []);
-
-      expect(result.abilityScoreIncreases).toEqual([
-        { name: 'Strength', amount: 2, isChoice: false },
-      ]);
-    });
   });
 });

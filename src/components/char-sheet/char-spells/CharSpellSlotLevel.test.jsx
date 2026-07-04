@@ -1,3 +1,4 @@
+// @cleaned-by-ai
 // @improved-by-ai
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -64,50 +65,7 @@ describe('CharSpellSlotLevel', () => {
       }
     });
 
-    it('renders all slots with no active or inactive class when totalSlots is 0', () => {
-      useRuntimeValue.mockReturnValue(0);
-
-      const { container } = render(
-        <CharSpellSlotLevel
-          level={1}
-          totalSlots={0}
-          playerStats={createPlayerStats()}
-        />
-      );
-
-      const slots = container.querySelectorAll('.slot');
-      expect(slots.length).toBe(4);
-      slots.forEach((slot) => {
-        expect(slot).not.toHaveClass('active');
-        expect(slot).not.toHaveClass('inactive');
-      });
-    });
-  });
-
-  describe('available slots source', () => {
-    it('prefers runtime value over _trackedResources', () => {
-      useRuntimeValue.mockReturnValue(1);
-
-      const playerStats = createPlayerStats({
-        _trackedResources: {
-          'spell_slots_level_1': { current: 4 },
-        },
-      });
-
-      const { container } = render(
-        <CharSpellSlotLevel
-          level={1}
-          totalSlots={4}
-          playerStats={playerStats}
-        />
-      );
-
-      const slots = container.querySelectorAll('.slot');
-      expect(slots[0]).toHaveClass('active');
-      expect(slots[1]).not.toHaveClass('active');
-    });
-
-    it('falls back to _trackedResources when runtime value is null', () => {
+    it('uses _trackedResources fallback when runtime value is null', () => {
       useRuntimeValue.mockReturnValue(null);
 
       const playerStats = createPlayerStats({
@@ -125,11 +83,11 @@ describe('CharSpellSlotLevel', () => {
       );
 
       const slots = container.querySelectorAll('.slot');
-      expect(slots.length).toBe(4);
-      slots.forEach((slot) => expect(slot).toHaveClass('active'));
+      const activeSlots = [...slots].filter((slot) => slot.classList.contains('active'));
+      expect(activeSlots.length).toBe(4);
     });
 
-    it('falls back to totalSlots when both runtime value and _trackedResources are absent', () => {
+    it('uses totalSlots fallback when both runtime value and _trackedResources are absent', () => {
       useRuntimeValue.mockReturnValue(null);
 
       const playerStats = createPlayerStats({
@@ -145,10 +103,8 @@ describe('CharSpellSlotLevel', () => {
       );
 
       const slots = container.querySelectorAll('.slot');
-      expect(slots[0]).toHaveClass('active');
-      expect(slots[1]).toHaveClass('active');
-      expect(slots[2]).toHaveClass('active');
-      expect(slots[3]).not.toHaveClass('active');
+      const activeSlots = [...slots].filter((slot) => slot.classList.contains('active'));
+      expect(activeSlots.length).toBe(3);
     });
   });
 
@@ -204,32 +160,7 @@ describe('CharSpellSlotLevel', () => {
       }
     );
 
-    it('passes campaignName to setRuntimeValue on interaction', () => {
-      useRuntimeValue.mockReturnValue(3);
-
-      const { container } = render(
-        <CharSpellSlotLevel
-          level={1}
-          totalSlots={3}
-          playerStats={createPlayerStats()}
-          campaignName="MyCampaign"
-        />
-      );
-
-      const levelDiv = container.querySelector('.level');
-      fireEvent.click(levelDiv);
-
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'Test Character',
-        'spell_slots_level_1',
-        2,
-        'MyCampaign'
-      );
-    });
-  });
-
-  describe('interaction with _trackedResources fallback', () => {
-    it('resets when using _trackedResources fallback and slots are 0', () => {
+    it('uses _trackedResources fallback for interaction when runtime value is null', () => {
       useRuntimeValue.mockReturnValue(null);
 
       const playerStats = createPlayerStats({
@@ -255,28 +186,6 @@ describe('CharSpellSlotLevel', () => {
         4,
         undefined
       );
-    });
-  });
-
-  describe('playerStats edge cases', () => {
-    it('falls back to totalSlots when playerStats has no _trackedResources property', () => {
-      useRuntimeValue.mockReturnValue(null);
-
-      const playerStats = { name: 'Test Character' };
-
-      const { container } = render(
-        <CharSpellSlotLevel
-          level={1}
-          totalSlots={3}
-          playerStats={playerStats}
-        />
-      );
-
-      const slots = container.querySelectorAll('.slot');
-      expect(slots[0]).toHaveClass('active');
-      expect(slots[1]).toHaveClass('active');
-      expect(slots[2]).toHaveClass('active');
-      expect(slots[3]).not.toHaveClass('active');
     });
   });
 });

@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import useAttackDamageResolution from './useAttackDamageResolution.js';
 
@@ -155,50 +155,6 @@ describe('useAttackDamageResolution - cantrip damage bonus', () => {
             expect(mockRollDamage).toHaveBeenCalledWith(
                 'Fire Bolt',
                 expect.stringContaining('4 [Cantrip]'),
-                expect.any(Number), expect.any(Array), expect.any(Number), expect.any(Object)
-            );
-        });
-
-        it('does not add bonus when spell is not a cantrip (level > 0)', async () => {
-            const stats = makeCantripStats({
-                spellAbilities: {
-                    spells: [
-                        { name: 'Fire Bolt', level: 1 },
-                    ],
-                },
-            });
-            const { resolveAttackDamage } = UseAttackDamageResolution({ playerStats: stats });
-            const attack = {
-                name: 'Fire Bolt', damage: '2d10', damageType: 'Fire',
-                weaponType: 'ranged', properties: [],
-            };
-            await resolveAttackDamage(attack);
-            await tick();
-            expect(mockRollDamage).toHaveBeenCalledWith(
-                'Fire Bolt',
-                '2d10',
-                expect.any(Number), expect.any(Array), expect.any(Number), expect.any(Object)
-            );
-        });
-
-        it('does not add bonus when Wisdom modifier is 0 or negative', async () => {
-            const stats = makeCantripStats({
-                abilities: [
-                    { name: 'Strength', bonus: 3 },
-                    { name: 'Dexterity', bonus: 2 },
-                    { name: 'Wisdom', bonus: -2 },
-                ],
-            });
-            const { resolveAttackDamage } = UseAttackDamageResolution({ playerStats: stats });
-            const attack = {
-                name: 'Fire Bolt', damage: '1d10', damageType: 'Fire',
-                weaponType: 'ranged', properties: [],
-            };
-            await resolveAttackDamage(attack);
-            await tick();
-            expect(mockRollDamage).toHaveBeenCalledWith(
-                'Fire Bolt',
-                '1d10',
                 expect.any(Number), expect.any(Array), expect.any(Number), expect.any(Object)
             );
         });

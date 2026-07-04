@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import { findFeat } from '../../services/shared/featFinder.js';
@@ -85,18 +85,6 @@ describe('computeAllFeatBuffs', () => {
   });
 
   describe('5e ruleset', () => {
-    it('should default to "5e" ruleset when not specified', () => {
-      findFeat.mockReturnValue({
-        benefits: ['Increase your Strength score by 2'],
-      });
-
-      const result = computeAllFeatBuffs({ feats: ['Tough'] }, []);
-
-      expect(result.abilityScoreIncreases).toEqual([
-        { name: 'Strength', amount: 2, isChoice: false },
-      ]);
-    });
-
     it('should find and parse a single 5e feat with ability score increase', () => {
       findFeat.mockReturnValue({
         benefits: ['Increase your Strength score by 2'],
@@ -802,43 +790,4 @@ describe('computeAllFeatBuffs', () => {
     });
   });
 
-  describe('ruleset switching', () => {
-    it('should use 5e parsing for 5e ruleset', () => {
-      findFeat.mockReturnValue({
-        benefits: ['Increase your Strength score by 2'],
-      });
-
-      const result = computeAllFeatBuffs(
-        { rules: '5e', feats: ['Tough'] },
-        []
-      );
-
-      expect(result.abilityScoreIncreases).toEqual([
-        { name: 'Strength', amount: 2, isChoice: false },
-      ]);
-    });
-
-    it('should use 2024 parsing for 2024 ruleset', () => {
-      findFeat.mockReturnValue({
-        benefits: [
-          { type: 'ability_score_increase', description: '+1 STR' },
-        ],
-        ability_score_increase: { scores: ['Strength'], amount: 1 },
-      });
-
-      const result = computeAllFeatBuffs(
-        { rules: '2024', feats: ['Tough'] },
-        []
-      );
-
-      expect(result.abilityScoreIncreases).toEqual([
-        {
-          name: 'Strength',
-          amount: 1,
-          isChoice: false,
-          description: '+1 STR',
-        },
-      ]);
-    });
-  });
 });

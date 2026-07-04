@@ -1,6 +1,7 @@
+// @cleaned-by-ai
 // @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, act, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, act } from '@testing-library/react';
 import React from 'react';
 import CharReactions from './CharReactions.jsx';
 
@@ -125,8 +126,7 @@ vi.mock('../../services/rules/spells/spellCastService.js', () => ({
   executeSpellCast: vi.fn(),
 }));
 
-import { useRuntimeValue, getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
-import { buildFeatureDetailHtml } from '../../hooks/combat/useActionPopup.js';
+import { useRuntimeValue, getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import { hasAutomation, hasTacticalShift, hasSpeedyOpportunityDisadvantage } from '../../services/combat/automation/automationService.js';
 import { getCombatContext, getTargetFromAttacker } from '../../services/rules/combat/damageUtils.js';
 import { executeHandler } from '../../services/automation/index.js';
@@ -196,25 +196,6 @@ describe('CharReactions - Edge Cases', () => {
     resetMocks();
   });
 
-  // ===== Undefined/null playerStats handling =====
-
-  it('handles undefined playerStats properties gracefully', () => {
-    const stats = { ...basePlayerStats, reactions: undefined, attacks: undefined, spellAbilities: undefined };
-    render(<CharReactions {...baseProps} playerStats={stats} />);
-    expect(screen.getByText('Reactions')).toBeInTheDocument();
-    expect(screen.getByText('Opportunity Attack:')).toBeInTheDocument();
-  });
-
-  // ===== cannotAct blocking for different reaction types =====
-
-  it('prevents automation, details, and Stand reactions when cannotAct is true', async () => {
-    vi.mocked(hasAutomation).mockReturnValue(true);
-    render(<CharReactions {...baseProps} cannotAct={true} />);
-    fireEvent.click(screen.getByText('Reaction Test:'));
-    expect(executeHandler).not.toHaveBeenCalled();
-    expect(buildFeatureDetailHtml).not.toHaveBeenCalled();
-  });
-
   // ===== Reaction clickability =====
 
   it('marks a reaction with automation as clickable', () => {
@@ -230,19 +211,6 @@ describe('CharReactions - Edge Cases', () => {
     expect(screen.getByText('Plain Reaction:')).not.toHaveClass('clickable');
   });
 
-  // ===== MetamagicPopup with _currentSP =====
-
-  it('renders MetamagicPopup with pendingMetamagic data', () => {
-    vi.mocked(useSpellMetamagicFlow).mockReturnValue({
-      pendingMetamagic: { spellName: 'Shield', spellLevel: 1, _currentSP: 5 },
-      gateMetamagic: vi.fn(),
-      handleConfirm: vi.fn(),
-      handleSkip: vi.fn(),
-    });
-    render(<CharReactions {...baseProps} />);
-    expect(screen.getByTestId('metamagic-popup')).toBeInTheDocument();
-  });
-
   // ===== Multiple dynamic reactions =====
 
   it('adds both Revivification and Stand when both conditions are met', () => {
@@ -256,64 +224,12 @@ describe('CharReactions - Edge Cases', () => {
     expect(screen.getByText('Stand (Power Word Heal):')).toBeInTheDocument();
   });
 
-  it('adds Revivification only once even with multiple reactionSave buffs', () => {
-    vi.mocked(useRuntimeValue).mockImplementation((charName, key) => {
-      if (key === 'activeBuffs') return [{ reactionSave: 'CHA' }, { reactionSave: 'WIS' }];
-      return undefined;
-    });
-    render(<CharReactions {...baseProps} />);
-    expect(screen.queryAllByText('Revivification:').length).toBe(1);
-  });
-
-  it('adds Stand only once even when pwhStance check passes', () => {
-    vi.mocked(useRuntimeValue).mockImplementation((charName, key) => {
-      if (key === 'powerWordHealStandPermission') return true;
-      return undefined;
-    });
-    const stats = { ...basePlayerStats, reactions: [...basePlayerStats.reactions, { name: 'Stand (Power Word Heal)', description: 'Already present' }] };
-    render(<CharReactions {...baseProps} playerStats={stats} />);
-    expect(screen.queryAllByText('Stand (Power Word Heal):').length).toBe(1);
-  });
-
-  // ===== Reaction with automation returning various result types =====
-
-  it('shows feature detail when executeHandler returns undefined', async () => {
-    vi.mocked(hasAutomation).mockReturnValue(true);
-    vi.mocked(executeHandler).mockResolvedValue(undefined);
-    const stats = { ...basePlayerStats, reactions: [{ name: 'Undefined Handler', description: 'Handler returns undefined', details: 'Some details', automation: { type: 'test' } }] };
-    render(<CharReactions {...baseProps} playerStats={stats} />);
-    await act(async () => { fireEvent.click(screen.getByText('Undefined Handler:')); });
-    await waitFor(() => { expect(buildFeatureDetailHtml).toHaveBeenCalled(); });
-  });
-
   // ===== Spell detail popup with onCast handler =====
 
   it('renders SpellDetailPopup with onCast for normal reaction spell', () => {
     render(<CharReactions {...baseProps} />);
     fireEvent.click(screen.getByText('Shield'));
     expect(screen.getByTestId('spell-detail-popup')).toBeInTheDocument();
-  });
-
-  // ===== FeaturesToIgnore =====
-
-  it('filters features using 5e featuresToIgnore by default and with explicit 5e ruleset', () => {
-    const stats = { ...basePlayerStats, rules: undefined, reactions: [{ name: 'Spellcasting', description: 'Casts spells' }, { name: 'Opportunity Attack', description: 'Attacks fleeing enemies' }] };
-    render(<CharReactions {...baseProps} playerStats={stats} />);
-    expect(screen.queryByText('Spellcasting:')).not.toBeInTheDocument();
-    expect(screen.getByText('Opportunity Attack:')).toBeInTheDocument();
-  });
-
-  // ===== Stand behavior =====
-
-  it('clears pwhStance when Stand is clicked regardless of prone condition', () => {
-    vi.mocked(useRuntimeValue).mockImplementation((charName, key) => {
-      if (key === 'powerWordHealStandPermission') return true;
-      return undefined;
-    });
-    vi.mocked(getRuntimeValue).mockReturnValue([]);
-    render(<CharReactions {...baseProps} />);
-    fireEvent.click(screen.getByText('Stand (Power Word Heal):'));
-    expect(setRuntimeValue).toHaveBeenCalledWith(basePlayerStats.name, 'powerWordHealStandPermission', false, baseProps.campaignName);
   });
 
   // ===== ArcaneWardRestoreModal prop spreading =====

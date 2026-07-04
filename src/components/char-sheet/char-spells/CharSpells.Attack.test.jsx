@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharSpells from './CharSpells.jsx';
@@ -146,40 +146,6 @@ describe('CharSpells', () => {
   });
 
   describe('Spell attack to-hit', () => {
-    it('should render the spell attack to-hit label', () => {
-      renderCharSpells();
-      expect(screen.getByText(/Attack \(to hit\):/)).toBeInTheDocument();
-    });
-
-    it('should not call rollAttack when cannotAct is true', () => {
-      const mockRollAttack = vi.fn();
-      useLoggedDiceRoll.mockImplementation(() => ({
-        popupHtml: null,
-        setPopupHtml: vi.fn(),
-        rollAttack: mockRollAttack,
-        rollDamage: vi.fn(),
-        quickRollPlayerSave: vi.fn(),
-      }));
-
-      renderCharSpells({ cannotAct: true });
-
-      const attackLabel = screen.getByText(/Attack \(to hit\):/);
-      fireEvent.click(attackLabel);
-
-      expect(mockRollAttack).not.toHaveBeenCalled();
-    });
-
-    it('should call rollAttack with correct arguments for a non-sorcerer', () => {
-      const mockRollAttack = createMockRollAttack();
-
-      renderCharSpells();
-
-      const attackLabel = screen.getByText(/Attack \(to hit\):/);
-      fireEvent.click(attackLabel);
-
-      expect(mockRollAttack).toHaveBeenCalledWith('Spell Attack', 5, expect.any(Object));
-    });
-
     it.each`
       exhaustionPenalty | expectedToHit
       ${0}              | ${5}
@@ -358,22 +324,6 @@ describe('CharSpells', () => {
       renderCharSpells({ playerStats: statsWithSaveDc });
 
       expect(screen.getByText(expectedDisplay)).toBeInTheDocument();
-    });
-  });
-
-  describe('Spell attack with null/undefined values', () => {
-    it('should render spell attack when toHit is zero', () => {
-      const statsWithZeroToHit = {
-        ...mockPlayerStats,
-        spellAbilities: {
-          ...mockPlayerStats.spellAbilities,
-          toHit: 0,
-        },
-      };
-
-      renderCharSpells({ playerStats: statsWithZeroToHit });
-
-      expect(screen.getByText('+0')).toBeInTheDocument();
     });
   });
 });

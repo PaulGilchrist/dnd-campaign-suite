@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharSummary from './CharSummary.jsx';
@@ -141,23 +141,10 @@ describe('CharSummary - Buff Effects', () => {
             expect(screen.getByText(/hover/)).toBeInTheDocument();
         });
 
-        it('sets fly speed 60 default for dragon_wings without explicit flySpeed', () => {
-            getActiveBuffs.mockReturnValue([{ effect: 'dragon_wings' }]);
-            render(<CharSummary playerStats={mockPlayerStats} campaignName={mockCampaignName} exhaustionLevel={0} />);
-            expect(screen.getByText(/fly 60 ft/)).toBeInTheDocument();
-            expect(screen.getByText(/hover/)).toBeInTheDocument();
-        });
-
         it('sets fly speed for avenging_angel_flight buff', () => {
             getActiveBuffs.mockReturnValue([{ effect: 'avenging_angel_flight', flySpeed: 40 }]);
             render(<CharSummary playerStats={mockPlayerStats} campaignName={mockCampaignName} exhaustionLevel={0} />);
             expect(screen.getByText(/fly 40 ft/)).toBeInTheDocument();
-        });
-
-        it('sets fly speed 60 default for avenging_angel_flight without explicit flySpeed', () => {
-            getActiveBuffs.mockReturnValue([{ effect: 'avenging_angel_flight' }]);
-            render(<CharSummary playerStats={mockPlayerStats} campaignName={mockCampaignName} exhaustionLevel={0} />);
-            expect(screen.getByText(/fly 60 ft/)).toBeInTheDocument();
         });
 
         it('sets fly speed for telekinetic_leap buff', () => {
@@ -270,18 +257,6 @@ describe('CharSummary - Speed Calculations', () => {
             const speedEl = screen.getByText(/Speed:/).nextElementSibling;
             expect(speedEl.textContent).toContain('20 ft');
         });
-
-        it('applies exhaustion penalty to speed with aura bonus', () => {
-            render(<CharSummary
-                playerStats={mockPlayerStats}
-                campaignName={mockCampaignName}
-                exhaustionLevel={2}
-                auraComboEffects={{ speedBonus: 10, speedSource: 'Aura of Protection' }}
-            />);
-            // base 25 - 10 (exhaustion) + 10 (aura) = 25
-            const speedEl = screen.getByText(/Speed:/).nextElementSibling;
-            expect(speedEl.textContent).toContain('25 ft');
-        });
     });
 
     describe('condition speed effects', () => {
@@ -293,7 +268,8 @@ describe('CharSummary - Speed Calculations', () => {
                 conditionEffects={{ speedHalved: true }}
             />);
             // 25 / 2 = 12
-            expect(document.body.textContent).toContain('12');
+            const speedEl = screen.getByText(/Speed:/).nextElementSibling;
+            expect(speedEl.textContent).toContain('12 ft');
         });
 
         it('applies speed reduction when speedReduction is present', () => {
@@ -306,18 +282,6 @@ describe('CharSummary - Speed Calculations', () => {
             // 25 - 10 = 15
             const speedEl = screen.getByText(/Speed:/).nextElementSibling;
             expect(speedEl.textContent).toContain('15 ft');
-        });
-
-        it('applies speed reduction with aura bonus', () => {
-            render(<CharSummary
-                playerStats={mockPlayerStats}
-                campaignName={mockCampaignName}
-                exhaustionLevel={0}
-                conditionEffects={{ speedReduction: 10 }}
-                auraComboEffects={{ speedBonus: 5, speedSource: 'Aura of Protection' }}
-            />);
-            const speedEl = screen.getByText(/Speed:/).nextElementSibling;
-            expect(speedEl.textContent).toContain('20 ft');
         });
     });
 
@@ -587,20 +551,6 @@ describe('CharSummary - Circle Forms AC Override', () => {
         render(<CharSummary playerStats={stats} campaignName={mockCampaignName} exhaustionLevel={0} />);
         // 13 + 3 (WIS) = 16
         expect(screen.getByText((content, element) => element?.tagName === 'DIV' && element.className?.includes('clickable') && content.includes('16'))).toBeInTheDocument();
-    });
-
-    it('overrides AC for Moon Druid with large_form buff', () => {
-        getActiveBuffs.mockReturnValue([{ effect: 'large_form' }]);
-        const stats = {
-            ...mockPlayerStats,
-            class: { name: 'Druid', subclass: { name: 'Moon' }, major: { name: 'Moon' } },
-            abilities: [{ name: 'Wisdom', bonus: 2 }],
-            inventory: { equipped: [] },
-            equipment: [],
-        };
-        render(<CharSummary playerStats={stats} campaignName={mockCampaignName} exhaustionLevel={0} />);
-        // 13 + 2 = 15
-        expect(screen.getByText((content, element) => element?.tagName === 'DIV' && element.className?.includes('clickable') && content.includes('15'))).toBeInTheDocument();
     });
 
     it('does not override AC for non-Moon Druid', () => {

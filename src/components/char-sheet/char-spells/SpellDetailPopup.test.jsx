@@ -1,4 +1,4 @@
-/* @improved-by-ai */
+/* @cleaned-by-ai */
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import SpellDetailPopup from './SpellDetailPopup.jsx';
@@ -79,16 +79,12 @@ describe('SpellDetailPopup', () => {
   });
 
   describe('rendering', () => {
-    it('renders spell name and description', () => {
+    it('renders spell name, description, and all metadata fields', () => {
       renderPopup();
       expect(screen.getByText('Magic Missile')).toBeInTheDocument();
       expect(
         screen.getByText('Three darts of force strike a creature.')
       ).toBeInTheDocument();
-    });
-
-    it('renders spell metadata fields', () => {
-      renderPopup();
       expect(screen.getByText(/Level:/)).toBeInTheDocument();
       expect(screen.getByText('1')).toBeInTheDocument();
       expect(screen.getByText(/Casting Time:/)).toBeInTheDocument();
@@ -107,19 +103,16 @@ describe('SpellDetailPopup', () => {
       expect(screen.getByText('Cantrip')).toBeInTheDocument();
     });
 
-    it('does not show slots remaining for cantrips', () => {
-      const cantrip = { ...baseMockSpell, level: 0 };
-      renderPopup(cantrip);
-      expect(screen.queryByText(/Slots Remaining:/)).not.toBeInTheDocument();
-    });
-
-    it('shows slots remaining for non-upcastable spells', () => {
-      const fixedLevelSpell = {
-        ...baseMockSpell,
-        damage: { damage_at_slot_level: { '1': '3d4+1' } },
-      };
-      renderPopup(fixedLevelSpell);
-      expect(screen.getByText(/Slots Remaining:/)).toBeInTheDocument();
+    it.each([
+      { spell: { ...baseMockSpell, level: 0 }, showSlots: false, name: 'cantrip' },
+      { spell: baseMockSpell, showSlots: true, name: 'non-upcastable spell' },
+    ])('shows slots remaining for $name, hides for cantrip', ({ spell, showSlots }) => {
+      renderPopup(spell);
+      if (showSlots) {
+        expect(screen.getByText(/Slots Remaining:/)).toBeInTheDocument();
+      } else {
+        expect(screen.queryByText(/Slots Remaining:/)).not.toBeInTheDocument();
+      }
     });
 
     it('hides slots remaining when upcast selector is shown', () => {
@@ -154,26 +147,19 @@ describe('SpellDetailPopup', () => {
       expect(screen.getByText('Level 3')).toBeInTheDocument();
     });
 
-    it('selects first level with available slots by default', () => {
-      const upcastLevels = [
-        { level: 1, formula: '3d4+1', availableSlots: 0 },
-        { level: 2, formula: '4d4+1', availableSlots: 3 },
-      ];
+    it.each([
+      { levels: [{ level: 1, formula: '3d4+1', availableSlots: 0 }, { level: 2, formula: '4d4+1', availableSlots: 3 }], expectedChecked: 1, expectedDefault: 'first available', name: 'first available slot' },
+      { levels: [{ level: 1, formula: '3d4+1', availableSlots: 4 }], expectedChecked: null, expectedDefault: 'base level', name: 'single level (no selector shown)' },
+    ])('defaults to $expectedDefault when $name', ({ levels, expectedChecked }) => {
       renderPopup(baseMockSpell, baseMockPlayerStats, mockCampaignName, {
-        upcastLevels,
+        upcastLevels: levels,
       });
-      const radios = screen.getAllByRole('radio');
-      expect(radios[1]).toBeChecked();
-    });
-
-    it('defaults to base spell level when only one upcast level available', () => {
-      const upcastLevels = [
-        { level: 1, formula: '3d4+1', availableSlots: 4 },
-      ];
-      renderPopup(baseMockSpell, baseMockPlayerStats, mockCampaignName, {
-        upcastLevels,
-      });
-      expect(screen.queryByText(/Cast at Level:/)).not.toBeInTheDocument();
+      if (expectedChecked !== null) {
+        const radios = screen.getAllByRole('radio');
+        expect(radios[expectedChecked]).toBeChecked();
+      } else {
+        expect(screen.queryByText(/Cast at Level:/)).not.toBeInTheDocument();
+      }
     });
 
     it('disables radio options with zero available slots', () => {
@@ -203,26 +189,18 @@ describe('SpellDetailPopup', () => {
       expect(radios[1]).toBeChecked();
     });
 
-    it('shows slot counts next to each upcast level option', () => {
+    it.each([
+      { slots: 3, expectedText: '3 slots', name: 'plural' },
+      { slots: 1, expectedText: '1 slot', name: 'singular' },
+    ])('uses $name slot label for available slots', ({ slots, expectedText }) => {
       const upcastLevels = [
-        { level: 2, formula: '4d4+1', availableSlots: 3 },
+        { level: 2, formula: '4d4+1', availableSlots: slots },
         { level: 3, formula: '5d4+1', availableSlots: 2 },
       ];
       renderPopup(baseMockSpell, baseMockPlayerStats, mockCampaignName, {
         upcastLevels,
       });
-      expect(screen.getByText('3 slots')).toBeInTheDocument();
-    });
-
-    it('uses singular "slot" when availableSlots is 1', () => {
-      const upcastLevels = [
-        { level: 2, formula: '4d4+1', availableSlots: 1 },
-        { level: 3, formula: '5d4+1', availableSlots: 2 },
-      ];
-      renderPopup(baseMockSpell, baseMockPlayerStats, mockCampaignName, {
-        upcastLevels,
-      });
-      expect(screen.getByText('1 slot')).toBeInTheDocument();
+      expect(screen.getByText(expectedText)).toBeInTheDocument();
     });
   });
 
@@ -338,23 +316,17 @@ describe('SpellDetailPopup', () => {
   });
 
   describe('area of effect rendering', () => {
-    it('renders area of effect with type and size', () => {
+    it.each([
+      { aoe: { type: 'Circle', size: '20 ft. radius' }, expectedText: 'Circle - 20 ft. radius', name: 'with type and size' },
+      { aoe: { type: 'Sphere' }, expectedText: 'Sphere', name: 'type only, no size' },
+    ])('renders area of effect $name', ({ aoe, expectedText }) => {
       const spell = {
         ...baseMockSpell,
-        area_of_effect: { type: 'Circle', size: '20 ft. radius' },
+        area_of_effect: aoe,
       };
       renderPopup(spell);
       expect(screen.getByText(/Area:/)).toBeInTheDocument();
-      expect(screen.getByText('Circle - 20 ft. radius')).toBeInTheDocument();
-    });
-
-    it('renders area of effect with only type when size is missing', () => {
-      const spell = {
-        ...baseMockSpell,
-        area_of_effect: { type: 'Sphere' },
-      };
-      renderPopup(spell);
-      expect(screen.getByText('Sphere')).toBeInTheDocument();
+      expect(screen.getByText(expectedText)).toBeInTheDocument();
     });
   });
 

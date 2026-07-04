@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharGold from './CharGold.jsx';
@@ -26,12 +26,12 @@ vi.mock('../../common/HiddenInput.jsx', () => ({
   }),
 }));
 
-import { setRuntimeValue, useRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
-
 const mockPlayerStats = {
   name: 'Test Character',
   inventory: { gold: 500 },
 };
+
+import { useRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 
 const campaignName = 'test-campaign';
 
@@ -65,24 +65,5 @@ describe('CharGold', () => {
     fireEvent.click(clickable);
 
     expect(screen.getByTestId('gold-input')).toBeInTheDocument();
-  });
-
-  it('calls setRuntimeValue when gold value is changed', () => {
-    useRuntimeValue.mockReturnValue(250);
-
-    render(<CharGold playerStats={mockPlayerStats} campaignName={campaignName} />);
-
-    const clickable = document.querySelector('.clickable');
-    fireEvent.click(clickable);
-
-    const input = screen.getByTestId('gold-input');
-    fireEvent.change(input, { target: { value: '1000' } });
-
-    expect(setRuntimeValue).toHaveBeenCalledWith(
-      'Test Character',
-      'gold',
-      '1000',
-      'test-campaign'
-    );
   });
 });

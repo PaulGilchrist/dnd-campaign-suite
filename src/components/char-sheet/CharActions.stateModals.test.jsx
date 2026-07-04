@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharActions from './CharActions.jsx';
@@ -263,42 +263,34 @@ describe('CharActions state and modals', () => {
   });
 
   describe('metamagic popup', () => {
-    it('renders MetamagicPopup when pendingMetamagic is set', async () => {
-      useSpellMetamagicFlow.mockReturnValue({
-        pendingMetamagic: { spellName: 'Fireball', spellLevel: 3, _currentSP: 5 },
-        gateMetamagic: vi.fn(),
-        handleConfirm: vi.fn(),
-        handleSkip: vi.fn(),
-        pendingAid: null,
-        handleAidConfirm: vi.fn(),
-        handleAidSkip: vi.fn(),
-        pendingGreaterRestoration: null,
-        handleGreaterRestorationConfirm: vi.fn(),
-        handleGreaterRestorationSkip: vi.fn(),
-        pendingRemoveCurse: null,
-        handleRemoveCurseConfirm: vi.fn(),
-        handleRemoveCurseSkip: vi.fn(),
-      });
+    it.each([
+      { flowHook: 'useSpellMetamagicFlow', _pendingKey: 'pendingMetamagic', pendingValue: { spellName: 'Fireball', spellLevel: 3, _currentSP: 5 }, extraSetup: null },
+      { flowHook: 'useActionSpellMetamagic', _pendingKey: 'pendingActionMetamagic', pendingValue: { spellName: 'Fireball', spellLevel: 3, _currentSP: 5 }, extraSetup: { getInnateSorceryBonus: { saveDcBonus: 0 } } },
+    ])('renders MetamagicPopup when %s returns pending', async ({ flowHook, _pendingKey, pendingValue, extraSetup }) => {
+      if (extraSetup?.getInnateSorceryBonus) {
+        vi.mocked(getInnateSorceryBonus).mockReturnValue(extraSetup.getInnateSorceryBonus);
+      }
 
-      const stats = createStats({
-        spellAbilities: { spells: [{ name: 'Fireball', range: '150 ft', casting_time: '1 action', prepared: 'Prepared', damage: '8d6' }] },
-      });
-
-      await act(async () => { render(<CharActions playerStats={stats} />); });
-      expect(screen.getByTestId('metamagic-popup')).toBeInTheDocument();
-    });
-
-    it('renders MetamagicPopup when pendingActionMetamagic is set', async () => {
-      vi.mocked(getInnateSorceryBonus).mockReturnValue({ saveDcBonus: 0 });
-
-      useActionSpellMetamagic.mockReturnValue({
-        pendingActionMetamagic: { spellName: 'Fireball', spellLevel: 3, _currentSP: 5 },
-        handleActionMetamagicConfirm: vi.fn(),
-        handleActionMetamagicSkip: vi.fn(),
-        handleActionSpellDamageClick: vi.fn(),
-        handleSpellAttackClick: vi.fn(),
-        handleSpellDamageClick: vi.fn(),
-      });
+      if (flowHook === 'useSpellMetamagicFlow') {
+        useSpellMetamagicFlow.mockReturnValue({
+          pendingMetamagic: pendingValue,
+          gateMetamagic: vi.fn(),
+          handleConfirm: vi.fn(),
+          handleSkip: vi.fn(),
+          pendingAid: null, handleAidConfirm: vi.fn(), handleAidSkip: vi.fn(),
+          pendingGreaterRestoration: null, handleGreaterRestorationConfirm: vi.fn(), handleGreaterRestorationSkip: vi.fn(),
+          pendingRemoveCurse: null, handleRemoveCurseConfirm: vi.fn(), handleRemoveCurseSkip: vi.fn(),
+        });
+      } else {
+        useActionSpellMetamagic.mockReturnValue({
+          pendingActionMetamagic: pendingValue,
+          handleActionMetamagicConfirm: vi.fn(),
+          handleActionMetamagicSkip: vi.fn(),
+          handleActionSpellDamageClick: vi.fn(),
+          handleSpellAttackClick: vi.fn(),
+          handleSpellDamageClick: vi.fn(),
+        });
+      }
 
       const stats = createStats({
         spellAbilities: { spells: [{ name: 'Fireball', range: '150 ft', casting_time: '1 action', prepared: 'Prepared', damage: '8d6' }] },

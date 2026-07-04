@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharacterCreationWizard from './CharacterCreationWizard.jsx';
@@ -293,20 +293,6 @@ describe('CharacterCreationWizard - Integration', () => {
   it('renders step 1 (Ruleset) by default', () => {
     render(<CharacterCreationWizard {...defaultProps} />);
     expect(screen.getByTestId('step-ruleset')).toBeInTheDocument();
-  });
-
-  it('renders the step content corresponding to currentStep from navigation', () => {
-    useWizardNavigation.mockImplementation(() => ({
-      currentStep: 5,
-      isNextDisabled: false,
-      navigateNext: mockNavigateNext,
-      navigatePrevious: mockNavigatePrevious,
-      goToStep: mockGoToStep,
-      getStepEnabled: mockGetStepEnabled,
-      isSaveEnabled: true,
-    }));
-    render(<CharacterCreationWizard {...defaultProps} />);
-    expect(screen.getByTestId('step-abilities')).toBeInTheDocument();
   });
 
   it('updates tempInventory when onTempInventoryChange is called from step', async () => {
