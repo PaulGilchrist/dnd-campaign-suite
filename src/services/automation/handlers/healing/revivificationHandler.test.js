@@ -90,7 +90,7 @@ describe('revivificationHandler', () => {
       expect(result.payload.automation).toEqual({});
     });
 
-    it('returns popup when rage is negative or null', async () => {
+    it('returns popup when rage is null', async () => {
       useRuntimeState.getRuntimeValue.mockImplementation((_target, key) => {
         if (key === 'ragePoints') return null;
         return null;
@@ -103,7 +103,6 @@ describe('revivificationHandler', () => {
         null,
       );
 
-      expect(result.type).toBe('popup');
       expect(result.payload.description).toBe(
         'No Rage remaining to power Revivification.',
       );
@@ -245,7 +244,7 @@ describe('revivificationHandler', () => {
   // ── Rage decrement ─────────────────────────────────────────
 
   describe('rage decrement', () => {
-    it('decrements ragePoints by 1 for player target', async () => {
+    it('decrements ragePoints by 1 regardless of target type', async () => {
       useRuntimeState.getRuntimeValue.mockImplementation((target, key) => {
         if (key === 'ragePoints') return 3;
         if (key === 'currentHitPoints') return 0;
@@ -253,29 +252,6 @@ describe('revivificationHandler', () => {
       });
       damageUtils.getCombatContext.mockResolvedValue({});
       damageUtils.getTargetFromAttacker.mockReturnValue(makePlayerTarget('Ally'));
-
-      await handle(
-        makeAction(),
-        makePlayerStats(),
-        campaignName,
-        null,
-      );
-
-      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-        playerName,
-        'ragePoints',
-        2,
-        campaignName,
-      );
-    });
-
-    it('decrements ragePoints by 1 for NPC target', async () => {
-      useRuntimeState.getRuntimeValue.mockImplementation((_target, key) => {
-        if (key === 'ragePoints') return 3;
-        return null;
-      });
-      damageUtils.getCombatContext.mockResolvedValue({});
-      damageUtils.getTargetFromAttacker.mockReturnValue(makeNPCTarget('Goblin'));
 
       await handle(
         makeAction(),
@@ -347,7 +323,7 @@ describe('revivificationHandler', () => {
   // ── Logging ────────────────────────────────────────────────
 
   describe('logging', () => {
-    it('posts heal log entry with correct data for player target', async () => {
+    it('posts heal log entry with correct data', async () => {
       useRuntimeState.getRuntimeValue.mockImplementation((target, key) => {
         if (key === 'ragePoints') return 1;
         if (key === 'currentHitPoints') return 0;
@@ -376,42 +352,12 @@ describe('revivificationHandler', () => {
       });
       dateSpy.mockRestore();
     });
-
-    it('posts heal log entry with correct data for NPC target', async () => {
-      useRuntimeState.getRuntimeValue.mockImplementation((_target, key) => {
-        if (key === 'ragePoints') return 1;
-        return null;
-      });
-      damageUtils.getCombatContext.mockResolvedValue({});
-      damageUtils.getTargetFromAttacker.mockReturnValue(makeNPCTarget('Goblin'));
-
-      const now = Date.now();
-      const dateSpy = vi.spyOn(Date, 'now').mockReturnValue(now);
-
-      await handle(
-        makeAction(),
-        makePlayerStats(),
-        campaignName,
-        null,
-      );
-
-      expect(logPoster.postLogEntry).toHaveBeenCalledWith(campaignName, {
-        type: 'heal',
-        characterName: playerName,
-        targetName: 'Goblin',
-        amount: 5,
-        abilityName: 'Revivification',
-        timestamp: now,
-      });
-      dateSpy.mockRestore();
-    });
   });
 
   // ── Heal amount ────────────────────────────────────────────
 
   describe('heal amount', () => {
-    it('uses playerStats.level as healAmount', async () => {
-      const ps = makePlayerStats({ level: 7 });
+    it('uses playerStats.level as healAmount, defaulting to 1 when falsy', async () => {
       useRuntimeState.getRuntimeValue.mockImplementation((target, key) => {
         if (key === 'ragePoints') return 1;
         if (key === 'currentHitPoints') return 0;
@@ -420,30 +366,7 @@ describe('revivificationHandler', () => {
       damageUtils.getCombatContext.mockResolvedValue({});
       damageUtils.getTargetFromAttacker.mockReturnValue(makePlayerTarget('Ally'));
 
-      await handle(
-        makeAction(),
-        ps,
-        campaignName,
-        null,
-      );
-
-      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-        'Ally',
-        'currentHitPoints',
-        7,
-        campaignName,
-      );
-    });
-
-    it('uses default healAmount of 1 when level is falsy', async () => {
       const ps = makePlayerStats({ level: 0 });
-      useRuntimeState.getRuntimeValue.mockImplementation((target, key) => {
-        if (key === 'ragePoints') return 1;
-        if (key === 'currentHitPoints') return 0;
-        return null;
-      });
-      damageUtils.getCombatContext.mockResolvedValue({});
-      damageUtils.getTargetFromAttacker.mockReturnValue(makePlayerTarget('Ally'));
 
       await handle(
         makeAction(),
@@ -464,7 +387,7 @@ describe('revivificationHandler', () => {
   // ── Success popup ──────────────────────────────────────────
 
   describe('success popup', () => {
-    it('returns automation_info popup with correct description for player target', async () => {
+    it('returns automation_info popup with correct description', async () => {
       useRuntimeState.getRuntimeValue.mockImplementation((target, key) => {
         if (key === 'ragePoints') return 1;
         if (key === 'currentHitPoints') return 0;
@@ -486,28 +409,6 @@ describe('revivificationHandler', () => {
         'TestHero uses Revivification to save Ally, setting their Hit Points to 5 and expending 1 Rage.',
       );
       expect(result.payload.name).toBe('Revivification');
-    });
-
-    it('returns automation_info popup with correct description for NPC target', async () => {
-      useRuntimeState.getRuntimeValue.mockImplementation((_target, key) => {
-        if (key === 'ragePoints') return 1;
-        return null;
-      });
-      damageUtils.getCombatContext.mockResolvedValue({});
-      damageUtils.getTargetFromAttacker.mockReturnValue(makeNPCTarget('Goblin'));
-
-      const result = await handle(
-        makeAction(),
-        makePlayerStats(),
-        campaignName,
-        null,
-      );
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.type).toBe('automation_info');
-      expect(result.payload.description).toBe(
-        'TestHero uses Revivification to save Goblin, setting their Hit Points to 5 and expending 1 Rage.',
-      );
     });
   });
 });

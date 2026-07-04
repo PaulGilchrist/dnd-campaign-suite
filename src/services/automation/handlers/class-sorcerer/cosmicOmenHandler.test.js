@@ -84,16 +84,6 @@ describe('cosmicOmenHandler', () => {
             expect(result.payload.description).not.toContain('no uses remaining');
         });
 
-        it('evaluates uses_expression when usesMax is falsy', async () => {
-            evaluateAutoExpression.mockReturnValue(1);
-            getRuntimeValue.mockReturnValue(null);
-
-            const action = makeAction({ automation: { usesMax: 0, uses_expression: '1d6' } });
-            await handle(action, makePlayerStats(), 'test-campaign');
-
-            expect(evaluateAutoExpression).toHaveBeenCalledWith('1d6', expect.any(Object));
-        });
-
         it('proceeds when usesMax > 0 and runtime uses is positive', async () => {
             getRuntimeValue.mockReturnValue(1);
             rollExpression.mockImplementation((expr) => {
@@ -304,15 +294,6 @@ describe('cosmicOmenHandler', () => {
             expect(result.payload.automation).toEqual(makeAction().automation);
         });
 
-        it('uses action name as feature name', async () => {
-            getRuntimeValue.mockReturnValue(1);
-            rollExpression.mockReturnValue({ total: 10 });
-
-            const result = await handle(makeAction(), makePlayerStats(), 'test-campaign');
-
-            expect(result.payload.name).toBe('Cosmic Omen');
-        });
-
         it('uses default feature name when action name is missing', async () => {
             getRuntimeValue.mockReturnValue(1);
             rollExpression.mockReturnValue({ total: 10 });
@@ -338,16 +319,6 @@ describe('cosmicOmenHandler', () => {
                 'test-campaign'
             );
         });
-
-        it('works with different player and campaign names', async () => {
-            await clearCosmicOmenEffect('OtherPlayer', 'other-campaign');
-
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'OtherPlayer',
-                'cosmicOmenEffect',
-                null,
-                'other-campaign'
-            );
-        });
     });
 });
+// @cleaned-by-ai

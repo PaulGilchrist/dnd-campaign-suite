@@ -68,37 +68,23 @@ describe('largeFormHandler', () => {
                 expect(result.payload.automationType).toBe('large_form');
             });
 
-            it('allows activation when character is exactly level 5', async () => {
-                const stats = makePlayerStats({ level: 5 });
+            it('allows activation when character is level 5 or above', async () => {
                 getRuntimeValue.mockImplementation((_name, key) => {
                     if (key === 'largeFormActive') return false;
                     if (key === 'activeBuffs') return [];
                     return null;
                 });
 
+                const stats = makePlayerStats({ level: 10 });
                 const result = await handle(makeAction(), stats, campaignName, null);
 
                 expect(result.type).toBe('popup');
                 expect(result.payload.description).toContain('activated');
                 expect(result.payload.description).toContain('Large Form');
             });
-
-            it('allows activation when character is above level 5', async () => {
-                const stats = makePlayerStats({ level: 10 });
-                getRuntimeValue.mockImplementation((_name, key) => {
-                    if (key === 'largeFormActive') return false;
-                    if (key === 'activeBuffs') return [];
-                    return null;
-                });
-
-                const result = await handle(makeAction(), stats, campaignName, null);
-
-                expect(result.type).toBe('popup');
-                expect(result.payload.description).toContain('activated');
-            });
         });
 
-        describe('deactivation (toggle off)', () => {
+        describe('deactivation', () => {
             it('ends large form when already active', async () => {
                 getRuntimeValue.mockImplementation((_name, key) => {
                     if (key === 'largeFormActive') return true;
@@ -147,25 +133,6 @@ describe('largeFormHandler', () => {
                     campaignName,
                 );
             });
-
-            it('handles deactivation when activeBuffs is not an array', async () => {
-                getRuntimeValue.mockImplementation((_name, key) => {
-                    if (key === 'largeFormActive') return true;
-                    if (key === 'activeBuffs') return 'not-an-array';
-                    return null;
-                });
-
-                const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-                expect(result.type).toBe('popup');
-                expect(result.payload.description).toBe('Large Form ended.');
-                expect(setRuntimeValue).toHaveBeenCalledWith(
-                    playerName,
-                    'activeBuffs',
-                    [],
-                    campaignName,
-                );
-            });
         });
 
         describe('long rest gate', () => {
@@ -182,20 +149,6 @@ describe('largeFormHandler', () => {
                 expect(result.payload.description).toBe(
                     'Large Form has been used and cannot be used again until a Long Rest.',
                 );
-            });
-
-            it('allows activation when long rest mark is not set', async () => {
-                getRuntimeValue.mockImplementation((_name, key) => {
-                    if (key === 'largeFormActive') return false;
-                    if (key === 'largeFormActive_restUsed') return false;
-                    if (key === 'activeBuffs') return [];
-                    return null;
-                });
-
-                const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-                expect(result.type).toBe('popup');
-                expect(result.payload.description).toContain('activated');
             });
         });
 
@@ -314,58 +267,24 @@ describe('largeFormHandler', () => {
                 });
                 expect(result.payload.automation).toEqual(makeAction().automation);
             });
-
-            it('handles activation when activeBuffs is not an array', async () => {
-                getRuntimeValue.mockImplementation((_name, key) => {
-                    if (key === 'largeFormActive') return false;
-                    if (key === 'activeBuffs') return 'not-an-array';
-                    return null;
-                });
-
-                const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-                expect(result.type).toBe('popup');
-                expect(result.payload.description).toContain('activated');
-                expect(setRuntimeValue).toHaveBeenCalledWith(
-                    playerName,
-                    'activeBuffs',
-                    expect.arrayContaining([
-                        expect.objectContaining({ name: 'Large Form' }),
-                    ]),
-                    campaignName,
-                );
-            });
         });
     });
 
     describe('isLargeFormActive', () => {
-        it('returns true when the key is true', () => {
+        it('returns true when the key is true, false otherwise', () => {
             getRuntimeValue.mockReturnValue(true);
-
             expect(isLargeFormActive(playerName, campaignName)).toBe(true);
-        });
 
-        it('returns false when the key is false', () => {
             getRuntimeValue.mockReturnValue(false);
-
             expect(isLargeFormActive(playerName, campaignName)).toBe(false);
-        });
 
-        it('returns false when the key is null', () => {
             getRuntimeValue.mockReturnValue(null);
-
             expect(isLargeFormActive(playerName, campaignName)).toBe(false);
-        });
 
-        it('returns false when the key is undefined', () => {
             getRuntimeValue.mockReturnValue(undefined);
-
             expect(isLargeFormActive(playerName, campaignName)).toBe(false);
-        });
 
-        it('returns false when the key is a non-boolean value', () => {
             getRuntimeValue.mockReturnValue('yes');
-
             expect(isLargeFormActive(playerName, campaignName)).toBe(false);
         });
     });

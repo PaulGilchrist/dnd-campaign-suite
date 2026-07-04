@@ -332,41 +332,37 @@ describe('aidHandler', () => {
   // ── applyAid ────────────────────────────────────────────────
 
   describe('applyAid', () => {
-    it('returns null when targetNames is empty array', async () => {
-      const result = await applyAid(
+    it('returns null and performs no side effects when targetNames is empty, null, or not an array', async () => {
+      let result = await applyAid(
         makeAction(),
         makePlayerStats(),
         campaignName,
         mapName,
         [],
       );
-
       expect(result).toBeNull();
       expect(setRuntimeValue).not.toHaveBeenCalled();
       expect(addExpiration).not.toHaveBeenCalled();
-    });
 
-    it('returns null when targetNames is null', async () => {
-      const result = await applyAid(
+      vi.clearAllMocks();
+      evaluateAutoExpression.mockReturnValue(5);
+
+      result = await applyAid(
         makeAction(),
         makePlayerStats(),
         campaignName,
         mapName,
         null,
       );
-
       expect(result).toBeNull();
-    });
 
-    it('returns null when targetNames is not an array', async () => {
-      const result = await applyAid(
+      result = await applyAid(
         makeAction(),
         makePlayerStats(),
         campaignName,
         mapName,
         'Ally1',
       );
-
       expect(result).toBeNull();
     });
 

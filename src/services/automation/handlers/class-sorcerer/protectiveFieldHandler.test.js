@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { handle } from './protectiveFieldHandler.js';
 import * as runtimeState from '../../../../hooks/runtime/useRuntimeState.js';
@@ -78,7 +78,7 @@ describe('protectiveFieldHandler', () => {
     });
 
     describe('handle', () => {
-        it('returns popup with automation_info type when no psionic energy remaining', async () => {
+        it('returns popup with automation_info type and recharger message when no psionic energy remaining', async () => {
             runtimeState.getRuntimeValue.mockReturnValue(0);
 
             const result = await handle(makeAction(), makePlayerStats(), 'campaign', 'map');
@@ -86,13 +86,6 @@ describe('protectiveFieldHandler', () => {
             expect(result.type).toBe('popup');
             expect(result.payload.type).toBe('automation_info');
             expect(result.payload.name).toBe('Protective Field');
-        });
-
-        it('includes rechargerecovery message when psionic energy is depleted', async () => {
-            runtimeState.getRuntimeValue.mockReturnValue(0);
-
-            const result = await handle(makeAction(), makePlayerStats(), 'campaign', 'map');
-
             expect(result.payload.description).toContain('No Psionic Energy remaining');
             expect(result.payload.description).toContain('Short or Long Rest');
         });
@@ -113,19 +106,12 @@ describe('protectiveFieldHandler', () => {
             expect(logService.addEntry).not.toHaveBeenCalled();
         });
 
-        it('returns popup with reduction value when psionic energy is available', async () => {
-            const result = await handle(makeAction(), makePlayerStats(), 'campaign', 'map');
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.type).toBe('automation_info');
-            expect(result.payload.name).toBe('Protective Field');
-            expect(result.payload.description).toContain('Reduce damage by');
-        });
-
         it('computes reduction as die roll result plus intelligence modifier', async () => {
             // dieRoll.total=4, intMod=3 => reduction=7
             const result = await handle(makeAction(), makePlayerStats(), 'campaign', 'map');
 
+            expect(result.type).toBe('popup');
+            expect(result.payload.type).toBe('automation_info');
             expect(result.payload.description).toContain('7');
             expect(result.payload.description).toContain('+ INT 3');
         });
@@ -152,18 +138,6 @@ describe('protectiveFieldHandler', () => {
             }));
         });
 
-        it('passes automation object through to the popup payload', async () => {
-            const result = await handle(makeAction(), makePlayerStats(), 'campaign', 'map');
-
-            expect(result.payload.automation).toEqual({ type: 'protective_field' });
-        });
-
-        it('passes automationType through to the popup payload', async () => {
-            const result = await handle(makeAction(), makePlayerStats(), 'campaign', 'map');
-
-            expect(result.payload.automationType).toBe('protective_field');
-        });
-
         it('uses default max of 6 when resources object is missing', async () => {
             const playerStats = { name: 'TestHero', abilities: [{ name: 'Intelligence', bonus: 3 }] };
 
@@ -172,7 +146,7 @@ describe('protectiveFieldHandler', () => {
             expect(result.payload.description).toContain('Psionic Energy: 5/6');
         });
 
-        it('uses default max from playerStats.resources when runtime value is not set', async () => {
+        it('uses default max from playerStats.resources when runtime value is null or undefined', async () => {
             runtimeState.getRuntimeValue.mockReturnValue(null);
 
             const playerStats = {
@@ -186,20 +160,6 @@ describe('protectiveFieldHandler', () => {
             expect(result.payload.description).toContain('Psionic Energy: 7/8');
         });
 
-        it('uses default max from playerStats.resources when runtime value is undefined', async () => {
-            runtimeState.getRuntimeValue.mockReturnValue(undefined);
-
-            const playerStats = {
-                name: 'TestHero',
-                abilities: [{ name: 'Intelligence', bonus: 2 }],
-                _trackedResources: { psionicEnergy: { max: 10 } },
-            };
-
-            const result = await handle(makeAction(), playerStats, 'campaign', 'map');
-
-            expect(result.payload.description).toContain('Psionic Energy: 9/10');
-        });
-
         it('handles missing intelligence ability by treating bonus as 0', async () => {
             const playerStats = { name: 'TestHero', abilities: [] };
 
@@ -208,17 +168,7 @@ describe('protectiveFieldHandler', () => {
             expect(result.payload.description).toContain('+ INT 0');
         });
 
-        it('handles missing abilities array by treating intelligence bonus as 0', async () => {
-            runtimeState.getRuntimeValue.mockReturnValue(6);
-
-            const playerStats = { name: 'TestHero' };
-
-            const result = await handle(makeAction(), playerStats, 'campaign', 'map');
-
-            expect(result.payload.description).toContain('+ INT 0');
-        });
-
-        it('falls back to die size when dieRoll returns null', async () => {
+        it('falls back to die size when dieRoll returns null or missing total', async () => {
             diceRoller.rollExpression.mockReturnValue(null);
 
             const result = await handle(makeAction(), makePlayerStats(), 'campaign', 'map');
@@ -227,15 +177,6 @@ describe('protectiveFieldHandler', () => {
             expect(result.payload.description).toContain('9');
             expect(result.payload.description).toContain('Rolled 6');
             expect(result.payload.description).toContain('for 6');
-        });
-
-        it('falls back to die size when dieRoll returns object without total', async () => {
-            diceRoller.rollExpression.mockReturnValue({});
-
-            const result = await handle(makeAction(), makePlayerStats(), 'campaign', 'map');
-
-            // dieRoll.total=undefined => dieValue=psionicDieSize=6, intMod=3 => reduction=9
-            expect(result.payload.description).toContain('9');
         });
 
         it('uses custom psionic die size from evaluateAutoExpression', async () => {
@@ -310,14 +251,10 @@ describe('protectiveFieldHandler', () => {
             expect(applyHealing.applyHealingToTarget).not.toHaveBeenCalled();
         });
 
-        it('includes defender name in popup when attack found', async () => {
+        it('includes defender name in popup and log entry when attack found', async () => {
             const result = await handle(makeAction(), makePlayerStats(), 'campaign', 'map');
 
             expect(result.payload.description).toContain('Damage to TestHero reduced.');
-        });
-
-        it('includes defender name in log entry when attack found', async () => {
-            await handle(makeAction(), makePlayerStats(), 'campaign', 'map');
 
             expect(logService.addEntry).toHaveBeenCalledWith('campaign', expect.objectContaining({
                 description: expect.stringContaining('Damage reduced to TestHero.'),

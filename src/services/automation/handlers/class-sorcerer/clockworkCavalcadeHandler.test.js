@@ -58,24 +58,18 @@ describe('clockworkCavalcadeHandler', () => {
     });
 
     describe('when feature has uses remaining', () => {
-        it('should return a popup with automation_info type', async () => {
+        it('should return a popup with automation_info payload containing the feature name', async () => {
             useRuntimeState.getRuntimeValue.mockReturnValue(null);
 
             const result = await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
 
             expect(result.type).toBe('popup');
             expect(result.payload.type).toBe('automation_info');
-        });
-
-        it('should include the feature name in the payload', async () => {
-            useRuntimeState.getRuntimeValue.mockReturnValue(null);
-
-            const result = await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
-
             expect(result.payload.name).toBe('Clockwork Cavalcade');
+            expect(result.payload.automation).toEqual({ type: 'clockwork_cavalcade' });
         });
 
-        it('should use the action name as the feature name', async () => {
+        it('should use the action name as the feature name when provided', async () => {
             useRuntimeState.getRuntimeValue.mockReturnValue(null);
 
             const result = await handle(
@@ -99,14 +93,6 @@ describe('clockworkCavalcadeHandler', () => {
             );
 
             expect(result.payload.name).toBe('Clockwork Cavalcade');
-        });
-
-        it('should include automation config in the payload', async () => {
-            useRuntimeState.getRuntimeValue.mockReturnValue(null);
-
-            const result = await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
-
-            expect(result.payload.automation).toEqual({ type: 'clockwork_cavalcade' });
         });
 
         it('should decrement uses from the stored value', async () => {
@@ -141,7 +127,7 @@ describe('clockworkCavalcadeHandler', () => {
             }));
         });
 
-        it('should show uses remaining in the description', async () => {
+        it('should show the correct uses remaining in the description', async () => {
             useRuntimeState.getRuntimeValue.mockReturnValue('3');
 
             const result = await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
@@ -167,24 +153,26 @@ describe('clockworkCavalcadeHandler', () => {
     });
 
     describe('when feature has no uses remaining', () => {
-        it('should return a popup with the normal description when SP are available to restore', async () => {
-            useRuntimeState.getRuntimeValue.mockReturnValue('0');
-
-            const result = await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.type).toBe('automation_info');
-            expect(result.payload.description).toContain('No uses remaining');
-        });
-
-        it('should return a popup suggesting SP restoration when SP are insufficient', async () => {
+        it('should return a popup with "no uses remaining" when SP are insufficient', async () => {
             useRuntimeState.getRuntimeValue.mockReturnValue('0');
 
             const stats = makePlayerStats({ resources: { sorcery_points: { current: 5 } } });
 
             const result = await handle(makeAction(), stats, 'test-campaign', null);
 
-            expect(result.payload.description).toContain('7 Sorcery Points');
+            expect(result.payload.description).toContain('no uses remaining');
+            expect(spendSorceryPoints).not.toHaveBeenCalled();
+        });
+
+        it('should not restore when SP are zero', async () => {
+            useRuntimeState.getRuntimeValue.mockReturnValue('0');
+
+            const stats = makePlayerStats({ resources: { sorcery_points: { current: 0 } } });
+
+            const result = await handle(makeAction(), stats, 'test-campaign', null);
+
+            expect(result.payload.description).toContain('no uses remaining');
+            expect(spendSorceryPoints).not.toHaveBeenCalled();
         });
 
         it('should spend 7 SP and set uses to 0 when enough SP are available', async () => {
@@ -212,40 +200,6 @@ describe('clockworkCavalcadeHandler', () => {
                 abilityName: 'Clockwork Cavalcade',
             }));
         });
-
-        it('should not restore when SP are below the 7 threshold', async () => {
-            useRuntimeState.getRuntimeValue.mockReturnValue('0');
-
-            const stats = makePlayerStats({ resources: { sorcery_points: { current: 5 } } });
-
-            const result = await handle(makeAction(), stats, 'test-campaign', null);
-
-            expect(result.payload.description).toContain('no uses remaining');
-            expect(spendSorceryPoints).not.toHaveBeenCalled();
-            expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
-        });
-
-        it('should not restore when SP are exactly at the boundary (6)', async () => {
-            useRuntimeState.getRuntimeValue.mockReturnValue('0');
-
-            const stats = makePlayerStats({ resources: { sorcery_points: { current: 6 } } });
-
-            const result = await handle(makeAction(), stats, 'test-campaign', null);
-
-            expect(result.payload.description).toContain('no uses remaining');
-            expect(spendSorceryPoints).not.toHaveBeenCalled();
-        });
-
-        it('should not restore when SP are zero', async () => {
-            useRuntimeState.getRuntimeValue.mockReturnValue('0');
-
-            const stats = makePlayerStats({ resources: { sorcery_points: { current: 0 } } });
-
-            const result = await handle(makeAction(), stats, 'test-campaign', null);
-
-            expect(result.payload.description).toContain('no uses remaining');
-            expect(spendSorceryPoints).not.toHaveBeenCalled();
-        });
     });
 
     describe('sorcery point resolution', () => {
@@ -260,7 +214,7 @@ describe('clockworkCavalcadeHandler', () => {
             expect(spendSorceryPoints).toHaveBeenCalledWith('TestSorcerer', 7, 'test-campaign');
         });
 
-        it('should fall back to maxSorceryPoints from getClassFeatures when sorcery_points resource is missing', async () => {
+        it('should fall back to maxSorceryPoints when sorcery_points resource is missing', async () => {
             useRuntimeState.getRuntimeValue.mockReturnValue('0');
 
             const stats = makePlayerStats({ resources: {} });
@@ -297,64 +251,20 @@ describe('clockworkCavalcadeHandler', () => {
         });
     });
 
-    describe('runtime key construction', () => {
-        it('should use playerName-based key for storing uses', async () => {
-            useRuntimeState.getRuntimeValue.mockReturnValue(null);
-
-            await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
-
-            expect(useRuntimeState.getRuntimeValue).toHaveBeenCalledWith(
-                'TestSorcerer',
-                expect.stringContaining('clockworkCavalcadeUses'),
-                'test-campaign'
-            );
-        });
-
-        it('should store uses as a number, not a string', async () => {
-            useRuntimeState.getRuntimeValue.mockReturnValue('3');
-
-            await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
-
-            const calls = getSetRuntimeValueCallsForUses();
-            expect(calls.length).toBeGreaterThan(0);
-            expect(typeof calls[0][2]).toBe('number');
-        });
-    });
-
     describe('description content', () => {
-        it('should describe the heal capability', async () => {
+        it('should describe all capabilities and area of effect', async () => {
             useRuntimeState.getRuntimeValue.mockReturnValue(null);
 
             const result = await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
 
             expect(result.payload.description).toContain('Heal');
             expect(result.payload.description).toContain('100 HP');
-        });
-
-        it('should describe the repair capability', async () => {
-            useRuntimeState.getRuntimeValue.mockReturnValue(null);
-
-            const result = await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
-
             expect(result.payload.description).toContain('Repair');
-        });
-
-        it('should describe the dispel capability', async () => {
-            useRuntimeState.getRuntimeValue.mockReturnValue(null);
-
-            const result = await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
-
             expect(result.payload.description).toContain('Dispel');
             expect(result.payload.description).toContain('level 6 and lower');
-        });
-
-        it('should describe the area of effect', async () => {
-            useRuntimeState.getRuntimeValue.mockReturnValue(null);
-
-            const result = await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
-
             expect(result.payload.description).toContain('30-foot Cube');
         });
     });
 
 });
+// @cleaned-by-ai

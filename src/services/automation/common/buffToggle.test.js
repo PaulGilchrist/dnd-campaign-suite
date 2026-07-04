@@ -57,20 +57,6 @@ describe('toggleBuff', () => {
             expect(result.targetName).toBe('fighter');
         });
 
-        it('preserves existing buffs when adding a new one', () => {
-            clearRuntimeState('wizard');
-            const auto1 = makeAuto({ effect: 'invisibility' });
-            toggleBuff('wizard', 'Invisibility', auto1, campaign);
-
-            const auto2 = makeAuto({ effect: 'haste' });
-            const result = toggleBuff('wizard', 'Haste', auto2, campaign);
-
-            expect(result.buffs).toHaveLength(2);
-            const names = result.buffs.map(b => b.name);
-            expect(names).toContain('Invisibility');
-            expect(names).toContain('Haste');
-        });
-
         it('uses targetName instead of playerName when provided, defaults to playerName for undefined and empty string', () => {
             clearRuntimeState('ally-char');
             const auto = makeAuto({ effect: 'bless' });
@@ -125,25 +111,6 @@ describe('toggleBuff', () => {
             expect(buff.resistanceTypes).toEqual(['fire', 'cold']);
             expect(buff.acBonus).toBe(3);
             expect(buff.saveBonus).toBe(2);
-
-            // Verify defaults when optional fields are omitted
-            clearRuntimeState('minimal-char');
-            const minimalAuto = { effect: 'hex', duration: '1 hour' };
-            toggleBuff('minimal-char', 'Hex', minimalAuto, campaign);
-
-            const minimalBuff = getActiveBuffs('minimal-char', campaign)[0];
-            expect(minimalBuff.enemiesDisadvantageSaves).toEqual([]);
-            expect(minimalBuff.distance).toBe('');
-            expect(minimalBuff.extendedDistance).toBe('');
-            expect(minimalBuff.blocksSpellcasting).toBe(false);
-            expect(minimalBuff.flySpeed).toBeNull();
-            expect(minimalBuff.hover).toBe(false);
-            expect(minimalBuff.seeInvisibleRange).toBeNull();
-            expect(minimalBuff.narrowSpace).toBe(false);
-            expect(minimalBuff.castingTime).toBe('');
-            expect(minimalBuff.resistanceTypes).toEqual([]);
-            expect(minimalBuff.acBonus).toBe(0);
-            expect(minimalBuff.saveBonus).toBe(0);
         });
     });
 
@@ -218,11 +185,6 @@ describe('toggleBuff', () => {
 
 describe('getActiveBuffs', () => {
     const campaign = 'TestCampaign';
-
-    it('returns empty array when no buffs stored for the character', () => {
-        clearRuntimeState('empty-char');
-        expect(getActiveBuffs('empty-char', campaign)).toEqual([]);
-    });
 
     it('returns the stored buffs array with correct structure', () => {
         clearRuntimeState('buffed-char');

@@ -11,28 +11,21 @@ describe('injectSpecialActions', () => {
       expect(result).toEqual([]);
     });
 
-    it('filters out features already in existingActions', () => {
-      const existingActions = new Set(['Darkvision', 'Fey Ancestry']);
+    it('filters out features already in existingActions and deduplicates within the input list', () => {
+      const existingActions = new Set(['Darkvision']);
       const features = [
         { name: 'Darkvision', description: 'Already known' },
         { name: 'Halfling Luck', description: 'New feature' },
-      ];
-      const result = injectSpecialActions(existingActions, features);
-      expect(result).toHaveLength(1);
-      expect(result[0].name).toBe('Halfling Luck');
-    });
-
-    it('deduplicates features within the input list, keeping the first occurrence', () => {
-      const existingActions = new Set();
-      const features = [
+        { name: 'Halfling Luck', description: 'Duplicate in input' },
         { name: 'Feature 1', description: 'First' },
-        { name: 'Feature 1', description: 'Duplicate' },
+        { name: 'Feature 1', description: 'Duplicate in input' },
         { name: 'Feature 2', description: 'Second' },
       ];
       const result = injectSpecialActions(existingActions, features);
-      expect(result).toHaveLength(2);
-      expect(result[0].name).toBe('Feature 1');
-      expect(result[0].description).toBe('First');
+      expect(result).toHaveLength(3);
+      expect(result.map(r => r.name)).toEqual(['Halfling Luck', 'Feature 1', 'Feature 2']);
+      expect(result[0].description).toBe('New feature');
+      expect(result[1].description).toBe('First');
     });
 
     it('preserves the original order of features', () => {
@@ -72,13 +65,6 @@ describe('injectSpecialActions', () => {
       expect(result1[0].type).toBe('action');
       expect(result2[0].type).toBe('passive');
     });
-
-    it('always sets source to feat regardless of input', () => {
-      const existingActions = new Set();
-      const features = [{ name: 'Feature', description: 'Desc' }];
-      const result = injectSpecialActions(existingActions, features);
-      expect(result[0].source).toBe('feat');
-    });
   });
 
   describe('automation handling', () => {
@@ -99,36 +85,19 @@ describe('injectSpecialActions', () => {
       const result = injectSpecialActions(existingActions, features, { includeAutomation: false });
       expect(result[0]).not.toHaveProperty('automation');
     });
-
-    it('omits automation when the feature has no automation or a falsy automation value', () => {
-      const existingActions = new Set();
-      const features = [
-        { name: 'Feature', description: 'Desc' },
-        { name: 'Feature2', description: 'Desc', automation: null },
-        { name: 'Feature3', description: 'Desc', automation: '' },
-        { name: 'Feature4', description: 'Desc', automation: 0 },
-      ];
-      const result = injectSpecialActions(existingActions, features, { includeAutomation: true });
-      expect(result.every(r => !r.automation)).toBe(true);
-    });
   });
 
   describe('existing actions tracking', () => {
-    it('adds new feature names to the existingActions Set', () => {
+    it('adds new feature names to the existingActions Set and accumulates across calls', () => {
       const existingActions = new Set(['Existing']);
-      const features = [{ name: 'New', description: 'New' }];
-      injectSpecialActions(existingActions, features);
-      expect(existingActions).toContain('New');
-    });
-
-    it('accumulates new names across multiple calls', () => {
-      const existingActions = new Set();
       const f1 = [{ name: 'Feature 1', description: 'First' }];
       const f2 = [{ name: 'Feature 2', description: 'Second' }];
+
       injectSpecialActions(existingActions, f1);
-      injectSpecialActions(existingActions, f2);
-      expect(existingActions.size).toBe(2);
       expect(existingActions).toContain('Feature 1');
+
+      injectSpecialActions(existingActions, f2);
+      expect(existingActions.size).toBe(3);
       expect(existingActions).toContain('Feature 2');
     });
   });

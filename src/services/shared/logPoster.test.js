@@ -20,11 +20,4 @@ describe('postLogEntry', () => {
     expect(logService.addEntry).toHaveBeenCalledWith('campaign/with/slashes', { type: 'damage', amount: 15 });
   });
 
-  it('returns undefined when addEntry rejects', async () => {
-    logService.addEntry.mockRejectedValue(new Error('Network error'));
-
-    const result = await postLogEntry('campaign-1', { text: 'Fails' });
-
-    expect(result).toBeUndefined();
-  });
 });

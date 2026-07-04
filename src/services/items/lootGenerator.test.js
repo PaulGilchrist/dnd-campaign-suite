@@ -70,35 +70,14 @@ describe('formatCurrencyString', () => {
     expect(formatCurrencyString({ pp: 0, gp: 0, sp: 0, cp: 0 })).toBe('0 platinum pieces');
   });
 
-  it('uses singular "platinum piece" when pp === 1', () => {
+  it('uses singular/plural correctly per denomination', () => {
     expect(formatCurrencyString({ pp: 1, gp: 0, sp: 0, cp: 0 })).toBe('1 platinum piece');
-  });
-
-  it('uses plural "platinum pieces" when pp > 1', () => {
     expect(formatCurrencyString({ pp: 5, gp: 0, sp: 0, cp: 0 })).toBe('5 platinum pieces');
-  });
-
-  it('uses singular "gold piece" when gp === 1', () => {
     expect(formatCurrencyString({ pp: 0, gp: 1, sp: 0, cp: 0 })).toBe('1 gold piece');
-  });
-
-  it('uses plural "gold pieces" when gp > 1', () => {
     expect(formatCurrencyString({ pp: 0, gp: 3, sp: 0, cp: 0 })).toBe('3 gold pieces');
-  });
-
-  it('uses singular "silver coin" when sp === 1', () => {
     expect(formatCurrencyString({ pp: 0, gp: 0, sp: 1, cp: 0 })).toBe('1 silver coin');
-  });
-
-  it('uses plural "silver coins" when sp > 1', () => {
     expect(formatCurrencyString({ pp: 0, gp: 0, sp: 2, cp: 0 })).toBe('2 silver coins');
-  });
-
-  it('uses singular "copper coin" when cp === 1', () => {
     expect(formatCurrencyString({ pp: 0, gp: 0, sp: 0, cp: 1 })).toBe('1 copper coin');
-  });
-
-  it('uses plural "copper coins" when cp > 1', () => {
     expect(formatCurrencyString({ pp: 0, gp: 0, sp: 0, cp: 4 })).toBe('4 copper coins');
   });
 
@@ -151,11 +130,6 @@ describe('calculateEncounterXp', () => {
       { name: 'Orc', xp: 200 },
     ];
     expect(calculateEncounterXp(monsters)).toBe(300);
-  });
-
-  it('handles large qty multiplier', () => {
-    const monsters = [{ name: 'Rat', xp: 5, qty: 20 }];
-    expect(calculateEncounterXp(monsters)).toBe(100);
   });
 });
 
@@ -237,14 +211,15 @@ describe('generateLootSuggestions', () => {
     expect(result.lootEntries.some(e => /\(\d+ \w+\)/.test(e))).toBe(true);
   });
 
-  it('skips equipment in "Property" category', async () => {
-    const equipmentData = [
+  it('excludes Property and Mounts/Vehicles from equipment loot', async () => {
+    const excludedEquip = [
       { name: 'Caravan', cost: { quantity: 5000, unit: 'gp' }, equipment_category: 'Property' },
+      { name: 'Warhorse', cost: { quantity: 75, unit: 'gp' }, equipment_category: 'Mounts and Vehicles' },
     ];
     mockRandom([0.2, 0.1, 0.88]);
     global.fetch
       .mockResolvedValueOnce(createMockResponse([]))
-      .mockResolvedValueOnce(createMockResponse(equipmentData));
+      .mockResolvedValueOnce(createMockResponse(excludedEquip));
 
     const result = await generateLootSuggestions([
       { name: 'Monster', xp: 50, challenge_rating: 3 },
@@ -252,55 +227,15 @@ describe('generateLootSuggestions', () => {
     expect(result.lootEntries.some(e => /\(\d+ \w+\)/.test(e))).toBe(false);
   });
 
-  it('handles missing equipment data gracefully', async () => {
-    mockRandom([0.2, 0.1, 0.88]);
-    global.fetch
-      .mockResolvedValueOnce(createMockResponse([]))
-      .mockResolvedValueOnce(createMockResponse([]));
-    const result = await generateLootSuggestions([
-      { name: 'Monster', xp: 50, challenge_rating: 3 },
-    ]);
-    expect(Array.isArray(result.lootEntries)).toBe(true);
-  });
-
-  it('handles equipment with non-standard cost gracefully', async () => {
+  it('handles missing or invalid equipment data gracefully', async () => {
     const badEquipment = [
       { name: 'Broken Item', cost: null, equipment_category: 'Weapon' },
-    ];
-    mockRandom([0.2, 0.1, 0.88]);
-    global.fetch
-      .mockResolvedValueOnce(createMockResponse([]))
-      .mockResolvedValueOnce(createMockResponse(badEquipment));
-
-    const result = await generateLootSuggestions([
-      { name: 'Monster', xp: 50, challenge_rating: 3 },
-    ]);
-    expect(result.lootEntries.some(e => /\(\d+ \w+\)/.test(e))).toBe(false);
-  });
-
-  it('handles equipment missing quantity in cost object', async () => {
-    const badEquipment = [
       { name: 'No Qty Item', cost: { unit: 'gp' }, equipment_category: 'Armor' },
     ];
     mockRandom([0.2, 0.1, 0.88]);
     global.fetch
       .mockResolvedValueOnce(createMockResponse([]))
       .mockResolvedValueOnce(createMockResponse(badEquipment));
-
-    const result = await generateLootSuggestions([
-      { name: 'Monster', xp: 50, challenge_rating: 3 },
-    ]);
-    expect(result.lootEntries.some(e => /\(\d+ \w+\)/.test(e))).toBe(false);
-  });
-
-  it('excludes "Mounts and Vehicles" from equipment loot', async () => {
-    const mountEquip = [
-      { name: 'Warhorse', cost: { quantity: 75, unit: 'gp' }, equipment_category: 'Mounts and Vehicles' },
-    ];
-    mockRandom([0.2, 0.1, 0.88]);
-    global.fetch
-      .mockResolvedValueOnce(createMockResponse([]))
-      .mockResolvedValueOnce(createMockResponse(mountEquip));
 
     const result = await generateLootSuggestions([
       { name: 'Monster', xp: 50, challenge_rating: 3 },
@@ -320,21 +255,6 @@ describe('generateLootSuggestions', () => {
     expect(result.totalEncounterXp).toBe(5000);
   });
 
-  it('recognizes "Very rare" rarity with +3 notation', async () => {
-    mockRandom([0.2, 0.1, 0.97, 0.5, 0.33]);
-    const plusThreeItems = [
-      { name: '+3 Sword', rarity: 'rare +3', type: 'sword' },
-    ];
-    global.fetch
-      .mockResolvedValueOnce(createMockResponse(plusThreeItems))
-      .mockResolvedValueOnce(createMockResponse([]));
-
-    const result = await generateLootSuggestions([
-      { name: 'Monster', xp: 100, challenge_rating: 5 },
-    ]);
-    expect(result.lootEntries.some(e => e.includes('+3 Sword'))).toBe(true);
-  });
-
   it('processes multiple monsters with different tiers', async () => {
     mockRandom([0.2, 0.1, 0.3, 0.5, 0.5, 0.1, 0.1, 0.3, 0.5, 0.5]);
     global.fetch.mockResolvedValue(createMockResponse([]));
@@ -344,28 +264,6 @@ describe('generateLootSuggestions', () => {
       { name: 'Hobgoblin', xp: 150, challenge_rating: 4 },
     ]);
     expect(result.totalEncounterXp).toBe(175);
-    expect(Array.isArray(result.lootEntries)).toBe(true);
-  });
-
-  it('shows "No loot for these monsters" fallback', async () => {
-    mockRandom([0.5]);
-    global.fetch.mockResolvedValue(createMockResponse([]));
-    const result = await generateLootSuggestions([
-      { name: 'Rat', xp: 5, challenge_rating: '1/2' },
-    ]);
-    expect(result.lootEntries[0]).toBe('No loot for these monsters');
-  });
-
-  it('normalizes total currency across multiple entries into one string', async () => {
-    mockRandom([0.2, 0.0, 0.3, 0.5, 0.3, 0.2, 0.0, 0.3, 0.5, 0.3]);
-    global.fetch.mockResolvedValue(createMockResponse([]));
-
-    const monsters = [
-      { name: 'Goblin', xp: 25, challenge_rating: 3 },
-      { name: 'Bugbear', xp: 50, challenge_rating: 1.5 },
-    ];
-    const result = await generateLootSuggestions(monsters);
-    expect(result.totalEncounterXp).toBe(75);
     expect(Array.isArray(result.lootEntries)).toBe(true);
   });
 

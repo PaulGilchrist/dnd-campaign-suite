@@ -62,28 +62,21 @@ describe('getResourceAmount', () => {
             expect(result).toBe(2);
         });
 
-        it('returns 0 when no classLevel matches the player level and getClassFeatures returns null', () => {
-            const playerStats = createPlayerStats('Wizard', 10, [
-                { level: 1 },
-                { level: 4 },
-            ]);
-            classFeatures.getClassFeatures.mockReturnValue(null);
-
-            const result = getResourceAmount(playerStats, 'focusPoints');
-
-            expect(result).toBe(0);
-        });
-
-        it('returns 0 when class_levels is empty', () => {
-            const playerStats = createPlayerStats('Fighter', 1, []);
-
-            const result = getResourceAmount(playerStats, 'focusPoints');
-
+        it('returns 0 when class_levels is empty or missing', () => {
+            const result = getResourceAmount(createPlayerStats('Fighter', 1, []), 'focusPoints');
             expect(result).toBe(0);
         });
 
         it('returns 0 when class is undefined', () => {
-            const playerStats = { name: 'NPC', level: 1 };
+            const result = getResourceAmount({ name: 'NPC', level: 1 }, 'focusPoints');
+            expect(result).toBe(0);
+        });
+
+        it('returns 0 when no classLevel matches and getClassFeatures returns null', () => {
+            const playerStats = createPlayerStats('Wizard', 10, [
+                { level: 1 },
+                { level: 4 },
+            ]);
 
             const result = getResourceAmount(playerStats, 'focusPoints');
 
@@ -122,7 +115,7 @@ describe('getResourceAmount', () => {
             expect(result).toBe(2);
         });
 
-        it('returns 0 when stored value is null and _trackedResources is missing or null', () => {
+        it('returns 0 when stored value is null and _trackedResources is missing', () => {
             runtimeState.getRuntimeValue.mockReturnValue(null);
 
             const result = getResourceAmount({ name: 'Wizard' }, 'Arcane Recovery');
@@ -213,7 +206,7 @@ describe('spendResource', () => {
         expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith('Druid', 'Wild', 3, undefined);
     });
 
-    it('passes resourceNameOrKey directly without transformation when used as a raw key', () => {
+    it('passes resourceNameOrKey directly without transformation', () => {
         runtimeState.getRuntimeValue.mockReturnValue(6);
 
         spendResource('Barbarian', 'rageUses', 2, 'TestCampaign');

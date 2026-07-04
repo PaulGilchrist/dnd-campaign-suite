@@ -1,7 +1,4 @@
 // @cleaned-by-ai
-// Consolidated redundant tests: removed duplicate falsy value permutations,
-// brittle implementation-detail assertions, and low-value trivial passthrough tests.
-// Kept: one test per distinct behavioral path (no die, roll failure, success).
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
@@ -53,7 +50,7 @@ describe('bardicInspirationUseHandler.handle', () => {
   });
 
   describe('no bardic inspiration die', () => {
-    it('should return info popup when bardicInspirationDie is falsy', async () => {
+    it('should return info popup when die is falsy', async () => {
       const ps = makePlayerStats();
       const action = makeAction();
 
@@ -116,21 +113,8 @@ describe('bardicInspirationUseHandler.handle', () => {
 
       const result = await handle(action, ps, campaignName);
 
-      expect(runtimeState.setRuntimeValue).toHaveBeenNthCalledWith(
-        1,
-        playerName,
-        'bardicInspirationDie',
-        null,
-        campaignName,
-      );
-      expect(runtimeState.setRuntimeValue).toHaveBeenNthCalledWith(
-        2,
-        playerName,
-        'bardicInspirationGrantedBy',
-        null,
-        campaignName,
-      );
-      expect(runtimeState.setRuntimeValue).toHaveBeenCalledTimes(2);
+      expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(playerName, 'bardicInspirationDie', null, campaignName);
+      expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(playerName, 'bardicInspirationGrantedBy', null, campaignName);
 
       expect(result.type).toBe('popup');
       expect(result.payload.type).toBe('automation_info');

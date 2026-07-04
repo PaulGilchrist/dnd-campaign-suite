@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
     getAvailableAttackRiderManeuvers,
@@ -6,6 +6,7 @@ import {
     getAvailableSkillCheckManeuvers,
     getAttackRiderOptions,
     getAttackRiderOptionsByContext,
+    getManeuversForRules,
     handleAttackRiderPrompt,
     handleSkillCheckPrompt,
 } from './combatSuperiorityHandler.js';
@@ -55,17 +56,45 @@ const makePlayerStats = (overrides = {}) => ({
     ...overrides,
 });
 
+// ── Shared helpers ─────────────────────────────────────────────────────
+
+async function populateManeuverCache() {
+    await getManeuversForRules('2024');
+}
+
+// ── Shared early-return setup ──────────────────────────────────────────
+
+const makeNoManeuversRuntime = () =>
+    vi.fn().mockImplementation((_playerName, key, _campaignName) => {
+        if (key === 'superiorityDice') return 4;
+        if (key === SELECTION_KEY) return [];
+        return undefined;
+    });
+
+const makeNoDiceRuntime = () =>
+    vi.fn().mockImplementation((_playerName, key, _campaignName) => {
+        if (key === 'superiorityDice') return 0;
+        if (key === SELECTION_KEY) return ['Trip Attack'];
+        return undefined;
+    });
+
+const makeReadyRuntime = (maneuverNames = ['Trip Attack', 'Pushing Attack']) =>
+    vi.fn().mockImplementation((_playerName, key, _campaignName) => {
+        if (key === 'superiorityDice') return 4;
+        if (key === SELECTION_KEY) return maneuverNames;
+        return undefined;
+    });
+
+// ── getAvailableAttackRiderManeuvers ───────────────────────────────────
+
 describe('getAvailableAttackRiderManeuvers', () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        dataLoader.loadManeuvers.mockResolvedValue(allManeuvers);
     });
 
-    it('returns empty array when no maneuvers known', async () => {
-        getRuntimeValue.mockImplementation((_playerName, key, _campaignName) => {
-            if (key === 'superiorityDice') return 4;
-            if (key === SELECTION_KEY) return [];
-            return undefined;
-        });
+    it('returns empty when no maneuvers known or no superiority dice', async () => {
+        getRuntimeValue.mockImplementation(makeNoManeuversRuntime());
 
         const result = await getAvailableAttackRiderManeuvers(
             makePlayerStats(),
@@ -76,12 +105,8 @@ describe('getAvailableAttackRiderManeuvers', () => {
         expect(result).toEqual([]);
     });
 
-    it('returns empty array when no superiority dice', async () => {
-        getRuntimeValue.mockImplementation((_playerName, key, _campaignName) => {
-            if (key === 'superiorityDice') return 0;
-            if (key === SELECTION_KEY) return ['Trip Attack', 'Pushing Attack'];
-            return undefined;
-        });
+    it('returns empty when no superiority dice even with known maneuvers', async () => {
+        getRuntimeValue.mockImplementation(makeNoDiceRuntime());
 
         const result = await getAvailableAttackRiderManeuvers(
             makePlayerStats(),
@@ -90,20 +115,33 @@ describe('getAvailableAttackRiderManeuvers', () => {
         );
 
         expect(result).toEqual([]);
+    });
+
+    it('filters known attack_rider maneuvers by trigger', async () => {
+        getRuntimeValue.mockImplementation(makeReadyRuntime(['Trip Attack', 'Maneuvering Attack']));
+        await populateManeuverCache();
+
+        const result = await getAvailableAttackRiderManeuvers(
+            makePlayerStats(),
+            'test-campaign',
+            { weaponType: 'melee', hit: true }
+        );
+
+        expect(result).toHaveLength(2);
+        expect(result.map(m => m.name)).toEqual(['Trip Attack', 'Maneuvering Attack']);
     });
 });
+
+// ── getAvailableAttackRiderManeuversByTrigger ──────────────────────────
 
 describe('getAvailableAttackRiderManeuversByTrigger', () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        dataLoader.loadManeuvers.mockResolvedValue(allManeuvers);
     });
 
-    it('returns empty when no maneuvers known', async () => {
-        getRuntimeValue.mockImplementation((_playerName, key, _campaignName) => {
-            if (key === 'superiorityDice') return 4;
-            if (key === SELECTION_KEY) return [];
-            return undefined;
-        });
+    it('returns empty when no maneuvers known or no superiority dice', async () => {
+        getRuntimeValue.mockImplementation(makeNoManeuversRuntime());
 
         const result = await getAvailableAttackRiderManeuversByTrigger(
             makePlayerStats(),
@@ -114,28 +152,9 @@ describe('getAvailableAttackRiderManeuversByTrigger', () => {
         expect(result).toEqual([]);
     });
 
-    it('returns empty when no superiority dice', async () => {
-        getRuntimeValue.mockImplementation((_playerName, key, _campaignName) => {
-            if (key === 'superiorityDice') return 0;
-            if (key === SELECTION_KEY) return ['Trip Attack'];
-            return undefined;
-        });
-
-        const result = await getAvailableAttackRiderManeuversByTrigger(
-            makePlayerStats(),
-            'test-campaign',
-            { weaponType: 'melee', hit: true }
-        );
-
-        expect(result).toEqual([]);
-    });
-
-    it('filters by attack_roll_miss trigger for miss', async () => {
-        getRuntimeValue.mockImplementation((_playerName, key, _campaignName) => {
-            if (key === 'superiorityDice') return 4;
-            if (key === SELECTION_KEY) return ['Trip Attack', 'Pushing Attack'];
-            return undefined;
-        });
+    it('filters miss-triggered maneuvers when attack missed', async () => {
+        getRuntimeValue.mockImplementation(makeReadyRuntime(['Precision Attack']));
+        await populateManeuverCache();
 
         const result = await getAvailableAttackRiderManeuversByTrigger(
             makePlayerStats(),
@@ -143,21 +162,35 @@ describe('getAvailableAttackRiderManeuversByTrigger', () => {
             { weaponType: 'melee', hit: false }
         );
 
-        expect(result).toHaveLength(0);
+        expect(result).toHaveLength(1);
+        expect(result[0].name).toBe('Precision Attack');
+    });
+
+    it('excludes melee-only maneuvers on ranged miss', async () => {
+        getRuntimeValue.mockImplementation(makeReadyRuntime(['Trip Attack', 'Precision Attack']));
+        await populateManeuverCache();
+
+        const result = await getAvailableAttackRiderManeuversByTrigger(
+            makePlayerStats(),
+            'test-campaign',
+            { weaponType: 'ranged', hit: false }
+        );
+
+        expect(result).toHaveLength(1);
+        expect(result[0].name).toBe('Precision Attack');
     });
 });
+
+// ── getAvailableSkillCheckManeuvers ────────────────────────────────────
 
 describe('getAvailableSkillCheckManeuvers', () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        dataLoader.loadManeuvers.mockResolvedValue(allManeuvers);
     });
 
-    it('returns empty when no maneuvers known', async () => {
-        getRuntimeValue.mockImplementation((_playerName, key, _campaignName) => {
-            if (key === 'superiorityDice') return 4;
-            if (key === SELECTION_KEY) return [];
-            return undefined;
-        });
+    it('returns empty when no maneuvers known or no superiority dice', async () => {
+        getRuntimeValue.mockImplementation(makeNoManeuversRuntime());
 
         const result = getAvailableSkillCheckManeuvers(
             makePlayerStats(),
@@ -169,12 +202,9 @@ describe('getAvailableSkillCheckManeuvers', () => {
         expect(result).toEqual([]);
     });
 
-    it('returns empty when no superiority dice', async () => {
-        getRuntimeValue.mockImplementation((_playerName, key, _campaignName) => {
-            if (key === 'superiorityDice') return 0;
-            if (key === SELECTION_KEY) return ['Ambush'];
-            return undefined;
-        });
+    it('filters skill_check maneuvers by skill name', async () => {
+        getRuntimeValue.mockImplementation(makeReadyRuntime(['Ambush', 'Quick Insight']));
+        await populateManeuverCache();
 
         const result = getAvailableSkillCheckManeuvers(
             makePlayerStats(),
@@ -183,9 +213,26 @@ describe('getAvailableSkillCheckManeuvers', () => {
             false
         );
 
-        expect(result).toEqual([]);
+        expect(result).toHaveLength(1);
+        expect(result[0].name).toBe('Ambush');
+    });
+
+    it('returns initiative maneuvers when isInitiative is true', async () => {
+        getRuntimeValue.mockImplementation(makeReadyRuntime(['Ambush', 'Quick Insight']));
+        await populateManeuverCache();
+
+        const result = getAvailableSkillCheckManeuvers(
+            makePlayerStats(),
+            'test-campaign',
+            'Stealth',
+            true
+        );
+
+        expect(result).toHaveLength(2);
     });
 });
+
+// ── handleAttackRiderPrompt ────────────────────────────────────────────
 
 describe('handleAttackRiderPrompt', () => {
     beforeEach(() => {
@@ -206,7 +253,7 @@ describe('handleAttackRiderPrompt', () => {
         expect(result).toBeNull();
     });
 
-    it('returns null when no maneuvers known', async () => {
+    it('returns null when no maneuvers known or no superiority dice', async () => {
         getRuntimeValue.mockImplementation((_playerName, key, _campaignName) => {
             if (key === 'pendingCombatSuperiorityPrompt') return { attackContext: { hit: true } };
             if (key === SELECTION_KEY) return [];
@@ -223,31 +270,14 @@ describe('handleAttackRiderPrompt', () => {
         expect(result).toBeNull();
     });
 
-    it('returns null when no superiority dice', async () => {
+    it('returns modal with available maneuvers when conditions are met', async () => {
         getRuntimeValue.mockImplementation((_playerName, key, _campaignName) => {
-            if (key === 'pendingCombatSuperiorityPrompt') return { attackContext: { hit: true } };
-            if (key === SELECTION_KEY) return ['Trip Attack'];
-            if (key === 'superiorityDice') return 0;
-            return undefined;
-        });
-
-        const result = await handleAttackRiderPrompt(
-            { name: 'Test', automation: { type: 'combat_superiority' } },
-            makePlayerStats(),
-            'test-campaign',
-            null
-        );
-
-        expect(result).toBeNull();
-    });
-
-    it('returns null when no available maneuvers by trigger', async () => {
-        getRuntimeValue.mockImplementation((_playerName, key, _campaignName) => {
-            if (key === 'pendingCombatSuperiorityPrompt') return { attackContext: { hit: true } };
-            if (key === SELECTION_KEY) return ['Trip Attack'];
+            if (key === 'pendingCombatSuperiorityPrompt') return { attackContext: { hit: true, weaponType: 'melee' } };
             if (key === 'superiorityDice') return 4;
+            if (key === SELECTION_KEY) return ['Trip Attack'];
             return undefined;
         });
+        await populateManeuverCache();
 
         const result = await handleAttackRiderPrompt(
             { name: 'Test', automation: { type: 'combat_superiority' } },
@@ -256,9 +286,13 @@ describe('handleAttackRiderPrompt', () => {
             null
         );
 
-        expect(result).toBeNull();
+        expect(result.type).toBe('modal');
+        expect(result.modalName).toBe('combatSuperiority');
+        expect(result.payload.knownManeuvers).toEqual(['Trip Attack']);
     });
 });
+
+// ── handleSkillCheckPrompt ─────────────────────────────────────────────
 
 describe('handleSkillCheckPrompt', () => {
     beforeEach(() => {
@@ -279,28 +313,10 @@ describe('handleSkillCheckPrompt', () => {
         expect(result).toBeNull();
     });
 
-    it('returns null when no maneuvers known', async () => {
+    it('returns null when no maneuvers known or no superiority dice', async () => {
         getRuntimeValue.mockImplementation((_playerName, key, _campaignName) => {
             if (key === 'pendingCombatSuperiorityPrompt') return { skillContext: { skillName: 'Stealth' } };
             if (key === SELECTION_KEY) return [];
-            return undefined;
-        });
-
-        const result = await handleSkillCheckPrompt(
-            { name: 'Test', automation: { type: 'combat_superiority' } },
-            makePlayerStats(),
-            'test-campaign',
-            null
-        );
-
-        expect(result).toBeNull();
-    });
-
-    it('returns null when no superiority dice', async () => {
-        getRuntimeValue.mockImplementation((_playerName, key, _campaignName) => {
-            if (key === 'pendingCombatSuperiorityPrompt') return { skillContext: { skillName: 'Stealth' } };
-            if (key === SELECTION_KEY) return ['Ambush'];
-            if (key === 'superiorityDice') return 0;
             return undefined;
         });
 
@@ -336,18 +352,16 @@ describe('handleSkillCheckPrompt', () => {
     });
 });
 
+// ── getAttackRiderOptions ──────────────────────────────────────────────
+
 describe('getAttackRiderOptions', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         dataLoader.loadManeuvers.mockResolvedValue(allManeuvers);
     });
 
-    it('returns empty when no maneuvers known', async () => {
-        getRuntimeValue.mockImplementation((_playerName, key, _campaignName) => {
-            if (key === 'superiorityDice') return 4;
-            if (key === SELECTION_KEY) return [];
-            return undefined;
-        });
+    it('returns empty when no maneuvers known or no superiority dice', async () => {
+        getRuntimeValue.mockImplementation(makeNoManeuversRuntime());
 
         const result = await getAttackRiderOptions(
             makePlayerStats(),
@@ -358,28 +372,8 @@ describe('getAttackRiderOptions', () => {
         expect(result).toEqual([]);
     });
 
-    it('returns empty when no superiority dice', async () => {
-        getRuntimeValue.mockImplementation((_playerName, key, _campaignName) => {
-            if (key === 'superiorityDice') return 0;
-            if (key === SELECTION_KEY) return ['Trip Attack'];
-            return undefined;
-        });
-
-        const result = await getAttackRiderOptions(
-            makePlayerStats(),
-            'test-campaign',
-            { weaponType: 'melee', hit: true }
-        );
-
-        expect(result).toEqual([]);
-    });
-
-    it('returns formatted options for known attack rider maneuvers when cache is populated', async () => {
-        getRuntimeValue.mockImplementation((_playerName, key, _campaignName) => {
-            if (key === 'superiorityDice') return 4;
-            if (key === SELECTION_KEY) return ['Trip Attack', 'Pushing Attack'];
-            return undefined;
-        });
+    it('returns formatted options for known attack rider maneuvers', async () => {
+        getRuntimeValue.mockImplementation(makeReadyRuntime(['Trip Attack', 'Pushing Attack']));
 
         await handleAttackRiderPrompt(
             { name: 'Test', automation: { type: 'combat_superiority' } },
@@ -411,18 +405,16 @@ describe('getAttackRiderOptions', () => {
     });
 });
 
+// ── getAttackRiderOptionsByContext ─────────────────────────────────────
+
 describe('getAttackRiderOptionsByContext', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         dataLoader.loadManeuvers.mockResolvedValue(allManeuvers);
     });
 
-    it('returns empty when no maneuvers known', async () => {
-        getRuntimeValue.mockImplementation((_playerName, key, _campaignName) => {
-            if (key === 'superiorityDice') return 4;
-            if (key === SELECTION_KEY) return [];
-            return undefined;
-        });
+    it('returns empty when no maneuvers known or no superiority dice', async () => {
+        getRuntimeValue.mockImplementation(makeNoManeuversRuntime());
 
         const result = await getAttackRiderOptionsByContext(
             makePlayerStats(),
@@ -435,11 +427,7 @@ describe('getAttackRiderOptionsByContext', () => {
     });
 
     it('includes maneuvers without trigger for any context', async () => {
-        getRuntimeValue.mockImplementation((_playerName, key, _campaignName) => {
-            if (key === 'superiorityDice') return 4;
-            if (key === SELECTION_KEY) return ['Maneuvering Attack'];
-            return undefined;
-        });
+        getRuntimeValue.mockImplementation(makeReadyRuntime(['Maneuvering Attack']));
 
         await handleAttackRiderPrompt(
             { name: 'Test', automation: { type: 'combat_superiority' } },

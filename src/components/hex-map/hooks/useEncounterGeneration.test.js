@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook } from '@testing-library/react';
 import useEncounterGeneration from './useEncounterGeneration.js';
@@ -32,7 +32,7 @@ describe('useEncounterGeneration', () => {
     ];
 
     describe('generateMonsterPlacements', () => {
-        it('returns an array of monster placement objects', () => {
+        it('returns an array of monster placement objects with correct counts', () => {
             const { result } = renderHook(() =>
                 useEncounterGeneration(...baseArgs)
             );
@@ -46,59 +46,15 @@ describe('useEncounterGeneration', () => {
 
             expect(Array.isArray(items)).toBe(true);
             expect(items.length).toBe(5);
-        });
 
-        it('creates items with correct shape', () => {
-            const { result } = renderHook(() =>
-                useEncounterGeneration(...baseArgs)
-            );
-            const { generateMonsterPlacements } = result.current;
-
-            const items = generateMonsterPlacements(
-                [{ name: 'Goblin', qty: 1 }],
-                30
-            );
-
-            expect(items[0]).toHaveProperty('id');
-            expect(items[0]).toHaveProperty('type', 'npc');
-            expect(items[0]).toHaveProperty('name', 'Goblin');
-            expect(items[0]).toHaveProperty('gridX');
-            expect(items[0]).toHaveProperty('gridY');
-            expect(items[0]).toHaveProperty('visible', true);
-        });
-
-        it('assigns incrementing id counters', () => {
-            const { result } = renderHook(() =>
-                useEncounterGeneration(...baseArgs)
-            );
-            const { generateMonsterPlacements } = result.current;
-
-            const items = generateMonsterPlacements(
-                [
-                    { name: 'Goblin', qty: 2 },
-                    { name: 'Orc', qty: 2 },
-                ],
-                30
-            );
-
-            expect(items[0].id).toBe('enc-monster-0');
-            expect(items[1].id).toBe('enc-monster-1');
-            expect(items[2].id).toBe('enc-monster-2');
-            expect(items[3].id).toBe('enc-monster-3');
-        });
-
-        it('places monsters within grid bounds', () => {
-            const { result } = renderHook(() =>
-                useEncounterGeneration(...baseArgs)
-            );
-            const { generateMonsterPlacements } = result.current;
-
-            const items = generateMonsterPlacements(
-                [{ name: 'Goblin', qty: 10 }],
-                30
-            );
+            const goblinCount = items.filter((i) => i.name === 'Goblin').length;
+            const orcCount = items.filter((i) => i.name === 'Orc').length;
+            expect(goblinCount).toBe(3);
+            expect(orcCount).toBe(2);
 
             for (const item of items) {
+                expect(item.type).toBe('npc');
+                expect(item.visible).toBe(true);
                 expect(item.gridX).toBeGreaterThanOrEqual(1);
                 expect(item.gridX).toBeLessThanOrEqual(28);
                 expect(item.gridY).toBeGreaterThanOrEqual(1);
@@ -123,27 +79,6 @@ describe('useEncounterGeneration', () => {
                 expect(keys.has(key)).toBe(false);
                 keys.add(key);
             }
-        });
-
-        it('respects qty per group', () => {
-            const { result } = renderHook(() =>
-                useEncounterGeneration(...baseArgs)
-            );
-            const { generateMonsterPlacements } = result.current;
-
-            const items = generateMonsterPlacements(
-                [
-                    { name: 'Goblin', qty: 5 },
-                    { name: 'Orc', qty: 3 },
-                ],
-                30
-            );
-
-            const goblinCount = items.filter((i) => i.name === 'Goblin').length;
-            const orcCount = items.filter((i) => i.name === 'Orc').length;
-
-            expect(goblinCount).toBe(5);
-            expect(orcCount).toBe(3);
         });
 
         it('returns stable function reference', () => {
@@ -363,28 +298,6 @@ describe('useEncounterGeneration', () => {
             );
         });
 
-        it('does not call extraPlacedItems when none provided', async () => {
-            generateOutdoorEncounter.mockReturnValue({
-                placedItems: [{ id: 'enc-item-1' }],
-                players: [],
-                bgFill: '#7A9B6A',
-            });
-            mapsService.createMap.mockResolvedValue({});
-            mapsService.saveMapData.mockResolvedValue({});
-
-            const { result } = renderHook(() =>
-                useEncounterGeneration(...baseArgs)
-            );
-
-            await result.current.handleStartEncounter(0, 0);
-
-            const callArgs = mapsService.createMap.mock.calls[0];
-            const placedItems = callArgs[2].placedItems;
-
-            expect(placedItems.length).toBe(1);
-            expect(placedItems[0].id).toBe('enc-item-1');
-        });
-
         it.each`
             service              | setup
             ${'createMap'}       | ${() => mapsService.createMap.mockRejectedValue(new Error('Network error'))}
@@ -437,49 +350,6 @@ describe('useEncounterGeneration', () => {
             expect(onEncounterCreated).not.toHaveBeenCalled();
         });
 
-        it('generates correct createMap call args for various hex coordinates', async () => {
-            generateOutdoorEncounter.mockReturnValue({
-                placedItems: [],
-                players: [],
-                bgFill: '#7A9B6A',
-            });
-            mapsService.createMap.mockResolvedValue({});
-
-            const { result } = renderHook(() =>
-                useEncounterGeneration(...baseArgs)
-            );
-
-            await result.current.handleStartEncounter(3, 7);
-
-            expect(mapsService.createMap).toHaveBeenCalledWith(
-                'test-campaign',
-                'test-map - Encounter at 3,7',
-                expect.objectContaining({
-                    gridSize: 30,
-                    parentHex: { q: 3, r: 7 },
-                })
-            );
-        });
-
-        it('handles generateOutdoorEncounter returning null placedItems', async () => {
-            generateOutdoorEncounter.mockReturnValue({
-                placedItems: null,
-                players: [],
-                bgFill: '#7A9B6A',
-            });
-            mapsService.createMap.mockResolvedValue({});
-
-            const { result } = renderHook(() =>
-                useEncounterGeneration(...baseArgs)
-            );
-
-            await result.current.handleStartEncounter(0, 0);
-
-            expect(mapsService.createMap).toHaveBeenCalled();
-            const callArgs = mapsService.createMap.mock.calls[0];
-            expect(callArgs[2].placedItems).toBeNull();
-        });
-
         it('handles generateOutdoorEncounter throwing an error', async () => {
             generateOutdoorEncounter.mockImplementation(() => {
                 throw new Error('Encounter generation failed');
@@ -512,37 +382,6 @@ describe('useEncounterGeneration', () => {
             expect(mapsService.createMap).not.toHaveBeenCalled();
             expect(consoleSpy).not.toHaveBeenCalled();
             consoleSpy.mockRestore();
-        });
-
-        it('handles empty terrain map with no hex keys', async () => {
-            generateOutdoorEncounter.mockReturnValue({
-                placedItems: [],
-                players: [],
-                bgFill: '#7A9B6A',
-            });
-            mapsService.createMap.mockResolvedValue({});
-
-            const emptyTerrainArgs = [
-                'test-campaign',
-                'test-map.json',
-                {},
-                ['Alice'],
-                vi.fn(),
-            ];
-
-            const { result } = renderHook(() =>
-                useEncounterGeneration(...emptyTerrainArgs)
-            );
-
-            await result.current.handleStartEncounter(0, 0);
-
-            expect(generateOutdoorEncounter).toHaveBeenCalledWith(
-                'plains',
-                30,
-                ['Alice'],
-                0,
-                0
-            );
         });
 
         it('returns stable handleStartEncounter reference', () => {

@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { describe, it, expect } from 'vitest';
 import {
   applyAbilityScoreIncreases,
@@ -6,11 +6,8 @@ import {
 } from './buffApplier.js';
 
 describe('applyAbilityScoreIncreases', () => {
-  it('returns void and mutates nothing when abilities is null', () => {
+  it('returns void and mutates nothing when abilities is falsy', () => {
     expect(applyAbilityScoreIncreases(null, [])).toBeUndefined();
-  });
-
-  it('returns void and mutates nothing when abilities is undefined', () => {
     expect(applyAbilityScoreIncreases(undefined, [])).toBeUndefined();
   });
 
@@ -39,28 +36,30 @@ describe('applyAbilityScoreIncreases', () => {
     expect(abilities[0].featIncrease).toBe(5);
   });
 
-  it('adds to existing featIncrease value', () => {
-    const abilities = [{ name: 'Intelligence', featIncrease: 4 }];
-    applyAbilityScoreIncreases(abilities, [{ name: 'intelligence', amount: 1 }]);
+  it('adds to existing featIncrease value and treats missing as 0', () => {
+    const abilities = [
+      { name: 'Intelligence', featIncrease: 4 },
+      { name: 'Wisdom' },
+    ];
+    applyAbilityScoreIncreases(abilities, [
+      { name: 'intelligence', amount: 1 },
+      { name: 'wisdom', amount: 2 },
+    ]);
     expect(abilities[0].featIncrease).toBe(5);
+    expect(abilities[1].featIncrease).toBe(2);
   });
 
-  it('treats missing featIncrease as 0', () => {
-    const abilities = [{ name: 'Wisdom' }];
-    applyAbilityScoreIncreases(abilities, [{ name: 'wisdom', amount: 2 }]);
-    expect(abilities[0].featIncrease).toBe(2);
-  });
-
-  it('supports negative amounts', () => {
-    const abilities = [{ name: 'Constitution', featIncrease: 0 }];
-    applyAbilityScoreIncreases(abilities, [{ name: 'Constitution', amount: -1 }]);
+  it('supports negative and zero amounts', () => {
+    const abilities = [
+      { name: 'Constitution', featIncrease: 0 },
+      { name: 'Strength', featIncrease: 3 },
+    ];
+    applyAbilityScoreIncreases(abilities, [
+      { name: 'Constitution', amount: -1 },
+      { name: 'strength', amount: 0 },
+    ]);
     expect(abilities[0].featIncrease).toBe(-1);
-  });
-
-  it('handles zero amount without changing value', () => {
-    const abilities = [{ name: 'Strength', featIncrease: 3 }];
-    applyAbilityScoreIncreases(abilities, [{ name: 'strength', amount: 0 }]);
-    expect(abilities[0].featIncrease).toBe(3);
+    expect(abilities[1].featIncrease).toBe(3);
   });
 
   it('skips increases with name "any"', () => {
@@ -81,18 +80,6 @@ describe('applyAbilityScoreIncreases', () => {
     applyAbilityScoreIncreases(abilities, [{ amount: 5 }, { name: undefined, amount: 5 }]);
     expect(abilities[0].featIncrease).toBe(0);
     expect(abilities[1].featIncrease).toBe(0);
-  });
-
-  it('does not affect non-matching abilities', () => {
-    const abilities = [
-      { name: 'Strength', featIncrease: 0 },
-      { name: 'Dexterity', featIncrease: 3 },
-      { name: 'Constitution', featIncrease: 1 },
-    ];
-    applyAbilityScoreIncreases(abilities, [{ name: 'charisma', amount: 5 }]);
-    expect(abilities[0].featIncrease).toBe(0);
-    expect(abilities[1].featIncrease).toBe(3);
-    expect(abilities[2].featIncrease).toBe(1);
   });
 
   it('applies increases across different abilities in one call', () => {
@@ -166,12 +153,6 @@ describe('mergeDeduplicated', () => {
     const target = { langs: undefined };
     mergeDeduplicated(target, 'langs', ['Dwarvish']);
     expect(target.langs).toEqual(['Dwarvish']);
-  });
-
-  it('does not affect other keys on the target object', () => {
-    const target = { attacks: [{ name: 'Sword' }], otherData: [1, 2] };
-    mergeDeduplicated(target, 'attacks', []);
-    expect(target.otherData).toEqual([1, 2]);
   });
 
   it('handles empty string items', () => {

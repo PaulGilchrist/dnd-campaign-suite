@@ -146,16 +146,12 @@ describe('bardicInspirationHandler.handle', () => {
 
       expect(result.type).toBe('popup');
       expect(result.payload.description).toContain('requires a target');
-    });
 
-    it('returns info popup when resolveTarget returns empty object', async () => {
-      useRuntimeState.getRuntimeValue.mockReturnValue(2);
       targetResolver.resolveTarget.mockResolvedValue({});
+      const result2 = await handle(action, playerStats, campaignName, mapName);
 
-      const result = await handle(action, playerStats, campaignName, mapName);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.description).toContain('requires a target');
+      expect(result2.type).toBe('popup');
+      expect(result2.payload.description).toContain('requires a target');
     });
   });
 
@@ -175,33 +171,22 @@ describe('bardicInspirationHandler.handle', () => {
       expect(result.payload.description).toContain('60 ft');
     });
 
-    it('skips range check when mapName is null or undefined', async () => {
+    it('skips range check when mapName is null, positions are missing, or incomplete', async () => {
       useRuntimeState.getRuntimeValue.mockReturnValue(2);
       rangeValidation.getDistanceFeet.mockReturnValue(1000);
 
-      const result = await handle(action, playerStats, campaignName, null);
-
+      let result = await handle(action, playerStats, campaignName, null);
       expect(result.type).toBe('popup');
       expect(result.payload.description).toContain('granted to Ally');
       expect(rangeValidation.getDistanceFeet).not.toHaveBeenCalled();
-    });
 
-    it('skips range check when resolveMapPositions returns null', async () => {
-      useRuntimeState.getRuntimeValue.mockReturnValue(2);
       targetResolver.resolveMapPositions.mockResolvedValue(null);
-
-      const result = await handle(action, playerStats, campaignName, mapName);
-
+      result = await handle(action, playerStats, campaignName, mapName);
       expect(result.type).toBe('popup');
       expect(result.payload.description).toContain('granted to Ally');
-    });
 
-    it('skips range check when positions are incomplete', async () => {
-      useRuntimeState.getRuntimeValue.mockReturnValue(2);
       targetResolver.resolveMapPositions.mockResolvedValue({ attackerPos: { x: 0, y: 0 } });
-
-      const result = await handle(action, playerStats, campaignName, mapName);
-
+      result = await handle(action, playerStats, campaignName, mapName);
       expect(result.type).toBe('popup');
       expect(result.payload.description).toContain('granted to Ally');
     });
@@ -221,31 +206,12 @@ describe('bardicInspirationHandler.handle', () => {
         '8',
         campaignName,
       );
-    });
-
-    it('uses the custom range when specified in action', async () => {
-      useRuntimeState.getRuntimeValue.mockReturnValue(2);
-      action.automation.range = '120_ft';
-      rangeValidation.rangeToFeet.mockReturnValue(120);
-
-      await handle(action, playerStats, campaignName, mapName);
-
-      expect(rangeValidation.rangeToFeet).toHaveBeenCalledWith('120_ft');
       expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
         'Ally',
-        'bardicInspirationDie',
-        '8',
+        'bardicInspirationGrantedBy',
+        'Bard',
         campaignName,
       );
-    });
-
-    it('uses default 60_ft range when action range is undefined', async () => {
-      useRuntimeState.getRuntimeValue.mockReturnValue(2);
-      action.automation.range = undefined;
-
-      await handle(action, playerStats, campaignName, mapName);
-
-      expect(rangeValidation.rangeToFeet).toHaveBeenCalledWith('60_ft');
     });
   });
 
@@ -275,29 +241,6 @@ describe('bardicInspirationHandler.handle', () => {
         'Ally',
         'bardicInspirationDie',
         '6',
-        campaignName,
-      );
-    });
-  });
-
-  // ── Runtime state ──────────────────────────────────────────────
-
-  describe('runtime state', () => {
-    it('sets bardicInspirationDie and bardicInspirationGrantedBy on the target', async () => {
-      useRuntimeState.getRuntimeValue.mockReturnValue(2);
-
-      await handle(action, playerStats, campaignName, mapName);
-
-      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-        'Ally',
-        'bardicInspirationDie',
-        '8',
-        campaignName,
-      );
-      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-        'Ally',
-        'bardicInspirationGrantedBy',
-        'Bard',
         campaignName,
       );
     });

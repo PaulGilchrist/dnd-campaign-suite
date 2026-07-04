@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { handle, confirmArcaneCharge } from './arcaneChargeHandler.js';
 
 const campaignName = 'test-campaign';
@@ -34,17 +34,8 @@ describe('arcaneChargeHandler', () => {
             expect(result.payload.distance).toBe('30 ft');
         });
 
-        it('should use default distance of 30 ft when automation object is missing distance', async () => {
+        it('should use default distance of 30 ft when automation distance is missing, null, or empty', async () => {
             const action = makeAction({ automation: { type: 'arcane_charge', casting_time: '1 action' } });
-            const playerStats = makePlayerStats();
-
-            const result = await handle(action, playerStats, campaignName);
-
-            expect(result.payload.distance).toBe('30 ft');
-        });
-
-        it('should use default distance when automation distance is falsy', async () => {
-            const action = makeAction({ automation: { type: 'arcane_charge', distance: null } });
             const playerStats = makePlayerStats();
 
             const result = await handle(action, playerStats, campaignName);
@@ -59,15 +50,6 @@ describe('arcaneChargeHandler', () => {
             const result = await handle(action, playerStats, campaignName);
 
             expect(result.payload.distance).toBe('60 ft');
-        });
-
-        it('should use default distance when automation distance is empty string', async () => {
-            const action = makeAction({ automation: { type: 'arcane_charge', distance: '', casting_time: '1 action' } });
-            const playerStats = makePlayerStats();
-
-            const result = await handle(action, playerStats, campaignName);
-
-            expect(result.payload.distance).toBe('30 ft');
         });
     });
 
@@ -95,17 +77,8 @@ describe('arcaneChargeHandler', () => {
             expect(result.payload.description).toBe('Arcane Charge: Teleported 60 ft to an unoccupied space you can see.');
         });
 
-        it('should use default distance when automation distance is missing', async () => {
+        it('should use default distance when automation distance is missing or null', async () => {
             const action = makeAction({ automation: { type: 'arcane_charge', casting_time: '1 action' } });
-            const playerStats = makePlayerStats();
-
-            const result = await confirmArcaneCharge(action, playerStats, campaignName);
-
-            expect(result.payload.description).toBe('Arcane Charge: Teleported 30 ft to an unoccupied space you can see.');
-        });
-
-        it('should use default distance when automation distance is null', async () => {
-            const action = makeAction({ automation: { type: 'arcane_charge', distance: null, casting_time: '1 action' } });
             const playerStats = makePlayerStats();
 
             const result = await confirmArcaneCharge(action, playerStats, campaignName);
@@ -126,4 +99,4 @@ describe('arcaneChargeHandler', () => {
     });
 });
 
-// end of file
+// @cleaned-by-ai

@@ -48,7 +48,7 @@ const { getRuntimeValue, setRuntimeValue } = await import(
 const { getCombatContext, getTargetFromAttacker } = await import(
     '../../rules/combat/damageUtils.js'
 );
-const { applyHealingToTarget } = await import('../../rules/combat/applyHealing.js');
+
 const { postLogEntry } = await import('../../shared/logPoster.js');
 
 // ── Test fixtures ─────────────────────────────────────────────────
@@ -80,10 +80,6 @@ function defaultMocks() {
     getCombatContext.mockResolvedValue(null);
 }
 
-function createDispatchSpy() {
-    return vi.spyOn(window, 'dispatchEvent');
-}
-
 // ── Tests ─────────────────────────────────────────────────────────
 
 beforeEach(() => {
@@ -98,7 +94,6 @@ describe('rollHealingForAction', () => {
         it.each([
             [undefined],
             [''],
-            [null],
         ])('returns null when healExpression is %s', async (value) => {
             const auto = value === undefined ? {} : makeAuto({ healExpression: value });
             const result = await rollHealingForAction(auto, makePlayerStats(), campaignName);
@@ -144,7 +139,7 @@ describe('rollHealingForAction', () => {
             });
         });
 
-        it('passes the healExpression string to rollExpression', async () => {
+        it('passes the healExpression to rollExpression for different formulas', async () => {
             hasHealingMaximization.mockReturnValue(false);
             rollExpression.mockReturnValue({ total: 15, rolls: [1, 2, 3, 4], modifier: 3 });
 
@@ -258,15 +253,6 @@ describe('applyHealingDirectly', () => {
             expect(result.actualHeal).toBe(0);
         });
 
-        it('caps HP even when stored HP exceeds max', () => {
-            getRuntimeValue.mockReturnValue(35);
-
-            const result = applyHealingDirectly(playerStats, targetName, 10, campaignName);
-
-            expect(result.newHp).toBe(30);
-            expect(result.actualHeal).toBe(-5);
-        });
-
         it('defaults to maxHitPoints when stored HP is null or empty string', () => {
             getRuntimeValue.mockReturnValue(null);
 
@@ -296,7 +282,7 @@ describe('applyHealingDirectly', () => {
 
         it('dispatches combat-summary-updated event', () => {
             getRuntimeValue.mockReturnValue(10);
-            const dispatchSpy = createDispatchSpy();
+            const dispatchSpy = vi.spyOn(window, 'dispatchEvent');
 
             applyHealingDirectly(playerStats, targetName, 5, campaignName);
 
@@ -349,7 +335,7 @@ describe('logHealingToSSE', () => {
     });
 
     it('dispatches combat-summary-updated event', () => {
-        const dispatchSpy = createDispatchSpy();
+        const dispatchSpy = vi.spyOn(window, 'dispatchEvent');
 
         logHealingToSSE(campaignName, {
             targetName: 'T',

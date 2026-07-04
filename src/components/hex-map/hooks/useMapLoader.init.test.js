@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @improved-by-ai @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook } from '@testing-library/react';
 import useMapLoader from './useMapLoader.js';
@@ -41,32 +41,25 @@ describe('useMapLoader - initial state', () => {
         { name: 'Gandalf' },
     ];
 
-    it('returns loading as true initially', () => {
+    it('returns loading true and mapData null before async load completes', () => {
         const { result } = renderHook(() => useMapLoader('test-campaign', 'test-map', characters));
         expect(result.current.loading).toBe(true);
-    });
-
-    it('returns mapData as null initially', () => {
-        const { result } = renderHook(() => useMapLoader('test-campaign', 'test-map', characters));
         expect(result.current.mapData).toBeNull();
+        expect(result.current.travelInit).toBeNull();
+        expect(result.current.marchingOrder).toEqual([]);
+        expect(result.current.partyPosition).toBeNull();
     });
 
-    it.each([
-        ['gridSize', 10],
-        ['terrain', {}],
-        ['rivers', []],
-        ['roads', []],
-        ['pois', []],
-        ['marchingOrder', []],
-        ['partyPosition', null],
-        ['weather', null],
-        ['travelInit', null],
-        ['travelSaveVersion', 0],
-        ['zoom', 2],
-        ['panX', 0],
-        ['panY', 0],
-    ])('returns %s as %o initially', (field, expectedValue) => {
+    it('returns default values before async load completes', () => {
         const { result } = renderHook(() => useMapLoader('test-campaign', 'test-map', characters));
-        expect(result.current[field]).toEqual(expectedValue);
+        expect(result.current.gridSize).toBe(10);
+        expect(result.current.terrain).toEqual({});
+        expect(result.current.rivers).toEqual([]);
+        expect(result.current.roads).toEqual([]);
+        expect(result.current.pois).toEqual([]);
+        expect(result.current.zoom).toBe(2);
+        expect(result.current.panX).toBe(0);
+        expect(result.current.panY).toBe(0);
+        expect(result.current.travelSaveVersion).toBe(0);
     });
 });

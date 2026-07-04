@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
@@ -91,7 +91,7 @@ describe('hypnoticPatternShake.handle', () => {
         expect(result.payload.description).toBe('No eligible targets within range.');
     });
 
-    it('returns modal with hypnoticPatternShake modalName', async () => {
+    it('returns modal with full payload for eligible NPC targets', async () => {
         getCombatContext.mockResolvedValue({
             creatures: [{ name: 'Goblin', type: 'npc' }],
         });
@@ -100,19 +100,12 @@ describe('hypnoticPatternShake.handle', () => {
 
         expect(result.type).toBe('modal');
         expect(result.modalName).toBe('hypnoticPatternShake');
-    });
-
-    it('includes targets list in payload', async () => {
-        getCombatContext.mockResolvedValue({
-            creatures: [
-                { name: 'Goblin', type: 'npc' },
-                { name: 'Bard1', type: 'player' },
-            ],
-        });
-
-        const result = await handle(makeAction(), makePlayerStats(), campaignName, mapName);
-
-        expect(result.payload.targets).toContain('Goblin');
+        expect(result.payload.targets).toEqual(['Goblin']);
+        expect(result.payload.featureName).toBe('Shake Out Stupor');
+        expect(result.payload.rangeFeet).toBe(5);
+        expect(result.payload.automation).toEqual({ type: 'hypnotic_pattern_shake' });
+        expect(result.payload.attackerName).toBe('Bard1');
+        expect(result.payload.campaignName).toBe('TestCampaign');
     });
 
     it('excludes caster from targets', async () => {
@@ -126,6 +119,7 @@ describe('hypnoticPatternShake.handle', () => {
         const result = await handle(makeAction(), makePlayerStats(), campaignName, mapName);
 
         expect(result.payload.targets).not.toContain('Bard1');
+        expect(result.payload.targets).toContain('Goblin');
     });
 
     it('prefers charmed/incapacitated player targets over eligible targets', async () => {
@@ -143,7 +137,7 @@ describe('hypnoticPatternShake.handle', () => {
         expect(result.payload.targets).not.toContain('Goblin');
     });
 
-    it('prefers charmed/incapacitated npcs over eligible targets', async () => {
+    it('prefers charmed/incapacitated npc targets over eligible targets', async () => {
         getCombatContext.mockResolvedValue({
             creatures: [
                 { name: 'Goblin', type: 'npc', conditions: [{ key: 'charmed' }] },
@@ -159,9 +153,7 @@ describe('hypnoticPatternShake.handle', () => {
 
     it('returns no eligible targets popup when only caster is charmed/incapacitated', async () => {
         getCombatContext.mockResolvedValue({
-            creatures: [
-                { name: 'Bard1', type: 'player' },
-            ],
+            creatures: [{ name: 'Bard1', type: 'player' }],
         });
         getRuntimeValue.mockReturnValue(['charmed']);
 
@@ -169,16 +161,6 @@ describe('hypnoticPatternShake.handle', () => {
 
         expect(result.type).toBe('popup');
         expect(result.payload.description).toBe('No eligible targets within range.');
-    });
-
-    it('includes featureName in payload', async () => {
-        getCombatContext.mockResolvedValue({
-            creatures: [{ name: 'Goblin', type: 'npc' }],
-        });
-
-        const result = await handle(makeAction(), makePlayerStats(), campaignName, mapName);
-
-        expect(result.payload.featureName).toBe('Shake Out Stupor');
     });
 
     it('uses custom action name when provided', async () => {
@@ -191,16 +173,6 @@ describe('hypnoticPatternShake.handle', () => {
         expect(result.payload.featureName).toBe('Custom Shake');
     });
 
-    it('includes rangeFeet in payload', async () => {
-        getCombatContext.mockResolvedValue({
-            creatures: [{ name: 'Goblin', type: 'npc' }],
-        });
-
-        const result = await handle(makeAction({ range: '5 ft' }), makePlayerStats(), campaignName, mapName);
-
-        expect(result.payload.rangeFeet).toBe(5);
-    });
-
     it('defaults rangeFeet to 5 when range not specified', async () => {
         getCombatContext.mockResolvedValue({
             creatures: [{ name: 'Goblin', type: 'npc' }],
@@ -211,76 +183,14 @@ describe('hypnoticPatternShake.handle', () => {
         expect(result.payload.rangeFeet).toBe(5);
     });
 
-    it('includes automation in payload', async () => {
+    it('uses custom range when specified', async () => {
         getCombatContext.mockResolvedValue({
             creatures: [{ name: 'Goblin', type: 'npc' }],
         });
 
-        const result = await handle(makeAction({ customProp: 'value' }), makePlayerStats(), campaignName, mapName);
+        const result = await handle(makeAction({ range: '5 ft' }), makePlayerStats(), campaignName, mapName);
 
-        expect(result.payload.automation).toEqual({ type: 'hypnotic_pattern_shake', customProp: 'value' });
-    });
-
-    it('includes attackerName and campaignName in payload', async () => {
-        getCombatContext.mockResolvedValue({
-            creatures: [{ name: 'Goblin', type: 'npc' }],
-        });
-
-        const result = await handle(makeAction(), makePlayerStats(), campaignName, mapName);
-
-        expect(result.payload.attackerName).toBe('Bard1');
-        expect(result.payload.campaignName).toBe('TestCampaign');
-    });
-
-    it('handles player with incapacitated condition', async () => {
-        getCombatContext.mockResolvedValue({
-            creatures: [
-                { name: 'Ally1', type: 'player' },
-                { name: 'Goblin', type: 'npc', conditions: [] },
-            ],
-        });
-        getRuntimeValue.mockReturnValue(['incapacitated']);
-
-        const result = await handle(makeAction(), makePlayerStats(), campaignName, mapName);
-
-        expect(result.payload.targets).toEqual(['Ally1']);
-    });
-
-    it('handles npc with charmed condition using conditions.key format', async () => {
-        getCombatContext.mockResolvedValue({
-            creatures: [
-                { name: 'Goblin', type: 'npc', conditions: [{ key: 'charmed' }] },
-            ],
-        });
-
-        const result = await handle(makeAction(), makePlayerStats(), campaignName, mapName);
-
-        expect(result.payload.targets).toContain('Goblin');
-    });
-
-    it('handles npc with incapacitated condition using conditions.key format', async () => {
-        getCombatContext.mockResolvedValue({
-            creatures: [
-                { name: 'Goblin', type: 'npc', conditions: [{ key: 'incapacitated' }] },
-            ],
-        });
-
-        const result = await handle(makeAction(), makePlayerStats(), campaignName, mapName);
-
-        expect(result.payload.targets).toContain('Goblin');
-    });
-
-    it('uses eligible targets when no charmed/incapacitated targets exist', async () => {
-        getCombatContext.mockResolvedValue({
-            creatures: [
-                { name: 'Goblin', type: 'npc', conditions: [] },
-            ],
-        });
-
-        const result = await handle(makeAction(), makePlayerStats(), campaignName, mapName);
-
-        expect(result.type).toBe('modal');
-        expect(result.payload.targets).toContain('Goblin');
+        expect(result.payload.rangeFeet).toBe(5);
     });
 
     it('calls resolveMapPositions when mapName is provided', async () => {
@@ -292,16 +202,6 @@ describe('hypnoticPatternShake.handle', () => {
         await handle(makeAction(), makePlayerStats(), campaignName, mapName);
 
         expect(resolveMapPositions).toHaveBeenCalledWith(campaignName, mapName, 'Bard1');
-    });
-
-    it('handles missing conditions array on npc gracefully', async () => {
-        getCombatContext.mockResolvedValue({
-            creatures: [{ name: 'Goblin', type: 'npc' }],
-        });
-
-        const result = await handle(makeAction(), makePlayerStats(), campaignName, mapName);
-
-        expect(result.payload.targets).toContain('Goblin');
     });
 });
 
@@ -324,11 +224,11 @@ describe('handleConfirm', () => {
         expect(result).toBeNull();
     });
 
-    it('removes charmed and incapacitated conditions from player target', async () => {
+    it('removes charmed, incapacitated, and speed_zero from player target', async () => {
         getCombatContext.mockResolvedValue({
             creatures: [{ name: 'Ally1', type: 'player' }],
         });
-        getRuntimeValue.mockReturnValue(['charmed', 'incapacitated', 'poisoned']);
+        getRuntimeValue.mockReturnValue(['charmed', 'incapacitated', 'speed_zero', 'poisoned']);
 
         const result = await handleConfirm(makeAction(), makePlayerStats(), campaignName, mapName, 'Ally1');
 
@@ -341,63 +241,7 @@ describe('handleConfirm', () => {
         );
     });
 
-    it('removes speed_zero along with charmed/incapacitated from player target', async () => {
-        getCombatContext.mockResolvedValue({
-            creatures: [{ name: 'Ally1', type: 'player' }],
-        });
-        getRuntimeValue.mockReturnValue(['charmed', 'speed_zero', 'poisoned']);
-
-        await handleConfirm(makeAction(), makePlayerStats(), campaignName, mapName, 'Ally1');
-
-        expect(setRuntimeValue).toHaveBeenCalledWith(
-            'Ally1',
-            'activeConditions',
-            ['poisoned'],
-            campaignName,
-        );
-    });
-
-    it('posts condition log entry for removed charmed on player target', async () => {
-        getCombatContext.mockResolvedValue({
-            creatures: [{ name: 'Ally1', type: 'player' }],
-        });
-        getRuntimeValue.mockReturnValue(['charmed']);
-
-        await handleConfirm(makeAction(), makePlayerStats(), campaignName, mapName, 'Ally1');
-
-        expect(postLogEntry).toHaveBeenCalledWith(
-            campaignName,
-            expect.objectContaining({
-                type: 'condition',
-                action: 'removed',
-                characterName: 'Ally1',
-                condition: 'Charmed',
-                reason: 'Shake Out Stupor (Hypnotic Pattern)',
-            }),
-        );
-    });
-
-    it('posts condition log entry for removed incapacitated on player target', async () => {
-        getCombatContext.mockResolvedValue({
-            creatures: [{ name: 'Ally1', type: 'player' }],
-        });
-        getRuntimeValue.mockReturnValue(['incapacitated']);
-
-        await handleConfirm(makeAction(), makePlayerStats(), campaignName, mapName, 'Ally1');
-
-        expect(postLogEntry).toHaveBeenCalledWith(
-            campaignName,
-            expect.objectContaining({
-                type: 'condition',
-                action: 'removed',
-                characterName: 'Ally1',
-                condition: 'Incapacitated',
-                reason: 'Shake Out Stupor (Hypnotic Pattern)',
-            }),
-        );
-    });
-
-    it('posts condition log entries for charmed, incapacitated, and speed_zero on player target', async () => {
+    it('posts condition log entries for each removed condition on player target', async () => {
         getCombatContext.mockResolvedValue({
             creatures: [{ name: 'Ally1', type: 'player' }],
         });
@@ -423,7 +267,7 @@ describe('handleConfirm', () => {
         );
     });
 
-    it('does not call setRuntimeValue when no removable conditions exist on player target', async () => {
+    it('does not modify conditions or post logs when no removable conditions exist on player target', async () => {
         getCombatContext.mockResolvedValue({
             creatures: [{ name: 'Ally1', type: 'player' }],
         });
@@ -436,30 +280,20 @@ describe('handleConfirm', () => {
         expect(postLogEntry).not.toHaveBeenCalled();
     });
 
-    it('posts log entries for all tracked conditions when charmed is the only condition on player target', async () => {
+    it('does not modify conditions or post logs when player target has no conditions', async () => {
         getCombatContext.mockResolvedValue({
             creatures: [{ name: 'Ally1', type: 'player' }],
         });
-        getRuntimeValue.mockReturnValue(['charmed']);
+        getRuntimeValue.mockReturnValue([]);
 
-        await handleConfirm(makeAction(), makePlayerStats(), campaignName, mapName, 'Ally1');
+        const result = await handleConfirm(makeAction(), makePlayerStats(), campaignName, mapName, 'Ally1');
 
-        expect(postLogEntry).toHaveBeenCalledTimes(3);
-        expect(postLogEntry).toHaveBeenCalledWith(
-            campaignName,
-            expect.objectContaining({ condition: 'Charmed' }),
-        );
-        expect(postLogEntry).toHaveBeenCalledWith(
-            campaignName,
-            expect.objectContaining({ condition: 'Incapacitated' }),
-        );
-        expect(postLogEntry).toHaveBeenCalledWith(
-            campaignName,
-            expect.objectContaining({ condition: 'Speed_zero' }),
-        );
+        expect(result.type).toBe('popup');
+        expect(setRuntimeValue).not.toHaveBeenCalled();
+        expect(postLogEntry).not.toHaveBeenCalled();
     });
 
-    it('removes charmed/incapacitated from npc creature conditions', async () => {
+    it('removes charmed/incapacitated from npc target', async () => {
         getCombatContext.mockResolvedValue({
             creatures: [{ name: 'Goblin', type: 'npc', conditions: [{ key: 'charmed' }, { key: 'incapacitated' }, { key: 'poisoned' }] }],
         });
@@ -508,23 +342,7 @@ describe('handleConfirm', () => {
         expect(postLogEntry).not.toHaveBeenCalled();
     });
 
-    it('removes speed_zero from npc conditions', async () => {
-        getCombatContext.mockResolvedValue({
-            creatures: [{ name: 'Goblin', type: 'npc', conditions: [{ key: 'speed_zero' }, { key: 'poisoned' }] }],
-        });
-        getRuntimeValue.mockReturnValue(['speed_zero', 'poisoned']);
-
-        await handleConfirm(makeAction(), makePlayerStats(), campaignName, mapName, 'Goblin');
-
-        expect(setRuntimeValue).toHaveBeenCalledWith(
-            'Goblin',
-            'activeConditions',
-            ['poisoned'],
-            campaignName,
-        );
-    });
-
-    it('returns popup with correct description', async () => {
+    it('returns popup with correct description for player target', async () => {
         getCombatContext.mockResolvedValue({
             creatures: [{ name: 'Ally1', type: 'player' }],
         });
@@ -561,19 +379,6 @@ describe('handleConfirm', () => {
             abilityName: 'Shake Out Stupor',
             targetName: 'Ally1',
         }));
-    });
-
-    it('does not call setRuntimeValue or postLogEntry when player target has no conditions', async () => {
-        getCombatContext.mockResolvedValue({
-            creatures: [{ name: 'Ally1', type: 'player' }],
-        });
-        getRuntimeValue.mockReturnValue([]);
-
-        const result = await handleConfirm(makeAction(), makePlayerStats(), campaignName, mapName, 'Ally1');
-
-        expect(result.type).toBe('popup');
-        expect(setRuntimeValue).not.toHaveBeenCalled();
-        expect(postLogEntry).not.toHaveBeenCalled();
     });
 
     it('returns popup with correct description when target not found in combat', async () => {

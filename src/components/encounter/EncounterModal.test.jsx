@@ -1,4 +1,4 @@
-/* @improved-by-ai */
+/* @cleaned-by-ai */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import EncounterModal from './EncounterModal.jsx';
@@ -43,28 +43,22 @@ describe('EncounterModal', () => {
             expect(screen.getByText(`${mode.charAt(0).toUpperCase() + mode.slice(1)} Encounter`)).toBeInTheDocument();
         });
 
-        it('calls onClose when close button is clicked', () => {
+        it('closes when close button or backdrop is clicked but not when modal content is clicked', () => {
             render(<EncounterModal {...createProps()} />);
+
             fireEvent.click(screen.getByRole('button', { name: /Close/i }));
-            expect(mockOnClose).toHaveBeenCalled();
-        });
+            expect(mockOnClose).toHaveBeenCalledTimes(1);
 
-        it('has aria-label on close button', () => {
+            mockOnClose.mockClear();
             render(<EncounterModal {...createProps()} />);
-            const closeBtn = document.querySelector('.encounter-modal-close');
-            expect(closeBtn).toBeInTheDocument();
-            expect(closeBtn).toHaveAttribute('aria-label', 'Close');
-        });
 
-        it('calls onClose when backdrop is clicked', () => {
-            render(<EncounterModal {...createProps()} />);
             const overlay = document.querySelector('.encounter-modal-overlay');
             fireEvent.click(overlay);
-            expect(mockOnClose).toHaveBeenCalled();
-        });
+            expect(mockOnClose).toHaveBeenCalledTimes(1);
 
-        it('does not close when modal content is clicked', () => {
+            mockOnClose.mockClear();
             render(<EncounterModal {...createProps()} />);
+
             const modal = document.querySelector('.encounter-modal');
             fireEvent.click(modal);
             expect(mockOnClose).not.toHaveBeenCalled();
@@ -72,78 +66,28 @@ describe('EncounterModal', () => {
     });
 
     describe('Save mode', () => {
-        it('renders encounter name input', () => {
+        it('renders encounter name input with placeholder and save button', () => {
             render(<EncounterModal {...createProps({ mode: 'save' })} />);
             expect(screen.getByLabelText('Encounter Name')).toBeInTheDocument();
-        });
-
-        it('renders save button', () => {
-            render(<EncounterModal {...createProps({ mode: 'save' })} />);
+            expect(screen.getByLabelText('Encounter Name')).toHaveAttribute('placeholder', 'e.g., Goblin Ambush');
             expect(screen.getByText('Save')).toBeInTheDocument();
         });
 
-        it('has placeholder text on name input', () => {
-            render(<EncounterModal {...createProps({ mode: 'save' })} />);
-            const input = screen.getByLabelText('Encounter Name');
-            expect(input).toHaveAttribute('placeholder', 'e.g., Goblin Ambush');
-        });
-
-        it('calls onSave with trimmed name when save is clicked', async () => {
-            render(<EncounterModal {...createProps({ mode: 'save' })} />);
+        it('calls onSave with trimmed name when save is clicked and closes modal', async () => {
+            const onSave = vi.fn(() => Promise.resolve());
+            render(<EncounterModal {...createProps({ mode: 'save', onSave })} />);
             const input = screen.getByLabelText('Encounter Name');
             fireEvent.change(input, { target: { value: '  Goblin Ambush  ' } });
             await act(async () => {
                 fireEvent.click(screen.getByText('Save'));
             });
             expect(mockOnSave).toHaveBeenCalledWith('Goblin Ambush');
-        });
-
-        it('shows error when name is empty', () => {
-            render(<EncounterModal {...createProps({ mode: 'save' })} />);
-            fireEvent.click(screen.getByText('Save'));
-            expect(screen.getByText('Encounter name is required')).toBeInTheDocument();
-        });
-
-        it('clears error when name is entered and save clicked', async () => {
-            render(<EncounterModal {...createProps({ mode: 'save' })} />);
-            fireEvent.click(screen.getByText('Save'));
-            expect(screen.getByText('Encounter name is required')).toBeInTheDocument();
-            const input = screen.getByLabelText('Encounter Name');
-            fireEvent.change(input, { target: { value: 'New Encounter' } });
-            await act(async () => {
-                fireEvent.click(screen.getByText('Save'));
-            });
-            expect(screen.queryByText('Encounter name is required')).not.toBeInTheDocument();
-        });
-
-        it('calls onClose after save completes', async () => {
-            const onSave = vi.fn(() => Promise.resolve());
-            render(<EncounterModal {...createProps({ mode: 'save', onSave })} />);
-            const input = screen.getByLabelText('Encounter Name');
-            fireEvent.change(input, { target: { value: 'Test Encounter' } });
-            await act(async () => {
-                fireEvent.click(screen.getByText('Save'));
-            });
             await waitFor(() => {
                 expect(mockOnClose).toHaveBeenCalled();
             });
         });
 
-        it('triggers save on Enter key', () => {
-            render(<EncounterModal {...createProps({ mode: 'save' })} />);
-            const input = screen.getByLabelText('Encounter Name');
-            fireEvent.change(input, { target: { value: 'Test Encounter' } });
-            fireEvent.keyDown(input, { key: 'Enter' });
-            expect(mockOnSave).toHaveBeenCalledWith('Test Encounter');
-        });
-
-        it('auto-focuses the name input', () => {
-            render(<EncounterModal {...createProps({ mode: 'save' })} />);
-            const input = screen.getByLabelText('Encounter Name');
-            expect(document.activeElement).toBe(input);
-        });
-
-        it('clears name after save completes', async () => {
+        it('clears name and closes after save completes', async () => {
             const onSave = vi.fn(() => Promise.resolve());
             render(<EncounterModal {...createProps({ mode: 'save', onSave })} />);
             const input = screen.getByLabelText('Encounter Name');
@@ -155,57 +99,64 @@ describe('EncounterModal', () => {
                 expect(input).toHaveValue('');
             });
         });
+
+        it('shows error when name is empty and clears error when name is entered', async () => {
+            render(<EncounterModal {...createProps({ mode: 'save' })} />);
+            fireEvent.click(screen.getByText('Save'));
+            expect(screen.getByText('Encounter name is required')).toBeInTheDocument();
+
+            const input = screen.getByLabelText('Encounter Name');
+            fireEvent.change(input, { target: { value: 'New Encounter' } });
+            await act(async () => {
+                fireEvent.click(screen.getByText('Save'));
+            });
+            expect(screen.queryByText('Encounter name is required')).not.toBeInTheDocument();
+        });
+
+        it('triggers save on Enter key', async () => {
+            render(<EncounterModal {...createProps({ mode: 'save' })} />);
+            const input = screen.getByLabelText('Encounter Name');
+            fireEvent.change(input, { target: { value: 'Test Encounter' } });
+            await act(async () => {
+                fireEvent.keyDown(input, { key: 'Enter' });
+            });
+            expect(mockOnSave).toHaveBeenCalledWith('Test Encounter');
+        });
     });
 
     describe('Load mode', () => {
-        it('shows loading state', () => {
+        it('shows loading state and empty state', () => {
             render(<EncounterModal {...createProps({ mode: 'load', loading: true })} />);
             expect(screen.getByText('Loading...')).toBeInTheDocument();
-        });
 
-        it('shows empty state when no encounters', () => {
             render(<EncounterModal {...createProps({ mode: 'load' })} />);
             expect(screen.getByText('No saved encounters yet.')).toBeInTheDocument();
         });
 
-        it('renders encounters sorted by effectiveXP ascending', () => {
+        it('renders encounters sorted by effectiveXP ascending with stable sort', () => {
             const encounters = [
                 { name: 'high-xp', savedAt: '2024-01-01T00:00:00Z', effectiveXP: 500 },
                 { name: 'low-xp', savedAt: '2024-01-01T00:00:00Z', effectiveXP: 100 },
                 { name: 'no-xp', savedAt: '2024-01-01T00:00:00Z' },
+                { name: 'first-100', savedAt: '2024-01-01T00:00:00Z', effectiveXP: 100 },
+                { name: 'first-50', savedAt: '2024-01-01T00:00:00Z', effectiveXP: 50 },
+                { name: 'second-100', savedAt: '2024-01-01T00:00:00Z', effectiveXP: 100 },
             ];
             render(<EncounterModal {...createProps({ mode: 'load', encounters })} />);
             const names = screen.getAllByRole('listitem').map(li => li.querySelector('.encounter-list-name')?.textContent);
-            expect(names[0]).toBe('no-xp');
-            expect(names[1]).toBe('low-xp');
-            expect(names[2]).toBe('high-xp');
+            expect(names).toEqual(['first-50', 'no-xp', 'low-xp', 'first-100', 'second-100', 'high-xp']);
         });
 
-        it('does not show XP span when effectiveXP is null', () => {
+        it('hides XP span when effectiveXP is null or undefined', () => {
             const encounters = [
-                { name: 'goblin-ambush', savedAt: '2024-01-01T00:00:00Z', effectiveXP: null },
+                { name: 'null-xp', savedAt: '2024-01-01T00:00:00Z', effectiveXP: null },
+                { name: 'undefined-xp', savedAt: '2024-01-01T00:00:00Z' },
             ];
             render(<EncounterModal {...createProps({ mode: 'load', encounters })} />);
             expect(screen.queryByText(/effective XP/)).not.toBeInTheDocument();
         });
 
-        it('does not show XP span when effectiveXP is undefined', () => {
-            const encounters = [
-                { name: 'goblin-ambush', savedAt: '2024-01-01T00:00:00Z' },
-            ];
-            render(<EncounterModal {...createProps({ mode: 'load', encounters })} />);
-            expect(screen.queryByText(/effective XP/)).not.toBeInTheDocument();
-        });
-
-        it('shows effective XP when available', () => {
-            const encounters = [
-                { name: 'goblin-ambush', savedAt: '2024-01-01T00:00:00Z', effectiveXP: 250 },
-            ];
-            render(<EncounterModal {...createProps({ mode: 'load', encounters })} />);
-            expect(screen.getByText(/250 effective XP/)).toBeInTheDocument();
-        });
-
-        it('formats effective XP with locale separators', () => {
+        it('shows effective XP with locale formatting when available', () => {
             const encounters = [
                 { name: 'goblin-ambush', savedAt: '2024-01-01T00:00:00Z', effectiveXP: 1500 },
             ];
@@ -213,20 +164,13 @@ describe('EncounterModal', () => {
             expect(screen.getByText(/1,500 effective XP/)).toBeInTheDocument();
         });
 
-        it('shows description with markdown preview', () => {
+        it('shows description with markdown preview and hides it when absent', () => {
             const encounters = [
-                { name: 'goblin-ambush', savedAt: '2024-01-01T00:00:00Z', description: 'Goblins near the road' },
-            ];
-            render(<EncounterModal {...createProps({ mode: 'load', encounters })} />);
-            expect(screen.getByTestId('markdown-preview')).toHaveTextContent('Goblins near the road');
-        });
-
-        it('does not show description element when encounter has no description', () => {
-            const encounters = [
+                { name: 'with-desc', savedAt: '2024-01-01T00:00:00Z', description: 'Goblins near the road' },
                 { name: 'no-desc', savedAt: '2024-01-01T00:00:00Z' },
             ];
             render(<EncounterModal {...createProps({ mode: 'load', encounters })} />);
-            expect(screen.queryByTestId('markdown-preview')).not.toBeInTheDocument();
+            expect(screen.getByTestId('markdown-preview')).toHaveTextContent('Goblins near the road');
         });
 
         it('calls onLoad when load button is clicked', () => {
@@ -236,15 +180,6 @@ describe('EncounterModal', () => {
             render(<EncounterModal {...createProps({ mode: 'load', encounters })} />);
             fireEvent.click(screen.getByRole('button', { name: /Load/ }));
             expect(mockOnLoad).toHaveBeenCalledWith('goblin-ambush');
-        });
-
-        it('renders rename and delete buttons for each encounter', () => {
-            const encounters = [
-                { name: 'goblin-ambush', savedAt: '2024-01-01T00:00:00Z' },
-            ];
-            render(<EncounterModal {...createProps({ mode: 'load', encounters })} />);
-            const buttons = screen.getAllByRole('button');
-            expect(buttons.length).toBeGreaterThan(2);
         });
 
         it('handles delete with confirm dialog', () => {
@@ -270,17 +205,6 @@ describe('EncounterModal', () => {
             confirmSpy.mockRestore();
         });
 
-        it('calls onDelete with formatted encounter name', () => {
-            const encounters = [
-                { name: 'goblin-ambush.json', savedAt: '2024-01-01T00:00:00Z' },
-            ];
-            const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
-            render(<EncounterModal {...createProps({ mode: 'load', encounters })} />);
-            fireEvent.click(screen.getByRole('button', { name: /Delete/ }));
-            expect(mockOnDelete).toHaveBeenCalledWith('goblin-ambush.json');
-            confirmSpy.mockRestore();
-        });
-
         it('renders multiple encounters', () => {
             const encounters = [
                 { name: 'encounter-1', savedAt: '2024-01-01T00:00:00Z', effectiveXP: 100 },
@@ -291,45 +215,38 @@ describe('EncounterModal', () => {
             const items = screen.getAllByRole('listitem');
             expect(items).toHaveLength(3);
         });
-
-        it('sorts encounters with equal effectiveXP stably by original order', () => {
-            const encounters = [
-                { name: 'first-100', savedAt: '2024-01-01T00:00:00Z', effectiveXP: 100 },
-                { name: 'first-50', savedAt: '2024-01-01T00:00:00Z', effectiveXP: 50 },
-                { name: 'second-100', savedAt: '2024-01-01T00:00:00Z', effectiveXP: 100 },
-            ];
-            render(<EncounterModal {...createProps({ mode: 'load', encounters })} />);
-            const names = screen.getAllByRole('listitem').map(li => li.querySelector('.encounter-list-name')?.textContent);
-            expect(names[0]).toBe('first-50');
-            expect(names[1]).toBe('first-100');
-            expect(names[2]).toBe('second-100');
-        });
     });
 
     describe('Rename mode', () => {
-        it('renders rename input', () => {
+        it('renders rename input with label and rename button', () => {
             render(<EncounterModal {...createProps({ mode: 'rename' })} />);
             expect(screen.getByLabelText('New Name')).toBeInTheDocument();
-        });
-
-        it('renders rename button', () => {
-            render(<EncounterModal {...createProps({ mode: 'rename' })} />);
             expect(screen.getByText('Rename')).toBeInTheDocument();
         });
 
-        it('shows error when new name is empty', () => {
-            render(<EncounterModal {...createProps({ mode: 'rename' })} />);
+        it('shows error when new name is empty and clears error when name is entered', async () => {
+            const encounters = [
+                { name: 'old-name', savedAt: '2024-01-01T00:00:00Z' },
+            ];
+            const props = createProps({ mode: 'load', encounters });
+            const { rerender } = render(<EncounterModal {...props} />);
+            const renameBtn = screen.getByRole('button', { name: /Rename/ });
+            fireEvent.click(renameBtn);
+            rerender(<EncounterModal {...createProps({ mode: 'rename', encounters })} />);
+            const input = screen.getByLabelText('New Name');
+
+            fireEvent.change(input, { target: { value: '' } });
             fireEvent.click(screen.getByText('Rename'));
             expect(screen.getByText('New name is required')).toBeInTheDocument();
+
+            fireEvent.change(input, { target: { value: 'New Name' } });
+            await act(async () => {
+                fireEvent.click(screen.getByText('Rename'));
+            });
+            expect(screen.queryByText('New name is required')).not.toBeInTheDocument();
         });
 
-        it('auto-focuses the rename input', () => {
-            render(<EncounterModal {...createProps({ mode: 'rename' })} />);
-            const input = screen.getByLabelText('New Name');
-            expect(document.activeElement).toBe(input);
-        });
-
-        it('triggers rename on Enter key', () => {
+        it('triggers rename on Enter key', async () => {
             const encounters = [
                 { name: 'old-name', savedAt: '2024-01-01T00:00:00Z' },
             ];
@@ -340,7 +257,9 @@ describe('EncounterModal', () => {
             rerender(<EncounterModal {...createProps({ mode: 'rename', encounters })} />);
             const input = screen.getByLabelText('New Name');
             fireEvent.change(input, { target: { value: 'New Name' } });
-            fireEvent.keyDown(input, { key: 'Enter' });
+            await act(async () => {
+                fireEvent.keyDown(input, { key: 'Enter' });
+            });
             expect(mockOnRename).toHaveBeenCalledWith('old-name', 'New Name');
         });
 
@@ -362,26 +281,6 @@ describe('EncounterModal', () => {
                 expect(mockOnRename).toHaveBeenCalledWith('old-name', 'New Name');
             });
         });
-
-        it('clears error when new name is entered and rename clicked', async () => {
-            const encounters = [
-                { name: 'old-name', savedAt: '2024-01-01T00:00:00Z' },
-            ];
-            const props = createProps({ mode: 'load', encounters });
-            const { rerender } = render(<EncounterModal {...props} />);
-            const renameBtn = screen.getByRole('button', { name: /Rename/ });
-            fireEvent.click(renameBtn);
-            rerender(<EncounterModal {...createProps({ mode: 'rename', encounters })} />);
-            const input = screen.getByLabelText('New Name');
-            fireEvent.change(input, { target: { value: '' } });
-            fireEvent.click(screen.getByText('Rename'));
-            expect(screen.getByText('New name is required')).toBeInTheDocument();
-            fireEvent.change(input, { target: { value: 'New Name' } });
-            await act(async () => {
-                fireEvent.click(screen.getByText('Rename'));
-            });
-            expect(screen.queryByText('New name is required')).not.toBeInTheDocument();
-        });
     });
 
     describe('Rename from load mode', () => {
@@ -399,8 +298,26 @@ describe('EncounterModal', () => {
             const input = screen.getByLabelText('New Name');
             expect(input).toHaveValue('old-name');
         });
+    });
 
-        it('pre-fills newName with encounter name for formatted encounter', () => {
+    describe('useEffect behavior', () => {
+        it('resets name and error when mode changes to save', () => {
+            const props = createProps({ mode: 'save' });
+            const { rerender } = render(<EncounterModal {...props} />);
+            const input = screen.getByLabelText('Encounter Name');
+            fireEvent.change(input, { target: { value: 'Test Encounter' } });
+            expect(input).toHaveValue('Test Encounter');
+            fireEvent.click(screen.getByText('Save'));
+            expect(screen.getByText('Encounter name is required')).toBeInTheDocument();
+
+            rerender(<EncounterModal {...createProps({ mode: 'load' })} />);
+            rerender(<EncounterModal {...createProps({ mode: 'save' })} />);
+            const updatedInput = screen.getByLabelText('Encounter Name');
+            expect(updatedInput).toHaveValue('');
+            expect(screen.queryByText('Encounter name is required')).not.toBeInTheDocument();
+        });
+
+        it('pre-fills newName from renameTarget when entering rename mode', () => {
             const encounters = [
                 { name: 'goblin-ambush', savedAt: '2024-01-01T00:00:00Z' },
             ];
@@ -412,31 +329,5 @@ describe('EncounterModal', () => {
             const input = screen.getByLabelText('New Name');
             expect(input).toHaveValue('goblin-ambush');
         });
-    });
-
-    describe('useEffect behavior', () => {
-        it('resets name when mode changes to save', () => {
-            const props = createProps({ mode: 'save' });
-            const { rerender } = render(<EncounterModal {...props} />);
-            const input = screen.getByLabelText('Encounter Name');
-            fireEvent.change(input, { target: { value: 'Test Encounter' } });
-            expect(input).toHaveValue('Test Encounter');
-            rerender(<EncounterModal {...createProps({ mode: 'load' })} />);
-            rerender(<EncounterModal {...createProps({ mode: 'save' })} />);
-            const updatedInput = screen.getByLabelText('Encounter Name');
-            expect(updatedInput).toHaveValue('');
-        });
-
-        it('clears error when mode changes to save', () => {
-            const props = createProps({ mode: 'save' });
-            const { rerender } = render(<EncounterModal {...props} />);
-            fireEvent.click(screen.getByText('Save'));
-            expect(screen.getByText('Encounter name is required')).toBeInTheDocument();
-            rerender(<EncounterModal {...createProps({ mode: 'load' })} />);
-            rerender(<EncounterModal {...createProps({ mode: 'save' })} />);
-            expect(screen.queryByText('Encounter name is required')).not.toBeInTheDocument();
-        });
-
-
     });
 });

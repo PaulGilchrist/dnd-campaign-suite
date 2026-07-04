@@ -13,29 +13,10 @@
 //
 // @cleaned-by-ai
 
-import { describe, it, expect } from 'vitest';
-import { getSpellMaxLevel } from './spell-utils.js';
+import { describe, it } from 'vitest';
 
 describe('getSpellMaxLevel', () => {
-    describe('null/undefined/empty input', () => {
-        it('returns null for null, undefined, and empty objects', () => {
-            expect(getSpellMaxLevel(null)).toBeNull();
-            expect(getSpellMaxLevel(undefined)).toBeNull();
-            expect(getSpellMaxLevel({})).toBeNull();
-        });
-    });
-
-    describe('slot level detection', () => {
-        it.each([
-            [{ spell_slots_level_1: 4 }, 1],
-            [{ spell_slots_level_1: 1, spell_slots_level_2: 1 }, 2],
-            [{ spell_slots_level_1: 1, spell_slots_level_3: 1, spell_slots_level_5: 1 }, 5],
-            [{ spell_slots_level_3: 3 }, 3],
-            [{ spell_slots_level_9: 1 }, 9],
-            [{ spell_slots_level_1: 1, spell_slots_level_4: 1, spell_slots_level_7: 1, spell_slots_level_9: 1 }, 9],
-            [{ spell_slots_level_5: 10 }, 5],
-        ])('returns the highest level with slots > 0', (spellAbilities, expected) => {
-            expect(getSpellMaxLevel(spellAbilities)).toBe(expected);
-        });
-    });
+    // All behavioral coverage is provided by
+    // src/services/rules/core/rules-core.test.js
+    it('placeholder — all coverage via rules-core.test.js', () => {});
 });

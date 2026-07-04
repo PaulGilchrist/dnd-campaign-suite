@@ -1,4 +1,4 @@
-/* @improved-by-ai */
+/* @cleaned-by-ai */
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import EncounterSelectedMonsters from './EncounterSelectedMonsters.jsx';
@@ -16,36 +16,21 @@ describe('EncounterSelectedMonsters', () => {
   };
 
   describe('empty/null state', () => {
-    it('returns null when selectedMonsters is null', () => {
-      const { container } = render(
-        <EncounterSelectedMonsters selectedMonsters={null} onRemoveMonster={vi.fn()} />
-      );
-      expect(container.innerHTML).toBe('');
-    });
-
-    it('returns null when selectedMonsters is an empty array', () => {
-      const { container } = render(
+    it('returns null when selectedMonsters is null or empty', () => {
+      const { container: emptyContainer } = render(
         <EncounterSelectedMonsters selectedMonsters={[]} onRemoveMonster={vi.fn()} />
       );
-      expect(container.innerHTML).toBe('');
+      expect(emptyContainer.firstChild).toBeNull();
+
+      const { container: nullContainer } = render(
+        <EncounterSelectedMonsters selectedMonsters={null} onRemoveMonster={vi.fn()} />
+      );
+      expect(nullContainer.firstChild).toBeNull();
     });
   });
 
   describe('monster list rendering', () => {
-    it('renders the section header with total monster count', () => {
-      render(
-        <EncounterSelectedMonsters
-          selectedMonsters={[
-            { ...baseMonster },
-            { index: 'orc', name: 'Orc', xp: 100, challenge_rating: 0.5 },
-          ]}
-          onRemoveMonster={vi.fn()}
-        />
-      );
-      expect(screen.getByText('Selected Monsters (2)')).toBeInTheDocument();
-    });
-
-    it('renders total count that includes qty multipliers', () => {
+    it('renders the section header with total monster count including qty multipliers', () => {
       render(
         <EncounterSelectedMonsters
           selectedMonsters={[
@@ -58,7 +43,7 @@ describe('EncounterSelectedMonsters', () => {
       expect(screen.getByText('Selected Monsters (5)')).toBeInTheDocument();
     });
 
-    it('defaults qty to 1 when not provided', () => {
+    it('defaults total count to 1 when qty is not provided', () => {
       render(
         <EncounterSelectedMonsters
           selectedMonsters={[{ ...baseMonster }]}
@@ -68,7 +53,7 @@ describe('EncounterSelectedMonsters', () => {
       expect(screen.getByText('Selected Monsters (1)')).toBeInTheDocument();
     });
 
-    it('renders monster names in the list', () => {
+    it('renders monster names, CR, and XP', () => {
       render(
         <EncounterSelectedMonsters
           selectedMonsters={[
@@ -80,32 +65,10 @@ describe('EncounterSelectedMonsters', () => {
       );
       expect(screen.getByText('Goblin')).toBeInTheDocument();
       expect(screen.getByText('Orc')).toBeInTheDocument();
-    });
-
-    it('renders CR for each monster', () => {
-      render(
-        <EncounterSelectedMonsters
-          selectedMonsters={[
-            { index: 'goblin', name: 'Goblin', xp: 50, challenge_rating: 0.25 },
-            { index: 'orc', name: 'Orc', xp: 100, challenge_rating: 0.5 },
-          ]}
-          onRemoveMonster={vi.fn()}
-        />
-      );
       expect(screen.getByText('CR 0.25')).toBeInTheDocument();
       expect(screen.getByText('CR 0.5')).toBeInTheDocument();
-    });
-
-    it('renders XP for each monster', () => {
-      render(
-        <EncounterSelectedMonsters
-          selectedMonsters={[
-            { index: 'goblin', name: 'Goblin', xp: 50, challenge_rating: 0.25 },
-          ]}
-          onRemoveMonster={vi.fn()}
-        />
-      );
       expect(screen.getByText('50 XP')).toBeInTheDocument();
+      expect(screen.getByText('100 XP')).toBeInTheDocument();
     });
 
     it('formats XP with thousands separators', () => {
@@ -144,28 +107,20 @@ describe('EncounterSelectedMonsters', () => {
       expect(screen.getByText('Goblin (5)')).toBeInTheDocument();
     });
 
-    it('does not show qty when qty is 1', () => {
-      render(
-        <EncounterSelectedMonsters
-          selectedMonsters={[
-            { ...baseMonster, qty: 1 },
-          ]}
-          onRemoveMonster={vi.fn()}
-        />
-      );
-      expect(screen.getByText('Goblin')).toBeInTheDocument();
-      expect(screen.queryByText('Goblin (1)')).not.toBeInTheDocument();
-    });
+    it('does not show qty when qty is 1 or not provided', () => {
+      const monsterWithQty1 = { ...baseMonster, index: 'goblin-qty1', name: 'Goblin A', qty: 1 };
+      const monsterWithoutQty = { ...baseMonster, index: 'goblin-no-qty', name: 'Goblin B' };
 
-    it('does not show qty when qty is not provided', () => {
       render(
         <EncounterSelectedMonsters
-          selectedMonsters={[baseMonster]}
+          selectedMonsters={[monsterWithQty1, monsterWithoutQty]}
           onRemoveMonster={vi.fn()}
         />
       );
-      expect(screen.getByText('Goblin')).toBeInTheDocument();
-      expect(screen.queryByText('Goblin (1)')).not.toBeInTheDocument();
+      expect(screen.queryByText('Goblin A (1)')).not.toBeInTheDocument();
+      expect(screen.queryByText('Goblin B (1)')).not.toBeInTheDocument();
+      expect(screen.getByText('Goblin A')).toBeInTheDocument();
+      expect(screen.getByText('Goblin B')).toBeInTheDocument();
     });
   });
 

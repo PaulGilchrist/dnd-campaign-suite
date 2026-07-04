@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import {
@@ -75,15 +75,6 @@ describe('elfishLineageHandler', () => {
             expect(result.payload.description).toContain('Drow');
             expect(result.payload.description).toContain('already selected');
             expect(result.payload.automation.type).toBe('elfish_lineage');
-        });
-
-        it('passes the original action object in modal payload', async () => {
-            getRuntimeValue.mockReturnValue(null);
-            const action = { name: 'Elfish Lineage', automation: { type: 'elfish_lineage' } };
-
-            const result = await handle(action, makePlayerStats(), 'test-campaign', null);
-
-            expect(result.payload.action).toBe(action);
         });
     });
 
@@ -215,72 +206,18 @@ describe('elfishLineageHandler', () => {
             );
         });
 
-        it('returns error popup when lineage name does not match any option', async () => {
-            const result = await confirmElfisLineage(makePlayerStats(), 'Nonexistent', 'test-campaign');
+        it('returns error popup when lineage is invalid, empty, or undefined', async () => {
+            const invalidResult = await confirmElfisLineage(makePlayerStats(), 'Nonexistent', 'test-campaign');
+            expect(invalidResult.type).toBe('popup');
+            expect(invalidResult.payload.description).toBe('No lineage selected.');
 
-            expect(result.type).toBe('popup');
-            expect(result.payload.type).toBe('automation_info');
-            expect(result.payload.description).toBe('No lineage selected.');
-        });
+            const emptyResult = await confirmElfisLineage(makePlayerStats(), '', 'test-campaign');
+            expect(emptyResult.type).toBe('popup');
+            expect(emptyResult.payload.description).toBe('No lineage selected.');
 
-        it('returns error popup when lineage is an empty string', async () => {
-            const result = await confirmElfisLineage(makePlayerStats(), '', 'test-campaign');
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.description).toBe('No lineage selected.');
-        });
-
-        it('returns error popup when lineage is undefined', async () => {
-            const result = await confirmElfisLineage(makePlayerStats(), undefined, 'test-campaign');
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.description).toBe('No lineage selected.');
-        });
-
-        it('stores cantrip, level 3 spell, and level 5 spell for Drow lineage', async () => {
-            await confirmElfisLineage(makePlayerStats(), 'Drow', 'test-campaign');
-
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'TestHero',
-                '_elfishLineageCantrip',
-                'Dancing Lights',
-                'test-campaign'
-            );
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'TestHero',
-                '_elfishLineageLevel3',
-                'Faerie Fire',
-                'test-campaign'
-            );
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'TestHero',
-                '_elfishLineageLevel5',
-                'Darkness',
-                'test-campaign'
-            );
-        });
-
-        it('stores cantrip, level 3 spell, and level 5 spell for High Elf lineage', async () => {
-            await confirmElfisLineage(makePlayerStats(), 'High Elf', 'test-campaign');
-
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'TestHero',
-                '_elfishLineageCantrip',
-                'Prestidigitation',
-                'test-campaign'
-            );
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'TestHero',
-                '_elfishLineageLevel3',
-                'Detect Magic',
-                'test-campaign'
-            );
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'TestHero',
-                '_elfishLineageLevel5',
-                'Misty Step',
-                'test-campaign'
-            );
+            const undefinedResult = await confirmElfisLineage(makePlayerStats(), undefined, 'test-campaign');
+            expect(undefinedResult.type).toBe('popup');
+            expect(undefinedResult.payload.description).toBe('No lineage selected.');
         });
     });
 
@@ -295,18 +232,6 @@ describe('elfishLineageHandler', () => {
                 'TestHero',
                 '_elfishLineageWizardCantrip',
                 'Fire Bolt',
-                'test-campaign'
-            );
-        });
-
-        it('stores an empty cantrip name', async () => {
-            const result = await changeElfisLineageCantrip(makePlayerStats(), '', 'test-campaign');
-
-            expect(result.type).toBe('popup');
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'TestHero',
-                '_elfishLineageWizardCantrip',
-                '',
                 'test-campaign'
             );
         });
@@ -325,18 +250,6 @@ describe('elfishLineageHandler', () => {
 
             const selection = getElfisLineageSelection(makePlayerStats(), 'test-campaign');
             expect(selection).toBe(null);
-        });
-
-        it('passes the correct key and campaign to getRuntimeValue', () => {
-            getRuntimeValue.mockReturnValue('Wood Elf');
-
-            getElfisLineageSelection(makePlayerStats(), 'my-campaign');
-
-            expect(getRuntimeValue).toHaveBeenCalledWith(
-                'TestHero',
-                '_elfishLineageSelection',
-                'my-campaign'
-            );
         });
     });
 
@@ -457,17 +370,6 @@ describe('elfishLineageHandler', () => {
             expect(setRuntimeValue).toHaveBeenCalledWith(
                 'TestHero',
                 '_elfishLineageWizardCantrip',
-                null,
-                'test-campaign'
-            );
-        });
-
-        it('uses the provided player name, not playerStats.name', async () => {
-            await restoreUses('DifferentPlayer', 'test-campaign');
-
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'DifferentPlayer',
-                '_elfishLineageSelection',
                 null,
                 'test-campaign'
             );

@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { handle, handleSummon, handleCommand, handleRestore, handleBonusActionCommand, applyBonusActionCommand } from './primalCompanionHandler.js';
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
@@ -97,16 +97,6 @@ describe('primalCompanionHandler', () => {
             expect(result.payload.name).toBe('Primal Companion');
             expect(result.payload.description).toBe('No companion type selected.');
             expect(result.payload.automation).toBe(action.automation);
-        });
-
-        it('returns error popup when empty string type selected', async () => {
-            const action = makeAction();
-
-            const result = await handleSummon(action, mockPlayerStats, mockCampaignName, '');
-
-            expect(setRuntimeValue).not.toHaveBeenCalled();
-            expect(result.type).toBe('popup');
-            expect(result.payload.description).toBe('No companion type selected.');
         });
     });
 
@@ -378,22 +368,5 @@ describe('primalCompanionHandler', () => {
             expect(result.payload.automation).toBe(action.automation);
         });
 
-        it('handles all valid bonus action commands', async () => {
-            getRuntimeValue.mockReturnValue('Beast of the Land');
-
-            const action = makeAction({
-                name: 'Exceptional Training',
-                automation: { type: 'primal_companion_bonus_action_command' },
-            });
-
-            const validActions = ['Dash', 'Disengage', 'Dodge', 'Help'];
-
-            for (const cmd of validActions) {
-                const result = await applyBonusActionCommand(action, mockPlayerStats, mockCampaignName, cmd, false);
-
-                expect(result.type).toBe('popup');
-                expect(result.payload.description).toContain(cmd);
-            }
-        });
     });
 });

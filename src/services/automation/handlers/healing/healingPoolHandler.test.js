@@ -1,4 +1,3 @@
-// @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { handle } from './healingPoolHandler.js';
 
@@ -25,14 +24,7 @@ describe('healingPoolHandler.handle', () => {
   });
 
   describe('response structure', () => {
-    it('returns type "modal" with modalName "healingPool"', async () => {
-      const result = await handle(makeAction(), {}, campaignName, mapName);
-
-      expect(result.type).toBe('modal');
-      expect(result.modalName).toBe('healingPool');
-    });
-
-    it('passes the action name and pool into the payload', async () => {
+    it('returns a modal with the action name and pool in the payload', async () => {
       const action = {
         name: 'Divine Smite',
         automation: { pool: 'life_pool' },
@@ -40,12 +32,23 @@ describe('healingPoolHandler.handle', () => {
 
       const result = await handle(action, {}, campaignName, mapName);
 
-      expect(result.payload.name).toBe('Divine Smite');
-      expect(result.payload.pool).toBe('life_pool');
+      expect(result).toEqual({
+        type: 'modal',
+        modalName: 'healingPool',
+        payload: {
+          name: 'Divine Smite',
+          pool: 'life_pool',
+          alsoCures: [],
+          cureCost: 5,
+          range: '',
+          resourceCost: '',
+          bloodiedOnly: false,
+          restoringTouchConditions: [],
+          maxDicePerUse: '',
+        },
+      });
     });
-  });
 
-  describe('automation field passthrough', () => {
     it('passes optional automation fields through to payload', async () => {
       const result = await handle(
         makeAction({
@@ -66,19 +69,10 @@ describe('healingPoolHandler.handle', () => {
       expect(result.payload.maxDicePerUse).toBe('3');
       expect(result.payload.resourceKey).toBe('spell_slot');
     });
-
-    it('applies defaults for missing optional fields', async () => {
-      const result = await handle(makeAction(), {}, campaignName, mapName);
-
-      expect(result.payload.poolExpression).toBeUndefined();
-      expect(result.payload.isDicePool).toBeUndefined();
-      expect(result.payload.dieType).toBeUndefined();
-      expect(result.payload.maxDicePerUse).toBe('');
-    });
   });
 
   describe('default values for missing automation fields', () => {
-    it('defaults alsoCures to empty array, cureCost to 5, range/resourceCost to empty strings', async () => {
+    it('applies defaults for alsoCures, cureCost, range, and resourceCost', async () => {
       const result = await handle(makeAction(), {}, campaignName, mapName);
 
       expect(result.payload.alsoCures).toEqual([]);
@@ -108,7 +102,7 @@ describe('healingPoolHandler.handle', () => {
   });
 
   describe('bloodiedOnly coercion', () => {
-    it('coerces bloodiedOnly to boolean', async () => {
+    it('coerces bloodiedOnly to boolean, treating truthy as true and falsy as false', async () => {
       const resultTrue = await handle(
         makeAction({ bloodiedOnly: true }),
         {},
@@ -168,7 +162,7 @@ describe('healingPoolHandler.handle', () => {
       ]);
     });
 
-    it('returns empty array when Restoring Touch is absent or has no cureConditions', async () => {
+    it('returns empty array when Restoring Touch is absent, missing, or has no cureConditions', async () => {
       // absent feature
       const result1 = await handle(
         makeAction(),
@@ -238,16 +232,6 @@ describe('healingPoolHandler.handle', () => {
       );
 
       expect(result.payload.restoringTouchConditions).toEqual(['Prone']);
-    });
-  });
-
-  describe('null/empty campaignName and mapName', () => {
-    it('does not throw when campaignName and mapName are null or empty strings', async () => {
-      const result1 = await handle(makeAction(), {}, null, null);
-      expect(result1.type).toBe('modal');
-
-      const result2 = await handle(makeAction(), {}, '', '');
-      expect(result2.type).toBe('modal');
     });
   });
 });

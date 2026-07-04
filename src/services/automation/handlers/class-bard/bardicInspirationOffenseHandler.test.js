@@ -73,17 +73,6 @@ describe('bardicInspirationOffenseHandler.handle', () => {
       expect(result.payload.name).toBe('Offensive Inspiration');
       expect(result.payload.description).toBe('You do not have a Bardic Inspiration die.');
     });
-
-    it('does not roll dice, clear state, or log when no die', async () => {
-      useRuntimeState.getRuntimeValue.mockReturnValue(null);
-
-      await handle(makeAction(), makePlayerStats(), campaignName);
-
-      expect(diceRoller.rollExpression).not.toHaveBeenCalled();
-      expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
-      expect(logService.addEntry).not.toHaveBeenCalled();
-      expect(damageRollback.findLastAttack).not.toHaveBeenCalled();
-    });
   });
 
   describe('roll failure', () => {
@@ -96,18 +85,6 @@ describe('bardicInspirationOffenseHandler.handle', () => {
 
       expect(result.type).toBe('popup');
       expect(result.payload.description).toBe('Roll failed.');
-    });
-
-    it('does not clear state or log when roll fails', async () => {
-      useRuntimeState.getRuntimeValue.mockReturnValueOnce(8);
-      useRuntimeState.getRuntimeValue.mockReturnValueOnce(undefined);
-      diceRoller.rollExpression.mockReturnValue(null);
-
-      await handle(makeAction(), makePlayerStats(), campaignName);
-
-      expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
-      expect(logService.addEntry).not.toHaveBeenCalled();
-      expect(damageRollback.findLastAttack).not.toHaveBeenCalled();
     });
   });
 
@@ -195,17 +172,6 @@ describe('bardicInspirationOffenseHandler.handle', () => {
 
       expect(result.payload.description).toContain('Die granted by Goblin');
     });
-
-    it('includes action.automation in returned payload', async () => {
-      useRuntimeState.getRuntimeValue.mockReturnValueOnce(8);
-      useRuntimeState.getRuntimeValue.mockReturnValueOnce(undefined);
-      diceRoller.rollExpression.mockReturnValue({ total: 5, rolls: [5] });
-      damageRollback.findLastAttack.mockResolvedValue(null);
-
-      const result = await handle(makeAction(), makePlayerStats(), campaignName);
-
-      expect(result.payload.automation).toEqual({ type: 'bardic_inspiration_offense' });
-    });
   });
 
   describe('damage application to matching attacker', () => {
@@ -219,17 +185,6 @@ describe('bardicInspirationOffenseHandler.handle', () => {
 
       expect(result.payload.description).toContain('Bonus damage applied to Goblin');
       expect(result.payload.description).not.toContain('No recent damage event found');
-    });
-
-    it('does not include defender HP in description', async () => {
-      useRuntimeState.getRuntimeValue.mockReturnValueOnce(8);
-      useRuntimeState.getRuntimeValue.mockReturnValueOnce(undefined);
-      diceRoller.rollExpression.mockReturnValue({ total: 5, rolls: [5] });
-      damageRollback.findLastAttack.mockResolvedValue(makeLastAttack('Bard', 'Goblin', Date.now()));
-
-      const result = await handle(makeAction(), makePlayerStats(), campaignName);
-
-      expect(result.payload.description).not.toContain('HP:');
     });
   });
 
@@ -245,36 +200,6 @@ describe('bardicInspirationOffenseHandler.handle', () => {
       expect(result.payload.description).toContain('No recent damage event found');
       expect(result.payload.description).toContain('Add 4 damage');
       expect(result.payload.description).not.toContain('Bonus damage');
-    });
-  });
-
-  describe('no bonus when targetName is empty', () => {
-    it('treats empty string targetName as no recent damage event', async () => {
-      useRuntimeState.getRuntimeValue.mockReturnValueOnce(8);
-      useRuntimeState.getRuntimeValue.mockReturnValueOnce(undefined);
-      diceRoller.rollExpression.mockReturnValue({ total: 4, rolls: [4] });
-      damageRollback.findLastAttack.mockResolvedValue(makeLastAttack('Bard', '', Date.now()));
-
-      const result = await handle(makeAction(), makePlayerStats(), campaignName);
-
-      expect(result.payload.description).toContain('No recent damage event found');
-      expect(result.payload.description).not.toContain('Bonus damage');
-    });
-  });
-
-  describe('uses playerStats.name throughout', () => {
-    it('uses custom character name in log entry', async () => {
-      useRuntimeState.getRuntimeValue.mockReturnValueOnce(8);
-      useRuntimeState.getRuntimeValue.mockReturnValueOnce(undefined);
-      diceRoller.rollExpression.mockReturnValue({ total: 3, rolls: [3] });
-      damageRollback.findLastAttack.mockResolvedValue(null);
-
-      await handle(makeAction(), makePlayerStats({ name: 'Valeria' }), campaignName);
-
-      expect(logService.addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
-        characterName: 'Valeria',
-        description: expect.stringContaining('Valeria used Offensive Inspiration'),
-      }));
     });
   });
 

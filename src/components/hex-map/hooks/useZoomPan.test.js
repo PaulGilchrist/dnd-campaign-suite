@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import useZoomPan from './useZoomPan.js';
@@ -124,40 +124,19 @@ describe('useZoomPan', () => {
     });
 
     describe('clampPan', () => {
-        it('clamps x within grid bounds', () => {
+        it('clamps x and y within grid bounds', () => {
             const args = createArgs();
             const { result } = renderHookWithArgs(args);
-            const clamped = result.current.clampPan(2, 999999, 0);
+            const clamped = result.current.clampPan(2, 999999, 999999);
             expect(clamped.x).not.toBe(999999);
-            expect(clamped.x).toBeLessThanOrEqual(999999);
-        });
-
-        it('clamps y within grid bounds', () => {
-            const args = createArgs();
-            const { result } = renderHookWithArgs(args);
-            const clamped = result.current.clampPan(2, 0, 999999);
             expect(clamped.y).not.toBe(999999);
-            expect(clamped.y).toBeLessThanOrEqual(999999);
-        });
-
-        it('clamps negative values to minimum bounds', () => {
-            const args = createArgs();
-            const { result } = renderHookWithArgs(args);
-            const clamped = result.current.clampPan(2, -999999, -999999);
-            expect(clamped.x).not.toBe(-999999);
-            expect(clamped.y).not.toBe(-999999);
+            const negClamped = result.current.clampPan(2, -999999, -999999);
+            expect(negClamped.x).not.toBe(-999999);
+            expect(negClamped.y).not.toBe(-999999);
         });
     });
 
     describe('centerView', () => {
-        it('returns a clamped centered position for the given zoom', () => {
-            const args = createArgs();
-            const { result } = renderHookWithArgs(args);
-            const centered = result.current.centerView(4);
-            expect(typeof centered.x).toBe('number');
-            expect(typeof centered.y).toBe('number');
-        });
-
         it('returns different center positions for different zoom levels', () => {
             const args = createArgs();
             const { result } = renderHookWithArgs(args);
@@ -183,30 +162,27 @@ describe('useZoomPan', () => {
             expect(mockEvent.preventDefault).toHaveBeenCalled();
         });
 
-        it('does not set panning when button is not 0', () => {
+        it('does not set panning for non-left buttons or null svgRef', () => {
             const args = createArgs();
             const { result } = renderHookWithArgs(args);
-            const mockEvent = {
-                button: 1,
-                clientX: 100,
-                clientY: 100,
-                preventDefault: vi.fn(),
-            };
-            act(() => { result.current.handlePanStart(mockEvent); });
+            act(() => {
+                result.current.handlePanStart({
+                    button: 1,
+                    clientX: 100,
+                    clientY: 100,
+                    preventDefault: vi.fn(),
+                });
+            });
             expect(result.current.panning).toBeNull();
-        });
-
-        it('does nothing when svgRef is null', () => {
-            const args = createArgs();
             args.svgRef.current = null;
-            const { result } = renderHookWithArgs(args);
-            const mockEvent = {
-                button: 0,
-                clientX: 100,
-                clientY: 100,
-                preventDefault: vi.fn(),
-            };
-            act(() => { result.current.handlePanStart(mockEvent); });
+            act(() => {
+                result.current.handlePanStart({
+                    button: 0,
+                    clientX: 100,
+                    clientY: 100,
+                    preventDefault: vi.fn(),
+                });
+            });
             expect(result.current.panning).toBeNull();
         });
     });
@@ -240,29 +216,6 @@ describe('useZoomPan', () => {
             });
             expect(args.setPanX).toHaveBeenCalled();
             expect(args.setPanY).toHaveBeenCalled();
-        });
-
-        it('does nothing when svgRef is null during pan', () => {
-            const args = createArgs();
-            const { result } = renderHookWithArgs(args);
-            act(() => {
-                result.current.handlePanStart({
-                    button: 0,
-                    clientX: 100,
-                    clientY: 100,
-                    preventDefault: vi.fn(),
-                });
-            });
-            args.svgRef.current = null;
-            act(() => {
-                result.current.handlePanMove({
-                    clientX: 120,
-                    clientY: 120,
-                    preventDefault: vi.fn(),
-                });
-            });
-            expect(args.setPanX).not.toHaveBeenCalled();
-            expect(args.setPanY).not.toHaveBeenCalled();
         });
     });
 
@@ -336,7 +289,7 @@ describe('useZoomPan', () => {
             expect(args.setZoom).toHaveBeenCalledWith(2);
         });
 
-        it('respects MIN_ZOOM cap during zoom out', () => {
+        it('respects MIN_ZOOM and MAX_ZOOM caps during extended wheel input', () => {
             const args = createArgs();
             args.zoomState.current = 2;
             const { result } = renderHookWithArgs(args);
@@ -352,12 +305,7 @@ describe('useZoomPan', () => {
                 });
             }
             expect(args.zoomState.current).toBeGreaterThanOrEqual(2);
-        });
-
-        it('respects MAX_ZOOM cap during zoom in', () => {
-            const args = createArgs();
             args.zoomState.current = 8;
-            const { result } = renderHookWithArgs(args);
             for (let i = 0; i < 20; i++) {
                 act(() => {
                     result.current.handleWheel({
@@ -421,84 +369,60 @@ describe('useZoomPan', () => {
             rerender(args);
             expect(result.current.gridPixelBounds.height).toBeGreaterThan(bounds1.height);
         });
-
-        it('includes all expected bound properties', () => {
-            const args = createArgs();
-            const { result } = renderHookWithArgs(args);
-            const bounds = result.current.gridPixelBounds;
-            expect(bounds).toHaveProperty('width');
-            expect(bounds).toHaveProperty('height');
-            expect(bounds).toHaveProperty('offsetX');
-            expect(bounds).toHaveProperty('offsetY');
-            expect(bounds).toHaveProperty('centerX');
-            expect(bounds).toHaveProperty('centerY');
-        });
     });
 
     describe('reacting to prop changes', () => {
-        it('updates zoomValueRef when zoom prop changes', () => {
+        it.each([
+            { prop: 'zoom', stateKey: 'zoomState', value: 4, action: 'zoomIn', expected: 5 },
+            { prop: 'panX', stateKey: 'panXState', value: 100, action: 'panMoveX', expected: 100 },
+            { prop: 'panY', stateKey: 'panYState', value: 50, action: 'panMoveY', expected: 50 },
+        ])('syncs $prop ref and reflects changes on $action', ({ stateKey, value, action, expected }) => {
             const args = createArgs();
             const { result, rerender } = renderHook(
                 (a) => useZoomPan(a.svgRef, a.hexCols, a.hexRows, a.zoom, a.setZoom, a.panX, a.setPanX, a.panY, a.setPanY),
                 { initialProps: args },
             );
             expect(result.current.panning).toBeNull();
-            args.zoomState.current = 4;
+            args[stateKey].current = value;
             rerender(args);
-            act(() => { result.current.zoomIn(); });
-            expect(args.zoomState.current).toBe(5);
-        });
-
-        it('updates panXValueRef when panX prop changes', () => {
-            const args = createArgs();
-            const { result, rerender } = renderHook(
-                (a) => useZoomPan(a.svgRef, a.hexCols, a.hexRows, a.zoom, a.setZoom, a.panX, a.setPanX, a.panY, a.setPanY),
-                { initialProps: args },
-            );
-            args.panXState.current = 100;
-            rerender(args);
-            act(() => {
-                result.current.handlePanStart({
-                    button: 0,
-                    clientX: 100,
-                    clientY: 100,
-                    preventDefault: vi.fn(),
+            if (action === 'zoomIn') {
+                act(() => { result.current.zoomIn(); });
+                expect(args.zoomState.current).toBe(expected);
+            } else if (action === 'panMoveX') {
+                act(() => {
+                    result.current.handlePanStart({
+                        button: 0,
+                        clientX: 100,
+                        clientY: 100,
+                        preventDefault: vi.fn(),
+                    });
                 });
-            });
-            act(() => {
-                result.current.handlePanMove({
-                    clientX: 120,
-                    clientY: 100,
-                    preventDefault: vi.fn(),
+                act(() => {
+                    result.current.handlePanMove({
+                        clientX: 120,
+                        clientY: 100,
+                        preventDefault: vi.fn(),
+                    });
                 });
-            });
-            expect(args.setPanX).toHaveBeenCalled();
-        });
-
-        it('updates panYValueRef when panY prop changes', () => {
-            const args = createArgs();
-            const { result, rerender } = renderHook(
-                (a) => useZoomPan(a.svgRef, a.hexCols, a.hexRows, a.zoom, a.setZoom, a.panX, a.setPanX, a.panY, a.setPanY),
-                { initialProps: args },
-            );
-            args.panYState.current = 50;
-            rerender(args);
-            act(() => {
-                result.current.handlePanStart({
-                    button: 0,
-                    clientX: 100,
-                    clientY: 100,
-                    preventDefault: vi.fn(),
+                expect(args.setPanX).toHaveBeenCalled();
+            } else {
+                act(() => {
+                    result.current.handlePanStart({
+                        button: 0,
+                        clientX: 100,
+                        clientY: 100,
+                        preventDefault: vi.fn(),
+                    });
                 });
-            });
-            act(() => {
-                result.current.handlePanMove({
-                    clientX: 100,
-                    clientY: 120,
-                    preventDefault: vi.fn(),
+                act(() => {
+                    result.current.handlePanMove({
+                        clientX: 100,
+                        clientY: 120,
+                        preventDefault: vi.fn(),
+                    });
                 });
-            });
-            expect(args.setPanY).toHaveBeenCalled();
+                expect(args.setPanY).toHaveBeenCalled();
+            }
         });
     });
 });

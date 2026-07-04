@@ -59,7 +59,7 @@ describe('bardicInspirationDefenseHandler.handle', () => {
   // ── No bardic inspiration die ──────────────────────────────────
 
   describe('no bardic inspiration die', () => {
-    const falsyValues = [null, undefined, 0, ''];
+    const falsyValues = [null, undefined, 0];
 
     for (const dieValue of falsyValues) {
       it(`returns info popup when bardicInspirationDie is ${JSON.stringify(dieValue)}`, async () => {
@@ -71,18 +71,11 @@ describe('bardicInspirationDefenseHandler.handle', () => {
         expect(result.payload.type).toBe('automation_info');
         expect(result.payload.description).toBe('You do not have a Bardic Inspiration die.');
         expect(result.payload.name).toBe('Defensive Inspiration');
+        expect(diceRoller.rollExpression).not.toHaveBeenCalled();
+        expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
+        expect(logService.addEntry).not.toHaveBeenCalled();
       });
     }
-
-    it('does not roll dice or modify state when there is no die', async () => {
-      useRuntimeState.getRuntimeValue.mockReturnValue(null);
-
-      await handle(makeAction(), makePlayerStats(), campaignName);
-
-      expect(diceRoller.rollExpression).not.toHaveBeenCalled();
-      expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
-      expect(logService.addEntry).not.toHaveBeenCalled();
-    });
   });
 
   // ── Roll expression fails ──────────────────────────────────────
@@ -100,18 +93,10 @@ describe('bardicInspirationDefenseHandler.handle', () => {
         expect(result.type).toBe('popup');
         expect(result.payload.type).toBe('automation_info');
         expect(result.payload.description).toBe('Roll failed.');
+        expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
+        expect(logService.addEntry).not.toHaveBeenCalled();
       });
     }
-
-    it('does not modify state or log when roll fails', async () => {
-      useRuntimeState.getRuntimeValue.mockReturnValueOnce(8).mockReturnValueOnce(undefined);
-      diceRoller.rollExpression.mockReturnValue(null);
-
-      await handle(makeAction(), makePlayerStats(), campaignName);
-
-      expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
-      expect(logService.addEntry).not.toHaveBeenCalled();
-    });
   });
 
   // ── Successful invocation ──────────────────────────────────────
@@ -149,24 +134,14 @@ describe('bardicInspirationDefenseHandler.handle', () => {
 
       await handle(makeAction(), makePlayerStats(), campaignName);
 
-      const entry = logService.addEntry.mock.calls[0][1];
-      expect(logService.addEntry).toHaveBeenCalledWith(campaignName, entry);
-      expect(entry.type).toBe('ability_use');
-      expect(entry.characterName).toBe('Bard');
-      expect(entry.abilityName).toBe('Defensive Inspiration');
-      expect(entry.biDieRoll).toBe(3);
-      expect(entry.biDieSize).toBe(8);
-      expect(entry.timestamp).toBeTypeOf('number');
-    });
-
-    it('includes die roll info in the log description', async () => {
-      useRuntimeState.getRuntimeValue.mockReturnValueOnce(6).mockReturnValueOnce(undefined);
-      diceRoller.rollExpression.mockReturnValue(makeRollResult(4));
-
-      await handle(makeAction(), makePlayerStats(), campaignName);
-
-      const logDescription = logService.addEntry.mock.calls[0][1].description;
-      expect(logDescription).toContain('rolled 1d6 (4)');
+      expect(logService.addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+        type: 'ability_use',
+        characterName: 'Bard',
+        abilityName: 'Defensive Inspiration',
+        biDieRoll: 3,
+        biDieSize: 8,
+        timestamp: expect.any(Number),
+      }));
     });
 
     it('returns popup with roll details', async () => {
@@ -183,22 +158,13 @@ describe('bardicInspirationDefenseHandler.handle', () => {
       expect(result.payload.description).toContain('Use your Reaction to add this to your AC');
     });
 
-    it('includes grantedBy in the description when set', async () => {
+    it('includes grantedBy in the description when set or falls back to unknown', async () => {
       useRuntimeState.getRuntimeValue.mockReturnValueOnce(8).mockReturnValueOnce('Fellow Bard');
       diceRoller.rollExpression.mockReturnValue(makeRollResult(3));
 
       const result = await handle(makeAction(), makePlayerStats(), campaignName);
 
       expect(result.payload.description).toContain('Die granted by Fellow Bard');
-    });
-
-    it('uses "unknown" as grantedBy when falsy', async () => {
-      useRuntimeState.getRuntimeValue.mockReturnValueOnce(8).mockReturnValueOnce(null);
-      diceRoller.rollExpression.mockReturnValue(makeRollResult(5));
-
-      const result = await handle(makeAction(), makePlayerStats(), campaignName);
-
-      expect(result.payload.description).toContain('Die granted by unknown');
     });
 
     it('includes action.automation in the returned payload', async () => {

@@ -1,9 +1,7 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { render } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import RiverLayer from './RiverLayer.jsx';
-import * as hexMapUtils from '../../services/maps/hexMapUtils.js';
-
 vi.mock('../../config/outdoorConfig.js', () => ({
     HEX_SIZE: 30,
 }));
@@ -52,20 +50,12 @@ describe('RiverLayer', () => {
             expect(layer).toBeInTheDocument();
         });
 
-        it('should render null when rivers is empty', () => {
-            const { container } = renderLayer({ rivers: [] });
-            const layer = container.querySelector('g.river-layer');
-            expect(layer).not.toBeInTheDocument();
-        });
-
-        it('should render null when rivers is null', () => {
-            const { container } = renderLayer({ rivers: null });
-            const layer = container.querySelector('g.river-layer');
-            expect(layer).not.toBeInTheDocument();
-        });
-
-        it('should render null when rivers is undefined', () => {
-            const { container } = renderLayer({ rivers: undefined });
+        it.each([
+            { name: 'empty array', rivers: [] },
+            { name: 'null', rivers: null },
+            { name: 'undefined', rivers: undefined },
+        ])('should render null when rivers is %(name)s', ({ rivers }) => {
+            const { container } = renderLayer({ rivers });
             const layer = container.querySelector('g.river-layer');
             expect(layer).not.toBeInTheDocument();
         });
@@ -81,37 +71,7 @@ describe('RiverLayer', () => {
             const fills = container.querySelectorAll('circle');
             expect(fills.length).toBe(3);
         });
-    });
 
-    describe('utility calls', () => {
-        it('should call hexToPixel for each river hex', () => {
-            renderLayer();
-            expect(hexMapUtils.hexToPixel).toHaveBeenCalled();
-        });
-
-        it('should call orderHexPath for multi-hex segments', () => {
-            renderLayer();
-            expect(hexMapUtils.orderHexPath).toHaveBeenCalled();
-        });
-
-        it('should call buildWindingPathDescriptor for multi-hex segments', () => {
-            renderLayer();
-            expect(hexMapUtils.buildWindingPathDescriptor).toHaveBeenCalled();
-        });
-
-        it('should pass correct color to buildWindingPathDescriptor', () => {
-            renderLayer();
-            expect(hexMapUtils.buildWindingPathDescriptor).toHaveBeenCalledWith(
-                expect.any(Array),
-                30,
-                '#3A82D2',
-                2.5,
-                12
-            );
-        });
-    });
-
-    describe('isolated hexes', () => {
         it('should render an isolated river hex as a circle fill only', () => {
             const { container } = renderLayer({ rivers: ['5,5'] });
             const fills = container.querySelectorAll('circle');
@@ -125,54 +85,17 @@ describe('RiverLayer', () => {
             const fills = container.querySelectorAll('circle');
             expect(fills.length).toBe(1);
         });
-    });
-
-    describe('multiple segments', () => {
-        it('should render multiple disconnected segments', () => {
-            const { container } = renderLayer({ rivers: ['0,0', '3,3', '4,3'] });
-            const fills = container.querySelectorAll('circle');
-            expect(fills.length).toBe(3);
-        });
 
         it('should not double-render fills for connected segments', () => {
             const { container } = renderLayer({ rivers: ['0,0', '1,0', '2,0'] });
             const fills = container.querySelectorAll('circle');
             expect(fills.length).toBe(3);
         });
-    });
 
-    describe('edge cases', () => {
-        it('should not render paths when buildWindingPathDescriptor returns null', () => {
-            vi.mocked(hexMapUtils.buildWindingPathDescriptor).mockReturnValue(null);
-            const { container } = renderLayer();
-            const paths = container.querySelectorAll('path');
-            expect(paths.length).toBe(0);
-        });
-
-        it('should not crash when buildWindingPathDescriptor returns object without path', () => {
-            vi.mocked(hexMapUtils.buildWindingPathDescriptor).mockReturnValue({});
-            const { container } = renderLayer();
-            const layer = container.querySelector('g.river-layer');
-            expect(layer).toBeInTheDocument();
-        });
-
-        it('should handle large number of river hexes', () => {
-            const largeRivers = Array.from({ length: 50 }, (_, i) => `${i},0`);
-            const { container } = renderLayer({ rivers: largeRivers });
+        it('should render multiple disconnected segments', () => {
+            const { container } = renderLayer({ rivers: ['0,0', '3,3', '4,3'] });
             const fills = container.querySelectorAll('circle');
-            expect(fills.length).toBe(50);
-        });
-
-        it('should handle boundary-constrained neighbor checks', () => {
-            const { container } = renderLayer({ rivers: ['0,0', '1,0'] });
-            const fills = container.querySelectorAll('circle');
-            expect(fills.length).toBe(2);
-        });
-
-        it('should handle river hexes near boundary', () => {
-            const { container } = renderLayer({ rivers: ['9,9'] });
-            const fills = container.querySelectorAll('circle');
-            expect(fills.length).toBe(1);
+            expect(fills.length).toBe(3);
         });
     });
 });

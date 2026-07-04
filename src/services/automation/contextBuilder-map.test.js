@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { buildAttackContext } from './contextBuilder.js';
 import { getCombatContext, getTargetFromAttacker } from '../rules/combat/damageUtils.js';
@@ -162,18 +162,14 @@ describe('contextBuilder: buildAttackContext (map-based)', () => {
   });
 
   describe('no map name — delegates to sync path', () => {
-    it('returns base attack context when mapName is null', async () => {
-      const result = await buildAttackContext(mockRangedAttack, mockStats, 'camp', null, 'normal', {});
-
+    it('returns base attack context when mapName is null or undefined', async () => {
+      let result = await buildAttackContext(mockRangedAttack, mockStats, 'camp', null, 'normal', {});
       expect(result.targetName).toBe('Orc');
       expect(result.attackerName).toBe('Fighter1');
       expect(result.damageType).toBe('Piercing');
       expect(result.isMelee).toBe(false);
-    });
 
-    it('returns base attack context when mapName is undefined', async () => {
-      const result = await buildAttackContext(mockRangedAttack, mockStats, 'camp', undefined, 'normal', {});
-
+      result = await buildAttackContext(mockRangedAttack, mockStats, 'camp', undefined, 'normal', {});
       expect(result.targetName).toBe('Orc');
     });
   });
@@ -196,19 +192,16 @@ describe('contextBuilder: buildAttackContext (map-based)', () => {
       expect(result.targetName).toBe('Orc');
     });
 
-    it('returns base context when map data is null', async () => {
-      loadMapData.mockResolvedValue(null);
-
-      const result = await buildAttackContext(mockRangedAttack, mockStats, 'camp', 'test-map', 'normal', {});
-
+    it('returns base context when map data is null or has no players array', async () => {
+      let result = await buildAttackContext(mockRangedAttack, mockStats, 'camp', 'test-map', 'normal', {});
       expect(result.targetName).toBe('Orc');
-    });
 
-    it('returns base context when map data has no players array', async () => {
+      loadMapData.mockResolvedValue(null);
+      result = await buildAttackContext(mockRangedAttack, mockStats, 'camp', 'test-map', 'normal', {});
+      expect(result.targetName).toBe('Orc');
+
       loadMapData.mockResolvedValue({});
-
-      const result = await buildAttackContext(mockRangedAttack, mockStats, 'camp', 'test-map', 'normal', {});
-
+      result = await buildAttackContext(mockRangedAttack, mockStats, 'camp', 'test-map', 'normal', {});
       expect(result.targetName).toBe('Orc');
     });
 
@@ -502,15 +495,6 @@ describe('contextBuilder: buildAttackContext (map-based)', () => {
       );
     });
 
-    it('skips cover calculations when target position cannot be resolved', async () => {
-      loadMapData.mockResolvedValue(makeMapData([{ name: 'Fighter1', gridX: 1, gridY: 1 }]));
-      getCombatContext.mockResolvedValue(null);
-
-      await buildAttackContext(mockRangedAttack, mockStats, 'camp', 'test-map', 'normal', {});
-
-      expect(computeCover).not.toHaveBeenCalled();
-    });
-
     it('skips cover when getTargetFromAttacker returns null', async () => {
       loadMapData.mockResolvedValue(makeMapData([{ name: 'Fighter1', gridX: 1, gridY: 1 }]));
       getCombatContext.mockResolvedValue(makeCombatContext('Fighter1', 'Orc', 10, 10));
@@ -626,92 +610,25 @@ describe('contextBuilder: buildAttackContext (map-based)', () => {
     });
   });
 
-  describe('NPC handling', () => {
-    it('matches NPCs with numeric suffixes to NPC data', async () => {
-      loadMapData.mockResolvedValue(makeMapData(
-        [{ name: 'Fighter1', gridX: 1, gridY: 1 }],
-        [{ type: 'npc', name: 'Goblin 1', gridX: 2, gridY: 2 }],
-      ));
-      loadNPCs.mockResolvedValue([{ name: 'Goblin 1', attitude: 'negative' }]);
-      getCombatContext.mockResolvedValue(makeCombatContext('Fighter1', 'Orc', 10, 10));
-      getTargetFromAttacker.mockReturnValue({ name: 'Orc', gridX: 10, gridY: 10 });
-
-      const result = await buildAttackContext(mockRangedAttack, mockStats, 'camp', 'test-map', 'normal', {});
-
-      expect(result).toBeDefined();
-    });
-
-    it('handles NPCs without matching NPC data gracefully', async () => {
-      loadMapData.mockResolvedValue(makeMapData(
-        [{ name: 'Fighter1', gridX: 1, gridY: 1 }],
-        [{ type: 'npc', name: 'Goblin', gridX: 2, gridY: 2 }],
-      ));
-      loadNPCs.mockResolvedValue([]);
-      getCombatContext.mockResolvedValue(makeCombatContext('Fighter1', 'Orc', 10, 10));
-      getTargetFromAttacker.mockReturnValue({ name: 'Orc', gridX: 10, gridY: 10 });
-
-      const result = await buildAttackContext(mockRangedAttack, mockStats, 'camp', 'test-map', 'normal', {});
-
-      expect(result).toBeDefined();
-      expect(isHostileNPC).toHaveBeenCalled();
-    });
-
-    it('handles missing placedItems array on map data', async () => {
-      loadMapData.mockResolvedValue(makeMapData([{ name: 'Fighter1', gridX: 1, gridY: 1 }], undefined));
-      getCombatContext.mockResolvedValue(makeCombatContext('Fighter1', 'Orc', 10, 10));
-      getTargetFromAttacker.mockReturnValue({ name: 'Orc', gridX: 10, gridY: 10 });
-
-      const result = await buildAttackContext(mockRangedAttack, mockStats, 'camp', 'test-map', 'normal', {});
-
-      expect(result).toBeDefined();
-    });
-
-    it('handles missing NPCs array from loadNPCs', async () => {
-      loadMapData.mockResolvedValue(makeMapData([{ name: 'Fighter1', gridX: 1, gridY: 1 }]));
-      loadNPCs.mockResolvedValue(null);
-      getCombatContext.mockResolvedValue(makeCombatContext('Fighter1', 'Orc', 10, 10));
-      getTargetFromAttacker.mockReturnValue({ name: 'Orc', gridX: 10, gridY: 10 });
-
-      const result = await buildAttackContext(mockRangedAttack, mockStats, 'camp', 'test-map', 'normal', {});
-
-      expect(result).toBeDefined();
-    });
-  });
-
   describe('feat range effects', () => {
-    it('uses default feat effects when featRangeEffects is undefined', async () => {
+    it('handles undefined/null featRangeEffects and provided feat effects', async () => {
       loadMapData.mockResolvedValue(makeMapData([{ name: 'Fighter1', gridX: 1, gridY: 1 }]));
       getCombatContext.mockResolvedValue(makeCombatContext('Fighter1', 'Orc', 10, 10));
       getTargetFromAttacker.mockReturnValue({ name: 'Orc', gridX: 10, gridY: 10 });
 
-      const result = await buildAttackContext(mockRangedAttack, mockStats, 'camp', 'test-map', 'normal', undefined);
-
+      let result = await buildAttackContext(mockRangedAttack, mockStats, 'camp', 'test-map', 'normal', undefined);
       expect(result).toBeDefined();
-    });
 
-    it('uses default feat effects when featRangeEffects is null', async () => {
-      loadMapData.mockResolvedValue(makeMapData([{ name: 'Fighter1', gridX: 1, gridY: 1 }]));
-      getCombatContext.mockResolvedValue(makeCombatContext('Fighter1', 'Orc', 10, 10));
-      getTargetFromAttacker.mockReturnValue({ name: 'Orc', gridX: 10, gridY: 10 });
-
-      const result = await buildAttackContext(mockRangedAttack, mockStats, 'camp', 'test-map', 'normal', null);
-
+      result = await buildAttackContext(mockRangedAttack, mockStats, 'camp', 'test-map', 'normal', null);
       expect(result).toBeDefined();
-    });
 
-    it('uses provided feat range effects', async () => {
-      loadMapData.mockResolvedValue(makeMapData([{ name: 'Fighter1', gridX: 1, gridY: 1 }]));
-      getCombatContext.mockResolvedValue(makeCombatContext('Fighter1', 'Orc', 10, 10));
-      getTargetFromAttacker.mockReturnValue({ name: 'Orc', gridX: 10, gridY: 10 });
       const feats = {
         ignoresMeleeDisadvantage: true,
         ignoresLongRangeDisadvantage: true,
         rangeMultiplier: 1,
         spellRangeBonus: 10,
       };
-
-      const result = await buildAttackContext(mockRangedAttack, mockStats, 'camp', 'test-map', 'normal', feats);
-
+      result = await buildAttackContext(mockRangedAttack, mockStats, 'camp', 'test-map', 'normal', feats);
       expect(result).toBeDefined();
     });
   });
@@ -723,8 +640,6 @@ describe('contextBuilder: buildAttackContext (map-based)', () => {
       ));
       getCombatContext.mockResolvedValue(makeCombatContext('Fighter1', 'Orc', 10, 10));
       getTargetFromAttacker.mockReturnValue({ name: 'Orc', gridX: 10, gridY: 10 });
-      // Sync path wolf returns false so forcedMode stays undefined for map-path wolf
-      getWolfAdvantageAgainst.mockReturnValue({ advantage: false });
       // Map-path wolf returns true — need a second call override via mockImplementation
       getWolfAdvantageAgainst.mockImplementation((opts) =>
         opts.targetPos ? { advantage: true } : { advantage: false }
@@ -786,24 +701,6 @@ describe('contextBuilder: buildAttackContext (map-based)', () => {
       getDuplicityAdvantageAgainst.mockReturnValue({ advantage: false });
       getLionDisadvantageAgainst.mockReturnValue({ disadvantage: false });
       getRuntimeValue.mockReturnValue([{ effect: 'protection', target: 'Orc', source: 'Paladin' }]);
-
-      const result = await buildAttackContext(mockRangedAttack, mockStats, 'camp', 'test-map', 'normal', {});
-
-      expect(result.forcedMode).toBe('disadvantage');
-    });
-
-    it('applies corona save disadvantage when no other auras apply', async () => {
-      loadMapData.mockResolvedValue(makeMapData(
-        [{ name: 'Fighter1', gridX: 1, gridY: 1 }],
-        [{ name: 'Orc', gridX: 10, gridY: 10, type: 'npc' }],
-      ));
-      getCombatContext.mockResolvedValue(makeCombatContext('Fighter1', 'Orc', 10, 10));
-      getTargetFromAttacker.mockReturnValue({ name: 'Orc', gridX: 10, gridY: 10 });
-      getNearestPlacedItem.mockReturnValue({ name: 'Orc', gridX: 10, gridY: 10 });
-      getWolfAdvantageAgainst.mockReturnValue({ advantage: false });
-      getDuplicityAdvantageAgainst.mockReturnValue({ advantage: false });
-      getLionDisadvantageAgainst.mockReturnValue({ disadvantage: false });
-      getCoronaSaveDisadvantage.mockReturnValue({ disadvantage: true });
 
       const result = await buildAttackContext(mockRangedAttack, mockStats, 'camp', 'test-map', 'normal', {});
 

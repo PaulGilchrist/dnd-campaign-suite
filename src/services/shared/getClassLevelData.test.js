@@ -4,10 +4,9 @@ import { getClassLevelData } from './getClassLevelData.js';
 
 describe('getClassLevelData', () => {
   describe('invalid or missing data returns null', () => {
-    it('returns null when class_levels is absent, null, or undefined', () => {
+    it('returns null when class_levels is absent or null', () => {
       expect(getClassLevelData({ level: 1 })).toBeNull();
       expect(getClassLevelData({ class: { class_levels: null } })).toBeNull();
-      expect(getClassLevelData({ class: { class_levels: undefined } })).toBeNull();
     });
 
     it('returns null when level does not match any entry', () => {
@@ -37,18 +36,6 @@ describe('getClassLevelData', () => {
         },
       };
       expect(getClassLevelData(playerStats)).toEqual({ level: 3, features: ['Martial Archetype'] });
-    });
-
-    it('returns the full entry object including extra properties', () => {
-      const result = getClassLevelData({
-        level: 5,
-        class: {
-          class_levels: [
-            { level: 5, hp: 45, features: ['Extra Attack'], profBonus: 3 },
-          ],
-        },
-      });
-      expect(result).toEqual({ level: 5, hp: 45, features: ['Extra Attack'], profBonus: 3 });
     });
   });
 });

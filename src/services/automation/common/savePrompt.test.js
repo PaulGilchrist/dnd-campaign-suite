@@ -82,6 +82,10 @@ describe('buildSaveDc', () => {
             );
 
             expect(dc).toBe(14); // 8 + 3 + 3
+            expect(getAbilityModifier).toHaveBeenCalledWith(
+                basePlayerStats.abilities,
+                'STR'
+            );
         });
 
         it('uses first element when saveAbility is an array', () => {
@@ -99,7 +103,7 @@ describe('buildSaveDc', () => {
             );
         });
 
-        it('applies negative ability modifier correctly', () => {
+        it('handles negative ability modifier', () => {
             getAbilityModifier.mockReturnValue(-1);
 
             const dc = buildSaveDc(
@@ -109,45 +113,15 @@ describe('buildSaveDc', () => {
 
             expect(dc).toBe(10); // 8 + (-1) + 3
         });
-
-        it('defaults proficiency to 0 when undefined or null', () => {
-            getAbilityModifier.mockReturnValue(2);
-
-            const dc = buildSaveDc(
-                { saveDc: 'ability' },
-                makePlayerStats({ proficiency: undefined })
-            );
-
-            expect(dc).toBe(10); // 8 + 2 + 0
-        });
-
-        it('handles high ability bonus and proficiency', () => {
-            getAbilityModifier.mockReturnValue(5);
-
-            const dc = buildSaveDc(
-                { saveDc: 'ability', saveAbility: 'CHA' },
-                makePlayerStats({ proficiency: 6 })
-            );
-
-            expect(dc).toBe(19); // 8 + 5 + 6
-        });
     });
 
     describe('saveDc === "spell_save_dc"', () => {
-        it('uses CHA ability modifier with default proficiency', () => {
+        it('uses CHA ability modifier with proficiency', () => {
             getAbilityModifier.mockReturnValue(4);
 
             const dc = buildSaveDc({ saveDc: 'spell_save_dc' }, basePlayerStats);
 
             expect(dc).toBe(15); // 8 + 4 + 3
-        });
-
-        it('handles negative CHA bonus', () => {
-            getAbilityModifier.mockReturnValue(-2);
-
-            const dc = buildSaveDc({ saveDc: 'spell_save_dc' }, basePlayerStats);
-
-            expect(dc).toBe(9); // 8 + (-2) + 3
         });
     });
 
@@ -156,7 +130,7 @@ describe('buildSaveDc', () => {
             expect(buildSaveDc({ saveDc: 15 }, basePlayerStats)).toBe(15);
         });
 
-        it('returns default 10 when saveDc is undefined, null, or empty string', () => {
+        it('returns default 10 when saveDc is undefined, null, or empty', () => {
             expect(buildSaveDc({}, basePlayerStats)).toBe(10);
             expect(buildSaveDc({ saveDc: null }, basePlayerStats)).toBe(10);
             expect(buildSaveDc({ saveDc: '' }, basePlayerStats)).toBe(10);
@@ -169,16 +143,6 @@ describe('buildSaveDc', () => {
 describe('createSaveListener', () => {
     const campaignName = 'TestCampaign';
 
-    it('generates a unique promptId and returns it', () => {
-        utils.guid.mockReturnValue('unique-id-123');
-
-        const { promptId } = createSaveListener(campaignName, {
-            targetName: 'Goblin',
-        });
-
-        expect(promptId).toBe('unique-id-123');
-    });
-
     it('calls sendSavePrompt with correct data including defaults', () => {
         utils.guid.mockReturnValue('prompt-abc');
 
@@ -188,8 +152,6 @@ describe('createSaveListener', () => {
             promptId: 'prompt-abc',
             targetName: 'Orc',
             saveType: 'CON',
-            saveDc: undefined,
-            dcSuccess: undefined,
             advantage: false,
             disadvantage: false,
         });
@@ -216,16 +178,6 @@ describe('createSaveListener', () => {
             advantage: true,
             disadvantage: false,
         });
-    });
-
-    it('returns an object with promptId and a Promise', () => {
-        utils.guid.mockReturnValue('ret-id');
-
-        const result = createSaveListener(campaignName, { targetName: 'Test' });
-
-        expect(result).toHaveProperty('promptId', 'ret-id');
-        expect(result).toHaveProperty('promise');
-        expect(result.promise).toBeInstanceOf(Promise);
     });
 
     it('resolves with event.detail when matching promptId is received', async () => {

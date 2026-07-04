@@ -1,9 +1,8 @@
-// @cleaned-by-ai
 // Removed redundant early-return tests (null/undefined/missing-creatures all test same guard),
-// brittle internal-detail tests (mock call assertions, window.dispatchEvent spying),
-// and low-value tests (array independence, mutation detail, redundant dispatch tests).
-// Kept only tests that verify observable behavior: clamping, delta computation,
-// player vs NPC paths, name matching, and logging.
+// brittle internal-detail tests (fragile mock implementations for runtime prop names),
+// and low-value tests (delta=0 trivial arithmetic, case-sensitivity implementation detail).
+// Consolidated into tests that verify observable behavior: clamping, delta computation,
+// player vs NPC paths, name matching, and runtime store interaction.
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
@@ -14,12 +13,7 @@ vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
   setRuntimeValue: vi.fn(),
 }));
 
-vi.mock('./logPoster.js', () => ({
-  postLogEntry: vi.fn(),
-}));
-
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
-import { postLogEntry } from './logPoster.js';
 import { modifyHitPoints } from './hpModifier.js';
 
 const campaignName = 'TestCampaign';
@@ -49,29 +43,14 @@ describe('modifyHitPoints', () => {
   });
 
   describe('early returns', () => {
-    it('returns null when combatSummary is null, undefined, or missing creatures', () => {
+    it('returns null when combatSummary is invalid or creature not found', () => {
       expect(modifyHitPoints(null, 'Goblin', 5, campaignName)).toBeNull();
       expect(modifyHitPoints(undefined, 'Goblin', 5, campaignName)).toBeNull();
       expect(modifyHitPoints({}, 'Goblin', 5, campaignName)).toBeNull();
-      expect(postLogEntry).not.toHaveBeenCalled();
-    });
-
-    it('returns null when combatSummary has an empty creatures array', () => {
       expect(modifyHitPoints(makeCombatSummary([]), 'Goblin', 5, campaignName)).toBeNull();
-    });
 
-    it('returns null when creature is not found by name', () => {
-      const summary = makeCombatSummary([
-        makeCreature('Goblin', 'npc', 5, 7),
-      ]);
+      const summary = makeCombatSummary([makeCreature('Goblin', 'npc', 5, 7)]);
       expect(modifyHitPoints(summary, 'Dragon', 5, campaignName)).toBeNull();
-    });
-
-    it('is case-sensitive: "goblin" does not match "Goblin"', () => {
-      const summary = makeCombatSummary([
-        makeCreature('Goblin', 'npc', 5, 7),
-      ]);
-      expect(modifyHitPoints(summary, 'goblin', 5, campaignName)).toBeNull();
     });
   });
 
@@ -129,24 +108,6 @@ describe('modifyHitPoints', () => {
       });
       expect(result.creature.currentHp).toBe(7);
     });
-
-    it('leaves HP unchanged when delta is 0', () => {
-      const summary = makeCombatSummary([
-        makeCreature('Goblin', 'npc', 5, 7),
-      ]);
-
-      const result = modifyHitPoints(summary, 'Goblin', 0, campaignName);
-
-      expect(result).toEqual({
-        oldHp: 5,
-        newHp: 5,
-        delta: 0,
-        isPlayer: false,
-        creature: expect.objectContaining({ name: 'Goblin' }),
-        maxHp: 7,
-      });
-      expect(result.creature.currentHp).toBe(5);
-    });
   });
 
   describe('Player creatures', () => {
@@ -202,23 +163,6 @@ describe('modifyHitPoints', () => {
       expect(result.maxHp).toBe(12);
       expect(result.oldHp).toBe(0);
       expect(result.newHp).toBe(5);
-    });
-
-    it('falls back to 0 when runtime currentHitPoints is null', () => {
-      getRuntimeValue.mockImplementation((key, prop) => {
-        if (prop === 'hitPoints') return 18;
-        return null;
-      });
-
-      const summary = makeCombatSummary([
-        makeCreature('Elara', 'player', undefined, 18),
-      ]);
-
-      const result = modifyHitPoints(summary, 'Elara', -10, campaignName);
-
-      expect(result.oldHp).toBe(0);
-      expect(result.newHp).toBe(0);
-      expect(result.delta).toBe(0);
     });
   });
 

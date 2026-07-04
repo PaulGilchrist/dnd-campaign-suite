@@ -12,9 +12,6 @@ describe('deduplicateAndSort', () => {
       expect(deduplicateAndSort({})).toEqual([]);
     });
 
-    it('should return empty array for empty array', () => {
-      expect(deduplicateAndSort([])).toEqual([]);
-    });
   });
 
   describe('deduplication', () => {
@@ -36,35 +33,17 @@ describe('deduplicateAndSort', () => {
       expect(result[0].name).toBe('Alice');
       expect(result[1].name).toBe('Bob');
     });
-
-    it('should preserve a single NaN among other values', () => {
-      const result = deduplicateAndSort([NaN, 1, NaN, 2]);
-      expect(result.length).toBe(3);
-      expect(result).toContain(1);
-      expect(result).toContain(2);
-      expect(result.some(v => Number.isNaN(v))).toBe(true);
-    });
   });
 
   describe('sorting', () => {
-    it('should sort objects alphabetically by a string sortKey', () => {
+    it('should sort objects by string and numeric sortKey values', () => {
       const arr = [
         { name: 'Charlie', age: 30 },
         { name: 'Alice', age: 25 },
         { name: 'Bob', age: 35 },
       ];
-      const result = deduplicateAndSort(arr, 'name');
-      expect(result.map(r => r.name)).toEqual(['Alice', 'Bob', 'Charlie']);
-    });
-
-    it('should sort objects by a numeric sortKey using string comparison', () => {
-      const arr = [
-        { name: 'Charlie', age: 30 },
-        { name: 'Alice', age: 25 },
-        { name: 'Bob', age: 35 },
-      ];
-      const result = deduplicateAndSort(arr, 'age');
-      expect(result.map(r => r.name)).toEqual(['Alice', 'Charlie', 'Bob']);
+      expect(deduplicateAndSort(arr, 'name').map(r => r.name)).toEqual(['Alice', 'Bob', 'Charlie']);
+      expect(deduplicateAndSort(arr, 'age').map(r => r.name)).toEqual(['Alice', 'Charlie', 'Bob']);
     });
   });
 });

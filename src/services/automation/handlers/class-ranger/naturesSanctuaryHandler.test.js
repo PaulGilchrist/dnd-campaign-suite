@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
@@ -251,7 +251,7 @@ describe("Nature's Sanctuary Handler", () => {
       );
     });
 
-    it('skips cube position when map name is not provided', async () => {
+    it('does not set cube position when map is unavailable', async () => {
       useRuntimeState.getRuntimeValue.mockImplementation((player, key) => {
         if (key === 'wildShapeUses') return 3;
         if (key === 'naturesSanctuaryActive') return null;
@@ -261,61 +261,30 @@ describe("Nature's Sanctuary Handler", () => {
       const action = makeAction();
       const playerStats = makePlayerStats();
 
+      // No map name provided
       await handle(action, playerStats, campaignName, null);
-
-      expect(mapsService.loadMapData).not.toHaveBeenCalled();
       expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalledWith(
         'Druid',
         'naturesSanctuaryCubeX',
         expect.anything(),
         campaignName,
       );
-    });
 
-    it('skips cube position when player is not on the map', async () => {
-      useRuntimeState.getRuntimeValue.mockImplementation((player, key) => {
-        if (key === 'wildShapeUses') return 3;
-        if (key === 'naturesSanctuaryActive') return null;
-        return null;
-      });
+      // Map data is null
+      mapsService.loadMapData.mockResolvedValue(null);
+      await handle(action, playerStats, campaignName, 'battlefield');
+      expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalledWith(
+        'Druid',
+        'naturesSanctuaryCubeX',
+        expect.anything(),
+        campaignName,
+      );
 
-      const action = makeAction();
-      const playerStats = makePlayerStats();
-      const mapName = 'battlefield';
-
+      // Player not on the map
       mapsService.loadMapData.mockResolvedValue({
         players: [{ name: 'Ally', gridX: 5, gridY: 5 }],
       });
-
-      await handle(action, playerStats, campaignName, mapName);
-
-      expect(mapsService.loadMapData).toHaveBeenCalledWith(
-        campaignName,
-        mapName,
-      );
-      expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalledWith(
-        'Druid',
-        'naturesSanctuaryCubeX',
-        expect.anything(),
-        campaignName,
-      );
-    });
-
-    it('skips cube position when map data is null', async () => {
-      useRuntimeState.getRuntimeValue.mockImplementation((player, key) => {
-        if (key === 'wildShapeUses') return 3;
-        if (key === 'naturesSanctuaryActive') return null;
-        return null;
-      });
-
-      const action = makeAction();
-      const playerStats = makePlayerStats();
-      const mapName = 'battlefield';
-
-      mapsService.loadMapData.mockResolvedValue(null);
-
-      await handle(action, playerStats, campaignName, mapName);
-
+      await handle(action, playerStats, campaignName, 'battlefield');
       expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalledWith(
         'Druid',
         'naturesSanctuaryCubeX',
@@ -348,29 +317,6 @@ describe("Nature's Sanctuary Handler", () => {
         'Druid',
         'naturesSanctuaryResistance',
         expect.anything(),
-        campaignName,
-      );
-    });
-
-    it('falls back to max wild shape when runtime value is null', async () => {
-      useRuntimeState.getRuntimeValue.mockImplementation((player, key) => {
-        if (key === 'wildShapeUses') return null;
-        if (key === 'naturesSanctuaryActive') return null;
-        return null;
-      });
-
-      const action = makeAction();
-      const playerStats = makePlayerStats();
-
-      const result = await handle(action, playerStats, campaignName, null);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.type).toBe('automation_info');
-      expect(result.payload.description).toContain('activated');
-      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-        'Druid',
-        'wildShapeUses',
-        3,
         campaignName,
       );
     });
@@ -463,27 +409,6 @@ describe("Nature's Sanctuary Handler", () => {
       expect(result.type).toBe('popup');
       expect(result.payload.description).toContain('no moves remaining');
       expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
-    });
-
-    it('falls back to max moves when runtime value is null', async () => {
-      useRuntimeState.getRuntimeValue.mockImplementation((player, key) => {
-        if (key === 'naturesSanctuaryActive') return true;
-        if (key === 'naturesSanctuaryMoves') return null;
-        return null;
-      });
-
-      const action = makeMoveAction();
-      const playerStats = makePlayerStats();
-
-      const result = await handleMove(action, playerStats, campaignName, null);
-
-      expect(result.type).toBe('popup');
-      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-        'Druid',
-        'naturesSanctuaryMoves',
-        0,
-        campaignName,
-      );
     });
 
     it('uses movesPerDuration from automation config', async () => {

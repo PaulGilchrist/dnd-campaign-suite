@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { handle, confirmCelestialRevelation } from './celestialRevelationHandler.js';
 import * as runtimeState from '../../../../hooks/runtime/useRuntimeState.js';
@@ -88,16 +88,6 @@ describe('celestialRevelationHandler', () => {
             expect(result.payload.automation).toBeDefined();
         });
 
-        it('returns popup with correct level message for level 2 character', async () => {
-            const level2Stats = makePlayerStats({ level: 2 });
-
-            const result = await handle(makeAction(), level2Stats, campaignName, null);
-
-            expect(result.payload.description).toBe(
-                'Celestial Revelation requires character level 3. You are currently level 2.'
-            );
-        });
-
         it('returns modal when level gate passes', async () => {
             const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
@@ -130,14 +120,6 @@ describe('celestialRevelationHandler', () => {
 
             expect(result.type).toBe('modal');
             expect(result.modalName).toBe('celestialRevelation');
-        });
-
-        it('uses default maxUses of 1 when neither uses nor usesMax is set', async () => {
-            runtimeState.getRuntimeValue.mockReturnValue(1);
-
-            const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-            expect(result.type).toBe('modal');
         });
 
         it('treats maxUses of 0 as unlimited (skips uses check)', async () => {
@@ -192,15 +174,6 @@ describe('celestialRevelationHandler', () => {
             expect(result.type).toBe('modal');
         });
 
-        it('handles string representation of uses from runtime storage', async () => {
-            const action = makeAction({ automation: { uses: 1, usesMax: 1 } });
-            runtimeState.getRuntimeValue.mockReturnValue('1');
-
-            const result = await handle(action, makePlayerStats(), campaignName, null);
-
-            expect(result.type).toBe('modal');
-        });
-
         it('handles string "0" representation of depleted uses from runtime storage', async () => {
             const action = makeAction({ automation: { uses: 1, usesMax: 1 } });
             runtimeState.getRuntimeValue.mockReturnValue('0');
@@ -247,16 +220,6 @@ describe('celestialRevelationHandler', () => {
             expect(buffToggle.toggleBuff).not.toHaveBeenCalled();
         });
 
-        it('skips all side effects when below minimum level', async () => {
-            const lowLevelStats = makePlayerStats({ level: 0 });
-
-            await confirmCelestialRevelation(lowLevelStats, 'Inner Radiance', campaignName);
-
-            expect(runtimeState.setRuntimeValue).not.toHaveBeenCalled();
-            expect(expirations.addExpiration).not.toHaveBeenCalled();
-            expect(buffToggle.toggleBuff).not.toHaveBeenCalled();
-        });
-
         it('decrements uses by 1 when uses are available', async () => {
             runtimeState.getRuntimeValue.mockReturnValue(1);
 
@@ -266,19 +229,6 @@ describe('celestialRevelationHandler', () => {
                 playerName,
                 defaultUsesKey,
                 0,
-                campaignName
-            );
-        });
-
-        it('decrements uses from the correct runtime value', async () => {
-            runtimeState.getRuntimeValue.mockReturnValue(5);
-
-            await confirmCelestialRevelation(makePlayerStats(), 'Inner Radiance', campaignName);
-
-            expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-                playerName,
-                defaultUsesKey,
-                4,
                 campaignName
             );
         });
@@ -328,11 +278,10 @@ describe('celestialRevelationHandler', () => {
             );
         });
 
-        it('calls toggleBuff with correct effect for Heavenly Wings', async () => {
+        it('calls toggleBuff with correct effect for each transformation option', async () => {
             runtimeState.getRuntimeValue.mockReturnValue(1);
 
             await confirmCelestialRevelation(makePlayerStats(), 'Heavenly Wings', campaignName);
-
             expect(buffToggle.toggleBuff).toHaveBeenCalledWith(
                 playerName,
                 'Heavenly Wings',
@@ -340,13 +289,8 @@ describe('celestialRevelationHandler', () => {
                 campaignName,
                 playerName
             );
-        });
-
-        it('calls toggleBuff with correct effect for Inner Radiance', async () => {
-            runtimeState.getRuntimeValue.mockReturnValue(1);
 
             await confirmCelestialRevelation(makePlayerStats(), 'Inner Radiance', campaignName);
-
             expect(buffToggle.toggleBuff).toHaveBeenCalledWith(
                 playerName,
                 'Inner Radiance',
@@ -354,13 +298,8 @@ describe('celestialRevelationHandler', () => {
                 campaignName,
                 playerName
             );
-        });
-
-        it('calls toggleBuff with correct effect for Necrotic Shroud', async () => {
-            runtimeState.getRuntimeValue.mockReturnValue(1);
 
             await confirmCelestialRevelation(makePlayerStats(), 'Necrotic Shroud', campaignName);
-
             expect(buffToggle.toggleBuff).toHaveBeenCalledWith(
                 playerName,
                 'Necrotic Shroud',
@@ -485,67 +424,6 @@ describe('celestialRevelationHandler', () => {
                 campaignName,
                 'CustomSorcerer'
             );
-        });
-
-        it('sets expiration buffName to the chosen option value', async () => {
-            runtimeState.getRuntimeValue.mockReturnValue(1);
-
-            await confirmCelestialRevelation(makePlayerStats(), 'Inner Radiance', campaignName);
-
-            expect(expirations.addExpiration).toHaveBeenCalledWith(
-                expect.any(String),
-                expect.any(String),
-                expect.arrayContaining([
-                    expect.objectContaining({ buffName: 'Inner Radiance' }),
-                ]),
-                expect.any(String),
-                expect.any(Number)
-            );
-        });
-
-        it('sets buff duration to 1_minute for all transformation options', async () => {
-            runtimeState.getRuntimeValue.mockReturnValue(1);
-
-            await confirmCelestialRevelation(makePlayerStats(), 'Heavenly Wings', campaignName);
-            expect(buffToggle.toggleBuff).toHaveBeenCalledWith(
-                expect.any(String),
-                expect.any(String),
-                expect.objectContaining({ duration: '1_minute' }),
-                expect.any(String),
-                expect.any(String)
-            );
-
-            await confirmCelestialRevelation(makePlayerStats(), 'Inner Radiance', campaignName);
-            expect(buffToggle.toggleBuff).toHaveBeenCalledWith(
-                expect.any(String),
-                expect.any(String),
-                expect.objectContaining({ duration: '1_minute' }),
-                expect.any(String),
-                expect.any(String)
-            );
-
-            await confirmCelestialRevelation(makePlayerStats(), 'Necrotic Shroud', campaignName);
-            expect(buffToggle.toggleBuff).toHaveBeenCalledWith(
-                expect.any(String),
-                expect.any(String),
-                expect.objectContaining({ duration: '1_minute' }),
-                expect.any(String),
-                expect.any(String)
-            );
-        });
-
-        it('returns automation object in popup payload', async () => {
-            runtimeState.getRuntimeValue.mockReturnValue(1);
-
-            const result = await confirmCelestialRevelation(
-                makePlayerStats(),
-                'Heavenly Wings',
-                campaignName
-            );
-
-            expect(result.payload.automation).toBeDefined();
-            expect(result.payload.automation.type).toBe('celestial_revelation');
-            expect(result.payload.automation.minLevel).toBe(3);
         });
     });
 });

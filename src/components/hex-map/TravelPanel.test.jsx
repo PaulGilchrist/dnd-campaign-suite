@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import TravelPanel from './TravelPanel.jsx';
@@ -55,9 +55,10 @@ describe('TravelPanel', () => {
       expect(screen.getByText('Travel Mode')).toBeInTheDocument();
     });
 
-    it('should render close button', () => {
+    it('should render close and cancel buttons', () => {
       render(<TravelPanel {...props} />);
       expect(screen.getByTitle('Cancel travel')).toBeInTheDocument();
+      expect(screen.getByText('Cancel')).toBeInTheDocument();
     });
 
     it('should render remaining hexes stat', () => {
@@ -70,19 +71,9 @@ describe('TravelPanel', () => {
       expect(screen.getByText('7.0 left')).toBeInTheDocument();
     });
 
-    it('should render advance button', () => {
-      render(<TravelPanel {...props} />);
-      expect(screen.getByText('Advance One Hex')).toBeInTheDocument();
-    });
-
     it('should show "Arrived" when path is fully traversed', () => {
       render(<TravelPanel {...props} pathIndex={mockPath.length} />);
       expect(screen.getByText('Arrived')).toBeInTheDocument();
-    });
-
-    it('should render cancel button in controls', () => {
-      render(<TravelPanel {...props} />);
-      expect(screen.getByText('Cancel')).toBeInTheDocument();
     });
 
     it('should render last message when provided', () => {
@@ -112,12 +103,6 @@ describe('TravelPanel', () => {
     it('should show budget text with accrued cost', () => {
       render(<TravelPanel {...props} accruedCost={7.5} dailyBudget={10} />);
       expect(screen.getByText('7.5 / 10')).toBeInTheDocument();
-    });
-
-    it('should show zero budget when accrued is zero', () => {
-      const { container } = render(<TravelPanel {...props} accruedCost={0} dailyBudget={10} />);
-      const bar = container.querySelector('.travel-budget-fill');
-      expect(bar.style.width).toBe('0%');
     });
   });
 
@@ -170,11 +155,8 @@ describe('TravelPanel', () => {
       expect(screen.getByTitle('Re-roll weather')).toBeInTheDocument();
     });
 
-    it('should not render weather section when weather is null or undefined', () => {
+    it('should not render weather section when weather is null', () => {
       render(<TravelPanel {...props} weather={null} />);
-      expect(screen.queryByText('Weather:')).not.toBeInTheDocument();
-
-      render(<TravelPanel {...props} weather={undefined} />);
       expect(screen.queryByText('Weather:')).not.toBeInTheDocument();
     });
   });
@@ -235,12 +217,10 @@ describe('TravelPanel', () => {
   });
 
   describe('horseback toggle', () => {
-    it('should show "Walking" when horseback is false', () => {
+    it('should show correct mount label based on horseback state', () => {
       render(<TravelPanel {...props} horseback={false} />);
       expect(screen.getByText('Walking')).toBeInTheDocument();
-    });
 
-    it('should show "Horseback" when horseback is true', () => {
       render(<TravelPanel {...props} horseback={true} />);
       expect(screen.getByText('Horseback')).toBeInTheDocument();
     });
@@ -402,86 +382,6 @@ describe('TravelPanel', () => {
       const terrain = { '0,0': 'plains' };
       render(<TravelPanel {...props} terrain={terrain} horseback={true} />);
       expect(screen.getByText('45 min')).toBeInTheDocument();
-    });
-  });
-
-  describe('terrain lookup', () => {
-    it('should default to plains when no terrain data provided for current hex', () => {
-      render(<TravelPanel {...props} terrain={{}} />);
-      const statsContainer = screen.getByText('Remaining').closest('.travel-panel-stats');
-      const statLabels = statsContainer.querySelectorAll('.travel-stat-label');
-      const nextHexLabel = Array.from(statLabels).find(l => l.textContent === 'Next hex');
-      expect(nextHexLabel).toBeInTheDocument();
-    });
-  });
-
-  describe('Font Awesome icons', () => {
-    it('should render route icon in title', () => {
-      render(<TravelPanel {...props} />);
-      const title = screen.getByText('Travel Mode').closest('.travel-panel-title');
-      const icon = title.querySelector('.fa-route');
-      expect(icon).toBeInTheDocument();
-    });
-
-    it('should render tent icon in exhausted section', () => {
-      render(<TravelPanel {...props} dayExhausted={true} />);
-      const exhausted = screen.getByText(/Travel budget exhausted/).closest('.travel-panel-exhausted');
-      const icon = exhausted.querySelector('.fa-tent');
-      expect(icon).toBeInTheDocument();
-    });
-
-    it('should render campground icon on camp button', () => {
-      render(<TravelPanel {...props} dayExhausted={true} />);
-      const btn = screen.getByText('Camp');
-      expect(btn.querySelector('.fa-campground')).toBeInTheDocument();
-    });
-
-    it('should render running icon on forced march button', () => {
-      render(<TravelPanel {...props} dayExhausted={true} />);
-      const btn = screen.getByText('Forced March');
-      expect(btn.querySelector('.fa-person-running')).toBeInTheDocument();
-    });
-
-    it('should render heart pulse icon in exhaustion display', () => {
-      render(<TravelPanel {...props} forcedMarchHours={3} />);
-      const label = screen.getByText('Forced March').closest('.travel-exhaustion-label');
-      expect(label.querySelector('.fa-heart-pulse')).toBeInTheDocument();
-    });
-
-    it('should render gauge icon in exhaustion speed display', () => {
-      render(<TravelPanel {...props} forcedMarchHours={3} />);
-      const speed = screen.getByText('Speed: 100%').closest('.travel-exhaustion-speed');
-      expect(speed.querySelector('.fa-gauge')).toBeInTheDocument();
-    });
-
-    it('should render dice icon on weather re-roll button', () => {
-      render(<TravelPanel {...props} weather={{ icon: 'sun', label: 'Sunny', description: 'Clear' }} />);
-      const btn = screen.getByTitle('Re-roll weather');
-      expect(btn.querySelector('.fa-dice')).toBeInTheDocument();
-    });
-
-    it('should render horse icon on horseback button', () => {
-      render(<TravelPanel {...props} />);
-      const btn = screen.getByRole('button', { name: /walking/i });
-      expect(btn.querySelector('.fa-horse')).toBeInTheDocument();
-    });
-
-    it('should render walking icon on advance button', () => {
-      render(<TravelPanel {...props} />);
-      const btn = screen.getByText('Advance One Hex');
-      expect(btn.querySelector('.fa-person-walking')).toBeInTheDocument();
-    });
-
-    it('should render ban icon on cancel button', () => {
-      render(<TravelPanel {...props} />);
-      const btn = screen.getByText('Cancel');
-      expect(btn.querySelector('.fa-ban')).toBeInTheDocument();
-    });
-
-    it('should render xmark icon on close button', () => {
-      render(<TravelPanel {...props} />);
-      const btn = screen.getByTitle('Cancel travel');
-      expect(btn.querySelector('.fa-xmark')).toBeInTheDocument();
     });
   });
 

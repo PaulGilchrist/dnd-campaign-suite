@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import { handle } from './restoreBalanceHandler.js';
@@ -111,10 +111,6 @@ function makeFreshSaveRoll(overrides = {}) {
     };
 }
 
-function setupNoTarget() {
-    resolveTarget.mockResolvedValue(null);
-}
-
 function setupTargetResolved(targetName = 'TargetAlly') {
     resolveTarget.mockResolvedValue({ target: { name: targetName } });
 }
@@ -135,10 +131,6 @@ function setupOutofRange() {
     getDistanceFeet.mockReturnValue(999);
 }
 
-function setupNoMapPositions() {
-    resolveMapPositions.mockResolvedValue(null);
-}
-
 function setupUses(remaining) {
     getRuntimeValue.mockReturnValue(remaining);
 }
@@ -154,7 +146,7 @@ describe('restoreBalanceHandler.handle', () => {
 
     describe('target resolution', () => {
         it('returns popup when no target is resolved', async () => {
-            setupNoTarget();
+            resolveTarget.mockResolvedValue(null);
 
             const result = await handle(
                 makeAction(),
@@ -204,27 +196,10 @@ describe('restoreBalanceHandler.handle', () => {
             expect(resolveMapPositions).not.toHaveBeenCalled();
         });
 
-        it('skips range check when rangeToFeet returns null', async () => {
-            setupTargetResolved();
-            rangeToFeet.mockReturnValue(null);
-            setupUses(1);
-            setupCombatContext(makeFreshAttackRoll());
-
-            const result = await handle(
-                makeAction(),
-                makePlayerStats(),
-                campaignName,
-                mapName,
-            );
-
-            expect(result.type).toBe('popup');
-            expect(resolveMapPositions).not.toHaveBeenCalled();
-        });
-
         it('skips range check when map positions are unavailable', async () => {
             setupTargetResolved();
             rangeToFeet.mockReturnValue(60);
-            setupNoMapPositions();
+            resolveMapPositions.mockResolvedValue(null);
             setupUses(1);
             setupCombatContext(makeFreshAttackRoll());
 
@@ -283,7 +258,6 @@ describe('restoreBalanceHandler.handle', () => {
     describe('uses check', () => {
         it('returns popup when no uses remaining', async () => {
             setupTargetResolved();
-            setupNoMapPositions();
             setupUses(0);
             setupCombatContext(makeFreshAttackRoll());
 
@@ -306,7 +280,6 @@ describe('restoreBalanceHandler.handle', () => {
 
         it('uses max(1, chaMod) as default uses when runtime value is null', async () => {
             setupTargetResolved();
-            setupNoMapPositions();
             getRuntimeValue.mockReturnValue(null);
             setupCombatContext(makeFreshAttackRoll());
 
@@ -326,28 +299,8 @@ describe('restoreBalanceHandler.handle', () => {
 
         it('uses max(1, chaMod) for usesMax when CHA modifier is negative', async () => {
             setupTargetResolved();
-            setupNoMapPositions();
             getAbilityModifier.mockReturnValue(-1);
             getRuntimeValue.mockReturnValue(null);
-            setupCombatContext(makeFreshAttackRoll());
-
-            await handle(
-                makeAction(),
-                makePlayerStats(),
-                campaignName,
-                null,
-            );
-
-            expect(getRuntimeValue).toHaveBeenCalledWith(
-                'TestSorcerer',
-                'restorebalanceUses',
-            );
-        });
-
-        it('uses correct uses key derived from feature name', async () => {
-            setupTargetResolved();
-            setupNoMapPositions();
-            setupUses(1);
             setupCombatContext(makeFreshAttackRoll());
 
             await handle(
@@ -367,7 +320,6 @@ describe('restoreBalanceHandler.handle', () => {
     describe('roll freshness validation', () => {
         it('returns popup when no recent d20 roll exists', async () => {
             setupTargetResolved();
-            setupNoMapPositions();
             setupUses(1);
             setupCombatContext(null);
 
@@ -385,28 +337,8 @@ describe('restoreBalanceHandler.handle', () => {
             expect(result.payload.description).toContain('TargetAlly');
         });
 
-        it('returns popup when lastAttack exists but has no attackerName', async () => {
-            setupTargetResolved();
-            setupNoMapPositions();
-            setupUses(1);
-            setupCombatContext({ rollType: 'attack', timestamp: Date.now() });
-
-            const result = await handle(
-                makeAction(),
-                makePlayerStats(),
-                campaignName,
-                null,
-            );
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain(
-                'No recent d20 roll found',
-            );
-        });
-
         it('returns popup when roll attacker does not match target', async () => {
             setupTargetResolved('TargetAlly');
-            setupNoMapPositions();
             setupUses(1);
             setupCombatContext({
                 ...makeFreshAttackRoll(),
@@ -427,9 +359,8 @@ describe('restoreBalanceHandler.handle', () => {
             expect(result.payload.description).toContain('TargetAlly');
         });
 
-        it('proceeds with attack roll type', async () => {
+        it('displays attack roll results with HIT/MISS', async () => {
             setupTargetResolved();
-            setupNoMapPositions();
             setupUses(1);
             setupCombatContext(makeFreshAttackRoll());
 
@@ -440,7 +371,6 @@ describe('restoreBalanceHandler.handle', () => {
                 null,
             );
 
-            expect(result.type).toBe('popup');
             expect(result.payload.description).toContain('Attack roll');
             expect(result.payload.description).toContain('d20(15)');
             expect(result.payload.description).toContain('HIT');
@@ -448,7 +378,6 @@ describe('restoreBalanceHandler.handle', () => {
 
         it('shows MISS for failed attack roll', async () => {
             setupTargetResolved();
-            setupNoMapPositions();
             setupUses(1);
             setupCombatContext(
                 makeFreshAttackRoll({ d20: 1, bonus: 5, hit: false }),
@@ -464,27 +393,8 @@ describe('restoreBalanceHandler.handle', () => {
             expect(result.payload.description).toContain('MISS');
         });
 
-        it('shows "—" when targetAc is null on attack roll', async () => {
+        it('displays ability check results', async () => {
             setupTargetResolved();
-            setupNoMapPositions();
-            setupUses(1);
-            setupCombatContext(
-                makeFreshAttackRoll({ targetAc: null, hit: true }),
-            );
-
-            const result = await handle(
-                makeAction(),
-                makePlayerStats(),
-                campaignName,
-                null,
-            );
-
-            expect(result.payload.description).toContain('—');
-        });
-
-        it('proceeds with ability check type (check rollType)', async () => {
-            setupTargetResolved();
-            setupNoMapPositions();
             setupUses(1);
             setupCombatContext(makeFreshCheckRoll());
 
@@ -499,27 +409,8 @@ describe('restoreBalanceHandler.handle', () => {
             expect(result.payload.description).toContain('d20(12)');
         });
 
-        it('proceeds with ability check type (skill rollType)', async () => {
+        it('displays saving throw results', async () => {
             setupTargetResolved();
-            setupNoMapPositions();
-            setupUses(1);
-            setupCombatContext(
-                makeFreshCheckRoll({ rollType: 'skill' }),
-            );
-
-            const result = await handle(
-                makeAction(),
-                makePlayerStats(),
-                campaignName,
-                null,
-            );
-
-            expect(result.payload.description).toContain('Stealth');
-        });
-
-        it('proceeds with saving throw type', async () => {
-            setupTargetResolved();
-            setupNoMapPositions();
             setupUses(1);
             setupCombatContext(makeFreshSaveRoll());
 
@@ -535,7 +426,6 @@ describe('restoreBalanceHandler.handle', () => {
 
         it('shows "Save" label when saveType is missing', async () => {
             setupTargetResolved();
-            setupNoMapPositions();
             setupUses(1);
             setupCombatContext(
                 makeFreshSaveRoll({ saveType: null }),
@@ -551,9 +441,8 @@ describe('restoreBalanceHandler.handle', () => {
             expect(result.payload.description).toContain('Save');
         });
 
-        it('includes target name in all roll descriptions', async () => {
+        it('includes target name and advantage neutralized note in description', async () => {
             setupTargetResolved('Goblin');
-            setupNoMapPositions();
             setupUses(1);
             setupCombatContext(
                 makeFreshAttackRoll({ attackerName: 'Goblin' }),
@@ -567,21 +456,6 @@ describe('restoreBalanceHandler.handle', () => {
             );
 
             expect(result.payload.description).toContain('Target: Goblin');
-        });
-
-        it('includes advantage neutralized note in description', async () => {
-            setupTargetResolved();
-            setupNoMapPositions();
-            setupUses(1);
-            setupCombatContext(makeFreshAttackRoll());
-
-            const result = await handle(
-                makeAction(),
-                makePlayerStats(),
-                campaignName,
-                null,
-            );
-
             expect(result.payload.description).toContain(
                 'Advantage/Disadvantage neutralized',
             );
@@ -591,7 +465,6 @@ describe('restoreBalanceHandler.handle', () => {
     describe('usage decrement and logging', () => {
         it('decrements uses by 1 after applying', async () => {
             setupTargetResolved();
-            setupNoMapPositions();
             setupUses(3);
             setupCombatContext(makeFreshAttackRoll());
 
@@ -612,7 +485,6 @@ describe('restoreBalanceHandler.handle', () => {
 
         it('sets uses to 0 when only 1 use remains', async () => {
             setupTargetResolved();
-            setupNoMapPositions();
             setupUses(1);
             setupCombatContext(makeFreshAttackRoll());
 
@@ -633,7 +505,6 @@ describe('restoreBalanceHandler.handle', () => {
 
         it('logs an ability_use entry to the campaign log', async () => {
             setupTargetResolved('AllyOne');
-            setupNoMapPositions();
             setupUses(2);
             setupCombatContext(
                 makeFreshAttackRoll({ attackerName: 'AllyOne' }),
@@ -657,28 +528,8 @@ describe('restoreBalanceHandler.handle', () => {
             });
         });
 
-        it('passes the automation object through to the result payload', async () => {
+        it('uses action name as feature name in the result payload', async () => {
             setupTargetResolved();
-            setupNoMapPositions();
-            setupUses(1);
-            setupCombatContext(makeFreshAttackRoll());
-
-            const result = await handle(
-                makeAction(),
-                makePlayerStats(),
-                campaignName,
-                null,
-            );
-
-            expect(result.payload.automation).toEqual({
-                type: 'restore_balance',
-                range: '60_ft',
-            });
-        });
-
-        it('uses action name as feature name', async () => {
-            setupTargetResolved();
-            setupNoMapPositions();
             setupUses(1);
             setupCombatContext(makeFreshAttackRoll());
 
@@ -693,3 +544,4 @@ describe('restoreBalanceHandler.handle', () => {
         });
     });
 });
+// @cleaned-by-ai

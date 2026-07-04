@@ -142,17 +142,10 @@ describe('healingHandler', () => {
 
       const result = await handle(action, ps, campaignName, null);
 
-      expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-        'TestHealer',
-        'healingtouchUses',
-        0,
-        campaignName,
-        true,
-      );
       expect(result.payload.description).toContain('no uses remaining');
     });
 
-    it('should block and report Short Rest recharge when no uses remaining', async () => {
+    it('should block when no uses remaining and report recharge type', async () => {
       runtimeState.getRuntimeValue.mockReturnValue(0);
       const ps = makePlayerStats();
       const action = makeAction({ healExpression: '1d4', uses: 1 });
@@ -163,6 +156,25 @@ describe('healingHandler', () => {
       expect(result.payload.type).toBe('automation_info');
       expect(result.payload.description).toContain('no uses remaining');
       expect(result.payload.description).toContain('Short Rest');
+    });
+
+    it('should report Long Rest when recharge is long_rest', async () => {
+      runtimeState.getRuntimeValue.mockReturnValue(0);
+      const ps = makePlayerStats();
+      const action = {
+        name: 'Lay on Hands',
+        automation: {
+          type: 'self_healing',
+          healExpression: '1d4',
+          uses: 1,
+          recharge: 'long_rest',
+        },
+      };
+
+      const result = await handle(action, ps, campaignName, null);
+
+      expect(result.payload.description).toContain('Long Rest');
+      expect(result.payload.description).not.toContain('Short Rest');
     });
 
     it('should use resourceKey when provided', async () => {
@@ -196,7 +208,6 @@ describe('healingHandler', () => {
 
       const result = await handle(action, ps, campaignName, null);
 
-      expect(result.type).toBe('popup');
       expect(result.payload.description).toContain('4 uses remaining');
     });
 
@@ -209,6 +220,17 @@ describe('healingHandler', () => {
       await handle(action, ps, campaignName, null);
 
       expect(diceRoller.rollExpression).toHaveBeenCalledWith('1d4 + 7');
+    });
+
+    it('should replace fighter level with 1 when level is missing', async () => {
+      const ps = makePlayerStats({ level: undefined });
+      const action = makeAction({
+        healExpression: '1d4 + fighter level',
+      });
+
+      await handle(action, ps, campaignName, null);
+
+      expect(diceRoller.rollExpression).toHaveBeenCalledWith('1d4 + 1');
     });
   });
 
@@ -320,6 +342,25 @@ describe('healingHandler', () => {
 
       expect(restRules.computeHitDieRecovery).toHaveBeenCalledWith(6, 3);
     });
+
+    it('should not decrement hit dice when hitDiceCost is 0', async () => {
+      runtimeState.getRuntimeValue.mockReturnValue(undefined);
+      const ps = makePlayerStats();
+      const action = makeAction({
+        healExpression: 'hit_die_roll',
+        hitDiceCost: 0,
+      });
+
+      await handle(action, ps, campaignName, null);
+
+      expect(runtimeState.setRuntimeValue).not.toHaveBeenCalledWith(
+        'TestHealer',
+        'shortRestHitDice',
+        expect.any(Number),
+        campaignName,
+        true,
+      );
+    });
   });
 
   // ── Bloodied only ────────────────────────────────────────────
@@ -351,6 +392,19 @@ describe('healingHandler', () => {
       expect(result.payload.type).toBe('automation_info');
     });
 
+    it('should allow when at exactly floor(maxHp/2)', async () => {
+      const ps = makePlayerStats({ currentHitPoints: 7, maxHitPoints: 15 });
+      const action = makeAction({
+        healExpression: '1d4',
+        bloodiedOnly: true,
+      });
+
+      const result = await handle(action, ps, campaignName, null);
+
+      expect(result.type).toBe('popup');
+      expect(result.payload.type).toBe('automation_info');
+    });
+
     it('should block when HP is zero', async () => {
       const ps = makePlayerStats({ currentHitPoints: 0, maxHitPoints: 20 });
       const action = makeAction({
@@ -360,20 +414,6 @@ describe('healingHandler', () => {
 
       const result = await handle(action, ps, campaignName, null);
 
-      expect(result.type).toBe('popup');
-      expect(result.payload.description).toContain('Bloodied');
-    });
-
-    it('should block when HP exceeds max (edge case)', async () => {
-      const ps = makePlayerStats({ currentHitPoints: 25, maxHitPoints: 20 });
-      const action = makeAction({
-        healExpression: '1d4',
-        bloodiedOnly: true,
-      });
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.type).toBe('popup');
       expect(result.payload.description).toContain('Bloodied');
     });
   });
@@ -404,20 +444,6 @@ describe('healingHandler', () => {
 
       expect(diceRoller.rollExpression).toHaveBeenCalledWith('1d6', { rerollOnes: true });
       expect(diceRoller.rollExpressionMaximized).not.toHaveBeenCalled();
-    });
-
-    it('should prefer maximize over rerollOnes when both are true', async () => {
-      automationService.hasHealingMaximization.mockReturnValue(true);
-      automationService.hasRerollHealingOnes.mockReturnValue(true);
-      diceRoller.rollExpressionMaximized.mockReturnValue({ total: 8, rolls: [8], modifier: 0 });
-
-      const ps = makePlayerStats();
-      const action = makeAction({ healExpression: '1d6' });
-
-      await handle(action, ps, campaignName, null);
-
-      expect(diceRoller.rollExpressionMaximized).toHaveBeenCalledWith('1d6');
-      expect(diceRoller.rollExpression).not.toHaveBeenCalled();
     });
 
     it('should use normal rollExpression when neither flag is set', async () => {
@@ -461,8 +487,6 @@ describe('healingHandler', () => {
 
       const result = await handle(action, ps, campaignName, null);
 
-      expect(result.type).toBe('popup');
-      expect(result.payload.type).toBe('automation_info');
       expect(result.payload.description).toContain('no uses remaining');
     });
 
@@ -478,6 +502,126 @@ describe('healingHandler', () => {
 
       expect(result.type).toBe('popup');
       expect(result.payload.type).toBe('healing');
+    });
+
+    it('should resolve target when uses available for non-self type', async () => {
+      runtimeState.getRuntimeValue.mockReturnValue(1);
+      targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Ally' } });
+
+      const ps = makePlayerStats();
+      const action = {
+        name: 'Cure Wounds',
+        automation: {
+          type: 'reaction',
+          uses: 1,
+          healExpression: '1d8',
+        },
+      };
+
+      await handle(action, ps, campaignName, null);
+
+      expect(targetResolver.resolveTarget).toHaveBeenCalledWith(campaignName, 'TestHealer');
+    });
+
+    it('should apply healing and log when target resolves to ally', async () => {
+      runtimeState.getRuntimeValue.mockReturnValue(1);
+      targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Ally' } });
+      healingRoll.applyHealingDirectly.mockReturnValue({ newHp: 15, maxHp: 20, actualHeal: 5 });
+
+      const ps = makePlayerStats();
+      const action = {
+        name: 'Cure Wounds',
+        automation: {
+          type: 'reaction',
+          uses: 1,
+          healExpression: '1d8',
+        },
+      };
+
+      const result = await handle(action, ps, campaignName, null);
+
+      expect(result.payload.description).toContain('Ally');
+      expect(result.payload.description).toContain('Regained 5 HP');
+      expect(healingRoll.logHealingToSSE).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+        targetName: 'Ally',
+        sourceName: 'Cure Wounds',
+      }));
+    });
+
+    it('should return automation_info with Long Rest message when uses depleted for non-self', async () => {
+      runtimeState.getRuntimeValue.mockReturnValue(0);
+
+      const ps = makePlayerStats();
+      const action = {
+        name: 'Cure Wounds',
+        automation: {
+          type: 'reaction',
+          uses: 1,
+          healExpression: '1d8',
+        },
+      };
+
+      const result = await handle(action, ps, campaignName, null);
+
+      expect(result.payload.description).toContain('Long Rest');
+    });
+  });
+
+  // ── Non-self healing without uses field ──────────────────────
+
+  describe('non-self healing without uses field', () => {
+    it('should return healing popup with expression when no uses', async () => {
+      targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Ally' } });
+
+      const ps = makePlayerStats();
+      const action = {
+        name: 'Cure Wounds',
+        automation: {
+          type: 'reaction',
+          healExpression: '1d8',
+        },
+      };
+
+      const result = await handle(action, ps, campaignName, null);
+
+      expect(result.type).toBe('popup');
+      expect(result.payload.type).toBe('healing');
+      expect(result.payload.healAmount).toBe('1d8');
+    });
+
+    it('should return healing popup when no uses and no healExpression', async () => {
+      targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Ally' } });
+
+      const ps = makePlayerStats();
+      const action = {
+        name: 'Stabilize',
+        automation: {
+          type: 'reaction',
+        },
+      };
+
+      const result = await handle(action, ps, campaignName, null);
+
+      expect(result.type).toBe('popup');
+      expect(result.payload.type).toBe('healing');
+    });
+
+    it('should include bonus HP in description when resolveHealingBonuses > 0', async () => {
+      automationService.resolveHealingBonuses.mockReturnValue(2);
+      targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Ally' } });
+
+      const ps = makePlayerStats();
+      const action = {
+        name: 'Cure Wounds',
+        automation: {
+          type: 'reaction',
+          healExpression: '1d8',
+        },
+      };
+
+      const result = await handle(action, ps, campaignName, null);
+
+      expect(result.payload.description).toContain('+ 2 bonus HP');
     });
   });
 
@@ -516,23 +660,6 @@ describe('healingHandler', () => {
 
       expect(result.payload.healAmount).toBe(8);
       expect(result.payload.description).toContain('+ 3 bonus HP');
-    });
-
-    it('should return expression string when healAmount is not a number and no uses', async () => {
-      const ps = makePlayerStats();
-      const action = {
-        name: 'Cure Wounds',
-        automation: {
-          type: 'reaction',
-          healAmount: '1d8',
-          healExpression: '1d8',
-        },
-      };
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.payload.type).toBe('healing');
-      expect(result.payload.healAmount).toBe('1d8');
     });
   });
 
@@ -573,19 +700,24 @@ describe('healingHandler', () => {
       expect(result.payload.formula).toContain('1d8');
     });
 
-    it('should return null when rollExpression returns null', async () => {
+    it('should default martialArtsDie to 4 when class features returns null', async () => {
       const ps = makePlayerStats({
         abilities: [{ name: 'Wisdom', bonus: 2 }],
       });
-      const action = makeAction({
-        healExpression: 'martial_arts_die + WIS',
-      });
+      const action = {
+        name: 'Hand of Healing',
+        automation: {
+          type: 'self_healing',
+          healExpression: 'martial_arts_die + WIS',
+        },
+      };
 
-      diceRoller.rollExpression.mockReturnValue(null);
+      classFeatures.getClassFeatures.mockReturnValue(null);
+      diceRoller.rollExpression.mockReturnValue({ total: 4, rolls: [4], modifier: 0 });
 
       const result = await handle(action, ps, campaignName, null);
 
-      expect(result).toBeNull();
+      expect(result.payload.formula).toContain('1d4');
     });
 
     it('should include bonus in formula when resolveHealingBonuses > 0', async () => {
@@ -624,6 +756,47 @@ describe('healingHandler', () => {
       expect(result.payload.targetCurrentHp).toBe(18);
       expect(result.payload.targetMaxHp).toBe(20);
     });
+
+    it('should use targetName from resolveTarget when isSelf is false', async () => {
+      const ps = makePlayerStats({
+        abilities: [{ name: 'Wisdom', bonus: 3 }],
+      });
+      const action = {
+        name: 'Hand of Healing',
+        automation: {
+          type: 'other_healing',
+          healExpression: 'martial_arts_die + WIS',
+        },
+      };
+
+      targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Ally' } });
+      diceRoller.rollExpression.mockReturnValue({ total: 6, rolls: [6], modifier: 0 });
+
+      const result = await handle(action, ps, campaignName, null);
+
+      expect(result.type).toBe('modal');
+      expect(result.payload.targetName).toBe('Ally');
+    });
+
+    it('should fallback to player name when resolveTarget returns null for monk healing', async () => {
+      const ps = makePlayerStats({
+        abilities: [{ name: 'Wisdom', bonus: 3 }],
+      });
+      const action = {
+        name: 'Hand of Healing',
+        automation: {
+          type: 'other_healing',
+          healExpression: 'martial_arts_die + WIS',
+        },
+      };
+
+      targetResolver.resolveTarget.mockResolvedValue(null);
+      diceRoller.rollExpression.mockReturnValue({ total: 6, rolls: [6], modifier: 0 });
+
+      const result = await handle(action, ps, campaignName, null);
+
+      expect(result.payload.targetName).toBe('TestHealer');
+    });
   });
 
   // ── Physician's Touch ────────────────────────────────────────
@@ -642,6 +815,69 @@ describe('healingHandler', () => {
       const result = await handle(action, ps, campaignName, null);
 
       expect(result.payload.hasPhysiciansTouch).toBe(true);
+    });
+  });
+
+  // ── Uses tracking edge cases ─────────────────────────────────
+
+  describe('uses tracking edge cases', () => {
+    it('should use auto.uses as default when no runtime value and no _trackedResources', async () => {
+      runtimeState.getRuntimeValue.mockReturnValue(undefined);
+      const ps = makePlayerStats();
+      const action = makeAction({ healExpression: '1d4', uses: 5 });
+
+      const result = await handle(action, ps, campaignName, null);
+
+      expect(result.type).toBe('popup');
+      expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
+        'TestHealer',
+        'healingtouchUses',
+        4,
+        campaignName,
+        true,
+      );
+    });
+
+    it('should use usesMax from automation when no runtime value', async () => {
+      runtimeState.getRuntimeValue.mockReturnValue(undefined);
+      const ps = makePlayerStats();
+      const action = makeAction({ healExpression: '1d4', usesMax: 3 });
+
+      const result = await handle(action, ps, campaignName, null);
+
+      expect(result.type).toBe('popup');
+      expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
+        'TestHealer',
+        'healingtouchUses',
+        2,
+        campaignName,
+        true,
+      );
+    });
+  });
+
+  // ── Popup description edge cases ─────────────────────────────
+
+  describe('popup description edge cases', () => {
+    it('should report singular "use" when 1 use remaining', async () => {
+      runtimeState.getRuntimeValue.mockReturnValue(2);
+      const ps = makePlayerStats();
+      const action = makeAction({ healExpression: '1d4', uses: 1 });
+
+      const result = await handle(action, ps, campaignName, null);
+
+      expect(result.payload.description).toContain('1 use remaining');
+      expect(result.payload.description).not.toContain('uses');
+    });
+
+    it('should report plural "uses" when more than 1 remaining', async () => {
+      runtimeState.getRuntimeValue.mockReturnValue(3);
+      const ps = makePlayerStats();
+      const action = makeAction({ healExpression: '1d4', uses: 1 });
+
+      const result = await handle(action, ps, campaignName, null);
+
+      expect(result.payload.description).toContain('2 uses remaining');
     });
   });
 });

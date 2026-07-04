@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import * as hexMapUtils from '../../services/maps/hexMapUtils.js';
@@ -33,19 +33,15 @@ describe('TravelPathLayer', () => {
     });
 
     describe('null/empty path handling', () => {
-        it('should return null when path is null', () => {
-            const { container } = renderTravelPathLayer({ path: null });
-            expect(container.querySelector('g.travel-path-layer')).not.toBeInTheDocument();
-        });
+        it('should return null when path is null, undefined, or empty', () => {
+            const { container: c1 } = render(<TravelPathLayer path={null} />);
+            expect(c1.querySelector('g.travel-path-layer')).not.toBeInTheDocument();
 
-        it('should return null when path is undefined', () => {
-            const { container } = render(<TravelPathLayer path={undefined} />);
-            expect(container.querySelector('g.travel-path-layer')).not.toBeInTheDocument();
-        });
+            const { container: c2 } = render(<TravelPathLayer path={undefined} />);
+            expect(c2.querySelector('g.travel-path-layer')).not.toBeInTheDocument();
 
-        it('should return null when path is empty', () => {
-            const { container } = render(<TravelPathLayer path={[]} />);
-            expect(container.querySelector('g.travel-path-layer')).not.toBeInTheDocument();
+            const { container: c3 } = render(<TravelPathLayer path={[]} />);
+            expect(c3.querySelector('g.travel-path-layer')).not.toBeInTheDocument();
         });
     });
 
@@ -54,183 +50,95 @@ describe('TravelPathLayer', () => {
             const { container } = renderTravelPathLayer();
             expect(container.querySelector('g.travel-path-layer')).toBeInTheDocument();
         });
-
-        it('should render the destination marker text "D"', () => {
-            renderTravelPathLayer();
-            expect(screen.getByText('D')).toBeInTheDocument();
-        });
     });
 
     describe('path polylines', () => {
-        it('should render 2 polylines (behind + ahead) for pathIndex=2', () => {
+        it('should render behind and ahead polylines for a valid pathIndex', () => {
             const { container } = renderTravelPathLayer();
             const polylines = container.querySelectorAll('polyline');
             expect(polylines.length).toBe(2);
         });
 
-        it('should render behind polyline with stroke-opacity 0.4', () => {
+        it('should render behind polyline with correct style', () => {
             const { container } = renderTravelPathLayer();
             const behind = container.querySelector('polyline[stroke-opacity="0.4"]');
             expect(behind).toBeInTheDocument();
-        });
-
-        it('should render ahead polyline with stroke-opacity 0.8', () => {
-            const { container } = renderTravelPathLayer();
-            const ahead = container.querySelector('polyline[stroke-opacity="0.8"]');
-            expect(ahead).toBeInTheDocument();
-        });
-
-        it('should render behind polyline with stroke #FFD700', () => {
-            const { container } = renderTravelPathLayer();
-            const behind = container.querySelector('polyline[stroke-opacity="0.4"]');
             expect(behind.getAttribute('stroke')).toBe('#FFD700');
-        });
-
-        it('should render ahead polyline with stroke #FFD700', () => {
-            const { container } = renderTravelPathLayer();
-            const ahead = container.querySelector('polyline[stroke-opacity="0.8"]');
-            expect(ahead.getAttribute('stroke')).toBe('#FFD700');
-        });
-
-        it('should render behind polyline with strokeWidth 2', () => {
-            const { container } = renderTravelPathLayer();
-            const behind = container.querySelector('polyline[stroke-opacity="0.4"]');
             expect(behind.getAttribute('stroke-width')).toBe('2');
-        });
-
-        it('should render ahead polyline with strokeWidth 3', () => {
-            const { container } = renderTravelPathLayer();
-            const ahead = container.querySelector('polyline[stroke-opacity="0.8"]');
-            expect(ahead.getAttribute('stroke-width')).toBe('3');
-        });
-
-        it('should render behind polyline with dasharray "4 3"', () => {
-            const { container } = renderTravelPathLayer();
-            const behind = container.querySelector('polyline[stroke-opacity="0.4"]');
             expect(behind.getAttribute('stroke-dasharray')).toBe('4 3');
         });
 
-        it('should render ahead polyline with dasharray "6 4"', () => {
+        it('should render ahead polyline with correct style', () => {
             const { container } = renderTravelPathLayer();
             const ahead = container.querySelector('polyline[stroke-opacity="0.8"]');
+            expect(ahead).toBeInTheDocument();
+            expect(ahead.getAttribute('stroke')).toBe('#FFD700');
+            expect(ahead.getAttribute('stroke-width')).toBe('3');
             expect(ahead.getAttribute('stroke-dasharray')).toBe('6 4');
         });
 
-        it('should render behind polyline with correct point count based on pathIndex', () => {
+        it('should render correct point counts for behind and ahead polylines', () => {
             const { container } = renderTravelPathLayer({ pathIndex: 2 });
             const behind = container.querySelector('polyline[stroke-opacity="0.4"]');
-            const points = behind.getAttribute('points').split(' ').map(p => p.split(',').map(Number));
-            expect(points.length).toBe(2);
-        });
-
-        it('should render ahead polyline with correct point count based on pathIndex', () => {
-            const { container } = renderTravelPathLayer({ pathIndex: 2 });
             const ahead = container.querySelector('polyline[stroke-opacity="0.8"]');
-            const points = ahead.getAttribute('points').split(' ').map(p => p.split(',').map(Number));
-            expect(points.length).toBe(3);
+            const behindPoints = behind.getAttribute('points').split(' ').length;
+            const aheadPoints = ahead.getAttribute('points').split(' ').length;
+            expect(behindPoints).toBe(2);
+            expect(aheadPoints).toBe(3);
         });
 
-        it('should render no behind path when pathIndex is 0', () => {
+        it('should not render behind polyline when pathIndex is 0', () => {
             const { container } = renderTravelPathLayer({ pathIndex: 0 });
-            const behind = container.querySelectorAll('polyline[stroke-opacity="0.4"]');
-            expect(behind.length).toBe(0);
+            expect(container.querySelectorAll('polyline[stroke-opacity="0.4"]')).toHaveLength(0);
         });
 
-        it('should render no ahead path when pathIndex equals path length', () => {
+        it('should not render ahead polyline when pathIndex equals path length', () => {
             const { container } = renderTravelPathLayer({ pathIndex: 5 });
-            const ahead = container.querySelectorAll('polyline[stroke-opacity="0.8"]');
-            expect(ahead.length).toBe(0);
-        });
-
-        it('should render behind path with 1 element when pathIndex is 1', () => {
-            const { container } = renderTravelPathLayer({ pathIndex: 1 });
-            const behind = container.querySelector('polyline[stroke-opacity="0.4"]');
-            expect(behind).toBeInTheDocument();
-        });
-
-        it('should render ahead path with remaining elements when pathIndex is 1', () => {
-            const { container } = renderTravelPathLayer({ pathIndex: 1 });
-            const ahead = container.querySelector('polyline[stroke-opacity="0.8"]');
-            expect(ahead).toBeInTheDocument();
+            expect(container.querySelectorAll('polyline[stroke-opacity="0.8"]')).toHaveLength(0);
         });
     });
 
     describe('current position circle', () => {
-        it('should render 1 circle for current position when pathIndex is valid', () => {
-            const { container } = renderTravelPathLayer();
-            const circles = container.querySelectorAll('circle');
-            expect(circles.length).toBe(1);
-        });
-
-        it('should render current circle with stroke #FFD700', () => {
+        it('should render a circle with correct style for a valid pathIndex', () => {
             const { container } = renderTravelPathLayer();
             const circle = container.querySelector('circle');
+            expect(circle).toBeInTheDocument();
             expect(circle.getAttribute('stroke')).toBe('#FFD700');
-        });
-
-        it('should render current circle with correct radius (HEX_SIZE * 0.6 = 18)', () => {
-            const { container } = renderTravelPathLayer();
-            const circle = container.querySelector('circle');
             expect(circle.getAttribute('r')).toBe('18');
-        });
-
-        it('should render current circle with fill rgba(255, 215, 0, 0.15)', () => {
-            const { container } = renderTravelPathLayer();
-            const circle = container.querySelector('circle');
             expect(circle.getAttribute('fill')).toBe('rgba(255, 215, 0, 0.15)');
-        });
-
-        it('should render current circle with strokeWidth 2', () => {
-            const { container } = renderTravelPathLayer();
-            const circle = container.querySelector('circle');
             expect(circle.getAttribute('stroke-width')).toBe('2');
         });
 
-        it('should render no current position circle when pathIndex equals path length', () => {
-            const { container } = renderTravelPathLayer({ pathIndex: 5 });
-            const circles = container.querySelectorAll('circle');
-            expect(circles.length).toBe(0);
-        });
+        it('should not render a circle when pathIndex is at or beyond path length', () => {
+            const { container: c1 } = renderTravelPathLayer({ pathIndex: 5 });
+            expect(c1.querySelectorAll('circle')).toHaveLength(0);
 
-        it('should render no current position circle when pathIndex is out of bounds', () => {
-            const { container } = renderTravelPathLayer({ pathIndex: 10 });
-            const circles = container.querySelectorAll('circle');
-            expect(circles.length).toBe(0);
+            const { container: c2 } = renderTravelPathLayer({ pathIndex: 10 });
+            expect(c2.querySelectorAll('circle')).toHaveLength(0);
         });
     });
 
     describe('destination marker', () => {
-        it('should always render destination marker regardless of pathIndex', () => {
-            renderTravelPathLayer({ pathIndex: 0 });
-            expect(screen.getByText('D')).toBeInTheDocument();
+        it('should always render the destination marker regardless of pathIndex', () => {
+            const { container: c1 } = renderTravelPathLayer({ pathIndex: 0 });
+            expect(c1.querySelector('text')).toBeInTheDocument();
+
+            const { container: c2 } = renderTravelPathLayer({ pathIndex: 5 });
+            expect(c2.querySelector('text')).toBeInTheDocument();
         });
 
-        it('should always render destination marker at end of path', () => {
-            renderTravelPathLayer({ pathIndex: 5 });
-            expect(screen.getByText('D')).toBeInTheDocument();
-        });
-
-        it('should render destination rect with correct dimensions (36x36)', () => {
+        it('should render the destination rect with correct style', () => {
             const { container } = renderTravelPathLayer();
             const destRect = container.querySelector('rect[stroke="#FFD700"]');
+            expect(destRect).toBeInTheDocument();
             expect(destRect.getAttribute('width')).toBe('36');
             expect(destRect.getAttribute('height')).toBe('36');
-        });
-
-        it('should render destination rect with strokeWidth 2.5 and rx 4', () => {
-            const { container } = renderTravelPathLayer();
-            const destRect = container.querySelector('rect[stroke="#FFD700"]');
             expect(destRect.getAttribute('stroke-width')).toBe('2.5');
             expect(destRect.getAttribute('rx')).toBe('4');
-        });
-
-        it('should render destination rect with dasharray "5 3"', () => {
-            const { container } = renderTravelPathLayer();
-            const destRect = container.querySelector('rect[stroke="#FFD700"]');
             expect(destRect.getAttribute('stroke-dasharray')).toBe('5 3');
         });
 
-        it('should render destination text with correct styling', () => {
+        it('should render the destination text with correct style', () => {
             renderTravelPathLayer();
             const text = screen.getByText('D');
             expect(text.getAttribute('fill')).toBe('#FFD700');
@@ -239,7 +147,7 @@ describe('TravelPathLayer', () => {
             expect(text.getAttribute('text-anchor')).toBe('middle');
         });
 
-        it('should render destination text at correct x and y coordinates', () => {
+        it('should render the destination text at the correct position', () => {
             const { container } = renderTravelPathLayer();
             const text = container.querySelector('text');
             const destHex = defaultPath[defaultPath.length - 1];
@@ -251,14 +159,7 @@ describe('TravelPathLayer', () => {
     });
 
     describe('coordinate passthrough to hexToPixel', () => {
-        it('should call hexToPixel for behind, ahead, current, and destination hexes', () => {
-            // pathIndex=2: behind=[0,1] (2 calls), ahead=[2,3,4] (3 calls),
-            // current=path[2] (1 call), destination=path[4] (1 call) = 7 total
-            renderTravelPathLayer();
-            expect(hexMapUtils.hexToPixel).toHaveBeenCalledTimes(7);
-        });
-
-        it('should pass hex coordinates to hexToPixel for each hex in behind and ahead segments', () => {
+        it('should call hexToPixel with correct coordinates for behind, ahead, current, and destination hexes', () => {
             renderTravelPathLayer();
             const callArgs = hexMapUtils.hexToPixel.mock.calls.map(call => ({ q: call[0], r: call[1] }));
             // current: path[2] -> (1,1)

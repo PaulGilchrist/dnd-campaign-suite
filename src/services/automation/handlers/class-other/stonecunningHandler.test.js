@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { handle, restoreUses } from './stonecunningHandler.js';
 import { toggleBuff } from '../../common/buffToggle.js';
@@ -48,10 +48,10 @@ function makeAction(overrides = {}) {
     };
 }
 
-function expectSuccessfulActivation(result) {
+function expectSuccessfulActivation(result, customName) {
     expect(result.type).toBe('popup');
     expect(result.payload.type).toBe('automation_info');
-    expect(result.payload.name).toBe('Stonecunning');
+    expect(result.payload.name).toBe(customName || 'Stonecunning');
     expect(result.payload.automationType).toBe('stonecunning');
 }
 
@@ -74,7 +74,6 @@ describe('stonecunningHandler', () => {
             const result = await handle(action, makePlayerStats(), 'test-campaign', null);
 
             expectSuccessfulActivation(result);
-            expect(result.payload.description).toContain('activated');
             // proficiency_bonus=2, so newUses=1, "1 use remaining"
             expect(result.payload.description).toContain('1 use remaining');
         });
@@ -167,7 +166,7 @@ describe('stonecunningHandler', () => {
             expect(addEntry).not.toHaveBeenCalled();
         });
 
-        it('treats stored non-numeric value as usesMax', async () => {
+        it('treats stored non-numeric value as no uses remaining', async () => {
             getRuntimeValue.mockImplementation((_name, key) => {
                 if (key === 'dwarfboy_stonecunningUses') return 'abc';
                 return null;
@@ -299,30 +298,6 @@ describe('stonecunningHandler', () => {
     });
 
     describe('popup description', () => {
-        it('includes duration in activation description', async () => {
-            getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === 'dwarfboy_stonecunningUses') return 1;
-                return null;
-            });
-            toggleBuff.mockReturnValue({ wasActive: false });
-
-            const result = await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
-
-            expect(result.payload.description).toContain('10_minutes');
-        });
-
-        it('includes remaining uses count in activation description', async () => {
-            getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === 'dwarfboy_stonecunningUses') return 3;
-                return null;
-            });
-            toggleBuff.mockReturnValue({ wasActive: false });
-
-            const result = await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
-
-            expect(result.payload.description).toContain('2 uses remaining');
-        });
-
         it('uses singular "use" when exactly 1 remaining after activation', async () => {
             getRuntimeValue.mockImplementation((_name, key) => {
                 if (key === 'dwarfboy_stonecunningUses') return 2;

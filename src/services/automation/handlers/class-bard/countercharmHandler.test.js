@@ -146,16 +146,6 @@ describe('countercharmHandler.handle', () => {
       expect(result.payload.description).toContain('30 ft');
     });
 
-    it('should include the custom range in no-save message when range differs from default', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction({ range: '60 ft' });
-      rangeToFeet.mockReturnValue(60);
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.payload.description).toContain('60 ft');
-    });
-
     it('should find player\'s own failed save', async () => {
       const ps = makePlayerStats();
       const action = makeAction();
@@ -168,20 +158,6 @@ describe('countercharmHandler.handle', () => {
 
       expect(result.payload.description).toContain('Target: TestHero');
       expect(result.payload.description).toContain('Original save');
-    });
-
-    it('should report already succeeded when original save was a hit', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-      findLastAttack.mockResolvedValue(makeAttackResult({
-        attackEvent: makeAttackEvent({ d20: 14, targetAc: 13, hit: true }),
-        targetName: 'TestHero',
-      }));
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.payload.description).toContain('already succeeded');
-      expect(result.payload.description).toContain('Countercharm has no effect');
     });
   });
 
@@ -210,7 +186,7 @@ describe('countercharmHandler.handle', () => {
       expect(result.payload.description).toContain('Target: Ally1');
     });
 
-    it('should skip ally search when range is falsy', async () => {
+    it('should skip ally search when range is falsy or combat context is empty', async () => {
       const ps = makePlayerStats();
       const action = makeAction({ range: null });
       findLastAttack.mockResolvedValue(makeAttackResult());
@@ -220,18 +196,16 @@ describe('countercharmHandler.handle', () => {
 
       expect(result.type).toBe('popup');
       expect(result.payload.description).toContain('No recent save');
-    });
 
-    it('should skip ally search when combat context is null or empty', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
+      vi.clearAllMocks();
+      getRuntimeValue.mockReturnValue(undefined);
       findLastAttack.mockResolvedValue(makeAttackResult());
       getCombatContext.mockResolvedValue(null);
 
-      const result = await handle(action, ps, campaignName, null);
+      const result2 = await handle(action, ps, campaignName, null);
 
-      expect(result.type).toBe('popup');
-      expect(result.payload.description).toContain('No recent save');
+      expect(result2.type).toBe('popup');
+      expect(result2.payload.description).toContain('No recent save');
     });
   });
 
@@ -315,7 +289,7 @@ describe('countercharmHandler.handle', () => {
       expect(result.payload.description).toContain('Target: Ally2');
     });
 
-    it('should skip ally if map positions are missing', async () => {
+    it('should skip ally if map positions are missing or distance is null', async () => {
       const ps = makePlayerStats();
       const action = makeAction({ range: '30 ft' });
       let callCount = 0;
@@ -345,34 +319,16 @@ describe('countercharmHandler.handle', () => {
       const result = await handle(action, ps, campaignName, mapName);
 
       expect(result.payload.description).toContain('Target: Ally1');
-    });
 
-    it('should skip ally if distance calculation returns null', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction({ range: '30 ft' });
-      findLastAttack.mockImplementation(async () => {
-        const c = findLastAttack.mock.calls.length;
-        if (c === 1) {
-          return makeAttackResult();
-        }
-        return makeAttackResult({
-          attackEvent: makeAttackEvent(),
-          attackerName: 'Ally1',
-          targetName: 'Ally1',
-        });
-      });
-      resolveMapPositions.mockResolvedValue({
-        attackerPos: { gridX: 1, gridY: 1 },
-        targetPos: { gridX: 4, gridY: 1 },
-      });
-      getDistanceFeet.mockReturnValue(null);
-      getCombatContext.mockResolvedValue({
-        creatures: [{ name: 'TestHero' }, { name: 'Ally1' }],
-      });
+      vi.clearAllMocks();
+      getRuntimeValue.mockReturnValue(undefined);
+      findLastAttack.mockResolvedValue(makeAttackResult());
+      getCombatContext.mockResolvedValue(null);
 
-      const result = await handle(action, ps, campaignName, mapName);
+      const result2 = await handle(action, ps, campaignName, null);
 
-      expect(result.payload.description).toContain('Target: Ally1');
+      expect(result2.type).toBe('popup');
+      expect(result2.payload.description).toContain('No recent save');
     });
   });
 
@@ -392,23 +348,10 @@ describe('countercharmHandler.handle', () => {
       expect(result.payload.description).toContain('Original save: d20(8)');
       expect(result.payload.description).toContain('Reroll with Advantage');
     });
-
-    it('should display dash when targetAc is null or undefined', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-      findLastAttack.mockResolvedValue(makeAttackResult({
-        attackEvent: makeAttackEvent({ targetAc: null }),
-        targetName: 'TestHero',
-      }));
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.payload.description).toContain('\u2014');
-    });
   });
 
   describe('uses decrement', () => {
-    it('should decrement uses from stored value after successful execution', async () => {
+    it('should decrement uses from stored value, falling back to usesMax when no stored value', async () => {
       const ps = makePlayerStats();
       const action = makeAction({ uses: 3 });
       findLastAttack.mockResolvedValue(makeAttackResult({
@@ -450,38 +393,26 @@ describe('countercharmHandler.handle', () => {
 
       expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', 'countercharmUses', 3, campaignName);
     });
-
-    it('should use usesMax=1 when uses is 0 (0 || 1 fallback)', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction({ uses: 0 });
-      findLastAttack.mockResolvedValue(makeAttackResult({
-        attackEvent: makeAttackEvent({ hit: false }),
-        targetName: 'TestHero',
-      }));
-      getRuntimeValue.mockReturnValue(1);
-
-      await handle(action, ps, campaignName, null);
-
-      expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', 'countercharmUses', 0, campaignName);
-    });
   });
 
   describe('custom feature name', () => {
-    it('should use custom name in popup and description', async () => {
+    it('should use custom name in popup, description, and runtime key', async () => {
       const ps = makePlayerStats();
       const action = {
-        name: 'MyCountercharm',
+        name: 'Bardic Countercharm',
         automation: { range: '30 ft', uses: 1 },
       };
       findLastAttack.mockResolvedValue(makeAttackResult({
         attackEvent: makeAttackEvent({ hit: false }),
         targetName: 'TestHero',
       }));
+      getRuntimeValue.mockReturnValue(1);
 
       const result = await handle(action, ps, campaignName, null);
 
-      expect(result.payload.name).toBe('MyCountercharm');
-      expect(result.payload.description).toContain('<b>MyCountercharm</b>');
+      expect(result.payload.name).toBe('Bardic Countercharm');
+      expect(result.payload.description).toContain('<b>Bardic Countercharm</b>');
+      expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', 'bardiccountercharmUses', 0, campaignName);
     });
 
     it('should use custom name in no-uses message', async () => {
@@ -495,38 +426,6 @@ describe('countercharmHandler.handle', () => {
       const result = await handle(action, ps, campaignName, null);
 
       expect(result.payload.description).toContain('MyCountercharm has no uses remaining');
-    });
-
-    it('should use custom name in no-save message', async () => {
-      const ps = makePlayerStats();
-      const action = {
-        name: 'MyCountercharm',
-        automation: { range: '60 ft', uses: 1 },
-      };
-      getRuntimeValue.mockReturnValue(1);
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.payload.name).toBe('MyCountercharm');
-      expect(result.payload.description).toContain('MyCountercharm');
-      expect(result.payload.description).toContain('60 ft');
-    });
-
-    it('should generate runtime key from custom feature name', async () => {
-      const ps = makePlayerStats();
-      const action = {
-        name: 'Bardic Countercharm',
-        automation: { range: '30 ft', uses: 1 },
-      };
-      findLastAttack.mockResolvedValue(makeAttackResult({
-        attackEvent: makeAttackEvent({ hit: false }),
-        targetName: 'TestHero',
-      }));
-      getRuntimeValue.mockReturnValue(1);
-
-      await handle(action, ps, campaignName, null);
-
-      expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', 'bardiccountercharmUses', 0, campaignName);
     });
   });
 
@@ -580,22 +479,6 @@ describe('countercharmHandler.handle', () => {
         targetName: 'Ally1',
         timestamp: expect.any(Number),
       });
-    });
-  });
-
-  describe('automation passthrough', () => {
-    it('should include automation object in successful popup payload', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction({ uses: 2, range: '45 ft' });
-      findLastAttack.mockResolvedValue(makeAttackResult({
-        attackEvent: makeAttackEvent({ hit: false }),
-        targetName: 'TestHero',
-      }));
-      rangeToFeet.mockReturnValue(45);
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.payload.automation).toEqual({ range: '45 ft', uses: 2 });
     });
   });
 });

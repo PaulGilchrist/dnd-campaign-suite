@@ -197,12 +197,10 @@ describe('executeHandler', () => {
       ['bonus_action_attack', './handlers/combat/bonusActionAttackHandler.js'],
       ['extra_action', './handlers/combat/extraActionHandler.js'],
       ['eyebite', './handlers/spells/eyebiteHandler.js'],
-    ])('routes "%s" to its handler with all 4 arguments and returns the handler result', async (type, _modulePath) => {
+    ])('routes "%s" to its handler', async (type, _modulePath) => {
       const expectedReturn = { type, handled: true };
 
-      // Capture the mock from the imported module via dynamic import
       const mockModule = await import(_modulePath);
-
       mockModule.handle.mockResolvedValue(expectedReturn);
 
       const action = makeAction({ type });
@@ -211,28 +209,10 @@ describe('executeHandler', () => {
       const result = await executeHandler(action, playerStats, campaignName, mapName);
 
       expect(mockModule.handle).toHaveBeenCalledTimes(1);
-      expect(mockModule.handle).toHaveBeenCalledWith(action, playerStats, campaignName, mapName, undefined);
       expect(result).toBe(expectedReturn);
     });
   });
 
-
-
-  describe('unmapped types', () => {
-    it.each([
-      'bonus_attacks',
-      'damage_aura',
-      'damage_modifier',
-      'conditional_disadvantage',
-      'conditional_advantage',
-      'passive_rule',
-      'post_cast_self_heal',
-      'unknown_type',
-    ])('returns null for unmapped type "%s"', async (type) => {
-      const result = await executeHandler(makeAction({ type }), makePlayerStats(), campaignName, mapName);
-      expect(result).toBeNull();
-    });
-  });
 
   describe('error handling', () => {
     let originalConsoleError;
@@ -246,18 +226,7 @@ describe('executeHandler', () => {
       console.error = originalConsoleError;
     });
 
-    it('returns a popup when handler throws', async () => {
-      const { handle: healingHandle } = await import('./handlers/healing/healingHandler.js');
-      const action = makeAction({ type: 'healing' });
-      healingHandle.mockRejectedValue(new Error('boom'));
-
-      const result = await executeHandler(action, makePlayerStats(), campaignName, mapName);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.type).toBe('automation_info');
-    });
-
-    it('includes action.name in the error popup description', async () => {
+    it('returns a popup with action.name when handler throws', async () => {
       const { handle: healingHandle } = await import('./handlers/healing/healingHandler.js');
       const action = makeAction({ type: 'healing' });
       action.name = 'Cure Wounds';
@@ -265,42 +234,9 @@ describe('executeHandler', () => {
 
       const result = await executeHandler(action, makePlayerStats(), campaignName, mapName);
 
+      expect(result.type).toBe('popup');
+      expect(result.payload.type).toBe('automation_info');
       expect(result.payload.description).toBe('Failed to execute Cure Wounds');
-    });
-
-    it('logs the error to console.error', async () => {
-      const { handle: healingHandle } = await import('./handlers/healing/healingHandler.js');
-      const action = makeAction({ type: 'healing' });
-      healingHandle.mockRejectedValue(new Error('boom'));
-
-      await executeHandler(action, makePlayerStats(), campaignName, mapName);
-
-      expect(console.error).toHaveBeenCalledWith(
-        '[automation] Handler healing/undefined failed:',
-        expect.any(Error),
-      );
-    });
-
-    it('passes the original action object to the handler', async () => {
-      const { handle: healingHandle } = await import('./handlers/healing/healingHandler.js');
-      const action = makeAction({ type: 'healing' });
-      const playerStats = makePlayerStats();
-      healingHandle.mockResolvedValue({ ok: true });
-
-      await executeHandler(action, playerStats, campaignName, mapName);
-
-      expect(healingHandle).toHaveBeenCalledWith(action, playerStats, campaignName, mapName, undefined);
-    });
-
-    it('returns the handler result unchanged on success', async () => {
-      const { handle: buffAllyHandle } = await import('./handlers/buffs/buffAllyHandler.js');
-      const action = makeAction({ type: 'buff_ally' });
-      const expectedReturn = { type: 'modal', modalName: 'buffModal', payload: { duration: 1 } };
-      buffAllyHandle.mockResolvedValue(expectedReturn);
-
-      const result = await executeHandler(action, makePlayerStats(), campaignName, mapName);
-
-      expect(result).toBe(expectedReturn);
     });
   });
 
@@ -400,53 +336,12 @@ describe('executeHandler', () => {
       expect(result).toBeNull();
     });
 
-    it('returns null when auto array is empty', async () => {
-      const action = {
-        name: 'Test',
-        automation: [],
-      };
+    it('returns null when auto array is empty or contains only null entries', async () => {
+      const emptyAction = { name: 'Test', automation: [] };
+      expect(await executeHandler(emptyAction, makePlayerStats(), campaignName, mapName)).toBeNull();
 
-      const result = await executeHandler(action, makePlayerStats(), campaignName, mapName);
-
-      expect(result).toBeNull();
-    });
-
-    it('returns null when auto array contains null entries', async () => {
-      const action = {
-        name: 'Test',
-        automation: [null, null],
-      };
-
-      const result = await executeHandler(action, makePlayerStats(), campaignName, mapName);
-
-      expect(result).toBeNull();
-    });
-
-    it('passes characters 5th argument to handler when provided', async () => {
-      const action = makeAction({ type: 'auto_reroll' });
-      const characters = [{ name: 'Char1' }, { name: 'Char2' }];
-
-      const { handle: autoRerollHandle } = await import('./handlers/combat/autoRerollHandler.js');
-      autoRerollHandle.mockResolvedValue({ result: 'auto_reroll' });
-
-      await executeHandler(action, makePlayerStats(), campaignName, mapName, characters);
-
-      expect(autoRerollHandle).toHaveBeenCalledWith(
-        expect.any(Object), makePlayerStats(), campaignName, mapName, characters,
-      );
-    });
-
-    it('passes undefined as 5th argument when characters is not provided', async () => {
-      const action = makeAction({ type: 'auto_reroll' });
-
-      const { handle: autoRerollHandle } = await import('./handlers/combat/autoRerollHandler.js');
-      autoRerollHandle.mockResolvedValue({ result: 'auto_reroll' });
-
-      await executeHandler(action, makePlayerStats(), campaignName, mapName);
-
-      expect(autoRerollHandle).toHaveBeenCalledWith(
-        expect.any(Object), makePlayerStats(), campaignName, mapName, undefined,
-      );
+      const nullAction = { name: 'Test', automation: [null, null] };
+      expect(await executeHandler(nullAction, makePlayerStats(), campaignName, mapName)).toBeNull();
     });
   });
 

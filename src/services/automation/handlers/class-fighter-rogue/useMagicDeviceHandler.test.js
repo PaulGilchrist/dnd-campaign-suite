@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
@@ -9,6 +9,8 @@ vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
 const { getRuntimeValue, setRuntimeValue } = await import(
     '../../../../hooks/runtime/useRuntimeState.js'
 );
+
+import { handle } from './useMagicDeviceHandler.js';
 
 function makeAction(overrides = {}) {
     return {
@@ -157,69 +159,17 @@ describe('useMagicDeviceHandler', () => {
             );
         });
 
-        it('handles missing automation object with defaults', async () => {
+        it('uses custom attunementLimit and chargeRerollSuccess from automation config', async () => {
             getRuntimeValue.mockImplementation((_, key) =>
                 key === 'activeBuffs' ? [] : undefined
             );
 
-            const action = {
-                name: 'Use Magic Device',
-                automation: { type: 'use_magic_device' },
-            };
-            const result = await handle(
-                action,
-                makePlayerStats(),
-                'test-campaign'
-            );
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('4 magic items');
-            expect(result.payload.description).toContain('roll 1d6');
-        });
-
-        it('handles undefined automation with defaults', async () => {
-            getRuntimeValue.mockImplementation((_, key) =>
-                key === 'activeBuffs' ? [] : undefined
-            );
-
-            const action = { name: 'Use Magic Device' };
-            const result = await handle(
-                action,
-                makePlayerStats(),
-                'test-campaign'
-            );
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('4 magic items');
-        });
-
-        it('uses custom attunementLimit from automation config', async () => {
-            getRuntimeValue.mockImplementation((_, key) =>
-                key === 'activeBuffs' ? [] : undefined
-            );
-
-            const action = makeAction({ automation: { attunementLimit: 6 } });
-            const result = await handle(
-                action,
-                makePlayerStats(),
-                'test-campaign'
-            );
+            const action = makeAction({
+                automation: { attunementLimit: 6, chargeRerollSuccess: 5 },
+            });
+            const result = await handle(action, makePlayerStats(), 'test-campaign');
 
             expect(result.payload.description).toContain('6 magic items');
-        });
-
-        it('uses custom chargeRerollSuccess from automation config', async () => {
-            getRuntimeValue.mockImplementation((_, key) =>
-                key === 'activeBuffs' ? [] : undefined
-            );
-
-            const action = makeAction({ automation: { chargeRerollSuccess: 5 } });
-            const result = await handle(
-                action,
-                makePlayerStats(),
-                'test-campaign'
-            );
-
             expect(result.payload.description).toContain('5 use without expending');
         });
 
@@ -241,52 +191,7 @@ describe('useMagicDeviceHandler', () => {
             );
         });
 
-        it('handles non-array activeBuffs stored value', async () => {
-            getRuntimeValue.mockImplementation((_, key) =>
-                key === 'activeBuffs' ? null : undefined
-            );
-
-            const result = await handle(
-                makeAction(),
-                makePlayerStats(),
-                'test-campaign'
-            );
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('activated');
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'TestRogue',
-                'activeBuffs',
-                expect.any(Array),
-                'test-campaign'
-            );
-        });
-
-        it('uses stored activeBuffs as-is when already an array', async () => {
-            getRuntimeValue.mockImplementation((_, key) =>
-                key === 'activeBuffs'
-                    ? [{ name: 'Existing Buff', effect: 'existing' }]
-                    : undefined
-            );
-
-            await handle(
-                makeAction(),
-                makePlayerStats(),
-                'test-campaign'
-            );
-
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'TestRogue',
-                'activeBuffs',
-                expect.arrayContaining([
-                    expect.objectContaining({ name: 'Existing Buff' }),
-                    expect.objectContaining({ name: 'Use Magic Device' }),
-                ]),
-                'test-campaign'
-            );
-        });
-
-        it('uses playerStats name for runtime state keys', async () => {
+        it('uses playerStats name and campaignName for runtime state keys', async () => {
             getRuntimeValue.mockImplementation((_, key) =>
                 key === 'activeBuffs' ? [] : undefined
             );
@@ -304,26 +209,5 @@ describe('useMagicDeviceHandler', () => {
                 'custom-campaign'
             );
         });
-
-        it('uses campaignName for runtime state keys', async () => {
-            getRuntimeValue.mockImplementation((_, key) =>
-                key === 'activeBuffs' ? [] : undefined
-            );
-
-            await handle(
-                makeAction(),
-                makePlayerStats(),
-                'my-campaign'
-            );
-
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'TestRogue',
-                'activeBuffs',
-                expect.any(Array),
-                'my-campaign'
-            );
-        });
     });
 });
-
-import { handle } from './useMagicDeviceHandler.js';

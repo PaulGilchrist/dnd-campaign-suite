@@ -71,7 +71,7 @@ describe('damageRollback', () => {
     // ─── findLastAttack ────────────────────────────────────────
 
     describe('findLastAttack', () => {
-        it('returns null fields when combat context or lastAttack is absent', async () => {
+        it('returns default values when combat context or lastAttack is absent', async () => {
             getCombatContext.mockResolvedValue(null);
             let result = await findLastAttack(campaignName);
             expect(result).toEqual({
@@ -97,7 +97,7 @@ describe('damageRollback', () => {
             expect(result.secondaryDamage).toBe(3);
         });
 
-        it('sums primary and secondary when actualDamage is absent or undefined', async () => {
+        it('sums primary and secondary when actualDamage is absent', async () => {
             const cs = makeCombatContext({
                 lastAttack: makeLastAttack({ primaryDamage: 8, secondaryDamage: 3 }),
             });
@@ -108,20 +108,13 @@ describe('damageRollback', () => {
         });
 
         it('falls back to rawDamage when primaryDamage is falsy', async () => {
-            let cs = makeCombatContext({
-                lastAttack: makeLastAttack({ primaryDamage: undefined, rawDamage: 12 }),
-            });
-            getCombatContext.mockResolvedValue(cs);
-            let result = await findLastAttack(campaignName);
-            expect(result.primaryDamage).toBe(12);
-            expect(result.totalDamage).toBe(12);
-
-            cs = makeCombatContext({
+            const cs = makeCombatContext({
                 lastAttack: makeLastAttack({ primaryDamage: 0, rawDamage: 7 }),
             });
             getCombatContext.mockResolvedValue(cs);
-            result = await findLastAttack(campaignName);
+            const result = await findLastAttack(campaignName);
             expect(result.primaryDamage).toBe(7);
+            expect(result.totalDamage).toBe(7);
         });
 
         it('returns damageTypes from attack event or empty array when absent', async () => {
@@ -189,32 +182,27 @@ describe('damageRollback', () => {
             let result = await rollbackDamage('Goblin', 'Hero', campaignName, 'Mirror Image');
             expect(result).toBe(0);
             expect(applyHealingToTarget).not.toHaveBeenCalled();
-            expect(addEntry).not.toHaveBeenCalled();
 
             // attackerName mismatch
-            const attack1 = makeLastAttack({ attackerName: 'Orc' });
-            const cs1 = makeCombatContext({ lastAttack: attack1 });
+            const cs1 = makeCombatContext({ lastAttack: makeLastAttack({ attackerName: 'Orc' }) });
             getCombatContext.mockResolvedValue(cs1);
             result = await rollbackDamage('Goblin', 'Hero', campaignName, 'Mirror Image');
             expect(result).toBe(0);
 
             // targetName mismatch
-            const attack2 = makeLastAttack({ targetName: 'Wizard' });
-            const cs2 = makeCombatContext({ lastAttack: attack2 });
+            const cs2 = makeCombatContext({ lastAttack: makeLastAttack({ targetName: 'Wizard' }) });
             getCombatContext.mockResolvedValue(cs2);
             result = await rollbackDamage('Goblin', 'Hero', campaignName, 'Mirror Image');
             expect(result).toBe(0);
 
             // zero damage
-            const attack3 = makeLastAttack({ primaryDamage: 0, secondaryDamage: 0, actualDamage: 0 });
-            const cs3 = makeCombatContext({ lastAttack: attack3 });
+            const cs3 = makeCombatContext({ lastAttack: makeLastAttack({ primaryDamage: 0, secondaryDamage: 0, actualDamage: 0 }) });
             getCombatContext.mockResolvedValue(cs3);
             result = await rollbackDamage('Goblin', 'Hero', campaignName, 'Mirror Image');
             expect(result).toBe(0);
 
             // negative damage
-            const attack4 = makeLastAttack({ actualDamage: -5 });
-            const cs4 = makeCombatContext({ lastAttack: attack4 });
+            const cs4 = makeCombatContext({ lastAttack: makeLastAttack({ actualDamage: -5 }) });
             getCombatContext.mockResolvedValue(cs4);
             result = await rollbackDamage('Goblin', 'Hero', campaignName, 'Mirror Image');
             expect(result).toBe(0);

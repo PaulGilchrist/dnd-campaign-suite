@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
     getSuperiorityDice,
@@ -57,13 +57,7 @@ describe('getSuperiorityDice', () => {
         expect(result).toBe(3);
     });
 
-    it('returns default of 4 when no value stored', () => {
-        getRuntimeValue.mockReturnValue(undefined);
-        const result = getSuperiorityDice(makePlayerStats(), 'test-campaign');
-        expect(result).toBe(4);
-    });
-
-    it('returns default of 4 when null stored', () => {
+    it('returns default of 4 when value is missing or null', () => {
         getRuntimeValue.mockReturnValue(null);
         const result = getSuperiorityDice(makePlayerStats(), 'test-campaign');
         expect(result).toBe(4);
@@ -117,7 +111,6 @@ describe('getManeuversForRules', () => {
         const result1 = await getManeuversForRules('2024');
         expect(result1).toEqual([{ name: 'Test' }]);
 
-        // Second call should use cache
         const result2 = await getManeuversForRules('2024');
         expect(result2).toEqual([{ name: 'Test' }]);
         expect(dataLoader.loadManeuvers).toHaveBeenCalledTimes(1);
@@ -149,7 +142,6 @@ describe('rollManeuverDie', () => {
         );
 
         expect(result.dieValue).toBe(7);
-        expect(result.dieDescription).toContain('Rolled d10 for 7');
         expect(result.expendedDie).toBe(true);
         expect(result.relentlessUsed).toBe(false);
     });
@@ -171,7 +163,6 @@ describe('rollManeuverDie', () => {
         );
 
         expect(result.dieValue).toBe(3);
-        expect(result.dieDescription).toContain('Relentless');
         expect(result.expendedDie).toBe(false);
         expect(result.relentlessUsed).toBe(false);
         expect(setRuntimeValue).toHaveBeenCalledWith(

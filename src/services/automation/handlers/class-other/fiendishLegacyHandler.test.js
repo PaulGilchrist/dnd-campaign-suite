@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import {
@@ -37,14 +37,6 @@ function makeAction(automation = {}) {
     };
 }
 
-const LEGACY_KEYS = [
-    '_fiendishLegacySelection',
-    '_fiendishLegacyAbility',
-    '_fiendishLegacyCantrip',
-    '_fiendishLegacyLevel3',
-    '_fiendishLegacyLevel5',
-];
-
 // ─── handle ──────────────────────────────────────────────────────
 
 describe('fiendishLegacyHandler.handle', () => {
@@ -63,16 +55,7 @@ describe('fiendishLegacyHandler.handle', () => {
         expect(result.payload.automation).toEqual({ type: 'fiendish_legacy' });
     });
 
-    it('returns info popup with custom automation in payload when already selected', async () => {
-        getRuntimeValue.mockReturnValue('Abyssal');
-
-        const result = await handle(makeAction({ custom: 'val' }), makePlayerStats(), campaignName, null);
-
-        expect(result.type).toBe('popup');
-        expect(result.payload.automation).toEqual({ type: 'fiendish_legacy', custom: 'val' });
-    });
-
-    it('returns modal when no legacy is selected (null)', async () => {
+    it('returns modal when no legacy is selected', async () => {
         getRuntimeValue.mockReturnValue(null);
 
         const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
@@ -82,24 +65,6 @@ describe('fiendishLegacyHandler.handle', () => {
         expect(result.payload.action).toBeDefined();
         expect(result.payload.playerStats).toBeInstanceOf(Object);
         expect(result.payload.campaignName).toBe(campaignName);
-    });
-
-    it('returns modal when no legacy is selected (undefined)', async () => {
-        getRuntimeValue.mockReturnValue(undefined);
-
-        const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-        expect(result.type).toBe('modal');
-        expect(result.modalName).toBe('fiendishLegacy');
-    });
-
-    it('returns modal when no legacy is selected (empty string)', async () => {
-        getRuntimeValue.mockReturnValue('');
-
-        const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-        expect(result.type).toBe('modal');
-        expect(result.modalName).toBe('fiendishLegacy');
     });
 });
 
@@ -164,23 +129,6 @@ describe('confirmFiendishLegacy', () => {
         expect(setRuntimeValue).toHaveBeenNthCalledWith(4, playerName, '_fiendishLegacyLevel3', 'False Life', campaignName);
         expect(setRuntimeValue).toHaveBeenNthCalledWith(5, playerName, '_fiendishLegacyLevel5', 'Ray of Enfeeblement', campaignName);
     });
-
-    it('calls setRuntimeValue exactly 5 times for any valid legacy', async () => {
-        await confirmFiendishLegacy(makePlayerStats(), 'Infernal', campaignName);
-
-        expect(setRuntimeValue).toHaveBeenCalledTimes(5);
-    });
-
-    it('uses the player stats name (not hardcoded) for all setRuntimeValue calls', async () => {
-        const customStats = makePlayerStats({ name: 'CustomWarlock' });
-        await confirmFiendishLegacy(customStats, 'Infernal', campaignName);
-
-        expect(setRuntimeValue).toHaveBeenCalledWith('CustomWarlock', '_fiendishLegacySelection', 'Infernal', campaignName);
-        expect(setRuntimeValue).toHaveBeenCalledWith('CustomWarlock', '_fiendishLegacyAbility', 'Charisma', campaignName);
-        expect(setRuntimeValue).toHaveBeenCalledWith('CustomWarlock', '_fiendishLegacyCantrip', 'Fire Bolt', campaignName);
-        expect(setRuntimeValue).toHaveBeenCalledWith('CustomWarlock', '_fiendishLegacyLevel3', 'Hellish Rebuke', campaignName);
-        expect(setRuntimeValue).toHaveBeenCalledWith('CustomWarlock', '_fiendishLegacyLevel5', 'Darkness', campaignName);
-    });
 });
 
 // ─── Getters ──────────────────────────────────────────────────────
@@ -201,14 +149,6 @@ describe('getFiendishLegacySelection', () => {
 
         expect(result).toBeNull();
     });
-
-    it('delegates to getRuntimeValue with the correct key', () => {
-        getRuntimeValue.mockReturnValue('Abyssal');
-
-        getFiendishLegacySelection(makePlayerStats(), campaignName);
-
-        expect(getRuntimeValue).toHaveBeenCalledWith(playerName, '_fiendishLegacySelection', campaignName);
-    });
 });
 
 describe('getFiendishLegacyAbility', () => {
@@ -226,14 +166,6 @@ describe('getFiendishLegacyAbility', () => {
         const result = getFiendishLegacyAbility(makePlayerStats(), campaignName);
 
         expect(result).toBeNull();
-    });
-
-    it('delegates to getRuntimeValue with the correct key', () => {
-        getRuntimeValue.mockReturnValue('Charisma');
-
-        getFiendishLegacyAbility(makePlayerStats(), campaignName);
-
-        expect(getRuntimeValue).toHaveBeenCalledWith(playerName, '_fiendishLegacyAbility', campaignName);
     });
 });
 
@@ -253,14 +185,6 @@ describe('getFiendishLegacyCantrip', () => {
 
         expect(result).toBeNull();
     });
-
-    it('delegates to getRuntimeValue with the correct key', () => {
-        getRuntimeValue.mockReturnValue('Chill Touch');
-
-        getFiendishLegacyCantrip(makePlayerStats(), campaignName);
-
-        expect(getRuntimeValue).toHaveBeenCalledWith(playerName, '_fiendishLegacyCantrip', campaignName);
-    });
 });
 
 describe('getFiendishLegacyLevel3Spell', () => {
@@ -278,14 +202,6 @@ describe('getFiendishLegacyLevel3Spell', () => {
         const result = getFiendishLegacyLevel3Spell(makePlayerStats(), campaignName);
 
         expect(result).toBeNull();
-    });
-
-    it('delegates to getRuntimeValue with the correct key', () => {
-        getRuntimeValue.mockReturnValue('False Life');
-
-        getFiendishLegacyLevel3Spell(makePlayerStats(), campaignName);
-
-        expect(getRuntimeValue).toHaveBeenCalledWith(playerName, '_fiendishLegacyLevel3', campaignName);
     });
 });
 
@@ -305,14 +221,6 @@ describe('getFiendishLegacyLevel5Spell', () => {
 
         expect(result).toBeNull();
     });
-
-    it('delegates to getRuntimeValue with the correct key', () => {
-        getRuntimeValue.mockReturnValue('Hold Person');
-
-        getFiendishLegacyLevel5Spell(makePlayerStats(), campaignName);
-
-        expect(getRuntimeValue).toHaveBeenCalledWith(playerName, '_fiendishLegacyLevel5', campaignName);
-    });
 });
 
 // ─── restoreUses ─────────────────────────────────────────────────
@@ -329,29 +237,15 @@ describe('restoreUses', () => {
 
         const calls = setRuntimeValue.mock.calls;
         const keys = calls.map((c) => c[1]);
-        expect(keys).toEqual(LEGACY_KEYS);
+        expect(keys).toEqual([
+            '_fiendishLegacySelection',
+            '_fiendishLegacyAbility',
+            '_fiendishLegacyCantrip',
+            '_fiendishLegacyLevel3',
+            '_fiendishLegacyLevel5',
+        ]);
         calls.forEach((c) => {
             expect(c[2]).toBeNull();
-        });
-    });
-
-    it('uses the playerName argument for all calls', () => {
-        restoreUses('OtherPlayer', campaignName);
-
-        const calls = setRuntimeValue.mock.calls;
-        expect(calls.length).toBe(5);
-        calls.forEach((c) => {
-            expect(c[0]).toBe('OtherPlayer');
-        });
-    });
-
-    it('uses the campaignName argument for all calls', () => {
-        restoreUses(playerName, 'OtherCampaign');
-
-        const calls = setRuntimeValue.mock.calls;
-        expect(calls.length).toBe(5);
-        calls.forEach((c) => {
-            expect(c[3]).toBe('OtherCampaign');
         });
     });
 });

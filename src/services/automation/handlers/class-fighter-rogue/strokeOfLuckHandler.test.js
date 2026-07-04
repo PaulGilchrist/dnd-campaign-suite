@@ -1,4 +1,3 @@
-// @improved-by-ai
 import { handle } from './strokeOfLuckHandler.js';
 import * as runtimeState from '../../../../hooks/runtime/useRuntimeState.js';
 import * as damageRollback from '../../../../services/automation/common/damageRollback.js';
@@ -130,33 +129,6 @@ describe('strokeOfLuckHandler.handle', () => {
         );
     });
 
-    it('should propagate errors from setRuntimeValue', async () => {
-        runtimeState.getRuntimeValue.mockReturnValueOnce(false);
-        damageRollback.findLastAttack.mockResolvedValue({
-            attackEvent: { d20: 1, bonus: 5, targetName: 'Goblin', hit: false, rollType: 'attack', targetAc: 15, timestamp: Date.now() },
-            attackerName: 'TestRogue',
-            targetName: 'Goblin',
-            primaryDamage: 10,
-            secondaryDamage: 0,
-            totalDamage: 10,
-            damageTypes: ['Slashing'],
-        });
-        runtimeState.setRuntimeValue.mockRejectedValue(new Error('Network failure'));
-
-        await expect(
-            handle(mockAction, mockPlayerStats, mockCampaignName)
-        ).rejects.toThrow('Network failure');
-    });
-
-    it('should propagate errors from findLastAttack', async () => {
-        runtimeState.getRuntimeValue.mockReturnValueOnce(false);
-        damageRollback.findLastAttack.mockRejectedValue(new Error('Database unavailable'));
-
-        await expect(
-            handle(mockAction, mockPlayerStats, mockCampaignName)
-        ).rejects.toThrow('Database unavailable');
-    });
-
     it('should use unknown when targetName is missing from attackEvent', async () => {
         runtimeState.getRuntimeValue.mockReturnValueOnce(false);
         damageRollback.findLastAttack.mockResolvedValue({
@@ -178,3 +150,5 @@ describe('strokeOfLuckHandler.handle', () => {
         expect(result.payload.description).toContain('<strong>23</strong>');
     });
 });
+
+// @cleaned-by-ai

@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { handle } from './telekineticMovementHandler.js';
 import * as logService from '../../../ui/logService.js';
 
@@ -22,28 +22,13 @@ describe('telekineticMovementHandler', () => {
     });
 
     describe('handle', () => {
-        it('should return a popup with automation_info type', async () => {
+        it('should return a popup with automation_info type and all payload fields', async () => {
             const result = await handle(makeAction(), makePlayerStats(), 'campaign', 'map');
 
             expect(result.type).toBe('popup');
             expect(result.payload.type).toBe('automation_info');
-        });
-
-        it('should include the action name in the popup payload', async () => {
-            const result = await handle(makeAction(), makePlayerStats(), 'campaign', 'map');
-
             expect(result.payload.name).toBe('Telekinetic Movement');
-        });
-
-        it('should include the automation type in the popup payload', async () => {
-            const result = await handle(makeAction(), makePlayerStats(), 'campaign', 'map');
-
             expect(result.payload.automationType).toBe('telekinetic_movement');
-        });
-
-        it('should include the automation object in the popup payload', async () => {
-            const result = await handle(makeAction(), makePlayerStats(), 'campaign', 'map');
-
             expect(result.payload.automation).toEqual({
                 type: 'telekinetic_movement',
                 range: '30',
@@ -101,18 +86,6 @@ describe('telekineticMovementHandler', () => {
                     type: 'automation_info',
                 }),
             });
-        });
-
-        it('should accept and ignore the mapName parameter', async () => {
-            const result = await handle(
-                makeAction(),
-                makePlayerStats(),
-                'campaign',
-                'some-map-name'
-            );
-
-            expect(result.type).toBe('popup');
-            expect(logService.addEntry).toHaveBeenCalledWith('campaign', expect.any(Object));
         });
     });
 });

@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @improved-by-ai @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import useMapLoader from './useMapLoader.js';
@@ -57,7 +57,7 @@ describe('useMapLoader - load existing map data', () => {
 
     const createMapData = (overrides = {}) => ({ ...baseMapData, ...overrides });
 
-    describe('load existing map data', () => {
+    describe('loads existing map fields', () => {
         it('calls loadMapData with campaign and map name', async () => {
             mapsService.loadMapData.mockResolvedValue(createMapData());
 
@@ -88,79 +88,47 @@ describe('useMapLoader - load existing map data', () => {
             expect(result.current[field]).toEqual(existingValue);
         });
 
-        it('sets weather from existing map data', async () => {
-            mapsService.loadMapData.mockResolvedValue(createMapData({ weather: 'stormy' }));
+        it('sets weather, gridSize, zoom, panX, panY from existing data', async () => {
+            mapsService.loadMapData.mockResolvedValue(createMapData({
+                weather: 'stormy',
+                gridSize: 20,
+                zoom: 5,
+                panX: 100,
+                panY: 200,
+            }));
 
             const { result } = renderHook(() => useMapLoader('test-campaign', 'test-map', characters));
 
             await new Promise(r => setTimeout(r, 50));
 
             expect(result.current.weather).toBe('stormy');
-        });
-
-        it('uses existing gridSize from map data', async () => {
-            mapsService.loadMapData.mockResolvedValue(createMapData({ gridSize: 20 }));
-
-            const { result } = renderHook(() => useMapLoader('test-campaign', 'test-map', characters));
-
-            await new Promise(r => setTimeout(r, 50));
-
             expect(result.current.gridSize).toBe(20);
-        });
-
-        it.each`
-            zoom   | expected
-            ${1}   | ${2}
-            ${5}   | ${5}
-        `('sets zoom from existing map data, clamped to MIN_ZOOM (input: $zoom)', async ({ zoom, expected }) => {
-            mapsService.loadMapData.mockResolvedValue(createMapData({ zoom }));
-
-            const { result } = renderHook(() => useMapLoader('test-campaign', 'test-map', characters));
-
-            await new Promise(r => setTimeout(r, 50));
-
-            expect(result.current.zoom).toBe(expected);
-        });
-
-        it('sets panX and panY from existing map data when non-default', async () => {
-            mapsService.loadMapData.mockResolvedValue(createMapData({ panX: 100, panY: 200 }));
-
-            const { result } = renderHook(() => useMapLoader('test-campaign', 'test-map', characters));
-
-            await new Promise(r => setTimeout(r, 50));
-
+            expect(result.current.zoom).toBe(5);
             expect(result.current.panX).toBe(100);
             expect(result.current.panY).toBe(200);
         });
 
-        it('resets panX and panY to 0 when they are the old default (0, 0)', async () => {
-            mapsService.loadMapData.mockResolvedValue(createMapData());
+        it('clamps zoom to MIN_ZOOM', async () => {
+            mapsService.loadMapData.mockResolvedValue(createMapData({ zoom: 1 }));
 
             const { result } = renderHook(() => useMapLoader('test-campaign', 'test-map', characters));
 
             await new Promise(r => setTimeout(r, 50));
 
-            expect(result.current.panX).toBe(0);
-            expect(result.current.panY).toBe(0);
+            expect(result.current.zoom).toBe(2);
         });
 
-        it('sets marchingOrder from existing map data', async () => {
-            mapsService.loadMapData.mockResolvedValue(createMapData({ marchingOrder: ['Alaric', 'Serena'] }));
+        it('sets marchingOrder and partyPosition from existing data', async () => {
+            mapsService.loadMapData.mockResolvedValue(createMapData({
+                marchingOrder: ['Alaric', 'Serena'],
+                partyPosition: { q: 10, r: 5 },
+            }));
 
             const { result } = renderHook(() => useMapLoader('test-campaign', 'test-map', characters));
 
             await new Promise(r => setTimeout(r, 50));
 
             expect(result.current.marchingOrder).toEqual(['Alaric', 'Serena']);
-        });
-
-        it('sets partyPosition from existing map data', async () => {
-            mapsService.loadMapData.mockResolvedValue(createMapData({ partyPosition: { q: 10, r: 5 } }));
-
-            const { result } = renderHook(() => useMapLoader('test-campaign', 'test-map', characters));
-
-            await new Promise(r => setTimeout(r, 50));
-
             expect(result.current.partyPosition).toEqual({ q: 10, r: 5 });
         });
 
@@ -175,7 +143,7 @@ describe('useMapLoader - load existing map data', () => {
             expect(result.current.mapData).toBe(existingData);
         });
 
-        it('sets loading to false after loading existing map', async () => {
+        it('sets loading to false after loading', async () => {
             mapsService.loadMapData.mockResolvedValue(createMapData());
 
             const { result } = renderHook(() => useMapLoader('test-campaign', 'test-map', characters));
@@ -186,19 +154,9 @@ describe('useMapLoader - load existing map data', () => {
         });
     });
 
-    describe('existing map with type field', () => {
-        it('preserves existing type field', async () => {
+    describe('existing map type', () => {
+        it('preserves existing type or defaults to outdoor', async () => {
             mapsService.loadMapData.mockResolvedValue(createMapData({ type: 'outdoor' }));
-
-            const { result } = renderHook(() => useMapLoader('test-campaign', 'test-map', characters));
-
-            await new Promise(r => setTimeout(r, 50));
-
-            expect(result.current.mapData.type).toBe('outdoor');
-        });
-
-        it('sets type to outdoor when not present in existing data', async () => {
-            mapsService.loadMapData.mockResolvedValue(createMapData());
 
             const { result } = renderHook(() => useMapLoader('test-campaign', 'test-map', characters));
 
@@ -209,7 +167,7 @@ describe('useMapLoader - load existing map data', () => {
     });
 
     describe('existing map displayName', () => {
-        it('sets hexMapDisplayNameRef from existing displayName', async () => {
+        it('sets hexMapDisplayNameRef from existing displayName or mapName', async () => {
             mapsService.loadMapData.mockResolvedValue(createMapData({ displayName: 'My Custom Map' }));
 
             const { result } = renderHook(() => useMapLoader('test-campaign', 'test-map', characters));
@@ -219,7 +177,7 @@ describe('useMapLoader - load existing map data', () => {
             expect(result.current.hexMapDisplayNameRef.current).toBe('My Custom Map');
         });
 
-        it('sets hexMapDisplayNameRef to mapName when no displayName', async () => {
+        it('falls back to mapName when no displayName', async () => {
             mapsService.loadMapData.mockResolvedValue(createMapData());
 
             const { result } = renderHook(() => useMapLoader('test-campaign', 'my-map-name', characters));
@@ -230,8 +188,8 @@ describe('useMapLoader - load existing map data', () => {
         });
     });
 
-    describe('existing map with non-default pan values', () => {
-        it('does not set needsResetViewRef when pan is non-default', async () => {
+    describe('existing map pan view', () => {
+        it('sets needsResetViewRef based on pan values', async () => {
             mapsService.loadMapData.mockResolvedValue(createMapData({ panX: 50, panY: 75 }));
 
             const { result } = renderHook(() => useMapLoader('test-campaign', 'test-map', characters));
@@ -241,7 +199,7 @@ describe('useMapLoader - load existing map data', () => {
             expect(result.current.needsResetViewRef.current).toBe(false);
         });
 
-        it('sets needsResetViewRef when pan is default (0, 0)', async () => {
+        it('sets needsResetViewRef true when pan is default (0, 0)', async () => {
             mapsService.loadMapData.mockResolvedValue(createMapData());
 
             const { result } = renderHook(() => useMapLoader('test-campaign', 'test-map', characters));
@@ -254,15 +212,15 @@ describe('useMapLoader - load existing map data', () => {
 
     describe('existing map with missing optional fields', () => {
         it.each`
-            field             | missingKey    | fallbackValue            | expectedValue
-            ${'terrain'}      | ${'terrain'}  | ${undefined}             | ${({})}
-            ${'rivers'}       | ${'rivers'}   | ${undefined}             | ${([])}
-            ${'roads'}        | ${'roads'}    | ${undefined}             | ${([])}
-            ${'pois'}         | ${'pois'}     | ${undefined}             | ${([])}
-            ${'gridSize'}     | ${'gridSize'} | ${undefined}             | ${10}
-            ${'zoom'}         | ${'zoom'}     | ${undefined}             | ${2}
-            ${'panX'}         | ${'panX'}     | ${undefined}             | ${0}
-            ${'panY'}         | ${'panY'}     | ${undefined}             | ${0}
+            field             | missingKey    | expectedValue
+            ${'terrain'}      | ${'terrain'}  | ${({})}
+            ${'rivers'}       | ${'rivers'}   | ${([])}
+            ${'roads'}        | ${'roads'}    | ${([])}
+            ${'pois'}         | ${'pois'}     | ${([])}
+            ${'gridSize'}     | ${'gridSize'} | ${10}
+            ${'zoom'}         | ${'zoom'}     | ${2}
+            ${'panX'}         | ${'panX'}     | ${0}
+            ${'panY'}         | ${'panY'}     | ${0}
         `('handles missing $field ($missingKey) using fallback value', async ({ missingKey, expectedValue }) => {
             const dataWithoutKey = { ...baseMapData };
             delete dataWithoutKey[missingKey];
@@ -275,7 +233,7 @@ describe('useMapLoader - load existing map data', () => {
             expect(result.current[missingKey]).toEqual(expectedValue);
         });
 
-        it('handles missing marchingOrder from characters', async () => {
+        it('rebuilds marchingOrder from characters when missing', async () => {
             const dataWithoutKey = { ...baseMapData };
             delete dataWithoutKey.marchingOrder;
             mapsService.loadMapData.mockResolvedValue(dataWithoutKey);
@@ -287,7 +245,7 @@ describe('useMapLoader - load existing map data', () => {
             expect(result.current.marchingOrder).toEqual(['Thorin', 'Gandalf']);
         });
 
-        it('handles missing partyPosition by computing center', async () => {
+        it('computes partyPosition from grid center when missing', async () => {
             const dataWithoutKey = { ...baseMapData };
             delete dataWithoutKey.partyPosition;
             mapsService.loadMapData.mockResolvedValue(dataWithoutKey);

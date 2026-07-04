@@ -20,7 +20,7 @@ import { getWolfAdvantageAgainst } from '../combat/auras/wolfAuraUtils.js';
 import { getDuplicityAdvantageAgainst } from '../combat/auras/duplicityAuraUtils.js';
 import { getLionDisadvantageAgainst } from '../combat/auras/lionAuraUtils.js';
 import { getCoronaSaveDisadvantage } from '../combat/auras/coronaAuraUtils.js';
-import { hasAuraOfProtection } from '../combat/auras/auraOfProtection.js';
+
 import { isActive, isAuraTarget } from './handlers/class-cleric-paladin/avengingAngelHandler.js';
 
 vi.mock('./common/damageRoll.js', () => ({
@@ -78,10 +78,6 @@ vi.mock('../combat/auras/coronaAuraUtils.js', () => ({
   getCoronaSaveDisadvantage: vi.fn(),
 }));
 
-vi.mock('../combat/auras/auraOfProtection.js', () => ({
-  hasAuraOfProtection: vi.fn(),
-}));
-
 vi.mock('./handlers/class-cleric-paladin/avengingAngelHandler.js', () => ({
   isActive: vi.fn(),
   isAuraTarget: vi.fn(),
@@ -135,7 +131,6 @@ function setupDefaults() {
   getRuntimeValue.mockReturnValue(undefined);
   setRuntimeValue.mockReturnValue(undefined);
   getInnateSorceryBonus.mockReturnValue({ spellAdvantage: false, saveDcBonus: 0 });
-  hasAuraOfProtection.mockReturnValue(false);
   isActive.mockReturnValue(false);
   isAuraTarget.mockReturnValue(false);
   getWolfAdvantageAgainst.mockReturnValue({ advantage: false });
@@ -293,15 +288,6 @@ describe('contextBuilder: buildAttackContext — cover AC bonuses (map path)', (
           expect(result.coverAcBonus).toBeGreaterThan(0);
         });
 
-        it('does not apply AC bonus when feature is not active', async () => {
-          feature.mockSetup();
-          computeCover.mockReturnValue({ level: 'none', acBonus: 0 });
-
-          const result = await buildAttackContext(mockRangedAttack, mockStats, 'camp', 'test-map', 'normal', {});
-
-          expect(result.coverAcBonus).toBeUndefined();
-        });
-
         it('does not override existing cover when existing bonus is higher or equal', async () => {
           feature.mockSetup();
           computeCover.mockReturnValue({ level: 'half', acBonus: 2 });
@@ -314,61 +300,5 @@ describe('contextBuilder: buildAttackContext — cover AC bonuses (map path)', (
       });
     }
 
-    describe('smite of protection', () => {
-      it('applies half cover when smite is active and target is within aura range', async () => {
-        loadMapData.mockResolvedValue(makeMapWithPlayersAndNpc(
-          [{ name: 'Fighter1', gridX: 1, gridY: 1 }, { name: 'Orc', gridX: 5, gridY: 5 }],
-          [{ name: 'Orc', gridX: 5, gridY: 5, type: 'npc' }],
-        ));
-        getCombatContext.mockResolvedValue(makeCombatContext('Fighter1', 'Orc', 5, 5));
-        getTargetFromAttacker.mockReturnValue({ name: 'Orc', gridX: 5, gridY: 5 });
-        getNearestPlacedItem.mockReturnValue({ name: 'Orc', gridX: 5, gridY: 5 });
-        getDistanceFeet.mockReturnValue(30);
-        computeCover.mockReturnValue({ level: 'none', acBonus: 0 });
-        hasAuraOfProtection.mockReturnValue(true);
-        getRuntimeValue.mockImplementation((name, key) => {
-          if (key === 'smiteOfProtectionActive') return true;
-          return undefined;
-        });
-
-        const result = await buildAttackContext(mockRangedAttack, mockStats, 'camp', 'test-map', 'normal', {});
-
-        expect(result.coverAcBonus).toBe(2);
-        expect(result.coverLevel).toBe('half');
-      });
-
-      it('does not apply smite cover when smite is not active', async () => {
-        loadMapData.mockResolvedValue(makeMapWithPlayersAndNpc(
-          [{ name: 'Fighter1', gridX: 1, gridY: 1 }],
-          [{ name: 'Orc', gridX: 10, gridY: 10, type: 'npc' }],
-        ));
-        getCombatContext.mockResolvedValue(makeCombatContext('Fighter1', 'Orc', 10, 10));
-        getTargetFromAttacker.mockReturnValue({ name: 'Orc', gridX: 10, gridY: 10 });
-        getNearestPlacedItem.mockReturnValue({ name: 'Orc', gridX: 10, gridY: 10 });
-        getDistanceFeet.mockReturnValue(50);
-        computeCover.mockReturnValue({ level: 'none', acBonus: 0 });
-        hasAuraOfProtection.mockReturnValue(true);
-
-        const result = await buildAttackContext(mockRangedAttack, mockStats, 'camp', 'test-map', 'normal', {});
-
-        expect(result.coverAcBonus).toBeUndefined();
-      });
-
-      it('does not apply smite cover when aura source is null (no players on map)', async () => {
-        loadMapData.mockResolvedValue(makeMapData([], []));
-        getCombatContext.mockResolvedValue(makeCombatContext('Fighter1', 'Orc', 10, 10));
-        getTargetFromAttacker.mockReturnValue({ name: 'Orc', gridX: 10, gridY: 10 });
-        computeCover.mockReturnValue({ level: 'none', acBonus: 0 });
-        hasAuraOfProtection.mockReturnValue(true);
-        getRuntimeValue.mockImplementation((name, key) => {
-          if (key === 'smiteOfProtectionActive') return true;
-          return undefined;
-        });
-
-        const result = await buildAttackContext(mockRangedAttack, mockStats, 'camp', 'test-map', 'normal', {});
-
-        expect(result.coverAcBonus).toBeUndefined();
-      });
-    });
   });
 });

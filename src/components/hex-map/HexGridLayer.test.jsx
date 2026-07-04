@@ -47,33 +47,18 @@ describe('HexGridLayer', () => {
         expect(layer).toBeInTheDocument();
     });
 
-    it('should render one path element per hex', () => {
-        const { container } = render(<HexGridLayer hexCols={3} hexRows={2} />);
-        const paths = container.querySelectorAll('path');
-        expect(paths.length).toBe(6);
-    });
-
     it.each`
-        hexCols | hexRows
-        ${0}    | ${3}
-        ${3}    | ${0}
-        ${0}    | ${0}
-    `('should render no paths when dimensions are $hexCols x $hexRows', ({ hexCols, hexRows }) => {
+        hexCols | hexRows | expectedPaths
+        ${0}    | ${3}    | ${0}
+        ${3}    | ${0}    | ${0}
+        ${0}    | ${0}    | ${0}
+        ${1}    | ${1}    | ${1}
+        ${3}    | ${2}    | ${6}
+        ${5}    | ${4}    | ${20}
+    `('should render $expectedPaths paths for grid $hexCols x $hexRows', ({ hexCols, hexRows, expectedPaths }) => {
         const { container } = render(<HexGridLayer hexCols={hexCols} hexRows={hexRows} />);
         const paths = container.querySelectorAll('path');
-        expect(paths.length).toBe(0);
-    });
-
-    it('should render correct number of paths for 1x1 grid', () => {
-        const { container } = render(<HexGridLayer hexCols={1} hexRows={1} />);
-        const paths = container.querySelectorAll('path');
-        expect(paths.length).toBe(1);
-    });
-
-    it('should render correct number of paths for large grid', () => {
-        const { container } = render(<HexGridLayer hexCols={5} hexRows={4} />);
-        const paths = container.querySelectorAll('path');
-        expect(paths.length).toBe(20);
+        expect(paths.length).toBe(expectedPaths);
     });
 
     it('should render all paths within the hex-grid-layer group', () => {
@@ -105,32 +90,14 @@ describe('HexGridLayer', () => {
         });
     });
 
-    it('should render paths in row-major order (q varies fastest)', () => {
-        const { container } = render(<HexGridLayer hexCols={3} hexRows={2} />);
-        const paths = container.querySelectorAll('path');
-        expect(paths.length).toBe(6);
-        paths.forEach(path => {
-            const d = path.getAttribute('d');
-            expect(d).toMatch(/^M[\d.-]+,[\d.-]+/);
-        });
-    });
-
-    it('should regenerate paths when hexCols changes', () => {
+    it('should regenerate paths when grid dimensions change', () => {
         const { container: c1 } = render(<HexGridLayer hexCols={2} hexRows={2} />);
         const paths1 = c1.querySelectorAll('path');
-        const { container: c2 } = render(<HexGridLayer hexCols={4} hexRows={2} />);
-        const paths2 = c2.querySelectorAll('path');
         expect(paths1.length).toBe(4);
-        expect(paths2.length).toBe(8);
-    });
 
-    it('should regenerate paths when hexRows changes', () => {
-        const { container: c1 } = render(<HexGridLayer hexCols={2} hexRows={2} />);
-        const paths1 = c1.querySelectorAll('path');
-        const { container: c2 } = render(<HexGridLayer hexCols={2} hexRows={4} />);
+        const { container: c2 } = render(<HexGridLayer hexCols={4} hexRows={4} />);
         const paths2 = c2.querySelectorAll('path');
-        expect(paths1.length).toBe(4);
-        expect(paths2.length).toBe(8);
+        expect(paths2.length).toBe(16);
     });
 
     it('should not crash with large grid dimensions', () => {
@@ -139,3 +106,4 @@ describe('HexGridLayer', () => {
         expect(paths.length).toBe(300);
     });
 });
+// @cleaned-by-ai

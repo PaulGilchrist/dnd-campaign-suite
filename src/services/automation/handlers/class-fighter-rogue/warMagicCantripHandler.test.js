@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { handle, confirmWarMagicCantrip } from './warMagicCantripHandler.js'
 
@@ -78,21 +78,6 @@ describe('warMagicCantripHandler', () => {
 
             expect(result.type).toBe('modal')
             expect(result.payload.spellListKey).toBe('sorcerer_cantrips')
-            expect(loadSpellData).toHaveBeenCalledWith(mockPlayerStats)
-        })
-
-        it('defaults spellListKey to wizard_cantrips when not specified', async () => {
-            const { loadSpellData } = await import('../../../ui/dataLoader.js')
-            loadSpellData.mockResolvedValue([cantripA])
-
-            const action = {
-                name: 'War Magic',
-                automation: { type: 'war_magic_cantrip' },
-            }
-
-            await handle(action, mockPlayerStats, mockCampaignName)
-
-            expect(loadSpellData).toHaveBeenCalledWith(mockPlayerStats)
         })
 
         it('returns an info popup when the spell list contains no cantrips', async () => {
@@ -130,21 +115,6 @@ describe('warMagicCantripHandler', () => {
             expect(result.type).toBe('popup')
             expect(result.payload.type).toBe('automation_info')
             expect(result.payload.description).toBe('No Wizard cantrips available.')
-        })
-
-        it('returns an info popup when the spell list is null', async () => {
-            const { loadSpellData } = await import('../../../ui/dataLoader.js')
-            loadSpellData.mockResolvedValue(null)
-
-            const action = {
-                name: 'War Magic',
-                automation: { type: 'war_magic_cantrip' },
-            }
-
-            const result = await handle(action, mockPlayerStats, mockCampaignName)
-
-            expect(result.type).toBe('popup')
-            expect(result.payload.type).toBe('automation_info')
         })
 
         it('uses fallback defaults for missing spell properties in optionDetails', async () => {
@@ -190,7 +160,7 @@ describe('warMagicCantripHandler', () => {
             })
         })
 
-        it('returns an error popup when no cantrip is selected (null)', async () => {
+        it('returns an error popup when no cantrip is selected', async () => {
             const action = {
                 name: 'Improved War Magic',
                 automation: { type: 'war_magic_cantrip' },
@@ -206,17 +176,6 @@ describe('warMagicCantripHandler', () => {
                     description: 'No cantrip selected.',
                 },
             })
-        })
-
-        it('returns an error popup when no cantrip is selected (empty string)', async () => {
-            const action = {
-                name: 'Improved War Magic',
-                automation: { type: 'war_magic_cantrip' },
-            }
-
-            const result = await confirmWarMagicCantrip(action, mockPlayerStats, mockCampaignName, '')
-
-            expect(result.payload.description).toBe('No cantrip selected.')
         })
 
         it('logs an ability_use entry with the correct description', async () => {

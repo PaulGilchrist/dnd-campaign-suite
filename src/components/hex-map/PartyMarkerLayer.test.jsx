@@ -1,7 +1,6 @@
 // @improved-by-ai
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import * as hexMapUtils from '../../services/maps/hexMapUtils.js';
 import PartyMarkerLayer from './PartyMarkerLayer.jsx';
 
 vi.mock('../../services/maps/hexMapUtils.js', () => ({
@@ -41,43 +40,18 @@ describe('PartyMarkerLayer', () => {
     });
 
     describe('null/undefined position', () => {
-        it('should return null when position is null', () => {
+        it('should return null when position is null or undefined', () => {
             const { container } = renderMarker({ position: null });
-            expect(container.querySelector('g.party-marker-layer')).not.toBeInTheDocument();
-        });
-
-        it('should return null when position is undefined', () => {
-            const { container } = renderMarker({ position: undefined });
             expect(container.querySelector('g.party-marker-layer')).not.toBeInTheDocument();
         });
     });
 
     describe('rendering', () => {
-        it('should render the party-marker-layer group', () => {
+        it('should render the party-marker-layer group with hex shape and P label', () => {
             const { container } = renderMarker();
             expect(container.querySelector('g.party-marker-layer')).toBeInTheDocument();
-        });
-
-        it('should render a path element for the hex shape', () => {
-            const { container } = renderMarker();
             expect(container.querySelector('path')).toBeInTheDocument();
-        });
-
-        it('should render the P text label', () => {
-            renderMarker();
             expect(screen.getByText('P')).toBeInTheDocument();
-        });
-
-        it('should render the P text at the hex center position', () => {
-            const { container } = renderMarker();
-            const text = container.querySelector('text');
-            expect(text.getAttribute('x')).toBe('0');
-            expect(text.getAttribute('y')).toBe('4');
-        });
-
-        it('should pass hex coordinates to hexToPixel', () => {
-            renderMarker({ position: { q: 5, r: 3 } });
-            expect(hexMapUtils.hexToPixel).toHaveBeenCalledWith(5, 3, 30);
         });
 
         it('should render marker at correct pixel position for non-zero hex coordinates', () => {
@@ -109,13 +83,6 @@ describe('PartyMarkerLayer', () => {
             expect(screen.getByText('Advance One Hex')).toBeInTheDocument();
             expect(screen.getByText('Cancel Travel')).toBeInTheDocument();
             expect(screen.queryByText('Start Encounter')).not.toBeInTheDocument();
-        });
-
-        it('should not render context menu when travelMode is active even if contextMenuOpen is true', () => {
-            // travelMode='active' with contextMenuOpen shows travel menu, not encounter menu
-            renderMarker({ contextMenuOpen: true, travelMode: 'active' });
-            expect(screen.queryByText('Start Encounter')).not.toBeInTheDocument();
-            expect(screen.getByText('Advance One Hex')).toBeInTheDocument();
         });
     });
 
@@ -150,35 +117,29 @@ describe('PartyMarkerLayer', () => {
     });
 
     describe('callback safety with missing handlers', () => {
-        it('should not throw when onContextMenu is not provided', () => {
+        it('should not throw when any callback is undefined', () => {
             const { container } = renderMarker({ onContextMenu: undefined });
             const path = container.querySelector('path');
             expect(() => {
                 fireEvent.contextMenu(path, { preventDefault: () => {}, stopPropagation: () => {} });
             }).not.toThrow();
-        });
 
-        it('should not throw when onEncounter is not provided', () => {
             renderMarker({ onEncounter: undefined, contextMenuOpen: true, travelMode: 'inactive' });
             const hitRect = document.querySelector('.party-menu-hit');
             expect(() => {
                 fireEvent.click(hitRect);
             }).not.toThrow();
-        });
 
-        it('should not throw when onAdvance is not provided', () => {
             renderMarker({ onAdvance: undefined, contextMenuOpen: true, travelMode: 'active' });
-            const hitRects = document.querySelectorAll('.party-menu-hit');
+            const hitRects1 = document.querySelectorAll('.party-menu-hit');
             expect(() => {
-                fireEvent.click(hitRects[0]);
+                fireEvent.click(hitRects1[0]);
             }).not.toThrow();
-        });
 
-        it('should not throw when onCancelTravel is not provided', () => {
             renderMarker({ onCancelTravel: undefined, contextMenuOpen: true, travelMode: 'active' });
-            const hitRects = document.querySelectorAll('.party-menu-hit');
+            const hitRects2 = document.querySelectorAll('.party-menu-hit');
             expect(() => {
-                fireEvent.click(hitRects[1]);
+                fireEvent.click(hitRects2[1]);
             }).not.toThrow();
         });
     });

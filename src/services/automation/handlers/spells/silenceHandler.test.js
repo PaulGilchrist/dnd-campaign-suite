@@ -64,13 +64,14 @@ describe('silenceHandler', () => {
 
     describe('handle', () => {
         describe('activation (not previously active)', () => {
-            it('returns popup with automation_info type', async () => {
+            it('returns popup with automation_info type and correct payload', async () => {
                 const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
                 expect(result.type).toBe('popup');
                 expect(result.payload.type).toBe('automation_info');
                 expect(result.payload.name).toBe('Silence');
                 expect(result.payload.automationType).toBe('silence');
+                expect(result.payload.automation).toEqual(makeAction().automation);
             });
 
             it('includes description with aoe radius in activation message', async () => {
@@ -81,18 +82,18 @@ describe('silenceHandler', () => {
                 expect(result.payload.description).toContain('activated');
             });
 
-            it('uses custom aoeRadius from automation when provided', async () => {
+            it('uses custom aoeRadius from automation in description and log', async () => {
                 const action = makeAction({ automation: { aoeRadius: 30 } });
                 const result = await handle(action, makePlayerStats(), campaignName, null);
 
                 expect(result.payload.description).toContain('30-foot-radius');
-            });
 
-            it('defaults aoeRadius to 20 when automation has no aoeRadius', async () => {
-                const action = makeAction({ automation: {} });
-                const result = await handle(action, makePlayerStats(), campaignName, null);
-
-                expect(result.payload.description).toContain('20-foot-radius');
+                expect(postLogEntry).toHaveBeenCalledWith(
+                    campaignName,
+                    expect.objectContaining({
+                        description: expect.stringContaining('30-foot-radius'),
+                    }),
+                );
             });
 
             it('calls toggleBuff with correct parameters', async () => {
@@ -110,7 +111,7 @@ describe('silenceHandler', () => {
                 );
             });
 
-            it('sets runtime values for silence state', async () => {
+            it('sets runtime values for silence state on activation', async () => {
                 await handle(makeAction(), makePlayerStats(), campaignName, null);
 
                 expect(setRuntimeValue).toHaveBeenCalledWith(
@@ -121,7 +122,7 @@ describe('silenceHandler', () => {
                 );
             });
 
-            it('sets silence center grid when combat context exists with caster position', async () => {
+            it('sets silence center based on combat context', async () => {
                 getCombatContext.mockResolvedValue({
                     players: [{ name: casterName, gridX: 5, gridY: 10 }],
                 });
@@ -136,47 +137,23 @@ describe('silenceHandler', () => {
                 );
             });
 
-            it('sets silence center to null when combat context has no caster position', async () => {
-                getCombatContext.mockResolvedValue({
-                    players: [{ name: 'OtherCleric', gridX: 3, gridY: 7 }],
-                });
+            it('sets silence center to null when caster position is unavailable', async () => {
+                const scenarios = [
+                    { ctx: null },
+                    { ctx: { players: [{ name: 'OtherCleric', gridX: 3, gridY: 7 }] } },
+                    { ctx: { players: [{ name: casterName, gridX: 5, gridY: null }] } },
+                ];
 
-                await handle(makeAction(), makePlayerStats(), campaignName, null);
+                for (const { ctx } of scenarios) {
+                    getCombatContext.mockResolvedValue(ctx);
+                    await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-                expect(setRuntimeValue).toHaveBeenCalledWith(
-                    casterName,
-                    'silenceCenter',
-                    null,
-                    campaignName,
-                );
-            });
-
-            it('sets silence center to null when combat context is null', async () => {
-                getCombatContext.mockResolvedValue(null);
-
-                await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-                expect(setRuntimeValue).toHaveBeenCalledWith(
-                    casterName,
-                    'silenceCenter',
-                    null,
-                    campaignName,
-                );
-            });
-
-            it('sets silence center to null when caster grid position is incomplete', async () => {
-                getCombatContext.mockResolvedValue({
-                    players: [{ name: casterName, gridX: 5, gridY: null }],
-                });
-
-                await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-                expect(setRuntimeValue).toHaveBeenCalledWith(
-                    casterName,
-                    'silenceCenter',
-                    null,
-                    campaignName,
-                );
+                    expect(setRuntimeValue).toHaveBeenCalledWith(
+                        casterName, 'silenceCenter', null, campaignName,
+                    );
+                    vi.clearAllMocks();
+                    toggleBuff.mockReturnValue({ wasActive: false });
+                }
             });
 
             it('adds expiration to remove the buff', async () => {
@@ -201,25 +178,6 @@ describe('silenceHandler', () => {
                     timestamp: expect.any(Number),
                 });
             });
-
-            it('includes aoe radius in log description', async () => {
-                const action = makeAction({ automation: { aoeRadius: 30 } });
-
-                await handle(action, makePlayerStats(), campaignName, null);
-
-                expect(postLogEntry).toHaveBeenCalledWith(
-                    campaignName,
-                    expect.objectContaining({
-                        description: expect.stringContaining('30-foot-radius'),
-                    }),
-                );
-            });
-
-            it('passes automation object in popup payload', async () => {
-                const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-                expect(result.payload.automation).toEqual(makeAction().automation);
-            });
         });
 
         describe('deactivation (previously active)', () => {
@@ -229,6 +187,7 @@ describe('silenceHandler', () => {
                 const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
                 expect(result.payload.description).toBe('Silence ended');
+                expect(result.payload.automation).toEqual(makeAction().automation);
             });
 
             it('resets runtime values to false/null', async () => {
@@ -247,43 +206,19 @@ describe('silenceHandler', () => {
                 );
             });
 
-            it('does not add expiration when deactivating', async () => {
+            it('does not add expiration or post log when deactivating', async () => {
                 toggleBuff.mockReturnValue({ wasActive: true });
 
                 await handle(makeAction(), makePlayerStats(), campaignName, null);
 
                 expect(addExpiration).not.toHaveBeenCalled();
-            });
-
-            it('does not post log entry when deactivating', async () => {
-                toggleBuff.mockReturnValue({ wasActive: true });
-
-                await handle(makeAction(), makePlayerStats(), campaignName, null);
-
                 expect(postLogEntry).not.toHaveBeenCalled();
-            });
-
-            it('includes automation in popup payload when ending', async () => {
-                toggleBuff.mockReturnValue({ wasActive: true });
-
-                const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-                expect(result.payload.automation).toEqual(makeAction().automation);
-            });
-        });
-
-        describe('automation field variations', () => {
-            it('uses action name from automation field in payload', async () => {
-                const action = makeAction({ automation: { type: 'custom_silence' } });
-                const result = await handle(action, makePlayerStats(), campaignName, null);
-
-                expect(result.payload.automationType).toBe('custom_silence');
             });
         });
     });
 
     describe('isSilenceActive', () => {
-        it('delegates to silenceService and returns its result true', () => {
+        it('delegates to silenceService and returns its result', () => {
             isSilenceActiveService.mockReturnValue(true);
 
             const result = isSilenceActive(casterName, campaignName);
@@ -291,14 +226,6 @@ describe('silenceHandler', () => {
             expect(result).toBe(true);
             expect(isSilenceActiveService).toHaveBeenCalledWith(casterName, campaignName);
         });
-
-        it('delegates to silenceService and returns its result false', () => {
-            isSilenceActiveService.mockReturnValue(false);
-
-            const result = isSilenceActive(casterName, campaignName);
-
-            expect(result).toBe(false);
-            expect(isSilenceActiveService).toHaveBeenCalledWith(casterName, campaignName);
-        });
     });
 });
+// @cleaned-by-ai

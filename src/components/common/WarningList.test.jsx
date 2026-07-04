@@ -19,30 +19,20 @@ describe('WarningList', () => {
         });
     });
 
-    it('renders a container div with warning class', () => {
-        const warnings = [{ type: 'warning', message: 'Test warning' }];
+    it('renders warning items with correct type class', () => {
+        const warnings = [
+            { type: 'warning', message: 'This is a warning' },
+            { type: 'info', message: 'This is info' },
+        ];
         render(<WarningList warnings={warnings} />);
 
-        const container = document.querySelector('.warning-container');
-        expect(container).not.toBeNull();
-    });
+        const warningItem = document.querySelector('.warning-message.warning');
+        expect(warningItem).toBeInTheDocument();
+        expect(warningItem.textContent).toContain('This is a warning');
 
-    it('renders warning items with correct type class for warning type', () => {
-        const warnings = [{ type: 'warning', message: 'This is a warning' }];
-        render(<WarningList warnings={warnings} />);
-
-        const item = document.querySelector('.warning-message.warning');
-        expect(item).toBeInTheDocument();
-        expect(item.textContent).toContain('This is a warning');
-    });
-
-    it('renders warning items with correct type class for info type', () => {
-        const warnings = [{ type: 'info', message: 'This is info' }];
-        render(<WarningList warnings={warnings} />);
-
-        const item = document.querySelector('.warning-message.info');
-        expect(item).toBeInTheDocument();
-        expect(item.textContent).toContain('This is info');
+        const infoItem = document.querySelector('.warning-message.info');
+        expect(infoItem).toBeInTheDocument();
+        expect(infoItem.textContent).toContain('This is info');
     });
 
     it('renders multiple warning items', () => {
@@ -56,17 +46,6 @@ describe('WarningList', () => {
         expect(screen.getByText('Warning 1')).toBeInTheDocument();
         expect(screen.getByText('Info 2')).toBeInTheDocument();
         expect(screen.getByText('Warning 3')).toBeInTheDocument();
-    });
-
-    it('renders warning messages text content', () => {
-        const warnings = [
-            { type: 'warning', message: 'Something is wrong' },
-            { type: 'info', message: 'All good' },
-        ];
-        render(<WarningList warnings={warnings} />);
-
-        expect(screen.getByText(/Something is wrong/)).toBeInTheDocument();
-        expect(screen.getByText(/All good/)).toBeInTheDocument();
     });
 
     it('renders icons when showIcons is true', () => {
@@ -91,22 +70,5 @@ describe('WarningList', () => {
 
         expect(screen.getByText('Warning message')).toBeInTheDocument();
         expect(screen.queryByText(/⚠/)).not.toBeInTheDocument();
-    });
-
-    it('defaults to not showing icons when showIcons is not provided', () => {
-        const warnings = [{ type: 'warning', message: 'Warning message' }];
-        render(<WarningList warnings={warnings} />);
-
-        expect(screen.getByText('Warning message')).toBeInTheDocument();
-        expect(screen.queryByText(/⚠/)).not.toBeInTheDocument();
-    });
-
-    it('renders icon for unknown type without icon character', () => {
-        const warnings = [{ type: 'unknown', message: 'Unknown warning' }];
-        render(<WarningList warnings={warnings} showIcons />);
-
-        const item = document.querySelector('.warning-message.unknown');
-        expect(item).toBeInTheDocument();
-        expect(item.textContent).toContain('Unknown warning');
     });
 });

@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { onCombatSuperioritySelected } from './combatSuperiorityHandler.js';
 import { setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
@@ -87,22 +87,6 @@ describe('onCombatSuperioritySelected - selection', () => {
             );
         });
 
-        it('saves only valid maneuver names when all are valid', async () => {
-            await onCombatSuperioritySelected(
-                makeAction(),
-                makePlayerStats(),
-                'test-campaign',
-                ['Trip Attack', 'Pushing Attack', 'Rally']
-            );
-
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'TestFighter',
-                'BattleMasterManeuvers_selection',
-                ['Trip Attack', 'Pushing Attack', 'Rally'],
-                'test-campaign'
-            );
-        });
-
         it('saves empty array when all selected names are invalid', async () => {
             await onCombatSuperioritySelected(
                 makeAction(),
@@ -136,51 +120,31 @@ describe('onCombatSuperioritySelected - selection', () => {
             expect(result.payload.description).toContain('Rally');
             expect(result.payload.description).toContain('Combat Superiority');
         });
-
-        it('includes automation config in popup payload', async () => {
-            const result = await onCombatSuperioritySelected(
-                makeAction({ maxOptions: 5 }),
-                makePlayerStats(),
-                'test-campaign',
-                ['Trip Attack']
-            );
-
-            expect(result.payload.automation).toEqual({
-                type: 'combat_superiority',
-                saveType: 'WIS',
-                saveDc: 'ability',
-                dieExpression: 'superiority_die',
-                uses_max: 4,
-                maxOptions: 5,
-            });
-        });
     });
 
     describe('no maneuver selected', () => {
-        it('returns info popup when selectedManeuverNames is null', async () => {
-            const result = await onCombatSuperioritySelected(
+        it('returns info popup when selectedManeuverNames is null or undefined', async () => {
+            const nullResult = await onCombatSuperioritySelected(
                 makeAction(),
                 makePlayerStats(),
                 'test-campaign',
                 null
             );
 
-            expect(result.type).toBe('popup');
-            expect(result.payload.type).toBe('automation_info');
-            expect(result.payload.description).toBe('No maneuver selected.');
-        });
+            expect(nullResult.type).toBe('popup');
+            expect(nullResult.payload.type).toBe('automation_info');
+            expect(nullResult.payload.description).toBe('No maneuver selected.');
 
-        it('returns info popup when selectedManeuverNames is undefined', async () => {
-            const result = await onCombatSuperioritySelected(
+            const undefinedResult = await onCombatSuperioritySelected(
                 makeAction(),
                 makePlayerStats(),
                 'test-campaign',
                 undefined
             );
 
-            expect(result.type).toBe('popup');
-            expect(result.payload.type).toBe('automation_info');
-            expect(result.payload.description).toBe('No maneuver selected.');
+            expect(undefinedResult.type).toBe('popup');
+            expect(undefinedResult.payload.type).toBe('automation_info');
+            expect(undefinedResult.payload.description).toBe('No maneuver selected.');
         });
     });
 
@@ -194,17 +158,6 @@ describe('onCombatSuperioritySelected - selection', () => {
             );
 
             expect(dataLoader.loadManeuvers).toHaveBeenCalledWith('5e');
-        });
-
-        it('loads maneuvers for 2024 ruleset by default', async () => {
-            await onCombatSuperioritySelected(
-                makeAction(),
-                makePlayerStats({ rules: '2024' }),
-                'test-campaign',
-                ['Trip Attack']
-            );
-
-            expect(dataLoader.loadManeuvers).toHaveBeenCalledWith('2024');
         });
 
         it('defaults to 2024 ruleset when playerStats.rules is null', async () => {

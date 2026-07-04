@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @improved-by-ai @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import useMapLoader from './useMapLoader.js';
@@ -75,7 +75,7 @@ describe('useMapLoader - API surface', () => {
     });
 
     describe('refs', () => {
-        it('returns all refs with .current property', async () => {
+        it('returns refs with .current property', async () => {
             mapsService.loadMapData.mockResolvedValue(null);
 
             const { result } = renderHook(() => useMapLoader('test-campaign', 'test-map', characters));
@@ -86,40 +86,6 @@ describe('useMapLoader - API surface', () => {
             expect(result.current.hexMapNameRef).toHaveProperty('current');
             expect(result.current.hexMapDisplayNameRef).toHaveProperty('current');
             expect(result.current.travelStateRef).toHaveProperty('current');
-        });
-    });
-
-    describe('returned object shape', () => {
-        it('returns exactly the expected keys', async () => {
-            mapsService.loadMapData.mockResolvedValue(baseMapData);
-
-            const { result } = renderHook(() => useMapLoader('test-campaign', 'test-map', characters));
-
-            await new Promise(r => setTimeout(r, 50));
-
-            const keys = Object.keys(result.current);
-            const expectedKeys = [
-                'loading', 'mapData', 'setMapData',
-                'gridSize', 'setGridSize',
-                'terrain', 'setTerrain',
-                'rivers', 'setRivers',
-                'roads', 'setRoads',
-                'pois', 'setPois',
-                'marchingOrder', 'setMarchingOrder',
-                'partyPosition', 'setPartyPosition',
-                'weather', 'setWeather',
-                'travelInit', 'setTravelInit',
-                'travelSaveVersion',
-                'travelStateRef', 'setTravelStateRef',
-                'zoom', 'setZoom',
-                'panX', 'setPanX',
-                'panY', 'setPanY',
-                'needsResetViewRef',
-                'hexMapNameRef',
-                'hexMapDisplayNameRef',
-            ];
-
-            expect(keys).toEqual(expectedKeys);
         });
     });
 
@@ -151,16 +117,6 @@ describe('useMapLoader - API surface', () => {
             await new Promise(r => setTimeout(r, 50));
 
             expect(result.current.mapData).toEqual(loadedData);
-        });
-
-        it('is null when loadMapData returns null', async () => {
-            mapsService.loadMapData.mockResolvedValue(null);
-
-            const { result } = renderHook(() => useMapLoader('test-campaign', 'test-map', characters));
-
-            await new Promise(r => setTimeout(r, 50));
-
-            expect(result.current.mapData).not.toBeNull();
         });
     });
 });

@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
     handle,
@@ -71,14 +71,6 @@ describe('gnomishLineageHandler', () => {
                 campaignName: 'test-campaign',
             });
         });
-
-        it('reads lineage using player stats name and campaign name', async () => {
-            getRuntimeValue.mockReturnValue(undefined);
-
-            await handle(makeAction(), makePlayerStats({ name: 'OtherPlayer' }), 'my-campaign', null);
-
-            expect(getRuntimeValue).toHaveBeenCalledWith('OtherPlayer', '_gnomishLineageSelection', 'my-campaign');
-        });
     });
 
     describe('confirmGnomishLineage', () => {
@@ -104,18 +96,6 @@ describe('gnomishLineageHandler', () => {
             expect(result.payload.automation.type).toBe('gnomish_lineage');
         });
 
-        it('returns success popup for Forest Gnome', async () => {
-            const result = await confirmGnomishLineage(makePlayerStats(), 'Forest Gnome', 'test-campaign');
-
-            expect(result.payload.description).toBe('Selected Forest Gnome lineage. Spellcasting ability: Intelligence.');
-        });
-
-        it('returns success popup for Rock Gnome', async () => {
-            const result = await confirmGnomishLineage(makePlayerStats(), 'Rock Gnome', 'test-campaign');
-
-            expect(result.payload.description).toBe('Selected Rock Gnome lineage. Spellcasting ability: Intelligence.');
-        });
-
         it('stores all runtime values for a valid lineage', async () => {
             await confirmGnomishLineage(makePlayerStats(), 'Deep Gnome', 'test-campaign');
 
@@ -127,17 +107,6 @@ describe('gnomishLineageHandler', () => {
             expect(calls[2]).toEqual(['GnomeBoy', '_gnomishLineageCantrip', 'Magic Stone', 'test-campaign']);
             expect(calls[3]).toEqual(['GnomeBoy', '_gnomishLineageLevel3', 'Nondetection', 'test-campaign']);
             expect(calls[4]).toEqual(['GnomeBoy', '_gnomishLineageLevel5', 'Passwall', 'test-campaign']);
-        });
-
-        it('stores correct lineage name for each lineage type', async () => {
-            await confirmGnomishLineage(makePlayerStats(), 'Forest Gnome', 'test-campaign');
-            const calls = setRuntimeValue.mock.calls;
-            expect(calls[0][2]).toBe('Forest Gnome');
-
-            setRuntimeValue.mockClear();
-            await confirmGnomishLineage(makePlayerStats(), 'Rock Gnome', 'test-campaign');
-            const calls2 = setRuntimeValue.mock.calls;
-            expect(calls2[0][2]).toBe('Rock Gnome');
         });
 
         it('uses player stats name and campaign name for runtime writes', async () => {
@@ -158,20 +127,6 @@ describe('gnomishLineageHandler', () => {
 
             expect(getGnomishLineageSelection(makePlayerStats(), 'test-campaign')).toBe('Forest Gnome');
         });
-
-        it('returns null when no lineage stored', () => {
-            getRuntimeValue.mockReturnValue(null);
-
-            expect(getGnomishLineageSelection(makePlayerStats(), 'test-campaign')).toBeNull();
-        });
-
-        it('passes correct keys to getRuntimeValue', () => {
-            getRuntimeValue.mockReturnValue('Rock Gnome');
-
-            getGnomishLineageSelection(makePlayerStats({ name: 'OtherPlayer' }), 'my-campaign');
-
-            expect(getRuntimeValue).toHaveBeenCalledWith('OtherPlayer', '_gnomishLineageSelection', 'my-campaign');
-        });
     });
 
     describe('getGnomishLineageAbility', () => {
@@ -179,14 +134,6 @@ describe('gnomishLineageHandler', () => {
             getRuntimeValue.mockReturnValue('Intelligence');
 
             expect(getGnomishLineageAbility(makePlayerStats(), 'test-campaign')).toBe('Intelligence');
-        });
-
-        it('passes correct keys to getRuntimeValue', () => {
-            getRuntimeValue.mockReturnValue('Wisdom');
-
-            getGnomishLineageAbility(makePlayerStats({ name: 'OtherPlayer' }), 'my-campaign');
-
-            expect(getRuntimeValue).toHaveBeenCalledWith('OtherPlayer', '_gnomishLineageAbility', 'my-campaign');
         });
     });
 
@@ -196,14 +143,6 @@ describe('gnomishLineageHandler', () => {
 
             expect(getGnomishLineageCantrip(makePlayerStats(), 'test-campaign')).toBe('Minor Illusion');
         });
-
-        it('passes correct keys to getRuntimeValue', () => {
-            getRuntimeValue.mockReturnValue('Mending');
-
-            getGnomishLineageCantrip(makePlayerStats({ name: 'OtherPlayer' }), 'my-campaign');
-
-            expect(getRuntimeValue).toHaveBeenCalledWith('OtherPlayer', '_gnomishLineageCantrip', 'my-campaign');
-        });
     });
 
     describe('getGnomishLineageLevel3Spell', () => {
@@ -212,14 +151,6 @@ describe('gnomishLineageHandler', () => {
 
             expect(getGnomishLineageLevel3Spell(makePlayerStats(), 'test-campaign')).toBe('Speak with Animals');
         });
-
-        it('passes correct keys to getRuntimeValue', () => {
-            getRuntimeValue.mockReturnValue('Prestidigitation');
-
-            getGnomishLineageLevel3Spell(makePlayerStats({ name: 'OtherPlayer' }), 'my-campaign');
-
-            expect(getRuntimeValue).toHaveBeenCalledWith('OtherPlayer', '_gnomishLineageLevel3', 'my-campaign');
-        });
     });
 
     describe('getGnomishLineageLevel5Spell', () => {
@@ -227,14 +158,6 @@ describe('gnomishLineageHandler', () => {
             getRuntimeValue.mockReturnValue('Call Lightning');
 
             expect(getGnomishLineageLevel5Spell(makePlayerStats(), 'test-campaign')).toBe('Call Lightning');
-        });
-
-        it('passes correct keys to getRuntimeValue', () => {
-            getRuntimeValue.mockReturnValue('Passwall');
-
-            getGnomishLineageLevel5Spell(makePlayerStats({ name: 'OtherPlayer' }), 'my-campaign');
-
-            expect(getRuntimeValue).toHaveBeenCalledWith('OtherPlayer', '_gnomishLineageLevel5', 'my-campaign');
         });
     });
 
@@ -250,17 +173,6 @@ describe('gnomishLineageHandler', () => {
             expect(calls[2]).toEqual(['GnomeBoy', '_gnomishLineageCantrip', null, 'test-campaign']);
             expect(calls[3]).toEqual(['GnomeBoy', '_gnomishLineageLevel3', null, 'test-campaign']);
             expect(calls[4]).toEqual(['GnomeBoy', '_gnomishLineageLevel5', null, 'test-campaign']);
-        });
-
-        it('uses player stats name and campaign name for runtime writes', () => {
-            restoreUses('OtherPlayer', 'my-campaign');
-
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'OtherPlayer',
-                '_gnomishLineageSelection',
-                null,
-                'my-campaign'
-            );
         });
     });
 });

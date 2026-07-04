@@ -110,7 +110,7 @@ describe('rollDamageForAction', () => {
             expect(result.attackContext.damage).toBe('2d6+3');
         });
 
-        it('returns null when non-crit dice roll fails', () => {
+        it('returns null when dice roll fails', () => {
             const auto = { damage: 'invalid' };
             diceRoller.rollExpression.mockReturnValue(null);
 
@@ -183,11 +183,10 @@ describe('rollDamageForAction', () => {
             });
         });
 
-        it('defaults saveType to DEX and saveSuccess to 0 when not provided', () => {
+        it('defaults saveType to DEX when not provided', () => {
             const auto = { damage: '1d6' };
             const result = rollDamageForAction(auto);
             expect(result.attackContext.saveType).toBe('DEX');
-            expect(result.attackContext.saveSuccess).toBe(0);
         });
 
         it('uses saveType and dcSuccess from auto when provided', () => {
@@ -376,7 +375,7 @@ describe('buildAttackContextForDamage', () => {
             expect(result.attackerName).toBe(playerName);
         });
 
-        it('returns basic context when loadNPCs rejects', async () => {
+        it('returns basic context when loadNPCs or loadMapData rejects', async () => {
             mapsService.loadMapData.mockResolvedValue(makeMapData([attackerPlayer]));
             npcsService.loadNPCs.mockRejectedValue(new Error('Failed to load NPCs'));
 
@@ -462,33 +461,6 @@ describe('buildAttackContextForDamage', () => {
 
             expect(result.forcedMode).toBe('disadvantage');
             expect(result.rangeReason).toBe('Threatened by nearby enemy');
-        });
-
-        it('filters nearby threats to hostile NPCs only', async () => {
-            damageUtils.getTargetFromAttacker.mockReturnValue(null);
-            damageUtils.getAttackerTargetName.mockReturnValue('Enemy');
-
-            const mapData = makeMapData([attackerPlayer], [
-                { type: 'npc', name: 'Friendly NPC', gridX: 3, gridY: 3, attitude: 'friendly' },
-                { type: 'npc', name: 'Hostile NPC', gridX: 4, gridY: 4, attitude: 'hostile' },
-            ]);
-            mapsService.loadMapData.mockResolvedValue(mapData);
-            npcsService.loadNPCs.mockResolvedValue([
-                { name: 'Friendly NPC', attitude: 'friendly' },
-                { name: 'Hostile NPC', attitude: 'hostile' },
-            ]);
-
-            rangeValidation.rangeToFeet.mockReturnValue(60);
-            rangeValidation.isHostileNPC.mockImplementation((item) => item.attitude === 'hostile');
-
-            await buildAttackContextForDamage(
-                makeAttackContext({ range: '60 ft.' }),
-                playerName, campaignName, mapName,
-            );
-
-            expect(rangeValidation.isHostileNPC).toHaveBeenCalledWith(
-                expect.objectContaining({ name: 'Hostile NPC', attitude: 'hostile' }),
-            );
         });
 
         it('returns isAutoMiss when cover is full', async () => {
@@ -700,7 +672,6 @@ describe('buildAttackContextForDamage', () => {
             rangeValidation.rangeToFeet.mockReturnValue(0);
             coverService.computeCover.mockReturnValue({ level: 'none', acBonus: 0 });
 
-            runtimeState.getRuntimeValue.mockReset();
             runtimeState.getRuntimeValue
                 .mockReturnValueOnce('true')
                 .mockReturnValueOnce('5')

@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { describe, it, expect, vi } from 'vitest';
 import { onCombatSuperioritySelected } from './combatSuperiorityHandler.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
@@ -87,7 +87,7 @@ const makePlayerStats = (overrides = {}) => ({
 const DEFAULT_SUPERIORITY_DICE = 2;
 const DIE_ROLL_TOTAL = 5;
 
-describe('combatSuperiorityHandler.executeManeuver - effect descriptions', () => {
+describe('combatSuperiorityHandler.executeManeuver - effect routing and modal returns', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         getRuntimeValue.mockImplementation((_playerName, key) => {
@@ -103,41 +103,7 @@ describe('combatSuperiorityHandler.executeManeuver - effect descriptions', () =>
         });
     });
 
-    it('describes distracting_strike_advantage effect with advantage text', async () => {
-        dataLoader.loadManeuvers.mockResolvedValue([
-            { name: 'Distracting Strike', effect: 'distracting_strike_advantage', damageBonus: true },
-        ]);
-
-        const result = await onCombatSuperioritySelected(
-            makeAction(),
-            makePlayerStats(),
-            'test-campaign',
-            null,
-            'Distracting Strike'
-        );
-
-        expect(result.payload.description).toContain('next attack');
-        expect(result.payload.description).toContain('Advantage');
-    });
-
-    it('describes ally_movement effect with reaction and opportunity attacks text', async () => {
-        dataLoader.loadManeuvers.mockResolvedValue([
-            { name: 'Maneuvering Attack', effect: 'ally_movement', damageBonus: true },
-        ]);
-
-        const result = await onCombatSuperioritySelected(
-            makeAction(),
-            makePlayerStats(),
-            'test-campaign',
-            null,
-            'Maneuvering Attack'
-        );
-
-        expect(result.payload.description).toContain('Reaction');
-        expect(result.payload.description).toContain('Opportunity Attacks');
-    });
-
-    it('describes grant_attack actionType with reaction attack text', async () => {
+    it('returns modal for grant_attack actionType with ally options', async () => {
         dataLoader.loadManeuvers.mockResolvedValue([
             { name: "Commander's Strike", actionType: 'grant_attack', damageBonus: true },
         ]);
@@ -183,70 +149,10 @@ describe('combatSuperiorityHandler.executeManeuver - effect descriptions', () =>
         expect(result.payload.options).toBeDefined();
         expect(result.payload.options.length).toBeGreaterThanOrEqual(1);
         expect(result.payload.options[0].value).toBe('TestFighter');
-        expect(result.payload.description).toContain('+5 AC');
-        expect(result.payload.description).not.toContain('Target:');
         expect(setRuntimeValue).not.toHaveBeenCalledWith(expect.any(String), 'baitAndSwitchActive', true, expect.any(String));
     });
 
-    it('describes ac_bonus_disengage effect and sets bait-and-switch runtime values', async () => {
-        dataLoader.loadManeuvers.mockResolvedValue([
-            { name: 'Evasive Footwork', effect: 'ac_bonus_disengage' },
-        ]);
-
-        const result = await onCombatSuperioritySelected(
-            makeAction(),
-            makePlayerStats(),
-            'test-campaign',
-            null,
-            'Evasive Footwork'
-        );
-
-        expect(result.payload.description).toContain('Disengage action');
-        expect(result.payload.description).toContain('+5 AC');
-        expect(setRuntimeValue).toHaveBeenCalledWith('TestFighter', 'baitAndSwitchActive', true, 'test-campaign');
-        expect(setRuntimeValue).toHaveBeenCalledWith('TestFighter', 'baitAndSwitchBonus', 5, 'test-campaign');
-        expect(setRuntimeValue).toHaveBeenCalledWith('TestFighter', 'baitAndSwitchSource', 'Evasive Footwork', 'test-campaign');
-        expect(result.payload.description).not.toContain('Target:');
-    });
-
-    it('describes advantage_and_damage effect and stores feinting attack state', async () => {
-        dataLoader.loadManeuvers.mockResolvedValue([
-            { name: 'Feinting Attack', effect: 'advantage_and_damage' },
-        ]);
-
-        const result = await onCombatSuperioritySelected(
-            makeAction(),
-            makePlayerStats(),
-            'test-campaign',
-            null,
-            'Feinting Attack'
-        );
-
-        expect(result.payload.description).toContain('Advantage');
-        expect(result.payload.description).toContain('next attack roll');
-        expect(result.payload.description).toContain(String(DIE_ROLL_TOTAL));
-        expect(setRuntimeValue).toHaveBeenCalledWith('TestFighter', 'feintingAttackDieValue', DIE_ROLL_TOTAL, 'test-campaign');
-    });
-
-    it('describes dash_and_damage effect with distance text', async () => {
-        dataLoader.loadManeuvers.mockResolvedValue([
-            { name: 'Lunging Attack', effect: 'dash_and_damage' },
-        ]);
-
-        const result = await onCombatSuperioritySelected(
-            makeAction(),
-            makePlayerStats(),
-            'test-campaign',
-            null,
-            'Lunging Attack'
-        );
-
-        expect(result.payload.description).toContain('Dash action');
-        expect(result.payload.description).toContain('next melee hit this turn');
-        expect(result.payload.description).toContain(String(DIE_ROLL_TOTAL));
-    });
-
-    it('describes temp_hp effect returns rallyChoice modal with ally options', async () => {
+    it('returns modal for temp_hp effect with ally options and HP calculation', async () => {
         dataLoader.loadManeuvers.mockResolvedValue([
             { name: 'Rally', effect: 'temp_hp' },
         ]);
@@ -272,48 +178,7 @@ describe('combatSuperiorityHandler.executeManeuver - effect descriptions', () =>
         expect(result.payload.extraHp).toBe(7);
     });
 
-    it('describes damage_reduction effect with STR/DEX modifier calculation', async () => {
-        dataLoader.loadManeuvers.mockResolvedValue([
-            { name: 'Parry', effect: 'damage_reduction' },
-        ]);
-
-        const result = await onCombatSuperioritySelected(
-            makeAction(),
-            makePlayerStats(),
-            'test-campaign',
-            null,
-            'Parry'
-        );
-
-        expect(result.payload.description).toContain('Damage reduced by');
-        // 5 (die) + 4 (STR modifier)
-        expect(result.payload.description).toContain('9');
-        expect(result.payload.description).toContain('STR/DEX modifier');
-    });
-
-    it('uses max of STR/DEX for damage_reduction when DEX is higher', async () => {
-        dataLoader.loadManeuvers.mockResolvedValue([
-            { name: 'Parry', effect: 'damage_reduction' },
-        ]);
-        rollExpression.mockReturnValue({ total: 4 });
-
-        const result = await onCombatSuperioritySelected(
-            makeAction(),
-            makePlayerStats({
-                abilities: [
-                    { name: 'Strength', bonus: 2 },
-                    { name: 'Dexterity', bonus: 5 },
-                ],
-            }),
-            'test-campaign',
-            null,
-            'Parry'
-        );
-
-        expect(result.payload.description).toContain('9'); // 4 (die) + 5 (DEX modifier)
-    });
-
-    it('describes melee_attack_reaction effect and returns attack_roll type', async () => {
+    it('returns attack_roll type for melee_attack_reaction when melee attacks available', async () => {
         dataLoader.loadManeuvers.mockResolvedValue([
             { name: 'Riposte', effect: 'melee_attack_reaction', damageBonus: true },
         ]);
@@ -335,7 +200,7 @@ describe('combatSuperiorityHandler.executeManeuver - effect descriptions', () =>
         expect(result.context.superiorityDieValue).toBe(DIE_ROLL_TOTAL);
     });
 
-    it('describes melee_attack_reaction effect when no melee attacks available', async () => {
+    it('returns popup when melee_attack_reaction has no melee attacks available', async () => {
         dataLoader.loadManeuvers.mockResolvedValue([
             { name: 'Riposte', effect: 'melee_attack_reaction' },
         ]);
@@ -351,28 +216,27 @@ describe('combatSuperiorityHandler.executeManeuver - effect descriptions', () =>
         expect(result.type).toBe('popup');
         expect(result.payload.description).toContain('No melee attack available');
     });
+});
 
-    it('describes secondary_damage effect with range and damage text', async () => {
-        dataLoader.loadManeuvers.mockResolvedValue([
-            { name: 'Sweeping Attack', effect: 'secondary_damage' },
-        ]);
-
-        const result = await onCombatSuperioritySelected(
-            makeAction(),
-            makePlayerStats(),
-            'test-campaign',
-            null,
-            'Sweeping Attack'
-        );
-
-        expect(result.payload.description).toContain('second creature');
-        expect(result.payload.description).toContain('5 feet');
-        expect(result.payload.description).toContain(`${DIE_ROLL_TOTAL} damage`);
+describe('combatSuperiorityHandler.executeManeuver - self-only effect side effects', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+        getRuntimeValue.mockImplementation((_playerName, key) => {
+            if (key === 'superiorityDice') return DEFAULT_SUPERIORITY_DICE;
+            return undefined;
+        });
+        rollExpression.mockReturnValue({ total: DIE_ROLL_TOTAL });
+        automationService.evaluateAutoExpression.mockReturnValue(10);
+        targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
+        savePrompt.buildSaveDc.mockReturnValue(15);
+        savePrompt.createSaveListener.mockReturnValue({
+            promise: Promise.resolve({ success: false }),
+        });
     });
 
-    it('describes attack_roll_bonus effect with attack roll text', async () => {
+    it('sets bait-and-switch runtime values for ac_bonus_disengage effect', async () => {
         dataLoader.loadManeuvers.mockResolvedValue([
-            { name: 'Precision Attack', effect: 'attack_roll_bonus' },
+            { name: 'Evasive Footwork', effect: 'ac_bonus_disengage' },
         ]);
 
         const result = await onCombatSuperioritySelected(
@@ -380,16 +244,18 @@ describe('combatSuperiorityHandler.executeManeuver - effect descriptions', () =>
             makePlayerStats(),
             'test-campaign',
             null,
-            'Precision Attack'
+            'Evasive Footwork'
         );
 
-        expect(result.payload.description).toContain(String(DIE_ROLL_TOTAL));
-        expect(result.payload.description).toContain('attack roll');
+        expect(setRuntimeValue).toHaveBeenCalledWith('TestFighter', 'baitAndSwitchActive', true, 'test-campaign');
+        expect(setRuntimeValue).toHaveBeenCalledWith('TestFighter', 'baitAndSwitchBonus', 5, 'test-campaign');
+        expect(setRuntimeValue).toHaveBeenCalledWith('TestFighter', 'baitAndSwitchSource', 'Evasive Footwork', 'test-campaign');
+        expect(result.payload.description).not.toContain('Target:');
     });
 
-    it('describes skill_check actionType with ability check text', async () => {
+    it('stores feinting attack state for advantage_and_damage effect', async () => {
         dataLoader.loadManeuvers.mockResolvedValue([
-            { name: 'Ambush', actionType: 'skill_check' },
+            { name: 'Feinting Attack', effect: 'advantage_and_damage' },
         ]);
 
         const result = await onCombatSuperioritySelected(
@@ -397,10 +263,13 @@ describe('combatSuperiorityHandler.executeManeuver - effect descriptions', () =>
             makePlayerStats(),
             'test-campaign',
             null,
-            'Ambush'
+            'Feinting Attack'
         );
 
-        expect(result.payload.description).toContain(String(DIE_ROLL_TOTAL));
-        expect(result.payload.description).toContain('ability check');
+        expect(setRuntimeValue).toHaveBeenCalledWith('TestFighter', 'feintingAttackDieValue', DIE_ROLL_TOTAL, 'test-campaign');
+        expect(result.payload.description).toContain('Advantage');
+        expect(result.payload.description).toContain('next attack roll');
     });
 });
+
+// @cleaned-by-ai

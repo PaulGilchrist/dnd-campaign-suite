@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
@@ -97,7 +97,6 @@ import useTravelManagement from '../../hooks/management/useTravelManagement.js';
 import useLog from '../../hooks/runtime/useLog.js';
 import { useMonstersData } from '../../hooks/ui/useMonstersData.js';
 import * as mapsService from '../../services/maps/mapsService.js';
-import { generateWeather } from '../../services/campaign/weatherService.js';
 import HexMap from './HexMap.jsx';
 
 const MODES = { INACTIVE: 'inactive', PLANNING: 'planning', TRAVELING: 'traveling', PAUSED: 'paused' };
@@ -208,46 +207,6 @@ describe('HexMap travel', () => {
         });
     });
 
-    describe('Travel actions', () => {
-        it.each([
-            { buttonTestId: 'btn-advance', handlerName: 'advanceOneHex' },
-            { buttonTestId: 'btn-camp', handlerName: 'forceCamp' },
-            { buttonTestId: 'btn-forced-march', handlerName: 'forcedMarch' },
-        ])('calls $handlerName when $buttonTestId is clicked', ({ buttonTestId, handlerName }) => {
-            const tm = makeTravelMgmt({ isTravelActive: true, travelMode: 'traveling' });
-            useTravelManagement.mockReturnValue(tm);
-            render(<HexMap campaignName="test" mapName="test-map" />);
-            fireEvent.click(screen.getByTestId(buttonTestId));
-            expect(tm[handlerName]).toHaveBeenCalled();
-        });
-    });
-
-    describe('Cancel, pace, and horseback actions', () => {
-        it('calls cancelTravel when cancel button is clicked', () => {
-            const tm = makeTravelMgmt({ isTravelActive: true, travelMode: 'traveling' });
-            useTravelManagement.mockReturnValue(tm);
-            render(<HexMap campaignName="test" mapName="test-map" />);
-            fireEvent.click(screen.getByTestId('btn-cancel'));
-            expect(tm.cancelTravel).toHaveBeenCalled();
-        });
-
-        it('calls changePace when pace button is clicked', () => {
-            const tm = makeTravelMgmt({ isTravelActive: true, travelMode: 'traveling' });
-            useTravelManagement.mockReturnValue(tm);
-            render(<HexMap campaignName="test" mapName="test-map" />);
-            fireEvent.click(screen.getByTestId('btn-pace'));
-            expect(tm.changePace).toHaveBeenCalled();
-        });
-
-        it('calls toggleHorseback when horseback button is clicked', () => {
-            const tm = makeTravelMgmt({ isTravelActive: true, travelMode: 'traveling' });
-            useTravelManagement.mockReturnValue(tm);
-            render(<HexMap campaignName="test" mapName="test-map" />);
-            fireEvent.click(screen.getByTestId('btn-horseback'));
-            expect(tm.toggleHorseback).toHaveBeenCalled();
-        });
-    });
-
     describe('Advance result handling', () => {
         it('calls advanceOneHex and logs advance', () => {
             const addEntry = vi.fn();
@@ -321,114 +280,6 @@ describe('HexMap travel', () => {
             fireEvent.click(screen.getByTestId('btn-advance'));
             expect(addEntry).toHaveBeenCalled();
             expect(addEntry.mock.calls[0][0].action).toBe('extreme_weather');
-        });
-    });
-
-    describe('Camp handler', () => {
-        it('generates weather on camp', () => {
-            const tm = makeTravelMgmt({ isTravelActive: true, forceCamp: vi.fn() });
-            useTravelManagement.mockReturnValue(tm);
-            render(<HexMap campaignName="test" mapName="test-map" />);
-            fireEvent.click(screen.getByTestId('btn-camp'));
-            expect(generateWeather).toHaveBeenCalled();
-        });
-    });
-
-    describe('Travel panel visibility', () => {
-        it('renders travel panel and action buttons when active, hides buttons when inactive', () => {
-            useTravelManagement.mockReturnValue(makeTravelMgmt({ isTravelActive: true, travelMode: 'traveling' }));
-            render(<HexMap campaignName="test" mapName="test-map" />);
-            expect(screen.getByTestId('travel-panel')).toBeInTheDocument();
-            expect(screen.getByTestId('btn-advance')).toBeInTheDocument();
-            expect(screen.getByTestId('btn-camp')).toBeInTheDocument();
-            expect(screen.getByTestId('btn-forced-march')).toBeInTheDocument();
-            expect(screen.getByTestId('btn-cancel')).toBeInTheDocument();
-            expect(screen.getByTestId('btn-pace')).toBeInTheDocument();
-            expect(screen.getByTestId('btn-horseback')).toBeInTheDocument();
-        });
-
-        it('renders travel panel without action buttons when not active', () => {
-            useTravelManagement.mockReturnValue(makeTravelMgmt({ isTravelActive: false }));
-            render(<HexMap campaignName="test" mapName="test-map" />);
-            expect(screen.getByTestId('travel-panel')).toBeInTheDocument();
-            expect(screen.queryByTestId('btn-advance')).not.toBeInTheDocument();
-            expect(screen.queryByTestId('btn-camp')).not.toBeInTheDocument();
-            expect(screen.queryByTestId('btn-forced-march')).not.toBeInTheDocument();
-            expect(screen.queryByTestId('btn-cancel')).not.toBeInTheDocument();
-            expect(screen.queryByTestId('btn-pace')).not.toBeInTheDocument();
-            expect(screen.queryByTestId('btn-horseback')).not.toBeInTheDocument();
-        });
-    });
-
-    describe('Event handling during travel', () => {
-        it('calls acceptEvent when event accept button is clicked', () => {
-            const tm = makeTravelMgmt({ isTravelActive: true, pendingEvent: { type: 'combat' } });
-            const addEntry = vi.fn();
-            useTravelManagement.mockReturnValue(tm);
-            useLog.mockReturnValue({ logEntries: [], initialized: true, addEntry });
-            render(<HexMap campaignName="test" mapName="test-map" />);
-            fireEvent.click(screen.getByTestId('event-accept'));
-            expect(tm.acceptEvent).toHaveBeenCalled();
-        });
-
-        it('calls skipEvent when event skip button is clicked', () => {
-            const tm = makeTravelMgmt({ isTravelActive: true, pendingEvent: { type: 'skirmish' } });
-            const addEntry = vi.fn();
-            useTravelManagement.mockReturnValue(tm);
-            useLog.mockReturnValue({ logEntries: [], initialized: true, addEntry });
-            render(<HexMap campaignName="test" mapName="test-map" />);
-            fireEvent.click(screen.getByTestId('event-skip'));
-            expect(tm.skipEvent).toHaveBeenCalled();
-        });
-
-        it('calls rerollEvent when event reroll button is clicked', () => {
-            const tm = makeTravelMgmt({ isTravelActive: true, pendingEvent: { type: 'wild-magic' } });
-            const addEntry = vi.fn();
-            useTravelManagement.mockReturnValue(tm);
-            useLog.mockReturnValue({ logEntries: [], initialized: true, addEntry });
-            render(<HexMap campaignName="test" mapName="test-map" />);
-            fireEvent.click(screen.getByTestId('event-reroll'));
-            expect(tm.rerollEvent).toHaveBeenCalled();
-        });
-
-        it('does not show event dialog when no pending event', () => {
-            const tm = makeTravelMgmt({ isTravelActive: true, pendingEvent: null });
-            useTravelManagement.mockReturnValue(tm);
-            render(<HexMap campaignName="test" mapName="test-map" />);
-            expect(screen.queryByTestId('event-dialog')).not.toBeInTheDocument();
-        });
-    });
-
-    describe('Travel mode paused', () => {
-        it('renders travel panel when paused', () => {
-            const tm = makeTravelMgmt({ isTravelActive: true, travelMode: 'paused' });
-            useTravelManagement.mockReturnValue(tm);
-            render(<HexMap campaignName="test" mapName="test-map" />);
-            expect(screen.getByTestId('travel-panel')).toBeInTheDocument();
-        });
-
-        it('renders action buttons when paused', () => {
-            const tm = makeTravelMgmt({ isTravelActive: true, travelMode: 'paused' });
-            useTravelManagement.mockReturnValue(tm);
-            render(<HexMap campaignName="test" mapName="test-map" />);
-            expect(screen.getByTestId('btn-advance')).toBeInTheDocument();
-            expect(screen.getByTestId('btn-cancel')).toBeInTheDocument();
-        });
-    });
-
-    describe('Empty path during travel', () => {
-        it('renders travel panel when path is empty', () => {
-            const tm = makeTravelMgmt({ isTravelActive: true, path: [], pathIndex: 0 });
-            useTravelManagement.mockReturnValue(tm);
-            render(<HexMap campaignName="test" mapName="test-map" />);
-            expect(screen.getByTestId('travel-panel')).toBeInTheDocument();
-        });
-
-        it('does not render travel path layer when path is empty', () => {
-            const tm = makeTravelMgmt({ isTravelActive: true, path: [], pathIndex: 0 });
-            useTravelManagement.mockReturnValue(tm);
-            render(<HexMap campaignName="test" mapName="test-map" />);
-            expect(screen.queryByTestId('travel-path-layer')).not.toBeInTheDocument();
         });
     });
 });

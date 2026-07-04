@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { onCombatSuperioritySelected } from './combatSuperiorityHandler.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
@@ -268,7 +268,7 @@ describe('combatSuperiorityHandler.executeManeuver - die expenditure and roll fa
         );
     });
 
-    it('uses die roll total from rollExpression in description', async () => {
+    it('uses die roll total from rollExpression in description, falling back to die size when null', async () => {
         rollExpression.mockReturnValue({ total: 9 });
 
         dataLoader.loadManeuvers.mockResolvedValue([
@@ -284,16 +284,13 @@ describe('combatSuperiorityHandler.executeManeuver - die expenditure and roll fa
         );
 
         expect(result.payload.description).toContain('Rolled d10 for 9');
-    });
 
-    it('falls back to die size when rollExpression returns null', async () => {
         rollExpression.mockReturnValue(null);
-
         dataLoader.loadManeuvers.mockResolvedValue([
             { name: 'Trip Attack', effect: 'knock_prone', damageBonus: true },
         ]);
 
-        const result = await onCombatSuperioritySelected(
+        const fallbackResult = await onCombatSuperioritySelected(
             makeAction(),
             makePlayerStats(),
             'test-campaign',
@@ -301,7 +298,7 @@ describe('combatSuperiorityHandler.executeManeuver - die expenditure and roll fa
             'Trip Attack'
         );
 
-        expect(result.payload.description).toContain('Rolled d10 for 10');
+        expect(fallbackResult.payload.description).toContain('Rolled d10 for 10');
     });
 
     it('does not expend die when relentless is available and not used this round', async () => {
@@ -717,23 +714,6 @@ describe('combatSuperiorityHandler.executeManeuver - edge cases and HP restorati
         expect(result.payload.description).toContain('HP restored: 20 \u2192 20');
     });
 
-    it('does not show target line for ac_bonus_and_swap effect', async () => {
-        dataLoader.loadManeuvers.mockResolvedValue([
-            { name: 'Bait and Switch', effect: 'ac_bonus_and_swap' },
-        ]);
-
-        const result = await onCombatSuperioritySelected(
-            makeAction(),
-            makePlayerStats(),
-            'test-campaign',
-            null,
-            'Bait and Switch'
-        );
-
-        expect(result.payload.description).not.toContain('Target:');
-        expect(result.type).toBe('modal');
-    });
-
     it('executeBaitAndSwitchChoice applies bonus to chosen target', async () => {
         const { executeBaitAndSwitchChoice } = await import('./combatSuperiorityHandler.js');
 
@@ -752,12 +732,40 @@ describe('combatSuperiorityHandler.executeManeuver - edge cases and HP restorati
         expect(result.payload.description).toContain('TestFighter\'s next turn');
     });
 
-    it('does not show target line for ac_bonus_disengage effect', async () => {
+    it('does not show target line for self-only effects (ac_bonus_and_swap, ac_bonus_disengage, damage_reduction)', async () => {
+        dataLoader.loadManeuvers.mockResolvedValue([
+            { name: 'Bait and Switch', effect: 'ac_bonus_and_swap' },
+        ]);
+
+        const result = await onCombatSuperioritySelected(
+            makeAction(),
+            makePlayerStats(),
+            'test-campaign',
+            null,
+            'Bait and Switch'
+        );
+
+        expect(result.payload.description).not.toContain('Target:');
+        expect(result.type).toBe('modal');
+
+        vi.clearAllMocks();
+        getRuntimeValue.mockImplementation((_playerName, key) => {
+            if (key === 'superiorityDice') return DEFAULT_SUPERIORITY_DICE;
+            return undefined;
+        });
+        rollExpression.mockReturnValue({ total: DIE_ROLL_TOTAL });
+        automationService.evaluateAutoExpression.mockReturnValue(10);
+        targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
+        savePrompt.buildSaveDc.mockReturnValue(15);
+        savePrompt.createSaveListener.mockReturnValue({
+            promise: Promise.resolve({ success: false }),
+        });
+
         dataLoader.loadManeuvers.mockResolvedValue([
             { name: 'Evasive Footwork', effect: 'ac_bonus_disengage' },
         ]);
 
-        const result = await onCombatSuperioritySelected(
+        const disengageResult = await onCombatSuperioritySelected(
             makeAction(),
             makePlayerStats(),
             'test-campaign',
@@ -765,15 +773,26 @@ describe('combatSuperiorityHandler.executeManeuver - edge cases and HP restorati
             'Evasive Footwork'
         );
 
-        expect(result.payload.description).not.toContain('Target:');
-    });
+        expect(disengageResult.payload.description).not.toContain('Target:');
 
-    it('does not show target line for damage_reduction effect', async () => {
+        vi.clearAllMocks();
+        getRuntimeValue.mockImplementation((_playerName, key) => {
+            if (key === 'superiorityDice') return DEFAULT_SUPERIORITY_DICE;
+            return undefined;
+        });
+        rollExpression.mockReturnValue({ total: DIE_ROLL_TOTAL });
+        automationService.evaluateAutoExpression.mockReturnValue(10);
+        targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
+        savePrompt.buildSaveDc.mockReturnValue(15);
+        savePrompt.createSaveListener.mockReturnValue({
+            promise: Promise.resolve({ success: false }),
+        });
+
         dataLoader.loadManeuvers.mockResolvedValue([
             { name: 'Parry', effect: 'damage_reduction' },
         ]);
 
-        const result = await onCombatSuperioritySelected(
+        const parryResult = await onCombatSuperioritySelected(
             makeAction(),
             makePlayerStats(),
             'test-campaign',
@@ -781,22 +800,6 @@ describe('combatSuperiorityHandler.executeManeuver - edge cases and HP restorati
             'Parry'
         );
 
-        expect(result.payload.description).not.toContain('Target:');
-    });
-
-    it('includes automation in popup payload for not-found maneuver', async () => {
-        dataLoader.loadManeuvers.mockResolvedValue([
-            { name: 'Trip Attack', effect: 'knock_prone' },
-        ]);
-
-        const result = await onCombatSuperioritySelected(
-            makeAction(),
-            makePlayerStats(),
-            'test-campaign',
-            null,
-            'Unknown Maneuver'
-        );
-
-        expect(result.payload.automation).toEqual(makeAction().automation);
+        expect(parryResult.payload.description).not.toContain('Target:');
     });
 });

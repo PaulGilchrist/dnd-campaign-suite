@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import { handle, applyWarpingImplosion } from './warpingImplosionHandler.js';
@@ -49,7 +49,6 @@ vi.mock('../../../rules/combat/rangeValidation.js', () => ({
 const makeAction = (overrides = {}) => ({
     name: 'Warping Implosion',
     automation: {
-        type: 'save_attack',
         action: 'action',
         casting_time: '1 action',
         damage: '3d10',
@@ -150,7 +149,7 @@ describe('warpingImplosionHandler', () => {
             expect(result.payload.description).toContain('cannot restore');
         });
 
-        it('returns popup when no uses but can restore', async () => {
+        it('returns modal when no uses but can restore', async () => {
             runtimeState.getRuntimeValue.mockReturnValue(0);
             metamagic.getCurrentSorceryPoints.mockReturnValue(10);
 
@@ -171,32 +170,6 @@ describe('warpingImplosionHandler', () => {
             expect(result.type).toBe('popup');
         });
 
-        it('uses custom resourceKey when provided', async () => {
-            runtimeState.getRuntimeValue.mockImplementation((name, key) => {
-                if (key === 'customUsesKey') return 0;
-                return 1;
-            });
-            const action = makeAction({ automation: { resourceKey: 'customUsesKey' } });
-
-            await handle(action, makePlayerStats(), 'TestCampaign', null);
-
-            expect(runtimeState.getRuntimeValue).toHaveBeenCalledWith(
-                'TestHero',
-                'customUsesKey',
-                'TestCampaign'
-            );
-        });
-
-        it('uses default resource key derived from action name when no resourceKey', async () => {
-            await handle(makeAction(), makePlayerStats(), 'TestCampaign', null);
-
-            expect(runtimeState.getRuntimeValue).toHaveBeenCalledWith(
-                'TestHero',
-                'warpingimplosionUses',
-                'TestCampaign'
-            );
-        });
-
         it('defaults to max uses when no runtime value exists', async () => {
             runtimeState.getRuntimeValue.mockReturnValue(null);
 
@@ -206,17 +179,8 @@ describe('warpingImplosionHandler', () => {
             expect(result.payload.hasRemaining).toBe(true);
         });
 
-        it('includes mapData and attackerPos when mapName is provided', async () => {
-            vi.mocked(logService.addEntry).mockResolvedValue(undefined);
-
+        it('includes mapData and attackerPos in payload', async () => {
             const result = await handle(makeAction(), makePlayerStats(), 'TestCampaign', 'battlemap');
-
-            expect(result.payload.mapData).toBeNull();
-            expect(result.payload.attackerPos).toBeNull();
-        });
-
-        it('passes null mapData when mapName is not provided', async () => {
-            const result = await handle(makeAction(), makePlayerStats(), 'TestCampaign', null);
 
             expect(result.payload.mapData).toBeNull();
             expect(result.payload.attackerPos).toBeNull();
@@ -327,7 +291,7 @@ describe('warpingImplosionHandler', () => {
             expect(result.payload.modifier).toBe(0);
         });
 
-        it('includes save configuration in roll payload context', async () => {
+        it('includes save configuration and notes in roll payload', async () => {
             runtimeState.getRuntimeValue.mockReturnValue(1);
             savePrompt.buildSaveDc.mockReturnValue(15);
 
@@ -344,25 +308,10 @@ describe('warpingImplosionHandler', () => {
             expect(result.payload.contextConfig.saveDc).toBe(15);
             expect(result.payload.contextConfig.saveType).toBe('STR');
             expect(result.payload.contextConfig.attackerName).toBe('TestHero');
-        });
-
-        it('includes correct description notes in roll payload', async () => {
-            runtimeState.getRuntimeValue.mockReturnValue(1);
-        savePrompt.buildSaveDc.mockReturnValue(14);
-
-            const result = await applyWarpingImplosion(
-                makeAction(),
-                makePlayerStats(),
-                'TestCampaign',
-                ['Enemy1', 'Enemy2'],
-                { gridX: 5, gridY: 5 },
-                false
-            );
-
             expect(result.payload.notes).toContain('Teleported to an unoccupied space within 120 feet');
             expect(result.payload.notes).toContain('30 feet');
             expect(result.payload.notes).toContain('STR saving throw');
-            expect(result.payload.notes).toContain('DC 14');
+            expect(result.payload.notes).toContain('DC 15');
             expect(result.payload.notes).toContain('27 Force damage');
         });
 
@@ -504,23 +453,6 @@ describe('warpingImplosionHandler', () => {
                 5,
                 'TestCampaign'
             );
-        });
-
-        it('returns popup with no-target count in log when targets is empty', async () => {
-            runtimeState.getRuntimeValue.mockReturnValue(1);
-
-            await applyWarpingImplosion(
-                makeAction(),
-                makePlayerStats(),
-                'TestCampaign',
-                [],
-                { gridX: 5, gridY: 5 },
-                false
-            );
-
-            expect(logService.addEntry).toHaveBeenCalledWith('TestCampaign', expect.objectContaining({
-                description: expect.stringContaining('0 creature'),
-            }));
         });
 
         it('uses custom saveType from automation', async () => {

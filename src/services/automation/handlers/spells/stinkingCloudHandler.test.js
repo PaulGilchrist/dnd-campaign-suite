@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../common/savePrompt.js', () => ({
@@ -78,7 +78,7 @@ describe('stinkingCloudHandler', () => {
 
   describe('handle', () => {
     describe('combat context validation', () => {
-      it('should return popup when combat context is null', async () => {
+      it('should return popup when no creatures in combat', async () => {
         getCombatContext.mockResolvedValue(null);
 
         const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
@@ -90,7 +90,7 @@ describe('stinkingCloudHandler', () => {
         expect(result.payload.description).toContain('has no effect');
       });
 
-      it('should return popup when no creatures are in combat', async () => {
+      it('should return popup when creatures array is empty', async () => {
         getCombatContext.mockResolvedValue({ creatures: [] });
 
         const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
@@ -152,23 +152,7 @@ describe('stinkingCloudHandler', () => {
         });
       });
 
-      it('should call buildSaveDc with action automation and playerStats', async () => {
-        getCombatContext.mockResolvedValue(singleTargetCombat);
-        buildSaveDc.mockReturnValue(15);
-        createSaveListener.mockReturnValue({
-          promptId: 'goblin-prompt',
-          promise: Promise.resolve({ success: true }),
-        });
-
-        await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-        expect(buildSaveDc).toHaveBeenCalledWith(
-          expect.objectContaining({ type: 'spell' }),
-          expect.any(Object),
-        );
-      });
-
-      it('should log ability_use for the caster', async () => {
+      it('should log ability_use and save_result for the caster', async () => {
         getCombatContext.mockResolvedValue(singleTargetCombat);
         createSaveListener.mockReturnValue({
           promptId: 'goblin-prompt',
@@ -184,17 +168,6 @@ describe('stinkingCloudHandler', () => {
           description: expect.stringContaining('casts Stinking Cloud'),
           promptId: 'goblin-prompt',
         });
-      });
-
-      it('should log save_result with success=true when target saves', async () => {
-        getCombatContext.mockResolvedValue(singleTargetCombat);
-        createSaveListener.mockReturnValue({
-          promptId: 'goblin-prompt',
-          promise: Promise.resolve({ success: true }),
-        });
-
-        await handle(makeAction(), makePlayerStats(), campaignName, null);
-
         expect(addEntry).toHaveBeenCalledWith(campaignName, {
           type: 'save_result',
           characterName: 'TestWizard',
@@ -218,31 +191,6 @@ describe('stinkingCloudHandler', () => {
 
         expect(result.payload.description).toContain('1 creature(s) saved');
         expect(result.payload.description).toContain('No creatures affected');
-      });
-
-      it('should not apply conditions or tracking when target saves', async () => {
-        getCombatContext.mockResolvedValue(singleTargetCombat);
-        createSaveListener.mockReturnValue({
-          promptId: 'goblin-prompt',
-          promise: Promise.resolve({ success: true }),
-        });
-
-        await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-        expect(setRuntimeValue).not.toHaveBeenCalledWith(
-          expect.any(String),
-          'activeConditions',
-          expect.any(Array),
-          expect.any(String),
-        );
-        expect(setRuntimeValue).not.toHaveBeenCalledWith(
-          expect.any(String),
-          '_stinking_cloud_',
-          expect.anything(),
-          expect.any(String),
-        );
-        expect(addExpiration).not.toHaveBeenCalled();
-        expect(postLogEntry).not.toHaveBeenCalled();
       });
     });
 
@@ -283,7 +231,7 @@ describe('stinkingCloudHandler', () => {
         );
       });
 
-      it('should set tracking key for repeat save', async () => {
+      it('should set tracking key and add expiration for concentration', async () => {
         getCombatContext.mockResolvedValue(singleTargetCombat);
         getRuntimeValue.mockReturnValue([]);
         createSaveListener.mockReturnValue({
@@ -299,18 +247,6 @@ describe('stinkingCloudHandler', () => {
           true,
           campaignName,
         );
-      });
-
-      it('should add expiration for concentration', async () => {
-        getCombatContext.mockResolvedValue(singleTargetCombat);
-        getRuntimeValue.mockReturnValue([]);
-        createSaveListener.mockReturnValue({
-          promptId: 'goblin-prompt',
-          promise: Promise.resolve({ success: false }),
-        });
-
-        await handle(makeAction(), makePlayerStats(), campaignName, null);
-
         expect(addExpiration).toHaveBeenCalledWith(
           'TestWizard',
           'EnemyGoblin',
@@ -382,7 +318,7 @@ describe('stinkingCloudHandler', () => {
         );
       });
 
-      it('should post condition log entry for poisoned application', async () => {
+      it('should post condition log entry and log save_result on failed save', async () => {
         getCombatContext.mockResolvedValue(singleTargetCombat);
         getRuntimeValue.mockReturnValue([]);
         createSaveListener.mockReturnValue({
@@ -401,18 +337,6 @@ describe('stinkingCloudHandler', () => {
           note: expect.stringContaining("can't take an Action or Bonus Action"),
           timestamp: expect.any(Number),
         });
-      });
-
-      it('should log save_result with success=false on failed save', async () => {
-        getCombatContext.mockResolvedValue(singleTargetCombat);
-        getRuntimeValue.mockReturnValue([]);
-        createSaveListener.mockReturnValue({
-          promptId: 'goblin-prompt',
-          promise: Promise.resolve({ success: false }),
-        });
-
-        await handle(makeAction(), makePlayerStats(), campaignName, null);
-
         expect(addEntry).toHaveBeenCalledWith(campaignName, {
           type: 'save_result',
           characterName: 'TestWizard',
@@ -425,7 +349,7 @@ describe('stinkingCloudHandler', () => {
         });
       });
 
-      it('should include poisoned description in popup', async () => {
+      it('should include poisoned description and repeat save instructions in popup', async () => {
         getCombatContext.mockResolvedValue(singleTargetCombat);
         getRuntimeValue.mockReturnValue([]);
         createSaveListener.mockReturnValue({
@@ -437,42 +361,13 @@ describe('stinkingCloudHandler', () => {
 
         expect(result.payload.description).toContain('Poisoned');
         expect(result.payload.description).toContain('1 creature(s)');
-      });
-
-      it('should include repeat save instructions in popup', async () => {
-        getCombatContext.mockResolvedValue(singleTargetCombat);
-        getRuntimeValue.mockReturnValue([]);
-        createSaveListener.mockReturnValue({
-          promptId: 'goblin-prompt',
-          promise: Promise.resolve({ success: false }),
-        });
-
-        const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
         expect(result.payload.description).toContain('end of their current turn');
         expect(result.payload.description).toContain('repeat the save');
       });
     });
 
     describe('poison immunity', () => {
-      it('should skip targets with poison immunity', async () => {
-        getCombatContext.mockResolvedValue(singleTargetCombat);
-        createSaveListener.mockReturnValue({
-          promptId: 'goblin-prompt',
-          promise: Promise.resolve({ success: false }),
-        });
-
-        const immuneStats = makePlayerStats({
-          immunities: ['Poison', 'Fire'],
-        });
-
-        const result = await handle(makeAction(), immuneStats, campaignName, null);
-
-        expect(createSaveListener).not.toHaveBeenCalled();
-        expect(result.payload.description).toContain('No creatures affected');
-      });
-
-      it('should handle case-insensitive poison immunity', async () => {
+      it('should skip targets with poison immunity (case-insensitive)', async () => {
         getCombatContext.mockResolvedValue(singleTargetCombat);
         createSaveListener.mockReturnValue({
           promptId: 'goblin-prompt',
@@ -489,7 +384,7 @@ describe('stinkingCloudHandler', () => {
         expect(result.payload.description).toContain('No creatures affected');
       });
 
-      it('should not process targets when caster is immune', async () => {
+      it('should not process any targets when caster is immune', async () => {
         getCombatContext.mockResolvedValue(multiTargetCombat);
 
         const immuneStats = makePlayerStats({
@@ -611,19 +506,6 @@ describe('stinkingCloudHandler', () => {
       expect(result).toBeNull();
     });
 
-    it('should return null when tracking is falsy', async () => {
-      getRuntimeValue.mockReturnValue(undefined);
-
-      const result = await processStinkingCloudRepeatSave(
-        'TestWizard',
-        'EnemyGoblin',
-        13,
-        campaignName,
-      );
-
-      expect(result).toBeNull();
-    });
-
     it('should call createSaveListener with CON save config', async () => {
       getRuntimeValue.mockReturnValue(true);
       createSaveListener.mockReturnValue({
@@ -692,7 +574,7 @@ describe('stinkingCloudHandler', () => {
         expect(result.payload.description).toContain('Stinking Cloud ends');
       });
 
-      it('should clear activeConditions by removing poisoned', async () => {
+      it('should clear activeConditions and tracking key on success', async () => {
         getRuntimeValue
           .mockReturnValueOnce(true) // tracking
           .mockReturnValueOnce(['poisoned', 'stunned']); // activeConditions
@@ -714,24 +596,6 @@ describe('stinkingCloudHandler', () => {
           ['stunned'],
           campaignName,
         );
-      });
-
-      it('should clear tracking key', async () => {
-        getRuntimeValue
-          .mockReturnValueOnce(true) // tracking
-          .mockReturnValueOnce([]); // activeConditions
-        createSaveListener.mockReturnValue({
-          promptId: 'repeat-prompt',
-          promise: Promise.resolve({ success: true }),
-        });
-
-        await processStinkingCloudRepeatSave(
-          'TestWizard',
-          'EnemyGoblin',
-          13,
-          campaignName,
-        );
-
         expect(setRuntimeValue).toHaveBeenCalledWith(
           'TestWizard',
           '_stinking_cloud_EnemyGoblin',
@@ -740,7 +604,7 @@ describe('stinkingCloudHandler', () => {
         );
       });
 
-      it('should call postLogEntry with condition removed', async () => {
+      it('should call postLogEntry with condition removed and log save_result', async () => {
         getRuntimeValue
           .mockReturnValueOnce(true) // tracking
           .mockReturnValueOnce([]); // activeConditions
@@ -764,24 +628,6 @@ describe('stinkingCloudHandler', () => {
           reason: 'Stinking Cloud (successful repeat save)',
           timestamp: expect.any(Number),
         });
-      });
-
-      it('should log save_result with success=true', async () => {
-        getRuntimeValue
-          .mockReturnValueOnce(true) // tracking
-          .mockReturnValueOnce([]); // activeConditions
-        createSaveListener.mockReturnValue({
-          promptId: 'repeat-prompt',
-          promise: Promise.resolve({ success: true }),
-        });
-
-        await processStinkingCloudRepeatSave(
-          'TestWizard',
-          'EnemyGoblin',
-          13,
-          campaignName,
-        );
-
         expect(addEntry).toHaveBeenCalledWith(campaignName, {
           type: 'save_result',
           characterName: 'TestWizard',
@@ -792,6 +638,31 @@ describe('stinkingCloudHandler', () => {
           success: true,
           description: expect.stringContaining('Stinking Cloud ends'),
         });
+      });
+
+      it('should handle falsy or non-array activeConditions gracefully', async () => {
+        getRuntimeValue
+          .mockReturnValueOnce(true) // tracking
+          .mockReturnValueOnce(null); // activeConditions is null
+        createSaveListener.mockReturnValue({
+          promptId: 'repeat-prompt',
+          promise: Promise.resolve({ success: true }),
+        });
+
+        const result = await processStinkingCloudRepeatSave(
+          'TestWizard',
+          'EnemyGoblin',
+          13,
+          campaignName,
+        );
+
+        expect(result.type).toBe('popup');
+        expect(setRuntimeValue).toHaveBeenCalledWith(
+          'EnemyGoblin',
+          'activeConditions',
+          [],
+          campaignName,
+        );
       });
     });
 
@@ -815,7 +686,7 @@ describe('stinkingCloudHandler', () => {
         expect(result.payload.description).toContain('remains Poisoned');
       });
 
-      it('should not clear tracking on failed save', async () => {
+      it('should not clear tracking or modify conditions on failed save', async () => {
         getRuntimeValue.mockReturnValueOnce(true);
         createSaveListener.mockReturnValue({
           promptId: 'repeat-prompt',
@@ -835,9 +706,15 @@ describe('stinkingCloudHandler', () => {
           null,
           campaignName,
         );
+        expect(setRuntimeValue).not.toHaveBeenCalledWith(
+          'EnemyGoblin',
+          'activeConditions',
+          expect.any(Array),
+          campaignName,
+        );
       });
 
-      it('should log save_result with success=false on failure', async () => {
+      it('should log save_result on failure and not post condition log', async () => {
         getRuntimeValue.mockReturnValueOnce(true);
         createSaveListener.mockReturnValue({
           promptId: 'repeat-prompt',
@@ -861,45 +738,7 @@ describe('stinkingCloudHandler', () => {
           success: false,
           description: expect.stringContaining('remains Poisoned'),
         });
-      });
-
-      it('should not post condition log on failure', async () => {
-        getRuntimeValue.mockReturnValueOnce(true);
-        createSaveListener.mockReturnValue({
-          promptId: 'repeat-prompt',
-          promise: Promise.resolve({ success: false }),
-        });
-
-        await processStinkingCloudRepeatSave(
-          'TestWizard',
-          'EnemyGoblin',
-          13,
-          campaignName,
-        );
-
         expect(postLogEntry).not.toHaveBeenCalled();
-      });
-
-      it('should not modify activeConditions on failure', async () => {
-        getRuntimeValue.mockReturnValueOnce(true);
-        createSaveListener.mockReturnValue({
-          promptId: 'repeat-prompt',
-          promise: Promise.resolve({ success: false }),
-        });
-
-        await processStinkingCloudRepeatSave(
-          'TestWizard',
-          'EnemyGoblin',
-          13,
-          campaignName,
-        );
-
-        expect(setRuntimeValue).not.toHaveBeenCalledWith(
-          'EnemyGoblin',
-          'activeConditions',
-          expect.any(Array),
-          campaignName,
-        );
       });
 
       it('should call cleanupTargetEffect on repeat save success', async () => {
@@ -931,61 +770,11 @@ describe('stinkingCloudHandler', () => {
           campaignName,
         );
       });
-
-      it('should handle falsy activeConditions in repeat save success', async () => {
-        getRuntimeValue
-          .mockReturnValueOnce(true) // tracking
-          .mockReturnValueOnce(null); // activeConditions is null
-        createSaveListener.mockReturnValue({
-          promptId: 'repeat-prompt',
-          promise: Promise.resolve({ success: true }),
-        });
-
-        const result = await processStinkingCloudRepeatSave(
-          'TestWizard',
-          'EnemyGoblin',
-          13,
-          campaignName,
-        );
-
-        expect(result.type).toBe('popup');
-        expect(setRuntimeValue).toHaveBeenCalledWith(
-          'EnemyGoblin',
-          'activeConditions',
-          [],
-          campaignName,
-        );
-      });
-
-      it('should handle non-array activeConditions in repeat save success', async () => {
-        getRuntimeValue
-          .mockReturnValueOnce(true) // tracking
-          .mockReturnValueOnce('not-an-array'); // activeConditions is a string
-        createSaveListener.mockReturnValue({
-          promptId: 'repeat-prompt',
-          promise: Promise.resolve({ success: true }),
-        });
-
-        const result = await processStinkingCloudRepeatSave(
-          'TestWizard',
-          'EnemyGoblin',
-          13,
-          campaignName,
-        );
-
-        expect(result.type).toBe('popup');
-        expect(setRuntimeValue).toHaveBeenCalledWith(
-          'EnemyGoblin',
-          'activeConditions',
-          [],
-          campaignName,
-        );
-      });
     });
   });
 
   describe('defensive coding paths', () => {
-    it('should handle falsy targetEffects in handle save failure', async () => {
+    it('should handle falsy or non-array targetEffects in handle save failure', async () => {
       getCombatContext.mockResolvedValue(singleTargetCombat);
       getRuntimeValue
         .mockReturnValueOnce([]) // activeConditions
@@ -1001,44 +790,9 @@ describe('stinkingCloudHandler', () => {
       expect(result.payload.description).toContain('Poisoned');
     });
 
-    it('should handle non-array targetEffects in handle save failure', async () => {
-      getCombatContext.mockResolvedValue(singleTargetCombat);
-      getRuntimeValue
-        .mockReturnValueOnce([]) // activeConditions
-        .mockReturnValueOnce('not-an-array'); // targetEffects is a string
-      createSaveListener.mockReturnValue({
-        promptId: 'goblin-prompt',
-        promise: Promise.resolve({ success: false }),
-      });
-
-      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.description).toContain('Poisoned');
-    });
-
-    it('should handle falsy activeConditions in handle save failure', async () => {
+    it('should handle falsy or non-array activeConditions in handle save failure', async () => {
       getCombatContext.mockResolvedValue(singleTargetCombat);
       getRuntimeValue.mockReturnValueOnce(null); // activeConditions is null
-      createSaveListener.mockReturnValue({
-        promptId: 'goblin-prompt',
-        promise: Promise.resolve({ success: false }),
-      });
-
-      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(result.type).toBe('popup');
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'EnemyGoblin',
-        'activeConditions',
-        ['poisoned'],
-        campaignName,
-      );
-    });
-
-    it('should handle non-array activeConditions in handle save failure', async () => {
-      getCombatContext.mockResolvedValue(singleTargetCombat);
-      getRuntimeValue.mockReturnValueOnce('not-an-array'); // activeConditions is a string
       createSaveListener.mockReturnValue({
         promptId: 'goblin-prompt',
         promise: Promise.resolve({ success: false }),

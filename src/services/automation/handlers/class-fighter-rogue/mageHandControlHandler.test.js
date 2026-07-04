@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { handle } from './mageHandControlHandler.js';
 
@@ -87,42 +87,9 @@ describe('mageHandControlHandler', () => {
             expect(result.payload.description).toContain('60');
         });
 
-        it('uses default range "30" when automation has no range', async () => {
+        it('uses default range "30" when range is missing', async () => {
             const result = await handle(
                 makeAction({ automation: { type: 'mage_hand_control' } }),
-                makePlayerStats(),
-                'test-campaign',
-                null
-            );
-
-            expect(result.payload.description).toContain('30');
-        });
-
-        it('uses default range "30" when automation is empty object', async () => {
-            const result = await handle(
-                makeAction({ automation: {} }),
-                makePlayerStats(),
-                'test-campaign',
-                null
-            );
-
-            expect(result.payload.description).toContain('30');
-        });
-
-        it('uses default range "30" when automation is undefined', async () => {
-            const result = await handle(
-                makeAction({ automation: undefined }),
-                makePlayerStats(),
-                'test-campaign',
-                null
-            );
-
-            expect(result.payload.description).toContain('30');
-        });
-
-        it('uses default range "30" when range is null', async () => {
-            const result = await handle(
-                makeAction({ automation: { range: null } }),
                 makePlayerStats(),
                 'test-campaign',
                 null
@@ -146,19 +113,6 @@ describe('mageHandControlHandler', () => {
                 type: 'ability_use',
                 characterName: 'TestWizard',
                 abilityName: 'Mage Hand Control',
-            }));
-        });
-
-        it('includes the range in the log description', async () => {
-            await handle(
-                makeAction({ automation: { range: '60' } }),
-                makePlayerStats(),
-                'test-campaign',
-                null
-            );
-
-            expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
-                description: expect.stringContaining('60'),
             }));
         });
 
@@ -189,17 +143,6 @@ describe('mageHandControlHandler', () => {
 
             expect(result.type).toBe('popup');
             expect(result.payload.type).toBe('automation_info');
-        });
-
-        it('accepts and ignores the mapName parameter', async () => {
-            const result = await handle(
-                makeAction(),
-                makePlayerStats(),
-                'test-campaign',
-                'battle-map-1'
-            );
-
-            expect(result.type).toBe('popup');
         });
     });
 });

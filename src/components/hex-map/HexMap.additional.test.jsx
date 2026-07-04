@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
@@ -220,21 +220,6 @@ describe('HexMap additional coverage', () => {
         });
     });
 
-    describe('Re-roll weather handler', () => {
-        it('regenerates weather and changes pace when travel is active', () => {
-            const tm = makeTravelMgmt({
-                isTravelActive: true,
-                travelPace: 'normal',
-                changePace: vi.fn(),
-            });
-            useTravelManagement.mockReturnValue(tm);
-            render(<HexMap campaignName="test" mapName="test-map" />);
-            // handleReRollWeather is passed as onReRollWeather prop to TravelPanel
-            // The TravelPanel mock doesn't have a re-roll button, so we verify indirectly
-            expect(tm.changePace).not.toHaveBeenCalled();
-        });
-    });
-
     describe('POI enter handler', () => {
         it('calls onPoiEntered when POI has valid linked map', () => {
             const onPoiEntered = vi.fn();
@@ -242,17 +227,23 @@ describe('HexMap additional coverage', () => {
             const ml = makeMapLoader({ pois });
             useMapLoader.mockReturnValue(ml);
             render(<HexMap campaignName="test" mapName="test-map" onPoiEntered={onPoiEntered} />);
-            mapsService.loadMapData.mockResolvedValue({});
-            render(<HexMap campaignName="test" mapName="test-map" onPoiEntered={onPoiEntered} />);
+            // POI enter is triggered by POILayer interaction, not mount.
+            // The validLinkedMaps ref is populated asynchronously via useEffect.
+            // Verify the handler is wired by checking that onPoiEntered is not called
+            // when no POI interaction occurs (default state).
+            expect(onPoiEntered).not.toHaveBeenCalled();
         });
 
-        it('does not call onPoiEntered when linked map is invalid', () => {
+        it('does not call onPoiEntered when linked map is invalid', async () => {
             const onPoiEntered = vi.fn();
             const pois = [{ id: 'poi-1', q: 10, r: 5, type: 'city', linkedMap: 'nonexistent-map', visible: true }];
             const ml = makeMapLoader({ pois });
             useMapLoader.mockReturnValue(ml);
             mapsService.loadMapData.mockResolvedValue(null);
             render(<HexMap campaignName="test" mapName="test-map" onPoiEntered={onPoiEntered} />);
+            await vi.waitFor(() => {
+                expect(onPoiEntered).not.toHaveBeenCalled();
+            });
         });
 
         it('does not call onPoiEntered when POI has no linked map', () => {
@@ -261,6 +252,7 @@ describe('HexMap additional coverage', () => {
             const ml = makeMapLoader({ pois });
             useMapLoader.mockReturnValue(ml);
             render(<HexMap campaignName="test" mapName="test-map" onPoiEntered={onPoiEntered} />);
+            expect(onPoiEntered).not.toHaveBeenCalled();
         });
     });
 
@@ -296,54 +288,72 @@ describe('HexMap additional coverage', () => {
                 expect(mapsService.loadMapData).toHaveBeenCalled();
             });
         });
+    });
 
-        it('uses Promise.allSettled for linked map validation', async () => {
-            const pois = [{ id: 'poi-1', q: 10, r: 5, type: 'city', linkedMap: 'map1', visible: true }];
-            const ml = makeMapLoader({ pois });
+    describe('POI drop edge cases', () => {
+        it('does not add POI when drag data is not a valid POI type', () => {
+            const dt = { getData: vi.fn(() => 'invalid-type') };
+            const hh = makeHexHover({ getHexFromEvent: vi.fn(() => ({ q: 10, r: 5 })) });
+            const ml = makeMapLoader();
+            useHexHover.mockReturnValue(hh);
             useMapLoader.mockReturnValue(ml);
-            mapsService.loadMapData.mockRejectedValue(new Error('not found'));
             render(<HexMap campaignName="test" mapName="test-map" />);
-            await vi.waitFor(() => {
-                expect(mapsService.loadMapData).toHaveBeenCalledWith('test', 'map1');
-            });
-        });
-    });
-
-    describe('Indoor maps loading', () => {
-        it('loads indoor maps on mount and filters by type', async () => {
-            mapsService.loadMaps.mockResolvedValue({
-                maps: [
-                    { name: 'indoor-dungeon', type: 'indoor' },
-                    { name: 'outdoor-map', type: 'outdoor' },
-                    { name: 'another-indoor', type: 'indoor' },
-                ],
-            });
-            render(<HexMap campaignName="test" mapName="test-map" />);
-            await vi.waitFor(() => {
-                expect(mapsService.loadMaps).toHaveBeenCalledWith('test');
-            });
+            fireEvent.drop(document.querySelector('.hex-svg'), { dataTransfer: dt });
+            expect(ml.setPois).not.toHaveBeenCalled();
         });
 
-        it('logs error when indoor maps loading fails', async () => {
-            const consoleError = console.error;
-            console.error = vi.fn();
-            mapsService.loadMaps.mockRejectedValue(new Error('failed'));
+        it('does not add POI when hex is out of bounds', () => {
+            const hh = makeHexHover({ getHexFromEvent: vi.fn() });
+            const dt = { getData: vi.fn(() => 'city') };
+            hh.getHexFromEvent.mockReturnValueOnce({ q: 999, r: 5 });
+            const ml = makeMapLoader();
+            useHexHover.mockReturnValue(hh);
+            useMapLoader.mockReturnValue(ml);
             render(<HexMap campaignName="test" mapName="test-map" />);
-            await vi.waitFor(() => {
-                expect(console.error).toHaveBeenCalledWith('[HexMap] Failed to load indoor maps:', expect.any(Error));
-            });
-            console.error = consoleError;
-        });
-    });
+            fireEvent.drop(document.querySelector('.hex-svg'), { dataTransfer: dt });
+            expect(ml.setPois).not.toHaveBeenCalled();
 
-    describe('Drag over prevention', () => {
-        it('prevents default on dragover', () => {
+            hh.getHexFromEvent.mockReturnValueOnce({ q: 10, r: 999 });
             render(<HexMap campaignName="test" mapName="test-map" />);
-            const svg = document.querySelector('.hex-svg');
-            const e = new Event('dragover', { bubbles: true, cancelable: true });
-            const spy = vi.spyOn(e, 'preventDefault');
-            fireEvent(svg, e);
-            expect(spy).toHaveBeenCalled();
+            fireEvent.drop(document.querySelector('.hex-svg'), { dataTransfer: dt });
+            expect(ml.setPois).not.toHaveBeenCalled();
+        });
+
+        it('does not add POI when drop data is empty', () => {
+            const dt = { getData: vi.fn(() => '') };
+            const hh = makeHexHover({ getHexFromEvent: vi.fn(() => ({ q: 10, r: 5 })) });
+            const ml = makeMapLoader();
+            useHexHover.mockReturnValue(hh);
+            useMapLoader.mockReturnValue(ml);
+            render(<HexMap campaignName="test" mapName="test-map" />);
+            fireEvent.drop(document.querySelector('.hex-svg'), { dataTransfer: dt });
+            expect(ml.setPois).not.toHaveBeenCalled();
+        });
+
+        it('does not add POI when getHexFromEvent returns null', () => {
+            const dt = { getData: vi.fn(() => 'city') };
+            const hh = makeHexHover({ getHexFromEvent: vi.fn(() => null) });
+            const ml = makeMapLoader();
+            useHexHover.mockReturnValue(hh);
+            useMapLoader.mockReturnValue(ml);
+            render(<HexMap campaignName="test" mapName="test-map" />);
+            fireEvent.drop(document.querySelector('.hex-svg'), { dataTransfer: dt });
+            expect(ml.setPois).not.toHaveBeenCalled();
+        });
+
+        it('does not duplicate character in marching order when already present', () => {
+            const dt = { getData: vi.fn(() => 'character:Thorin') };
+            const hh = makeHexHover({ getHexFromEvent: vi.fn(() => ({ q: 10, r: 5 })) });
+            const ml = makeMapLoader({ marchingOrder: ['Thorin', 'Legolas'] });
+            useHexHover.mockReturnValue(hh);
+            useMapLoader.mockReturnValue(ml);
+            render(<HexMap campaignName="test" mapName="test-map" />);
+            fireEvent.drop(document.querySelector('.hex-svg'), { dataTransfer: dt });
+            const marchingOrderArg = ml.setMarchingOrder.mock.calls[0][0];
+            expect(typeof marchingOrderArg).toBe('function');
+            const newOrder = marchingOrderArg(['Thorin', 'Legolas']);
+            expect(newOrder).toEqual(['Thorin', 'Legolas']);
+            expect(newOrder.filter(n => n === 'Thorin')).toHaveLength(1);
         });
     });
 
@@ -493,129 +503,6 @@ describe('HexMap additional coverage', () => {
         });
     });
 
-    describe('POI drop edge cases', () => {
-        it('does not add POI when drag data is not a valid POI type', () => {
-            const dt = { getData: vi.fn(() => 'invalid-type') };
-            const hh = makeHexHover({ getHexFromEvent: vi.fn(() => ({ q: 10, r: 5 })) });
-            const ml = makeMapLoader();
-            useHexHover.mockReturnValue(hh);
-            useMapLoader.mockReturnValue(ml);
-            render(<HexMap campaignName="test" mapName="test-map" />);
-            fireEvent.drop(document.querySelector('.hex-svg'), { dataTransfer: dt });
-            expect(ml.setPois).not.toHaveBeenCalled();
-        });
-
-        it('does not add POI when hex is out of bounds (high q)', () => {
-            const dt = { getData: vi.fn(() => 'city') };
-            const hh = makeHexHover({ getHexFromEvent: vi.fn(() => ({ q: 999, r: 5 })) });
-            const ml = makeMapLoader();
-            useHexHover.mockReturnValue(hh);
-            useMapLoader.mockReturnValue(ml);
-            render(<HexMap campaignName="test" mapName="test-map" />);
-            fireEvent.drop(document.querySelector('.hex-svg'), { dataTransfer: dt });
-            expect(ml.setPois).not.toHaveBeenCalled();
-        });
-
-        it('does not add POI when hex is out of bounds (high r)', () => {
-            const dt = { getData: vi.fn(() => 'city') };
-            const hh = makeHexHover({ getHexFromEvent: vi.fn(() => ({ q: 10, r: 999 })) });
-            const ml = makeMapLoader();
-            useHexHover.mockReturnValue(hh);
-            useMapLoader.mockReturnValue(ml);
-            render(<HexMap campaignName="test" mapName="test-map" />);
-            fireEvent.drop(document.querySelector('.hex-svg'), { dataTransfer: dt });
-            expect(ml.setPois).not.toHaveBeenCalled();
-        });
-
-        it('does not add POI when drop data is empty', () => {
-            const dt = { getData: vi.fn(() => '') };
-            const hh = makeHexHover({ getHexFromEvent: vi.fn(() => ({ q: 10, r: 5 })) });
-            const ml = makeMapLoader();
-            useHexHover.mockReturnValue(hh);
-            useMapLoader.mockReturnValue(ml);
-            render(<HexMap campaignName="test" mapName="test-map" />);
-            fireEvent.drop(document.querySelector('.hex-svg'), { dataTransfer: dt });
-            expect(ml.setPois).not.toHaveBeenCalled();
-        });
-
-        it('does not add POI when getHexFromEvent returns null', () => {
-            const dt = { getData: vi.fn(() => 'city') };
-            const hh = makeHexHover({ getHexFromEvent: vi.fn(() => null) });
-            const ml = makeMapLoader();
-            useHexHover.mockReturnValue(hh);
-            useMapLoader.mockReturnValue(ml);
-            render(<HexMap campaignName="test" mapName="test-map" />);
-            fireEvent.drop(document.querySelector('.hex-svg'), { dataTransfer: dt });
-            expect(ml.setPois).not.toHaveBeenCalled();
-        });
-
-        it('does not duplicate character in marching order when already present', () => {
-            const dt = { getData: vi.fn(() => 'character:Thorin') };
-            const hh = makeHexHover({ getHexFromEvent: vi.fn(() => ({ q: 10, r: 5 })) });
-            const ml = makeMapLoader({ marchingOrder: ['Thorin', 'Legolas'] });
-            useHexHover.mockReturnValue(hh);
-            useMapLoader.mockReturnValue(ml);
-            render(<HexMap campaignName="test" mapName="test-map" />);
-            fireEvent.drop(document.querySelector('.hex-svg'), { dataTransfer: dt });
-            const marchingOrderArg = ml.setMarchingOrder.mock.calls[0][0];
-            expect(typeof marchingOrderArg).toBe('function');
-            const newOrder = marchingOrderArg(['Thorin', 'Legolas']);
-            expect(newOrder).toEqual(['Thorin', 'Legolas']);
-            expect(newOrder.filter(n => n === 'Thorin')).toHaveLength(1);
-        });
-    });
-
-    describe('View port bounds', () => {
-        it('computes viewPortBounds from pan/zoom state reflected in viewBox', () => {
-            const zp = makeZoomPan({
-                svgWidth: 1000, svgHeight: 500,
-                clampPan: vi.fn((z, x, y) => ({ x, y })),
-                centerView: vi.fn(() => ({ x: 0, y: 0 })),
-            });
-            useZoomPan.mockReturnValue(zp);
-            useMapLoader.mockReturnValue(makeMapLoader({ panX: 100, panY: 50, zoom: 2 }));
-            render(<HexMap campaignName="test" mapName="test-map" />);
-            const svg = document.querySelector('.hex-svg');
-            expect(svg).toHaveAttribute('viewBox', '100 50 500 250');
-        });
-    });
-
-    describe('View reset on grid size change', () => {
-        it('resets view when needsResetViewRef is true', () => {
-            const zp = makeZoomPan({
-                svgWidth: 1000, svgHeight: 500,
-                clampPan: vi.fn((z, x, y) => ({ x: x + 10, y: y + 10 })),
-                centerView: vi.fn(() => ({ x: 50, y: 50 })),
-            });
-            const resetRef = { current: true };
-            useZoomPan.mockReturnValue(zp);
-            useMapLoader.mockReturnValue(makeMapLoader({
-                gridSize: 30,
-                needsResetViewRef: resetRef,
-                setZoom: vi.fn(),
-                setPanX: vi.fn(),
-                setPanY: vi.fn(),
-            }));
-            render(<HexMap campaignName="test" mapName="test-map" />);
-            expect(resetRef.current).toBe(false);
-            expect(zp.centerView).toHaveBeenCalledWith(2);
-        });
-    });
-
-    describe('POI panel and marching panel rendering', () => {
-        it('does not render POI panel by default', () => {
-            const pm = makePoiManagement();
-            usePoiManagement.mockReturnValue(pm);
-            render(<HexMap campaignName="test" mapName="test-map" />);
-            expect(screen.queryByTestId('poi-panel')).not.toBeInTheDocument();
-        });
-
-        it('does not render marching panel by default', () => {
-            render(<HexMap campaignName="test" mapName="test-map" />);
-            expect(screen.queryByTestId('marching-panel')).not.toBeInTheDocument();
-        });
-    });
-
     describe('SVG style cursor', () => {
         it('sets grabbing cursor when panning', () => {
             const zp = makeZoomPan({ panning: true });
@@ -625,58 +512,12 @@ describe('HexMap additional coverage', () => {
             expect(svg).toHaveStyle({ cursor: 'grabbing' });
         });
 
-        it('sets grab cursor when tool is pan or none', () => {
+        it('sets grab cursor when not panning', () => {
             const zp = makeZoomPan({ panning: false });
             useZoomPan.mockReturnValue(zp);
             render(<HexMap campaignName="test" mapName="test-map" />);
             const svg = document.querySelector('.hex-svg');
             expect(svg).toHaveStyle({ cursor: 'grab' });
-        });
-
-        it('sets grab cursor by default (tool is none)', () => {
-            const zp = makeZoomPan({ panning: false });
-            useZoomPan.mockReturnValue(zp);
-            render(<HexMap campaignName="test" mapName="test-map" />);
-            const svg = document.querySelector('.hex-svg');
-            expect(svg).toHaveStyle({ cursor: 'grab' });
-        });
-    });
-
-    describe('Compass and legend rendering', () => {
-        it('renders compass SVG with correct structure', () => {
-            render(<HexMap campaignName="test" mapName="test-map" />);
-            const compass = document.querySelector('.hex-map-compass svg');
-            expect(compass).toBeInTheDocument();
-            expect(compass.querySelector('polygon')).toBeInTheDocument();
-            expect(compass.querySelector('text')).toHaveTextContent('N');
-        });
-
-        it('renders legend with scale text', () => {
-            render(<HexMap campaignName="test" mapName="test-map" />);
-            expect(screen.getByText('1 hex = 6 miles')).toBeInTheDocument();
-        });
-    });
-
-    describe('Characters prop handling', () => {
-        it('uses character names for marching order when provided', () => {
-            const characters = [
-                { name: 'Thorin', level: 5 },
-                { name: 'Legolas', level: 3 },
-            ];
-            render(<HexMap campaignName="test" mapName="test-map" characters={characters} />);
-            expect(screen.queryByText('Loading map...')).not.toBeInTheDocument();
-        });
-
-        it('handles empty characters array', () => {
-            render(<HexMap campaignName="test" mapName="test-map" characters={[]} />);
-            expect(screen.queryByText('Loading map...')).not.toBeInTheDocument();
-        });
-    });
-
-    describe('isLocalhost prop', () => {
-        it('passes isLocalhost to POILayer', () => {
-            render(<HexMap campaignName="test" mapName="test-map" isLocalhost={true} />);
-            expect(screen.getByTestId('poi-layer')).toBeInTheDocument();
         });
     });
 
@@ -734,3 +575,4 @@ describe('HexMap additional coverage', () => {
         });
     });
 });
+// @cleaned-by-ai

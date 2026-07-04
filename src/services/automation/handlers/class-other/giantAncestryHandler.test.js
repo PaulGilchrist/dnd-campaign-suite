@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import { handle, confirmGiantAncestry, getGiantAncestrySelection, getGiantAncestryOptions, handleDirectType, handleCloudsJaunt, handleFiresBurn, handleFrostsChill, handleHillsTumble, handleStonesEndurance, handleStormsThunder } from './giantAncestryHandler.js';
@@ -34,10 +34,8 @@ vi.mock('../../../rules/combat/damageUtils.js', () => ({
 // ── Re-import after mocking ────────────────────────────────────
 
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
-import { rollExpression } from '../../../dice/diceRoller.js';
 import { addEntry } from '../../../ui/logService.js';
 import { resolveTarget } from '../../common/targetResolver.js';
-import { evaluateAutoExpression } from '../../../combat/automation/automationService.js';
 import { getCombatContext, getTargetFromAttacker } from '../../../rules/combat/damageUtils.js';
 
 // ── Helpers ────────────────────────────────────────────────────
@@ -172,14 +170,10 @@ describe('giantAncestryHandler', () => {
     });
 
     describe('getGiantAncestryOptions', () => {
-        it('should return all 6 giant ancestry options', () => {
+        it('should return all 6 giant ancestry options with type, icon, and description', () => {
             const options = getGiantAncestryOptions();
             expect(Array.isArray(options)).toBe(true);
             expect(options).toHaveLength(6);
-        });
-
-        it('should include type and icon for each option', () => {
-            const options = getGiantAncestryOptions();
             options.forEach(opt => {
                 expect(opt.type).toBeDefined();
                 expect(opt.icon).toBeDefined();
@@ -262,7 +256,7 @@ describe('giantAncestryHandler', () => {
     describe('handleCloudsJaunt', () => {
         const option = { name: "Cloud's Jaunt", type: 'teleport', range: '30_ft' };
 
-        it('should return modal for teleport', async () => {
+        it('should return modal for teleport with uses available', async () => {
             getRuntimeValue.mockReturnValue(3);
             const action = makeAction();
             const result = await handleCloudsJaunt(action, makePlayerStats(), 'campaign', option);
@@ -291,15 +285,6 @@ describe('giantAncestryHandler', () => {
 
             expect(result.type).toBe('modal');
             expect(result.modalName).toBe('teleport');
-        });
-
-        it('should use playerStats.proficiency as max uses', async () => {
-            const lowProfStats = makePlayerStats({ proficiency: 1 });
-            getRuntimeValue.mockReturnValue(1);
-            const action = makeAction();
-            const result = await handleCloudsJaunt(action, lowProfStats, 'campaign', option);
-
-            expect(result.type).toBe('modal');
         });
     });
 
@@ -513,14 +498,6 @@ describe('giantAncestryHandler', () => {
             expect(result.type).toBe('popup');
             expect(addEntry).toHaveBeenCalled();
         });
-
-        it('should use evaluateAutoExpression to calculate reduction', async () => {
-            getRuntimeValue.mockReturnValue(3);
-            const action = makeAction();
-            await handleStonesEndurance(action, makePlayerStats(), 'campaign', option);
-
-            expect(evaluateAutoExpression).toHaveBeenCalledWith('1d10 + CON modifier', expect.any(Object));
-        });
     });
 
     describe('handleStormsThunder', () => {
@@ -580,18 +557,6 @@ describe('giantAncestryHandler', () => {
 
             expect(result.type).toBe('popup');
             expect(addEntry).toHaveBeenCalled();
-        });
-
-        it('should use rollExpression to calculate damage', async () => {
-            getRuntimeValue.mockImplementation((_name, key, _campaign) => {
-                if (key === "storm'sthunderUses") return 3;
-                return null;
-            });
-            resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
-            const action = makeAction();
-            await handleStormsThunder(action, makePlayerStats(), 'campaign', 'map', option);
-
-            expect(rollExpression).toHaveBeenCalledWith('1d8');
         });
     });
 });

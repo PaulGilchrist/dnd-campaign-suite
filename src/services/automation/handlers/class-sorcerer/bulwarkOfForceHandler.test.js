@@ -87,33 +87,22 @@ describe('bulwarkOfForceHandler', () => {
             expect(result.type).toBe('popup');
             expect(result.payload.type).toBe('automation_info');
             expect(result.payload.description).toBe('Bulwark of Force is already active.');
-            expect(runtimeState.setRuntimeValue).not.toHaveBeenCalled();
-            expect(expirations.addExpiration).not.toHaveBeenCalled();
-            expect(logService.addEntry).not.toHaveBeenCalled();
         });
 
-        it('uses minimum 1 target when INT modifier is 0', async () => {
+        it.each([
+            [0, 1],
+            [-5, 1],
+            [10, 10],
+        ])('uses max(1, INT modifier) for maxTargets: INT bonus=%i -> maxTargets=%i', async (intBonus, expectedMax) => {
             runtimeState.getRuntimeValue.mockReturnValue(false);
 
             const stats = makePlayerStats({
-                abilities: [{ name: 'Intelligence', bonus: 0 }],
+                abilities: [{ name: 'Intelligence', bonus: intBonus }],
             });
 
             const result = await handle(makeAction(), stats, campaignName, 'test-map');
 
-            expect(result.payload.maxTargets).toBe(1);
-        });
-
-        it('uses minimum 1 target when INT modifier is negative', async () => {
-            runtimeState.getRuntimeValue.mockReturnValue(false);
-
-            const stats = makePlayerStats({
-                abilities: [{ name: 'Intelligence', bonus: -5 }],
-            });
-
-            const result = await handle(makeAction(), stats, campaignName, 'test-map');
-
-            expect(result.payload.maxTargets).toBe(1);
+            expect(result.payload.maxTargets).toBe(expectedMax);
         });
 
         it('uses minimum 1 target when Intelligence ability is missing', async () => {
@@ -126,18 +115,6 @@ describe('bulwarkOfForceHandler', () => {
             const result = await handle(makeAction(), stats, campaignName, 'test-map');
 
             expect(result.payload.maxTargets).toBe(1);
-        });
-
-        it('respects high INT modifier for max targets', async () => {
-            runtimeState.getRuntimeValue.mockReturnValue(false);
-
-            const stats = makePlayerStats({
-                abilities: [{ name: 'Intelligence', bonus: 10 }],
-            });
-
-            const result = await handle(makeAction(), stats, campaignName, 'test-map');
-
-            expect(result.payload.maxTargets).toBe(10);
         });
     });
 
@@ -240,3 +217,5 @@ describe('bulwarkOfForceHandler', () => {
         });
     });
 });
+
+// @cleaned-by-ai

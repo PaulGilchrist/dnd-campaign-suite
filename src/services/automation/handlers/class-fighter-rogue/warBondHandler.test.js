@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { handle, handleSummon } from './warBondHandler.js';
 
@@ -57,32 +57,15 @@ describe('warBondHandler', () => {
                 });
             });
 
-            it('returns popup when stored value is null', async () => {
-                getRuntimeValue.mockReturnValue(null);
+            it('treats null, undefined, and non-array as no bonded weapons', async () => {
+                for (const badValue of [null, undefined, 'not-an-array']) {
+                    getRuntimeValue.mockReturnValue(badValue);
 
-                const result = await handle(makeAction(), makePlayerStats(), 'test-campaign');
+                    const result = await handle(makeAction(), makePlayerStats(), 'test-campaign');
 
-                expect(result.type).toBe('popup');
-                expect(result.payload.type).toBe('automation_info');
-                expect(result.payload.description).toContain('No bonded weapons');
-            });
-
-            it('returns popup when stored value is undefined', async () => {
-                getRuntimeValue.mockReturnValue(undefined);
-
-                const result = await handle(makeAction(), makePlayerStats(), 'test-campaign');
-
-                expect(result.type).toBe('popup');
-                expect(result.payload.description).toContain('No bonded weapons');
-            });
-
-            it('returns popup when stored value is a non-array string', async () => {
-                getRuntimeValue.mockReturnValue('not-an-array');
-
-                const result = await handle(makeAction(), makePlayerStats(), 'test-campaign');
-
-                expect(result.type).toBe('popup');
-                expect(result.payload.description).toContain('No bonded weapons');
+                    expect(result.type).toBe('popup');
+                    expect(result.payload.description).toContain('No bonded weapons');
+                }
             });
 
             it('uses custom maxBonded in description when bondedWeaponCount is set', async () => {
@@ -97,28 +80,22 @@ describe('warBondHandler', () => {
                 expect(result.payload.description).toContain('up to 5');
             });
 
-            it('uses default maxBonded of 2 when bondedWeaponCount is null', async () => {
+            it('uses default maxBonded of 2 when bondedWeaponCount is null or undefined', async () => {
                 getRuntimeValue.mockReturnValue([]);
 
-                const result = await handle(
+                const resultNull = await handle(
                     makeAction({ automation: { bondedWeaponCount: null } }),
                     makePlayerStats(),
                     'test-campaign'
                 );
+                expect(resultNull.payload.description).toContain('up to 2');
 
-                expect(result.payload.description).toContain('up to 2');
-            });
-
-            it('uses default maxBonded of 2 when bondedWeaponCount is undefined', async () => {
-                getRuntimeValue.mockReturnValue([]);
-
-                const result = await handle(
+                const resultUndefined = await handle(
                     makeAction({ automation: {} }),
                     makePlayerStats(),
                     'test-campaign'
                 );
-
-                expect(result.payload.description).toContain('up to 2');
+                expect(resultUndefined.payload.description).toContain('up to 2');
             });
         });
 
@@ -148,7 +125,7 @@ describe('warBondHandler', () => {
                 });
             });
 
-            it('uses custom action name in description', async () => {
+            it('uses custom action name and weapon in description', async () => {
                 getRuntimeValue.mockImplementation((_name, key) =>
                     key === SEASON_KEY ? ['Shortsword'] : undefined
                 );
@@ -159,19 +136,7 @@ describe('warBondHandler', () => {
                     'test-campaign'
                 );
 
-                expect(result.payload.description).toContain('War Bond (Variant): Shortsword');
-            });
-
-            it('passes the automation object into the popup payload', async () => {
-                getRuntimeValue.mockImplementation((_name, key) =>
-                    key === SEASON_KEY ? ['Mace'] : undefined
-                );
-
-                const action = makeAction({ automation: { customField: 'customValue' } });
-
-                const result = await handle(action, makePlayerStats(), 'test-campaign');
-
-                expect(result.payload.automation).toEqual(action.automation);
+                expect(result.payload.description).toBe('War Bond (Variant): Shortsword is summoned to your hand.');
             });
         });
 
@@ -187,9 +152,6 @@ describe('warBondHandler', () => {
                 expect(result.modalName).toBe('warBondSummon');
                 expect(result.payload.bondedWeapons).toEqual(['Longsword', 'Battleaxe']);
                 expect(result.payload.maxBonded).toBe(2);
-                expect(result.payload.action).toBeInstanceOf(Object);
-                expect(result.payload.playerStats).toBeInstanceOf(Object);
-                expect(result.payload.campaignName).toBe('test-campaign');
             });
 
             it('respects custom bondedWeaponCount from automation', async () => {
@@ -208,23 +170,7 @@ describe('warBondHandler', () => {
                 expect(result.payload.bondedWeapons).toHaveLength(3);
             });
 
-            it('passes action, playerStats, and campaignName by reference in modal payload', async () => {
-                getRuntimeValue.mockImplementation((_name, key) =>
-                    key === SEASON_KEY ? ['Rapier', 'Dagger'] : undefined
-                );
-
-                const action = makeAction();
-                const playerStats = makePlayerStats();
-                const campaignName = 'my-campaign';
-
-                const result = await handle(action, playerStats, campaignName);
-
-                expect(result.payload.action).toBe(action);
-                expect(result.payload.playerStats).toBe(playerStats);
-                expect(result.payload.campaignName).toBe(campaignName);
-            });
-
-            it('handles more weapons than maxBonded from stored data', async () => {
+            it('passes all weapons to modal even when more than maxBonded', async () => {
                 getRuntimeValue.mockImplementation((_name, key) =>
                     key === SEASON_KEY ? ['A', 'B', 'C', 'D'] : undefined
                 );
@@ -269,50 +215,21 @@ describe('warBondHandler', () => {
             });
         });
 
-        it('returns error popup when no weapon selected (null)', async () => {
-            const result = await handleSummon(
-                makeAction(),
-                makePlayerStats(),
-                'test-campaign',
-                null
-            );
+        it('returns error popup when no weapon selected (null, undefined, or empty string)', async () => {
+            for (const badValue of [null, undefined, '']) {
+                vi.clearAllMocks();
 
-            expect(setRuntimeValue).not.toHaveBeenCalled();
-            expect(result).toEqual({
-                type: 'popup',
-                payload: {
-                    type: 'automation_info',
-                    name: 'War Bond',
-                    description: 'No weapon selected.',
-                    automation: makeAction().automation,
-                },
-            });
-        });
+                const result = await handleSummon(
+                    makeAction(),
+                    makePlayerStats(),
+                    'test-campaign',
+                    badValue
+                );
 
-        it('returns error popup when no weapon selected (undefined)', async () => {
-            const result = await handleSummon(
-                makeAction(),
-                makePlayerStats(),
-                'test-campaign',
-                undefined
-            );
-
-            expect(setRuntimeValue).not.toHaveBeenCalled();
-            expect(result.type).toBe('popup');
-            expect(result.payload.description).toBe('No weapon selected.');
-        });
-
-        it('returns error popup when no weapon selected (empty string)', async () => {
-            const result = await handleSummon(
-                makeAction(),
-                makePlayerStats(),
-                'test-campaign',
-                ''
-            );
-
-            expect(setRuntimeValue).not.toHaveBeenCalled();
-            expect(result.type).toBe('popup');
-            expect(result.payload.description).toBe('No weapon selected.');
+                expect(setRuntimeValue).not.toHaveBeenCalled();
+                expect(result.type).toBe('popup');
+                expect(result.payload.description).toBe('No weapon selected.');
+            }
         });
 
         it('uses custom action name in success description', async () => {

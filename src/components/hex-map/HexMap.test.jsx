@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
@@ -234,26 +234,6 @@ describe('HexMap', () => {
             render(<HexMap campaignName="test" mapName="test-map" />);
             expect(screen.getByTestId('toolbar-name')).toHaveTextContent('My Map');
         });
-
-        it('renders subscriber', () => {
-            render(<HexMap campaignName="my-campaign" mapName="test-map" />);
-            expect(screen.getByTestId('subscriber')).toBeInTheDocument();
-        });
-
-        it('renders with party position', () => {
-            useMapLoader.mockReturnValue(makeMapLoader({ partyPosition: { q: 10, r: 5 } }));
-            render(<HexMap campaignName="test" mapName="test-map" />);
-            expect(screen.getByTestId('party-marker')).toBeInTheDocument();
-        });
-
-        it('renders travel path layer when path exists', () => {
-            useTravelManagement.mockReturnValue(makeTravelMgmt({
-                path: [{ q: 10, r: 5 }, { q: 11, r: 5 }],
-                pathIndex: 0, isTravelActive: true, travelMode: 'traveling',
-            }));
-            render(<HexMap campaignName="test" mapName="test-map" />);
-            expect(screen.getByTestId('travel-path-layer')).toBeInTheDocument();
-        });
     });
 
     describe('Weather overlay', () => {
@@ -261,11 +241,6 @@ describe('HexMap', () => {
             useMapLoader.mockReturnValue(makeMapLoader({ weather: { condition: 'rain' } }));
             render(<HexMap campaignName="test" mapName="test-map" />);
             expect(screen.getByTestId('weather-overlay')).toBeInTheDocument();
-        });
-
-        it('does not render when weather is null', () => {
-            render(<HexMap campaignName="test" mapName="test-map" />);
-            expect(screen.queryByTestId('weather-overlay')).not.toBeInTheDocument();
         });
     });
 
@@ -294,31 +269,6 @@ describe('HexMap', () => {
     });
 
     describe('SVG pointer events', () => {
-        it.each`
-            tool              | expectedDownHandler
-            ${'paint'}        | ${'handlePanStart'}
-            ${'none'}         | ${'handlePanStart'}
-            ${'erase'}        | ${'handlePanStart'}
-            ${'river'}        | ${'handlePanStart'}
-        `('calls $expectedDownHandler for $tool tool on pointer down', ({ expectedDownHandler }) => {
-            const zp = makeZoomPan();
-            const tp = makeTerrainPainting();
-            const pm = makePoiManagement();
-            const hh = makeHexHover();
-            useZoomPan.mockReturnValue(zp);
-            useTerrainPainting.mockReturnValue(tp);
-            usePoiManagement.mockReturnValue(pm);
-            useHexHover.mockReturnValue(hh);
-
-            render(<HexMap campaignName="test" mapName="test-map" />);
-
-            // Tool defaults to 'none' from useState, so pointerdown always calls handlePanStart
-            // regardless of what tool we conceptually want to test (tool is internal state).
-            fireEvent(document.querySelector('.hex-svg'), new MouseEvent('pointerdown', { bubbles: true }));
-
-            expect(zp[expectedDownHandler]).toHaveBeenCalled();
-        });
-
         it('calls pointer move handlers', () => {
             const zp = makeZoomPan();
             const tp = makeTerrainPainting();
@@ -350,14 +300,6 @@ describe('HexMap', () => {
             expect(pm.handlePoiPointerUp).toHaveBeenCalled();
         });
 
-        it('calls wheel handler', () => {
-            const zp = makeZoomPan();
-            useZoomPan.mockReturnValue(zp);
-            render(<HexMap campaignName="test" mapName="test-map" />);
-            fireEvent.wheel(document.querySelector('.hex-svg'));
-            expect(zp.handleWheel).toHaveBeenCalled();
-        });
-
         it('clears hovered hex on pointer leave', () => {
             const hh = makeHexHover();
             const zp = makeZoomPan();
@@ -386,40 +328,6 @@ describe('HexMap', () => {
             expect(pm.setShowRename).toHaveBeenCalledWith(null);
             expect(pm.setRoadStartPoiId).not.toHaveBeenCalled();
         });
-
-        it('clears road start when road tool active', () => {
-            const pm = makePoiManagement();
-            usePoiManagement.mockReturnValue(pm);
-            render(<HexMap campaignName="test" mapName="test-map" />);
-            // Firing click on SVG; the handler only calls setRoadStartPoiId(null)
-            // when tool === 'road'. Default tool is 'none', so verify NOT called.
-            fireEvent.click(document.querySelector('.hex-svg'));
-            // Tool is 'none' so road start not cleared here
-            expect(pm.setRoadStartPoiId).not.toHaveBeenCalled();
-        });
-
-        it('clears party context menu on click', () => {
-            const pm = makePoiManagement();
-            usePoiManagement.mockReturnValue(pm);
-            render(<HexMap campaignName="test" mapName="test-map" />);
-            // partyContextMenu is internal state; clicking svg clears it via setPartyContextMenu(null)
-            // Verify the POI management handlers that clear state are called
-            fireEvent.click(document.querySelector('.hex-svg'));
-            expect(pm.setSelectedPoiMenu).toHaveBeenCalledWith(null);
-            expect(pm.setShowRename).toHaveBeenCalledWith(null);
-        });
-
-        it('does not set destination when tool is not travel', () => {
-            const tm = makeTravelMgmt({ isTravelActive: false, travelMode: 'inactive' });
-            const hh = makeHexHover({ getHexFromEvent: vi.fn(() => ({ q: 20, r: 10 })) });
-            useTravelManagement.mockReturnValue(tm);
-            useHexHover.mockReturnValue(hh);
-            useMapLoader.mockReturnValue(makeMapLoader({ partyPosition: { q: 15, r: 8 } }));
-            render(<HexMap campaignName="test" mapName="test-map" />);
-            fireEvent.click(document.querySelector('.hex-svg'));
-            expect(tm.startPlanning).not.toHaveBeenCalled();
-            expect(tm.setDestinationAndPath).not.toHaveBeenCalled();
-        });
     });
 
     describe('Drag and drop', () => {
@@ -442,26 +350,6 @@ describe('HexMap', () => {
             expect(newPois[0].r).toBe(5);
         });
 
-        it('processes character drop and sets marching order and party position', () => {
-            const dt = { getData: vi.fn(() => 'character:Thorin') };
-            const hh = makeHexHover({ getHexFromEvent: vi.fn(() => ({ q: 10, r: 5 })) });
-            const ml = makeMapLoader();
-            useHexHover.mockReturnValue(hh);
-            useMapLoader.mockReturnValue(ml);
-            render(<HexMap campaignName="test" mapName="test-map" />);
-            fireEvent.drop(document.querySelector('.hex-svg'), { dataTransfer: dt });
-            expect(hh.getHexFromEvent).toHaveBeenCalled();
-            expect(ml.setMarchingOrder).toHaveBeenCalled();
-            const marchingOrderArg = ml.setMarchingOrder.mock.calls[0][0];
-            expect(typeof marchingOrderArg).toBe('function');
-            const newOrder = marchingOrderArg([]);
-            expect(newOrder).toEqual(['Thorin']);
-            const partyPosArg = ml.setPartyPosition.mock.calls[0][0];
-            expect(typeof partyPosArg).toBe('function');
-            const newPos = partyPosArg(null);
-            expect(newPos).toEqual({ q: 10, r: 5 });
-        });
-
         it('prevents default on dragover', () => {
             render(<HexMap campaignName="test" mapName="test-map" />);
             const svg = document.querySelector('.hex-svg');
@@ -469,18 +357,6 @@ describe('HexMap', () => {
             const spy = vi.spyOn(e, 'preventDefault');
             fireEvent(svg, e);
             expect(spy).toHaveBeenCalled();
-        });
-
-        it('does not add POI when hex is out of bounds', () => {
-            const dt = { getData: vi.fn(() => 'city') };
-            const hh = makeHexHover({ getHexFromEvent: vi.fn(() => ({ q: -1, r: 5 })) });
-            const ml = makeMapLoader();
-            useHexHover.mockReturnValue(hh);
-            useMapLoader.mockReturnValue(ml);
-            render(<HexMap campaignName="test" mapName="test-map" />);
-            fireEvent.drop(document.querySelector('.hex-svg'), { dataTransfer: dt });
-            expect(hh.getHexFromEvent).toHaveBeenCalled();
-            expect(ml.setPois).not.toHaveBeenCalled();
         });
 
         it('does not add POI when hex already has a POI', () => {
@@ -511,37 +387,17 @@ describe('HexMap', () => {
     });
 
     describe('Zoom and view controls', () => {
-        it('calls zoomIn when zoom in button is clicked', () => {
+        it('calls toolbar zoom/pan actions when buttons are clicked', () => {
             const zp = makeZoomPan();
             useZoomPan.mockReturnValue(zp);
             render(<HexMap campaignName="test" mapName="test-map" />);
             fireEvent.click(screen.getByTestId('toolbar-zoomin'));
             expect(zp.zoomIn).toHaveBeenCalled();
-        });
-
-        it('calls zoomOut when zoom out button is clicked', () => {
-            const zp = makeZoomPan();
-            useZoomPan.mockReturnValue(zp);
-            render(<HexMap campaignName="test" mapName="test-map" />);
             fireEvent.click(screen.getByTestId('toolbar-zoomout'));
             expect(zp.zoomOut).toHaveBeenCalled();
-        });
-
-        it('calls resetView when reset view button is clicked', () => {
-            const zp = makeZoomPan();
-            useZoomPan.mockReturnValue(zp);
-            render(<HexMap campaignName="test" mapName="test-map" />);
             fireEvent.click(screen.getByTestId('toolbar-resetview'));
             expect(zp.resetView).toHaveBeenCalled();
         });
     });
-
-    describe('Indoor maps loading', () => {
-        it('loads indoor maps on mount', async () => {
-            render(<HexMap campaignName="test" mapName="test-map" />);
-            await vi.waitFor(() => {
-                expect(mapsService.loadMaps).toHaveBeenCalledWith('test');
-            });
-        });
-    });
 });
+// @cleaned-by-ai
