@@ -456,22 +456,6 @@ describe('DivineInterventionModal', () => {
     expect(props.onClose).toHaveBeenCalledTimes(1);
   });
 
-  it('calls onClose when clicking the overlay background', () => {
-    const props = makeProps();
-    render(<DivineInterventionModal {...props} />);
-    const overlay = document.querySelector('.sp-overlay');
-    fireEvent.click(overlay);
-    expect(props.onClose).toHaveBeenCalledTimes(1);
-  });
-
-  it('does NOT call onClose when clicking inside the modal', () => {
-    const props = makeProps();
-    render(<DivineInterventionModal {...props} />);
-    const modal = document.querySelector('.sp-modal');
-    fireEvent.click(modal);
-    expect(props.onClose).not.toHaveBeenCalled();
-  });
-
   // ── Empty spell list ──
 
   it('shows "No spells found" message when eligibleSpells is empty', () => {

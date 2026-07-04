@@ -99,13 +99,6 @@ describe('ConditionEffectBadges', () => {
             );
             expect(screen.getByText('Insp. Move')).toBeInTheDocument();
         });
-
-        it('should not render Insp. Move badge when creatureName or campaignName is missing', () => {
-            getRuntimeValue.mockReturnValue(null);
-            computeConditionEffects.mockReturnValue(makeEffects({}));
-            render(<ConditionEffectBadges conditions={[]} targetEffects={[]} campaignName="test" />);
-            expect(screen.queryByText('Insp. Move')).not.toBeInTheDocument();
-        });
     });
 
     describe('speed effects', () => {

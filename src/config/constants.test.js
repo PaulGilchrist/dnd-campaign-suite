@@ -5,8 +5,7 @@ import * as constants from './constants.js';
 describe('constants', () => {
   describe('REQUIRED_FIELDS', () => {
     it('should export an array containing exactly the expected required field names', () => {
-      expect(constants.REQUIRED_FIELDS).toBeInstanceOf(Array);
-      const expected = [
+      expect(constants.REQUIRED_FIELDS).toEqual([
         'name',
         'level',
         'alignment',
@@ -16,11 +15,7 @@ describe('constants', () => {
         'inventory',
         'skillProficiencies',
         'expertSkills',
-      ];
-      expect(constants.REQUIRED_FIELDS).toHaveLength(expected.length);
-      for (const field of expected) {
-        expect(constants.REQUIRED_FIELDS).toContain(field);
-      }
+      ]);
     });
   });
 

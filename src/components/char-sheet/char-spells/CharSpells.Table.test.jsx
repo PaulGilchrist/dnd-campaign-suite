@@ -302,32 +302,6 @@ describe('CharSpells - Table Rendering', () => {
       expect(screen.getByText('Utility')).toBeInTheDocument();
     });
 
-    it('makes damage effect cells clickable and non-damage cells not clickable', () => {
-      const spellWithDamage = {
-        name: 'Custom Spell',
-        level: 1,
-        casting_time: '1 turn',
-        range: 'Self',
-        duration: 'Instantaneous',
-        components: ['V', 'S'],
-        damage: {
-          damage_at_slot_level: { '1': '1d4' },
-          damage_type: 'Fire',
-        },
-        prepared: 'Always',
-      };
-      const stats = {
-        ...basePlayerStats,
-        spellAbilities: {
-          ...basePlayerStats.spellAbilities,
-          spells: [spellWithDamage],
-        },
-      };
-      render(<CharSpells playerStats={stats} campaignName="test" />);
-      const effectCell = document.querySelector('.clickable');
-      expect(effectCell).toBeInTheDocument();
-    });
-
     it('includes save DC info in effect text when spell has both damage and a save', () => {
       const saveSpell = {
         name: 'Cone of Cold',

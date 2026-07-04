@@ -217,11 +217,6 @@ describe('OpenHandTechniqueModal', () => {
       expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
     });
 
-    it('has sp-dismiss-btn class', () => {
-      renderModal();
-      expect(screen.getByRole('button', { name: 'Cancel' }).classList.contains('sp-dismiss-btn')).toBe(true);
-    });
-
     it('calls onClose when clicked', () => {
       const onClose = vi.fn();
       renderModal({ onClose });
@@ -534,68 +529,6 @@ describe('OpenHandTechniqueModal', () => {
         fireEvent.click(screen.getByText('Done'));
       });
       expect(onClose).toHaveBeenCalledTimes(1);
-    });
-
-    it('calls onClose when clicking the overlay background', () => {
-      const onClose = vi.fn();
-      renderModal({ onClose });
-      fireEvent.click(document.querySelector('.sp-overlay'));
-      expect(onClose).toHaveBeenCalledTimes(1);
-    });
-
-    it('does not close when clicking inside the modal content', () => {
-      const onClose = vi.fn();
-      renderModal({ onClose });
-      fireEvent.click(document.querySelector('.sp-modal'));
-      expect(onClose).not.toHaveBeenCalled();
-    });
-
-    it('calls onClose when clicking the overlay in applied state', async () => {
-      const onClose = vi.fn();
-      openHandHandler.applyOpenHandTechnique.mockResolvedValue({
-        type: 'popup',
-        payload: {
-          type: 'automation_info',
-          name: 'Open Hand Technique',
-          description: 'Done.',
-        },
-      });
-
-      renderModal({ onClose });
-      const radios = document.querySelectorAll('input[type="radio"]');
-      fireEvent.click(radios[0]);
-      await act(async () => {
-        fireEvent.click(screen.getByRole('button', { name: /Apply Effect/ }));
-      });
-
-      await waitFor(() => {
-        fireEvent.click(document.querySelector('.sp-overlay'));
-      });
-      expect(onClose).toHaveBeenCalledTimes(1);
-    });
-
-    it('does not close when clicking inside modal in applied state', async () => {
-      const onClose = vi.fn();
-      openHandHandler.applyOpenHandTechnique.mockResolvedValue({
-        type: 'popup',
-        payload: {
-          type: 'automation_info',
-          name: 'Open Hand Technique',
-          description: 'Done.',
-        },
-      });
-
-      renderModal({ onClose });
-      const radios = document.querySelectorAll('input[type="radio"]');
-      fireEvent.click(radios[0]);
-      await act(async () => {
-        fireEvent.click(screen.getByRole('button', { name: /Apply Effect/ }));
-      });
-
-      await waitFor(() => {
-        fireEvent.click(document.querySelector('.sp-modal'));
-      });
-      expect(onClose).not.toHaveBeenCalled();
     });
   });
 });

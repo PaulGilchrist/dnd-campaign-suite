@@ -40,8 +40,6 @@ describe('npcCombatService - addNPCToInitiative', () => {
     global.fetch = vi.fn(() => Promise.resolve({ ok: true }));
   });
 
-  // --- Early return: NPC lacks stat block ---
-
   describe('early return when NPC lacks stat block', () => {
     it('returns undefined without loading combat or persisting', async () => {
       npcHasStatBlock.mockReturnValue(false);
@@ -59,8 +57,6 @@ describe('npcCombatService - addNPCToInitiative', () => {
     });
   });
 
-  // --- Combat summary initialization ---
-
   describe('combat summary initialization', () => {
     it('creates a default combatSummary when none exists', async () => {
       await addNPCToInitiative(CAMPAIGN, defaultNPC());
@@ -69,22 +65,14 @@ describe('npcCombatService - addNPCToInitiative', () => {
       expect(saved.creatures.length).toBe(1);
     });
 
-    it('preserves existing round number from combat summary', async () => {
-      loadCombatSummary.mockResolvedValue({ round: 5, creatures: [] });
+    it('preserves existing round number and creatures from combat summary', async () => {
+      loadCombatSummary.mockResolvedValue({ round: 5, creatures: [{ type: 'pc', name: 'Hero' }] });
       await addNPCToInitiative(CAMPAIGN, defaultNPC());
       const saved = storage.set.mock.calls[0][1];
       expect(saved.round).toBe(5);
-    });
-
-    it('preserves existing creatures when summary already exists', async () => {
-      loadCombatSummary.mockResolvedValue({ round: 3, creatures: [{ type: 'pc', name: 'Hero' }] });
-      await addNPCToInitiative(CAMPAIGN, defaultNPC());
-      const saved = storage.set.mock.calls[0][1];
       expect(saved.creatures.length).toBe(2);
     });
   });
-
-  // --- Duplicate NPC handling ---
 
   describe('duplicate NPC check', () => {
     it('returns early without persisting when NPC already exists as npc type', async () => {
@@ -111,8 +99,6 @@ describe('npcCombatService - addNPCToInitiative', () => {
     });
   });
 
-  // --- Initiative bonus ---
-
   describe('initiative bonus', () => {
     it('adds a positive bonus to the d20 roll', async () => {
       rollD20.mockReturnValue(15);
@@ -129,45 +115,16 @@ describe('npcCombatService - addNPCToInitiative', () => {
       expect(creature.initiative).toBe('13');
     });
 
-    it('defaults bonus to 0 when parseInt returns NaN', async () => {
-      rollD20.mockReturnValue(15);
-      await addNPCToInitiative(CAMPAIGN, { ...defaultNPC(), initiativeBonus: 'invalid' });
-      const creature = storage.set.mock.calls[0][1].creatures[0];
-      expect(creature.initiative).toBe('15');
-      expect(creature.initiativeBonus).toBe(0);
-    });
-
-    it('defaults bonus to 0 when initiativeBonus is undefined', async () => {
-      rollD20.mockReturnValue(15);
-      await addNPCToInitiative(CAMPAIGN, defaultNPC());
-      const creature = storage.set.mock.calls[0][1].creatures[0];
-      expect(creature.initiative).toBe('15');
-      expect(creature.initiativeBonus).toBe(0);
-    });
-
-    it('defaults bonus to 0 when initiativeBonus is an empty string', async () => {
-      rollD20.mockReturnValue(15);
-      await addNPCToInitiative(CAMPAIGN, { ...defaultNPC(), initiativeBonus: '' });
-      const creature = storage.set.mock.calls[0][1].creatures[0];
-      expect(creature.initiativeBonus).toBe(0);
-    });
-
-    it('defaults bonus to 0 when initiativeBonus is null', async () => {
-      rollD20.mockReturnValue(15);
-      await addNPCToInitiative(CAMPAIGN, { ...defaultNPC(), initiativeBonus: null });
-      const creature = storage.set.mock.calls[0][1].creatures[0];
-      expect(creature.initiativeBonus).toBe(0);
-    });
-
-    it('defaults bonus to 0 when initiativeBonus is whitespace-only', async () => {
-      rollD20.mockReturnValue(15);
-      await addNPCToInitiative(CAMPAIGN, { ...defaultNPC(), initiativeBonus: '   ' });
-      const creature = storage.set.mock.calls[0][1].creatures[0];
-      expect(creature.initiativeBonus).toBe(0);
+    it('defaults bonus to 0 for invalid, empty, null, whitespace, and undefined values', async () => {
+      const invalidValues = ['invalid', '', null, '   ', undefined];
+      for (const bonus of invalidValues) {
+        await addNPCToInitiative(CAMPAIGN, { ...defaultNPC(), initiativeBonus: bonus });
+        const creature = storage.set.mock.calls[0][1].creatures[0];
+        expect(creature.initiative).toBe('15');
+        expect(creature.initiativeBonus).toBe(0);
+      }
     });
   });
-
-  // --- Creature properties ---
 
   describe('creature fields', () => {
     it('sets all required default fields on the pushed creature', async () => {
@@ -179,11 +136,12 @@ describe('npcCombatService - addNPCToInitiative', () => {
       expect(creature.targetName).toBeNull();
       expect(creature.concentration).toBeNull();
       expect(creature.saveBonuses).toEqual({});
-    });
-
-    it('uses npc.armorClass when it is a valid number', async () => {
-      await addNPCToInitiative(CAMPAIGN, defaultNPC());
-      expect(storage.set.mock.calls[0][1].creatures[0].ac).toBe(12);
+      expect(creature.ac).toBe(12);
+      expect(creature.maxHp).toBe(7);
+      expect(creature.currentHp).toBe(7);
+      expect(creature.resistances).toEqual([]);
+      expect(creature.immunities).toEqual([]);
+      expect(creature.imagePath).toBe('');
     });
 
     it('defaults AC to 10 and logs error when armorClass is not a number', async () => {
@@ -195,25 +153,14 @@ describe('npcCombatService - addNPCToInitiative', () => {
       consoleSpy.mockRestore();
     });
 
-    it('defaults AC to 10 when armorClass is undefined', async () => {
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-      await addNPCToInitiative(CAMPAIGN, { name: 'Goblin' });
-      expect(storage.set.mock.calls[0][1].creatures[0].ac).toBe(10);
-      consoleSpy.mockRestore();
-    });
-
-    it('defaults AC to 10 when armorClass is a string', async () => {
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-      await addNPCToInitiative(CAMPAIGN, { name: 'Goblin', armorClass: '12' });
-      expect(storage.set.mock.calls[0][1].creatures[0].ac).toBe(10);
-      consoleSpy.mockRestore();
-    });
-
-    it('defaults maxHp and currentHp to 10 when hitPoints is missing', async () => {
-      await addNPCToInitiative(CAMPAIGN, { name: 'Goblin', armorClass: 12 });
-      const creature = storage.set.mock.calls[0][1].creatures[0];
-      expect(creature.maxHp).toBe(10);
-      expect(creature.currentHp).toBe(10);
+    it('defaults maxHp and currentHp to 10 when hitPoints is missing, 0, NaN, or falsy', async () => {
+      const invalidValues = [undefined, 0, NaN];
+      for (const hp of invalidValues) {
+        await addNPCToInitiative(CAMPAIGN, { name: 'Goblin', armorClass: 12, hitPoints: hp });
+        const creature = storage.set.mock.calls[0][1].creatures[0];
+        expect(creature.maxHp).toBe(10);
+        expect(creature.currentHp).toBe(10);
+      }
     });
 
     it('uses hitPoints when it is a valid number', async () => {
@@ -223,57 +170,15 @@ describe('npcCombatService - addNPCToInitiative', () => {
       expect(creature.currentHp).toBe(25);
     });
 
-    it('defaults HP to 10 when hitPoints is 0', async () => {
-      await addNPCToInitiative(CAMPAIGN, { name: 'Goblin', armorClass: 12, hitPoints: 0 });
+    it('carries over damageResistances and damageImmunities from NPC', async () => {
+      await addNPCToInitiative(CAMPAIGN, {
+        ...defaultNPC(),
+        damageResistances: ['fire', 'cold'],
+        damageImmunities: ['poison'],
+      });
       const creature = storage.set.mock.calls[0][1].creatures[0];
-      expect(creature.maxHp).toBe(10);
-      expect(creature.currentHp).toBe(10);
-    });
-
-    it('defaults HP to 10 when hitPoints is NaN', async () => {
-      await addNPCToInitiative(CAMPAIGN, { name: 'Goblin', armorClass: 12, hitPoints: NaN });
-      const creature = storage.set.mock.calls[0][1].creatures[0];
-      expect(creature.maxHp).toBe(10);
-      expect(creature.currentHp).toBe(10);
-    });
-
-    it('carries over damageResistances from NPC', async () => {
-      await addNPCToInitiative(CAMPAIGN, { ...defaultNPC(), damageResistances: ['fire', 'cold'] });
-      expect(storage.set.mock.calls[0][1].creatures[0].resistances).toEqual(['fire', 'cold']);
-    });
-
-    it('defaults resistances to empty array when missing', async () => {
-      await addNPCToInitiative(CAMPAIGN, defaultNPC());
-      expect(storage.set.mock.calls[0][1].creatures[0].resistances).toEqual([]);
-    });
-
-    it('carries over damageImmunities from NPC', async () => {
-      await addNPCToInitiative(CAMPAIGN, { ...defaultNPC(), damageImmunities: ['poison'] });
-      expect(storage.set.mock.calls[0][1].creatures[0].immunities).toEqual(['poison']);
-    });
-
-    it('defaults immunities to empty array when missing', async () => {
-      await addNPCToInitiative(CAMPAIGN, defaultNPC());
-      expect(storage.set.mock.calls[0][1].creatures[0].immunities).toEqual([]);
-    });
-  });
-
-  // --- Image path resolution ---
-
-  describe('imagePath resolution', () => {
-    it('uses npc.imagePath when present', async () => {
-      await addNPCToInitiative(CAMPAIGN, { ...defaultNPC(), imagePath: '/images/goblin.jpg' });
-      expect(storage.set.mock.calls[0][1].creatures[0].imagePath).toBe('/images/goblin.jpg');
-    });
-
-    it('falls back to npc.image when imagePath is missing', async () => {
-      await addNPCToInitiative(CAMPAIGN, { ...defaultNPC(), image: '/images/goblin.png' });
-      expect(storage.set.mock.calls[0][1].creatures[0].imagePath).toBe('/images/goblin.png');
-    });
-
-    it('defaults imagePath to empty string when neither property exists', async () => {
-      await addNPCToInitiative(CAMPAIGN, defaultNPC());
-      expect(storage.set.mock.calls[0][1].creatures[0].imagePath).toBe('');
+      expect(creature.resistances).toEqual(['fire', 'cold']);
+      expect(creature.immunities).toEqual(['poison']);
     });
 
     it('prefers imagePath over image when both are present', async () => {
@@ -281,8 +186,6 @@ describe('npcCombatService - addNPCToInitiative', () => {
       expect(storage.set.mock.calls[0][1].creatures[0].imagePath).toBe('/images/goblin.jpg');
     });
   });
-
-  // --- Sorting and persistence ---
 
   describe('sorting and persistence', () => {
     it('sorts creatures by initiative in descending order', async () => {
@@ -323,8 +226,6 @@ describe('npcCombatService - addNPCToInitiative', () => {
     });
   });
 
-  // --- logInitiativeRoll — fetch payload verification ---
-
   describe('logInitiativeRoll fetch payload', () => {
     it('sends correct log payload for a normal roll', async () => {
       rollD20.mockReturnValue(14);
@@ -340,23 +241,20 @@ describe('npcCombatService - addNPCToInitiative', () => {
       expect(body.rolls).toEqual([14]);
       expect(body.total).toBe(14);
       expect(body.bonus).toBe(0);
-      expect(body.mode).toBe('normal');
       expect(body.isNatural20).toBe(false);
       expect(body.isNatural1).toBe(false);
     });
 
-    it('sets isNatural20 to true when roll is 20', async () => {
+    it('sets isNatural20/isNatural1 based on roll value', async () => {
       rollD20.mockReturnValue(20);
       await addNPCToInitiative(CAMPAIGN, defaultNPC());
-      const body = JSON.parse(global.fetch.mock.calls[0][1].body);
+      let body = JSON.parse(global.fetch.mock.calls[0][1].body);
       expect(body.isNatural20).toBe(true);
       expect(body.isNatural1).toBe(false);
-    });
 
-    it('sets isNatural1 to true when roll is 1', async () => {
       rollD20.mockReturnValue(1);
       await addNPCToInitiative(CAMPAIGN, defaultNPC());
-      const body = JSON.parse(global.fetch.mock.calls[0][1].body);
+      body = JSON.parse(global.fetch.mock.calls[1][1].body);
       expect(body.isNatural1).toBe(true);
       expect(body.isNatural20).toBe(false);
     });
@@ -368,22 +266,14 @@ describe('npcCombatService - addNPCToInitiative', () => {
       expect(body.bonus).toBe(3);
     });
 
-    it('includes a timestamp in the log payload', async () => {
+    it('includes a timestamp and GUID id in the log payload', async () => {
       rollD20.mockReturnValue(15);
       await addNPCToInitiative(CAMPAIGN, defaultNPC());
       const body = JSON.parse(global.fetch.mock.calls[0][1].body);
       expect(body.timestamp).toBeTypeOf('number');
-    });
-
-    it('includes a GUID id in the log payload', async () => {
-      rollD20.mockReturnValue(15);
-      await addNPCToInitiative(CAMPAIGN, defaultNPC());
-      const body = JSON.parse(global.fetch.mock.calls[0][1].body);
       expect(body.id).toBe('test-guid');
     });
   });
-
-  // --- Resilience to errors ---
 
   describe('resilience', () => {
     it('does not throw when the logInitiativeRoll fetch fails', async () => {

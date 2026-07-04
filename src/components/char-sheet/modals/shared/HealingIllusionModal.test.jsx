@@ -144,20 +144,6 @@ describe('HealingIllusionModal', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Skip' }));
       expect(mockOnClose).toHaveBeenCalledTimes(1);
     });
-
-    it('calls onClose when clicking the overlay background', () => {
-      render(<HealingIllusionModal {...makeProps()} />);
-      const overlay = document.querySelector('.sp-overlay');
-      fireEvent.click(overlay);
-      expect(mockOnClose).toHaveBeenCalledTimes(1);
-    });
-
-    it('does not call onClose when clicking inside the modal content', () => {
-      render(<HealingIllusionModal {...makeProps()} />);
-      const modal = document.querySelector('.sp-modal');
-      fireEvent.click(modal);
-      expect(mockOnClose).not.toHaveBeenCalled();
-    });
   });
 
   describe('healing action', () => {

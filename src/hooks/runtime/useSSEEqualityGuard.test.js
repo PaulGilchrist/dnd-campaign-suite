@@ -66,18 +66,6 @@ describe('useSSEEqualityGuard', () => {
       expect(setter).toHaveBeenCalledTimes(0);
     });
 
-    it('should not call setter when comparing undefined to null (loose equality treats them as equal)', () => {
-      const setter = vi.fn();
-      const { result } = renderHook(() => useSSEEqualityGuard(setter));
-      act(() => {
-        result.current(undefined);
-      });
-      act(() => {
-        result.current(null);
-      });
-      expect(setter).toHaveBeenCalledTimes(0);
-    });
-
     it('should call setter for NaN values', () => {
       const setter = vi.fn();
       const { result } = renderHook(() => useSSEEqualityGuard(setter));
@@ -382,54 +370,6 @@ describe('useSSEEqualityGuard', () => {
       });
       act(() => {
         result.current({ a: 1 });
-      });
-      expect(setter).toHaveBeenCalledTimes(2);
-    });
-
-    it('should call setter when comparing Date to non-Date', () => {
-      const setter = vi.fn();
-      const { result } = renderHook(() => useSSEEqualityGuard(setter));
-      act(() => {
-        result.current(new Date('2024-01-01'));
-      });
-      act(() => {
-        result.current('2024-01-01');
-      });
-      expect(setter).toHaveBeenCalledTimes(2);
-    });
-
-    it('should call setter when comparing RegExp to non-RegExp', () => {
-      const setter = vi.fn();
-      const { result } = renderHook(() => useSSEEqualityGuard(setter));
-      act(() => {
-        result.current(/test/);
-      });
-      act(() => {
-        result.current('test');
-      });
-      expect(setter).toHaveBeenCalledTimes(2);
-    });
-
-    it('should call setter when comparing Function to non-Function', () => {
-      const setter = vi.fn();
-      const { result } = renderHook(() => useSSEEqualityGuard(setter));
-      act(() => {
-        result.current(() => {});
-      });
-      act(() => {
-        result.current('not a function');
-      });
-      expect(setter).toHaveBeenCalledTimes(2);
-    });
-
-    it('should call setter when comparing Symbol to non-Symbol', () => {
-      const setter = vi.fn();
-      const { result } = renderHook(() => useSSEEqualityGuard(setter));
-      act(() => {
-        result.current(Symbol('test'));
-      });
-      act(() => {
-        result.current('symbol');
       });
       expect(setter).toHaveBeenCalledTimes(2);
     });

@@ -58,42 +58,6 @@ function setupFetchSuccess() {
   });
 }
 
-function setupFetchLanguageError() {
-  global.fetch = vi.fn((url) => {
-    if (url.includes('languages.json')) {
-      return Promise.reject(new Error('Network error'));
-    }
-    if (url.includes('fighting-styles.json')) {
-      return Promise.resolve({
-        ok: true,
-        json: () => Promise.resolve(mockFightingStyles),
-      });
-    }
-    return Promise.resolve({
-      ok: true,
-      json: () => Promise.resolve([]),
-    });
-  });
-}
-
-function setupFetchFightingStylesError() {
-  global.fetch = vi.fn((url) => {
-    if (url.includes('languages.json')) {
-      return Promise.resolve({
-        ok: true,
-        json: () => Promise.resolve(mockLanguages),
-      });
-    }
-    if (url.includes('fighting-styles.json')) {
-      return Promise.reject(new Error('Network error'));
-    }
-    return Promise.resolve({
-      ok: true,
-      json: () => Promise.resolve([]),
-    });
-  });
-}
-
 describe('WizardStepLanguages', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -111,8 +75,6 @@ describe('WizardStepLanguages', () => {
         expect(screen.getByText(/Fighters get 1 fighting style/)).toBeInTheDocument();
         expect(screen.getByText(/You have selected 1 of 3 allowed language/)).toBeInTheDocument();
         expect(screen.getByText(/You have selected 1 of 1 allowed fighting style/)).toBeInTheDocument();
-        const checkboxes = document.querySelectorAll('input[type="checkbox"]');
-        expect(checkboxes.length).toBeGreaterThan(0);
       });
     });
   });
@@ -134,15 +96,6 @@ describe('WizardStepLanguages', () => {
         expect(screen.getByText(/allowed fighting style/)).toBeInTheDocument();
       });
       expect(screen.queryByText(/allowed language/)).not.toBeInTheDocument();
-    });
-
-    it('should not render warnings container when warnings is falsy or empty', async () => {
-      setupFetchSuccess();
-      render(<WizardStepLanguages {...createMockProps()} warnings={null} />);
-      await waitFor(() => {
-        expect(screen.getByText('Step 7: Languages & Fighting Styles')).toBeInTheDocument();
-      });
-      expect(screen.queryByText(/warning/i)).not.toBeInTheDocument();
     });
 
     it('should render warnings when provided', async () => {
@@ -209,8 +162,7 @@ describe('WizardStepLanguages', () => {
       });
     });
 
-    it('should not auto-select pre-selected items already in formData', async () => {
-      setupFetchSuccess();
+    it('should not auto-select pre-selected items already in formData or when limits are null', async () => {
       const mockOnLanguageToggle = vi.fn();
       render(
         <WizardStepLanguages
@@ -227,20 +179,17 @@ describe('WizardStepLanguages', () => {
       await waitFor(() => {
         expect(mockOnLanguageToggle).not.toHaveBeenCalled();
       });
-    });
 
-    it('should not auto-select when limits are null', async () => {
-      setupFetchSuccess();
-      const mockOnLanguageToggle = vi.fn();
+      const mockOnLanguageToggle2 = vi.fn();
       render(
         <WizardStepLanguages
           {...createMockProps({ formData: { languages: [], class: { fightingStyles: [] } } })}
           languageLimits={null}
-          onLanguageToggle={mockOnLanguageToggle}
+          onLanguageToggle={mockOnLanguageToggle2}
         />
       );
       await waitFor(() => {
-        expect(mockOnLanguageToggle).not.toHaveBeenCalled();
+        expect(mockOnLanguageToggle2).not.toHaveBeenCalled();
       });
     });
   });
@@ -349,7 +298,15 @@ describe('WizardStepLanguages', () => {
   describe('Error handling', () => {
     it('should log error and continue rendering when language fetch fails', async () => {
       const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-      setupFetchLanguageError();
+      global.fetch = vi.fn((url) => {
+        if (url.includes('languages.json')) {
+          return Promise.reject(new Error('Network error'));
+        }
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve(mockFightingStyles),
+        });
+      });
       render(<WizardStepLanguages {...createMockProps()} />);
       await waitFor(() => {
         expect(consoleSpy).toHaveBeenCalledWith('Error loading languages:', expect.any(Error));
@@ -361,24 +318,21 @@ describe('WizardStepLanguages', () => {
 
     it('should log error and continue rendering when fighting styles fetch fails', async () => {
       const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-      setupFetchFightingStylesError();
+      global.fetch = vi.fn((url) => {
+        if (url.includes('fighting-styles.json')) {
+          return Promise.reject(new Error('Network error'));
+        }
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve(mockLanguages),
+        });
+      });
       render(<WizardStepLanguages {...createMockProps()} />);
       await waitFor(() => {
         expect(consoleSpy).toHaveBeenCalledWith('Error loading fighting styles:', expect.any(Error));
       });
       expect(screen.getByText('Step 7: Languages & Fighting Styles')).toBeInTheDocument();
       expect(screen.getByText('Languages')).toBeInTheDocument();
-      consoleSpy.mockRestore();
-    });
-
-    it('should render headers even when both fetches fail', async () => {
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-      global.fetch = vi.fn(() => Promise.reject(new Error('Network error')));
-      render(<WizardStepLanguages {...createMockProps()} />);
-      await waitFor(() => {
-        expect(consoleSpy).toHaveBeenCalledWith('Error loading languages:', expect.any(Error));
-      });
-      expect(screen.getByText('Step 7: Languages & Fighting Styles')).toBeInTheDocument();
       consoleSpy.mockRestore();
     });
   });

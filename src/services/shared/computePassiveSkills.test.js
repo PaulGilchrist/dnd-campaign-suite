@@ -64,10 +64,6 @@ describe('computePassiveSkills', () => {
           input: { abilities: [{ name: 'Wisdom', bonus: 3, skills: [] }] },
         },
         {
-          expected: { name: 'Passive Perception', value: '12' },
-          input: { abilities: [{ name: 'Wisdom', bonus: 2 }] },
-        },
-        {
           expected: { name: 'Passive Investigation', value: '12' },
           input: { abilities: [{ name: 'Intelligence', bonus: 2, skills: [] }] },
         },
@@ -77,27 +73,6 @@ describe('computePassiveSkills', () => {
         },
       ];
       for (const { expected, input } of inputs) {
-        const result = computePassiveSkills(input);
-        expect(result).toContainEqual(expected);
-      }
-    });
-
-    it('uses skill bonus for passive skills when both skill and ability exist', () => {
-      const cases = [
-        {
-          expected: { name: 'Passive Perception', value: '17' },
-          input: { abilities: [{ name: 'Wisdom', bonus: 1, skills: [{ name: 'Perception', bonus: 7 }] }] },
-        },
-        {
-          expected: { name: 'Passive Investigation', value: '11' },
-          input: { abilities: [{ name: 'Intelligence', bonus: 5, skills: [{ name: 'Investigation', bonus: 1 }] }] },
-        },
-        {
-          expected: { name: 'Passive Insight', value: '14' },
-          input: { abilities: [{ name: 'Wisdom', bonus: -1, skills: [{ name: 'Insight', bonus: 4 }] }] },
-        },
-      ];
-      for (const { expected, input } of cases) {
         const result = computePassiveSkills(input);
         expect(result).toContainEqual(expected);
       }

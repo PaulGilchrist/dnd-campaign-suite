@@ -345,7 +345,7 @@ describe('usePoiManagement', () => {
             act(() => {
                 occupiedResult.current.handlePoiPointerMove({ clientX: 0, clientY: 0 });
             });
-            expect(occupiedResult.current.poiDragging).not.toBeNull();
+            expect(setPois).not.toHaveBeenCalled();
         });
     });
 

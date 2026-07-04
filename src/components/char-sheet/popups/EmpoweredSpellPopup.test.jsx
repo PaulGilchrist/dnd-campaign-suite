@@ -539,20 +539,4 @@ describe('EmpoweredSpellPopup', () => {
         expect(diffLines[0].parentElement.textContent).not.toMatch(/\+0/);
     });
 
-    // ── CSS class presence ──
-
-    it('renders with dice-roll-result class', () => {
-        render(<EmpoweredSpellPopup state={makeState()} onReroll={vi.fn()} onClose={vi.fn()} />);
-        expect(document.querySelector('.dice-roll-result')).toBeInTheDocument();
-    });
-
-    it('renders with dice-roll-header class', () => {
-        render(<EmpoweredSpellPopup state={makeState()} onReroll={vi.fn()} onClose={vi.fn()} />);
-        expect(document.querySelector('.dice-roll-header')).toBeInTheDocument();
-    });
-
-    it('renders with metamagic-sp-display class', () => {
-        render(<EmpoweredSpellPopup state={makeState()} onReroll={vi.fn()} onClose={vi.fn()} />);
-        expect(document.querySelector('.metamagic-sp-display')).toBeInTheDocument();
-    });
 });

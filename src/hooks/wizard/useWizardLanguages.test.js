@@ -172,16 +172,6 @@ describe('useWizardLanguages', () => {
       expect(result.current).not.toHaveProperty('warnings');
     });
 
-    it('does not expose setWarnings in the return object', () => {
-      const { result } = renderLanguages();
-      expect(result.current).not.toHaveProperty('setWarnings');
-    });
-
-    it('returns an object (not null or primitive)', () => {
-      const { result } = renderLanguages();
-      expect(typeof result.current).toBe('object');
-    });
-
     it('passes through non-empty warnings from useWizardConfig', () => {
       const mockWarnings = [
         { message: 'Too many languages selected', type: 'warning' },

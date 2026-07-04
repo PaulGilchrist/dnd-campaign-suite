@@ -2,15 +2,13 @@ import { describe, it, expect } from 'vitest';
 import { extractDamageDiceFromDescription } from './MonsterCardModal.jsx';
 
 describe('extractDamageDiceFromDescription', () => {
-  describe('existingDamageDice takes precedence', () => {
+  describe('early returns', () => {
     it('returns existingDamageDice when provided, ignoring description', () => {
       expect(extractDamageDiceFromDescription('Hit: 7 (1d6+3)', '2d6+4')).toBe('2d6+4');
       expect(extractDamageDiceFromDescription('Hit: 10 (2d8+4) slashing', '1d12+5')).toBe('1d12+5');
     });
-  });
 
-  describe('falsy description returns null', () => {
-    it('returns null when description is null, undefined, or empty string', () => {
+    it('returns null when description is falsy', () => {
       expect(extractDamageDiceFromDescription(null, null)).toBe(null);
       expect(extractDamageDiceFromDescription(undefined, null)).toBe(null);
       expect(extractDamageDiceFromDescription('', null)).toBe(null);

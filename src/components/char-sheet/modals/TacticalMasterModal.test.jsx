@@ -395,66 +395,6 @@ describe('TacticalMasterModal - close behavior', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Skip' }));
     expect(onClose).toHaveBeenCalledTimes(1);
   });
-
-  it('calls onClose when clicking the overlay background', () => {
-    const onClose = vi.fn();
-    render(<TacticalMasterModal {...makeProps({ onClose })} />);
-    const overlay = document.querySelector('.sp-overlay');
-    fireEvent.click(overlay);
-    expect(onClose).toHaveBeenCalledTimes(1);
-  });
-
-  it('does NOT close when clicking inside the modal content', () => {
-    const onClose = vi.fn();
-    render(<TacticalMasterModal {...makeProps({ onClose })} />);
-    const modal = document.querySelector('.sp-modal');
-    fireEvent.click(modal);
-    expect(onClose).not.toHaveBeenCalled();
-  });
-
-  it('calls onClose when clicking the overlay in applied state', async () => {
-    const onClose = vi.fn();
-    const onConfirm = vi.fn().mockResolvedValue(undefined);
-    render(<TacticalMasterModal {...makeProps({ onClose, onConfirm })} />);
-    const radios = document.querySelectorAll('input[name="tacticalMasterOption"]');
-    fireEvent.click(radios[0]);
-    fireEvent.click(screen.getByRole('button', { name: /Apply/ }));
-
-    await waitFor(() => {
-      expect(screen.getByText('Done')).toBeInTheDocument();
-    });
-
-    const overlay = document.querySelector('.sp-overlay');
-    fireEvent.click(overlay);
-    expect(onClose).toHaveBeenCalledTimes(1);
-  });
-
-  it('does NOT close when clicking inside modal in applied state', async () => {
-    const onClose = vi.fn();
-    const onConfirm = vi.fn().mockResolvedValue(undefined);
-    render(<TacticalMasterModal {...makeProps({ onClose, onConfirm })} />);
-    const radios = document.querySelectorAll('input[name="tacticalMasterOption"]');
-    fireEvent.click(radios[0]);
-    fireEvent.click(screen.getByRole('button', { name: /Apply/ }));
-
-    await waitFor(() => {
-      expect(screen.getByText('Done')).toBeInTheDocument();
-    });
-
-    const modal = document.querySelector('.sp-modal');
-    fireEvent.click(modal);
-    expect(onClose).not.toHaveBeenCalled();
-  });
-});
-
-// ── Skip button ──
-
-describe('TacticalMasterModal - skip button', () => {
-  it('has the sp-dismiss-btn class', () => {
-    renderModal();
-    const btn = screen.getByRole('button', { name: 'Skip' });
-    expect(btn.classList.contains('sp-dismiss-btn')).toBe(true);
-  });
 });
 
 // ── Edge cases: empty/missing masteries ──

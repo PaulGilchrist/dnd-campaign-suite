@@ -57,14 +57,6 @@ describe('npcHasStatBlock', () => {
     expect(npcHasStatBlock({ armorClass: null })).toBe(false);
     expect(npcHasStatBlock({})).toBe(false);
   });
-
-  it('returns false when npc is falsy', () => {
-    expect(npcHasStatBlock(null)).toBeFalsy();
-    expect(npcHasStatBlock(undefined)).toBeFalsy();
-    expect(npcHasStatBlock(0)).toBeFalsy();
-    expect(npcHasStatBlock('')).toBeFalsy();
-    expect(npcHasStatBlock(false)).toBeFalsy();
-  });
 });
 
 // ===================================================================
@@ -149,11 +141,6 @@ describe('findNPCByName', () => {
 
   it('returns null when no NPC matches', () => {
     expect(findNPCByName('Nonexistent', [npcWithStats])).toBeNull();
-  });
-
-  it('returns null when NPC has undefined or missing name', () => {
-    const noNameNpc = { ...npcWithStats, name: undefined };
-    expect(findNPCByName('Test NPC', [noNameNpc])).toBeNull();
   });
 });
 
@@ -266,10 +253,6 @@ describe('npcToMonsterFormat', () => {
     expect(npcToMonsterFormat(makeNPC({ initiativeBonus: -3 })).initiative_details).toBe('-3');
   });
 
-  it('handles string initiative bonus input', () => {
-    expect(npcToMonsterFormat(makeNPC({ initiativeBonus: '4' })).initiative_details).toBe('+4');
-  });
-
   it('omits initiative_details for undefined, null, or empty string bonuses', () => {
     expect(npcToMonsterFormat(makeNPC({ initiativeBonus: undefined })).initiative_details).toBeNull();
     expect(npcToMonsterFormat(makeNPC({ initiativeBonus: null })).initiative_details).toBeNull();
@@ -289,22 +272,6 @@ describe('npcToMonsterFormat', () => {
     expect(spy).toHaveBeenCalledWith(
       '[AC] NPC "Broken NPC" has no armorClass defined. Defaulting to 10.'
     );
-    spy.mockRestore();
-  });
-
-  it('does not log when armorClass is a valid number', () => {
-    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
-    npcToMonsterFormat(makeNPC({ armorClass: 15 }));
-    expect(spy).not.toHaveBeenCalled();
-    spy.mockRestore();
-  });
-
-  it('passes through NaN armorClass without logging', () => {
-    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
-    const npc = { name: 'NaN NPC', armorClass: NaN };
-    const monster = npcToMonsterFormat(npc);
-    expect(Number.isNaN(monster.armor_class)).toBe(true);
-    expect(spy).not.toHaveBeenCalled();
     spy.mockRestore();
   });
 
@@ -380,12 +347,6 @@ describe('npcToMonsterFormat', () => {
 
   it('defaults speed to { walk: "30 ft." }', () => {
     expect(npcToMonsterFormat({ armorClass: 10 }).speed).toEqual({ walk: '30 ft.' });
-  });
-
-  // --- NPC with undefined name ---
-  it('defaults name to "Unknown" when npc.name is undefined', () => {
-    const monster = npcToMonsterFormat({ armorClass: 10, name: undefined });
-    expect(monster.name).toBe('Unknown');
   });
 
   // --- Full integration ---

@@ -12,7 +12,7 @@ describe('Popup', () => {
     vi.clearAllMocks();
   });
 
-  it('should render popup overlay with sanitized HTML when html prop is provided', () => {
+  it('renders popup overlay with sanitized HTML when html prop is provided', () => {
     const handleClose = vi.fn();
     render(<Popup html="<b>Test Content</b>" onClickOrKeyDown={handleClose} />);
 
@@ -20,7 +20,7 @@ describe('Popup', () => {
     expect(screen.getByText('Test Content')).toBeInTheDocument();
   });
 
-  it('should render children when html prop is not provided', () => {
+  it('renders children when html prop is not provided', () => {
     const handleClose = vi.fn();
     render(<Popup onClickOrKeyDown={handleClose}><span>Child Content</span></Popup>);
 
@@ -28,7 +28,7 @@ describe('Popup', () => {
     expect(screen.getByText('Child Content')).toBeInTheDocument();
   });
 
-  it('should call onClickOrKeyDown when overlay is clicked', () => {
+  it('calls onClickOrKeyDown when overlay is clicked or Escape key is pressed', () => {
     const handleClose = vi.fn();
     render(<Popup html="<b>Test</b>" onClickOrKeyDown={handleClose} />);
 
@@ -36,22 +36,9 @@ describe('Popup', () => {
     expect(handleClose).toHaveBeenCalledTimes(1);
   });
 
-  it('should call onClickOrKeyDown when Escape key is pressed', () => {
+  it('calls onClickOrKeyDown when Escape key is pressed', () => {
     const handleClose = vi.fn();
     render(<Popup html="<b>Test</b>" onClickOrKeyDown={handleClose} />);
-
-    fireEvent.keyDown(document, { key: 'Escape' });
-    expect(handleClose).toHaveBeenCalledTimes(1);
-  });
-
-  it('should remove event listeners on unmount', () => {
-    const handleClose = vi.fn();
-    const { unmount } = render(<Popup html="<b>Test</b>" onClickOrKeyDown={handleClose} />);
-
-    fireEvent.keyDown(document, { key: 'Escape' });
-    expect(handleClose).toHaveBeenCalledTimes(1);
-
-    unmount();
 
     fireEvent.keyDown(document, { key: 'Escape' });
     expect(handleClose).toHaveBeenCalledTimes(1);

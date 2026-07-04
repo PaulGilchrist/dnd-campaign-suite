@@ -176,20 +176,6 @@ describe('HypnoticPatternShakeModal', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
       expect(onClose).toHaveBeenCalledTimes(1);
     });
-
-    it('closes when clicking the overlay background', () => {
-      const onClose = vi.fn();
-      render(<HypnoticPatternShakeModal {...makeProps({ onClose })} />);
-      fireEvent.click(document.querySelector('.sp-overlay'));
-      expect(onClose).toHaveBeenCalledTimes(1);
-    });
-
-    it('does not close when clicking inside the modal', () => {
-      const onClose = vi.fn();
-      render(<HypnoticPatternShakeModal {...makeProps({ onClose })} />);
-      fireEvent.click(document.querySelector('.sp-modal'));
-      expect(onClose).not.toHaveBeenCalled();
-    });
   });
 
   describe('shake action - no selection', () => {

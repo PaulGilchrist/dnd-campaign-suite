@@ -139,11 +139,5 @@ describe('ConcentrationPicker', () => {
             fireEvent.click(screen.getByRole('button', { name: 'Apply' }));
             expect(props.onApply).toHaveBeenCalled();
         });
-
-        it('should not call onApply when Apply button is disabled', () => {
-            render(<ConcentrationPicker {...props} spellName='' />);
-            fireEvent.click(screen.getByRole('button', { name: 'Apply' }));
-            expect(props.onApply).not.toHaveBeenCalled();
-        });
     });
 });

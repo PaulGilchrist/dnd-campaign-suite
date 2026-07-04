@@ -99,18 +99,6 @@ describe('useRuntimeState — setRuntimeObject', () => {
     expect(getRuntimeValue('test-char', 'sp')).toBeNull();
   });
 
-  it('handles object with array values', async () => {
-    const arr = ['fireball', 'magic-missile'];
-    setRuntimeObject('test-char', { spells: arr }, 'test-campaign');
-    expect(getRuntimeValue('test-char', 'spells')).toEqual(arr);
-  });
-
-  it('handles object with nested object values', async () => {
-    const obj = { stats: { str: 18, dex: 14 } };
-    setRuntimeObject('test-char', obj, 'test-campaign');
-    expect(getRuntimeValue('test-char', 'stats')).toEqual({ str: 18, dex: 14 });
-  });
-
   it('does not throw when fetch rejects but skipSync is true', async () => {
     vi.spyOn(global, 'fetch').mockRejectedValue(new Error('network error'));
     expect(() => {

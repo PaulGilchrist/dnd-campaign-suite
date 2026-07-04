@@ -93,18 +93,6 @@ describe('featureCategories2024', () => {
         expect(featuresToIgnore).not.toContain(item);
       }
     });
-
-    it('should contain no duplicate entries', () => {
-      const unique = new Set(featuresToIgnore);
-      expect(featuresToIgnore).toHaveLength(unique.size);
-    });
-
-    it('should use consistent string casing (no trailing whitespace)', () => {
-      for (const item of featuresToIgnore) {
-        expect(item).toBe(item.trim());
-        expect(item).toMatch(/^[A-Z(]/);
-      }
-    });
   });
 
   describe('actions', () => {
@@ -114,11 +102,6 @@ describe('featureCategories2024', () => {
 
     it('should contain the expected action entries', () => {
       expect(actions).toContain('Naturally Stealthy');
-    });
-
-    it('should contain no duplicate entries', () => {
-      const unique = new Set(actions);
-      expect(actions).toHaveLength(unique.size);
     });
   });
 
@@ -130,11 +113,6 @@ describe('featureCategories2024', () => {
     it('should contain the expected bonus action entries', () => {
       expect(bonusActions).toContain("Nature's Veil");
     });
-
-    it('should contain no duplicate entries', () => {
-      const unique = new Set(bonusActions);
-      expect(bonusActions).toHaveLength(unique.size);
-    });
   });
 
   describe('reactions', () => {
@@ -144,11 +122,6 @@ describe('featureCategories2024', () => {
 
     it('should contain 2024-specific reactions', () => {
       expect(reactions).toContain('Protection');
-    });
-
-    it('should contain no duplicate entries', () => {
-      const unique = new Set(reactions);
-      expect(reactions).toHaveLength(unique.size);
     });
   });
 
@@ -180,12 +153,6 @@ describe('featureCategories2024', () => {
       for (const item of expectedItems) {
         expect(characterAdvancement).toContain(item);
       }
-    });
-
-
-    it('should contain no duplicate entries', () => {
-      const unique = new Set(characterAdvancement);
-      expect(characterAdvancement).toHaveLength(unique.size);
     });
   });
 

@@ -116,41 +116,6 @@ function setupFetchMock(rules, background = null) {
   });
 }
 
-function setupFetchFailure() {
-  global.fetch.mockImplementation((url) => {
-    if (url.includes('ability-scores.json')) {
-      return Promise.resolve({
-        ok: true,
-        headers: { get: () => 'application/json' },
-        json: () => Promise.resolve(mockAbilityScores),
-      });
-    }
-
-    if (url.includes('rules-validation.json')) {
-      return Promise.resolve({
-        ok: true,
-        headers: { get: () => 'application/json' },
-        json: () => Promise.resolve(mockRulesValidation5e),
-      });
-    }
-
-    if (url.includes('backgrounds.json')) {
-      return Promise.resolve({
-        ok: false,
-        status: 404,
-        headers: { get: () => 'application/json' },
-        json: () => Promise.resolve([]),
-      });
-    }
-
-    return Promise.resolve({
-      ok: true,
-      headers: { get: () => 'application/json' },
-      json: () => Promise.resolve([]),
-    });
-  });
-}
-
 describe('WizardStepAbilities', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -232,10 +197,10 @@ describe('WizardStepAbilities', () => {
       expect(props.onAbilityMiscIncreaseChange).toHaveBeenCalledWith(0, 3);
     });
 
-    it('should show error styling and message for invalid base score', async () => {
+    it('should show error styling and message for invalid base score or misc increase', async () => {
       setupFetchMock('5e');
       const props = createMockProps({
-        errors: { ability_0_baseScore: 'Invalid score' },
+        errors: { ability_0_baseScore: 'Invalid score', ability_0_miscIncrease: 'Invalid value' },
       });
       render(<WizardStepAbilities {...props} />);
 
@@ -246,18 +211,6 @@ describe('WizardStepAbilities', () => {
       const baseInputs = screen.getAllByLabelText('Base Score (8-15)');
       expect(baseInputs[0]).toHaveClass('error');
       expect(screen.getByText('Invalid score')).toBeInTheDocument();
-    });
-
-    it('should show error styling and message for invalid misc increase', async () => {
-      setupFetchMock('5e');
-      const props = createMockProps({
-        errors: { ability_0_miscIncrease: 'Invalid value' },
-      });
-      render(<WizardStepAbilities {...props} />);
-
-      await waitFor(() => {
-        expect(screen.getByText('Strength')).toBeInTheDocument();
-      });
 
       const miscInputs = screen.getAllByLabelText('Misc Increase');
       expect(miscInputs[0]).toHaveClass('error');
@@ -340,18 +293,6 @@ describe('WizardStepAbilities', () => {
       expect(screen.queryByText(/Background Ability Scores/)).not.toBeInTheDocument();
     });
 
-    it('should not show background ability section for 2024 without background', async () => {
-      setupFetchMock('2024');
-      const props = createMockProps({ formData: { rules: '2024' } });
-      render(<WizardStepAbilities {...props} />);
-
-      await waitFor(() => {
-        expect(screen.getByText('Step 5: Ability Scores')).toBeInTheDocument();
-      });
-
-      expect(screen.queryByText(/Background Ability Scores/)).not.toBeInTheDocument();
-    });
-
     it('should show point buy total of 24 for both 5e and 2024 rulesets', async () => {
       setupFetchMock('5e');
       const props = createMockProps();
@@ -403,7 +344,7 @@ describe('WizardStepAbilities', () => {
       expect(selects[2]).toHaveValue('0');
     });
 
-    it('should call onBackgroundIncreaseChange when background ability is changed', async () => {
+    it('should call onBackgroundIncreaseChange and save to localStorage when background ability is changed', async () => {
       const props = createMockProps({
         formData: { rules: '2024', background: 'Acolyte' },
       });
@@ -419,23 +360,6 @@ describe('WizardStepAbilities', () => {
       fireEvent.change(selects[0], { target: { value: '2' } });
 
       expect(props.onBackgroundIncreaseChange).toHaveBeenCalledWith('Intelligence', 2);
-    });
-
-    it('should save background ability assignments to localStorage', async () => {
-      const props = createMockProps({
-        formData: { rules: '2024', background: 'Acolyte' },
-      });
-
-      setupFetchMock('2024', 'Acolyte');
-      render(<WizardStepAbilities {...props} />);
-
-      await waitFor(() => {
-        expect(screen.getByText(/Background Ability Scores \(Acolyte\)/)).toBeInTheDocument();
-      });
-
-      const selects = screen.getAllByRole('combobox');
-      fireEvent.change(selects[0], { target: { value: '2' } });
-
       expect(localStorage.setItem).toHaveBeenCalledWith(
         '_background_abilities_Acolyte',
         expect.stringContaining('Intelligence'),
@@ -458,7 +382,7 @@ describe('WizardStepAbilities', () => {
       expect(bgBadges.length).toBeGreaterThan(0);
     });
 
-    it('should show validation warning when less than 3 points assigned', async () => {
+    it('should show validation warnings when points are outside the 3-point limit', async () => {
       const props = createMockProps({
         formData: { rules: '2024', background: 'Acolyte' },
       });
@@ -476,50 +400,16 @@ describe('WizardStepAbilities', () => {
       await waitFor(() => {
         expect(screen.getByText(/must assign at least 3 points/)).toBeInTheDocument();
       });
-    });
 
-    it('should show validation warning when more than 3 points assigned', async () => {
-      const props = createMockProps({
-        formData: { rules: '2024', background: 'Acolyte' },
-      });
-
-      setupFetchMock('2024', 'Acolyte');
+      vi.clearAllMocks();
       render(<WizardStepAbilities {...props} />);
-
       await waitFor(() => {
         expect(screen.getByText(/Background Ability Scores \(Acolyte\)/)).toBeInTheDocument();
       });
 
-      const selects = screen.getAllByRole('combobox');
-      fireEvent.change(selects[0], { target: { value: '2' } });
-      fireEvent.change(selects[1], { target: { value: '2' } });
-
-      await waitFor(() => {
-        expect(screen.getByText(/maximum is 3/)).toBeInTheDocument();
-      });
-    });
-
-    it('should cap background ability bonus at 2 since component enforces max', async () => {
-      const props = createMockProps({
-        formData: { rules: '2024', background: 'Acolyte' },
-      });
-
-      setupFetchMock('2024', 'Acolyte');
-      render(<WizardStepAbilities {...props} />);
-
-      await waitFor(() => {
-        expect(screen.getByText(/Background Ability Scores \(Acolyte\)/)).toBeInTheDocument();
-      });
-
-      const selects = screen.getAllByRole('combobox');
-      // Each select only has options 0, 1, 2 - the component caps at 2
-      const maxOption = selects[0].querySelector('option[value="2"]');
-      expect(maxOption).toBeInTheDocument();
-      // Total of 6 would trigger the "maximum is 3" warning, not the "no single ability" warning
-      // because the component caps individual values at 2
-      fireEvent.change(selects[0], { target: { value: '2' } });
-      fireEvent.change(selects[1], { target: { value: '2' } });
-      fireEvent.change(selects[2], { target: { value: '2' } });
+      const selects2 = screen.getAllByRole('combobox');
+      fireEvent.change(selects2[0], { target: { value: '2' } });
+      fireEvent.change(selects2[1], { target: { value: '2' } });
 
       await waitFor(() => {
         expect(screen.getByText(/maximum is 3/)).toBeInTheDocument();
@@ -546,7 +436,36 @@ describe('WizardStepAbilities', () => {
         formData: { rules: '2024', background: 'NonExistent' },
       });
 
-      setupFetchFailure();
+      global.fetch.mockImplementation((url) => {
+        if (url.includes('ability-scores.json')) {
+          return Promise.resolve({
+            ok: true,
+            headers: { get: () => 'application/json' },
+            json: () => Promise.resolve(mockAbilityScores),
+          });
+        }
+        if (url.includes('rules-validation.json')) {
+          return Promise.resolve({
+            ok: true,
+            headers: { get: () => 'application/json' },
+            json: () => Promise.resolve(mockRulesValidation2024),
+          });
+        }
+        if (url.includes('backgrounds.json')) {
+          return Promise.resolve({
+            ok: false,
+            status: 404,
+            headers: { get: () => 'application/json' },
+            json: () => Promise.resolve([]),
+          });
+        }
+        return Promise.resolve({
+          ok: true,
+          headers: { get: () => 'application/json' },
+          json: () => Promise.resolve([]),
+        });
+      });
+
       render(<WizardStepAbilities {...props} />);
 
       await waitFor(() => {

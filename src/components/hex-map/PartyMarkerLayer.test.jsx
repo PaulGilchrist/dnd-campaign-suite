@@ -44,19 +44,12 @@ describe('PartyMarkerLayer', () => {
             const { container } = renderMarker({ position: null });
             expect(container.querySelector('g.party-marker-layer')).not.toBeInTheDocument();
         });
-    });
 
-    describe('rendering', () => {
-        it('should render the party marker group with hex shape and P label', () => {
-            const { container } = renderMarker();
+        it('should render the party marker group when position is defined', () => {
+            const { container } = renderMarker({ position: { q: 5, r: 3 } });
             expect(container.querySelector('g.party-marker-layer')).toBeInTheDocument();
             expect(container.querySelector('path')).toBeInTheDocument();
             expect(screen.getByText('P')).toBeInTheDocument();
-        });
-
-        it('should render the marker group when position is defined', () => {
-            const { container } = renderMarker({ position: { q: 5, r: 3 } });
-            expect(container.querySelector('g.party-marker-layer')).toBeInTheDocument();
         });
     });
 

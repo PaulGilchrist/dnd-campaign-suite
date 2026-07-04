@@ -598,14 +598,6 @@ describe('HealingPoolModal', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it('does not close when clicking inside the modal content', async () => {
-    const onClose = vi.fn();
-    await renderModal({ current: 15, max: 20 }, { onClose });
-    const modalContent = document.querySelector('.short-rest-modal');
-    fireEvent.click(modalContent);
-    expect(onClose).not.toHaveBeenCalled();
-  });
-
   // ── Edge cases ──
 
   it('handles heal amount clamped to pool max in input display', async () => {

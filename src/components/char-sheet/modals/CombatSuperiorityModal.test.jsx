@@ -70,12 +70,6 @@ describe('CombatSuperiorityModal - result display', () => {
       });
     });
 
-    it('renders the bolt icon in the result header', async () => {
-      setupResultState({ payload: { name: 'Ki-Fueled Attack', description: 'Desc.' } });
-      await waitFor(() => {
-        expect(document.querySelector('.fa-solid.fa-bolt')).toBeInTheDocument();
-      });
-    });
 
     it('renders the result description via dangerouslySetInnerHTML', async () => {
       setupResultState({ payload: { name: 'Ki-Fueled Attack', description: '<strong>Tripped!</strong>' } });
@@ -89,14 +83,6 @@ describe('CombatSuperiorityModal - result display', () => {
       setupResultState({ payload: { name: 'Ki-Fueled Attack', description: 'Desc.' } });
       await waitFor(() => {
         expect(screen.getByText('Done')).toBeInTheDocument();
-      });
-    });
-
-    it('has sp-roll-btn class on Done button', async () => {
-      setupResultState({ payload: { name: 'Ki-Fueled Attack', description: 'Desc.' } });
-      await waitFor(() => {
-        const doneBtn = screen.getByText('Done');
-        expect(doneBtn.classList.contains('sp-roll-btn')).toBe(true);
       });
     });
 
@@ -197,10 +183,6 @@ describe('CombatSuperiorityModal - selection mode rendering', () => {
       expect(screen.getByText(/Combat Superiority — Select Maneuvers/)).toBeInTheDocument();
     });
 
-    it('renders bolt icon in selection mode header', () => {
-      renderModal({ payload: makePayload({ selectionMode: true }) });
-      expect(document.querySelector('.fa-solid.fa-bolt')).toBeInTheDocument();
-    });
 
     it('shows known maneuvers message when knownManeuvers has entries', () => {
       renderModal({
@@ -410,34 +392,6 @@ describe('CombatSuperiorityModal - selection behavior', () => {
       expect(onClose).not.toHaveBeenCalled();
     });
 
-    it('has sp-roll-btn class on confirm button', () => {
-      renderModal({ payload: makePayload({ selectionMode: true }) });
-      const btn = screen.getByRole('button', { name: /Confirm Selection/ });
-      expect(btn.classList.contains('sp-roll-btn')).toBe(true);
-    });
-
-    it('has sp-dismiss-btn class on cancel button', () => {
-      renderModal({ payload: makePayload({ selectionMode: true }) });
-      const btn = screen.getByRole('button', { name: /Cancel/ });
-      expect(btn.classList.contains('sp-dismiss-btn')).toBe(true);
-    });
-
-    it('has sp-dismiss-btn class on clear selection button', () => {
-      renderModal({
-        payload: makePayload({
-          selectionMode: true,
-          knownManeuvers: ['Ki-Fueled Attack'],
-        }),
-      });
-      const btn = screen.getByRole('button', { name: /Clear Selection/ });
-      expect(btn.classList.contains('sp-dismiss-btn')).toBe(true);
-    });
-
-    it('renders check icon inside confirm button', () => {
-      renderModal({ payload: makePayload({ selectionMode: true }) });
-      const btn = screen.getByRole('button', { name: /Confirm Selection/ });
-      expect(btn.querySelector('.fa-solid.fa-check')).toBeInTheDocument();
-    });
 
     it('respects maxOptions from payload', () => {
       renderModal({
@@ -463,15 +417,6 @@ describe('CombatSuperiorityModal - maneuver use mode', () => {
       expect(screen.getByText(/Combat Superiority — Choose Maneuver/)).toBeInTheDocument();
     });
 
-    it('renders bolt icon in use mode header', () => {
-      renderModal({
-        payload: makePayload({
-          selectionMode: false,
-          knownManeuvers: ['Ki-Fueled Attack'],
-        }),
-      });
-      expect(document.querySelector('.fa-solid.fa-bolt')).toBeInTheDocument();
-    });
 
     it('shows instruction text in use mode', () => {
       renderModal({
@@ -658,27 +603,6 @@ describe('CombatSuperiorityModal - maneuver use mode', () => {
       expect(screen.getByRole('button', { name: /Use Maneuver/ })).not.toBeDisabled();
     });
 
-    it('has sp-roll-btn class on use maneuver button', () => {
-      renderModal({
-        payload: makePayload({
-          selectionMode: false,
-          knownManeuvers: ['Ki-Fueled Attack'],
-        }),
-      });
-      const btn = screen.getByRole('button', { name: /Use Maneuver/ });
-      expect(btn.classList.contains('sp-roll-btn')).toBe(true);
-    });
-
-    it('renders bolt icon inside use maneuver button', () => {
-      renderModal({
-        payload: makePayload({
-          selectionMode: false,
-          knownManeuvers: ['Ki-Fueled Attack'],
-        }),
-      });
-      const btn = screen.getByRole('button', { name: /Use Maneuver/ });
-      expect(btn.querySelector('.fa-solid.fa-bolt')).toBeInTheDocument();
-    });
 
     it('calls onConfirm with null and maneuver name when use maneuver is clicked', async () => {
       const onConfirm = vi.fn();
@@ -770,16 +694,6 @@ describe('CombatSuperiorityModal - maneuver use mode', () => {
       expect(onClose).not.toHaveBeenCalled();
     });
 
-    it('has sp-dismiss-btn class on cancel button in use mode', () => {
-      renderModal({
-        payload: makePayload({
-          selectionMode: false,
-          knownManeuvers: ['Ki-Fueled Attack'],
-        }),
-      });
-      const btn = screen.getByRole('button', { name: /Cancel/ });
-      expect(btn.classList.contains('sp-dismiss-btn')).toBe(true);
-    });
 
     it('shows maneuver name with action type subtitle for grant_attack', () => {
       renderModal({

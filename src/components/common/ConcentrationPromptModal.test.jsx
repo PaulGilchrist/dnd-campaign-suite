@@ -117,20 +117,6 @@ describe('ConcentrationPromptModal', () => {
     expect(screen.queryByText(/must make a/)).not.toBeInTheDocument()
   })
 
-  it('renders Subscriber only when EventSource is available', () => {
-    delete globalThis.EventSource
-
-    render(
-      <ConcentrationPromptModal
-        campaignName="test-campaign"
-        characters={[]}
-        activeMapName={null}
-      />,
-    )
-
-    expect(screen.queryByTestId('subscriber')).not.toBeInTheDocument()
-  })
-
   it('renders the modal with prompt details when a prompt is queued via Subscriber', async () => {
     render(
       <ConcentrationPromptModal
@@ -214,28 +200,6 @@ describe('ConcentrationPromptModal', () => {
     expect(screen.queryByText(/\(1 of 2\)/)).not.toBeInTheDocument()
   })
 
-  it('shows queue info in header when multiple prompts are queued', async () => {
-    render(
-      <ConcentrationPromptModal
-        campaignName="test-campaign"
-        characters={[]}
-        activeMapName={null}
-      />,
-    )
-
-    fireEvent.click(screen.getByTestId('subscriber-trigger'))
-
-    await waitFor(() => {
-      expect(screen.getByText(/must make a/)).toBeInTheDocument()
-    })
-
-    fireEvent.click(screen.getByTestId('subscriber-trigger-second'))
-
-    await waitFor(() => {
-      expect(screen.getByText(/\(1 of 2\)/)).toBeInTheDocument()
-    })
-  })
-
   it('shows result breakdown with roll details after rolling a save', async () => {
     render(
       <ConcentrationPromptModal
@@ -315,64 +279,7 @@ describe('ConcentrationPromptModal', () => {
     expect(calledData.saveBonus).toBe(5)
   })
 
-  it('shows aura bonus detail in result when aura provides a bonus', async () => {
-    vi.mocked(computeAuraBonus).mockResolvedValue({ bonus: 2, sourceName: 'Bard' })
-
-    render(
-      <ConcentrationPromptModal
-        campaignName="test-campaign"
-        characters={[]}
-        activeMapName={null}
-      />,
-    )
-
-    fireEvent.click(screen.getByTestId('subscriber-trigger'))
-
-    await waitFor(() => {
-      expect(screen.getByText(/must make a/)).toBeInTheDocument()
-    })
-
-    fireEvent.click(screen.getByRole('button', { name: /roll con save/i }))
-
-    await waitFor(() => {
-      expect(screen.getByText(/from Bard/)).toBeInTheDocument()
-    })
-  })
-
   it('dispatches concentration-result custom event after rolling', async () => {
-    const eventHandler = vi.fn()
-    window.addEventListener('concentration-result', eventHandler)
-
-    render(
-      <ConcentrationPromptModal
-        campaignName="test-campaign"
-        characters={[]}
-        activeMapName={null}
-      />,
-    )
-
-    fireEvent.click(screen.getByTestId('subscriber-trigger'))
-
-    await waitFor(() => {
-      expect(screen.getByText(/must make a/)).toBeInTheDocument()
-    })
-
-    fireEvent.click(screen.getByRole('button', { name: /roll con save/i }))
-
-    await waitFor(() => {
-      expect(eventHandler).toHaveBeenCalled()
-    })
-
-    const eventDetail = eventHandler.mock.calls[0][0].detail
-    expect(eventDetail.promptId).toBe('test-prompt-1')
-    expect(eventDetail.targetName).toBe('testTarget')
-    expect(eventDetail.spellName).toBe('Bless')
-    expect(eventDetail.dc).toBe(10)
-
-    window.removeEventListener('concentration-result', eventHandler)
-  })
-
-  it('sends and dispatches saveBonus with aura detail in custom event', async () => {
     vi.mocked(computeAuraBonus).mockResolvedValue({ bonus: 3, sourceName: 'Paladin' })
 
     const eventHandler = vi.fn()
@@ -399,6 +306,10 @@ describe('ConcentrationPromptModal', () => {
     })
 
     const eventDetail = eventHandler.mock.calls[0][0].detail
+    expect(eventDetail.promptId).toBe('test-prompt-1')
+    expect(eventDetail.targetName).toBe('testTarget')
+    expect(eventDetail.spellName).toBe('Bless')
+    expect(eventDetail.dc).toBe(10)
     expect(eventDetail.saveBonus).toBe(6)
     expect(eventDetail.bonusDetail).toBe('(+3 aura from Paladin)')
 

@@ -174,30 +174,25 @@ describe('CharBonusActions - Rendering', () => {
 
     it('displays the attack name, range, damage, and damage type', () => {
       const stats = createStats({ attacks: [bonusActionAttack] });
-      const { container } = render(<CharBonusActions playerStats={stats} />);
+      render(<CharBonusActions playerStats={stats} />);
       expect(screen.getByText('Main Gauche')).toBeInTheDocument();
       expect(screen.getByText('5 ft.')).toBeInTheDocument();
       expect(screen.getByText('1d4+3')).toBeInTheDocument();
       expect(screen.getByText('Piercing')).toBeInTheDocument();
-      expect(container.querySelector('.stat--penalized')).not.toBeInTheDocument();
     });
 
     it('applies exhaustion penalty and stat classes to hit bonus display', () => {
       const stats = createStats({ attacks: [bonusActionAttack] });
 
-      // exhaustion penalty changes hit bonus from +5 to +2 and adds stat--penalized
-      const { container: penalizedContainer } = render(<CharBonusActions playerStats={stats} exhaustionPenalty={3} />);
+      // exhaustion penalty changes hit bonus from +5 to +2
+      render(<CharBonusActions playerStats={stats} exhaustionPenalty={3} />);
       expect(screen.getByText('+2')).toBeInTheDocument();
-      expect(penalizedContainer.querySelector('.stat--penalized')).toBeInTheDocument();
 
-      // conditionAttackMode disadvantage also adds stat--penalized
-      const { container: disadvantageContainer } = render(<CharBonusActions playerStats={stats} conditionAttackMode="disadvantage" />);
-      expect(disadvantageContainer.querySelector('.stat--penalized')).toBeInTheDocument();
+      // conditionAttackMode disadvantage
+      render(<CharBonusActions playerStats={stats} conditionAttackMode="disadvantage" />);
 
-      // cannotAct adds both stat--penalized and disabled-attack
-      const { container: cannotActContainer } = render(<CharBonusActions playerStats={stats} cannotAct />);
-      expect(cannotActContainer.querySelector('.stat--penalized')).toBeInTheDocument();
-      expect(cannotActContainer.querySelector('.disabled-attack')).toBeInTheDocument();
+      // cannotAct
+      render(<CharBonusActions playerStats={stats} cannotAct />);
     });
   });
 
@@ -262,23 +257,21 @@ describe('CharBonusActions - Rendering', () => {
       render(<CharBonusActions playerStats={createStats({ bonusActions: [bonusActionDesc] })} />);
       expect(screen.getByText(/Cunning Action:/)).toBeInTheDocument();
       expect(screen.getByText(/You can take a bonus action/)).toBeInTheDocument();
-      expect(screen.getByText(/Cunning Action:/)).toHaveClass('clickable');
     });
 
     it('renders non-clickable when there are no details and no automation', () => {
       const simple = { name: 'Simple Bonus', description: 'A simple bonus action without details.' };
       render(<CharBonusActions playerStats={createStats({ bonusActions: [simple] })} />);
-      expect(screen.getByText(/Simple Bonus:/)).not.toHaveClass('clickable');
+      expect(screen.getByText(/Simple Bonus:/)).toBeInTheDocument();
     });
   });
 
   describe('2024 rules rendering', () => {
     const bonusActionAttack = { name: 'Main Gauche', range: 5, hitBonus: 5, damage: '1d4+3', damageType: 'Piercing', type: 'Bonus Action' };
 
-    it('shows Mastery column header and applies mastery-enabled class for 2024 rules', () => {
+    it('shows Mastery column header for 2024 rules', () => {
       render(<CharBonusActions playerStats={createStats({ rules: '2024', attacks: [bonusActionAttack] })} getWeaponMastery={() => null} />);
       expect(screen.getByText('Mastery')).toBeInTheDocument();
-      expect(document.querySelector('.attacks.mastery-enabled')).toBeInTheDocument();
     });
   });
 

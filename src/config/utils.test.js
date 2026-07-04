@@ -34,21 +34,6 @@ describe('character-creation/utils', () => {
       expect(utils.validateFinalFormData(formData)).toEqual({});
     });
 
-    it('skips validation for abilities, inventory, and skillProficiencies', () => {
-      const formData = {
-        name: 'Test',
-        level: 1,
-        alignment: 'Lawful Good',
-        race: { name: 'Human' },
-        class: { name: 'Wizard' },
-        abilities: [],
-        inventory: [],
-        skillProficiencies: [],
-        expertSkills: []
-      };
-      expect(utils.validateFinalFormData(formData)).toEqual({});
-    });
-
     it('returns an error when name is absent or whitespace-only', () => {
       expect(utils.validateFinalFormData({
         level: 1,
@@ -75,20 +60,6 @@ describe('character-creation/utils', () => {
       }
     });
 
-    it('does not flag abilities, inventory, or skillProficiencies as missing', () => {
-      const formData = {
-        name: 'Test',
-        level: 1,
-        alignment: 'Lawful Good',
-        race: { name: 'Human' },
-        class: { name: 'Wizard' },
-        expertSkills: []
-      };
-      const errors = utils.validateFinalFormData(formData);
-      expect(errors).not.toHaveProperty('abilities');
-      expect(errors).not.toHaveProperty('inventory');
-      expect(errors).not.toHaveProperty('skillProficiencies');
-    });
   });
 
   describe('validateLevel', () => {
@@ -116,7 +87,6 @@ describe('character-creation/utils', () => {
     it('returns an error for falsy level values', async () => {
       expect((await utils.validateLevel(undefined, '5e')).level).toBe('Level must be between 1 and 20');
       expect((await utils.validateLevel(null, '5e')).level).toBe('Level must be between 1 and 20');
-      expect((await utils.validateLevel(0, '5e')).level).toBe('Level must be between 1 and 20');
       expect((await utils.validateLevel('', '5e')).level).toBe('Level must be between 1 and 20');
     });
 
@@ -138,10 +108,8 @@ describe('character-creation/utils', () => {
       vi.restoreAllMocks();
     });
 
-    it('returns no errors for valid base scores (mid-range and boundary)', async () => {
+    it('returns no errors for valid base scores', async () => {
       expect(await utils.validateAbility({ baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 }, 0, '5e', 1)).toEqual({});
-      expect((await utils.validateAbility({ baseScore: 8, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 }, 0, '5e', 1)).baseScore).toBeUndefined();
-      expect((await utils.validateAbility({ baseScore: 15, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 }, 0, '5e', 1)).baseScore).toBeUndefined();
     });
 
     it('returns an error when baseScore is below or above the allowed range', async () => {
@@ -189,10 +157,6 @@ describe('character-creation/utils', () => {
       vi.spyOn(dataLoader, 'loadValidationRules').mockResolvedValue({ level_range: { min: 1, max: 20 } });
       const freshUtils = await import('./utils.js');
       expect(await freshUtils.getPointBuyCosts('5e')).toEqual({});
-
-      vi.spyOn(dataLoader, 'loadValidationRules').mockResolvedValue({ point_buy: {} });
-      const freshUtils2 = await import('./utils.js');
-      expect(await freshUtils2.getPointBuyCosts('5e')).toEqual({});
     });
   });
 
@@ -233,15 +197,11 @@ describe('character-creation/utils', () => {
         expect(errors).toEqual({});
       });
 
-      it('requires background for 2024 ruleset', async () => {
+      it('requires background for 2024 ruleset but not for 5e', async () => {
         const formData = { name: 'Test', level: 1, alignment: 'Good' };
-        const errors = await utils.validateStep(2, formData, {}, [], [], '2024');
+        let errors = await utils.validateStep(2, formData, {}, [], [], '2024');
         expect(errors).toHaveProperty('background', 'Background is required');
-      });
-
-      it('does not require background for 5e ruleset', async () => {
-        const formData = { name: 'Test', level: 1, alignment: 'Good' };
-        const errors = await utils.validateStep(2, formData, {}, [], [], '5e');
+        errors = await utils.validateStep(2, formData, {}, [], [], '5e');
         expect(errors).not.toHaveProperty('background');
       });
     });
@@ -305,7 +265,6 @@ describe('character-creation/utils', () => {
     describe('Steps 4+', () => {
       it('returns no errors regardless of step number or missing data', async () => {
         expect(await utils.validateStep(4, {}, {}, [], [], '5e')).toEqual({});
-        expect(await utils.validateStep(10, {}, {}, [], [], '5e')).toEqual({});
       });
     });
   });

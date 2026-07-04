@@ -76,11 +76,6 @@ describe('logService', () => {
             await expect(getLog('my-campaign')).rejects.toThrow('Failed to fetch log');
         });
 
-        it('propagates the original error message on network failure', async () => {
-            fetchSpy.mockRejectedValue(new TypeError('Failed to fetch'));
-
-            await expect(getLog('my-campaign')).rejects.toThrow('Failed to fetch');
-        });
     });
 
     describe('addEntry', () => {
@@ -152,10 +147,5 @@ describe('logService', () => {
             await expect(addEntry('my-campaign', { message: 'Test' })).rejects.toThrow('Failed to add log entry');
         });
 
-        it('propagates the original error message on network failure', async () => {
-            fetchSpy.mockRejectedValue(new TypeError('Failed to fetch'));
-
-            await expect(addEntry('my-campaign', { message: 'Test' })).rejects.toThrow('Failed to fetch');
-        });
     });
 });

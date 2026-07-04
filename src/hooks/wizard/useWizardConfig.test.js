@@ -505,34 +505,6 @@ describe('useWizardConfig', () => {
     });
   });
 
-  describe('return value structure', () => {
-    it('returns an object with spread slot state, warnings, and setWarnings', () => {
-      const { result } = renderConfig();
-      expect(typeof result.current).toBe('object');
-      expect(Array.isArray(result.current.warnings)).toBe(true);
-      expect(typeof result.current.setWarnings).toBe('function');
-    });
-
-    it('includes all slot keys in the returned object', () => {
-      const { result } = renderConfig();
-      mockSlots.forEach((slot) => {
-        expect(result.current).toHaveProperty(slot.state.key);
-      });
-    });
-
-    it('includes preSelectedState keys in the returned object', () => {
-      const { result } = renderConfig({
-        preSelect: {
-          stateKey: 'preloaded',
-          getFn: vi.fn().mockResolvedValue([]),
-          deps: () => [],
-        },
-      });
-
-      expect(result.current).toHaveProperty('preloaded');
-    });
-  });
-
   describe('getDeps usage', () => {
     it('calls getDeps with formData for effect dependencies', () => {
       renderConfig();

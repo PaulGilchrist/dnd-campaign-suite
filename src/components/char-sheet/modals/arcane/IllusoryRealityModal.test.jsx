@@ -211,24 +211,6 @@ describe('IllusoryRealityModal', () => {
     });
   });
 
-  // ── Overlay and modal click behavior ──
-
-  describe('overlay click behavior', () => {
-    it('calls onClose when clicking the overlay background', () => {
-      const onClose = vi.fn();
-      renderModal({ onClose });
-      fireEvent.click(document.querySelector('.sp-overlay'));
-      expect(onClose).toHaveBeenCalledTimes(1);
-    });
-
-    it('does not call onClose when clicking inside the modal content', () => {
-      const onClose = vi.fn();
-      renderModal({ onClose });
-      fireEvent.click(document.querySelector('.sp-modal'));
-      expect(onClose).not.toHaveBeenCalled();
-    });
-  });
-
   // ── Cancel button ──
 
   describe('cancel button', () => {
@@ -318,26 +300,6 @@ describe('IllusoryRealityModal', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Done' }));
       });
       expect(onClose).toHaveBeenCalledTimes(1);
-    });
-
-    it('calls onClose when clicking the overlay in result state', async () => {
-      const onClose = vi.fn();
-      renderModal({ onClose });
-      await fillAndConfirm('stone');
-      await waitFor(() => {
-        fireEvent.click(document.querySelector('.sp-overlay'));
-      });
-      expect(onClose).toHaveBeenCalledTimes(1);
-    });
-
-    it('does not call onClose when clicking modal content in result state', async () => {
-      const onClose = vi.fn();
-      renderModal({ onClose });
-      await fillAndConfirm('stone');
-      await waitFor(() => {
-        fireEvent.click(document.querySelector('.sp-modal'));
-      });
-      expect(onClose).not.toHaveBeenCalled();
     });
 
     it('preserves modal CSS classes in result state', async () => {

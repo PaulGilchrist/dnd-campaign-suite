@@ -57,17 +57,6 @@ describe('useWizardForm', () => {
       expect(result.current.errors).toEqual({});
     });
 
-    it('should return all expected methods', () => {
-      const { result } = renderHook(() => useWizardForm(null, false));
-      expect(result.current.setFormData).toBeTypeOf('function');
-      expect(result.current.setErrors).toBeTypeOf('function');
-      expect(result.current.updateField).toBeTypeOf('function');
-      expect(result.current.updateArrayField).toBeTypeOf('function');
-      expect(result.current.updateAbility).toBeTypeOf('function');
-      expect(result.current.updateInventory).toBeTypeOf('function');
-      expect(result.current.updateClass).toBeTypeOf('function');
-      expect(result.current.resetErrors).toBeTypeOf('function');
-    });
   });
 
   describe('updateField', () => {
@@ -99,15 +88,6 @@ describe('useWizardForm', () => {
         result.current.updateField('name', 'Test');
       });
       expect(result.current.errors.level).toBe('Invalid');
-    });
-
-    it('should replace the formData object reference', () => {
-      const { result } = renderHook(() => useWizardForm(null, false));
-      const oldFormData = result.current.formData;
-      act(() => {
-        result.current.updateField('name', 'Test');
-      });
-      expect(result.current.formData).not.toBe(oldFormData);
     });
 
     it('should handle updating level', () => {
@@ -163,15 +143,6 @@ describe('useWizardForm', () => {
       expect(result.current.errors.languages).toBeNull();
     });
 
-    it('should replace the formData object reference', () => {
-      const { result } = renderHook(() => useWizardForm(null, false));
-      const oldFormData = result.current.formData;
-      act(() => {
-        result.current.updateArrayField('languages', ['Common']);
-      });
-      expect(result.current.formData).not.toBe(oldFormData);
-    });
-
     it('should handle empty array values', () => {
       const { result } = renderHook(() => useWizardForm(null, false));
       act(() => {
@@ -209,15 +180,6 @@ describe('useWizardForm', () => {
         result.current.updateAbility(0, 'baseScore', 10);
       });
       expect(result.current.errors.ability_0_baseScore).toBe('Invalid score');
-    });
-
-    it('should replace the formData object reference', () => {
-      const { result } = renderHook(() => useWizardForm(null, false));
-      const oldFormData = result.current.formData;
-      act(() => {
-        result.current.updateAbility(0, 'baseScore', 15);
-      });
-      expect(result.current.formData).not.toBe(oldFormData);
     });
 
     it('should update a non-baseScore field', () => {
@@ -269,15 +231,6 @@ describe('useWizardForm', () => {
       });
       expect(result.current.formData.inventory.backpack).toEqual([]);
       expect(result.current.formData.inventory.equipped).toEqual([]);
-    });
-
-    it('should replace the formData object reference', () => {
-      const { result } = renderHook(() => useWizardForm(null, false));
-      const oldFormData = result.current.formData;
-      act(() => {
-        result.current.updateInventory('gold', 100);
-      });
-      expect(result.current.formData).not.toBe(oldFormData);
     });
 
     it('should handle zero gold', () => {

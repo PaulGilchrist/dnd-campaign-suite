@@ -60,7 +60,7 @@ describe('EncounterSummaryPanel', () => {
       expect(screen.getByText('Unknown')).toBeInTheDocument();
     });
 
-    it('renders Unknown when difficultyLabels is an empty array', () => {
+    it('renders Unknown when difficultyLabels is empty', () => {
       render(<EncounterSummaryPanel {...defaultProps} difficultyLabels={[]} />);
       expect(screen.getByText('Unknown')).toBeInTheDocument();
     });

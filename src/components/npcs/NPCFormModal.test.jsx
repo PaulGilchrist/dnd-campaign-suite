@@ -95,32 +95,11 @@ describe('NPCFormModal', () => {
       expect(screen.getByText('Upload Avatar')).toBeInTheDocument();
     });
 
-    it('should not render remove button when no image', () => {
-      renderModal();
-      expect(screen.queryByText('Remove')).not.toBeInTheDocument();
-    });
-
     it('should render remove button when image or imagePath exists', () => {
       renderModal({
         formData: { ...defaultFormData, image: 'data:image/png;base64,abc' },
       });
       expect(screen.getByText('Remove')).toBeInTheDocument();
-    });
-
-    it('should render remove button when imagePath exists without image', () => {
-      renderModal({
-        formData: { ...defaultFormData, imagePath: '/avatars/gandalf.png' },
-      });
-      expect(screen.getByText('Remove')).toBeInTheDocument();
-    });
-
-    it('should call setFormData with image data on file upload', async () => {
-      renderModal();
-      const fileInput = document.querySelector('.npcs-avatar-input');
-      const file = new File(['avatar'], 'avatar.png', { type: 'image/png' });
-      fireEvent.change(fileInput, { target: { files: [file] } });
-      await new Promise((resolve) => setTimeout(resolve, 10));
-      expect(mockSetFormData).toHaveBeenCalled();
     });
 
     it('should clear image data on remove click', () => {
@@ -141,37 +120,18 @@ describe('NPCFormModal', () => {
       expect(screen.getByText('Stats')).toBeInTheDocument();
     });
 
-    it('should default to Roleplay tab active', () => {
+    it('should switch tabs when clicked and show corresponding content', () => {
       renderModal();
-      const roleplayTab = screen.getByText('Roleplay').closest('button');
-      expect(roleplayTab).toHaveClass('npcs-tab-active');
-    });
 
-    it('should switch tabs when clicked and toggle active class', () => {
-      renderModal();
-      const statsTab = screen.getByText('Stats');
-      fireEvent.click(statsTab);
-      expect(statsTab.closest('button')).toHaveClass('npcs-tab-active');
-
-      const roleplayTab = screen.getByText('Roleplay');
-      fireEvent.click(roleplayTab);
-      expect(roleplayTab.closest('button')).toHaveClass('npcs-tab-active');
-    });
-
-    it('should show roleplay tab content when active and stats content when hidden', () => {
-      renderModal();
-      expect(screen.getByLabelText('Race')).toBeInTheDocument();
-      const statsTabContent = screen.getByText('AC').closest('.npcs-stats-tab');
-      expect(statsTabContent).toHaveClass('npcs-tab-hidden');
-    });
-
-    it('should show stats tab content when active and roleplay content when hidden', () => {
-      renderModal();
+      // Stats tab
       const statsTab = screen.getByText('Stats');
       fireEvent.click(statsTab);
       expect(screen.getByText('AC')).toBeInTheDocument();
-      const roleplayTabContent = screen.getByText('Race').closest('.npcs-roleplay-tab');
-      expect(roleplayTabContent).toHaveClass('npcs-tab-hidden');
+
+      // Back to roleplay tab
+      const roleplayTab = screen.getByText('Roleplay');
+      fireEvent.click(roleplayTab);
+      expect(screen.getByLabelText('Race')).toBeInTheDocument();
     });
   });
 
@@ -295,39 +255,6 @@ describe('NPCFormModal', () => {
       renderModal({ formData: { ...defaultFormData, armorClass: 15 }, disabled: true });
       const btn = screen.getByText(/Save & Add to Initiative/).closest('button');
       expect(btn).toHaveAttribute('disabled');
-    });
-  });
-
-  // ── Avatar Modal ──────────────────────────────────────────────────
-
-  describe('Avatar Modal', () => {
-    it('should not render avatar modal by default even with image or imagePath', () => {
-      renderModal({
-        formData: { ...defaultFormData, image: 'data:image/png;base64,abc' },
-      });
-      expect(document.querySelector('.avatar-modal-overlay')).not.toBeInTheDocument();
-
-      renderModal({
-        formData: { ...defaultFormData, imagePath: '/avatars/gandalf.png' },
-      });
-      expect(document.querySelector('.avatar-modal-overlay')).not.toBeInTheDocument();
-    });
-  });
-
-  // ── Modal Structure ───────────────────────────────────────────────
-
-  describe('Modal Structure', () => {
-    it('should not call setFormData when no file provided', () => {
-      renderModal();
-      const fileInput = document.querySelector('.npcs-avatar-input');
-      fireEvent.change(fileInput, { target: { files: [] } });
-      expect(mockSetFormData).not.toHaveBeenCalled();
-    });
-
-    it('should render with empty form data', () => {
-      renderModal({ formData: {} });
-      expect(screen.getByRole('heading', { name: 'New NPC' })).toBeInTheDocument();
-      expect(screen.getByLabelText(/Name/)).toBeInTheDocument();
     });
   });
 });

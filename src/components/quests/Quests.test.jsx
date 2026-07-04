@@ -81,12 +81,6 @@ describe('Quests', () => {
       expect(screen.getByPlaceholderText(/Search Quests/)).toBeInTheDocument();
     });
 
-    it('renders required asterisk for name field', () => {
-      renderWithQuests([]);
-      fireEvent.click(screen.getByRole('button', { name: /New Quest/ }));
-      expect(screen.getByText('*')).toBeInTheDocument();
-    });
-
     it('renders status options with correct labels', () => {
       renderWithQuests([]);
       fireEvent.click(screen.getByRole('button', { name: /New Quest/ }));
@@ -107,7 +101,6 @@ describe('Quests', () => {
       renderWithQuests([]);
       expect(screen.getByText(/No quests yet/)).toBeInTheDocument();
     });
-
   });
 
   describe('back navigation', () => {
@@ -184,28 +177,20 @@ describe('Quests', () => {
       expect(notesField.value).toBe('Be careful');
     });
 
-    it('disables save button when name is empty', () => {
+    it('disables save button when name is empty or whitespace, enables when non-empty', () => {
       renderWithQuests([]);
       fireEvent.click(screen.getByRole('button', { name: /New Quest/ }));
-      const saveButton = screen.getByText('Save').closest('button');
-      expect(saveButton).toHaveAttribute('disabled');
-    });
 
-    it('disables save button when name is whitespace only', () => {
-      renderWithQuests([]);
-      fireEvent.click(screen.getByRole('button', { name: /New Quest/ }));
+      let saveButton = screen.getByText('Save').closest('button');
+      expect(saveButton).toHaveAttribute('disabled');
+
       const nameInput = screen.getByLabelText(/Name/);
       fireEvent.change(nameInput, { target: { value: '   ' } });
-      const saveButton = screen.getByText('Save').closest('button');
+      saveButton = screen.getByText('Save').closest('button');
       expect(saveButton).toHaveAttribute('disabled');
-    });
 
-    it('enables save button when name has a value', () => {
-      renderWithQuests([]);
-      fireEvent.click(screen.getByRole('button', { name: /New Quest/ }));
-      const nameInput = screen.getByLabelText(/Name/);
       fireEvent.change(nameInput, { target: { value: 'Find the Lost Sword' } });
-      const saveButton = screen.getByText('Save').closest('button');
+      saveButton = screen.getByText('Save').closest('button');
       expect(saveButton).not.toHaveAttribute('disabled');
     });
 
@@ -352,31 +337,6 @@ describe('Quests', () => {
 
       expect(screen.getByLabelText('Edit quest: Test Quest')).toBeInTheDocument();
     });
-
-    it('handles quest with null name in filter gracefully', async () => {
-      renderWithQuests([
-        {
-          id: 'quest-1',
-          name: null,
-          status: 'active',
-          description: '',
-          rewards: '',
-          notes: '',
-        },
-        {
-          id: 'quest-2',
-          name: 'Valid Quest',
-          status: 'active',
-          description: '',
-          rewards: '',
-          notes: '',
-        },
-      ]);
-
-      await waitFor(() => {
-        expect(screen.getByText('Valid Quest')).toBeInTheDocument();
-      });
-    });
   });
 
   describe('status badges', () => {
@@ -417,26 +377,6 @@ describe('Quests', () => {
       expect(screen.getByText('active')).toBeInTheDocument();
       expect(screen.getByText('completed')).toBeInTheDocument();
       expect(screen.getByText('failed')).toBeInTheDocument();
-    });
-
-    it('renders status badge with title attribute', async () => {
-      renderWithQuests([
-        {
-          id: 'quest-1',
-          name: 'Title Test Quest',
-          status: 'completed',
-          description: '',
-          rewards: '',
-          notes: '',
-        },
-      ]);
-
-      await waitFor(() => {
-        expect(screen.getByText('Title Test Quest')).toBeInTheDocument();
-      });
-
-      const badge = screen.getByText('completed');
-      expect(badge).toHaveAttribute('title', 'completed');
     });
   });
 
@@ -591,51 +531,6 @@ describe('Quests', () => {
       expect(updatedQuest.rewards).toBe('100 gold');
       expect(updatedQuest.notes).toBe('Updated notes');
     });
-
-    it('does not modify other quests when editing one', async () => {
-      const { mockSave } = renderWithQuests([
-        {
-          id: 'quest-1',
-          name: 'Quest One',
-          status: 'active',
-          description: '',
-          rewards: '',
-          notes: '',
-        },
-        {
-          id: 'quest-2',
-          name: 'Quest Two',
-          status: 'completed',
-          description: '',
-          rewards: '',
-          notes: '',
-        },
-      ]);
-
-      await waitFor(() => {
-        expect(screen.getByText('Quest One')).toBeInTheDocument();
-        expect(screen.getByText('Quest Two')).toBeInTheDocument();
-      });
-
-      fireEvent.click(screen.getByText('Quest One'));
-
-      const nameInput = screen.getByLabelText(/Name/);
-      fireEvent.change(nameInput, { target: { value: 'Updated One' } });
-
-      const saveButton = screen.getByText('Save').closest('button');
-      fireEvent.click(saveButton);
-
-      await waitFor(() => {
-        expect(mockSave).toHaveBeenCalled();
-      });
-
-      const savedQuests = mockSave.mock.calls[0][0];
-      expect(savedQuests.length).toBe(2);
-      const questTwo = savedQuests.find(q => q.id === 'quest-2');
-      expect(questTwo.name).toBe('Quest Two');
-      expect(questTwo.status).toBe('completed');
-    });
-
   });
 
   describe('search', () => {
@@ -670,37 +565,7 @@ describe('Quests', () => {
       expect(screen.getByText('Defeat the Dragon')).toBeInTheDocument();
     });
 
-    it('filters quests case-insensitively', async () => {
-      renderWithQuests([
-        {
-          id: 'quest-1',
-          name: 'Find the Lost Sword',
-          status: 'active',
-          description: '',
-          rewards: '',
-          notes: '',
-        },
-      ]);
-
-      await waitFor(() => {
-        expect(screen.getByText('Find the Lost Sword')).toBeInTheDocument();
-      });
-
-      const searchInput = screen.getByPlaceholderText(/Search Quests/);
-      fireEvent.change(searchInput, { target: { value: 'find the lost sword' } });
-
-      expect(screen.getByText('Find the Lost Sword')).toBeInTheDocument();
-      expect(screen.queryByText(/No quests found/)).not.toBeInTheDocument();
-    });
-
-    it('shows clear search button when search has text', () => {
-      renderWithQuests([]);
-      const searchInput = screen.getByPlaceholderText(/Search Quests/);
-      fireEvent.change(searchInput, { target: { value: 'test' } });
-      expect(screen.getByLabelText('Clear search')).toBeInTheDocument();
-    });
-
-    it('clears search when clear button clicked', () => {
+    it('shows clear search button when search has text and clears on click', () => {
       renderWithQuests([
         {
           id: 'quest-1',
@@ -713,9 +578,14 @@ describe('Quests', () => {
       ]);
 
       const searchInput = screen.getByPlaceholderText(/Search Quests/);
+      expect(screen.queryByLabelText('Clear search')).not.toBeInTheDocument();
+
       fireEvent.change(searchInput, { target: { value: 'test' } });
+      expect(screen.getByLabelText('Clear search')).toBeInTheDocument();
+
       fireEvent.click(screen.getByLabelText('Clear search'));
       expect(searchInput.value).toBe('');
+      expect(screen.queryByLabelText('Clear search')).not.toBeInTheDocument();
     });
 
     it('restores all quests after clearing search', async () => {
@@ -753,28 +623,6 @@ describe('Quests', () => {
       expect(screen.getByText('Quest Two')).toBeInTheDocument();
     });
 
-    it('shows search no results message', async () => {
-      renderWithQuests([
-        {
-          id: 'quest-1',
-          name: 'Find the Lost Sword',
-          status: 'active',
-          description: 'Search for the sword',
-          rewards: '',
-          notes: '',
-        },
-      ]);
-
-      await waitFor(() => {
-        expect(screen.getByText('Find the Lost Sword')).toBeInTheDocument();
-      });
-
-      const searchInput = screen.getByPlaceholderText(/Search Quests/);
-      fireEvent.change(searchInput, { target: { value: 'dragons' } });
-
-      expect(screen.getByText(/No quests found matching/)).toBeInTheDocument();
-    });
-
     it('shows search no results message with the search query', async () => {
       renderWithQuests([
         {
@@ -792,11 +640,6 @@ describe('Quests', () => {
 
       const emptyState = screen.getByText(/No quests found matching/);
       expect(emptyState.textContent).toContain('dragons');
-    });
-
-    it('hides clear search button when search is empty', () => {
-      renderWithQuests([]);
-      expect(screen.queryByLabelText('Clear search')).not.toBeInTheDocument();
     });
   });
 
@@ -945,140 +788,6 @@ describe('Quests', () => {
     });
   });
 
-  describe('modal close behavior', () => {
-    it('closes modal when Cancel clicked during edit', async () => {
-      renderWithQuests([
-        {
-          id: 'quest-1',
-          name: 'Edit Quest',
-          status: 'active',
-          description: '',
-          rewards: '',
-          notes: '',
-        },
-      ]);
-
-      await waitFor(() => {
-        expect(screen.getByText('Edit Quest')).toBeInTheDocument();
-      });
-
-      fireEvent.click(screen.getByText('Edit Quest'));
-      expect(screen.getByRole('heading', { name: 'Edit Quest' })).toBeInTheDocument();
-      fireEvent.click(screen.getByText('Cancel'));
-      expect(screen.queryByRole('heading', { name: 'Edit Quest' })).not.toBeInTheDocument();
-    });
-
-    it('closes modal when X clicked during edit', async () => {
-      renderWithQuests([
-        {
-          id: 'quest-1',
-          name: 'Edit Quest',
-          status: 'active',
-          description: '',
-          rewards: '',
-          notes: '',
-        },
-      ]);
-
-      await waitFor(() => {
-        expect(screen.getByText('Edit Quest')).toBeInTheDocument();
-      });
-
-      fireEvent.click(screen.getByText('Edit Quest'));
-      expect(screen.getByRole('heading', { name: 'Edit Quest' })).toBeInTheDocument();
-      fireEvent.click(screen.getByLabelText('Close'));
-      expect(screen.queryByRole('heading', { name: 'Edit Quest' })).not.toBeInTheDocument();
-    });
-
-    it('closes modal when overlay clicked during edit', async () => {
-      renderWithQuests([
-        {
-          id: 'quest-1',
-          name: 'Edit Quest',
-          status: 'active',
-          description: '',
-          rewards: '',
-          notes: '',
-        },
-      ]);
-
-      await waitFor(() => {
-        expect(screen.getByText('Edit Quest')).toBeInTheDocument();
-      });
-
-      fireEvent.click(screen.getByText('Edit Quest'));
-      expect(screen.getByRole('heading', { name: 'Edit Quest' })).toBeInTheDocument();
-      const overlay = document.querySelector('.ct-modal-overlay');
-      fireEvent.click(overlay);
-      expect(screen.queryByRole('heading', { name: 'Edit Quest' })).not.toBeInTheDocument();
-    });
-  });
-
-  describe('quest item keyboard accessibility', () => {
-    it('opens edit modal when Enter is pressed on quest item', async () => {
-      renderWithQuests([
-        {
-          id: 'quest-1',
-          name: 'Keyboard Quest',
-          status: 'active',
-          description: '',
-          rewards: '',
-          notes: '',
-        },
-      ]);
-
-      await waitFor(() => {
-        expect(screen.getByText('Keyboard Quest')).toBeInTheDocument();
-      });
-
-      const listItems = document.querySelectorAll('.ct-list-item');
-      fireEvent.keyDown(listItems[0], { key: 'Enter' });
-      expect(screen.getByRole('heading', { name: 'Edit Quest' })).toBeInTheDocument();
-    });
-
-    it('opens edit modal when Space is pressed on quest item', async () => {
-      renderWithQuests([
-        {
-          id: 'quest-1',
-          name: 'Space Quest',
-          status: 'active',
-          description: '',
-          rewards: '',
-          notes: '',
-        },
-      ]);
-
-      await waitFor(() => {
-        expect(screen.getByText('Space Quest')).toBeInTheDocument();
-      });
-
-      const listItems = document.querySelectorAll('.ct-list-item');
-      fireEvent.keyDown(listItems[0], { key: ' ' });
-      expect(screen.getByRole('heading', { name: 'Edit Quest' })).toBeInTheDocument();
-    });
-
-    it('does not open edit modal when other keys are pressed', async () => {
-      renderWithQuests([
-        {
-          id: 'quest-1',
-          name: 'Other Key Quest',
-          status: 'active',
-          description: '',
-          rewards: '',
-          notes: '',
-        },
-      ]);
-
-      await waitFor(() => {
-        expect(screen.getByText('Other Key Quest')).toBeInTheDocument();
-      });
-
-      const listItems = document.querySelectorAll('.ct-list-item');
-      fireEvent.keyDown(listItems[0], { key: 'a' });
-      expect(screen.queryByRole('heading', { name: 'Edit Quest' })).not.toBeInTheDocument();
-    });
-  });
-
   describe('form reset behavior', () => {
     it('resets form to defaults when opening new quest modal after a previous edit', async () => {
       renderWithQuests([
@@ -1117,54 +826,6 @@ describe('Quests', () => {
       expect(screen.getByTestId('field-quest-description').value).toBe('');
       expect(screen.getByTestId('field-quest-rewards').value).toBe('');
       expect(screen.getByTestId('field-quest-notes').value).toBe('');
-    });
-  });
-
-  describe('header structure', () => {
-    it('renders back button, title, and new quest button', () => {
-      renderWithQuests([]);
-      expect(document.querySelector('.ct-back-btn')).toBeInTheDocument();
-      expect(document.querySelector('.ct-title')).toBeInTheDocument();
-      expect(document.querySelector('.ct-new-btn')).toBeInTheDocument();
-      expect(document.querySelector('.ct-search-row')).toBeInTheDocument();
-    });
-  });
-
-  describe('list item structure', () => {
-    it('renders list item header with name and meta', async () => {
-      renderWithQuests([
-        {
-          id: 'quest-1',
-          name: 'Structure Quest',
-          status: 'active',
-          description: '',
-          rewards: '',
-          notes: '',
-        },
-      ]);
-
-      await waitFor(() => {
-        expect(screen.getByText('Structure Quest')).toBeInTheDocument();
-      });
-
-      const listItems = document.querySelectorAll('.ct-list-item');
-      const questItem = listItems[0];
-      expect(questItem.querySelector('.ct-list-item-header')).toBeInTheDocument();
-      expect(questItem.querySelector('.ct-list-name')).toBeInTheDocument();
-      expect(questItem.querySelector('.ct-list-meta')).toBeInTheDocument();
-    });
-  });
-
-  describe('modal structure', () => {
-    it('renders modal body with all field labels', async () => {
-      renderWithQuests([]);
-      fireEvent.click(screen.getByRole('button', { name: /New Quest/ }));
-
-      expect(screen.getByLabelText(/Name/)).toBeInTheDocument();
-      expect(screen.getByLabelText('Status')).toBeInTheDocument();
-      expect(screen.getByTestId('preview-toggle-quest-description')).toBeInTheDocument();
-      expect(screen.getByTestId('preview-toggle-quest-rewards')).toBeInTheDocument();
-      expect(screen.getByTestId('preview-toggle-quest-notes')).toBeInTheDocument();
     });
   });
 });

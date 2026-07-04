@@ -43,19 +43,6 @@ describe('CreatureSelectionModal', () => {
   // ── Rendering ──
 
   describe('initial render', () => {
-    it('renders the modal overlay and modal container', () => {
-      render(<CreatureSelectionModal {...makeProps()} />);
-      expect(document.querySelector('.sp-overlay')).toBeInTheDocument();
-      expect(document.querySelector('.sp-modal')).toBeInTheDocument();
-    });
-
-    it('renders the header sections', () => {
-      render(<CreatureSelectionModal {...makeProps()} />);
-      expect(document.querySelector('.sp-header')).toBeInTheDocument();
-      expect(document.querySelector('.sp-body')).toBeInTheDocument();
-      expect(document.querySelector('.sp-actions')).toBeInTheDocument();
-    });
-
     it('renders the title in the header', () => {
       render(<CreatureSelectionModal {...makeProps()} />);
       expect(screen.getByText('Select Targets')).toBeInTheDocument();

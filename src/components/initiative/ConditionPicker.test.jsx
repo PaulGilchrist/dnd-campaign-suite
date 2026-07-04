@@ -94,16 +94,10 @@ describe('ConditionPicker', () => {
             expect(screen.getByRole('button', { name: 'Apply' })).not.toBeDisabled();
         });
 
-        it.each([
-            { targetName: 'Player Character', expected: 'Add Condition to Player Character' },
-            { targetName: 'Tiamat', expected: 'Add Condition to Tiamat' },
-        ])(
-            'should display "$expected" as the heading for targetName="$targetName"',
-            ({ expected }) => {
-                render(<ConditionPicker {...props} targetName={expected.replace('Add Condition to ', '') || ''} />);
-                expect(screen.getByRole('heading', { name: new RegExp(expected, 'i') })).toBeInTheDocument();
-            },
-        );
+        it('should display the target name in the heading', () => {
+            render(<ConditionPicker {...props} targetName="Tiamat" />);
+            expect(screen.getByRole('heading', { name: /add condition to tiamat/i })).toBeInTheDocument();
+        });
     });
 
     describe('DC input interaction', () => {

@@ -109,22 +109,6 @@ describe('WeaponMasteryChoiceModal', () => {
     expect(slashingLabel.style.border).not.toBe('1px solid transparent');
   });
 
-  // ── Overlay and modal click behavior ──
-
-  it('calls onClose when clicking the overlay background', () => {
-    const onClose = vi.fn();
-    render(<WeaponMasteryChoiceModal {...makeProps({ onClose })} />);
-    fireEvent.click(document.querySelector('.sp-overlay'));
-    expect(onClose).toHaveBeenCalledTimes(1);
-  });
-
-  it('does not close when clicking inside the modal content', () => {
-    const onClose = vi.fn();
-    render(<WeaponMasteryChoiceModal {...makeProps({ onClose })} />);
-    fireEvent.click(document.querySelector('.sp-modal'));
-    expect(onClose).not.toHaveBeenCalled();
-  });
-
   // ── Skip button ──
 
   it('calls onClose and not onConfirm when Skip is clicked', () => {

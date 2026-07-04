@@ -88,16 +88,10 @@ describe('NPCListItem', () => {
       expect(screen.queryByTestId('avatar-image')).not.toBeInTheDocument();
     });
 
-    it('renders AvatarImage when imagePath provided', () => {
-      renderListItem({ imagePath: '/images/gandalf.png' });
-      const avatar = screen.getByTestId('avatar-image');
-      expect(avatar).toBeInTheDocument();
-      expect(avatar).toHaveAttribute('alt', 'Gandalf avatar');
-    });
-
-    it('passes NPC name to AvatarImage alt text', () => {
+    it('renders AvatarImage with correct alt text when imagePath provided', () => {
       renderListItem({ name: 'Aragorn', imagePath: '/images/aragorn.png' });
       const avatar = screen.getByTestId('avatar-image');
+      expect(avatar).toBeInTheDocument();
       expect(avatar).toHaveAttribute('alt', 'Aragorn avatar');
     });
   });
@@ -160,26 +154,22 @@ describe('NPCListItem', () => {
       expect(document.querySelector('.npcs-list-subtitle')).not.toBeInTheDocument();
     });
 
-    it('renders race only', () => {
-      renderListItem({ race: 'Human', classRole: '' });
-      const subtitle = document.querySelector('.npcs-list-subtitle');
-      expect(subtitle).toBeInTheDocument();
-      expect(subtitle).toHaveTextContent('Human');
-    });
-
-    it('renders classRole only', () => {
-      renderListItem({ race: '', classRole: 'Wizard' });
-      const subtitle = document.querySelector('.npcs-list-subtitle');
-      expect(subtitle).toBeInTheDocument();
-      expect(subtitle).toHaveTextContent('Wizard');
-    });
-
-    it('renders race and classRole with separator', () => {
+    it('renders race and classRole with separator when both are provided', () => {
       renderListItem({ race: 'Elf', classRole: 'Archer' });
       const subtitle = document.querySelector('.npcs-list-subtitle');
       expect(subtitle).toHaveTextContent('Elf');
       expect(subtitle).toHaveTextContent('Archer');
       expect(document.querySelector('.npcs-list-separator')).toBeInTheDocument();
+    });
+
+    it.each([
+      ['race only', { race: 'Human', classRole: '' }, 'Human'],
+      ['classRole only', { race: '', classRole: 'Wizard' }, 'Wizard'],
+    ])('renders %s', (_, subProps, expectedText) => {
+      renderListItem(subProps);
+      const subtitle = document.querySelector('.npcs-list-subtitle');
+      expect(subtitle).toBeInTheDocument();
+      expect(subtitle).toHaveTextContent(expectedText);
     });
   });
 
@@ -231,14 +221,14 @@ describe('NPCListItem', () => {
   // ── Edit Callback ─────────────────────────────────────────────────
 
   describe('Edit callback', () => {
-    it('calls onEdit when list item is clicked', () => {
+    it('calls onEdit with the npc object when clicked', () => {
       renderListItem();
       const listItem = screen.getByRole('button', { name: 'Edit NPC: Gandalf' });
       fireEvent.click(listItem);
       expect(mockOnEdit).toHaveBeenCalledWith(baseNPC);
     });
 
-    it('calls onEdit with the npc object', () => {
+    it('calls onEdit with the npc object when a different npc is provided', () => {
       const npc = { ...baseNPC, name: 'Legolas', race: 'Elf' };
       render(
         <NPCListItem npc={npc} onEdit={mockOnEdit} onAddToInitiative={mockOnAddToInitiative} />
@@ -252,17 +242,10 @@ describe('NPCListItem', () => {
   // ── Keyboard Accessibility ────────────────────────────────────────
 
   describe('Keyboard accessibility', () => {
-    it('calls onEdit on Enter key press', () => {
+    it.each(['Enter', ' '])('calls onEdit on %s key press', (key) => {
       renderListItem();
       const listItem = screen.getByRole('button', { name: 'Edit NPC: Gandalf' });
-      fireEvent.keyDown(listItem, { key: 'Enter' });
-      expect(mockOnEdit).toHaveBeenCalledWith(baseNPC);
-    });
-
-    it('calls onEdit on Space key press', () => {
-      renderListItem();
-      const listItem = screen.getByRole('button', { name: 'Edit NPC: Gandalf' });
-      fireEvent.keyDown(listItem, { key: ' ' });
+      fireEvent.keyDown(listItem, { key });
       expect(mockOnEdit).toHaveBeenCalledWith(baseNPC);
     });
   });

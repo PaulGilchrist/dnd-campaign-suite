@@ -3,10 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import { findFeat } from '../../services/shared/featFinder.js';
 import {
-  computeFeatBuffs,
   computeAllFeatBuffs,
-  applyFeatBuffsToFormData,
-  clearAppliedFeatBuffs,
 } from './featBuffService.js';
 
 vi.mock('../../services/shared/featFinder.js', () => ({
@@ -19,7 +16,7 @@ vi.mock('../../services/shared/buffApplier.js', () => ({
   resetMiscBonuses: vi.fn(),
 }));
 
-import { mergeDeduplicated } from '../../services/shared/buffApplier.js';
+
 
 describe('computeAllFeatBuffs', () => {
   beforeEach(() => {
@@ -843,188 +840,5 @@ describe('computeAllFeatBuffs', () => {
         },
       ]);
     });
-  });
-});
-
-describe('computeFeatBuffs', () => {
-  describe('5e ruleset', () => {
-    it('should return empty result when feat is null', () => {
-      const result = computeFeatBuffs(null, '5e');
-
-      expect(result.abilityScoreIncreases).toEqual([]);
-      expect(result.proficiencies).toEqual([]);
-      expect(result.resistances).toEqual([]);
-      expect(result.features).toEqual([]);
-    });
-
-    it('should return empty result when feat has no benefits', () => {
-      const result = computeFeatBuffs({ name: 'Empty Feat' }, '5e');
-
-      expect(result.abilityScoreIncreases).toEqual([]);
-      expect(result.proficiencies).toEqual([]);
-      expect(result.resistances).toEqual([]);
-      expect(result.features).toEqual([]);
-    });
-
-    it('should parse multiple benefit strings from a single 5e feat', () => {
-      const result = computeFeatBuffs(
-        {
-          benefits: [
-            'Increase your Strength score by 2',
-            'Your speed increases by 10 feet',
-          ],
-        },
-        '5e'
-      );
-
-      expect(result.abilityScoreIncreases).toEqual([
-        { name: 'Strength', amount: 2, isChoice: false },
-      ]);
-      expect(result.features).toEqual([
-        {
-          name: 'Speed Bonus',
-          description: 'Your speed increases by 10 feet',
-          type: 'speed',
-          value: 10,
-        },
-      ]);
-    });
-
-    it('should default to 2024 when ruleset is undefined', () => {
-      const result = computeFeatBuffs({
-        benefits: [{ type: 'ability_score_increase', description: '+1 CON' }],
-        ability_score_increase: { scores: ['Constitution'], amount: 1 },
-      });
-
-      expect(result.abilityScoreIncreases).toEqual([
-        { name: 'Constitution', amount: 1, isChoice: false, description: '+1 CON' },
-      ]);
-    });
-  });
-
-  describe('2024 ruleset', () => {
-    it('should return empty result when feat has no benefits', () => {
-      const result = computeFeatBuffs({ name: 'Empty Feat' }, '2024');
-
-      expect(result.abilityScoreIncreases).toEqual([]);
-      expect(result.proficiencies).toEqual([]);
-      expect(result.resistances).toEqual([]);
-      expect(result.features).toEqual([]);
-    });
-
-    it('should skip benefit objects without a type field in 2024', () => {
-      const result = computeFeatBuffs(
-        {
-          benefits: [
-            { description: 'No type here' },
-            { type: 'ability_score_increase', description: '+1 STR' },
-          ],
-          ability_score_increase: { scores: ['Strength'], amount: 1 },
-        },
-        '2024'
-      );
-
-      expect(result.abilityScoreIncreases).toEqual([
-        {
-          name: 'Strength',
-          amount: 1,
-          isChoice: false,
-          description: '+1 STR',
-        },
-      ]);
-    });
-
-    it('should skip non-object benefit entries in 2024', () => {
-      const result = computeFeatBuffs(
-        {
-          benefits: [
-            'not an object',
-            { type: 'ability_score_increase', description: '+1 DEX' },
-          ],
-          ability_score_increase: { scores: ['Dexterity'], amount: 1 },
-        },
-        '2024'
-      );
-
-      expect(result.abilityScoreIncreases).toEqual([
-        {
-          name: 'Dexterity',
-          amount: 1,
-          isChoice: false,
-          description: '+1 DEX',
-        },
-      ]);
-    });
-  });
-});
-
-describe('applyFeatBuffsToFormData', () => {
-  it('should apply ability score increases and call buffApplier functions', () => {
-    const abilities = [
-      { name: 'Strength', featIncrease: 0 },
-      { name: 'Dexterity', featIncrease: 0 },
-    ];
-    const formData = {
-      abilities,
-      resistances: [],
-      feats: ['Tough'],
-      rules: '5e',
-    };
-
-    findFeat.mockReturnValue({
-      benefits: [
-        'Increase your Strength score by 2',
-        'You have resistance to fire',
-      ],
-    });
-
-    applyFeatBuffsToFormData(formData, []);
-
-    expect(formData.abilities[0].featIncrease).toBe(2);
-    expect(mergeDeduplicated).toHaveBeenCalledWith(
-      formData,
-      'resistances',
-      ['fire']
-    );
-  });
-
-  it('should return the computed buffs', () => {
-    const formData = {
-      abilities: [],
-      resistances: [],
-      feats: ['Tough'],
-      rules: '5e',
-    };
-
-    findFeat.mockReturnValue({
-      benefits: ['Increase your Strength score by 2'],
-    });
-
-    const result = applyFeatBuffsToFormData(formData, []);
-
-    expect(result.abilityScoreIncreases).toEqual([
-      { name: 'Strength', amount: 2, isChoice: false },
-    ]);
-  });
-});
-
-describe('clearAppliedFeatBuffs', () => {
-  it('should set featIncrease to 0 on each ability', () => {
-    const abilities = [
-      { name: 'Strength', featIncrease: 2 },
-      { name: 'Dexterity', featIncrease: 1 },
-    ];
-    const formData = { abilities };
-
-    clearAppliedFeatBuffs(formData);
-
-    expect(formData.abilities[0].featIncrease).toBe(0);
-    expect(formData.abilities[1].featIncrease).toBe(0);
-  });
-
-  it('should handle null abilities gracefully', () => {
-    const formData = { abilities: null };
-
-    expect(() => clearAppliedFeatBuffs(formData)).not.toThrow();
   });
 });

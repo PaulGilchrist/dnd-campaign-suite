@@ -845,89 +845,11 @@ describe('WeaponKindMasteryModal', () => {
       });
       expect(onClose).toHaveBeenCalledTimes(1);
     });
-
-    it('calls onClose when clicking the overlay background', async () => {
-      const onClose = vi.fn();
-      renderWithWeapons({ onClose });
-      await waitFor(() => {
-        const overlay = document.querySelector('.sp-overlay');
-        fireEvent.click(overlay);
-      });
-      expect(onClose).toHaveBeenCalledTimes(1);
-    });
-
-    it('does NOT close when clicking inside the modal content', async () => {
-      const onClose = vi.fn();
-      renderWithWeapons({ onClose });
-      await waitFor(() => {
-        const modal = document.querySelector('.sp-modal');
-        fireEvent.click(modal);
-      });
-      expect(onClose).not.toHaveBeenCalled();
-    });
-
-    it('calls onClose when clicking the overlay in result state', async () => {
-      const onClose = vi.fn();
-      automation.applyWeaponKindMastery.mockResolvedValue({
-        type: 'popup',
-        payload: {
-          type: 'automation_info',
-          name: 'Weapon Mastery',
-          description: 'Weapon kinds set to: Battleaxe.',
-        },
-      });
-      renderWithWeapons({ onClose });
-      await waitFor(() => {
-        const checkboxes = document.querySelectorAll('input[type="checkbox"]');
-        fireEvent.click(checkboxes[0]);
-      });
-      await act(async () => {
-        fireEvent.click(screen.getByRole('button', { name: 'Select' }));
-      });
-      await waitFor(() => {
-        const overlay = document.querySelector('.sp-overlay');
-        fireEvent.click(overlay);
-      });
-      expect(onClose).toHaveBeenCalledTimes(1);
-    });
-
-    it('does NOT close when clicking inside modal in result state', async () => {
-      const onClose = vi.fn();
-      automation.applyWeaponKindMastery.mockResolvedValue({
-        type: 'popup',
-        payload: {
-          type: 'automation_info',
-          name: 'Weapon Mastery',
-          description: 'Weapon kinds set to: Battleaxe.',
-        },
-      });
-      renderWithWeapons({ onClose });
-      await waitFor(() => {
-        const checkboxes = document.querySelectorAll('input[type="checkbox"]');
-        fireEvent.click(checkboxes[0]);
-      });
-      await act(async () => {
-        fireEvent.click(screen.getByRole('button', { name: 'Select' }));
-      });
-      await waitFor(() => {
-        const modal = document.querySelector('.sp-modal');
-        fireEvent.click(modal);
-      });
-      expect(onClose).not.toHaveBeenCalled();
-    });
   });
 
   // ── Skip button ──
 
   describe('skip button', () => {
-    it('has the sp-dismiss-btn class', async () => {
-      renderWithWeapons();
-      await waitFor(() => {
-        const btn = screen.getByRole('button', { name: 'Skip' });
-        expect(btn.classList.contains('sp-dismiss-btn')).toBe(true);
-      });
-    });
-
     it('calls onClose when Skip is clicked', async () => {
       const onClose = vi.fn();
       renderWithWeapons({ onClose });

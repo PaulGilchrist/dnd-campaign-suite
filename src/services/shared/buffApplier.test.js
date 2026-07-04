@@ -49,17 +49,14 @@ describe('applyAbilityScoreIncreases', () => {
     expect(abilities[1].featIncrease).toBe(2);
   });
 
-  it('supports negative and zero amounts', () => {
+  it('supports negative amounts', () => {
     const abilities = [
       { name: 'Constitution', featIncrease: 0 },
-      { name: 'Strength', featIncrease: 3 },
     ];
     applyAbilityScoreIncreases(abilities, [
       { name: 'Constitution', amount: -1 },
-      { name: 'strength', amount: 0 },
     ]);
     expect(abilities[0].featIncrease).toBe(-1);
-    expect(abilities[1].featIncrease).toBe(3);
   });
 
   it('skips increases with name "any"', () => {

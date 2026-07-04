@@ -20,4 +20,10 @@ describe('postLogEntry', () => {
     expect(logService.addEntry).toHaveBeenCalledWith('campaign/with/slashes', { type: 'damage', amount: 15 });
   });
 
+  it('returns undefined when addEntry rejects', async () => {
+    logService.addEntry.mockRejectedValue(new Error('fail'));
+
+    const result = await postLogEntry('test-campaign', { type: 'test' });
+    expect(result).toBeUndefined();
+  });
 });

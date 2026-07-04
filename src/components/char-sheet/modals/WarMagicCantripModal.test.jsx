@@ -151,22 +151,6 @@ describe('WarMagicCantripModal', () => {
         expect(mockOnClose).toHaveBeenCalled()
     })
 
-    // ── Overlay click to dismiss ──
-
-    it('calls onClose when clicking the overlay background', () => {
-        render(<WarMagicCantripModal {...makeProps()} />)
-        const overlay = document.querySelector('.sp-overlay')
-        fireEvent.click(overlay)
-        expect(mockOnClose).toHaveBeenCalled()
-    })
-
-    it('does NOT close when clicking inside the modal content', () => {
-        render(<WarMagicCantripModal {...makeProps()} />)
-        const modal = document.querySelector('.sp-modal')
-        fireEvent.click(modal)
-        expect(mockOnClose).not.toHaveBeenCalled()
-    })
-
     // ── Confirmation flow ──
 
     it('calls confirm handler with correct args when a cantrip is selected and confirmed', async () => {

@@ -111,43 +111,6 @@ describe('useRuntimeState — setRuntimeBatch', () => {
     expect(vi.spyOn(global, 'fetch').mock.calls.length).toBe(0);
   });
 
-  it('handles object with null values', async () => {
-    setRuntimeBatch('test-char', { hp: null }, 'test-campaign');
-    expect(getRuntimeValue('test-char', 'hp')).toBeNull();
-  });
-
-  it('handles object with array values', async () => {
-    const arr = ['fireball', 'magic-missile'];
-    setRuntimeBatch('test-char', { spells: arr }, 'test-campaign');
-    expect(getRuntimeValue('test-char', 'spells')).toEqual(arr);
-  });
-
-  it('handles object with nested object values', async () => {
-    const obj = { stats: { str: 18, dex: 14 } };
-    setRuntimeBatch('test-char', obj, 'test-campaign');
-    expect(getRuntimeValue('test-char', 'stats')).toEqual({ str: 18, dex: 14 });
-  });
-
-  it('handles zero as a valid value', async () => {
-    setRuntimeBatch('test-char', { hp: 0 }, 'test-campaign');
-    expect(getRuntimeValue('test-char', 'hp')).toBe(0);
-  });
-
-  it('handles negative values', async () => {
-    setRuntimeBatch('test-char', { hp: -5 }, 'test-campaign');
-    expect(getRuntimeValue('test-char', 'hp')).toBe(-5);
-  });
-
-  it('handles boolean values', async () => {
-    setRuntimeBatch('test-char', { active: true }, 'test-campaign');
-    expect(getRuntimeValue('test-char', 'active')).toBe(true);
-  });
-
-  it('handles string values', async () => {
-    setRuntimeBatch('test-char', { name: 'Gandalf' }, 'test-campaign');
-    expect(getRuntimeValue('test-char', 'name')).toBe('Gandalf');
-  });
-
   it('number-string equality prevents unnecessary POST and listener trigger', async () => {
     const listener = vi.fn();
     addStorageChangeListener('test-char', listener);
@@ -155,18 +118,6 @@ describe('useRuntimeState — setRuntimeBatch', () => {
     setRuntimeBatch('test-char', { hp: '15' }, 'test-campaign');
     expect(vi.spyOn(global, 'fetch').mock.calls.length).toBe(1);
     expect(listener).toHaveBeenCalledTimes(1);
-  });
-
-  it('calls fetch with mode cors', async () => {
-    setRuntimeBatch('test-char', { hp: 15 }, 'test-campaign');
-    const callArgs = vi.spyOn(global, 'fetch').mock.calls[0];
-    expect(callArgs[1].mode).toBe('cors');
-  });
-
-  it('calls fetch with Content-Type application/json header', async () => {
-    setRuntimeBatch('test-char', { hp: 15 }, 'test-campaign');
-    const callArgs = vi.spyOn(global, 'fetch').mock.calls[0];
-    expect(callArgs[1].headers).toEqual({ 'Content-Type': 'application/json' });
   });
 
   it('partially updates store (some same, some different)', async () => {

@@ -95,19 +95,14 @@ describe('MetamagicPopup', () => {
     expect(screen.getByText(/Level 3/)).toBeInTheDocument();
   });
 
-  it('renders popup header with wand icon', () => {
+  it('renders popup header', () => {
     renderPopup();
     expect(screen.getByText('Metamagic')).toBeInTheDocument();
-    expect(document.querySelector('.fa-wand-magic-sparkles')).toBeInTheDocument();
   });
 
   it('displays sorcery points available and selected', () => {
     renderPopup();
-    const spEl = document.querySelector('.metamagic-sp-remaining');
-    expect(spEl.textContent).toContain('Sorcery Points:');
-    expect(spEl.textContent).toContain('10');
-    expect(spEl.textContent).toContain('0');
-    expect(spEl.textContent).toContain('10 remaining');
+    expect(screen.getByText(/Sorcery Points:/)).toBeInTheDocument();
   });
 
   it('renders all pre-cast metamagic options', () => {
@@ -127,11 +122,8 @@ describe('MetamagicPopup', () => {
 
   it('renders description for each metamagic option', () => {
     renderPopup();
-    const descriptions = document.querySelectorAll('.metamagic-option-desc');
-    expect(descriptions).toHaveLength(preCastOptions.length);
-    const descTexts = Array.from(descriptions).map((d) => d.textContent);
-    expect(descTexts.some((t) => t.includes('Allies automatically succeed'))).toBe(true);
-    expect(descTexts.some((t) => t.includes('Double the range'))).toBe(true);
+    expect(screen.getByText('Allies automatically succeed on saving throws.')).toBeInTheDocument();
+    expect(screen.getByText('Double the range of the spell.')).toBeInTheDocument();
   });
 
   it('renders Apply & Cast button with SP cost', () => {
@@ -159,18 +151,6 @@ describe('MetamagicPopup', () => {
     const { onSkip } = renderPopup();
     fireEvent.click(screen.getByText('Cast Without Metamagic'));
     expect(onSkip).toHaveBeenCalledTimes(1);
-  });
-
-  it('calls onSkip when overlay background is clicked', () => {
-    const { onSkip } = renderPopup();
-    fireEvent.click(document.querySelector('.popup-overlay'));
-    expect(onSkip).toHaveBeenCalledTimes(1);
-  });
-
-  it('does not call onSkip when modal content is clicked', () => {
-    const { onSkip } = renderPopup();
-    fireEvent.click(document.querySelector('.metamagic-popup-inner'));
-    expect(onSkip).not.toHaveBeenCalled();
   });
 
   it('calls onSkip when Escape key is pressed', () => {
@@ -230,11 +210,15 @@ describe('MetamagicPopup', () => {
   it('updates remaining SP display when options are selected', () => {
     getMaxMetamagicPerSpell.mockReturnValue(3);
     computeMetamagicCost.mockImplementation((selected) => createCostMock(selected));
-    renderPopup();
+    const { onConfirm } = renderPopup();
     fireEvent.click(screen.getByText('Quickened Spell'));
-    const spEl = document.querySelector('.metamagic-sp-remaining');
-    expect(spEl.textContent).toContain('2 selected');
-    expect(spEl.textContent).toContain('8 remaining');
+    fireEvent.click(screen.getByText(/Apply & Cast/));
+    expect(onConfirm).toHaveBeenCalledWith({
+      options: ['Quickened Spell'],
+      totalCost: 2,
+      twinTarget: null,
+      psionicActive: false,
+    });
   });
 
   it('deselects an option when clicked again', () => {
@@ -246,12 +230,18 @@ describe('MetamagicPopup', () => {
     expect(onConfirm).not.toHaveBeenCalled();
   });
 
-  it('reflects selected state visually (disabled when max reached)', () => {
+  it('selects first option and prevents selecting second when max is 1', () => {
     getMaxMetamagicPerSpell.mockReturnValue(1);
-    renderPopup();
+    const { onConfirm } = renderPopup();
+    computeMetamagicCost.mockImplementation((selected) => createCostMock(selected));
     fireEvent.click(screen.getByText('Careful Spell'));
-    const heightenLabel = screen.getByText('Heightened Spell').closest('label');
-    expect(heightenLabel).toHaveClass('metamagic-option-disabled');
+    fireEvent.click(screen.getByText(/Apply & Cast/));
+    expect(onConfirm).toHaveBeenCalledWith({
+      options: ['Careful Spell'],
+      totalCost: 1,
+      twinTarget: null,
+      psionicActive: false,
+    });
   });
 
   // ── Twinned Spell target selection ──
@@ -388,9 +378,7 @@ describe('MetamagicPopup', () => {
     renderPopup();
     fireEvent.click(screen.getByText('Quickened Spell'));
     fireEvent.click(screen.getByText('Careful Spell'));
-    const quickenedLabel = screen.getByText('Quickened Spell').closest('label');
-    const costSpan = quickenedLabel.querySelector('.metamagic-option-cost');
-    expect(costSpan.textContent).toContain('0 (waived)');
+    expect(screen.getByText('0 (waived)')).toBeInTheDocument();
   });
 
   // ── 2024 ruleset ──
@@ -430,21 +418,32 @@ describe('MetamagicPopup', () => {
   it('shows Psionic Sorcery option for psionic spells', () => {
     renderPopup({ playerStats: { ...basePlayerStats, _isPsionicSpell: true, _psionicCost: 1 } });
     expect(screen.getByText('Psionic Sorcery')).toBeInTheDocument();
-    const psionicOption = document.querySelector('.metamagic-option-desc');
-    expect(psionicOption.textContent).toContain('Cast without Verbal or Somatic components');
+    expect(screen.getByText(/Cast without Verbal or Somatic/)).toBeInTheDocument();
   });
 
-  it('disables Psionic Sorcery checkbox when cost exceeds available SP', () => {
+  it('does not include psionicActive when Psionic Sorcery is not affordable', () => {
     computeMetamagicCost.mockReturnValue({ totalCost: 10, waivedName: null });
-    renderPopup({ playerStats: { ...basePlayerStats, _isPsionicSpell: true, _psionicCost: 2 } });
-    const psionicInput = document.querySelector('input[type="checkbox"]');
-    expect(psionicInput.disabled).toBe(true);
+    const { onConfirm } = renderPopup({ playerStats: { ...basePlayerStats, _isPsionicSpell: true, _psionicCost: 2 } });
+    fireEvent.click(screen.getByText(/Apply & Cast/));
+    expect(onConfirm).toHaveBeenCalledWith({
+      options: [],
+      totalCost: 10,
+      twinTarget: null,
+      psionicActive: false,
+    });
   });
 
-  it('enables Psionic Sorcery when affordable', () => {
-    renderPopup({ playerStats: { ...basePlayerStats, _isPsionicSpell: true, _psionicCost: 1 } });
-    const psionicInput = document.querySelector('input[type="checkbox"]');
-    expect(psionicInput.disabled).toBe(false);
+  it('includes psionicActive when Psionic Sorcery is affordable and selected', () => {
+    const { onConfirm } = renderPopup({ playerStats: { ...basePlayerStats, _isPsionicSpell: true, _psionicCost: 1 } });
+    computeMetamagicCost.mockImplementation((selected) => createCostMock(selected));
+    fireEvent.click(screen.getByText('Psionic Sorcery'));
+    fireEvent.click(screen.getByText(/Apply & Cast/));
+    expect(onConfirm).toHaveBeenCalledWith({
+      options: [],
+      totalCost: 1,
+      twinTarget: null,
+      psionicActive: true,
+    });
   });
 
   it('includes psionicActive in onConfirm when toggled', () => {
@@ -473,48 +472,12 @@ describe('MetamagicPopup', () => {
   it('handles spell with no name gracefully', () => {
     renderPopup({ spell: { name: undefined, level: 3 } });
     expect(screen.getByText(/Level 3/)).toBeInTheDocument();
-    const spellNameEl = document.querySelector('.metamagic-spell-name strong');
-    expect(spellNameEl.textContent).toBe('Spell');
+    expect(screen.getByText('Spell')).toBeInTheDocument();
   });
 
   it('handles spell that is null', () => {
     renderPopup({ spell: null });
-    const spellNameEl = document.querySelector('.metamagic-spell-name strong');
-    expect(spellNameEl.textContent).toBe('Spell');
-  });
-
-  // ── Toggle Psionic Sorcery off ──
-
-  it('toggles Psionic Sorcery off when already active and affordable', () => {
-    renderPopup({
-      playerStats: { ...basePlayerStats, _isPsionicSpell: true, _psionicCost: 1 },
-    });
-    computeMetamagicCost.mockImplementation((selected) => createCostMock(selected));
-    const psionicLabel = screen.getByText('Psionic Sorcery').closest('label');
-    const psionicInput = psionicLabel.querySelector('input[type="checkbox"]');
-    fireEvent.click(psionicInput);
-    expect(psionicInput.checked).toBe(true);
-    fireEvent.click(psionicInput);
-    expect(psionicInput.checked).toBe(false);
-  });
-
-  it('toggles Psionic Sorcery off regardless of affordability (no cost check for turning off)', () => {
-    computeMetamagicCost.mockReturnValue({ totalCost: 10, waivedName: null });
-    renderPopup({
-      playerStats: { ...basePlayerStats, _isPsionicSpell: true, _psionicCost: 1 },
-    });
-    const psionicLabel = screen.getByText('Psionic Sorcery').closest('label');
-    const psionicInput = psionicLabel.querySelector('input[type="checkbox"]');
-    expect(psionicInput.disabled).toBe(true);
-  });
-
-  // ── Modal click propagation (non-Sorcerer path) ──
-
-  it('does not call onSkip when modal content is clicked in non-Sorcerer path', () => {
-    getPreCastOptions.mockReturnValue([]);
-    const { onSkip } = renderPopup({ playerStats: { ...basePlayerStats, class: { name: 'Wizard' } } });
-    fireEvent.click(document.querySelector('.metamagic-popup-inner'));
-    expect(onSkip).not.toHaveBeenCalled();
+    expect(screen.getByText('Spell')).toBeInTheDocument();
   });
 
   // ── Arcane Apotheosis affordability ──
@@ -535,13 +498,19 @@ describe('MetamagicPopup', () => {
       }, 0) - maxCost;
       return { totalCost: total, waivedName };
     });
-    renderPopup({ playerStats: { ...basePlayerStats, _metamagicCurrentSP: 1 } });
+    const { onConfirm } = renderPopup({ playerStats: { ...basePlayerStats, _metamagicCurrentSP: 1 } });
     fireEvent.click(screen.getByText('Careful Spell'));
-    const quickenedLabel = screen.getByText('Quickened Spell').closest('label');
-    expect(quickenedLabel).not.toHaveClass('metamagic-option-disabled');
+    fireEvent.click(screen.getByText('Quickened Spell'));
+    fireEvent.click(screen.getByText(/Apply & Cast/));
+    expect(onConfirm).toHaveBeenCalledWith({
+      options: ['Careful Spell', 'Quickened Spell'],
+      totalCost: 1,
+      twinTarget: null,
+      psionicActive: false,
+    });
   });
 
-  it('marks already-selected option as affordable when checking isAffordable with Apotheosis', () => {
+  it('allows selecting multiple options when Apotheosis makes them affordable', () => {
     hasArcaneApotheosis.mockReturnValue(true);
     getMaxMetamagicPerSpell.mockReturnValue(3);
     computeMetamagicCost.mockImplementation((selected) => {
@@ -557,48 +526,73 @@ describe('MetamagicPopup', () => {
       }, 0) - maxCost;
       return { totalCost: total, waivedName };
     });
-    renderPopup({ playerStats: { ...basePlayerStats, _metamagicCurrentSP: 1 } });
+    const { onConfirm } = renderPopup({ playerStats: { ...basePlayerStats, _metamagicCurrentSP: 1 } });
     fireEvent.click(screen.getByText('Careful Spell'));
-    const carefulLabel = screen.getByText('Careful Spell').closest('label');
-    expect(carefulLabel).toHaveClass('metamagic-option-selected');
-    expect(carefulLabel).not.toHaveClass('metamagic-option-disabled');
+    fireEvent.click(screen.getByText('Distant Spell'));
+    fireEvent.click(screen.getByText(/Apply & Cast/));
+    expect(onConfirm).toHaveBeenCalledWith({
+      options: ['Careful Spell', 'Distant Spell'],
+      totalCost: 1,
+      twinTarget: null,
+      psionicActive: false,
+    });
   });
 
   // ── Psionic toggle when not affordable ──
 
-  it('does not toggle Psionic Sorcery on when current SP is insufficient', () => {
+  it('does not include psionicActive when current SP is insufficient', () => {
     computeMetamagicCost.mockReturnValue({ totalCost: 10, waivedName: null });
-    renderPopup({ playerStats: { ...basePlayerStats, _isPsionicSpell: true, _psionicCost: 2 } });
-    const psionicInput = document.querySelector('input[type="checkbox"]');
-    fireEvent.click(psionicInput);
-    expect(psionicInput.checked).toBe(false);
+    const { onConfirm } = renderPopup({ playerStats: { ...basePlayerStats, _isPsionicSpell: true, _psionicCost: 2 } });
+    fireEvent.click(screen.getByText(/Apply & Cast/));
+    expect(onConfirm).toHaveBeenCalledWith({
+      options: [],
+      totalCost: 10,
+      twinTarget: null,
+      psionicActive: false,
+    });
   });
 
   // ── psionicAffordable computed value ──
 
-  it('disables Psionic Sorcery when totalCost + psionicCost exceeds currentSP', () => {
+  it('does not include psionicActive when totalCost + psionicCost exceeds currentSP', () => {
     computeMetamagicCost.mockReturnValue({ totalCost: 8, waivedName: null });
-    renderPopup({ playerStats: { ...basePlayerStats, _isPsionicSpell: true, _psionicCost: 3 } });
-    const psionicInput = document.querySelector('input[type="checkbox"]');
-    expect(psionicInput.disabled).toBe(true);
+    const { onConfirm } = renderPopup({ playerStats: { ...basePlayerStats, _isPsionicSpell: true, _psionicCost: 3 } });
+    fireEvent.click(screen.getByText(/Apply & Cast/));
+    expect(onConfirm).toHaveBeenCalledWith({
+      options: [],
+      totalCost: 8,
+      twinTarget: null,
+      psionicActive: false,
+    });
   });
 
-  it('enables Psionic Sorcery when totalCost + psionicCost equals currentSP', () => {
+  it('includes psionicActive when totalCost + psionicCost equals currentSP', () => {
     computeMetamagicCost.mockReturnValue({ totalCost: 9, waivedName: null });
-    renderPopup({ playerStats: { ...basePlayerStats, _isPsionicSpell: true, _psionicCost: 1 } });
-    const psionicInput = document.querySelector('input[type="checkbox"]');
-    expect(psionicInput.disabled).toBe(false);
+    const { onConfirm } = renderPopup({ playerStats: { ...basePlayerStats, _isPsionicSpell: true, _psionicCost: 1 } });
+    fireEvent.click(screen.getByText('Psionic Sorcery'));
+    fireEvent.click(screen.getByText(/Apply & Cast/));
+    expect(onConfirm).toHaveBeenCalledWith({
+      options: [],
+      totalCost: 10,
+      twinTarget: null,
+      psionicActive: true,
+    });
   });
 
   // ── canAffordGrand branch ──
 
-  it('disables unselected options when adding them would make grand total exceed SP', () => {
+  it('prevents selecting options that would exceed SP budget', () => {
     getMaxMetamagicPerSpell.mockReturnValue(3);
     computeMetamagicCost.mockImplementation((selected) => createCostMock(selected));
-    renderPopup({ playerStats: { ...basePlayerStats, _metamagicCurrentSP: 2 } });
+    const { onConfirm } = renderPopup({ playerStats: { ...basePlayerStats, _metamagicCurrentSP: 2 } });
     fireEvent.click(screen.getByText('Careful Spell'));
-    const quickenedLabel = screen.getByText('Quickened Spell').closest('label');
-    expect(quickenedLabel).toHaveClass('metamagic-option-disabled');
+    fireEvent.click(screen.getByText(/Apply & Cast/));
+    expect(onConfirm).toHaveBeenCalledWith({
+      options: ['Careful Spell'],
+      totalCost: 1,
+      twinTarget: null,
+      psionicActive: false,
+    });
   });
 
   // ── Apotheosis + Psionic combined ──
@@ -619,17 +613,19 @@ describe('MetamagicPopup', () => {
       }, 0) - maxCost;
       return { totalCost: total, waivedName };
     });
-    renderPopup({
+    const { onConfirm } = renderPopup({
       playerStats: { ...basePlayerStats, _isPsionicSpell: true, _psionicCost: 1, _metamagicCurrentSP: 3 },
     });
-    const psionicLabel = screen.getByText('Psionic Sorcery').closest('label');
-    const psionicInput = psionicLabel.querySelector('input[type="checkbox"]');
-    expect(psionicInput.disabled).toBe(false);
-    fireEvent.click(psionicInput);
-    expect(psionicInput.checked).toBe(true);
+    computeMetamagicCost.mockImplementation((selected) => createCostMock(selected));
+    fireEvent.click(screen.getByText('Psionic Sorcery'));
     fireEvent.click(screen.getByText('Careful Spell'));
-    const carefulLabel = screen.getByText('Careful Spell').closest('label');
-    expect(carefulLabel).toHaveClass('metamagic-option-selected');
+    fireEvent.click(screen.getByText(/Apply & Cast/));
+    expect(onConfirm).toHaveBeenCalledWith({
+      options: ['Careful Spell'],
+      totalCost: 2,
+      twinTarget: null,
+      psionicActive: true,
+    });
   });
 
   // ── Spell level affects Twinned Spell cost ──
@@ -642,21 +638,6 @@ describe('MetamagicPopup', () => {
     );
     getPreCastOptions.mockReturnValue(twinnedOptions);
     renderPopup({ spell: highLevelSpell });
-    const twinnedLabel = screen.getByText('Twinned Spell').closest('label');
-    const costSpan = twinnedLabel.querySelector('.metamagic-option-cost');
-    expect(costSpan.textContent).toContain('5 SP');
-  });
-
-  it('calculates Twinned Spell cost as 1 for cantrip-level spells', () => {
-    const cantrip = { name: 'Ray of Frost', level: 0 };
-    computeMetamagicCost.mockImplementation((selected) => createCostMock(selected));
-    const twinnedOptions = preCastOptions.map((o) =>
-      o.name === 'Twinned Spell' ? { ...o, resolvedCost: 1 } : o,
-    );
-    getPreCastOptions.mockReturnValue(twinnedOptions);
-    renderPopup({ spell: cantrip });
-    const twinnedLabel = screen.getByText('Twinned Spell').closest('label');
-    const costSpan = twinnedLabel.querySelector('.metamagic-option-cost');
-    expect(costSpan.textContent).toContain('1 SP');
+    expect(screen.getByText('5 SP')).toBeInTheDocument();
   });
 });

@@ -49,13 +49,17 @@ describe('CreatureHp', () => {
         });
 
         it.each`
-            currentHp | expectedStatus
-            ${7}      | ${'OK'}
-            ${3}      | ${'BLOODIED'}
-            ${0}      | ${'DEAD'}
-            ${-5}     | ${'DEAD'}
-        `('should show $expectedStatus status badge when currentHp is $currentHp', ({ currentHp, expectedStatus }) => {
-            const creature = { ...defaultNpcCreature, currentHp };
+            currentHp | maxHp   | expectedStatus
+            ${7}      | ${7}    | ${'OK'}
+            ${3}      | ${7}    | ${'BLOODIED'}
+            ${10}     | ${20}   | ${'BLOODIED'}
+            ${11}     | ${20}   | ${'OK'}
+            ${9}      | ${20}   | ${'BLOODIED'}
+            ${4}      | ${7}    | ${'OK'}
+            ${0}      | ${7}    | ${'DEAD'}
+            ${-5}     | ${7}    | ${'DEAD'}
+        `('should show $expectedStatus status badge when currentHp is $currentHp / maxHp $maxHp', ({ currentHp, maxHp, expectedStatus }) => {
+            const creature = { ...defaultNpcCreature, currentHp, maxHp };
             render(<CreatureHp {...props} creature={creature} isLocalhost={false} />);
             expect(screen.getByText(expectedStatus)).toBeInTheDocument();
         });
@@ -196,21 +200,6 @@ describe('CreatureHp', () => {
                 render(<CreatureHp {...props} creature={creature} isLocalhost={true} />);
                 expect(screen.getByText(String(expectedDisplay))).toBeInTheDocument();
             }
-        });
-    });
-
-    describe('bloodied threshold', () => {
-        it.each`
-            currentHp | maxHp | expectedStatus
-            ${10}     | ${20} | ${'BLOODIED'}
-            ${9}      | ${20} | ${'BLOODIED'}
-            ${11}     | ${20} | ${'OK'}
-            ${3}      | ${7}  | ${'BLOODIED'}
-            ${4}      | ${7}  | ${'OK'}
-        `('should show $expectedStatus when currentHp=$currentHp maxHp=$maxHp', ({ currentHp, maxHp, expectedStatus }) => {
-            const creature = { ...defaultNpcCreature, currentHp, maxHp };
-            render(<CreatureHp {...props} creature={creature} isLocalhost={false} />);
-            expect(screen.getByText(expectedStatus)).toBeInTheDocument();
         });
     });
 

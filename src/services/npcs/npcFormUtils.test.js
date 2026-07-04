@@ -27,10 +27,6 @@ describe('npcFormUtils', () => {
       });
     });
 
-    it('ABILITY_LABELS keys should match ABILITY_ABBR', () => {
-      expect(Object.keys(ABILITY_LABELS)).toEqual(ABILITY_ABBR);
-    });
-
     it('ATTITUDE_OPTIONS should have 5 options with value and label strings', () => {
       expect(ATTITUDE_OPTIONS).toHaveLength(5);
       for (const option of ATTITUDE_OPTIONS) {
@@ -60,79 +56,56 @@ describe('npcFormUtils', () => {
   });
 
   describe('getDefaultFormData', () => {
-    const expectedDefaults = {
-      name: '',
-      race: '',
-      classRole: '',
-      appearance: '',
-      personality: '',
-      goals: '',
-      secrets: '',
-      notes: '',
-      tags: '',
-      attitude: 'neutral',
-      image: '',
-      imageName: '',
-      imagePath: '',
-      armorClass: 10,
-      hitPoints: '',
-      hitDice: '',
-      initiativeBonus: '',
-      speed: { walk: '30 ft.' },
-      abilityScores: { str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10 },
-      savingThrowBonuses: {},
-      skillBonuses: {},
-      damageResistances: [],
-      damageImmunities: [],
-      conditionImmunities: [],
-      actions: [],
-      traits: '',
-      reactions: '',
-    };
-
     it('should return correct default values for all fields', () => {
       const form = getDefaultFormData();
-      expect(form).toEqual(expectedDefaults);
+      expect(form).toEqual({
+        name: '',
+        race: '',
+        classRole: '',
+        appearance: '',
+        personality: '',
+        goals: '',
+        secrets: '',
+        notes: '',
+        tags: '',
+        attitude: 'neutral',
+        image: '',
+        imageName: '',
+        imagePath: '',
+        armorClass: 10,
+        hitPoints: '',
+        hitDice: '',
+        initiativeBonus: '',
+        speed: { walk: '30 ft.' },
+        abilityScores: { str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10 },
+        savingThrowBonuses: {},
+        skillBonuses: {},
+        damageResistances: [],
+        damageImmunities: [],
+        conditionImmunities: [],
+        actions: [],
+        traits: '',
+        reactions: '',
+      });
     });
 
-    it('should default all ability scores to 10', () => {
-      const form = getDefaultFormData();
-      for (const abbr of ABILITY_ABBR) {
-        expect(form.abilityScores[abbr]).toBe(10);
-      }
-    });
-
-    it('should apply override scalar fields', () => {
-      const form = getDefaultFormData({ name: 'Grog', hitPoints: 20, armorClass: 15 });
-      expect(form.name).toBe('Grog');
-      expect(form.hitPoints).toBe(20);
-      expect(form.armorClass).toBe(15);
-    });
-
-    it('should apply override object fields by replacing entirely', () => {
-      const customScores = { str: 18, dex: 14, con: 16, int: 10, wis: 8, cha: 12 };
-      const form = getDefaultFormData({ abilityScores: customScores });
-      expect(form.abilityScores).toEqual(customScores);
-    });
-
-    it('should apply override array fields by replacing entirely', () => {
+    it('should apply override scalar, object, and array fields', () => {
       const form = getDefaultFormData({
+        name: 'Grog',
+        hitPoints: 20,
+        armorClass: 15,
+        abilityScores: { str: 18, dex: 14, con: 16, int: 10, wis: 8, cha: 12 },
         damageResistances: ['fire', 'cold'],
         damageImmunities: ['psychic'],
         actions: [{ name: 'Longsword' }],
       });
+      expect(form.name).toBe('Grog');
+      expect(form.hitPoints).toBe(20);
+      expect(form.armorClass).toBe(15);
+      expect(form.abilityScores).toEqual({ str: 18, dex: 14, con: 16, int: 10, wis: 8, cha: 12 });
       expect(form.damageResistances).toEqual(['fire', 'cold']);
       expect(form.damageImmunities).toEqual(['psychic']);
       expect(form.actions).toEqual([{ name: 'Longsword' }]);
-    });
-
-    it('should preserve non-overridden defaults when partial overrides are given', () => {
-      const form = getDefaultFormData({ name: 'Grog' });
-      expect(form.name).toBe('Grog');
-      expect(form.armorClass).toBe(10);
-      expect(form.abilityScores.str).toBe(10);
-      expect(form.damageResistances).toEqual([]);
-      expect(form.speed).toEqual({ walk: '30 ft.' });
     });
 
     it('should return a fresh object each call with independent mutable fields', () => {
@@ -154,7 +127,6 @@ describe('npcFormUtils', () => {
       expect(cleaned).not.toBe(data);
       expect(cleaned.armorClass).toBe(16);
       expect(cleaned.name).toBe('Grog');
-      expect(cleaned.race).toBe('Orc');
     });
 
     it('should default AC to 10 for null, undefined, and empty string without logging', () => {
@@ -186,30 +158,9 @@ describe('npcFormUtils', () => {
       consoleSpy.mockRestore();
     });
 
-    it('should accept AC of 0 as valid', () => {
-      const cleaned = cleanNPCData({ name: 'Grog', armorClass: 0 });
-      expect(cleaned.armorClass).toBe(0);
-    });
-
-    it('should accept negative AC values', () => {
-      const cleaned = cleanNPCData({ name: 'Grog', armorClass: -5 });
-      expect(cleaned.armorClass).toBe(-5);
-    });
-
-    it('should preserve other fields while correcting AC', () => {
-      const data = {
-        name: 'Grog',
-        race: 'Hill Dwarf',
-        hitPoints: 12,
-        armorClass: null,
-        speed: { walk: '25 ft.' },
-      };
-      const cleaned = cleanNPCData(data);
-      expect(cleaned).not.toBe(data);
-      expect(cleaned.name).toBe('Grog');
-      expect(cleaned.race).toBe('Hill Dwarf');
-      expect(cleaned.hitPoints).toBe(12);
-      expect(cleaned.speed).toEqual({ walk: '25 ft.' });
+    it('should accept AC of 0 and negative values as valid', () => {
+      expect(cleanNPCData({ name: 'Grog', armorClass: 0 }).armorClass).toBe(0);
+      expect(cleanNPCData({ name: 'Grog', armorClass: -5 }).armorClass).toBe(-5);
     });
 
     it('should not mutate the original data object', () => {

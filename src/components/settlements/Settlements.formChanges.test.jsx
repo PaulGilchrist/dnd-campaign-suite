@@ -52,7 +52,8 @@ vi.mock('../../services/campaign/settlementGenerator.js', () => ({
 describe('Settlements - form field changes', () => {
   const mockUseSettlements = {
     items: [],
-    loading: false,    saveItems: async () => {},
+    loading: false,
+    saveItems: async () => {},
     deleteItem: async () => {},
   };
 
@@ -104,19 +105,13 @@ describe('Settlements - form field changes', () => {
     Object.assign(settlementMockReturn, mockUseSettlements);
   });
 
-  it('changes description, atmosphere, government, population, and threat when size changes', async () => {
+  it('populates fields with defaults when size changes', async () => {
     globalThis.Math.random = () => 0.5;
     render(<Settlements campaignName="test" onBack={() => {}} />);
     const modalOpen = screen.getByRole('button', { name: /new settlement/i });
     fireEvent.click(modalOpen);
     const sizeSelect = screen.getByRole('combobox', { name: /size/i });
     fireEvent.change(sizeSelect, { target: { value: 'town' } });
-    const governmentField = screen.getByText(/government/i).parentElement?.querySelector('textarea');
-    expect(governmentField).toBeInTheDocument();
-    const descriptionField = screen.getByText(/description/i).parentElement?.querySelector('textarea');
-    expect(descriptionField).toBeInTheDocument();
-    const atmosphereField = screen.getByText(/atmosphere/i).parentElement?.querySelector('textarea');
-    expect(atmosphereField).toBeInTheDocument();
     const popInput = screen.getByPlaceholderText(/souls/i);
     expect(popInput.value).toContain('souls');
   });

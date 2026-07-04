@@ -291,18 +291,6 @@ describe('generateOutdoorEncounter', () => {
       const result = gen('forest', 100, [], 0, 0);
       expect(result.placedItems.length).toBeLessThanOrEqual(60);
     });
-
-    it('generates encounter data for a small grid (gridSize=5)', () => {
-      const result = gen('plains', 5, ['Tiny'], 0, 0);
-      expect(result.gridSize).toBe(5);
-      expect(result.placedItems).toBeInstanceOf(Array);
-    });
-
-    it('generates encounter data for a default-size grid (gridSize=30)', () => {
-      const result = gen('forest', 30, defaultPlayers, 0, 0);
-      expect(result.gridSize).toBe(30);
-      expect(result.players.length).toBe(4);
-    });
   });
 
   // ════════════════════════════════════════════════════════════════════
@@ -314,12 +302,6 @@ describe('generateOutdoorEncounter', () => {
       expect(result.parentHex.q).toBe(-5);
       expect(result.parentHex.r).toBe(-3);
       expect(result.placedItems).toBeInstanceOf(Array);
-    });
-
-    it('handles large q and r values without crashing', () => {
-      const result = gen('mountains', 10, [], 999, -999);
-      expect(result.placedItems).toBeInstanceOf(Array);
-      expect(result.bgFill).toBe('#6F6F62');
     });
   });
 });

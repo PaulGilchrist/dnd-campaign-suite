@@ -12,7 +12,7 @@ describe('HiddenInput', () => {
   });
 
   describe('rendering', () => {
-    it('should render the value as text when showInput is false and displayValue is true', () => {
+    it('renders the value as text when showInput is false and displayValue is true', () => {
       render(
         <HiddenInput
           handleInputToggle={mockOnToggle}
@@ -25,7 +25,7 @@ describe('HiddenInput', () => {
       expect(screen.getByText('5')).toBeInTheDocument();
     });
 
-    it('should not render anything when showInput is false and displayValue is false', () => {
+    it('renders nothing when showInput is false and displayValue is false', () => {
       render(
         <HiddenInput
           handleInputToggle={mockOnToggle}
@@ -39,153 +39,7 @@ describe('HiddenInput', () => {
       expect(screen.queryByText('5')).not.toBeInTheDocument();
     });
 
-    it('should render a number input when showInput is true', () => {
-      render(
-        <HiddenInput
-          handleInputToggle={mockOnToggle}
-          handleValueChange={mockOnChange}
-          showInput
-          value={5}
-        />
-      );
-
-      const input = screen.getByRole('spinbutton');
-      expect(input).toBeInTheDocument();
-      expect(input).toHaveValue(5);
-    });
-
-    it('should render a number input with null value', () => {
-      render(
-        <HiddenInput
-          handleInputToggle={mockOnToggle}
-          handleValueChange={mockOnChange}
-          showInput
-          value={null}
-        />
-      );
-
-      const input = screen.getByRole('spinbutton');
-      expect(input).toBeInTheDocument();
-    });
-
-    it('should render a number input with undefined value', () => {
-      render(
-        <HiddenInput
-          handleInputToggle={mockOnToggle}
-          handleValueChange={mockOnChange}
-          showInput
-          value={undefined}
-        />
-      );
-
-      const input = screen.getByRole('spinbutton');
-      expect(input).toBeInTheDocument();
-    });
-
-    it('should render a number input with zero value', () => {
-      render(
-        <HiddenInput
-          handleInputToggle={mockOnToggle}
-          handleValueChange={mockOnChange}
-          showInput
-          value={0}
-        />
-      );
-
-      const input = screen.getByRole('spinbutton');
-      expect(input).toBeInTheDocument();
-      expect(input).toHaveValue(0);
-    });
-  });
-
-  describe('input interaction', () => {
-    it('should update local value on change without calling handleValueChange', () => {
-      render(
-        <HiddenInput
-          handleInputToggle={mockOnToggle}
-          handleValueChange={mockOnChange}
-          showInput
-          value={5}
-        />
-      );
-
-      const input = screen.getByRole('spinbutton');
-      fireEvent.change(input, { target: { value: '10' } });
-
-      expect(mockOnChange).not.toHaveBeenCalled();
-      expect(input).toHaveValue(10);
-    });
-
-    it('should commit the current local value and toggle on blur', () => {
-      render(
-        <HiddenInput
-          handleInputToggle={mockOnToggle}
-          handleValueChange={mockOnChange}
-          showInput
-          value={5}
-        />
-      );
-
-      const input = screen.getByRole('spinbutton');
-      fireEvent.change(input, { target: { value: '10' } });
-      fireEvent.blur(input);
-
-      expect(mockOnChange).toHaveBeenCalledWith(10);
-      expect(mockOnToggle).toHaveBeenCalled();
-    });
-
-    it('should commit the original value and toggle on blur when no change occurred', () => {
-      render(
-        <HiddenInput
-          handleInputToggle={mockOnToggle}
-          handleValueChange={mockOnChange}
-          showInput
-          value={5}
-        />
-      );
-
-      const input = screen.getByRole('spinbutton');
-      fireEvent.blur(input);
-
-      expect(mockOnChange).toHaveBeenCalledWith(5);
-      expect(mockOnToggle).toHaveBeenCalled();
-    });
-
-    it('should commit on Enter key and toggle', () => {
-      render(
-        <HiddenInput
-          handleInputToggle={mockOnToggle}
-          handleValueChange={mockOnChange}
-          showInput
-          value={5}
-        />
-      );
-
-      const input = screen.getByRole('spinbutton');
-      fireEvent.keyDown(input, { key: 'Enter' });
-
-      expect(mockOnChange).toHaveBeenCalled();
-      expect(mockOnToggle).toHaveBeenCalled();
-    });
-
-    it('should not commit on non-Enter key press', () => {
-      render(
-        <HiddenInput
-          handleInputToggle={mockOnToggle}
-          handleValueChange={mockOnChange}
-          showInput
-          value={5}
-        />
-      );
-
-      const input = screen.getByRole('spinbutton');
-      fireEvent.keyDown(input, { key: 'Escape' });
-
-      expect(mockOnChange).not.toHaveBeenCalled();
-      expect(mockOnToggle).not.toHaveBeenCalled();
-    });
-
-    it('should focus the input when showInput becomes true', () => {
+    it('renders a number input with correct value when showInput is true', () => {
       const { rerender } = render(
         <HiddenInput
           handleInputToggle={mockOnToggle}
@@ -205,10 +59,36 @@ describe('HiddenInput', () => {
       );
 
       const input = screen.getByRole('spinbutton');
+      expect(input).toBeInTheDocument();
+      expect(input).toHaveValue(5);
       expect(document.activeElement).toBe(input);
     });
 
-    it('should hide the input and show the value when showInput becomes false', () => {
+    it('renders a number input with null value', () => {
+      render(
+        <HiddenInput
+          handleInputToggle={mockOnToggle}
+          handleValueChange={mockOnChange}
+          showInput
+          value={null}
+        />
+      );
+      expect(screen.getByRole('spinbutton')).toBeInTheDocument();
+    });
+
+    it('renders a number input with zero value', () => {
+      render(
+        <HiddenInput
+          handleInputToggle={mockOnToggle}
+          handleValueChange={mockOnChange}
+          showInput
+          value={0}
+        />
+      );
+      expect(screen.getByRole('spinbutton')).toHaveValue(0);
+    });
+
+    it('hides the input and shows the value when showInput becomes false', () => {
       const { rerender } = render(
         <HiddenInput
           handleInputToggle={mockOnToggle}
@@ -231,7 +111,7 @@ describe('HiddenInput', () => {
       expect(screen.getByText('5')).toBeInTheDocument();
     });
 
-    it('should not sync local value when the controlled value prop changes during editing', () => {
+    it('does not sync local value when the controlled value prop changes during editing', () => {
       const { rerender } = render(
         <HiddenInput
           handleInputToggle={mockOnToggle}
@@ -255,8 +135,87 @@ describe('HiddenInput', () => {
       // controlled value change is intentionally ignored.
       expect(input).toHaveValue(5);
     });
+  });
 
-    it('should clamp value to max on commit', () => {
+  describe('input interaction', () => {
+    it('updates local value on change without calling handleValueChange', () => {
+      render(
+        <HiddenInput
+          handleInputToggle={mockOnToggle}
+          handleValueChange={mockOnChange}
+          showInput
+          value={5}
+        />
+      );
+
+      const input = screen.getByRole('spinbutton');
+      fireEvent.change(input, { target: { value: '10' } });
+
+      expect(mockOnChange).not.toHaveBeenCalled();
+      expect(input).toHaveValue(10);
+    });
+
+    it('commits the current local value and toggles on blur', () => {
+      render(
+        <HiddenInput
+          handleInputToggle={mockOnToggle}
+          handleValueChange={mockOnChange}
+          showInput
+          value={5}
+        />
+      );
+
+      const input = screen.getByRole('spinbutton');
+      fireEvent.change(input, { target: { value: '10' } });
+      fireEvent.blur(input);
+
+      expect(mockOnChange).toHaveBeenCalledWith(10);
+      expect(mockOnToggle).toHaveBeenCalled();
+    });
+
+    it('commits the original value and toggles on blur when no change occurred', () => {
+      render(
+        <HiddenInput
+          handleInputToggle={mockOnToggle}
+          handleValueChange={mockOnChange}
+          showInput
+          value={5}
+        />
+      );
+
+      const input = screen.getByRole('spinbutton');
+      fireEvent.blur(input);
+
+      expect(mockOnChange).toHaveBeenCalledWith(5);
+      expect(mockOnToggle).toHaveBeenCalled();
+    });
+
+    it('commits on Enter key and toggles, but not on Escape', () => {
+      render(
+        <HiddenInput
+          handleInputToggle={mockOnToggle}
+          handleValueChange={mockOnChange}
+          showInput
+          value={5}
+        />
+      );
+
+      const input = screen.getByRole('spinbutton');
+      fireEvent.keyDown(input, { key: 'Enter' });
+
+      expect(mockOnChange).toHaveBeenCalled();
+      expect(mockOnToggle).toHaveBeenCalled();
+
+      mockOnChange.mockClear();
+      mockOnToggle.mockClear();
+
+      fireEvent.keyDown(input, { key: 'Escape' });
+
+      expect(mockOnChange).not.toHaveBeenCalled();
+      expect(mockOnToggle).not.toHaveBeenCalled();
+    });
+
+    it('clamps value to max and 0 minimum on commit', () => {
       render(
         <HiddenInput
           handleInputToggle={mockOnToggle}
@@ -274,7 +233,7 @@ describe('HiddenInput', () => {
       expect(mockOnChange).toHaveBeenCalledWith(10);
     });
 
-    it('should clamp value to 0 on commit when negative', () => {
+    it('clamps negative values to 0 on commit', () => {
       render(
         <HiddenInput
           handleInputToggle={mockOnToggle}

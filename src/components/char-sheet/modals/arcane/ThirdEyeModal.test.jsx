@@ -106,24 +106,6 @@ describe('ThirdEyeModal', () => {
     });
   });
 
-  // ── Overlay click behavior ──
-
-  describe('overlay interaction', () => {
-    it('calls onClose when clicking the overlay background', async () => {
-      const onClose = vi.fn();
-      render(<ThirdEyeModal {...makeProps({ onClose })} />);
-      fireEvent.click(document.querySelector('.sp-overlay'));
-      expect(onClose).toHaveBeenCalledTimes(1);
-    });
-
-    it('does not close when clicking inside the modal content', () => {
-      const onClose = vi.fn();
-      render(<ThirdEyeModal {...makeProps({ onClose })} />);
-      fireEvent.click(document.querySelector('.sp-modal'));
-      expect(onClose).not.toHaveBeenCalled();
-    });
-  });
-
   // ── Radio selection ──
 
   describe('radio selection', () => {

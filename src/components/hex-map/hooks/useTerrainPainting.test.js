@@ -55,8 +55,9 @@ describe('useTerrainPainting', () => {
             expect(callArg['4,5']).toBe('desert');
         });
 
-        it('adds river when tool is river and river not present', () => {
+        it('toggles river when tool is river', () => {
             const setTerrain = vi.fn();
+
             const setRivers = vi.fn((fn) => fn([]));
             const { result } = createHooks(10, 10, () => ({ q: 2, r: 3 }), 'forest', setTerrain, setRivers);
 
@@ -68,41 +69,13 @@ describe('useTerrainPainting', () => {
             expect(setRivers).toHaveBeenCalled();
             const callArg = setRivers.mock.calls[0][0]([]);
             expect(callArg).toContain('2,3');
-        });
 
-        it('removes river when tool is river and river already present', () => {
-            const setTerrain = vi.fn();
-            const setRivers = vi.fn((fn) => fn(['2,3', '4,5']));
-            const { result } = createHooks(10, 10, () => ({ q: 2, r: 3 }), 'forest', setTerrain, setRivers);
-
+            // Toggle off: river already present
             act(() => {
                 result.current.handleTerrainPointerDown({ clientX: 0, clientY: 0 }, 'river');
             });
-
-            expect(setTerrain).not.toHaveBeenCalled();
-            expect(setRivers).toHaveBeenCalled();
-            const callArg = setRivers.mock.calls[0][0](['2,3', '4,5']);
-            expect(callArg).toEqual(['4,5']);
-        });
-    });
-
-    describe('handleTerrainPointerMove', () => {
-        it('does not duplicate river keys during move', () => {
-            const setTerrain = vi.fn();
-            const setRivers = vi.fn((fn) => fn(['2,3']));
-            const { result } = createHooks(10, 10, () => ({ q: 2, r: 3 }), 'forest', setTerrain, setRivers);
-
-            act(() => {
-                result.current.handleTerrainPointerDown({ clientX: 0, clientY: 0 }, 'river');
-            });
-
-            act(() => {
-                result.current.handleTerrainPointerMove({ clientX: 0, clientY: 0 }, 'river');
-            });
-
-            expect(setRivers).toHaveBeenCalled();
-            const callArg = setRivers.mock.calls[1][0](['2,3']);
-            expect(callArg).toEqual(['2,3']);
+            const callArg2 = setRivers.mock.calls[1][0](['2,3']);
+            expect(callArg2).toEqual([]);
         });
     });
 

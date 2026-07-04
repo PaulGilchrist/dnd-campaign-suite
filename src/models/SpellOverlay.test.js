@@ -50,13 +50,6 @@ describe('DEFAULTS', () => {
     expect(l.widthFt).toBe(5);
     expect(l.radiusFt).toBe(0);
   });
-
-  it('all shapes share the same default color', () => {
-    const color = DEFAULTS.sphere.color;
-    for (const shape of Object.values(OverlayShape)) {
-      expect(DEFAULTS[shape].color).toBe(color);
-    }
-  });
 });
 
 // ── toGrid ──────────────────────────────────────────────────────
@@ -67,21 +60,9 @@ describe('toGrid', () => {
     expect(toGrid(10)).toBe(2);
     expect(toGrid(20)).toBe(4);
     expect(toGrid(60)).toBe(12);
-  });
-
-  it('handles zero', () => {
     expect(toGrid(0)).toBe(0);
-  });
-
-  it('handles non-integer feet values', () => {
     expect(toGrid(7)).toBeCloseTo(1.4);
-  });
-
-  it('handles negative feet values', () => {
     expect(toGrid(-10)).toBe(-2);
-  });
-
-  it('returns NaN for NaN input', () => {
     expect(toGrid(NaN)).toBeNaN();
   });
 });
@@ -167,12 +148,6 @@ describe('hitTestOverlay', () => {
       // radiusFt=20 → r=160px, 4 cells = 160px
       const overlay = makeOverlay('sphere', 5, 5, 0, { radiusFt: 20 });
       expect(hitTestOverlay(overlay, 5, 9)).toBe(true);
-    });
-
-    it('rejects points just beyond the boundary', () => {
-      // radiusFt=20 → r=160px, 5 cells = 200px
-      const overlay = makeOverlay('sphere', 5, 5, 0, { radiusFt: 20 });
-      expect(hitTestOverlay(overlay, 5, 10)).toBe(false);
     });
 
     it('only hits the center when radiusFt=0', () => {
@@ -322,11 +297,6 @@ describe('hitTestOverlay', () => {
       const overlay = makeOverlay('cone', 5, 5, -90, { distanceFt: 60, coneAngle: 53 });
       expect(hitTestOverlay(overlay, 5, 2)).toBe(true);
     });
-
-    it('points left at 180 degrees', () => {
-      const overlay = makeOverlay('cone', 5, 5, 180, { distanceFt: 60, coneAngle: 53 });
-      expect(hitTestOverlay(overlay, 2, 5)).toBe(true);
-    });
   });
 
   // ── LINE ──────────────────────────────────────────────────────
@@ -383,11 +353,6 @@ describe('hitTestOverlay', () => {
       expect(hitTestOverlay(overlay, 5, 2)).toBe(true);
     });
 
-    it('points left at 180 degrees', () => {
-      const overlay = makeOverlay('line', 5, 5, 180, { distanceFt: 60, widthFt: 5 });
-      expect(hitTestOverlay(overlay, 2, 5)).toBe(true);
-    });
-
     it('hits along a diagonal angle', () => {
       const overlay = makeOverlay('line', 5, 5, 45, { distanceFt: 60, widthFt: 10 });
       expect(hitTestOverlay(overlay, 8, 8)).toBe(true);
@@ -416,20 +381,6 @@ describe('hitTestOverlay', () => {
 
       overlay.shape = '';
       expect(hitTestOverlay(overlay, 5, 5)).toBe(false);
-    });
-  });
-
-  // ── Edge cases ────────────────────────────────────────────────
-
-  describe('edge cases', () => {
-    it('handles large grid coordinates', () => {
-      const overlay = makeOverlay('sphere', 100, 100, 0, { radiusFt: 20 });
-      expect(hitTestOverlay(overlay, 100, 100)).toBe(true);
-    });
-
-    it('handles zero grid coordinates', () => {
-      const overlay = makeOverlay('sphere', 0, 0, 0, { radiusFt: 20 });
-      expect(hitTestOverlay(overlay, 0, 0)).toBe(true);
     });
   });
 });

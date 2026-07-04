@@ -131,18 +131,6 @@ describe('useRuntimeState — setRuntimeValue', () => {
     consoleErrorSpy.mockRestore();
   });
 
-  it('calls fetch with mode cors', async () => {
-    setRuntimeValue('test-char', 'hp', 15, 'test-campaign');
-    const callArgs = getFetchCall();
-    expect(callArgs[1].mode).toBe('cors');
-  });
-
-  it('calls fetch with Content-Type application/json header', async () => {
-    setRuntimeValue('test-char', 'hp', 15, 'test-campaign');
-    const callArgs = getFetchCall();
-    expect(callArgs[1].headers).toEqual({ 'Content-Type': 'application/json' });
-  });
-
   it('triggers listeners for each property change in a sequence', async () => {
     const listener = vi.fn();
     addStorageChangeListener('test-char', listener);

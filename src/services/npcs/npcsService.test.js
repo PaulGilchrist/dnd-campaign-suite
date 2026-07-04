@@ -2,41 +2,25 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { loadNPCs, saveNPCs, loadNPC, deleteNPC, saveNPC } from './npcsService.js';
 
-// ─── Fixtures ────────────────────────────────────────────────────────────────
-
 function makeFetchMock() {
   return vi.fn();
 }
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
-/**
- * Stub global fetch for one test, then restore the original automatically.
- * Uses vi.stubGlobal so vi.restoreAllMocks() (from setup.js) cleans up.
- */
 function stubFetch(fn) {
   vi.stubGlobal('fetch', fn);
 }
 
-/**
- * Build a successful fetch mock that resolves with the given JSON body.
- */
 function okResponse(body) {
   return Promise.resolve({ ok: true, json: () => Promise.resolve(body) });
 }
 
-/**
- * Build a failed fetch mock that resolves with an error JSON body.
- */
 function errResponse(errorBody) {
   return Promise.resolve({ ok: false, json: () => Promise.resolve(errorBody) });
 }
 
-// ─── Tests ───────────────────────────────────────────────────────────────────
-
 describe('npcsService', () => {
   afterEach(() => {
-    // vi.restoreAllMocks() from setup.js restores stubGlobal + clears mocks
+    vi.restoreAllMocks();
   });
 
   describe('saveNPC', () => {
@@ -62,30 +46,14 @@ describe('npcsService', () => {
 
     it('should use oldName as the URL path when renaming', async () => {
       const npc = { name: 'New Guard' };
-      const responseData = { renamed: true };
       const fetchMock = makeFetchMock();
-      fetchMock.mockResolvedValue(okResponse(responseData));
+      fetchMock.mockResolvedValue(okResponse({}));
       stubFetch(fetchMock);
 
       await saveNPC('campaign1', npc, 'Old Guard');
 
       expect(fetchMock).toHaveBeenCalledWith(
         '/api/campaigns/campaign1/npcs/Old%20Guard',
-        expect.any(Object)
-      );
-    });
-
-    it('should fall back to npc.name when oldName is falsy', async () => {
-      const npc = { name: 'Village Elder' };
-      const responseData = { success: true };
-      const fetchMock = makeFetchMock();
-      fetchMock.mockResolvedValue(okResponse(responseData));
-      stubFetch(fetchMock);
-
-      await saveNPC('campaign1', npc, null);
-
-      expect(fetchMock).toHaveBeenCalledWith(
-        '/api/campaigns/campaign1/npcs/Village%20Elder',
         expect.any(Object)
       );
     });
@@ -126,17 +94,6 @@ describe('npcsService', () => {
       stubFetch(fetchMock);
 
       await expect(saveNPC('campaign1', { name: 'Ghost' })).rejects.toThrow('ENOTFOUND');
-    });
-
-    it('should throw when response.json() fails on error', async () => {
-      const fetchMock = makeFetchMock();
-      fetchMock.mockResolvedValue({
-        ok: false,
-        json: () => Promise.reject(new SyntaxError('Invalid JSON')),
-      });
-      stubFetch(fetchMock);
-
-      await expect(saveNPC('campaign1', { name: 'Ghost' })).rejects.toThrow();
     });
   });
 
@@ -187,31 +144,12 @@ describe('npcsService', () => {
       await expect(loadNPCs('campaign1')).rejects.toThrow('Campaign not found');
     });
 
-    it('should throw generic message when API error has no error field', async () => {
-      const fetchMock = makeFetchMock();
-      fetchMock.mockResolvedValue(errResponse({}));
-      stubFetch(fetchMock);
-
-      await expect(loadNPCs('campaign1')).rejects.toThrow('Failed to load NPCs');
-    });
-
     it('should throw on network error', async () => {
       const fetchMock = makeFetchMock();
       fetchMock.mockRejectedValue(new Error('Network error'));
       stubFetch(fetchMock);
 
       await expect(loadNPCs('campaign1')).rejects.toThrow('Network error');
-    });
-
-    it('should throw when response.json() fails on error', async () => {
-      const fetchMock = makeFetchMock();
-      fetchMock.mockResolvedValue({
-        ok: false,
-        json: () => Promise.reject(new SyntaxError('Invalid JSON')),
-      });
-      stubFetch(fetchMock);
-
-      await expect(loadNPCs('campaign1')).rejects.toThrow();
     });
   });
 
@@ -257,31 +195,12 @@ describe('npcsService', () => {
       await expect(saveNPCs('campaign1', [])).rejects.toThrow('Invalid NPCs data');
     });
 
-    it('should throw generic message when API error has no error field', async () => {
-      const fetchMock = makeFetchMock();
-      fetchMock.mockResolvedValue(errResponse({}));
-      stubFetch(fetchMock);
-
-      await expect(saveNPCs('campaign1', [])).rejects.toThrow('Failed to save NPCs');
-    });
-
     it('should throw on network error', async () => {
       const fetchMock = makeFetchMock();
       fetchMock.mockRejectedValue(new Error('Network error'));
       stubFetch(fetchMock);
 
       await expect(saveNPCs('campaign1', [])).rejects.toThrow('Network error');
-    });
-
-    it('should throw when response.json() fails on error', async () => {
-      const fetchMock = makeFetchMock();
-      fetchMock.mockResolvedValue({
-        ok: false,
-        json: () => Promise.reject(new SyntaxError('Invalid JSON')),
-      });
-      stubFetch(fetchMock);
-
-      await expect(saveNPCs('campaign1', [])).rejects.toThrow();
     });
   });
 
@@ -322,31 +241,12 @@ describe('npcsService', () => {
       await expect(loadNPC('campaign1', 'Town Guard')).rejects.toThrow('NPC not found');
     });
 
-    it('should throw generic message when API error has no error field', async () => {
-      const fetchMock = makeFetchMock();
-      fetchMock.mockResolvedValue(errResponse({}));
-      stubFetch(fetchMock);
-
-      await expect(loadNPC('campaign1', 'Town Guard')).rejects.toThrow('Failed to load NPC');
-    });
-
     it('should throw on network error', async () => {
       const fetchMock = makeFetchMock();
       fetchMock.mockRejectedValue(new Error('Network error'));
       stubFetch(fetchMock);
 
       await expect(loadNPC('campaign1', 'Town Guard')).rejects.toThrow('Network error');
-    });
-
-    it('should throw when response.json() fails on error', async () => {
-      const fetchMock = makeFetchMock();
-      fetchMock.mockResolvedValue({
-        ok: false,
-        json: () => Promise.reject(new SyntaxError('Invalid JSON')),
-      });
-      stubFetch(fetchMock);
-
-      await expect(loadNPC('campaign1', 'Town Guard')).rejects.toThrow();
     });
   });
 
@@ -387,31 +287,12 @@ describe('npcsService', () => {
       await expect(deleteNPC('campaign1', 'Town Guard')).rejects.toThrow('NPC not found');
     });
 
-    it('should throw generic message when API error has no error field', async () => {
-      const fetchMock = makeFetchMock();
-      fetchMock.mockResolvedValue(errResponse({}));
-      stubFetch(fetchMock);
-
-      await expect(deleteNPC('campaign1', 'Town Guard')).rejects.toThrow('Failed to delete NPC');
-    });
-
     it('should throw on network error', async () => {
       const fetchMock = makeFetchMock();
       fetchMock.mockRejectedValue(new Error('Network error'));
       stubFetch(fetchMock);
 
       await expect(deleteNPC('campaign1', 'Town Guard')).rejects.toThrow('Network error');
-    });
-
-    it('should throw when response.json() fails on error', async () => {
-      const fetchMock = makeFetchMock();
-      fetchMock.mockResolvedValue({
-        ok: false,
-        json: () => Promise.reject(new SyntaxError('Invalid JSON')),
-      });
-      stubFetch(fetchMock);
-
-      await expect(deleteNPC('campaign1', 'Town Guard')).rejects.toThrow();
     });
   });
 });

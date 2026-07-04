@@ -5,7 +5,7 @@ import AvatarModal from './AvatarModal.jsx';
 
 describe('AvatarModal', () => {
   describe('image rendering', () => {
-    it('should render the full-size image with correct src and alt', () => {
+    it('renders the full-size image with correct src and alt', () => {
       render(<AvatarModal name="Gandalf" imagePath="/images/gandalf.png" onClose={vi.fn()} />);
 
       const img = screen.getByRole('img');
@@ -16,12 +16,12 @@ describe('AvatarModal', () => {
   });
 
   describe('initial fallback rendering', () => {
-    it('should render the initial letter for a name', () => {
-      render(<AvatarModal name="Gandalf" onClose={vi.fn()} />);
+    it('renders the initial letter for a name, uppercased', () => {
+      render(<AvatarModal name="gandalf" onClose={vi.fn()} />);
       expect(screen.getByText('G')).toBeInTheDocument();
     });
 
-    it('should render "?" for empty, null, or undefined name', () => {
+    it('renders "?" for empty, null, or undefined name', () => {
       const { rerender } = render(<AvatarModal name="" onClose={vi.fn()} />);
       expect(screen.getByText('?')).toBeInTheDocument();
 
@@ -31,20 +31,15 @@ describe('AvatarModal', () => {
       rerender(<AvatarModal name={undefined} onClose={vi.fn()} />);
       expect(screen.getByText('?')).toBeInTheDocument();
     });
-
-    it('should uppercase the initial regardless of input case', () => {
-      render(<AvatarModal name="gandalf" onClose={vi.fn()} />);
-      expect(screen.getByText('G')).toBeInTheDocument();
-    });
   });
 
   describe('overlay and close interactions', () => {
-    it('should render a close button with aria-label', () => {
+    it('renders a close button with aria-label', () => {
       render(<AvatarModal name="Gandalf" imagePath="/images/gandalf.png" onClose={vi.fn()} />);
       expect(screen.getByLabelText('Close')).toBeInTheDocument();
     });
 
-    it('should call onClose when overlay is clicked', () => {
+    it('calls onClose when overlay is clicked', () => {
       const handleClose = vi.fn();
       render(<AvatarModal name="Gandalf" onClose={handleClose} />);
 
@@ -52,7 +47,23 @@ describe('AvatarModal', () => {
       expect(handleClose).toHaveBeenCalledTimes(1);
     });
 
-    it('should not call onClose when modal content is clicked', () => {
+    it('calls onClose when close button is clicked', () => {
+      const handleClose = vi.fn();
+      render(<AvatarModal name="Gandalf" onClose={handleClose} />);
+
+      fireEvent.click(screen.getByLabelText('Close'));
+      expect(handleClose).toHaveBeenCalledTimes(1);
+    });
+
+    it('calls onClose when Escape is pressed', () => {
+      const handleClose = vi.fn();
+      render(<AvatarModal name="Gandalf" onClose={handleClose} />);
+
+      fireEvent.keyDown(document, { key: 'Escape' });
+      expect(handleClose).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not call onClose when modal content is clicked', () => {
       const handleClose = vi.fn();
       render(<AvatarModal name="Gandalf" onClose={handleClose} />);
 
@@ -61,23 +72,7 @@ describe('AvatarModal', () => {
       expect(handleClose).not.toHaveBeenCalled();
     });
 
-    it('should call onClose when close button is clicked', () => {
-      const handleClose = vi.fn();
-      render(<AvatarModal name="Gandalf" onClose={handleClose} />);
-
-      fireEvent.click(screen.getByLabelText('Close'));
-      expect(handleClose).toHaveBeenCalledTimes(1);
-    });
-
-    it('should call onClose on Escape keydown', () => {
-      const handleClose = vi.fn();
-      render(<AvatarModal name="Gandalf" onClose={handleClose} />);
-
-      fireEvent.keyDown(document, { key: 'Escape' });
-      expect(handleClose).toHaveBeenCalledTimes(1);
-    });
-
-    it('should remove event listener on unmount', () => {
+    it('removes event listener on unmount', () => {
       const handleClose = vi.fn();
       const { unmount } = render(<AvatarModal name="Gandalf" onClose={handleClose} />);
 

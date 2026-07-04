@@ -71,34 +71,22 @@ describe('Subscriber', () => {
         delete global.EventSource;
     });
 
-    it('should create an EventSource with the correct URL', () => {
+    it('creates an EventSource with the correct URL and campaign param', () => {
         render(<Subscriber handleEvent={handleEventMock} campaignName="Test Campaign" />);
 
         const instance = MockEventSource.getInstance(urlWithCampaign('Test Campaign'));
         expect(instance).toBeDefined();
+        expect(instance.url).toBe('http://localhost/subscribe?campaign=Test+Campaign');
     });
 
-    it('should call handleEvent when a message is received', () => {
-        render(<Subscriber handleEvent={handleEventMock} campaignName="Test Campaign" />);
+    it('does not include campaign param when campaignName is omitted', () => {
+        render(<Subscriber handleEvent={handleEventMock} />);
 
-        const instance = MockEventSource.getInstance(urlWithCampaign('Test Campaign'));
-        instance.onmessage({ data: JSON.stringify({ type: 'test', payload: 'data' }) });
-
-        expect(handleEventMock).toHaveBeenCalledWith({ type: 'test', payload: 'data' });
+        const instance = MockEventSource.getInstance(urlWithCampaign());
+        expect(instance.url).toBe('http://localhost/subscribe?');
     });
 
-    it('should close the EventSource on unmount', () => {
-        const { unmount } = render(<Subscriber handleEvent={handleEventMock} campaignName="Test Campaign" />);
-
-        const instance = MockEventSource.getInstance(urlWithCampaign('Test Campaign'));
-        expect(instance.closed).toBe(false);
-
-        unmount();
-
-        expect(instance.closed).toBe(true);
-    });
-
-    it('should create an absolute URL using the hostname', () => {
+    it('uses the hostname to build an absolute URL', () => {
         Object.defineProperty(window, 'location', {
             value: { hostname: 'example.com' },
             writable: true,
@@ -111,7 +99,16 @@ describe('Subscriber', () => {
         expect(instance).toBeDefined();
     });
 
-    it('should throw when onmessage receives invalid JSON', () => {
+    it('calls handleEvent when a message is received', () => {
+        render(<Subscriber handleEvent={handleEventMock} campaignName="Test Campaign" />);
+
+        const instance = MockEventSource.getInstance(urlWithCampaign('Test Campaign'));
+        instance.onmessage({ data: JSON.stringify({ type: 'test', payload: 'data' }) });
+
+        expect(handleEventMock).toHaveBeenCalledWith({ type: 'test', payload: 'data' });
+    });
+
+    it('throws when onmessage receives invalid JSON', () => {
         render(<Subscriber handleEvent={handleEventMock} campaignName="Test Campaign" />);
 
         const instance = MockEventSource.getInstance(urlWithCampaign('Test Campaign'));
@@ -121,7 +118,7 @@ describe('Subscriber', () => {
         }).toThrow(SyntaxError);
     });
 
-    it('should use ref to always call the latest handleEvent', () => {
+    it('uses ref to always call the latest handleEvent', () => {
         const { rerender } = render(<Subscriber handleEvent={handleEventMock} campaignName="Test Campaign" />);
 
         const instance = MockEventSource.getInstance(urlWithCampaign('Test Campaign'));
@@ -136,7 +133,18 @@ describe('Subscriber', () => {
         expect(handleEventMock).not.toHaveBeenCalledWith({ type: 'updated' });
     });
 
-    it('should create separate EventSource instances for different campaign names', () => {
+    it('closes the EventSource on unmount', () => {
+        const { unmount } = render(<Subscriber handleEvent={handleEventMock} campaignName="Test Campaign" />);
+
+        const instance = MockEventSource.getInstance(urlWithCampaign('Test Campaign'));
+        expect(instance.closed).toBe(false);
+
+        unmount();
+
+        expect(instance.closed).toBe(true);
+    });
+
+    it('creates separate EventSource instances for different campaign names', () => {
         render(
             <>
                 <Subscriber handleEvent={handleEventMock} campaignName="Campaign A" />
@@ -150,20 +158,6 @@ describe('Subscriber', () => {
         expect(instanceA).toBeDefined();
         expect(instanceB).toBeDefined();
         expect(instanceA).not.toBe(instanceB);
-    });
-
-    it('should not include campaign query param when campaignName is omitted', () => {
-        render(<Subscriber handleEvent={handleEventMock} />);
-
-        const instance = MockEventSource.getInstance(urlWithCampaign());
-        expect(instance.url).toBe('http://localhost/subscribe?');
-    });
-
-    it('should include campaign query param when campaignName is provided', () => {
-        render(<Subscriber handleEvent={handleEventMock} campaignName="Dungeon Master" />);
-
-        const instance = MockEventSource.getInstance(urlWithCampaign('Dungeon Master'));
-        expect(instance.url).toBe('http://localhost/subscribe?campaign=Dungeon+Master');
     });
 
 });

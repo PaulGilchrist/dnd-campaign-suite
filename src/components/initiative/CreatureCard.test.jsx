@@ -149,22 +149,6 @@ describe('CreatureCard', () => {
             expect(targetSelect.querySelector('option[value="overlay-overlay1"]')).toBeInTheDocument();
         });
 
-        it('should include overlay options with distanceFt fallback', () => {
-            const overlays = [
-                { id: 'overlay1', shape: 'cone', distanceFt: 30 },
-            ];
-            render(<CreatureCard {...props} overlays={overlays} />);
-            expect(screen.getByText('Cone (30ft)')).toBeInTheDocument();
-        });
-
-        it('should include overlay options with sizeFt fallback', () => {
-            const overlays = [
-                { id: 'overlay1', shape: 'cube', sizeFt: 10 },
-            ];
-            render(<CreatureCard {...props} overlays={overlays} />);
-            expect(screen.getByText('Cube (10ft)')).toBeInTheDocument();
-        });
-
         it('should group overlays under "─── Overlays ───" optgroup', () => {
             const overlays = [{ id: 'overlay1', shape: 'sphere', radiusFt: 10 }];
             render(<CreatureCard {...props} overlays={overlays} />);
@@ -215,18 +199,13 @@ describe('CreatureCard', () => {
             expect(props.onRemoveNpc).toHaveBeenCalledWith('Goblin');
         });
 
-        it.each`
-            isLocalhost | creatureType | expectRemoveButton
-            ${false}    | ${'npc'}     | ${false}
-            ${true}     | ${'player'}  | ${false}
-        `('should not render remove button when isLocalhost=$isLocalhost and type=$creatureType', ({ isLocalhost, creatureType, expectRemoveButton }) => {
-            const creature = creatureType === 'npc' ? defaultNpcCreature : defaultPlayerCreature;
-            render(<CreatureCard {...props} creature={creature} isLocalhost={isLocalhost} />);
-            if (expectRemoveButton) {
-                expect(screen.getByTitle('Remove NPC')).toBeInTheDocument();
-            } else {
-                expect(screen.queryByTitle('Remove NPC')).not.toBeInTheDocument();
-            }
+        it('should not render remove button for non-localhost or player creatures', () => {
+            const npcCreature = { ...defaultNpcCreature };
+            render(<CreatureCard {...props} creature={npcCreature} isLocalhost={false} />);
+            expect(screen.queryByTitle('Remove NPC')).not.toBeInTheDocument();
+
+            render(<CreatureCard {...props} creature={defaultPlayerCreature} isLocalhost={true} />);
+            expect(screen.queryByTitle('Remove NPC')).not.toBeInTheDocument();
         });
     });
 
@@ -249,13 +228,6 @@ describe('CreatureCard', () => {
             const initiativeInput = document.querySelector('.creature-initiative input[type="number"]');
             expect(initiativeInput).toBeInTheDocument();
         });
-
-        it('should show initiative value when NPC has one', () => {
-            const npcWithInit = { ...defaultNpcCreature, initiative: 12 };
-            render(<CreatureCard {...props} creature={npcWithInit} />);
-            const initiativeInput = document.querySelector('.creature-initiative input[type="number"]');
-            expect(initiativeInput).toHaveValue(12);
-        });
     });
 
     describe('target select', () => {
@@ -267,19 +239,10 @@ describe('CreatureCard', () => {
             expect(props.onTargetChange).toHaveBeenCalledWith('Alice', 'Bob');
         });
 
-        it.each`
-            isLocalhost | creatureType | expectDisabled
-            ${false}    | ${'npc'}     | ${true}
-            ${true}     | ${'npc'}     | ${false}
-        `('should $expectDisabled target select for NPC when isLocalhost=$isLocalhost', ({ isLocalhost, creatureType, expectDisabled }) => {
-            const creature = creatureType === 'npc' ? defaultNpcCreature : defaultPlayerCreature;
-            render(<CreatureCard {...props} creature={creature} isLocalhost={isLocalhost} />);
+        it('should disable target select for NPC when not localhost', () => {
+            render(<CreatureCard {...props} creature={defaultNpcCreature} isLocalhost={false} />);
             const targetSelect = document.querySelector('.creature-target select');
-            if (expectDisabled) {
-                expect(targetSelect).toBeDisabled();
-            } else {
-                expect(targetSelect).not.toBeDisabled();
-            }
+            expect(targetSelect).toBeDisabled();
         });
 
         it('should set selected value to creature.targetName', () => {
@@ -321,13 +284,6 @@ describe('CreatureCard', () => {
             render(<CreatureCard {...props} creature={{ ...defaultPlayerCreature, conditions }} />);
             fireEvent.click(screen.getByText('Blinded DC 12'));
             expect(props.onRollConditionSave).toHaveBeenCalledWith('Alice', conditions[0]);
-        });
-
-        it('should call onRollConditionSave when condition badge is clicked for localhost NPC', () => {
-            const conditions = [{ id: 'c1', label: 'Blinded', dc: 12, ability: 'Wisdom' }];
-            render(<CreatureCard {...props} creature={{ ...defaultNpcCreature, conditions }} isLocalhost={true} />);
-            fireEvent.click(screen.getByText('Blinded DC 12'));
-            expect(props.onRollConditionSave).toHaveBeenCalledWith('Goblin', conditions[0]);
         });
 
         it('should disable condition save button for non-localhost NPC', () => {

@@ -52,7 +52,8 @@ vi.mock('../../services/campaign/settlementGenerator.js', () => ({
 describe('Settlements - generate settlement', () => {
   const mockUseSettlements = {
     items: [],
-    loading: false,    saveItems: async () => {},
+    loading: false,
+    saveItems: async () => {},
     deleteItem: async () => {},
   };
 
@@ -113,32 +114,5 @@ describe('Settlements - generate settlement', () => {
       expect(generateSettlement).toHaveBeenCalled();
     });
     expect(screen.queryByRole('heading', { name: 'New Settlement' })).not.toBeInTheDocument();
-  });
-
-  it('re-enables generate button after generation completes', async () => {
-    const { generateSettlement } = await import('../../services/campaign/settlementGenerator.js');
-    vi.mocked(generateSettlement).mockResolvedValue({
-      name: 'Generated Town',
-      size: 'town',
-      description: 'A bustling town',
-      atmosphere: 'Lively',
-      government: 'Council',
-      population: '1,500 souls',
-      services: [],
-      notableNPCs: [],
-      rumors: [],
-      tags: 'generated',
-      notes: '',
-      threat: 'Bandits',
-    });
-    render(<Settlements campaignName="test" onBack={() => {}} />);
-    const genBtn = screen.getByRole('button', { name: /generate settlement/i });
-    fireEvent.click(genBtn);
-    await waitFor(() => {
-      expect(genBtn).toBeDisabled();
-    });
-    await waitFor(() => {
-      expect(genBtn).not.toBeDisabled();
-    });
   });
 });

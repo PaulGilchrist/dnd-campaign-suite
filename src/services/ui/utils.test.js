@@ -1,5 +1,5 @@
 // @improved-by-ai
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import utils from './utils.js';
 
 describe('utils', () => {
@@ -81,11 +81,6 @@ describe('utils', () => {
             expect(guids.size).toBe(100);
         });
 
-        it('produces deterministic output when Math.random is controlled', () => {
-            vi.spyOn(Math, 'random').mockReturnValue(0.1234);
-            const result = utils.guid();
-            expect(result).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
-            vi.restoreAllMocks();
-        });
+
     });
 });

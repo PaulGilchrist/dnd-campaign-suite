@@ -53,17 +53,27 @@ describe('WizardStepSkills', () => {
       render(<WizardStepSkills {...baseProps} />);
       await waitForSkills();
       expect(screen.getByText('Step 6: Skill Proficiencies')).toBeInTheDocument();
-      expect(screen.getByText(/Rules/)).toBeInTheDocument();
       expect(screen.getByText(/Your class and level grant 3 skills/)).toBeInTheDocument();
       expect(screen.getByText('Acrobatics')).toBeInTheDocument();
       expect(screen.getByText('Stealth')).toBeInTheDocument();
       expect(screen.getByText('Perception')).toBeInTheDocument();
     });
 
-    it('should display proficiency count based on formData', async () => {
+    it('should display proficiency and expertise counts based on formData', async () => {
       render(<WizardStepSkills {...baseProps} />);
       await waitForSkills();
       expect(screen.getByText(/You have selected 1 of 3 allowed/)).toBeInTheDocument();
+      expect(screen.getByText(/Expertise:/)).toBeInTheDocument();
+      expect(screen.getByText(/Rogues get expertise in 2 skills/)).toBeInTheDocument();
+    });
+
+    it('should display expertise count based on formData', async () => {
+      render(<WizardStepSkills
+        {...baseProps}
+        formData={{ skillProficiencies: ['Acrobatics'], expertSkills: ['Acrobatics'] }}
+      />);
+      await waitForSkills();
+      expect(screen.getByText(/You have expertise in 1 of 2 allowed/)).toBeInTheDocument();
     });
 
     it('should update proficiency count when formData changes', async () => {
@@ -82,29 +92,11 @@ describe('WizardStepSkills', () => {
       expect(screen.getByText(/You have selected 1 of 3 allowed/)).toBeInTheDocument();
     });
 
-    it('should display expertise info when provided', async () => {
-      render(<WizardStepSkills {...baseProps} />);
-      await waitForSkills();
-      expect(screen.getByText(/Expertise:/)).toBeInTheDocument();
-      expect(screen.getByText(/Rogues get expertise in 2 skills/)).toBeInTheDocument();
-    });
-
-    it('should display expertise count based on formData', async () => {
-      render(<WizardStepSkills
-        {...baseProps}
-        formData={{ skillProficiencies: ['Acrobatics'], expertSkills: ['Acrobatics'] }}
-      />);
-      await waitForSkills();
-      expect(screen.getByText(/You have expertise in 1 of 2 allowed/)).toBeInTheDocument();
-    });
-
-    it('should render warnings when provided', async () => {
+    it('should render warnings and errors when provided', async () => {
       render(<WizardStepSkills {...baseProps} warnings={[{ type: 'warning', message: 'Warning message' }]} />);
       await waitForSkills();
       expect(screen.getByText('Warning message')).toBeInTheDocument();
-    });
 
-    it('should show proficiency error when provided', async () => {
       render(<WizardStepSkills {...baseProps} errors={{ skillProficiencies: 'Too many skills selected.' }} />);
       await waitForSkills();
       expect(screen.getByText('Too many skills selected.')).toBeInTheDocument();
@@ -139,12 +131,8 @@ describe('WizardStepSkills', () => {
   });
 
   describe('proficiency toggling', () => {
-    it.each`
-      description
-      ${'should call onSkillToggle when toggling a non-proficient skill'}
-      ${'should call onSkillToggle when unchecking a proficient skill'}
-    `('$description', async ({ description: _desc }) => {
-      const proficiencyList = _desc.includes('unchecking') ? ['Acrobatics', 'Stealth'] : ['Acrobatics'];
+    it('should call onSkillToggle when toggling a skill', async () => {
+      const proficiencyList = ['Acrobatics'];
       const mockOnSkillToggle = vi.fn();
 
       render(<WizardStepSkills
@@ -160,6 +148,23 @@ describe('WizardStepSkills', () => {
       fireEvent.click(checkbox);
 
       expect(mockOnSkillToggle).toHaveBeenCalledWith('Stealth');
+    });
+
+    it('should call onSkillToggle when unchecking a proficient skill', async () => {
+      const mockOnSkillToggle = vi.fn();
+      render(<WizardStepSkills
+        {...baseProps}
+        formData={{ skillProficiencies: ['Acrobatics', 'Stealth'], expertSkills: [] }}
+        onSkillToggle={mockOnSkillToggle}
+      />);
+      await waitForSkills();
+
+      const labels = document.querySelectorAll('.multi-select-item');
+      const acrobaticsLabel = Array.from(labels).find(l => l.textContent.includes('Acrobatics'));
+      const checkbox = acrobaticsLabel.querySelector('input[type="checkbox"]');
+      fireEvent.click(checkbox);
+
+      expect(mockOnSkillToggle).toHaveBeenCalledWith('Acrobatics');
     });
   });
 
@@ -238,10 +243,8 @@ describe('WizardStepSkills', () => {
 
       expect(button).toBeDisabled();
       expect(button.title).toBe('Select proficient first');
-
       fireEvent.click(button);
       expect(mockOnSkillExpertiseToggle).not.toHaveBeenCalled();
-      expect(document.querySelector('.expertise-feedback')).toBeNull();
     });
 
     it('should show success feedback when elevating a proficient skill', async () => {
@@ -271,7 +274,6 @@ describe('WizardStepSkills', () => {
         formData={{ skillProficiencies: ['Acrobatics', 'Stealth'], expertSkills: ['Acrobatics'] }}
       />);
       await waitForSkills();
-
       expect(screen.getByText('(Expert)')).toBeInTheDocument();
     });
 
@@ -303,13 +305,11 @@ describe('WizardStepSkills', () => {
       expect(screen.queryByText(/You have selected/)).not.toBeInTheDocument();
     });
 
-    it('should not show expertise section when expertiseLimits is null', async () => {
+    it('should not show expertise section when expertiseLimits is null or allowed is false', async () => {
       render(<WizardStepSkills {...baseProps} expertiseLimits={null} />);
       await waitForSkills();
       expect(screen.queryByText(/Expertise:/)).not.toBeInTheDocument();
-    });
 
-    it('should not show expertise section when expertiseLimits.allowed is false', async () => {
       render(<WizardStepSkills
         {...baseProps}
         expertiseLimits={{ allowed: false, count: 0, details: 'No expertise available.' }}

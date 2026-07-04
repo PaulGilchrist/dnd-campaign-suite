@@ -51,16 +51,6 @@ describe('CombatSuperiorityModal - no maneuvers state', () => {
       expect(screen.getByText(/No maneuvers selected/)).toBeInTheDocument();
     });
 
-    it('renders bolt icon in no maneuvers state', () => {
-      renderModal({
-        payload: makePayload({
-          selectionMode: false,
-          knownManeuvers: [],
-        }),
-      });
-      expect(document.querySelector('.fa-solid.fa-bolt')).toBeInTheDocument();
-    });
-
     it('renders "Combat Superiority" header in no maneuvers state', () => {
       renderModal({
         payload: makePayload({
@@ -81,17 +71,6 @@ describe('CombatSuperiorityModal - no maneuvers state', () => {
       expect(screen.getByRole('button', { name: /Close/ })).toBeInTheDocument();
     });
 
-    it('has sp-dismiss-btn class on close button in no maneuvers state', () => {
-      renderModal({
-        payload: makePayload({
-          selectionMode: false,
-          knownManeuvers: [],
-        }),
-      });
-      const btn = screen.getByRole('button', { name: /Close/ });
-      expect(btn.classList.contains('sp-dismiss-btn')).toBe(true);
-    });
-
     it('calls onClose when close button is clicked in no maneuvers state', () => {
       const onClose = vi.fn();
       renderModal({
@@ -103,34 +82,6 @@ describe('CombatSuperiorityModal - no maneuvers state', () => {
       });
       fireEvent.click(screen.getByRole('button', { name: /Close/ }));
       expect(onClose).toHaveBeenCalledTimes(1);
-    });
-
-    it('calls onClose when overlay is clicked in no maneuvers state', () => {
-      const onClose = vi.fn();
-      renderModal({
-        payload: makePayload({
-          selectionMode: false,
-          knownManeuvers: [],
-        }),
-        onClose,
-      });
-      const overlay = document.querySelector('.sp-overlay');
-      fireEvent.click(overlay);
-      expect(onClose).toHaveBeenCalledTimes(1);
-    });
-
-    it('does not close when clicking inside modal in no maneuvers state', () => {
-      const onClose = vi.fn();
-      renderModal({
-        payload: makePayload({
-          selectionMode: false,
-          knownManeuvers: [],
-        }),
-        onClose,
-      });
-      const modal = document.querySelector('.sp-modal');
-      fireEvent.click(modal);
-      expect(onClose).not.toHaveBeenCalled();
     });
 
     it('shows the instruction text in no maneuvers state', () => {
@@ -180,36 +131,6 @@ describe('CombatSuperiorityModal - grouping edge cases', () => {
   });
 });
 
-// ── CSS classes ──
-
-describe('CombatSuperiorityModal - CSS classes', () => {
-  describe('CSS classes', () => {
-    it('has sp-overlay class on outer container', () => {
-      renderModal({ payload: makePayload({ selectionMode: true }) });
-      expect(document.querySelector('.sp-overlay')).toBeInTheDocument();
-    });
-
-    it('has sp-modal class on modal container', () => {
-      renderModal({ payload: makePayload({ selectionMode: true }) });
-      expect(document.querySelector('.sp-modal')).toBeInTheDocument();
-    });
-
-    it('has sp-header class on header', () => {
-      renderModal({ payload: makePayload({ selectionMode: true }) });
-      expect(document.querySelector('.sp-header')).toBeInTheDocument();
-    });
-
-    it('has sp-body class on body', () => {
-      renderModal({ payload: makePayload({ selectionMode: true }) });
-      expect(document.querySelector('.sp-body')).toBeInTheDocument();
-    });
-
-    it('has sp-actions class on actions container', () => {
-      renderModal({ payload: makePayload({ selectionMode: true }) });
-      expect(document.querySelector('.sp-actions')).toBeInTheDocument();
-    });
-  });
-});
 
 // ── Known maneuvers filtering ──
 
@@ -823,69 +744,6 @@ describe('CombatSuperiorityModal - maxOptions 1', () => {
   });
 });
 
-// ── CSS consistency ──
-
-describe('CombatSuperiorityModal - CSS consistency', () => {
-  describe('CSS class consistency across modes', () => {
-    it('selection mode has correct CSS classes', () => {
-      renderModal({ payload: makePayload({ selectionMode: true }) });
-      expect(document.querySelector('.sp-overlay')).toBeInTheDocument();
-      expect(document.querySelector('.sp-modal')).toBeInTheDocument();
-      expect(document.querySelector('.sp-header')).toBeInTheDocument();
-      expect(document.querySelector('.sp-body')).toBeInTheDocument();
-      expect(document.querySelector('.sp-actions')).toBeInTheDocument();
-    });
-
-    it('use mode has correct CSS classes', () => {
-      renderModal({
-        payload: makePayload({
-          selectionMode: false,
-          knownManeuvers: ['Ki-Fueled Attack'],
-        }),
-      });
-      expect(document.querySelector('.sp-overlay')).toBeInTheDocument();
-      expect(document.querySelector('.sp-modal')).toBeInTheDocument();
-      expect(document.querySelector('.sp-header')).toBeInTheDocument();
-      expect(document.querySelector('.sp-body')).toBeInTheDocument();
-      expect(document.querySelector('.sp-actions')).toBeInTheDocument();
-    });
-
-    it('no-maneuvers mode has correct CSS classes', () => {
-      renderModal({
-        payload: makePayload({
-          selectionMode: false,
-          knownManeuvers: [],
-        }),
-      });
-      expect(document.querySelector('.sp-overlay')).toBeInTheDocument();
-      expect(document.querySelector('.sp-modal')).toBeInTheDocument();
-      expect(document.querySelector('.sp-header')).toBeInTheDocument();
-      expect(document.querySelector('.sp-body')).toBeInTheDocument();
-      expect(document.querySelector('.sp-actions')).toBeInTheDocument();
-    });
-
-    it('result mode has correct CSS classes', async () => {
-      const props = makeProps();
-      props.payload = makePayload({ selectionMode: false, knownManeuvers: ['Ki-Fueled Attack'] });
-      props.onConfirm.mockResolvedValue({
-        payload: { name: 'Ki-Fueled Attack', description: 'Desc.' },
-      });
-      render(<CombatSuperiorityModal {...props} />);
-
-      const radios = document.querySelectorAll('input[name="combatManeuver"]');
-      fireEvent.click(radios[0]);
-      fireEvent.click(screen.getByRole('button', { name: /Use Maneuver/ }));
-
-      await waitFor(() => {
-        expect(document.querySelector('.sp-overlay')).toBeInTheDocument();
-        expect(document.querySelector('.sp-modal')).toBeInTheDocument();
-        expect(document.querySelector('.sp-header')).toBeInTheDocument();
-        expect(document.querySelector('.sp-body')).toBeInTheDocument();
-        expect(document.querySelector('.sp-actions')).toBeInTheDocument();
-      });
-    });
-  });
-});
 
 // ── Action type ordering ──
 

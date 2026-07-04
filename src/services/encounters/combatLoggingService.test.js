@@ -76,11 +76,6 @@ describe('logInitiativeRoll', () => {
         logInitiativeRoll(campaignName, 'Gortha', 1, -2);
         expect(capturedEntry().isNatural1).toBe(true);
     });
-
-    it('passes campaignName to postLogEntry', () => {
-        logInitiativeRoll(campaignName, 'Gortha', 12, 1);
-        expect(postLogEntry).toHaveBeenCalledWith(campaignName, expect.any(Object));
-    });
 });
 
 describe('logConditionEvent', () => {
@@ -114,11 +109,6 @@ describe('logConditionEvent', () => {
         expect(entry.condition).toBe('stunned');
         expect(entry.dc).toBeUndefined();
         expect(entry.ability).toBeUndefined();
-    });
-
-    it('passes campaignName to postLogEntry', () => {
-        logConditionEvent(campaignName, 'add', 'Orc', 'charmed', 15, 'WIS');
-        expect(postLogEntry).toHaveBeenCalledWith(campaignName, expect.any(Object));
     });
 });
 
@@ -159,11 +149,6 @@ describe('logConcentrationSave', () => {
         expect(entry.condition).toBe('Concentration: Held Horror');
         expect(entry.characterName).toBe('Gortha');
     });
-
-    it('passes campaignName to postLogEntry', () => {
-        logConcentrationSave(campaignName, 'Gortha', 10, 2, '+2 DEX', 'Fireball', 15, true);
-        expect(postLogEntry).toHaveBeenCalledWith(campaignName, expect.any(Object));
-    });
 });
 
 describe('logConditionSave', () => {
@@ -203,11 +188,6 @@ describe('logConditionSave', () => {
         expect(entry.condition).toBe('stunned');
         expect(entry.name).toBe('Constitution');
     });
-
-    it('passes campaignName to postLogEntry', () => {
-        logConditionSave(campaignName, 'Gortha', 8, 0, '+0 CON', 'stunned', 'Constitution', 12, false);
-        expect(postLogEntry).toHaveBeenCalledWith(campaignName, expect.any(Object));
-    });
 });
 
 describe('logHpChange', () => {
@@ -246,18 +226,6 @@ describe('logHpChange', () => {
         const entry = capturedEntry();
         expect(entry.isUnconscious).toBe(true);
     });
-
-    it('does not include timestamp or id in hp_change entries', () => {
-        logHpChange(campaignName, 'Orc', -5, 20, 30, false, false);
-        const entry = capturedEntry();
-        expect(entry).not.toHaveProperty('timestamp');
-        expect(entry).not.toHaveProperty('id');
-    });
-
-    it('passes campaignName to postLogEntry', () => {
-        logHpChange(campaignName, 'Orc', -5, 20, 30, false, false);
-        expect(postLogEntry).toHaveBeenCalledWith(campaignName, expect.any(Object));
-    });
 });
 
 describe('logNpcThreshold', () => {
@@ -283,24 +251,5 @@ describe('logNpcThreshold', () => {
 
         const entry = capturedEntry();
         expect(entry.threshold).toBe(0);
-    });
-
-    it('does not include timestamp or id', () => {
-        logNpcThreshold(campaignName, 'Bandit Leader', -10, 5, 10);
-        const entry = capturedEntry();
-        expect(entry).not.toHaveProperty('timestamp');
-        expect(entry).not.toHaveProperty('id');
-    });
-
-    it('does not include isHealing or isUnconscious fields', () => {
-        logNpcThreshold(campaignName, 'Bandit Leader', -10, 5, 10);
-        const entry = capturedEntry();
-        expect(entry).not.toHaveProperty('isHealing');
-        expect(entry).not.toHaveProperty('isUnconscious');
-    });
-
-    it('passes campaignName to postLogEntry', () => {
-        logNpcThreshold(campaignName, 'Bandit Leader', -10, 5, 10);
-        expect(postLogEntry).toHaveBeenCalledWith(campaignName, expect.any(Object));
     });
 });

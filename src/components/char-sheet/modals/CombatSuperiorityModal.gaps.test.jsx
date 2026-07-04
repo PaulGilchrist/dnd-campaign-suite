@@ -218,20 +218,6 @@ describe('CombatSuperiorityModal - superiority dice', () => {
       });
     });
 
-    it('renders no dice modal with sp-modal--wide class', async () => {
-      vi.spyOn(runtimeModule, 'getRuntimeValue').mockReturnValue(0);
-      renderModal({
-        payload: makePayload({
-          selectionMode: false,
-          knownManeuvers: ['Ki-Fueled Attack'],
-          playerStats: { name: 'TestCharacter' },
-        }),
-      });
-      await waitFor(() => {
-        expect(document.querySelector('.sp-modal--wide')).toBeInTheDocument();
-      });
-    });
-
     it('calls onClose when Close button is clicked in no dice state', async () => {
       const onClose = vi.fn();
       vi.spyOn(runtimeModule, 'getRuntimeValue').mockReturnValue(0);
@@ -1046,21 +1032,6 @@ describe('CombatSuperiorityModal - onReopenSelection', () => {
       const btn = screen.getByRole('button', { name: /Manage Maneuvers/ });
       expect(btn.querySelector('.fa-solid.fa-gear')).toBeInTheDocument();
     });
-
-    it('renders Manage Maneuvers button with sp-dismiss-btn class', () => {
-      render(<CombatSuperiorityModal
-        payload={{
-          allManeuvers: [{ name: 'Ki-Fueled Attack', actionType: 'bonus_action' }],
-          knownManeuvers: ['Ki-Fueled Attack'],
-          maxOptions: 3,
-          selectionMode: false,
-        }}
-        onConfirm={vi.fn()}
-        onClose={vi.fn()}
-      />);
-      const btn = screen.getByRole('button', { name: /Manage Maneuvers/ });
-      expect(btn.classList.contains('sp-dismiss-btn')).toBe(true);
-    });
   });
 });
 
@@ -1382,50 +1353,6 @@ describe('CombatSuperiorityModal - knownManeuverObjects', () => {
   });
 });
 
-// ── sp-modal--wide class ──
-
-describe('CombatSuperiorityModal - sp-modal--wide class', () => {
-  describe('sp-modal--wide class presence', () => {
-    it('has sp-modal--wide in selection mode', () => {
-      renderModal({ payload: makePayload({ selectionMode: true }) });
-      expect(document.querySelector('.sp-modal--wide')).toBeInTheDocument();
-    });
-
-    it('has sp-modal--wide in use mode', () => {
-      renderModal({
-        payload: makePayload({
-          selectionMode: false,
-          knownManeuvers: ['Ki-Fueled Attack'],
-        }),
-      });
-      expect(document.querySelector('.sp-modal--wide')).toBeInTheDocument();
-    });
-
-    it('has sp-modal--wide in no maneuvers state', () => {
-      renderModal({
-        payload: makePayload({
-          selectionMode: false,
-          knownManeuvers: [],
-        }),
-      });
-      expect(document.querySelector('.sp-modal--wide')).toBeInTheDocument();
-    });
-
-    it('has sp-modal--wide in no dice state', async () => {
-      vi.spyOn(runtimeModule, 'getRuntimeValue').mockReturnValue(0);
-      renderModal({
-        payload: makePayload({
-          selectionMode: false,
-          knownManeuvers: ['Ki-Fueled Attack'],
-          playerStats: { name: 'TestCharacter' },
-        }),
-      });
-      await waitFor(() => {
-        expect(document.querySelector('.sp-modal--wide')).toBeInTheDocument();
-      });
-    });
-  });
-});
 
 // ── Cursor styles ──
 

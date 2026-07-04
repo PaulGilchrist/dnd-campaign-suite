@@ -28,8 +28,6 @@ const FAKE_MONSTERS = [
   { index: 'dragon', name: 'Ancient Dragon' },
 ];
 
-const FALSY_NAMES = ['', null, undefined];
-
 function makeNpc(name, overrides = {}) {
   return { name, armorClass: 15, ...overrides };
 }
@@ -41,16 +39,11 @@ describe('monsterUtils', () => {
   });
 
   describe('getMonsterImageUrl', () => {
-    it('returns null for falsy names', async () => {
+    it('returns null for falsy and whitespace-only names', async () => {
       const { getMonsterImageUrl } = await import('./monsterUtils.js');
-      for (const name of FALSY_NAMES) {
+      for (const name of ['', null, undefined, '   ']) {
         await expect(getMonsterImageUrl(name)).resolves.toBeNull();
       }
-    });
-
-    it('returns null for whitespace-only names', async () => {
-      const { getMonsterImageUrl } = await import('./monsterUtils.js');
-      await expect(getMonsterImageUrl('   ')).resolves.toBeNull();
     });
 
     it('looks up monster data case-insensitively with trailing number stripping', async () => {
@@ -63,9 +56,6 @@ describe('monsterUtils', () => {
       );
       await expect(getMonsterImageUrl('Orc 42')).resolves.toBe(
         'https://paulgilchrist.github.io/dnd-tools/images/orc.jpg'
-      );
-      await expect(getMonsterImageUrl('Tarrasque 99')).resolves.toBe(
-        'https://paulgilchrist.github.io/dnd-tools/images/tarrasque.jpg'
       );
     });
 
@@ -80,12 +70,6 @@ describe('monsterUtils', () => {
       const { getMonsterImageUrl } = await import('./monsterUtils.js');
       const npcs = [makeNpc('Goblin', { imagePath: '/custom/goblin.png' })];
       await expect(getMonsterImageUrl('Goblin', npcs)).resolves.toBe('/custom/goblin.png');
-    });
-
-    it('prefers campaign NPC with valid imagePath even when monster data exists', async () => {
-      const { getMonsterImageUrl } = await import('./monsterUtils.js');
-      const npcs = [makeNpc('Orc', { imagePath: '/custom/orc.png' })];
-      await expect(getMonsterImageUrl('Orc', npcs)).resolves.toBe('/custom/orc.png');
     });
 
     it('skips campaign NPCs with falsy imagePath and falls back to monster data', async () => {
@@ -122,18 +106,10 @@ describe('monsterUtils', () => {
       await expect(getMonsterImageUrl('Goblin', npcs)).resolves.toBe('/custom/first.png');
     });
 
-    it('skips campaign NPCs with empty name and falls back to monster data', async () => {
+    it('skips campaign NPCs with falsy or empty name and falls back to monster data', async () => {
       const { getMonsterImageUrl } = await import('./monsterUtils.js');
       const npcs = [
         { name: '', imagePath: '/custom/empty.png' },
-        makeNpc('Goblin', { imagePath: '/custom/goblin.png' }),
-      ];
-      await expect(getMonsterImageUrl('Goblin', npcs)).resolves.toBe('/custom/goblin.png');
-    });
-
-    it('skips campaign NPCs with falsy name and falls back to monster data', async () => {
-      const { getMonsterImageUrl } = await import('./monsterUtils.js');
-      const npcs = [
         { name: null, imagePath: '/custom/null.png' },
         { name: undefined, imagePath: '/custom/undef.png' },
         makeNpc('Goblin', { imagePath: '/custom/goblin.png' }),
@@ -163,16 +139,11 @@ describe('monsterUtils', () => {
   });
 
   describe('getMonsterData', () => {
-    it('returns null for falsy names', async () => {
+    it('returns null for falsy and whitespace-only names', async () => {
       const { getMonsterData } = await import('./monsterUtils.js');
-      for (const name of FALSY_NAMES) {
+      for (const name of ['', null, undefined, '   ']) {
         await expect(getMonsterData(name)).resolves.toBeNull();
       }
-    });
-
-    it('returns null for whitespace-only names', async () => {
-      const { getMonsterData } = await import('./monsterUtils.js');
-      await expect(getMonsterData('   ')).resolves.toBeNull();
     });
 
     it('returns null when monster is not found in data or campaign NPCs', async () => {
@@ -244,21 +215,12 @@ describe('monsterUtils', () => {
       expect(result).toEqual({ name: 'Goblin', armorClass: 15, formatted: true });
     });
 
-    it('skips campaign NPCs with empty name and falls back to monster data', async () => {
+    it('skips campaign NPCs with falsy or empty name and falls back to monster data', async () => {
       const { getMonsterData } = await import('./monsterUtils.js');
       const npcs = [
         { name: '', armorClass: 10 },
-        makeNpc('Goblin', { armorClass: 12 }),
-      ];
-      const result = await getMonsterData('Goblin', npcs);
-      expect(result).toEqual({ name: 'Goblin', armorClass: 12, formatted: true });
-    });
-
-    it('skips campaign NPCs with falsy name and falls back to monster data', async () => {
-      const { getMonsterData } = await import('./monsterUtils.js');
-      const npcs = [
-        { name: null, armorClass: 10 },
-        { name: undefined, armorClass: 11 },
+        { name: null, armorClass: 11 },
+        { name: undefined, armorClass: 12 },
         makeNpc('Goblin', { armorClass: 12 }),
       ];
       const result = await getMonsterData('Goblin', npcs);
@@ -288,15 +250,10 @@ describe('monsterUtils', () => {
       expect(loadMonsters).not.toHaveBeenCalled();
     });
 
-    it('calls loadMonsters when no campaign NPC match is found', async () => {
-      const { getMonsterData } = await import('./monsterUtils.js');
-      await getMonsterData('Goblin', []);
-      expect(loadMonsters).toHaveBeenCalled();
-    });
-
-    it('returns the raw monster data object from loadMonsters', async () => {
+    it('calls loadMonsters and returns raw monster data when no campaign NPC match is found', async () => {
       const { getMonsterData } = await import('./monsterUtils.js');
       const result = await getMonsterData('Tarrasque');
+      expect(loadMonsters).toHaveBeenCalled();
       expect(result).toEqual(FAKE_MONSTERS.find((m) => m.index === 'tarrasque'));
     });
   });

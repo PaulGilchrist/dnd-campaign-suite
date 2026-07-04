@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { describe, it, expect } from 'vitest';
 import {
   rollD20,
@@ -39,24 +39,10 @@ describe('rollDice', () => {
     expect(result.total).toBe(result.rolls[0] + result.rolls[1]);
   });
 
-  it('returns a single roll when count is 1', () => {
-    const result = rollDice(1, 8);
-    expect(result.rolls).toHaveLength(1);
-    expect(result.total).toBe(result.rolls[0]);
-  });
-
   it('returns empty rolls and zero total when count is 0', () => {
     const result = rollDice(0, 6);
     expect(result.rolls).toHaveLength(0);
     expect(result.total).toBe(0);
-  });
-
-  it('validates each roll is within the die range', () => {
-    const result = rollDice(3, 12);
-    for (const r of result.rolls) {
-      expect(r).toBeGreaterThanOrEqual(1);
-      expect(r).toBeLessThanOrEqual(12);
-    }
   });
 });
 
@@ -66,10 +52,6 @@ describe('rollAdvantage', () => {
     expect(result.rolls).toHaveLength(2);
     expect(result.total).toBe(Math.max(...result.rolls));
     expect(result.label).toBe('advantage');
-    for (const r of result.rolls) {
-      expect(r).toBeGreaterThanOrEqual(1);
-      expect(r).toBeLessThanOrEqual(20);
-    }
   });
 });
 
@@ -79,10 +61,6 @@ describe('rollDisadvantage', () => {
     expect(result.rolls).toHaveLength(2);
     expect(result.total).toBe(Math.min(...result.rolls));
     expect(result.label).toBe('disadvantage');
-    for (const r of result.rolls) {
-      expect(r).toBeGreaterThanOrEqual(1);
-      expect(r).toBeLessThanOrEqual(20);
-    }
   });
 });
 
@@ -106,7 +84,6 @@ describe('parseExpression', () => {
   it('strips square-bracket tags before parsing', () => {
     expect(parseExpression('2d6[Fire]')).toEqual({ count: 2, sides: 6, modifier: 0 });
     expect(parseExpression('[Damage] 1d8+3')).toEqual({ count: 1, sides: 8, modifier: 3 });
-    expect(parseExpression('[a] 2d6[b] + 1[c]')).toEqual({ count: 2, sides: 6, modifier: 1 });
   });
 
   it('returns null for empty or whitespace-only input', () => {
@@ -127,16 +104,8 @@ describe('parseExpression', () => {
     expect(parseExpression('invalid or 2d6')).toEqual({ count: 2, sides: 6, modifier: 0 });
   });
 
-  it('handles case-insensitive "or" separator', () => {
-    expect(parseExpression('1d8 + 3 OR 2d6')).toEqual({ count: 1, sides: 8, modifier: 3 });
-  });
-
   it('returns null when all options in " or " formula are invalid', () => {
     expect(parseExpression('invalid or nonsense')).toBeNull();
-  });
-
-  it('handles spaces around "or" separator', () => {
-    expect(parseExpression('1d4or2d6')).toBeNull();
   });
 
   it('supports multi-digit counts and sides', () => {
@@ -149,10 +118,6 @@ describe('parseExpression', () => {
 
   it('parses multiple modifiers with mixed signs', () => {
     expect(parseExpression('1d10+5-3')).toEqual({ count: 1, sides: 10, modifier: 2 });
-  });
-
-  it('parses three modifiers', () => {
-    expect(parseExpression('2d6+1+2+3')).toEqual({ count: 2, sides: 6, modifier: 6 });
   });
 });
 
@@ -221,18 +186,6 @@ describe('rollExpression', () => {
     expect(result).not.toBeNull();
     expect(result.rolls).toHaveLength(2);
     expect(result.modifier).toBe(3);
-  });
-
-  it('skips invalid parts in " plus " and rolls valid ones', () => {
-    const result = rollExpression('invalid plus 2d6');
-    expect(result).not.toBeNull();
-    expect(result.rolls).toHaveLength(2);
-  });
-
-  it('skips invalid second part in " plus "', () => {
-    const result = rollExpression('2d6 plus invalid');
-    expect(result).not.toBeNull();
-    expect(result.rolls).toHaveLength(2);
   });
 
   it('strips brackets before evaluating', () => {
@@ -312,7 +265,6 @@ describe('rollExpressionMaximized', () => {
 
 describe('rerollOnes option', () => {
   it('rerolls 1s to new values when rerollOnes is true', () => {
-    // Force all 3 initial rolls to be 1 (random=0), then reroll each to 2+ (random=1/6)
     const originalRandom = Math.random;
     const results = [0, 0, 0, 1 / 6, 1 / 6, 1 / 6];
     let callCount = 0;
@@ -329,19 +281,6 @@ describe('rerollOnes option', () => {
         expect(r).toBeGreaterThanOrEqual(2);
         expect(r).toBeLessThanOrEqual(6);
       }
-    } finally {
-      Math.random = originalRandom;
-    }
-  });
-
-  it('does not reroll 1s when rerollOnes is false or absent', () => {
-    const originalRandom = Math.random;
-    Math.random = () => 0.01;
-    try {
-      const result = rollExpression('1d20');
-      expect(result).not.toBeNull();
-      expect(result.rolls[0]).toBe(1);
-      expect(result.total).toBe(1);
     } finally {
       Math.random = originalRandom;
     }

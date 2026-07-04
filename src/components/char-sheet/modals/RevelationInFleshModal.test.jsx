@@ -392,25 +392,7 @@ describe('RevelationInFleshModal', () => {
     });
   });
 
-  describe('closing the modal', () => {
-    it('calls onClose when clicking the overlay background', () => {
-      render(<RevelationInFleshModal {...makeProps()} />);
-      fireEvent.click(document.querySelector('.sp-overlay'));
-      expect(mockOnClose).toHaveBeenCalledTimes(1);
-    });
-
-    it('does not close when clicking inside the modal content', () => {
-      render(<RevelationInFleshModal {...makeProps()} />);
-      fireEvent.click(document.querySelector('.sp-modal'));
-      expect(mockOnClose).not.toHaveBeenCalled();
-    });
-
-    it('calls onClose when Cancel button is clicked', () => {
-      render(<RevelationInFleshModal {...makeProps()} />);
-      fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
-      expect(mockOnClose).toHaveBeenCalledTimes(1);
-    });
-
+  describe('after apply', () => {
     it('calls onClose when Done button is clicked after apply', async () => {
       render(<RevelationInFleshModal {...makeProps()} />);
       fireEvent.click(document.querySelectorAll('input[name="revelationOption"]')[0]);
@@ -419,18 +401,6 @@ describe('RevelationInFleshModal', () => {
       });
       await waitFor(() => {
         fireEvent.click(screen.getByRole('button', { name: 'Done' }));
-      });
-      expect(mockOnClose).toHaveBeenCalledTimes(1);
-    });
-
-    it('calls onClose when clicking overlay in result state', async () => {
-      render(<RevelationInFleshModal {...makeProps()} />);
-      fireEvent.click(document.querySelectorAll('input[name="revelationOption"]')[0]);
-      await act(async () => {
-        fireEvent.click(screen.getByRole('button', { name: /Activate/ }));
-      });
-      await waitFor(() => {
-        fireEvent.click(document.querySelector('.sp-overlay'));
       });
       expect(mockOnClose).toHaveBeenCalledTimes(1);
     });

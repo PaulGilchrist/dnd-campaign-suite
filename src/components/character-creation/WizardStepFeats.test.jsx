@@ -59,9 +59,13 @@ describe('WizardStepFeats', () => {
   });
 
   describe('Rendering — header and structure', () => {
-    it('should render the step header', () => {
+    it('should render the step header, search input, type filter, and "Show Only Selected" checkbox', () => {
       renderComponent();
       expect(screen.getByText('Step 4: Feats')).toBeInTheDocument();
+      expect(screen.getByPlaceholderText('Search feats...')).toBeInTheDocument();
+      const typeLabels = screen.getAllByText('Combat');
+      expect(typeLabels.length).toBeGreaterThan(0);
+      expect(screen.getByRole('checkbox')).toBeInTheDocument();
     });
 
     it('should render all feat names sorted alphabetically', () => {
@@ -74,31 +78,13 @@ describe('WizardStepFeats', () => {
       expect(screen.getByText('Sharpshooter')).toBeInTheDocument();
       expect(screen.getByText('Weapon Master')).toBeInTheDocument();
     });
-
-    it('should render the search input with correct placeholder', () => {
-      renderComponent();
-      expect(screen.getByPlaceholderText('Search feats...')).toBeInTheDocument();
-    });
-
-    it('should render the filter dropdown for feat type', () => {
-      renderComponent();
-      const typeLabels = screen.getAllByText('Combat');
-      expect(typeLabels.length).toBeGreaterThan(0);
-    });
-
-    it('should render the "Show Only Selected" checkbox', () => {
-      renderComponent();
-      expect(screen.getByRole('checkbox')).toBeInTheDocument();
-    });
   });
 
   describe('Rendering — pre-selected feats', () => {
-    it('should mark pre-selected feats with a pre-selected label', () => {
+    it('should mark pre-selected feats with a pre-selected label and not allow toggling', () => {
       renderComponent({ preSelectedFeats: ['Great Weapon Master'] });
       expect(screen.getByText('(Pre-selected)')).toBeInTheDocument();
-    });
 
-    it('should not allow toggling pre-selected items', () => {
       const mockOnChange = vi.fn();
       renderComponent({
         formData: { ...mockFormData, feats: ['Great Weapon Master'] },
@@ -112,28 +98,22 @@ describe('WizardStepFeats', () => {
   });
 
   describe('Rendering — expanded details', () => {
-    it('should show a "Show More" button for each feat', () => {
+    it('should toggle "Show More"/"Show Less" after expanding', async () => {
       renderComponent();
       const buttons = screen.getAllByRole('button', { name: 'Show More' });
       expect(buttons.length).toBeGreaterThan(0);
-    });
 
-    it('should toggle to "Show Less" after expanding', async () => {
-      renderComponent();
-      const buttons = screen.getAllByRole('button', { name: 'Show More' });
       fireEvent.click(buttons[0]);
       await waitFor(() => {
         expect(screen.getByRole('button', { name: 'Show Less' })).toBeInTheDocument();
       });
     });
-  });
 
-  describe('Rendering — feat descriptions', () => {
-    it('should render HTML descriptions for feats with a description field', async () => {
+    it('should render HTML and text descriptions for feats', async () => {
       const { container } = renderComponent();
       const buttons = screen.getAllByRole('button', { name: 'Show More' });
-      fireEvent.click(buttons[3]);
 
+      fireEvent.click(buttons[3]);
       await waitFor(() => {
         const descriptionDiv = container.querySelector('.feat-description');
         expect(descriptionDiv).toBeInTheDocument();
@@ -145,7 +125,6 @@ describe('WizardStepFeats', () => {
       renderComponent();
       const buttons = screen.getAllByRole('button', { name: 'Show More' });
       fireEvent.click(buttons[5]);
-
       await waitFor(() => {
         expect(screen.getByText('No disadvantage on long range')).toBeInTheDocument();
       });
@@ -155,7 +134,6 @@ describe('WizardStepFeats', () => {
       const { container } = renderComponent();
       const buttons = screen.getAllByRole('button', { name: 'Show More' });
       fireEvent.click(buttons[6]);
-
       await waitFor(() => {
         const descriptionDiv = container.querySelector('.feat-description');
         expect(descriptionDiv).toContainHTML('<strong>Master</strong>');
@@ -168,26 +146,22 @@ describe('WizardStepFeats', () => {
       renderComponent();
       const buttons = screen.getAllByRole('button', { name: 'Show More' });
 
-      // Actor has string prerequisite (index 0 after sort)
       fireEvent.click(buttons[0]);
       await waitFor(() => {
         expect(screen.getByText(/Charisma 13/)).toBeInTheDocument();
       });
 
-      // Lucky has object prerequisite { level: 4 } (index 2 after sort)
       fireEvent.click(buttons[2]);
       await waitFor(() => {
         expect(screen.getByText(/{"level":4}/)).toBeInTheDocument();
       });
 
-      // Magic Initiate has array prerequisites (index 3 after sort)
       fireEvent.click(buttons[3]);
       await waitFor(() => {
         expect(screen.getByText(/Spellcasting feature/)).toBeInTheDocument();
         expect(screen.getByText(/4th level/)).toBeInTheDocument();
       });
 
-      // Observant has object prerequisite with name (index 4 after sort)
       fireEvent.click(buttons[4]);
       await waitFor(() => {
         expect(screen.getByText(/Proficiency with Perception/)).toBeInTheDocument();
@@ -208,7 +182,7 @@ describe('WizardStepFeats', () => {
     });
   });
 
-  describe('Rendering — feat buffs in summary', () => {
+  describe('Rendering — buffs and summary', () => {
     it('should render buff counts in summary when buffs are provided', async () => {
       renderComponent({
         allFeats: [{ index: 'asi-feat', name: 'ASI Feat' }],
@@ -229,9 +203,7 @@ describe('WizardStepFeats', () => {
         expect(screen.getByText('• 1 passive/feature buff(s)')).toBeInTheDocument();
       });
     });
-  });
 
-  describe('Rendering — summary', () => {
     it('should display the rules details from featLimits', async () => {
       featValidation.getFeatLimits.mockResolvedValueOnce({
         allowed: 5,
@@ -247,7 +219,6 @@ describe('WizardStepFeats', () => {
 
     it('should display the correct count of user-selected vs allowed feats', async () => {
       renderComponent({ formData: { ...mockFormData, feats: ['Great Weapon Master', 'Lucky'] } });
-
       await waitFor(() => {
         expect(screen.getByText(/2 of 2 allowed/)).toBeInTheDocument();
       });
@@ -258,7 +229,6 @@ describe('WizardStepFeats', () => {
         formData: { ...mockFormData, feats: ['Great Weapon Master', 'Lucky'] },
         preSelectedFeats: ['Great Weapon Master'],
       });
-
       await waitFor(() => {
         expect(screen.getByText(/1 of 2 allowed/)).toBeInTheDocument();
         expect(screen.getByText(/plus 1 background feat/)).toBeInTheDocument();
@@ -267,7 +237,6 @@ describe('WizardStepFeats', () => {
 
     it('should not mention background feat count when there are none', async () => {
       renderComponent({ formData: { ...mockFormData, feats: ['Lucky'] } });
-
       await waitFor(() => {
         expect(screen.getByText(/1 of 2 allowed/)).toBeInTheDocument();
         expect(screen.queryByText(/plus/)).not.toBeInTheDocument();
@@ -276,7 +245,6 @@ describe('WizardStepFeats', () => {
 
     it('should display zero selected when no feats are chosen', async () => {
       renderComponent();
-
       await waitFor(() => {
         expect(screen.getByText(/0 of 2 allowed/)).toBeInTheDocument();
       });
@@ -300,15 +268,12 @@ describe('WizardStepFeats', () => {
   });
 
   describe('Rendering — filtering', () => {
-    it('should filter feats by search query matching the name', () => {
+    it('should filter feats by search query (case-insensitive), type dropdown, and "Show Only Selected" checkbox', () => {
       renderComponent();
       fireEvent.change(screen.getByPlaceholderText('Search feats...'), { target: { value: 'Lucky' } });
       expect(screen.getByText('Lucky')).toBeInTheDocument();
       expect(screen.queryByText('Great Weapon Master')).not.toBeInTheDocument();
-    });
 
-    it('should be case-insensitive when filtering by search query', () => {
-      renderComponent();
       fireEvent.change(screen.getByPlaceholderText('Search feats...'), { target: { value: 'lucky' } });
       expect(screen.getByText('Lucky')).toBeInTheDocument();
     });
@@ -322,13 +287,7 @@ describe('WizardStepFeats', () => {
       expect(screen.queryByText('Actor')).not.toBeInTheDocument();
     });
 
-    it('should show no results message when search has no matches', () => {
-      renderComponent();
-      fireEvent.change(screen.getByPlaceholderText('Search feats...'), { target: { value: 'Nonexistent' } });
-      expect(screen.getByText(/No feat found matching your criteria/)).toBeInTheDocument();
-    });
-
-    it('should combine search and type filter', () => {
+    it('should combine search, type filter, and show-only-selected', () => {
       renderComponent();
       fireEvent.change(screen.getByPlaceholderText('Search feats...'), { target: { value: 'Master' } });
       const typeFilter = document.querySelector('.type-filter');
@@ -350,34 +309,32 @@ describe('WizardStepFeats', () => {
       renderComponent({ formData: { ...mockFormData, feats: ['Lucky', 'Actor'] } });
       expect(screen.getByText(/2 selected\)/)).toBeInTheDocument();
     });
-  });
 
-  describe('Rendering — result count', () => {
-    it('should display plural "feats" when multiple items match', () => {
+    it('should display correct plural/singular/zero result counts', () => {
       renderComponent();
       expect(screen.getByText(/Showing 7 feats/)).toBeInTheDocument();
-    });
 
-    it('should display singular "feat" when one item matches', () => {
-      renderComponent();
       fireEvent.change(screen.getByPlaceholderText('Search feats...'), { target: { value: 'Lucky' } });
       expect(screen.getByText(/Showing 1 feat/)).toBeInTheDocument();
-    });
 
-    it('should display zero feats when no items match', () => {
-      renderComponent();
       fireEvent.change(screen.getByPlaceholderText('Search feats...'), { target: { value: 'ZZZZ' } });
       expect(screen.getByText(/Showing 0 feats/)).toBeInTheDocument();
+    });
+
+    it('should show no results message when search has no matches', () => {
+      renderComponent();
+      fireEvent.change(screen.getByPlaceholderText('Search feats...'), { target: { value: 'Nonexistent' } });
+      expect(screen.getByText(/No feat found matching your criteria/)).toBeInTheDocument();
     });
   });
 
   describe('Rendering — empty/missing items', () => {
-    it('should render loading message when allFeats is null, undefined, or empty', () => {
+    it('should render loading message when allFeats is null', () => {
       renderComponent({ allFeats: null });
       expect(screen.getByText('Feat data not yet loaded. Please try again.')).toBeInTheDocument();
     });
 
-    it('should still render the title in the loading state', () => {
+    it('should still render the title when allFeats is empty', () => {
       renderComponent({ allFeats: [] });
       expect(screen.getByText('Step 4: Feats')).toBeInTheDocument();
     });

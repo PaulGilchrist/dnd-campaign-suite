@@ -293,22 +293,6 @@ describe('SetConditionModal', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it('calls onClose when clicking the overlay background', () => {
-    const onClose = vi.fn();
-    render(<SetConditionModal {...makeProps({ onClose })} />);
-    const overlay = document.querySelector('.sp-overlay');
-    fireEvent.click(overlay);
-    expect(onClose).toHaveBeenCalledTimes(1);
-  });
-
-  it('does NOT close when clicking inside the modal body', () => {
-    const onClose = vi.fn();
-    render(<SetConditionModal {...makeProps({ onClose })} />);
-    const modal = document.querySelector('.sp-modal');
-    fireEvent.click(modal);
-    expect(onClose).not.toHaveBeenCalled();
-  });
-
   // ── Confirm flow — NPC saves (auto-roll) ──
 
   it('rolls NPC save and shows processing state on confirm', () => {

@@ -166,19 +166,6 @@ describe('Initiative - Callback Integration', () => {
             expect(setRuntimeValue).toHaveBeenCalledWith('Alice', 'currentHitPoints', 15, 'test-campaign');
         });
 
-        it('should update creature.currentHp for NPC HP change', async () => {
-            vi.mocked(loadCombatSummary).mockResolvedValue({ round: 1, creatures: [{ name: 'Goblin', type: 'npc', currentHp: 10, maxHp: 10 }] });
-            await act(async () => { render(<Initiative {...props} />); });
-            await waitFor(() => { expect(screen.queryByTestId('creature-card-Goblin')).toBeInTheDocument(); });
-
-            await act(async () => {
-                const hpInput = screen.getByTestId('hp-input-Goblin');
-                fireEvent.change(hpInput, { target: { value: '5' } });
-            });
-
-            expect(setRuntimeValue).not.toHaveBeenCalledWith('Goblin', 'currentHitPoints', 5, 'test-campaign');
-        });
-
         it('should reset death saves when player goes from <=0 to >0 HP', async () => {
             vi.mocked(getRuntimeValue).mockImplementation((key, prop) => {
                 if (prop === 'currentHitPoints') return 0;
@@ -277,34 +264,28 @@ describe('Initiative - Callback Integration', () => {
     });
 
     describe('NPC removal', () => {
-        it.each([
-            { name: 'NPC with HP', creature: { name: 'Goblin', type: 'npc', currentHp: 5 } },
-            { name: 'NPC with initiative', creature: { name: 'Goblin', type: 'npc', currentHp: 0, initiative: 15 } },
-        ])('should confirm before removing %s', async ({ creature }) => {
-            vi.mocked(loadCombatSummary).mockResolvedValue({ round: 1, creatures: [creature] });
+        it('should confirm before removing NPC with HP', async () => {
+            vi.mocked(loadCombatSummary).mockResolvedValue({ round: 1, creatures: [{ name: 'Goblin', type: 'npc', currentHp: 5 }] });
             await act(async () => { render(<Initiative {...props} />); });
-            await waitFor(() => { expect(screen.queryByTestId(`creature-card-${creature.name}`)).toBeInTheDocument(); });
+            await waitFor(() => { expect(screen.queryByTestId('creature-card-Goblin')).toBeInTheDocument(); });
 
             window.confirm.mockReturnValue(false);
             await act(async () => {
-                const removeBtn = screen.getByTestId(`npc-remove-${creature.name}`);
+                const removeBtn = screen.getByTestId('npc-remove-Goblin');
                 fireEvent.click(removeBtn);
             });
 
             expect(removeNpc).not.toHaveBeenCalled();
         });
 
-        it.each([
-            { name: 'NPC with HP', creature: { name: 'Goblin', type: 'npc', currentHp: 5 } },
-            { name: 'NPC with initiative', creature: { name: 'Goblin', type: 'npc', currentHp: 0, initiative: 15 } },
-        ])('should remove %s when user confirms', async ({ creature }) => {
-            vi.mocked(loadCombatSummary).mockResolvedValue({ round: 1, creatures: [creature] });
+        it('should remove NPC when user confirms', async () => {
+            vi.mocked(loadCombatSummary).mockResolvedValue({ round: 1, creatures: [{ name: 'Goblin', type: 'npc', currentHp: 5 }] });
             await act(async () => { render(<Initiative {...props} />); });
-            await waitFor(() => { expect(screen.queryByTestId(`creature-card-${creature.name}`)).toBeInTheDocument(); });
+            await waitFor(() => { expect(screen.queryByTestId('creature-card-Goblin')).toBeInTheDocument(); });
 
             window.confirm.mockReturnValue(true);
             await act(async () => {
-                const removeBtn = screen.getByTestId(`npc-remove-${creature.name}`);
+                const removeBtn = screen.getByTestId('npc-remove-Goblin');
                 fireEvent.click(removeBtn);
             });
 

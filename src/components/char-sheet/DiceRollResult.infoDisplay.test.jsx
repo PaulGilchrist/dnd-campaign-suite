@@ -17,11 +17,10 @@ describe('DiceRollResult', () => {
             ${-2}    | ${'-2'}
             ${3}     | ${'+3 proficient'}
         `('shows bonus $expected in breakdown when bonus is $bonus', ({ bonus, expected }) => {
-            const { container } = render(
+            render(
                 <DiceRollResult name="Test" type="d20" rolls={[10]} bonus={bonus} bonusDetail={expected === '+3 proficient' ? 'proficient' : undefined} />
             );
-            const breakdown = container.querySelector('.dice-roll-breakdown');
-            expect(breakdown.textContent).toContain(expected);
+            expect(screen.getByText(new RegExp(expected.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')))).toBeInTheDocument();
         });
     });
 
@@ -132,7 +131,7 @@ describe('DiceRollResult', () => {
 
     describe('str check/save replace', () => {
         it('uses strScore when it exceeds display total for strSaveReplace on save', () => {
-            const { container } = render(
+            render(
                 <DiceRollResult
                     name="Athletics"
                     type="d20"
@@ -143,11 +142,11 @@ describe('DiceRollResult', () => {
                     strScore={15}
                 />
             );
-            expect(container.querySelector('.dice-roll-total').textContent).toBe('15');
+            expect(screen.getByText('15')).toBeInTheDocument();
         });
 
         it('uses strScore when it exceeds display total for strCheckReplace on check', () => {
-            const { container } = render(
+            render(
                 <DiceRollResult
                     name="Athletics"
                     type="d20"
@@ -158,11 +157,11 @@ describe('DiceRollResult', () => {
                     strScore={15}
                 />
             );
-            expect(container.querySelector('.dice-roll-total').textContent).toBe('15');
+            expect(screen.getByText('15')).toBeInTheDocument();
         });
 
         it('uses display total when strScore is lower', () => {
-            const { container } = render(
+            render(
                 <DiceRollResult
                     name="Athletics"
                     type="d20"
@@ -173,13 +172,13 @@ describe('DiceRollResult', () => {
                     strScore={10}
                 />
             );
-            expect(container.querySelector('.dice-roll-total').textContent).toBe('12');
+            expect(screen.getByText('12')).toBeInTheDocument();
         });
     });
 
     describe('wis check replace', () => {
         it('uses wis bonus when wisCheckReplace is true for check', () => {
-            const { container } = render(
+            render(
                 <DiceRollResult
                     name="Insight"
                     type="d20"
@@ -191,7 +190,7 @@ describe('DiceRollResult', () => {
                     wisCheckMinBonus={4}
                 />
             );
-            expect(container.querySelector('.dice-roll-total').textContent).toBe('10');
+            expect(screen.getByText('10')).toBeInTheDocument();
         });
     });
 });

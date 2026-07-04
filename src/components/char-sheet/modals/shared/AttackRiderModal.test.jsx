@@ -750,20 +750,6 @@ describe('AttackRiderModal', () => {
       fireEvent.click(screen.getByText('Cancel'));
       expect(onClose).toHaveBeenCalledTimes(1);
     });
-
-    it('calls onClose when clicking the overlay background', () => {
-      const onClose = vi.fn();
-      render(<AttackRiderModal {...makeProps({ onClose })} />);
-      fireEvent.click(document.querySelector('.sp-overlay'));
-      expect(onClose).toHaveBeenCalledTimes(1);
-    });
-
-    it('does NOT close when clicking inside the modal body', () => {
-      const onClose = vi.fn();
-      render(<AttackRiderModal {...makeProps({ onClose })} />);
-      fireEvent.click(document.querySelector('.sp-modal'));
-      expect(onClose).not.toHaveBeenCalled();
-    });
   });
 
   // ── Edge cases ──

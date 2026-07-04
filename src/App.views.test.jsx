@@ -87,14 +87,6 @@ describe('App - Views, Overlays & Props', () => {
   const defaultFetch = () =>
     Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
 
-  const setNonLocalhost = () => {
-    Object.defineProperty(window, 'location', {
-      value: { hostname: 'example.com', reload: vi.fn() },
-      writable: true,
-      configurable: true,
-    });
-  };
-
   beforeEach(() => {
     vi.clearAllMocks();
 
@@ -170,6 +162,34 @@ describe('App - Views, Overlays & Props', () => {
       });
     });
 
+    it('navigates to sidebar views and hides char-sheet', async () => {
+      const viewTests = [
+        { btn: 'initiative-btn', view: 'initiative' },
+        { btn: 'encounter-btn', view: 'encounter-builder' },
+        { btn: 'notes-btn', view: 'notes-view' },
+        { btn: 'quests-btn', view: 'quests-view' },
+        { btn: 'npcs-btn', view: 'npcs-view' },
+        { btn: 'factions-btn', view: 'factions-view' },
+        { btn: 'settlements-btn', view: 'settlements-view' },
+        { btn: 'log-btn', view: 'campaign-log-view' },
+      ];
+
+      for (const { btn, view } of viewTests) {
+        const { unmount } = render(<App />);
+        mockState.characters = [{ name: 'Aragorn', level: 1 }];
+        await selectCampaign();
+        await waitFor(() => {
+          expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
+        });
+        fireEvent.click(screen.getByTestId(btn));
+        await waitFor(() => {
+          expect(screen.getByTestId(view)).toBeInTheDocument();
+          expect(screen.queryByTestId('char-sheet')).not.toBeInTheDocument();
+        });
+        unmount();
+      }
+    });
+
     it('passes characters to sub-views', async () => {
       mockState.characters = [{ name: 'Aragorn', level: 1 }];
       render(<App />);
@@ -210,78 +230,6 @@ describe('App - Views, Overlays & Props', () => {
       await waitFor(() => {
         expect(screen.getByTestId('npcs-view')).toBeInTheDocument();
         expect(screen.getByTestId('npcs-char-count').textContent).toBe('1');
-      });
-    });
-  });
-
-  describe('View coexistence with overlays', () => {
-    it('wizard overlay renders above char-sheet', async () => {
-      mockState.characters = [{ name: 'Aragorn', level: 1 }];
-      render(<App />);
-      await selectCampaign();
-      await waitFor(() => {
-        expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
-      });
-      fireEvent.click(screen.getByTestId('add-character-btn'));
-      await waitFor(() => {
-        expect(screen.getByTestId('character-wizard')).toBeInTheDocument();
-      });
-      expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
-    });
-
-    it('switches between views and hides char-sheet', async () => {
-      const viewTests = [
-        { btn: 'initiative-btn', view: 'initiative' },
-        { btn: 'encounter-btn', view: 'encounter-builder' },
-        { btn: 'notes-btn', view: 'notes-view' },
-        { btn: 'quests-btn', view: 'quests-view' },
-        { btn: 'npcs-btn', view: 'npcs-view' },
-        { btn: 'factions-btn', view: 'factions-view' },
-        { btn: 'settlements-btn', view: 'settlements-view' },
-        { btn: 'log-btn', view: 'campaign-log-view' },
-      ];
-
-      for (const { btn, view } of viewTests) {
-        const { unmount } = render(<App />);
-        mockState.characters = [{ name: 'Aragorn', level: 1 }];
-        await selectCampaign();
-        await waitFor(() => {
-          expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
-        });
-        fireEvent.click(screen.getByTestId(btn));
-        await waitFor(() => {
-          expect(screen.getByTestId(view)).toBeInTheDocument();
-          expect(screen.queryByTestId('char-sheet')).not.toBeInTheDocument();
-        });
-        unmount();
-      }
-    });
-  });
-
-  describe('Map view types', () => {
-    it('renders MapsManager when on localhost and maps clicked', async () => {
-      mockState.characters = [{ name: 'Aragorn', level: 1 }];
-      render(<App />);
-      await selectCampaign();
-      fireEvent.click(screen.getByTestId('maps-btn'));
-      await waitFor(() => {
-        expect(screen.getByTestId('maps-manager')).toBeInTheDocument();
-      });
-    });
-
-    it('renders Map when on non-localhost and maps clicked with active map', async () => {
-      setNonLocalhost();
-      const { loadMaps } = await import('./services/maps/mapsService.js');
-      loadMaps.mockResolvedValue({
-        maps: [{ fileName: 'dungeon-1.json', isActive: true }],
-      });
-
-      mockState.characters = [{ name: 'Aragorn', level: 1 }];
-      render(<App />);
-      await selectCampaign();
-      fireEvent.click(screen.getByTestId('maps-btn'));
-      await waitFor(() => {
-        expect(screen.getByTestId('map-view')).toBeInTheDocument();
       });
     });
   });

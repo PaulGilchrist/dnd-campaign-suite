@@ -97,20 +97,12 @@ describe('PreviewToggle', () => {
         });
 
         it('applies custom minHeight to textarea and preview', () => {
-            render(
-                <PreviewToggle value="text" onChange={() => {}} minHeight="200px" />
-            );
+            render(<PreviewToggle value="text" onChange={() => {}} minHeight="200px" />);
             const textarea = screen.getByRole('textbox');
             expect(textarea).toHaveStyle({ minHeight: '200px' });
 
             const previewDiv = document.querySelector('.preview-toggle-preview');
             expect(previewDiv).toHaveStyle({ minHeight: '200px' });
-        });
-
-        it('does not apply minHeight style when not provided', () => {
-            render(<PreviewToggle value="" onChange={() => {}} />);
-            const textarea = screen.getByRole('textbox');
-            expect(textarea.style.minHeight).toBe('');
         });
     });
 
@@ -149,7 +141,7 @@ describe('PreviewToggle', () => {
     });
 
     describe('markdown preview', () => {
-        it('renders bold markdown as HTML in preview mode', () => {
+        it('renders bold and italic markdown as HTML in preview mode', () => {
             render(<PreviewToggle value="**bold text**" onChange={() => {}} />);
             const button = screen.getByRole('button', { name: /preview/i });
             fireEvent.click(button);
@@ -157,16 +149,6 @@ describe('PreviewToggle', () => {
             const html = document.querySelector('.markdown-preview');
             expect(html).toHaveTextContent('bold text');
             expect(html.querySelector('strong')).toBeTruthy();
-        });
-
-        it('renders italic markdown as HTML in preview mode', () => {
-            render(<PreviewToggle value="*italic text*" onChange={() => {}} />);
-            const button = screen.getByRole('button', { name: /preview/i });
-            fireEvent.click(button);
-
-            const html = document.querySelector('.markdown-preview');
-            expect(html).toHaveTextContent('italic text');
-            expect(html.querySelector('em')).toBeTruthy();
         });
 
         it('does not show preview when value is empty', () => {

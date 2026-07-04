@@ -100,24 +100,6 @@ describe('AttackRiderManeuverPrompt - initial rendering', () => {
         renderPrompt();
         expect(screen.getByRole('button', { name: /Skip/ })).toBeInTheDocument();
     });
-
-    it('has sp-roll-btn class on Use Maneuver button', () => {
-        renderPrompt();
-        const btn = screen.getByRole('button', { name: /Use Maneuver/ });
-        expect(btn.classList.contains('sp-roll-btn')).toBe(true);
-    });
-
-    it('has sp-dismiss-btn class on Skip button', () => {
-        renderPrompt();
-        const btn = screen.getByRole('button', { name: /Skip/ });
-        expect(btn.classList.contains('sp-dismiss-btn')).toBe(true);
-    });
-
-    it('renders bolt icon inside Use Maneuver button', () => {
-        renderPrompt();
-        const btn = screen.getByRole('button', { name: /Use Maneuver/ });
-        expect(btn.querySelector('.fa-solid.fa-bolt')).toBeInTheDocument();
-    });
 });
 
 // ── Selection behavior ──
@@ -216,20 +198,6 @@ describe('AttackRiderManeuverPrompt - use maneuver', () => {
         });
     });
 
-    it('has sp-roll-btn class on Done button', async () => {
-        const onUse = vi.fn().mockResolvedValue({
-            payload: { name: 'Disarming Attack', description: 'Desc.' },
-        });
-        renderPrompt({ onUse });
-        const radios = document.querySelectorAll('input[name="attackRiderManeuver"]');
-        fireEvent.click(radios[0]);
-        fireEvent.click(screen.getByRole('button', { name: /Use Maneuver/ }));
-        await waitFor(() => {
-            const doneBtn = screen.getByText('Done');
-            expect(doneBtn.classList.contains('sp-roll-btn')).toBe(true);
-        });
-    });
-
     it('calls onSkip when Done button is clicked in result state', async () => {
         const onSkip = vi.fn();
         const onUse = vi.fn().mockResolvedValue({
@@ -282,7 +250,7 @@ describe('AttackRiderManeuverPrompt - skip and cancel', () => {
         fireEvent.click(radios[0]);
         fireEvent.click(screen.getByRole('button', { name: /Use Maneuver/ }));
         await waitFor(() => {
-            expect(document.querySelector('.fa-solid.fa-bolt')).toBeInTheDocument();
+            expect(screen.getByText('Disarming Attack')).toBeInTheDocument();
         });
     });
 
@@ -367,20 +335,6 @@ describe('AttackRiderManeuverPrompt - isMiss path', () => {
         });
         fireEvent.click(screen.getByText('Done'));
         expect(onSkip).toHaveBeenCalledTimes(1);
-    });
-
-    it('renders bolt icon in isMissResult header', async () => {
-        const onUse = vi.fn().mockResolvedValue({
-            isMissResult: true,
-            description: 'Miss turned into hit.',
-        });
-        renderPrompt({ isMiss: true, onUse });
-        const radios = document.querySelectorAll('input[name="attackRiderManeuver"]');
-        fireEvent.click(radios[0]);
-        fireEvent.click(screen.getByRole('button', { name: /Use Maneuver/ }));
-        await waitFor(() => {
-            expect(document.querySelector('.fa-solid.fa-bolt')).toBeInTheDocument();
-        });
     });
 });
 

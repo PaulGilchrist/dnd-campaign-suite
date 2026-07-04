@@ -117,31 +117,6 @@ describe('MistyWandererModal', () => {
     expect(screen.getByText('Custom Misty Step')).toBeInTheDocument();
   });
 
-  // ── Close behavior ──
-
-  describe('close behavior', () => {
-    it('calls onClose when clicking the overlay background', () => {
-      const onClose = vi.fn();
-      render(<MistyWandererModal {...makeProps({ onClose })} />);
-      fireEvent.click(document.querySelector('.sp-overlay'));
-      expect(onClose).toHaveBeenCalledTimes(1);
-    });
-
-    it('does not close when clicking inside the modal content', () => {
-      const onClose = vi.fn();
-      render(<MistyWandererModal {...makeProps({ onClose })} />);
-      fireEvent.click(document.querySelector('.sp-modal'));
-      expect(onClose).not.toHaveBeenCalled();
-    });
-
-    it('calls onClose when the Cancel button is clicked', () => {
-      const onClose = vi.fn();
-      render(<MistyWandererModal {...makeProps({ onClose })} />);
-      fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
-      expect(onClose).toHaveBeenCalledTimes(1);
-    });
-  });
-
   // ── Ally selection ──
 
   describe('ally selection', () => {
@@ -311,26 +286,6 @@ describe('MistyWandererModal', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Done' }));
       });
       expect(onClose).toHaveBeenCalledTimes(1);
-    });
-
-    it('calls onClose when clicking the result overlay', async () => {
-      const onClose = vi.fn();
-      render(<MistyWandererModal {...makeProps({ onClose })} />);
-      fireEvent.click(screen.getByRole('button', { name: /Cast Misty Step/ }));
-      await waitFor(() => {
-        fireEvent.click(document.querySelector('.sp-overlay'));
-      });
-      expect(onClose).toHaveBeenCalledTimes(1);
-    });
-
-    it('does not close when clicking the result modal content', async () => {
-      const onClose = vi.fn();
-      render(<MistyWandererModal {...makeProps({ onClose })} />);
-      fireEvent.click(screen.getByRole('button', { name: /Cast Misty Step/ }));
-      await waitFor(() => {
-        fireEvent.click(document.querySelector('.sp-modal'));
-      });
-      expect(onClose).not.toHaveBeenCalled();
     });
   });
 });

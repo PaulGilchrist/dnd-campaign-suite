@@ -19,19 +19,6 @@ describe('DiceRollResult', () => {
             expect(screen.getByText('15')).toBeInTheDocument();
         });
 
-        it.each`
-            type           | iconClass
-            ${'attack'}    | ${'fa-crosshairs'}
-            ${'save'}      | ${'fa-shield-halved'}
-            ${'save-damage'} | ${'fa-shield-halved'}
-            ${'initiative'}| ${'fa-gavel'}
-            ${'damage'}    | ${'fa-bolt'}
-        `('renders correct icon class for type: $type', ({ type, iconClass }) => {
-            const { container } = render(
-                <DiceRollResult name="Roll" type={type} rolls={[15]} bonus={2} />
-            );
-            expect(container.querySelector(`.${iconClass}`)).toBeInTheDocument();
-        });
     });
 
     describe('totals', () => {

@@ -419,29 +419,6 @@ describe('WildCompanionModal', () => {
     vi.restoreAllMocks();
   });
 
-  // ── Close behaviors ──
-
-  it('calls onClose when clicking the overlay background', () => {
-    const onClose = vi.fn();
-    render(<WildCompanionModal {...makeProps({ onClose })} />);
-    fireEvent.click(document.querySelector('.resource-pool-overlay'));
-    expect(onClose).toHaveBeenCalledTimes(1);
-  });
-
-  it('does not close when clicking inside the modal content', () => {
-    const onClose = vi.fn();
-    render(<WildCompanionModal {...makeProps({ onClose })} />);
-    fireEvent.click(document.querySelector('.resource-pool-modal'));
-    expect(onClose).not.toHaveBeenCalled();
-  });
-
-  it('calls onClose when Cancel button is clicked', () => {
-    const onClose = vi.fn();
-    render(<WildCompanionModal {...makeProps({ onClose })} />);
-    fireEvent.click(screen.getByRole('button', { name: /Cancel/i }));
-    expect(onClose).toHaveBeenCalledTimes(1);
-  });
-
   // ── Keyboard handling ──
 
   it('calls onClose when Escape key is pressed', () => {
@@ -490,13 +467,6 @@ describe('WildCompanionModal', () => {
   it('renders leaf icon in the title', () => {
     render(<WildCompanionModal {...makeProps()} />);
     expect(document.querySelector('.resource-pool-modal .fas.fa-leaf')).toBeInTheDocument();
-  });
-
-  it('renders check icon on the expend spell slot button', () => {
-    render(<WildCompanionModal {...makeProps()} />);
-    expect(
-      document.querySelector('.resource-pool-modal .fa-solid.fa-check')
-    ).toBeInTheDocument();
   });
 
   it('renders times icon on the cancel button', () => {

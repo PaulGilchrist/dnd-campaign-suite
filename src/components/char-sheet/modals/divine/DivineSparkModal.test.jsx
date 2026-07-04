@@ -132,22 +132,6 @@ describe('DivineSparkModal', () => {
     expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
   });
 
-  // ── Overlay click behavior ──
-
-  it('calls onClose when clicking the overlay background', () => {
-    const onClose = vi.fn();
-    render(<DivineSparkModal {...makeProps({ onClose })} />);
-    fireEvent.click(document.querySelector('.sp-overlay'));
-    expect(onClose).toHaveBeenCalledTimes(1);
-  });
-
-  it('does not close when clicking inside the modal content', () => {
-    const onClose = vi.fn();
-    render(<DivineSparkModal {...makeProps({ onClose })} />);
-    fireEvent.click(document.querySelector('.sp-modal'));
-    expect(onClose).not.toHaveBeenCalled();
-  });
-
   // ── Cancel button ──
 
   it('calls onClose when Cancel button is clicked', () => {

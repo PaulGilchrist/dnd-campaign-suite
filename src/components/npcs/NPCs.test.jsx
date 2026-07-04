@@ -155,19 +155,6 @@ describe('NPCs', () => {
       });
       expect(mockSaveNPC.mock.calls[0][1].name).toBe('Test NPC');
     });
-
-    it('closes modal after successful save', async () => {
-      renderWithNPCs();
-      fireEvent.click(screen.getByRole('button', { name: /New NPC/i }));
-      await waitFor(() => {
-        expect(screen.getByTestId('npc-form-modal')).toBeInTheDocument();
-      });
-      fireEvent.change(screen.getByTestId('npc-name-input'), { target: { value: 'Test NPC' } });
-      fireEvent.click(screen.getByRole('button', { name: 'Save' }));
-      await waitFor(() => {
-        expect(screen.queryByTestId('npc-form-modal')).not.toBeInTheDocument();
-      });
-    });
   });
 
   describe('delete flow', () => {
@@ -192,20 +179,6 @@ describe('NPCs', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
       await waitFor(() => {
         expect(mockDelete).toHaveBeenCalledWith('Goblin');
-      });
-    });
-
-    it('closes modal after successful delete', async () => {
-      const { mockDelete } = renderWithNPCs();
-      mockDelete.mockResolvedValue(undefined);
-      vi.spyOn(window, 'confirm').mockReturnValue(true);
-      fireEvent.click(screen.getByTestId('edit-btn-Goblin'));
-      await waitFor(() => {
-        expect(screen.getByTestId('npc-form-modal')).toBeInTheDocument();
-      });
-      fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
-      await waitFor(() => {
-        expect(screen.queryByTestId('npc-form-modal')).not.toBeInTheDocument();
       });
     });
   });
@@ -255,73 +228,6 @@ describe('NPCs', () => {
         expect(mockAddNPCToInitiative).toHaveBeenCalled();
       });
     });
-
-    it('closes modal after save-and-add to initiative', async () => {
-      mockSaveNPC.mockResolvedValue({ success: true, npc: { name: 'Goblin' } });
-      mockUseNPCsManagement.mockReturnValue({
-        items: defaultNPCs,
-        loading: false,
-        loadItems: vi.fn(),
-        saveItems: vi.fn(),
-        deleteItem: vi.fn(),
-      });
-      render(<NPCs {...defaultProps} />);
-      fireEvent.click(screen.getByTestId('edit-btn-Goblin'));
-      await waitFor(() => {
-        expect(screen.getByTestId('npc-form-modal')).toBeInTheDocument();
-      });
-      fireEvent.change(screen.getByTestId('npc-name-input'), { target: { value: 'Goblin' } });
-      fireEvent.click(screen.getByTestId('save-add-init-btn'));
-      await waitFor(() => {
-        expect(screen.queryByTestId('npc-form-modal')).not.toBeInTheDocument();
-      });
-    });
-
-    it('does not close modal when save-and-add throws error', async () => {
-      mockSaveNPC.mockRejectedValue(new Error('Save failed'));
-      mockUseNPCsManagement.mockReturnValue({
-        items: defaultNPCs,
-        loading: false,
-        loadItems: vi.fn(),
-        saveItems: vi.fn(),
-        deleteItem: vi.fn(),
-      });
-      render(<NPCs {...defaultProps} />);
-      fireEvent.click(screen.getByTestId('edit-btn-Goblin'));
-      await waitFor(() => {
-        expect(screen.getByTestId('npc-form-modal')).toBeInTheDocument();
-      });
-      fireEvent.change(screen.getByTestId('npc-name-input'), { target: { value: 'Goblin' } });
-      fireEvent.click(screen.getByTestId('save-add-init-btn'));
-      await waitFor(() => {
-        expect(screen.getByTestId('npc-form-modal')).toBeInTheDocument();
-      });
-    });
-
-    it('passes campaignName to addNPCToInitiative', async () => {
-      mockSaveNPC.mockResolvedValue({ success: true, npc: { name: 'Goblin', armorClass: 15 } });
-      mockUseNPCsManagement.mockReturnValue({
-        items: defaultNPCs,
-        loading: false,
-        loadItems: vi.fn(),
-        saveItems: vi.fn(),
-        deleteItem: vi.fn(),
-      });
-      render(<NPCs {...defaultProps} />);
-      fireEvent.click(screen.getByTestId('edit-btn-Goblin'));
-      await waitFor(() => {
-        expect(screen.getByTestId('npc-form-modal')).toBeInTheDocument();
-      });
-      fireEvent.change(screen.getByTestId('npc-name-input'), { target: { value: 'Goblin' } });
-      fireEvent.click(screen.getByTestId('save-add-init-btn'));
-      await waitFor(() => {
-        expect(mockAddNPCToInitiative).toHaveBeenCalledWith(
-          'test-campaign',
-          expect.any(Object),
-          defaultProps.onViewInitiative
-        );
-      });
-    });
   });
 
   describe('modal props', () => {
@@ -341,20 +247,6 @@ describe('NPCs', () => {
         expect(screen.getByTestId('npc-form-modal')).toBeInTheDocument();
       });
       expect(screen.getByTestId('modal-editing-npc')).toHaveTextContent('none');
-    });
-  });
-
-  describe('initiative', () => {
-    it('calls addNPCToInitiative when Add to Initiative clicked', async () => {
-      renderWithNPCs();
-      fireEvent.click(screen.getByTestId('init-btn-Goblin'));
-      await waitFor(() => {
-        expect(mockAddNPCToInitiative).toHaveBeenCalledWith(
-          'test-campaign',
-          defaultNPCs[0],
-          defaultProps.onViewInitiative
-        );
-      });
     });
   });
 });

@@ -105,8 +105,8 @@ describe('Settlements - filtering', () => {
     const searchInput = screen.getByLabelText('Search settlements');
     fireEvent.change(searchInput, { target: { value: 'fire' } });
     const villageBtns = screen.getAllByRole('button', { name: /village/i });
-    const filterBtn = villageBtns.find(btn => btn.classList.contains('settlements-size-btn'));
-    fireEvent.click(filterBtn);
+    const sizeFilterBtn = villageBtns.find(btn => btn.classList.contains('settlements-size-btn'));
+    fireEvent.click(sizeFilterBtn);
     expect(screen.getByText('Fire Village')).toBeInTheDocument();
     expect(screen.queryByText('Fireport')).not.toBeInTheDocument();
     expect(screen.queryByText('Iceholm')).not.toBeInTheDocument();

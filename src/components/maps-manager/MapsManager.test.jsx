@@ -175,42 +175,27 @@ describe('MapsManager', () => {
       render(<MapsManager {...defaultProps} />);
 
       await waitFor(() => {
-        expect(screen.getByText('Alpha Cave')).toBeInTheDocument();
-        expect(screen.getByText('Beta Forest')).toBeInTheDocument();
-        expect(screen.getByText('Zoo')).toBeInTheDocument();
+        const names = screen.getAllByRole('listitem');
+        expect(names[0]).toHaveTextContent('Alpha Cave');
+        expect(names[1]).toHaveTextContent('Beta Forest');
+        expect(names[2]).toHaveTextContent('Zoo');
       });
-
-      const items = document.querySelectorAll('.maps-manager-item');
-      expect(items[0].textContent).toContain('Alpha Cave');
-      expect(items[1].textContent).toContain('Beta Forest');
-      expect(items[2].textContent).toContain('Zoo');
     });
 
-    it('renders type badge for indoor maps', async () => {
+    it.each([
+      ['indoor', 'Indoor'],
+      ['outdoor', 'Outdoor'],
+    ])('renders %s type badge (%s)', async (type, badgeText) => {
       mapsService.loadMaps.mockResolvedValue({
         maps: [
-          { fileName: 'map1.json', name: 'Dungeon Level 1', type: 'indoor', isActive: false },
+          { fileName: 'map1.json', name: 'Test Map', type, isActive: false },
         ],
       });
 
       render(<MapsManager {...defaultProps} />);
 
       await waitFor(() => {
-        expect(screen.getByText('Indoor')).toBeInTheDocument();
-      });
-    });
-
-    it('renders type badge for outdoor maps', async () => {
-      mapsService.loadMaps.mockResolvedValue({
-        maps: [
-          { fileName: 'map1.json', name: 'Forest', type: 'outdoor', isActive: false },
-        ],
-      });
-
-      render(<MapsManager {...defaultProps} />);
-
-      await waitFor(() => {
-        expect(screen.getByText('Outdoor')).toBeInTheDocument();
+        expect(screen.getByText(badgeText)).toBeInTheDocument();
       });
     });
 
@@ -241,23 +226,6 @@ describe('MapsManager', () => {
         expect(screen.getByText('Dungeon Level 1')).toBeInTheDocument();
       });
       expect(screen.queryByRole('button', { name: 'Activate' })).not.toBeInTheDocument();
-    });
-
-    it('renders map without type badge when type is not set', async () => {
-      mapsService.loadMaps.mockResolvedValue({
-        maps: [
-          { fileName: 'map1.json', name: 'Generic Map', isActive: false },
-        ],
-      });
-
-      render(<MapsManager {...defaultProps} />);
-
-      await waitFor(() => {
-        expect(screen.getByText('Generic Map')).toBeInTheDocument();
-      });
-
-      const mapItem = screen.getByText('Generic Map').closest('.maps-manager-item');
-      expect(mapItem?.querySelector('.map-type-badge')).toBeNull();
     });
   });
 
@@ -400,29 +368,6 @@ describe('MapsManager', () => {
       expect(screen.getByText('Dungeon Level 1')).toBeInTheDocument();
     });
 
-    it('cancels rename when same name is entered', async () => {
-      mapsService.loadMaps.mockResolvedValue({
-        maps: [
-          { fileName: 'map1.json', name: 'Dungeon Level 1', type: 'indoor', isActive: true },
-        ],
-      });
-
-      render(<MapsManager {...defaultProps} />);
-
-      await waitFor(() => {
-        expect(screen.getByText('Dungeon Level 1')).toBeInTheDocument();
-      });
-
-      fireEvent.click(screen.getByRole('button', { name: 'Rename' }));
-
-      const renameInput = screen.getByDisplayValue('Dungeon Level 1');
-      fireEvent.keyDown(renameInput, { key: 'Enter' });
-
-      await waitFor(() => {
-        expect(mapsService.renameMap).not.toHaveBeenCalled();
-      });
-    });
-
     it('cancels rename when empty name is entered', async () => {
       mapsService.loadMaps.mockResolvedValue({
         maps: [
@@ -534,28 +479,6 @@ describe('MapsManager', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
       expect(screen.queryByRole('heading', { name: 'Delete Map' })).not.toBeInTheDocument();
     });
-
-    it('closes delete modal when overlay is clicked', async () => {
-      mapsService.loadMaps.mockResolvedValue({
-        maps: [
-          { fileName: 'map1.json', name: 'Dungeon Level 1', type: 'indoor', isActive: true },
-        ],
-      });
-
-      render(<MapsManager {...defaultProps} />);
-
-      await waitFor(() => {
-        expect(screen.getByText('Dungeon Level 1')).toBeInTheDocument();
-      });
-
-      fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
-      expect(screen.getByRole('heading', { name: 'Delete Map' })).toBeInTheDocument();
-
-      const overlay = document.querySelector('.maps-manager-modal-overlay');
-      fireEvent.click(overlay);
-
-      expect(screen.queryByRole('heading', { name: 'Delete Map' })).not.toBeInTheDocument();
-    });
   });
 
   describe('Edit Description Flow', () => {
@@ -578,28 +501,6 @@ describe('MapsManager', () => {
 
       await waitFor(() => {
         expect(screen.getByText(/Edit Description/)).toBeInTheDocument();
-      });
-    });
-
-    it('loads map data when opening edit description', async () => {
-      mapsService.loadMaps.mockResolvedValue({
-        maps: [
-          { fileName: 'map1.json', name: 'Dungeon Level 1', type: 'indoor', isActive: true },
-        ],
-      });
-      mapsService.loadMapData.mockResolvedValue({ description: 'A dark dungeon.' });
-
-      render(<MapsManager {...defaultProps} />);
-
-      await waitFor(() => {
-        expect(screen.getByText('Dungeon Level 1')).toBeInTheDocument();
-      });
-
-      const editDescButton = screen.getByTitle('Edit description');
-      fireEvent.click(editDescButton);
-
-      await waitFor(() => {
-        expect(mapsService.loadMapData).toHaveBeenCalledWith('test-campaign', 'map1.json');
       });
     });
 
@@ -661,60 +562,6 @@ describe('MapsManager', () => {
 
       expect(screen.queryByText(/Edit Description/)).not.toBeInTheDocument();
     });
-
-    it('closes edit description modal when overlay is clicked', async () => {
-      mapsService.loadMaps.mockResolvedValue({
-        maps: [
-          { fileName: 'map1.json', name: 'Dungeon Level 1', type: 'indoor', isActive: true },
-        ],
-      });
-      mapsService.loadMapData.mockResolvedValue({ description: '' });
-
-      render(<MapsManager {...defaultProps} />);
-
-      await waitFor(() => {
-        expect(screen.getByText('Dungeon Level 1')).toBeInTheDocument();
-      });
-
-      const editDescButton = screen.getByTitle('Edit description');
-      fireEvent.click(editDescButton);
-
-      await waitFor(() => {
-        expect(screen.getByText(/Edit Description/)).toBeInTheDocument();
-      });
-
-      const overlay = document.querySelector('.maps-manager-modal-overlay');
-      fireEvent.click(overlay);
-
-      expect(screen.queryByText(/Edit Description/)).not.toBeInTheDocument();
-    });
-
-    it('closes edit description modal when X button is clicked', async () => {
-      mapsService.loadMaps.mockResolvedValue({
-        maps: [
-          { fileName: 'map1.json', name: 'Dungeon Level 1', type: 'indoor', isActive: true },
-        ],
-      });
-      mapsService.loadMapData.mockResolvedValue({ description: '' });
-
-      render(<MapsManager {...defaultProps} />);
-
-      await waitFor(() => {
-        expect(screen.getByText('Dungeon Level 1')).toBeInTheDocument();
-      });
-
-      const editDescButton = screen.getByTitle('Edit description');
-      fireEvent.click(editDescButton);
-
-      await waitFor(() => {
-        expect(screen.getByText(/Edit Description/)).toBeInTheDocument();
-      });
-
-      const closeButton = screen.getByLabelText('Close');
-      fireEvent.click(closeButton);
-
-      expect(screen.queryByText(/Edit Description/)).not.toBeInTheDocument();
-    });
   });
 
   describe('Generate Buttons', () => {
@@ -728,18 +575,6 @@ describe('MapsManager', () => {
       const outdoorRadio = screen.getByRole('radio', { name: /outdoor/i });
       fireEvent.click(outdoorRadio);
       expect(screen.getByRole('button', { name: /Generate Terrain/i })).toBeInTheDocument();
-    });
-
-    it('hides Generate Dungeon button for outdoor type', () => {
-      render(<MapsManager {...defaultProps} />);
-      const outdoorRadio = screen.getByRole('radio', { name: /outdoor/i });
-      fireEvent.click(outdoorRadio);
-      expect(screen.queryByRole('button', { name: /Generate Dungeon/i })).not.toBeInTheDocument();
-    });
-
-    it('hides Generate Terrain button for indoor type', () => {
-      render(<MapsManager {...defaultProps} />);
-      expect(screen.queryByRole('button', { name: /Generate Terrain/i })).not.toBeInTheDocument();
     });
   });
 

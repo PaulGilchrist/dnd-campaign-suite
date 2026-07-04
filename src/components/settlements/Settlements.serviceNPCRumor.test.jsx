@@ -52,7 +52,8 @@ vi.mock('../../services/campaign/settlementGenerator.js', () => ({
 describe('Settlements - service, NPC, rumor management', () => {
   const mockUseSettlements = {
     items: [],
-    loading: false,    saveItems: async () => {},
+    loading: false,
+    saveItems: async () => {},
     deleteItem: async () => {},
   };
 
@@ -75,30 +76,24 @@ describe('Settlements - service, NPC, rumor management', () => {
     Object.assign(settlementMockReturn, mockUseSettlements);
   });
 
-  it('allows adding multiple services', () => {
+  it('allows adding and removing services, NPCs, and rumors via add/remove buttons', () => {
     render(<Settlements campaignName="test" onBack={() => {}} />);
     const modalOpen = screen.getByRole('button', { name: /new settlement/i });
     fireEvent.click(modalOpen);
+
+    // Services
     const addServiceBtn = screen.getByRole('button', { name: /add service/i });
     fireEvent.click(addServiceBtn);
     fireEvent.click(addServiceBtn);
     expect(screen.getAllByRole('button', { name: /remove service/i }).length).toBe(2);
-  });
 
-  it('allows adding multiple NPCs', () => {
-    render(<Settlements campaignName="test" onBack={() => {}} />);
-    const modalOpen = screen.getByRole('button', { name: /new settlement/i });
-    fireEvent.click(modalOpen);
+    // NPCs
     const addNpcBtn = screen.getByRole('button', { name: /add npc/i });
     fireEvent.click(addNpcBtn);
     fireEvent.click(addNpcBtn);
     expect(screen.getAllByRole('button', { name: /remove npc/i }).length).toBe(2);
-  });
 
-  it('allows adding multiple rumors', () => {
-    render(<Settlements campaignName="test" onBack={() => {}} />);
-    const modalOpen = screen.getByRole('button', { name: /new settlement/i });
-    fireEvent.click(modalOpen);
+    // Rumors
     const addRumorBtn = screen.getByRole('button', { name: /add rumor/i });
     fireEvent.click(addRumorBtn);
     fireEvent.click(addRumorBtn);

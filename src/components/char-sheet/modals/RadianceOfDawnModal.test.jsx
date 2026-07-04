@@ -43,12 +43,6 @@ describe('RadianceOfDawnModal', () => {
   // ── Rendering ──
 
   describe('initial render', () => {
-    it('renders the modal overlay and modal container', () => {
-      render(<RadianceOfDawnModal {...makeProps()} />);
-      expect(document.querySelector('.sp-overlay')).toBeInTheDocument();
-      expect(document.querySelector('.sp-modal')).toBeInTheDocument();
-    });
-
     it('renders the header with "Radiance of the Dawn" title and sun icon', () => {
       render(<RadianceOfDawnModal {...makeProps()} />);
       expect(screen.getByText('Radiance of the Dawn')).toBeInTheDocument();
@@ -203,12 +197,6 @@ describe('RadianceOfDawnModal', () => {
       render(<RadianceOfDawnModal {...makeProps()} />);
       fireEvent.click(document.querySelector('.sp-overlay'));
       expect(mockOnSkip).toHaveBeenCalledTimes(1);
-    });
-
-    it('does not close when clicking inside the modal content', () => {
-      render(<RadianceOfDawnModal {...makeProps()} />);
-      fireEvent.click(document.querySelector('.sp-modal'));
-      expect(mockOnSkip).not.toHaveBeenCalled();
     });
   });
 

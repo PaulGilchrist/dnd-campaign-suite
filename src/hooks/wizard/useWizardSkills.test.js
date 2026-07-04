@@ -279,37 +279,6 @@ describe('useWizardSkills', () => {
       expect(result.current).toHaveProperty('skillWarnings');
     });
 
-    it('does not expose setWarnings in the return object', () => {
-      useWizardConfig.mockReturnValue({
-        skillLimits: { maxSkills: 4 },
-        expertiseLimits: null,
-        preSelectedSkills: [],
-        warnings: [],
-      });
-
-      const { result } = renderSkills();
-
-      expect(result.current).not.toHaveProperty('setWarnings');
-    });
-
-    it('returns an object with the expected keys', () => {
-      useWizardConfig.mockReturnValue({
-        skillLimits: null,
-        expertiseLimits: null,
-        preSelectedSkills: [],
-        warnings: [],
-      });
-
-      const { result } = renderSkills();
-
-      expect(typeof result.current).toBe('object');
-      expect(Array.isArray(result.current.skillWarnings)).toBe(true);
-      expect(result.current).toHaveProperty('skillLimits');
-      expect(result.current).toHaveProperty('expertiseLimits');
-      expect(result.current).toHaveProperty('preSelectedSkills');
-      expect(result.current).toHaveProperty('skillWarnings');
-    });
-
     it('does not return extra properties beyond the four expected keys', () => {
       useWizardConfig.mockReturnValue({
         skillLimits: null,

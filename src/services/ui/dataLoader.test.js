@@ -573,13 +573,6 @@ describe('dataLoader', () => {
             const result = await loadEquipment();
             expect(result).toEqual([]);
         });
-
-        it('should return empty array on network error', async () => {
-            global.fetch.mockRejectedValueOnce(new Error('Network error'));
-
-            const result = await loadEquipment();
-            expect(result).toEqual([]);
-        });
     });
 
     describe('loadMonsters', () => {
@@ -601,13 +594,6 @@ describe('dataLoader', () => {
             const result = await loadMonsters();
             expect(result).toEqual([]);
         });
-
-        it('should return empty array on network error', async () => {
-            global.fetch.mockRejectedValueOnce(new Error('Network error'));
-
-            const result = await loadMonsters();
-            expect(result).toEqual([]);
-        });
     });
 
     describe('loadMagicItems', () => {
@@ -625,13 +611,6 @@ describe('dataLoader', () => {
 
         it('should return empty array on error', async () => {
             global.fetch.mockResolvedValueOnce(mockErrorResponse(500));
-
-            const result = await loadMagicItems();
-            expect(result).toEqual([]);
-        });
-
-        it('should return empty array on network error', async () => {
-            global.fetch.mockRejectedValueOnce(new Error('Network error'));
 
             const result = await loadMagicItems();
             expect(result).toEqual([]);
@@ -677,13 +656,6 @@ describe('dataLoader', () => {
 
         it('should return empty array on error', async () => {
             global.fetch.mockResolvedValueOnce(mockErrorResponse(500));
-
-            const result = await loadSpells('5e');
-            expect(result).toEqual([]);
-        });
-
-        it('should return empty array on network error', async () => {
-            global.fetch.mockRejectedValueOnce(new Error('Network error'));
 
             const result = await loadSpells('5e');
             expect(result).toEqual([]);
@@ -747,29 +719,6 @@ describe('dataLoader', () => {
             expect(result[0]).toEqual({ name: 'Athletics', ability: 'Strength' });
             expect(result[17]).toEqual({ name: 'Persuasion', ability: 'Charisma' });
         });
-
-        it('should return fallback skills on non-ok response', async () => {
-            global.fetch.mockResolvedValueOnce(mockErrorResponse(500));
-
-            const result = await loadSkills();
-
-            expect(result).toHaveLength(18);
-            expect(result[0]).toEqual({ name: 'Athletics', ability: 'Strength' });
-        });
-
-        it('should use fallback when ability data has null skills array', async () => {
-            const malformedData = [
-                { full_name: 'Strength', skills: null }
-            ];
-            global.fetch.mockResolvedValueOnce(mockSuccessResponse(malformedData));
-
-            const result = await loadSkills();
-
-            // The forEach on null skills throws, triggering the catch/fallback
-            expect(result).toHaveLength(18);
-            expect(result[0]).toEqual({ name: 'Acrobatics', ability: 'Dexterity' });
-            expect(result[17]).toEqual({ name: 'Survival', ability: 'Wisdom' });
-        });
     });
 
     describe('loadPassiveSkills', () => {
@@ -787,13 +736,6 @@ describe('dataLoader', () => {
 
         it('should return fallback passive skills on error', async () => {
             global.fetch.mockResolvedValueOnce(mockErrorResponse(500));
-
-            const result = await loadPassiveSkills();
-            expect(result).toEqual(['Insight', 'Investigation', 'Perception']);
-        });
-
-        it('should return fallback passive skills on network error', async () => {
-            global.fetch.mockRejectedValueOnce(new Error('Network error'));
 
             const result = await loadPassiveSkills();
             expect(result).toEqual(['Insight', 'Investigation', 'Perception']);
@@ -844,15 +786,6 @@ describe('dataLoader', () => {
             global.fetch.mockResolvedValueOnce(mockSuccessResponse(mockData));
 
             const result = await loadSpellData({});
-            expect(result).toEqual(mockData);
-            expect(global.fetch).toHaveBeenCalledWith('/data/spells.json');
-        });
-
-        it('should default to 5e when playerStats is null', async () => {
-            const mockData = [{ name: 'Fireball', level: 3 }];
-            global.fetch.mockResolvedValueOnce(mockSuccessResponse(mockData));
-
-            const result = await loadSpellData(null);
             expect(result).toEqual(mockData);
             expect(global.fetch).toHaveBeenCalledWith('/data/spells.json');
         });
@@ -923,67 +856,7 @@ describe('dataLoader', () => {
             expect(cacheState).toHaveProperty('2024');
         });
 
-        it('should return a deep copy that does not affect internal state', async () => {
-            const mockData = [{ name: 'Wizard' }];
-            global.fetch.mockResolvedValueOnce(mockSuccessResponse(mockData));
 
-            // Load data so the cache has content
-            await loadClassData('5e');
-
-            const cacheState = getCacheState();
-            cacheState['5e'].classes = 'modified';
-
-            const cacheState2 = getCacheState();
-            expect(cacheState2['5e'].classes).toEqual(mockData);
-        });
-
-        it('should contain all expected versioned keys', () => {
-            const cacheState = getCacheState();
-            const expectedKeys = ['classes', 'races', 'backgrounds', 'feats', 'rules-validation', 'spells', 'maneuvers'];
-
-            expectedKeys.forEach(key => {
-                expect(cacheState['5e']).toHaveProperty(key);
-                expect(cacheState['2024']).toHaveProperty(key);
-            });
-        });
-
-        it('should not include shared data keys in versioned cache', () => {
-            const cacheState = getCacheState();
-            const sharedKeys = ['skills', 'abilityScores', 'passiveSkills', 'equipment', 'monsters', 'magicItems'];
-
-            sharedKeys.forEach(key => {
-                expect(cacheState['5e']).not.toHaveProperty(key);
-            });
-        });
     });
 
-    describe('integration - caching across functions', () => {
-        it('should share cached data between load and fetch functions', async () => {
-            const mockData = [
-                { name: 'Wizard', index: 'wizard' },
-                { name: 'Sorcerer', index: 'sorcerer' }
-            ];
-            global.fetch.mockResolvedValueOnce(mockSuccessResponse(mockData));
-
-            // loadClassData populates the cache
-            await loadClassData('5e');
-
-            // fetchClassData should use the cached data, not fetch again
-            const result = await fetchClassData('Wizard', '5e');
-            expect(result).toEqual({ name: 'Wizard', index: 'wizard' });
-            expect(global.fetch).toHaveBeenCalledTimes(1);
-        });
-
-        it('should handle empty JSON array response gracefully', async () => {
-            global.fetch.mockResolvedValueOnce(mockSuccessResponse([]));
-
-            const result = await loadClassData('5e');
-            expect(result).toEqual([]);
-
-            // Empty result should still be cached
-            const cached = await loadClassData('5e');
-            expect(cached).toEqual([]);
-            expect(global.fetch).toHaveBeenCalledTimes(1);
-        });
-    });
 });

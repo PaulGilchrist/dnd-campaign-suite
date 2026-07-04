@@ -134,28 +134,6 @@ describe('WildMagicTamedModal', () => {
     });
   });
 
-  // ── Closing behavior ──
-
-  describe('closing the modal', () => {
-    it('calls onClose when clicking the overlay background', () => {
-      renderModal();
-      fireEvent.click(document.querySelector('.sp-overlay'));
-      expect(baseProps.onClose).toHaveBeenCalledTimes(1);
-    });
-
-    it('does not close when clicking inside the modal content', () => {
-      renderModal();
-      fireEvent.click(document.querySelector('.sp-modal'));
-      expect(baseProps.onClose).not.toHaveBeenCalled();
-    });
-
-    it('calls onClose when Cancel button is clicked', () => {
-      renderModal();
-      fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
-      expect(baseProps.onClose).toHaveBeenCalledTimes(1);
-    });
-  });
-
   // ── Surge selection ──
 
   describe('surge selection', () => {

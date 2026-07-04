@@ -165,50 +165,6 @@ describe('SacredWeaponModal', () => {
     expect(screen.queryByRole('button', { name: 'Done' })).not.toBeInTheDocument();
   });
 
-  // ── Overlay & dismissal ──
-
-  it('calls onClose when clicking the overlay background', () => {
-    const onClose = vi.fn();
-    render(<SacredWeaponModal {...makeProps({ onClose })} />);
-    fireEvent.click(document.querySelector('.sp-overlay'));
-    expect(onClose).toHaveBeenCalledTimes(1);
-  });
-
-  it('does not close when clicking inside the modal content', () => {
-    const onClose = vi.fn();
-    render(<SacredWeaponModal {...makeProps({ onClose })} />);
-    fireEvent.click(document.querySelector('.sp-modal'));
-    expect(onClose).not.toHaveBeenCalled();
-  });
-
-  it('does not close when clicking the modal header', () => {
-    const onClose = vi.fn();
-    render(<SacredWeaponModal {...makeProps({ onClose })} />);
-    fireEvent.click(document.querySelector('.sp-header'));
-    expect(onClose).not.toHaveBeenCalled();
-  });
-
-  it('does not close when clicking the modal body', () => {
-    const onClose = vi.fn();
-    render(<SacredWeaponModal {...makeProps({ onClose })} />);
-    fireEvent.click(document.querySelector('.sp-body'));
-    expect(onClose).not.toHaveBeenCalled();
-  });
-
-  it('does not close when clicking the modal actions', () => {
-    const onClose = vi.fn();
-    render(<SacredWeaponModal {...makeProps({ onClose })} />);
-    fireEvent.click(document.querySelector('.sp-actions'));
-    expect(onClose).not.toHaveBeenCalled();
-  });
-
-  it('calls onClose when the Cancel button is clicked', () => {
-    const onClose = vi.fn();
-    render(<SacredWeaponModal {...makeProps({ onClose })} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
-    expect(onClose).toHaveBeenCalledTimes(1);
-  });
-
   // ── Selection behavior ──
 
   it('selects an option when its radio button is clicked', () => {

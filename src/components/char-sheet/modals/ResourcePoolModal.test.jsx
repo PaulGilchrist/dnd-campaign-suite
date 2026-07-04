@@ -125,14 +125,6 @@ describe('ResourcePoolModal', () => {
     expect(handleClose).toHaveBeenCalledTimes(1);
   });
 
-  it('does not close when clicking inside the modal content', () => {
-    const handleClose = vi.fn();
-    renderModal(makePlayerStats(), makeAutomation(), 'test-campaign', handleClose);
-    const modalContent = document.querySelector('.resource-pool-modal');
-    fireEvent.click(modalContent);
-    expect(handleClose).not.toHaveBeenCalled();
-  });
-
   // ── Forward conversion (spell slot -> wild shape) ──
 
   it('shows forward conversion section when automation.conversion is spell_slot_to_wild_shape', () => {

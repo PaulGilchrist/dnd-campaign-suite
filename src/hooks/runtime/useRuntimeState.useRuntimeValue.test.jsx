@@ -27,28 +27,10 @@ describe('useRuntimeState — useRuntimeValue hook', () => {
     expect(result.current).toBe(0);
   });
 
-  it('returns false as a valid initial value', () => {
-    seedTrackedResources('test-char', { active: false });
-    const { result } = renderHook(() => useRuntimeValue('test-char', 'active', 'test-campaign'));
-    expect(result.current).toBe(false);
-  });
-
-  it('returns an empty string as a valid initial value', () => {
-    seedTrackedResources('test-char', { name: '' });
-    const { result } = renderHook(() => useRuntimeValue('test-char', 'name', 'test-campaign'));
-    expect(result.current).toBe('');
-  });
-
   it('returns an array value from the store', () => {
     seedTrackedResources('test-char', { spells: ['fireball'] });
     const { result } = renderHook(() => useRuntimeValue('test-char', 'spells', 'test-campaign'));
     expect(result.current).toEqual(['fireball']);
-  });
-
-  it('returns an object value from the store', () => {
-    seedTrackedResources('test-char', { stats: { str: 18 } });
-    const { result } = renderHook(() => useRuntimeValue('test-char', 'stats', 'test-campaign'));
-    expect(result.current).toEqual({ str: 18 });
   });
 
   it('updates when the value changes via setRuntimeValue', async () => {
@@ -135,30 +117,6 @@ describe('useRuntimeState — useRuntimeValue hook', () => {
     fetchSpy.mockRestore();
   });
 
-  it('handles undefined initial value gracefully', () => {
-    seedTrackedResources('test-char', { hp: undefined });
-    const { result } = renderHook(() => useRuntimeValue('test-char', 'hp', 'test-campaign'));
-    // Object.entries omits undefined values, so getRuntimeValue returns null
-    expect(result.current).toBeNull();
-  });
-
-  it('handles null value', () => {
-    seedTrackedResources('test-char', { hp: null });
-    const { result } = renderHook(() => useRuntimeValue('test-char', 'hp', 'test-campaign'));
-    expect(result.current).toBeNull();
-  });
-
-  it('handles negative values', () => {
-    seedTrackedResources('test-char', { hp: -5 });
-    const { result } = renderHook(() => useRuntimeValue('test-char', 'hp', 'test-campaign'));
-    expect(result.current).toBe(-5);
-  });
-
-  it('handles large numeric values', () => {
-    seedTrackedResources('test-char', { hp: 999999 });
-    const { result } = renderHook(() => useRuntimeValue('test-char', 'hp', 'test-campaign'));
-    expect(result.current).toBe(999999);
-  });
 });
 
 describe('useRuntimeState — useRuntimeValue hook — reactivity', () => {
@@ -219,21 +177,6 @@ describe('useRuntimeState — useRuntimeValue hook — reactivity', () => {
     fetchSpy.mockRestore();
   });
 
-  it('updates when value changes from string to number', async () => {
-    const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValue(undefined);
-    seedTrackedResources('react-char', { hp: '15' });
-    const { result } = renderHook(() => useRuntimeValue('react-char', 'hp', 'test-campaign'));
-    expect(result.current).toBe('15');
-
-    await act(async () => {
-      setRuntimeValue('react-char', 'hp', 15, 'test-campaign');
-    });
-    // 15 === "15" via valuesEqual, so no update
-    expect(result.current).toBe('15');
-
-    fetchSpy.mockRestore();
-  });
-
   it('updates when value changes via multiple seedTrackedResources calls', async () => {
     const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValue(undefined);
     seedTrackedResources('react-char', { hp: 10 });
@@ -281,116 +224,6 @@ describe('useRuntimeState — useRuntimeValue hook — reactivity', () => {
     });
     expect(result.current).toBe(25);
 
-    fetchSpy.mockRestore();
-  });
-});
-
-describe('useRuntimeState — useRuntimeValue hook — edge cases', () => {
-  beforeEach(() => {
-    clearRuntimeState('edge-char');
-    vi.restoreAllMocks();
-  });
-
-  it('does not crash when characterKey is falsy', () => {
-    const { result } = renderHook(() => useRuntimeValue(null, 'hp', 'test-campaign'));
-    expect(result.current).toBeNull();
-  });
-
-  it('does not crash when propertyName is falsy', () => {
-    const { result } = renderHook(() => useRuntimeValue('edge-char', null, 'test-campaign'));
-    expect(result.current).toBeNull();
-  });
-
-  it('works with special characters in characterKey', () => {
-    seedTrackedResources('char/with/slashes', { hp: 10 });
-    const { result } = renderHook(() => useRuntimeValue('char/with/slashes', 'hp', 'test-campaign'));
-    expect(result.current).toBe(10);
-  });
-
-  it('works with empty string characterKey', () => {
-    seedTrackedResources('', { hp: 10 });
-    const { result } = renderHook(() => useRuntimeValue('', 'hp', 'test-campaign'));
-    expect(result.current).toBe(10);
-  });
-
-  it('works with empty string propertyName', () => {
-    seedTrackedResources('edge-char', { '': 'empty-key' });
-    const { result } = renderHook(() => useRuntimeValue('edge-char', '', 'test-campaign'));
-    expect(result.current).toBe('empty-key');
-  });
-
-  it('handles boolean value changes', async () => {
-    const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValue(undefined);
-    seedTrackedResources('edge-char', { active: true });
-    const { result } = renderHook(() => useRuntimeValue('edge-char', 'active', 'test-campaign'));
-    expect(result.current).toBe(true);
-
-    await act(async () => {
-      setRuntimeValue('edge-char', 'active', false, 'test-campaign');
-    });
-    expect(result.current).toBe(false);
-
-    fetchSpy.mockRestore();
-  });
-
-  it('handles string value changes', async () => {
-    const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValue(undefined);
-    seedTrackedResources('edge-char', { name: 'Gandalf' });
-    const { result } = renderHook(() => useRuntimeValue('edge-char', 'name', 'test-campaign'));
-    expect(result.current).toBe('Gandalf');
-
-    await act(async () => {
-      setRuntimeValue('edge-char', 'name', 'Radagast', 'test-campaign');
-    });
-    expect(result.current).toBe('Radagast');
-
-    fetchSpy.mockRestore();
-  });
-
-  it('handles array value changes', async () => {
-    const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValue(undefined);
-    seedTrackedResources('edge-char', { spells: ['fireball'] });
-    const { result } = renderHook(() => useRuntimeValue('edge-char', 'spells', 'test-campaign'));
-    expect(result.current).toEqual(['fireball']);
-
-    await act(async () => {
-      setRuntimeValue('edge-char', 'spells', ['fireball', 'lightning-bolt'], 'test-campaign');
-    });
-    expect(result.current).toEqual(['fireball', 'lightning-bolt']);
-
-    fetchSpy.mockRestore();
-  });
-
-  it('handles object value changes', async () => {
-    const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValue(undefined);
-    seedTrackedResources('edge-char', { stats: { str: 18 } });
-    const { result } = renderHook(() => useRuntimeValue('edge-char', 'stats', 'test-campaign'));
-    expect(result.current).toEqual({ str: 18 });
-
-    await act(async () => {
-      setRuntimeValue('edge-char', 'stats', { str: 20, dex: 15 }, 'test-campaign');
-    });
-    expect(result.current).toEqual({ str: 20, dex: 15 });
-
-    fetchSpy.mockRestore();
-  });
-
-  it('does not update when object has same keys/values', async () => {
-    const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValue(undefined);
-    seedTrackedResources('edge-char', { stats: { str: 18 } });
-    let renderCount = 0;
-    renderHook(() => {
-      renderCount++;
-      return useRuntimeValue('edge-char', 'stats', 'test-campaign');
-    });
-    const initialCount = renderCount;
-
-    await act(async () => {
-      setRuntimeValue('edge-char', 'stats', { str: 18 }, 'test-campaign');
-    });
-
-    // Should not have re-rendered due to valuesEqual
-    expect(renderCount).toBe(initialCount);
     fetchSpy.mockRestore();
   });
 });

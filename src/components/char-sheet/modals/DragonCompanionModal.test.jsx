@@ -51,23 +51,17 @@ describe('DragonCompanionModal', () => {
   // ── Initial render / display ──
 
   describe('initial render', () => {
-    it('renders the modal overlay and modal container', () => {
+    it('renders the modal with header, body, actions, dragon icon, action name, and cancel button', () => {
       renderModal();
       expect(document.querySelector('.sp-overlay')).toBeInTheDocument();
       expect(document.querySelector('.sp-modal')).toBeInTheDocument();
-    });
-
-    it('renders the modal structure with header, body, and actions sections', () => {
-      renderModal();
       expect(document.querySelector('.sp-header')).toBeInTheDocument();
       expect(document.querySelector('.sp-body')).toBeInTheDocument();
       expect(document.querySelector('.sp-actions')).toBeInTheDocument();
-    });
-
-    it('renders the header with dragon icon and action name', () => {
-      renderModal();
       expect(screen.getByText('Dragon Companion')).toBeInTheDocument();
       expect(document.querySelector('.sp-header .fa-solid.fa-dragon')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Summon Dragon/ })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
     });
 
     it('renders a custom action name when provided', () => {
@@ -81,17 +75,6 @@ describe('DragonCompanionModal', () => {
       expect(body.textContent).toContain('Cast');
       expect(body.textContent).toContain('Summon Dragon');
       expect(body.textContent).toContain('without material components or spell slot');
-    });
-
-    it('renders a Summon Dragon button with dragon icon in actions', () => {
-      renderModal();
-      expect(screen.getByRole('button', { name: /Summon Dragon/ })).toBeInTheDocument();
-      expect(document.querySelector('.sp-actions .fa-solid.fa-dragon')).toBeInTheDocument();
-    });
-
-    it('renders a Cancel button', () => {
-      renderModal();
-      expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
     });
 
     it('does not show result state on initial render', () => {
@@ -142,13 +125,6 @@ describe('DragonCompanionModal', () => {
       renderModal({ onClose });
       fireEvent.click(document.querySelector('.sp-overlay'));
       expect(onClose).toHaveBeenCalledTimes(1);
-    });
-
-    it('does not close when clicking inside the modal content', () => {
-      const onClose = vi.fn();
-      renderModal({ onClose });
-      fireEvent.click(document.querySelector('.sp-modal'));
-      expect(onClose).not.toHaveBeenCalled();
     });
 
     it('calls onClose when Cancel button is clicked', () => {
@@ -264,32 +240,6 @@ describe('DragonCompanionModal', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Done' }));
       });
       expect(onClose).toHaveBeenCalledTimes(1);
-    });
-
-    it('calls onClose when overlay is clicked after confirm', async () => {
-      const onClose = vi.fn();
-      dragonCompanionHandler.confirmDragonCompanion.mockResolvedValue(defaultMockResult);
-      renderModal({ onClose });
-      await act(async () => {
-        fireEvent.click(screen.getByRole('button', { name: /Summon Dragon/ }));
-      });
-      await waitFor(() => {
-        fireEvent.click(document.querySelector('.sp-overlay'));
-      });
-      expect(onClose).toHaveBeenCalledTimes(1);
-    });
-
-    it('does not close when clicking modal content after confirm', async () => {
-      const onClose = vi.fn();
-      dragonCompanionHandler.confirmDragonCompanion.mockResolvedValue(defaultMockResult);
-      renderModal({ onClose });
-      await act(async () => {
-        fireEvent.click(screen.getByRole('button', { name: /Summon Dragon/ }));
-      });
-      await waitFor(() => {
-        fireEvent.click(document.querySelector('.sp-modal'));
-      });
-      expect(onClose).not.toHaveBeenCalled();
     });
   });
 

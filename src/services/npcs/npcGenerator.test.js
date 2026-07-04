@@ -1,8 +1,6 @@
 // @improved-by-ai
 import { describe, it, expect, vi, afterEach } from 'vitest';
 
-
-
 // ─── Fixtures ───────────────────────────────────────────────────────────────
 
 function createNamesFixture() {
@@ -29,10 +27,6 @@ function createTraitsFixture(extra = {}) {
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
-/**
- * Creates an isolated module import with mocked fetch and controlled randomness.
- * Each call resets modules and sets up fresh mocks to prevent cross-test pollution.
- */
 async function loadModule(names, traits, randomValue) {
   vi.resetModules();
 
@@ -119,8 +113,6 @@ describe('generateNPC', () => {
       const npc = await mod.generateNPC();
 
       const raceNames = names[npc.race];
-      // The name must exist in the fixture for the selected race's gender pool
-      // or in the male fallback
       const allNames = [
         ...(raceNames?.male ?? []),
         ...(raceNames?.female ?? []),
@@ -165,31 +157,26 @@ describe('generateNPC', () => {
       expect(existingNPCs.every((e) => e.name !== npc.name)).toBe(true);
     });
 
-    it('handles an empty existingNPCs array', async () => {
+    it('handles empty and undefined existingNPCs arrays', async () => {
       const { mod } = await loadModule(
         createNamesFixture(),
         createTraitsFixture(),
         0.5,
       );
 
-      const npc = await mod.generateNPC([]);
+      const npc1 = await mod.generateNPC([]);
+      expect(npc1).toBeDefined();
+      expect(typeof npc1.name).toBe('string');
+      expect(npc1.name.length).toBeGreaterThan(0);
 
-      expect(npc).toBeDefined();
-      expect(typeof npc.name).toBe('string');
-      expect(npc.name.length).toBeGreaterThan(0);
-    });
-
-    it('handles undefined existingNPCs gracefully', async () => {
-      const { mod } = await loadModule(
+      const { mod: mod2 } = await loadModule(
         createNamesFixture(),
         createTraitsFixture(),
-        0.5,
+        0.6,
       );
-
-      const npc = await mod.generateNPC(undefined);
-
-      expect(npc).toBeDefined();
-      expect(typeof npc.name).toBe('string');
+      const npc2 = await mod2.generateNPC(undefined);
+      expect(npc2).toBeDefined();
+      expect(typeof npc2.name).toBe('string');
     });
   });
 
@@ -198,7 +185,7 @@ describe('generateNPC', () => {
       const { mod } = await loadModule(
         createNamesFixture(),
         createTraitsFixture(),
-        0.1, // < 0.5 ensures Math.random() > 0.3 for stat block is false
+        0.1,
       );
 
       const npc = await mod.generateNPC();
@@ -212,7 +199,7 @@ describe('generateNPC', () => {
       const { mod } = await loadModule(
         createNamesFixture(),
         createTraitsFixture(),
-        0.9, // > 0.5 ensures Math.random() > 0.3 for stat block is true
+        0.9,
       );
 
       const npc = await mod.generateNPC();
@@ -232,7 +219,7 @@ describe('generateNPC', () => {
       const { mod } = await loadModule(
         createNamesFixture(),
         createTraitsFixture(),
-        0.95, // CR 3-5 range
+        0.95,
       );
 
       const npc = await mod.generateNPC();
@@ -249,7 +236,7 @@ describe('generateNPC', () => {
       const { mod } = await loadModule(
         createNamesFixture(),
         createTraitsFixture(),
-        0.9, // CR 2-5 range
+        0.9,
       );
 
       const npc = await mod.generateNPC();
@@ -257,7 +244,6 @@ describe('generateNPC', () => {
       expect(typeof npc.speed).toBe('object');
       expect(npc.speed.walk).toBe('30 ft.');
       const extraTypes = Object.keys(npc.speed).filter((k) => k !== 'walk');
-      // At CR >= 2 there's a chance for extra movement; having none is also valid
       expect(extraTypes.every((t) => ['fly', 'swim', 'climb', 'burrow'].includes(t))).toBe(true);
     });
 
@@ -276,23 +262,6 @@ describe('generateNPC', () => {
       expect(npc.damageImmunities).toEqual([]);
       expect(Array.isArray(npc.conditionImmunities)).toBe(true);
       expect(npc.conditionImmunities).toEqual([]);
-    });
-
-    it('includes empty strings for traits and reactions when no traits roll', async () => {
-      const { mod } = await loadModule(
-        createNamesFixture(),
-        createTraitsFixture(),
-        0.9,
-      );
-
-      const npc = await mod.generateNPC();
-
-      if (typeof npc.traits === 'string') {
-        expect(typeof npc.traits).toBe('string');
-      }
-      if (typeof npc.reactions === 'string') {
-        expect(typeof npc.reactions).toBe('string');
-      }
     });
 
     it('includes savingThrowBonuses and skillBonuses objects', async () => {

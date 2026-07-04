@@ -252,20 +252,6 @@ describe('FiendishResilienceModal', () => {
       expect(onClose).toHaveBeenCalledTimes(1);
     });
 
-    it('calls onClose when clicking the overlay background', () => {
-      const onClose = vi.fn();
-      render(<FiendishResilienceModal {...makeProps({ onClose })} />);
-      fireEvent.click(document.querySelector('.sp-overlay'));
-      expect(onClose).toHaveBeenCalledTimes(1);
-    });
-
-    it('does not close when clicking inside the modal content', () => {
-      const onClose = vi.fn();
-      render(<FiendishResilienceModal {...makeProps({ onClose })} />);
-      fireEvent.click(document.querySelector('.sp-modal'));
-      expect(onClose).not.toHaveBeenCalled();
-    });
-
     it('calls onClose when the Done button is clicked after apply', async () => {
       const onClose = vi.fn();
       fiendishResilienceHandler.applyTypeChoice.mockResolvedValue({

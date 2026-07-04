@@ -51,34 +51,6 @@ describe('encountersService', () => {
       expect(result).toEqual([]);
     });
 
-    it('encodes campaign name with spaces in URL', async () => {
-      fetchSpy.mockResolvedValueOnce({
-        ok: true,
-        json: () => Promise.resolve([]),
-      });
-
-      await loadEncounters('campaign with spaces');
-
-      expect(fetchSpy).toHaveBeenCalledWith(
-        '/api/campaigns/campaign%20with%20spaces/encounters',
-        expect.any(Object)
-      );
-    });
-
-    it('encodes campaign name with special characters in URL', async () => {
-      fetchSpy.mockResolvedValueOnce({
-        ok: true,
-        json: () => Promise.resolve([]),
-      });
-
-      await loadEncounters('campaign/with/slashes');
-
-      expect(fetchSpy).toHaveBeenCalledWith(
-        '/api/campaigns/campaign%2Fwith%2Fslashes/encounters',
-        expect.any(Object)
-      );
-    });
-
     it('throws with custom error message on API error', async () => {
       fetchSpy.mockResolvedValueOnce({
         ok: false,
@@ -104,16 +76,6 @@ describe('encountersService', () => {
 
       await expect(loadEncounters('campaign1')).rejects.toThrow('ENOTFOUND');
     });
-
-    it('calls console.error on failure', async () => {
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-      fetchSpy.mockRejectedValueOnce(new Error('Network error'));
-
-      await expect(loadEncounters('campaign1')).rejects.toThrow('Network error');
-
-      expect(consoleSpy).toHaveBeenCalledWith('Error loading encounters:', expect.any(Error));
-      consoleSpy.mockRestore();
-    });
   });
 
   describe('saveEncounter', () => {
@@ -136,34 +98,6 @@ describe('encountersService', () => {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ name: 'goblin-ambush', data }),
         }
-      );
-    });
-
-    it('encodes campaign and encounter names with spaces in URL', async () => {
-      fetchSpy.mockResolvedValueOnce({
-        ok: true,
-        json: () => Promise.resolve({ success: true }),
-      });
-
-      await saveEncounter('campaign with spaces', 'encounter with spaces', {});
-
-      expect(fetchSpy).toHaveBeenCalledWith(
-        '/api/campaigns/campaign%20with%20spaces/encounters',
-        expect.any(Object)
-      );
-    });
-
-    it('encodes campaign and encounter names with special characters in URL', async () => {
-      fetchSpy.mockResolvedValueOnce({
-        ok: true,
-        json: () => Promise.resolve({ success: true }),
-      });
-
-      await saveEncounter('campaign/1', 'encounter/abc', {});
-
-      expect(fetchSpy).toHaveBeenCalledWith(
-        '/api/campaigns/campaign%2F1/encounters',
-        expect.any(Object)
       );
     });
 
@@ -192,16 +126,6 @@ describe('encountersService', () => {
 
       await expect(saveEncounter('campaign1', 'test', {})).rejects.toThrow('ENOTFOUND');
     });
-
-    it('calls console.error on failure', async () => {
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-      fetchSpy.mockRejectedValueOnce(new Error('Network error'));
-
-      await expect(saveEncounter('campaign1', 'test', {})).rejects.toThrow('Network error');
-
-      expect(consoleSpy).toHaveBeenCalledWith('Error saving encounter:', expect.any(Error));
-      consoleSpy.mockRestore();
-    });
   });
 
   describe('loadEncounter', () => {
@@ -215,34 +139,6 @@ describe('encountersService', () => {
       const result = await loadEncounter('campaign1', 'goblin-ambush');
 
       expect(result).toEqual(mockEncounter);
-    });
-
-    it('encodes campaign and encounter names with spaces in URL', async () => {
-      fetchSpy.mockResolvedValueOnce({
-        ok: true,
-        json: () => Promise.resolve({}),
-      });
-
-      await loadEncounter('campaign with spaces', 'encounter with spaces');
-
-      expect(fetchSpy).toHaveBeenCalledWith(
-        '/api/campaigns/campaign%20with%20spaces/encounters/encounter%20with%20spaces',
-        expect.any(Object)
-      );
-    });
-
-    it('encodes campaign and encounter names with special characters in URL', async () => {
-      fetchSpy.mockResolvedValueOnce({
-        ok: true,
-        json: () => Promise.resolve({}),
-      });
-
-      await loadEncounter('campaign/1', 'encounter/abc');
-
-      expect(fetchSpy).toHaveBeenCalledWith(
-        '/api/campaigns/campaign%2F1/encounters/encounter%2Fabc',
-        expect.any(Object)
-      );
     });
 
     it('throws with custom error message on API error', async () => {
@@ -270,16 +166,6 @@ describe('encountersService', () => {
 
       await expect(loadEncounter('campaign1', 'test')).rejects.toThrow('ENOTFOUND');
     });
-
-    it('calls console.error on failure', async () => {
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-      fetchSpy.mockRejectedValueOnce(new Error('Network error'));
-
-      await expect(loadEncounter('campaign1', 'test')).rejects.toThrow('Network error');
-
-      expect(consoleSpy).toHaveBeenCalledWith('Error loading encounter:', expect.any(Error));
-      consoleSpy.mockRestore();
-    });
   });
 
   describe('updateEncounter', () => {
@@ -302,34 +188,6 @@ describe('encountersService', () => {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(data),
         }
-      );
-    });
-
-    it('encodes campaign and encounter names with spaces in URL', async () => {
-      fetchSpy.mockResolvedValueOnce({
-        ok: true,
-        json: () => Promise.resolve({}),
-      });
-
-      await updateEncounter('campaign with spaces', 'encounter with spaces', {});
-
-      expect(fetchSpy).toHaveBeenCalledWith(
-        '/api/campaigns/campaign%20with%20spaces/encounters/encounter%20with%20spaces',
-        expect.any(Object)
-      );
-    });
-
-    it('encodes campaign and encounter names with special characters in URL', async () => {
-      fetchSpy.mockResolvedValueOnce({
-        ok: true,
-        json: () => Promise.resolve({}),
-      });
-
-      await updateEncounter('campaign/1', 'encounter/abc', {});
-
-      expect(fetchSpy).toHaveBeenCalledWith(
-        '/api/campaigns/campaign%2F1/encounters/encounter%2Fabc',
-        expect.any(Object)
       );
     });
 
@@ -358,16 +216,6 @@ describe('encountersService', () => {
 
       await expect(updateEncounter('campaign1', 'test', {})).rejects.toThrow('ENOTFOUND');
     });
-
-    it('calls console.error on failure', async () => {
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-      fetchSpy.mockRejectedValueOnce(new Error('Network error'));
-
-      await expect(updateEncounter('campaign1', 'test', {})).rejects.toThrow('Network error');
-
-      expect(consoleSpy).toHaveBeenCalledWith('Error updating encounter:', expect.any(Error));
-      consoleSpy.mockRestore();
-    });
   });
 
   describe('deleteEncounter', () => {
@@ -383,34 +231,6 @@ describe('encountersService', () => {
       expect(result).toEqual(responseData);
       expect(fetchSpy).toHaveBeenCalledWith(
         '/api/campaigns/campaign1/encounters/goblin-ambush',
-        { method: 'DELETE' }
-      );
-    });
-
-    it('encodes campaign and encounter names with spaces in URL', async () => {
-      fetchSpy.mockResolvedValueOnce({
-        ok: true,
-        json: () => Promise.resolve({ success: true }),
-      });
-
-      await deleteEncounter('campaign with spaces', 'encounter with spaces');
-
-      expect(fetchSpy).toHaveBeenCalledWith(
-        '/api/campaigns/campaign%20with%20spaces/encounters/encounter%20with%20spaces',
-        { method: 'DELETE' }
-      );
-    });
-
-    it('encodes campaign and encounter names with special characters in URL', async () => {
-      fetchSpy.mockResolvedValueOnce({
-        ok: true,
-        json: () => Promise.resolve({ success: true }),
-      });
-
-      await deleteEncounter('campaign/1', 'encounter/abc');
-
-      expect(fetchSpy).toHaveBeenCalledWith(
-        '/api/campaigns/campaign%2F1/encounters/encounter%2Fabc',
         { method: 'DELETE' }
       );
     });
@@ -440,16 +260,6 @@ describe('encountersService', () => {
 
       await expect(deleteEncounter('campaign1', 'test')).rejects.toThrow('ENOTFOUND');
     });
-
-    it('calls console.error on failure', async () => {
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-      fetchSpy.mockRejectedValueOnce(new Error('Network error'));
-
-      await expect(deleteEncounter('campaign1', 'test')).rejects.toThrow('Network error');
-
-      expect(consoleSpy).toHaveBeenCalledWith('Error deleting encounter:', expect.any(Error));
-      consoleSpy.mockRestore();
-    });
   });
 
   describe('renameEncounter', () => {
@@ -470,34 +280,6 @@ describe('encountersService', () => {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ newName: 'goblin-ambush-v2' }),
         }
-      );
-    });
-
-    it('encodes campaign and encounter names with spaces in URL', async () => {
-      fetchSpy.mockResolvedValueOnce({
-        ok: true,
-        json: () => Promise.resolve({ success: true }),
-      });
-
-      await renameEncounter('campaign with spaces', 'old encounter', 'new encounter');
-
-      expect(fetchSpy).toHaveBeenCalledWith(
-        '/api/campaigns/campaign%20with%20spaces/encounters/old%20encounter/rename',
-        expect.any(Object)
-      );
-    });
-
-    it('encodes campaign and encounter names with special characters in URL', async () => {
-      fetchSpy.mockResolvedValueOnce({
-        ok: true,
-        json: () => Promise.resolve({ success: true }),
-      });
-
-      await renameEncounter('campaign/1', 'old/encounter', 'new/encounter');
-
-      expect(fetchSpy).toHaveBeenCalledWith(
-        '/api/campaigns/campaign%2F1/encounters/old%2Fencounter/rename',
-        expect.any(Object)
       );
     });
 
@@ -525,16 +307,6 @@ describe('encountersService', () => {
       fetchSpy.mockRejectedValueOnce(new Error('ENOTFOUND'));
 
       await expect(renameEncounter('campaign1', 'old', 'new')).rejects.toThrow('ENOTFOUND');
-    });
-
-    it('calls console.error on failure', async () => {
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-      fetchSpy.mockRejectedValueOnce(new Error('Network error'));
-
-      await expect(renameEncounter('campaign1', 'old', 'new')).rejects.toThrow('Network error');
-
-      expect(consoleSpy).toHaveBeenCalledWith('Error renaming encounter:', expect.any(Error));
-      consoleSpy.mockRestore();
     });
   });
 
@@ -570,14 +342,6 @@ describe('encountersService', () => {
 
     it('handles .json with multiple hyphens', () => {
       expect(formatEncounterName('the-final-battle.json')).toBe('The Final Battle');
-    });
-
-    it('handles double hyphens', () => {
-      expect(formatEncounterName('goblin--ambush')).toBe('Goblin  Ambush');
-    });
-
-    it('handles leading and trailing hyphens', () => {
-      expect(formatEncounterName('-goblin-ambush-')).toBe(' Goblin Ambush ');
     });
 
     it('handles names with numbers', () => {

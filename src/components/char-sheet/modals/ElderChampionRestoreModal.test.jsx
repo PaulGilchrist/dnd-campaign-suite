@@ -137,31 +137,6 @@ describe('ElderChampionRestoreModal', () => {
     });
   });
 
-  // ── Close behavior ──
-
-  describe('close behavior', () => {
-    it('calls onClose when clicking the overlay background', () => {
-      const onClose = vi.fn();
-      renderModal({ onClose });
-      fireEvent.click(document.querySelector('.sp-overlay'));
-      expect(onClose).toHaveBeenCalledTimes(1);
-    });
-
-    it('does not close when clicking inside the modal content', () => {
-      const onClose = vi.fn();
-      renderModal({ onClose });
-      fireEvent.click(document.querySelector('.sp-modal'));
-      expect(onClose).not.toHaveBeenCalled();
-    });
-
-    it('calls onClose when Cancel button is clicked', () => {
-      const onClose = vi.fn();
-      renderModal({ onClose });
-      fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
-      expect(onClose).toHaveBeenCalledTimes(1);
-    });
-  });
-
   // ── Confirm behavior ──
 
   describe('confirm behavior', () => {

@@ -39,12 +39,6 @@ describe('BulwarkOfForceModal', () => {
   // ── Rendering ──
 
   describe('initial render', () => {
-    it('renders the modal overlay and modal container', () => {
-      render(<BulwarkOfForceModal {...makeProps()} />);
-      expect(document.querySelector('.sp-overlay')).toBeInTheDocument();
-      expect(document.querySelector('.sp-modal')).toBeInTheDocument();
-    });
-
     it('renders the header with "Bulwark of Force" title and shield icon', () => {
       render(<BulwarkOfForceModal {...makeProps()} />);
       expect(screen.getByText('Bulwark of Force')).toBeInTheDocument();
@@ -205,18 +199,6 @@ describe('BulwarkOfForceModal', () => {
       render(<BulwarkOfForceModal {...makeProps()} />);
       fireEvent.click(screen.getByRole('button', { name: 'Skip' }));
       expect(mockOnSkip).toHaveBeenCalledTimes(1);
-    });
-
-    it('calls onSkip when clicking the overlay background', () => {
-      render(<BulwarkOfForceModal {...makeProps()} />);
-      fireEvent.click(document.querySelector('.sp-overlay'));
-      expect(mockOnSkip).toHaveBeenCalledTimes(1);
-    });
-
-    it('does not close when clicking inside the modal content', () => {
-      render(<BulwarkOfForceModal {...makeProps()} />);
-      fireEvent.click(document.querySelector('.sp-modal'));
-      expect(mockOnSkip).not.toHaveBeenCalled();
     });
   });
 

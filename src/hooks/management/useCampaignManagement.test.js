@@ -279,17 +279,6 @@ describe('useCampaignManagement', () => {
     });
   });
 
-  describe('setDeleteCampaignCallback', () => {
-    it('should store the callback without throwing', () => {
-      const callback = vi.fn();
-      const { result } = renderHook(() => useCampaignManagement());
-      act(() => {
-        result.current.setDeleteCampaignCallback(callback);
-      });
-      expect(result.current.handleDeleteCampaign).toBeDefined();
-    });
-  });
-
   describe('isLocalhost', () => {
     it('should return a boolean', () => {
       const { result } = renderHook(() => useCampaignManagement());

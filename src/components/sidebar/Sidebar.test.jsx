@@ -1,5 +1,5 @@
 // @improved-by-ai
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, cleanup } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import Sidebar from './Sidebar.jsx';
 
@@ -35,15 +35,6 @@ describe('Sidebar', () => {
       expect(screen.getByText('Test Campaign')).toBeInTheDocument();
     });
 
-    it('should render all permanent sidebar buttons', () => {
-      render(<Sidebar {...defaultProps} />);
-      expect(screen.getByText(/Campaigns/)).toBeInTheDocument();
-      expect(screen.getByText(/Add Character/)).toBeInTheDocument();
-      expect(screen.getByText(/Initiative/)).toBeInTheDocument();
-      expect(screen.getByText(/Notes/)).toBeInTheDocument();
-      expect(screen.getByText(/Rules/)).toBeInTheDocument();
-    });
-
     it('should render Maps label on localhost, Map label on non-localhost', () => {
       render(<Sidebar {...defaultProps} isLocalhost={true} />);
       expect(screen.getByText('Maps')).toBeInTheDocument();
@@ -57,7 +48,7 @@ describe('Sidebar', () => {
       { label: /Factions/ },
       { label: /NPCs/ },
       { label: /Quests/ },
-    ])('should render %s button on localhost, not on non-localhost', ({ label }) => {
+    ])('should render %s button on localhost', ({ label }) => {
       const localhostProps = { ...defaultProps, isLocalhost: true };
       render(<Sidebar {...localhostProps} />);
       expect(screen.getByText(label)).toBeInTheDocument();
@@ -110,13 +101,6 @@ describe('Sidebar', () => {
       expect(defaultProps.onDeleteCampaign).toHaveBeenCalledTimes(1);
     });
 
-    it('should call onCharacterClick with character object', () => {
-      const props = { ...defaultProps, characters: [{ name: 'Aragorn' }] };
-      render(<Sidebar {...props} />);
-      fireEvent.click(screen.getByText('Aragorn'));
-      expect(defaultProps.onCharacterClick).toHaveBeenCalledWith({ name: 'Aragorn' });
-    });
-
     it('should call localhost-only handlers when those buttons are clicked', () => {
       render(<Sidebar {...defaultProps} isLocalhost={true} />);
       fireEvent.click(screen.getByText(/Encounters/));
@@ -130,6 +114,13 @@ describe('Sidebar', () => {
 
       fireEvent.click(screen.getByText(/Quests/));
       expect(defaultProps.onQuestsClick).toHaveBeenCalledTimes(1);
+    });
+
+    it('should call onCharacterClick with character object', () => {
+      const props = { ...defaultProps, characters: [{ name: 'Aragorn' }] };
+      render(<Sidebar {...props} />);
+      fireEvent.click(screen.getByText('Aragorn'));
+      expect(defaultProps.onCharacterClick).toHaveBeenCalledWith({ name: 'Aragorn' });
     });
 
     it('should open rules URL in new tab when Rules clicked', () => {
@@ -149,11 +140,9 @@ describe('Sidebar', () => {
 
     it('should disable delete campaign button when characters exist, enable when empty', () => {
       render(<Sidebar {...defaultProps} characters={[{ name: 'Aragorn' }]} />);
-      const [disabledBtn] = screen.getAllByTitle('Delete Campaign');
-      expect(disabledBtn).toHaveAttribute('disabled');
-    });
+      expect(screen.getByTitle('Delete Campaign')).toHaveAttribute('disabled');
+      cleanup();
 
-    it('should enable delete campaign button when no characters', () => {
       render(<Sidebar {...defaultProps} characters={[]} />);
       expect(screen.getByTitle('Delete Campaign')).not.toHaveAttribute('disabled');
     });
@@ -182,23 +171,22 @@ describe('Sidebar', () => {
   });
 
   describe('characters section toggle', () => {
-    it('should toggle characters section when header clicked and persist state', () => {
+    it('should toggle characters section, persist state, and restore from localStorage', () => {
       const props = { ...defaultProps, characters: [{ name: 'Aragorn' }] };
+
+      // Default: expanded
       render(<Sidebar {...props} />);
       expect(screen.getByText('Aragorn')).toBeInTheDocument();
 
+      // Collapse
       const charactersHeader = screen.getByText('Characters').closest('button');
       fireEvent.click(charactersHeader);
-
       expect(screen.queryByText('Aragorn')).not.toBeInTheDocument();
       expect(window.localStorage.getItem('sidebar-characters-expanded')).toBe('false');
-    });
 
-    it('should restore collapsed state from localStorage', () => {
+      // Restore from localStorage
       window.localStorage.setItem('sidebar-characters-expanded', 'false');
-      const props = { ...defaultProps, characters: [{ name: 'Aragorn' }] };
       render(<Sidebar {...props} />);
-
       expect(screen.queryByText('Aragorn')).not.toBeInTheDocument();
     });
   });

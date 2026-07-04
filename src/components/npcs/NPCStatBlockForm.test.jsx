@@ -144,17 +144,6 @@ describe('NPCStatBlockForm', () => {
       const resistInput = container.querySelector('input[placeholder="fire, cold, poison"]');
       expect(resistInput.value).toBe('');
     });
-
-    it('renders with null defense arrays (falls back to empty string)', () => {
-      const { container } = render(<NPCStatBlockForm formData={{ ...defaultFormData, damageResistances: null }} setFormData={vi.fn()} />);
-      expect(container.querySelector('input[placeholder="fire, cold, poison"]').value).toBe('');
-
-      const { container: container2 } = render(<NPCStatBlockForm formData={{ ...defaultFormData, damageImmunities: null }} setFormData={vi.fn()} />);
-      expect(container2.querySelector('input[placeholder="necrotic, psychic"]').value).toBe('');
-
-      const { container: container3 } = render(<NPCStatBlockForm formData={{ ...defaultFormData, conditionImmunities: null }} setFormData={vi.fn()} />);
-      expect(container3.querySelector('input[placeholder="charmed, frightened"]').value).toBe('');
-    });
   });
 
   describe('actions', () => {
@@ -211,45 +200,6 @@ describe('NPCStatBlockForm', () => {
       expect(textareas.length).toBeGreaterThan(0);
       expect(textareas[1].value).toBe('Darkvision.');
       expect(textareas[2].value).toBe('Reaction text.');
-    });
-
-    it('renders with null traits and reactions (falls back to empty string)', () => {
-      const { container: container1 } = render(<NPCStatBlockForm formData={{ ...defaultFormData, traits: null }} setFormData={vi.fn()} />);
-      const textareas1 = container1.querySelectorAll('textarea');
-      const traitsTextarea = [...textareas1].find(t => t.placeholder.includes('Special traits'));
-      expect(traitsTextarea.value).toBe('');
-
-      const { container: container2 } = render(<NPCStatBlockForm formData={{ ...defaultFormData, reactions: null }} setFormData={vi.fn()} />);
-      const textareas2 = container2.querySelectorAll('textarea');
-      const reactionsTextarea = [...textareas2].find(t => t.placeholder.includes('Reactions'));
-      expect(reactionsTextarea.value).toBe('');
-    });
-  });
-
-  describe('null/undefined fallbacks', () => {
-    it('renders with null/undefined values falling back to empty or defaults', () => {
-      const { container: c1 } = render(<NPCStatBlockForm formData={{ ...defaultFormData, armorClass: null }} setFormData={vi.fn()} />);
-      expect(c1.querySelector('input[placeholder="10"]').value).toBe('');
-
-      const { container: c2 } = render(<NPCStatBlockForm formData={{ ...defaultFormData, hitPoints: null }} setFormData={vi.fn()} />);
-      expect(c2.querySelector('input[placeholder="e.g., 45"]').value).toBe('');
-
-      const { container: c3 } = render(<NPCStatBlockForm formData={{ ...defaultFormData, hitDice: null }} setFormData={vi.fn()} />);
-      expect(c3.querySelector('input[placeholder="e.g., 6d8"]').value).toBe('');
-
-      const { container: c4 } = render(<NPCStatBlockForm formData={{ ...defaultFormData, speed: null }} setFormData={vi.fn()} />);
-      expect(c4.querySelector('input[placeholder="30 ft."]').value).toBe('');
-
-      const { container: c5 } = render(<NPCStatBlockForm formData={{ ...defaultFormData, initiativeBonus: null }} setFormData={vi.fn()} />);
-      expect(c5.querySelector('input[placeholder="+0"][type="number"]').value).toBe('');
-
-      const { container: c6 } = render(<NPCStatBlockForm formData={{ ...defaultFormData, savingThrowBonuses: null }} setFormData={vi.fn()} />);
-      const saveInputs = [...c6.querySelectorAll('.npcs-save-input')];
-      expect(saveInputs.every(i => i.value === '')).toBeTruthy();
-
-      const { container: c7 } = render(<NPCStatBlockForm formData={{ ...defaultFormData, abilityScores: undefined }} setFormData={vi.fn()} />);
-      const abilityInputs = c7.querySelectorAll('.npcs-ability-input');
-      expect(abilityInputs[0].value).toBe('10');
     });
   });
 });

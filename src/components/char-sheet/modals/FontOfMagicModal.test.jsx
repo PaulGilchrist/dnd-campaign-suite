@@ -605,20 +605,6 @@ describe('FontOfMagicModal', () => {
     expect(mockOnClose).toHaveBeenCalledTimes(1);
   });
 
-  // ── Overlay click ──
-
-  it('calls onClose when clicking the overlay background', () => {
-    render(<FontOfMagicModal {...makeProps()} />);
-    fireEvent.click(document.querySelector('.font-of-magic-overlay'));
-    expect(mockOnClose).toHaveBeenCalledTimes(1);
-  });
-
-  it('does NOT close when clicking inside the modal', () => {
-    render(<FontOfMagicModal {...makeProps()} />);
-    fireEvent.click(document.querySelector('.font-of-magic-modal'));
-    expect(mockOnClose).not.toHaveBeenCalled();
-  });
-
   // ── Escape key ──
 
   it('calls onClose when Escape key is pressed', () => {

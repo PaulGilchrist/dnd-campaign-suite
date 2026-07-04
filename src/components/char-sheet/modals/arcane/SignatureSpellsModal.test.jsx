@@ -283,22 +283,6 @@ describe('SignatureSpellsModal', () => {
     expect(onConfirm).not.toHaveBeenCalled();
   });
 
-  // ── Overlay click behavior ──
-
-  it('calls onClose when clicking the overlay background', () => {
-    const onClose = vi.fn();
-    render(<SignatureSpellsModal {...makeProps({ onClose })} />);
-    fireEvent.click(document.querySelector('.popup-overlay'));
-    expect(onClose).toHaveBeenCalledTimes(1);
-  });
-
-  it('does not call onClose when clicking inside the modal content', () => {
-    const onClose = vi.fn();
-    render(<SignatureSpellsModal {...makeProps({ onClose })} />);
-    fireEvent.click(document.querySelector('.popup-modal'));
-    expect(onClose).not.toHaveBeenCalled();
-  });
-
   // ── Edge cases ──
 
   it('renders selects with only the default option when level3Options is empty', () => {

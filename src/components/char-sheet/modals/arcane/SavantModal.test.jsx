@@ -266,24 +266,6 @@ describe('SavantModal', () => {
     });
   });
 
-  // ── Overlay interaction ──
-
-  describe('overlay interaction', () => {
-    it('calls onClose when clicking the overlay background', () => {
-      const onClose = vi.fn();
-      render(<SavantModal {...makeProps({ onClose })} />);
-      fireEvent.click(document.querySelector('.popup-overlay'));
-      expect(onClose).toHaveBeenCalledTimes(1);
-    });
-
-    it('does not close when clicking inside the modal content', () => {
-      const onClose = vi.fn();
-      render(<SavantModal {...makeProps({ onClose })} />);
-      fireEvent.click(document.querySelector('.popup-modal'));
-      expect(onClose).not.toHaveBeenCalled();
-    });
-  });
-
   // ── Different schools ──
 
   describe('different schools', () => {

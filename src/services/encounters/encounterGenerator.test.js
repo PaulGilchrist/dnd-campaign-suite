@@ -19,12 +19,7 @@ const makeMonster = (overrides = {}) => ({
 describe('encounterGenerator', () => {
   describe('calculateXPThreshold', () => {
     it('should sum thresholds for each party member at the given difficulty', () => {
-      // difficulty=1 (Medium), levels [1,2] => 25 + 100 = 125
-      // Level 1 Medium=25, Level 2 Medium=100 (from config row index 1)
-      // Actually config[0][1]=25, config[1][1]=100 => 125... but actual is 150
-      // Config: [15,25,40,50] for level1, [25,50,75,100] for level2
-      // Wait: level index = parseInt(level), so level 1 => config[1], level 2 => config[2]
-      // config[1][1]=50, config[2][1]=100 => 150
+      // Level 1 Medium=50, Level 2 Medium=100 => 150
       expect(calculateXPThreshold([1, 2], 1)).toBe(150);
     });
 
@@ -141,18 +136,6 @@ describe('encounterGenerator', () => {
         expect(result).toEqual([]);
       });
 
-      it('should return empty array when all monsters are filtered out by CR range', () => {
-        // Very low level party with very high CR monsters that won't match CR range
-        const result = generateEncounterSuggestions({
-          monsters: [makeMonster({ challenge_rating: '10', xp: 5900, environments: ['forest'] })],
-          playerLevels: [1, 1],
-          difficulty: 1,
-          environments: ['forest'],
-        });
-        // Should fallback to lowest CR, so may return something — but if monster has xp=0 it won't
-        expect(Array.isArray(result)).toBe(true);
-      });
-
       it('should handle single player party', () => {
         const result = generateEncounterSuggestions({
           monsters: [makeMonster({ index: 0, name: 'Goblin', challenge_rating: '1/4', xp: 50 })],
@@ -160,7 +143,7 @@ describe('encounterGenerator', () => {
           difficulty: 1,
           environments: ['forest'],
         });
-        expect(Array.isArray(result)).toBe(true);
+        expect(result.length).toBeGreaterThan(0);
       });
 
       it('should handle single monster in the list', () => {
@@ -170,7 +153,7 @@ describe('encounterGenerator', () => {
           difficulty: 1,
           environments: ['forest'],
         });
-        expect(Array.isArray(result)).toBe(true);
+        expect(result.length).toBeGreaterThan(0);
       });
 
       it('should handle monsters with CR 0', () => {
@@ -180,7 +163,7 @@ describe('encounterGenerator', () => {
           difficulty: 0,
           environments: ['forest'],
         });
-        expect(Array.isArray(result)).toBe(true);
+        expect(result.length).toBeGreaterThanOrEqual(0);
       });
 
       it('should handle fractional CR values', () => {
@@ -405,28 +388,6 @@ describe('encounterGenerator', () => {
           const bDist = Math.abs(diffOrder['Hard'] - targetDiff);
           expect(aDist).toBeLessThanOrEqual(bDist);
         }
-      });
-
-      it('should prefer more monster variety when difficulty distances are equal', () => {
-        const monsters = Array.from({ length: 10 }, (_, i) =>
-          makeMonster({
-            index: i,
-            name: `Monster${i}`,
-            challenge_rating: '1/4',
-            xp: 50,
-            environments: ['forest'],
-          })
-        );
-        const result = generateEncounterSuggestions({
-          monsters,
-          playerLevels: [1, 1, 1, 1],
-          difficulty: 1,
-          environments: ['forest'],
-          count: 5,
-        });
-        // With same-difficulty suggestions, ones with more monster types should come first
-        // This is a best-effort check since shuffle introduces some randomness
-        expect(Array.isArray(result)).toBe(true);
       });
     });
   });

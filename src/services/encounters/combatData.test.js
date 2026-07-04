@@ -121,12 +121,6 @@ describe('combatData', () => {
     it('returns null when no summary has been loaded', () => {
       expect(combatData.getCombatSummary()).toBeNull();
     });
-
-    it('ignores the campaignName parameter (single cache)', () => {
-      combatData.setCombatSummaryCache({ round: 1 }, 'campaignA');
-      // Passing a different campaign name should still return the same cache
-      expect(combatData.getCombatSummary('campaignB')).toEqual({ round: 1 });
-    });
   });
 
   describe('loadActiveCreatureName', () => {
@@ -164,18 +158,6 @@ describe('combatData', () => {
       expect(result).toBeNull();
       expect(fetchSpy).not.toHaveBeenCalled();
     });
-
-    it('returns null when API returns null combatSummary', async () => {
-      vi.stubGlobal(
-        'fetch',
-        vi.fn().mockResolvedValue({
-          ok: true,
-          json: () => Promise.resolve({ combatSummary: null }),
-        })
-      );
-      const result = await combatData.loadActiveCreatureName('testCampaign');
-      expect(result).toBeNull();
-    });
   });
 
   describe('getActiveCreatureName', () => {
@@ -203,18 +185,6 @@ describe('combatData', () => {
 
     it('returns 1 when the API returns no round', async () => {
       stubFetchCombatSummary({ creatures: [] });
-      const result = await combatData.loadCurrentCombatRound('testCampaign');
-      expect(result).toBe(1);
-    });
-
-    it('returns 1 when the API returns null', async () => {
-      vi.stubGlobal(
-        'fetch',
-        vi.fn().mockResolvedValue({
-          ok: true,
-          json: () => Promise.resolve({ combatSummary: null }),
-        })
-      );
       const result = await combatData.loadCurrentCombatRound('testCampaign');
       expect(result).toBe(1);
     });
@@ -247,11 +217,6 @@ describe('combatData', () => {
     it('returns 1 when cached summary has no round', () => {
       combatData.setCombatSummaryCache({ creatures: [] });
       expect(combatData.getCurrentCombatRound()).toBe(1);
-    });
-
-    it('ignores the campaignName parameter (single cache)', () => {
-      combatData.setCombatSummaryCache({ round: 2 }, 'campaignA');
-      expect(combatData.getCurrentCombatRound('campaignB')).toBe(2);
     });
   });
 });

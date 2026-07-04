@@ -639,41 +639,4 @@ describe('useEquipmentSearch', () => {
     });
   });
 
-  describe('return value structure', () => {
-    it('returns all expected properties', () => {
-      const { result } = renderSearchHook();
-
-      expect(result.current).toHaveProperty('equipmentData');
-      expect(result.current).toHaveProperty('searchQuery');
-      expect(result.current).toHaveProperty('setSearchQuery');
-      expect(result.current).toHaveProperty('filteredEquipment');
-      expect(result.current).toHaveProperty('selectedCategory');
-      expect(result.current).toHaveProperty('showOnlySelectedBackpack');
-      expect(result.current).toHaveProperty('setShowOnlySelectedBackpack');
-      expect(result.current).toHaveProperty('showOnlySelectedEquipped');
-      expect(result.current).toHaveProperty('setShowOnlySelectedEquipped');
-      expect(result.current).toHaveProperty('searchField');
-      expect(result.current).toHaveProperty('setSearchField');
-      expect(result.current).toHaveProperty('handleEquipmentSelect');
-      expect(result.current).toHaveProperty('handleAddCustomItem');
-      expect(result.current).toHaveProperty('handleKeyDown');
-      expect(result.current).toHaveProperty('handleCategoryChange');
-      expect(result.current).toHaveProperty('handleSearchFieldFocus');
-      expect(result.current).toHaveProperty('uniqueCategories');
-    });
-
-    it('returns functions with correct types', () => {
-      const { result } = renderSearchHook();
-
-      expect(typeof result.current.setSearchQuery).toBe('function');
-      expect(typeof result.current.handleEquipmentSelect).toBe('function');
-      expect(typeof result.current.handleAddCustomItem).toBe('function');
-      expect(typeof result.current.handleKeyDown).toBe('function');
-      expect(typeof result.current.handleCategoryChange).toBe('function');
-      expect(typeof result.current.handleSearchFieldFocus).toBe('function');
-      expect(typeof result.current.setShowOnlySelectedBackpack).toBe('function');
-      expect(typeof result.current.setShowOnlySelectedEquipped).toBe('function');
-      expect(typeof result.current.setSearchField).toBe('function');
-    });
-  });
 });

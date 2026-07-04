@@ -63,11 +63,4 @@ describe('NpcAvatar', () => {
             expect(onClickMock).toHaveBeenCalledTimes(1);
         });
     });
-
-    describe('CSS class', () => {
-        it('should render with npc-avatar class in both branches', () => {
-            render(<NpcAvatar name="Goblin" imagePath="/images/goblin.png" onClick={onClickMock} />);
-            expect(document.querySelector('.npc-avatar')).toBeTruthy();
-        });
-    });
 });

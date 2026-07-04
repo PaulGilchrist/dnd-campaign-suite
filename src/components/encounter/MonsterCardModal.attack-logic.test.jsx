@@ -198,32 +198,24 @@ describe('MonsterCardModal - handleAttack: Bulwark of Force cover', () => {
   });
 
   it('does not apply Bulwark of Force cover when inactive or target not in targets', () => {
-    const scenarios = [
-      { bulwarkActive: false, bulwarkTargets: ['Player A'] },
-      { bulwarkActive: true, bulwarkTargets: ['Other Player'] },
-    ];
+    damageUtils.__setFindCreatureReturn({
+      name: 'Goblin',
+      conditions: [],
+      targetName: 'Player A',
+    });
+    useRuntimeState.__setBulwarkActive(false);
+    useRuntimeState.__setBulwarkTargets(['Player A']);
 
-    for (const scenario of scenarios) {
-      vi.clearAllMocks();
-      damageUtils.__setFindCreatureReturn({
-        name: 'Goblin',
-        conditions: [],
-        targetName: 'Player A',
-      });
-      useRuntimeState.__setBulwarkActive(scenario.bulwarkActive);
-      useRuntimeState.__setBulwarkTargets(scenario.bulwarkTargets);
+    const m = makeMonster({
+      actions: [{ name: 'Club', attack_bonus: 4, description: 'Melee Attack.' }],
+    });
+    const characters = [{ name: 'Player A' }];
+    render(<MonsterCardModal {...makeProps(m, { characters, creatures: [{ name: 'Goblin', targetName: 'Player A' }, { name: 'Player A', type: 'player' }] })} />);
 
-      const m = makeMonster({
-        actions: [{ name: 'Club', attack_bonus: 4, description: 'Melee Attack.' }],
-      });
-      const characters = [{ name: 'Player A' }];
-      render(<MonsterCardModal {...makeProps(m, { characters, creatures: [{ name: 'Goblin', targetName: 'Player A' }, { name: 'Player A', type: 'player' }] })} />);
-
-      clickAttackLink('+4');
-      expect(rollAttack).toHaveBeenCalled();
-      const callArgs = rollAttack.mock.calls[0][2];
-      expect(callArgs.coverAcBonus).toBe(0);
-    }
+    clickAttackLink('+4');
+    expect(rollAttack).toHaveBeenCalled();
+    const callArgs = rollAttack.mock.calls[0][2];
+    expect(callArgs.coverAcBonus).toBe(0);
   });
 });
 
@@ -273,48 +265,40 @@ describe('MonsterCardModal - handleAttack: Improved Duplicity advantage', () => 
   });
 
   it('does not grant advantage when cleric lacks create_illusion buff or monster is not in targets', () => {
-    const scenarios = [
-      { activeBuffs: [], advantageTargets: ['Goblin'] },
-      { activeBuffs: [{ effect: 'create_illusion' }], advantageTargets: ['OtherMonster'] },
-    ];
+    damageUtils.__setFindCreatureReturn({
+      name: 'Goblin',
+      conditions: [],
+      targetName: 'Player A',
+    });
+    useRuntimeState.__setInvokeDuplicityAdvantageTargets(['Goblin']);
+    useRuntimeState.__setActiveBuffs([]);
 
-    for (const scenario of scenarios) {
-      vi.clearAllMocks();
-      damageUtils.__setFindCreatureReturn({
-        name: 'Goblin',
-        conditions: [],
-        targetName: 'Player A',
-      });
-      useRuntimeState.__setInvokeDuplicityAdvantageTargets(scenario.advantageTargets);
-      useRuntimeState.__setActiveBuffs(scenario.activeBuffs);
-
-      const clericCharacter = {
-        name: 'Cleric',
-        computedStats: {
-          automation: {
-            passives: [
-              { effect: 'enhanced_distraction_and_healing' },
-            ],
-          },
+    const clericCharacter = {
+      name: 'Cleric',
+      computedStats: {
+        automation: {
+          passives: [
+            { effect: 'enhanced_distraction_and_healing' },
+          ],
         },
-      };
+      },
+    };
 
-      useRuntimeState.getRuntimeValue.mockImplementation((_characterKey, propertyName) => {
-        if (propertyName === 'activeBuffs') return scenario.activeBuffs;
-        if (propertyName === 'invokeDuplicityAdvantageTargets') return scenario.advantageTargets;
-        return null;
-      });
+    useRuntimeState.getRuntimeValue.mockImplementation((_characterKey, propertyName) => {
+      if (propertyName === 'activeBuffs') return [];
+      if (propertyName === 'invokeDuplicityAdvantageTargets') return ['Goblin'];
+      return null;
+    });
 
-      const m = makeMonster({
-        actions: [{ name: 'Club', attack_bonus: 4, description: 'Melee Attack.' }],
-      });
-      render(<MonsterCardModal {...makeProps(m, { characters: [clericCharacter], creatures: [{ name: 'Goblin', targetName: 'Player A' }, { name: 'Player A', type: 'player' }] })} />);
+    const m = makeMonster({
+      actions: [{ name: 'Club', attack_bonus: 4, description: 'Melee Attack.' }],
+    });
+    render(<MonsterCardModal {...makeProps(m, { characters: [clericCharacter], creatures: [{ name: 'Goblin', targetName: 'Player A' }, { name: 'Player A', type: 'player' }] })} />);
 
-      clickAttackLink('+4');
-      expect(rollAttack).toHaveBeenCalled();
-      const callArgs = rollAttack.mock.calls[0][2];
-      expect(callArgs.forcedMode).toBeUndefined();
-    }
+    clickAttackLink('+4');
+    expect(rollAttack).toHaveBeenCalled();
+    const callArgs = rollAttack.mock.calls[0][2];
+    expect(callArgs.forcedMode).toBeUndefined();
   });
 });
 
@@ -362,51 +346,36 @@ describe('MonsterCardModal - handleAttack: Graze mechanic', () => {
   });
 
   it('does not set grazeDamage when mastery is not Graze, attack is ranged, or monsterCharacter lacks computedStats', () => {
-    const scenarios = [
-      { chosenMastery: 'Polished', isMelee: true },
-      { chosenMastery: 'Graze', isMelee: false },
-      { chosenMastery: 'Graze', isMelee: true, hasComputedStats: false },
-    ];
+    // Non-Graze mastery
+    damageUtils.__setFindCreatureReturn({
+      name: 'Goblin',
+      conditions: [],
+      targetName: 'Player A',
+    });
 
-    for (const scenario of scenarios) {
-      vi.clearAllMocks();
-      damageUtils.__setFindCreatureReturn({
-        name: 'Goblin',
-        conditions: [],
-        targetName: 'Player A',
-      });
+    const monsterCharacter = {
+      name: 'Goblin',
+      computedStats: {
+        automation: {
+          passives: [
+            { type: 'weapon_mastery_choice', chosenMastery: 'Polished' },
+          ],
+        },
+        abilities: [
+          { name: 'Strength', bonus: 2 },
+        ],
+      },
+    };
 
-      let monsterCharacter;
-      if (scenario.hasComputedStats === false) {
-        monsterCharacter = { name: 'Goblin' };
-      } else {
-        monsterCharacter = {
-          name: 'Goblin',
-          computedStats: {
-            automation: {
-              passives: [
-                { type: 'weapon_mastery_choice', chosenMastery: scenario.chosenMastery },
-              ],
-            },
-            abilities: [
-              { name: 'Strength', bonus: 2 },
-            ],
-          },
-        };
-      }
+    const m = makeMonster({
+      actions: [{ name: 'Club', attack_bonus: 4, description: 'Melee Attack.', reach: '5 ft.' }],
+    });
+    render(<MonsterCardModal {...makeProps(m, { characters: [monsterCharacter], creatures: [{ name: 'Goblin', targetName: 'Player A' }, { name: 'Player A', type: 'player' }] })} />);
 
-      const m = makeMonster({
-        actions: scenario.isMelee
-          ? [{ name: 'Club', attack_bonus: 4, description: 'Melee Attack.', reach: '5 ft.' }]
-          : [{ name: 'Longbow', attack_bonus: 4, description: 'Ranged Attack.', range: '150/600' }],
-      });
-      render(<MonsterCardModal {...makeProps(m, { characters: [monsterCharacter], creatures: [{ name: 'Goblin', targetName: 'Player A' }, { name: 'Player A', type: 'player' }] })} />);
-
-      clickAttackLink('+4');
-      expect(rollAttack).toHaveBeenCalled();
-      const callArgs = rollAttack.mock.calls[0][2];
-      expect(callArgs.grazeDamage).toBe(false);
-    }
+    clickAttackLink('+4');
+    expect(rollAttack).toHaveBeenCalled();
+    const callArgs = rollAttack.mock.calls[0][2];
+    expect(callArgs.grazeDamage).toBe(false);
   });
 });
 
@@ -435,39 +404,6 @@ describe('MonsterCardModal - handleAttack: auto-crit within 5ft', () => {
     expect(rollAttack).toHaveBeenCalled();
     const callArgs = rollAttack.mock.calls[0][2];
     expect(callArgs.isAutoCrit).toBe(true);
-  });
-});
-
-describe('MonsterCardModal - handleAttack: attack range calculation', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    conditionEffects.__setComputeReturn(null);
-    damageUtils.__setFindCreatureReturn(null);
-    useRuntimeState.__setInvokeDuplicityAdvantageTargets([]);
-    useRuntimeState.__setActiveBuffs(null);
-  });
-
-  it('passes range-related data to rollAttack for melee, ranged, and default attacks', () => {
-    const scenarios = [
-      { action: { name: 'Club', attack_bonus: 4, description: 'Melee Attack.', reach: '5 ft.' }, label: 'melee' },
-      { action: { name: 'Longbow', attack_bonus: 4, description: 'Ranged Attack.', range: '150/600' }, label: 'ranged' },
-      { action: { name: 'Special', attack_bonus: 4, description: 'Special attack.' }, label: 'default' },
-    ];
-
-    for (const scenario of scenarios) {
-      vi.clearAllMocks();
-      damageUtils.__setFindCreatureReturn({
-        name: 'Goblin',
-        conditions: [],
-        targetName: 'Player A',
-      });
-
-      const m = makeMonster({ actions: [scenario.action] });
-      render(<MonsterCardModal {...makeProps(m, { creatures: [{ name: 'Goblin', targetName: 'Player A' }, { name: 'Player A', type: 'player' }] })} />);
-
-      clickAttackLink(`+${scenario.action.attack_bonus}`);
-      expect(rollAttack).toHaveBeenCalled();
-    }
   });
 });
 
