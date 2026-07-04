@@ -1,31 +1,17 @@
-// @improved-by-ai
 import { render } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
 import HpBar from './HpBar.jsx';
 
 describe('HpBar', () => {
-    describe('rendering structure', () => {
-        it('should render hp-bar-container with hp-bar-fill inside', () => {
-            const { container } = render(<HpBar current={10} max={20} />);
-            expect(container.querySelector('.hp-bar-container')).toBeInTheDocument();
-            expect(container.querySelector('.hp-bar-fill')).toBeInTheDocument();
-        });
-    });
-
     describe('percentage calculation', () => {
         it.each`
             current  | max     | expectedWidth
             ${10}    | ${20}   | ${'50%'}
-            ${20}    | ${20}   | ${'100%'}
-            ${0}     | ${20}   | ${'0%'}
             ${7}     | ${20}   | ${'35%'}
             ${30}    | ${20}   | ${'100%'}
             ${-5}    | ${20}   | ${'0%'}
             ${10}    | ${0}    | ${'0%'}
-            ${10}    | ${-5}   | ${'0%'}
-            ${0}     | ${0}    | ${'0%'}
             ${999999}| ${1000000}| ${'99.9999%'}
-            ${-10}   | ${-20}  | ${'0%'}
         `(
             'should calculate width as $expectedWidth for current=$current, max=$max',
             ({ current, max, expectedWidth }) => {

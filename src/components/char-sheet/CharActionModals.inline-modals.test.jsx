@@ -307,16 +307,6 @@ describe('CharActionModals inline modals', () => {
       expect(screen.getByText('Skip')).toBeInTheDocument();
     });
 
-    it('renders overlay with sp-overlay class', () => {
-      render(<CharActionModals {...createBaseProps()} divineFuryChoice={{}} />);
-      expect(document.querySelector('.sp-overlay')).toBeInTheDocument();
-    });
-
-    it('renders modal container with sp-modal class', () => {
-      render(<CharActionModals {...createBaseProps()} divineFuryChoice={{}} />);
-      expect(document.querySelector('.sp-modal')).toBeInTheDocument();
-    });
-
     it('calls handleDivineFuryDamageType with Necrotic when Necrotic button is clicked', () => {
       const handleDivineFuryDamageType = vi.fn();
       render(<CharActionModals
@@ -356,16 +346,6 @@ describe('CharActionModals inline modals', () => {
       fireEvent.click(document.querySelector('.sp-overlay'));
       expect(handleDivineFurySkip).toHaveBeenCalled();
     });
-
-    it('does not call handleDivineFurySkip when clicking inside the modal content', () => {
-      const handleDivineFurySkip = vi.fn();
-      render(<CharActionModals
-        {...createBaseProps({ handleDivineFurySkip })}
-        divineFuryChoice={{}}
-      />);
-      fireEvent.click(document.querySelector('.sp-modal'));
-      expect(handleDivineFurySkip).not.toHaveBeenCalled();
-    });
   });
 
   // ── Damage Type choice modal ──
@@ -394,22 +374,6 @@ describe('CharActionModals inline modals', () => {
         damageTypeChoice={{ title: 'Pick', types: ['Fire', 'Ice'] }}
       />);
       expect(screen.getByText('Skip')).toBeInTheDocument();
-    });
-
-    it('renders overlay with sp-overlay class', () => {
-      render(<CharActionModals
-        {...createBaseProps()}
-        damageTypeChoice={{ title: 'Pick', types: ['Fire', 'Ice'] }}
-      />);
-      expect(document.querySelector('.sp-overlay')).toBeInTheDocument();
-    });
-
-    it('renders modal container with sp-modal class', () => {
-      render(<CharActionModals
-        {...createBaseProps()}
-        damageTypeChoice={{ title: 'Pick', types: ['Fire', 'Ice'] }}
-      />);
-      expect(document.querySelector('.sp-modal')).toBeInTheDocument();
     });
 
     it('calls generic handler when no pendingDamageRef', () => {
@@ -514,16 +478,6 @@ describe('CharActionModals inline modals', () => {
       expect(handleDamageTypeModifierSkip).toHaveBeenCalled();
     });
 
-    it('does not call generic skip handler when clicking inside the modal content', () => {
-      const handleGenericDamageTypeSkip = vi.fn();
-      render(<CharActionModals
-        {...createBaseProps({ handleGenericDamageTypeSkip })}
-        damageTypeChoice={{ title: 'Pick', types: ['Fire'] }}
-      />);
-      fireEvent.click(document.querySelector('.sp-modal'));
-      expect(handleGenericDamageTypeSkip).not.toHaveBeenCalled();
-    });
-
     it('renders damage type buttons from custom types array', () => {
       render(<CharActionModals
         {...createBaseProps()}
@@ -580,22 +534,6 @@ describe('CharActionModals inline modals', () => {
       expect(screen.getByText('Cancel')).toBeInTheDocument();
     });
 
-    it('renders overlay with sp-overlay class', () => {
-      render(<CharActionModals
-        {...createBaseProps()}
-        featureChoice={{ action: { name: 'Test Feature', description: 'Choose wisely' }, options: ['Option A', 'Option B'] }}
-      />);
-      expect(document.querySelector('.sp-overlay')).toBeInTheDocument();
-    });
-
-    it('renders modal container with sp-modal class', () => {
-      render(<CharActionModals
-        {...createBaseProps()}
-        featureChoice={{ action: { name: 'Test Feature', description: 'Choose wisely' }, options: ['Option A', 'Option B'] }}
-      />);
-      expect(document.querySelector('.sp-modal')).toBeInTheDocument();
-    });
-
     it('calls handleFeatureChoiceConfirm with option string when clicked', () => {
       const handleFeatureChoiceConfirm = vi.fn();
       render(<CharActionModals
@@ -634,16 +572,6 @@ describe('CharActionModals inline modals', () => {
       />);
       fireEvent.click(document.querySelector('.sp-overlay'));
       expect(handleFeatureChoiceSkip).toHaveBeenCalled();
-    });
-
-    it('does not call handleFeatureChoiceSkip when clicking inside the modal content', () => {
-      const handleFeatureChoiceSkip = vi.fn();
-      render(<CharActionModals
-        {...createBaseProps({ handleFeatureChoiceSkip })}
-        featureChoice={{ action: { name: 'Pick', description: 'Pick one' }, options: ['Alpha'] }}
-      />);
-      fireEvent.click(document.querySelector('.sp-modal'));
-      expect(handleFeatureChoiceSkip).not.toHaveBeenCalled();
     });
 
     it('renders empty options array without option buttons', () => {

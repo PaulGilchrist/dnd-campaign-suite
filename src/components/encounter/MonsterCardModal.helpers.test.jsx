@@ -154,93 +154,12 @@ import * as useRuntimeState from '../../hooks/runtime/useRuntimeState.js';
 
 // ── Tests ───────────────────────────────────────────────────────────────────
 
-describe('MonsterCardModal - helper functions', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    conditionEffects.__setComputeReturn(null);
-    damageUtils.__setFindCreatureReturn(null);
-  });
-
-  describe('toAbbr', () => {
-    it('converts full ability names to lowercase abbreviations', () => {
-      const ABBR_MAP = { Strength: 'str', Dexterity: 'dex', Constitution: 'con', Intelligence: 'int', Wisdom: 'wis', Charisma: 'cha', str: 'str', dex: 'dex', con: 'con', int: 'int', wis: 'wis', cha: 'cha' };
-      const toAbbr = (name) => ABBR_MAP[name] || name?.substring(0, 3).toLowerCase();
-
-      expect(toAbbr('Strength')).toBe('str');
-      expect(toAbbr('Dexterity')).toBe('dex');
-      expect(toAbbr('Constitution')).toBe('con');
-      expect(toAbbr('Intelligence')).toBe('int');
-      expect(toAbbr('Wisdom')).toBe('wis');
-      expect(toAbbr('Charisma')).toBe('cha');
-    });
-
-    it('passes through lowercase abbreviations unchanged', () => {
-      const ABBR_MAP = { Strength: 'str', Dexterity: 'dex', Constitution: 'con', Intelligence: 'int', Wisdom: 'wis', Charisma: 'cha', str: 'str', dex: 'dex', con: 'con', int: 'int', wis: 'wis', cha: 'cha' };
-      const toAbbr = (name) => ABBR_MAP[name] || name?.substring(0, 3).toLowerCase();
-
-      expect(toAbbr('str')).toBe('str');
-      expect(toAbbr('dex')).toBe('dex');
-      expect(toAbbr('con')).toBe('con');
-      expect(toAbbr('int')).toBe('int');
-      expect(toAbbr('wis')).toBe('wis');
-      expect(toAbbr('cha')).toBe('cha');
-    });
-
-    it('falls back to first 3 chars lowercase for unknown input', () => {
-      const ABBR_MAP = { Strength: 'str', Dexterity: 'dex', Constitution: 'con', Intelligence: 'int', Wisdom: 'wis', Charisma: 'cha', str: 'str', dex: 'dex', con: 'con', int: 'int', wis: 'wis', cha: 'cha' };
-      const toAbbr = (name) => ABBR_MAP[name] || name?.substring(0, 3).toLowerCase();
-
-      expect(toAbbr('FooBar')).toBe('foo');
-    });
-
-    it('returns empty string for empty string input', () => {
-      const ABBR_MAP = { Strength: 'str', Dexterity: 'dex', Constitution: 'con', Intelligence: 'int', Wisdom: 'wis', Charisma: 'cha', str: 'str', dex: 'dex', con: 'con', int: 'int', wis: 'wis', cha: 'cha' };
-      const toAbbr = (name) => ABBR_MAP[name] || name?.substring(0, 3).toLowerCase();
-
-      expect(toAbbr('')).toBe('');
-    });
-  });
-
-  describe('getSaveModifierForSaveType behavior via save DC click', () => {
-    it('renders clickable save DC for save-only actions (no attack_bonus)', () => {
-      damageUtils.__setFindCreatureReturn({ name: 'Goblin', conditions: [], targetName: 'Player A' });
-      const m = makeMonster({
-        actions: [{ name: 'Web', description: 'Dexterity Saving Throw: DC 13', save_dc: 13, save_type: 'Dexterity' }],
-      });
-      render(<MonsterCardModal {...makeProps(m)} />);
-      const clickableSaveLinks = document.querySelectorAll('.mc-dice-link-save-clickable');
-      expect(clickableSaveLinks.length).toBeGreaterThan(0);
-    });
-
-    it('does not render clickable save DC when action has attack_bonus', () => {
-      const m = makeMonster({
-        actions: [{ name: 'Attack', description: '', attack_bonus: 3, save_dc: 13, save_type: 'Dexterity' }],
-      });
-      render(<MonsterCardModal {...makeProps(m)} />);
-      const clickableSaveLinks = document.querySelectorAll('.mc-dice-link-save-clickable');
-      expect(clickableSaveLinks.length).toBe(0);
-    });
-
-    it('does not render clickable save DC when attacker is incapacitated', () => {
-      conditionEffects.__setComputeReturn({ ...defaultConditionEffects, cannotAct: true });
-      damageUtils.__setFindCreatureReturn({ name: 'Goblin', conditions: [{ key: 'incapacitated', label: 'Incapacitated' }] });
-      const m = makeMonster({
-        actions: [{ name: 'Web', description: 'Dexterity Saving Throw: DC 13', save_dc: 13, save_type: 'Dexterity' }],
-      });
-      render(<MonsterCardModal {...makeProps(m)} />);
-      const clickableSaveLinks = document.querySelectorAll('.mc-dice-link-save-clickable');
-      expect(clickableSaveLinks.length).toBe(0);
-    });
-  });
-});
-
 describe('MonsterCardModal - condition effect badges', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     conditionEffects.__setComputeReturn(null);
     damageUtils.__setFindCreatureReturn(null);
   });
-
 
   it('renders Save Disadv badge when riderSaveDisadvantage is true', () => {
     conditionEffects.__setComputeReturn({ ...defaultConditionEffects, riderSaveDisadvantage: true });
@@ -266,47 +185,40 @@ describe('MonsterCardModal - condition effect badges', () => {
     expect(document.querySelector('.effect-cannot-act')).toBeInTheDocument();
   });
 
-  it('renders Save Disadv, +N to hit, No OA badges together when multiple conditions apply', () => {
+  it('renders multiple rider badges together (Save Disadv, +N to hit, No OA)', () => {
     conditionEffects.__setComputeReturn({
       ...defaultConditionEffects,
       riderSaveDisadvantage: true,
       riderAttackBonus: 3,
       riderCannotOpportunityAttack: true,
     });
-    damageUtils.__setFindCreatureReturn({ name: 'Goblin', conditions: [
-      { key: 'blinded', label: 'Blinded' },
-    ]});
+    damageUtils.__setFindCreatureReturn({ name: 'Goblin', conditions: [{ key: 'blinded', label: 'Blinded' }] });
     render(<MonsterCardModal {...makeProps(makeMonster())} />);
     expect(screen.getByText('Save Disadv')).toBeInTheDocument();
     expect(screen.getByText('+3 to hit')).toBeInTheDocument();
     expect(screen.getByText('No OA')).toBeInTheDocument();
   });
 
-  it('renders Inspiring Move badge when inspiringMovementNoOA runtime value is true and creature has conditions', () => {
+  it('renders Inspiring Move badge when inspiringMovementNoOA is true and creature has conditions', () => {
     useRuntimeState.__setInspiringMoveNoOA(true);
     damageUtils.__setFindCreatureReturn({ name: 'Goblin', conditions: [{ key: 'blinded', label: 'Blinded' }] });
     render(<MonsterCardModal {...makeProps(makeMonster())} />);
     expect(screen.getByText('Insp. Move')).toBeInTheDocument();
   });
 
-  it('renders No OA (Crit) badge when remarkableAthleteNoOA runtime value is true and creature has conditions', () => {
+  it('renders No OA (Crit) badge when remarkableAthleteNoOA is true and creature has conditions', () => {
     useRuntimeState.__setRemarkableNoOA(true);
     damageUtils.__setFindCreatureReturn({ name: 'Goblin', conditions: [{ key: 'blinded', label: 'Blinded' }] });
     render(<MonsterCardModal {...makeProps(makeMonster())} />);
     expect(screen.getByText('No OA (Crit)')).toBeInTheDocument();
   });
 
-  it('does not render inspiring move badge when creature has no conditions', () => {
+  it('does not render Inspiring Move or No OA (Crit) badges when creature has no conditions', () => {
     useRuntimeState.__setInspiringMoveNoOA(true);
-    damageUtils.__setFindCreatureReturn({ name: 'Goblin', conditions: [] });
-    render(<MonsterCardModal {...makeProps(makeMonster())} />);
-    expect(screen.queryByText('Insp. Move')).not.toBeInTheDocument();
-  });
-
-  it('does not render remarkable athlete badge when creature has no conditions', () => {
     useRuntimeState.__setRemarkableNoOA(true);
     damageUtils.__setFindCreatureReturn({ name: 'Goblin', conditions: [] });
     render(<MonsterCardModal {...makeProps(makeMonster())} />);
+    expect(screen.queryByText('Insp. Move')).not.toBeInTheDocument();
     expect(screen.queryByText('No OA (Crit)')).not.toBeInTheDocument();
   });
 });
@@ -364,14 +276,7 @@ describe('MonsterCardModal - speedy passive badges', () => {
     expect(screen.getByText('No Difficult Terrain on Dash')).toBeInTheDocument();
   });
 
-  it('does not render speedy passive badges when monsterCharacter is not provided', () => {
-    damageUtils.__setFindCreatureReturn({ name: 'Goblin', conditions: [] });
-    render(<MonsterCardModal {...makeProps(makeMonster())} characters={[]} />);
-    expect(screen.queryByText('OA Disadv')).not.toBeInTheDocument();
-    expect(screen.queryByText('No Difficult Terrain on Dash')).not.toBeInTheDocument();
-  });
-
-  it('does not render speedy passive badges when creature has no conditions', () => {
+  it('does not render speedy passive badges when monsterCharacter has no conditions', () => {
     const monsterCharacter = {
       name: 'Goblin',
       computedStats: {

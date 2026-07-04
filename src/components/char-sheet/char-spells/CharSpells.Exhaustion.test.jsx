@@ -164,14 +164,12 @@ describe('CharSpells', () => {
     function getToHitSpan() {
       const section = getSpellAbilitiesSection();
       const spans = section.querySelectorAll('span');
-      // First span after the attack label is the to-hit value
       return spans[0];
     }
 
     function getModifierSpan() {
       const section = getSpellAbilitiesSection();
       const spans = section.querySelectorAll('span');
-      // Second span is the modifier value
       return spans[1];
     }
 
@@ -180,17 +178,11 @@ describe('CharSpells', () => {
     }
 
     describe('cannotAct condition', () => {
-      it('should apply disabled-attack class to the attack label when cannotAct is true', () => {
+      it('should apply disabled-attack and stat--penalized classes to the attack label when cannotAct is true', () => {
         render(<CharSpells {...baseProps} cannotAct />);
 
         const attackLabel = getAttackLabel();
         expect(attackLabel).toHaveClass('disabled-attack');
-      });
-
-      it('should apply stat--penalized class to the attack label when cannotAct is true', () => {
-        render(<CharSpells {...baseProps} cannotAct />);
-
-        const attackLabel = getAttackLabel();
         expect(attackLabel).toHaveClass('stat--penalized');
       });
 
@@ -239,22 +231,14 @@ describe('CharSpells', () => {
     });
 
     describe('exhaustionPenalty', () => {
-      it('should apply stat--penalized class to the attack label when exhaustionPenalty > 0', () => {
+      it('should apply stat--penalized class to the attack label, to-hit span, and modifier span when exhaustionPenalty > 0', () => {
         render(<CharSpells {...baseProps} exhaustionPenalty={2} />);
 
         const attackLabel = getAttackLabel();
         expect(attackLabel).toHaveClass('stat--penalized');
-      });
-
-      it('should apply stat--penalized class to the to-hit span when exhaustionPenalty > 0', () => {
-        render(<CharSpells {...baseProps} exhaustionPenalty={2} />);
 
         const toHitSpan = getToHitSpan();
         expect(toHitSpan).toHaveClass('stat--penalized');
-      });
-
-      it('should apply stat--penalized class to the modifier span when exhaustionPenalty > 0', () => {
-        render(<CharSpells {...baseProps} exhaustionPenalty={2} />);
 
         const modifierSpan = getModifierSpan();
         expect(modifierSpan).toHaveClass('stat--penalized');
@@ -273,53 +257,19 @@ describe('CharSpells', () => {
         expect(modifierSpan).not.toHaveClass('stat--penalized');
       });
 
-      it('should subtract exhaustionPenalty from the to-hit display value', () => {
-        render(<CharSpells {...baseProps} exhaustionPenalty={2} />);
+      it.each`
+        penalty | expectedToHit | expectedModifier
+        ${0}    | ${'+5'}       | ${'+3'}
+        ${1}    | ${'+4'}       | ${'+2'}
+        ${2}    | ${'+3'}       | ${'+1'}
+        ${3}    | ${'+2'}       | ${'+0'}
+        ${5}    | ${'+0'}       | ${'+-2'}
+        ${6}    | ${'+-1'}      | ${'+-3'}
+      `('should display correct to-hit and modifier with exhaustionPenalty of $penalty', ({ penalty, expectedToHit, expectedModifier }) => {
+        render(<CharSpells {...baseProps} exhaustionPenalty={penalty} />);
 
-        // playerStats.spellAbilities.toHit is 5, penalty is 2 => +3
-        expect(getToHitSpan().textContent).toBe('+3');
-      });
-
-      it('should subtract exhaustionPenalty from the modifier display value', () => {
-        render(<CharSpells {...baseProps} exhaustionPenalty={2} />);
-
-        // playerStats.spellAbilities.modifier is 3, penalty is 2 => +1
-        expect(getModifierSpan().textContent).toBe('+1');
-      });
-
-      it('should display correct to-hit and modifier with exhaustionPenalty of 1', () => {
-        render(<CharSpells {...baseProps} exhaustionPenalty={1} />);
-
-        // toHit 5 - 1 = +4, modifier 3 - 1 = +2
-        expect(getToHitSpan().textContent).toBe('+4');
-        expect(getModifierSpan().textContent).toBe('+2');
-      });
-
-      it('should display correct to-hit and modifier with exhaustionPenalty of 3', () => {
-        render(<CharSpells {...baseProps} exhaustionPenalty={3} />);
-
-        // toHit 5 - 3 = +2, modifier 3 - 3 = +0
-        expect(getToHitSpan().textContent).toBe('+2');
-        expect(getModifierSpan().textContent).toBe('+0');
-      });
-
-      it('should display correct to-hit and modifier with exhaustionPenalty of 5 (full subtraction)', () => {
-        render(<CharSpells {...baseProps} exhaustionPenalty={5} />);
-
-        // toHit 5 - 5 = +0, modifier 3 - 5 = +-2
-        expect(getToHitSpan().textContent).toBe('+0');
-        expect(getModifierSpan().textContent).toBe('+-2');
-      });
-
-      it('should apply stat--penalized when exhaustionPenalty is greater than toHit value', () => {
-        render(<CharSpells {...baseProps} exhaustionPenalty={6} />);
-
-        const attackLabel = getAttackLabel();
-        expect(attackLabel).toHaveClass('stat--penalized');
-
-        const toHitSpan = getToHitSpan();
-        expect(toHitSpan).toHaveClass('stat--penalized');
-        expect(toHitSpan.textContent).toBe('+-1');
+        expect(getToHitSpan().textContent).toBe(expectedToHit);
+        expect(getModifierSpan().textContent).toBe(expectedModifier);
       });
     });
 
@@ -331,7 +281,7 @@ describe('CharSpells', () => {
         expect(attackLabel).toHaveClass('stat--penalized');
       });
 
-      it('should not apply stat--penalized class when conditionAttackMode is normal', () => {
+      it('should not apply stat--penalized class when conditionAttackMode is normal or undefined', () => {
         render(<CharSpells {...baseProps} conditionAttackMode="normal" />);
 
         const attackLabel = getAttackLabel();
@@ -394,7 +344,6 @@ describe('CharSpells', () => {
       it('should subtract exhaustionPenalty from to-hit display when cannotAct is also true', () => {
         render(<CharSpells {...baseProps} cannotAct exhaustionPenalty={2} />);
 
-        // toHit 5 - 2 = +3
         expect(getToHitSpan().textContent).toBe('+3');
       });
 

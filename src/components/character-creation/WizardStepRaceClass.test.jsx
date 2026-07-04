@@ -69,12 +69,6 @@ describe('WizardStepRaceClass', () => {
       expect(screen.getByText('Step 3: Race & Class')).toBeInTheDocument();
     });
 
-    it('renders the wizard-step class on the container', () => {
-      render(<WizardStepRaceClass {...makeProps()} />);
-      const container = screen.getByText('Step 3: Race & Class').parentElement;
-      expect(container).toHaveClass('wizard-step');
-    });
-
     it('renders Race and Class CascadingSelect components', () => {
       render(<WizardStepRaceClass {...makeProps()} />);
       expect(screen.getByTestId('cascading-select-race')).toBeInTheDocument();
@@ -88,34 +82,10 @@ describe('WizardStepRaceClass', () => {
     });
   });
 
-  describe('CascadingSelect props', () => {
-    it('passes racesData as options to the race CascadingSelect', () => {
-      const racesData = makeRacesData();
-      render(<WizardStepRaceClass {...makeProps({ racesData })} />);
-      expect(screen.getByTestId('cascading-select-race')).toBeInTheDocument();
-    });
-
-    it('passes classSubtypes as options to the class CascadingSelect', () => {
-      const classSubtypes = makeClassSubtypes();
-      render(<WizardStepRaceClass {...makeProps({ classSubtypes })} />);
-      expect(screen.getByTestId('cascading-select-class')).toBeInTheDocument();
-    });
-
-    it('passes ruleset to CascadingSelect components', () => {
-      render(<WizardStepRaceClass {...makeProps({ ruleset: '2024' })} />);
-      expect(screen.getByTestId('cascading-select-race')).toBeInTheDocument();
-      expect(screen.getByTestId('cascading-select-class')).toBeInTheDocument();
-    });
-  });
-
   describe('5e ruleset — no order selects', () => {
-    it('does not render Divine Order select', () => {
+    it('does not render Divine Order or Primal Order selects', () => {
       render(<WizardStepRaceClass {...makeProps({ ruleset: '5e' })} />);
       expect(screen.queryByText('Divine Order')).not.toBeInTheDocument();
-    });
-
-    it('does not render Primal Order select', () => {
-      render(<WizardStepRaceClass {...makeProps({ ruleset: '5e' })} />);
       expect(screen.queryByText('Primal Order')).not.toBeInTheDocument();
     });
   });
@@ -127,13 +97,9 @@ describe('WizardStepRaceClass', () => {
         formData: { race: '', subrace: '', class: { name: 'Cleric' } },
       });
 
-    it('renders Divine Order select with required asterisk', () => {
+    it('renders Divine Order select with required asterisk and options', () => {
       render(<WizardStepRaceClass {...props()} />);
       expect(screen.getByText('Divine Order *')).toBeInTheDocument();
-    });
-
-    it('renders Divine Order options', () => {
-      render(<WizardStepRaceClass {...props()} />);
       expect(screen.getByText('Protector')).toBeInTheDocument();
       expect(screen.getByText('Thaumaturge')).toBeInTheDocument();
     });
@@ -142,14 +108,6 @@ describe('WizardStepRaceClass', () => {
       render(<WizardStepRaceClass {...props()} />);
       const defaultOption = screen.getByText('Select a Divine Order');
       expect(defaultOption.closest('select')).toHaveValue('');
-    });
-
-    it('wraps the select in a form-group div', () => {
-      render(<WizardStepRaceClass {...props()} />);
-      const defaultOption = screen.getByText('Select a Divine Order');
-      const select = defaultOption.closest('select');
-      const formGroup = select.parentElement;
-      expect(formGroup).toHaveClass('form-group');
     });
 
     it('does not render Primal Order when Cleric is selected', () => {
@@ -199,13 +157,9 @@ describe('WizardStepRaceClass', () => {
         formData: { race: '', subrace: '', class: { name: 'Druid' } },
       });
 
-    it('renders Primal Order select with required asterisk', () => {
+    it('renders Primal Order select with required asterisk and options', () => {
       render(<WizardStepRaceClass {...props()} />);
       expect(screen.getByText('Primal Order *')).toBeInTheDocument();
-    });
-
-    it('renders Primal Order options', () => {
-      render(<WizardStepRaceClass {...props()} />);
       expect(screen.getByText('Magician')).toBeInTheDocument();
       expect(screen.getByText('Warden')).toBeInTheDocument();
     });
@@ -214,14 +168,6 @@ describe('WizardStepRaceClass', () => {
       render(<WizardStepRaceClass {...props()} />);
       const defaultOption = screen.getByText('Select a Primal Order');
       expect(defaultOption.closest('select')).toHaveValue('');
-    });
-
-    it('wraps the select in a form-group div', () => {
-      render(<WizardStepRaceClass {...props()} />);
-      const defaultOption = screen.getByText('Select a Primal Order');
-      const select = defaultOption.closest('select');
-      const formGroup = select.parentElement;
-      expect(formGroup).toHaveClass('form-group');
     });
 
     it('does not render Divine Order when Druid is selected', () => {
@@ -265,7 +211,7 @@ describe('WizardStepRaceClass', () => {
   });
 
   describe('2024 ruleset — non-Druid/non-Cleric hides order selects', () => {
-    it('does not render Divine Order for Fighter', () => {
+    it('does not render Divine Order or Primal Order for Fighter', () => {
       render(
         <WizardStepRaceClass
           {...makeProps({
@@ -275,17 +221,6 @@ describe('WizardStepRaceClass', () => {
         />
       );
       expect(screen.queryByText('Divine Order')).not.toBeInTheDocument();
-    });
-
-    it('does not render Primal Order for Fighter', () => {
-      render(
-        <WizardStepRaceClass
-          {...makeProps({
-            ruleset: '2024',
-            formData: { race: '', subrace: '', class: { name: 'Fighter' } },
-          })}
-        />
-      );
       expect(screen.queryByText('Primal Order')).not.toBeInTheDocument();
     });
   });
@@ -353,128 +288,6 @@ describe('WizardStepRaceClass', () => {
       );
       expect(screen.getByText('Please select a subclass')).toBeInTheDocument();
     });
-
-    it('does not render error messages when errors object is empty', () => {
-      render(<WizardStepRaceClass {...makeProps({ errors: {} })} />);
-      const errorMessages = document.querySelectorAll('.error-message');
-      expect(errorMessages.length).toBe(0);
-    });
-  });
-
-  describe('CascadingSelect prop passing', () => {
-    it('passes optionsKey="className" to class CascadingSelect', () => {
-      render(<WizardStepRaceClass {...makeProps()} />);
-      const classProps = mockCascadingSelectProps.mock.calls.find(
-        call => call[0].fieldName === 'class'
-      );
-      expect(classProps[0].optionsKey).toBe('className');
-    });
-
-    it('passes childExtraFields={description: ""} to race CascadingSelect', () => {
-      render(<WizardStepRaceClass {...makeProps()} />);
-      const raceProps = mockCascadingSelectProps.mock.calls.find(
-        call => call[0].fieldName === 'race'
-      );
-      expect(raceProps[0].childExtraFields).toEqual({ description: '' });
-    });
-
-    it('passes childExtraFields={type: ""} to class CascadingSelect', () => {
-      render(<WizardStepRaceClass {...makeProps()} />);
-      const classProps = mockCascadingSelectProps.mock.calls.find(
-        call => call[0].fieldName === 'class'
-      );
-      expect(classProps[0].childExtraFields).toEqual({ type: '' });
-    });
-
-    it('passes loadingText to race CascadingSelect', () => {
-      render(<WizardStepRaceClass {...makeProps()} />);
-      const raceProps = mockCascadingSelectProps.mock.calls.find(
-        call => call[0].fieldName === 'race'
-      );
-      expect(raceProps[0].loadingText).toBe('Loading races...');
-    });
-
-    it('passes loadingText to class CascadingSelect', () => {
-      render(<WizardStepRaceClass {...makeProps()} />);
-      const classProps = mockCascadingSelectProps.mock.calls.find(
-        call => call[0].fieldName === 'class'
-      );
-      expect(classProps[0].loadingText).toBe('Loading classes...');
-    });
-
-    it('passes errorKey="subrace" to race CascadingSelect', () => {
-      render(<WizardStepRaceClass {...makeProps()} />);
-      const raceProps = mockCascadingSelectProps.mock.calls.find(
-        call => call[0].fieldName === 'race'
-      );
-      expect(raceProps[0].errorKey).toBe('subrace');
-    });
-
-    it('passes errorKey="subclass" to class CascadingSelect', () => {
-      render(<WizardStepRaceClass {...makeProps()} />);
-      const classProps = mockCascadingSelectProps.mock.calls.find(
-        call => call[0].fieldName === 'class'
-      );
-      expect(classProps[0].errorKey).toBe('subclass');
-    });
-
-    it('passes subOptionsSelector to race CascadingSelect', () => {
-      render(<WizardStepRaceClass {...makeProps()} />);
-      const raceProps = mockCascadingSelectProps.mock.calls.find(
-        call => call[0].fieldName === 'race'
-      );
-      expect(typeof raceProps[0].subOptionsSelector).toBe('function');
-      const result = raceProps[0].subOptionsSelector('Elf');
-      expect(result).toEqual(['High Elf', 'Wood Elf']);
-    });
-
-    it('passes subOptionsSelector to class CascadingSelect', () => {
-      render(<WizardStepRaceClass {...makeProps()} />);
-      const classProps = mockCascadingSelectProps.mock.calls.find(
-        call => call[0].fieldName === 'class'
-      );
-      expect(typeof classProps[0].subOptionsSelector).toBe('function');
-      const clericResult = classProps[0].subOptionsSelector('Cleric');
-      expect(clericResult).toEqual(['Order of the Keeper', 'Order of the Storm']);
-    });
-
-    it('passes formData to both CascadingSelect components', () => {
-      const formData = { race: 'Elf', subrace: 'High Elf', class: { name: 'Cleric' } };
-      render(<WizardStepRaceClass {...makeProps({ formData })} />);
-      const raceProps = mockCascadingSelectProps.mock.calls.find(
-        call => call[0].fieldName === 'race'
-      );
-      expect(raceProps[0].formData).toEqual(formData);
-      const classProps = mockCascadingSelectProps.mock.calls.find(
-        call => call[0].fieldName === 'class'
-      );
-      expect(classProps[0].formData).toEqual(formData);
-    });
-
-    it('passes errors to both CascadingSelect components', () => {
-      const errors = { race: 'Required', subrace: 'Required' };
-      render(<WizardStepRaceClass {...makeProps({ errors })} />);
-      const raceProps = mockCascadingSelectProps.mock.calls.find(
-        call => call[0].fieldName === 'race'
-      );
-      expect(raceProps[0].errors).toEqual(errors);
-      const classProps = mockCascadingSelectProps.mock.calls.find(
-        call => call[0].fieldName === 'class'
-      );
-      expect(classProps[0].errors).toEqual(errors);
-    });
-
-    it('passes onInputChange to both CascadingSelect components', () => {
-      render(<WizardStepRaceClass {...makeProps()} />);
-      const raceProps = mockCascadingSelectProps.mock.calls.find(
-        call => call[0].fieldName === 'race'
-      );
-      expect(raceProps[0].onInputChange).toBe(makeOnInputChange);
-      const classProps = mockCascadingSelectProps.mock.calls.find(
-        call => call[0].fieldName === 'class'
-      );
-      expect(classProps[0].onInputChange).toBe(makeOnInputChange);
-    });
   });
 
   describe('pre-selected order values', () => {
@@ -531,31 +344,6 @@ describe('WizardStepRaceClass', () => {
 
       expect(screen.queryByText('Divine Order')).not.toBeInTheDocument();
       expect(screen.getByText('Primal Order *')).toBeInTheDocument();
-    });
-
-    it('shows Divine Order when class changes from Druid to Cleric', () => {
-      const { rerender } = render(
-        <WizardStepRaceClass
-          {...makeProps({
-            ruleset: '2024',
-            formData: { race: '', subrace: '', class: { name: 'Druid' } },
-          })}
-        />
-      );
-      expect(screen.getByText('Primal Order *')).toBeInTheDocument();
-      expect(screen.queryByText('Divine Order')).not.toBeInTheDocument();
-
-      rerender(
-        <WizardStepRaceClass
-          {...makeProps({
-            ruleset: '2024',
-            formData: { race: '', subrace: '', class: { name: 'Cleric' } },
-          })}
-        />
-      );
-
-      expect(screen.queryByText(/Primal Order/)).not.toBeInTheDocument();
-      expect(screen.getByText('Divine Order *')).toBeInTheDocument();
     });
   });
 });

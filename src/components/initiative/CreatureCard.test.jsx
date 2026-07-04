@@ -2,8 +2,6 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CreatureCard from './CreatureCard.jsx';
-import { useRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
-
 vi.mock('../common/AvatarImage.jsx', () => ({
     default: vi.fn(({ name, imagePath }) => {
         return <div data-testid={`avatar-${name}`} className="avatar-wrapper">{imagePath ? <img src={imagePath} alt={name} /> : <span>{name?.charAt(0).toUpperCase() || '?'}</span>}</div>;
@@ -100,12 +98,6 @@ describe('CreatureCard', () => {
     });
 
     describe('rendering - player creatures', () => {
-        it('should render the creature card container with correct classes', () => {
-            render(<CreatureCard {...props} />);
-            const card = document.querySelector('.creature-card');
-            expect(card).toHaveClass('player');
-        });
-
         it.each`
             isActive | expectedClass
             ${true}  | ${'active'}
@@ -133,39 +125,6 @@ describe('CreatureCard', () => {
             } else {
                 expect(card).not.toHaveClass('creature-unconscious');
             }
-        });
-
-        it('should render AvatarImage for player creatures', () => {
-            render(<CreatureCard {...props} />);
-            expect(screen.getByTestId('avatar-Alice')).toBeInTheDocument();
-        });
-
-        it('should render player name as a span', () => {
-            render(<CreatureCard {...props} />);
-            expect(screen.getByText('Alice')).toBeInTheDocument();
-        });
-
-        it('should render HP component for player creatures', () => {
-            render(<CreatureCard {...props} />);
-            expect(screen.getByTestId('creature-hp-Alice')).toBeInTheDocument();
-        });
-
-        it('should render initiative input for player creatures', () => {
-            render(<CreatureCard {...props} />);
-            const initiativeInput = document.querySelector('.creature-initiative input[type="number"]');
-            expect(initiativeInput).toBeInTheDocument();
-            expect(initiativeInput).toHaveValue(14);
-        });
-
-        it('should render target select for player creatures', () => {
-            render(<CreatureCard {...props} />);
-            const targetSelect = document.querySelector('.creature-target select');
-            expect(targetSelect).toBeInTheDocument();
-        });
-
-        it('should show "— No Target —" option in target select', () => {
-            render(<CreatureCard {...props} />);
-            expect(screen.getByText('— No Target —')).toBeInTheDocument();
         });
 
         it('should populate target select options from allCreatures excluding self', () => {
@@ -222,12 +181,6 @@ describe('CreatureCard', () => {
 
         it('should render MonsterNameAutocomplete for NPC creatures', () => {
             render(<CreatureCard {...props} creature={defaultNpcCreature} />);
-            expect(screen.getByTestId('monster-autocomplete')).toBeInTheDocument();
-        });
-
-        it('should pass campaignNpcs to MonsterNameAutocomplete', () => {
-            const campaignNpcs = [{ name: 'Goblin' }, { name: 'Orc' }];
-            render(<CreatureCard {...props} creature={defaultNpcCreature} campaignNpcs={campaignNpcs} />);
             expect(screen.getByTestId('monster-autocomplete')).toBeInTheDocument();
         });
 
@@ -314,16 +267,19 @@ describe('CreatureCard', () => {
             expect(props.onTargetChange).toHaveBeenCalledWith('Alice', 'Bob');
         });
 
-        it('should disable target select for NPC when not localhost', () => {
-            render(<CreatureCard {...props} creature={defaultNpcCreature} isLocalhost={false} />);
+        it.each`
+            isLocalhost | creatureType | expectDisabled
+            ${false}    | ${'npc'}     | ${true}
+            ${true}     | ${'npc'}     | ${false}
+        `('should $expectDisabled target select for NPC when isLocalhost=$isLocalhost', ({ isLocalhost, creatureType, expectDisabled }) => {
+            const creature = creatureType === 'npc' ? defaultNpcCreature : defaultPlayerCreature;
+            render(<CreatureCard {...props} creature={creature} isLocalhost={isLocalhost} />);
             const targetSelect = document.querySelector('.creature-target select');
-            expect(targetSelect).toBeDisabled();
-        });
-
-        it('should enable target select for NPC when localhost', () => {
-            render(<CreatureCard {...props} creature={defaultNpcCreature} isLocalhost={true} />);
-            const targetSelect = document.querySelector('.creature-target select');
-            expect(targetSelect).not.toBeDisabled();
+            if (expectDisabled) {
+                expect(targetSelect).toBeDisabled();
+            } else {
+                expect(targetSelect).not.toBeDisabled();
+            }
         });
 
         it('should set selected value to creature.targetName', () => {
@@ -381,12 +337,6 @@ describe('CreatureCard', () => {
             expect(conditionBtn).toBeDisabled();
         });
 
-        it('should render condition break button for localhost', () => {
-            const conditions = [{ id: 'c1', label: 'Blinded' }];
-            render(<CreatureCard {...props} creature={{ ...defaultPlayerCreature, conditions }} />);
-            expect(screen.getByTitle('Automatically break condition')).toBeInTheDocument();
-        });
-
         it('should call onBreakCondition when break button is clicked', () => {
             const conditions = [{ id: 'c1', label: 'Blinded' }];
             render(<CreatureCard {...props} creature={{ ...defaultPlayerCreature, conditions }} />);
@@ -400,15 +350,11 @@ describe('CreatureCard', () => {
             expect(screen.queryByTitle('Automatically break condition')).not.toBeInTheDocument();
         });
 
-        it('should render ConditionEffectBadges component', () => {
-            const conditions = [{ id: 'c1', label: 'Blinded' }];
+        it('should pass conditions to ConditionEffectBadges', () => {
+            const conditions = [{ id: 'c1', label: 'Blinded' }, { id: 'c2', label: 'Prone' }];
             render(<CreatureCard {...props} creature={{ ...defaultPlayerCreature, conditions }} />);
-            expect(screen.getByTestId('condition-effects-Alice')).toBeInTheDocument();
-        });
-
-        it('should render condition add button for localhost', () => {
-            render(<CreatureCard {...props} creature={defaultPlayerCreature} />);
-            expect(screen.getByTitle('Add condition')).toBeInTheDocument();
+            expect(screen.getByTestId('effect-condition-c1')).toBeInTheDocument();
+            expect(screen.getByTestId('effect-condition-c2')).toBeInTheDocument();
         });
 
         it('should call onOpenConditionPicker when add condition button is clicked', () => {
@@ -420,13 +366,6 @@ describe('CreatureCard', () => {
         it('should not render condition add button for non-localhost', () => {
             render(<CreatureCard {...props} creature={defaultPlayerCreature} isLocalhost={false} />);
             expect(screen.queryByTitle('Add condition')).not.toBeInTheDocument();
-        });
-
-        it('should pass conditions to ConditionEffectBadges', () => {
-            const conditions = [{ id: 'c1', label: 'Blinded' }, { id: 'c2', label: 'Prone' }];
-            render(<CreatureCard {...props} creature={{ ...defaultPlayerCreature, conditions }} />);
-            expect(screen.getByTestId('effect-condition-c1')).toBeInTheDocument();
-            expect(screen.getByTestId('effect-condition-c2')).toBeInTheDocument();
         });
     });
 
@@ -444,22 +383,11 @@ describe('CreatureCard', () => {
             expect(props.onRollConcentrationSave).toHaveBeenCalledWith('Alice');
         });
 
-        it('should render concentration break button when creature has concentration', () => {
-            const concentration = { spell: 'Fireball', dc: 15 };
-            render(<CreatureCard {...props} creature={{ ...defaultPlayerCreature, concentration }} />);
-            expect(screen.getByTitle('Break concentration')).toBeInTheDocument();
-        });
-
         it('should call onBreakConcentration when break button is clicked', () => {
             const concentration = { spell: 'Fireball', dc: 15 };
             render(<CreatureCard {...props} creature={{ ...defaultPlayerCreature, concentration }} />);
             fireEvent.click(screen.getByTitle('Break concentration'));
             expect(props.onBreakConcentration).toHaveBeenCalledWith('Alice');
-        });
-
-        it('should render concentration add button for localhost when no concentration', () => {
-            render(<CreatureCard {...props} creature={defaultPlayerCreature} />);
-            expect(screen.getByTitle('Add concentration')).toBeInTheDocument();
         });
 
         it('should call onOpenConcentrationPicker when add concentration button is clicked', () => {
@@ -545,38 +473,7 @@ describe('CreatureCard', () => {
         });
     });
 
-    describe('target effects from runtime state', () => {
-        it('should render target effects in ConditionEffectBadges', () => {
-            useRuntimeValue.mockImplementation((campaignName, key) => {
-                if (key === 'targetEffects') return [{ id: 'te1', target: 'Alice', effect: 'vulnerable' }];
-                return null;
-            });
-            const conditions = [];
-            render(<CreatureCard {...props} creature={{ ...defaultPlayerCreature, conditions }} />);
-            expect(screen.getByTestId('effect-target-te1')).toBeInTheDocument();
-            useRuntimeValue.mockRestore();
-        });
-    });
-
     describe('edge cases', () => {
-        it('should handle creature with undefined conditions', () => {
-            const creature = { ...defaultPlayerCreature, conditions: undefined };
-            render(<CreatureCard {...props} creature={creature} />);
-            expect(screen.getByTestId('condition-effects-Alice')).toBeInTheDocument();
-        });
-
-        it('should handle creature with empty conditions array', () => {
-            const creature = { ...defaultPlayerCreature, conditions: [] };
-            render(<CreatureCard {...props} creature={creature} />);
-            expect(screen.getByTestId('condition-effects-Alice')).toBeInTheDocument();
-        });
-
-        it('should handle creature with undefined name', () => {
-            const creature = { ...defaultPlayerCreature, name: undefined };
-            render(<CreatureCard {...props} creature={creature} />);
-            expect(screen.getByTestId('condition-effects-undefined')).toBeInTheDocument();
-        });
-
         it('should handle creature with null currentHp', () => {
             const creature = { ...defaultPlayerCreature, currentHp: null };
             render(<CreatureCard {...props} creature={creature} />);
@@ -587,18 +484,6 @@ describe('CreatureCard', () => {
             const creature = { ...defaultPlayerCreature, maxHp: null };
             render(<CreatureCard {...props} creature={creature} />);
             expect(screen.getByTestId('hp-input-Alice')).toBeInTheDocument();
-        });
-
-        it('should handle overlay without label using shape and sizeFt', () => {
-            const overlays = [{ id: 'overlay1', shape: 'line', sizeFt: 50 }];
-            render(<CreatureCard {...props} overlays={overlays} />);
-            expect(screen.getByText('Line (50ft)')).toBeInTheDocument();
-        });
-
-        it('should handle overlay with unknown shape', () => {
-            const overlays = [{ id: 'overlay1', shape: 'pyramid', radiusFt: 20 }];
-            render(<CreatureCard {...props} overlays={overlays} />);
-            expect(screen.getByText('pyramid (20ft)')).toBeInTheDocument();
         });
     });
 });

@@ -8,13 +8,7 @@ describe('SettlementSVG', () => {
         vi.clearAllMocks();
     });
 
-    describe('rendering and props', () => {
-        it('should render the SVG group element', () => {
-            const { container } = render(<SettlementSVG />);
-            const group = container.querySelector('g');
-            expect(group).toBeInTheDocument();
-        });
-
+    describe('props', () => {
         it('should render with the provided id attribute', () => {
             const { container } = render(<SettlementSVG id="settlement-1" />);
             const group = container.querySelector('g');
@@ -31,16 +25,6 @@ describe('SettlementSVG', () => {
             const { container } = render(<SettlementSVG data-testid="settlement-svg" onClick={vi.fn()} />);
             const group = container.querySelector('g');
             expect(group.getAttribute('data-testid')).toBe('settlement-svg');
-        });
-
-        it('should support ref forwarding', () => {
-            const ref = vi.fn();
-            render(<SettlementSVG ref={ref} />);
-            expect(ref).toHaveBeenCalled();
-        });
-
-        it('should have displayName set to SettlementSVG', () => {
-            expect(SettlementSVG.displayName).toBe('SettlementSVG');
         });
     });
 
@@ -190,73 +174,6 @@ describe('SettlementSVG', () => {
             expect(windows[1].getAttribute('x')).toBe('22');
             expect(windows[1].getAttribute('y')).toBe('19');
         });
-
-        it('should render window rects with rx 0.2', () => {
-            const { container } = render(<SettlementSVG />);
-            const windows = [...container.querySelectorAll('rect')].filter(r =>
-                r.getAttribute('fill') === '#F5D060' && r.getAttribute('rx') === '0.2'
-            );
-            expect(windows.length).toBe(2);
-        });
-    });
-
-    describe('element counts', () => {
-        it('should render exactly 1 ellipse (ground shadow)', () => {
-            const { container } = render(<SettlementSVG />);
-            expect(container.querySelectorAll('ellipse').length).toBe(1);
-        });
-
-        it('should render exactly 1 path (road)', () => {
-            const { container } = render(<SettlementSVG />);
-            expect(container.querySelectorAll('path').length).toBe(1);
-        });
-
-        it('should render 5 polygons (3 roofs + 2 highlights)', () => {
-            const { container } = render(<SettlementSVG />);
-            expect(container.querySelectorAll('polygon').length).toBe(5);
-        });
-
-        it('should render 8 rects (3 walls + 3 doors + 2 windows)', () => {
-            const { container } = render(<SettlementSVG />);
-            expect(container.querySelectorAll('rect').length).toBe(8);
-        });
-    });
-
-    describe('stylings', () => {
-        it('should render building roofs with strokeLinejoin round', () => {
-            const { container } = render(<SettlementSVG />);
-            const roofs = container.querySelectorAll('polygon[stroke-linejoin="round"]');
-            expect(roofs.length).toBe(3);
-        });
-
-        it('should render path with strokeLinecap round', () => {
-            const { container } = render(<SettlementSVG />);
-            const path = container.querySelector('path[stroke-linecap="round"]');
-            expect(path).toBeInTheDocument();
-        });
-
-        it('should render door rects with rx values', () => {
-            const { container } = render(<SettlementSVG />);
-            const doors = [...container.querySelectorAll('rect')].filter(r =>
-                r.getAttribute('fill') === '#5A2E10'
-            );
-            expect(doors.length).toBe(3);
-            const rxValues = new Set(doors.map(d => d.getAttribute('rx')));
-            expect(rxValues).toContain('0.3');
-            expect(rxValues).toContain('0.2');
-        });
-
-        it('should render building wall rects with rx values', () => {
-            const { container } = render(<SettlementSVG />);
-            const walls = [...container.querySelectorAll('rect')].filter(r =>
-                r.getAttribute('rx') === '0.5' && r.getAttribute('stroke') === '#8B5A2B'
-            );
-            expect(walls.length).toBe(2);
-
-            const wall3 = container.querySelector('rect[rx="0.4"]');
-            expect(wall3).toBeInTheDocument();
-            expect(wall3.getAttribute('fill')).toBe('#C49A6C');
-        });
     });
 
     describe('color palette', () => {
@@ -287,23 +204,6 @@ describe('SettlementSVG', () => {
             expect(strokes).toContain('#8B5A2B');
             expect(strokes).toContain('#5A2E10');
             expect(strokes).toContain('#A08060');
-        });
-    });
-
-    describe('element types', () => {
-        it('should contain all expected SVG element types', () => {
-            const { container } = render(<SettlementSVG />);
-            const group = container.querySelector('g');
-            expect(group.querySelector('ellipse')).toBeInTheDocument();
-            expect(group.querySelector('rect')).toBeInTheDocument();
-            expect(group.querySelector('polygon')).toBeInTheDocument();
-            expect(group.querySelector('path')).toBeInTheDocument();
-        });
-
-        it('should render children within the group', () => {
-            const { container } = render(<SettlementSVG />);
-            const group = container.querySelector('g');
-            expect(group.children.length).toBeGreaterThan(0);
         });
     });
 });

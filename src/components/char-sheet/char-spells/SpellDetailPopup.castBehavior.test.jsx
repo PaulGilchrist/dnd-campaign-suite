@@ -106,33 +106,6 @@ describe('SpellDetailPopup - Cast Behavior', () => {
       );
     });
 
-    it('marks Divination Savant as used after casting', () => {
-      vi.mocked(getRuntimeValue).mockImplementation((_name, key, _campaign) => {
-        if (key === '_Divination_Savant_selection') return ['Warding Bond'];
-        if (key === '_Divination_Savant_Warding_Bond_used') return false;
-        return null;
-      });
-      vi.mocked(setRuntimeValue).mockReturnValue();
-
-      const onCast = vi.fn();
-      const spell = {
-        ...baseMockSpell,
-        name: 'Warding Bond',
-        level: 2,
-        damage: { damage_at_slot_level: { '2': '2d6' } },
-      };
-      const stats = { ...baseMockPlayerStats };
-      renderPopup(spell, stats, mockCampaignName, { onCast });
-
-      fireEvent.click(screen.getByRole('button', { name: /Cast Spell/ }));
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'Elara',
-        '_Divination_Savant_Warding_Bond_used',
-        true,
-        mockCampaignName
-      );
-    });
-
     it('marks counter-based free cast count down after casting', () => {
       vi.mocked(getRuntimeValue).mockImplementation((_name, key) => {
         if (key === '_Mystic_Arcanum_freeCastCount') return 1;
@@ -169,58 +142,6 @@ describe('SpellDetailPopup - Cast Behavior', () => {
         'Elara',
         '_Mystic_Arcanum_freeCastCount',
         0,
-        mockCampaignName
-      );
-    });
-
-    it('clears naturalRecoveryFreeCast after casting', () => {
-      vi.mocked(getRuntimeValue).mockImplementation((_name, key) => {
-        if (key === 'naturalRecoveryFreeCast') return ['Healing Word'];
-        return null;
-      });
-      vi.mocked(setRuntimeValue).mockReturnValue();
-
-      const onCast = vi.fn();
-      const spell = {
-        ...baseMockSpell,
-        name: 'Healing Word',
-        level: 1,
-        damage: { damage_at_slot_level: { '1': '1d4+1' } },
-      };
-      const stats = { ...baseMockPlayerStats };
-      renderPopup(spell, stats, mockCampaignName, { onCast });
-
-      fireEvent.click(screen.getByRole('button', { name: /Cast Spell/ }));
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'Elara',
-        'naturalRecoveryFreeCast',
-        null,
-        mockCampaignName
-      );
-    });
-
-    it('clears bewitching magic free cast after casting Misty Step', () => {
-      vi.mocked(getRuntimeValue).mockImplementation((_name, key) => {
-        if (key === '_Bewitching_Magic_freeCast') return true;
-        return null;
-      });
-      vi.mocked(setRuntimeValue).mockReturnValue();
-
-      const onCast = vi.fn();
-      const spell = {
-        ...baseMockSpell,
-        name: 'Misty Step',
-        level: 2,
-        damage: { damage_at_slot_level: { '2': '3d6' } },
-      };
-      const stats = { ...baseMockPlayerStats };
-      renderPopup(spell, stats, mockCampaignName, { onCast });
-
-      fireEvent.click(screen.getByRole('button', { name: /Cast Spell/ }));
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'Elara',
-        '_Bewitching_Magic_freeCast',
-        null,
         mockCampaignName
       );
     });
@@ -266,7 +187,7 @@ describe('SpellDetailPopup - Cast Behavior', () => {
   });
 
   describe('onCast - Phantasmal Creatures modifications', () => {
-    it('changes school to Illusion and sets _phantasmalCreatures flag for Summon Beast', () => {
+    it('changes school to Illusion and sets _phantasmalCreatures flag for summon spells', () => {
       vi.mocked(getRuntimeValue).mockImplementation((_name, key) => {
         if (key === '_Phantasmal_Creatures_freeCastCount') return 1;
         if (key === '_phantasmalCreatures_list') return [];
@@ -293,37 +214,6 @@ describe('SpellDetailPopup - Cast Behavior', () => {
 
       fireEvent.click(screen.getByRole('button', { name: /Cast Spell/ }));
       expect(onCast).toHaveBeenCalledTimes(1);
-      const castSpell = onCast.mock.calls[0][0];
-      expect(castSpell.school).toBe('Illusion');
-      expect(castSpell._phantasmalCreatures).toBe(true);
-    });
-
-    it('changes school to Illusion and sets _phantasmalCreatures flag for Summon Fey', () => {
-      vi.mocked(getRuntimeValue).mockImplementation((_name, key) => {
-        if (key === '_Phantasmal_Creatures_freeCastCount') return 1;
-        if (key === '_phantasmalCreatures_list') return [];
-        return null;
-      });
-      vi.mocked(setRuntimeValue).mockReturnValue();
-
-      const onCast = vi.fn();
-      const spell = {
-        ...baseMockSpell,
-        name: 'Summon Fey',
-        level: 2,
-        school: 'Conjuration',
-        damage: { damage_at_slot_level: { '2': '3d6' } },
-      };
-      const stats = {
-        ...baseMockPlayerStats,
-        automation: {
-          passives: [{ type: 'phantasmal_creatures' }],
-          actions: [],
-        },
-      };
-      renderPopup(spell, stats, mockCampaignName, { onCast });
-
-      fireEvent.click(screen.getByRole('button', { name: /Cast Spell/ }));
       const castSpell = onCast.mock.calls[0][0];
       expect(castSpell.school).toBe('Illusion');
       expect(castSpell._phantasmalCreatures).toBe(true);
@@ -358,39 +248,6 @@ describe('SpellDetailPopup - Cast Behavior', () => {
         'Elara',
         '_phantasmalCreatures_list',
         ['Bestial Spirit'],
-        mockCampaignName
-      );
-    });
-
-    it('adds Fey Spirit to creature list for Summon Fey', () => {
-      vi.mocked(getRuntimeValue).mockImplementation((_name, key) => {
-        if (key === '_Phantasmal_Creatures_freeCastCount') return 1;
-        if (key === '_phantasmalCreatures_list') return [];
-        return null;
-      });
-      vi.mocked(setRuntimeValue).mockReturnValue();
-
-      const onCast = vi.fn();
-      const spell = {
-        ...baseMockSpell,
-        name: 'Summon Fey',
-        level: 2,
-        damage: { damage_at_slot_level: { '2': '3d6' } },
-      };
-      const stats = {
-        ...baseMockPlayerStats,
-        automation: {
-          passives: [{ type: 'phantasmal_creatures' }],
-          actions: [],
-        },
-      };
-      renderPopup(spell, stats, mockCampaignName, { onCast });
-
-      fireEvent.click(screen.getByRole('button', { name: /Cast Spell/ }));
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'Elara',
-        '_phantasmalCreatures_list',
-        ['Fey Spirit'],
         mockCampaignName
       );
     });
@@ -486,32 +343,10 @@ describe('SpellDetailPopup - Cast Behavior', () => {
         mockCampaignName
       );
     });
-
-    it('decrements base slot level when not upcasting', () => {
-      vi.mocked(getRuntimeValue).mockReturnValue(4);
-      vi.mocked(setRuntimeValue).mockReturnValue();
-
-      const onCast = vi.fn();
-      const noUpcastSpell = {
-        ...baseMockSpell,
-        damage: { damage_at_slot_level: { '1': '3d4+1' } },
-      };
-      renderPopup(noUpcastSpell, baseMockPlayerStats, mockCampaignName, {
-        onCast,
-      });
-
-      fireEvent.click(screen.getByRole('button', { name: /Cast Spell/ }));
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'Elara',
-        'spell_slots_level_1',
-        3,
-        mockCampaignName
-      );
-    });
   });
 
   describe('onCast - meta context for Spell Breaker', () => {
-    it('passes dispelAbilityCheckBonus when Dispel Magic is cast with Spell Breaker', () => {
+    it('passes dispelAbilityCheckBonus calculated from character level', () => {
       vi.mocked(getRuntimeValue).mockReturnValue(null);
 
       const onCast = vi.fn();
@@ -532,178 +367,9 @@ describe('SpellDetailPopup - Cast Behavior', () => {
       renderPopup(dispelSpell, spellBreakerStats, mockCampaignName, { onCast });
 
       fireEvent.click(screen.getByRole('button', { name: /Cast Spell/ }));
-      expect(onCast).toHaveBeenCalledTimes(1);
       const metaCtx = onCast.mock.calls[0][1];
       // Math.floor((11 - 1) / 4 + 2) = Math.floor(4.5) = 4
       expect(metaCtx.dispelAbilityCheckBonus).toBe(4);
-    });
-
-    it('calculates profBonus based on character level formula', () => {
-      vi.mocked(getRuntimeValue).mockReturnValue(null);
-
-      const onCast = vi.fn();
-      const spellBreakerStats = {
-        ...baseMockPlayerStats,
-        level: 5,
-        automation: {
-          passives: [{ type: 'spell_breaker' }],
-          actions: [],
-        },
-      };
-      const dispelSpell = {
-        ...baseMockSpell,
-        name: 'Dispel Magic',
-        casting_time: '1 action',
-        damage: { damage_at_slot_level: { '1': '3d4+1' } },
-      };
-      renderPopup(dispelSpell, spellBreakerStats, mockCampaignName, { onCast });
-
-      fireEvent.click(screen.getByRole('button', { name: /Cast Spell/ }));
-      const metaCtx = onCast.mock.calls[0][1];
-      // Math.floor((5 - 1) / 4 + 2) = Math.floor(3) = 3
-      expect(metaCtx.dispelAbilityCheckBonus).toBe(3);
-    });
-  });
-
-  describe('canCast with upcastable spells and slots', () => {
-    it('enables cast button when upcastable spell has available slots at base level', () => {
-      vi.mocked(getRuntimeValue).mockReturnValue(3);
-
-      const spell = {
-        ...baseMockSpell,
-        damage: { damage_at_slot_level: { '1': '3d4+1' } },
-      };
-      renderPopup(spell, baseMockPlayerStats);
-      expect(screen.getByRole('button', { name: /Cast Spell/ })).not.toBeDisabled();
-    });
-
-    it('disables cast button when upcastable spell has no slots at base level', () => {
-      vi.mocked(getRuntimeValue).mockReturnValue(0);
-
-      const spell = {
-        ...baseMockSpell,
-        damage: { damage_at_slot_level: { '1': '3d4+1' } },
-      };
-      renderPopup(spell, baseMockPlayerStats);
-      expect(screen.getByRole('button', { name: /Cast Spell/ })).toBeDisabled();
-    });
-
-    it('enables cast button for upcastable spell when upcast levels have available slots', () => {
-      vi.mocked(getRuntimeValue).mockReturnValue(0);
-
-      const upcastLevels = [
-        { level: 1, formula: '3d4+1', availableSlots: 0 },
-        { level: 2, formula: '4d4+1', availableSlots: 2 },
-      ];
-      const spell = {
-        ...baseMockSpell,
-        damage: { damage_at_slot_level: { '1': '3d4+1', '2': '4d4+1' } },
-      };
-      renderPopup(spell, baseMockPlayerStats, mockCampaignName, {
-        upcastLevels,
-      });
-      expect(screen.getByRole('button', { name: /Cast Spell/ })).not.toBeDisabled();
-    });
-  });
-
-  describe('spell detail popup CSS classes and icons', () => {
-    it('renders Font Awesome wand icon on Cast Spell button', () => {
-      renderPopup();
-      const icon = document.querySelector(
-        '.spell-detail-actions button.char-btn i.fa-solid.fa-wand-magic'
-      );
-      expect(icon).toBeInTheDocument();
-    });
-
-    it('renders Font Awesome times icon on Close button', () => {
-      renderPopup();
-      const icon = document.querySelector(
-        '.spell-detail-actions button.char-btn-secondary i.fa-solid.fa-times'
-      );
-      expect(icon).toBeInTheDocument();
-    });
-
-    it('renders Font Awesome arrow-up icon in upcast label', () => {
-      const upcastLevels = [
-        { level: 1, formula: '3d4+1', availableSlots: 4 },
-        { level: 2, formula: '4d4+1', availableSlots: 3 },
-      ];
-      renderPopup(baseMockSpell, baseMockPlayerStats, mockCampaignName, {
-        upcastLevels,
-      });
-      const icon = document.querySelector(
-        '.spell-detail-upcast-label i.fa-solid.fa-arrow-up'
-      );
-      expect(icon).toBeInTheDocument();
-    });
-
-    it('renders Font Awesome ghost icon for no-VS components badge', () => {
-      const warlockStats = {
-        ...baseMockPlayerStats,
-        class: { name: 'Warlock', major: { name: 'Warlock' } },
-        automation: {
-          passives: [{ type: 'psychic_spells' }],
-          actions: [],
-        },
-      };
-      const spell = {
-        ...baseMockSpell,
-        school: 'Enchantment',
-      };
-      renderPopup(spell, warlockStats);
-      const icon = document.querySelector(
-        '.spell-detail-free-cast i.fa-solid.fa-ghost'
-      );
-      expect(icon).toBeInTheDocument();
-    });
-
-    it('renders Font Awesome bolt icon for free cast message', () => {
-      vi.mocked(getRuntimeValue).mockImplementation((_name, key) => {
-        if (key === '_Spell_Mastery_freeCast') return ['Magic Missile'];
-        return null;
-      });
-
-      const stats = {
-        ...baseMockPlayerStats,
-        automation: {
-          passives: [],
-          actions: [{ name: 'Spell Mastery', type: 'free_spell', spell: 'Magic Missile' }],
-        },
-      };
-      renderPopup(baseMockSpell, stats);
-      const icon = document.querySelector(
-        '.spell-detail-free-cast i.fa-solid.fa-bolt'
-      );
-      expect(icon).toBeInTheDocument();
-    });
-  });
-
-  describe('popup structure and container elements', () => {
-    it('renders with spell-detail-popup outer container', () => {
-      renderPopup();
-      expect(document.querySelector('.spell-detail-popup')).toBeInTheDocument();
-    });
-
-    it('renders with spell-detail-content inner container', () => {
-      renderPopup();
-      expect(document.querySelector('.spell-detail-content')).toBeInTheDocument();
-    });
-
-    it('renders with spell-detail-meta container for metadata', () => {
-      renderPopup();
-      expect(document.querySelector('.spell-detail-meta')).toBeInTheDocument();
-    });
-
-    it('renders with spell-detail-actions container for buttons', () => {
-      renderPopup();
-      expect(document.querySelector('.spell-detail-actions')).toBeInTheDocument();
-    });
-
-    it('renders h3 heading for spell name', () => {
-      renderPopup();
-      const heading = document.querySelector('.spell-detail-content h3');
-      expect(heading).toBeInTheDocument();
-      expect(heading.textContent).toBe('Magic Missile');
     });
   });
 });

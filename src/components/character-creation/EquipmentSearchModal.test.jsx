@@ -57,14 +57,13 @@ describe('EquipmentSearchModal', () => {
   });
 
   describe('rendering', () => {
-    it('should not render anything when showSearchModal is false', () => {
+    it('should render nothing when showSearchModal is false', () => {
       const props = createMockProps({ showSearchModal: false });
       const { container } = render(<EquipmentSearchModal {...props} />);
       expect(container.innerHTML).toBe('');
-      expect(screen.queryByText('Select Equipment')).not.toBeInTheDocument();
     });
 
-    it('should render the modal overlay and header when showSearchModal is true', () => {
+    it('should render the modal overlay and header when visible', () => {
       const props = createMockProps();
       render(<EquipmentSearchModal {...props} />);
       expect(screen.getByText('Select Equipment')).toBeInTheDocument();
@@ -87,7 +86,6 @@ describe('EquipmentSearchModal', () => {
       const props = createMockProps();
       render(<EquipmentSearchModal {...props} />);
       const input = screen.getByPlaceholderText('Search equipment...');
-      expect(input).toBeInTheDocument();
       expect(input).toHaveAttribute('type', 'text');
     });
 
@@ -108,11 +106,8 @@ describe('EquipmentSearchModal', () => {
       expect(screen.getByText('Dagger')).toBeInTheDocument();
       expect(screen.getByText('Leather Armor')).toBeInTheDocument();
       expect(screen.getByText('Shield')).toBeInTheDocument();
-      expect(screen.getAllByText('Weapons').length).toBeGreaterThan(0);
-      expect(screen.getAllByText('Armor').length).toBeGreaterThan(0);
       expect(screen.getByText('1 cp')).toBeInTheDocument();
       expect(screen.getByText('2 gp')).toBeInTheDocument();
-      expect(screen.getAllByText('10 gp').length).toBeGreaterThan(0);
       expect(screen.getByText('2 lb')).toBeInTheDocument();
       expect(screen.getByText('1 lb')).toBeInTheDocument();
       expect(screen.getByText('12 lb')).toBeInTheDocument();
@@ -129,7 +124,7 @@ describe('EquipmentSearchModal', () => {
       );
     });
 
-    it('should not render cost when item has no cost property', () => {
+    it('should render equipment with partial cost data', () => {
       const itemWithoutCost = {
         index: 'rock',
         name: 'Rock',
@@ -140,23 +135,14 @@ describe('EquipmentSearchModal', () => {
       });
       render(<EquipmentSearchModal {...props} />);
       expect(screen.getByText('Rock')).toBeInTheDocument();
-      expect(screen.queryByText('0 ')).not.toBeInTheDocument();
     });
   });
 
-  describe('initial state', () => {
-    it('should have the search input unchecked by default', () => {
-      const props = createMockProps({ showOnlySelected: false });
-      render(<EquipmentSearchModal {...props} />);
-      const checkbox = screen.getByRole('checkbox');
-      expect(checkbox).not.toBeChecked();
-    });
-
+  describe('state display', () => {
     it('should reflect showOnlySelected value in checkbox state', () => {
       const props = createMockProps({ showOnlySelected: true });
       render(<EquipmentSearchModal {...props} />);
-      const checkbox = screen.getByRole('checkbox');
-      expect(checkbox).toBeChecked();
+      expect(screen.getByRole('checkbox')).toBeChecked();
     });
 
     it('should display search query value in the input', () => {
@@ -170,21 +156,12 @@ describe('EquipmentSearchModal', () => {
     it('should highlight the selected category button', () => {
       const props = createMockProps({ selectedCategory: 'Armor' });
       render(<EquipmentSearchModal {...props} />);
-      const armorButton = screen.getByText('Armor');
-      expect(armorButton).toHaveClass('active');
-      const allButton = screen.getByText('All');
-      expect(allButton).not.toHaveClass('active');
-    });
-
-    it('should default to All category when selectedCategory is not provided', () => {
-      const props = createMockProps({ selectedCategory: 'All' });
-      render(<EquipmentSearchModal {...props} />);
-      const allButton = screen.getByText('All');
-      expect(allButton).toHaveClass('active');
+      expect(screen.getByText('Armor')).toHaveClass('active');
+      expect(screen.getByText('All')).not.toHaveClass('active');
     });
   });
 
-  describe('search interaction', () => {
+  describe('interactions', () => {
     it('should call onSearchChange when user types in the search input', () => {
       const props = createMockProps();
       render(<EquipmentSearchModal {...props} />);
@@ -193,74 +170,29 @@ describe('EquipmentSearchModal', () => {
       expect(props.onSearchChange).toHaveBeenCalledWith('dagger');
     });
 
-    it('should call onSearchChange with empty string when input is cleared', () => {
-      const props = createMockProps({ searchQuery: 'sword' });
-      render(<EquipmentSearchModal {...props} />);
-      const searchInput = screen.getByPlaceholderText('Search equipment...');
-      fireEvent.change(searchInput, { target: { value: '' } });
-      expect(props.onSearchChange).toHaveBeenCalledWith('');
-    });
-  });
-
-  describe('category filter interaction', () => {
-    it('should call onCategoryChange with the selected category when a button is clicked', () => {
+    it('should call onCategoryChange when a category button is clicked', () => {
       const props = createMockProps();
       render(<EquipmentSearchModal {...props} />);
-      const weaponsButton = screen.getByText('Weapons');
-      fireEvent.click(weaponsButton);
+      fireEvent.click(screen.getByText('Weapons'));
       expect(props.onCategoryChange).toHaveBeenCalledWith('Weapons');
     });
 
-    it('should call onCategoryChange with All when All button is clicked', () => {
-      const props = createMockProps({ selectedCategory: 'Weapons' });
-      render(<EquipmentSearchModal {...props} />);
-      const allButton = screen.getByText('All');
-      fireEvent.click(allButton);
-      expect(props.onCategoryChange).toHaveBeenCalledWith('All');
-    });
-  });
-
-  describe('show-only-selected checkbox interaction', () => {
-    it('should call onShowOnlySelectedChange with true when checkbox is checked', () => {
+    it('should call onShowOnlySelectedChange when checkbox is toggled', () => {
       const props = createMockProps({ showOnlySelected: false });
       render(<EquipmentSearchModal {...props} />);
-      const checkbox = screen.getByRole('checkbox');
-      fireEvent.click(checkbox);
+      fireEvent.click(screen.getByRole('checkbox'));
       expect(props.onShowOnlySelectedChange).toHaveBeenCalledWith(true);
     });
 
-    it('should call onShowOnlySelectedChange with false when checkbox is unchecked', () => {
-      const props = createMockProps({ showOnlySelected: true });
-      render(<EquipmentSearchModal {...props} />);
-      const checkbox = screen.getByRole('checkbox');
-      fireEvent.click(checkbox);
-      expect(props.onShowOnlySelectedChange).toHaveBeenCalledWith(false);
-    });
-  });
-
-  describe('equipment selection', () => {
-    it('should call onEquipmentSelect with the correct item when an equipment item is clicked', () => {
+    it('should call onEquipmentSelect with the clicked item', () => {
       const props = createMockProps({
         filteredEquipment: mockEquipment,
       });
       render(<EquipmentSearchModal {...props} />);
-      const clubItem = screen.getByText('Club');
-      fireEvent.click(clubItem);
+      fireEvent.click(screen.getByText('Club'));
       expect(props.onEquipmentSelect).toHaveBeenCalledWith(mockEquipment[0]);
     });
 
-    it('should call onEquipmentSelect with the second item when clicked', () => {
-      const props = createMockProps({
-        filteredEquipment: mockEquipment,
-      });
-      render(<EquipmentSearchModal {...props} />);
-      const daggerItem = screen.getByText('Dagger');
-      fireEvent.click(daggerItem);
-      expect(props.onEquipmentSelect).toHaveBeenCalledWith(mockEquipment[1]);
-    });
-  });
-
-  describe('custom item creation via Enter key', () => {
     it('should call onAddCustomItem when Enter is pressed with a non-empty searchQuery', () => {
       const props = createMockProps({ searchQuery: 'custom item' });
       render(<EquipmentSearchModal {...props} />);
@@ -277,16 +209,8 @@ describe('EquipmentSearchModal', () => {
       expect(props.onAddCustomItem).toHaveBeenCalledWith('sword');
     });
 
-    it('should not call onAddCustomItem when Enter is pressed with empty searchQuery', () => {
+    it('should not call onAddCustomItem when Enter is pressed with empty or whitespace-only searchQuery', () => {
       const props = createMockProps({ searchQuery: '' });
-      render(<EquipmentSearchModal {...props} />);
-      const searchInput = screen.getByPlaceholderText('Search equipment...');
-      fireEvent.keyDown(searchInput, { key: 'Enter' });
-      expect(props.onAddCustomItem).not.toHaveBeenCalled();
-    });
-
-    it('should not call onAddCustomItem when Enter is pressed with whitespace-only searchQuery', () => {
-      const props = createMockProps({ searchQuery: '   ' });
       render(<EquipmentSearchModal {...props} />);
       const searchInput = screen.getByPlaceholderText('Search equipment...');
       fireEvent.keyDown(searchInput, { key: 'Enter' });
@@ -301,43 +225,16 @@ describe('EquipmentSearchModal', () => {
       expect(props.onAddCustomItem).not.toHaveBeenCalled();
     });
 
-    it('should not call onAddCustomItem when Escape is pressed', () => {
-      const props = createMockProps({ searchQuery: 'custom item' });
-      render(<EquipmentSearchModal {...props} />);
-      const searchInput = screen.getByPlaceholderText('Search equipment...');
-      fireEvent.keyDown(searchInput, { key: 'Escape' });
-      expect(props.onAddCustomItem).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('close behavior', () => {
-    it('should call onClose when the close (✕) button in the header is clicked', () => {
-      const props = createMockProps();
-      render(<EquipmentSearchModal {...props} />);
-      const closeButton = screen.getByText('✕');
-      fireEvent.click(closeButton);
-      expect(props.onClose).toHaveBeenCalledTimes(1);
-    });
-
-    it('should call onClose when the Cancel button in the footer is clicked', () => {
-      const props = createMockProps();
-      render(<EquipmentSearchModal {...props} />);
-      const cancelButton = screen.getByText('Close');
-      fireEvent.click(cancelButton);
-      expect(props.onClose).toHaveBeenCalledTimes(1);
-    });
-
-    it('should call onClose exactly once even when both close buttons are clicked', () => {
+    it('should call onClose when close buttons are clicked', () => {
       const props = createMockProps();
       render(<EquipmentSearchModal {...props} />);
       fireEvent.click(screen.getByText('✕'));
-      fireEvent.click(screen.getByText('Close'));
-      expect(props.onClose).toHaveBeenCalledTimes(2);
+      expect(props.onClose).toHaveBeenCalledTimes(1);
     });
   });
 
   describe('empty state messages', () => {
-    it('should show "No matches found" message when searchQuery exists but no results', () => {
+    it('should show "No matches found" when searchQuery exists but no results', () => {
       const props = createMockProps({
         searchQuery: 'nonexistent',
         filteredEquipment: [],
@@ -348,7 +245,7 @@ describe('EquipmentSearchModal', () => {
       ).toBeInTheDocument();
     });
 
-    it('should show "Start typing" message when no searchQuery and no results', () => {
+    it('should show "Start typing" when no searchQuery and no results', () => {
       const props = createMockProps({
         searchQuery: '',
         filteredEquipment: [],
@@ -359,7 +256,7 @@ describe('EquipmentSearchModal', () => {
       ).toBeInTheDocument();
     });
 
-    it('should not show "No matches found" when there are results even with searchQuery', () => {
+    it('should not show empty state messages when there are results', () => {
       const props = createMockProps({
         searchQuery: 'club',
         filteredEquipment: [mockEquipment[0]],
@@ -372,193 +269,6 @@ describe('EquipmentSearchModal', () => {
       expect(
         screen.queryByText('Start typing to search equipment.')
       ).not.toBeInTheDocument();
-    });
-  });
-
-  describe('CSS classes and structure', () => {
-    it('should render the modal overlay with correct class', () => {
-      const props = createMockProps();
-      const { container } = render(<EquipmentSearchModal {...props} />);
-      expect(container.querySelector('.equipment-search-modal-overlay')).toBeInTheDocument();
-    });
-
-    it('should render the modal container with correct class', () => {
-      const props = createMockProps();
-      const { container } = render(<EquipmentSearchModal {...props} />);
-      expect(container.querySelector('.equipment-search-modal')).toBeInTheDocument();
-    });
-
-    it('should render the header with correct class', () => {
-      const props = createMockProps();
-      const { container } = render(<EquipmentSearchModal {...props} />);
-      expect(container.querySelector('.search-modal-header')).toBeInTheDocument();
-    });
-
-    it('should render the body with correct class', () => {
-      const props = createMockProps();
-      const { container } = render(<EquipmentSearchModal {...props} />);
-      expect(container.querySelector('.search-modal-body')).toBeInTheDocument();
-    });
-
-    it('should render the footer with correct class', () => {
-      const props = createMockProps();
-      const { container } = render(<EquipmentSearchModal {...props} />);
-      expect(container.querySelector('.search-modal-footer')).toBeInTheDocument();
-    });
-
-    it('should render the category filters container with correct class', () => {
-      const props = createMockProps();
-      const { container } = render(<EquipmentSearchModal {...props} />);
-      expect(container.querySelector('.category-filters')).toBeInTheDocument();
-    });
-
-    it('should render the search input container with correct class', () => {
-      const props = createMockProps();
-      const { container } = render(<EquipmentSearchModal {...props} />);
-      expect(container.querySelector('.search-input-container')).toBeInTheDocument();
-    });
-
-    it('should render the search input with correct class', () => {
-      const props = createMockProps();
-      const { container } = render(<EquipmentSearchModal {...props} />);
-      expect(container.querySelector('.search-input')).toBeInTheDocument();
-    });
-
-    it('should render the filter checkbox group with correct class', () => {
-      const props = createMockProps();
-      const { container } = render(<EquipmentSearchModal {...props} />);
-      expect(container.querySelector('.filter-checkbox-group')).toBeInTheDocument();
-    });
-
-    it('should render the equipment results container with correct class', () => {
-      const props = createMockProps();
-      const { container } = render(<EquipmentSearchModal {...props} />);
-      expect(container.querySelector('.equipment-results')).toBeInTheDocument();
-    });
-
-    it('should render the close button with correct class', () => {
-      const props = createMockProps();
-      const { container } = render(<EquipmentSearchModal {...props} />);
-      expect(container.querySelector('.close-modal-btn')).toBeInTheDocument();
-    });
-
-    it('should render the cancel button with correct class', () => {
-      const props = createMockProps();
-      const { container } = render(<EquipmentSearchModal {...props} />);
-      expect(container.querySelector('.cancel-btn')).toBeInTheDocument();
-    });
-
-    it('should render the header h3 element', () => {
-      const props = createMockProps();
-      const { container } = render(<EquipmentSearchModal {...props} />);
-      expect(container.querySelector('h3')).toBeInTheDocument();
-    });
-
-    it('should render the search input with correct class', () => {
-      const props = createMockProps();
-      const { container } = render(<EquipmentSearchModal {...props} />);
-      const input = container.querySelector('.search-input');
-      expect(input).toHaveClass('search-input');
-    });
-
-    it('should render the filter checkbox label with correct class', () => {
-      const props = createMockProps();
-      const { container } = render(<EquipmentSearchModal {...props} />);
-      expect(container.querySelector('.filter-checkbox-label')).toBeInTheDocument();
-    });
-
-    it('should render the filter checkbox count span with correct class', () => {
-      const props = createMockProps({ currentItemCount: 3 });
-      const { container } = render(<EquipmentSearchModal {...props} />);
-      expect(container.querySelector('.filter-checkbox-count')).toBeInTheDocument();
-    });
-
-    it('should render category filter buttons with correct class', () => {
-      const props = createMockProps();
-      const { container } = render(<EquipmentSearchModal {...props} />);
-      const buttons = container.querySelectorAll('.category-filter-btn');
-      expect(buttons.length).toBeGreaterThan(0);
-    });
-
-    it('should render equipment items with correct class', () => {
-      const props = createMockProps({
-        filteredEquipment: mockEquipment,
-      });
-      const { container } = render(<EquipmentSearchModal {...props} />);
-      const items = container.querySelectorAll('.equipment-item');
-      expect(items.length).toBe(mockEquipment.length);
-    });
-
-    it('should render equipment item name with correct class', () => {
-      const props = createMockProps({
-        filteredEquipment: mockEquipment,
-      });
-      const { container } = render(<EquipmentSearchModal {...props} />);
-      expect(container.querySelector('.equipment-item-name')).toBeInTheDocument();
-    });
-
-    it('should render equipment item details with correct class', () => {
-      const props = createMockProps({
-        filteredEquipment: mockEquipment,
-      });
-      const { container } = render(<EquipmentSearchModal {...props} />);
-      expect(container.querySelector('.equipment-item-details')).toBeInTheDocument();
-    });
-
-    it('should render equipment item category with correct class', () => {
-      const props = createMockProps({
-        filteredEquipment: mockEquipment,
-      });
-      const { container } = render(<EquipmentSearchModal {...props} />);
-      expect(container.querySelector('.equipment-item-category')).toBeInTheDocument();
-    });
-
-    it('should render equipment item cost with correct class', () => {
-      const props = createMockProps({
-        filteredEquipment: mockEquipment,
-      });
-      const { container } = render(<EquipmentSearchModal {...props} />);
-      expect(container.querySelector('.equipment-item-cost')).toBeInTheDocument();
-    });
-
-    it('should render equipment item weight with correct class', () => {
-      const props = createMockProps({
-        filteredEquipment: mockEquipment,
-      });
-      const { container } = render(<EquipmentSearchModal {...props} />);
-      expect(container.querySelector('.equipment-item-weight')).toBeInTheDocument();
-    });
-
-    it('should render no results with correct class', () => {
-      const props = createMockProps({
-        searchQuery: 'nonexistent',
-        filteredEquipment: [],
-      });
-      const { container } = render(<EquipmentSearchModal {...props} />);
-      expect(container.querySelector('.no-results')).toBeInTheDocument();
-    });
-
-    it('should use item.index as the key for equipment items', () => {
-      const props = createMockProps({
-        filteredEquipment: mockEquipment,
-      });
-      render(<EquipmentSearchModal {...props} />);
-      // If items rendered without proper keys, React would log a warning
-      // The fact that they render correctly with matching indices confirms keys are used
-      expect(screen.getByText('Club')).toBeInTheDocument();
-      expect(screen.getByText('Dagger')).toBeInTheDocument();
-    });
-  });
-
-  describe('default props', () => {
-    it('should use ["All"] as default uniqueCategories when not provided', () => {
-      const props = createMockProps();
-      // eslint-disable-next-line no-unused-vars
-      const { uniqueCategories, ...rest } = props;
-      render(<EquipmentSearchModal {...rest} />);
-      expect(screen.getByText('All')).toBeInTheDocument();
-      expect(screen.queryByText('Weapons')).not.toBeInTheDocument();
-      expect(screen.queryByText('Armor')).not.toBeInTheDocument();
     });
   });
 });

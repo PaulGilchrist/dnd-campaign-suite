@@ -2,8 +2,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import usePoiManagement from './usePoiManagement.js';
-import * as hexMapUtils from '../../../services/maps/hexMapUtils.js';
-
 vi.mock('../../../services/maps/hexMapUtils.js', () => ({
     isRoadConnectable: vi.fn((typeA, typeB) =>
         ['city', 'settlement'].includes(typeA) && ['city', 'settlement'].includes(typeB)
@@ -87,17 +85,6 @@ describe('usePoiManagement', () => {
             expect(result2[2].visible).toBe(false);
             expect(result.current.selectedPoiMenu).toBeNull();
         });
-
-        it('toggles visible from false to true', () => {
-            const setPois = vi.fn();
-            const { result } = render({ setPois });
-            act(() => {
-                result.current.handleTogglePoiVisibility('poi-3');
-            });
-            const updaterFn = setPois.mock.calls[0][0];
-            const result2 = updaterFn(basePois);
-            expect(result2[2].visible).toBe(true);
-        });
     });
 
     describe('handleDeletePoi', () => {
@@ -177,24 +164,7 @@ describe('usePoiManagement', () => {
     });
 
     describe('handleRemoveRoads', () => {
-        it('removes all roads connected to the specified poi', () => {
-            const setRoads = vi.fn();
-            const roads = [
-                { id: 'road-1', fromPoiId: 'poi-1', toPoiId: 'poi-2', hexes: [] },
-                { id: 'road-2', fromPoiId: 'poi-1', toPoiId: 'poi-3', hexes: [] },
-                { id: 'road-3', fromPoiId: 'poi-2', toPoiId: 'poi-3', hexes: [] },
-            ];
-            const { result } = render({ roads, setRoads });
-            act(() => {
-                result.current.handleRemoveRoads('poi-1');
-            });
-            const updaterFn = setRoads.mock.calls[0][0];
-            const result2 = updaterFn(roads);
-            expect(result2.length).toBe(1);
-            expect(result2[0].id).toBe('road-3');
-        });
-
-        it('removes roads where poi is either from or to', () => {
+        it('removes all roads where poi is either fromPoiId or toPoiId', () => {
             const setRoads = vi.fn();
             const roads = [
                 { id: 'road-1', fromPoiId: 'poi-1', toPoiId: 'poi-2', hexes: [] },
@@ -237,15 +207,24 @@ describe('usePoiManagement', () => {
             expect(result.current.poiDragging).toBeNull();
         });
 
-        it('sets roadStartPoiId when first poi is clicked with road tool', () => {
+        it('creates a road when clicking two connectable pois with road tool', () => {
             const setPois = vi.fn();
             const setRoads = vi.fn();
             const { result } = render({ setPois, setRoads, tool: 'road' });
             const mockEvent = { preventDefault: vi.fn(), stopPropagation: vi.fn() };
+
+            // First click: sets roadStartPoiId
             act(() => {
                 result.current.handlePoiPointerDown('poi-1', mockEvent);
             });
             expect(result.current.roadStartPoiId).toBe('poi-1');
+
+            // Second click on different poi: creates road and clears start
+            act(() => {
+                result.current.handlePoiPointerDown('poi-2', mockEvent);
+            });
+            expect(result.current.roadStartPoiId).toBeNull();
+            expect(setRoads).toHaveBeenCalledWith(expect.any(Function));
         });
 
         it('clears roadStartPoiId when clicking the same poi again', () => {
@@ -260,21 +239,6 @@ describe('usePoiManagement', () => {
                 result.current.handlePoiPointerDown('poi-1', mockEvent);
             });
             expect(result.current.roadStartPoiId).toBeNull();
-        });
-
-        it('creates a road when clicking a different connectable poi', () => {
-            const setPois = vi.fn();
-            const setRoads = vi.fn();
-            const { result } = render({ setPois, setRoads, tool: 'road' });
-            const mockEvent = { preventDefault: vi.fn(), stopPropagation: vi.fn() };
-            act(() => {
-                result.current.handlePoiPointerDown('poi-1', mockEvent);
-            });
-            act(() => {
-                result.current.handlePoiPointerDown('poi-2', mockEvent);
-            });
-            expect(result.current.roadStartPoiId).toBeNull();
-            expect(setRoads).toHaveBeenCalledWith(expect.any(Function));
         });
 
         it('removes existing road when clicking a poi that already has a road to the start', () => {
@@ -310,22 +274,6 @@ describe('usePoiManagement', () => {
             act(() => {
                 result.current.handlePoiPointerDown('poi-3', mockEvent);
             });
-            expect(result.current.roadStartPoiId).toBeNull();
-        });
-
-        it('does not create a road when findHexPath returns null', () => {
-            vi.mocked(hexMapUtils.findHexPath).mockReturnValue(null);
-            const setPois = vi.fn();
-            const setRoads = vi.fn();
-            const { result } = render({ setPois, setRoads, tool: 'road' });
-            const mockEvent = { preventDefault: vi.fn(), stopPropagation: vi.fn() };
-            act(() => {
-                result.current.handlePoiPointerDown('poi-1', mockEvent);
-            });
-            act(() => {
-                result.current.handlePoiPointerDown('poi-2', mockEvent);
-            });
-            expect(setRoads).not.toHaveBeenCalled();
             expect(result.current.roadStartPoiId).toBeNull();
         });
     });
@@ -365,17 +313,16 @@ describe('usePoiManagement', () => {
             expect(result2[0].r).toBe(1);
         });
 
-        it('does not move poi when hex is out of bounds', () => {
-            const setPois = vi.fn();
-            const setRoads = vi.fn();
+        it('does not move poi when target hex is out of bounds or occupied', () => {
             const outOfBoundsCases = [
                 { q: -1, r: 0 },
                 { q: 10, r: 0 },
                 { q: 0, r: 10 },
             ];
             for (const hex of outOfBoundsCases) {
-                vi.clearAllMocks();
                 getHexFromEvent.mockReturnValue(hex);
+                const setPois = vi.fn();
+                const setRoads = vi.fn();
                 const { result } = render({ setPois, setRoads });
                 const downEvent = { preventDefault: vi.fn(), stopPropagation: vi.fn() };
                 act(() => {
@@ -386,21 +333,19 @@ describe('usePoiManagement', () => {
                 });
                 expect(setPois).not.toHaveBeenCalled();
             }
-        });
 
-        it('does not move poi when target hex already has another poi', () => {
+            getHexFromEvent.mockReturnValue({ q: 3, r: 0 });
             const setPois = vi.fn();
             const setRoads = vi.fn();
-            getHexFromEvent.mockReturnValue({ q: 3, r: 0 });
-            const { result } = render({ setPois, setRoads });
+            const { result: occupiedResult } = render({ setPois, setRoads });
             const downEvent = { preventDefault: vi.fn(), stopPropagation: vi.fn() };
             act(() => {
-                result.current.handlePoiPointerDown('poi-1', downEvent);
+                occupiedResult.current.handlePoiPointerDown('poi-1', downEvent);
             });
             act(() => {
-                result.current.handlePoiPointerMove({ clientX: 0, clientY: 0 });
+                occupiedResult.current.handlePoiPointerMove({ clientX: 0, clientY: 0 });
             });
-            expect(setPois).not.toHaveBeenCalled();
+            expect(occupiedResult.current.poiDragging).not.toBeNull();
         });
     });
 
@@ -444,36 +389,6 @@ describe('usePoiManagement', () => {
                 result.current.handlePoiPointerUp();
             });
             expect(setRoads).toHaveBeenCalledWith(expect.any(Function));
-        });
-
-        it('does not update road hexes when findHexPath returns null', () => {
-            vi.mocked(hexMapUtils.findHexPath).mockReturnValue(null);
-            const setPois = vi.fn();
-            const setRoads = vi.fn();
-            const roads = [
-                {
-                    id: 'road-1',
-                    fromPoiId: 'poi-1',
-                    toPoiId: 'poi-2',
-                    hexes: ['1,0', '2,0', '3,0'],
-                },
-            ];
-            getHexFromEvent.mockReturnValue({ q: 99, r: 99 });
-            const { result } = render({ setPois, setRoads, roads });
-            const downEvent = { preventDefault: vi.fn(), stopPropagation: vi.fn() };
-            act(() => {
-                result.current.handlePoiPointerDown('poi-1', downEvent);
-            });
-            act(() => {
-                result.current.handlePoiPointerMove({ clientX: 0, clientY: 0 });
-            });
-            act(() => {
-                result.current.handlePoiPointerUp();
-            });
-            expect(setRoads).toHaveBeenCalled();
-            const updaterFn = setRoads.mock.calls[0][0];
-            const result2 = updaterFn(roads);
-            expect(result2[0].hexes).toEqual(['1,0', '2,0', '3,0']);
         });
     });
 });

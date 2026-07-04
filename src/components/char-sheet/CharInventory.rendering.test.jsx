@@ -94,7 +94,7 @@ describe('CharInventory rendering', () => {
       expect(longswordElements.length).toBeGreaterThan(0);
     });
 
-    it('should render magic item without attunement requirements label when false', () => {
+    it('should render magic item without attunement requirements label when requiresAttunement is false', () => {
       const stats = {
         inventory: {
           magicItems: [
@@ -138,7 +138,7 @@ describe('CharInventory rendering', () => {
       expect(screen.getByText(/requires attunement/)).toBeInTheDocument();
     });
 
-    it('should render magic item without quantity label when missing', () => {
+    it('should render magic item without quantity label when quantity is missing or zero', () => {
       const stats = {
         inventory: {
           magicItems: [
@@ -148,26 +148,12 @@ describe('CharInventory rendering', () => {
               rarity: 'Rare',
               description: 'A magical ring.',
             },
-          ],
-          equipped: [],
-          backpack: [],
-        },
-      };
-
-      renderComponent(stats);
-      expect(screen.getByText(/Magic Ring/)).toBeInTheDocument();
-      expect(screen.queryByText(/qty/)).not.toBeInTheDocument();
-    });
-
-    it('should render magic item without requires attunement text when requiresAttunement is undefined', () => {
-      const stats = {
-        inventory: {
-          magicItems: [
             {
-              name: 'Amulet of Health',
+              name: 'Zero Quantity Ring',
+              quantity: 0,
               type: 'Ring',
-              rarity: 'Uncommon',
-              description: 'A mysterious item.',
+              rarity: 'Common',
+              description: 'A common ring.',
             },
           ],
           equipped: [],
@@ -176,8 +162,9 @@ describe('CharInventory rendering', () => {
       };
 
       renderComponent(stats);
-      expect(screen.getByText(/Amulet of Health/)).toBeInTheDocument();
-      expect(screen.queryByText(/requires attunement/)).not.toBeInTheDocument();
+      expect(screen.getByText(/Magic Ring/)).toBeInTheDocument();
+      expect(screen.getByText(/Zero Quantity Ring/)).toBeInTheDocument();
+      expect(screen.queryByText(/qty/)).not.toBeInTheDocument();
     });
 
     it('should render magic item description with sanitizeHtml', () => {
@@ -202,37 +189,14 @@ describe('CharInventory rendering', () => {
       expect(screen.getByText(/\+1 to AC and saving throws/)).toBeInTheDocument();
     });
 
-    it('should not render magic items section when magicItems is missing', () => {
+    it('should not render magic items section when magicItems is null or missing', () => {
       const stats = { inventory: {} };
       renderComponent(stats);
       expect(screen.queryByText(/Magic Items:/)).not.toBeInTheDocument();
-    });
 
-    it('should not render magic items section when magicItems is null', () => {
-      const stats = { inventory: { magicItems: null, equipped: [], backpack: [] } };
-      renderComponent(stats);
+      const nullStats = { inventory: { magicItems: null, equipped: [], backpack: [] } };
+      renderComponent(nullStats);
       expect(screen.queryByText(/Magic Items:/)).not.toBeInTheDocument();
-    });
-
-    it('should render magic item with array description joined by line breaks', () => {
-      const stats = {
-        inventory: {
-          magicItems: [
-            {
-              name: 'Multi-desc Item',
-              type: 'Wondrous Item',
-              rarity: 'Uncommon',
-              description: ['First line.', 'Second line.', 'Third line.'],
-              requiresAttunement: false,
-            },
-          ],
-          equipped: [],
-          backpack: [],
-        },
-      };
-
-      renderComponent(stats);
-      expect(screen.getByText(/Multi-desc Item/)).toBeInTheDocument();
     });
 
     it('should render magic item with no description gracefully', () => {
@@ -273,7 +237,7 @@ describe('CharInventory rendering', () => {
               type: 'Amulet',
               rarity: 'Rare',
               description: 'CON becomes 19',
-              requiresAttuement: false,
+              requiresAttunement: false,
             },
           ],
           equipped: [],
@@ -286,28 +250,6 @@ describe('CharInventory rendering', () => {
       expect(screen.getByText(/Amulet of Health/)).toBeInTheDocument();
       expect(screen.getByText(/Uncommon/)).toBeInTheDocument();
       expect(screen.getByText(/Rare/)).toBeInTheDocument();
-    });
-
-    it('should not show qty label when quantity is 0 (falsy)', () => {
-      const stats = {
-        inventory: {
-          magicItems: [
-            {
-              name: 'Zero Quantity Ring',
-              quantity: 0,
-              type: 'Ring',
-              rarity: 'Common',
-              description: 'A common ring.',
-            },
-          ],
-          equipped: [],
-          backpack: [],
-        },
-      };
-
-      renderComponent(stats);
-      expect(screen.getByText(/Zero Quantity Ring/)).toBeInTheDocument();
-      expect(screen.queryByText(/qty 0/)).not.toBeInTheDocument();
     });
 
     it('should render magic item with subtype in parentheses', () => {
@@ -352,27 +294,21 @@ describe('CharInventory rendering', () => {
       expect(screen.getByText('Healing Potion')).toBeInTheDocument();
     });
 
-    it('should not render equipped section when empty', () => {
+    it('should not render equipped or backpack sections when arrays are empty', () => {
       const stats = { inventory: { magicItems: [], equipped: [], backpack: [] } };
       renderComponent(stats);
       expect(screen.queryByText(/Equipped:/)).not.toBeInTheDocument();
-    });
-
-    it('should not render backpack section when empty', () => {
-      const stats = { inventory: { magicItems: [], equipped: [], backpack: [] } };
-      renderComponent(stats);
       expect(screen.queryByText(/Backpack:/)).not.toBeInTheDocument();
     });
 
-    it('should not render equipped section when missing from inventory', () => {
-      const stats = { inventory: {} };
-      renderComponent(stats);
+    it('should not render equipped or backpack sections when missing or null', () => {
+      const missingStats = { inventory: {} };
+      renderComponent(missingStats);
       expect(screen.queryByText(/Equipped:/)).not.toBeInTheDocument();
-    });
+      expect(screen.queryByText(/Backpack:/)).not.toBeInTheDocument();
 
-    it('should not render equipped section when equipped is null', () => {
-      const stats = { inventory: { magicItems: [], equipped: null, backpack: null } };
-      renderComponent(stats);
+      const nullStats = { inventory: { magicItems: [], equipped: null, backpack: null } };
+      renderComponent(nullStats);
       expect(screen.queryByText(/Equipped:/)).not.toBeInTheDocument();
       expect(screen.queryByText(/Backpack:/)).not.toBeInTheDocument();
     });

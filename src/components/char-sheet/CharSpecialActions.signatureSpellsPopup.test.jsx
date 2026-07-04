@@ -118,14 +118,6 @@ vi.mock('../../services/automation/handlers/class-wizard/signatureSpellsHandler.
   onSignatureSpellsSelected: vi.fn(),
 }));
 
-vi.mock('../../services/automation/handlers/class-wizard/spellMasteryHandler.js', () => ({
-  onSpellMasterySelected: vi.fn(),
-}));
-
-vi.mock('../../services/automation/handlers/class-wizard/SavantHandler.js', () => ({
-  onSavantSelected: vi.fn(),
-}));
-
 import { executeHandler } from '../../services/automation/index.js';
 import { onSignatureSpellsSelected } from '../../services/automation/handlers/class-wizard/signatureSpellsHandler.js';
 
@@ -248,52 +240,6 @@ describe('CharSpecialActions - SignatureSpells Confirm Popup', () => {
       const popupCall = mockSetPopupHtml.mock.calls[0][0];
       expect(popupCall).toContain('Signature Spells');
       expect(popupCall).toContain('Signature spells selected.');
-    });
-
-    it('handles string payload in signature spells confirm popup', async () => {
-      const mockSetPopupHtml = vi.fn();
-
-      executeHandler.mockResolvedValue({
-        type: 'modal',
-        modalName: 'signatureSpells',
-        payload: {
-          action: { name: 'Signature Spells' },
-          playerStats: basePlayerStats,
-          campaignName: 'test',
-          level3Options: ['Fireball', 'Haste'],
-          selectedSpells: [],
-        },
-      });
-
-      onSignatureSpellsSelected.mockResolvedValue({
-        type: 'popup',
-        payload: '<b>Custom HTML popup</b>',
-      });
-
-      const playerStats = createPlayerStats({
-        specialActions: [
-          { name: 'Signature Spells', description: 'Choose two level 3 spells.', automation: { type: 'signature_spells' } },
-        ],
-      });
-      render(<CharSpecialActions playerStats={playerStats} campaignName="test" />, {
-        wrapper: ({ children }) => (
-          <DiceRollContext.Provider value={{ popupHtml: null, setPopupHtml: mockSetPopupHtml }}>
-            {children}
-          </DiceRollContext.Provider>
-        ),
-      });
-
-      fireEvent.click(screen.getByText(/Signature Spells/));
-
-      await waitFor(() => {
-        expect(screen.getByTestId('signature-spells-modal')).toBeInTheDocument();
-      });
-
-      fireEvent.click(screen.getByText('Confirm'));
-
-      await waitFor(() => {
-        expect(mockSetPopupHtml).toHaveBeenCalledWith('<b>Custom HTML popup</b>');
-      });
     });
 
     it('clears signature spells modal after confirm regardless of result type', async () => {

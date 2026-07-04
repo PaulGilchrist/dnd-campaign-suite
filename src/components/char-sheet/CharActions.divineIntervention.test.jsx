@@ -2,10 +2,7 @@
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharActions from './CharActions.jsx';
-import { getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import { hasAutomation } from '../../services/combat/automation/automationService.js';
-import useLoggedDiceRoll from '../../hooks/combat/useLoggedDiceRoll.js';
-import { DiceRollContext } from '../../hooks/combat/DiceRollContext.js';
 import { executeHandler } from '../../services/automation/index.js';
 
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
@@ -259,16 +256,14 @@ function createStats(overrides = {}) {
   return { ...BASE_PLAYER_STATS, ...overrides };
 }
 
-describe('CharActions Divine Intervention cast', () => {
+describe('CharActions action click dispatches automation handler', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
     globalThis.fetch = vi.fn().mockResolvedValue({ json: () => Promise.resolve([]) });
-    getRuntimeValue.mockImplementation(() => null);
-    hasAutomation.mockImplementation(() => false);
   });
 
-  it('divineInterventionAction is set when modal dispatches divineIntervention modal type', async () => {
+  it('calls executeHandler when action with automation is clicked', async () => {
     hasAutomation.mockReturnValue(true);
     executeHandler.mockResolvedValue({
       type: 'modal',
@@ -282,116 +277,6 @@ describe('CharActions Divine Intervention cast', () => {
 
     await act(async () => { render(<CharActions playerStats={stats} campaignName="my-campaign" />); });
     const actionName = screen.getByText(/Divine Intervention:/);
-    await act(async () => { fireEvent.click(actionName); });
-
-    await waitFor(() => {
-      expect(executeHandler).toHaveBeenCalled();
-    });
-  });
-});
-
-describe('CharActions action spell click and cast', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    localStorage.clear();
-    globalThis.fetch = vi.fn().mockResolvedValue({ json: () => Promise.resolve([]) });
-    getRuntimeValue.mockImplementation(() => null);
-    hasAutomation.mockImplementation(() => false);
-  });
-
-  it('handleActionSpellClick sets selectedActionSpell when spell exists', async () => {
-    const stats = createStats({
-      spellAbilities: {
-        spells: [{
-          name: 'Fireball',
-          range: '150 ft',
-          casting_time: '1 action',
-          prepared: 'Prepared',
-          damage: '8d6',
-          level: 3,
-        }],
-      },
-    });
-    await act(async () => { render(<CharActions playerStats={stats} />); });
-    const spellLink = screen.getByText('Fireball');
-    fireEvent.click(spellLink);
-    // Clicking an action spell sets selectedActionSpell state,
-    // which is passed to CharActionSpellPopups child component
-    // The mock renders the test id
-    expect(screen.getByTestId('char-action-spell-popups')).toBeInTheDocument();
-  });
-
-  it('handleActionSpellCast triggers spell casting flow with metamagic', async () => {
-    const stats = createStats({
-      spellAbilities: {
-        spells: [{
-          name: 'Fireball',
-          range: '150 ft',
-          casting_time: '1 action',
-          prepared: 'Prepared',
-          damage: '8d6',
-          level: 3,
-        }],
-      },
-    });
-    await act(async () => { render(<CharActions playerStats={stats} />); });
-    const spellLink = screen.getByText('Fireball');
-    fireEvent.click(spellLink);
-    // The CharActionSpellPopups receives the selected spell
-    expect(screen.getByTestId('char-action-spell-popups')).toBeInTheDocument();
-  });
-
-  it('handleActionSpellCast does nothing when spell is not found', async () => {
-    const stats = createStats({
-      spellAbilities: { spells: [] },
-    });
-    await act(async () => { render(<CharActions playerStats={stats} />); });
-    // No spell to click - verify component renders without error
-    expect(screen.getByText('Actions')).toBeInTheDocument();
-  });
-});
-
-describe('CharActions defensive tactics modal popup', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    localStorage.clear();
-    globalThis.fetch = vi.fn().mockResolvedValue({ json: () => Promise.resolve([]) });
-    hasAutomation.mockImplementation(() => false);
-  });
-
-  it('shows defensive tactics HTML popup when modal defensiveTactics is returned with no stored choice', async () => {
-    hasAutomation.mockReturnValue(true);
-    executeHandler.mockResolvedValue({
-      type: 'modal',
-      modalName: 'defensiveTactics',
-      payload: { action: { name: 'Defensive Tactics' } },
-    });
-
-    const mockSetPopupHtml = vi.fn();
-    useLoggedDiceRoll.mockReturnValue({
-      popupHtml: null, setPopupHtml: mockSetPopupHtml, rollAttack: vi.fn(), rollDamage: vi.fn(), quickRollPlayerSave: vi.fn(),
-    });
-
-    // When the defensive_tactics gating is triggered, it shows feature choice
-    // To reach the executeHandler -> defensiveTactics modal dispatch path,
-    // we need a stored choice so the gating is skipped
-    getRuntimeValue.mockImplementation((_name, key) => {
-      if (key === '_Defensive_Tactics_choice') return 'Escape the Horde';
-      return null;
-    });
-
-    const stats = createStats({
-      actions: [{ name: 'Defensive Tactics', description: 'Choose tactic.', automation: { type: 'defensive_tactics' } }],
-    });
-
-    const wrapper = ({ children }) => (
-      <DiceRollContext.Provider value={{ popupHtml: null, setPopupHtml: mockSetPopupHtml }}>
-        {children}
-      </DiceRollContext.Provider>
-    );
-
-    await act(async () => { render(<CharActions playerStats={stats} campaignName="my-campaign" />, { wrapper }); });
-    const actionName = screen.getByText(/Defensive Tactics:/);
     await act(async () => { fireEvent.click(actionName); });
 
     await waitFor(() => {

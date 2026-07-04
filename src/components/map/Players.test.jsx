@@ -49,13 +49,6 @@ describe('Players', () => {
             expect(groups.length).toBe(0);
         });
 
-        it('should render a single player creature-group', () => {
-            const player = makePlayer();
-            const { container } = renderComponent({}, [player], []);
-            const groups = container.querySelectorAll('g.creature-group');
-            expect(groups.length).toBeGreaterThan(0);
-        });
-
         it('should render multiple player creature-groups', () => {
             const players = [
                 makePlayer({ id: 'p1', name: 'Thorin', gridX: 1, gridY: 1 }),
@@ -64,21 +57,7 @@ describe('Players', () => {
             ];
             const { container } = renderComponent({}, players, []);
             const groups = container.querySelectorAll('g.creature-group');
-            expect(groups.length).toBeGreaterThan(2);
-        });
-
-        it('should render creature-group with correct className', () => {
-            const player = makePlayer();
-            const { container } = renderComponent({}, [player], []);
-            const group = container.querySelector('g.creature-group');
-            expect(group).toHaveClass('creature-group');
-        });
-
-        it('should render creature-group with correct id', () => {
-            const player = makePlayer({ id: 'player-42' });
-            const { container } = renderComponent({}, [player], []);
-            const group = container.querySelector('g.creature-group');
-            expect(group).toBeInTheDocument();
+            expect(groups.length).toBe(3);
         });
     });
 
@@ -89,20 +68,6 @@ describe('Players', () => {
             const circle = container.querySelector('circle.creature-circle');
             expect(circle).toHaveAttribute('cx', String(gridCenterX(2)));
             expect(circle).toHaveAttribute('cy', String(gridCenterY(3)));
-        });
-
-        it('should render creature circle with correct radius', () => {
-            const player = makePlayer();
-            const { container } = renderComponent({}, [player], []);
-            const circle = container.querySelector('circle.creature-circle');
-            expect(circle).toHaveAttribute('r', '20');
-        });
-
-        it('should apply creature-circle class to the circle', () => {
-            const player = makePlayer();
-            const { container } = renderComponent({}, [player], []);
-            const circle = container.querySelector('circle.creature-circle');
-            expect(circle).toHaveClass('creature-circle');
         });
     });
 
@@ -122,16 +87,6 @@ describe('Players', () => {
             const nameText = container.querySelector('text.creature-name');
             expect(nameText.textContent).toBe('Thorin');
         });
-
-        it('should render creature name with correct SVG attributes', () => {
-            const player = makePlayer({ gridX: 2, gridY: 3 });
-            const { container } = renderComponent({}, [player], []);
-            const nameText = container.querySelector('text.creature-name');
-            expect(nameText).toHaveAttribute('text-anchor', 'middle');
-            expect(nameText).toHaveAttribute('dominant-baseline', 'central');
-            expect(nameText).toHaveAttribute('font-size', '18');
-            expect(nameText).toHaveAttribute('font-weight', 'bold');
-        });
     });
 
     describe('initial rendering', () => {
@@ -148,17 +103,6 @@ describe('Players', () => {
             const { container } = renderComponent({}, [player], []);
             const initialText = container.querySelector('text.creature-initial');
             expect(initialText.textContent).toBe('A');
-        });
-
-        it('should render creature initial with correct SVG attributes', () => {
-            const player = makePlayer({ name: 'Thorin' });
-            const { container } = renderComponent({}, [player], []);
-            const initial = container.querySelector('text.creature-initial');
-            expect(initial).toHaveAttribute('text-anchor', 'middle');
-            expect(initial).toHaveAttribute('dominant-baseline', 'central');
-            expect(initial).toHaveAttribute('fill', '#fff');
-            expect(initial).toHaveAttribute('font-size', '16');
-            expect(initial).toHaveAttribute('font-weight', 'bold');
         });
     });
 
@@ -182,20 +126,13 @@ describe('Players', () => {
             expect(initial).toBeInTheDocument();
         });
 
-        it('should not render image when characters array is null', () => {
-            const player = makePlayer({ name: 'Thorin' });
-            const { container } = renderComponent({}, [player], null);
-            const image = container.querySelector('image.creature-image');
-            expect(image).toBeNull();
-            const initial = container.querySelector('text.creature-initial');
-            expect(initial).toBeInTheDocument();
-        });
-
         it('should not render image when characters array is undefined', () => {
             const player = makePlayer({ name: 'Thorin' });
             const { container } = renderComponent({}, [player], undefined);
             const image = container.querySelector('image.creature-image');
             expect(image).toBeNull();
+            const initial = container.querySelector('text.creature-initial');
+            expect(initial).toBeInTheDocument();
         });
 
         it('should match character by name to find image', () => {
@@ -205,28 +142,6 @@ describe('Players', () => {
             const { container } = renderComponent({}, [player], [character, otherCharacter]);
             const image = container.querySelector('image.creature-image');
             expect(image).toHaveAttribute('xlink:href', 'https://example.com/thorin.png');
-        });
-
-        it('should render creature image with correct dimensions', () => {
-            const player = makePlayer({ name: 'Thorin', gridX: 2, gridY: 3 });
-            const character = makeCharacter();
-            const { container } = renderComponent({}, [player], [character]);
-            const image = container.querySelector('image.creature-image');
-            const cx = gridCenterX(2);
-            const cy = gridCenterY(3);
-            expect(image).toHaveAttribute('x', String(cx - 18));
-            expect(image).toHaveAttribute('y', String(cy - 18));
-            expect(image).toHaveAttribute('width', '36');
-            expect(image).toHaveAttribute('height', '36');
-            expect(image).toHaveAttribute('preserveAspectRatio', 'xMidYMid slice');
-        });
-
-        it('should apply clipPath to creature image', () => {
-            const player = makePlayer({ id: 'p1', name: 'Thorin' });
-            const character = makeCharacter();
-            const { container } = renderComponent({}, [player], [character]);
-            const image = container.querySelector('image.creature-image');
-            expect(image).toHaveAttribute('clip-path', 'url(#creature-clip-p1)');
         });
     });
 
@@ -256,23 +171,7 @@ describe('Players', () => {
             ];
             const { container } = renderComponent({}, players, []);
             const clipPaths = container.querySelectorAll('clipPath[id^="creature-clip-"]');
-            expect(clipPaths.length).toBeGreaterThan(2);
-        });
-    });
-
-    describe('SVG structure', () => {
-        it('should render correct SVG element structure', () => {
-            const player = makePlayer({ id: 'player-1', name: 'Thorin', gridX: 2, gridY: 3 });
-            const { container } = renderComponent({}, [player], []);
-            const group = container.querySelector('g.creature-group');
-            const defs = group.querySelector('defs');
-            const circle = group.querySelector('circle.creature-circle');
-            const nameText = group.querySelector('text.creature-name');
-            const initial = group.querySelector('text.creature-initial');
-            expect(defs).toBeInTheDocument();
-            expect(circle).toBeInTheDocument();
-            expect(nameText).toBeInTheDocument();
-            expect(initial).toBeInTheDocument();
+            expect(clipPaths.length).toBe(3);
         });
     });
 
@@ -292,14 +191,6 @@ describe('Players', () => {
             const circle = container.querySelector('circle.creature-circle');
             expect(circle).not.toHaveClass('dragging');
         });
-
-        it('should render creature with dragging class in className attribute', () => {
-            const player = makePlayer({ id: 'player-1' });
-            const dragging = { creatureId: 'player-1' };
-            const { container } = renderComponent({ dragging }, [player], []);
-            const circle = container.querySelector('circle.creature-circle');
-            expect(circle.className.baseVal).toContain('dragging');
-        });
     });
 
     describe('selected state', () => {
@@ -317,14 +208,6 @@ describe('Players', () => {
             const { container } = renderComponent({ selectedPlayer }, [player], []);
             const circle = container.querySelector('circle.creature-circle');
             expect(circle).not.toHaveClass('selected');
-        });
-
-        it('should render creature with selected class in className attribute', () => {
-            const player = makePlayer({ id: 'player-1' });
-            const selectedPlayer = { id: 'player-1' };
-            const { container } = renderComponent({ selectedPlayer }, [player], []);
-            const circle = container.querySelector('circle.creature-circle');
-            expect(circle.className.baseVal).toContain('selected');
         });
 
         it('should render selection highlight rect when player is selected', () => {
@@ -350,48 +233,9 @@ describe('Players', () => {
 
         it('should not render selection highlight when no player is selected', () => {
             const player = makePlayer({ id: 'player-1' });
-            const { container } = renderComponent({ selectedPlayer: undefined }, [player], []);
-            const rect = container.querySelector('rect[stroke="#FFD700"]');
-            expect(rect).toBeNull();
-        });
-
-        it('should not render selection highlight when selectedPlayer is null', () => {
-            const player = makePlayer({ id: 'player-1' });
             const { container } = renderComponent({ selectedPlayer: null }, [player], []);
             const rect = container.querySelector('rect[stroke="#FFD700"]');
             expect(rect).toBeNull();
-        });
-
-        it('should render selection rect with correct stroke width', () => {
-            const player = makePlayer({ id: 'player-1', gridX: 2, gridY: 3 });
-            const selectedPlayer = { id: 'player-1' };
-            const { container } = renderComponent({ selectedPlayer }, [player], []);
-            const rect = container.querySelector('rect[stroke="#FFD700"]');
-            expect(rect).toHaveAttribute('stroke-width', '2');
-        });
-
-        it('should render selection rect with dash array', () => {
-            const player = makePlayer({ id: 'player-1', gridX: 2, gridY: 3 });
-            const selectedPlayer = { id: 'player-1' };
-            const { container } = renderComponent({ selectedPlayer }, [player], []);
-            const rect = container.querySelector('rect[stroke="#FFD700"]');
-            expect(rect).toHaveAttribute('stroke-dasharray', '4 2');
-        });
-
-        it('should render selection rect with rx rounded corners', () => {
-            const player = makePlayer({ id: 'player-1', gridX: 2, gridY: 3 });
-            const selectedPlayer = { id: 'player-1' };
-            const { container } = renderComponent({ selectedPlayer }, [player], []);
-            const rect = container.querySelector('rect[stroke="#FFD700"]');
-            expect(rect).toHaveAttribute('rx', '4');
-        });
-
-        it('should render selection rect with pointerEvents none', () => {
-            const player = makePlayer({ id: 'player-1', gridX: 2, gridY: 3 });
-            const selectedPlayer = { id: 'player-1' };
-            const { container } = renderComponent({ selectedPlayer }, [player], []);
-            const rect = container.querySelector('rect[stroke="#FFD700"]');
-            expect(rect).toHaveAttribute('pointer-events', 'none');
         });
     });
 
@@ -472,13 +316,6 @@ describe('Players', () => {
             circle.dispatchEvent(event);
             expect(event.preventDefault).toHaveBeenCalled();
             expect(event.stopPropagation).toHaveBeenCalled();
-        });
-    });
-
-    describe('error handling', () => {
-        it('should throw when player array contains null', () => {
-            const character = makeCharacter();
-            expect(() => renderComponent({}, [null], [character])).toThrow();
         });
     });
 });

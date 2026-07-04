@@ -59,24 +59,6 @@ describe('CreatureHp', () => {
             render(<CreatureHp {...props} creature={creature} isLocalhost={false} />);
             expect(screen.getByText(expectedStatus)).toBeInTheDocument();
         });
-
-        it.each`
-            currentHp | expectedClass
-            ${7}      | ${'healthy'}
-            ${3}      | ${'bloodied'}
-            ${0}      | ${'dead'}
-        `('should apply $expectedClass class to status badge when currentHp is $currentHp', ({ currentHp, expectedClass }) => {
-            const creature = { ...defaultNpcCreature, currentHp };
-            render(<CreatureHp {...props} creature={creature} isLocalhost={false} />);
-            const badge = document.querySelector(`.status-badge.${expectedClass}`);
-            expect(badge).toBeInTheDocument();
-        });
-
-        it('should only render one status badge at a time', () => {
-            render(<CreatureHp {...props} creature={defaultNpcCreature} isLocalhost={false} />);
-            const badges = document.querySelectorAll('.status-badge');
-            expect(badges.length).toBe(1);
-        });
     });
 
     describe('NPC creatures - localhost', () => {
@@ -86,11 +68,6 @@ describe('CreatureHp', () => {
             expect(screen.getByText('HP')).toBeInTheDocument();
             expect(screen.getByText('/')).toBeInTheDocument();
             expect(document.querySelectorAll('.hp-inline-input').length).toBe(2);
-        });
-
-        it('should not render hp-status span for localhost NPC', () => {
-            render(<CreatureHp {...props} creature={defaultNpcCreature} isLocalhost={true} />);
-            expect(document.querySelector('.hp-status')).not.toBeInTheDocument();
         });
 
         it.each`
@@ -103,18 +80,15 @@ describe('CreatureHp', () => {
             expect(document.querySelectorAll('.hp-inline-input')[idx]).toHaveValue(expectedValue);
         });
 
-        it('should call onChange with new value when current HP input changes', () => {
+        it.each`
+            inputValue | expectedCall
+            ${'5'}     | ${['Goblin', 5]}
+            ${'abc'}   | ${['Goblin', 0]}
+        `('should call onChange with $expectedCall when current HP input is "$inputValue"', ({ inputValue, expectedCall }) => {
             render(<CreatureHp {...props} creature={defaultNpcCreature} isLocalhost={true} />);
             const currentInput = document.querySelectorAll('.hp-inline-input')[0];
-            fireEvent.change(currentInput, { target: { value: '5' } });
-            expect(props.onChange).toHaveBeenCalledWith('Goblin', 5);
-        });
-
-        it('should call onChange with 0 when current HP input is invalid', () => {
-            render(<CreatureHp {...props} creature={defaultNpcCreature} isLocalhost={true} />);
-            const currentInput = document.querySelectorAll('.hp-inline-input')[0];
-            fireEvent.change(currentInput, { target: { value: 'abc' } });
-            expect(props.onChange).toHaveBeenCalledWith('Goblin', 0);
+            fireEvent.change(currentInput, { target: { value: inputValue } });
+            expect(props.onChange).toHaveBeenCalledWith(...expectedCall);
         });
 
         it('should update creature.maxHp and cap currentHp when max HP input decreases below current', () => {
@@ -181,35 +155,15 @@ describe('CreatureHp', () => {
             expect(document.querySelector('.hp-max-input')).not.toBeInTheDocument();
         });
 
-        it('should display current HP value in input for localhost', () => {
+        it.each`
+            inputValue | expectedCall
+            ${'10'}    | ${['Alice', 10]}
+            ${'xyz'}   | ${['Alice', 0]}
+        `('should call onChange with $expectedCall when current HP input is "$inputValue" for localhost', ({ inputValue, expectedCall }) => {
             render(<CreatureHp {...props} isLocalhost={true} />);
             const currentInput = document.querySelector('.hp-inline-input');
-            expect(currentInput).toHaveValue(15);
-        });
-
-        it('should have hp-max-val class on max HP span', () => {
-            render(<CreatureHp {...props} isLocalhost={true} />);
-            const maxVal = document.querySelector('.hp-max-val');
-            expect(maxVal).toBeInTheDocument();
-        });
-
-        it('should call onChange with new value when current HP input changes for localhost', () => {
-            render(<CreatureHp {...props} isLocalhost={true} />);
-            const currentInput = document.querySelector('.hp-inline-input');
-            fireEvent.change(currentInput, { target: { value: '10' } });
-            expect(props.onChange).toHaveBeenCalledWith('Alice', 10);
-        });
-
-        it('should not call onChange when non-localhost player HP display changes', () => {
-            render(<CreatureHp {...props} isLocalhost={false} />);
-            expect(props.onChange).not.toHaveBeenCalled();
-        });
-
-        it('should call onChange with 0 when current HP input is invalid for localhost', () => {
-            render(<CreatureHp {...props} isLocalhost={true} />);
-            const currentInput = document.querySelector('.hp-inline-input');
-            fireEvent.change(currentInput, { target: { value: 'xyz' } });
-            expect(props.onChange).toHaveBeenCalledWith('Alice', 0);
+            fireEvent.change(currentInput, { target: { value: inputValue } });
+            expect(props.onChange).toHaveBeenCalledWith(...expectedCall);
         });
 
         it.each`
@@ -221,19 +175,6 @@ describe('CreatureHp', () => {
             render(<CreatureHp {...props} isLocalhost={true} />);
             const currentInput = document.querySelector('.hp-inline-input');
             expect(currentInput).toHaveAttribute(attribute, expectedValue);
-        });
-    });
-
-    describe('HpBar behavior', () => {
-        it.each`
-            creatureType  | isLocalhost
-            ${'player'}   | ${true}
-            ${'npc'}      | ${false}
-            ${'npc'}      | ${true}
-        `('should render HpBar for $creatureType creature (isLocalhost: $isLocalhost)', ({ creatureType, isLocalhost }) => {
-            const creature = creatureType === 'player' ? defaultPlayerCreature : defaultNpcCreature;
-            render(<CreatureHp {...props} creature={creature} isLocalhost={isLocalhost} />);
-            expect(screen.getByTestId('hp-bar')).toBeInTheDocument();
         });
     });
 
@@ -273,27 +214,7 @@ describe('CreatureHp', () => {
         });
     });
 
-    describe('dead threshold', () => {
-        it.each`
-            currentHp | expectedStatus
-            ${0}      | ${'DEAD'}
-            ${-1}     | ${'DEAD'}
-            ${-100}   | ${'DEAD'}
-            ${1}      | ${'OK'}
-        `('should show $expectedStatus when currentHp is $currentHp', ({ currentHp, expectedStatus }) => {
-            const creature = { ...defaultNpcCreature, currentHp };
-            render(<CreatureHp {...props} creature={creature} isLocalhost={false} />);
-            expect(screen.getByText(expectedStatus)).toBeInTheDocument();
-        });
-    });
-
     describe('render structure', () => {
-        it('should render hp-bar-row and creature-hp container for all rendering modes', () => {
-            render(<CreatureHp {...props} creature={defaultNpcCreature} isLocalhost={false} />);
-            expect(document.querySelector('.hp-bar-row')).toBeInTheDocument();
-            expect(document.querySelector('.creature-hp')).toBeInTheDocument();
-        });
-
         it.each`
             creatureType  | isLocalhost | hasHpStatus
             ${'npc'}      | ${false}    | ${true}

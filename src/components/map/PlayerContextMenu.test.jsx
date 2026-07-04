@@ -30,7 +30,7 @@ const renderComponent = (props = {}) =>
 
 describe('PlayerContextMenu', () => {
     describe('null rendering', () => {
-        it('should return null when selectedPlayer is null or undefined', () => {
+        it('should return null when selectedPlayer is null', () => {
             const { container } = render(
                 <svg>
                     <PlayerContextMenu

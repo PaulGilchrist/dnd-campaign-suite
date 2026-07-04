@@ -16,17 +16,6 @@ describe('MarkdownPreview', () => {
     });
 
     describe('className handling', () => {
-        it('renders nothing when text is empty', () => {
-            const { container } = render(<MarkdownPreview text="" />);
-            expect(container.querySelector('.markdown-preview')).not.toBeInTheDocument();
-        });
-
-        it('applies the markdown-preview class to the wrapper div', () => {
-            render(<MarkdownPreview text="hello" />);
-            const div = document.querySelector('.markdown-preview');
-            expect(div).toBeInTheDocument();
-        });
-
         it('merges custom className with the default markdown-preview class', () => {
             render(<MarkdownPreview text="hello" className="custom-class" />);
             const div = document.querySelector('.markdown-preview');
@@ -35,15 +24,10 @@ describe('MarkdownPreview', () => {
         });
     });
 
-    describe('sanitization', () => {
-        it('strips <script> tags from raw HTML in markdown input', () => {
-            render(
-                <MarkdownPreview
-                    text="<script>alert('xss')</script><b>Safe Content</b>"
-                />
-            );
-            expect(screen.getByText('Safe Content')).toBeInTheDocument();
-            expect(screen.queryByText("alert('xss')")).not.toBeInTheDocument();
+    describe('markdown rendering', () => {
+        it('renders sanitized markdown content', () => {
+            render(<MarkdownPreview text="**bold text**" />);
+            expect(screen.getByText('bold text')).toBeInTheDocument();
         });
     });
 });

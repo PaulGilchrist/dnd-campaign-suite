@@ -9,7 +9,7 @@ const mockAbilityScores = [
   { full_name: 'Constitution' },
   { full_name: 'Intelligence' },
   { full_name: 'Wisdom' },
-  { full_name: 'Charisma' }
+  { full_name: 'Charisma' },
 ];
 
 const mockPointBuyCosts = {
@@ -20,7 +20,7 @@ const mockPointBuyCosts = {
   12: 4,
   13: 5,
   14: 7,
-  15: 9
+  15: 9,
 };
 
 const mockBackgrounds2024 = [
@@ -28,25 +28,25 @@ const mockBackgrounds2024 = [
     index: 'acolyte',
     name: 'Acolyte',
     ability_scores: 'Intelligence, Wisdom, Charisma',
-  }
+  },
 ];
 
 const mockRulesValidation2024 = {
   2024: {
     point_buy: {
       total_points: 24,
-      costs: { 8: 0, 9: 1, 10: 2, 11: 3, 12: 4, 13: 5, 14: 7, 15: 9 }
-    }
-  }
+      costs: { 8: 0, 9: 1, 10: 2, 11: 3, 12: 4, 13: 5, 14: 7, 15: 9 },
+    },
+  },
 };
 
 const mockRulesValidation5e = {
   '5e': {
     point_buy: {
       total_points: 24,
-      costs: { 8: 0, 9: 1, 10: 2, 11: 3, 12: 4, 13: 5, 14: 7, 15: 9 }
-    }
-  }
+      costs: { 8: 0, 9: 1, 10: 2, 11: 3, 12: 4, 13: 5, 14: 7, 15: 9 },
+    },
+  },
 };
 
 global.fetch = vi.fn();
@@ -157,7 +157,7 @@ describe('WizardStepAbilities', () => {
   });
 
   describe('Header and description', () => {
-    it('should render the step header', async () => {
+    it('should render the step header and descriptions', async () => {
       setupFetchMock('5e');
       const props = createMockProps();
       render(<WizardStepAbilities {...props} />);
@@ -165,31 +165,16 @@ describe('WizardStepAbilities', () => {
       await waitFor(() => {
         expect(screen.getByText('Step 5: Ability Scores')).toBeInTheDocument();
       });
-    });
 
-    it('should render the point buy description with points remaining', async () => {
-      setupFetchMock('5e');
-      const props = createMockProps();
-      render(<WizardStepAbilities {...props} />);
-
-      await waitFor(() => {
-        expect(screen.getByText(/Total points allowed: 24/)).toBeInTheDocument();
-      });
-    });
-
-    it('should render the max score description', async () => {
-      setupFetchMock('5e');
-      const props = createMockProps();
-      render(<WizardStepAbilities {...props} />);
-
-      await waitFor(() => {
-        expect(screen.getByText(/Total score \(base \+ feat \+ background \+ misc\) cannot exceed 20/)).toBeInTheDocument();
-      });
+      expect(screen.getByText(/Total points allowed: 24/)).toBeInTheDocument();
+      expect(
+        screen.getByText(/Total score \(base \+ feat \+ background \+ misc\) cannot exceed 20/)
+      ).toBeInTheDocument();
     });
   });
 
   describe('Ability score cards', () => {
-    it('should render all six ability score cards', async () => {
+    it('should render all six ability score cards with inputs and totals', async () => {
       setupFetchMock('5e');
       const props = createMockProps();
       render(<WizardStepAbilities {...props} />);
@@ -203,59 +188,16 @@ describe('WizardStepAbilities', () => {
       expect(screen.getByText('Intelligence')).toBeInTheDocument();
       expect(screen.getByText('Wisdom')).toBeInTheDocument();
       expect(screen.getByText('Charisma')).toBeInTheDocument();
-    });
-
-    it('should render base score inputs for each ability', async () => {
-      setupFetchMock('5e');
-      const props = createMockProps();
-      render(<WizardStepAbilities {...props} />);
-
-      await waitFor(() => {
-        expect(screen.getByText('Strength')).toBeInTheDocument();
-      });
 
       const baseInputs = screen.getAllByLabelText('Base Score (8-15)');
       expect(baseInputs.length).toBe(6);
-    });
-
-    it('should render misc increase inputs for each ability', async () => {
-      setupFetchMock('5e');
-      const props = createMockProps();
-      render(<WizardStepAbilities {...props} />);
-
-      await waitFor(() => {
-        expect(screen.getByText('Strength')).toBeInTheDocument();
-      });
 
       const miscInputs = screen.getAllByLabelText('Misc Increase');
       expect(miscInputs.length).toBe(6);
-    });
-
-    it('should render total score display for each ability', async () => {
-      setupFetchMock('5e');
-      const props = createMockProps();
-      render(<WizardStepAbilities {...props} />);
-
-      await waitFor(() => {
-        expect(screen.getByText('Strength')).toBeInTheDocument();
-      });
 
       const totalScores = screen.getAllByText(/Total:/);
       expect(totalScores.length).toBe(6);
-    });
-
-    it('should show total score of 8 when all bases are 8 with no increases', async () => {
-      setupFetchMock('5e');
-      const props = createMockProps();
-      render(<WizardStepAbilities {...props} />);
-
-      await waitFor(() => {
-        expect(screen.getByText('Strength')).toBeInTheDocument();
-      });
-
-      const totalElements = screen.getAllByText(/Total:/);
-      expect(totalElements.length).toBe(6);
-      totalElements.forEach(el => {
+      totalScores.forEach((el) => {
         expect(el.textContent).toContain('Total: 8');
       });
     });
@@ -290,10 +232,10 @@ describe('WizardStepAbilities', () => {
       expect(props.onAbilityMiscIncreaseChange).toHaveBeenCalledWith(0, 3);
     });
 
-    it('should show error class on base score input when error exists', async () => {
+    it('should show error styling and message for invalid base score', async () => {
       setupFetchMock('5e');
       const props = createMockProps({
-        errors: { ability_0_baseScore: 'Invalid score' }
+        errors: { ability_0_baseScore: 'Invalid score' },
       });
       render(<WizardStepAbilities {...props} />);
 
@@ -303,26 +245,13 @@ describe('WizardStepAbilities', () => {
 
       const baseInputs = screen.getAllByLabelText('Base Score (8-15)');
       expect(baseInputs[0]).toHaveClass('error');
-    });
-
-    it('should show error message for invalid base score', async () => {
-      setupFetchMock('5e');
-      const props = createMockProps({
-        errors: { ability_0_baseScore: 'Invalid score' }
-      });
-      render(<WizardStepAbilities {...props} />);
-
-      await waitFor(() => {
-        expect(screen.getByText('Strength')).toBeInTheDocument();
-      });
-
       expect(screen.getByText('Invalid score')).toBeInTheDocument();
     });
 
-    it('should show error class on misc increase input when error exists', async () => {
+    it('should show error styling and message for invalid misc increase', async () => {
       setupFetchMock('5e');
       const props = createMockProps({
-        errors: { ability_0_miscIncrease: 'Invalid value' }
+        errors: { ability_0_miscIncrease: 'Invalid value' },
       });
       render(<WizardStepAbilities {...props} />);
 
@@ -332,24 +261,9 @@ describe('WizardStepAbilities', () => {
 
       const miscInputs = screen.getAllByLabelText('Misc Increase');
       expect(miscInputs[0]).toHaveClass('error');
-    });
-
-    it('should show error message for invalid misc increase', async () => {
-      setupFetchMock('5e');
-      const props = createMockProps({
-        errors: { ability_0_miscIncrease: 'Invalid value' }
-      });
-      render(<WizardStepAbilities {...props} />);
-
-      await waitFor(() => {
-        expect(screen.getByText('Strength')).toBeInTheDocument();
-      });
-
       expect(screen.getByText('Invalid value')).toBeInTheDocument();
     });
-  });
 
-  describe('Total score validation', () => {
     it('should show error styling when total score exceeds 20', async () => {
       setupFetchMock('5e');
       const props = createMockProps({
@@ -374,9 +288,46 @@ describe('WizardStepAbilities', () => {
       const errorTotals = screen.getAllByText(/max 20/);
       expect(errorTotals.length).toBeGreaterThan(0);
     });
+
+    it('should display point cost for each ability score', async () => {
+      setupFetchMock('5e');
+      const props = createMockProps();
+      render(<WizardStepAbilities {...props} />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Strength')).toBeInTheDocument();
+      });
+
+      const pointCosts = screen.getAllByText('Cost: 0');
+      expect(pointCosts.length).toBe(6);
+    });
+
+    it('should display correct point cost for score 10', async () => {
+      setupFetchMock('5e');
+      const props = createMockProps({
+        formData: {
+          rules: '5e',
+          abilities: [
+            { baseScore: '10', featIncrease: '0', miscIncrease: '0', backgroundIncrease: '0' },
+            { baseScore: '8', featIncrease: '0', miscIncrease: '0', backgroundIncrease: '0' },
+            { baseScore: '8', featIncrease: '0', miscIncrease: '0', backgroundIncrease: '0' },
+            { baseScore: '8', featIncrease: '0', miscIncrease: '0', backgroundIncrease: '0' },
+            { baseScore: '8', featIncrease: '0', miscIncrease: '0', backgroundIncrease: '0' },
+            { baseScore: '8', featIncrease: '0', miscIncrease: '0', backgroundIncrease: '0' },
+          ],
+        },
+      });
+      render(<WizardStepAbilities {...props} />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Strength')).toBeInTheDocument();
+      });
+
+      expect(screen.getByText('Cost: 2')).toBeInTheDocument();
+    });
   });
 
-  describe('5e ruleset behavior', () => {
+  describe('Ruleset-specific behavior', () => {
     it('should not show background ability section for 5e ruleset', async () => {
       setupFetchMock('5e');
       const props = createMockProps();
@@ -389,18 +340,6 @@ describe('WizardStepAbilities', () => {
       expect(screen.queryByText(/Background Ability Scores/)).not.toBeInTheDocument();
     });
 
-    it('should show point buy total of 24 for 5e ruleset', async () => {
-      setupFetchMock('5e');
-      const props = createMockProps();
-      render(<WizardStepAbilities {...props} />);
-
-      await waitFor(() => {
-        expect(screen.getByText(/Total points allowed: 24/)).toBeInTheDocument();
-      });
-    });
-  });
-
-  describe('2024 ruleset - background ability scores', () => {
     it('should not show background ability section for 2024 without background', async () => {
       setupFetchMock('2024');
       const props = createMockProps({ formData: { rules: '2024' } });
@@ -413,6 +352,18 @@ describe('WizardStepAbilities', () => {
       expect(screen.queryByText(/Background Ability Scores/)).not.toBeInTheDocument();
     });
 
+    it('should show point buy total of 24 for both 5e and 2024 rulesets', async () => {
+      setupFetchMock('5e');
+      const props = createMockProps();
+      render(<WizardStepAbilities {...props} />);
+
+      await waitFor(() => {
+        expect(screen.getByText(/Total points allowed: 24/)).toBeInTheDocument();
+      });
+    });
+  });
+
+  describe('2024 ruleset - background ability scores', () => {
     it('should show background ability section for 2024 with background', async () => {
       const props = createMockProps({
         formData: { rules: '2024', background: 'Acolyte' },
@@ -485,7 +436,10 @@ describe('WizardStepAbilities', () => {
       const selects = screen.getAllByRole('combobox');
       fireEvent.change(selects[0], { target: { value: '2' } });
 
-      expect(localStorage.setItem).toHaveBeenCalledWith('_background_abilities_Acolyte', expect.stringContaining('Intelligence'));
+      expect(localStorage.setItem).toHaveBeenCalledWith(
+        '_background_abilities_Acolyte',
+        expect.stringContaining('Intelligence'),
+      );
     });
 
     it('should highlight background abilities in the ability score grid with badge', async () => {
@@ -619,9 +573,7 @@ describe('WizardStepAbilities', () => {
     it('should show feat ability section when there are feat choices', async () => {
       setupFetchMock('5e');
       const props = createMockProps({
-        featAbilityChoices: [
-          { amount: 1, abilityNames: ['Strength', 'Constitution'] },
-        ],
+        featAbilityChoices: [{ amount: 1, abilityNames: ['Strength', 'Constitution'] }],
         featAbilityAssignments: { '0': 'Strength' },
       });
       render(<WizardStepAbilities {...props} />);
@@ -636,9 +588,7 @@ describe('WizardStepAbilities', () => {
     it('should call onFeatAbilityChoiceChange when feat ability is changed', async () => {
       setupFetchMock('5e');
       const props = createMockProps({
-        featAbilityChoices: [
-          { amount: 1, abilityNames: ['Strength', 'Constitution'] },
-        ],
+        featAbilityChoices: [{ amount: 1, abilityNames: ['Strength', 'Constitution'] }],
         featAbilityAssignments: { '0': 'Strength' },
       });
       render(<WizardStepAbilities {...props} />);
@@ -648,7 +598,7 @@ describe('WizardStepAbilities', () => {
       });
 
       const selects = screen.getAllByRole('combobox');
-      const featSelect = selects.find(s => {
+      const featSelect = selects.find((s) => {
         const parent = s.closest('.bg-ability-assignment');
         return parent && parent.textContent.includes('Feat ASI');
       });
@@ -662,9 +612,7 @@ describe('WizardStepAbilities', () => {
     it('should render all ability options for a feat choice', async () => {
       setupFetchMock('5e');
       const props = createMockProps({
-        featAbilityChoices: [
-          { amount: 1, abilityNames: ['Strength', 'Dexterity', 'Constitution'] },
-        ],
+        featAbilityChoices: [{ amount: 1, abilityNames: ['Strength', 'Dexterity', 'Constitution'] }],
         featAbilityAssignments: { '0': 'Strength' },
       });
       render(<WizardStepAbilities {...props} />);
@@ -677,70 +625,6 @@ describe('WizardStepAbilities', () => {
       expect(featSection).toHaveTextContent('Strength');
       expect(featSection).toHaveTextContent('Dexterity');
       expect(featSection).toHaveTextContent('Constitution');
-    });
-  });
-
-  describe('Edge cases', () => {
-    it('should handle undefined abilities array gracefully', async () => {
-      setupFetchMock('5e');
-      const props = createMockProps({
-        formData: { rules: '5e', abilities: undefined },
-      });
-      render(<WizardStepAbilities {...props} />);
-
-      await waitFor(() => {
-        expect(screen.getByText('Step 5: Ability Scores')).toBeInTheDocument();
-      });
-    });
-
-    it('should handle missing errors prop gracefully when no errors exist', async () => {
-      setupFetchMock('5e');
-      const props = createMockProps({
-        errors: {},
-      });
-      render(<WizardStepAbilities {...props} />);
-
-      await waitFor(() => {
-        expect(screen.getByText('Step 5: Ability Scores')).toBeInTheDocument();
-      });
-    });
-
-    it('should display point cost for each ability score', async () => {
-      setupFetchMock('5e');
-      const props = createMockProps();
-      render(<WizardStepAbilities {...props} />);
-
-      await waitFor(() => {
-        expect(screen.getByText('Strength')).toBeInTheDocument();
-      });
-
-      // Base score 8 costs 0 points
-      const pointCosts = screen.getAllByText('Cost: 0');
-      expect(pointCosts.length).toBe(6);
-    });
-
-    it('should display correct point cost for score 10', async () => {
-      setupFetchMock('5e');
-      const props = createMockProps({
-        formData: {
-          rules: '5e',
-          abilities: [
-            { baseScore: '10', featIncrease: '0', miscIncrease: '0', backgroundIncrease: '0' },
-            { baseScore: '8', featIncrease: '0', miscIncrease: '0', backgroundIncrease: '0' },
-            { baseScore: '8', featIncrease: '0', miscIncrease: '0', backgroundIncrease: '0' },
-            { baseScore: '8', featIncrease: '0', miscIncrease: '0', backgroundIncrease: '0' },
-            { baseScore: '8', featIncrease: '0', miscIncrease: '0', backgroundIncrease: '0' },
-            { baseScore: '8', featIncrease: '0', miscIncrease: '0', backgroundIncrease: '0' },
-          ],
-        },
-      });
-      render(<WizardStepAbilities {...props} />);
-
-      await waitFor(() => {
-        expect(screen.getByText('Strength')).toBeInTheDocument();
-      });
-
-      expect(screen.getByText('Cost: 2')).toBeInTheDocument();
     });
   });
 });

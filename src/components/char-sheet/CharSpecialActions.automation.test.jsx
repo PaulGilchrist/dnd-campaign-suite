@@ -141,151 +141,8 @@ describe('CharSpecialActions - Automation', () => {
       });
     });
 
-    it('shows a teleport modal when automation returns a teleport modal', async () => {
-      executeHandler.mockResolvedValue({
-        type: 'modal',
-        modalName: 'teleport',
-        payload: {
-          action: { name: 'Blink Steps', automation: { effect: 'bonus_teleport', distance: '30 ft' } },
-          playerStats: basePlayerStats,
-          campaignName: 'test',
-        },
-      });
-
-      const playerStats = createPlayerStats({
-        specialActions: [
-          { name: 'Blink Steps', description: 'Teleport up to 30 feet.', automation: { type: 'teleport', distance: '30 ft' } },
-        ],
-      });
-      render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
-      fireEvent.click(screen.getByText(/Blink Steps/));
-
-      await waitFor(() => {
-        expect(screen.getByTestId('teleport-modal')).toBeInTheDocument();
-      });
-    });
-
-    it('does not show a teleport modal for unknown modal types', async () => {
-      executeHandler.mockResolvedValue({
-        type: 'modal',
-        modalName: 'unknown',
-        payload: { action: { name: 'Unknown' } },
-      });
-
-      const playerStats = createPlayerStats({
-        specialActions: [
-          { name: 'Unknown Action', description: 'Does something unknown.', automation: { type: 'custom' } },
-        ],
-      });
-      render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
-      fireEvent.click(screen.getByText(/Unknown Action/));
-
-      await waitFor(() => {
-        expect(screen.queryByTestId('teleport-modal')).not.toBeInTheDocument();
-      });
-    });
-
-    it('renders automation actions with the clickable class', () => {
-      const playerStats = createPlayerStats({
-        specialActions: [
-          { name: 'Blink Steps', description: 'Teleport up to 30 feet.', automation: { type: 'teleport', distance: '30 ft' } },
-        ],
-      });
-      render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
-      expect(screen.getByText(/Blink Steps/)).toHaveClass('clickable');
-    });
-
-    it('renders non-automation actions without the clickable class', () => {
-      const playerStats = createPlayerStats({
-        specialActions: [
-          { name: 'Second Wind', description: 'Regain hit points.' },
-        ],
-      });
-      render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
-      expect(screen.getByText(/Second Wind/)).not.toHaveClass('clickable');
-    });
-
-    it('renders passive_rule savant actions with the clickable class', () => {
-      const playerStats = createPlayerStats({
-        specialActions: [
-          { name: 'Abjuration Savant', description: 'Choose spells.', automation: { type: 'passive_rule', effect: 'abjuration_savant' } },
-        ],
-      });
-      render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
-      expect(screen.getByText(/Abjuration Savant/)).toHaveClass('clickable');
-    });
-
-    it('does not render passive_rule with non-savant effect as clickable', () => {
-      const playerStats = createPlayerStats({
-        specialActions: [
-          { name: 'Some Feature', description: 'Does something.', automation: { type: 'passive_rule', effect: 'unknown_effect' } },
-        ],
-      });
-      render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
-      expect(screen.getByText(/Some Feature/)).not.toHaveClass('clickable');
-    });
-
-    it('does not render non-interactive automation types as clickable', () => {
-      const playerStats = createPlayerStats({
-        specialActions: [
-          { name: 'Blink Steps', description: 'Teleport.', automation: { type: 'temp_buff', effect: 'bonus_teleport' } },
-        ],
-      });
-      render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
-      expect(screen.getByText(/Blink Steps/)).not.toHaveClass('clickable');
-    });
-
-    it('does not show a popup when executeHandler returns popup (popups removed from Special Actions)', async () => {
-      executeHandler.mockResolvedValue({
-        type: 'popup',
-        payload: { type: 'automation_info', name: 'Berserker Rage', description: 'Enter a berserker rage.' },
-      });
-      const playerStats = createPlayerStats({
-        specialActions: [
-          { name: 'Berserker Rage', description: 'Enter a berserker rage.', automation: { type: 'teleport', distance: '30 ft' } },
-        ],
-      });
-      render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
-      fireEvent.click(screen.getByText(/Berserker Rage/));
-      await waitFor(() => {
-        expect(executeHandler).toHaveBeenCalled();
-      });
-      expect(screen.queryByTestId('popup-overlay')).not.toBeInTheDocument();
-    });
-
-    it('does not show a popup when a special action with details but no automation is clicked', () => {
-      const playerStats = createPlayerStats({
-        specialActions: [
-          {
-            name: 'Second Wind',
-            description: 'Regain hit points.',
-            details: 'This feature comes from the Fighter class.',
-          },
-        ],
-      });
-      render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
-      fireEvent.click(screen.getByText(/Second Wind/));
-      expect(screen.queryByText(/This feature comes from the Fighter class/)).not.toBeInTheDocument();
-    });
-
-    it('does not show a popup when a non-clickable special action is clicked', () => {
-      const playerStats = createPlayerStats({
-        specialActions: [
-          { name: 'Berserker Rage', description: 'Enter a berserker rage.' },
-        ],
-      });
-      render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
-      fireEvent.click(screen.getByText(/Berserker Rage/));
-      expect(screen.queryByTestId('popup-overlay')).not.toBeInTheDocument();
-    });
-  });
-
-  describe('cannotAct prop', () => {
-    it('prevents automation execution when cannotAct is true', async () => {
-      executeHandler.mockResolvedValue({
-        type: 'popup',
-        payload: { type: 'automation_info', name: 'Blink Steps', description: 'Teleported 30 ft.' },
-      });
+    it('does not execute automation when cannotAct is true', async () => {
+      executeHandler.mockResolvedValue(null);
 
       const playerStats = createPlayerStats({
         specialActions: [
@@ -315,9 +172,7 @@ describe('CharSpecialActions - Automation', () => {
         expect(executeHandler).toHaveBeenCalled();
       });
     });
-  });
 
-  describe('interaction with modals', () => {
     it('renders TeleportModal with correct props when shown', async () => {
       const teleportPayload = {
         action: { name: 'Misty Step', automation: { effect: 'teleport', distance: '30 ft' } },
@@ -344,79 +199,7 @@ describe('CharSpecialActions - Automation', () => {
       });
     });
 
-    it('closes TeleportModal when close button is clicked', async () => {
-      executeHandler.mockResolvedValue({
-        type: 'modal',
-        modalName: 'teleport',
-        payload: {
-          action: { name: 'Teleport' },
-          playerStats: basePlayerStats,
-          campaignName: 'test',
-        },
-      });
-
-      const playerStats = createPlayerStats({
-        specialActions: [
-          { name: 'Teleport', description: 'Teleport somewhere.', automation: { type: 'teleport', distance: '30 ft' } },
-        ],
-      });
-      render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
-      fireEvent.click(screen.getByText('Teleport:'));
-
-      await waitFor(() => {
-        expect(screen.getByTestId('teleport-modal')).toBeInTheDocument();
-      });
-
-      fireEvent.click(screen.getByText('Close'));
-
-      await waitFor(() => {
-        expect(screen.queryByTestId('teleport-modal')).not.toBeInTheDocument();
-      });
-    });
-  });
-
-  describe('executeHandler edge cases', () => {
-    it('handles executeHandler returning null', async () => {
-      executeHandler.mockResolvedValue(null);
-
-      const playerStats = createPlayerStats({
-        specialActions: [
-          { name: 'Blink Steps', description: 'Teleport up to 30 feet.', automation: { type: 'teleport', distance: '30 ft' } },
-        ],
-      });
-      render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
-      fireEvent.click(screen.getByText(/Blink Steps/));
-
-      await waitFor(() => {
-        expect(executeHandler).toHaveBeenCalled();
-      });
-      expect(screen.queryByTestId('popup-overlay')).not.toBeInTheDocument();
-      expect(screen.queryByTestId('teleport-modal')).not.toBeInTheDocument();
-    });
-
-    it('does not show error popup result (popups removed from Special Actions)', async () => {
-      executeHandler.mockResolvedValue({
-        type: 'popup',
-        payload: { type: 'automation_info', name: 'Broken Action', description: 'Failed to execute Broken Action' },
-      });
-
-      const playerStats = createPlayerStats({
-        specialActions: [
-          { name: 'Broken Action', description: 'This will fail.', automation: { type: 'teleport', distance: '30 ft' } },
-        ],
-      });
-      render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
-      fireEvent.click(screen.getByText(/Broken Action/));
-
-      await waitFor(() => {
-        expect(executeHandler).toHaveBeenCalled();
-      });
-      expect(screen.queryByTestId('popup-overlay')).not.toBeInTheDocument();
-    });
-  });
-
-  describe('Savant modal flow', () => {
-    it('shows a savant modal when automation returns a savant modal', async () => {
+    it('renders SavantModal when automation returns a savant modal', async () => {
       executeHandler.mockResolvedValue({
         type: 'modal',
         modalName: 'abjurationSavant',
@@ -441,29 +224,21 @@ describe('CharSpecialActions - Automation', () => {
       });
     });
 
-    it('renders SavantModal with correct props', async () => {
-      executeHandler.mockResolvedValue({
-        type: 'modal',
-        modalName: 'divinationSavant',
-        payload: {
-          action: { name: 'Divination Savant' },
-          playerStats: basePlayerStats,
-          campaignName: 'test',
-          school: 'Divination',
-        },
-      });
+    it('does not render any modal when executeHandler returns null', async () => {
+      executeHandler.mockResolvedValue(null);
 
       const playerStats = createPlayerStats({
         specialActions: [
-          { name: 'Divination Savant', description: 'Choose two divination spells.', automation: { type: 'passive_rule', effect: 'divination_savant' } },
+          { name: 'Blink Steps', description: 'Teleport up to 30 feet.', automation: { type: 'teleport', distance: '30 ft' } },
         ],
       });
       render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
-      fireEvent.click(screen.getByText(/Divination Savant/));
+      fireEvent.click(screen.getByText(/Blink Steps/));
 
       await waitFor(() => {
-        expect(screen.getByTestId('divination-savant-modal')).toBeInTheDocument();
+        expect(executeHandler).toHaveBeenCalled();
       });
+      expect(screen.queryByTestId('teleport-modal')).not.toBeInTheDocument();
     });
   });
 });

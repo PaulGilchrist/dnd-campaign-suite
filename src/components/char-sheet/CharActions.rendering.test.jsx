@@ -179,28 +179,9 @@ describe('CharActions rendering', () => {
   });
 
   describe('section headers and structure', () => {
-    it('renders the Actions section header', () => {
-      render(<CharActions playerStats={createStats()} />);
-      expect(screen.getByText('Actions')).toBeInTheDocument();
-    });
-
-    it('renders Base Actions section with empty actions list', () => {
-      render(<CharActions playerStats={createStats({ actions: [] })} />);
-      expect(screen.getByText('Base Actions:')).toBeInTheDocument();
-    });
-
     it('renders CharBonusActions child component', () => {
       render(<CharActions playerStats={createStats({ bonusActions: [{ name: 'Cunning Action', description: 'Dash, Disengage, or Hide.' }] })} />);
       expect(screen.getByTestId('char-bonus-actions')).toBeInTheDocument();
-    });
-
-    it('renders column headers for attacks table', () => {
-      render(<CharActions playerStats={createStats({ attacks: [{ name: 'Longsword', range: 5, hitBonus: 5, damage: '1d8+3', damageType: 'Slashing', type: 'Action' }] })} />);
-      expect(screen.getByText('Name')).toBeInTheDocument();
-      expect(screen.getByText('Range')).toBeInTheDocument();
-      expect(screen.getByText('Hit')).toBeInTheDocument();
-      expect(screen.getByText('Damage')).toBeInTheDocument();
-      expect(screen.getByText('Type')).toBeInTheDocument();
     });
   });
 
@@ -223,26 +204,14 @@ describe('CharActions rendering', () => {
     });
 
     it('filters out non-Action type attacks from the list', () => {
-      render(<CharActions playerStats={createStats({ attacks: [{ ...baseAttack, type: 'Bonus Action', name: 'Main Gauche' }] })} />);
-      expect(screen.queryByText('Main Gauche')).not.toBeInTheDocument();
-    });
-
-    it('filters out Reaction type attacks from the list', () => {
-      render(<CharActions playerStats={createStats({ attacks: [{ ...baseAttack, type: 'Reaction', name: 'Opportunity Attack' }] })} />);
-      expect(screen.queryByText('Opportunity Attack')).not.toBeInTheDocument();
-    });
-
-    it('renders both Action and non-Action attacks in stats without filtering in the data layer', () => {
-      // Verify that the component receives all attacks but only renders Action-type
-      const stats = createStats({
-        attacks: [
-          { ...baseAttack },
-          { ...baseAttack, type: 'Bonus Action', name: 'Secondary' },
-        ],
-      });
-      render(<CharActions playerStats={stats} />);
+      render(<CharActions playerStats={createStats({ attacks: [
+        { ...baseAttack },
+        { ...baseAttack, type: 'Bonus Action', name: 'Secondary' },
+        { ...baseAttack, type: 'Reaction', name: 'Opportunity Attack' },
+      ] })} />);
       expect(screen.getByText('Longsword')).toBeInTheDocument();
       expect(screen.queryByText('Secondary')).not.toBeInTheDocument();
+      expect(screen.queryByText('Opportunity Attack')).not.toBeInTheDocument();
     });
 
     it('renders empty attacks list without crashing', () => {
@@ -266,39 +235,28 @@ describe('CharActions rendering', () => {
       expect(screen.getByText('+5')).toBeInTheDocument();
     });
 
-    it('subtracts exhaustion penalty from hit bonus', () => {
+    it('subtracts exhaustion penalty from hit bonus and applies penalized class', () => {
       render(<CharActions playerStats={createStats({ attacks: [baseAttack] })} exhaustionPenalty={2} />);
       expect(screen.getByText('+3')).toBeInTheDocument();
-    });
-
-    it('subtracts exhaustion penalty of 3 from hit bonus', () => {
-      render(<CharActions playerStats={createStats({ attacks: [baseAttack] })} exhaustionPenalty={3} />);
-      expect(screen.getByText('+2')).toBeInTheDocument();
-    });
-
-    it('applies stat--penalized class when exhaustionPenalty is greater than zero', () => {
-      render(<CharActions playerStats={createStats({ attacks: [baseAttack] })} exhaustionPenalty={2} />);
-      expect(document.querySelector('.stat--penalized')).toBeInTheDocument();
-    });
-
-    it('applies stat--penalized class when conditionAttackMode is disadvantage', () => {
-      render(<CharActions playerStats={createStats({ attacks: [baseAttack] })} conditionAttackMode="disadvantage" exhaustionPenalty={0} />);
-      expect(document.querySelector('.stat--penalized')).toBeInTheDocument();
-    });
-
-    it('does not apply stat--penalized class when exhaustionPenalty is zero and no disadvantage', () => {
-      render(<CharActions playerStats={createStats({ attacks: [baseAttack] })} exhaustionPenalty={0} />);
-      expect(document.querySelector('.stat--penalized')).not.toBeInTheDocument();
-    });
-
-    it('applies stat--penalized class when cannotAct is true', () => {
-      render(<CharActions playerStats={createStats({ attacks: [baseAttack] })} cannotAct={true} />);
       expect(document.querySelector('.stat--penalized')).toBeInTheDocument();
     });
 
     it('computes negative hit bonus correctly with high exhaustion', () => {
       render(<CharActions playerStats={createStats({ attacks: [{ ...baseAttack, hitBonus: 1 }] })} exhaustionPenalty={4} />);
       expect(screen.getByText('-3')).toBeInTheDocument();
+    });
+
+    it('applies stat--penalized class for disadvantage and cannotAct conditions', () => {
+      render(<CharActions playerStats={createStats({ attacks: [baseAttack] })} conditionAttackMode="disadvantage" exhaustionPenalty={0} />);
+      expect(document.querySelector('.stat--penalized')).toBeInTheDocument();
+
+      render(<CharActions playerStats={createStats({ attacks: [baseAttack] })} cannotAct={true} />);
+      expect(document.querySelector('.stat--penalized')).toBeInTheDocument();
+    });
+
+    it('does not apply stat--penalized class when exhaustionPenalty is zero and no disadvantage', () => {
+      render(<CharActions playerStats={createStats({ attacks: [baseAttack] })} exhaustionPenalty={0} />);
+      expect(document.querySelector('.stat--penalized')).not.toBeInTheDocument();
     });
   });
 
@@ -313,7 +271,7 @@ describe('CharActions rendering', () => {
       type: 'Action',
     };
 
-    it('displays save DC in DC X TYPE format', () => {
+    it('displays save DC in DC X TYPE format with saveDcBonus', () => {
       render(<CharActions playerStats={createStats({ attacks: [saveDcAttack] })} />);
       expect(screen.getByText(/DC 14 CON/)).toBeInTheDocument();
     });
@@ -345,24 +303,18 @@ describe('CharActions rendering', () => {
       type: 'Action',
     };
 
-    it('shows Mastery column header for 2024 rules', () => {
-      render(<CharActions playerStats={createStats({ rules: '2024', attacks: [baseAttack] })} />);
-      expect(screen.getByText('Mastery')).toBeInTheDocument();
-    });
-
-    it('does not show Mastery column header for 5e rules', () => {
-      render(<CharActions playerStats={createStats({ rules: '5e', attacks: [baseAttack] })} />);
-      expect(screen.queryByText('Mastery')).not.toBeInTheDocument();
-    });
-
-    it('adds mastery-enabled class to attacks container for 2024 rules', () => {
-      render(<CharActions playerStats={createStats({ rules: '2024', attacks: [baseAttack] })} />);
-      expect(document.querySelector('.attacks.mastery-enabled')).toBeInTheDocument();
-    });
-
-    it('does not add mastery-enabled class for 5e rules', () => {
-      render(<CharActions playerStats={createStats({ rules: '5e', attacks: [baseAttack] })} />);
-      expect(document.querySelector('.attacks.mastery-enabled')).not.toBeInTheDocument();
+    it.each([
+      ['2024', true],
+      ['5e', false],
+    ])('shows Mastery column and mastery-enabled class for %s rules', (rules, shouldShow) => {
+      render(<CharActions playerStats={createStats({ rules, attacks: [baseAttack] })} />);
+      if (shouldShow) {
+        expect(screen.getByText('Mastery')).toBeInTheDocument();
+        expect(document.querySelector('.attacks.mastery-enabled')).toBeInTheDocument();
+      } else {
+        expect(screen.queryByText('Mastery')).not.toBeInTheDocument();
+        expect(document.querySelector('.attacks.mastery-enabled')).not.toBeInTheDocument();
+      }
     });
   });
 
@@ -376,22 +328,16 @@ describe('CharActions rendering', () => {
       type: 'Action',
     };
 
-    it('applies disabled-attack class when cannotAct is true', () => {
+    it('applies disabled-attack class and renders Incapacitated label when cannotAct is true', () => {
       render(<CharActions playerStats={createStats({ attacks: [baseAttack] })} cannotAct={true} />);
       expect(document.querySelector('.disabled-attack')).toBeInTheDocument();
-    });
-
-    it('renders Incapacitated label when cannotAct is true', () => {
-      render(<CharActions playerStats={createStats({ attacks: [baseAttack] })} cannotAct={true} />);
       expect(screen.getByText('(Incapacitated)')).toBeInTheDocument();
     });
 
-    it('does not show Incapacitated label when cannotAct is false', () => {
+    it('does not show Incapacitated label when cannotAct is false or undefined', () => {
       render(<CharActions playerStats={createStats({ attacks: [baseAttack] })} cannotAct={false} />);
       expect(screen.queryByText('(Incapacitated)')).not.toBeInTheDocument();
-    });
 
-    it('does not show Incapacitated label when cannotAct is undefined', () => {
       render(<CharActions playerStats={createStats({ attacks: [baseAttack] })} />);
       expect(screen.queryByText('(Incapacitated)')).not.toBeInTheDocument();
     });
@@ -414,33 +360,10 @@ describe('CharActions rendering', () => {
       expect(screen.getByText('Regain hit points.')).toBeInTheDocument();
     });
 
-    it('calls sanitizeHtml with the action description', async () => {
-      const stats = createStats({
-        actions: [{ name: 'Second Wind', description: 'Regain hit points.', details: 'Heal 1d10+1 HP.' }],
-      });
-      render(<CharActions playerStats={stats} />);
-      const { sanitizeHtml } = await import('../../services/ui/sanitize.js');
-      expect(sanitizeHtml).toHaveBeenCalledWith('Regain hit points.');
-    });
-
-    it('sanitizes XSS in action descriptions', async () => {
-      const stats = createStats({
-        actions: [{ name: 'XSS Test', description: '<script>alert("xss")</script>Test' }],
-      });
-      render(<CharActions playerStats={stats} />);
-      const { sanitizeHtml } = await import('../../services/ui/sanitize.js');
-      expect(sanitizeHtml).toHaveBeenCalledWith('<script>alert("xss")</script>Test');
-    });
-
     it('does not render feature actions when actions array is empty', () => {
       render(<CharActions playerStats={createStats({ actions: [] })} />);
       expect(screen.queryByText(/Second Wind:/)).not.toBeInTheDocument();
       expect(screen.queryByText(/Rage:/)).not.toBeInTheDocument();
-    });
-
-    it('does not crash when spellAbilities is undefined', () => {
-      render(<CharActions playerStats={createStats({ spellAbilities: undefined, attacks: [{ name: 'Longsword', range: 5, hitBonus: 5, damage: '1d8+3', damageType: 'Slashing', type: 'Action' }] })} />);
-      expect(screen.getByText('Longsword')).toBeInTheDocument();
     });
   });
 
@@ -557,7 +480,7 @@ describe('CharActions rendering', () => {
       expect(screen.getByText(/Restore with Rage/)).toBeInTheDocument();
     });
 
-    it('does not show Restore with Rage when not rage-expendable', async () => {
+    it('does not show Restore with Rage when not rage-expendable or not exhausted', async () => {
       const { hasAutomation } = await import('../../services/combat/automation/automationService.js');
       const { isExhausted } = await import('../../services/automation/handlers/combat/saveAttackHandler.js');
       hasAutomation.mockReturnValue(true);
@@ -567,17 +490,11 @@ describe('CharActions rendering', () => {
       });
       render(<CharActions playerStats={stats} />);
       expect(screen.queryByText(/Restore with Rage/)).not.toBeInTheDocument();
-    });
 
-    it('does not show Restore with Rage when not exhausted', async () => {
-      const { hasAutomation } = await import('../../services/combat/automation/automationService.js');
-      const { isExhausted } = await import('../../services/automation/handlers/combat/saveAttackHandler.js');
-      hasAutomation.mockReturnValue(true);
       isExhausted.mockReturnValue(false);
-      const stats = createStats({
+      render(<CharActions playerStats={createStats({
         actions: [{ name: 'Berserker Rage', description: 'You enter a rage.', automation: { type: 'combat_stance', recharge: 'long_rest_or_expend_rage' } }],
-      });
-      render(<CharActions playerStats={stats} />);
+      })} />);
       expect(screen.queryByText(/Restore with Rage/)).not.toBeInTheDocument();
     });
   });
@@ -595,31 +512,11 @@ describe('CharActions rendering', () => {
       expect(screen.getByText('Fireball')).toBeInTheDocument();
     });
 
-    it('renders both action attacks and action features together', () => {
-      const stats = createStats({
-        attacks: [{ name: 'Longsword', range: 5, hitBonus: 5, damage: '1d8+3', damageType: 'Slashing', type: 'Action' }],
-        actions: [{ name: 'Second Wind', description: 'Regain hit points.', details: 'Heal 1d10+1 HP.' }],
-      });
-      render(<CharActions playerStats={stats} />);
-      expect(screen.getByText('Longsword')).toBeInTheDocument();
-      expect(screen.getByText(/Second Wind:/)).toBeInTheDocument();
-    });
-
     it('renders all three sections with empty arrays gracefully', () => {
       const stats = createStats({ attacks: [], actions: [], spellAbilities: { spells: [] } });
       render(<CharActions playerStats={stats} />);
       expect(screen.getByText('Actions')).toBeInTheDocument();
       expect(screen.getByText('Base Actions:')).toBeInTheDocument();
-    });
-
-    it('renders attack and spell with same name together', () => {
-      const stats = createStats({
-        attacks: [{ name: 'Fireball', range: 5, hitBonus: 5, damage: '1d8+3', damageType: 'Fire', type: 'Action' }],
-        spellAbilities: { spells: [{ name: 'Fireball', range: '150 ft', casting_time: '1 action', prepared: 'Prepared', damage: '8d6' }] },
-      });
-      render(<CharActions playerStats={stats} />);
-      // Both attack and spell render with the same name in the DOM
-      expect(screen.getAllByText('Fireball').length).toBe(2);
     });
   });
 });

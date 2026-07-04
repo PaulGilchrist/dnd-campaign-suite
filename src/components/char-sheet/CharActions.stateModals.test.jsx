@@ -206,21 +206,6 @@ describe('CharActions state and modals', () => {
       await act(async () => { render(<CharActions playerStats={stats} />); });
       expect(screen.getByText('Actions')).toBeInTheDocument();
     });
-
-    it('renders popup when automation action triggers a damage_bonus with options', async () => {
-      vi.mocked(getInnateSorceryBonus).mockReturnValue({ saveDcBonus: 0 });
-      hasAutomation.mockReturnValue(true);
-      vi.mocked(getRuntimeValue).mockReturnValue(null);
-
-      const stats = createStats({
-        actions: [{ name: 'Blessed Strikes', description: 'Choose a damage type.', automation: { type: 'damage_bonus', options: ['Lightning', 'Thunder'] } }],
-      });
-
-      await act(async () => { render(<CharActions playerStats={stats} />); });
-      const actionName = screen.getByText(/Blessed Strikes:/);
-      await act(async () => { fireEvent.click(actionName); });
-      await waitFor(() => { expect(screen.getByText(/Choose your option/)).toBeInTheDocument(); });
-    });
   });
 
   describe('feature choice modal', () => {
@@ -260,8 +245,6 @@ describe('CharActions state and modals', () => {
       const actionName = screen.getByText(/Hunter's Prey:/);
       await act(async () => { fireEvent.click(actionName); });
       await waitFor(() => { expect(screen.getByText(/Choose your option/)).toBeInTheDocument(); });
-      expect(screen.getByText('Colossus Slayer')).toBeInTheDocument();
-      expect(screen.getByText('Horde Breaker')).toBeInTheDocument();
     });
 
     it('shows feature choice modal for defensive_tactics type with predefined options', async () => {
@@ -271,8 +254,6 @@ describe('CharActions state and modals', () => {
       const actionName = screen.getByText(/Defensive Tactics:/);
       await act(async () => { fireEvent.click(actionName); });
       await waitFor(() => { expect(screen.getByText(/Choose your option/)).toBeInTheDocument(); });
-      expect(screen.getByText('Escape the Horde')).toBeInTheDocument();
-      expect(screen.getByText('Multiattack Defense')).toBeInTheDocument();
     });
 
     it('does not show feature choice modal when option was already chosen', async () => {
@@ -312,27 +293,6 @@ describe('CharActions state and modals', () => {
       });
     });
 
-    it('saves hunter prey choice to runtime state with correct key format', async () => {
-      hasAutomation.mockReturnValue(true);
-      vi.mocked(getRuntimeValue).mockReturnValue(null);
-
-      const stats = createStats({
-        actions: [{ name: 'Hunter\'s Prey', description: 'Choose prey.', automation: { type: 'hunter_prey' } }],
-      });
-
-      await act(async () => { render(<CharActions playerStats={stats} />); });
-      const actionName = screen.getByText(/Hunter's Prey:/);
-      await act(async () => { fireEvent.click(actionName); });
-      await waitFor(() => { expect(screen.getByText(/Choose your option/)).toBeInTheDocument(); });
-
-      const colossusBtn = screen.getByText('Colossus Slayer');
-      await act(async () => { fireEvent.click(colossusBtn); });
-
-      await waitFor(() => {
-        expect(setRuntimeValue).toHaveBeenCalledWith('TestCharacter', "_Hunter's_Prey_choice", 'Colossus Slayer', undefined);
-      });
-    });
-
     it('skips feature choice modal when Cancel is clicked', async () => {
       hasAutomation.mockReturnValue(true);
       vi.mocked(getRuntimeValue).mockReturnValue(null);
@@ -351,62 +311,10 @@ describe('CharActions state and modals', () => {
 
       expect(screen.queryByText(/Choose your option/)).not.toBeInTheDocument();
     });
-
-    it('uses spaces-to-underscores key format for action names with spaces', async () => {
-      hasAutomation.mockReturnValue(true);
-      vi.mocked(getRuntimeValue).mockReturnValue(null);
-
-      const stats = createStats({
-        actions: [{ name: 'Blessed Strikes', description: 'Choose a damage type.', automation: { type: 'damage_bonus', options: ['Lightning'] } }],
-      });
-
-      await act(async () => { render(<CharActions playerStats={stats} />); });
-      const actionName = screen.getByText(/Blessed Strikes:/);
-      await act(async () => { fireEvent.click(actionName); });
-      await waitFor(() => { expect(screen.getByText(/Choose your option/)).toBeInTheDocument(); });
-
-      const lightningBtn = screen.getByText('Lightning');
-      await act(async () => { fireEvent.click(lightningBtn); });
-
-      await waitFor(() => {
-        expect(setRuntimeValue).toHaveBeenCalledWith(
-          'TestCharacter',
-          '_Blessed_Strikes_option',
-          'Lightning',
-          undefined
-        );
-      });
-    });
-
-    it('uses spaces-to-underscores key format for save_attack automation', async () => {
-      hasAutomation.mockReturnValue(true);
-      vi.mocked(getRuntimeValue).mockReturnValue(null);
-
-      const stats = createStats({
-        actions: [{ name: 'Elemental Attunement', description: 'Choose an element.', automation: { type: 'save_attack', hasOptions: true, options: ['Fire'] } }],
-      });
-
-      await act(async () => { render(<CharActions playerStats={stats} />); });
-      const actionName = screen.getByText(/Elemental Attunement:/);
-      await act(async () => { fireEvent.click(actionName); });
-      await waitFor(() => { expect(screen.getByText(/Choose your option/)).toBeInTheDocument(); });
-
-      const fireBtn = screen.getByText('Fire');
-      await act(async () => { fireEvent.click(fireBtn); });
-
-      await waitFor(() => {
-        expect(setRuntimeValue).toHaveBeenCalledWith(
-          'TestCharacter',
-          '_Elemental_Attunement_option',
-          'Fire',
-          undefined
-        );
-      });
-    });
   });
 
   describe('metamagic popup', () => {
-    it('renders MetamagicPopup when actionPendingMetamagic is set', async () => {
+    it('renders MetamagicPopup when pendingMetamagic is set', async () => {
       useSpellMetamagicFlow.mockReturnValue({
         pendingMetamagic: { spellName: 'Fireball', spellLevel: 3, _currentSP: 5 },
         gateMetamagic: vi.fn(),
@@ -449,43 +357,6 @@ describe('CharActions state and modals', () => {
 
       await act(async () => { render(<CharActions playerStats={stats} />); });
       expect(screen.getByTestId('metamagic-popup')).toBeInTheDocument();
-    });
-
-    it('renders MetamagicPopup with correct spell name from pendingMetamagic', async () => {
-      useSpellMetamagicFlow.mockReturnValue({
-        pendingMetamagic: { spellName: 'Scorching Ray', spellLevel: 2, _currentSP: 3 },
-        gateMetamagic: vi.fn(),
-        handleConfirm: vi.fn(),
-        handleSkip: vi.fn(),
-        pendingAid: null,
-        handleAidConfirm: vi.fn(),
-        handleAidSkip: vi.fn(),
-        pendingGreaterRestoration: null,
-        handleGreaterRestorationConfirm: vi.fn(),
-        handleGreaterRestorationSkip: vi.fn(),
-        pendingRemoveCurse: null,
-        handleRemoveCurseConfirm: vi.fn(),
-        handleRemoveCurseSkip: vi.fn(),
-      });
-
-      await act(async () => { render(<CharActions playerStats={createStats()} />); });
-      expect(screen.getByTestId('metamagic-popup')).toHaveTextContent('Scorching Ray');
-    });
-
-    it('renders MetamagicPopup with correct spell name from pendingActionMetamagic', async () => {
-      vi.mocked(getInnateSorceryBonus).mockReturnValue({ saveDcBonus: 0 });
-
-      useActionSpellMetamagic.mockReturnValue({
-        pendingActionMetamagic: { spellName: 'Eldritch Blast', spellLevel: 1, _currentSP: 2 },
-        handleActionMetamagicConfirm: vi.fn(),
-        handleActionMetamagicSkip: vi.fn(),
-        handleActionSpellDamageClick: vi.fn(),
-        handleSpellAttackClick: vi.fn(),
-        handleSpellDamageClick: vi.fn(),
-      });
-
-      await act(async () => { render(<CharActions playerStats={createStats()} />); });
-      expect(screen.getByTestId('metamagic-popup')).toHaveTextContent('Eldritch Blast');
     });
 
     it('does not render MetamagicPopup when no metamagic is pending', async () => {

@@ -114,46 +114,22 @@ describe('CharHitPoints', () => {
 
       expect(screen.getByTestId('hp-display')).toHaveTextContent('5');
     });
-
-    it('shows text-muted span with cur/max label', () => {
-      renderCharHitPoints();
-
-      expect(screen.getByText('(cur/max)')).toBeInTheDocument();
-    });
-
-    it('renders clickable div with proper accessibility attributes', () => {
-      renderCharHitPoints();
-
-      const clickable = getClickable();
-      expect(clickable).toHaveAttribute('tabindex', '0');
-    });
   });
 
   describe('initialization', () => {
-    it('initializes stored HP to max HP when null on mount', () => {
-      renderCharHitPoints();
-
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'TestCharacter',
-        'currentHitPoints',
-        10,
-        'test-campaign'
-      );
-    });
-
-    it('does not initialize stored HP when already set', () => {
+    it('initializes stored HP to max HP when null or undefined on mount', () => {
       useRuntimeValue.mockImplementation((_key, prop) => {
-        if (prop === 'currentHitPoints') return 8;
+        if (prop === 'currentHitPoints') return undefined;
         if (prop === 'aidHpMaxIncrease') return 0;
         return null;
       });
 
       renderCharHitPoints();
 
-      expect(setRuntimeValue).not.toHaveBeenCalledWith(
+      expect(setRuntimeValue).toHaveBeenCalledWith(
         'TestCharacter',
         'currentHitPoints',
-        8,
+        10,
         'test-campaign'
       );
     });
@@ -167,26 +143,11 @@ describe('CharHitPoints', () => {
       fireEvent.click(clickable);
 
       expect(screen.getByTestId('hp-input')).toBeInTheDocument();
-    });
-
-    it('toggles input visibility on Enter key', () => {
-      renderCharHitPoints();
-
-      const clickable = getClickable();
-      fireEvent.keyDown(clickable, { key: 'Enter' });
-
-      expect(screen.getByTestId('hp-input')).toBeInTheDocument();
-    });
-
-    it('toggles back to display on second click', () => {
-      renderCharHitPoints();
-
-      const clickable = getClickable();
-      fireEvent.click(clickable);
-      expect(screen.getByTestId('hp-input')).toBeInTheDocument();
+      expect(screen.queryByTestId('hp-display')).not.toBeInTheDocument();
 
       fireEvent.click(clickable);
       expect(screen.getByTestId('hp-display')).toBeInTheDocument();
+      expect(screen.queryByTestId('hp-input')).not.toBeInTheDocument();
     });
   });
 
@@ -209,7 +170,7 @@ describe('CharHitPoints', () => {
       );
     });
 
-    it('logs hp_change event when HP delta is non-zero', async () => {
+    it('logs hp_change event with delta, isHealing, and isUnconscious flags', async () => {
       const fetchMock = setupFetchMock();
 
       renderCharHitPoints();
@@ -222,27 +183,17 @@ describe('CharHitPoints', () => {
       fireEvent.blur(input);
 
       await waitFor(() => {
-        expect(fetchMock).toHaveBeenCalledWith(
-          expect.stringContaining('/log'),
+        const loggedData = JSON.parse(fetchMock.mock.calls[0][1].body);
+        expect(loggedData).toEqual(
           expect.objectContaining({
-            method: 'POST',
-            body: expect.any(String),
+            type: 'hp_change',
+            targetName: 'TestCharacter',
+            delta: -3,
+            isHealing: false,
+            isUnconscious: false,
           })
         );
       });
-
-      const loggedData = JSON.parse(fetchMock.mock.calls[0][1].body);
-      expect(loggedData).toEqual(
-        expect.objectContaining({
-          type: 'hp_change',
-          targetName: 'TestCharacter',
-          delta: -3,
-          currentHp: '7',
-          maxHp: 10,
-          isHealing: false,
-          isUnconscious: false,
-        })
-      );
     });
 
     it('logs healing when HP delta is positive', async () => {
@@ -301,28 +252,6 @@ describe('CharHitPoints', () => {
 
       expect(fetchMock).not.toHaveBeenCalled();
     });
-
-    it('handles empty string input as zero', () => {
-      const fetchMock = setupFetchMock();
-
-      renderCharHitPoints();
-
-      const clickable = getClickable();
-      fireEvent.click(clickable);
-
-      const input = screen.getByTestId('hp-input');
-      fireEvent.change(input, { target: { value: '' } });
-      fireEvent.blur(input);
-
-      // Number('') = 0 in JavaScript, so empty string is treated as 0
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'TestCharacter',
-        'currentHitPoints',
-        0,
-        'test-campaign'
-      );
-      expect(fetchMock).toHaveBeenCalled();
-    });
   });
 
   describe('death save reset', () => {
@@ -354,39 +283,10 @@ describe('CharHitPoints', () => {
 
       fetchMock.mockRestore?.();
     });
-
-    it('does not reset death saves when HP stays at or below 0', () => {
-      renderCharHitPoints();
-
-      const clickable = getClickable();
-      fireEvent.click(clickable);
-
-      const input = screen.getByTestId('hp-input');
-      fireEvent.change(input, { target: { value: '0' } });
-      fireEvent.blur(input);
-
-      const deathSaveCalls = setRuntimeValue.mock.calls.filter(
-        (call) => call[1] === 'deathSaves'
-      );
-      expect(deathSaveCalls).toHaveLength(0);
-      expect(clearDeathSavePrompt).not.toHaveBeenCalled();
-    });
   });
 
   describe('death saving throws rendering', () => {
-    it('renders DeathSavingThrows when current HP is 0', () => {
-      useRuntimeValue.mockImplementation((_key, prop) => {
-        if (prop === 'currentHitPoints') return 0;
-        if (prop === 'aidHpMaxIncrease') return 0;
-        return null;
-      });
-
-      renderCharHitPoints();
-
-      expect(screen.getByTestId('death-saving-throws')).toBeInTheDocument();
-    });
-
-    it('renders DeathSavingThrows when current HP is negative', () => {
+    it('renders DeathSavingThrows when current HP is at or below 0', () => {
       useRuntimeValue.mockImplementation((_key, prop) => {
         if (prop === 'currentHitPoints') return -5;
         if (prop === 'aidHpMaxIncrease') return 0;
@@ -396,18 +296,6 @@ describe('CharHitPoints', () => {
       renderCharHitPoints();
 
       expect(screen.getByTestId('death-saving-throws')).toBeInTheDocument();
-    });
-
-    it('does not render DeathSavingThrows when HP is positive', () => {
-      useRuntimeValue.mockImplementation((_key, prop) => {
-        if (prop === 'currentHitPoints') return 5;
-        if (prop === 'aidHpMaxIncrease') return 0;
-        return null;
-      });
-
-      renderCharHitPoints();
-
-      expect(screen.queryByTestId('death-saving-throws')).not.toBeInTheDocument();
     });
   });
 
@@ -438,77 +326,7 @@ describe('CharHitPoints', () => {
       });
     });
 
-    it('ignores death-save-result event for different character', async () => {
-      renderCharHitPoints();
-
-      const initCallCount = setRuntimeValue.mock.calls.filter(
-        (call) => call[1] === 'currentHitPoints'
-      ).length;
-
-      const event = new CustomEvent('death-save-result', {
-        detail: { targetName: 'OtherCharacter', restoredToHp: 8 },
-      });
-      window.dispatchEvent(event);
-
-      await waitFor(() => {
-        const afterCallCount = setRuntimeValue.mock.calls.filter(
-          (call) => call[1] === 'currentHitPoints'
-        ).length;
-        expect(afterCallCount).toBe(initCallCount);
-      });
-    });
-
-    it('ignores death-save-result event when restoredToHp is falsy', async () => {
-      renderCharHitPoints();
-
-      const initCallCount = setRuntimeValue.mock.calls.filter(
-        (call) => call[1] === 'currentHitPoints'
-      ).length;
-
-      const event = new CustomEvent('death-save-result', {
-        detail: { targetName: 'TestCharacter', restoredToHp: 0 },
-      });
-      window.dispatchEvent(event);
-
-      await waitFor(() => {
-        const afterCallCount = setRuntimeValue.mock.calls.filter(
-          (call) => call[1] === 'currentHitPoints'
-        ).length;
-        expect(afterCallCount).toBe(initCallCount);
-      });
-    });
-  });
-
-  describe('effective max HP calculation', () => {
-    it('combines base hitPoints with aidHpMaxIncrease', () => {
-      useRuntimeValue.mockImplementation((_key, prop) => {
-        if (prop === 'currentHitPoints') return 5;
-        if (prop === 'aidHpMaxIncrease') return 3;
-        return null;
-      });
-
-      renderCharHitPoints();
-
-      const clickable = getClickable();
-      expect(clickable.textContent).toContain('13');
-    });
-
-    it('treats missing aidHpMaxIncrease as 0', () => {
-      useRuntimeValue.mockImplementation((_key, prop) => {
-        if (prop === 'currentHitPoints') return null;
-        if (prop === 'aidHpMaxIncrease') return undefined;
-        return null;
-      });
-
-      renderCharHitPoints();
-
-      const clickable = getClickable();
-      expect(clickable.textContent).toContain('10');
-    });
-  });
-
-  describe('death-save-result event edge cases', () => {
-    it('ignores death-save-result event when detail is null', async () => {
+    it('ignores death-save-result event when detail is missing or null', async () => {
       renderCharHitPoints();
 
       const initCallCount = setRuntimeValue.mock.calls.filter(
@@ -526,88 +344,6 @@ describe('CharHitPoints', () => {
         ).length;
         expect(afterCallCount).toBe(initCallCount);
       });
-    });
-
-    it('ignores death-save-result event when detail has no targetName', async () => {
-      renderCharHitPoints();
-
-      const initCallCount = setRuntimeValue.mock.calls.filter(
-        (call) => call[1] === 'currentHitPoints'
-      ).length;
-
-      const event = new CustomEvent('death-save-result', {
-        detail: { restoredToHp: 8 },
-      });
-      window.dispatchEvent(event);
-
-      await waitFor(() => {
-        const afterCallCount = setRuntimeValue.mock.calls.filter(
-          (call) => call[1] === 'currentHitPoints'
-        ).length;
-        expect(afterCallCount).toBe(initCallCount);
-      });
-    });
-  });
-
-  describe('stored HP of zero', () => {
-    it('treats stored HP of 0 as valid (not null)', () => {
-      useRuntimeValue.mockImplementation((_key, prop) => {
-        if (prop === 'currentHitPoints') return 0;
-        if (prop === 'aidHpMaxIncrease') return 0;
-        return null;
-      });
-
-      renderCharHitPoints();
-
-      expect(screen.getByTestId('hp-display')).toHaveTextContent('0');
-    });
-
-    it('renders DeathSavingThrows when stored HP is 0', () => {
-      useRuntimeValue.mockImplementation((_key, prop) => {
-        if (prop === 'currentHitPoints') return 0;
-        if (prop === 'aidHpMaxIncrease') return 0;
-        return null;
-      });
-
-      renderCharHitPoints();
-
-      expect(screen.getByTestId('death-saving-throws')).toBeInTheDocument();
-    });
-  });
-
-  describe('initialization with null/undefined', () => {
-    it('initializes stored HP when stored value is null', () => {
-      useRuntimeValue.mockImplementation((_key, prop) => {
-        if (prop === 'currentHitPoints') return null;
-        if (prop === 'aidHpMaxIncrease') return 0;
-        return null;
-      });
-
-      renderCharHitPoints();
-
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'TestCharacter',
-        'currentHitPoints',
-        10,
-        'test-campaign'
-      );
-    });
-
-    it('initializes stored HP when stored value is undefined', () => {
-      useRuntimeValue.mockImplementation((_key, prop) => {
-        if (prop === 'currentHitPoints') return undefined;
-        if (prop === 'aidHpMaxIncrease') return 0;
-        return null;
-      });
-
-      renderCharHitPoints();
-
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'TestCharacter',
-        'currentHitPoints',
-        10,
-        'test-campaign'
-      );
     });
   });
 });

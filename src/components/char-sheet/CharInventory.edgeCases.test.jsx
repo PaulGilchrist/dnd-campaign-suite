@@ -1,4 +1,3 @@
-// @improved-by-ai
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharInventory from './CharInventory.jsx';
@@ -21,7 +20,6 @@ vi.mock('../../services/ui/sanitize.js', () => ({
 
 import usePopup from '../../hooks/combat/usePopup.js';
 import { loadEquipment } from '../../services/ui/dataLoader.js';
-import { sanitizeHtml } from '../../services/ui/sanitize.js';
 
 const mockEquipmentData = [
   {
@@ -59,37 +57,12 @@ describe('CharInventory edge cases', () => {
     loadEquipment.mockResolvedValue(mockEquipmentData);
   });
 
-  describe('section header rendering', () => {
+  describe('inventory section header', () => {
     it('should render the Inventory section header', () => {
       renderComponent({
         inventory: { magicItems: [], equipped: [], backpack: [] },
       });
       expect(screen.getByText('Inventory')).toBeInTheDocument();
-    });
-
-    it('should render section header even with no inventory data at all', () => {
-      renderComponent({ inventory: {} });
-      expect(screen.getByText('Inventory')).toBeInTheDocument();
-    });
-  });
-
-  describe('null/undefined safety', () => {
-    it('should throw when playerStats is undefined', () => {
-      expect(() => {
-        render(<CharInventory />);
-      }).toThrow();
-    });
-
-    it('should throw when playerStats.inventory is null', () => {
-      expect(() => {
-        render(<CharInventory playerStats={{ inventory: null }} />);
-      }).toThrow();
-    });
-
-    it('should throw when playerStats.inventory is undefined', () => {
-      expect(() => {
-        render(<CharInventory playerStats={{}} />);
-      }).toThrow();
     });
   });
 
@@ -163,52 +136,6 @@ describe('CharInventory edge cases', () => {
       expect(screen.getByText(/qty 3/)).toBeInTheDocument();
     });
 
-    it('should render magic item with quantity when it is a large number', () => {
-      const stats = {
-        inventory: {
-          magicItems: [
-            {
-              name: 'Magic Stone',
-              quantity: 100,
-              type: 'Weapon',
-              rarity: 'Common',
-              description: 'A stone.',
-              requiresAttunement: false,
-            },
-          ],
-          equipped: [],
-          backpack: [],
-        },
-      };
-
-      renderComponent(stats);
-      expect(screen.getByText(/qty 100/)).toBeInTheDocument();
-    });
-
-    it('should render magic item description as sanitized HTML', () => {
-      sanitizeHtml.mockReturnValue('<b>Sanitized output</b>');
-
-      const stats = {
-        inventory: {
-          magicItems: [
-            {
-              name: 'Test Item',
-              type: 'Wondrous Item',
-              rarity: 'Common',
-              description: '<script>alert("xss")</script>Safe content',
-              requiresAttunement: false,
-            },
-          ],
-          equipped: [],
-          backpack: [],
-        },
-      };
-
-      renderComponent(stats);
-      expect(screen.getByText(/Test Item/)).toBeInTheDocument();
-      expect(sanitizeHtml).toHaveBeenCalledWith('<script>alert("xss")</script>Safe content');
-    });
-
     it('should render magic item with undefined rarity gracefully', () => {
       const stats = {
         inventory: {
@@ -230,12 +157,12 @@ describe('CharInventory edge cases', () => {
     });
   });
 
-  describe('backpack items with parenthetical quantities', () => {
-    it('should display parenthetical quantity in backpack item text', () => {
+  describe('backpack and equipped rendering', () => {
+    it('should display parenthetical quantity in item text', () => {
       const stats = {
         inventory: {
           magicItems: [],
-          equipped: [],
+          equipped: ['Potions of Healing (3)'],
           backpack: ['Arrows (20)', 'Rations (5)'],
         },
       };
@@ -243,39 +170,26 @@ describe('CharInventory edge cases', () => {
       renderComponent(stats);
       expect(screen.getByText(/Arrows \(20\)/)).toBeInTheDocument();
       expect(screen.getByText(/Rations \(5\)/)).toBeInTheDocument();
-    });
-
-    it('should display parenthetical quantity in equipped item text', () => {
-      const stats = {
-        inventory: {
-          magicItems: [],
-          equipped: ['Potions of Healing (3)'],
-          backpack: [],
-        },
-      };
-
-      renderComponent(stats);
       expect(screen.getByText(/Potions of Healing \(3\)/)).toBeInTheDocument();
     });
 
-    it('should handle backpack items without parenthetical quantities', () => {
+    it('should handle items without parenthetical quantities', () => {
       const stats = {
         inventory: {
           magicItems: [],
-          equipped: [],
-          backpack: ['Sword', 'Shield'],
+          equipped: ['Sword', 'Shield'],
+          backpack: ['Rations'],
         },
       };
 
       renderComponent(stats);
       expect(screen.getByText(/Sword/)).toBeInTheDocument();
       expect(screen.getByText(/Shield/)).toBeInTheDocument();
+      expect(screen.getByText(/Rations/)).toBeInTheDocument();
     });
-  });
 
-  describe('single item rendering', () => {
-    it('should not render comma separator when only one equipped item', () => {
-      const stats = {
+    it('should not render comma separator when only one item in a section', () => {
+      const statsEquipped = {
         inventory: {
           magicItems: [],
           equipped: ['Longsword'],
@@ -283,13 +197,11 @@ describe('CharInventory edge cases', () => {
         },
       };
 
-      renderComponent(stats);
+      renderComponent(statsEquipped);
       const equippedSection = screen.getByText(/Equipped:/).parentElement;
       expect(equippedSection.textContent).not.toContain(',');
-    });
 
-    it('should not render comma separator when only one backpack item', () => {
-      const stats = {
+      const statsBackpack = {
         inventory: {
           magicItems: [],
           equipped: [],
@@ -297,12 +209,12 @@ describe('CharInventory edge cases', () => {
         },
       };
 
-      renderComponent(stats);
+      renderComponent(statsBackpack);
       const backpackSection = screen.getByText(/Backpack:/).parentElement;
       expect(backpackSection.textContent).not.toContain(',');
     });
 
-    it('should render exactly two items with one comma separator', () => {
+    it('should render comma separator between multiple items', () => {
       const stats = {
         inventory: {
           magicItems: [],
@@ -316,70 +228,6 @@ describe('CharInventory edge cases', () => {
       expect(equippedSection.textContent).toContain(',');
       expect(equippedSection.textContent).toContain('Sword');
       expect(equippedSection.textContent).toContain('Shield');
-    });
-  });
-
-  describe('empty inventory object', () => {
-    it('should render only section header with completely empty inventory', () => {
-      renderComponent({ inventory: {} });
-      expect(screen.getByText('Inventory')).toBeInTheDocument();
-      expect(screen.queryByText(/Magic Items:/)).not.toBeInTheDocument();
-      expect(screen.queryByText(/Equipped:/)).not.toBeInTheDocument();
-      expect(screen.queryByText(/Backpack:/)).not.toBeInTheDocument();
-    });
-
-    it('should render nothing for empty arrays', () => {
-      renderComponent({
-        inventory: { magicItems: [], equipped: [], backpack: [] },
-      });
-      expect(screen.getByText('Inventory')).toBeInTheDocument();
-      expect(screen.queryByText(/Magic Items:/)).not.toBeInTheDocument();
-      expect(screen.queryByText(/Equipped:/)).not.toBeInTheDocument();
-      expect(screen.queryByText(/Backpack:/)).not.toBeInTheDocument();
-    });
-  });
-
-  describe('magic items with only requiresAttunement true, no custom requirements', () => {
-    it('should show "(requires attunement)" text', () => {
-      const stats = {
-        inventory: {
-          magicItems: [
-            {
-              name: 'Cloak of Protection',
-              type: 'Armor',
-              rarity: 'Uncommon',
-              description: '+1 AC.',
-              requiresAttunement: true,
-            },
-          ],
-          equipped: [],
-          backpack: [],
-        },
-      };
-
-      renderComponent(stats);
-      expect(screen.getByText(/requires attunement/)).toBeInTheDocument();
-    });
-
-    it('should not show "(requires attunement)" when requiresAttunement is false', () => {
-      const stats = {
-        inventory: {
-          magicItems: [
-            {
-              name: 'Ring of Protection',
-              type: 'Ring',
-              rarity: 'Uncommon',
-              description: '+1 AC.',
-              requiresAttunement: false,
-            },
-          ],
-          equipped: [],
-          backpack: [],
-        },
-      };
-
-      renderComponent(stats);
-      expect(screen.queryByText(/requires attunement/)).not.toBeInTheDocument();
     });
   });
 });

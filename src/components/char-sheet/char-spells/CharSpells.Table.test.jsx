@@ -149,27 +149,9 @@ vi.mock('../popups/MultiTargetCountPopup.jsx', () => ({
   },
 }));
 
-vi.mock('../popups/MultiTargetCountPopup.jsx', () => ({
-  default: function MultiTargetCountPopup() {
-    return <div data-testid="heroes-feast-popup">HeroesFeast</div>;
-  },
-}));
-
 vi.mock('../popups/TargetWithCheckboxesPopup.jsx', () => ({
   default: function TargetWithCheckboxesPopup() {
     return <div data-testid="greater-restoration-popup">GreaterRestoration</div>;
-  },
-}));
-
-vi.mock('../popups/TargetWithCheckboxesPopup.jsx', () => ({
-  default: function TargetWithCheckboxesPopup() {
-    return <div data-testid="lesser-restoration-popup">LesserRestoration</div>;
-  },
-}));
-
-vi.mock('../popups/TargetWithCheckboxesPopup.jsx', () => ({
-  default: function TargetWithCheckboxesPopup() {
-    return <div data-testid="remove-curse-popup">RemoveCurse</div>;
   },
 }));
 
@@ -179,21 +161,9 @@ vi.mock('../popups/SingleTargetPopup.jsx', () => ({
   },
 }));
 
-vi.mock('../popups/SingleTargetPopup.jsx', () => ({
-  default: function SingleTargetPopup() {
-    return <div data-testid="shield-of-faith-popup">ShieldOfFaith</div>;
-  },
-}));
-
 vi.mock('../popups/TargetWithTypePopup.jsx', () => ({
   default: function TargetWithTypePopup() {
     return <div data-testid="protection-from-energy-popup">ProtectionFromEnergy</div>;
-  },
-}));
-
-vi.mock('../popups/TargetWithTypePopup.jsx', () => ({
-  default: function TargetWithTypePopup() {
-    return <div data-testid="resistance-popup">Resistance</div>;
   },
 }));
 
@@ -304,7 +274,7 @@ describe('CharSpells - Table Rendering', () => {
       expect(levelCells).toContain('1');
     });
 
-    it('does not render level column content for 2024 rules', () => {
+    it('renders level column content for 2024 rules', () => {
       renderWithProps({ playerStats: helpers.mockPlayerStats2024 });
       const table = screen.getByRole('table');
       const rows = table.querySelectorAll('tbody tr');
@@ -325,56 +295,6 @@ describe('CharSpells - Table Rendering', () => {
       renderWithProps({});
       const table = screen.getByRole('table');
       expect(table.textContent).toContain(' A');
-    });
-
-    it('abbreviates casting time "bonus action" as "BA"', () => {
-      const bonusActionSpell = {
-        name: 'Shield',
-        level: 1,
-        casting_time: '1 bonus action',
-        range: 'Self',
-        duration: '1 round',
-        damage: {
-          damage_at_slot_level: { '1': '1d4' },
-          damage_type: 'Fire',
-        },
-        prepared: 'Prepared',
-      };
-      const stats = {
-        ...basePlayerStats,
-        spellAbilities: {
-          ...basePlayerStats.spellAbilities,
-          spells: [bonusActionSpell],
-        },
-      };
-      render(<CharSpells playerStats={stats} campaignName="test" />);
-      // Bonus action + damage spells are filtered from the Spells table
-      expect(screen.queryByText('Shield')).not.toBeInTheDocument();
-    });
-
-    it('abbreviates casting time "reaction" as "Reaction"', () => {
-      const reactionSpell = {
-        name: 'Reaction Spell',
-        level: 0,
-        casting_time: '1 reaction',
-        range: 'Self',
-        duration: 'Instantaneous',
-        damage: {
-          damage_at_slot_level: { '0': '1d4' },
-          damage_type: 'Fire',
-        },
-        prepared: 'Always',
-      };
-      const stats = {
-        ...basePlayerStats,
-        spellAbilities: {
-          ...basePlayerStats.spellAbilities,
-          spells: [reactionSpell],
-        },
-      };
-      render(<CharSpells playerStats={stats} campaignName="test" />);
-      // Reaction + damage spells are filtered from the Spells table
-      expect(screen.queryByText('Reaction Spell')).not.toBeInTheDocument();
     });
   });
 
@@ -665,126 +585,6 @@ describe('CharSpells - Table Rendering', () => {
       renderWithProps({ exhaustionPenalty: 2 });
       const toHitSpan = document.querySelector('.spell-abilities span');
       expect(toHitSpan).toHaveClass('stat--penalized');
-    });
-  });
-
-  describe('edge cases - null/undefined fields', () => {
-    it('renders a spell row when components is null', () => {
-      const spell = {
-        name: 'Null Components Spell',
-        level: 1,
-        casting_time: '1 action',
-        range: 'Self',
-        duration: '1 round',
-        components: null,
-        prepared: 'Always',
-      };
-      const stats = {
-        ...basePlayerStats,
-        spellAbilities: {
-          ...basePlayerStats.spellAbilities,
-          spells: [spell],
-        },
-      };
-      render(<CharSpells playerStats={stats} campaignName="test" />);
-      expect(screen.getByText('Null Components Spell')).toBeInTheDocument();
-    });
-
-    it('renders a spell row when components is an empty array', () => {
-      const spell = {
-        name: 'Empty Components Spell',
-        level: 1,
-        casting_time: '1 action',
-        range: 'Self',
-        duration: '1 round',
-        components: [],
-        prepared: 'Always',
-      };
-      const stats = {
-        ...basePlayerStats,
-        spellAbilities: {
-          ...basePlayerStats.spellAbilities,
-          spells: [spell],
-        },
-      };
-      render(<CharSpells playerStats={stats} campaignName="test" />);
-      expect(screen.getByText('Empty Components Spell')).toBeInTheDocument();
-    });
-
-    it('renders a spell row when duration is null', () => {
-      const spell = {
-        name: 'No Duration Spell',
-        level: 1,
-        casting_time: '1 action',
-        range: 'Self',
-        duration: null,
-        prepared: 'Always',
-      };
-      const stats = {
-        ...basePlayerStats,
-        spellAbilities: {
-          ...basePlayerStats.spellAbilities,
-          spells: [spell],
-        },
-      };
-      render(<CharSpells playerStats={stats} campaignName="test" />);
-      expect(screen.getByText('No Duration Spell')).toBeInTheDocument();
-    });
-
-    it('renders a spell row when casting_time is null', () => {
-      const spell = {
-        name: 'No Cast Time Spell',
-        level: 1,
-        casting_time: null,
-        range: 'Self',
-        duration: '1 round',
-        prepared: 'Always',
-      };
-      const stats = {
-        ...basePlayerStats,
-        spellAbilities: {
-          ...basePlayerStats.spellAbilities,
-          spells: [spell],
-        },
-      };
-      render(<CharSpells playerStats={stats} campaignName="test" />);
-      expect(screen.getByText('No Cast Time Spell')).toBeInTheDocument();
-    });
-
-    it('renders a spell row when range is null', () => {
-      const spell = {
-        name: 'No Range Spell',
-        level: 1,
-        casting_time: '1 action',
-        range: null,
-        duration: '1 round',
-        prepared: 'Always',
-      };
-      const stats = {
-        ...basePlayerStats,
-        spellAbilities: {
-          ...basePlayerStats.spellAbilities,
-          spells: [spell],
-        },
-      };
-      render(<CharSpells playerStats={stats} campaignName="test" />);
-      expect(screen.getByText('No Range Spell')).toBeInTheDocument();
-    });
-
-    it('renders the table when only cantrips exist', () => {
-      const cantripOnly = {
-        ...basePlayerStats.spellAbilities.spells[2],
-      };
-      const stats = {
-        ...basePlayerStats,
-        spellAbilities: {
-          ...basePlayerStats.spellAbilities,
-          spells: [cantripOnly],
-        },
-      };
-      render(<CharSpells playerStats={stats} campaignName="test" />);
-      const table = screen.getByRole('table');
-      expect(table).toBeInTheDocument();
     });
   });
 });

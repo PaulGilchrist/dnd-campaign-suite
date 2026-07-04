@@ -288,9 +288,6 @@ function createBaseProps(overrides) {
     setBaitAndSwitchChoiceModal: vi.fn(),
     setCommanderStrikeChoiceModal: vi.fn(),
     setRallyChoiceModal: vi.fn(),
-    setBulwarkOfForceModal: vi.fn(),
-    setCoronaEnemySelectionModal: vi.fn(),
-    setRadianceOfDawnModal: vi.fn(),
     handleMasteryClose: vi.fn(),
     handleWeaponMasteryChoice: vi.fn(),
     handleWeaponKindMasteryClose: vi.fn(),
@@ -330,142 +327,50 @@ describe('CharActionModals BulwarkOfForce, Corona, and Radiance modals', () => {
     vi.clearAllMocks();
   });
 
-  describe('BulwarkOfForceModal', () => {
-    it('renders BulwarkOfForceModal when bulwarkOfForceModal is set', () => {
+  const modalTests = [
+    {
+      name: 'BulwarkOfForceModal',
+      prop: 'bulwarkOfForceModal',
+      testId: 'bulwark-of-force-modal',
+      value: { creatureTargets: [{ name: 'Goblin' }], maxTargets: 3 },
+      skipTestId: 'bulwark-skip',
+      setModalFn: 'setBulwarkOfForceModal',
+    },
+    {
+      name: 'CoronaEnemySelectionModal',
+      prop: 'coronaEnemySelectionModal',
+      testId: 'corona-enemy-selection-modal',
+      value: { creatureTargets: [{ name: 'Dragon' }] },
+      skipTestId: 'corona-skip',
+      setModalFn: 'setCoronaEnemySelectionModal',
+    },
+    {
+      name: 'RadianceOfDawnModal',
+      prop: 'radianceOfDawnModal',
+      testId: 'radiance-of-dawn-modal',
+      value: {
+        creatureTargets: [{ name: 'Goblin' }],
+        saveType: 'Dex',
+        saveDc: 15,
+        damageExpression: '3d10',
+        damageType: 'Radiant',
+        rangeFeet: 15,
+      },
+      skipTestId: 'radiance-skip',
+      setModalFn: 'setRadianceOfDawnModal',
+    },
+  ];
+
+  for (const { name, prop, testId, value, skipTestId, setModalFn } of modalTests) {
+    it(`renders ${name} when ${prop} is truthy and dismisses on skip`, () => {
+      const setModal = vi.fn();
       render(<CharActionModals
-        {...createBaseProps()}
-        bulwarkOfForceModal={{ creatureTargets: [{ name: 'Goblin' }], maxTargets: 3 }}
+        {...createBaseProps({ [setModalFn]: setModal })}
+        {...{ [prop]: value }}
       />);
-      expect(screen.getByTestId('bulwark-of-force-modal')).toBeInTheDocument();
+      expect(screen.getByTestId(testId)).toBeInTheDocument();
+      fireEvent.click(screen.getByTestId(skipTestId));
+      expect(setModal).toHaveBeenCalledWith(null);
     });
-
-    it('passes creatureTargets and maxTargets to BulwarkOfForceModal', () => {
-      const { container } = render(<CharActionModals
-        {...createBaseProps()}
-        bulwarkOfForceModal={{ creatureTargets: [{ name: 'Ogre' }, { name: 'Skeleton' }], maxTargets: 2 }}
-      />);
-      expect(container.querySelector('[data-testid="bulwark-of-force-modal"]')).toBeInTheDocument();
-    });
-
-    it('calls handleBulwarkOfForceConfirm when confirmed', () => {
-      const handleBulwarkOfForceConfirm = vi.fn();
-      const { container } = render(<CharActionModals
-        {...createBaseProps({ handleBulwarkOfForceConfirm })}
-        bulwarkOfForceModal={{ creatureTargets: [{ name: 'Goblin' }], maxTargets: 1 }}
-      />);
-      expect(container.querySelector('[data-testid="bulwark-of-force-modal"]')).toBeInTheDocument();
-    });
-
-    it('calls setBulwarkOfForceModal(null) on skip', () => {
-      const setBulwarkOfForceModal = vi.fn();
-      render(<CharActionModals
-        {...createBaseProps({ setBulwarkOfForceModal })}
-        bulwarkOfForceModal={{ creatureTargets: [{ name: 'Goblin' }], maxTargets: 1 }}
-      />);
-      fireEvent.click(screen.getByTestId('bulwark-skip'));
-      expect(setBulwarkOfForceModal).toHaveBeenCalledWith(null);
-    });
-  });
-
-  describe('CoronaEnemySelectionModal', () => {
-    it('renders CoronaEnemySelectionModal when coronaEnemySelectionModal is set', () => {
-      render(<CharActionModals
-        {...createBaseProps()}
-        coronaEnemySelectionModal={{ creatureTargets: [{ name: 'Dragon' }] }}
-      />);
-      expect(screen.getByTestId('corona-enemy-selection-modal')).toBeInTheDocument();
-    });
-
-    it('passes creatureTargets to CoronaEnemySelectionModal', () => {
-      const { container } = render(<CharActionModals
-        {...createBaseProps()}
-        coronaEnemySelectionModal={{ creatureTargets: [{ name: 'Dragon' }, { name: 'Golem' }] }}
-      />);
-      expect(container.querySelector('[data-testid="corona-enemy-selection-modal"]')).toBeInTheDocument();
-    });
-
-    it('calls handleCoronaEnemySelectionConfirm when confirmed', () => {
-      const handleCoronaEnemySelectionConfirm = vi.fn();
-      const { container } = render(<CharActionModals
-        {...createBaseProps({ handleCoronaEnemySelectionConfirm })}
-        coronaEnemySelectionModal={{ creatureTargets: [{ name: 'Dragon' }] }}
-      />);
-      expect(container.querySelector('[data-testid="corona-enemy-selection-modal"]')).toBeInTheDocument();
-    });
-
-    it('calls setCoronaEnemySelectionModal(null) on skip', () => {
-      const setCoronaEnemySelectionModal = vi.fn();
-      render(<CharActionModals
-        {...createBaseProps({ setCoronaEnemySelectionModal })}
-        coronaEnemySelectionModal={{ creatureTargets: [{ name: 'Dragon' }] }}
-      />);
-      fireEvent.click(screen.getByTestId('corona-skip'));
-      expect(setCoronaEnemySelectionModal).toHaveBeenCalledWith(null);
-    });
-  });
-
-  describe('RadianceOfDawnModal', () => {
-    it('renders RadianceOfDawnModal when radianceOfDawnModal is set', () => {
-      render(<CharActionModals
-        {...createBaseProps()}
-        radianceOfDawnModal={{
-          creatureTargets: [{ name: 'Goblin' }],
-          saveType: 'Dex',
-          saveDc: 15,
-          damageExpression: '3d10',
-          damageType: 'Radiant',
-          rangeFeet: 15,
-        }}
-      />);
-      expect(screen.getByTestId('radiance-of-dawn-modal')).toBeInTheDocument();
-    });
-
-    it('passes all props to RadianceOfDawnModal', () => {
-      const { container } = render(<CharActionModals
-        {...createBaseProps()}
-        radianceOfDawnModal={{
-          creatureTargets: [{ name: 'Ogre' }],
-          saveType: 'Con',
-          saveDc: 12,
-          damageExpression: '2d8',
-          damageType: 'Fire',
-          rangeFeet: 10,
-        }}
-      />);
-      expect(container.querySelector('[data-testid="radiance-of-dawn-modal"]')).toBeInTheDocument();
-    });
-
-    it('calls handleRadianceOfDawnConfirm when confirmed', () => {
-      const handleRadianceOfDawnConfirm = vi.fn();
-      const { container } = render(<CharActionModals
-        {...createBaseProps({ handleRadianceOfDawnConfirm })}
-        radianceOfDawnModal={{
-          creatureTargets: [{ name: 'Goblin' }],
-          saveType: 'Dex',
-          saveDc: 15,
-          damageExpression: '3d10',
-          damageType: 'Radiant',
-          rangeFeet: 15,
-        }}
-      />);
-      expect(container.querySelector('[data-testid="radiance-of-dawn-modal"]')).toBeInTheDocument();
-    });
-
-    it('calls setRadianceOfDawnModal(null) on skip', () => {
-      const setRadianceOfDawnModal = vi.fn();
-      render(<CharActionModals
-        {...createBaseProps({ setRadianceOfDawnModal })}
-        radianceOfDawnModal={{
-          creatureTargets: [{ name: 'Goblin' }],
-          saveType: 'Dex',
-          saveDc: 15,
-          damageExpression: '3d10',
-          damageType: 'Radiant',
-          rangeFeet: 15,
-        }}
-      />);
-      fireEvent.click(screen.getByTestId('radiance-skip'));
-      expect(setRadianceOfDawnModal).toHaveBeenCalledWith(null);
-    });
-  });
+  }
 });

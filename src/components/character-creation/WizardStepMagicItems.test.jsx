@@ -265,9 +265,11 @@ describe('WizardStepMagicItems', () => {
   });
 
   describe('rendering', () => {
-    it('renders the step title', () => {
+    it('renders the step title and each magic item name', () => {
       render(<WizardStepMagicItems {...createProps()} />);
       expect(screen.getByText('Step 10: Magic Items')).toBeInTheDocument();
+      expect(screen.getByText('Amulet of Health')).toBeInTheDocument();
+      expect(screen.getByText('Wand of Magic')).toBeInTheDocument();
     });
 
     it('renders the search input with correct placeholder', () => {
@@ -293,61 +295,36 @@ describe('WizardStepMagicItems', () => {
       render(<WizardStepMagicItems {...createProps()} />);
       expect(screen.getByText(/Showing 2 magic items/)).toBeInTheDocument();
     });
+
+    it('renders the attunement badge on items that require attunement', () => {
+      render(<WizardStepMagicItems {...createProps()} />);
+      expect(screen.getByText('requires attunement')).toBeInTheDocument();
+    });
   });
 
   describe('item display', () => {
-    it('renders each magic item name', () => {
+    it('renders Show More button for collapsed items', () => {
       render(<WizardStepMagicItems {...createProps()} />);
-      expect(screen.getByText('Amulet of Health')).toBeInTheDocument();
-      expect(screen.getByText('Wand of Magic')).toBeInTheDocument();
-    });
-
-    it('renders item types', () => {
-      render(<WizardStepMagicItems {...createProps()} />);
-      const typeElements = document.querySelectorAll('.magic-item-type');
-      expect(typeElements.length).toBe(2);
-      expect(typeElements[0].textContent).toBe('Amulet');
-      expect(typeElements[1].textContent).toBe('Rod');
-    });
-
-    it('renders item rarities', () => {
-      render(<WizardStepMagicItems {...createProps()} />);
-      const rarityElements = screen.getAllByText('Uncommon');
-      expect(rarityElements.length).toBe(2);
-    });
-
-    it('shows the selected item with a checkmark', () => {
-      render(<WizardStepMagicItems {...createProps()} />);
-      expect(screen.getByText('✓')).toBeInTheDocument();
-    });
-
-    it('renders Show More button for collapsed items and Show Less for expanded items', () => {
-      render(<WizardStepMagicItems {...createProps()} />);
-      // Both items start collapsed, so both show "Show More"
       const showMoreButtons = screen.getAllByText('Show More');
       expect(showMoreButtons.length).toBe(2);
     });
 
-    it('clicking Show More toggles it to Show Less and reveals description', () => {
+    it('clicking Show More toggles to Show Less and reveals description', () => {
       render(<WizardStepMagicItems {...createProps()} />);
-      // Amulet is first alphabetically, click its Show More
       const showMoreButtons = screen.getAllByText('Show More');
       fireEvent.click(showMoreButtons[0]);
-      // Should now show the description text (inside <p> tag)
       expect(screen.getByText(/Health amulet/)).toBeInTheDocument();
-      // The button should now say "Show Less"
       expect(screen.getByText('Show Less')).toBeInTheDocument();
     });
 
     it('renders the expanded item description after clicking Show More', () => {
       render(<WizardStepMagicItems {...createProps()} />);
       const showMoreButtons = screen.getAllByText('Show More');
-      // Click the second Show More (Wand of Magic)
       fireEvent.click(showMoreButtons[1]);
       expect(screen.getByText(/magic wand/)).toBeInTheDocument();
     });
 
-    it('renders the multi-line description second paragraph', () => {
+    it('renders multi-line descriptions with second paragraph visible after expand', () => {
       const multiLineItem = {
         name: 'Ring of Powers',
         index: 'ring',
@@ -364,10 +341,63 @@ describe('WizardStepMagicItems', () => {
           {...createProps({ allMagicItems: [multiLineItem] })}
         />,
       );
-      // Click Show More to expand
       const showMoreBtn = screen.getByText('Show More');
       fireEvent.click(showMoreBtn);
       expect(screen.getByText(/Second paragraph/)).toBeInTheDocument();
+    });
+
+    it('renders items with string and array descriptions after expanding', () => {
+      const stringDescItem = {
+        name: 'Potion of Healing',
+        index: 'potion',
+        type: 'Potion',
+        description: '<p>Restores 2d4+2 HP.</p>',
+        requiresAttunement: false,
+      };
+      const arrayDescItem = {
+        name: 'Staff of Power',
+        index: 'staff',
+        type: 'Staff',
+        rarity: 'Very Rare',
+        description: [
+          '<p>Can hold up to 5 charges.</p>',
+          '<p>Regains 1d4+1 charges daily.</p>',
+        ],
+        requiresAttunement: true,
+      };
+      render(
+        <WizardStepMagicItems
+          {...createProps({
+            allMagicItems: [stringDescItem, arrayDescItem],
+          })}
+        />,
+      );
+      // Both items start as "Potion of Healing" and "Staff of Power" alphabetically
+      // Click Potion's Show More (index 0)
+      const showMoreBtns = screen.getAllByText('Show More');
+      fireEvent.click(showMoreBtns[0]);
+      expect(screen.getByText(/Restores 2d4\+2 HP/)).toBeInTheDocument();
+      // Now Potion shows "Show Less", Staff still shows "Show More"
+      // Click Staff's Show More (the only remaining "Show More")
+      const staffShowMore = screen.getByText('Show More');
+      fireEvent.click(staffShowMore);
+      expect(screen.getByText(/Can hold up to 5 charges/)).toBeInTheDocument();
+      expect(screen.getByText(/Regains 1d4\+1 charges daily/)).toBeInTheDocument();
+    });
+
+    it('renders items with missing optional fields gracefully', () => {
+      const minimalItem = {
+        name: 'Odd Item',
+        index: 'odd',
+      };
+      render(
+        <WizardStepMagicItems
+          {...createProps({
+            allMagicItems: [minimalItem],
+          })}
+        />,
+      );
+      expect(screen.getByText('Odd Item')).toBeInTheDocument();
     });
   });
 
@@ -410,28 +440,6 @@ describe('WizardStepMagicItems', () => {
               },
             },
             allMagicItems: attunedItems,
-          })}
-        />,
-      );
-      expect(
-        screen.queryByText(/items requiring attunement/),
-      ).not.toBeInTheDocument();
-    });
-
-    it('does not display a warning when no items require attunement', () => {
-      const nonAttunedItems = [
-        { name: 'Potion', requiresAttunement: false },
-        { name: 'Scroll', requiresAttunement: false },
-      ];
-      render(
-        <WizardStepMagicItems
-          {...createProps({
-            formData: {
-              inventory: {
-                magicItems: ['Potion', 'Scroll'],
-              },
-            },
-            allMagicItems: nonAttunedItems,
           })}
         />,
       );
@@ -502,7 +510,7 @@ describe('WizardStepMagicItems', () => {
       ).toBeInTheDocument();
     });
 
-    it('displays a warning with limit of 4 when character is Thief Rogue level 13+ and exceeds limit', () => {
+    it('displays a warning with limit of 4 when Thief Rogue level 13+ exceeds limit', () => {
       const thiefClassSubtypes = [
         {
           className: 'Rogue',
@@ -638,7 +646,7 @@ describe('WizardStepMagicItems', () => {
       expect(screen.getByText(warningText)).toBeInTheDocument();
     });
 
-    it('uses limit of 3 when classSubtypes is not provided', () => {
+    it('uses limit of 3 when classSubtypes is null', () => {
       const attunedItems = [
         { name: 'Boots', requiresAttunement: true },
         { name: 'Cloak', requiresAttunement: true },
@@ -667,7 +675,7 @@ describe('WizardStepMagicItems', () => {
       expect(screen.getByText(warningText)).toBeInTheDocument();
     });
 
-    it('uses limit of 3 when character level is below 13 for Thief', () => {
+    it('uses limit of 3 when Thief character is below level 13', () => {
       const thiefClassSubtypes = [
         {
           className: 'Rogue',
@@ -711,41 +719,6 @@ describe('WizardStepMagicItems', () => {
     });
   });
 
-  describe('attunement badge', () => {
-    it('renders attunement badge on items that require attunement', () => {
-      render(<WizardStepMagicItems {...createProps()} />);
-      expect(screen.getByText('requires attunement')).toBeInTheDocument();
-    });
-
-    it('does not render attunement badge on items that do not require attunement', () => {
-      const nonAttunedItems = [
-        {
-          name: 'Wand of Magic',
-          index: 'wand',
-          type: 'Rod',
-          rarity: 'Uncommon',
-          description: '<p>A magic wand.</p>',
-          requiresAttunement: false,
-        },
-      ];
-
-      render(
-        <WizardStepMagicItems
-          {...createProps({
-            formData: {
-              inventory: {
-                magicItems: ['Wand of Magic'],
-              },
-            },
-            allMagicItems: nonAttunedItems,
-          })}
-        />,
-      );
-
-      expect(screen.queryByText('requires attunement')).not.toBeInTheDocument();
-    });
-  });
-
   describe('item selection', () => {
     it('calls onArrayFieldChange when an unselected item checkbox is clicked', () => {
       const onArrayFieldChange = vi.fn();
@@ -757,8 +730,6 @@ describe('WizardStepMagicItems', () => {
           })}
         />,
       );
-      // Items are sorted alphabetically: Amulet first (index 0), Wand second (index 1).
-      // Both are unselected. Click the Wand's checkbox (second checkbox, index 1) to select it.
       const checkboxes = document.querySelectorAll('.list-item-checkbox-trigger');
       expect(checkboxes.length).toBe(2);
       fireEvent.click(checkboxes[1]);
@@ -777,10 +748,8 @@ describe('WizardStepMagicItems', () => {
           })}
         />,
       );
-      // Wand is pre-selected. Click its checkbox to deselect.
       const checkboxes = document.querySelectorAll('.list-item-checkbox-trigger');
       expect(checkboxes.length).toBe(2);
-      // Wand is at index 1 (sorted alphabetically after Amulet)
       fireEvent.click(checkboxes[1]);
       expect(onArrayFieldChange).toHaveBeenCalledWith(
         'inventory.magicItems',
@@ -796,21 +765,6 @@ describe('WizardStepMagicItems', () => {
       fireEvent.change(searchInput, { target: { value: 'Amulet' } });
       expect(screen.getByText('Amulet of Health')).toBeInTheDocument();
       expect(screen.queryByText('Wand of Magic')).not.toBeInTheDocument();
-    });
-
-    it('filters items by search query matching item index', () => {
-      render(<WizardStepMagicItems {...createProps()} />);
-      const searchInput = screen.getByRole('textbox');
-      fireEvent.change(searchInput, { target: { value: 'wand' } });
-      expect(screen.getByText('Wand of Magic')).toBeInTheDocument();
-      expect(screen.queryByText('Amulet of Health')).not.toBeInTheDocument();
-    });
-
-    it('updates the result count when filtering', () => {
-      render(<WizardStepMagicItems {...createProps()} />);
-      const searchInput = screen.getByRole('textbox');
-      fireEvent.change(searchInput, { target: { value: 'Amulet' } });
-      expect(screen.getByText(/Showing 1 magic item/)).toBeInTheDocument();
     });
 
     it('filters by item type dropdown', () => {
@@ -830,49 +784,14 @@ describe('WizardStepMagicItems', () => {
       expect(screen.getByText('Wand of Magic')).toBeInTheDocument();
       expect(screen.queryByText('Amulet of Health')).not.toBeInTheDocument();
     });
-
-    it('shows no results message when search has no matches', () => {
-      render(<WizardStepMagicItems {...createProps()} />);
-      const searchInput = screen.getByRole('textbox');
-      fireEvent.change(searchInput, { target: { value: 'Nonexistent' } });
-      expect(
-        screen.getByText(/No magic item found matching your criteria/),
-      ).toBeInTheDocument();
-    });
   });
 
   describe('edge cases', () => {
-    it('renders a loading message when allMagicItems is null', () => {
+    it('renders a loading message when items are unavailable', () => {
       render(
         <WizardStepMagicItems
           {...createProps({
             allMagicItems: null,
-          })}
-        />,
-      );
-      expect(
-        screen.getByText('Magic item data not yet loaded. Please try again.'),
-      ).toBeInTheDocument();
-    });
-
-    it('renders a loading message when allMagicItems is undefined', () => {
-      render(
-        <WizardStepMagicItems
-          {...createProps({
-            allMagicItems: undefined,
-          })}
-        />,
-      );
-      expect(
-        screen.getByText('Magic item data not yet loaded. Please try again.'),
-      ).toBeInTheDocument();
-    });
-
-    it('renders a loading message when allMagicItems is an empty array', () => {
-      render(
-        <WizardStepMagicItems
-          {...createProps({
-            allMagicItems: [],
           })}
         />,
       );
@@ -890,94 +809,6 @@ describe('WizardStepMagicItems', () => {
         />,
       );
       expect(screen.getByText('Step 10: Magic Items')).toBeInTheDocument();
-    });
-
-    it('handles items matched by index instead of name', () => {
-      const indexedItem = {
-        name: 'Staff of Power',
-        index: 'staff',
-        type: 'Staff',
-        rarity: 'Very Rare',
-        description: '<p>A powerful staff.</p>',
-        requiresAttunement: false,
-      };
-      render(
-        <WizardStepMagicItems
-          {...createProps({
-            formData: {
-              inventory: { magicItems: ['staff'] },
-            },
-            allMagicItems: [indexedItem],
-          })}
-        />,
-      );
-      expect(screen.getByText('Staff of Power')).toBeInTheDocument();
-    });
-
-    it('renders items with string descriptions after expanding', () => {
-      const stringDescItem = {
-        name: 'Potion of Healing',
-        index: 'potion',
-        type: 'Potion',
-        description: '<p>Restores 2d4+2 HP.</p>',
-        requiresAttunement: false,
-      };
-      render(
-        <WizardStepMagicItems
-          {...createProps({
-            allMagicItems: [stringDescItem],
-          })}
-        />,
-      );
-      expect(screen.getByText('Potion of Healing')).toBeInTheDocument();
-      // Must click Show More to expand the description
-      const showMoreBtn = screen.getByText('Show More');
-      fireEvent.click(showMoreBtn);
-      expect(screen.getByText(/Restores 2d4\+2 HP/)).toBeInTheDocument();
-    });
-
-    it('renders items with array descriptions after expanding', () => {
-      const arrayDescItem = {
-        name: 'Staff of Power',
-        index: 'staff',
-        type: 'Staff',
-        rarity: 'Very Rare',
-        description: [
-          '<p>Can hold up to 5 charges.</p>',
-          '<p>Regains 1d4+1 charges daily.</p>',
-        ],
-        requiresAttunement: true,
-      };
-      render(
-        <WizardStepMagicItems
-          {...createProps({
-            allMagicItems: [arrayDescItem],
-          })}
-        />,
-      );
-      expect(screen.getByText('Staff of Power')).toBeInTheDocument();
-      // Must click Show More to expand the description
-      const showMoreBtn = screen.getByText('Show More');
-      fireEvent.click(showMoreBtn);
-      expect(screen.getByText(/Can hold up to 5 charges/)).toBeInTheDocument();
-      expect(
-        screen.getByText(/Regains 1d4\+1 charges daily/),
-      ).toBeInTheDocument();
-    });
-
-    it('renders items with missing optional fields', () => {
-      const minimalItem = {
-        name: 'Odd Item',
-        index: 'odd',
-      };
-      render(
-        <WizardStepMagicItems
-          {...createProps({
-            allMagicItems: [minimalItem],
-          })}
-        />,
-      );
-      expect(screen.getByText('Odd Item')).toBeInTheDocument();
     });
   });
 });

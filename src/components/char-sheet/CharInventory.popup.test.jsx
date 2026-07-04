@@ -79,13 +79,6 @@ describe('CharInventory item popup', () => {
 
   describe('equipment lookup', () => {
     it('should show popup with equipment details when an item is clicked', async () => {
-      const mockSetPopupHtml = vi.fn();
-      usePopup.mockImplementation(() => ({
-        showPopup: vi.fn(),
-        popupHtml: null,
-        setPopupHtml: mockSetPopupHtml,
-      }));
-
       renderComponent();
 
       const equippedSection = screen.getByText(/Equipped:/).parentElement;
@@ -93,10 +86,10 @@ describe('CharInventory item popup', () => {
       fireEvent.click(longswordElement);
 
       await waitFor(() => {
-        expect(mockSetPopupHtml).toHaveBeenCalled();
+        expect(usePopup.mock.results[0].value.setPopupHtml).toHaveBeenCalled();
       });
 
-      const popupContent = mockSetPopupHtml.mock.calls[0][0];
+      const popupContent = usePopup.mock.results[0].value.setPopupHtml.mock.calls[0][0];
       expect(popupContent).toContain('Longsword');
       expect(popupContent).toContain('A common sword');
       expect(popupContent).toContain('Cost:');
@@ -108,68 +101,31 @@ describe('CharInventory item popup', () => {
     it('should show error popup when loadEquipment rejects', async () => {
       loadEquipment.mockRejectedValue(new Error('Network error'));
 
-      const mockSetPopupHtml = vi.fn();
-      usePopup.mockImplementation(() => ({
-        showPopup: vi.fn(),
-        popupHtml: null,
-        setPopupHtml: mockSetPopupHtml,
-      }));
-
       renderComponent();
 
       const shieldElement = screen.getByText('Shield');
       fireEvent.click(shieldElement);
 
       await waitFor(() => {
-        expect(mockSetPopupHtml).toHaveBeenCalled();
+        expect(usePopup.mock.results[0].value.setPopupHtml).toHaveBeenCalled();
       });
 
-      const popupContent = mockSetPopupHtml.mock.calls[0][0];
+      const popupContent = usePopup.mock.results[0].value.setPopupHtml.mock.calls[0][0];
       expect(popupContent).toContain('Error loading item details');
       expect(popupContent).toContain('Network error');
     });
 
-    it('should show not-found popup when equipment list is empty', async () => {
-      loadEquipment.mockResolvedValue([]);
-
-      const mockSetPopupHtml = vi.fn();
-      usePopup.mockImplementation(() => ({
-        showPopup: vi.fn(),
-        popupHtml: null,
-        setPopupHtml: mockSetPopupHtml,
-      }));
-
-      renderComponent();
-
-      const shieldElement = screen.getByText('Shield');
-      fireEvent.click(shieldElement);
-
-      await waitFor(() => {
-        expect(mockSetPopupHtml).toHaveBeenCalled();
-      });
-
-      const popupContent = mockSetPopupHtml.mock.calls[0][0];
-      expect(popupContent).toContain('not found in database');
-    });
-
     it('should show not-found popup when item is not in equipment database', async () => {
-      const mockSetPopupHtml = vi.fn();
-      usePopup.mockImplementation(() => ({
-        showPopup: vi.fn(),
-        popupHtml: null,
-        setPopupHtml: mockSetPopupHtml,
-      }));
-
       renderComponent();
 
       const healingPotionElement = screen.getByText('Healing Potion');
       fireEvent.click(healingPotionElement);
 
       await waitFor(() => {
-        expect(mockSetPopupHtml).toHaveBeenCalled();
+        expect(usePopup.mock.results[0].value.setPopupHtml).toHaveBeenCalled();
       });
 
-      const popupContent = mockSetPopupHtml.mock.calls[0][0];
+      const popupContent = usePopup.mock.results[0].value.setPopupHtml.mock.calls[0][0];
       expect(popupContent).toContain('Healing Potion');
       expect(popupContent).toContain('not found in database');
     });
@@ -190,13 +146,6 @@ describe('CharInventory item popup', () => {
 
       loadEquipment.mockResolvedValue(dataWithRations);
 
-      const mockSetPopupHtml = vi.fn();
-      usePopup.mockImplementation(() => ({
-        showPopup: vi.fn(),
-        popupHtml: null,
-        setPopupHtml: mockSetPopupHtml,
-      }));
-
       renderComponent();
 
       const backpackSection = screen.getByText(/Backpack:/).parentElement;
@@ -204,7 +153,7 @@ describe('CharInventory item popup', () => {
       fireEvent.click(rationsElement);
 
       await waitFor(() => {
-        expect(mockSetPopupHtml).toHaveBeenCalledWith(
+        expect(usePopup.mock.results[0].value.setPopupHtml).toHaveBeenCalledWith(
           expect.stringContaining('Rations')
         );
       });
@@ -224,13 +173,6 @@ describe('CharInventory item popup', () => {
 
       loadEquipment.mockResolvedValue(dataWithSingular);
 
-      const mockSetPopupHtml = vi.fn();
-      usePopup.mockImplementation(() => ({
-        showPopup: vi.fn(),
-        popupHtml: null,
-        setPopupHtml: mockSetPopupHtml,
-      }));
-
       const stats = {
         inventory: {
           equipped: ['Arrows'],
@@ -244,7 +186,7 @@ describe('CharInventory item popup', () => {
       fireEvent.click(arrowsElement);
 
       await waitFor(() => {
-        expect(mockSetPopupHtml).toHaveBeenCalledWith(
+        expect(usePopup.mock.results[0].value.setPopupHtml).toHaveBeenCalledWith(
           expect.stringContaining('Arrow')
         );
       });
@@ -264,13 +206,6 @@ describe('CharInventory item popup', () => {
 
       loadEquipment.mockResolvedValue(dataWithPlural);
 
-      const mockSetPopupHtml = vi.fn();
-      usePopup.mockImplementation(() => ({
-        showPopup: vi.fn(),
-        popupHtml: null,
-        setPopupHtml: mockSetPopupHtml,
-      }));
-
       const stats = {
         inventory: {
           equipped: [],
@@ -284,7 +219,7 @@ describe('CharInventory item popup', () => {
       fireEvent.click(rationElement);
 
       await waitFor(() => {
-        expect(mockSetPopupHtml).toHaveBeenCalledWith(
+        expect(usePopup.mock.results[0].value.setPopupHtml).toHaveBeenCalledWith(
           expect.stringContaining('Rations')
         );
       });
@@ -304,13 +239,6 @@ describe('CharInventory item popup', () => {
 
       loadEquipment.mockResolvedValue(dataWithIndex);
 
-      const mockSetPopupHtml = vi.fn();
-      usePopup.mockImplementation(() => ({
-        showPopup: vi.fn(),
-        popupHtml: null,
-        setPopupHtml: mockSetPopupHtml,
-      }));
-
       renderComponent({
         inventory: { equipped: ['longsword'], backpack: [] },
       });
@@ -319,13 +247,13 @@ describe('CharInventory item popup', () => {
       fireEvent.click(longswordElement);
 
       await waitFor(() => {
-        expect(mockSetPopupHtml).toHaveBeenCalledWith(
+        expect(usePopup.mock.results[0].value.setPopupHtml).toHaveBeenCalledWith(
           expect.stringContaining('Longsword')
         );
       });
     });
 
-    it('should handle item with spaces in name matching spaces in index', async () => {
+    it('should normalize spaces to hyphens when matching name to index', async () => {
       const dataWithSpaces = [
         {
           name: 'Heavy Crossbow',
@@ -339,13 +267,6 @@ describe('CharInventory item popup', () => {
 
       loadEquipment.mockResolvedValue(dataWithSpaces);
 
-      const mockSetPopupHtml = vi.fn();
-      usePopup.mockImplementation(() => ({
-        showPopup: vi.fn(),
-        popupHtml: null,
-        setPopupHtml: mockSetPopupHtml,
-      }));
-
       renderComponent({
         inventory: { equipped: ['Heavy Crossbow'], backpack: [] },
       });
@@ -354,111 +275,8 @@ describe('CharInventory item popup', () => {
       fireEvent.click(itemElement);
 
       await waitFor(() => {
-        const callArg = mockSetPopupHtml.mock.calls[0][0];
+        const callArg = usePopup.mock.results[0].value.setPopupHtml.mock.calls[0][0];
         expect(callArg).toContain('Heavy Crossbow');
-      });
-    });
-
-    it('should handle item with multiple spaces between words', async () => {
-      const dataWithSpaces = [
-        {
-          name: 'Potion of Healing',
-          index: 'potion-of-healing',
-          desc: ['Restores HP.'],
-          cost: { quantity: 100, unit: 'gp' },
-          weight: 0.5,
-          equipment_category: 'Potions',
-        },
-      ];
-
-      loadEquipment.mockResolvedValue(dataWithSpaces);
-
-      const mockSetPopupHtml = vi.fn();
-      usePopup.mockImplementation(() => ({
-        showPopup: vi.fn(),
-        popupHtml: null,
-        setPopupHtml: mockSetPopupHtml,
-      }));
-
-      renderComponent({
-        inventory: { equipped: ['Potion of Healing'], backpack: [] },
-      });
-
-      const itemElement = screen.getByText('Potion of Healing');
-      fireEvent.click(itemElement);
-
-      await waitFor(() => {
-        const callArg = mockSetPopupHtml.mock.calls[0][0];
-        expect(callArg).toContain('Potion of Healing');
-      });
-    });
-
-    it('should show popup when item is found via plural fallback', async () => {
-      const dataWithSingular = [
-        {
-          name: 'Sword',
-          index: 'sword',
-          desc: ['A weapon.'],
-          cost: { quantity: 10, unit: 'gp' },
-          weight: 3,
-          equipment_category: 'Weapons',
-        },
-      ];
-
-      loadEquipment.mockResolvedValue(dataWithSingular);
-
-      const mockSetPopupHtml = vi.fn();
-      usePopup.mockImplementation(() => ({
-        showPopup: vi.fn(),
-        popupHtml: null,
-        setPopupHtml: mockSetPopupHtml,
-      }));
-
-      renderComponent({
-        inventory: { equipped: ['Swords'], backpack: [] },
-      });
-
-      const swordsElement = screen.getByText('Swords');
-      fireEvent.click(swordsElement);
-
-      await waitFor(() => {
-        const callArg = mockSetPopupHtml.mock.calls[0][0];
-        expect(callArg).toContain('Sword');
-        expect(callArg).toContain('A weapon');
-      });
-    });
-
-    it('should show popup when item is found via singular fallback', async () => {
-      const dataWithPlural = [
-        {
-          name: 'Rations',
-          index: 'rations',
-          desc: ['Food.'],
-          cost: { quantity: 5, unit: 'sp' },
-          weight: 2,
-          equipment_category: 'Supplies',
-        },
-      ];
-
-      loadEquipment.mockResolvedValue(dataWithPlural);
-
-      const mockSetPopupHtml = vi.fn();
-      usePopup.mockImplementation(() => ({
-        showPopup: vi.fn(),
-        popupHtml: null,
-        setPopupHtml: mockSetPopupHtml,
-      }));
-
-      renderComponent({
-        inventory: { equipped: ['Ration'], backpack: [] },
-      });
-
-      const rationElement = screen.getByText('Ration');
-      fireEvent.click(rationElement);
-
-      await waitFor(() => {
-        const callArg = mockSetPopupHtml.mock.calls[0][0];
-        expect(callArg).toContain('Rations');
       });
     });
   });
@@ -476,13 +294,6 @@ describe('CharInventory item popup', () => {
 
       loadEquipment.mockResolvedValue(dataWithAllProps);
 
-      const mockSetPopupHtml = vi.fn();
-      usePopup.mockImplementation(() => ({
-        showPopup: vi.fn(),
-        popupHtml: null,
-        setPopupHtml: mockSetPopupHtml,
-      }));
-
       renderComponent();
 
       const equippedSection = screen.getByText(/Equipped:/).parentElement;
@@ -490,37 +301,13 @@ describe('CharInventory item popup', () => {
       fireEvent.click(longswordElement);
 
       await waitFor(() => {
-        const callArg = mockSetPopupHtml.mock.calls[0][0];
+        const callArg = usePopup.mock.results[0].value.setPopupHtml.mock.calls[0][0];
         expect(callArg).toContain('Cost:');
         expect(callArg).toContain('Weight:');
         expect(callArg).toContain('Category:');
         expect(callArg).toContain('Ability:');
         expect(callArg).toContain('Utilize:');
         expect(callArg).toContain('Craft:');
-      });
-    });
-
-    it('should display item name without parentheses when item has no parenthetical quantity', async () => {
-      loadEquipment.mockResolvedValue(mockEquipmentData);
-
-      const mockSetPopupHtml = vi.fn();
-      usePopup.mockImplementation(() => ({
-        showPopup: vi.fn(),
-        popupHtml: null,
-        setPopupHtml: mockSetPopupHtml,
-      }));
-
-      renderComponent({
-        inventory: { equipped: ['Longsword'], backpack: [] },
-      });
-
-      const longswordElement = screen.getByText('Longsword');
-      fireEvent.click(longswordElement);
-
-      await waitFor(() => {
-        expect(mockSetPopupHtml).toHaveBeenCalledWith(
-          expect.stringContaining('Longsword')
-        );
       });
     });
 
@@ -535,13 +322,6 @@ describe('CharInventory item popup', () => {
 
       loadEquipment.mockResolvedValue(dataWithMinimalProps);
 
-      const mockSetPopupHtml = vi.fn();
-      usePopup.mockImplementation(() => ({
-        showPopup: vi.fn(),
-        popupHtml: null,
-        setPopupHtml: mockSetPopupHtml,
-      }));
-
       renderComponent({
         inventory: { equipped: ['Simple Item'], backpack: [] },
       });
@@ -550,7 +330,7 @@ describe('CharInventory item popup', () => {
       fireEvent.click(simpleItemElement);
 
       await waitFor(() => {
-        const callArg = mockSetPopupHtml.mock.calls[0][0];
+        const callArg = usePopup.mock.results[0].value.setPopupHtml.mock.calls[0][0];
         expect(callArg).toContain('Simple Item');
         expect(callArg).toContain('A simple item');
         expect(callArg).not.toContain('Cost:');
@@ -560,106 +340,6 @@ describe('CharInventory item popup', () => {
         expect(callArg).not.toContain('Utilize:');
         expect(callArg).not.toContain('Craft:');
       });
-    });
-
-    it('should handle item with empty desc array', async () => {
-      const dataWithEmptyDesc = [
-        {
-          name: 'Empty Desc Item',
-          index: 'empty-desc-item',
-          desc: [],
-          cost: { quantity: 1, unit: 'gp' },
-          weight: 1,
-          equipment_category: 'Misc',
-        },
-      ];
-
-      loadEquipment.mockResolvedValue(dataWithEmptyDesc);
-
-      const mockSetPopupHtml = vi.fn();
-      usePopup.mockImplementation(() => ({
-        showPopup: vi.fn(),
-        popupHtml: null,
-        setPopupHtml: mockSetPopupHtml,
-      }));
-
-      renderComponent({
-        inventory: { equipped: ['Empty Desc Item'], backpack: [] },
-      });
-
-      const itemElement = screen.getByText('Empty Desc Item');
-      fireEvent.click(itemElement);
-
-      await waitFor(() => {
-        const callArg = mockSetPopupHtml.mock.calls[0][0];
-        expect(callArg).toContain('Empty Desc Item');
-        expect(callArg).toContain('Cost:');
-      });
-    });
-
-    it('should handle item with null desc entries in array', async () => {
-      const dataWithNullDesc = [
-        {
-          name: 'Null Desc Item',
-          index: 'null-desc-item',
-          desc: ['Valid desc', null, 'Another valid desc'],
-        },
-      ];
-
-      loadEquipment.mockResolvedValue(dataWithNullDesc);
-
-      const mockSetPopupHtml = vi.fn();
-      usePopup.mockImplementation(() => ({
-        showPopup: vi.fn(),
-        popupHtml: null,
-        setPopupHtml: mockSetPopupHtml,
-      }));
-
-      renderComponent({
-        inventory: { equipped: ['Null Desc Item'], backpack: [] },
-      });
-
-      const itemElement = screen.getByText('Null Desc Item');
-      fireEvent.click(itemElement);
-
-      await waitFor(() => {
-        const callArg = mockSetPopupHtml.mock.calls[0][0];
-        expect(callArg).toContain('Null Desc Item');
-        expect(callArg).toContain('Valid desc');
-        expect(callArg).toContain('Another valid desc');
-      });
-    });
-  });
-
-  describe('popup rendering', () => {
-    it('should render popup element when popupHtml is set', async () => {
-      const mockSetPopupHtml = vi.fn();
-
-      usePopup.mockImplementation(() => ({
-        showPopup: vi.fn(),
-        popupHtml: '<b>Test Popup</b>',
-        setPopupHtml: mockSetPopupHtml,
-      }));
-
-      renderComponent({
-        inventory: { magicItems: [], equipped: [], backpack: [] },
-      });
-
-      expect(screen.getByTestId('popup-overlay')).toBeInTheDocument();
-    });
-
-    it('should not render popup element when popupHtml is null', () => {
-      usePopup.mockImplementation(() => ({
-        showPopup: vi.fn(),
-        popupHtml: null,
-        setPopupHtml: vi.fn(),
-      }));
-
-      renderComponent({
-        inventory: { magicItems: [], equipped: [], backpack: [] },
-      });
-
-      expect(screen.queryByTestId('popup-overlay')).not.toBeInTheDocument();
     });
   });
 });

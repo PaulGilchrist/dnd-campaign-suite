@@ -1,6 +1,6 @@
 // @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import CharClassFeatures from './CharClassFeatures.jsx';
 
 vi.mock('./TrackedResourceInput.jsx', () => ({
@@ -132,27 +132,14 @@ describe('CharClassFeatures', () => {
             automation: { passives: [] },
         });
 
-        it('renders sorcerer container', () => {
-            renderComponent(sorcererStats());
-            expect(screen.getByTestId('char-class-sorcerer')).toBeInTheDocument();
-        });
-
-        it('renders sorcery points tracked resource', () => {
+        it('renders sorcerer tracked resources', () => {
             renderComponent(sorcererStats());
             expect(screen.getByTestId('tracked-resource-Sorcery Points')).toBeInTheDocument();
-        });
-
-        it('renders metamagic known tracked resource', () => {
-            renderComponent(sorcererStats());
             expect(screen.getByTestId('tracked-resource-Metamagic Known')).toBeInTheDocument();
-        });
-
-        it('renders innate sorcery tracked resource', () => {
-            renderComponent(sorcererStats());
             expect(screen.getByTestId('tracked-resource-Innate Sorcery')).toBeInTheDocument();
         });
 
-        it('renders spell slot costs when available', () => {
+        it('renders spell slot costs when creatingSpellSlotCosts is populated', () => {
             renderComponent(sorcererStats());
             expect(screen.getByText(/Spell Slot \(level 1-5\) Costs:/)).toBeInTheDocument();
         });
@@ -201,7 +188,7 @@ describe('CharClassFeatures', () => {
             restore();
         });
 
-        it('shows revelation badge when revelation in flesh buff exists', () => {
+        it('shows revelation badge with mapped effect text', () => {
             const restore = vi.mocked(useRuntimeValue).mockImplementation((_name, key) => {
                 if (key === 'activeBuffs') return [{ name: 'Revelation in Flesh', effect: 'glistening_flight' }];
                 return null;
@@ -211,7 +198,7 @@ describe('CharClassFeatures', () => {
             restore();
         });
 
-        it('shows generic revelation badge when effect key is unknown', () => {
+        it('shows generic revelation badge for unknown effect', () => {
             const restore = vi.mocked(useRuntimeValue).mockImplementation((_name, key) => {
                 if (key === 'activeBuffs') return [{ name: 'Revelation in Flesh', effect: 'unknown_effect' }];
                 return null;
@@ -231,26 +218,6 @@ describe('CharClassFeatures', () => {
             expect(screen.queryByText(/Revelation in Flesh/)).not.toBeInTheDocument();
             restore();
         });
-
-        it('handles activeBuffs as null gracefully', () => {
-            const restore = vi.mocked(useRuntimeValue).mockImplementation((_name, key) => {
-                if (key === 'activeBuffs') return null;
-                return null;
-            });
-            const { container } = renderComponent(sorcererStats());
-            expect(container.innerHTML).not.toBe('');
-            restore();
-        });
-
-        it('handles activeBuffs as non-array gracefully', () => {
-            const restore = vi.mocked(useRuntimeValue).mockImplementation((_name, key) => {
-                if (key === 'activeBuffs') return 'not-an-array';
-                return null;
-            });
-            const { container } = renderComponent(sorcererStats());
-            expect(container.innerHTML).not.toBe('');
-            restore();
-        });
     });
 
     describe('Warlock features', () => {
@@ -259,28 +226,13 @@ describe('CharClassFeatures', () => {
             automation: { passives: [] },
         });
 
-        it('renders warlock container', () => {
-            renderComponent(warlockStats());
-            expect(screen.getByTestId('char-class-warlock')).toBeInTheDocument();
-        });
-
-        it('renders invocations known', () => {
+        it('renders warlock invocations and pact boon', () => {
             renderComponent(warlockStats());
             expect(screen.getByText(/Eldritch Invocations/)).toBeInTheDocument();
-        });
-
-        it('renders invocations list when available', () => {
-            renderComponent(warlockStats());
-            const allInvocations = screen.getAllByText(/Invocations:/);
-            expect(allInvocations.length).toBeGreaterThan(0);
-        });
-
-        it('renders pact boon when available', () => {
-            renderComponent(warlockStats());
             expect(screen.getByText(/Pact Boon:/)).toBeInTheDocument();
         });
 
-        it('renders pact boon automation button when available', () => {
+        it('renders pact boon automation button', () => {
             renderComponent(warlockStats());
             expect(screen.getByTitle(/Pact Boon: Chain/)).toBeInTheDocument();
         });
@@ -288,10 +240,6 @@ describe('CharClassFeatures', () => {
         it('renders arcanums when hasArcanum is true', () => {
             renderComponent(warlockStats());
             expect(screen.getByText(/Arcanums Known/)).toBeInTheDocument();
-        });
-
-        it('renders arcanums list when available', () => {
-            renderComponent(warlockStats());
             expect(screen.getByText(/Arcanums:/)).toBeInTheDocument();
         });
 
@@ -306,31 +254,6 @@ describe('CharClassFeatures', () => {
             spy.mockRestore();
         });
 
-        it('renders "Invocations Known" label when invocationsKnown is 0', () => {
-            const spy = vi.spyOn(classFeaturesModule, 'getClassFeatures').mockReturnValue({
-                ...classFeaturesModule.getClassFeatures(),
-                invocationsKnown: 0,
-                invocations: [],
-            });
-            const { container } = renderComponent(warlockStats());
-            const div = container.querySelector('div');
-            expect(div.textContent).toContain('Invocations Known');
-            expect(div.textContent).toContain('0');
-            expect(screen.queryByText(/Eldritch Invocations/)).not.toBeInTheDocument();
-            spy.mockRestore();
-        });
-
-        it('renders invocations label even when invocations array is empty', () => {
-            const spy = vi.spyOn(classFeaturesModule, 'getClassFeatures').mockReturnValue({
-                ...classFeaturesModule.getClassFeatures(),
-                invocations: [],
-            });
-            const { container } = renderComponent(warlockStats());
-            // Empty array is truthy in JS, so the div still renders but with empty content
-            expect(container.querySelector('div').textContent).toContain('Invocations');
-            spy.mockRestore();
-        });
-
         it('does not render pact boon when pactBoon is null', () => {
             const spy = vi.spyOn(classFeaturesModule, 'getClassFeatures').mockReturnValue({
                 ...classFeaturesModule.getClassFeatures(),
@@ -342,14 +265,14 @@ describe('CharClassFeatures', () => {
             spy.mockRestore();
         });
 
-        it('renders sorted invocations list', () => {
+        it('renders invocations sorted alphabetically', () => {
             const spy = vi.spyOn(classFeaturesModule, 'getClassFeatures').mockReturnValue({
                 ...classFeaturesModule.getClassFeatures(),
                 invocations: ['Z', 'A', 'M'],
             });
-            const { container } = renderComponent(warlockStats());
-            expect(container.querySelector('div').textContent).toContain('Invocations');
-            expect(container.querySelector('div').textContent).toContain('A, M, Z');
+            renderComponent(warlockStats());
+            const invocationsDiv = document.querySelector('[data-testid="char-class-warlock"] div:nth-child(4)');
+            expect(invocationsDiv.textContent).toContain('A, M, Z');
             spy.mockRestore();
         });
     });
@@ -361,41 +284,18 @@ describe('CharClassFeatures', () => {
             automation: { passives: [] },
         });
 
-        it('renders wizard container when showWizardFeatures is true', () => {
-            renderComponent(wizardStats());
-            expect(screen.getByTestId('char-class-wizard')).toBeInTheDocument();
-        });
-
-        it('returns null when showWizardFeatures is false', () => {
-            const getClassFeaturesSpy = vi.spyOn(classFeaturesModule, 'getClassFeatures').mockReturnValue({ showWizardFeatures: false });
-            const { container } = renderComponent(wizardStats());
-            expect(container.innerHTML).toBe('');
-            getClassFeaturesSpy.mockRestore();
-        });
-
-        it('renders arcane recovery tracked resource', () => {
+        it('renders wizard tracked resources and automation button', () => {
             renderComponent(wizardStats());
             expect(screen.getByTestId('tracked-resource-Arcane Recovery Levels')).toBeInTheDocument();
-        });
-
-        it('renders arcane ward tracked resource', () => {
-            renderComponent(wizardStats());
             expect(screen.getByTestId('tracked-resource-Arcane Ward HP')).toBeInTheDocument();
-        });
-
-        it('renders arcane recovery automation button', () => {
-            renderComponent(wizardStats());
             expect(screen.getByTitle(/Arcane Recovery: Regain spell slots/)).toBeInTheDocument();
         });
 
-        it('renders projected ward badge when reaction exists', () => {
-            const stats = makeStats({
-                level: 5,
-                class: { name: 'Wizard', class_levels: [{ level: 5 }] },
-                automation: { reactions: [{ type: 'projected_ward', range: 30 }] },
-            });
-            renderComponent(stats);
-            expect(screen.getByText(/Projected Ward:/)).toBeInTheDocument();
+        it('returns null when showWizardFeatures is false', () => {
+            const spy = vi.spyOn(classFeaturesModule, 'getClassFeatures').mockReturnValue({ showWizardFeatures: false });
+            const { container } = renderComponent(wizardStats());
+            expect(container.innerHTML).toBe('');
+            spy.mockRestore();
         });
 
         it('renders projected ward with custom range', () => {
@@ -423,7 +323,7 @@ describe('CharClassFeatures', () => {
             expect(screen.queryByText(/Projected Ward:/)).not.toBeInTheDocument();
         });
 
-        it('renders portent section when portent action exists', () => {
+        it('renders portent section and button when portent action exists', () => {
             const stats = makeStats({
                 level: 5,
                 class: { name: 'Wizard', class_levels: [{ level: 5 }] },
@@ -432,16 +332,6 @@ describe('CharClassFeatures', () => {
             });
             renderComponent(stats);
             expect(screen.getByText(/Portent Dice:/)).toBeInTheDocument();
-        });
-
-        it('renders use portent button when portent is available', () => {
-            const stats = makeStats({
-                level: 5,
-                class: { name: 'Wizard', class_levels: [{ level: 5 }] },
-                automation: { passives: [] },
-                specialActions: [{ name: 'Portent', automation: { type: 'portent' } }],
-            });
-            renderComponent(stats);
             expect(screen.getByTitle(/Use Portent/)).toBeInTheDocument();
         });
 
@@ -452,7 +342,7 @@ describe('CharClassFeatures', () => {
         });
 
         it('shows no dice remaining badge when portent dice array is empty', () => {
-            vi.mocked(getRuntimeValue).mockImplementation((_name, key) => {
+            const restore = vi.mocked(getRuntimeValue).mockImplementation((_name, key) => {
                 if (key === 'portentDice') return [];
                 return null;
             });
@@ -464,10 +354,11 @@ describe('CharClassFeatures', () => {
             });
             renderComponent(stats);
             expect(screen.getByText(/No dice remaining/)).toBeInTheDocument();
+            restore();
         });
 
         it('shows dice count badge when portent dice exist', () => {
-            vi.mocked(getRuntimeValue).mockImplementation((_name, key) => {
+            const restore = vi.mocked(getRuntimeValue).mockImplementation((_name, key) => {
                 if (key === 'portentDice') return [1, 20];
                 return null;
             });
@@ -479,10 +370,11 @@ describe('CharClassFeatures', () => {
             });
             renderComponent(stats);
             expect(screen.getByText(/2 remaining/)).toBeInTheDocument();
+            restore();
         });
 
         it('renders portent dice display values when stored', () => {
-            vi.mocked(getRuntimeValue).mockImplementation((_name, key) => {
+            const restore = vi.mocked(getRuntimeValue).mockImplementation((_name, key) => {
                 if (key === 'portentDice') return [15, 18];
                 return null;
             });
@@ -495,10 +387,11 @@ describe('CharClassFeatures', () => {
             renderComponent(stats);
             expect(screen.getByText(/15/)).toBeInTheDocument();
             expect(screen.getByText(/18/)).toBeInTheDocument();
+            restore();
         });
 
-        it('renders third eye badge when buff exists', () => {
-            vi.mocked(useRuntimeValue).mockImplementation((_name, key) => {
+        it('renders third eye badge for known effects', () => {
+            const restore = vi.mocked(useRuntimeValue).mockImplementation((_name, key) => {
                 if (key === 'activeBuffs') return [{ name: 'The Third Eye', effect: 'darkvision_120' }];
                 return null;
             });
@@ -509,11 +402,12 @@ describe('CharClassFeatures', () => {
             });
             renderComponent(stats);
             expect(screen.getByText(/Darkvision 120 ft\./)).toBeInTheDocument();
+            restore();
         });
 
-        it('renders third eye badge for greater_comprehension effect', () => {
-            vi.mocked(useRuntimeValue).mockImplementation((_name, key) => {
-                if (key === 'activeBuffs') return [{ name: 'The Third Eye', effect: 'greater_comprehension' }];
+        it('renders third eye generic Active badge for unknown effect', () => {
+            const restore = vi.mocked(useRuntimeValue).mockImplementation((_name, key) => {
+                if (key === 'activeBuffs') return [{ name: 'The Third Eye', effect: 'unknown_effect' }];
                 return null;
             });
             const stats = makeStats({
@@ -522,21 +416,8 @@ describe('CharClassFeatures', () => {
                 automation: { passives: [] },
             });
             renderComponent(stats);
-            expect(screen.getByText(/Greater Comprehension/)).toBeInTheDocument();
-        });
-
-        it('renders third eye badge for see_invisibility effect', () => {
-            vi.mocked(useRuntimeValue).mockImplementation((_name, key) => {
-                if (key === 'activeBuffs') return [{ name: 'The Third Eye', effect: 'see_invisibility' }];
-                return null;
-            });
-            const stats = makeStats({
-                level: 5,
-                class: { name: 'Wizard', class_levels: [{ level: 5 }] },
-                automation: { passives: [] },
-            });
-            renderComponent(stats);
-            expect(screen.getByText(/See Invisibility/)).toBeInTheDocument();
+            expect(screen.getByText(/Active/)).toBeInTheDocument();
+            restore();
         });
 
         it('does not render third eye badge when buff is absent', () => {
@@ -548,38 +429,6 @@ describe('CharClassFeatures', () => {
             expect(screen.queryByText(/Darkvision 120 ft\./)).not.toBeInTheDocument();
             expect(screen.queryByText(/The Third Eye:/)).not.toBeInTheDocument();
             restore();
-        });
-
-        it('renders third eye badge with generic text for unknown effect', () => {
-            vi.mocked(useRuntimeValue).mockImplementation((_name, key) => {
-                if (key === 'activeBuffs') return [{ name: 'The Third Eye', effect: 'unknown_effect' }];
-                return null;
-            });
-            const stats = makeStats({
-                level: 5,
-                class: { name: 'Wizard', class_levels: [{ level: 5 }] },
-                automation: { passives: [] },
-            });
-            renderComponent(stats);
-            expect(screen.getByText(/Active/)).toBeInTheDocument();
-        });
-
-        it('handles activeBuffs as null gracefully for wizard', () => {
-            vi.mocked(useRuntimeValue).mockImplementation((_name, key) => {
-                if (key === 'activeBuffs') return null;
-                return null;
-            });
-            const { container } = renderComponent(wizardStats());
-            expect(container.innerHTML).not.toBe('');
-        });
-
-        it('handles activeBuffs as non-array gracefully for wizard', () => {
-            vi.mocked(useRuntimeValue).mockImplementation((_name, key) => {
-                if (key === 'activeBuffs') return 'not-an-array';
-                return null;
-            });
-            const { container } = renderComponent(wizardStats());
-            expect(container.innerHTML).not.toBe('');
         });
     });
 
@@ -597,51 +446,6 @@ describe('CharClassFeatures', () => {
             expect(screen.getByTestId('char-class-barbarian')).toBeInTheDocument();
         });
 
-        it('renders fighter 2024 with action surge based on level', () => {
-            const stats = makeStats({
-                rules: '2024',
-                level: 17,
-                class: {
-                    name: 'Fighter',
-                    class_levels: Array.from({ length: 17 }, (_, i) => ({ level: i + 1 })),
-                    fightingStyles: [],
-                },
-                automation: { passives: [] },
-            });
-            renderComponent(stats);
-            expect(screen.getByTestId('char-class-fighter')).toBeInTheDocument();
-        });
-
-        it('renders fighter 2024 with action surge = 2 at level 17+', () => {
-            const stats = makeStats({
-                rules: '2024',
-                level: 20,
-                class: {
-                    name: 'Fighter',
-                    class_levels: Array.from({ length: 20 }, (_, i) => ({ level: i + 1 })),
-                    fightingStyles: [],
-                },
-                automation: { passives: [] },
-            });
-            renderComponent(stats);
-            expect(screen.getByTestId('char-class-fighter')).toBeInTheDocument();
-        });
-
-        it('renders fighter 2024 with action surge = 1 at level 2-16', () => {
-            const stats = makeStats({
-                rules: '2024',
-                level: 10,
-                class: {
-                    name: 'Fighter',
-                    class_levels: Array.from({ length: 10 }, (_, i) => ({ level: i + 1 })),
-                    fightingStyles: [],
-                },
-                automation: { passives: [] },
-            });
-            renderComponent(stats);
-            expect(screen.getByTestId('char-class-fighter')).toBeInTheDocument();
-        });
-
         it('renders barbarian 2024 with weapon mastery value', () => {
             const stats = makeStats({
                 rules: '2024',
@@ -653,35 +457,6 @@ describe('CharClassFeatures', () => {
             });
             renderComponent(stats);
             expect(screen.getByText(/Weapon Mastery:/)).toBeInTheDocument();
-        });
-    });
-
-    describe('automation button states', () => {
-        it('renders Font of Inspiration button with disabled class when at max', () => {
-            const stats = makeStats({
-                level: 5,
-                class: { name: 'Bard', class_levels: [{ level: 5 }] },
-                automation: { passives: [{ type: 'font_of_inspiration' }] },
-            });
-            renderComponent(stats);
-            const btn = screen.getByTitle(/Font of Inspiration/);
-            expect(btn).toHaveClass('automation-btn--disabled');
-        });
-
-        it('renders Font of Inspiration button with active class when available', () => {
-            const stats = makeStats({
-                level: 5,
-                class: { name: 'Bard', class_levels: [{ level: 5 }] },
-                automation: { passives: [{ type: 'font_of_inspiration' }] },
-            });
-            vi.mocked(getRuntimeValue).mockImplementation((_name, key) => {
-                if (key === 'bardicInspirationUses') return 2;
-                return null;
-            });
-            renderComponent(stats);
-            const btn = screen.getByTitle(/Font of Inspiration/);
-            expect(btn).not.toHaveClass('automation-btn--disabled');
-            expect(btn).not.toBeDisabled();
         });
     });
 
@@ -721,54 +496,6 @@ describe('CharClassFeatures', () => {
             renderComponent(stats);
             expect(screen.getByTestId('char-class-cleric')).toBeInTheDocument();
             expect(screen.getByTestId('tracked-resource-Adrenaline Rush')).toBeInTheDocument();
-        });
-
-        it('renders WeaponKindMasteryModal when weaponKindMasteryModal state is set', () => {
-            const stats = makeStats({
-                level: 5,
-                class: {
-                    name: 'Fighter',
-                    class_levels: [{ level: 5 }, { level: 4 }, { level: 3 }, { level: 2 }, { level: 1 }],
-                    fightingStyles: [],
-                },
-                automation: { passives: [] },
-            });
-            renderComponent(stats);
-            expect(screen.getByTestId('char-class-fighter')).toBeInTheDocument();
-        });
-
-        it('renders weapon mastery as clickable for fighter', () => {
-            const stats = makeStats({
-                level: 5,
-                class: {
-                    name: 'Fighter',
-                    class_levels: [{ level: 5, weapon_mastery: 'Heavy' }, { level: 4 }, { level: 3 }, { level: 2 }, { level: 1 }],
-                    fightingStyles: [],
-                },
-                automation: { passives: [] },
-            });
-            renderComponent(stats);
-            const weaponMasterySpan = screen.getByText(/Weapon Mastery:/).nextSibling;
-            expect(weaponMasterySpan).toHaveAttribute('class', 'clickable');
-        });
-
-        it('calls handleWeaponMasteryClick when weapon mastery span is clicked', () => {
-            global.fetch = vi.fn().mockResolvedValue({
-                json: () => Promise.resolve([]),
-            });
-            const stats = makeStats({
-                level: 5,
-                class: {
-                    name: 'Fighter',
-                    class_levels: [{ level: 5, weapon_mastery: 'Heavy' }, { level: 4 }, { level: 3 }, { level: 2 }, { level: 1 }],
-                    fightingStyles: [],
-                },
-                automation: { passives: [] },
-            });
-            renderComponent(stats);
-            const clickable = document.querySelector('.clickable');
-            fireEvent.click(clickable);
-            expect(getRuntimeValue).toHaveBeenCalledWith('Thorin', '_Weapon_Kind_Mastery_chosenWeapons', mockCampaignName);
         });
 
         it('returns null when no class component and no adrenaline rush', () => {

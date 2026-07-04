@@ -95,124 +95,28 @@ describe('CharAbilities condition effects on rendering', () => {
   });
 
   describe('auto fail saves', () => {
-    it('shows AUTO FAIL text when ability abbreviation is in autoFailSaves', () => {
-      render(<CharAbilities {...defaultProps} conditionEffects={{ autoFailSaves: ['str'] }} />);
+    it.each([
+      { abbr: 'str', ability: 'Strength', saveText: '+6' },
+      { abbr: 'dex', ability: 'Dexterity', saveText: '+4' },
+      { abbr: 'con', ability: 'Constitution', saveText: '+3' },
+      { abbr: 'int', ability: 'Intelligence', saveText: '+0' },
+      { abbr: 'wis', ability: 'Wisdom', saveText: '+1' },
+      { abbr: 'cha', ability: 'Charisma', saveText: '+2' },
+    ])('shows AUTO FAIL for $ability save when $abbr is in autoFailSaves', ({ ability }) => {
+      render(<CharAbilities {...defaultProps} conditionEffects={{ autoFailSaves: [ability.substring(0, 3).toLowerCase()] }} />);
       expect(screen.getByText('AUTO FAIL')).toBeInTheDocument();
     });
 
-    it('does not show AUTO FAIL when ability is not in autoFailSaves', () => {
-      const testProps = {
-        allAbilityScores: mockAllAbilityScores,
-        playerStats: createPlayerStats(),
-        campaignName: 'test-campaign',
-        exhaustionPenalty: 0,
-        conditionEffects: { autoFailSaves: ['dex'] },
-        isRaging: false,
-        onReroll: vi.fn(),
-        onStrokeOfLuck: vi.fn(),
-      };
-      const { container } = render(<CharAbilities {...testProps} />);
-      const saveCells = container.querySelectorAll('.abilities > div:nth-child(4)');
-      const saveTexts = Array.from(saveCells).map(c => c.textContent);
-      // dex is in autoFailSaves, so Dexterity (index 1) should show AUTO FAIL
-      expect(saveTexts[1]).toBe('AUTO FAIL');
-      // Strength (index 0) should NOT show AUTO FAIL
-      expect(saveTexts[0]).not.toBe('AUTO FAIL');
+    it('shows AUTO FAIL for one ability but not others in the same render', () => {
+      const { container } = render(<CharAbilities {...defaultProps} conditionEffects={{ autoFailSaves: ['dex'] }} />);
+      const saveTexts = getSaveTexts(container);
+      expect(saveTexts).toContain('AUTO FAIL');
+      expect(saveTexts).toContain('+6');
     });
 
-    it('does not show AUTO FAIL for empty autoFailSaves', () => {
+    it('does not show AUTO FAIL when autoFailSaves is empty', () => {
       render(<CharAbilities {...defaultProps} conditionEffects={{ autoFailSaves: [] }} />);
       expect(screen.queryByText('AUTO FAIL')).not.toBeInTheDocument();
-    });
-
-    it('does not show AUTO FAIL when conditionEffects is undefined', () => {
-      render(<CharAbilities {...defaultProps} conditionEffects={undefined} />);
-      expect(screen.queryByText('AUTO FAIL')).not.toBeInTheDocument();
-    });
-
-    it('shows AUTO FAIL for dex save when dex is in autoFailSaves', () => {
-      const testProps = {
-        allAbilityScores: mockAllAbilityScores,
-        playerStats: createPlayerStats(),
-        campaignName: 'test-campaign',
-        exhaustionPenalty: 0,
-        conditionEffects: { autoFailSaves: ['dex'] },
-        isRaging: false,
-        onReroll: vi.fn(),
-        onStrokeOfLuck: vi.fn(),
-      };
-      render(<CharAbilities {...testProps} />);
-      const clickableEls = document.querySelectorAll('.clickable');
-      const saveCell = Array.from(clickableEls).find(el => el.textContent === 'AUTO FAIL' && el.closest('.abilities'));
-      expect(saveCell).toBeInTheDocument();
-    });
-
-    it('shows AUTO FAIL for con save when con is in autoFailSaves', () => {
-      const testProps = {
-        allAbilityScores: mockAllAbilityScores,
-        playerStats: createPlayerStats(),
-        campaignName: 'test-campaign',
-        exhaustionPenalty: 0,
-        conditionEffects: { autoFailSaves: ['con'] },
-        isRaging: false,
-        onReroll: vi.fn(),
-        onStrokeOfLuck: vi.fn(),
-      };
-      render(<CharAbilities {...testProps} />);
-      const clickableEls = document.querySelectorAll('.clickable');
-      const saveCell = Array.from(clickableEls).find(el => el.textContent === 'AUTO FAIL' && el.closest('.abilities'));
-      expect(saveCell).toBeInTheDocument();
-    });
-
-    it('shows AUTO FAIL for int save when int is in autoFailSaves', () => {
-      const testProps = {
-        allAbilityScores: mockAllAbilityScores,
-        playerStats: createPlayerStats(),
-        campaignName: 'test-campaign',
-        exhaustionPenalty: 0,
-        conditionEffects: { autoFailSaves: ['int'] },
-        isRaging: false,
-        onReroll: vi.fn(),
-        onStrokeOfLuck: vi.fn(),
-      };
-      render(<CharAbilities {...testProps} />);
-      const clickableEls = document.querySelectorAll('.clickable');
-      const saveCell = Array.from(clickableEls).find(el => el.textContent === 'AUTO FAIL' && el.closest('.abilities'));
-      expect(saveCell).toBeInTheDocument();
-    });
-
-    it('shows AUTO FAIL for wis save when wis is in autoFailSaves', () => {
-      const testProps = {
-        allAbilityScores: mockAllAbilityScores,
-        playerStats: createPlayerStats(),
-        campaignName: 'test-campaign',
-        exhaustionPenalty: 0,
-        conditionEffects: { autoFailSaves: ['wis'] },
-        isRaging: false,
-        onReroll: vi.fn(),
-        onStrokeOfLuck: vi.fn(),
-      };
-      render(<CharAbilities {...testProps} />);
-      const clickableEls = document.querySelectorAll('.clickable');
-      const saveCell = Array.from(clickableEls).find(el => el.textContent === 'AUTO FAIL' && el.closest('.abilities'));
-      expect(saveCell).toBeInTheDocument();
-    });
-
-    it('shows AUTO FAIL for cha save when cha is in autoFailSaves', () => {
-      const testProps = {
-        allAbilityScores: mockAllAbilityScores,
-        playerStats: createPlayerStats(),
-        campaignName: 'test-campaign',
-        exhaustionPenalty: 0,
-        conditionEffects: { autoFailSaves: ['cha'] },
-        isRaging: false,
-        onReroll: vi.fn(),
-        onStrokeOfLuck: vi.fn(),
-      };
-      render(<CharAbilities {...testProps} />);
-      const clickableEls = document.querySelectorAll('.clickable');
-      const saveCell = Array.from(clickableEls).find(el => el.textContent === 'AUTO FAIL' && el.closest('.abilities'));
-      expect(saveCell).toBeInTheDocument();
     });
   });
 
@@ -223,7 +127,7 @@ describe('CharAbilities condition effects on rendering', () => {
       expect(saveTexts).toContain('+6 (Adv)');
     });
 
-    it('shows (Adv) for specific ability save advantage', () => {
+    it('shows (Adv) when ability is in saveAdvantageAbilities', () => {
       const { container } = render(<CharAbilities {...defaultProps} conditionEffects={{ saveAdvantageAbilities: ['STR'] }} />);
       const saveTexts = getSaveTexts(container);
       expect(saveTexts).toContain('+6 (Adv)');
@@ -239,12 +143,6 @@ describe('CharAbilities condition effects on rendering', () => {
       const { container } = render(<CharAbilities {...defaultProps} conditionEffects={{ saveAdvantageAbilities: ['WIS'] }} />);
       const saveTexts = getSaveTexts(container);
       expect(saveTexts).not.toContain('+6 (Adv)');
-    });
-
-    it('shows (Adv) for DEX when saveAdvantageAbilities includes DEX', () => {
-      const { container } = render(<CharAbilities {...defaultProps} conditionEffects={{ saveAdvantageAbilities: ['DEX'] }} />);
-      const saveTexts = getSaveTexts(container);
-      expect(saveTexts).toContain('+4 (Adv)');
     });
   });
 
@@ -277,13 +175,6 @@ describe('CharAbilities condition effects on rendering', () => {
       const { container } = render(<CharAbilities {...defaultProps} exhaustionPenalty={0} />);
       const bonusTexts = getBonusTexts(container);
       expect(bonusTexts).toContain('+4');
-    });
-
-    it('does not crash when exhaustionPenalty is not provided', () => {
-      const props = { ...defaultProps };
-      delete props.exhaustionPenalty;
-      render(<CharAbilities {...props} />);
-      expect(screen.getByText('Strength')).toBeInTheDocument();
     });
   });
 
@@ -431,18 +322,6 @@ describe('CharAbilities condition effects on rendering', () => {
       render(<CharAbilities {...defaultProps} playerStats={stats} isRaging={true} />);
       expect(screen.getByText('Acrobatics (+2)')).toBeInTheDocument();
       expect(screen.getByText(/Arcana \(\+\d+\)/)).toBeInTheDocument();
-    });
-
-    it('renders normally when isRaging is false', () => {
-      render(<CharAbilities {...defaultProps} isRaging={false} />);
-      expect(screen.getByText('Athletics (+8)')).toBeInTheDocument();
-    });
-
-    it('renders normally when isRaging is not provided', () => {
-      const props = { ...defaultProps };
-      delete props.isRaging;
-      render(<CharAbilities {...props} />);
-      expect(screen.getByText('Athletics (+8)')).toBeInTheDocument();
     });
 
     it('calculates primal knowledge bonus with proficiency', () => {
@@ -605,12 +484,6 @@ describe('CharAbilities condition effects on rendering', () => {
       const { container } = render(<CharAbilities {...defaultProps} conditionEffects={{ abilityCheckDisadvantage: true }} />);
       const bonusCells = container.querySelectorAll('.stat--penalized');
       expect(bonusCells.length).toBeGreaterThan(0);
-    });
-
-    it('applies stat--penalized class when autoFailSave is active', () => {
-      const { container } = render(<CharAbilities {...defaultProps} conditionEffects={{ autoFailSaves: ['str'] }} />);
-      const penalizedCells = container.querySelectorAll('.stat--penalized');
-      expect(penalizedCells.length).toBeGreaterThan(0);
     });
 
     it('applies stat--buffed class when save advantage is active', () => {

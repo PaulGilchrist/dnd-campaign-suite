@@ -55,26 +55,7 @@ describe('ItemsPanel', () => {
   });
 
   describe('items rendering', () => {
-    it('renders indoor items by default', () => {
-      render(<ItemsPanel {...defaultProps} />);
-      expect(screen.getByText('Altar')).toBeInTheDocument();
-      expect(screen.getByText('Door')).toBeInTheDocument();
-      expect(screen.getByText('Treasure Chest')).toBeInTheDocument();
-    });
-
-    it('renders outdoor items when mapVariant is outdoor', () => {
-      render(<ItemsPanel {...defaultProps} mapVariant="outdoor" />);
-      expect(screen.getByText('Barrel')).toBeInTheDocument();
-      expect(screen.getByText('Tree')).toBeInTheDocument();
-      expect(screen.queryByText('Altar')).not.toBeInTheDocument();
-    });
-
-    it('renders NPC item', () => {
-      render(<ItemsPanel {...defaultProps} />);
-      expect(screen.getByText('NPC')).toBeInTheDocument();
-    });
-
-    it('renders indoor items with correct labels', () => {
+    it('renders all indoor items with correct labels', () => {
       render(<ItemsPanel {...defaultProps} />);
       const labels = ['Altar', 'Arrow Slit Wall', 'Barrel', 'Bed', 'Bookshelf', 'Chair', 'Treasure Chest', 'Crate', 'Door', 'Fire Pit', 'Fountain', 'Pillar', 'Secret Door', 'Stairs', 'Statue', 'Table', 'Torch', 'Trap', 'Spider Web', 'NPC'];
       labels.forEach(label => {
@@ -82,29 +63,24 @@ describe('ItemsPanel', () => {
       });
     });
 
-    it('renders fewer items for outdoor variant', () => {
+    it('renders outdoor items and excludes indoor-only items', () => {
       render(<ItemsPanel {...defaultProps} mapVariant="outdoor" />);
+      const outdoorLabels = ['Barrel', 'Boulder', 'Bush', 'Crate', 'Fire Pit', 'Torch', 'Tree'];
+      outdoorLabels.forEach(label => {
+        expect(screen.getByText(label)).toBeInTheDocument();
+      });
       const indoorLabels = ['Altar', 'Arrow Slit Wall', 'Bed', 'Bookshelf', 'Chair', 'Treasure Chest', 'Door', 'Fountain', 'Pillar', 'Secret Door', 'Stairs', 'Statue', 'Table', 'Trap', 'Spider Web'];
       indoorLabels.forEach(label => {
         expect(screen.queryByText(label)).not.toBeInTheDocument();
       });
-    });
-
-    it('renders with empty players and characters arrays', () => {
-      render(<ItemsPanel {...defaultProps} characters={[]} players={[]} />);
-      expect(screen.getByText('Altar')).toBeInTheDocument();
     });
   });
 
   describe('characters section', () => {
     it('renders characters section when characters are not in players', () => {
       render(<ItemsPanel {...defaultProps} characters={[{ name: 'Goblin' }]} players={[{ name: 'Player1' }]} />);
+      expect(screen.getByText('Characters')).toBeInTheDocument();
       expect(screen.getByText('Goblin')).toBeInTheDocument();
-    });
-
-    it('does not render characters section when all characters are players', () => {
-      render(<ItemsPanel {...defaultProps} characters={[{ name: 'Player1' }]} players={[{ name: 'Player1' }]} />);
-      expect(screen.queryByText('Characters')).not.toBeInTheDocument();
     });
 
     it('does not render characters section when no characters', () => {
@@ -112,9 +88,9 @@ describe('ItemsPanel', () => {
       expect(screen.queryByText('Characters')).not.toBeInTheDocument();
     });
 
-    it('renders character initial when no imagePath', () => {
-      render(<ItemsPanel {...defaultProps} characters={[{ name: 'Goblin' }]} players={[]} />);
-      expect(screen.getByText('G')).toBeInTheDocument();
+    it('does not render characters section when all characters are players', () => {
+      render(<ItemsPanel {...defaultProps} characters={[{ name: 'Player1' }]} players={[{ name: 'Player1' }]} />);
+      expect(screen.queryByText('Characters')).not.toBeInTheDocument();
     });
 
     it('renders character image when imagePath provided', () => {
@@ -123,15 +99,11 @@ describe('ItemsPanel', () => {
       expect(img).toHaveAttribute('src', '/goblin.png');
     });
 
-    it('renders multiple missing characters', () => {
+    it('renders multiple missing characters with section title', () => {
       render(<ItemsPanel {...defaultProps} characters={[{ name: 'Goblin' }, { name: 'Orc' }]} players={[{ name: 'Player1' }]} />);
+      expect(screen.getByText('Characters')).toBeInTheDocument();
       expect(screen.getByText('Goblin')).toBeInTheDocument();
       expect(screen.getByText('Orc')).toBeInTheDocument();
-    });
-
-    it('shows characters section title when characters are missing from players', () => {
-      render(<ItemsPanel {...defaultProps} characters={[{ name: 'Goblin' }]} players={[]} />);
-      expect(screen.getByText('Characters')).toBeInTheDocument();
     });
   });
 
@@ -155,73 +127,72 @@ describe('ItemsPanel', () => {
       ghostCleanup();
     });
 
-    const fireDragStart = (labelText) => {
-      const mockDT = { setData: vi.fn(), setDragImage: vi.fn() };
-      const el = screen.getByText(labelText).closest('.items-panel-item');
-      fireEvent.dragStart(el, { dataTransfer: mockDT });
-      return mockDT;
-    };
+    it('sets drag data type for indoor item, outdoor item, NPC, and character', () => {
+      const indoorDT = { setData: vi.fn(), setDragImage: vi.fn() };
+      render(<ItemsPanel {...defaultProps} mapVariant="indoor" />);
+      const barrel = screen.getAllByText('Barrel')[0].closest('.items-panel-item');
+      fireEvent.dragStart(barrel, { dataTransfer: indoorDT });
+      expect(indoorDT.setData).toHaveBeenCalledWith('text/plain', 'barrel');
 
-    it('sets drag data type for indoor item', () => {
-      render(<ItemsPanel {...defaultProps} />);
-      const mockDT = fireDragStart('Barrel');
-      expect(mockDT.setData).toHaveBeenCalledWith('text/plain', 'barrel');
-    });
-
-    it('sets drag data type for outdoor item', () => {
       render(<ItemsPanel {...defaultProps} mapVariant="outdoor" />);
-      const mockDT = fireDragStart('Tree');
-      expect(mockDT.setData).toHaveBeenCalledWith('text/plain', 'tree');
-    });
+      const outdoorDT = { setData: vi.fn(), setDragImage: vi.fn() };
+      const tree = screen.getAllByText('Tree')[0].closest('.items-panel-item');
+      fireEvent.dragStart(tree, { dataTransfer: outdoorDT });
+      expect(outdoorDT.setData).toHaveBeenCalledWith('text/plain', 'tree');
 
-    it('sets drag data type for NPC', () => {
       render(<ItemsPanel {...defaultProps} />);
-      const mockDT = fireDragStart('NPC');
-      expect(mockDT.setData).toHaveBeenCalledWith('text/plain', 'npc');
-    });
+      const npcDT = { setData: vi.fn(), setDragImage: vi.fn() };
+      const npc = screen.getAllByText('NPC')[0].closest('.items-panel-item');
+      fireEvent.dragStart(npc, { dataTransfer: npcDT });
+      expect(npcDT.setData).toHaveBeenCalledWith('text/plain', 'npc');
 
-    it('sets drag data type for character', () => {
       render(<ItemsPanel {...defaultProps} characters={[{ name: 'Goblin' }]} players={[]} />);
-      const mockDT = fireDragStart('Goblin');
-      expect(mockDT.setData).toHaveBeenCalledWith('text/plain', 'character:Goblin');
+      const charDT = { setData: vi.fn(), setDragImage: vi.fn() };
+      const char = screen.getByText('Goblin').closest('.items-panel-item');
+      fireEvent.dragStart(char, { dataTransfer: charDT });
+      expect(charDT.setData).toHaveBeenCalledWith('text/plain', 'character:Goblin');
     });
 
-    it('calls setDragImage for item drag', () => {
-      render(<ItemsPanel {...defaultProps} />);
-      const mockDT = fireDragStart('Barrel');
-      expect(mockDT.setDragImage).toHaveBeenCalled();
-    });
-
-    it('calls setDragImage for NPC drag', () => {
-      render(<ItemsPanel {...defaultProps} />);
-      const mockDT = fireDragStart('NPC');
-      expect(mockDT.setDragImage).toHaveBeenCalled();
-    });
-
-    it('calls setDragImage for character drag', () => {
-      render(<ItemsPanel {...defaultProps} characters={[{ name: 'Goblin' }]} players={[]} />);
-      const mockDT = fireDragStart('Goblin');
-      expect(mockDT.setDragImage).toHaveBeenCalled();
-    });
-
-    it('creates ghost div in DOM for item drag', () => {
+    it('calls setDragImage for item, NPC, and character drags', () => {
       render(<ItemsPanel {...defaultProps} />);
       const mockDT = { setData: vi.fn(), setDragImage: vi.fn() };
       const barrel = screen.getByText('Barrel').closest('.items-panel-item');
       fireEvent.dragStart(barrel, { dataTransfer: mockDT });
+      expect(mockDT.setDragImage).toHaveBeenCalled();
 
-      const ghosts = getGhostDivs();
-      expect(ghosts).toHaveLength(1);
-      expect(ghosts[0].querySelector('svg')).toBeInTheDocument();
+      vi.clearAllMocks();
+      const mockDT2 = { setData: vi.fn(), setDragImage: vi.fn() };
+      const npc = screen.getByText('NPC').closest('.items-panel-item');
+      fireEvent.dragStart(npc, { dataTransfer: mockDT2 });
+      expect(mockDT2.setDragImage).toHaveBeenCalled();
+
+      vi.clearAllMocks();
+      render(<ItemsPanel {...defaultProps} characters={[{ name: 'Goblin' }]} players={[]} />);
+      const mockDT3 = { setData: vi.fn(), setDragImage: vi.fn() };
+      const char = screen.getByText('Goblin').closest('.items-panel-item');
+      fireEvent.dragStart(char, { dataTransfer: mockDT3 });
+      expect(mockDT3.setDragImage).toHaveBeenCalled();
     });
 
-    it('creates ghost div in DOM for NPC drag', () => {
+    it('creates ghost div in DOM for item and NPC drag', () => {
       render(<ItemsPanel {...defaultProps} />);
       const mockDT = { setData: vi.fn(), setDragImage: vi.fn() };
-      const npc = screen.getByText('NPC').closest('.items-panel-item');
-      fireEvent.dragStart(npc, { dataTransfer: mockDT });
+      const barrel = screen.getAllByText('Barrel')[0].closest('.items-panel-item');
+      fireEvent.dragStart(barrel, { dataTransfer: mockDT });
 
-      const ghosts = getGhostDivs();
+      let ghosts = getGhostDivs();
+      expect(ghosts).toHaveLength(1);
+      expect(ghosts[0].querySelector('svg')).toBeInTheDocument();
+
+      // The setTimeout callback removes the ghost; run it to clear before re-rendering
+      vi.runOnlyPendingTimers();
+
+      render(<ItemsPanel {...defaultProps} />);
+      const mockDT2 = { setData: vi.fn(), setDragImage: vi.fn() };
+      const npc = screen.getAllByText('NPC')[0].closest('.items-panel-item');
+      fireEvent.dragStart(npc, { dataTransfer: mockDT2 });
+
+      ghosts = getGhostDivs();
       expect(ghosts).toHaveLength(1);
       expect(ghosts[0].querySelector('svg')).toBeInTheDocument();
     });

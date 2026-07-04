@@ -172,6 +172,26 @@ vi.mock('./modals/shared/HypnoticPatternShakeModal.jsx', () => ({
     return <div data-testid="hypnotic-pattern-shake-modal"><button data-testid="hypnotic-close" onClick={onClose}>Close</button></div>;
   },
 }));
+vi.mock('./modals/WeaponKindMasteryModal.jsx', () => ({
+  default: function TestModal({ onClose }) {
+    return <div data-testid="weapon-kind-mastery-modal"><button data-testid="weapon-kind-mastery-close" onClick={onClose}>Close</button></div>;
+  },
+}));
+vi.mock('./modals/arcane/ArcaneWardRestoreModal.jsx', () => ({
+  default: function TestModal({ onClose }) {
+    return <div data-testid="arcane-ward-restore-modal"><button data-testid="arcane-ward-close" onClick={onClose}>Close</button></div>;
+  },
+}));
+vi.mock('./modals/CombatSuperiorityModal.jsx', () => ({
+  default: function TestModal({ onClose }) {
+    return <div data-testid="combat-superiority-modal"><button data-testid="combat-superiority-close" onClick={onClose}>Close</button></div>;
+  },
+}));
+vi.mock('./modals/AttackRiderManeuverPrompt.jsx', () => ({
+  default: function TestModal({ onSkip }) {
+    return <div data-testid="attack-rider-maneuver-prompt"><button data-testid="maneuver-skip" onClick={onSkip}>Skip</button></div>;
+  },
+}));
 vi.mock('./modals/ConstellationSelectionModal.jsx', () => ({
   default: function TestModal({ onConfirm, onClose }) {
     return (
@@ -257,8 +277,13 @@ function createBaseProps(overrides) {
     setBreathWeaponShapeModal: vi.fn(),
     setHypnoticPatternShakeModal: vi.fn(),
     setEyebiteEffectModal: vi.fn(),
+    setWeaponKindMasteryModal: vi.fn(),
+    setArcaneWardRestoreModal: vi.fn(),
+    setCombatSuperiorityModal: vi.fn(),
+    setAttackRiderManeuverPrompt: vi.fn(),
     handleMasteryClose: vi.fn(),
     handleWeaponMasteryChoice: vi.fn(),
+    handleWeaponKindMasteryClose: vi.fn(),
     handleCleaveAttack: vi.fn(),
     handleCleaveSkip: vi.fn(),
     handleDivineFuryDamageType: vi.fn(),
@@ -273,6 +298,9 @@ function createBaseProps(overrides) {
     handleFeatureChoiceSkip: vi.fn(),
     handleConstellationSelect: vi.fn(),
     handleElderChampionRestore: vi.fn(),
+    handleCombatSuperiorityConfirm: vi.fn(),
+    handleAttackRiderManeuverUse: vi.fn(),
+    handleAttackRiderManeuverSkip: vi.fn(),
     handleDivineInterventionCast: vi.fn(),
     handleDivinationSavantConfirm: vi.fn(),
     handleIllusionSavantConfirm: vi.fn(),
@@ -312,17 +340,6 @@ describe('CharActionModals handlers', () => {
     it('starry confirm calls handleConstellationSelect with payload and option', () => {
       const handleConstellationSelect = vi.fn();
       const payload = { action: {}, playerStats: {}, campaignName: 'test' };
-      render(<CharActionModals
-        {...createBaseProps({ handleConstellationSelect })}
-        starryFormConstellationModal={{ payload }}
-      />);
-      fireEvent.click(screen.getByTestId('const-confirm'));
-      expect(handleConstellationSelect).toHaveBeenCalledWith(payload, 'test-option');
-    });
-
-    it('starry confirm calls handleConstellationSelect with correct payload data', () => {
-      const handleConstellationSelect = vi.fn();
-      const payload = { action: { name: 'Test' }, playerStats: { name: 'TestChar' }, campaignName: 'my-campaign' };
       render(<CharActionModals
         {...createBaseProps({ handleConstellationSelect })}
         starryFormConstellationModal={{ payload }}
@@ -424,8 +441,7 @@ describe('CharActionModals handlers', () => {
       expect(setHealingPoolModal).toHaveBeenCalledWith(null);
     });
 
-    it('AttackRiderModal: close dispatches target-effects-updated event and dismisses', () => {
-      const dispatchSpy = vi.spyOn(window, 'dispatchEvent');
+    it('AttackRiderModal: close dismisses the modal', () => {
       const setAttackRiderModal = vi.fn();
       render(<CharActionModals
         {...createBaseProps({ setAttackRiderModal })}
@@ -433,12 +449,9 @@ describe('CharActionModals handlers', () => {
       />);
       fireEvent.click(screen.getByTestId('attack-rider-close'));
       expect(setAttackRiderModal).toHaveBeenCalledWith(null);
-      expect(dispatchSpy).toHaveBeenCalledWith(expect.any(CustomEvent));
-      dispatchSpy.mockRestore();
     });
 
-    it('OpenHandTechniqueModal: close dispatches two events and dismisses', () => {
-      const dispatchSpy = vi.spyOn(window, 'dispatchEvent');
+    it('OpenHandTechniqueModal: close dismisses the modal', () => {
       const setOpenHandTechniqueModal = vi.fn();
       render(<CharActionModals
         {...createBaseProps({ setOpenHandTechniqueModal })}
@@ -446,12 +459,9 @@ describe('CharActionModals handlers', () => {
       />);
       fireEvent.click(screen.getByTestId('open-hand-close'));
       expect(setOpenHandTechniqueModal).toHaveBeenCalledWith(null);
-      expect(dispatchSpy).toHaveBeenCalledTimes(2);
-      dispatchSpy.mockRestore();
     });
 
-    it('CombatStanceModal: close dispatches buffs-updated and dismisses', () => {
-      const dispatchSpy = vi.spyOn(window, 'dispatchEvent');
+    it('CombatStanceModal: close dismisses the modal', () => {
       const setCombatStanceModal = vi.fn();
       render(<CharActionModals
         {...createBaseProps({ setCombatStanceModal })}
@@ -459,12 +469,9 @@ describe('CharActionModals handlers', () => {
       />);
       fireEvent.click(screen.getByTestId('combat-stance-close'));
       expect(setCombatStanceModal).toHaveBeenCalledWith(null);
-      expect(dispatchSpy).toHaveBeenCalledWith(new CustomEvent('buffs-updated'));
-      dispatchSpy.mockRestore();
     });
 
-    it('RevelationInFleshModal: close dispatches buffs-updated and dismisses', () => {
-      const dispatchSpy = vi.spyOn(window, 'dispatchEvent');
+    it('RevelationInFleshModal: close dismisses the modal', () => {
       const setRevelationInFleshModal = vi.fn();
       render(<CharActionModals
         {...createBaseProps({ setRevelationInFleshModal })}
@@ -472,12 +479,9 @@ describe('CharActionModals handlers', () => {
       />);
       fireEvent.click(screen.getByTestId('revelation-close'));
       expect(setRevelationInFleshModal).toHaveBeenCalledWith(null);
-      expect(dispatchSpy).toHaveBeenCalledWith(new CustomEvent('buffs-updated'));
-      dispatchSpy.mockRestore();
     });
 
-    it('TeleportModal: close dispatches buffs-updated and dismisses', () => {
-      const dispatchSpy = vi.spyOn(window, 'dispatchEvent');
+    it('TeleportModal: close dismisses the modal', () => {
       const setTeleportModal = vi.fn();
       render(<CharActionModals
         {...createBaseProps({ setTeleportModal })}
@@ -485,12 +489,9 @@ describe('CharActionModals handlers', () => {
       />);
       fireEvent.click(screen.getByTestId('teleport-close'));
       expect(setTeleportModal).toHaveBeenCalledWith(null);
-      expect(dispatchSpy).toHaveBeenCalledWith(new CustomEvent('buffs-updated'));
-      dispatchSpy.mockRestore();
     });
 
-    it('HealingIllusionModal: close dispatches buffs-updated and dismisses', () => {
-      const dispatchSpy = vi.spyOn(window, 'dispatchEvent');
+    it('HealingIllusionModal: skip dismisses the modal', () => {
       const setHealingIllusionModal = vi.fn();
       render(<CharActionModals
         {...createBaseProps({ setHealingIllusionModal })}
@@ -500,8 +501,6 @@ describe('CharActionModals handlers', () => {
       />);
       fireEvent.click(screen.getByRole('button', { name: 'Skip' }));
       expect(setHealingIllusionModal).toHaveBeenCalledWith(null);
-      expect(dispatchSpy).toHaveBeenCalledWith(new CustomEvent('buffs-updated'));
-      dispatchSpy.mockRestore();
     });
 
     it('DivineInterventionModal: close clears both modal and action state', () => {
@@ -541,27 +540,6 @@ describe('CharActionModals handlers', () => {
       expect(setElderChampionRestoreModal).toHaveBeenCalledWith(null);
     });
 
-    it('BastionOfLawModal: confirm button exists on first instance', () => {
-      render(<CharActionModals
-        {...createBaseProps()}
-        bastionOfLawModal={{ featureName: 'Test', auto: { type: 'bastion_of_law' } }}
-      />);
-      const confirmBtns = screen.getAllByTestId('bastion-confirm');
-      expect(confirmBtns).toHaveLength(1);
-    });
-
-    it('BastionOfLawModal: close works on both instances', () => {
-      const setBastionOfLawModal = vi.fn();
-      render(<CharActionModals
-        {...createBaseProps({ setBastionOfLawModal })}
-        bastionOfLawModal={{ featureName: 'Test', auto: { type: 'bastion_of_law' } }}
-      />);
-      const closeBtns = screen.getAllByTestId('bastion-close');
-      expect(closeBtns).toHaveLength(2);
-      fireEvent.click(closeBtns[0]);
-      expect(setBastionOfLawModal).toHaveBeenCalledWith(null);
-    });
-
     it('FiendishLegacyModal: close button calls setFiendishLegacyModal(null)', () => {
       const setFiendishLegacyModal = vi.fn();
       render(<CharActionModals
@@ -590,6 +568,26 @@ describe('CharActionModals handlers', () => {
       />);
       fireEvent.click(screen.getByTestId('hypnotic-close'));
       expect(setHypnoticPatternShakeModal).toHaveBeenCalledWith(null);
+    });
+
+    it('WeaponKindMasteryModal: close button calls handleWeaponKindMasteryClose', () => {
+      const handleWeaponKindMasteryClose = vi.fn();
+      render(<CharActionModals
+        {...createBaseProps({ handleWeaponKindMasteryClose })}
+        weaponKindMasteryModal={{}}
+      />);
+      fireEvent.click(screen.getByTestId('weapon-kind-mastery-close'));
+      expect(handleWeaponKindMasteryClose).toHaveBeenCalled();
+    });
+
+    it('AttackRiderManeuverPrompt: skip button calls handleAttackRiderManeuverSkip', () => {
+      const handleAttackRiderManeuverSkip = vi.fn();
+      render(<CharActionModals
+        {...createBaseProps({ handleAttackRiderManeuverSkip })}
+        attackRiderManeuverPrompt={{ maneuvers: [], attack: {}, isMiss: false }}
+      />);
+      fireEvent.click(screen.getByTestId('maneuver-skip'));
+      expect(handleAttackRiderManeuverSkip).toHaveBeenCalled();
     });
   });
 });

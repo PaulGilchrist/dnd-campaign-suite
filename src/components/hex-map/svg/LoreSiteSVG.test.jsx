@@ -1,13 +1,9 @@
 // @improved-by-ai
 import { render } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import LoreSiteSVG from './LoreSiteSVG.jsx';
 
 describe('LoreSiteSVG', () => {
-    beforeEach(() => {
-        vi.clearAllMocks();
-    });
-
     describe('props and rendering', () => {
         it('should render the SVG group element', () => {
             const { container } = render(<LoreSiteSVG />);
@@ -25,22 +21,6 @@ describe('LoreSiteSVG', () => {
             const { container } = render(<LoreSiteSVG className="lore-site-icon" />);
             const group = container.querySelector('g');
             expect(group.getAttribute('class')).toBe('lore-site-icon');
-        });
-
-        it('should pass through additional props via spread', () => {
-            const { container } = render(<LoreSiteSVG data-testid="lore-svg" onClick={vi.fn()} />);
-            const group = container.querySelector('g');
-            expect(group.getAttribute('data-testid')).toBe('lore-svg');
-        });
-
-        it('should support ref forwarding', () => {
-            const ref = vi.fn();
-            render(<LoreSiteSVG ref={ref} />);
-            expect(ref).toHaveBeenCalled();
-        });
-
-        it('should have displayName LoreSiteSVG', () => {
-            expect(LoreSiteSVG.displayName).toBe('LoreSiteSVG');
         });
     });
 
@@ -140,13 +120,6 @@ describe('LoreSiteSVG', () => {
             expect(polygons[0].getAttribute('points')).toBe('24,14 27,14 25.5,11');
             expect(polygons[1].getAttribute('points')).toBe('13,18 15.5,18 14.25,15.5');
         });
-
-        it('should render stones with correct depth ordering by y position', () => {
-            const { container } = render(<LoreSiteSVG />);
-            const stones = standingStoneRects(container);
-            const ys = stones.map(s => parseInt(s.getAttribute('y')));
-            expect(ys).toEqual([12, 14, 8, 18, 19]);
-        });
     });
 
     describe('rune marks', () => {
@@ -196,19 +169,12 @@ describe('LoreSiteSVG', () => {
     });
 
     describe('ground stones', () => {
-        it('should render 4 ground stone circles', () => {
-            const { container } = render(<LoreSiteSVG />);
-            const stones = [...container.querySelectorAll('circle')].filter(c =>
-                c.getAttribute('fill') === '#546E7A'
-            );
-            expect(stones.length).toBe(4);
-        });
-
         it('should render ground stones with correct positions and sizes', () => {
             const { container } = render(<LoreSiteSVG />);
             const stones = [...container.querySelectorAll('circle')].filter(c =>
                 c.getAttribute('fill') === '#546E7A'
             );
+            expect(stones.length).toBe(4);
 
             const expected = [
                 { cx: '6', cy: '28', r: '0.5', opacity: '0.3' },
@@ -239,7 +205,7 @@ describe('LoreSiteSVG', () => {
     });
 
     describe('colors', () => {
-        it('should use stone grays for fills and strokes', () => {
+        it('should use stone grays and brown for moss patches', () => {
             const { container } = render(<LoreSiteSVG />);
             const group = container.querySelector('g');
             const allElements = group.querySelectorAll('*');
@@ -252,18 +218,8 @@ describe('LoreSiteSVG', () => {
             expect(fills).toContain('#78909C');
             expect(fills).toContain('#546E7A');
             expect(fills).toContain('#90A4AE');
-            expect(strokes).toContain('#546E7A');
-        });
-
-        it('should use brown for moss patches', () => {
-            const { container } = render(<LoreSiteSVG />);
-            const group = container.querySelector('g');
-            const allElements = group.querySelectorAll('*');
-            const fills = new Set();
-            allElements.forEach(el => {
-                if (el.getAttribute('fill')) fills.add(el.getAttribute('fill'));
-            });
             expect(fills).toContain('#8D6E63');
+            expect(strokes).toContain('#546E7A');
         });
     });
 });

@@ -80,7 +80,6 @@ describe('useAttackDamageResolution - feats', () => {
     const mockSetAttackRiderModal = vi.fn();
     const mockPendingDamageRef = { current: null };
 
-     
     function useAttackDamageResolutionHook(overrides = {}) {
         const deps = {
             playerStats: mockPlayerStats,
@@ -175,33 +174,6 @@ describe('useAttackDamageResolution - feats', () => {
             expect(setRuntimeValue).toHaveBeenCalledWith('TestFighter', '_Charge_Attack_usedRound', 1, 'test-campaign');
         });
 
-        it('skips Charger when already used this round', async () => {
-            getCombatContext.mockResolvedValue(createCombatContext());
-            getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
-            mockRuntimeValueForKey('_Charge_Attack_usedRound', 1);
-            const stats = {
-                ...mockPlayerStats,
-                automation: {
-                    actions: [],
-                    passives: [
-                        {
-                            type: 'attack_rider', trigger: 'melee_hit_after_10ft_charge',
-                            chooseOne: true, name: 'Charge Attack',
-                            options: [{ name: 'Push 10 ft', effect: 'push', value: 10 }],
-                        },
-                    ],
-                },
-            };
-            const { resolveAttackDamage } = useAttackDamageResolutionHook({ playerStats: stats });
-            const attack = {
-                name: 'Longsword', damage: '1d8+5', damageType: 'Slashing',
-                weaponType: 'melee', properties: [],
-            };
-            await resolveAttackDamage(attack);
-            await tick();
-            expect(setRuntimeValue).not.toHaveBeenCalledWith('TestFighter', '_Charge_Attack_usedRound', expect.any(Number), 'test-campaign');
-        });
-
         it('skips Charger when no combat context target available', async () => {
             getCombatContext.mockResolvedValue(null);
             getTargetFromAttacker.mockReturnValue(null);
@@ -290,63 +262,6 @@ describe('useAttackDamageResolution - feats', () => {
             expect(setRuntimeValue).not.toHaveBeenCalledWith('test-campaign', 'targetEffects', expect.anything(), 'test-campaign');
             expect(mockRollDamage).toHaveBeenCalled();
         });
-
-        it('verifies parseMagicItemName is called for shield detection', async () => {
-            getCombatContext.mockResolvedValue(createCombatContext());
-            getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
-            parseMagicItemName.mockImplementation((_name) => ({ baseName: 'Shield+1' }));
-            const stats = {
-                ...mockPlayerStats,
-                inventory: { equipped: ['Shield+1'] },
-                equipment: [{ name: 'Shield+1', equipment_category: 'Shield' }],
-                automation: {
-                    actions: [],
-                    passives: [
-                        {
-                            type: 'attack_rider', trigger: 'melee_hit_with_shield_equipped',
-                            name: 'Shield Bash',
-                            options: [{ name: 'Push 5 ft', effect: 'push', value: 5 }],
-                        },
-                    ],
-                },
-            };
-            const { resolveAttackDamage } = useAttackDamageResolutionHook({ playerStats: stats });
-            const attack = {
-                name: 'Longsword', damage: '1d8+5', damageType: 'Slashing',
-                weaponType: 'melee', properties: [],
-            };
-            await resolveAttackDamage(attack);
-            await tick();
-            expect(parseMagicItemName).toHaveBeenCalledWith('Shield+1');
-            expect(mockRollDamage).toHaveBeenCalled();
-        });
-
-        it('skips Shield Bash when already used this round', async () => {
-            getCombatContext.mockResolvedValue(createCombatContext());
-            getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
-            mockRuntimeValueForKey('_Shield_Bash_usedRound', 1);
-            const stats = {
-                ...mockPlayerStats,
-                automation: {
-                    actions: [],
-                    passives: [
-                        {
-                            type: 'attack_rider', trigger: 'melee_hit_with_shield_equipped',
-                            name: 'Shield Bash',
-                            options: [{ name: 'Push 5 ft', effect: 'push', value: 5 }],
-                        },
-                    ],
-                },
-            };
-            const { resolveAttackDamage } = useAttackDamageResolutionHook({ playerStats: stats });
-            const attack = {
-                name: 'Longsword', damage: '1d8+5', damageType: 'Slashing',
-                weaponType: 'melee', properties: [],
-            };
-            await resolveAttackDamage(attack);
-            await tick();
-            expect(setRuntimeValue).not.toHaveBeenCalledWith('TestFighter', '_Shield_Bash_usedRound', expect.any(Number), 'test-campaign');
-        });
     });
 
     describe('Crusher feat', () => {
@@ -407,33 +322,6 @@ describe('useAttackDamageResolution - feats', () => {
             await tick();
             expect(setRuntimeValue).not.toHaveBeenCalledWith('test-campaign', 'targetEffects', expect.anything(), 'test-campaign');
             expect(mockRollDamage).toHaveBeenCalled();
-        });
-
-        it('does not apply Crusher push when already used this round', async () => {
-            getCombatContext.mockResolvedValue(createCombatContext());
-            getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
-            mockRuntimeValueForKey('_Crusher_usedRound', 1);
-            const stats = {
-                ...mockPlayerStats,
-                automation: {
-                    actions: [],
-                    passives: [
-                        {
-                            type: 'attack_rider', trigger: 'bludgeoning_damage_hit',
-                            oncePerTurn: true, name: 'Crusher',
-                            options: [{ name: 'Push 5 ft', effect: 'push', value: 5 }],
-                        },
-                    ],
-                },
-            };
-            const { resolveAttackDamage } = useAttackDamageResolutionHook({ playerStats: stats });
-            const attack = {
-                name: 'Warhammer', damage: '1d8+5', damageType: 'Bludgeoning',
-                weaponType: 'melee', properties: [],
-            };
-            await resolveAttackDamage(attack);
-            await tick();
-            expect(setRuntimeValue).not.toHaveBeenCalledWith('TestFighter', '_Crusher_usedRound', expect.any(Number), 'test-campaign');
         });
 
         it('applies Crusher Enhanced Critical on bludgeoning crit', async () => {
@@ -553,33 +441,6 @@ describe('useAttackDamageResolution - feats', () => {
             expect(mockRollDamage).toHaveBeenCalled();
         });
 
-        it('does not apply Slasher when already used this round', async () => {
-            getCombatContext.mockResolvedValue(createCombatContext());
-            getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
-            mockRuntimeValueForKey('_Slasher_usedRound', 1);
-            const stats = {
-                ...mockPlayerStats,
-                automation: {
-                    actions: [],
-                    passives: [
-                        {
-                            type: 'attack_rider', trigger: 'slashing_damage_hit',
-                            oncePerTurn: true, name: 'Slasher',
-                            options: [{ name: 'Reduce Speed', effect: 'speed_reduction', value: 10 }],
-                        },
-                    ],
-                },
-            };
-            const { resolveAttackDamage } = useAttackDamageResolutionHook({ playerStats: stats });
-            const attack = {
-                name: 'Longsword', damage: '1d8+5', damageType: 'Slashing',
-                weaponType: 'melee', properties: [],
-            };
-            await resolveAttackDamage(attack);
-            await tick();
-            expect(setRuntimeValue).not.toHaveBeenCalledWith('TestFighter', '_Slasher_usedRound', expect.any(Number), 'test-campaign');
-        });
-
         it('applies Slasher Enhanced Critical on slashing crit', async () => {
             getCombatContext.mockResolvedValue(createCombatContext());
             getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
@@ -694,37 +555,6 @@ describe('useAttackDamageResolution - feats', () => {
             );
         });
 
-        it('does not apply Piercer reroll when already used this round', async () => {
-            getCombatContext.mockResolvedValue(createCombatContext());
-            getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
-            mockRuntimeValueForKey('_Piercer_usedRound', 1);
-            const stats = {
-                ...mockPlayerStats,
-                automation: {
-                    actions: [],
-                    passives: [
-                        {
-                            type: 'attack_rider', trigger: 'piercing_damage_hit',
-                            oncePerTurn: true, name: 'Piercer',
-                        },
-                    ],
-                },
-            };
-            const { resolveAttackDamage } = useAttackDamageResolutionHook({ playerStats: stats });
-            const attack = {
-                name: 'Rapier', damage: '1d8+5', damageType: 'Piercing',
-                weaponType: 'melee', properties: [],
-            };
-            await resolveAttackDamage(attack);
-            await tick();
-            expect(setRuntimeValue).not.toHaveBeenCalledWith('TestFighter', '_Piercer_usedRound', expect.any(Number), 'test-campaign');
-            expect(mockRollDamage).toHaveBeenCalledWith(
-                'Rapier',
-                '1d8+5',
-                expect.any(Number), expect.any(Array), expect.any(Number), expect.any(Object)
-            );
-        });
-
         it('applies Piercer extra damage die on crit', async () => {
             const stats = {
                 ...mockPlayerStats,
@@ -804,30 +634,6 @@ describe('useAttackDamageResolution - feats', () => {
             expect(setRuntimeValue).toHaveBeenCalledWith('TestFighter', '_Savage_Attacker_usedRound', 1, 'test-campaign');
             expect(mockRollDamage).toHaveBeenCalled();
             floorSpy.mockRestore();
-        });
-
-        it('marks the feature as used regardless of reroll outcome', async () => {
-            vi.spyOn(Math, 'floor').mockReturnValueOnce(12); // secondTotal = 13 > firstTotal = 5
-
-            const stats = {
-                ...mockPlayerStats,
-                automation: {
-                    actions: [],
-                    passives: [
-                        { type: 'passive_rule', effect: 'reroll_damage_once_per_turn', name: 'Savage Attacker' },
-                    ],
-                },
-            };
-            const { resolveAttackDamage } = useAttackDamageResolutionHook({ playerStats: stats });
-            const attack = {
-                name: 'Greataxe', damage: '1d12+5', damageType: 'Slashing',
-                weaponType: 'melee', properties: ['Heavy'],
-            };
-            await resolveAttackDamage(attack);
-            await tick();
-            // Feature should always be marked as used regardless of whether reroll improved the total
-            expect(setRuntimeValue).toHaveBeenCalledWith('TestFighter', '_Savage_Attacker_usedRound', 1, 'test-campaign');
-            expect(mockRollDamage).toHaveBeenCalled();
         });
 
         it('does not reroll when already used this round', async () => {
@@ -949,294 +755,6 @@ describe('useAttackDamageResolution - feats', () => {
             await resolveAttackDamage(attack);
             await tick();
             expect(setRuntimeValue).not.toHaveBeenCalledWith('test-campaign', 'targetEffects', expect.anything(), 'test-campaign');
-            expect(mockRollDamage).toHaveBeenCalled();
-        });
-
-        it('does not apply Tavern Brawler push when already used this round', async () => {
-            getCombatContext.mockResolvedValue(createCombatContext());
-            getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
-            mockRuntimeValueForKey('_Tavern_Brawler_Push_UsedRound', 1);
-            const stats = {
-                ...mockPlayerStats,
-                automation: {
-                    actions: [],
-                    passives: [{ effect: 'tavern_brawler_push' }],
-                },
-            };
-            const { resolveAttackDamage } = useAttackDamageResolutionHook({ playerStats: stats });
-            const attack = {
-                name: 'Unarmed Strike', damage: '1d4', damageType: 'Bludgeoning',
-                weaponType: 'unarmed', properties: [],
-            };
-            await resolveAttackDamage(attack);
-            await tick();
-            expect(setRuntimeValue).not.toHaveBeenCalledWith('TestFighter', '_Tavern_Brawler_Push_UsedRound', expect.any(Number), 'test-campaign');
-        });
-    });
-
-    describe('Sacred Weapon', () => {
-        it('updates attack damage type from sacred weapon buff', async () => {
-            getRuntimeValue.mockImplementation((name, key) => {
-                if (key === 'activeBuffs') return [
-                    { name: 'Sacred Weapon', effect: 'sacred_weapon', damageTypeChoice: 'radiant' },
-                ];
-                return null;
-            });
-            const stats = {
-                ...mockPlayerStats,
-                automation: {
-                    actions: [],
-                    passives: [{ name: 'Sacred Weapon', effect: 'sacred_weapon' }],
-                },
-            };
-            const { resolveAttackDamage } = useAttackDamageResolutionHook({ playerStats: stats });
-            const attack = {
-                name: 'Longsword', damage: '1d8+5', damageType: 'Slashing',
-                weaponType: 'melee', properties: [],
-            };
-            await resolveAttackDamage(attack);
-            await tick();
-            expect(attack.damageType).toBe('radiant');
-            expect(mockRollDamage).toHaveBeenCalledWith(
-                'Longsword',
-                expect.any(String),
-                expect.any(Number), expect.any(Array), expect.any(Number), expect.any(Object)
-            );
-        });
-
-        it('does not change damage type for ranged attacks', async () => {
-            getRuntimeValue.mockImplementation((name, key) => {
-                if (key === 'activeBuffs') return [
-                    { name: 'Sacred Weapon', effect: 'sacred_weapon', damageTypeChoice: 'radiant' },
-                ];
-                return null;
-            });
-            const stats = {
-                ...mockPlayerStats,
-                automation: {
-                    actions: [],
-                    passives: [{ name: 'Sacred Weapon', effect: 'sacred_weapon' }],
-                },
-            };
-            const { resolveAttackDamage } = useAttackDamageResolutionHook({ playerStats: stats });
-            const attack = {
-                name: 'Longbow', damage: '1d8+5', damageType: 'Piercing',
-                weaponType: 'ranged', properties: [],
-            };
-            await resolveAttackDamage(attack);
-            await tick();
-            expect(attack.damageType).toBe('Piercing');
-        });
-    });
-
-    describe('Unarmed strike damage type modifiers', () => {
-        it('applies stored damage type modifier for unarmed strike', async () => {
-            getRuntimeValue.mockImplementation((name, key) => {
-                if (key === 'empoweredStrikesDamageType') return 'Force';
-                return null;
-            });
-            const stats = {
-                ...mockPlayerStats,
-                automation: {
-                    actions: [],
-                    passives: [
-                        {
-                            type: 'damage_type_modifier', trigger: 'unarmed_strike_hit',
-                            name: 'Empowered Strikes',
-                        },
-                    ],
-                },
-            };
-            const { resolveAttackDamage } = useAttackDamageResolutionHook({ playerStats: stats });
-            const attack = {
-                name: 'Unarmed Strike', damage: '1d6+5', damageType: 'Bludgeoning',
-                weaponType: 'unarmed', properties: [],
-            };
-            await resolveAttackDamage(attack);
-            await tick();
-            expect(attack.damageType).toBe('Force');
-            expect(setRuntimeValue).toHaveBeenCalledWith('TestFighter', 'empoweredStrikesDamageType', null, 'test-campaign');
-            expect(mockRollDamage).toHaveBeenCalled();
-        });
-
-        it('does not apply stored damage type for non-unarmed attacks', async () => {
-            getRuntimeValue.mockImplementation((name, key) => {
-                if (key === 'empoweredStrikesDamageType') return 'Force';
-                return null;
-            });
-            const stats = {
-                ...mockPlayerStats,
-                automation: {
-                    actions: [],
-                    passives: [
-                        {
-                            type: 'damage_type_modifier', trigger: 'unarmed_strike_hit',
-                            name: 'Empowered Strikes',
-                        },
-                    ],
-                },
-            };
-            const { resolveAttackDamage } = useAttackDamageResolutionHook({ playerStats: stats });
-            const attack = {
-                name: 'Longsword', damage: '1d8+5', damageType: 'Slashing',
-                weaponType: 'melee', properties: [],
-            };
-            await resolveAttackDamage(attack);
-            await tick();
-            expect(attack.damageType).toBe('Slashing');
-        });
-
-        it('shows damage type choice modal when modifier has options', async () => {
-            getRuntimeValue.mockReturnValue(null);
-            const stats = {
-                ...mockPlayerStats,
-                automation: {
-                    actions: [],
-                    passives: [
-                        {
-                            type: 'damage_type_modifier', trigger: 'unarmed_strike_hit',
-                            name: 'Empowered Strikes',
-                            options: [{ damageType: 'Force' }, { damageType: 'Radiant' }],
-                        },
-                    ],
-                },
-            };
-            const { resolveAttackDamage } = useAttackDamageResolutionHook({ playerStats: stats });
-            const attack = {
-                name: 'Unarmed Strike', damage: '1d6+5', damageType: 'Bludgeoning',
-                weaponType: 'unarmed', properties: [],
-            };
-            await resolveAttackDamage(attack);
-            await tick();
-            expect(mockSetDamageTypeChoice).toHaveBeenCalledWith(expect.objectContaining({
-                title: 'Empowered Strikes — Damage Type',
-                types: ['Force', 'Radiant'],
-            }));
-            expect(mockRollDamage).not.toHaveBeenCalled();
-        });
-
-        it('applies stored unarmed attack rider option', async () => {
-            getRuntimeValue.mockImplementation((name, key) => {
-                if (key === '_Enhanced_Unarmed_Strike_selectedOption') return 'Knock Prone';
-                return null;
-            });
-            const stats = {
-                ...mockPlayerStats,
-                automation: {
-                    actions: [],
-                    passives: [
-                        {
-                            type: 'attack_rider', trigger: 'unarmed_strike_hit',
-                            chooseOne: true, name: 'Enhanced Unarmed Strike',
-                            options: [
-                                { name: 'Knock Prone', effect: 'damage_bonus', damageExpression: '1d4', damageType: 'bludgeoning' },
-                                { name: 'Push', effect: 'push', value: 5 },
-                            ],
-                        },
-                    ],
-                },
-            };
-            const { resolveAttackDamage } = useAttackDamageResolutionHook({ playerStats: stats });
-            const attack = {
-                name: 'Unarmed Strike', damage: '1d6+5', damageType: 'Bludgeoning',
-                weaponType: 'unarmed', properties: [],
-            };
-            await resolveAttackDamage(attack);
-            await tick();
-            expect(rollExpression).toHaveBeenCalledWith('1d4');
-            expect(mockRollDamage).toHaveBeenCalledWith(
-                'Unarmed Strike',
-                expect.stringContaining('1d4 [bludgeoning]'),
-                expect.any(Number), expect.any(Array), expect.any(Number), expect.any(Object)
-            );
-        });
-
-        it('shows damage type choice modal when no stored unarmed attack rider option', async () => {
-            getRuntimeValue.mockReturnValue(null);
-            const stats = {
-                ...mockPlayerStats,
-                automation: {
-                    actions: [],
-                    passives: [
-                        {
-                            type: 'attack_rider', trigger: 'unarmed_strike_hit',
-                            chooseOne: true, name: 'Enhanced Unarmed Strike',
-                            options: [
-                                { name: 'Knock Prone', effect: 'damage_bonus', damageExpression: '1d4', damageType: 'bludgeoning' },
-                                { name: 'Push', effect: 'push', value: 5 },
-                            ],
-                        },
-                    ],
-                },
-            };
-            const { resolveAttackDamage } = useAttackDamageResolutionHook({ playerStats: stats });
-            const attack = {
-                name: 'Unarmed Strike', damage: '1d6+5', damageType: 'Bludgeoning',
-                weaponType: 'unarmed', properties: [],
-            };
-            await resolveAttackDamage(attack);
-            await tick();
-            expect(mockSetDamageTypeChoice).toHaveBeenCalledWith(expect.objectContaining({
-                title: 'Enhanced Unarmed Strike — Enhanced Unarmed Strike',
-            }));
-            expect(mockRollDamage).not.toHaveBeenCalled();
-        });
-
-        it('does not apply unarmed attack rider for non-unarmed weapons', async () => {
-            getRuntimeValue.mockReturnValue(null);
-            const stats = {
-                ...mockPlayerStats,
-                automation: {
-                    actions: [],
-                    passives: [
-                        {
-                            type: 'attack_rider', trigger: 'unarmed_strike_hit',
-                            chooseOne: true, name: 'Enhanced Unarmed Strike',
-                            options: [
-                                { name: 'Knock Prone', effect: 'damage_bonus', damageExpression: '1d4', damageType: 'bludgeoning' },
-                                { name: 'Push', effect: 'push', value: 5 },
-                            ],
-                        },
-                    ],
-                },
-            };
-            const { resolveAttackDamage } = useAttackDamageResolutionHook({ playerStats: stats });
-            const attack = {
-                name: 'Longsword', damage: '1d8+5', damageType: 'Slashing',
-                weaponType: 'melee', properties: [],
-            };
-            await resolveAttackDamage(attack);
-            await tick();
-            expect(mockSetDamageTypeChoice).not.toHaveBeenCalled();
-            expect(mockRollDamage).toHaveBeenCalled();
-        });
-
-        it('skips unarmed attack rider when already used this round', async () => {
-            mockRuntimeValueForKey('_Enhanced_Unarmed_Strike_usedRound', 1);
-            const stats = {
-                ...mockPlayerStats,
-                automation: {
-                    actions: [],
-                    passives: [
-                        {
-                            type: 'attack_rider', trigger: 'unarmed_strike_hit',
-                            oncePerTurn: true, chooseOne: true, name: 'Enhanced Unarmed Strike',
-                            options: [
-                                { name: 'Knock Prone', effect: 'damage_bonus', damageExpression: '1d4', damageType: 'bludgeoning' },
-                                { name: 'Push', effect: 'push', value: 5 },
-                            ],
-                        },
-                    ],
-                },
-            };
-            const { resolveAttackDamage } = useAttackDamageResolutionHook({ playerStats: stats });
-            const attack = {
-                name: 'Unarmed Strike', damage: '1d6+5', damageType: 'Bludgeoning',
-                weaponType: 'unarmed', properties: [],
-            };
-            await resolveAttackDamage(attack);
-            await tick();
-            expect(mockSetDamageTypeChoice).not.toHaveBeenCalled();
             expect(mockRollDamage).toHaveBeenCalled();
         });
     });

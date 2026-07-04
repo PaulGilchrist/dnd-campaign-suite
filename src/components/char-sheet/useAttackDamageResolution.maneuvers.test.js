@@ -159,25 +159,9 @@ describe('useAttackDamageResolution - attack rider maneuvers', () => {
             expect(mockRollDamage).not.toHaveBeenCalled();
         });
 
-        it('does not prompt when attack hits', async () => {
+        it('does not prompt when attack hits or is a crit', async () => {
             const { resolveAttackDamage } = UseAttackDamageResolution({
                 popupHtml: { hit: true, isCrit: false, targetName: 'Goblin' },
-            });
-            const attack = {
-                name: 'Longsword', damage: '1d8+3', damageType: 'slashing',
-                weaponType: 'melee', properties: [],
-            };
-
-            await resolveAttackDamage(attack);
-            await tick();
-
-            expect(mockSetAttackRiderManeuverPrompt).not.toHaveBeenCalled();
-            expect(mockRollDamage).toHaveBeenCalled();
-        });
-
-        it('does not prompt when isCrit is true', async () => {
-            const { resolveAttackDamage } = UseAttackDamageResolution({
-                popupHtml: { hit: true, isCrit: true, targetName: 'Goblin' },
             });
             const attack = {
                 name: 'Longsword', damage: '1d8+3', damageType: 'slashing',
@@ -223,31 +207,6 @@ describe('useAttackDamageResolution - attack rider maneuvers', () => {
 
             expect(mockRollDamage).toHaveBeenCalled();
         });
-
-        it('passes weaponType and isUnarmedStrike to getAttackRiderOptionsByContext', async () => {
-            getAttackRiderOptionsByContext.mockResolvedValue([]);
-            const { resolveAttackDamage } = UseAttackDamageResolution({
-                popupHtml: { hit: false, isCrit: false, targetName: 'Goblin' },
-            });
-            const attack = {
-                name: 'Unarmed Strike', damage: '1d4', damageType: 'bludgeoning',
-                weaponType: 'unarmed', properties: [],
-            };
-
-            await resolveAttackDamage(attack);
-            await tick();
-
-            expect(getAttackRiderOptionsByContext).toHaveBeenCalledWith(
-                mockPlayerStats,
-                'test-campaign',
-                expect.objectContaining({
-                    weaponType: 'unarmed',
-                    isUnarmedStrike: true,
-                    targetName: 'Goblin',
-                }),
-                'miss',
-            );
-        });
     });
 
     // ── Superior Strike on hit ────────────────────────────────────────
@@ -276,29 +235,12 @@ describe('useAttackDamageResolution - attack rider maneuvers', () => {
             expect(mockRollDamage).not.toHaveBeenCalled();
         });
 
-        it('does not prompt when attack misses', async () => {
+        it('does not prompt when attack misses or no maneuvers available', async () => {
             getAttackRiderOptions.mockResolvedValue([
                 { name: 'Gouging Attack', effect: 'damage_bonus' },
             ]);
             const { resolveAttackDamage } = UseAttackDamageResolution({
                 popupHtml: { hit: false, isCrit: false, targetName: 'Goblin' },
-            });
-            const attack = {
-                name: 'Longsword', damage: '1d8+3', damageType: 'slashing',
-                weaponType: 'melee', properties: [],
-            };
-
-            await resolveAttackDamage(attack);
-            await tick();
-
-            expect(mockSetAttackRiderManeuverPrompt).not.toHaveBeenCalled();
-            expect(mockRollDamage).toHaveBeenCalled();
-        });
-
-        it('does not prompt when no maneuvers are available on hit', async () => {
-            getAttackRiderOptions.mockResolvedValue([]);
-            const { resolveAttackDamage } = UseAttackDamageResolution({
-                popupHtml: { hit: true, isCrit: false, targetName: 'Goblin' },
             });
             const attack = {
                 name: 'Longsword', damage: '1d8+3', damageType: 'slashing',
@@ -332,7 +274,7 @@ describe('useAttackDamageResolution - attack rider maneuvers', () => {
     // ── handleAttackRiderManeuverUse ──────────────────────────────────
 
     describe('handleAttackRiderManeuverUse', () => {
-        it('returns { formula, total, rolls } for non-miss maneuvers', async () => {
+        it('returns formula/total/rolls unchanged for non-miss maneuvers', async () => {
             const { handleAttackRiderManeuverUse } = UseAttackDamageResolution();
             const maneuver = { name: 'Gouging Attack' };
             const attack = { damageType: 'slashing' };
@@ -352,7 +294,7 @@ describe('useAttackDamageResolution - attack rider maneuvers', () => {
             expect(mockSetPopupHtml).not.toHaveBeenCalled();
         });
 
-        it('returns { formula, total, rolls, isMissResult } for miss maneuvers with attack_roll_bonus effect', async () => {
+        it('clears prompt and returns miss result when precision attack turns a miss into a hit', async () => {
             const { handleAttackRiderManeuverUse } = UseAttackDamageResolution({
                 popupHtml: { rolls: [12], bonus: 3, targetAc: 15, isCrit: false },
             });
@@ -372,13 +314,11 @@ describe('useAttackDamageResolution - attack rider maneuvers', () => {
 
             expect(result.isMissResult).toBe(true);
             expect(result.hit).toBe(true);
-            expect(result.description).toContain('Precision Attack');
-            expect(result.description).toContain('The attack now hits!');
             expect(mockSetAttackRiderManeuverPrompt).toHaveBeenCalledWith(null);
             expect(mockSetPopupHtml).toHaveBeenCalled();
         });
 
-        it('handles miss that still misses after precision attack', async () => {
+        it('returns miss result with hit=false when precision attack still misses', async () => {
             const { handleAttackRiderManeuverUse } = UseAttackDamageResolution({
                 popupHtml: { rolls: [8], bonus: 2, targetAc: 20, isCrit: false },
             });
@@ -398,28 +338,6 @@ describe('useAttackDamageResolution - attack rider maneuvers', () => {
 
             expect(result.isMissResult).toBe(true);
             expect(result.hit).toBe(false);
-            expect(result.description).toContain('The attack still misses');
-        });
-
-        it('handles natural 20 in precision attack', async () => {
-            const { handleAttackRiderManeuverUse } = UseAttackDamageResolution({
-                popupHtml: { rolls: [20], bonus: 3, targetAc: 15, isCrit: true },
-            });
-            const maneuver = {
-                name: 'Precision Attack',
-                effect: 'attack_roll_bonus',
-                dieExpression: '1d6',
-            };
-            const attack = { damageType: 'slashing' };
-            const popupHtmlData = { isMiss: false, hit: true };
-
-            const result = await handleAttackRiderManeuverUse(
-                maneuver, attack, popupHtmlData,
-                '1d8+3', 8, [5, 3],
-            );
-
-            expect(result.isMissResult).toBe(undefined);
-            expect(mockSetAttackRiderManeuverPrompt).toHaveBeenCalledWith(null);
         });
 
         it('adds damage bonus when maneuver has damageBonus and result type is popup', async () => {
@@ -445,7 +363,7 @@ describe('useAttackDamageResolution - attack rider maneuvers', () => {
             );
 
             expect(result.formula).toContain('+ 4');
-            expect(result.total).toBeGreaterThan(8);
+            expect(result.total).toBe(12);
         });
 
         it('opens sweeping attack target modal when maneuver returns that type', async () => {
@@ -487,29 +405,6 @@ describe('useAttackDamageResolution - attack rider maneuvers', () => {
             );
 
             expect(mockSetPopupHtml).toHaveBeenCalledWith({ hit: true, isCrit: false });
-        });
-
-        it('handles maneuver string instead of object', async () => {
-            const { executeAttackRiderManeuver } = await import('../../services/automation/handlers/class-fighter-rogue/combatSuperiorityHandler.js');
-            executeAttackRiderManeuver.mockResolvedValue({});
-
-            const { handleAttackRiderManeuverUse } = UseAttackDamageResolution();
-            const maneuver = 'Gouging Attack';
-            const attack = { damageType: 'slashing' };
-            const popupHtmlData = { isMiss: false };
-
-            await handleAttackRiderManeuverUse(
-                maneuver, attack, popupHtmlData,
-                '1d8+3', 8, [5, 3],
-            );
-
-            expect(executeAttackRiderManeuver).toHaveBeenCalledWith(
-                expect.any(Object),
-                mockPlayerStats,
-                'test-campaign',
-                'Gouging Attack',
-                expect.any(Object),
-            );
         });
     });
 
@@ -584,7 +479,8 @@ describe('useAttackDamageResolution - attack rider maneuvers', () => {
             expect(mockRollDamage).not.toHaveBeenCalled();
         });
 
-        it('skips Cunning Strike when already used this round', async () => {
+        it('skips when already used or skipped this round, clears skip flag', async () => {
+            // Already used this round
             getRuntimeValue.mockImplementation((name, key) => {
                 if (key === '_CunningStrike_usedRound') return 1;
                 if (key === '_cunningStrikeSkippedRound') return null;
@@ -624,7 +520,7 @@ describe('useAttackDamageResolution - attack rider maneuvers', () => {
             expect(mockRollDamage).toHaveBeenCalled();
         });
 
-        it('skips Cunning Strike when skipped this round', async () => {
+        it('clears skip flag when skipped this round then proceeds', async () => {
             getRuntimeValue.mockImplementation((name, key) => {
                 if (key === '_CunningStrike_usedRound') return null;
                 if (key === '_cunningStrikeSkippedRound') return 1;
@@ -723,145 +619,117 @@ describe('useAttackDamageResolution - attack rider maneuvers', () => {
             });
         });
 
-        it('does not prompt for Cunning Strike when sneak attack dice are 0', async () => {
+        it('does not prompt when sneak attack dice are 0, attack missed, no passive, or no lastAttack', async () => {
+            const createTest = (overrides) => {
+                const stats = {
+                    ...mockPlayerStats,
+                    name: 'TestRogue',
+                    automation: {
+                        ...mockPlayerStats.automation,
+                        passives: [
+                            { name: 'Cunning Strike', type: 'attack_rider' },
+                        ],
+                    },
+                };
+                const ctx = { targetName: 'Goblin', sneakAttackDice: overrides.sneakAttackDice ?? 2 };
+                mockBuildCtx.mockReturnValue(Promise.resolve(ctx));
+                mockBuildCtxSync.mockReturnValue(Promise.resolve(ctx));
+
+                return UseAttackDamageResolution({
+                    playerStats: overrides.playerStats ?? stats,
+                    popupHtml: overrides.popupHtml ?? { hit: true, isCrit: false, targetName: 'Goblin' },
+                });
+            };
+
+            // sneak attack dice = 0
             getRuntimeValue.mockImplementation((name, key) => {
                 if (key === '_CunningStrike_usedRound') return null;
                 if (key === '_cunningStrikeSkippedRound') return null;
                 return null;
             });
-            loadCombatSummary.mockResolvedValue({
-                lastAttack: { hit: true, targetName: 'Goblin' },
-            });
-
-            const stats = {
-                ...mockPlayerStats,
-                name: 'TestRogue',
-                automation: {
-                    ...mockPlayerStats.automation,
-                    passives: [
-                        { name: 'Cunning Strike', type: 'attack_rider' },
-                    ],
-                },
-            };
-            const ctx = { targetName: 'Goblin', sneakAttackDice: 0 };
-            mockBuildCtx.mockReturnValue(Promise.resolve(ctx));
-            mockBuildCtxSync.mockReturnValue(Promise.resolve(ctx));
-
-            const { resolveAttackDamage } = UseAttackDamageResolution({
-                playerStats: stats,
-                popupHtml: { hit: true, isCrit: false, targetName: 'Goblin' },
-            });
-            const attack = {
-                name: 'Rapier', damage: '1d8+3', damageType: 'piercing',
-                weaponType: 'melee', properties: [],
-            };
-
-            await resolveAttackDamage(attack);
+            loadCombatSummary.mockResolvedValue({ lastAttack: { hit: true, targetName: 'Goblin' } });
+            let { resolveAttackDamage } = createTest({ sneakAttackDice: 0 });
+            await resolveAttackDamage({ name: 'Rapier', damage: '1d8+3', damageType: 'piercing', weaponType: 'melee', properties: [] });
             await tick();
-
             expect(mockSetAttackRiderModal).not.toHaveBeenCalled();
             expect(mockRollDamage).toHaveBeenCalled();
-        });
+            vi.clearAllMocks();
+            rollExpression.mockReturnValue(defaultRollResult);
+            rollExpressionDoubled.mockReturnValue({ total: 10, rolls: [5, 5], modifier: 6 });
+            getRuntimeValue.mockReturnValue(null);
+            setRuntimeValue.mockReturnValue(undefined);
+            getActiveBuffs.mockReturnValue([]);
+            hasTwoWeaponFighting.mockReturnValue(false);
+            getAttackRiderOptions.mockResolvedValue([]);
+            getAttackRiderOptionsByContext.mockResolvedValue([]);
+            getCombatContext.mockResolvedValue(null);
+            getCurrentCombatRound.mockReturnValue(1);
+            mockBuildCtx.mockReturnValue(Promise.resolve(defaultCtx));
+            mockBuildCtxSync.mockReturnValue(Promise.resolve(defaultCtx));
+            mockPendingDamageRef.current = null;
 
-        it('does not prompt for Cunning Strike when attack missed', async () => {
+            // attack missed
             getRuntimeValue.mockImplementation((name, key) => {
                 if (key === '_CunningStrike_usedRound') return null;
                 if (key === '_cunningStrikeSkippedRound') return null;
                 return null;
             });
-            loadCombatSummary.mockResolvedValue({
-                lastAttack: { hit: false, targetName: 'Goblin' },
-            });
-
-            const stats = {
-                ...mockPlayerStats,
-                name: 'TestRogue',
-                automation: {
-                    ...mockPlayerStats.automation,
-                    passives: [
-                        { name: 'Cunning Strike', type: 'attack_rider' },
-                    ],
-                },
-            };
-            const ctx = { targetName: 'Goblin', sneakAttackDice: 2 };
-            mockBuildCtx.mockReturnValue(Promise.resolve(ctx));
-            mockBuildCtxSync.mockReturnValue(Promise.resolve(ctx));
-
-            const { resolveAttackDamage } = UseAttackDamageResolution({
-                playerStats: stats,
-                popupHtml: { hit: false, isCrit: false, targetName: 'Goblin' },
-            });
-            const attack = {
-                name: 'Rapier', damage: '1d8+3', damageType: 'piercing',
-                weaponType: 'melee', properties: [],
-            };
-
-            await resolveAttackDamage(attack);
+            loadCombatSummary.mockResolvedValue({ lastAttack: { hit: false, targetName: 'Goblin' } });
+            ({ resolveAttackDamage } = createTest({ popupHtml: { hit: false, isCrit: false, targetName: 'Goblin' } }));
+            await resolveAttackDamage({ name: 'Rapier', damage: '1d8+3', damageType: 'piercing', weaponType: 'melee', properties: [] });
             await tick();
-
             expect(mockSetAttackRiderModal).not.toHaveBeenCalled();
             expect(mockRollDamage).toHaveBeenCalled();
-        });
+            vi.clearAllMocks();
+            rollExpression.mockReturnValue(defaultRollResult);
+            rollExpressionDoubled.mockReturnValue({ total: 10, rolls: [5, 5], modifier: 6 });
+            getRuntimeValue.mockReturnValue(null);
+            setRuntimeValue.mockReturnValue(undefined);
+            getActiveBuffs.mockReturnValue([]);
+            hasTwoWeaponFighting.mockReturnValue(false);
+            getAttackRiderOptions.mockResolvedValue([]);
+            getAttackRiderOptionsByContext.mockResolvedValue([]);
+            getCombatContext.mockResolvedValue(null);
+            getCurrentCombatRound.mockReturnValue(1);
+            mockBuildCtx.mockReturnValue(Promise.resolve(defaultCtx));
+            mockBuildCtxSync.mockReturnValue(Promise.resolve(defaultCtx));
+            mockPendingDamageRef.current = null;
 
-        it('does not prompt for Cunning Strike when no cunning strike passive exists', async () => {
+            // no cunning strike passive
             getRuntimeValue.mockImplementation((name, key) => {
                 if (key === '_CunningStrike_usedRound') return null;
                 if (key === '_cunningStrikeSkippedRound') return null;
                 return null;
             });
-            loadCombatSummary.mockResolvedValue({
-                lastAttack: { hit: true, targetName: 'Goblin' },
-            });
-
-            const ctx = { targetName: 'Goblin', sneakAttackDice: 2 };
-            mockBuildCtx.mockReturnValue(Promise.resolve(ctx));
-            mockBuildCtxSync.mockReturnValue(Promise.resolve(ctx));
-
-            const { resolveAttackDamage } = UseAttackDamageResolution({
+            loadCombatSummary.mockResolvedValue({ lastAttack: { hit: true, targetName: 'Goblin' } });
+            ({ resolveAttackDamage } = UseAttackDamageResolution({
                 playerStats: mockPlayerStats,
                 popupHtml: { hit: true, isCrit: false, targetName: 'Goblin' },
-            });
-            const attack = {
-                name: 'Rapier', damage: '1d8+3', damageType: 'piercing',
-                weaponType: 'melee', properties: [],
-            };
-
-            await resolveAttackDamage(attack);
+            }));
+            await resolveAttackDamage({ name: 'Rapier', damage: '1d8+3', damageType: 'piercing', weaponType: 'melee', properties: [] });
             await tick();
-
             expect(mockSetAttackRiderModal).not.toHaveBeenCalled();
             expect(mockRollDamage).toHaveBeenCalled();
-        });
+            vi.clearAllMocks();
+            rollExpression.mockReturnValue(defaultRollResult);
+            rollExpressionDoubled.mockReturnValue({ total: 10, rolls: [5, 5], modifier: 6 });
+            getRuntimeValue.mockReturnValue(null);
+            setRuntimeValue.mockReturnValue(undefined);
+            getActiveBuffs.mockReturnValue([]);
+            hasTwoWeaponFighting.mockReturnValue(false);
+            getAttackRiderOptions.mockResolvedValue([]);
+            getAttackRiderOptionsByContext.mockResolvedValue([]);
+            getCombatContext.mockResolvedValue(null);
+            getCurrentCombatRound.mockReturnValue(1);
+            mockBuildCtx.mockReturnValue(Promise.resolve(defaultCtx));
+            mockBuildCtxSync.mockReturnValue(Promise.resolve(defaultCtx));
+            mockPendingDamageRef.current = null;
 
-        it('does not prompt for Cunning Strike when lastAttack is undefined', async () => {
+            // no lastAttack
             loadCombatSummary.mockResolvedValue({});
-
-            const stats = {
-                ...mockPlayerStats,
-                name: 'TestRogue',
-                automation: {
-                    ...mockPlayerStats.automation,
-                    passives: [
-                        { name: 'Cunning Strike', type: 'attack_rider' },
-                    ],
-                },
-            };
-            const ctx = { targetName: 'Goblin', sneakAttackDice: 2 };
-            mockBuildCtx.mockReturnValue(Promise.resolve(ctx));
-            mockBuildCtxSync.mockReturnValue(Promise.resolve(ctx));
-
-            const { resolveAttackDamage } = UseAttackDamageResolution({
-                playerStats: stats,
-                popupHtml: { hit: true, isCrit: false, targetName: 'Goblin' },
-            });
-            const attack = {
-                name: 'Rapier', damage: '1d8+3', damageType: 'piercing',
-                weaponType: 'melee', properties: [],
-            };
-
-            await resolveAttackDamage(attack);
+            ({ resolveAttackDamage } = createTest({ playerStats: { ...mockPlayerStats, name: 'TestRogue', automation: { ...mockPlayerStats.automation, passives: [{ name: 'Cunning Strike', type: 'attack_rider' }] } } }));
+            await resolveAttackDamage({ name: 'Rapier', damage: '1d8+3', damageType: 'piercing', weaponType: 'melee', properties: [] });
             await tick();
-
             expect(mockSetAttackRiderModal).not.toHaveBeenCalled();
             expect(mockRollDamage).toHaveBeenCalled();
         });

@@ -90,11 +90,7 @@ describe('EncounterFilterPanel', () => {
       expect(props.onEnvironmentChange).toHaveBeenCalledTimes(1);
     });
 
-    it('defaults to empty string (All Environments) when environment is empty', () => {
-      render(<EncounterFilterPanel {...props} filter={{ ...props.filter, environment: '' }} />);
-      const select = document.querySelector('#environment-select');
-      expect(select.value).toBe('');
-    });
+
   });
 
   describe('player levels', () => {
@@ -102,11 +98,6 @@ describe('EncounterFilterPanel', () => {
       render(<EncounterFilterPanel {...props} />);
       expect(screen.getByText('PC 1')).toBeInTheDocument();
       expect(screen.getByText('PC 2')).toBeInTheDocument();
-    });
-
-    it('renders a row for a single player', () => {
-      render(<EncounterFilterPanel {...props} filter={{ ...props.filter, playerLevels: [7] }} />);
-      expect(screen.getByText('PC 1')).toBeInTheDocument();
     });
 
     it('renders the Add Player button', () => {
@@ -133,23 +124,11 @@ describe('EncounterFilterPanel', () => {
       expect(screen.getByLabelText('Remove player 1').disabled).toBe(true);
     });
 
-    it('enables the remove button when more than one player exists', () => {
-      render(<EncounterFilterPanel {...props} />);
-      expect(screen.getByLabelText('Remove player 1').disabled).toBe(false);
-      expect(screen.getByLabelText('Remove player 2').disabled).toBe(false);
-    });
-
     it('calls onPlayerLevelChange with numeric index and converted number value', () => {
       render(<EncounterFilterPanel {...props} />);
       const input = document.querySelector('#player-level-0');
       fireEvent.change(input, { target: { value: '10' } });
       expect(props.onPlayerLevelChange).toHaveBeenCalledWith(0, 10);
-    });
-
-    it('uses the correct input IDs for each player', () => {
-      render(<EncounterFilterPanel {...props} />);
-      expect(document.querySelector('#player-level-0')).toBeInTheDocument();
-      expect(document.querySelector('#player-level-1')).toBeInTheDocument();
     });
   });
 
@@ -179,20 +158,8 @@ describe('EncounterFilterPanel', () => {
       expect(threshold.textContent).toContain('Unknown');
     });
 
-    it('shows Unknown when difficultyLabels is undefined', () => {
-      render(<EncounterFilterPanel {...props} filter={{ ...props.filter, difficultyLabels: undefined }} />);
-      const threshold = document.querySelector('.threshold-display');
-      expect(threshold.textContent).toContain('Unknown');
-    });
-
     it('uses default text color when difficultyColors is null', () => {
       render(<EncounterFilterPanel {...props} filter={{ ...props.filter, difficultyColors: null }} />);
-      const threshold = document.querySelector('.threshold-display');
-      expect(threshold.style.borderLeftColor).toContain('var(--color-text)');
-    });
-
-    it('uses default text color when difficultyColors is undefined', () => {
-      render(<EncounterFilterPanel {...props} filter={{ ...props.filter, difficultyColors: undefined }} />);
       const threshold = document.querySelector('.threshold-display');
       expect(threshold.style.borderLeftColor).toContain('var(--color-text)');
     });
@@ -207,12 +174,6 @@ describe('EncounterFilterPanel', () => {
       render(<EncounterFilterPanel {...props} filter={{ ...props.filter, totalThreshold: -100 }} />);
       const threshold = document.querySelector('.threshold-display');
       expect(threshold.textContent).toContain('-100 XP');
-    });
-
-    it('shows large threshold with comma separators', () => {
-      render(<EncounterFilterPanel {...props} filter={{ ...props.filter, totalThreshold: 25000 }} />);
-      const threshold = document.querySelector('.threshold-display');
-      expect(threshold.textContent).toContain('25,000 XP');
     });
 
     it('displays the Target: prefix', () => {

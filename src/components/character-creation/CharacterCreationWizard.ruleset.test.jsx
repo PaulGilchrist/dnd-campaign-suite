@@ -290,8 +290,9 @@ describe('CharacterCreationWizard - Ruleset change', () => {
     validateFinalFormData.mockImplementation(() => ({}));
   });
 
-  it('clears spells, feats, and background when switching to 2024', async () => {
-    render(<CharacterCreationWizard {...defaultProps} />);
+  it('clears spells, feats, and background when switching rulesets, and navigates to step 2', async () => {
+    const { unmount } = render(<CharacterCreationWizard {...defaultProps} />);
+
     await act(async () => {
       fireEvent.click(screen.getByText('Change Ruleset'));
     });
@@ -306,75 +307,37 @@ describe('CharacterCreationWizard - Ruleset change', () => {
       background: 'Acolyte',
       rules: '5e',
     });
+
     expect(result.rules).toBe('2024');
     expect(result.spells).toEqual([]);
     expect(result.feats).toEqual([]);
     expect(result.background).toBe('');
-
     expect(mockGoToStep).toHaveBeenCalledWith(2);
-  });
 
-  it('clears spells, feats, and background when switching to 5e', async () => {
+    unmount();
+    vi.clearAllMocks();
+
     render(<CharacterCreationWizard {...defaultProps} />);
+
     await act(async () => {
       fireEvent.click(screen.getByText('Ruleset 5e'));
     });
 
     expect(mockSetFormData).toHaveBeenCalledWith(expect.any(Function));
 
-    const updater = mockSetFormData.mock.calls[0][0];
-    const result = updater({
-      ...mockFormData,
-      spells: ['Fireball'],
-      feats: ['Alert'],
-      background: 'Acolyte',
-      rules: '2024',
-    });
-    expect(result.rules).toBe('5e');
-    expect(result.spells).toEqual([]);
-    expect(result.feats).toEqual([]);
-    expect(result.background).toBe('');
-
-    expect(mockGoToStep).toHaveBeenCalledWith(2);
-  });
-
-  it('clears spells, feats, and background when switching from 2024 to 5e', async () => {
-    render(<CharacterCreationWizard {...defaultProps} />);
-    await act(async () => {
-      fireEvent.click(screen.getByText('Ruleset 5e'));
-    });
-
-    const updater = mockSetFormData.mock.calls[0][0];
-    const result = updater({
+    const updater2 = mockSetFormData.mock.calls[0][0];
+    const result2 = updater2({
       ...mockFormData,
       spells: ['Magic Missile'],
       feats: ['War Caster'],
       background: 'Soldier',
       rules: '2024',
     });
-    expect(result.rules).toBe('5e');
-    expect(result.spells).toEqual([]);
-    expect(result.feats).toEqual([]);
-    expect(result.background).toBe('');
-  });
 
-  it('clears spells, feats, and background when switching from 5e to 2024', async () => {
-    render(<CharacterCreationWizard {...defaultProps} />);
-    await act(async () => {
-      fireEvent.click(screen.getByText('Change Ruleset'));
-    });
-
-    const updater = mockSetFormData.mock.calls[0][0];
-    const result = updater({
-      ...mockFormData,
-      spells: ['Fireball'],
-      feats: ['Great Fortitude'],
-      background: 'Criminal',
-      rules: '5e',
-    });
-    expect(result.rules).toBe('2024');
-    expect(result.spells).toEqual([]);
-    expect(result.feats).toEqual([]);
-    expect(result.background).toBe('');
+    expect(result2.rules).toBe('5e');
+    expect(result2.spells).toEqual([]);
+    expect(result2.feats).toEqual([]);
+    expect(result2.background).toBe('');
+    expect(mockGoToStep).toHaveBeenCalledWith(2);
   });
 });

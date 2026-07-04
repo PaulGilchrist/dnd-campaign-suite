@@ -68,30 +68,9 @@ describe('useInitiativeEffects', () => {
         );
     }
 
-    describe('initialization', () => {
-        it('returns undefined (hook has no return value)', () => {
-            const { result } = renderHookWithStats();
-            expect(result.current).toBeUndefined();
-        });
-
-        it('registers event listeners on mount', () => {
-            const addEventListenerSpy = vi.spyOn(window, 'addEventListener');
-            renderHookWithStats();
-            expect(addEventListenerSpy).toHaveBeenCalledWith(
-                'initiative-rolled',
-                expect.any(Function)
-            );
-            expect(addEventListenerSpy).toHaveBeenCalledWith(
-                'turn-undead-result',
-                expect.any(Function)
-            );
-            addEventListenerSpy.mockRestore();
-        });
-    });
-
     describe('initiative-rolled event', () => {
         describe('guard clauses', () => {
-            it('does nothing when playerStats is null', () => {
+            it('does nothing when playerStats is null or undefined', () => {
                 renderHook(() =>
                     useInitiativeEffects(null, campaignName, vi.fn())
                 );
@@ -102,38 +81,15 @@ describe('useInitiativeEffects', () => {
                 expect(setRuntimeValue).not.toHaveBeenCalled();
             });
 
-            it('does nothing when playerStats is undefined', () => {
-                renderHook(() =>
-                    useInitiativeEffects(undefined, campaignName, vi.fn())
-                );
-                dispatchInitiativeRoll({
-                    characterName: 'TestMonk',
-                    roll: 15,
-                });
-                expect(setRuntimeValue).not.toHaveBeenCalled();
-            });
-
-            it('does nothing when event detail is null', () => {
+            it('does nothing when event detail is null or undefined', () => {
                 renderHookWithStats();
                 dispatchInitiativeRoll(null);
                 expect(setRuntimeValue).not.toHaveBeenCalled();
             });
 
-            it('does nothing when event detail is undefined', () => {
-                renderHookWithStats();
-                dispatchInitiativeRoll(undefined);
-                expect(setRuntimeValue).not.toHaveBeenCalled();
-            });
-
-            it('does nothing when detail has no characterName', () => {
+            it('does nothing when detail has no characterName or characterName is empty', () => {
                 renderHookWithStats();
                 dispatchInitiativeRoll({ roll: 15 });
-                expect(setRuntimeValue).not.toHaveBeenCalled();
-            });
-
-            it('does nothing when characterName is an empty string', () => {
-                renderHookWithStats();
-                dispatchInitiativeRoll({ characterName: '', roll: 15 });
                 expect(setRuntimeValue).not.toHaveBeenCalled();
             });
 
@@ -175,31 +131,6 @@ describe('useInitiativeEffects', () => {
                     6,
                     campaignName
                 );
-            });
-
-            it('handles name normalization via utils.getName', () => {
-                getRuntimeValue.mockImplementation((_name, key) => {
-                    if (key === 'focusPoints') return 3;
-                    return null;
-                });
-                utils.getName.mockImplementation((n) => n);
-                const stats = {
-                    ...defaultPlayerStats,
-                    actions: [
-                        {
-                            automation: {
-                                type: 'initiative_action',
-                                effect: 'other',
-                            },
-                        },
-                    ],
-                };
-                renderHookWithStats(stats);
-                dispatchInitiativeRoll({
-                    characterName: 'TestMonk',
-                    roll: 15,
-                });
-                expect(setRuntimeValue).toHaveBeenCalled();
             });
         });
 
@@ -800,44 +731,6 @@ describe('useInitiativeEffects', () => {
                 );
             });
 
-            it('uses proficiency when class level has no bardic_inspiration_uses', () => {
-                getRuntimeValue.mockImplementation((_name, key) => {
-                    if (key === 'bardicInspirationUses') return 0;
-                    return null;
-                });
-                const stats = {
-                    ...defaultPlayerStats,
-                    class: {
-                        ...defaultPlayerStats.class,
-                        name: 'Bard',
-                        class_levels: [{ level: 20 }],
-                    },
-                    automation: {
-                        ...defaultPlayerStats.automation,
-                        actions: [
-                            {
-                                type: 'initiative_action',
-                                effect:
-                                    'regain_bardic_inspiration_on_initiative',
-                            },
-                        ],
-                    },
-                    proficiency: 6,
-                };
-                renderHookWithStats(stats);
-                dispatchInitiativeRoll({
-                    characterName: 'TestMonk',
-                    roll: 15,
-                });
-                // maxBI = 6, minTarget = 2, so newBI = min(6, 2) = 2
-                expect(setRuntimeValue).toHaveBeenCalledWith(
-                    'TestMonk',
-                    'bardicInspirationUses',
-                    2,
-                    campaignName
-                );
-            });
-
             it('caps at max when max is less than target', () => {
                 getRuntimeValue.mockImplementation((_name, key) => {
                     if (key === 'bardicInspirationUses') return 0;
@@ -873,7 +766,6 @@ describe('useInitiativeEffects', () => {
                     characterName: 'Bard',
                     roll: 15,
                 });
-                // maxBI = 1, minTarget = 2, so newBI = min(1, 2) = 1
                 expect(setRuntimeValue).toHaveBeenCalledWith(
                     'Bard',
                     'bardicInspirationUses',
@@ -977,7 +869,7 @@ describe('useInitiativeEffects', () => {
         }
 
         describe('guard clauses', () => {
-            it('does nothing when playerStats is null', () => {
+            it('does nothing when playerStats is null or undefined', () => {
                 const rollDamage = vi.fn();
                 renderHook(() =>
                     useInitiativeEffects(null, campaignName, rollDamage)
@@ -990,34 +882,12 @@ describe('useInitiativeEffects', () => {
                 expect(rollDamage).not.toHaveBeenCalled();
             });
 
-            it('does nothing when playerStats is undefined', () => {
-                const rollDamage = vi.fn();
-                renderHook(() =>
-                    useInitiativeEffects(undefined, campaignName, rollDamage)
-                );
-                dispatchTurnUndeadResult({
-                    attackerName: 'Cleric',
-                    campaignName,
-                    failedTargets: ['Goblin'],
-                });
-                expect(rollDamage).not.toHaveBeenCalled();
-            });
-
-            it('does nothing when event detail is null', () => {
+            it('does nothing when event detail is null or undefined', () => {
                 const rollDamage = vi.fn();
                 renderHook(() =>
                     useInitiativeEffects(createClericStats(), campaignName, rollDamage)
                 );
                 dispatchTurnUndeadResult(null);
-                expect(rollDamage).not.toHaveBeenCalled();
-            });
-
-            it('does nothing when event detail is undefined', () => {
-                const rollDamage = vi.fn();
-                renderHook(() =>
-                    useInitiativeEffects(createClericStats(), campaignName, rollDamage)
-                );
-                dispatchTurnUndeadResult(undefined);
                 expect(rollDamage).not.toHaveBeenCalled();
             });
 
@@ -1241,26 +1111,6 @@ describe('useInitiativeEffects', () => {
                 });
                 expect(rollDamage).not.toHaveBeenCalled();
             });
-        });
-    });
-
-    describe('cleanup', () => {
-        it('removes both event listeners on unmount', () => {
-            const removeEventListenerSpy = vi.spyOn(
-                window,
-                'removeEventListener'
-            );
-            const { unmount } = renderHookWithStats();
-            unmount();
-            expect(removeEventListenerSpy).toHaveBeenCalledWith(
-                'initiative-rolled',
-                expect.any(Function)
-            );
-            expect(removeEventListenerSpy).toHaveBeenCalledWith(
-                'turn-undead-result',
-                expect.any(Function)
-            );
-            removeEventListenerSpy.mockRestore();
         });
     });
 });

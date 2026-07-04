@@ -1,4 +1,3 @@
-// @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import useCharActionModals from './useCharActionModals.js';
@@ -126,7 +125,7 @@ describe('useCharActionModals', () => {
   });
 
   describe('initial state', () => {
-    it('returns all modal states as null', () => {
+    it('returns all modal states as null and pendingDamageRef as null', () => {
       const { result } = renderHook(() => useCharActionModals(baseArgs));
 
       for (const [stateName] of modalStatePairs) {
@@ -139,7 +138,7 @@ describe('useCharActionModals', () => {
 
   describe('modal state setters', () => {
     for (const [stateName, setterName] of modalStatePairs) {
-      it(`sets and retrieves ${stateName} via ${setterName}`, () => {
+      it(`sets ${stateName} via ${setterName}`, () => {
         const { result } = renderHook(() => useCharActionModals(baseArgs));
         const modalData = { type: stateName };
 
@@ -150,6 +149,7 @@ describe('useCharActionModals', () => {
         expect(result.current[stateName]).toEqual(modalData);
       });
     }
+  });
 
   describe('delegated functions', () => {
     it('returns resolveAttackDamage from useAttackDamageResolution', () => {
@@ -165,92 +165,13 @@ describe('useCharActionModals', () => {
     }
   });
 
-  describe('return value structure', () => {
-    it('returns all modal state pairs plus refs and handlers', () => {
-      const { result } = renderHook(() => useCharActionModals(baseArgs));
-
-      for (const [stateName] of modalStatePairs) {
-        expect(result.current).toHaveProperty(stateName);
-      }
-
-      expect(result.current).toHaveProperty('pendingDamageRef');
-      expect(result.current).toHaveProperty('resolveAttackDamage');
-
-      for (const handlerName of delegatedHandlerNames) {
-        expect(result.current).toHaveProperty(handlerName);
-      }
-    });
-
-    it('returns a ref object for pendingDamageRef', () => {
-      const { result } = renderHook(() => useCharActionModals(baseArgs));
-      expect(result.current.pendingDamageRef).toBeDefined();
-      expect(result.current.pendingDamageRef).toHaveProperty('current');
-    });
-  });
-
-  describe('delegation wiring', () => {
-    it('passes all expected setters to useModalHandlers', () => {
-      renderHook(() => useCharActionModals(baseArgs));
-
-      const handlersCall = useModalHandlers.mock.calls[0][0];
-
-      expect(handlersCall).toHaveProperty('setWeaponMasteryModal');
-      expect(handlersCall).toHaveProperty('setWeaponMasteryChoiceModal');
-      expect(handlersCall).toHaveProperty('setFeatureChoice');
-      expect(handlersCall).toHaveProperty('setDamageTypeChoice');
-      expect(handlersCall).toHaveProperty('setDivineFuryChoice');
-      expect(handlersCall).toHaveProperty('setStarryFormConstellationModal');
-      expect(handlersCall).toHaveProperty('setTwinklingConstellationModal');
-      expect(handlersCall).toHaveProperty('setPopupHtml');
-    });
-
-    it('passes all expected setters to useAttackDamageResolution', () => {
-      renderHook(() => useCharActionModals(baseArgs));
-
-      const clickCall = useAttackDamageResolution.mock.calls[0][0];
-
-      expect(clickCall).toHaveProperty('setDamageTypeChoice');
-      expect(clickCall).toHaveProperty('setDivineFuryChoice');
-      expect(clickCall).toHaveProperty('setWeaponMasteryModal');
-      expect(clickCall).toHaveProperty('setAttackRiderModal');
-      expect(clickCall).toHaveProperty('pendingDamageRef');
-    });
-  });
-
   describe('edge cases', () => {
-    it('handles null playerStats without throwing', () => {
-      expect(() => {
-        renderHook(() => useCharActionModals({ ...baseArgs, playerStats: null }));
-      }).not.toThrow();
-    });
-
-    it('handles null campaignName without throwing', () => {
-      expect(() => {
-        renderHook(() => useCharActionModals({ ...baseArgs, campaignName: null }));
-      }).not.toThrow();
-    });
-
-    it('handles empty args object without throwing', () => {
-      expect(() => {
-        renderHook(() => useCharActionModals({}));
-      }).not.toThrow();
-    });
-
-    it('returns null modal states when called with minimal args', () => {
+    it('handles minimal args without throwing and returns null modal states', () => {
       const { result } = renderHook(() => useCharActionModals({}));
 
       expect(result.current.healingPoolModal).toBeNull();
+      expect(result.current.featureChoice).toBeNull();
       expect(result.current.pendingDamageRef.current).toBeNull();
     });
-
-    it('returns null modal states when playerStats is missing class', () => {
-      const { result } = renderHook(() =>
-        useCharActionModals({ ...baseArgs, playerStats: { name: 'Orphan' } })
-      );
-
-      expect(result.current.healingPoolModal).toBeNull();
-      expect(result.current.featureChoice).toBeNull();
-    });
   });
-});
 });

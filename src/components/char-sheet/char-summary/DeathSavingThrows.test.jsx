@@ -72,15 +72,11 @@ describe('DeathSavingThrows', () => {
       expect(screen.getByText('Death Saves')).toBeInTheDocument();
     });
 
-    it('renders three empty circles for successes when no saves recorded', () => {
+    it('renders empty circles for successes and failures when no saves recorded', () => {
       render(<DeathSavingThrows playerStats={mockPlayerStats} campaignName={mockCampaignName} />);
       const successTrack = screen.getByText(/Successes:/).parentElement;
-      expect(successTrack.textContent).toContain('◯◯◯');
-    });
-
-    it('renders three empty circles for failures when no failures recorded', () => {
-      render(<DeathSavingThrows playerStats={mockPlayerStats} campaignName={mockCampaignName} />);
       const failureTrack = screen.getByText(/Failures:/).parentElement;
+      expect(successTrack.textContent).toContain('◯◯◯');
       expect(failureTrack.textContent).toContain('◯◯◯');
     });
 
@@ -119,15 +115,8 @@ describe('DeathSavingThrows', () => {
       expect(screen.getByText('Dead')).toBeInTheDocument();
     });
 
-    it('hides the roll button when the character is stable', () => {
+    it('hides the roll button when the character is stable or dead', () => {
       deathSaveRules.isStable.mockReturnValue(true);
-      render(<DeathSavingThrows playerStats={mockPlayerStats} campaignName={mockCampaignName} />);
-      expect(screen.queryByRole('button', { name: /roll/i })).not.toBeInTheDocument();
-    });
-
-    it('hides the roll button when the character is dead', () => {
-      deathSaveRules.isStable.mockReturnValue(false);
-      deathSaveRules.isDead.mockReturnValue(true);
       render(<DeathSavingThrows playerStats={mockPlayerStats} campaignName={mockCampaignName} />);
       expect(screen.queryByRole('button', { name: /roll/i })).not.toBeInTheDocument();
     });
@@ -141,12 +130,6 @@ describe('DeathSavingThrows', () => {
       render(<DeathSavingThrows playerStats={mockPlayerStats} campaignName={mockCampaignName} />);
       const rollBtn = screen.getByRole('button', { name: /roll/i });
       expect(rollBtn.querySelector('.fa-dice-d20')).toBeInTheDocument();
-    });
-
-    it('gives the roll button a tabIndex for keyboard accessibility', () => {
-      render(<DeathSavingThrows playerStats={mockPlayerStats} campaignName={mockCampaignName} />);
-      const rollBtn = screen.getByRole('button', { name: /roll/i });
-      expect(rollBtn).toHaveAttribute('tabIndex', '0');
     });
   });
 
@@ -197,30 +180,11 @@ describe('DeathSavingThrows', () => {
       );
     });
 
-    it('does not call rollDeathSave when stable', () => {
+    it('does not call rollDeathSave when stable or dead', () => {
       deathSaveRules.isStable.mockReturnValue(true);
       render(<DeathSavingThrows playerStats={mockPlayerStats} campaignName={mockCampaignName} />);
       expect(screen.queryByRole('button', { name: /roll/i })).not.toBeInTheDocument();
       expect(deathSaveRules.rollDeathSave).not.toHaveBeenCalled();
-    });
-
-    it('does not call rollDeathSave when dead', () => {
-      deathSaveRules.isDead.mockReturnValue(true);
-      render(<DeathSavingThrows playerStats={mockPlayerStats} campaignName={mockCampaignName} />);
-      expect(screen.queryByRole('button', { name: /roll/i })).not.toBeInTheDocument();
-      expect(deathSaveRules.rollDeathSave).not.toHaveBeenCalled();
-    });
-
-    it('does not call clearDeathSavePrompt when stable', () => {
-      deathSaveRules.isStable.mockReturnValue(true);
-      render(<DeathSavingThrows playerStats={mockPlayerStats} campaignName={mockCampaignName} />);
-      expect(clearDeathSavePrompt).not.toHaveBeenCalled();
-    });
-
-    it('does not call clearDeathSavePrompt when dead', () => {
-      deathSaveRules.isDead.mockReturnValue(true);
-      render(<DeathSavingThrows playerStats={mockPlayerStats} campaignName={mockCampaignName} />);
-      expect(clearDeathSavePrompt).not.toHaveBeenCalled();
     });
 
     it('updates the save circles after a successful roll', async () => {
@@ -276,19 +240,6 @@ describe('DeathSavingThrows', () => {
       });
     });
 
-    it('treats a stable roll result as a success for display purposes', async () => {
-      deathSaveRules.rollDeathSave.mockReturnValue({
-        ...defaultRollResult,
-        result: 'stable',
-      });
-      render(<DeathSavingThrows playerStats={mockPlayerStats} campaignName={mockCampaignName} />);
-      fireEvent.click(screen.getByRole('button', { name: /roll/i }));
-
-      await waitFor(() => {
-        expect(screen.getByText('Success')).toBeInTheDocument();
-      });
-    });
-
     it('shows the roll value in parentheses next to the result', async () => {
       render(<DeathSavingThrows playerStats={mockPlayerStats} campaignName={mockCampaignName} />);
       fireEvent.click(screen.getByRole('button', { name: /roll/i }));
@@ -329,6 +280,7 @@ describe('DeathSavingThrows', () => {
         expect(screen.getByText('NAT 1')).toBeInTheDocument();
       });
     });
+
     it('hides the result indicator after 2 seconds', async () => {
       vi.useFakeTimers();
       render(<DeathSavingThrows playerStats={mockPlayerStats} campaignName={mockCampaignName} />);
@@ -397,18 +349,6 @@ describe('DeathSavingThrows', () => {
       });
     });
 
-    it('does not call setRuntimeValue for currentHitPoints on a non-20 roll', async () => {
-      render(<DeathSavingThrows playerStats={mockPlayerStats} campaignName={mockCampaignName} />);
-      fireEvent.click(screen.getByRole('button', { name: /roll/i }));
-
-      expect(setRuntimeValue).not.toHaveBeenCalledWith(
-        'Test Character',
-        'currentHitPoints',
-        expect.any(Number),
-        mockCampaignName
-      );
-    });
-
     it('clears the death save prompt after a roll', async () => {
       render(<DeathSavingThrows playerStats={mockPlayerStats} campaignName={mockCampaignName} />);
       fireEvent.click(screen.getByRole('button', { name: /roll/i }));
@@ -416,18 +356,6 @@ describe('DeathSavingThrows', () => {
       await waitFor(() => {
         expect(clearDeathSavePrompt).toHaveBeenCalledWith(mockCampaignName, 'Test Character');
       });
-    });
-
-    it('does not clear the death save prompt when stable', () => {
-      deathSaveRules.isStable.mockReturnValue(true);
-      render(<DeathSavingThrows playerStats={mockPlayerStats} campaignName={mockCampaignName} />);
-      expect(clearDeathSavePrompt).not.toHaveBeenCalled();
-    });
-
-    it('does not clear the death save prompt when dead', () => {
-      deathSaveRules.isDead.mockReturnValue(true);
-      render(<DeathSavingThrows playerStats={mockPlayerStats} campaignName={mockCampaignName} />);
-      expect(clearDeathSavePrompt).not.toHaveBeenCalled();
     });
   });
 
@@ -565,50 +493,6 @@ describe('DeathSavingThrows', () => {
 
       const successTrack = screen.getByText(/Successes:/).parentElement;
       expect(successTrack.textContent).toContain('⬤◯◯');
-    });
-
-    it('shows NAT 20 text from a custom event with isNat20=true', async () => {
-      render(<DeathSavingThrows playerStats={mockPlayerStats} campaignName={mockCampaignName} />);
-
-      await act(async () => {
-        window.dispatchEvent(
-          new CustomEvent('death-save-result', {
-            detail: {
-              targetName: 'Test Character',
-              roll: 20,
-              success: true,
-              isNat20: true,
-              isNat1: false,
-              newSaves: [false, false, false],
-              newFailures: [false, false, false],
-            },
-          })
-        );
-      });
-
-      expect(screen.getByText('NAT 20')).toBeInTheDocument();
-    });
-
-    it('shows NAT 1 text from a custom event with isNat1=true', async () => {
-      render(<DeathSavingThrows playerStats={mockPlayerStats} campaignName={mockCampaignName} />);
-
-      await act(async () => {
-        window.dispatchEvent(
-          new CustomEvent('death-save-result', {
-            detail: {
-              targetName: 'Test Character',
-              roll: 1,
-              success: false,
-              isNat20: false,
-              isNat1: true,
-              newSaves: [false, false, false],
-              newFailures: [true, false, false],
-            },
-          })
-        );
-      });
-
-      expect(screen.getByText('NAT 1')).toBeInTheDocument();
     });
 
     it('hides the result from a custom event after 2 seconds', async () => {

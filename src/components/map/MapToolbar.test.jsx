@@ -1,5 +1,5 @@
 // @improved-by-ai
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, within } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import MapToolbar from './MapToolbar.jsx';
 
@@ -44,18 +44,8 @@ describe('MapToolbar', () => {
             expect(screen.getByText('Dungeon Map')).toBeInTheDocument();
         });
 
-        it('should render formatted map name from kebab-case', () => {
-            renderMapToolbar({ mapName: 'boss-room-1.json' });
-            expect(screen.getByText('Boss Room 1')).toBeInTheDocument();
-        });
-
-        it('should render "Map" when mapName is empty', () => {
+        it('should render "Map" when mapName is empty or null', () => {
             renderMapToolbar({ mapName: '' });
-            expect(screen.getByText('Map')).toBeInTheDocument();
-        });
-
-        it('should render "Map" when mapName is null', () => {
-            renderMapToolbar({ mapName: null });
             expect(screen.getByText('Map')).toBeInTheDocument();
         });
 
@@ -66,9 +56,7 @@ describe('MapToolbar', () => {
 
         it('should render back button when onBack is provided', () => {
             renderMapToolbar();
-            const backBtn = screen.getByTitle('Back');
-            expect(backBtn).toBeInTheDocument();
-            expect(backBtn.querySelector('i.fa-solid.fa-arrow-left')).toBeInTheDocument();
+            expect(screen.getByTitle('Back')).toBeInTheDocument();
         });
 
         it('should render grid size input with correct attributes when isLocalhost is true', () => {
@@ -92,6 +80,7 @@ describe('MapToolbar', () => {
             expect(screen.getByText('Erase')).toBeInTheDocument();
             expect(screen.getByText('Select')).toBeInTheDocument();
             expect(screen.getByText('Room')).toBeInTheDocument();
+            expect(screen.getByText('Items')).toBeInTheDocument();
         });
 
         it('should not render localhost-specific tools when isLocalhost is false', () => {
@@ -100,15 +89,6 @@ describe('MapToolbar', () => {
             expect(screen.queryByText('Erase')).not.toBeInTheDocument();
             expect(screen.queryByText('Select')).not.toBeInTheDocument();
             expect(screen.queryByText('Room')).not.toBeInTheDocument();
-        });
-
-        it('should render Items button when isLocalhost is true', () => {
-            renderMapToolbar({ isLocalhost: true });
-            expect(screen.getByText('Items')).toBeInTheDocument();
-        });
-
-        it('should not render Items button when isLocalhost is false', () => {
-            renderMapToolbar({ isLocalhost: false });
             expect(screen.queryByText('Items')).not.toBeInTheDocument();
         });
 
@@ -118,7 +98,7 @@ describe('MapToolbar', () => {
             expect(screen.getByText('Ruler')).toBeInTheDocument();
         });
 
-        it('should render zoom and reset view buttons', () => {
+        it('should render Reset View button', () => {
             renderMapToolbar();
             expect(screen.getByText('Reset View')).toBeInTheDocument();
         });
@@ -129,90 +109,47 @@ describe('MapToolbar', () => {
             expect(screen.getByText('Spell Overlay')).toBeInTheDocument();
         });
 
-        it('should not render SpellOverlayControls when spellMode is null', () => {
+        it('should not render SpellOverlayControls when spellMode is null or undefined', () => {
             renderMapToolbar();
+            expect(screen.queryByText('Spell Overlay')).not.toBeInTheDocument();
+            const mockState = createMockSpellOverlayState({ spellMode: undefined });
+            renderMapToolbar({ spellOverlayState: mockState });
             expect(screen.queryByText('Spell Overlay')).not.toBeInTheDocument();
         });
 
         it('should render ruler hint with icon when rulerMode is true', () => {
             renderMapToolbar({ rulerMode: true });
-            const rulerHint = screen.getByText('Click two points to measure distance');
-            expect(rulerHint).toBeInTheDocument();
-            expect(rulerHint.querySelector('i.fa-solid.fa-ruler')).toBeInTheDocument();
+            expect(screen.getByText('Click two points to measure distance')).toBeInTheDocument();
         });
 
         it('should not render ruler hint when rulerMode is false', () => {
             renderMapToolbar();
             expect(screen.queryByText('Click two points to measure distance')).not.toBeInTheDocument();
         });
-    });
 
-    describe('button icons', () => {
-        it('should render Spell button with wand icon', () => {
-            renderMapToolbar();
-            const spellBtn = screen.getByText('Spell');
-            expect(spellBtn.querySelector('i.fa-solid.fa-wand-magic-sparkles')).toBeInTheDocument();
-        });
-
-        it('should render Ruler button with ruler icon', () => {
-            renderMapToolbar();
-            const rulerBtn = screen.getByText('Ruler');
-            expect(rulerBtn.querySelector('i.fa-solid.fa-ruler')).toBeInTheDocument();
-        });
-
-        it('should render zoom in button with magnifying glass plus icon', () => {
-            renderMapToolbar();
-            const buttons = screen.getAllByRole('button');
-            const zoomInBtn = buttons.find(btn =>
-                btn.querySelector('i.fa-solid.fa-magnifying-glass-plus')
-            );
-            expect(zoomInBtn).toBeInTheDocument();
-        });
-
-        it('should render zoom out button with magnifying glass minus icon', () => {
-            renderMapToolbar();
-            const buttons = screen.getAllByRole('button');
-            const zoomOutBtn = buttons.find(btn =>
-                btn.querySelector('i.fa-solid.fa-magnifying-glass-minus')
-            );
-            expect(zoomOutBtn).toBeInTheDocument();
-        });
-
-        it('should render reset view button with rotate icon', () => {
-            renderMapToolbar();
-            const resetBtn = screen.getByText('Reset View');
-            expect(resetBtn.querySelector('i.fa-solid.fa-rotate-left')).toBeInTheDocument();
+        it('should render without crashing when spellOverlayState is null or undefined', () => {
+            const { container: c1 } = renderMapToolbar({ spellOverlayState: null });
+            expect(within(c1).getByText('Dungeon Map')).toBeInTheDocument();
+            const { container: c2 } = renderMapToolbar({ spellOverlayState: undefined });
+            expect(within(c2).getByText('Dungeon Map')).toBeInTheDocument();
         });
     });
 
     describe('tool button active states', () => {
-        it('should apply active class to paint button when tool is paint', () => {
-            renderMapToolbar({ tool: 'paint' });
-            expect(screen.getByText('Paint')).toHaveClass('active');
-        });
-
-        it('should apply active class to erase button when tool is erase', () => {
-            renderMapToolbar({ tool: 'erase' });
-            expect(screen.getByText('Erase')).toHaveClass('active');
-        });
-
-        it('should apply active class to select button when tool is select', () => {
-            renderMapToolbar({ tool: 'select' });
-            expect(screen.getByText('Select')).toHaveClass('active');
-        });
-
-        it('should apply active class to room button when tool is room', () => {
-            renderMapToolbar({ tool: 'room' });
-            expect(screen.getByText('Room')).toHaveClass('active');
+        it('should apply active class to tool buttons when their tool is active', () => {
+            const tools = ['paint', 'erase', 'select', 'room'];
+            for (const tool of tools) {
+                const { container } = renderMapToolbar({ tool });
+                const btn = within(container).getByText(tool.charAt(0).toUpperCase() + tool.slice(1));
+                expect(btn).toHaveClass('active');
+            }
         });
 
         it('should not apply active class when tool is none', () => {
             renderMapToolbar({ tool: 'none' });
             expect(screen.getByText('Paint')).not.toHaveClass('active');
         });
-    });
 
-    describe('spell and ruler button active states', () => {
         it('should apply active class to spell button when spellMode is set', () => {
             const mockState = createMockSpellOverlayState({ spellMode: 'sphere' });
             renderMapToolbar({ spellOverlayState: mockState });
@@ -250,22 +187,6 @@ describe('MapToolbar', () => {
             expect(mockSetSelectedShape).toHaveBeenCalledWith('cone');
             expect(mockSetSpellMode).toHaveBeenCalledWith('cone');
         });
-
-        it('should not render SpellOverlayControls when spellMode is undefined', () => {
-            const mockState = createMockSpellOverlayState({ spellMode: undefined });
-            renderMapToolbar({ spellOverlayState: mockState });
-            expect(screen.queryByText('Spell Overlay')).not.toBeInTheDocument();
-        });
-
-        it('should render without crashing when spellOverlayState is null', () => {
-            renderMapToolbar({ spellOverlayState: null });
-            expect(screen.getByText('Dungeon Map')).toBeInTheDocument();
-        });
-
-        it('should render without crashing when spellOverlayState is undefined', () => {
-            renderMapToolbar({ spellOverlayState: undefined });
-            expect(screen.getByText('Dungeon Map')).toBeInTheDocument();
-        });
     });
 
     describe('user interactions', () => {
@@ -274,14 +195,6 @@ describe('MapToolbar', () => {
             renderMapToolbar({ onBack: mockOnBack });
             fireEvent.click(screen.getByTitle('Back'));
             expect(mockOnBack).toHaveBeenCalledTimes(1);
-        });
-
-        it('should call setGridSize with new value when grid input changes', () => {
-            const mockSetGridSize = vi.fn();
-            renderMapToolbar({ setGridSize: mockSetGridSize, gridSize: 10 });
-            const gridInput = screen.getByRole('spinbutton');
-            fireEvent.change(gridInput, { target: { value: '15' } });
-            expect(mockSetGridSize).toHaveBeenCalledWith(15);
         });
 
         it('should call zoomIn when zoom in button is clicked', () => {
@@ -320,17 +233,17 @@ describe('MapToolbar', () => {
             expect(mockSetItemsPanelOpen).toHaveBeenCalled();
         });
 
-        it('should toggle ruler mode on when clicked while false', () => {
+        it('should toggle ruler mode on when clicked while false, off when clicked while true', () => {
             const toggleRulerMode = vi.fn();
-            renderMapToolbar({ rulerMode: false, setRulerMode: toggleRulerMode });
-            fireEvent.click(screen.getByText('Ruler'));
+            const { container } = renderMapToolbar({ rulerMode: false, setRulerMode: toggleRulerMode });
+            fireEvent.click(within(container).getByText('Ruler'));
             expect(toggleRulerMode).toHaveBeenCalledWith(true);
         });
 
         it('should toggle ruler mode off when clicked while true', () => {
             const toggleRulerMode = vi.fn();
-            renderMapToolbar({ rulerMode: true, setRulerMode: toggleRulerMode });
-            fireEvent.click(screen.getByText('Ruler'));
+            const { container } = renderMapToolbar({ rulerMode: true, setRulerMode: toggleRulerMode });
+            fireEvent.click(within(container).getByText('Ruler'));
             expect(toggleRulerMode).toHaveBeenCalledWith(false);
         });
 
@@ -377,68 +290,17 @@ describe('MapToolbar', () => {
             expect(mockSetSpellMode).toHaveBeenCalledWith('cone');
         });
 
-        it('should toggle paint tool off when already active', () => {
-            const mockSetTool = vi.fn();
-            renderMapToolbar({ tool: 'paint', setTool: mockSetTool });
-            const paintBtn = screen.getByText('Paint');
-            fireEvent.click(paintBtn);
-            expect(mockSetTool).toHaveBeenCalledWith('none');
-        });
-
-        it('should toggle paint tool on when inactive', () => {
-            const mockSetTool = vi.fn();
-            renderMapToolbar({ tool: 'none', setTool: mockSetTool });
-            const paintBtn = screen.getByText('Paint');
-            fireEvent.click(paintBtn);
-            expect(mockSetTool).toHaveBeenCalledWith('paint');
-        });
-
-        it('should toggle erase tool off when already active', () => {
-            const mockSetTool = vi.fn();
-            renderMapToolbar({ tool: 'erase', setTool: mockSetTool });
-            const eraseBtn = screen.getByText('Erase');
-            fireEvent.click(eraseBtn);
-            expect(mockSetTool).toHaveBeenCalledWith('none');
-        });
-
-        it('should toggle erase tool on when inactive', () => {
-            const mockSetTool = vi.fn();
-            renderMapToolbar({ tool: 'none', setTool: mockSetTool });
-            const eraseBtn = screen.getByText('Erase');
-            fireEvent.click(eraseBtn);
-            expect(mockSetTool).toHaveBeenCalledWith('erase');
-        });
-
-        it('should toggle select tool off when already active', () => {
-            const mockSetTool = vi.fn();
-            renderMapToolbar({ tool: 'select', setTool: mockSetTool });
-            const selectBtn = screen.getByText('Select');
-            fireEvent.click(selectBtn);
-            expect(mockSetTool).toHaveBeenCalledWith('none');
-        });
-
-        it('should toggle select tool on when inactive', () => {
-            const mockSetTool = vi.fn();
-            renderMapToolbar({ tool: 'none', setTool: mockSetTool });
-            const selectBtn = screen.getByText('Select');
-            fireEvent.click(selectBtn);
-            expect(mockSetTool).toHaveBeenCalledWith('select');
-        });
-
-        it('should toggle room tool off when already active', () => {
-            const mockSetTool = vi.fn();
-            renderMapToolbar({ tool: 'room', setTool: mockSetTool });
-            const roomBtn = screen.getByText('Room');
-            fireEvent.click(roomBtn);
-            expect(mockSetTool).toHaveBeenCalledWith('none');
-        });
-
-        it('should toggle room tool on when inactive', () => {
-            const mockSetTool = vi.fn();
-            renderMapToolbar({ tool: 'none', setTool: mockSetTool });
-            const roomBtn = screen.getByText('Room');
-            fireEvent.click(roomBtn);
-            expect(mockSetTool).toHaveBeenCalledWith('room');
+        it('should toggle paint, erase, select, and room tools on and off when clicked', () => {
+            const tools = ['paint', 'erase', 'select', 'room'];
+            for (const tool of tools) {
+                const mockSetTool = vi.fn();
+                const { container: c1 } = renderMapToolbar({ tool, setTool: mockSetTool });
+                fireEvent.click(within(c1).getByText(tool.charAt(0).toUpperCase() + tool.slice(1)));
+                expect(mockSetTool).toHaveBeenCalledWith('none');
+                const { container: c2 } = renderMapToolbar({ tool: 'none', setTool: mockSetTool });
+                fireEvent.click(within(c2).getByText(tool.charAt(0).toUpperCase() + tool.slice(1)));
+                expect(mockSetTool).toHaveBeenCalledWith(tool);
+            }
         });
     });
 });

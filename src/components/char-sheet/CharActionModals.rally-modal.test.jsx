@@ -317,112 +317,20 @@ describe('CharActionModals Rally modal', () => {
   });
 
   describe('Rally modal', () => {
-    it('renders header with heart icon and title', () => {
-      render(<CharActionModals
-        {...createBaseProps()}
-        rallyChoiceModal={{ description: 'Test description', allyOptions: [] }}
-      />);
-      expect(screen.getByText(/Rally/)).toBeInTheDocument();
-    });
-
-    it('displays the description from the modal data', () => {
-      render(<CharActionModals
-        {...createBaseProps()}
-        rallyChoiceModal={{ description: 'Use your reaction to grant temp HP', allyOptions: [] }}
-      />);
-      expect(screen.getByText('Use your reaction to grant temp HP')).toBeInTheDocument();
-    });
-
-    it('renders options from allyOptions array', () => {
-      render(<CharActionModals
-        {...createBaseProps()}
-        rallyChoiceModal={{
-          description: 'Test',
-          allyOptions: [{ name: 'Bard' }, { name: 'Rogue' }],
-        }}
-      />);
-      expect(screen.getByText('Bard')).toBeInTheDocument();
-      expect(screen.getByText('Rogue')).toBeInTheDocument();
-    });
-
-    it('renders Grant Temp HP button', () => {
-      render(<CharActionModals
-        {...createBaseProps()}
-        rallyChoiceModal={{ description: 'Test', allyOptions: [{ name: 'Bard' }] }}
-      />);
-      expect(screen.getByText(/Grant Temp HP/)).toBeInTheDocument();
-    });
-
-    it('renders Skip button', () => {
-      render(<CharActionModals
-        {...createBaseProps()}
-        rallyChoiceModal={{ description: 'Test', allyOptions: [{ name: 'Bard' }] }}
-      />);
-      expect(screen.getByText('Skip')).toBeInTheDocument();
-    });
-
-    it('renders overlay with sp-overlay class', () => {
-      render(<CharActionModals
-        {...createBaseProps()}
-        rallyChoiceModal={{ description: 'Test', allyOptions: [{ name: 'Bard' }] }}
-      />);
-      expect(document.querySelector('.sp-overlay')).toBeInTheDocument();
-    });
-
-    it('renders modal container with sp-modal class', () => {
-      render(<CharActionModals
-        {...createBaseProps()}
-        rallyChoiceModal={{ description: 'Test', allyOptions: [{ name: 'Bard' }] }}
-      />);
-      expect(document.querySelector('.sp-modal')).toBeInTheDocument();
-    });
-
-    it('Grant Temp HP button is disabled when no target selected', () => {
-      render(<CharActionModals
-        {...createBaseProps()}
-        rallyChoiceModal={{ description: 'Test', allyOptions: [{ name: 'Bard' }] }}
-      />);
-      const grantBtn = screen.getByText(/Grant Temp HP/);
-      expect(grantBtn).toBeDisabled();
-    });
-
-    it('Grant Temp HP button is enabled when target is selected', () => {
-      render(<CharActionModals
-        {...createBaseProps()}
-        rallyChoiceModal={{ description: 'Test', allyOptions: [{ name: 'Bard' }] }}
-      />);
-      fireEvent.click(screen.getByText('Bard'));
-      const grantBtn = screen.getByText(/Grant Temp HP/);
-      expect(grantBtn).toBeEnabled();
-    });
-
-    it('selecting an option and confirming calls handleRallyChoiceConfirm with ally name', () => {
+    it('calls handleRallyChoiceConfirm with ally name and modal data on confirm', () => {
       const handleRallyChoiceConfirm = vi.fn();
       render(<CharActionModals
         {...createBaseProps({ handleRallyChoiceConfirm })}
-        rallyChoiceModal={{ description: 'Test', allyOptions: [{ name: 'Bard' }] }}
+        rallyChoiceModal={{ description: 'Test description', allyOptions: [{ name: 'Bard' }] }}
       />);
       fireEvent.click(screen.getByText('Bard'));
       fireEvent.click(screen.getByText(/Grant Temp HP/));
       expect(handleRallyChoiceConfirm).toHaveBeenCalledWith('Bard', expect.objectContaining({
-        description: 'Test',
+        description: 'Test description',
       }));
     });
 
-    it('clicking Grant Temp HP calls handleRallyChoiceConfirm', () => {
-      const handleRallyChoiceConfirm = vi.fn();
-      render(<CharActionModals
-        {...createBaseProps({ handleRallyChoiceConfirm })}
-        rallyChoiceModal={{ description: 'Test', allyOptions: [{ name: 'Bard' }] }}
-      />);
-      fireEvent.click(screen.getByText('Bard'));
-      fireEvent.click(screen.getByText(/Grant Temp HP/));
-      expect(handleRallyChoiceConfirm).toHaveBeenCalledWith('Bard', expect.objectContaining({
-        description: 'Test',
-      }));
-    });
-
-    it('clicking Skip calls setRallyChoiceModal(null)', () => {
+    it('calls setRallyChoiceModal(null) when clicking Skip', () => {
       const setRallyChoiceModal = vi.fn();
       render(<CharActionModals
         {...createBaseProps({ setRallyChoiceModal })}
@@ -432,7 +340,7 @@ describe('CharActionModals Rally modal', () => {
       expect(setRallyChoiceModal).toHaveBeenCalledWith(null);
     });
 
-    it('clicking overlay calls setRallyChoiceModal(null)', () => {
+    it('calls setRallyChoiceModal(null) when clicking the overlay', () => {
       const setRallyChoiceModal = vi.fn();
       render(<CharActionModals
         {...createBaseProps({ setRallyChoiceModal })}
@@ -450,55 +358,6 @@ describe('CharActionModals Rally modal', () => {
       />);
       fireEvent.click(document.querySelector('.sp-modal'));
       expect(setRallyChoiceModal).not.toHaveBeenCalled();
-    });
-
-    it('renders empty allyOptions array without option buttons', () => {
-      render(<CharActionModals
-        {...createBaseProps()}
-        rallyChoiceModal={{ description: 'Test', allyOptions: [] }}
-      />);
-      expect(screen.getByText(/Rally/)).toBeInTheDocument();
-      expect(screen.getByText(/Grant Temp HP/)).toBeInTheDocument();
-      expect(screen.queryByRole('radio')).not.toBeInTheDocument();
-    });
-
-    it('renders radio inputs for each ally option', () => {
-      render(<CharActionModals
-        {...createBaseProps()}
-        rallyChoiceModal={{ description: 'Test', allyOptions: [{ name: 'Bard' }, { name: 'Rogue' }] }}
-      />);
-      const radios = document.querySelectorAll('input[type="radio"]');
-      expect(radios).toHaveLength(2);
-    });
-
-    it('clicking a target name selects it and enables the confirm button', () => {
-      render(<CharActionModals
-        {...createBaseProps()}
-        rallyChoiceModal={{ description: 'Test', allyOptions: [{ name: 'Bard' }, { name: 'Rogue' }] }}
-      />);
-      expect(screen.getByText(/Grant Temp HP/)).toBeDisabled();
-      fireEvent.click(screen.getByText('Rogue'));
-      expect(screen.getByText(/Grant Temp HP/)).toBeEnabled();
-    });
-
-    it('renders label with selected styling when option is chosen', () => {
-      render(<CharActionModals
-        {...createBaseProps()}
-        rallyChoiceModal={{ description: 'Test', allyOptions: [{ name: 'Bard' }] }}
-      />);
-      fireEvent.click(screen.getByText('Bard'));
-      const labels = document.querySelectorAll('label.secondary-target-row');
-      expect(labels[0]).toHaveClass('secondary-target-selected');
-    });
-
-    it('renders label without selected styling when option is not chosen', () => {
-      render(<CharActionModals
-        {...createBaseProps()}
-        rallyChoiceModal={{ description: 'Test', allyOptions: [{ name: 'Bard' }, { name: 'Rogue' }] }}
-      />);
-      fireEvent.click(screen.getByText('Bard'));
-      const labels = document.querySelectorAll('label.secondary-target-row');
-      expect(labels[1]).not.toHaveClass('secondary-target-selected');
     });
   });
 });

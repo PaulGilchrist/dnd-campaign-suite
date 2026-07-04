@@ -132,19 +132,14 @@ describe('CharClassFeatures', () => {
             automation: { passives: [] },
         });
 
-        it('renders druid container at level 5', () => {
-            renderComponent(druidStats(5));
-            expect(screen.getByTestId('char-class-druid')).toBeInTheDocument();
-        });
-
         it('returns null for druid below level 2', () => {
             const { container } = renderComponent(druidStats(1));
             expect(container.innerHTML).toBe('');
         });
 
-        it('returns null for druid at level 0', () => {
-            const { container } = renderComponent(druidStats(0));
-            expect(container.innerHTML).toBe('');
+        it('renders druid container at level 5', () => {
+            renderComponent(druidStats(5));
+            expect(screen.getByTestId('char-class-druid')).toBeInTheDocument();
         });
 
         it('renders natural recovery section when resource_restoration passive exists', () => {
@@ -181,23 +176,11 @@ describe('CharClassFeatures', () => {
             expect(screen.getByText(/Free cast used/)).toBeInTheDocument();
         });
 
-        it('renders wild shape limitations', () => {
+        it('renders wild shape features', () => {
             renderComponent(druidStats(5));
             expect(screen.getByText(/Wild Shape Limitations:/)).toBeInTheDocument();
-        });
-
-        it('renders beast forms known when > 0', () => {
-            renderComponent(druidStats(5));
             expect(screen.getByText(/Beast Forms Known:/)).toBeInTheDocument();
-        });
-
-        it('renders wild shape max challenge rating', () => {
-            renderComponent(druidStats(5));
             expect(screen.getByText(/Wild Shape Max Challenge Rating:/)).toBeInTheDocument();
-        });
-
-        it('renders wild shape uses tracked resource', () => {
-            renderComponent(druidStats(5));
             expect(screen.getByTestId('tracked-resource-Wild Shape Uses')).toBeInTheDocument();
         });
     });
@@ -222,34 +205,18 @@ describe('CharClassFeatures', () => {
             expect(screen.getByTestId('char-class-fighter')).toBeInTheDocument();
         });
 
-        it('returns null when class_levels is null', () => {
-            const { container } = renderComponent(makeStats({
+        it('returns null when class_levels is null or undefined', () => {
+            const { container: c1 } = renderComponent(makeStats({
                 class: { name: 'Fighter', class_levels: null },
                 automation: { passives: [] },
             }));
-            expect(container.innerHTML).toBe('');
-        });
+            expect(c1.innerHTML).toBe('');
 
-        it('returns null when class_levels is undefined', () => {
-            const { container } = renderComponent(makeStats({
+            const { container: c2 } = renderComponent(makeStats({
                 class: { name: 'Fighter', class_levels: undefined },
                 automation: { passives: [] },
             }));
-            expect(container.innerHTML).toBe('');
-        });
-
-        it('returns null when fighter is level 1 (classLevel exists but energy check fails)', () => {
-            const stats = makeStats({
-                level: 1,
-                class: {
-                    name: 'Fighter',
-                    class_levels: [{ level: 1 }],
-                    fightingStyles: [],
-                },
-                automation: { passives: [] },
-            });
-            renderComponent(stats);
-            expect(screen.getByTestId('char-class-fighter')).toBeInTheDocument();
+            expect(c2.innerHTML).toBe('');
         });
 
         it('renders psionic energy section for Psi Warrior subclass', () => {
@@ -290,27 +257,7 @@ describe('CharClassFeatures', () => {
             expect(screen.queryByText(/Energy Dice/)).not.toBeInTheDocument();
         });
 
-        it('renders superiority dice for Battle Master subclass', () => {
-            const stats = makeStats({
-                level: 5,
-                class: {
-                    name: 'Fighter',
-                    class_levels: [
-                        { level: 1 }, { level: 2 }, { level: 3 }, { level: 4 },
-                        { level: 5, extra_attacks: 2, weapon_mastery: 'Mercy' },
-                    ],
-                    major: { name: 'Battle Master' },
-                    fightingStyles: [],
-                },
-                automation: { passives: [] },
-            });
-            const { container } = renderComponent(stats);
-            expect(container.querySelector('[data-testid="tracked-resource-Superiority Dice"]')).toBeInTheDocument();
-            const dieDiv = [...container.querySelectorAll('div')].find(d => d.textContent.includes('Superiority Die'));
-            expect(dieDiv.textContent).toContain('d8');
-        });
-
-        it('renders superiority die type d8 for Battle Master level 5', () => {
+        it('renders superiority dice and die type for Battle Master subclass', () => {
             const stats = makeStats({
                 level: 5,
                 class: {
@@ -399,7 +346,7 @@ describe('CharClassFeatures', () => {
         });
 
         it('renders fighting styles when present', () => {
-            const stats = makeStats({
+            const statsWithStyles = makeStats({
                 level: 5,
                 class: {
                     name: 'Fighter',
@@ -411,12 +358,12 @@ describe('CharClassFeatures', () => {
                 },
                 automation: { passives: [] },
             });
-            renderComponent(stats);
+            renderComponent(statsWithStyles);
             expect(screen.getByText(/Fighting Styles.*/));
         });
 
         it('renders N/A for fighting styles when absent', () => {
-            const stats = makeStats({
+            const statsNoStyles = makeStats({
                 level: 1,
                 class: {
                     name: 'Fighter',
@@ -425,7 +372,7 @@ describe('CharClassFeatures', () => {
                 },
                 automation: { passives: [] },
             });
-            renderComponent(stats);
+            renderComponent(statsNoStyles);
             expect(screen.getByText(/Fighting Styles.*/));
         });
 
@@ -467,38 +414,22 @@ describe('CharClassFeatures', () => {
             automation: { passives: [] },
         });
 
-        it('renders monk container at level 5', () => {
-            renderComponent(monkStats(5));
-            expect(screen.getByTestId('char-class-monk')).toBeInTheDocument();
-        });
-
         it('returns null for monk below level 2', () => {
             const { container } = renderComponent(monkStats(1));
             expect(container.innerHTML).toBe('');
         });
 
-        it('renders focus save DC based on wisdom bonus', () => {
+        it('renders monk container at level 5', () => {
             renderComponent(monkStats(5));
-            expect(screen.getByText(/Focus Save DC.*/));
+            expect(screen.getByTestId('char-class-monk')).toBeInTheDocument();
         });
 
-        it('renders unarmored movement increase', () => {
+        it('renders monk features', () => {
             renderComponent(monkStats(5));
+            expect(screen.getByText(/Focus Save DC.*/)).toBeInTheDocument();
             expect(screen.getByText(/Unarmored Movement:/)).toBeInTheDocument();
-        });
-
-        it('renders martial arts die', () => {
-            renderComponent(monkStats(5));
             expect(screen.getByText(/Martial Arts Die:/)).toBeInTheDocument();
-        });
-
-        it('renders extra attacks from class_levels', () => {
-            renderComponent(monkStats(5));
             expect(screen.getByText(/Extra Attacks.*/));
-        });
-
-        it('renders focus points tracked resource', () => {
-            renderComponent(monkStats(5));
             expect(screen.getByTestId('tracked-resource-Focus Points')).toBeInTheDocument();
         });
 
@@ -535,14 +466,14 @@ describe('CharClassFeatures', () => {
         });
 
         it('renders aura of protection with charisma bonus', () => {
-            const { container } = renderComponent(paladinStats());
-            expect(container.querySelector('div').textContent).toContain('Aura of Protection');
-            expect(container.querySelector('div').textContent).toContain('+3');
+            renderComponent(paladinStats());
+            expect(screen.getByText(/Aura of Protection/)).toBeInTheDocument();
+            expect(screen.getByText(/\+3/)).toBeInTheDocument();
         });
 
         it('shows locked aura range at level < 6', () => {
-            const { container } = renderComponent(paladinStats());
-            expect(container.querySelector('div').textContent).toContain('locked');
+            renderComponent(paladinStats());
+            expect(screen.getByText(/locked/)).toBeInTheDocument();
         });
 
         it('shows 10 ft aura range at level >= 6', () => {
@@ -551,8 +482,8 @@ describe('CharClassFeatures', () => {
                 class: { name: 'Paladin', class_levels: [{ level: 6 }] },
                 automation: { passives: [] },
             });
-            const { container } = renderComponent(stats);
-            expect(container.querySelector('div').textContent).toContain('10 ft');
+            renderComponent(stats);
+            expect(screen.getByText(/10 ft/)).toBeInTheDocument();
         });
 
         it('renders aura range when available', () => {
@@ -638,32 +569,20 @@ describe('CharClassFeatures', () => {
             expect(screen.getByText(/Fighting Styles.*/));
         });
 
-        it('does not render fighting styles when level is 1', () => {
-            const stats = makeStats({
+        it('does not render fighting styles when level is 1 or styles is null', () => {
+            const statsLevel1 = makeStats({
                 level: 1,
                 class: { name: 'Ranger', class_levels: [{ level: 1 }], fightingStyles: ['Defense'] },
                 automation: { passives: [] },
             });
-            renderComponent(stats);
+            renderComponent(statsLevel1);
             expect(screen.queryByText(/Fighting Styles:/)).not.toBeInTheDocument();
-        });
 
-        it('renders fighting styles section when styles array is empty', () => {
-            const stats = makeStats({
-                class: { name: 'Ranger', class_levels: [{ level: 5 }], fightingStyles: [] },
-                automation: { passives: [] },
-            });
-            renderComponent(stats);
-            // Empty array is truthy in JS, so the div renders but with empty content
-            expect(screen.getByText(/Fighting Styles.*/));
-        });
-
-        it('does not render fighting styles when styles is null', () => {
-            const stats = makeStats({
+            const statsNull = makeStats({
                 class: { name: 'Ranger', class_levels: [{ level: 5 }], fightingStyles: null },
                 automation: { passives: [] },
             });
-            renderComponent(stats);
+            renderComponent(statsNull);
             expect(screen.queryByText(/Fighting Styles:/)).not.toBeInTheDocument();
         });
     });

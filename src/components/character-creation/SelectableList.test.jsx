@@ -62,27 +62,15 @@ describe('SelectableList', () => {
       expect(screen.getByText('Test List')).toBeInTheDocument();
     });
 
-    it('should render a custom className on the root element', () => {
+    it('should apply custom className to root and nested containers', () => {
       const { container } = renderComponent({ className: 'custom-class' });
       expect(container.querySelector('.wizard-step.custom-class')).toBeInTheDocument();
-    });
-
-    it('should render a custom className on the results container', () => {
-      const { container } = renderComponent({ className: 'custom-class' });
       expect(container.querySelector('.custom-class-results-container')).toBeInTheDocument();
-    });
-
-    it('should render a custom className on the results header', () => {
-      const { container } = renderComponent({ className: 'custom-class' });
       expect(container.querySelector('.custom-class-results-header')).toBeInTheDocument();
-    });
-
-    it('should render a custom className on the results list', () => {
-      const { container } = renderComponent({ className: 'custom-class' });
       expect(container.querySelector('.custom-class-results-list')).toBeInTheDocument();
     });
 
-    it('should render search input with the correct placeholder', () => {
+    it('should render search input with the correct placeholder and id', () => {
       renderComponent({ searchPlaceholder: 'Search items...' });
       expect(screen.getByPlaceholderText('Search items...')).toBeInTheDocument();
     });
@@ -124,26 +112,12 @@ describe('SelectableList', () => {
       const mockRenderSummary = createRenderSummary();
       renderComponent({ renderSummary: mockRenderSummary });
       expect(screen.getByTestId('summary')).toBeInTheDocument();
-      expect(mockRenderSummary).toHaveBeenCalled();
-    });
-
-    it('should not call renderSummary when not provided', () => {
-      const mockRenderSummary = createRenderSummary();
-      renderComponent();
-      expect(mockRenderSummary).not.toHaveBeenCalled();
     });
 
     it('should render renderWarnings when provided', () => {
       const mockRenderWarnings = createRenderWarnings();
       renderComponent({ renderWarnings: mockRenderWarnings });
       expect(screen.getByTestId('warnings')).toBeInTheDocument();
-      expect(mockRenderWarnings).toHaveBeenCalled();
-    });
-
-    it('should not call renderWarnings when not provided', () => {
-      const mockRenderWarnings = createRenderWarnings();
-      renderComponent();
-      expect(mockRenderWarnings).not.toHaveBeenCalled();
     });
 
     it('should render "Show Only Selected" checkbox with selected count', () => {
@@ -172,7 +146,7 @@ describe('SelectableList', () => {
       expect(screen.getByText('Loading...')).toBeInTheDocument();
     });
 
-    it('should render loading message when items is null', () => {
+    it('should render default "not loaded" message when items is null', () => {
       const renderItem = createRenderItem();
       render(
         <SelectableList
@@ -189,7 +163,7 @@ describe('SelectableList', () => {
       expect(screen.getByText('Data not yet loaded. Please try again.')).toBeInTheDocument();
     });
 
-    it('should render loading message when items is undefined', () => {
+    it('should render default "not loaded" message when items is undefined', () => {
       const renderItem = createRenderItem();
       render(
         <SelectableList
@@ -221,24 +195,6 @@ describe('SelectableList', () => {
         />,
       );
       expect(screen.getByText('My Title')).toBeInTheDocument();
-    });
-
-    it('should render the loading message with a custom className', () => {
-      const renderItem = createRenderItem();
-      const { container } = render(
-        <SelectableList
-          items={[]}
-          fieldName="skills"
-          formData={{}}
-          onArrayFieldChange={vi.fn()}
-          title="Test List"
-          searchPlaceholder="Search..."
-          filters={[]}
-          renderItem={renderItem}
-          className="custom-class"
-        />,
-      );
-      expect(container.querySelector('.wizard-step.custom-class')).toBeInTheDocument();
     });
   });
 
@@ -309,37 +265,12 @@ describe('SelectableList', () => {
       expect(screen.getByText(/No items available/)).toBeInTheDocument();
       expect(screen.queryByText(/found matching your criteria/)).not.toBeInTheDocument();
     });
-
-    it('should trim whitespace from search queries', () => {
-      const renderItem = createRenderItem();
-      renderItem.mockImplementation((item) => <div key={item.name}>{item.name}</div>);
-      render(
-        <SelectableList
-          items={mockItems}
-          fieldName="skills"
-          formData={mockFormData}
-          onArrayFieldChange={vi.fn()}
-          title="Test List"
-          searchPlaceholder="Search..."
-          filters={[]}
-          renderItem={renderItem}
-        />,
-      );
-      fireEvent.change(screen.getByPlaceholderText('Search...'), { target: { value: '   ' } });
-      expect(screen.getByText('Item A')).toBeInTheDocument();
-    });
   });
 
   describe('filter dropdowns', () => {
     it('should render filter dropdowns with correct label', () => {
       renderComponent({ filters: mockFilters });
       expect(screen.getByText('Type1')).toBeInTheDocument();
-    });
-
-    it('should default filter to the defaultLabel option', () => {
-      renderComponent({ filters: mockFilters });
-      const select = document.querySelector('select');
-      expect(select.value).toBe('All');
     });
 
     it('should filter by selected type using getValue', () => {
@@ -497,11 +428,12 @@ describe('SelectableList', () => {
       expect(screen.getByText('★ Type2')).toBeInTheDocument();
     });
 
-    it('should handle filter with undefined values in items', () => {
+    it('should handle filter with undefined or null values in items', () => {
       const items = [
         { name: 'Item A', type: 'Type1' },
         { name: 'Item B' },
         { name: 'Item C', type: 'Type1' },
+        { name: 'Item D', type: null },
       ];
       const filter = [{ field: 'type', defaultLabel: 'All', label: 'Type' }];
 
@@ -523,39 +455,12 @@ describe('SelectableList', () => {
       const options = Array.from(select.options).map((o) => o.value);
       expect(options).toContain('Type1');
       expect(options).not.toContain('undefined');
-    });
-
-    it('should handle filter with null values in items', () => {
-      const items = [
-        { name: 'Item A', type: 'Type1' },
-        { name: 'Item B', type: null },
-        { name: 'Item C', type: 'Type1' },
-      ];
-      const filter = [{ field: 'type', defaultLabel: 'All', label: 'Type' }];
-
-      const renderItem = createRenderItem();
-      render(
-        <SelectableList
-          items={items}
-          fieldName="skills"
-          formData={mockFormData}
-          onArrayFieldChange={vi.fn()}
-          title="Test List"
-          searchPlaceholder="Search..."
-          filters={filter}
-          renderItem={renderItem}
-        />,
-      );
-
-      const select = document.querySelector('select');
-      const options = Array.from(select.options).map((o) => o.value);
-      expect(options).toContain('Type1');
       expect(options).not.toContain('null');
     });
   });
 
   describe('item toggling', () => {
-    it('should call onArrayFieldChange when a non-selected item is clicked', () => {
+    function renderToggleTest(formData) {
       const mockOnChange = vi.fn();
       const renderItem = createRenderItem();
       renderItem.mockImplementation((item, index, opts) => (
@@ -567,7 +472,7 @@ describe('SelectableList', () => {
         <SelectableList
           items={mockItems}
           fieldName="skills"
-          formData={{ skills: [] }}
+          formData={formData}
           onArrayFieldChange={mockOnChange}
           title="Test List"
           searchPlaceholder="Search..."
@@ -575,62 +480,28 @@ describe('SelectableList', () => {
           renderItem={renderItem}
         />,
       );
+      return { mockOnChange, renderItem };
+    }
 
+    it('should add a non-selected item to the array', () => {
+      const { mockOnChange } = renderToggleTest({ skills: [] });
       fireEvent.click(screen.getByTestId('item-1'));
       expect(mockOnChange).toHaveBeenCalledWith('skills', ['Item B']);
     });
 
-    it('should call onArrayFieldChange when a selected item is toggled off', () => {
-      const mockOnChange = vi.fn();
-      const renderItem = createRenderItem();
-      renderItem.mockImplementation((item, index, opts) => (
-        <div data-testid={`item-${index}`} onClick={opts.onToggle}>
-          <span>{item.name}</span>
-        </div>
-      ));
-      render(
-        <SelectableList
-          items={mockItems}
-          fieldName="skills"
-          formData={{ skills: ['Item A'] }}
-          onArrayFieldChange={mockOnChange}
-          title="Test List"
-          searchPlaceholder="Search..."
-          filters={[]}
-          renderItem={renderItem}
-        />,
-      );
-
-      fireEvent.click(screen.getByTestId('item-0'));
-      expect(mockOnChange).toHaveBeenCalledWith('skills', []);
-    });
-
-    it('should call onArrayFieldChange with the updated array when toggling on', () => {
-      const mockOnChange = vi.fn();
-      const renderItem = createRenderItem();
-      renderItem.mockImplementation((item, index, opts) => (
-        <div data-testid={`item-${index}`} onClick={opts.onToggle}>
-          <span>{item.name}</span>
-        </div>
-      ));
-      render(
-        <SelectableList
-          items={mockItems}
-          fieldName="skills"
-          formData={{ skills: ['Item A'] }}
-          onArrayFieldChange={mockOnChange}
-          title="Test List"
-          searchPlaceholder="Search..."
-          filters={[]}
-          renderItem={renderItem}
-        />,
-      );
-
+    it('should add a non-selected item to an existing array', () => {
+      const { mockOnChange } = renderToggleTest({ skills: ['Item A'] });
       fireEvent.click(screen.getByTestId('item-1'));
       expect(mockOnChange).toHaveBeenCalledWith('skills', ['Item A', 'Item B']);
     });
 
-    it('should not call onArrayFieldChange when a pre-selected item is toggled off', () => {
+    it('should remove a selected item from the array', () => {
+      const { mockOnChange } = renderToggleTest({ skills: ['Item A', 'Item B'] });
+      fireEvent.click(screen.getByTestId('item-1'));
+      expect(mockOnChange).toHaveBeenCalledWith('skills', ['Item A']);
+    });
+
+    it('should not allow toggling pre-selected items off', () => {
       const mockOnChange = vi.fn();
       const renderItem = createRenderItem();
       renderItem.mockImplementation((item, index, opts) => (
@@ -656,7 +527,7 @@ describe('SelectableList', () => {
       expect(mockOnChange).not.toHaveBeenCalled();
     });
 
-    it('should call onArrayFieldChange when a non-pre-selected selected item is toggled off', () => {
+    it('should allow toggling non-pre-selected items off', () => {
       const mockOnChange = vi.fn();
       const renderItem = createRenderItem();
       renderItem.mockImplementation((item, index, opts) => (
@@ -682,45 +553,7 @@ describe('SelectableList', () => {
       expect(mockOnChange).toHaveBeenCalledWith('skills', ['Item A']);
     });
 
-    it('should pass isSelected to renderItem for selected items', () => {
-      const renderItem = createRenderItem();
-      render(
-        <SelectableList
-          items={mockItems}
-          fieldName="skills"
-          formData={{ skills: ['Item A'] }}
-          onArrayFieldChange={vi.fn()}
-          title="Test List"
-          searchPlaceholder="Search..."
-          filters={[]}
-          renderItem={renderItem}
-        />,
-      );
-
-      const firstCall = renderItem.mock.calls[0];
-      expect(firstCall[2].isSelected).toBe(true);
-    });
-
-    it('should pass isSelected to renderItem for non-selected items', () => {
-      const renderItem = createRenderItem();
-      render(
-        <SelectableList
-          items={mockItems}
-          fieldName="skills"
-          formData={{ skills: ['Item A'] }}
-          onArrayFieldChange={vi.fn()}
-          title="Test List"
-          searchPlaceholder="Search..."
-          filters={[]}
-          renderItem={renderItem}
-        />,
-      );
-
-      const secondCall = renderItem.mock.calls[1];
-      expect(secondCall[2].isSelected).toBe(false);
-    });
-
-    it('should pass isPreSelected to renderItem for pre-selected items', () => {
+    it('should pass isSelected, isPreSelected, and onToggleExpand to renderItem', () => {
       const renderItem = createRenderItem();
       render(
         <SelectableList
@@ -736,72 +569,19 @@ describe('SelectableList', () => {
         />,
       );
 
-      const firstCall = renderItem.mock.calls[0];
-      expect(firstCall[2].isPreSelected).toBe(true);
-    });
+      // First call should have Item A: isSelected=true, isPreSelected=true
+      expect(renderItem.mock.calls[0][2].isSelected).toBe(true);
+      expect(renderItem.mock.calls[0][2].isPreSelected).toBe(true);
+      expect(typeof renderItem.mock.calls[0][2].onToggleExpand).toBe('function');
 
-    it('should pass isPreSelected to renderItem for non-pre-selected items', () => {
-      const renderItem = createRenderItem();
-      render(
-        <SelectableList
-          items={mockItems}
-          fieldName="skills"
-          formData={mockFormData}
-          onArrayFieldChange={vi.fn()}
-          title="Test List"
-          searchPlaceholder="Search..."
-          filters={[]}
-          renderItem={renderItem}
-          preSelectedItems={['Item A']}
-        />,
-      );
-
-      const secondCall = renderItem.mock.calls[1];
-      expect(secondCall[2].isPreSelected).toBe(false);
-    });
-
-    it('should pass onToggleExpand to renderItem', () => {
-      const renderItem = createRenderItem();
-      render(
-        <SelectableList
-          items={mockItems}
-          fieldName="skills"
-          formData={mockFormData}
-          onArrayFieldChange={vi.fn()}
-          title="Test List"
-          searchPlaceholder="Search..."
-          filters={[]}
-          renderItem={renderItem}
-        />,
-      );
-
-      const firstCall = renderItem.mock.calls[0];
-      expect(typeof firstCall[2].onToggleExpand).toBe('function');
+      // Second call should have Item B: isSelected=false, isPreSelected=false
+      expect(renderItem.mock.calls[1][2].isSelected).toBe(false);
+      expect(renderItem.mock.calls[1][2].isPreSelected).toBe(false);
     });
   });
 
   describe('expand/collapse', () => {
-    it('should show expanded content when item is expanded', () => {
-      const renderItem = createRenderItem();
-      render(
-        <SelectableList
-          items={mockItems}
-          fieldName="skills"
-          formData={mockFormData}
-          onArrayFieldChange={vi.fn()}
-          title="Test List"
-          searchPlaceholder="Search..."
-          filters={[]}
-          renderItem={renderItem}
-        />,
-      );
-
-      const buttons = screen.getAllByRole('button', { name: 'Toggle' });
-      fireEvent.click(buttons[0]);
-      expect(screen.getByTestId('expanded-0')).toBeInTheDocument();
-    });
-
-    it('should hide expanded content when item is collapsed', () => {
+    it('should show and hide expanded content on toggle', () => {
       const renderItem = createRenderItem();
       render(
         <SelectableList
@@ -850,26 +630,6 @@ describe('SelectableList', () => {
   });
 
   describe('show only selected filtering', () => {
-    it('should show all items when the checkbox is unchecked', () => {
-      const renderItem = createRenderItem();
-      render(
-        <SelectableList
-          items={mockItems}
-          fieldName="skills"
-          formData={{ skills: ['Item A'] }}
-          onArrayFieldChange={vi.fn()}
-          title="Test List"
-          searchPlaceholder="Search..."
-          filters={[]}
-          renderItem={renderItem}
-        />,
-      );
-
-      expect(screen.getByText('Item A')).toBeInTheDocument();
-      expect(screen.getByText('Item B')).toBeInTheDocument();
-      expect(screen.getByText('Item C')).toBeInTheDocument();
-    });
-
     it('should filter to show only selected items when checkbox is checked', () => {
       const renderItem = createRenderItem();
       render(

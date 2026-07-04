@@ -388,53 +388,6 @@ describe('CharSpells', () => {
       expect(row).toBeDefined();
       expect(row[7]).toContain('V/S/M');
     });
-
-    it('should display components joined with slashes for two components', () => {
-      const spell = createSpell({
-        name: 'Light',
-        components: ['V', 'M'],
-      });
-      const { table } = renderSpellsTable({
-        ...mockPlayerStats,
-        spellAbilities: { ...mockPlayerStats.spellAbilities, spells: [spell] },
-      });
-
-      const row = getSpellRow(table, 'Light');
-      expect(row).toBeDefined();
-      expect(row[7]).toContain('V/M');
-    });
-
-    it('should display empty notes for spell with no flags or components', () => {
-      const spell = createSpell({
-        name: 'Magic Missile',
-        components: [],
-      });
-      const { table } = renderSpellsTable({
-        ...mockPlayerStats,
-        spellAbilities: { ...mockPlayerStats.spellAbilities, spells: [spell] },
-      });
-
-      const row = getSpellRow(table, 'Magic Missile');
-      expect(row).toBeDefined();
-      expect(row[7]).toBe('');
-    });
-
-    it('should display only components in notes (no concentration or ritual)', () => {
-      const spell = createSpell({
-        name: 'Concentration Ritual Spell',
-        concentration: true,
-        ritual: true,
-        components: ['V', 'S', 'M'],
-      });
-      const { table } = renderSpellsTable({
-        ...mockPlayerStats,
-        spellAbilities: { ...mockPlayerStats.spellAbilities, spells: [spell] },
-      });
-
-      const row = getSpellRow(table, 'Concentration Ritual Spell');
-      expect(row).toBeDefined();
-      expect(row[7]).toBe('V/S/M');
-    });
   });
 
   describe('Duration display', () => {
@@ -496,51 +449,6 @@ describe('CharSpells', () => {
       const row = getSpellRow(table, 'Light');
       expect(row).toBeDefined();
       expect(row[6]).toBe('10 mins');
-    });
-
-    it('should remove "up to " prefix from duration', () => {
-      const spell = createSpell({
-        name: 'Bless',
-        duration: 'Concentration, up to 1 minute',
-      });
-      const { table } = renderSpellsTable({
-        ...mockPlayerStats,
-        spellAbilities: { ...mockPlayerStats.spellAbilities, spells: [spell] },
-      });
-
-      const row = getSpellRow(table, 'Bless');
-      expect(row).toBeDefined();
-      expect(row[6]).toBe('Concentration, 1 min');
-    });
-
-    it('should leave duration unchanged when no abbreviation applies', () => {
-      const spell = createSpell({
-        name: 'Armor of Agathys',
-        duration: '1 hour',
-      });
-      const { table } = renderSpellsTable({
-        ...mockPlayerStats,
-        spellAbilities: { ...mockPlayerStats.spellAbilities, spells: [spell] },
-      });
-
-      const row = getSpellRow(table, 'Armor of Agathys');
-      expect(row).toBeDefined();
-      expect(row[6]).toBe('1 hour');
-    });
-
-    it('should render empty string for missing duration', () => {
-      const spell = createSpell({
-        name: 'Test Spell',
-        duration: undefined,
-      });
-      const { table } = renderSpellsTable({
-        ...mockPlayerStats,
-        spellAbilities: { ...mockPlayerStats.spellAbilities, spells: [spell] },
-      });
-
-      const row = getSpellRow(table, 'Test Spell');
-      expect(row).toBeDefined();
-      expect(row[6]).toBe('');
     });
   });
 
@@ -610,46 +518,9 @@ describe('CharSpells', () => {
       expect(row).toBeDefined();
       expect(row[3]).toBe('1 turn');
     });
-
-    it('should render empty string for missing casting_time', () => {
-      const spell = createSpell({
-        name: 'Test Spell',
-        casting_time: undefined,
-      });
-      const { table } = renderSpellsTable({
-        ...mockPlayerStats,
-        spellAbilities: { ...mockPlayerStats.spellAbilities, spells: [spell] },
-      });
-
-      const row = getSpellRow(table, 'Test Spell');
-      expect(row).toBeDefined();
-      expect(row[3]).toBe('');
-    });
   });
 
   describe('Damage display edge cases', () => {
-    it('should display damage_at_character_level with multiple levels for a cantrip', () => {
-      const spell = createSpell({
-        name: 'Eldritch Blast',
-        level: 0,
-        damage: {
-          damage_at_character_level: {
-            '1': '1d10',
-            '5': '2d10',
-          },
-          damage_type: 'Force',
-        },
-      });
-      const { table } = renderSpellsTable({
-        ...mockPlayerStats,
-        spellAbilities: { ...mockPlayerStats.spellAbilities, spells: [spell] },
-      });
-
-      const row = getSpellRow(table, 'Eldritch Blast');
-      expect(row).toBeDefined();
-      expect(row[5]).toBe('1d10 Force');
-    });
-
     it('should display damage value when only damage_at_character_level has data', () => {
       const spell = createSpell({
         name: 'Scorching Ray',

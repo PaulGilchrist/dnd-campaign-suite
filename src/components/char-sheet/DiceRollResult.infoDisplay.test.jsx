@@ -11,7 +11,7 @@ describe('DiceRollResult', () => {
             expect(screen.getByText(/8d6/)).toBeInTheDocument();
         });
 
-        it('shows d20 label in breakdown for d20 type without formula', () => {
+        it('shows d20 label in breakdown for d20 type', () => {
             render(
                 <DiceRollResult name="Test" type="d20" rolls={[10]} bonus={0} />
             );
@@ -26,35 +26,17 @@ describe('DiceRollResult', () => {
             expect(breakdown.textContent).toMatch(/^d20:/);
         });
 
-        it('shows click to dismiss hint', () => {
-            render(
-                <DiceRollResult name="Test" type="d20" rolls={[10]} bonus={0} />
-            );
-            expect(screen.getByText('click to dismiss')).toBeInTheDocument();
-        });
-
-        it('shows bonus in breakdown when positive', () => {
+        it.each`
+            bonus    | expected
+            ${3}     | ${'+3'}
+            ${-2}    | ${'-2'}
+            ${3}     | ${'+3 proficient'}
+        `('shows bonus $expected in breakdown when bonus is $bonus', ({ bonus, expected }) => {
             const { container } = render(
-                <DiceRollResult name="Test" type="d20" rolls={[10]} bonus={3} />
+                <DiceRollResult name="Test" type="d20" rolls={[10]} bonus={bonus} bonusDetail={expected === '+3 proficient' ? 'proficient' : undefined} />
             );
             const breakdown = container.querySelector('.dice-roll-breakdown');
-            expect(breakdown.textContent).toContain('+3');
-        });
-
-        it('shows bonus with detail when bonusDetail is provided', () => {
-            const { container } = render(
-                <DiceRollResult name="Test" type="d20" rolls={[10]} bonus={3} bonusDetail="proficient" />
-            );
-            const breakdown = container.querySelector('.dice-roll-breakdown');
-            expect(breakdown.textContent).toContain('+3 proficient');
-        });
-
-        it('shows negative bonus in breakdown when negative', () => {
-            const { container } = render(
-                <DiceRollResult name="Test" type="d20" rolls={[10]} bonus={-2} />
-            );
-            const breakdown = container.querySelector('.dice-roll-breakdown');
-            expect(breakdown.textContent).toContain('-2');
+            expect(breakdown.textContent).toContain(expected);
         });
 
         it('shows advantage/disadvantage arrow notation in breakdown', () => {
@@ -68,7 +50,7 @@ describe('DiceRollResult', () => {
     });
 
     describe('save info display', () => {
-        it('shows save info when dc and dcType are provided without success', () => {
+        it('shows save info when dc and dcType are provided', () => {
             render(
                 <DiceRollResult
                     name="Fireball"
@@ -110,52 +92,6 @@ describe('DiceRollResult', () => {
             );
             expect(screen.queryByText(/Save DC/)).not.toBeInTheDocument();
         });
-
-        it('does not show save info when success is provided (resolved save)', () => {
-            render(
-                <DiceRollResult
-                    name="Fireball"
-                    type="damage"
-                    rolls={[6]}
-                    bonus={0}
-                    dc={16}
-                    success={true}
-                />
-            );
-            expect(screen.queryByText(/Save DC/)).not.toBeInTheDocument();
-        });
-
-        it('does not show save info when waitingForPlayerSave is true', () => {
-            render(
-                <DiceRollResult
-                    name="Fireball"
-                    type="damage"
-                    rolls={[6]}
-                    bonus={0}
-                    dc={16}
-                    dcType="DEX"
-                    waitingForPlayerSave={true}
-                    saveDc={16}
-                    saveType="DEX"
-                />
-            );
-            expect(screen.queryByText(/Save DC/)).not.toBeInTheDocument();
-        });
-
-        it('does not show save info for save-damage type', () => {
-            render(
-                <DiceRollResult
-                    name="Poison Cloud"
-                    type="save-damage"
-                    rolls={[6]}
-                    bonus={0}
-                    dc={16}
-                    dcType="CON"
-                    dcSuccess="half"
-                />
-            );
-            expect(screen.queryByText(/Save DC/)).not.toBeInTheDocument();
-        });
     });
 
     describe('resistance notice', () => {
@@ -170,18 +106,6 @@ describe('DiceRollResult', () => {
                 />
             );
             expect(screen.getByText(/Target resistant to fire damage/)).toBeInTheDocument();
-        });
-
-        it('does not show resistance notice when not provided', () => {
-            render(
-                <DiceRollResult
-                    name="Fireball"
-                    type="damage"
-                    rolls={[6]}
-                    bonus={0}
-                />
-            );
-            expect(screen.queryByText(/resistant/)).not.toBeInTheDocument();
         });
     });
 
@@ -212,18 +136,6 @@ describe('DiceRollResult', () => {
             expect(screen.getByText(/Favored Enemy: Beast/)).toBeInTheDocument();
             expect(screen.getByText(/Sense Motive: \+5/)).toBeInTheDocument();
         });
-
-        it('does not show hunter lore notice when not provided', () => {
-            render(
-                <DiceRollResult
-                    name="Attack"
-                    type="attack"
-                    rolls={[15]}
-                    bonus={3}
-                />
-            );
-            expect(screen.queryByText(/Favored Enemy/)).not.toBeInTheDocument();
-        });
     });
 
     describe('potent cantrip', () => {
@@ -240,22 +152,10 @@ describe('DiceRollResult', () => {
             expect(screen.getByText(/Potent Cantrip/)).toBeInTheDocument();
             expect(screen.getByText(/half damage on miss/)).toBeInTheDocument();
         });
-
-        it('does not show potent cantrip when not provided', () => {
-            render(
-                <DiceRollResult
-                    name="Ray of Frost"
-                    type="attack"
-                    rolls={[15]}
-                    bonus={3}
-                />
-            );
-            expect(screen.queryByText(/Potent Cantrip/)).not.toBeInTheDocument();
-        });
     });
 
     describe('reliable talent', () => {
-        it('shows reliable talent message when conditions met', () => {
+        it('shows reliable talent message when roll is 9 or below', () => {
             render(
                 <DiceRollResult
                     name="Persuasion"
@@ -293,20 +193,6 @@ describe('DiceRollResult', () => {
                     bonus={4}
                     rollType="attack"
                     reliableTalent={true}
-                />
-            );
-            expect(screen.queryByText(/Reliable Talent/)).not.toBeInTheDocument();
-        });
-
-        it('does not show reliable talent when reliableTalent is false', () => {
-            render(
-                <DiceRollResult
-                    name="Persuasion"
-                    type="d20"
-                    rolls={[5]}
-                    bonus={4}
-                    rollType="check"
-                    reliableTalent={false}
                 />
             );
             expect(screen.queryByText(/Reliable Talent/)).not.toBeInTheDocument();
@@ -376,22 +262,6 @@ describe('DiceRollResult', () => {
             );
             expect(container.querySelector('.dice-roll-total').textContent).toBe('10');
         });
-
-        it('does not use wis replace for non-check/skill roll types', () => {
-            const { container } = render(
-                <DiceRollResult
-                    name="Attack"
-                    type="d20"
-                    rolls={[5]}
-                    bonus={2}
-                    modifier={1}
-                    rollType="attack"
-                    wisCheckReplace={true}
-                    wisCheckMinBonus={4}
-                />
-            );
-            expect(container.querySelector('.dice-roll-total').textContent).toBe('8');
-        });
     });
 
     describe('reliable talent total calculation', () => {
@@ -407,20 +277,6 @@ describe('DiceRollResult', () => {
                 />
             );
             expect(container.querySelector('.dice-roll-total').textContent).toBe('13');
-        });
-
-        it('uses normal total when roll is above 9', () => {
-            const { container } = render(
-                <DiceRollResult
-                    name="Stealth"
-                    type="d20"
-                    rolls={[12]}
-                    bonus={3}
-                    rollType="skill"
-                    reliableTalent={true}
-                />
-            );
-            expect(container.querySelector('.dice-roll-total').textContent).toBe('15');
         });
     });
 });

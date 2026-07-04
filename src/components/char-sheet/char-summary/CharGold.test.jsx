@@ -1,6 +1,6 @@
 // @improved-by-ai
 import { render, screen, fireEvent } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharGold from './CharGold.jsx';
 
 vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
@@ -41,25 +41,10 @@ describe('CharGold', () => {
     useRuntimeValue.mockReturnValue(null);
   });
 
-  afterEach(() => {
-    vi.restoreAllMocks();
-  });
-
-  it('renders the Gold label', () => {
+  it('renders the Gold label and displays the gold value', () => {
     render(<CharGold playerStats={mockPlayerStats} campaignName={campaignName} />);
 
     expect(screen.getByText(/Gold:/)).toBeInTheDocument();
-  });
-
-  it('renders the HiddenInput component with the gold value', () => {
-    render(<CharGold playerStats={mockPlayerStats} campaignName={campaignName} />);
-
-    expect(screen.getByTestId('gold-value')).toBeInTheDocument();
-  });
-
-  it('falls back to playerStats.inventory.gold when no stored value', () => {
-    render(<CharGold playerStats={mockPlayerStats} campaignName={campaignName} />);
-
     expect(screen.getByTestId('gold-value')).toHaveTextContent('500');
   });
 
@@ -71,7 +56,7 @@ describe('CharGold', () => {
     expect(screen.getByTestId('gold-value')).toHaveTextContent('0');
   });
 
-  it('uses stored gold value from useRuntimeValue when available', () => {
+  it('uses stored gold from useRuntimeValue when available', () => {
     useRuntimeValue.mockReturnValue(250);
 
     render(<CharGold playerStats={mockPlayerStats} campaignName={campaignName} />);
@@ -79,25 +64,7 @@ describe('CharGold', () => {
     expect(screen.getByTestId('gold-value')).toHaveTextContent('250');
   });
 
-  it('prefers stored gold over inventory.gold', () => {
-    useRuntimeValue.mockReturnValue(250);
-
-    render(<CharGold playerStats={mockPlayerStats} campaignName={campaignName} />);
-
-    expect(screen.getByTestId('gold-value')).toHaveTextContent('250');
-  });
-
-  it('calls useRuntimeValue with correct arguments', () => {
-    render(<CharGold playerStats={mockPlayerStats} campaignName={campaignName} />);
-
-    expect(useRuntimeValue).toHaveBeenCalledWith(
-      'Test Character',
-      'gold',
-      'test-campaign'
-    );
-  });
-
-  it('toggles input visibility on click', () => {
+  it('toggles input visibility on interaction', () => {
     render(<CharGold playerStats={mockPlayerStats} campaignName={campaignName} />);
 
     expect(screen.queryByTestId('gold-input')).not.toBeInTheDocument();
@@ -108,25 +75,7 @@ describe('CharGold', () => {
     expect(screen.getByTestId('gold-input')).toBeInTheDocument();
   });
 
-  it('toggles input visibility on Enter keydown', () => {
-    render(<CharGold playerStats={mockPlayerStats} campaignName={campaignName} />);
-
-    const clickable = document.querySelector('.clickable');
-    fireEvent.keyDown(clickable, { key: 'Enter' });
-
-    expect(screen.getByTestId('gold-input')).toBeInTheDocument();
-  });
-
-  it('toggles input visibility on other keydown events', () => {
-    render(<CharGold playerStats={mockPlayerStats} campaignName={campaignName} />);
-
-    const clickable = document.querySelector('.clickable');
-    fireEvent.keyDown(clickable, { key: ' ' });
-
-    expect(screen.getByTestId('gold-input')).toBeInTheDocument();
-  });
-
-  it('passes campaignName to setRuntimeValue on value change', () => {
+  it('calls setRuntimeValue when gold value is changed', () => {
     useRuntimeValue.mockReturnValue(250);
 
     render(<CharGold playerStats={mockPlayerStats} campaignName={campaignName} />);
@@ -145,21 +94,7 @@ describe('CharGold', () => {
     );
   });
 
-  it('has tabIndex for keyboard accessibility', () => {
-    render(<CharGold playerStats={mockPlayerStats} campaignName={campaignName} />);
-
-    const clickable = document.querySelector('.clickable');
-    expect(clickable).toHaveAttribute('tabindex', '0');
-  });
-
-  it('has clickable class on the container div', () => {
-    render(<CharGold playerStats={mockPlayerStats} campaignName={campaignName} />);
-
-    const clickable = document.querySelector('.clickable');
-    expect(clickable).toHaveClass('clickable');
-  });
-
-  it('renders with no campaignName', () => {
+  it('renders without campaignName', () => {
     render(<CharGold playerStats={mockPlayerStats} />);
 
     expect(screen.getByText(/Gold:/)).toBeInTheDocument();

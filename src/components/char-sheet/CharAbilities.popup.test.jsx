@@ -4,7 +4,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharAbilities from './CharAbilities';
 import { DiceRollContext } from '../../hooks/combat/DiceRollContext.js';
 
-  vi.mock('../../hooks/combat/useLoggedDiceRoll.js', () => ({
+vi.mock('../../hooks/combat/useLoggedDiceRoll.js', () => ({
   default: vi.fn(() => ({
     rollAbilityCheck: vi.fn(),
     rollSavingThrow: vi.fn(),
@@ -64,7 +64,11 @@ describe('CharAbilities popup integration', () => {
     mockStore.clear();
   });
 
-  it('calls setPopupHtml with ability description HTML when ability name is clicked', () => {
+  it.each([
+    { name: 'Strength', abbr: 'STR' },
+    { name: 'Dexterity', abbr: 'DEX' },
+    { name: 'Constitution', abbr: 'CON' },
+  ])('calls setPopupHtml with $name description when $name is clicked', ({ name }) => {
     const mockSetPopupHtml = vi.fn();
     const wrapper = ({ children }) => (
       <DiceRollContext.Provider value={{ popupHtml: null, setPopupHtml: mockSetPopupHtml }}>
@@ -73,46 +77,7 @@ describe('CharAbilities popup integration', () => {
     );
 
     render(<CharAbilities {...defaultProps} />, { wrapper });
-    fireEvent.click(screen.getByText('Strength'));
-    expect(mockSetPopupHtml).toHaveBeenCalledWith(expect.stringContaining('Strength'));
-  });
-
-  it('calls setPopupHtml with Dexterity description when Dexterity is clicked', () => {
-    const mockSetPopupHtml = vi.fn();
-    const wrapper = ({ children }) => (
-      <DiceRollContext.Provider value={{ popupHtml: null, setPopupHtml: mockSetPopupHtml }}>
-        {children}
-      </DiceRollContext.Provider>
-    );
-
-    render(<CharAbilities {...defaultProps} />, { wrapper });
-    fireEvent.click(screen.getByText('Dexterity'));
-    expect(mockSetPopupHtml).toHaveBeenCalledWith(expect.stringContaining('Dexterity'));
-  });
-
-  it('renders popup parent container with correct class', () => {
-    const mockSetPopupHtml = vi.fn();
-    const wrapper = ({ children }) => (
-      <DiceRollContext.Provider value={{ popupHtml: null, setPopupHtml: mockSetPopupHtml }}>
-        {children}
-      </DiceRollContext.Provider>
-    );
-
-    const { container } = render(<CharAbilities {...defaultProps} />, { wrapper });
-    // The component renders a div with class 'char-abilities' as the root container
-    expect(container.querySelector('.char-abilities')).toBeInTheDocument();
-  });
-
-  it('handles ability name click when allAbilityScores is empty array', () => {
-    const mockSetPopupHtml = vi.fn();
-    const wrapper = ({ children }) => (
-      <DiceRollContext.Provider value={{ popupHtml: null, setPopupHtml: mockSetPopupHtml }}>
-        {children}
-      </DiceRollContext.Provider>
-    );
-
-    render(<CharAbilities {...defaultProps} allAbilityScores={[]} />, { wrapper });
-    fireEvent.click(screen.getByText('Strength'));
-    expect(mockSetPopupHtml).toHaveBeenCalled();
+    fireEvent.click(screen.getByText(name));
+    expect(mockSetPopupHtml).toHaveBeenCalledWith(expect.stringContaining(name));
   });
 });

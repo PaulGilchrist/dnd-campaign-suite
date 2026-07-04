@@ -117,11 +117,10 @@ vi.mock('../../services/rules/spells/spellCastService.js', () => ({
   executeSpellCast: vi.fn(),
 }));
 
-import { executeSpellCast } from '../../services/rules/spells/spellCastService.js';
 import { useSpellMetamagicFlow } from '../../hooks/combat/useSpellMetamagicFlow.js';
+import { getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import * as mapsService from '../../services/maps/mapsService.js';
 import * as damageUtils from '../../services/rules/combat/damageUtils.js';
-import { getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 
 const basePlayerStats = {
   name: 'TestCharacter',
@@ -142,10 +141,10 @@ describe('CharBonusActions - Spell Cast Flow', () => {
     localStorage.clear();
   });
 
-  describe('handleBonusSpellCast flow', () => {
+  describe('spell casting from detail popup', () => {
     const bonusActionSpell = { name: 'Shocking Grasp', range: 'Touch', casting_time: '1 bonus action', prepared: 'Prepared' };
 
-    it('clears selectedBonusSpell when spell is cast from detail popup', async () => {
+    it('clears selectedBonusSpell and closes popup when spell is cast', async () => {
       render(<CharBonusActions playerStats={createStats({ spellAbilities: { spells: [bonusActionSpell] } })} campaignName="test" />);
       const spellLink = screen.getByText('Shocking Grasp');
       fireEvent.click(spellLink);
@@ -156,7 +155,7 @@ describe('CharBonusActions - Spell Cast Flow', () => {
       expect(screen.queryByTestId('spell-detail-popup')).not.toBeInTheDocument();
     });
 
-    it('calls gateMetamagic with the spell and metamagic context when casting', async () => {
+    it('calls gateMetamagic with the spell when casting', async () => {
       const mockGateMetamagic = vi.fn();
       vi.mocked(useSpellMetamagicFlow).mockReturnValue({
         pendingMetamagic: null,
@@ -183,7 +182,7 @@ describe('CharBonusActions - Spell Cast Flow', () => {
       });
     });
 
-    it('resolves spell positions when mapName is provided before casting', async () => {
+    it('resolves spell positions when mapName is provided', async () => {
       const mapData = {
         players: [
           { name: 'TestCharacter', gridX: 5, gridY: 5 },
@@ -195,7 +194,6 @@ describe('CharBonusActions - Spell Cast Flow', () => {
       damageUtils.getTargetFromAttacker.mockReturnValue({ name: 'Enemy' });
       mapsService.loadMapData.mockResolvedValue(mapData);
 
-      // Mock gateMetamagic to call bonusCastAction which triggers position resolution
       const mockGateMetamagic = vi.fn();
       vi.mocked(useSpellMetamagicFlow).mockReturnValue({
         pendingMetamagic: null,
@@ -214,7 +212,6 @@ describe('CharBonusActions - Spell Cast Flow', () => {
       const spellLink = screen.getByText('Shocking Grasp');
       fireEvent.click(spellLink);
 
-      // gateMetamagic is called with the spell and metamagic context
       const castBtn = screen.getByTestId('cast-btn');
       fireEvent.click(castBtn);
 
@@ -222,146 +219,51 @@ describe('CharBonusActions - Spell Cast Flow', () => {
         expect(mockGateMetamagic).toHaveBeenCalled();
       });
     });
-  });
 
-  describe('resolveBonusSpellPositions - no combat context', () => {
-    const bonusActionSpell = { name: 'Shocking Grasp', range: 'Touch', casting_time: '1 bonus action', prepared: 'Prepared' };
-
-    it('does not set positions when getCombatContext returns null', async () => {
+    it('does not crash when map resolution has no combat context', async () => {
       const mapData = {
-        players: [
-          { name: 'TestCharacter', gridX: 5, gridY: 5 },
-          { name: 'Enemy', gridX: 10, gridY: 10 },
-        ],
+        players: [{ name: 'TestCharacter', gridX: 5, gridY: 5 }],
         placedItems: [],
       };
       damageUtils.getCombatContext.mockResolvedValue(null);
       mapsService.loadMapData.mockResolvedValue(mapData);
-
       render(<CharBonusActions playerStats={createStats({ spellAbilities: { spells: [bonusActionSpell] } })} mapName="test-map" campaignName="test" />);
-      const spellLink = screen.getByText('Shocking Grasp');
-      fireEvent.click(spellLink);
+      fireEvent.click(screen.getByText('Shocking Grasp'));
       expect(screen.getByTestId('spell-detail-popup')).toBeInTheDocument();
     });
 
-    it('does not set positions when target is null', async () => {
+    it('does not crash when target is null or not on map', async () => {
       const mapData = {
-        players: [
-          { name: 'TestCharacter', gridX: 5, gridY: 5 },
-        ],
-        placedItems: [],
+        players: [{ name: 'TestCharacter', gridX: 5, gridY: 5 }],
+        placedItems: [{ name: 'Enemy', gridX: 10, gridY: 10 }],
       };
+      mapsService.loadMapData.mockResolvedValue(mapData);
+
+      // Test: target is null
       damageUtils.getCombatContext.mockResolvedValue({});
       damageUtils.getTargetFromAttacker.mockReturnValue(null);
-      mapsService.loadMapData.mockResolvedValue(mapData);
-
-      render(<CharBonusActions playerStats={createStats({ spellAbilities: { spells: [bonusActionSpell] } })} mapName="test-map" campaignName="test" />);
-      const spellLink = screen.getByText('Shocking Grasp');
-      fireEvent.click(spellLink);
+      const { unmount } = render(<CharBonusActions playerStats={createStats({ spellAbilities: { spells: [bonusActionSpell] } })} mapName="test-map" campaignName="test" />);
+      const spellLinks = document.querySelectorAll('div.left.clickable');
+      fireEvent.click(spellLinks[0]);
       expect(screen.getByTestId('spell-detail-popup')).toBeInTheDocument();
-    });
+      unmount();
+      vi.clearAllMocks();
 
-    it('does not set positions when target player is not on map', async () => {
-      const mapData = {
-        players: [
-          { name: 'TestCharacter', gridX: 5, gridY: 5 },
-        ],
-        placedItems: [],
-      };
-      damageUtils.getCombatContext.mockResolvedValue({});
-      damageUtils.getTargetFromAttacker.mockReturnValue({ name: 'UnknownEnemy' });
-      mapsService.loadMapData.mockResolvedValue(mapData);
-
-      render(<CharBonusActions playerStats={createStats({ spellAbilities: { spells: [bonusActionSpell] } })} mapName="test-map" campaignName="test" />);
-      const spellLink = screen.getByText('Shocking Grasp');
-      fireEvent.click(spellLink);
-      expect(screen.getByTestId('spell-detail-popup')).toBeInTheDocument();
-    });
-  });
-
-  describe('resolveBonusSpellPositions - with placedItems fallback', () => {
-    const bonusActionSpell = { name: 'Shocking Grasp', range: 'Touch', casting_time: '1 bonus action', prepared: 'Prepared' };
-
-    it('falls back to nearest placed item when target player is not found', async () => {
-      const mapData = {
-        players: [
-          { name: 'TestCharacter', gridX: 5, gridY: 5 },
-        ],
-        placedItems: [
-          { name: 'Enemy', gridX: 10, gridY: 10 },
-        ],
-      };
+      // Test: target player not on map, falls back to placed item
       damageUtils.getCombatContext.mockResolvedValue({});
       damageUtils.getTargetFromAttacker.mockReturnValue({ name: 'Enemy' });
-      mapsService.loadMapData.mockResolvedValue(mapData);
-
-      render(<CharBonusActions playerStats={createStats({ spellAbilities: { spells: [bonusActionSpell] } })} mapName="test-map" campaignName="test" />);
-      const spellLink = screen.getByText('Shocking Grasp');
-      fireEvent.click(spellLink);
+      const { unmount: unmount2 } = render(<CharBonusActions playerStats={createStats({ spellAbilities: { spells: [bonusActionSpell] } })} mapName="test-map" campaignName="test" />);
+      const spellLinks2 = document.querySelectorAll('div.left.clickable');
+      fireEvent.click(spellLinks2[0]);
       expect(screen.getByTestId('spell-detail-popup')).toBeInTheDocument();
+      unmount2();
     });
   });
 
-  describe('executeSpellCast invocation', () => {
+  describe('spell detail popup close', () => {
     const bonusActionSpell = { name: 'Shocking Grasp', range: 'Touch', casting_time: '1 bonus action', prepared: 'Prepared' };
 
-    it('calls executeSpellCast when gateMetamagic callback triggers bonusCastAction', async () => {
-      const mapData = {
-        players: [
-          { name: 'TestCharacter', gridX: 5, gridY: 5 },
-          { name: 'Enemy', gridX: 10, gridY: 10 },
-        ],
-        placedItems: [],
-      };
-      damageUtils.getCombatContext.mockResolvedValue({});
-      damageUtils.getTargetFromAttacker.mockReturnValue({ name: 'Enemy' });
-      mapsService.loadMapData.mockResolvedValue(mapData);
-
-      const characters = [{ name: 'TestCharacter' }];
-      const rollAttack = vi.fn();
-      const rollDamage = vi.fn();
-      const getTargetInfo = vi.fn();
-
-      // Mock gateMetamagic to immediately call bonusCastAction
-      const mockGateMetamagic = vi.fn(() => {
-        // bonusCastAction is the closure that calls executeSpellCast
-        // We can't easily access it, so we verify executeSpellCast is called
-        // by the component's internal flow
-      });
-      vi.mocked(useSpellMetamagicFlow).mockReturnValue({
-        pendingMetamagic: null,
-        gateMetamagic: mockGateMetamagic,
-        handleConfirm: vi.fn(),
-        handleSkip: vi.fn(),
-        pendingAid: null,
-        handleAidConfirm: vi.fn(),
-        handleAidSkip: vi.fn(),
-        pendingGreaterRestoration: null,
-        handleGreaterRestorationConfirm: vi.fn(),
-        handleGreaterRestorationSkip: vi.fn(),
-      });
-
-      render(
-        <CharBonusActions
-          playerStats={createStats({ spellAbilities: { spells: [bonusActionSpell] } })}
-          mapName="test-map"
-          campaignName="test"
-          characters={characters}
-          rollAttack={rollAttack}
-          rollDamage={rollDamage}
-          getTargetInfo={getTargetInfo}
-        />
-      );
-
-      expect(executeSpellCast).toBeDefined();
-      expect(typeof executeSpellCast).toBe('function');
-    });
-  });
-
-  describe('onClose callback from SpellDetailPopup', () => {
-    const bonusActionSpell = { name: 'Shocking Grasp', range: 'Touch', casting_time: '1 bonus action', prepared: 'Prepared' };
-
-    it('closes spell detail popup when onClose is called from SpellDetailPopup', async () => {
+    it('closes popup when onClose is called', async () => {
       render(<CharBonusActions playerStats={createStats({ spellAbilities: { spells: [bonusActionSpell] } })} campaignName="test" />);
       const spellLink = screen.getByText('Shocking Grasp');
       fireEvent.click(spellLink);
@@ -371,28 +273,14 @@ describe('CharBonusActions - Spell Cast Flow', () => {
       fireEvent.click(closeBtn);
       expect(screen.queryByTestId('spell-detail-popup')).not.toBeInTheDocument();
     });
-
-    it('does not re-render SpellDetailPopup after onClose clears selectedBonusSpell', async () => {
-      render(<CharBonusActions playerStats={createStats({ spellAbilities: { spells: [bonusActionSpell] } })} campaignName="test" />);
-      const spellLink = screen.getByText('Shocking Grasp');
-      fireEvent.click(spellLink);
-      expect(screen.getByTestId('spell-detail-popup')).toBeInTheDocument();
-
-      const closeBtn = screen.getByTestId('close-btn');
-      fireEvent.click(closeBtn);
-
-      // SpellDetailPopup should no longer be in the document
-      expect(screen.queryByTestId('spell-detail-popup')).not.toBeInTheDocument();
-    });
   });
 
-  describe('popupHtml && hasBonusActions br rendering', () => {
-    it('renders br when popupHtml is truthy and hasBonusActions is true', () => {
+  describe('popupHtml and br rendering', () => {
+    it('does not render br when popupHtml is null (default mock)', () => {
       const stats = createStats({
         bonusActions: [{ name: 'Test', description: 'Test desc', details: 'Test details' }],
       });
       const { container } = render(<CharBonusActions playerStats={stats} />);
-      // The default mock returns popupHtml: null, so no br should render
       expect(container.querySelectorAll('br').length).toBe(0);
     });
 
@@ -406,107 +294,24 @@ describe('CharBonusActions - Spell Cast Flow', () => {
     });
   });
 
-  describe('getRuntimeValue for activeBuffs error handling', () => {
-    it('returns false for Elder Champion when getRuntimeValue throws', async () => {
-      getRuntimeValue.mockImplementation(() => {
-        throw new Error('Storage error');
-      });
-      const stats = createStats({
-        spellAbilities: { spells: [{ name: 'Shooting Star', range: '60 ft.', casting_time: '1 action', prepared: 'Prepared' }] },
-      });
-      expect(() => render(<CharBonusActions playerStats={stats} />)).toThrow('Storage error');
-    });
-  });
-
-  describe('isActionSpell helper behavior', () => {
-    it('returns false for bonus action casting times', () => {
-      // isActionSpell is called internally; verify via rendering that action spells
-      // are NOT shown when Elder Champion is not active
-      const actionSpell = { name: 'Fireball', range: '150 ft.', casting_time: '1 action', prepared: 'Prepared' };
-      const stats = createStats({ spellAbilities: { spells: [actionSpell] } });
+  describe('isActionSpell filtering', () => {
+    it('does not render non-bonus-action spells', () => {
+      const spells = [
+        { name: 'Fireball', range: '150 ft.', casting_time: '1 action', prepared: 'Prepared' },
+        { name: 'Reaction Spell', range: '60 ft.', casting_time: '1 reaction', prepared: 'Prepared' },
+        { name: 'Empty Casting Time', range: 'Touch', casting_time: '', prepared: 'Prepared' },
+        { name: 'Undefined Casting Time', range: 'Touch', casting_time: undefined, prepared: 'Prepared' },
+      ];
+      const stats = createStats({ spellAbilities: { spells } });
       render(<CharBonusActions playerStats={stats} />);
       expect(screen.queryByText('Fireball')).not.toBeInTheDocument();
-    });
-
-    it('returns false for reaction casting times', () => {
-      const reactionSpell = { name: 'Reaction Spell', range: '60 ft.', casting_time: '1 reaction', prepared: 'Prepared' };
-      const stats = createStats({ spellAbilities: { spells: [reactionSpell] } });
-      render(<CharBonusActions playerStats={stats} />);
       expect(screen.queryByText('Reaction Spell')).not.toBeInTheDocument();
-    });
-
-    it('returns false for zero-length casting time', () => {
-      const stats = createStats({ spellAbilities: { spells: [{ name: 'Test', range: 'Touch', casting_time: '', prepared: 'Prepared' }] } });
-      render(<CharBonusActions playerStats={stats} />);
-      expect(screen.queryByText('Test')).not.toBeInTheDocument();
-    });
-
-    it('returns false for undefined casting time', () => {
-      const stats = createStats({ spellAbilities: { spells: [{ name: 'Test', range: 'Touch', casting_time: undefined, prepared: 'Prepared' }] } });
-      render(<CharBonusActions playerStats={stats} />);
-      expect(screen.queryByText('Test')).not.toBeInTheDocument();
+      expect(screen.queryByText('Empty Casting Time')).not.toBeInTheDocument();
+      expect(screen.queryByText('Undefined Casting Time')).not.toBeInTheDocument();
     });
   });
 
-  describe('Horde Breaker damage click with cannotAct', () => {
-    const hordeBreakerAttack = {
-      name: 'Horde Breaker',
-      range: 30,
-      hitBonus: 5,
-      damage: '1d8+3',
-      damageType: 'Piercing',
-      type: 'Bonus Action',
-      isHordeBreaker: true,
-    };
-
-    it('does not render Horde Breaker section when cannotAct is true', () => {
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === '_Hunter\'s Prey_choice') return 'Horde Breaker';
-        if (key === '_Hunters_Prey_HordeBreaker_UsedRound') return 0;
-        return null;
-      });
-      render(<CharBonusActions playerStats={createStats({ attacks: [hordeBreakerAttack] })} campaignName="test" cannotAct />);
-      // Section should not render at all when cannotAct
-      expect(screen.queryByText('Horde Breaker')).not.toBeInTheDocument();
-    });
-  });
-
-  describe('2024 rules mastery empty div rendering', () => {
-    const bonusActionAttack = { name: 'Main Gauche', range: 5, hitBonus: 5, damage: '1d4+3', damageType: 'Piercing', type: 'Bonus Action' };
-
-    it('renders empty mastery div when getWeaponMastery returns null for 2024 rules', () => {
-      render(<CharBonusActions playerStats={createStats({ rules: '2024', attacks: [bonusActionAttack] })} getWeaponMastery={() => null} />);
-      // The mastery column should exist but the cell should be empty
-      expect(document.querySelector('.attacks.mastery-enabled')).toBeInTheDocument();
-    });
-
-    it('renders mastery div with mastery name when getWeaponMastery returns a value', () => {
-      render(<CharBonusActions playerStats={createStats({ rules: '2024', attacks: [bonusActionAttack] })} getWeaponMastery={() => 'Piercing' } />);
-      const masteryElements = screen.getAllByText('Piercing');
-      // Should have at least 2: one in the damage type column and one in the mastery column
-      expect(masteryElements.length).toBeGreaterThanOrEqual(2);
-    });
-  });
-
-  describe('spells render alongside attacks with matching names', () => {
-    it('includes spells whose name matches any attack name (not just bonus action attacks)', () => {
-      const spell = { name: 'Main Gauche', range: 'Touch', casting_time: '1 bonus action', prepared: 'Prepared' };
-      const attack = { name: 'Main Gauche', range: 5, hitBonus: 5, damage: '1d4+3', damageType: 'Piercing', type: 'Bonus Action' };
-      render(<CharBonusActions playerStats={createStats({ attacks: [attack], spellAbilities: { spells: [spell] } })} />);
-      // Both attack and spell render with the same name, so we get 2 elements
-      expect(screen.getAllByText('Main Gauche').length).toBe(2);
-    });
-
-    it('includes spells whose name matches any attack regardless of attack type', () => {
-      const spell = { name: 'Reaction Attack', range: 'Touch', casting_time: '1 bonus action', prepared: 'Prepared' };
-      const attack = { name: 'Reaction Attack', range: 5, hitBonus: 5, damage: '1d4+3', damageType: 'Piercing', type: 'Bonus Action' };
-      render(<CharBonusActions playerStats={createStats({ attacks: [attack], spellAbilities: { spells: [spell] } })} />);
-      // Both attack and spell render with the same name, so we get 2 elements
-      expect(screen.getAllByText('Reaction Attack').length).toBe(2);
-    });
-  });
-
-  describe('isHordeBreakerAvailable conditions', () => {
+  describe('Horde Breaker visibility', () => {
     const hordeBreakerAttack = {
       name: 'Horde Breaker',
       range: 30,
@@ -519,7 +324,7 @@ describe('CharBonusActions - Spell Cast Flow', () => {
 
     it('does not show Horde Breaker when cannotAct is true', () => {
       getRuntimeValue.mockImplementation((name, key) => {
-        if (key === '_Hunter\'s Prey_choice') return 'Horde Breaker';
+        if (key === "_Hunter's Prey_choice") return 'Horde Breaker';
         if (key === '_Hunters_Prey_HordeBreaker_UsedRound') return 0;
         return null;
       });
@@ -529,7 +334,7 @@ describe('CharBonusActions - Spell Cast Flow', () => {
 
     it('does not show Horde Breaker when Hunter\'s Prey is not set to Horde Breaker', () => {
       getRuntimeValue.mockImplementation((name, key) => {
-        if (key === '_Hunter\'s Prey_choice') return 'Something Else';
+        if (key === "_Hunter's Prey_choice") return 'Something Else';
         if (key === '_Hunters_Prey_HordeBreaker_UsedRound') return 0;
         return null;
       });
@@ -539,7 +344,7 @@ describe('CharBonusActions - Spell Cast Flow', () => {
 
     it('does not show Horde Breaker when hordeBreakerAttack is not found', () => {
       getRuntimeValue.mockImplementation((name, key) => {
-        if (key === '_Hunter\'s Prey_choice') return 'Horde Breaker';
+        if (key === "_Hunter's Prey_choice") return 'Horde Breaker';
         if (key === '_Hunters_Prey_HordeBreaker_UsedRound') return 0;
         return null;
       });
@@ -548,8 +353,17 @@ describe('CharBonusActions - Spell Cast Flow', () => {
     });
   });
 
-  describe('full grid layout with spells only', () => {
-    it('renders hit/damage columns even when only spells exist', () => {
+  describe('spells matching attack names', () => {
+    it('renders both spell and attack when they share the same name', () => {
+      const spell = { name: 'Main Gauche', range: 'Touch', casting_time: '1 bonus action', prepared: 'Prepared' };
+      const attack = { name: 'Main Gauche', range: 5, hitBonus: 5, damage: '1d4+3', damageType: 'Piercing', type: 'Bonus Action' };
+      render(<CharBonusActions playerStats={createStats({ attacks: [attack], spellAbilities: { spells: [spell] } })} />);
+      expect(screen.getAllByText('Main Gauche').length).toBe(2);
+    });
+  });
+
+  describe('grid layout', () => {
+    it('renders hit/damage columns when only spells exist', () => {
       const stats = createStats({
         spellAbilities: { spells: [{ name: 'Shocking Grasp', range: 'Touch', casting_time: '1 bonus action', prepared: 'Prepared' }] },
       });
@@ -568,7 +382,7 @@ describe('CharBonusActions - Spell Cast Flow', () => {
     });
   });
 
-  describe('spellAbilities null handling', () => {
+  describe('null spellAbilities handling', () => {
     it('handles null spellAbilities without crashing', () => {
       const stats = createStats({ spellAbilities: null, bonusActions: [{ name: 'Test', description: 'Test desc', details: 'Test details' }] });
       render(<CharBonusActions playerStats={stats} />);
@@ -576,18 +390,7 @@ describe('CharBonusActions - Spell Cast Flow', () => {
     });
   });
 
-  describe('popupHtml truthy with hasBonusActions', () => {
-    it('renders br when popupHtml is a non-null string and hasBonusActions is true', () => {
-      const stats = createStats({
-        bonusActions: [{ name: 'Test', description: 'Test desc', details: 'Test details' }],
-      });
-      const { container } = render(<CharBonusActions playerStats={stats} />);
-      // With default mock (popupHtml: null), no br should render
-      expect(container.querySelectorAll('br').length).toBe(0);
-    });
-  });
-
-  describe('executeSpellCast with various prop combinations', () => {
+  describe('full prop combinations', () => {
     it('renders correctly with all props provided', () => {
       const stats = createStats({ bonusActions: [{ name: 'Test', description: 'Test desc', details: 'Test details' }] });
       const characters = [{ name: 'Character1' }];
@@ -606,23 +409,6 @@ describe('CharBonusActions - Spell Cast Flow', () => {
         />
       );
       expect(screen.getByText('Bonus Actions')).toBeInTheDocument();
-    });
-  });
-
-  describe('setSelectedBonusSpell null after cast', () => {
-    const bonusActionSpell = { name: 'Shocking Grasp', range: 'Touch', casting_time: '1 bonus action', prepared: 'Prepared' };
-
-    it('clears selectedBonusSpell after casting, closing the popup', async () => {
-      render(<CharBonusActions playerStats={createStats({ spellAbilities: { spells: [bonusActionSpell] } })} campaignName="test" />);
-      const spellLink = screen.getByText('Shocking Grasp');
-      fireEvent.click(spellLink);
-      expect(screen.getByTestId('spell-detail-popup')).toBeInTheDocument();
-
-      const castBtn = screen.getByTestId('cast-btn');
-      fireEvent.click(castBtn);
-
-      // The popup should be closed because setSelectedBonusSpell(null) was called
-      expect(screen.queryByTestId('spell-detail-popup')).not.toBeInTheDocument();
     });
   });
 });

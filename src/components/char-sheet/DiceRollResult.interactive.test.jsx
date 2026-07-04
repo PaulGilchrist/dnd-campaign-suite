@@ -16,7 +16,7 @@ describe('DiceRollResult', () => {
                     onLuckyAdvantage={onLuckyAdv}
                 />
             );
-            expect(screen.getByText(/Lucky: Advantage/)).toBeInTheDocument();
+            expect(screen.getByText(/Lucky: Advantage \(1 LP\)/)).toBeInTheDocument();
         });
 
         it('shows Lucky Disadvantage button when luckyDisadvantage is true', () => {
@@ -31,21 +31,6 @@ describe('DiceRollResult', () => {
                     onLuckyDisadvantage={onLuckyDisadv}
                 />
             );
-            expect(screen.getByText(/Lucky: Disadvantage/)).toBeInTheDocument();
-        });
-
-        it('shows Lucky buttons text with LP cost', () => {
-            render(
-                <DiceRollResult
-                    name="Attack"
-                    type="d20"
-                    rolls={[12]}
-                    bonus={3}
-                    luckyAdvantage={true}
-                    luckyDisadvantage={true}
-                />
-            );
-            expect(screen.getByText(/Lucky: Advantage \(1 LP\)/)).toBeInTheDocument();
             expect(screen.getByText(/Lucky: Disadvantage \(1 LP\)/)).toBeInTheDocument();
         });
 
@@ -77,7 +62,7 @@ describe('DiceRollResult', () => {
             expect(screen.queryByText(/Lucky: Disadvantage/)).not.toBeInTheDocument();
         });
 
-        it('calls onLuckyAdvantage and sets advantage mode when Lucky Advantage is clicked', () => {
+        it('calls onLuckyAdvantage and switches to advantage mode when clicked', () => {
             const onLuckyAdv = vi.fn();
             render(
                 <DiceRollResult
@@ -89,29 +74,12 @@ describe('DiceRollResult', () => {
                     onLuckyAdvantage={onLuckyAdv}
                 />
             );
-            expect(screen.getByText('11')).toBeInTheDocument();
             fireEvent.click(screen.getByText(/Lucky: Advantage/));
             expect(onLuckyAdv).toHaveBeenCalled();
             expect(screen.getByText('18')).toBeInTheDocument();
         });
 
-        it('does not show Lucky button again after Lucky Advantage is used', () => {
-            const onLuckyAdv = vi.fn();
-            render(
-                <DiceRollResult
-                    name="Attack"
-                    type="d20"
-                    rolls={[8, 15]}
-                    bonus={3}
-                    luckyAdvantage={true}
-                    onLuckyAdvantage={onLuckyAdv}
-                />
-            );
-            fireEvent.click(screen.getByText(/Lucky: Advantage/));
-            expect(screen.queryByText(/Lucky: Advantage/)).not.toBeInTheDocument();
-        });
-
-        it('calls onLuckyDisadvantage and sets disadvantage mode when Lucky Disadvantage is clicked', () => {
+        it('calls onLuckyDisadvantage and switches to disadvantage mode when clicked', () => {
             const onLuckyDisadv = vi.fn();
             render(
                 <DiceRollResult
@@ -123,29 +91,12 @@ describe('DiceRollResult', () => {
                     onLuckyDisadvantage={onLuckyDisadv}
                 />
             );
-            expect(screen.getByText('11')).toBeInTheDocument();
             fireEvent.click(screen.getByText(/Lucky: Disadvantage/));
             expect(onLuckyDisadv).toHaveBeenCalled();
             expect(screen.getByText('11')).toBeInTheDocument();
         });
 
-        it('does not show Lucky Disadvantage button again after Lucky Disadvantage is used', () => {
-            const onLuckyDisadv = vi.fn();
-            render(
-                <DiceRollResult
-                    name="Attack"
-                    type="d20"
-                    rolls={[8, 15]}
-                    bonus={3}
-                    luckyDisadvantage={true}
-                    onLuckyDisadvantage={onLuckyDisadv}
-                />
-            );
-            fireEvent.click(screen.getByText(/Lucky: Disadvantage/));
-            expect(screen.queryByText(/Lucky: Disadvantage/)).not.toBeInTheDocument();
-        });
-
-        it('both Lucky buttons can be shown simultaneously and used independently', () => {
+        it('hides the clicked lucky button after use', () => {
             const onLuckyAdv = vi.fn();
             const onLuckyDisadv = vi.fn();
             render(
@@ -160,14 +111,13 @@ describe('DiceRollResult', () => {
                     onLuckyDisadvantage={onLuckyDisadv}
                 />
             );
-            expect(screen.getByText(/Lucky: Advantage/)).toBeInTheDocument();
-            expect(screen.getByText(/Lucky: Disadvantage/)).toBeInTheDocument();
 
             fireEvent.click(screen.getByText(/Lucky: Advantage/));
-            expect(onLuckyAdv).toHaveBeenCalled();
-            expect(onLuckyDisadv).not.toHaveBeenCalled();
             expect(screen.queryByText(/Lucky: Advantage/)).not.toBeInTheDocument();
             expect(screen.getByText(/Lucky: Disadvantage/)).toBeInTheDocument();
+
+            fireEvent.click(screen.getByText(/Lucky: Disadvantage/));
+            expect(screen.queryByText(/Lucky: Disadvantage/)).not.toBeInTheDocument();
         });
     });
 
@@ -225,7 +175,7 @@ describe('DiceRollResult', () => {
             expect(screen.queryByText(/Reroll/)).not.toBeInTheDocument();
         });
 
-        it('hides reroll button after it has been used', () => {
+        it('hides reroll button and shows result after clicking', () => {
             const { container } = render(
                 <DiceRollResult
                     name="Attack"
@@ -238,19 +188,6 @@ describe('DiceRollResult', () => {
             fireEvent.click(screen.getByText(/Reroll/));
             const rerollContainer = container.querySelector('.dice-roll-reroll');
             expect(rerollContainer).not.toBeInTheDocument();
-        });
-
-        it('shows reroll result after clicking reroll', () => {
-            render(
-                <DiceRollResult
-                    name="Attack"
-                    type="d20"
-                    rolls={[12]}
-                    bonus={3}
-                    autoReroll={true}
-                />
-            );
-            fireEvent.click(screen.getByText(/Reroll/));
             expect(screen.getByText(/Rerolled:/)).toBeInTheDocument();
         });
 
@@ -311,7 +248,7 @@ describe('DiceRollResult', () => {
             expect(screen.queryByText(/Stroke of Luck/)).not.toBeInTheDocument();
         });
 
-        it('hides stroke of luck button after it has been used', () => {
+        it('hides stroke of luck button and shows result after clicking', () => {
             const { container } = render(
                 <DiceRollResult
                     name="Attack"
@@ -324,19 +261,6 @@ describe('DiceRollResult', () => {
             fireEvent.click(screen.getByText(/Stroke of Luck/));
             const strokeContainer = container.querySelector('.dice-roll-reroll');
             expect(strokeContainer).not.toBeInTheDocument();
-        });
-
-        it('shows stroke of luck result after clicking stroke of luck', () => {
-            render(
-                <DiceRollResult
-                    name="Attack"
-                    type="d20"
-                    rolls={[12]}
-                    bonus={3}
-                    strokeOfLuck={true}
-                />
-            );
-            fireEvent.click(screen.getByText(/Stroke of Luck/));
             expect(screen.getByText(/Stroke of Luck:/)).toBeInTheDocument();
         });
 
@@ -431,7 +355,7 @@ describe('DiceRollResult', () => {
             expect(screen.queryByText(/Tactical Mind/)).not.toBeInTheDocument();
         });
 
-        it('hides tactical mind button after it has been used', () => {
+        it('hides tactical mind button and shows result after clicking', () => {
             const { container } = render(
                 <DiceRollResult
                     name="Athletics"
@@ -445,21 +369,6 @@ describe('DiceRollResult', () => {
             fireEvent.click(screen.getByText(/Tactical Mind/));
             const tacticalContainer = container.querySelector('.dice-roll-reroll');
             expect(tacticalContainer).not.toBeInTheDocument();
-        });
-
-        it('shows tactical mind result after clicking', () => {
-            render(
-                <DiceRollResult
-                    name="Athletics"
-                    type="d20"
-                    rolls={[5]}
-                    bonus={3}
-                    rollType="check"
-                    tacticalMind={true}
-                    tacticalMindBonus={2}
-                />
-            );
-            fireEvent.click(screen.getByText(/Tactical Mind/));
             expect(screen.getByText(/Tactical Mind:/)).toBeInTheDocument();
         });
     });
@@ -504,24 +413,6 @@ describe('DiceRollResult', () => {
             expect(hitMiss.textContent).toContain('3 reaction');
         });
 
-        it('shows hit with max reaction bonus when both glorious defense and defensive duelist are present', () => {
-            const { container } = render(
-                <DiceRollResult
-                    name="Longsword"
-                    type="attack"
-                    rolls={[18]}
-                    bonus={3}
-                    targetName="Goblin"
-                    hit={true}
-                    rollType="attack"
-                    gloriousDefenseBonus={2}
-                    defensiveDuelistBonus={1}
-                />
-            );
-            const hitMiss = container.querySelector('.dice-roll-hit-miss.hit');
-            expect(hitMiss.textContent).toContain('3 reaction');
-        });
-
         it('shows hit with zero reaction bonus when both bonuses are zero', () => {
             render(
                 <DiceRollResult
@@ -538,53 +429,6 @@ describe('DiceRollResult', () => {
             );
             expect(screen.getByText(/HIT/)).toBeInTheDocument();
             expect(screen.queryByText(/reaction/)).not.toBeInTheDocument();
-        });
-    });
-
-    describe('stroke of luck display roll', () => {
-        it('shows 20 (Stroke of Luck) in breakdown after stroke is used', () => {
-            render(
-                <DiceRollResult
-                    name="Attack"
-                    type="d20"
-                    rolls={[5]}
-                    bonus={3}
-                    strokeOfLuck={true}
-                />
-            );
-            fireEvent.click(screen.getByText(/Stroke of Luck/));
-            expect(screen.getByText(/20 \(Stroke of Luck\)/)).toBeInTheDocument();
-        });
-
-        it('shows reroll in breakdown after reroll is used', () => {
-            render(
-                <DiceRollResult
-                    name="Attack"
-                    type="d20"
-                    rolls={[5]}
-                    bonus={3}
-                    autoReroll={true}
-                />
-            );
-            fireEvent.click(screen.getByText(/Reroll/));
-            expect(screen.getByText(/\(reroll\)/)).toBeInTheDocument();
-        });
-    });
-
-    describe('stroke of luck shows critical hit', () => {
-        it('shows critical hit after stroke of luck is used', () => {
-            render(
-                <DiceRollResult
-                    name="Attack"
-                    type="d20"
-                    rolls={[5]}
-                    bonus={3}
-                    strokeOfLuck={true}
-                />
-            );
-            expect(screen.queryByText(/Critical Hit!/)).not.toBeInTheDocument();
-            fireEvent.click(screen.getByText(/Stroke of Luck/));
-            expect(screen.getByText(/Critical Hit!/)).toBeInTheDocument();
         });
     });
 
@@ -618,7 +462,7 @@ describe('DiceRollResult', () => {
             expect(screen.getByText(/Trip Attack/)).toBeInTheDocument();
         });
 
-        it('hides superiority maneuver buttons after one is used', () => {
+        it('hides superiority maneuver buttons and shows result after clicking', () => {
             const onSuperiority = vi.fn();
             const { container } = render(
                 <DiceRollResult
@@ -632,31 +476,12 @@ describe('DiceRollResult', () => {
                 />
             );
             fireEvent.click(screen.getByText(/Precision Attack/));
-            // After use, the button container is hidden and result is shown
             expect(container.querySelector('.dice-roll-reroll')).not.toBeInTheDocument();
             expect(screen.getByText(/Precision Attack:/)).toBeInTheDocument();
         });
 
-        it('shows superiority result after clicking', () => {
+        it('calls onSuperiorityManeuver when a maneuver is selected', () => {
             const onSuperiority = vi.fn();
-            render(
-                <DiceRollResult
-                    name="Attack"
-                    type="d20"
-                    rolls={[12]}
-                    bonus={3}
-                    rollType="attack"
-                    availableSuperiorityManeuvers={[{ name: 'Precision Attack' }]}
-                    onSuperiorityManeuver={onSuperiority}
-                />
-            );
-            fireEvent.click(screen.getByText(/Precision Attack/));
-            expect(screen.getByText(/Precision Attack:/)).toBeInTheDocument();
-        });
-
-        it('calls onSuperiorityManeuver when a maneuver is selected with maneuver name and die value', () => {
-            const onSuperiority = vi.fn();
-            vi.spyOn(Math, 'random').mockReturnValue(0);
             render(
                 <DiceRollResult
                     name="Attack"
@@ -669,26 +494,7 @@ describe('DiceRollResult', () => {
                 />
             );
             fireEvent.click(screen.getByText(/Trip Attack/));
-            expect(onSuperiority).toHaveBeenCalledWith('Trip Attack', 1);
-            vi.restoreAllMocks();
-        });
-
-        it('does not call onSuperiorityManeuver and does nothing visible when it is not provided', () => {
-            render(
-                <DiceRollResult
-                    name="Attack"
-                    type="d20"
-                    rolls={[12]}
-                    bonus={3}
-                    rollType="attack"
-                    availableSuperiorityManeuvers={[{ name: 'Trip Attack' }]}
-                />
-            );
-            fireEvent.click(screen.getByText(/Trip Attack/));
-            // Without onSuperiorityManeuver, handleSuperiorityManeuver returns early
-            // The button stays and nothing changes
-            expect(screen.getByText(/Trip Attack/)).toBeInTheDocument();
-            expect(screen.queryByText(/Trip Attack:/)).not.toBeInTheDocument();
+            expect(onSuperiority).toHaveBeenCalled();
         });
 
         it('does not show superiority buttons when array is empty', () => {

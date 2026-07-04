@@ -198,8 +198,8 @@ describe('useModalHandlers', () => {
             expect(deps.setCleaveAttackPending).not.toHaveBeenCalled();
         });
 
-        it('proceeds without cleave target selection when combat context has no creatures', async () => {
-            const deps = createDeps({
+        it('proceeds without cleave target selection when combat context is unavailable or has no creatures', async () => {
+            const makeDeps = () => createDeps({
                 pendingDamageRef: {
                     current: {
                         attack: { name: 'Longsword' },
@@ -216,40 +216,22 @@ describe('useModalHandlers', () => {
                     },
                 },
             });
-            getRuntimeValue.mockReturnValueOnce([{ effect: 'cleave', target: 'Goblin' }]);
-            getCombatContext.mockResolvedValueOnce({ creatures: [] });
 
-            const { handleMasteryClose } = useModalHandlers(deps);
-            await handleMasteryClose();
-
-            expect(deps.proceedWithDamage).toHaveBeenCalled();
-            expect(deps.setCleaveAttackPending).not.toHaveBeenCalled();
-        });
-
-        it('proceeds without cleave target selection when combat context is null', async () => {
-            const deps = createDeps({
-                pendingDamageRef: {
-                    current: {
-                        attack: { name: 'Longsword' },
-                        formula: '1d8+3',
-                        total: 10,
-                        rolls: [5, 5],
-                        modifier: 3,
-                        damage: '1d8+3',
-                        damageType: 'slashing',
-                        abilityName: 'Strength',
-                        weaponType: 'melee',
-                        properties: [],
-                        proficiencyBonus: 3,
-                    },
-                },
-            });
+            // null combat context
+            let deps = makeDeps();
             getRuntimeValue.mockReturnValueOnce([{ effect: 'cleave', target: 'Goblin' }]);
             getCombatContext.mockResolvedValueOnce(null);
-
-            const { handleMasteryClose } = useModalHandlers(deps);
+            let { handleMasteryClose } = useModalHandlers(deps);
             await handleMasteryClose();
+            expect(deps.proceedWithDamage).toHaveBeenCalled();
+            expect(deps.setCleaveAttackPending).not.toHaveBeenCalled();
 
+            vi.clearAllMocks();
+            getRuntimeValue.mockReturnValueOnce([{ effect: 'cleave', target: 'Goblin' }]);
+            getCombatContext.mockResolvedValueOnce({ creatures: [] });
+            deps = makeDeps();
+            ({ handleMasteryClose } = useModalHandlers(deps));
+            await handleMasteryClose();
             expect(deps.proceedWithDamage).toHaveBeenCalled();
             expect(deps.setCleaveAttackPending).not.toHaveBeenCalled();
         });
@@ -269,13 +251,6 @@ describe('useModalHandlers', () => {
             const deps = createDeps();
             const { handleWeaponMasteryChoice } = useModalHandlers(deps);
             handleWeaponMasteryChoice('Mercy');
-            expect(deps.setWeaponMasteryChoiceModal).toHaveBeenCalledWith(null);
-        });
-
-        it('works with empty string argument', () => {
-            const deps = createDeps();
-            const { handleWeaponMasteryChoice } = useModalHandlers(deps);
-            handleWeaponMasteryChoice('');
             expect(deps.setWeaponMasteryChoiceModal).toHaveBeenCalledWith(null);
         });
     });
@@ -416,7 +391,7 @@ describe('useModalHandlers', () => {
         });
 
         it('uses ac of 0 when target is not found — always hits since attackBonus > 0', async () => {
-            const deps = createDeps({
+            const makeDeps = () => createDeps({
                 cleaveAttackPending: {
                     attackName: 'Longsword',
                     damage: '1d8+3',
@@ -431,13 +406,12 @@ describe('useModalHandlers', () => {
                     secondTargets: [],
                 },
             });
-            getCombatContext.mockResolvedValue({
-                creatures: [],
-            });
 
-            const { handleCleaveAttack } = useModalHandlers(deps);
+            // empty creatures list
+            let deps = makeDeps();
+            getCombatContext.mockResolvedValue({ creatures: [] });
+            let { handleCleaveAttack } = useModalHandlers(deps);
             await handleCleaveAttack('Goblin');
-
             expect(deps.rollDamage).toHaveBeenCalled();
             expect(deps.rollDamage).toHaveBeenLastCalledWith(
                 'Longsword (Cleave)',
@@ -451,29 +425,14 @@ describe('useModalHandlers', () => {
                     attackerName: 'TestFighter',
                 })
             );
-        });
 
-        it('uses ac of 0 when combat context is null', async () => {
-            const deps = createDeps({
-                cleaveAttackPending: {
-                    attackName: 'Longsword',
-                    damage: '1d8+3',
-                    damageType: 'slashing',
-                    abilityName: 'Strength',
-                    weaponType: 'melee',
-                    properties: [],
-                    proficiencyBonus: 3,
-                    abilities: [{ name: 'Strength', bonus: 3 }],
-                    campaignName: 'test-campaign',
-                    playerStats: { name: 'TestFighter', level: 5, proficiency: 3, abilities: [{ name: 'Strength', bonus: 3 }] },
-                    secondTargets: [],
-                },
-            });
+            vi.clearAllMocks();
+
+            // null combat context
+            deps = makeDeps();
             getCombatContext.mockResolvedValueOnce(null);
-
-            const { handleCleaveAttack } = useModalHandlers(deps);
+            ({ handleCleaveAttack } = useModalHandlers(deps));
             await handleCleaveAttack('Goblin');
-
             expect(deps.rollDamage).toHaveBeenCalled();
         });
 

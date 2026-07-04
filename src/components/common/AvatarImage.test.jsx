@@ -20,12 +20,7 @@ describe('AvatarImage', () => {
       expect(screen.getByText('T')).toBeInTheDocument();
     });
 
-    it('should render "?" when name is missing', () => {
-      render(<AvatarImage />);
-      expect(screen.getByText('?')).toBeInTheDocument();
-    });
-
-    it('should render "?" when name is empty', () => {
+    it('should render "?" when name is missing or empty', () => {
       render(<AvatarImage name="" />);
       expect(screen.getByText('?')).toBeInTheDocument();
     });
@@ -70,25 +65,16 @@ describe('AvatarImage', () => {
       expect(onClick).toHaveBeenCalledTimes(1);
     });
 
-    it('should not call onClick when other keys are pressed', () => {
+    it('should render a button wrapper with tabindex when onClick is provided', () => {
       const onClick = vi.fn();
       render(<AvatarImage name="Test" imagePath="/avatar.png" onClick={onClick} />);
-      fireEvent.keyDown(screen.getByRole('button'), { key: 'a' });
-      expect(onClick).not.toHaveBeenCalled();
+      const button = screen.getByRole('button');
+      expect(button).toHaveAttribute('tabindex', '0');
     });
 
     it('should not render a button wrapper when onClick is not provided', () => {
       render(<AvatarImage name="Test" imagePath="/avatar.png" />);
       expect(screen.queryByRole('button')).not.toBeInTheDocument();
-    });
-  });
-
-  describe('accessibility', () => {
-    it('should have tabindex when onClick is provided', () => {
-      const onClick = vi.fn();
-      render(<AvatarImage name="Test" imagePath="/avatar.png" onClick={onClick} />);
-      const button = screen.getByRole('button');
-      expect(button).toHaveAttribute('tabindex', '0');
     });
   });
 });

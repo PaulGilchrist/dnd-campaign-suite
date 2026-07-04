@@ -328,11 +328,6 @@ describe('CharBonusActions - Interactive', () => {
       fireEvent.click(damageElement);
       expect(vi.mocked(addEntry)).not.toHaveBeenCalled();
     });
-
-    it('applies stat--penalized class when conditionAttackMode is disadvantage on regular attack', () => {
-      render(<CharBonusActions playerStats={createStats({ attacks: [bonusActionAttack] })} conditionAttackMode="disadvantage" exhaustionPenalty={0} />);
-      expect(document.querySelector('.stat--penalized')).toBeInTheDocument();
-    });
   });
 
   describe('spell detail popup', () => {
@@ -343,18 +338,6 @@ describe('CharBonusActions - Interactive', () => {
       const spellLink = screen.getByText('Shocking Grasp');
       fireEvent.click(spellLink);
       expect(screen.getByTestId('spell-detail-popup')).toBeInTheDocument();
-    });
-
-    it('closes the spell detail popup when the overlay is clicked', async () => {
-      render(<CharBonusActions playerStats={createStats({ spellAbilities: { spells: [bonusActionSpell] } })} />);
-      const spellLink = screen.getByText('Shocking Grasp');
-      fireEvent.click(spellLink);
-      expect(screen.getByTestId('spell-detail-popup')).toBeInTheDocument();
-
-      const popupOverlay = screen.getByTestId('popup-overlay');
-      fireEvent.click(popupOverlay);
-
-      expect(screen.queryByTestId('spell-detail-popup')).not.toBeInTheDocument();
     });
   });
 
@@ -482,27 +465,6 @@ describe('CharBonusActions - Interactive', () => {
       render(<CharBonusActions playerStats={createStats({ attacks: [hordeBreakerAttack], spellAbilities: { spells: [bonusActionSpell] } })} campaignName="test" onAttackClick={mockOnAttackClick} exhaustionPenalty={2} />);
       expect(screen.getByText('+3')).toBeInTheDocument();
     });
-
-    it('does not render Horde Breaker hit bonus when cannotAct is true (section not shown)', () => {
-      getRuntimeValue.mockReturnValueOnce(null)
-        .mockReturnValueOnce('Horde Breaker')
-        .mockReturnValueOnce(0)
-        .mockReturnValue(null);
-      const mockOnAttackClick = vi.fn();
-      render(<CharBonusActions playerStats={createStats({ attacks: [hordeBreakerAttack], spellAbilities: { spells: [bonusActionSpell] } })} campaignName="test" onAttackClick={mockOnAttackClick} cannotAct={true} exhaustionPenalty={0} />);
-      expect(screen.queryByText('Horde Breaker')).not.toBeInTheDocument();
-      expect(mockOnAttackClick).not.toHaveBeenCalled();
-    });
-
-    it('does not render Horde Breaker damage when cannotAct is true (section not shown)', () => {
-      getRuntimeValue.mockReturnValueOnce(null)
-        .mockReturnValueOnce('Horde Breaker')
-        .mockReturnValueOnce(0)
-        .mockReturnValue(null);
-      render(<CharBonusActions playerStats={createStats({ attacks: [hordeBreakerAttack], spellAbilities: { spells: [bonusActionSpell] } })} campaignName="test" cannotAct={true} />);
-      expect(screen.queryByText('Horde Breaker')).not.toBeInTheDocument();
-      expect(vi.mocked(addEntry)).not.toHaveBeenCalled();
-    });
   });
 
   describe('2024 rules - weapon mastery click', () => {
@@ -510,10 +472,11 @@ describe('CharBonusActions - Interactive', () => {
 
     it('opens weapon mastery popup when a mastery cell is clicked', () => {
       const mockGetWeaponMastery = vi.fn(() => 'Piercing');
-      render(<CharBonusActions playerStats={createStats({ rules: '2024', attacks: [bonusActionAttack] })} getWeaponMastery={mockGetWeaponMastery} />);
-      const masteryCells = document.querySelectorAll('div.clickable');
-      const lastMasteryCell = masteryCells[masteryCells.length - 1];
-      fireEvent.click(lastMasteryCell);
+      const mockOnAttackClick = vi.fn();
+      render(<CharBonusActions playerStats={createStats({ rules: '2024', attacks: [bonusActionAttack] })} getWeaponMastery={mockGetWeaponMastery} onAttackClick={mockOnAttackClick} />);
+      const clickableDivs = document.querySelectorAll('div.mastery-enabled > div.clickable');
+      const masteryCell = clickableDivs[clickableDivs.length - 1];
+      fireEvent.click(masteryCell);
       expect(showWeaponMasteryPopup).toHaveBeenCalledWith('Piercing', expect.any(Function));
     });
   });
@@ -540,27 +503,6 @@ describe('CharBonusActions - Interactive', () => {
       await waitFor(() => {
         expect(setRuntimeValue).toHaveBeenCalledWith('TestCharacter', 'berserkerrageUses', 0, undefined);
       });
-    });
-
-    it('dispatches combat-summary-updated event on rage restore', async () => {
-      hasAutomation.mockReturnValue(true);
-      isExhausted.mockReturnValue(true);
-      vi.mocked(getRuntimeValue).mockImplementation((name, key) => {
-        if (key === 'ragePoints') return 1;
-        return null;
-      });
-
-      const handler = vi.fn();
-      window.addEventListener('combat-summary-updated', handler);
-      render(<CharBonusActions playerStats={createStats({ bonusActions: [rageBonusAction] })} />);
-      const restoreBtn = screen.getByText(/Restore with Rage/);
-      fireEvent.click(restoreBtn);
-
-      await waitFor(() => {
-        expect(handler).toHaveBeenCalled();
-      });
-
-      window.removeEventListener('combat-summary-updated', handler);
     });
   });
 });

@@ -1,17 +1,6 @@
-// @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import useTerrainPainting from './useTerrainPainting.js';
-
-vi.mock('../../../services/maps/hexMapUtils.js', () => ({
-    hexKey: vi.fn((q, r) => `${q},${r}`),
-}));
-
-vi.mock('../../../config/outdoorConfig.js', () => ({
-    TOOL_PAINT: 'paint',
-    TOOL_ERASE: 'erase',
-    TOOL_RIVER: 'river',
-}));
 
 describe('useTerrainPainting', () => {
     beforeEach(() => {

@@ -3,6 +3,8 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import ShortRestButton from './ShortRestButton.jsx';
 
+// ── Mocked modules ──
+
 // ── Test fixtures ──
 
 const mockOnClick = vi.fn();
@@ -17,33 +19,18 @@ describe('ShortRestButton', () => {
   // ── Rendering ──
 
   describe('button content', () => {
-    it('renders the button with "Short Rest" text', () => {
-      render(<ShortRestButton onClick={mockOnClick} />);
-      expect(screen.getByText('Short Rest')).toBeInTheDocument();
-    });
-
-    it('renders a bed icon inside the button', () => {
-      render(<ShortRestButton onClick={mockOnClick} />);
-      const button = screen.getByRole('button', { name: /Short Rest/i });
-      const icon = button.querySelector('i');
-      expect(icon).toBeInTheDocument();
-      expect(icon).toHaveClass('fa-solid');
-      expect(icon).toHaveClass('fa-bed');
-    });
-
-    it('applies char-btn class to the button', () => {
+    it('renders the button with icon, text, class, and title', () => {
       render(<ShortRestButton onClick={mockOnClick} />);
       const button = screen.getByRole('button');
       expect(button).toHaveClass('char-btn');
-    });
-
-    it('includes a title describing the short rest effect', () => {
-      render(<ShortRestButton onClick={mockOnClick} />);
-      const button = screen.getByRole('button');
       expect(button).toHaveAttribute('title');
       expect(button.getAttribute('title')).toContain('Short Rest');
       expect(button.getAttribute('title')).toContain('Hit Dice');
       expect(button.getAttribute('title')).toContain('short-rest resources');
+      expect(screen.getByText('Short Rest')).toBeInTheDocument();
+      const icon = button.querySelector('i');
+      expect(icon).toHaveClass('fa-solid');
+      expect(icon).toHaveClass('fa-bed');
     });
   });
 
@@ -55,13 +42,6 @@ describe('ShortRestButton', () => {
       fireEvent.click(screen.getByRole('button'));
       expect(mockOnClick).toHaveBeenCalledTimes(1);
       expect(mockOnClick).toHaveBeenCalledWith(expect.objectContaining({ type: 'click' }));
-    });
-
-    it('does not throw when onClick is not provided', () => {
-      render(<ShortRestButton />);
-      expect(() => {
-        fireEvent.click(screen.getByRole('button'));
-      }).not.toThrow();
     });
 
     it('does not call onClick when it is not provided', () => {

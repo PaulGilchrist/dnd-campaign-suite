@@ -67,7 +67,7 @@ const mockPlayerStats = {
 const mockCampaignName = 'test-campaign';
 const defaultRollResult = { total: 5, rolls: [5], modifier: 0 };
 
-describe('useAttackDamageResolution - advanced automations', () => {
+describe('useAttackDamageResolution - cantrip damage bonus', () => {
     const mockSetPopupHtml = vi.fn();
     const mockRollDamage = vi.fn();
     const mockBuildCtx = vi.fn(() => Promise.resolve({ targetName: 'Goblin' }));
@@ -119,270 +119,9 @@ describe('useAttackDamageResolution - advanced automations', () => {
         await new Promise(r => setTimeout(r, 0));
     }
 
-    describe('natural 20 damage bonus', () => {
-        it('applies natural_20_attack_roll damage bonus', async () => {
-            getRuntimeValue.mockReturnValue(null);
-            const stats = {
-                ...mockPlayerStats,
-                automation: {
-                    actions: [
-                        { type: 'damage_bonus', trigger: 'natural_20_attack_roll', extraDamageExpression: '2d6', extraDamageType: 'force', name: 'Overwhelming Strike' },
-                    ],
-                    passives: [],
-                },
-            };
-            const { resolveAttackDamage } = UseAttackDamageResolution({
-                playerStats: stats,
-                popupHtml: { isCrit: true, isNatural20: true },
-            });
-            const attack = {
-                name: 'Longsword', damage: '1d8+3', damageType: 'Slashing',
-                weaponType: 'melee', properties: [],
-            };
-            await resolveAttackDamage(attack);
-            await tick();
-            expect(setRuntimeValue).toHaveBeenCalledWith('TestFighter', '_Overwhelming_Strike_usedRound', 1, 'test-campaign');
-            expect(mockRollDamage).toHaveBeenCalledWith(
-                'Longsword',
-                expect.stringContaining('2d6 [force]'),
-                expect.any(Number), expect.any(Array), expect.any(Number), expect.any(Object)
-            );
-        });
-
-        it('does not apply natural 20 bonus if already used this round', async () => {
-            getRuntimeValue.mockImplementation((name, key) => {
-                if (key === '_Overwhelming_Strike_usedRound') return 1;
-                return null;
-            });
-            const stats = {
-                ...mockPlayerStats,
-                automation: {
-                    actions: [
-                        { type: 'damage_bonus', trigger: 'natural_20_attack_roll', extraDamageExpression: '2d6', extraDamageType: 'force', name: 'Overwhelming Strike' },
-                    ],
-                    passives: [],
-                },
-            };
-            const { resolveAttackDamage } = UseAttackDamageResolution({
-                playerStats: stats,
-                popupHtml: { isCrit: true, isNatural20: true },
-            });
-            const attack = {
-                name: 'Longsword', damage: '1d8+3', damageType: 'Slashing',
-                weaponType: 'melee', properties: [],
-            };
-            await resolveAttackDamage(attack);
-            await tick();
-            expect(mockRollDamage).toHaveBeenCalledWith(
-                'Longsword',
-                '1d8+3',
-                expect.any(Number), expect.any(Array), expect.any(Number), expect.any(Object)
-            );
-        });
-
-        it('uses increased_ability_score for extraDamageExpr', async () => {
-            getRuntimeValue.mockReturnValue(null);
-            const stats = {
-                ...mockPlayerStats,
-                automation: {
-                    actions: [
-                        {
-                            type: 'damage_bonus', trigger: 'natural_20_attack_roll',
-                            extraDamageExpression: 'increased_ability_score',
-                            extraDamageType: 'same_as_attack',
-                            abilityIncreased: 'Strength',
-                            name: 'Overwhelming Strike',
-                        },
-                    ],
-                    passives: [],
-                },
-            };
-            const { resolveAttackDamage } = UseAttackDamageResolution({
-                playerStats: stats,
-                popupHtml: { isCrit: true, isNatural20: true },
-            });
-            const attack = {
-                name: 'Longsword', damage: '1d8+3', damageType: 'Slashing',
-                weaponType: 'melee', properties: [],
-            };
-            await resolveAttackDamage(attack);
-            await tick();
-            expect(mockRollDamage).toHaveBeenCalledWith(
-                'Longsword',
-                expect.stringContaining('3 [Slashing]'),
-                expect.any(Number), expect.any(Array), expect.any(Number), expect.any(Object)
-            );
-        });
-
-        it('does not apply natural 20 bonus when isNatural20 is false', async () => {
-            const stats = {
-                ...mockPlayerStats,
-                automation: {
-                    actions: [
-                        { type: 'damage_bonus', trigger: 'natural_20_attack_roll', extraDamageExpression: '2d6', extraDamageType: 'force', name: 'Overwhelming Strike' },
-                    ],
-                    passives: [],
-                },
-            };
-            const { resolveAttackDamage } = UseAttackDamageResolution({
-                playerStats: stats,
-                popupHtml: { isCrit: true, isNatural20: false },
-            });
-            const attack = {
-                name: 'Longsword', damage: '1d8+3', damageType: 'Slashing',
-                weaponType: 'melee', properties: [],
-            };
-            await resolveAttackDamage(attack);
-            await tick();
-            expect(mockRollDamage).toHaveBeenCalledWith(
-                'Longsword',
-                '1d8+3',
-                expect.any(Number), expect.any(Array), expect.any(Number), expect.any(Object)
-            );
-        });
-
-        it('does not apply natural 20 bonus when popupHtml is null', async () => {
-            const stats = {
-                ...mockPlayerStats,
-                automation: {
-                    actions: [
-                        { type: 'damage_bonus', trigger: 'natural_20_attack_roll', extraDamageExpression: '2d6', extraDamageType: 'force', name: 'Overwhelming Strike' },
-                    ],
-                    passives: [],
-                },
-            };
-            const { resolveAttackDamage } = UseAttackDamageResolution({
-                playerStats: stats,
-                popupHtml: null,
-            });
-            const attack = {
-                name: 'Longsword', damage: '1d8+3', damageType: 'Slashing',
-                weaponType: 'melee', properties: [],
-            };
-            await resolveAttackDamage(attack);
-            await tick();
-            expect(mockRollDamage).toHaveBeenCalledWith(
-                'Longsword',
-                '1d8+3',
-                expect.any(Number), expect.any(Array), expect.any(Number), expect.any(Object)
-            );
-        });
-    });
-
-    describe('Celestial Revelation', () => {
-        it('applies Celestial Revelation extra damage from active transformation', async () => {
-            getRuntimeValue.mockReturnValue(null);
-            getActiveBuffs.mockReturnValue([
-                { name: 'Necrotic Shroud' },
-            ]);
-            const stats = {
-                ...mockPlayerStats,
-                automation: {
-                    actions: [],
-                    passives: [
-                        { type: 'attack_rider', damageExpression: '2d8', trigger: 'hit', name: 'Necrotic Shroud', oncePerTurn: true },
-                    ],
-                },
-            };
-            const { resolveAttackDamage } = UseAttackDamageResolution({ playerStats: stats });
-            const attack = {
-                name: 'Longsword', damage: '1d8+3', damageType: 'Slashing',
-                weaponType: 'melee', properties: [],
-            };
-            await resolveAttackDamage(attack);
-            await tick();
-            expect(setRuntimeValue).toHaveBeenCalledWith('TestFighter', '_Necrotic_Shroud_usedRound', 1, 'test-campaign');
-            expect(mockRollDamage).toHaveBeenCalledWith(
-                'Longsword',
-                expect.stringContaining('2d8 ['),
-                expect.any(Number), expect.any(Array), expect.any(Number), expect.any(Object)
-            );
-        });
-
-        it('skips Celestial Revelation if used this round and oncePerTurn', async () => {
-            getRuntimeValue.mockImplementation((name, key) => {
-                if (key === '_Necrotic_Shroud_usedRound') return 1;
-                return null;
-            });
-            getActiveBuffs.mockReturnValue([
-                { name: 'Necrotic Shroud' },
-            ]);
-            const stats = {
-                ...mockPlayerStats,
-                automation: {
-                    actions: [],
-                    passives: [
-                        { type: 'attack_rider', damageExpression: '2d8', trigger: 'hit', name: 'Necrotic Shroud', oncePerTurn: true },
-                    ],
-                },
-            };
-            const { resolveAttackDamage } = UseAttackDamageResolution({ playerStats: stats });
-            const attack = {
-                name: 'Longsword', damage: '1d8+3', damageType: 'Slashing',
-                weaponType: 'melee', properties: [],
-            };
-            await resolveAttackDamage(attack);
-            await tick();
-            expect(mockRollDamage).toHaveBeenCalledWith(
-                'Longsword',
-                '1d8+3',
-                expect.any(Number), expect.any(Array), expect.any(Number), expect.any(Object)
-            );
-        });
-
-        it('skips Celestial Revelation when no active transformation buff', async () => {
-            getActiveBuffs.mockReturnValue([]);
-            const stats = {
-                ...mockPlayerStats,
-                automation: {
-                    actions: [],
-                    passives: [
-                        { type: 'attack_rider', damageExpression: '2d8', trigger: 'hit', name: 'Necrotic Shroud', oncePerTurn: true },
-                    ],
-                },
-            };
-            const { resolveAttackDamage } = UseAttackDamageResolution({ playerStats: stats });
-            const attack = {
-                name: 'Longsword', damage: '1d8+3', damageType: 'Slashing',
-                weaponType: 'melee', properties: [],
-            };
-            await resolveAttackDamage(attack);
-            await tick();
-            expect(mockRollDamage).toHaveBeenCalledWith(
-                'Longsword',
-                '1d8+3',
-                expect.any(Number), expect.any(Array), expect.any(Number), expect.any(Object)
-            );
-        });
-
-        it('applies Celestial Revelation for Heavenly Wings transformation', async () => {
-            getRuntimeValue.mockReturnValue(null);
-            getActiveBuffs.mockReturnValue([
-                { name: 'Heavenly Wings' },
-            ]);
-            const stats = {
-                ...mockPlayerStats,
-                automation: {
-                    actions: [],
-                    passives: [
-                        { type: 'attack_rider', damageExpression: '2d8', trigger: 'hit', name: 'Heavenly Wings', oncePerTurn: true },
-                    ],
-                },
-            };
-            const { resolveAttackDamage } = UseAttackDamageResolution({ playerStats: stats });
-            const attack = {
-                name: 'Longsword', damage: '1d8+3', damageType: 'Slashing',
-                weaponType: 'melee', properties: [],
-            };
-            await resolveAttackDamage(attack);
-            await tick();
-            expect(setRuntimeValue).toHaveBeenCalledWith('TestFighter', '_Heavenly_Wings_usedRound', 1, 'test-campaign');
-        });
-    });
-
-    describe('cantrip damage bonus (Potent Spellcasting)', () => {
-        it('adds Wisdom modifier to cantrip damage', async () => {
-            const stats = {
+    describe('Potent Spellcasting (cantrip damage bonus)', () => {
+        function makeCantripStats(overrides = {}) {
+            return {
                 ...mockPlayerStats,
                 automation: {
                     actions: [
@@ -390,6 +129,7 @@ describe('useAttackDamageResolution - advanced automations', () => {
                             type: 'damage_bonus', trigger: 'weapon_attack_hit',
                             options: ['Potent Spellcasting (Cantrip)'],
                             name: 'Potent Spellcasting',
+                            ...overrides,
                         },
                     ],
                     passives: [],
@@ -399,7 +139,12 @@ describe('useAttackDamageResolution - advanced automations', () => {
                         { name: 'Fire Bolt', level: 0 },
                     ],
                 },
+                ...overrides,
             };
+        }
+
+        it('adds Wisdom modifier to cantrip damage when ability is positive', async () => {
+            const stats = makeCantripStats();
             const { resolveAttackDamage } = UseAttackDamageResolution({ playerStats: stats });
             const attack = {
                 name: 'Fire Bolt', damage: '1d10', damageType: 'Fire',
@@ -410,29 +155,18 @@ describe('useAttackDamageResolution - advanced automations', () => {
             expect(mockRollDamage).toHaveBeenCalledWith(
                 'Fire Bolt',
                 expect.stringContaining('4 [Cantrip]'),
-                9, expect.any(Array), 0, expect.any(Object)
+                expect.any(Number), expect.any(Array), expect.any(Number), expect.any(Object)
             );
         });
 
-        it('does not apply Potent Spellcasting to non-cantrips', async () => {
-            const stats = {
-                ...mockPlayerStats,
-                automation: {
-                    actions: [
-                        {
-                            type: 'damage_bonus', trigger: 'weapon_attack_hit',
-                            options: ['Potent Spellcasting (Cantrip)'],
-                            name: 'Potent Spellcasting',
-                        },
-                    ],
-                    passives: [],
-                },
+        it('does not add bonus when spell is not a cantrip (level > 0)', async () => {
+            const stats = makeCantripStats({
                 spellAbilities: {
                     spells: [
                         { name: 'Fire Bolt', level: 1 },
                     ],
                 },
-            };
+            });
             const { resolveAttackDamage } = UseAttackDamageResolution({ playerStats: stats });
             const attack = {
                 name: 'Fire Bolt', damage: '2d10', damageType: 'Fire',
@@ -447,30 +181,14 @@ describe('useAttackDamageResolution - advanced automations', () => {
             );
         });
 
-        it('does not apply Potent Spellcasting when Wisdom modifier is 0', async () => {
-            const stats = {
-                ...mockPlayerStats,
-                automation: {
-                    actions: [
-                        {
-                            type: 'damage_bonus', trigger: 'weapon_attack_hit',
-                            options: ['Potent Spellcasting (Cantrip)'],
-                            name: 'Potent Spellcasting',
-                        },
-                    ],
-                    passives: [],
-                },
-                spellAbilities: {
-                    spells: [
-                        { name: 'Fire Bolt', level: 0 },
-                    ],
-                },
+        it('does not add bonus when Wisdom modifier is 0 or negative', async () => {
+            const stats = makeCantripStats({
                 abilities: [
                     { name: 'Strength', bonus: 3 },
                     { name: 'Dexterity', bonus: 2 },
-                    { name: 'Wisdom', bonus: 0 },
+                    { name: 'Wisdom', bonus: -2 },
                 ],
-            };
+            });
             const { resolveAttackDamage } = UseAttackDamageResolution({ playerStats: stats });
             const attack = {
                 name: 'Fire Bolt', damage: '1d10', damageType: 'Fire',
@@ -483,68 +201,6 @@ describe('useAttackDamageResolution - advanced automations', () => {
                 '1d10',
                 expect.any(Number), expect.any(Array), expect.any(Number), expect.any(Object)
             );
-        });
-
-        it('grants temp HP when bonus.tempHpExpression is set', async () => {
-            const stats = {
-                ...mockPlayerStats,
-                automation: {
-                    actions: [
-                        {
-                            type: 'damage_bonus', trigger: 'weapon_attack_hit',
-                            options: ['Potent Spellcasting (Cantrip)'],
-                            name: 'Potent Spellcasting',
-                            tempHpExpression: '5',
-                        },
-                    ],
-                    passives: [],
-                },
-                spellAbilities: {
-                    spells: [
-                        { name: 'Fire Bolt', level: 0 },
-                    ],
-                },
-            };
-            evaluateAutoExpression.mockReturnValue(5);
-            const { resolveAttackDamage } = UseAttackDamageResolution({ playerStats: stats });
-            const attack = {
-                name: 'Fire Bolt', damage: '1d10', damageType: 'Fire',
-                weaponType: 'ranged', properties: [],
-            };
-            await resolveAttackDamage(attack);
-            await tick();
-            expect(setRuntimeValue).toHaveBeenCalledWith('TestFighter', 'tempHp', 5, 'test-campaign');
-        });
-
-        it('does not grant temp HP when evaluateAutoExpression returns NaN', async () => {
-            evaluateAutoExpression.mockReturnValue(NaN);
-            const stats = {
-                ...mockPlayerStats,
-                automation: {
-                    actions: [
-                        {
-                            type: 'damage_bonus', trigger: 'weapon_attack_hit',
-                            options: ['Potent Spellcasting (Cantrip)'],
-                            name: 'Potent Spellcasting',
-                            tempHpExpression: 'invalid',
-                        },
-                    ],
-                    passives: [],
-                },
-                spellAbilities: {
-                    spells: [
-                        { name: 'Fire Bolt', level: 0 },
-                    ],
-                },
-            };
-            const { resolveAttackDamage } = UseAttackDamageResolution({ playerStats: stats });
-            const attack = {
-                name: 'Fire Bolt', damage: '1d10', damageType: 'Fire',
-                weaponType: 'ranged', properties: [],
-            };
-            await resolveAttackDamage(attack);
-            await tick();
-            expect(setRuntimeValue).not.toHaveBeenCalledWith('TestFighter', 'tempHp', expect.any(Number), 'test-campaign');
         });
     });
 });

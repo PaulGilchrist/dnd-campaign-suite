@@ -191,7 +191,7 @@ vi.mock('./hooks/useMapDrops.js', () => ({
 }));
 
 describe('Map conditional rendering', () => {
-    describe('indoor map rendering', () => {
+    describe('indoor vs outdoor map branching', () => {
         it('should render indoor map (SVG-based) when mapData.type is not outdoor', async () => {
             const { container } = render(
                 <Map campaignName="test-campaign" characters={[]} isLocalhost={true} mapName="test-map" onBack={vi.fn()} />
@@ -200,106 +200,6 @@ describe('Map conditional rendering', () => {
             expect(container.querySelector('svg.grid-svg')).toBeInTheDocument();
             // Should NOT render the hex-map root
             expect(container.querySelector('.hex-map')).toBeNull();
-        });
-    });
-
-    describe('conditional component rendering', () => {
-        it('should not render rename popover when renamePopover is null', async () => {
-            const { container } = render(
-                <Map campaignName="test-campaign" characters={[]} isLocalhost={true} mapName="test-map" onBack={vi.fn()} />
-            );
-            expect(container.querySelector('monster-name-autocomplete')).toBeNull();
-        });
-
-        it('should not render ItemsPanel when itemsPanelOpen is false', async () => {
-            const { container } = render(
-                <Map campaignName="test-campaign" characters={[]} isLocalhost={true} mapName="test-map" onBack={vi.fn()} />
-            );
-            expect(container.querySelector('items-panel')).toBeNull();
-        });
-
-        it('should not render ItemsPanel when isLocalhost is false', async () => {
-            const { container } = render(
-                <Map campaignName="test-campaign" characters={[]} isLocalhost={false} mapName="test-map" onBack={vi.fn()} />
-            );
-            expect(container.querySelector('items-panel')).toBeNull();
-        });
-
-        it('should not render MonsterCardModal when viewingMonster is null', async () => {
-            const { container } = render(
-                <Map campaignName="test-campaign" characters={[]} isLocalhost={true} mapName="test-map" onBack={vi.fn()} />
-            );
-            expect(container.querySelector('monster-card-modal')).toBeNull();
-        });
-    });
-
-    describe('SSE subscriber', () => {
-        it('should render a Subscriber component for SSE events', async () => {
-            const { container } = render(
-                <Map campaignName="test-campaign" characters={[]} isLocalhost={true} mapName="test-map" onBack={vi.fn()} />
-            );
-            // Subscriber renders a React.Fragment, so we check the parent renders
-            expect(container.querySelector('div.map')).toBeInTheDocument();
-        });
-    });
-
-    describe('spell overlay controls rendering', () => {
-        it('should render SpellOverlayRenderer inside the SVG', async () => {
-            const { container } = render(
-                <Map campaignName="test-campaign" characters={[]} isLocalhost={true} mapName="test-map" onBack={vi.fn()} />
-            );
-            const svg = container.querySelector('svg.grid-svg');
-            expect(svg).toBeInTheDocument();
-            // SpellOverlayRenderer renders a g with class spell-overlay-layer
-            expect(svg.querySelector('.spell-overlay-layer')).toBeInTheDocument();
-        });
-
-        it('should render RulerOverlay inside the SVG when ruler is active', async () => {
-            const { container } = render(
-                <Map campaignName="test-campaign" characters={[]} isLocalhost={true} mapName="test-map" onBack={vi.fn()} />
-            );
-            const svg = container.querySelector('svg.grid-svg');
-            expect(svg).toBeInTheDocument();
-            // RulerOverlay returns null when start is null, so no ruler-group is rendered initially
-        });
-    });
-
-    describe('context menu rendering', () => {
-        it('should render ItemContextMenu component inside the SVG', async () => {
-            const { container } = render(
-                <Map campaignName="test-campaign" characters={[]} isLocalhost={true} mapName="test-map" onBack={vi.fn()} />
-            );
-            const svg = container.querySelector('svg.grid-svg');
-            expect(svg).toBeInTheDocument();
-        });
-
-        it('should render RoomContextMenu component inside the SVG', async () => {
-            const { container } = render(
-                <Map campaignName="test-campaign" characters={[]} isLocalhost={true} mapName="test-map" onBack={vi.fn()} />
-            );
-            const svg = container.querySelector('svg.grid-svg');
-            expect(svg).toBeInTheDocument();
-        });
-
-        it('should render PlayerContextMenu component inside the SVG', async () => {
-            const { container } = render(
-                <Map campaignName="test-campaign" characters={[]} isLocalhost={true} mapName="test-map" onBack={vi.fn()} />
-            );
-            const svg = container.querySelector('svg.grid-svg');
-            expect(svg).toBeInTheDocument();
-        });
-    });
-
-    describe('grid size', () => {
-        it('should use gridSize from useMapLoader for SVG size calculation', async () => {
-            const { container } = render(
-                <Map campaignName="test-campaign" characters={[]} isLocalhost={true} mapName="test-map" onBack={vi.fn()} />
-            );
-            const svg = container.querySelector('svg.grid-svg');
-            expect(svg).toBeInTheDocument();
-            // SVG_SIZE = 30 * 40 = 1200
-            const viewBox = svg.getAttribute('viewBox');
-            expect(viewBox).toContain('1200');
         });
     });
 

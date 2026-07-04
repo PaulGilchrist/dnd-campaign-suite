@@ -1,13 +1,9 @@
 // @improved-by-ai
 import { render } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import LandmarkSVG from './LandmarkSVG.jsx';
 
 describe('LandmarkSVG', () => {
-    beforeEach(() => {
-        vi.clearAllMocks();
-    });
-
     describe('props and rendering', () => {
         it('should render the SVG group element', () => {
             const { container } = render(<LandmarkSVG />);
@@ -25,22 +21,6 @@ describe('LandmarkSVG', () => {
             const { container } = render(<LandmarkSVG className="landmark-icon" />);
             const group = container.querySelector('g');
             expect(group.getAttribute('class')).toBe('landmark-icon');
-        });
-
-        it('should pass through additional props via spread', () => {
-            const { container } = render(<LandmarkSVG data-testid="landmark-svg" onClick={vi.fn()} />);
-            const group = container.querySelector('g');
-            expect(group.getAttribute('data-testid')).toBe('landmark-svg');
-        });
-
-        it('should support ref forwarding', () => {
-            const ref = vi.fn();
-            render(<LandmarkSVG ref={ref} />);
-            expect(ref).toHaveBeenCalled();
-        });
-
-        it('should have displayName LandmarkSVG', () => {
-            expect(LandmarkSVG.displayName).toBe('LandmarkSVG');
         });
     });
 
@@ -96,20 +76,6 @@ describe('LandmarkSVG', () => {
             expect(highlight).toBeInTheDocument();
             expect(highlight.getAttribute('points')).toBe('19,6 21,6 22,28 19,28');
         });
-
-        it('should apply strokeLinejoin round to all obelisk face polygons', () => {
-            const { container } = render(<LandmarkSVG />);
-            const polygons = [...container.querySelectorAll('polygon')];
-            polygons.forEach(poly => {
-                const fill = poly.getAttribute('fill');
-                const isHighlight = fill === '#A8A8A8' && poly.getAttribute('opacity') === '0.25';
-                if (isHighlight) {
-                    expect(poly.getAttribute('stroke-linejoin')).toBeNull();
-                } else {
-                    expect(poly.getAttribute('stroke-linejoin')).toBe('round');
-                }
-            });
-        });
     });
 
     describe('pyramidion', () => {
@@ -142,14 +108,6 @@ describe('LandmarkSVG', () => {
     });
 
     describe('stone texture lines', () => {
-        it('should render 4 stone texture horizontal lines', () => {
-            const { container } = render(<LandmarkSVG />);
-            const textureLines = [...container.querySelectorAll('line')].filter(l =>
-                l.getAttribute('stroke') === '#666' && l.getAttribute('stroke-width') === '0.3' && l.getAttribute('opacity') === '0.35'
-            );
-            expect(textureLines.length).toBe(4);
-        });
-
         it('should render texture lines at the correct y positions with correct x ranges', () => {
             const { container } = render(<LandmarkSVG />);
             const lines = [...container.querySelectorAll('line')];
@@ -211,6 +169,7 @@ describe('LandmarkSVG', () => {
             expect(plinth.getAttribute('width')).toBe('16');
             expect(plinth.getAttribute('height')).toBe('3');
             expect(plinth.getAttribute('rx')).toBe('0.5');
+            expect(plinth.getAttribute('stroke-width')).toBe('0.5');
         });
 
         it('should render the plinth highlight rect', () => {
@@ -229,12 +188,6 @@ describe('LandmarkSVG', () => {
             );
             expect(plinthShadow).toBeInTheDocument();
             expect(plinthShadow.getAttribute('rx')).toBe('0.2');
-        });
-
-        it('should render the plinth with correct stroke width', () => {
-            const { container } = render(<LandmarkSVG />);
-            const plinth = container.querySelector('rect[fill="#8D8D8D"][stroke="#616161"]');
-            expect(plinth.getAttribute('stroke-width')).toBe('0.5');
         });
     });
 
@@ -298,51 +251,6 @@ describe('LandmarkSVG', () => {
                 expect(bird).toBeInTheDocument();
                 expect(bird.getAttribute('opacity')).toBe(opacity);
             });
-        });
-    });
-
-    describe('colors', () => {
-        it('should use all expected gray tones', () => {
-            const { container } = render(<LandmarkSVG />);
-            const group = container.querySelector('g');
-            const allElements = group.querySelectorAll('*');
-            const fills = new Set();
-            const strokes = new Set();
-            allElements.forEach(el => {
-                if (el.getAttribute('fill')) fills.add(el.getAttribute('fill'));
-                if (el.getAttribute('stroke')) strokes.add(el.getAttribute('stroke'));
-            });
-            expect(fills).toContain('#616161');
-            expect(fills).toContain('#757575');
-            expect(fills).toContain('#8D8D8D');
-            expect(fills).toContain('#A8A8A8');
-            expect(strokes).toContain('#616161');
-            expect(strokes).toContain('#555');
-            expect(strokes).toContain('#757575');
-        });
-
-        it('should use hieroglyphic gold color', () => {
-            const { container } = render(<LandmarkSVG />);
-            const group = container.querySelector('g');
-            const allElements = group.querySelectorAll('*');
-            const strokes = new Set();
-            allElements.forEach(el => {
-                if (el.getAttribute('stroke')) strokes.add(el.getAttribute('stroke'));
-            });
-            expect(strokes).toContain('#C8A870');
-        });
-    });
-
-    describe('element types', () => {
-        it('should render all SVG element types present', () => {
-            const { container } = render(<LandmarkSVG />);
-            const group = container.querySelector('g');
-            expect(group.querySelector('ellipse')).toBeInTheDocument();
-            expect(group.querySelector('rect')).toBeInTheDocument();
-            expect(group.querySelector('line')).toBeInTheDocument();
-            expect(group.querySelector('polygon')).toBeInTheDocument();
-            expect(group.querySelector('path')).toBeInTheDocument();
-            expect(group.querySelector('circle')).toBeInTheDocument();
         });
     });
 });

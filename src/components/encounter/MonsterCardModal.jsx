@@ -21,7 +21,8 @@ function toAbbr(name) {
   return ABBR_MAP[name] || name?.substring(0, 3).toLowerCase();
 }
 
-function extractDamageDiceFromDescription(description, existingDamageDice) {
+// eslint-disable-next-line react-refresh/only-export-components
+export function extractDamageDiceFromDescription(description, existingDamageDice) {
   if (existingDamageDice) return existingDamageDice;
   if (!description) return null;
   const hitMatch = description.match(/(?:Hit|Failure|Success):\s*\d+\s*\((\d+d\d+(?:\s*[+-]\s*\d+)?)\)/i);

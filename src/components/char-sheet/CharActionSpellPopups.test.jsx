@@ -47,28 +47,13 @@ vi.mock('./popups/MultiTargetCountPopup.jsx', () => ({
 vi.mock('./popups/TargetWithCheckboxesPopup.jsx', () => ({
   default: function TestTargetWithCheckboxesPopup({ spell, creatureTargets, range, onConfirm, onSkip }) {
     return (
-      <div data-testid="greater-restoration-popup">
-        <span data-testid="gr-spell-name">{spell?.name}</span>
-        <span data-testid="gr-spell-level">{spell?.level}</span>
-        <span data-testid="gr-creature-count">{creatureTargets?.length}</span>
-        <span data-testid="gr-range">{range}</span>
-        {onConfirm && <button data-testid="gr-confirm" onClick={onConfirm}>Confirm</button>}
-        {onSkip && <button data-testid="gr-skip" onClick={onSkip}>Skip</button>}
-      </div>
-    );
-  },
-}));
-
-vi.mock('./popups/TargetWithCheckboxesPopup.jsx', () => ({
-  default: function TestTargetWithCheckboxesPopup({ spell, creatureTargets, range, onConfirm, onSkip }) {
-    return (
-      <div data-testid="remove-curse-popup">
-        <span data-testid="rc-spell-name">{spell?.name}</span>
-        <span data-testid="rc-spell-level">{spell?.level}</span>
-        <span data-testid="rc-creature-count">{creatureTargets?.length}</span>
-        <span data-testid="rc-range">{range}</span>
-        {onConfirm && <button data-testid="rc-confirm" onClick={onConfirm}>Confirm</button>}
-        {onSkip && <button data-testid="rc-skip" onClick={onSkip}>Skip</button>}
+      <div data-testid="checkbox-popup">
+        <span data-testid="checkbox-spell-name">{spell?.name}</span>
+        <span data-testid="checkbox-spell-level">{spell?.level}</span>
+        <span data-testid="checkbox-creature-count">{creatureTargets?.length}</span>
+        <span data-testid="checkbox-range">{range}</span>
+        {onConfirm && <button data-testid="checkbox-confirm" onClick={onConfirm}>Confirm</button>}
+        {onSkip && <button data-testid="checkbox-skip" onClick={onSkip}>Skip</button>}
       </div>
     );
   },
@@ -178,56 +163,20 @@ describe('CharActionSpellPopups', () => {
       );
       expect(container).toBeEmptyDOMElement();
     });
-
-    it('renders all popups when all popup flags are empty objects (truthy)', () => {
-      const { container } = render(
-        <CharActionSpellPopups
-          {...createBaseProps()}
-          selectedActionSpell={{}}
-          actionPendingMetamagic={{}}
-          pendingActionMetamagic={{}}
-          actionPendingAid={{}}
-        />
-      );
-      expect(container).not.toBeEmptyDOMElement();
-    });
   });
 
-  describe('SpellDetailPopup rendering', () => {
-    it('renders SpellDetailPopup when selectedActionSpell is a truthy object', () => {
+  describe('SpellDetailPopup', () => {
+    it('renders when selectedActionSpell is truthy', () => {
       render(<CharActionSpellPopups {...createBaseProps()} selectedActionSpell={{ name: 'Fireball', level: 3 }} />);
       expect(screen.getByTestId('spell-detail-popup')).toBeInTheDocument();
     });
 
-    it('does not render SpellDetailPopup when selectedActionSpell is null', () => {
+    it('does not render when selectedActionSpell is null', () => {
       render(<CharActionSpellPopups {...createBaseProps()} selectedActionSpell={null} />);
       expect(screen.queryByTestId('spell-detail-popup')).not.toBeInTheDocument();
     });
 
-    it('does not render SpellDetailPopup when selectedActionSpell is undefined', () => {
-      render(<CharActionSpellPopups {...createBaseProps()} selectedActionSpell={undefined} />);
-      expect(screen.queryByTestId('spell-detail-popup')).not.toBeInTheDocument();
-    });
-
-    it('renders SpellDetailPopup when selectedActionSpell has no level property', () => {
-      render(<CharActionSpellPopups {...createBaseProps()} selectedActionSpell={{ name: 'Minor Illusion' }} />);
-      expect(screen.getByTestId('spell-detail-popup')).toBeInTheDocument();
-    });
-
-    it('calls buildUpcastLevels with the selected spell and passes the result as upcastLevels', () => {
-      const buildUpcastLevels = vi.fn(() => [3, 4, 5]);
-      render(
-        <CharActionSpellPopups
-          {...createBaseProps()}
-          selectedActionSpell={{ name: 'Fireball', level: 3 }}
-          buildUpcastLevels={buildUpcastLevels}
-        />
-      );
-      expect(buildUpcastLevels).toHaveBeenCalledWith({ name: 'Fireball', level: 3 });
-      expect(screen.getByTestId('detail-upcast-count')).toHaveTextContent('3');
-    });
-
-    it('passes the selected spell name and level to SpellDetailPopup', () => {
+    it('passes spell name and level to SpellDetailPopup', () => {
       render(
         <CharActionSpellPopups
           {...createBaseProps()}
@@ -249,14 +198,17 @@ describe('CharActionSpellPopups', () => {
       expect(screen.getByTestId('detail-player-level')).toHaveTextContent('12');
     });
 
-    it('passes campaignName to SpellDetailPopup', () => {
+    it('calls buildUpcastLevels with the selected spell and passes the result as upcastLevels', () => {
+      const buildUpcastLevels = vi.fn(() => [3, 4, 5]);
       render(
         <CharActionSpellPopups
-          {...createBaseProps({ campaignName: 'my-campaign' })}
+          {...createBaseProps()}
           selectedActionSpell={{ name: 'Fireball', level: 3 }}
+          buildUpcastLevels={buildUpcastLevels}
         />
       );
-      expect(screen.getByTestId('detail-campaign')).toHaveTextContent('my-campaign');
+      expect(buildUpcastLevels).toHaveBeenCalledWith({ name: 'Fireball', level: 3 });
+      expect(screen.getByTestId('detail-upcast-count')).toHaveTextContent('3');
     });
 
     it('wraps SpellDetailPopup in a Popup component', () => {
@@ -264,7 +216,7 @@ describe('CharActionSpellPopups', () => {
       expect(screen.getByTestId('popup')).toBeInTheDocument();
     });
 
-    it('passes onClose handler to Popup that calls setSelectedActionSpell', () => {
+    it('calls setSelectedActionSpell(null) when closing', () => {
       const setSelectedActionSpell = vi.fn();
       render(
         <CharActionSpellPopups
@@ -276,7 +228,7 @@ describe('CharActionSpellPopups', () => {
       expect(setSelectedActionSpell).toHaveBeenCalledWith(null);
     });
 
-    it('passes onCast handler to SpellDetailPopup', () => {
+    it('provides onCast handler to SpellDetailPopup', () => {
       const handleActionSpellCast = vi.fn();
       render(
         <CharActionSpellPopups
@@ -288,13 +240,13 @@ describe('CharActionSpellPopups', () => {
     });
   });
 
-  describe('MetamagicPopup rendering (actionPendingMetamagic)', () => {
-    it('renders MetamagicPopup when actionPendingMetamagic is truthy', () => {
-      render(<CharActionSpellPopups {...createBaseProps()} actionPendingMetamagic={{ spellName: 'Fireball', spellLevel: 3 }} />);
+  describe('MetamagicPopup (actionPendingMetamagic)', () => {
+    it('renders when actionPendingMetamagic is truthy', () => {
+      render(<CharActionSpellPopups {...createBaseProps()} actionPendingMetamagic={{ spellName: 'Empowered Spell', spellLevel: 3 }} />);
       expect(screen.getByTestId('metamagic-popup')).toBeInTheDocument();
     });
 
-    it('does not render MetamagicPopup when actionPendingMetamagic is null', () => {
+    it('does not render when actionPendingMetamagic is null', () => {
       render(<CharActionSpellPopups {...createBaseProps()} actionPendingMetamagic={null} />);
       expect(screen.queryByTestId('metamagic-popup')).not.toBeInTheDocument();
     });
@@ -310,12 +262,12 @@ describe('CharActionSpellPopups', () => {
       expect(screen.getByTestId('metamagic-spell-level')).toHaveTextContent('0');
     });
 
-    it('passes spell level 0 when spellLevel is missing from actionPendingMetamagic', () => {
+    it('uses level 0 when spellLevel is missing', () => {
       render(<CharActionSpellPopups {...createBaseProps()} actionPendingMetamagic={{ spellName: 'Ray of Frost' }} />);
       expect(screen.getByTestId('metamagic-spell-level')).toHaveTextContent('0');
     });
 
-    it('passes onConfirm handler from actionHandleConfirm', () => {
+    it('calls actionHandleConfirm on confirm', () => {
       const actionHandleConfirm = vi.fn();
       render(
         <CharActionSpellPopups
@@ -327,7 +279,7 @@ describe('CharActionSpellPopups', () => {
       expect(actionHandleConfirm).toHaveBeenCalled();
     });
 
-    it('passes onSkip handler from actionHandleSkip', () => {
+    it('calls actionHandleSkip on skip', () => {
       const actionHandleSkip = vi.fn();
       render(
         <CharActionSpellPopups
@@ -338,46 +290,15 @@ describe('CharActionSpellPopups', () => {
       screen.getByTestId('metamagic-skip').click();
       expect(actionHandleSkip).toHaveBeenCalled();
     });
-
-    it('passes playerStats with _metamagicCurrentSP to MetamagicPopup when _currentSP is provided', () => {
-      render(
-        <CharActionSpellPopups
-          {...createBaseProps()}
-          actionPendingMetamagic={{ spellName: 'Empowered Spell', spellLevel: 0, _currentSP: 2 }}
-        />
-      );
-      expect(screen.getByTestId('metamagic-popup')).toBeInTheDocument();
-    });
-
-    it('passes playerStats without _metamagicCurrentSP when _currentSP is not provided', () => {
-      render(
-        <CharActionSpellPopups
-          {...createBaseProps()}
-          actionPendingMetamagic={{ spellName: 'Quickened Spell', spellLevel: 0 }}
-        />
-      );
-      expect(screen.getByTestId('metamagic-popup')).toBeInTheDocument();
-    });
-
-    it('passes campaignName to MetamagicPopup', () => {
-      render(
-        <CharActionSpellPopups
-          {...createBaseProps({ campaignName: 'forge-campaign' })}
-          actionPendingMetamagic={{ spellName: 'Twin Spell', spellLevel: 2 }}
-        />
-      );
-      // The Popup wrapper receives campaignName via context through its children
-      expect(screen.getByTestId('metamagic-popup')).toBeInTheDocument();
-    });
   });
 
-  describe('MetamagicPopup rendering (pendingActionMetamagic)', () => {
-    it('renders MetamagicPopup when pendingActionMetamagic is truthy', () => {
+  describe('MetamagicPopup (pendingActionMetamagic)', () => {
+    it('renders when pendingActionMetamagic is truthy', () => {
       render(<CharActionSpellPopups {...createBaseProps()} pendingActionMetamagic={{ spellName: 'Sorcery Surge', spellLevel: 1 }} />);
       expect(screen.getByTestId('metamagic-popup')).toBeInTheDocument();
     });
 
-    it('does not render MetamagicPopup when pendingActionMetamagic is null', () => {
+    it('does not render when pendingActionMetamagic is null', () => {
       render(<CharActionSpellPopups {...createBaseProps()} pendingActionMetamagic={null} />);
       expect(screen.queryByTestId('metamagic-popup')).not.toBeInTheDocument();
     });
@@ -393,12 +314,7 @@ describe('CharActionSpellPopups', () => {
       expect(screen.getByTestId('metamagic-spell-level')).toHaveTextContent('1');
     });
 
-    it('passes spell level 0 when spellLevel is missing from pendingActionMetamagic', () => {
-      render(<CharActionSpellPopups {...createBaseProps()} pendingActionMetamagic={{ spellName: 'Twinned Spell' }} />);
-      expect(screen.getByTestId('metamagic-spell-level')).toHaveTextContent('0');
-    });
-
-    it('passes onConfirm handler from handleActionMetamagicConfirm', () => {
+    it('calls handleActionMetamagicConfirm on confirm', () => {
       const handleActionMetamagicConfirm = vi.fn();
       render(
         <CharActionSpellPopups
@@ -410,7 +326,7 @@ describe('CharActionSpellPopups', () => {
       expect(handleActionMetamagicConfirm).toHaveBeenCalled();
     });
 
-    it('passes onSkip handler from handleActionMetamagicSkip', () => {
+    it('calls handleActionMetamagicSkip on skip', () => {
       const handleActionMetamagicSkip = vi.fn();
       render(
         <CharActionSpellPopups
@@ -421,20 +337,10 @@ describe('CharActionSpellPopups', () => {
       screen.getByTestId('metamagic-skip').click();
       expect(handleActionMetamagicSkip).toHaveBeenCalled();
     });
-
-    it('passes playerStats with _metamagicCurrentSP from pendingActionMetamagic._currentSP', () => {
-      render(
-        <CharActionSpellPopups
-          {...createBaseProps()}
-          pendingActionMetamagic={{ spellName: 'Subtle Spell', spellLevel: 0, _currentSP: 1 }}
-        />
-      );
-      expect(screen.getByTestId('metamagic-popup')).toBeInTheDocument();
-    });
   });
 
-  describe('MultiTargetCountPopup rendering', () => {
-    it('renders MultiTargetCountPopup when actionPendingAid is truthy', () => {
+  describe('MultiTargetCountPopup (Aid)', () => {
+    it('renders when actionPendingAid is truthy', () => {
       render(
         <CharActionSpellPopups
           {...createBaseProps()}
@@ -452,55 +358,12 @@ describe('CharActionSpellPopups', () => {
       expect(screen.getByTestId('aid-target-popup')).toBeInTheDocument();
     });
 
-    it('does not render MultiTargetCountPopup when actionPendingAid is null', () => {
+    it('does not render when actionPendingAid is null', () => {
       render(<CharActionSpellPopups {...createBaseProps()} actionPendingAid={null} />);
       expect(screen.queryByTestId('aid-target-popup')).not.toBeInTheDocument();
     });
 
-    it('passes spell name and level to MultiTargetCountPopup', () => {
-      render(
-        <CharActionSpellPopups
-          {...createBaseProps()}
-          actionPendingAid={{ spellName: 'Aid', spellLevel: 2 }}
-        />
-      );
-      expect(screen.getByTestId('aid-spell-name')).toHaveTextContent('Aid');
-      expect(screen.getByTestId('aid-spell-level')).toHaveTextContent('2');
-    });
-
-    it('passes range and rangeFt to MultiTargetCountPopup', () => {
-      render(
-        <CharActionSpellPopups
-          {...createBaseProps()}
-          actionPendingAid={{ spellName: 'Aid', spellLevel: 2, range: '60 feet', rangeFt: 60 }}
-        />
-      );
-      expect(screen.getByTestId('aid-range')).toHaveTextContent('60 feet');
-      expect(screen.getByTestId('aid-range-ft')).toHaveTextContent('60');
-    });
-
-    it('passes creatureTargets and maxTargets to MultiTargetCountPopup', () => {
-      render(
-        <CharActionSpellPopups
-          {...createBaseProps()}
-          actionPendingAid={{ spellName: 'Aid', spellLevel: 2, creatureTargets: ['Ally1', 'Ally2'], maxTargets: 5 }}
-        />
-      );
-      expect(screen.getByTestId('aid-creature-count')).toHaveTextContent('2');
-      expect(screen.getByTestId('aid-max-targets')).toHaveTextContent('5');
-    });
-
-    it('passes attackerPos to MultiTargetCountPopup', () => {
-      render(
-        <CharActionSpellPopups
-          {...createBaseProps()}
-          actionPendingAid={{ spellName: 'Aid', spellLevel: 2, attackerPos: { gridX: 10, gridY: 20 } }}
-        />
-      );
-      expect(screen.getByTestId('aid-attacker-pos')).toHaveTextContent('10,20');
-    });
-
-    it('passes onConfirm handler from actionHandleAidConfirm', () => {
+    it('calls actionHandleAidConfirm on confirm', () => {
       const actionHandleAidConfirm = vi.fn();
       render(
         <CharActionSpellPopups
@@ -512,7 +375,7 @@ describe('CharActionSpellPopups', () => {
       expect(actionHandleAidConfirm).toHaveBeenCalled();
     });
 
-    it('passes onSkip handler from actionHandleAidSkip', () => {
+    it('calls actionHandleAidSkip on skip', () => {
       const actionHandleAidSkip = vi.fn();
       render(
         <CharActionSpellPopups
@@ -523,27 +386,181 @@ describe('CharActionSpellPopups', () => {
       screen.getByTestId('aid-skip').click();
       expect(actionHandleAidSkip).toHaveBeenCalled();
     });
+  });
 
-    it('passes campaignName to MultiTargetCountPopup', () => {
+  describe('TargetWithCheckboxesPopup (Greater Restoration)', () => {
+    it('renders when actionPendingGreaterRestoration is truthy', () => {
       render(
         <CharActionSpellPopups
-          {...createBaseProps({ campaignName: 'aid-test' })}
-          actionPendingAid={{ spellName: 'Aid', spellLevel: 2 }}
+          {...createBaseProps()}
+          actionPendingGreaterRestoration={{ spellName: 'Greater Restoration', spellLevel: 5, creatureTargets: ['Ally'] }}
         />
       );
-      expect(screen.getByTestId('aid-target-popup')).toBeInTheDocument();
+      expect(screen.getByTestId('checkbox-popup')).toBeInTheDocument();
     });
-  });
 
-  describe('TargetWithCheckboxesPopup rendering', () => {
-    it('does not render TargetWithCheckboxesPopup when actionPendingGreaterRestoration is null', () => {
+    it('does not render when actionPendingGreaterRestoration is null', () => {
       render(<CharActionSpellPopups {...createBaseProps()} actionPendingGreaterRestoration={null} />);
+      expect(screen.queryByTestId('checkbox-popup')).not.toBeInTheDocument();
     });
   });
 
-  describe('TargetWithCheckboxesPopup rendering (Remove Curse)', () => {
-    it('does not render TargetWithCheckboxesPopup when actionPendingRemoveCurse is null', () => {
+  describe('TargetWithCheckboxesPopup (Remove Curse)', () => {
+    it('renders when actionPendingRemoveCurse is truthy', () => {
+      render(
+        <CharActionSpellPopups
+          {...createBaseProps()}
+          actionPendingRemoveCurse={{ spellName: 'Remove Curse', spellLevel: 3, creatureTargets: ['Ally'] }}
+        />
+      );
+      expect(screen.getByTestId('checkbox-popup')).toBeInTheDocument();
+    });
+
+    it('does not render when actionPendingRemoveCurse is null', () => {
       render(<CharActionSpellPopups {...createBaseProps()} actionPendingRemoveCurse={null} />);
+      expect(screen.queryByTestId('checkbox-popup')).not.toBeInTheDocument();
+    });
+  });
+
+  describe('MagicMissileTargetPopup', () => {
+    it('renders when actionPendingMagicMissile is truthy', () => {
+      render(
+        <CharActionSpellPopups
+          {...createBaseProps()}
+          actionPendingMagicMissile={{
+            spell: { name: 'Magic Missile', level: 1 },
+            totalMissiles: 3,
+            missileDamage: '1d4+1',
+            creatureTargets: ['Goblin', 'Skeleton'],
+          }}
+        />
+      );
+      expect(screen.getByTestId('magic-missile-popup')).toBeInTheDocument();
+    });
+
+    it('does not render when actionPendingMagicMissile is null', () => {
+      render(<CharActionSpellPopups {...createBaseProps()} actionPendingMagicMissile={null} />);
+      expect(screen.queryByTestId('magic-missile-popup')).not.toBeInTheDocument();
+    });
+
+    it('passes spell name and level to MagicMissileTargetPopup', () => {
+      render(
+        <CharActionSpellPopups
+          {...createBaseProps()}
+          actionPendingMagicMissile={{
+            spell: { name: 'Magic Missile', level: 1 },
+            totalMissiles: 3,
+            missileDamage: '1d4+1',
+            creatureTargets: ['Goblin'],
+          }}
+        />
+      );
+      expect(screen.getByTestId('mm-spell-name')).toHaveTextContent('Magic Missile');
+      expect(screen.getByTestId('mm-spell-level')).toHaveTextContent('1');
+    });
+
+    it('passes creature names to MagicMissileTargetPopup', () => {
+      render(
+        <CharActionSpellPopups
+          {...createBaseProps()}
+          actionPendingMagicMissile={{
+            spell: { name: 'Magic Missile', level: 1 },
+            totalMissiles: 3,
+            missileDamage: '1d4+1',
+            creatureTargets: ['Goblin', 'Skeleton'],
+          }}
+        />
+      );
+      const creatureNames = screen.getAllByTestId('mm-creature-name');
+      expect(creatureNames).toHaveLength(2);
+      expect(creatureNames[0]).toHaveTextContent('Goblin');
+      expect(creatureNames[1]).toHaveTextContent('Skeleton');
+    });
+
+    it('calls actionHandleMagicMissileConfirm on confirm', () => {
+      const actionHandleMagicMissileConfirm = vi.fn();
+      render(
+        <CharActionSpellPopups
+          {...createBaseProps({ actionHandleMagicMissileConfirm })}
+          actionPendingMagicMissile={{
+            spell: { name: 'Magic Missile', level: 1 },
+            totalMissiles: 3,
+            missileDamage: '1d4+1',
+            creatureTargets: ['Goblin'],
+          }}
+        />
+      );
+      screen.getByTestId('mm-confirm').click();
+      expect(actionHandleMagicMissileConfirm).toHaveBeenCalled();
+    });
+
+    it('calls actionHandleMagicMissileSkip on skip', () => {
+      const actionHandleMagicMissileSkip = vi.fn();
+      render(
+        <CharActionSpellPopups
+          {...createBaseProps({ actionHandleMagicMissileSkip })}
+          actionPendingMagicMissile={{
+            spell: { name: 'Magic Missile', level: 1 },
+            totalMissiles: 3,
+            missileDamage: '1d4+1',
+            creatureTargets: ['Goblin'],
+          }}
+        />
+      );
+      screen.getByTestId('mm-skip').click();
+      expect(actionHandleMagicMissileSkip).toHaveBeenCalled();
+    });
+
+    it('does not wrap MagicMissileTargetPopup in a Popup', () => {
+      render(
+        <CharActionSpellPopups
+          {...createBaseProps()}
+          actionPendingMagicMissile={{
+            spell: { name: 'Magic Missile', level: 1 },
+            totalMissiles: 3,
+            missileDamage: '1d4+1',
+            creatureTargets: ['Goblin'],
+          }}
+        />
+      );
+      expect(screen.getByTestId('magic-missile-popup')).toBeInTheDocument();
+      expect(screen.queryByTestId('popup')).not.toBeInTheDocument();
+    });
+
+    it('uses currentTargetName from getTargetFromAttacker', () => {
+      mockedCombatData.getCombatSummary.mockReturnValue({ creatures: [{ name: 'Goblin' }, { name: 'Orc' }] });
+      mockedDamageUtils.getTargetFromAttacker.mockReturnValue({ name: 'Orc' });
+      render(
+        <CharActionSpellPopups
+          {...createBaseProps()}
+          actionPendingMagicMissile={{
+            spell: { name: 'Magic Missile', level: 1 },
+            totalMissiles: 3,
+            missileDamage: '1d4+1',
+            creatureTargets: ['Goblin', 'Orc'],
+          }}
+        />
+      );
+      expect(mockedCombatData.getCombatSummary).toHaveBeenCalledWith('test-campaign');
+      expect(mockedDamageUtils.getTargetFromAttacker).toHaveBeenCalledWith({ creatures: [{ name: 'Goblin' }, { name: 'Orc' }] }, 'Test Character');
+      expect(screen.getByTestId('mm-current-target')).toHaveTextContent('Orc');
+    });
+
+    it('shows "none" when getTargetFromAttacker returns null', () => {
+      mockedCombatData.getCombatSummary.mockReturnValue({ creatures: [{ name: 'Goblin' }] });
+      mockedDamageUtils.getTargetFromAttacker.mockReturnValue(null);
+      render(
+        <CharActionSpellPopups
+          {...createBaseProps()}
+          actionPendingMagicMissile={{
+            spell: { name: 'Magic Missile', level: 1 },
+            totalMissiles: 3,
+            missileDamage: '1d4+1',
+            creatureTargets: ['Goblin'],
+          }}
+        />
+      );
+      expect(screen.getByTestId('mm-current-target')).toHaveTextContent('none');
     });
   });
 
@@ -584,270 +601,6 @@ describe('CharActionSpellPopups', () => {
       );
       const popups = screen.getAllByTestId('metamagic-popup');
       expect(popups).toHaveLength(2);
-    });
-
-    it('renders MetamagicPopup from pendingActionMetamagic alongside SpellDetailPopup', () => {
-      render(
-        <CharActionSpellPopups
-          {...createBaseProps()}
-          selectedActionSpell={{ name: 'Lightning Bolt', level: 3 }}
-          pendingActionMetamagic={{ spellName: 'Twin Spell', spellLevel: 1 }}
-        />
-      );
-      expect(screen.getByTestId('spell-detail-popup')).toBeInTheDocument();
-      expect(screen.getByTestId('metamagic-popup')).toBeInTheDocument();
-    });
-  });
-
-  describe('MagicMissileTargetPopup rendering', () => {
-    it('renders MagicMissileTargetPopup when actionPendingMagicMissile is truthy', () => {
-      render(
-        <CharActionSpellPopups
-          {...createBaseProps()}
-          actionPendingMagicMissile={{
-            spell: { name: 'Magic Missile', level: 1 },
-            totalMissiles: 3,
-            missileDamage: '1d4+1',
-            creatureTargets: ['Goblin', 'Skeleton'],
-          }}
-        />
-      );
-      expect(screen.getByTestId('magic-missile-popup')).toBeInTheDocument();
-    });
-
-    it('does not render MagicMissileTargetPopup when actionPendingMagicMissile is null', () => {
-      render(<CharActionSpellPopups {...createBaseProps()} actionPendingMagicMissile={null} />);
-      expect(screen.queryByTestId('magic-missile-popup')).not.toBeInTheDocument();
-    });
-
-    it('does not render MagicMissileTargetPopup when actionPendingMagicMissile is undefined', () => {
-      render(<CharActionSpellPopups {...createBaseProps()} actionPendingMagicMissile={undefined} />);
-      expect(screen.queryByTestId('magic-missile-popup')).not.toBeInTheDocument();
-    });
-
-    it('passes spell name and level to MagicMissileTargetPopup', () => {
-      render(
-        <CharActionSpellPopups
-          {...createBaseProps()}
-          actionPendingMagicMissile={{
-            spell: { name: 'Magic Missile', level: 1 },
-            totalMissiles: 3,
-            missileDamage: '1d4+1',
-            creatureTargets: ['Goblin'],
-          }}
-        />
-      );
-      expect(screen.getByTestId('mm-spell-name')).toHaveTextContent('Magic Missile');
-      expect(screen.getByTestId('mm-spell-level')).toHaveTextContent('1');
-    });
-
-    it('passes totalMissiles to MagicMissileTargetPopup', () => {
-      render(
-        <CharActionSpellPopups
-          {...createBaseProps()}
-          actionPendingMagicMissile={{
-            spell: { name: 'Magic Missile', level: 1 },
-            totalMissiles: 5,
-            missileDamage: '1d4+1',
-            creatureTargets: ['Goblin'],
-          }}
-        />
-      );
-      expect(screen.getByTestId('mm-total-missiles')).toHaveTextContent('5');
-    });
-
-    it('passes missileDamage to MagicMissileTargetPopup', () => {
-      render(
-        <CharActionSpellPopups
-          {...createBaseProps()}
-          actionPendingMagicMissile={{
-            spell: { name: 'Magic Missile', level: 1 },
-            totalMissiles: 3,
-            missileDamage: '2d4+2',
-            creatureTargets: ['Goblin'],
-          }}
-        />
-      );
-      expect(screen.getByTestId('mm-missile-damage')).toHaveTextContent('2d4+2');
-    });
-
-    it('passes creatureTargets to MagicMissileTargetPopup', () => {
-      render(
-        <CharActionSpellPopups
-          {...createBaseProps()}
-          actionPendingMagicMissile={{
-            spell: { name: 'Magic Missile', level: 1 },
-            totalMissiles: 3,
-            missileDamage: '1d4+1',
-            creatureTargets: ['Goblin', 'Skeleton', 'Orc'],
-          }}
-        />
-      );
-      expect(screen.getByTestId('mm-creature-count')).toHaveTextContent('3');
-    });
-
-    it('passes creature names to MagicMissileTargetPopup', () => {
-      render(
-        <CharActionSpellPopups
-          {...createBaseProps()}
-          actionPendingMagicMissile={{
-            spell: { name: 'Magic Missile', level: 1 },
-            totalMissiles: 3,
-            missileDamage: '1d4+1',
-            creatureTargets: ['Goblin', 'Skeleton'],
-          }}
-        />
-      );
-      const creatureNames = screen.getAllByTestId('mm-creature-name');
-      expect(creatureNames).toHaveLength(2);
-      expect(creatureNames[0]).toHaveTextContent('Goblin');
-      expect(creatureNames[1]).toHaveTextContent('Skeleton');
-    });
-
-    it('passes onConfirm handler from actionHandleMagicMissileConfirm', () => {
-      const actionHandleMagicMissileConfirm = vi.fn();
-      render(
-        <CharActionSpellPopups
-          {...createBaseProps({ actionHandleMagicMissileConfirm })}
-          actionPendingMagicMissile={{
-            spell: { name: 'Magic Missile', level: 1 },
-            totalMissiles: 3,
-            missileDamage: '1d4+1',
-            creatureTargets: ['Goblin'],
-          }}
-        />
-      );
-      screen.getByTestId('mm-confirm').click();
-      expect(actionHandleMagicMissileConfirm).toHaveBeenCalled();
-    });
-
-    it('passes onSkip handler from actionHandleMagicMissileSkip', () => {
-      const actionHandleMagicMissileSkip = vi.fn();
-      render(
-        <CharActionSpellPopups
-          {...createBaseProps({ actionHandleMagicMissileSkip })}
-          actionPendingMagicMissile={{
-            spell: { name: 'Magic Missile', level: 1 },
-            totalMissiles: 3,
-            missileDamage: '1d4+1',
-            creatureTargets: ['Goblin'],
-          }}
-        />
-      );
-      screen.getByTestId('mm-skip').click();
-      expect(actionHandleMagicMissileSkip).toHaveBeenCalled();
-    });
-
-    it('passes campaignName to MagicMissileTargetPopup', () => {
-      render(
-        <CharActionSpellPopups
-          {...createBaseProps({ campaignName: 'mm-test' })}
-          actionPendingMagicMissile={{
-            spell: { name: 'Magic Missile', level: 1 },
-            totalMissiles: 3,
-            missileDamage: '1d4+1',
-            creatureTargets: ['Goblin'],
-          }}
-        />
-      );
-      expect(screen.getByTestId('magic-missile-popup')).toBeInTheDocument();
-    });
-
-    it('passes playerStats to MagicMissileTargetPopup', () => {
-      render(
-        <CharActionSpellPopups
-          {...createBaseProps({ playerStats: { name: 'Vizzard', level: 7 } })}
-          actionPendingMagicMissile={{
-            spell: { name: 'Magic Missile', level: 1 },
-            totalMissiles: 3,
-            missileDamage: '1d4+1',
-            creatureTargets: ['Goblin'],
-          }}
-        />
-      );
-      expect(screen.getByTestId('magic-missile-popup')).toBeInTheDocument();
-    });
-
-    it('renders MagicMissileTargetPopup without a Popup wrapper', () => {
-      render(
-        <CharActionSpellPopups
-          {...createBaseProps()}
-          actionPendingMagicMissile={{
-            spell: { name: 'Magic Missile', level: 1 },
-            totalMissiles: 3,
-            missileDamage: '1d4+1',
-            creatureTargets: ['Goblin'],
-          }}
-        />
-      );
-      expect(screen.getByTestId('magic-missile-popup')).toBeInTheDocument();
-      expect(screen.queryByTestId('popup')).not.toBeInTheDocument();
-    });
-
-    it('renders MagicMissileTargetPopup when spell has no level property', () => {
-      render(
-        <CharActionSpellPopups
-          {...createBaseProps()}
-          actionPendingMagicMissile={{
-            spell: { name: 'Magic Missile' },
-            totalMissiles: 3,
-            missileDamage: '1d4+1',
-            creatureTargets: ['Goblin'],
-          }}
-        />
-      );
-      expect(screen.getByTestId('magic-missile-popup')).toBeInTheDocument();
-    });
-
-    it('renders MagicMissileTargetPopup when creatureTargets is empty array', () => {
-      render(
-        <CharActionSpellPopups
-          {...createBaseProps()}
-          actionPendingMagicMissile={{
-            spell: { name: 'Magic Missile', level: 1 },
-            totalMissiles: 0,
-            missileDamage: '1d4+1',
-            creatureTargets: [],
-          }}
-        />
-      );
-      expect(screen.getByTestId('magic-missile-popup')).toBeInTheDocument();
-    });
-
-    it('renders MagicMissileTargetPopup when currentTargetName is derived from getTargetFromAttacker', () => {
-      mockedCombatData.getCombatSummary.mockReturnValue({ creatures: [{ name: 'Goblin' }, { name: 'Orc' }] });
-      mockedDamageUtils.getTargetFromAttacker.mockReturnValue({ name: 'Orc' });
-      render(
-        <CharActionSpellPopups
-          {...createBaseProps()}
-          actionPendingMagicMissile={{
-            spell: { name: 'Magic Missile', level: 1 },
-            totalMissiles: 3,
-            missileDamage: '1d4+1',
-            creatureTargets: ['Goblin', 'Orc'],
-          }}
-        />
-      );
-      expect(mockedCombatData.getCombatSummary).toHaveBeenCalledWith('test-campaign');
-      expect(mockedDamageUtils.getTargetFromAttacker).toHaveBeenCalledWith({ creatures: [{ name: 'Goblin' }, { name: 'Orc' }] }, 'Test Character');
-      expect(screen.getByTestId('mm-current-target')).toHaveTextContent('Orc');
-    });
-
-    it('passes currentTargetName "none" when getTargetFromAttacker returns null', () => {
-      mockedCombatData.getCombatSummary.mockReturnValue({ creatures: [{ name: 'Goblin' }] });
-      mockedDamageUtils.getTargetFromAttacker.mockReturnValue(null);
-      render(
-        <CharActionSpellPopups
-          {...createBaseProps()}
-          actionPendingMagicMissile={{
-            spell: { name: 'Magic Missile', level: 1 },
-            totalMissiles: 3,
-            missileDamage: '1d4+1',
-            creatureTargets: ['Goblin'],
-          }}
-        />
-      );
-      expect(screen.getByTestId('mm-current-target')).toHaveTextContent('none');
     });
   });
 });

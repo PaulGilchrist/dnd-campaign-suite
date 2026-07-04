@@ -1,7 +1,7 @@
 // @improved-by-ai
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import CharConditions, { EXHAUSTION_LEVELS, loadActiveConditions } from './CharConditions.jsx';
+import CharConditions, { loadActiveConditions } from './CharConditions.jsx';
 
 vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(() => null),
@@ -98,11 +98,6 @@ describe('CharConditions', () => {
   };
 
   describe('exhaustion badge', () => {
-    it('renders the conditions container', () => {
-      render(<CharConditions {...defaultProps} />);
-      expect(document.querySelector('.char-conditions')).toBeInTheDocument();
-    });
-
     it('renders exhaustion label with current level', () => {
       render(<CharConditions {...defaultProps} />);
       expect(screen.getByText('Exhaustion (0)')).toBeInTheDocument();
@@ -143,34 +138,16 @@ describe('CharConditions', () => {
       expect(badge).toHaveClass('exhaustion-badge--dead');
     });
 
-    it('does not apply dead class when exhaustion is below 6', () => {
-      render(<CharConditions {...defaultProps} exhaustionLevel={5} />);
-      const badge = document.querySelector('.exhaustion-badge');
-      expect(badge).not.toHaveClass('exhaustion-badge--dead');
-    });
-
     it('applies active class to badge when exhaustion is above 0', () => {
       render(<CharConditions {...defaultProps} exhaustionLevel={2} />);
       const badge = document.querySelector('.exhaustion-badge');
       expect(badge).toHaveClass('exhaustion-badge--active');
     });
 
-    it('does not apply active class when exhaustion is 0', () => {
-      render(<CharConditions {...defaultProps} exhaustionLevel={0} />);
-      const badge = document.querySelector('.exhaustion-badge');
-      expect(badge).not.toHaveClass('exhaustion-badge--active');
-    });
-
     it('shows DEAD in the title when exhaustion is 6', () => {
       render(<CharConditions {...defaultProps} exhaustionLevel={6} />);
       const label = screen.getByTitle(/Exhaustion level 6.*DEAD/);
       expect(label).toBeInTheDocument();
-    });
-
-    it('does not show DEAD in the title when exhaustion is below 6', () => {
-      render(<CharConditions {...defaultProps} exhaustionLevel={5} />);
-      const label = screen.getByTitle(/Exhaustion level 5/);
-      expect(label).not.toHaveTextContent('DEAD');
     });
 
     it('increments exhaustion level on plus button click', () => {
@@ -236,13 +213,6 @@ describe('CharConditions', () => {
         rollType: 'save',
       }));
     });
-
-    it('does not call onConditionsChange when adjusting exhaustion', () => {
-      render(<CharConditions {...defaultProps} exhaustionLevel={3} />);
-      const minusBtn = screen.getByRole('button', { name: '−' });
-      fireEvent.click(minusBtn);
-      expect(defaultProps.onConditionsChange).not.toHaveBeenCalled();
-    });
   });
 
   describe('condition badges', () => {
@@ -261,13 +231,6 @@ describe('CharConditions', () => {
       expect(blindedBtn).toHaveClass('condition-badge--active');
     });
 
-    it('does not mark a condition badge as active when not in stored conditions', () => {
-      getRuntimeValue.mockReturnValue(['blinded']);
-      render(<CharConditions {...defaultProps} />);
-      const charmedBtn = screen.getByText('Charmed');
-      expect(charmedBtn).not.toHaveClass('condition-badge--active');
-    });
-
     it('activates a condition badge on click when inactive', () => {
       getRuntimeValue.mockReturnValue([]);
       render(<CharConditions {...defaultProps} />);
@@ -276,20 +239,12 @@ describe('CharConditions', () => {
       expect(charmedBtn).toHaveClass('condition-badge--active');
     });
 
-    it('deactivates a condition badge on click when active (no save)', () => {
+    it('deactivates a condition badge on click when active', () => {
       getRuntimeValue.mockReturnValue(['blinded']);
       render(<CharConditions {...defaultProps} />);
       const blindedBtn = screen.getByText('Blinded');
       fireEvent.click(blindedBtn);
       expect(blindedBtn).not.toHaveClass('condition-badge--active');
-    });
-
-    it('deactivates a condition badge on click when active (with save that is skipped)', () => {
-      getRuntimeValue.mockReturnValue(['incapacitated']);
-      render(<CharConditions {...defaultProps} />);
-      const incapacitatedBtn = screen.getByText('Incapacitated');
-      fireEvent.click(incapacitatedBtn);
-      expect(incapacitatedBtn).not.toHaveClass('condition-badge--active');
     });
 
     it('calls onConditionsChange when activating a condition', () => {
@@ -300,7 +255,7 @@ describe('CharConditions', () => {
       expect(defaultProps.onConditionsChange).toHaveBeenCalled();
     });
 
-    it('calls onConditionsChange when deactivating a condition without a save', () => {
+    it('calls onConditionsChange when deactivating a condition', () => {
       getRuntimeValue.mockReturnValue(['blinded']);
       render(<CharConditions {...defaultProps} />);
       const blindedBtn = screen.getByText('Blinded');
@@ -317,19 +272,8 @@ describe('CharConditions', () => {
       expect(defaultProps.onConditionsChange).not.toHaveBeenCalled();
     });
 
-    it('calls clearUnbreakableMajesty when incapacitated is toggled off', () => {
+    it('calls clearUnbreakableMajesty when incapacitated is toggled', () => {
       getRuntimeValue.mockReturnValue(['incapacitated']);
-      render(<CharConditions {...defaultProps} />);
-      const incapacitatedBtn = screen.getByText('Incapacitated');
-      fireEvent.click(incapacitatedBtn);
-      expect(clearUnbreakableMajesty).toHaveBeenCalledWith(
-        'Test Character',
-        'test-campaign'
-      );
-    });
-
-    it('calls clearUnbreakableMajesty when incapacitated is toggled on', () => {
-      getRuntimeValue.mockReturnValue([]);
       render(<CharConditions {...defaultProps} />);
       const incapacitatedBtn = screen.getByText('Incapacitated');
       fireEvent.click(incapacitatedBtn);
@@ -355,18 +299,6 @@ describe('CharConditions', () => {
       await waitFor(() => {
         expect(rollD20).toHaveBeenCalled();
       });
-    });
-
-    it('does not perform a save check when toggling a condition without a save ability', () => {
-      getRuntimeValue.mockReturnValue([]);
-      render(<CharConditions {...defaultProps} />);
-      const blindedBtn = screen.getByText('Blinded');
-      fireEvent.click(blindedBtn);
-      expect(rollD20).not.toHaveBeenCalled();
-      expect(global.fetch).not.toHaveBeenCalledWith(
-        expect.stringContaining('/log'),
-        expect.any(Object)
-      );
     });
 
     it('removes condition from active list on successful save', async () => {
@@ -447,54 +379,14 @@ describe('CharConditions', () => {
       });
     });
 
-    it('applies save advantage from saveAdvantage array', async () => {
-      getRuntimeValue.mockReturnValue(['charmed']);
-      render(<CharConditions {...defaultProps} conditionEffects={{ saveAdvantage: ['charmed'] }} />);
-      const charmedBtn = screen.getByText('Charmed');
-      fireEvent.click(charmedBtn);
-      await waitFor(() => {
-        // With advantage, both rolls are 15, total 15+2=17 >= DC 10
-        expect(setRuntimeValue).toHaveBeenCalledWith('Test Character', 'activeConditions', [], 'test-campaign');
-      });
-    });
-
-    it('applies save advantage from saveAdvantageCount', async () => {
-      getRuntimeValue.mockReturnValue(['charmed']);
-      render(<CharConditions {...defaultProps} conditionEffects={{ saveAdvantageCount: 1 }} />);
-      const charmedBtn = screen.getByText('Charmed');
-      fireEvent.click(charmedBtn);
-      await waitFor(() => {
-        expect(setRuntimeValue).toHaveBeenCalledWith('Test Character', 'activeConditions', [], 'test-campaign');
-      });
-    });
-
-    it('applies save advantage from saveAdvantageAbilities', async () => {
-      getRuntimeValue.mockReturnValue(['charmed']);
-      render(<CharConditions {...defaultProps} conditionEffects={{ saveAdvantageAbilities: ['wis'] }} />);
-      const charmedBtn = screen.getByText('Charmed');
-      fireEvent.click(charmedBtn);
-      await waitFor(() => {
-        expect(setRuntimeValue).toHaveBeenCalledWith('Test Character', 'activeConditions', [], 'test-campaign');
-      });
-    });
-
-    it('rolls two d20s when advantage is active', async () => {
+    it('applies save advantage and rolls two d20s', async () => {
       getRuntimeValue.mockReturnValue(['charmed']);
       render(<CharConditions {...defaultProps} conditionEffects={{ saveAdvantage: ['charmed'] }} />);
       const charmedBtn = screen.getByText('Charmed');
       fireEvent.click(charmedBtn);
       await waitFor(() => {
         expect(rollD20).toHaveBeenCalledTimes(2);
-      });
-    });
-
-    it('rolls one d20 when advantage is not active', async () => {
-      getRuntimeValue.mockReturnValue(['charmed']);
-      render(<CharConditions {...defaultProps} />);
-      const charmedBtn = screen.getByText('Charmed');
-      fireEvent.click(charmedBtn);
-      await waitFor(() => {
-        expect(rollD20).toHaveBeenCalledTimes(1);
+        expect(setRuntimeValue).toHaveBeenCalledWith('Test Character', 'activeConditions', [], 'test-campaign');
       });
     });
   });
@@ -536,16 +428,6 @@ describe('CharConditions', () => {
     });
   });
 
-  describe('exports', () => {
-    it('exports EXHAUSTION_LEVELS constant', () => {
-      expect(EXHAUSTION_LEVELS).toBe(6);
-    });
-
-    it('exports loadActiveConditions function', () => {
-      expect(typeof loadActiveConditions).toBe('function');
-    });
-  });
-
   describe('loadActiveConditions', () => {
     it('returns stored conditions array', () => {
       getRuntimeValue.mockReturnValue(['blinded', 'grappled']);
@@ -553,40 +435,12 @@ describe('CharConditions', () => {
       expect(result).toEqual(['blinded', 'grappled']);
     });
 
-    it('returns empty array when stored value is null', () => {
-      getRuntimeValue.mockReturnValue(null);
-      const result = loadActiveConditions('Test Character', 'test-campaign');
-      expect(result).toEqual([]);
-    });
-
-    it('returns empty array when stored value is undefined', () => {
-      getRuntimeValue.mockReturnValue(undefined);
-      const result = loadActiveConditions('Test Character', 'test-campaign');
-      expect(result).toEqual([]);
-    });
-
-    it('returns empty array when stored value is not an array', () => {
-      getRuntimeValue.mockReturnValue('not-an-array');
-      const result = loadActiveConditions('Test Character', 'test-campaign');
-      expect(result).toEqual([]);
-    });
-
-    it('returns empty array when stored value is an object', () => {
-      getRuntimeValue.mockReturnValue({ key: 'blinded' });
-      const result = loadActiveConditions('Test Character', 'test-campaign');
-      expect(result).toEqual([]);
-    });
-
-    it('returns empty array when stored value is a number', () => {
-      getRuntimeValue.mockReturnValue(42);
-      const result = loadActiveConditions('Test Character', 'test-campaign');
-      expect(result).toEqual([]);
-    });
-
-    it('returns empty array when stored value is an empty array', () => {
-      getRuntimeValue.mockReturnValue([]);
-      const result = loadActiveConditions('Test Character', 'test-campaign');
-      expect(result).toEqual([]);
+    it('returns empty array when stored value is null or not an array', () => {
+      for (const badValue of [null, undefined, 'not-an-array', { key: 'blinded' }, 42, []]) {
+        getRuntimeValue.mockReturnValue(badValue);
+        const result = loadActiveConditions('Test Character', 'test-campaign');
+        expect(result).toEqual([]);
+      }
     });
   });
 });

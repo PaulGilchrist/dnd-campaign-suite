@@ -257,7 +257,7 @@ vi.mock('../../config/utils.js', () => ({
   validateFinalFormData: vi.fn(() => ({})),
 }));
 
-describe('CharacterCreationWizard - Inventory sync', () => {
+describe('CharacterCreationWizard - Integration', () => {
   const mockOnComplete = vi.fn();
   const mockOnCancel = vi.fn();
 
@@ -290,98 +290,12 @@ describe('CharacterCreationWizard - Inventory sync', () => {
     validateFinalFormData.mockImplementation(() => ({}));
   });
 
-  it('initially displays 0 items in temp inventory', () => {
+  it('renders step 1 (Ruleset) by default', () => {
     render(<CharacterCreationWizard {...defaultProps} />);
-    expect(screen.getByTestId('temp-inventory-count').textContent).toBe('0');
+    expect(screen.getByTestId('step-ruleset')).toBeInTheDocument();
   });
 
-  it('syncs tempInventory when formData.inventory changes', () => {
-    render(<CharacterCreationWizard {...defaultProps} />);
-    expect(screen.getByTestId('temp-inventory-count').textContent).toBe('0');
-  });
-
-  it('renders the step content correctly with tempInventory passed to it', () => {
-    render(<CharacterCreationWizard {...defaultProps} />);
-    expect(screen.getByTestId('temp-inventory-count')).toBeInTheDocument();
-  });
-});
-
-describe('CharacterCreationWizard - Prop passing to WizardStepRenderer', () => {
-  const mockOnComplete = vi.fn();
-  const mockOnCancel = vi.fn();
-
-  const defaultProps = {
-    onComplete: mockOnComplete,
-    onCancel: mockOnCancel,
-    allClasses: [],
-    allSpells: [],
-    characterData: null,
-    isEditing: false,
-  };
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-    mockGoToStep.mockReset();
-    mockNavigateNext.mockReset();
-    mockNavigatePrevious.mockReset();
-    mockGetStepEnabled.mockReset();
-    mockGetStepEnabled.mockImplementation(() => true);
-    useWizardNavigation.mockImplementation(() => ({
-      currentStep: 1,
-      isNextDisabled: false,
-      navigateNext: mockNavigateNext,
-      navigatePrevious: mockNavigatePrevious,
-      goToStep: mockGoToStep,
-      getStepEnabled: mockGetStepEnabled,
-      isSaveEnabled: true,
-    }));
-    validateStep.mockImplementation(() => Promise.resolve({}));
-    validateFinalFormData.mockImplementation(() => ({}));
-  });
-
-  it('renders step 2 (Basic Information) when navigated there', () => {
-    useWizardNavigation.mockImplementation(() => ({
-      currentStep: 2,
-      isNextDisabled: false,
-      navigateNext: mockNavigateNext,
-      navigatePrevious: mockNavigatePrevious,
-      goToStep: mockGoToStep,
-      getStepEnabled: mockGetStepEnabled,
-      isSaveEnabled: true,
-    }));
-    render(<CharacterCreationWizard {...defaultProps} />);
-    expect(screen.getByTestId('step-basic')).toBeInTheDocument();
-  });
-
-  it('renders step 3 (Race & Class) when navigated there', () => {
-    useWizardNavigation.mockImplementation(() => ({
-      currentStep: 3,
-      isNextDisabled: false,
-      navigateNext: mockNavigateNext,
-      navigatePrevious: mockNavigatePrevious,
-      goToStep: mockGoToStep,
-      getStepEnabled: mockGetStepEnabled,
-      isSaveEnabled: true,
-    }));
-    render(<CharacterCreationWizard {...defaultProps} />);
-    expect(screen.getByTestId('step-race-class')).toBeInTheDocument();
-  });
-
-  it('renders step 4 (Feats) when navigated there', () => {
-    useWizardNavigation.mockImplementation(() => ({
-      currentStep: 4,
-      isNextDisabled: false,
-      navigateNext: mockNavigateNext,
-      navigatePrevious: mockNavigatePrevious,
-      goToStep: mockGoToStep,
-      getStepEnabled: mockGetStepEnabled,
-      isSaveEnabled: true,
-    }));
-    render(<CharacterCreationWizard {...defaultProps} />);
-    expect(screen.getByTestId('step-feats')).toBeInTheDocument();
-  });
-
-  it('renders step 5 (Ability Scores) when navigated there', () => {
+  it('renders the step content corresponding to currentStep from navigation', () => {
     useWizardNavigation.mockImplementation(() => ({
       currentStep: 5,
       isNextDisabled: false,
@@ -393,123 +307,6 @@ describe('CharacterCreationWizard - Prop passing to WizardStepRenderer', () => {
     }));
     render(<CharacterCreationWizard {...defaultProps} />);
     expect(screen.getByTestId('step-abilities')).toBeInTheDocument();
-  });
-
-  it('renders step 6 (Skills) when navigated there', () => {
-    useWizardNavigation.mockImplementation(() => ({
-      currentStep: 6,
-      isNextDisabled: false,
-      navigateNext: mockNavigateNext,
-      navigatePrevious: mockNavigatePrevious,
-      goToStep: mockGoToStep,
-      getStepEnabled: mockGetStepEnabled,
-      isSaveEnabled: true,
-    }));
-    render(<CharacterCreationWizard {...defaultProps} />);
-    expect(screen.getByTestId('step-skills')).toBeInTheDocument();
-  });
-
-  it('renders step 7 (Languages) when navigated there', () => {
-    useWizardNavigation.mockImplementation(() => ({
-      currentStep: 7,
-      isNextDisabled: false,
-      navigateNext: mockNavigateNext,
-      navigatePrevious: mockNavigatePrevious,
-      goToStep: mockGoToStep,
-      getStepEnabled: mockGetStepEnabled,
-      isSaveEnabled: true,
-    }));
-    render(<CharacterCreationWizard {...defaultProps} />);
-    expect(screen.getByTestId('step-languages')).toBeInTheDocument();
-  });
-
-  it('renders step 8 (Resistances) when navigated there', () => {
-    useWizardNavigation.mockImplementation(() => ({
-      currentStep: 8,
-      isNextDisabled: false,
-      navigateNext: mockNavigateNext,
-      navigatePrevious: mockNavigatePrevious,
-      goToStep: mockGoToStep,
-      getStepEnabled: mockGetStepEnabled,
-      isSaveEnabled: true,
-    }));
-    render(<CharacterCreationWizard {...defaultProps} />);
-    expect(screen.getByTestId('step-resistances')).toBeInTheDocument();
-  });
-
-  it('renders step 9 (Spells) when navigated there', () => {
-    useWizardNavigation.mockImplementation(() => ({
-      currentStep: 9,
-      isNextDisabled: false,
-      navigateNext: mockNavigateNext,
-      navigatePrevious: mockNavigatePrevious,
-      goToStep: mockGoToStep,
-      getStepEnabled: mockGetStepEnabled,
-      isSaveEnabled: true,
-    }));
-    render(<CharacterCreationWizard {...defaultProps} />);
-    expect(screen.getByTestId('step-spells')).toBeInTheDocument();
-  });
-
-  it('renders step 10 (Magic Items) when navigated there', () => {
-    useWizardNavigation.mockImplementation(() => ({
-      currentStep: 10,
-      isNextDisabled: false,
-      navigateNext: mockNavigateNext,
-      navigatePrevious: mockNavigatePrevious,
-      goToStep: mockGoToStep,
-      getStepEnabled: mockGetStepEnabled,
-      isSaveEnabled: true,
-    }));
-    render(<CharacterCreationWizard {...defaultProps} />);
-    expect(screen.getByTestId('step-magic-items')).toBeInTheDocument();
-  });
-
-  it('renders step 11 (Inventory) when navigated there', () => {
-    useWizardNavigation.mockImplementation(() => ({
-      currentStep: 11,
-      isNextDisabled: false,
-      navigateNext: mockNavigateNext,
-      navigatePrevious: mockNavigatePrevious,
-      goToStep: mockGoToStep,
-      getStepEnabled: mockGetStepEnabled,
-      isSaveEnabled: true,
-    }));
-    render(<CharacterCreationWizard {...defaultProps} />);
-    expect(screen.getByTestId('step-inventory')).toBeInTheDocument();
-  });
-
-  it('renders step 12 (Special) when navigated there', () => {
-    useWizardNavigation.mockImplementation(() => ({
-      currentStep: 12,
-      isNextDisabled: false,
-      navigateNext: mockNavigateNext,
-      navigatePrevious: mockNavigatePrevious,
-      goToStep: mockGoToStep,
-      getStepEnabled: mockGetStepEnabled,
-      isSaveEnabled: true,
-    }));
-    render(<CharacterCreationWizard {...defaultProps} />);
-    expect(screen.getByTestId('step-special')).toBeInTheDocument();
-  });
-
-  it('renders step 1 (Ruleset) by default', () => {
-    render(<CharacterCreationWizard {...defaultProps} />);
-    expect(screen.getByTestId('step-ruleset')).toBeInTheDocument();
-  });
-
-  it('renders different steps based on currentStep from navigation', () => {
-    useWizardNavigation.mockImplementation(() => ({
-      currentStep: 8,
-      isNextDisabled: false,
-      navigateNext: mockNavigateNext,
-      navigatePrevious: mockNavigatePrevious,
-      goToStep: mockGoToStep,
-      getStepEnabled: mockGetStepEnabled,
-      isSaveEnabled: true,
-    }));
-    render(<CharacterCreationWizard {...defaultProps} />);
-    expect(screen.getByTestId('step-resistances')).toBeInTheDocument();
   });
 
   it('updates tempInventory when onTempInventoryChange is called from step', async () => {

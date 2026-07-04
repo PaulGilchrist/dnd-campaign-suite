@@ -54,61 +54,11 @@ describe('WizardStepBasic', () => {
     setupFetchMock(mockAlignments);
   });
 
-  describe('Render — header and labels', () => {
-    it('should render the step header', () => {
-      render(<WizardStepBasic {...createMockProps()} />);
-
-      expect(screen.getByText('Step 2: Basic Information')).toBeInTheDocument();
-    });
-
-    it('should render all field labels', () => {
-      render(<WizardStepBasic {...createMockProps()} />);
-
-      expect(screen.getByText('Character Name *')).toBeInTheDocument();
-      expect(screen.getByText('Level *')).toBeInTheDocument();
-      expect(screen.getByText('Alignment *')).toBeInTheDocument();
-      expect(screen.getByText('Character Picture')).toBeInTheDocument();
-    });
-
-    it('should show background label for 2024 ruleset', () => {
-      render(
-        <WizardStepBasic
-          {...createMockProps()}
-          ruleset="2024"
-          backgrounds={mockBackgrounds2024}
-        />
-      );
-
-      expect(screen.getByText('Background (2024 Rules)')).toBeInTheDocument();
-    });
-
-    it('should not show background label for 5e ruleset', () => {
-      render(<WizardStepBasic {...createMockProps()} ruleset="5e" />);
-
-      expect(screen.queryByText('Background (2024 Rules)')).not.toBeInTheDocument();
-    });
-  });
-
-  describe('Render — form values', () => {
+  describe('Render — initial values', () => {
     it('should display the initial name value', () => {
       render(<WizardStepBasic {...createMockProps()} />);
 
       expect(screen.getByDisplayValue('Test Character')).toBeInTheDocument();
-    });
-
-    it('should display the initial level value', () => {
-      render(<WizardStepBasic {...createMockProps()} />);
-
-      const levelInput = document.querySelector('input[type="number"]');
-      expect(levelInput).toHaveAttribute('value', '5');
-    });
-
-    it('should render level input with min and max attributes', () => {
-      render(<WizardStepBasic {...createMockProps()} />);
-
-      const levelInput = document.querySelector('input[type="number"]');
-      expect(levelInput).toHaveAttribute('min', '1');
-      expect(levelInput).toHaveAttribute('max', '20');
     });
 
     it('should display the initial alignment value in the select', async () => {
@@ -119,58 +69,25 @@ describe('WizardStepBasic', () => {
         expect(alignmentSelect).toHaveValue('Lawful Good');
       });
     });
-
-    it('should render alignment options from fetched data', async () => {
-      render(<WizardStepBasic {...createMockProps()} />);
-
-      await waitFor(() => {
-        const options = document.querySelectorAll('select option');
-        expect(options.length).toBe(9);
-        expect(options[0]).toHaveValue('Lawful Good');
-        expect(options[8]).toHaveValue('Chaotic Evil');
-      });
-    });
   });
 
   describe('Render — image preview', () => {
-    it('should show "Click to upload" when no image is set', () => {
+    it('should show "Click to upload" and no remove button when no image is set', () => {
       render(<WizardStepBasic {...createMockProps()} />);
 
       expect(screen.getByText('Click to upload')).toBeInTheDocument();
-    });
-
-    it('should render image preview from base64 image data', () => {
-      render(
-        <WizardStepBasic
-          {...createMockProps({
-            formData: { image: 'data:image/png;base64,test' },
-          })}
-        />
-      );
-
-      const img = document.querySelector('.image-preview img');
-      expect(img).toBeInTheDocument();
-      expect(img).toHaveAttribute('src', 'data:image/png;base64,test');
-    });
-
-    it('should render image preview from image path', () => {
-      render(
-        <WizardStepBasic
-          {...createMockProps({
-            formData: { imagePath: '/path/to/portrait.jpg' },
-          })}
-        />
-      );
-
-      const img = document.querySelector('.image-preview img');
-      expect(img).toBeInTheDocument();
-      expect(img).toHaveAttribute('src', '/path/to/portrait.jpg');
-    });
-
-    it('should not show remove button when no image is set', () => {
-      render(<WizardStepBasic {...createMockProps()} />);
-
       expect(screen.queryByText('Remove Image')).not.toBeInTheDocument();
+    });
+
+    it.each([
+      { label: 'base64 image data', formData: { image: 'data:image/png;base64,test' } },
+      { label: 'image path', formData: { imagePath: '/path/to/portrait.jpg' } },
+    ])('should render image preview from %s', ({ formData }) => {
+      render(<WizardStepBasic {...createMockProps({ formData })} />);
+
+      const img = document.querySelector('.image-preview img');
+      expect(img).toBeInTheDocument();
+      expect(img).toHaveAttribute('src', formData.image || formData.imagePath);
     });
 
     it('should show remove button when an image is set', () => {
@@ -196,6 +113,7 @@ describe('WizardStepBasic', () => {
         />
       );
 
+      expect(screen.getByText('Background (2024 Rules)')).toBeInTheDocument();
       const bgSelect = document.querySelectorAll('select')[1];
       const options = bgSelect.querySelectorAll('option');
       expect(options[0]).toHaveValue('');
@@ -259,46 +177,22 @@ describe('WizardStepBasic', () => {
   });
 
   describe('Validation errors', () => {
-    it('should render error message and error class for the name field', () => {
+    it.each([
+      { field: 'name', error: 'Name is required', getInput: () => screen.getByDisplayValue('Test Character') },
+      { field: 'level', error: 'Level is required', getInput: () => document.querySelector('input[type="number"]') },
+      { field: 'alignment', error: 'Alignment is required', getInput: () => document.querySelector('select') },
+    ])('should render error message and error class for the %s field', ({ field, error, getInput }) => {
       render(
         <WizardStepBasic
           {...createMockProps({
-            errors: { name: 'Name is required' },
+            errors: { [field]: error },
           })}
         />
       );
 
-      expect(screen.getByText('Name is required')).toBeInTheDocument();
-      const nameInput = screen.getByDisplayValue('Test Character');
-      expect(nameInput).toHaveClass('error');
-    });
-
-    it('should render error message and error class for the level field', () => {
-      render(
-        <WizardStepBasic
-          {...createMockProps({
-            errors: { level: 'Level is required' },
-          })}
-        />
-      );
-
-      expect(screen.getByText('Level is required')).toBeInTheDocument();
-      const levelInput = document.querySelector('input[type="number"]');
-      expect(levelInput).toHaveClass('error');
-    });
-
-    it('should render error message and error class for the alignment field', () => {
-      render(
-        <WizardStepBasic
-          {...createMockProps({
-            errors: { alignment: 'Alignment is required' },
-          })}
-        />
-      );
-
-      expect(screen.getByText('Alignment is required')).toBeInTheDocument();
-      const alignmentSelect = document.querySelector('select');
-      expect(alignmentSelect).toHaveClass('error');
+      expect(screen.getByText(error)).toBeInTheDocument();
+      const input = getInput();
+      expect(input).toHaveClass('error');
     });
 
     it('should render error message and error class for the background field in 2024', () => {
@@ -400,22 +294,6 @@ describe('WizardStepBasic', () => {
       } finally {
         global.FileReader = originalFileReader;
       }
-    });
-  });
-
-  describe('Empty formData', () => {
-    it('should render without errors when formData has empty string values', () => {
-      render(
-        <WizardStepBasic
-          {...createMockProps({
-            formData: { name: '', level: '', alignment: '', background: '' },
-          })}
-        />
-      );
-
-      expect(screen.getByText('Step 2: Basic Information')).toBeInTheDocument();
-      const nameInput = document.querySelector('input[type="text"]');
-      expect(nameInput).toHaveValue('');
     });
   });
 

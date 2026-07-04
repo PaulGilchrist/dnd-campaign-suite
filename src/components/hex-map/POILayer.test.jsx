@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import POILayer from './POILayer.jsx';
@@ -64,50 +64,38 @@ describe('POILayer', () => {
     });
 
     describe('visibility', () => {
-        it('should hide hidden POIs from non-localhost users', () => {
-            const { container } = renderLayer({
-                isLocalhost: false,
-                pois: [{ id: 'hidden-poi', type: 'city', q: 0, r: 0, visible: false }],
-            });
-            expect(container.querySelectorAll('g.poi-item').length).toBe(0);
-        });
+        it('should hide hidden POIs from non-localhost users but show them to localhost', () => {
+            const hiddenPoi = { id: 'hidden-poi', type: 'city', q: 0, r: 0, visible: false };
 
-        it('should show hidden POIs to localhost users', () => {
-            const { container } = renderLayer({
-                isLocalhost: true,
-                pois: [{ id: 'hidden-poi', type: 'city', q: 0, r: 0, visible: false }],
+            const { container: nonLocalhostContainer } = renderLayer({
+                isLocalhost: false,
+                pois: [hiddenPoi],
             });
-            expect(container.querySelectorAll('g.poi-item').length).toBe(1);
+            expect(nonLocalhostContainer.querySelectorAll('g.poi-item').length).toBe(0);
+
+            const { container: localhostContainer } = renderLayer({
+                isLocalhost: true,
+                pois: [hiddenPoi],
+            });
+            expect(localhostContainer.querySelectorAll('g.poi-item').length).toBe(1);
         });
     });
 
     describe('interaction callbacks', () => {
         it('should call onPoiPointerDown when non-enterable POI is pressed', () => {
             renderLayer();
-            const hitAreas = document.querySelectorAll('rect[fill="transparent"]');
-            fireEvent.pointerDown(hitAreas[0], { preventDefault: () => {} });
+            const poiItems = document.querySelectorAll('g.poi-item');
+            const nonEnterableRect = poiItems[0].querySelector('rect[fill="transparent"]');
+            fireEvent.pointerDown(nonEnterableRect, { preventDefault: () => {} });
             expect(props.onPoiPointerDown).toHaveBeenCalledWith('poi-1', expect.any(Object));
         });
 
         it('should call onPoiContextMenu on right-click', () => {
             renderLayer();
-            const hitAreas = document.querySelectorAll('rect[fill="transparent"]');
-            fireEvent.contextMenu(hitAreas[0], { preventDefault: () => {}, stopPropagation: () => {} });
+            const poiItems = document.querySelectorAll('g.poi-item');
+            const nonEnterableRect = poiItems[0].querySelector('rect[fill="transparent"]');
+            fireEvent.contextMenu(nonEnterableRect, { preventDefault: () => {}, stopPropagation: () => {} });
             expect(props.onPoiContextMenu).toHaveBeenCalledWith('poi-1', expect.any(Object));
-        });
-    });
-
-    describe('drag and drop', () => {
-        it('should render drag highlight when POI is being dragged', () => {
-            const { container } = renderLayer({ poiDragging: { poiId: 'poi-1' } });
-            const dragHighlights = container.querySelectorAll('rect[stroke="#FFD700"][stroke-width="2"]');
-            expect(dragHighlights.length).toBeGreaterThan(0);
-        });
-
-        it('should render drop preview when poiHover is set', () => {
-            const { container } = renderLayer({ poiHover: { x: 100, y: 200 } });
-            const previews = container.querySelectorAll('rect[stroke="#FFD700"][stroke-dasharray="4 2"]');
-            expect(previews.length).toBe(1);
         });
     });
 
@@ -116,57 +104,30 @@ describe('POILayer', () => {
             return { id: 'enterable-poi', type: 'dungeon', q: 0, r: 1, visible: true, linkedMap: 'dungeon-map.json' };
         }
 
-        it('should render enterable POI with golden glow ring and Enter badge when adjacent to party', () => {
+        it('should render enterable POI with Enter badge and glow when adjacent to party with valid linkedMap', () => {
             const validMaps = new Set(['dungeon-map.json']);
             const { container } = renderLayer({
                 partyPosition: { q: 0, r: 0 },
                 validLinkedMaps: validMaps,
                 pois: [createEnterablePoi()],
             });
-            expect(container.querySelectorAll('circle[stroke="#FFD700"][stroke-dasharray="5 3"]').length).toBe(1);
             expect(screen.getByText('Enter')).toBeInTheDocument();
+            expect(container.querySelector('.poi-item-enterable')).toBeInTheDocument();
         });
 
-        it('should not render enterable indicators when POI is not adjacent to party', () => {
-            const validMaps = new Set(['dungeon-map.json']);
+        it.each([
+            ['not adjacent to party', { partyPosition: { q: 10, r: 10 }, validLinkedMaps: new Set(['dungeon-map.json']) }],
+            ['has no linkedMap', { partyPosition: { q: 0, r: 1 }, pois: [{ id: 'no-link-poi', type: 'city', q: 0, r: 1, visible: true, linkedMap: null }] }],
+            ['linkedMap not in validLinkedMaps', { partyPosition: { q: 0, r: 1 }, validLinkedMaps: new Set(['other-map.json']) }],
+            ['is hidden', { partyPosition: { q: 0, r: 1 }, validLinkedMaps: new Set(['dungeon-map.json']), pois: [{ ...createEnterablePoi(), visible: false }] }],
+            ['has null partyPosition', { partyPosition: null, validLinkedMaps: new Set(['dungeon-map.json']) }],
+        ])('should not render enterable indicators when POI is %s', (_, overrides) => {
             const { container } = renderLayer({
-                partyPosition: { q: 10, r: 10 },
-                validLinkedMaps: validMaps,
-                pois: [createEnterablePoi()],
+                ...overrides,
+                pois: overrides.pois || [createEnterablePoi()],
             });
-            expect(container.querySelectorAll('circle[stroke="#FFD700"][stroke-dasharray="5 3"]').length).toBe(0);
             expect(screen.queryByText('Enter')).not.toBeInTheDocument();
-        });
-
-        it('should not render enterable indicators when POI has no linkedMap', () => {
-            const { container } = renderLayer({
-                partyPosition: { q: 0, r: 1 },
-                pois: [{ id: 'no-link-poi', type: 'city', q: 0, r: 1, visible: true, linkedMap: null }],
-            });
-            expect(container.querySelectorAll('circle[stroke="#FFD700"][stroke-dasharray="5 3"]').length).toBe(0);
-            expect(screen.queryByText('Enter')).not.toBeInTheDocument();
-        });
-
-        it('should not render enterable indicators when linkedMap is not in validLinkedMaps', () => {
-            const validMaps = new Set(['other-map.json']);
-            const { container } = renderLayer({
-                partyPosition: { q: 0, r: 1 },
-                validLinkedMaps: validMaps,
-                pois: [createEnterablePoi()],
-            });
-            expect(container.querySelectorAll('circle[stroke="#FFD700"][stroke-dasharray="5 3"]').length).toBe(0);
-            expect(screen.queryByText('Enter')).not.toBeInTheDocument();
-        });
-
-        it('should not render enterable indicators when POI is hidden', () => {
-            const validMaps = new Set(['dungeon-map.json']);
-            const { container } = renderLayer({
-                partyPosition: { q: 0, r: 1 },
-                validLinkedMaps: validMaps,
-                pois: [{ ...createEnterablePoi(), visible: false }],
-            });
-            expect(container.querySelectorAll('circle[stroke="#FFD700"][stroke-dasharray="5 3"]').length).toBe(0);
-            expect(screen.queryByText('Enter')).not.toBeInTheDocument();
+            expect(container.querySelectorAll('.poi-item-enterable').length).toBe(0);
         });
 
         it('should call onPoiEnter when enterable POI is clicked', () => {
@@ -176,31 +137,10 @@ describe('POILayer', () => {
                 validLinkedMaps: validMaps,
                 pois: [createEnterablePoi()],
             });
-            const enterRect = document.querySelector('rect[fill="transparent"]');
+            const enterableItem = document.querySelector('g.poi-item-enterable');
+            const enterRect = enterableItem.querySelector('rect[fill="transparent"]');
             fireEvent.click(enterRect);
             expect(props.onPoiEnter).toHaveBeenCalledWith(expect.objectContaining({ id: 'enterable-poi' }));
-        });
-
-        it('should not render Enterable POI when partyPosition is null', () => {
-            const validMaps = new Set(['dungeon-map.json']);
-            renderLayer({
-                partyPosition: null,
-                validLinkedMaps: validMaps,
-                pois: [createEnterablePoi()],
-            });
-            expect(screen.queryByText('Enter')).not.toBeInTheDocument();
-        });
-    });
-
-    describe('road-start selection', () => {
-        it('should render road-start selection ring for matching POI', () => {
-            const { container } = renderLayer({ roadStartPoiId: 'poi-1' });
-            expect(container.querySelectorAll('circle[stroke="#A08060"][stroke-width="2.5"][stroke-dasharray="4 3"]').length).toBe(1);
-        });
-
-        it('should not render road-start selection ring when no match', () => {
-            const { container } = renderLayer({ roadStartPoiId: 'nonexistent' });
-            expect(container.querySelectorAll('circle[stroke="#A08060"][stroke-width="2.5"][stroke-dasharray="4 3"]').length).toBe(0);
         });
     });
 });

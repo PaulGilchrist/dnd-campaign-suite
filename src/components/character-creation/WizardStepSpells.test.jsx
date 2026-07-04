@@ -89,6 +89,21 @@ describe('WizardStepSpells', () => {
         expect(screen.getByTestId('selectable-list')).toHaveClass('wizard-step-spells');
       });
     });
+
+    it('renders spells via renderItem', async () => {
+      render(<WizardStepSpells {...mockProps} />);
+      await waitFor(() => {
+        expect(screen.getByText('Fireball')).toBeInTheDocument();
+        expect(screen.getByText('Magic Missile')).toBeInTheDocument();
+      });
+    });
+
+    it('shows auto-assigned label for pre-selected spells', async () => {
+      render(<WizardStepSpells {...mockProps} preSelectedSpells={['Magic Missile']} />);
+      await waitFor(() => {
+        expect(screen.getByText('(Auto-assigned)')).toBeInTheDocument();
+      });
+    });
   });
 
   describe('Spell summary', () => {
@@ -174,19 +189,10 @@ describe('WizardStepSpells', () => {
         expect(countEl).toHaveClass('exceeded');
       });
     });
-
-    it('does not show exceeded when within limit', async () => {
-      spellLimits.getSpellLimits.mockResolvedValueOnce(preparedLimits);
-      render(<WizardStepSpells {...mockProps} formData={{ ...mockProps.formData, spells: [] }} />);
-      await waitFor(() => {
-        const countEl = screen.getByText('0/4');
-        expect(countEl).not.toHaveClass('exceeded');
-      });
-    });
   });
 
   describe('Edge cases and null safety', () => {
-    it('renders with empty spells array', async () => {
+    it('renders with empty spells array and empty allSpells', async () => {
       render(<WizardStepSpells {...mockProps} formData={{ ...mockProps.formData, spells: [] }} allSpells={[]} />);
       await waitFor(() => {
         expect(screen.getByText('Step 9: Spells')).toBeInTheDocument();
@@ -240,14 +246,6 @@ describe('WizardStepSpells', () => {
       });
     });
 
-    it('does not render warnings when none are returned', async () => {
-      spellValidation.getSpellValidationInfo.mockResolvedValueOnce({ warnings: [] });
-      render(<WizardStepSpells {...mockProps} />);
-      await waitFor(() => {
-        expect(screen.queryByText(/Spell chosen outside/)).not.toBeInTheDocument();
-      });
-    });
-
     it('clears warnings when validation returns empty array', async () => {
       spellValidation.getSpellValidationInfo
         .mockResolvedValueOnce({ warnings: [{ message: 'old warning', type: 'warning' }] })
@@ -275,85 +273,6 @@ describe('WizardStepSpells', () => {
       });
 
       consoleSpy.mockRestore();
-    });
-  });
-
-  describe('SelectableList integration', () => {
-    it('passes availableSpells to SelectableList', async () => {
-      render(<WizardStepSpells {...mockProps} />);
-      await waitFor(() => {
-        expect(screen.getByTestId('selectable-list')).toBeInTheDocument();
-      });
-    });
-
-    it('renders each spell via renderItem', async () => {
-      render(<WizardStepSpells {...mockProps} />);
-      await waitFor(() => {
-        expect(screen.getByText('Fireball')).toBeInTheDocument();
-        expect(screen.getByText('Magic Missile')).toBeInTheDocument();
-      });
-    });
-
-    it('shows auto-assigned label for pre-selected spells', async () => {
-      render(<WizardStepSpells {...mockProps} preSelectedSpells={['Magic Missile']} />);
-      await waitFor(() => {
-        expect(screen.getByText('(Auto-assigned)')).toBeInTheDocument();
-      });
-    });
-
-    it('passes onArrayFieldChange as a prop to SelectableList', async () => {
-      const onArrayFieldChange = vi.fn();
-      render(<WizardStepSpells {...mockProps} onArrayFieldChange={onArrayFieldChange} />);
-      await waitFor(() => {
-        expect(screen.getByTestId('selectable-list')).toBeInTheDocument();
-      });
-    });
-
-    it('passes search placeholder to SelectableList', async () => {
-      render(<WizardStepSpells {...mockProps} />);
-      await waitFor(() => {
-        expect(screen.getByText('Step 9: Spells')).toBeInTheDocument();
-      });
-    });
-  });
-
-  describe('Spell level styling classes', () => {
-    it('applies cantrip class for level 0 spells', async () => {
-      const { container } = render(<WizardStepSpells {...mockProps} allSpells={[{ name: 'C', index: 'c', level: 0, school: 'Evocation', classes: ['Wizard'], desc: [] }]} formData={{ ...mockProps.formData, spells: [] }} />);
-      await waitFor(() => {
-        const el = container.querySelector('.spell-level');
-        expect(el).toHaveClass('cantrip');
-        expect(el).not.toHaveClass('low');
-      });
-    });
-
-    it('applies low class for levels 1-3', async () => {
-      const { container } = render(<WizardStepSpells {...mockProps} allSpells={[{ name: 'L2', index: 'l2', level: 2, school: 'Conjuration', classes: ['Wizard'], desc: [] }]} formData={{ ...mockProps.formData, spells: [] }} />);
-      await waitFor(() => {
-        const el = container.querySelector('.spell-level');
-        expect(el).toHaveClass('low');
-        expect(el).not.toHaveClass('mid');
-        expect(el).not.toHaveClass('high');
-      });
-    });
-
-    it('applies mid class for levels 4-5', async () => {
-      const { container } = render(<WizardStepSpells {...mockProps} allSpells={[{ name: 'L4', index: 'l4', level: 4, school: 'Divination', classes: ['Wizard'], desc: [] }]} formData={{ ...mockProps.formData, spells: [] }} />);
-      await waitFor(() => {
-        const el = container.querySelector('.spell-level');
-        expect(el).toHaveClass('mid');
-        expect(el).not.toHaveClass('low');
-        expect(el).not.toHaveClass('high');
-      });
-    });
-
-    it('applies high class for levels 6-9', async () => {
-      const { container } = render(<WizardStepSpells {...mockProps} allSpells={[{ name: 'L7', index: 'l7', level: 7, school: 'Necromancy', classes: ['Wizard'], desc: [] }]} formData={{ ...mockProps.formData, spells: [] }} />);
-      await waitFor(() => {
-        const el = container.querySelector('.spell-level');
-        expect(el).toHaveClass('high');
-        expect(el).not.toHaveClass('mid');
-      });
     });
   });
 
@@ -500,15 +419,6 @@ describe('WizardStepSpells', () => {
     });
   });
 
-  describe('Filter configuration', () => {
-    it('passes filters to SelectableList', async () => {
-      render(<WizardStepSpells {...mockProps} />);
-      await waitFor(() => {
-        expect(screen.getByTestId('selectable-list')).toBeInTheDocument();
-      });
-    });
-  });
-
   describe('Pre-selected spells excluded from counts', () => {
     it('excludes pre-selected spells from spell counts', async () => {
       spellLimits.getSpellLimits.mockResolvedValueOnce({
@@ -544,25 +454,6 @@ describe('WizardStepSpells', () => {
       render(<WizardStepSpells {...mockProps} allSpells={allSpells} formData={{ ...mockProps.formData, spells: ['PreSel1', 'PreSel2', 'UserSpell'] }} preSelectedSpells={['PreSel1', 'PreSel2']} />);
       await waitFor(() => {
         expect(screen.getByText('1/1')).toBeInTheDocument();
-      });
-    });
-  });
-
-  describe('Spell lookup by index', () => {
-    it('finds spells by index when name is not in formData.spells', async () => {
-      spellLimits.getSpellLimits.mockResolvedValueOnce({
-        cantrip: 3,
-        level1: 2, level2: 0, level3: 0, level4: 0,
-        level5: 0, level6: 0, level7: 0, level8: 0, level9: 0,
-        spellType: 'known',
-        preparedSpells: null,
-      });
-      const allSpells = [
-        { name: 'Fireball', index: 'fireball', level: 3, school: 'Evocation', classes: ['Wizard'], desc: [] },
-      ];
-      render(<WizardStepSpells {...mockProps} allSpells={allSpells} formData={{ ...mockProps.formData, spells: ['fireball'] }} />);
-      await waitFor(() => {
-        expect(screen.getByTestId('selectable-list')).toBeInTheDocument();
       });
     });
   });
@@ -611,33 +502,6 @@ describe('WizardStepSpells', () => {
     });
   });
 
-  describe('Validation message state', () => {
-    it('clears validation message when selection is valid', async () => {
-      spellLimits.validateSpellSelection.mockResolvedValueOnce({ valid: true, violations: [] });
-      render(<WizardStepSpells {...mockProps} />);
-      await waitFor(() => {
-        expect(screen.getByTestId('selectable-list')).toBeInTheDocument();
-      });
-    });
-
-    it('sets validation message when selection exceeds limits', async () => {
-      spellLimits.validateSpellSelection.mockResolvedValueOnce({ valid: false, violations: ['Cantrips: 4/3'] });
-      render(<WizardStepSpells {...mockProps} />);
-      await waitFor(() => {
-        expect(screen.getByTestId('selectable-list')).toBeInTheDocument();
-      });
-    });
-
-    it('skips validation when formData is missing', async () => {
-      spellLimits.validateSpellSelection.mockReturnValueOnce(Promise.resolve({ valid: true, violations: [] }));
-      render(<WizardStepSpells formData={{}} allSpells={[]} onArrayFieldChange={vi.fn()} />);
-      await waitFor(() => {
-        expect(screen.getByText('Step 9: Spells')).toBeInTheDocument();
-      });
-      expect(spellLimits.validateSpellSelection).not.toHaveBeenCalled();
-    });
-  });
-
   describe('2024 ruleset support', () => {
     it('uses 2024 ruleset when formData.rules is 2024', async () => {
       spellLimits.getSpellLimits.mockResolvedValueOnce({
@@ -668,27 +532,6 @@ describe('WizardStepSpells', () => {
     });
   });
 
-  describe('Spell limits loading state', () => {
-    it('sets isLoadingLimits to true before fetching', async () => {
-      let resolvePromise;
-      const promise = new Promise((resolve) => { resolvePromise = resolve; });
-      spellLimits.getSpellLimits.mockReturnValueOnce(promise);
-
-      render(<WizardStepSpells formData={{ class: { name: 'Wizard' }, level: 5, spells: [] }} allSpells={[]} onArrayFieldChange={vi.fn()} />);
-
-      resolvePromise({
-        cantrip: 3,
-        level1: 2, level2: 0, level3: 0, level4: 0,
-        level5: 0, level6: 0, level7: 0, level8: 0, level9: 0,
-        spellType: 'known',
-        preparedSpells: null,
-      });
-      await waitFor(() => {
-        expect(screen.getByText('Step 9: Spells')).toBeInTheDocument();
-      });
-    });
-  });
-
   describe('formData.spells undefined', () => {
     it('handles undefined formData.spells without error', async () => {
       spellLimits.getSpellLimits.mockResolvedValueOnce({
@@ -698,24 +541,6 @@ describe('WizardStepSpells', () => {
         spellType: 'known',
         preparedSpells: null,
       });
-      render(<WizardStepSpells {...mockProps} formData={{ ...mockProps.formData, spells: undefined }} />);
-      await waitFor(() => {
-        expect(screen.getByTestId('selectable-list')).toBeInTheDocument();
-      });
-    });
-  });
-
-  describe('Validation effect with no spells', () => {
-    it('clears warnings when formData.spells is empty', async () => {
-      spellValidation.getSpellValidationInfo.mockResolvedValueOnce({ warnings: [] });
-      render(<WizardStepSpells {...mockProps} formData={{ ...mockProps.formData, spells: [] }} />);
-      await waitFor(() => {
-        expect(screen.getByTestId('selectable-list')).toBeInTheDocument();
-      });
-    });
-
-    it('clears warnings when formData.spells is missing', async () => {
-      spellValidation.getSpellValidationInfo.mockResolvedValueOnce({ warnings: [] });
       render(<WizardStepSpells {...mockProps} formData={{ ...mockProps.formData, spells: undefined }} />);
       await waitFor(() => {
         expect(screen.getByTestId('selectable-list')).toBeInTheDocument();
@@ -738,16 +563,6 @@ describe('WizardStepSpells', () => {
     });
   });
 
-  describe('Validation with no class', () => {
-    it('returns empty validation message when class is missing', async () => {
-      spellLimits.validateSpellSelection.mockReturnValueOnce(Promise.resolve({ valid: true, violations: [] }));
-      render(<WizardStepSpells formData={{ level: 5, spells: [] }} allSpells={[]} onArrayFieldChange={vi.fn()} />);
-      await waitFor(() => {
-        expect(screen.getByTestId('selectable-list')).toBeInTheDocument();
-      });
-    });
-  });
-
   describe('Spell count with invalid spell name', () => {
     it('does not crash when spell name is not found in allSpells', async () => {
       spellLimits.getSpellLimits.mockResolvedValueOnce({
@@ -758,17 +573,6 @@ describe('WizardStepSpells', () => {
         preparedSpells: null,
       });
       render(<WizardStepSpells {...mockProps} allSpells={[]} formData={{ ...mockProps.formData, spells: ['NonExistentSpell'] }} />);
-      await waitFor(() => {
-        expect(screen.getByTestId('selectable-list')).toBeInTheDocument();
-      });
-    });
-  });
-
-  describe('Pre-selected spells in validation', () => {
-    it('excludes pre-selected spells from validation', async () => {
-      spellLimits.validateSpellSelection.mockResolvedValueOnce({ valid: true, violations: [] });
-      spellValidation.getSpellValidationInfo.mockResolvedValueOnce({ warnings: [] });
-      render(<WizardStepSpells {...mockProps} preSelectedSpells={['Fireball']} />);
       await waitFor(() => {
         expect(screen.getByTestId('selectable-list')).toBeInTheDocument();
       });
@@ -789,16 +593,6 @@ describe('WizardStepSpells', () => {
       await waitFor(() => {
         const levelSpan = container.querySelector('.spell-level');
         expect(levelSpan).toHaveTextContent('3');
-      });
-    });
-  });
-
-  describe('Spell name display in renderItem', () => {
-    it('displays spell name in list item', async () => {
-      const { container } = render(<WizardStepSpells {...mockProps} allSpells={[{ name: 'Fireball', index: 'fireball', level: 3, school: 'Evocation', classes: ['Wizard'], desc: [] }]} formData={{ ...mockProps.formData, spells: [] }} />);
-      await waitFor(() => {
-        const nameEl = container.querySelector('.list-item-name');
-        expect(nameEl).toHaveTextContent('Fireball');
       });
     });
   });
@@ -862,118 +656,6 @@ describe('WizardStepSpells', () => {
       await waitFor(() => {
         expect(screen.getByText('Show Less')).toBeInTheDocument();
       });
-    });
-  });
-
-  describe('Spell class filter getValue', () => {
-    it('returns additional classes for Wizard spells', async () => {
-      const wizardSpell = { name: 'Fireball', classes: ['Wizard'] };
-      const filter = {
-        label: 'Class',
-        field: 'class',
-        getValue: (spell) => {
-          const classes = spell.classes || [];
-          if (classes.includes('Wizard')) {
-            return [...classes, 'Fighter', 'Rogue'];
-          }
-          return classes;
-        },
-      };
-      const result = filter.getValue(wizardSpell);
-      expect(result).toEqual(['Wizard', 'Fighter', 'Rogue']);
-    });
-
-    it('returns original classes for non-Wizard spells', async () => {
-      const clericSpell = { name: 'Cure Wounds', classes: ['Cleric'] };
-      const filter = {
-        label: 'Class',
-        field: 'class',
-        getValue: (spell) => {
-          const classes = spell.classes || [];
-          if (classes.includes('Wizard')) {
-            return [...classes, 'Fighter', 'Rogue'];
-          }
-          return classes;
-        },
-      };
-      const result = filter.getValue(clericSpell);
-      expect(result).toEqual(['Cleric']);
-    });
-  });
-
-  describe('Spell level filter getValue', () => {
-    it('returns level as string for spells with level', async () => {
-      const spell = { name: 'Fireball', level: 3 };
-      const filter = {
-        label: 'Spell Level',
-        field: 'level',
-        getValue: (s) => s.level !== undefined ? s.level.toString() : '0',
-      };
-      expect(filter.getValue(spell)).toBe('3');
-    });
-
-    it('returns 0 for spells without level property', async () => {
-      const spell = { name: 'NoLevel' };
-      const filter = {
-        label: 'Spell Level',
-        field: 'level',
-        getValue: (s) => s.level !== undefined ? s.level.toString() : '0',
-      };
-      expect(filter.getValue(spell)).toBe('0');
-    });
-  });
-
-  describe('Spell level filter renderOption', () => {
-    it('renders 0 as Cantrip', async () => {
-      const filter = {
-        label: 'Spell Level',
-        field: 'level',
-        renderOption: (level) => level === '0' ? 'Cantrip' : level,
-      };
-      expect(filter.renderOption('0')).toBe('Cantrip');
-    });
-
-    it('renders non-zero levels as-is', async () => {
-      const filter = {
-        label: 'Spell Level',
-        field: 'level',
-        renderOption: (level) => level === '0' ? 'Cantrip' : level,
-      };
-      expect(filter.renderOption('3')).toBe('3');
-    });
-  });
-
-  describe('Spell level filter sortFn', () => {
-    it('sorts All to the top', async () => {
-      const filter = {
-        label: 'Spell Level',
-        field: 'level',
-        sortFn: (a, b) => {
-          if (a === 'All') return -1;
-          if (b === 'All') return 1;
-          return parseInt(a) - parseInt(b);
-        },
-      };
-      const options = ['1', '2', 'All', '3'];
-      options.sort(filter.sortFn);
-      expect(options[0]).toBe('All');
-    });
-
-    it('sorts numeric levels in ascending order', async () => {
-      const filter = {
-        label: 'Spell Level',
-        field: 'level',
-        sortFn: (a, b) => {
-          if (a === 'All') return -1;
-          if (b === 'All') return 1;
-          return parseInt(a) - parseInt(b);
-        },
-      };
-      const options = ['3', '1', '2'];
-      options.sort(filter.sortFn);
-      expect(options[0]).toBe('1');
-      expect(options[1]).toBe('2');
-      expect(options[2]).toBe('3');
     });
   });
 

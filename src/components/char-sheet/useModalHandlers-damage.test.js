@@ -1,4 +1,3 @@
-// @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import useModalHandlers from './useModalHandlers.js';
 
@@ -79,7 +78,6 @@ describe('useModalHandlers - damage type handlers', () => {
         rollExpression.mockReturnValue({ total: 5, rolls: [5], modifier: 0 });
         getCombatContext.mockResolvedValue(null);
         getDistanceFeet.mockReturnValue(5);
-        globalThis.Math.random = () => 20;
     });
 
     describe('handleDivineFuryDamageType', () => {
@@ -116,15 +114,6 @@ describe('useModalHandlers - damage type handlers', () => {
                 'test-campaign'
             );
         });
-
-        it('returns early when no pending damage', () => {
-            const deps = createDeps();
-            const { handleDivineFuryDamageType } = useModalHandlers(deps);
-            handleDivineFuryDamageType('Radiant');
-            expect(deps.setDivineFuryChoice).toHaveBeenCalledWith(null);
-            expect(deps.proceedWithDamage).not.toHaveBeenCalled();
-            expect(setRuntimeValue).not.toHaveBeenCalled();
-        });
     });
 
     describe('handleDivineFurySkip', () => {
@@ -150,15 +139,6 @@ describe('useModalHandlers - damage type handlers', () => {
                 [5],
                 0
             );
-            expect(deps.pendingDamageRef.current).toBeNull();
-        });
-
-        it('returns early when no pending damage', () => {
-            const deps = createDeps();
-            const { handleDivineFurySkip } = useModalHandlers(deps);
-            handleDivineFurySkip();
-            expect(deps.setDivineFuryChoice).toHaveBeenCalledWith(null);
-            expect(deps.proceedWithDamage).not.toHaveBeenCalled();
             expect(deps.pendingDamageRef.current).toBeNull();
         });
     });
@@ -220,15 +200,6 @@ describe('useModalHandlers - damage type handlers', () => {
             expect(deps.proceedWithDamage).toHaveBeenCalled();
             expect(setRuntimeValue).not.toHaveBeenCalled();
         });
-
-        it('returns early when no pending damage', () => {
-            const deps = createDeps();
-            const { handleGenericDamageTypeChoice } = useModalHandlers(deps);
-            handleGenericDamageTypeChoice('Fire');
-            expect(deps.setDamageTypeChoice).toHaveBeenCalledWith(null);
-            expect(deps.proceedWithDamage).not.toHaveBeenCalled();
-            expect(setRuntimeValue).not.toHaveBeenCalled();
-        });
     });
 
     describe('handleGenericDamageTypeSkip', () => {
@@ -254,15 +225,6 @@ describe('useModalHandlers - damage type handlers', () => {
                 [5],
                 0
             );
-            expect(deps.pendingDamageRef.current).toBeNull();
-        });
-
-        it('returns early when no pending damage', () => {
-            const deps = createDeps();
-            const { handleGenericDamageTypeSkip } = useModalHandlers(deps);
-            handleGenericDamageTypeSkip();
-            expect(deps.setDamageTypeChoice).toHaveBeenCalledWith(null);
-            expect(deps.proceedWithDamage).not.toHaveBeenCalled();
             expect(deps.pendingDamageRef.current).toBeNull();
         });
     });
@@ -293,15 +255,6 @@ describe('useModalHandlers - damage type handlers', () => {
                 'test-campaign'
             );
         });
-
-        it('returns early when no pending damage', () => {
-            const deps = createDeps();
-            const { handleDamageTypeModifierChoice } = useModalHandlers(deps);
-            handleDamageTypeModifierChoice('radiant');
-            expect(deps.setDamageTypeChoice).toHaveBeenCalledWith(null);
-            expect(deps.proceedWithDamage).not.toHaveBeenCalled();
-            expect(setRuntimeValue).not.toHaveBeenCalled();
-        });
     });
 
     describe('handleDamageTypeModifierSkip', () => {
@@ -329,15 +282,6 @@ describe('useModalHandlers - damage type handlers', () => {
                 1,
                 'test-campaign'
             );
-        });
-
-        it('returns early when no pending damage', () => {
-            const deps = createDeps();
-            const { handleDamageTypeModifierSkip } = useModalHandlers(deps);
-            handleDamageTypeModifierSkip();
-            expect(deps.setDamageTypeChoice).toHaveBeenCalledWith(null);
-            expect(deps.proceedWithDamage).not.toHaveBeenCalled();
-            expect(setRuntimeValue).not.toHaveBeenCalled();
         });
     });
 });

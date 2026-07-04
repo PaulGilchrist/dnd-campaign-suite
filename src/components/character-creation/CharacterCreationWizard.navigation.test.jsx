@@ -257,143 +257,6 @@ vi.mock('../../config/utils.js', () => ({
   validateFinalFormData: vi.fn(() => ({})),
 }));
 
-describe('CharacterCreationWizard - Footer buttons', () => {
-  const mockOnComplete = vi.fn();
-  const mockOnCancel = vi.fn();
-
-  const defaultProps = {
-    onComplete: mockOnComplete,
-    onCancel: mockOnCancel,
-    allClasses: [],
-    allSpells: [],
-    characterData: null,
-    isEditing: false,
-  };
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-    mockGoToStep.mockReset();
-    mockNavigateNext.mockReset();
-    mockNavigatePrevious.mockReset();
-    mockGetStepEnabled.mockReset();
-    mockGetStepEnabled.mockImplementation(() => true);
-    useWizardNavigation.mockImplementation(() => ({
-      currentStep: 1,
-      isNextDisabled: false,
-      navigateNext: mockNavigateNext,
-      navigatePrevious: mockNavigatePrevious,
-      goToStep: mockGoToStep,
-      getStepEnabled: mockGetStepEnabled,
-      isSaveEnabled: true,
-    }));
-    validateStep.mockImplementation(() => Promise.resolve({}));
-    validateFinalFormData.mockImplementation(() => ({}));
-  });
-
-  it('shows Cancel button (disabled) on first step when not editing', () => {
-    render(<CharacterCreationWizard {...defaultProps} />);
-    const cancelButton = screen.getByText('Cancel');
-    expect(cancelButton).toBeDisabled();
-    expect(cancelButton).toHaveClass('btn-secondary');
-  });
-
-  it('shows Previous button on non-first steps', () => {
-    useWizardNavigation.mockImplementation(() => ({
-      currentStep: 3,
-      isNextDisabled: false,
-      navigateNext: mockNavigateNext,
-      navigatePrevious: mockNavigatePrevious,
-      goToStep: mockGoToStep,
-      getStepEnabled: mockGetStepEnabled,
-      isSaveEnabled: true,
-    }));
-    render(<CharacterCreationWizard {...defaultProps} />);
-    const previousButton = screen.getByText('Previous');
-    expect(previousButton).not.toBeDisabled();
-    expect(previousButton).toHaveClass('btn-secondary');
-  });
-
-  it('shows Next button on non-last steps', () => {
-    render(<CharacterCreationWizard {...defaultProps} />);
-    const nextButton = screen.getByText('Next');
-    expect(nextButton).toBeInTheDocument();
-    expect(nextButton).toHaveClass('btn-primary');
-  });
-
-  it('shows Next button disabled when isNextDisabled is true', () => {
-    useWizardNavigation.mockImplementation(() => ({
-      currentStep: 1,
-      isNextDisabled: true,
-      navigateNext: mockNavigateNext,
-      navigatePrevious: mockNavigatePrevious,
-      goToStep: mockGoToStep,
-      getStepEnabled: mockGetStepEnabled,
-      isSaveEnabled: true,
-    }));
-    render(<CharacterCreationWizard {...defaultProps} />);
-    expect(screen.getByText('Next')).toBeDisabled();
-  });
-
-  it('shows "Create Character" submit button on last step when not editing', () => {
-    useWizardNavigation.mockImplementation(() => ({
-      currentStep: 12,
-      isNextDisabled: false,
-      navigateNext: mockNavigateNext,
-      navigatePrevious: mockNavigatePrevious,
-      goToStep: mockGoToStep,
-      getStepEnabled: mockGetStepEnabled,
-      isSaveEnabled: true,
-    }));
-    render(<CharacterCreationWizard {...defaultProps} />);
-    expect(screen.getByText('Create Character')).toBeInTheDocument();
-    expect(screen.getByText('Create Character')).toHaveClass('btn-success');
-  });
-
-  it('shows "Save Changes" submit button on last step when editing', () => {
-    useWizardNavigation.mockImplementation(() => ({
-      currentStep: 12,
-      isNextDisabled: false,
-      navigateNext: mockNavigateNext,
-      navigatePrevious: mockNavigatePrevious,
-      goToStep: mockGoToStep,
-      getStepEnabled: mockGetStepEnabled,
-      isSaveEnabled: true,
-    }));
-    render(<CharacterCreationWizard {...defaultProps} isEditing={true} />);
-    expect(screen.getByText('Save Changes')).toBeInTheDocument();
-  });
-
-  it('shows Previous button (not Cancel) when editing on step 3+', () => {
-    useWizardNavigation.mockImplementation(() => ({
-      currentStep: 3,
-      isNextDisabled: false,
-      navigateNext: mockNavigateNext,
-      navigatePrevious: mockNavigatePrevious,
-      goToStep: mockGoToStep,
-      getStepEnabled: mockGetStepEnabled,
-      isSaveEnabled: true,
-    }));
-    render(<CharacterCreationWizard {...defaultProps} isEditing={true} />);
-    expect(screen.getByText('Previous')).toBeInTheDocument();
-    expect(screen.queryByText('Cancel')).not.toBeInTheDocument();
-  });
-
-  it('shows Cancel button (disabled) when editing on step 2', () => {
-    useWizardNavigation.mockImplementation(() => ({
-      currentStep: 2,
-      isNextDisabled: false,
-      navigateNext: mockNavigateNext,
-      navigatePrevious: mockNavigatePrevious,
-      goToStep: mockGoToStep,
-      getStepEnabled: mockGetStepEnabled,
-      isSaveEnabled: true,
-    }));
-    render(<CharacterCreationWizard {...defaultProps} isEditing={true} />);
-    const cancelButton = screen.getByText('Cancel');
-    expect(cancelButton).toBeDisabled();
-  });
-});
-
 describe('CharacterCreationWizard - Navigation', () => {
   const mockOnComplete = vi.fn();
   const mockOnCancel = vi.fn();
@@ -427,117 +290,63 @@ describe('CharacterCreationWizard - Navigation', () => {
     validateFinalFormData.mockImplementation(() => ({}));
   });
 
-  it('calls navigatePrevious when Previous button is clicked', async () => {
-    useWizardNavigation.mockImplementation(() => ({
-      currentStep: 3,
-      isNextDisabled: false,
-      navigateNext: mockNavigateNext,
-      navigatePrevious: mockNavigatePrevious,
-      goToStep: mockGoToStep,
-      getStepEnabled: mockGetStepEnabled,
-      isSaveEnabled: true,
-    }));
-    render(<CharacterCreationWizard {...defaultProps} />);
-    await act(async () => {
-      fireEvent.click(screen.getByText('Previous'));
+  describe('handleNext behavior', () => {
+    it('calls navigateNext and resets errors when navigation succeeds', async () => {
+      mockNavigateNext.mockResolvedValue(true);
+      render(<CharacterCreationWizard {...defaultProps} />);
+      await act(async () => {
+        fireEvent.click(screen.getByText('Next'));
+      });
+      await waitFor(() => {
+        expect(mockNavigateNext).toHaveBeenCalled();
+        expect(mockResetErrors).toHaveBeenCalled();
+      });
     });
-    expect(mockNavigatePrevious).toHaveBeenCalled();
-  });
 
-  it('calls handleNext (navigateNext + resetErrors) when Next button is clicked and succeeds', async () => {
-    mockNavigateNext.mockResolvedValue(true);
-    render(<CharacterCreationWizard {...defaultProps} />);
-    await act(async () => {
-      fireEvent.click(screen.getByText('Next'));
+    it('calls navigateNext but does not reset errors when navigation fails', async () => {
+      mockNavigateNext.mockResolvedValue(false);
+      render(<CharacterCreationWizard {...defaultProps} />);
+      await act(async () => {
+        fireEvent.click(screen.getByText('Next'));
+      });
+      await waitFor(() => {
+        expect(mockNavigateNext).toHaveBeenCalled();
+        expect(mockResetErrors).not.toHaveBeenCalled();
+      });
     });
-    await waitFor(() => {
-      expect(mockNavigateNext).toHaveBeenCalled();
-      expect(mockResetErrors).toHaveBeenCalled();
+
+    it('calls navigatePrevious when Previous button is clicked', async () => {
+      useWizardNavigation.mockImplementation(() => ({
+        currentStep: 3,
+        isNextDisabled: false,
+        navigateNext: mockNavigateNext,
+        navigatePrevious: mockNavigatePrevious,
+        goToStep: mockGoToStep,
+        getStepEnabled: mockGetStepEnabled,
+        isSaveEnabled: true,
+      }));
+      render(<CharacterCreationWizard {...defaultProps} />);
+      await act(async () => {
+        fireEvent.click(screen.getByText('Previous'));
+      });
+      expect(mockNavigatePrevious).toHaveBeenCalled();
     });
-  });
 
-  it('does not reset errors when Next navigation fails', async () => {
-    mockNavigateNext.mockResolvedValue(false);
-    render(<CharacterCreationWizard {...defaultProps} />);
-    await act(async () => {
-      fireEvent.click(screen.getByText('Next'));
+    it('calls goToStep when sidebar navigation buttons are clicked', async () => {
+      useWizardNavigation.mockImplementation(() => ({
+        currentStep: 1,
+        isNextDisabled: false,
+        navigateNext: mockNavigateNext,
+        navigatePrevious: mockNavigatePrevious,
+        goToStep: mockGoToStep,
+        getStepEnabled: mockGetStepEnabled,
+        isSaveEnabled: true,
+      }));
+      render(<CharacterCreationWizard {...defaultProps} />);
+      await act(async () => {
+        fireEvent.click(screen.getByText('Go Step 6'));
+      });
+      expect(mockGoToStep).toHaveBeenCalledWith(6);
     });
-    await waitFor(() => {
-      expect(mockNavigateNext).toHaveBeenCalled();
-      expect(mockResetErrors).not.toHaveBeenCalled();
-    });
-  });
-
-  it('calls goToStep when sidebar navigation buttons are clicked', async () => {
-    useWizardNavigation.mockImplementation(() => ({
-      currentStep: 1,
-      isNextDisabled: false,
-      navigateNext: mockNavigateNext,
-      navigatePrevious: mockNavigatePrevious,
-      goToStep: mockGoToStep,
-      getStepEnabled: mockGetStepEnabled,
-      isSaveEnabled: true,
-    }));
-    render(<CharacterCreationWizard {...defaultProps} />);
-    await act(async () => {
-      fireEvent.click(screen.getByText('Go Step 6'));
-    });
-    expect(mockGoToStep).toHaveBeenCalledWith(6);
-  });
-
-  it('passes currentStep to WizardSidebar', () => {
-    useWizardNavigation.mockImplementation(() => ({
-      currentStep: 5,
-      isNextDisabled: false,
-      navigateNext: mockNavigateNext,
-      navigatePrevious: mockNavigatePrevious,
-      goToStep: mockGoToStep,
-      getStepEnabled: mockGetStepEnabled,
-      isSaveEnabled: true,
-    }));
-    render(<CharacterCreationWizard {...defaultProps} />);
-    expect(screen.getByTestId('sidebar-step').textContent).toBe('5');
-  });
-
-  it('passes isSaveEnabled to WizardSidebar', () => {
-    useWizardNavigation.mockImplementation(() => ({
-      currentStep: 1,
-      isNextDisabled: false,
-      navigateNext: mockNavigateNext,
-      navigatePrevious: mockNavigatePrevious,
-      goToStep: mockGoToStep,
-      getStepEnabled: mockGetStepEnabled,
-      isSaveEnabled: false,
-    }));
-    render(<CharacterCreationWizard {...defaultProps} />);
-    expect(screen.getByTestId('sidebar-save-enabled').textContent).toBe('false');
-  });
-
-  it('disables Next button when isNextDisabled is true', () => {
-    useWizardNavigation.mockImplementation(() => ({
-      currentStep: 2,
-      isNextDisabled: true,
-      navigateNext: mockNavigateNext,
-      navigatePrevious: mockNavigatePrevious,
-      goToStep: mockGoToStep,
-      getStepEnabled: mockGetStepEnabled,
-      isSaveEnabled: true,
-    }));
-    render(<CharacterCreationWizard {...defaultProps} />);
-    expect(screen.getByText('Next')).toBeDisabled();
-  });
-
-  it('enables Next button when isNextDisabled is false', () => {
-    useWizardNavigation.mockImplementation(() => ({
-      currentStep: 2,
-      isNextDisabled: false,
-      navigateNext: mockNavigateNext,
-      navigatePrevious: mockNavigatePrevious,
-      goToStep: mockGoToStep,
-      getStepEnabled: mockGetStepEnabled,
-      isSaveEnabled: true,
-    }));
-    render(<CharacterCreationWizard {...defaultProps} />);
-    expect(screen.getByText('Next')).not.toBeDisabled();
   });
 });

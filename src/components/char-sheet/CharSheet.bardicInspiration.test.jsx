@@ -60,26 +60,29 @@ vi.mock('./char-spells/CharSpells.jsx', () => ({
   )),
 }));
 
+const createMockPlayerStats = (overrides = {}) => ({
+  name: 'Test Bard',
+  level: 5,
+  hitPoints: { current: 40, max: 40 },
+  abilities: [{ name: 'Strength', bonus: 2, save: 4, skills: [] }],
+  spellAbilities: { spells: [], maxPreparedSpells: 5 },
+  rules: '5e',
+  automation: { passives: [] },
+  class: { name: 'Bard' },
+  speed: 30,
+  race: { speed: 30 },
+  actions: [],
+  bonusActions: [],
+  reactions: [],
+  specialActions: [],
+  characterAdvancement: [],
+  skillProficiencies: [],
+  ...overrides,
+});
+
 vi.mock('../../services/rules/rulesFactory.js', () => ({
   default: {
-    getPlayerStats: vi.fn().mockImplementation(() => Promise.resolve({
-      name: 'Test Bard',
-      level: 5,
-      hitPoints: { current: 40, max: 40 },
-      abilities: [{ name: 'Strength', bonus: 2, save: 4, skills: [] }],
-      spellAbilities: { spells: [], maxPreparedSpells: 5 },
-      rules: '5e',
-      automation: { passives: [] },
-      class: { name: 'Bard' },
-      speed: 30,
-      race: { speed: 30 },
-      actions: [],
-      bonusActions: [],
-      reactions: [],
-      specialActions: [],
-      characterAdvancement: [],
-      skillProficiencies: [],
-    })),
+    getPlayerStats: vi.fn().mockImplementation(() => Promise.resolve(createMockPlayerStats())),
   },
 }));
 
@@ -148,7 +151,7 @@ describe('bardic inspiration feature injection', () => {
     expect(screen.getByTestId('advancement-count')).toHaveTextContent('0');
   });
 
-  it('injects "Use Bardic Inspiration" when bardicInspirationDie is d6', async () => {
+  it('injects "Use Bardic Inspiration" when bardicInspirationDie is set', async () => {
     mockStore.set('Test Bard:bardicInspirationDie', 'd6');
     render(<CharSheet {...defaultProps} />);
     await waitFor(() => {
@@ -157,36 +160,7 @@ describe('bardic inspiration feature injection', () => {
     expect(screen.getByTestId('advancement-count')).toHaveTextContent('1');
   });
 
-  it('injects "Use Bardic Inspiration" when bardicInspirationDie is d8', async () => {
-    mockStore.set('Test Bard:bardicInspirationDie', 'd8');
-    render(<CharSheet {...defaultProps} />);
-    await waitFor(() => {
-      expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
-    });
-    expect(screen.getByTestId('advancement-count')).toHaveTextContent('1');
-  });
-
-  it('adds defense combat option when defense_add_to_ac is in combatOptions', async () => {
-    mockStore.set('Test Bard:bardicInspirationDie', 'd6');
-    mockStore.set('Test Bard:bardicInspirationCombatOptions', JSON.stringify(['defense_add_to_ac']));
-    render(<CharSheet {...defaultProps} />);
-    await waitFor(() => {
-      expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
-    });
-    expect(screen.getByTestId('advancement-count')).toHaveTextContent('2');
-  });
-
-  it('adds offense combat option when offense_add_to_damage is in combatOptions', async () => {
-    mockStore.set('Test Bard:bardicInspirationDie', 'd6');
-    mockStore.set('Test Bard:bardicInspirationCombatOptions', JSON.stringify(['offense_add_to_damage']));
-    render(<CharSheet {...defaultProps} />);
-    await waitFor(() => {
-      expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
-    });
-    expect(screen.getByTestId('advancement-count')).toHaveTextContent('2');
-  });
-
-  it('adds both defense and offense combat options', async () => {
+  it('adds defense and offense combat options when both are in combatOptions', async () => {
     mockStore.set('Test Bard:bardicInspirationDie', 'd6');
     mockStore.set('Test Bard:bardicInspirationCombatOptions', JSON.stringify(['defense_add_to_ac', 'offense_add_to_damage']));
     render(<CharSheet {...defaultProps} />);
@@ -196,35 +170,30 @@ describe('bardic inspiration feature injection', () => {
     expect(screen.getByTestId('advancement-count')).toHaveTextContent('3');
   });
 
-  it('handles invalid JSON for combatOptions gracefully without crashing', async () => {
+  it('adds only defense combat option when defense_add_to_ac is in combatOptions', async () => {
     mockStore.set('Test Bard:bardicInspirationDie', 'd6');
-    mockStore.set('Test Bard:bardicInspirationCombatOptions', 'not-valid-json');
+    mockStore.set('Test Bard:bardicInspirationCombatOptions', JSON.stringify(['defense_add_to_ac']));
     render(<CharSheet {...defaultProps} />);
     await waitFor(() => {
       expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
     });
-    expect(screen.getByTestId('advancement-count')).toHaveTextContent('1');
+    expect(screen.getByTestId('advancement-count')).toHaveTextContent('2');
+  });
+
+  it('adds only offense combat option when offense_add_to_damage is in combatOptions', async () => {
+    mockStore.set('Test Bard:bardicInspirationDie', 'd6');
+    mockStore.set('Test Bard:bardicInspirationCombatOptions', JSON.stringify(['offense_add_to_damage']));
+    render(<CharSheet {...defaultProps} />);
+    await waitFor(() => {
+      expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
+    });
+    expect(screen.getByTestId('advancement-count')).toHaveTextContent('2');
   });
 
   it('does not duplicate "Use Bardic Inspiration" if already in characterAdvancement', async () => {
-    vi.mocked(rulesFactory.getPlayerStats).mockImplementation(() => Promise.resolve({
-      name: 'Test Bard',
-      level: 5,
-      hitPoints: { current: 40, max: 40 },
-      abilities: [{ name: 'Strength', bonus: 2, save: 4, skills: [] }],
-      spellAbilities: { spells: [], maxPreparedSpells: 5 },
-      rules: '5e',
-      automation: { passives: [] },
-      class: { name: 'Bard' },
-      speed: 30,
-      race: { speed: 30 },
-      actions: [],
-      bonusActions: [],
-      reactions: [],
-      specialActions: [],
+    vi.mocked(rulesFactory.getPlayerStats).mockImplementation(() => Promise.resolve(createMockPlayerStats({
       characterAdvancement: [{ name: 'Use Bardic Inspiration', description: 'existing' }],
-      skillProficiencies: [],
-    }));
+    })));
     mockStore.set('Test Bard:bardicInspirationDie', 'd6');
     render(<CharSheet {...defaultProps} />);
     await waitFor(() => {

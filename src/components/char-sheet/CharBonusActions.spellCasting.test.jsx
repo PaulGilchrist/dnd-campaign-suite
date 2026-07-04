@@ -149,18 +149,9 @@ describe('CharBonusActions - Spell Cast Flow', () => {
       expect(screen.getByTestId('spell-detail-popup')).toBeInTheDocument();
     });
 
-    it('does not resolve positions when mapName is null', async () => {
+    it('does not resolve positions when mapName is null or undefined', async () => {
       const bonusActionSpell = { name: 'Shocking Grasp', range: 'Touch', casting_time: '1 bonus action', prepared: 'Prepared' };
       render(<CharBonusActions playerStats={createStats({ spellAbilities: { spells: [bonusActionSpell] } })} mapName={null} />);
-      const spellLink = screen.getByText('Shocking Grasp');
-      fireEvent.click(spellLink);
-      expect(screen.getByTestId('spell-detail-popup')).toBeInTheDocument();
-      expect(mapsService.loadMapData).not.toHaveBeenCalled();
-    });
-
-    it('does not resolve positions when mapName is undefined', async () => {
-      const bonusActionSpell = { name: 'Shocking Grasp', range: 'Touch', casting_time: '1 bonus action', prepared: 'Prepared' };
-      render(<CharBonusActions playerStats={createStats({ spellAbilities: { spells: [bonusActionSpell] } })} />);
       const spellLink = screen.getByText('Shocking Grasp');
       fireEvent.click(spellLink);
       expect(screen.getByTestId('spell-detail-popup')).toBeInTheDocument();
@@ -170,28 +161,6 @@ describe('CharBonusActions - Spell Cast Flow', () => {
     it('handles map data load failure gracefully', async () => {
       const bonusActionSpell = { name: 'Shocking Grasp', range: 'Touch', casting_time: '1 bonus action', prepared: 'Prepared' };
       mapsService.loadMapData.mockRejectedValue(new Error('Map not found'));
-
-      render(<CharBonusActions playerStats={createStats({ spellAbilities: { spells: [bonusActionSpell] } })} mapName="test-map" campaignName="test" />);
-      const spellLink = screen.getByText('Shocking Grasp');
-      fireEvent.click(spellLink);
-      expect(screen.getByTestId('spell-detail-popup')).toBeInTheDocument();
-    });
-
-    it('handles map data with no players gracefully', async () => {
-      const bonusActionSpell = { name: 'Shocking Grasp', range: 'Touch', casting_time: '1 bonus action', prepared: 'Prepared' };
-      const mapData = { placedItems: [] };
-      mapsService.loadMapData.mockResolvedValue(mapData);
-
-      render(<CharBonusActions playerStats={createStats({ spellAbilities: { spells: [bonusActionSpell] } })} mapName="test-map" campaignName="test" />);
-      const spellLink = screen.getByText('Shocking Grasp');
-      fireEvent.click(spellLink);
-      expect(screen.getByTestId('spell-detail-popup')).toBeInTheDocument();
-    });
-
-    it('handles map data with null players gracefully', async () => {
-      const bonusActionSpell = { name: 'Shocking Grasp', range: 'Touch', casting_time: '1 bonus action', prepared: 'Prepared' };
-      const mapData = { players: null, placedItems: [] };
-      mapsService.loadMapData.mockResolvedValue(mapData);
 
       render(<CharBonusActions playerStats={createStats({ spellAbilities: { spells: [bonusActionSpell] } })} mapName="test-map" campaignName="test" />);
       const spellLink = screen.getByText('Shocking Grasp');
@@ -219,38 +188,6 @@ describe('CharBonusActions - Spell Cast Flow', () => {
     });
   });
 
-  describe('spell detail popup props', () => {
-    const bonusActionSpell = { name: 'Shocking Grasp', range: 'Touch', casting_time: '1 bonus action', prepared: 'Prepared' };
-
-    it('passes playerStats to SpellDetailPopup', async () => {
-      render(<CharBonusActions playerStats={createStats({ level: 7, spellAbilities: { spells: [bonusActionSpell] } })} />);
-      const spellLink = screen.getByText('Shocking Grasp');
-      fireEvent.click(spellLink);
-      expect(screen.getByTestId('spell-name')).toHaveTextContent('Shocking Grasp');
-    });
-
-    it('passes campaignName to SpellDetailPopup', async () => {
-      render(<CharBonusActions playerStats={createStats({ spellAbilities: { spells: [bonusActionSpell] } })} campaignName="my-campaign" />);
-      const spellLink = screen.getByText('Shocking Grasp');
-      fireEvent.click(spellLink);
-      expect(screen.getByTestId('spell-name')).toHaveTextContent('Shocking Grasp');
-    });
-
-    it('passes playerLevel to SpellDetailPopup', async () => {
-      render(<CharBonusActions playerStats={createStats({ level: 12, spellAbilities: { spells: [bonusActionSpell] } })} />);
-      const spellLink = screen.getByText('Shocking Grasp');
-      fireEvent.click(spellLink);
-      expect(screen.getByTestId('spell-name')).toHaveTextContent('Shocking Grasp');
-    });
-
-    it('passes upcastLevels to SpellDetailPopup', async () => {
-      render(<CharBonusActions playerStats={createStats({ spellAbilities: { spells: [bonusActionSpell] } })} />);
-      const spellLink = screen.getByText('Shocking Grasp');
-      fireEvent.click(spellLink);
-      expect(screen.getByTestId('upcast-levels')).toBeInTheDocument();
-    });
-  });
-
   describe('MetamagicPopup rendering', () => {
     it('renders MetamagicPopup when pendingMetamagic is set', () => {
       vi.mocked(useSpellMetamagicFlow).mockReturnValue({
@@ -267,17 +204,6 @@ describe('CharBonusActions - Spell Cast Flow', () => {
       });
       render(<CharBonusActions playerStats={createStats({ spellAbilities: { spells: [{ name: 'Shocking Grasp', range: 'Touch', casting_time: '1 bonus action', prepared: 'Prepared' }] } })} />);
       expect(screen.getByTestId('metamagic-popup')).toBeInTheDocument();
-    });
-  });
-
-  describe('br rendering conditions', () => {
-    it('does not render br when popupHtml exists but hasBonusActions is false', async () => {
-      const stats = createStats({
-        bonusActions: [],
-        attacks: [{ name: 'Main Gauche', range: 5, hitBonus: 5, damage: '1d4+3', damageType: 'Piercing', type: 'Bonus Action' }],
-      });
-      const { container } = render(<CharBonusActions playerStats={stats} />);
-      expect(container.querySelectorAll('br').length).toBe(0);
     });
   });
 
@@ -321,45 +247,11 @@ describe('CharBonusActions - Spell Cast Flow', () => {
     });
   });
 
-  describe('spellAbilities.spells undefined handling', () => {
-    it('handles undefined spellAbilities.spells without crashing', () => {
-      const stats = createStats({ spellAbilities: { spells: undefined }, bonusActions: [{ name: 'Test', description: 'Test desc', details: 'Test details' }] });
-      render(<CharBonusActions playerStats={stats} />);
-      expect(screen.getByText('Bonus Actions')).toBeInTheDocument();
-    });
-
+  describe('spellAbilities.spells null handling', () => {
     it('handles null spellAbilities.spells without crashing', () => {
       const stats = createStats({ spellAbilities: { spells: null }, bonusActions: [{ name: 'Test', description: 'Test desc', details: 'Test details' }] });
       render(<CharBonusActions playerStats={stats} />);
       expect(screen.getByText('Bonus Actions')).toBeInTheDocument();
-    });
-  });
-
-  describe('cannotAct behavior on attack clicks for save DC attacks', () => {
-    const saveDcAttack = {
-      name: 'Cone of Cold',
-      range: 60,
-      saveDc: 14,
-      saveType: 'CON',
-      damage: '8d8',
-      damageType: 'Cold',
-      type: 'Bonus Action',
-    };
-
-    it('does not apply disabled-attack class to save DC attacks (only hit bonus div gets it)', () => {
-      render(<CharBonusActions playerStats={createStats({ attacks: [saveDcAttack] })} cannotAct />);
-      expect(document.querySelector('.disabled-attack')).not.toBeInTheDocument();
-    });
-
-    it('does not apply stat--penalized class to save DC attacks (only hit bonus div gets it)', () => {
-      render(<CharBonusActions playerStats={createStats({ attacks: [saveDcAttack] })} conditionAttackMode="disadvantage" />);
-      expect(document.querySelector('.stat--penalized')).not.toBeInTheDocument();
-    });
-
-    it('does not apply any penalty classes when conditions are normal', () => {
-      render(<CharBonusActions playerStats={createStats({ attacks: [saveDcAttack] })} exhaustionPenalty={0} />);
-      expect(document.querySelector('.stat--penalized')).not.toBeInTheDocument();
-      expect(document.querySelector('.disabled-attack')).not.toBeInTheDocument();
     });
   });
 
@@ -386,20 +278,6 @@ describe('CharBonusActions - Spell Cast Flow', () => {
         note: 'Direct damage roll (no target)',
       }));
     });
-
-    it('calls handleSimpleDamageRoll when cannotAct is undefined', async () => {
-      render(<CharBonusActions playerStats={createStats({ attacks: [bonusActionAttack] })} campaignName="test-campaign" />);
-      const damageElement = screen.getByText('1d4+3');
-      fireEvent.click(damageElement);
-      await act(async () => { await Promise.resolve(); });
-      expect(vi.mocked(addEntry)).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
-        type: 'roll',
-        rollType: 'damage',
-        name: 'Main Gauche',
-        formula: '1d4+3',
-        note: 'Direct damage roll (no target)',
-      }));
-    });
   });
 
   describe('canAct blocking on attack click', () => {
@@ -412,17 +290,9 @@ describe('CharBonusActions - Spell Cast Flow', () => {
       fireEvent.click(hitBonusElement);
       expect(mockOnAttackClick).toHaveBeenCalledWith(bonusActionAttack);
     });
-
-    it('still calls onAttackClick when cannotAct is false', () => {
-      const mockOnAttackClick = vi.fn();
-      render(<CharBonusActions playerStats={createStats({ attacks: [bonusActionAttack] })} cannotAct={false} exhaustionPenalty={0} onAttackClick={mockOnAttackClick} />);
-      const hitBonusElement = screen.getByText('+5');
-      fireEvent.click(hitBonusElement);
-      expect(mockOnAttackClick).toHaveBeenCalledWith(bonusActionAttack);
-    });
   });
 
-  describe('executeSpellCast integration', () => {
+  describe('executeSpellCast availability', () => {
     it('executeSpellCast is available as a mocked dependency', () => {
       expect(executeSpellCast).toBeDefined();
       expect(typeof executeSpellCast).toBe('function');

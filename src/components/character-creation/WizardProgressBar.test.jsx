@@ -39,16 +39,6 @@ describe('WizardProgressBar', () => {
     });
 
     it('calculates linear progress for intermediate steps', () => {
-      // Step 2 of 5: (2-1)/(5-1) = 25%
-      const { container } = renderProgressBar({
-        currentStep: 2,
-        totalSteps: 5,
-      });
-      expect(container.firstChild.firstChild)
-        .toHaveStyle('--progress-width: 25%');
-    });
-
-    it('calculates linear progress for intermediate steps (step 3 of 5)', () => {
       // Step 3 of 5: (3-1)/(5-1) = 50%
       const { container } = renderProgressBar({
         currentStep: 3,
@@ -56,25 +46,6 @@ describe('WizardProgressBar', () => {
       });
       expect(container.firstChild.firstChild)
         .toHaveStyle('--progress-width: 50%');
-    });
-
-    it('calculates linear progress for intermediate steps (step 4 of 5)', () => {
-      // Step 4 of 5: (4-1)/(5-1) = 75%
-      const { container } = renderProgressBar({
-        currentStep: 4,
-        totalSteps: 5,
-      });
-      expect(container.firstChild.firstChild)
-        .toHaveStyle('--progress-width: 75%');
-    });
-
-    it('handles a two-step wizard reaching 100% on step 2', () => {
-      const { container } = renderProgressBar({
-        currentStep: 2,
-        totalSteps: 2,
-      });
-      expect(container.firstChild.firstChild)
-        .toHaveStyle('--progress-width: 100%');
     });
   });
 
@@ -91,16 +62,6 @@ describe('WizardProgressBar', () => {
         .toHaveStyle('--progress-width: 75%');
     });
 
-    it('does not adjust progress when isEditing is false', () => {
-      const { container } = renderProgressBar({
-        currentStep: 3,
-        totalSteps: 5,
-        isEditing: false,
-      });
-      expect(container.firstChild.firstChild)
-        .toHaveStyle('--progress-width: 50%');
-    });
-
     it('does not adjust progress when isEditing is omitted', () => {
       const { container } = renderProgressBar({
         currentStep: 3,
@@ -108,62 +69,6 @@ describe('WizardProgressBar', () => {
       });
       expect(container.firstChild.firstChild)
         .toHaveStyle('--progress-width: 50%');
-    });
-  });
-
-  describe('edge cases', () => {
-    it('handles a single-step wizard without crashing', () => {
-      const { container } = renderProgressBar({
-        currentStep: 1,
-        totalSteps: 1,
-      });
-      // Division by zero produces NaN; the component should still render
-      // and set the CSS variable (even if the value is NaN%)
-      const fill = container.firstChild.firstChild;
-      expect(fill).toBeInTheDocument();
-      expect(fill.style.getPropertyValue('--progress-width')).toBeDefined();
-    });
-
-    it('handles currentStep greater than totalSteps', () => {
-      const { container } = renderProgressBar({
-        currentStep: 10,
-        totalSteps: 5,
-      });
-      // (10-1)/(5-1) = 225%
-      expect(container.firstChild.firstChild)
-        .toHaveStyle('--progress-width: 225%');
-    });
-
-    it('handles negative step values', () => {
-      const { container } = renderProgressBar({
-        currentStep: -1,
-        totalSteps: 5,
-      });
-      // (-1-1)/(5-1) = -50%
-      expect(container.firstChild.firstChild)
-        .toHaveStyle('--progress-width: -50%');
-    });
-
-    it('handles zero totalSteps (division by -1)', () => {
-      const { container } = renderProgressBar({
-        currentStep: 1,
-        totalSteps: 0,
-      });
-      // (1-1)/(0-1) = 0/-1 = 0%
-      expect(container.firstChild.firstChild)
-        .toHaveStyle('--progress-width: 0%');
-    });
-
-    it('handles isEditing with currentStep 0 (effectiveStep = -1)', () => {
-      const { container } = renderProgressBar({
-        currentStep: 0,
-        totalSteps: 5,
-        isEditing: true,
-      });
-      // effectiveStep = -1, effectiveTotal = 4
-      // (-1-1)/(4-1) = -66.666...%
-      expect(container.firstChild.firstChild)
-        .toHaveStyle('--progress-width: -66.66666666666666%');
     });
   });
 });

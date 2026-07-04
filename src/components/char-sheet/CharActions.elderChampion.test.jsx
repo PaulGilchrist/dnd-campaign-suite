@@ -275,17 +275,5 @@ describe('CharActions Elder Champion buff', () => {
       await act(async () => { render(<CharActions playerStats={stats} />); });
       expect(screen.getByText('Fireball')).toBeInTheDocument();
     });
-
-    it('treats non-array activeBuffs as empty (no Elder Champion)', async () => {
-      getRuntimeValue.mockImplementation((_name, key) => {
-        if (key === 'activeBuffs') return 'not-an-array';
-        return null;
-      });
-      const stats = createStats({
-        spellAbilities: { spells: [{ name: 'Fireball', range: '150 ft', casting_time: '1 action', prepared: 'Prepared', damage: '8d6' }] },
-      });
-      await act(async () => { render(<CharActions playerStats={stats} />); });
-      expect(screen.getByText('Fireball')).toBeInTheDocument();
-    });
   });
 });

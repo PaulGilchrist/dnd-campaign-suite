@@ -210,7 +210,18 @@ describe('CharSpecialActions - autoDamageRoll callback', () => {
   }
 
   describe('Superiority formula parsing and roll handling', () => {
-    it('handles formula with "+ N [Superiority]" suffix with space on non-crit', async () => {
+    function buildAutoDamage(overrides = {}) {
+      return {
+        name: 'Riposte',
+        formula: '2d6+ 1 [Superiority]',
+        damageType: 'Slashing',
+        targetName: 'Goblin',
+        attackerName: 'TestCharacter',
+        ...overrides,
+      };
+    }
+
+    it('parses superiority formula and adds superiority value to base roll on non-crit', async () => {
       rollExpression.mockReturnValue({ total: 5, rolls: [3, 2], modifier: 0 });
 
       const playerStats = createPlayerStats({
@@ -224,22 +235,11 @@ describe('CharSpecialActions - autoDamageRoll callback', () => {
       const autoDamageRoll = getAutoDamageRoll();
       expect(autoDamageRoll).toBeDefined();
 
-      const mockAutoDamage = {
-        name: 'Riposte',
-        formula: '2d6+ 1 [Superiority]',
-        damageType: 'Slashing',
-        targetName: 'Goblin',
-        attackerName: 'TestCharacter',
-      };
-
+      const mockAutoDamage = buildAutoDamage({ formula: '2d6+ 1 [Superiority]' });
       await autoDamageRoll(mockAutoDamage, false);
 
-      // The regex /\+ (\d+)\s*\[Superiority\]$/ matches "+ 1 [Superiority]"
-      // baseFormula = "2d6+ 1 [Superiority]".replace(/\+ \d+\s*\[Superiority\]/, '') = "2d6"
       expect(rollExpression).toHaveBeenCalledWith('2d6');
 
-      // Total = baseResult.total + superiorityValue = 5 + 1 = 6
-      // rolls = [...baseResult.rolls, superiorityValue] = [3, 2, 1]
       const calls = getRollDamageCalls();
       expect(calls).toHaveLength(1);
       expect(calls[0]).toEqual([
@@ -259,7 +259,7 @@ describe('CharSpecialActions - autoDamageRoll callback', () => {
       ]);
     });
 
-    it('handles formula with "+ N [Superiority]" suffix with space on crit', async () => {
+    it('parses superiority formula and doubles base dice on crit', async () => {
       rollExpressionDoubled.mockReturnValue({ total: 10, rolls: [3, 2, 3, 2], modifier: 0, doubledRolls: [3, 2, 3, 2] });
 
       const playerStats = createPlayerStats({
@@ -272,14 +272,7 @@ describe('CharSpecialActions - autoDamageRoll callback', () => {
 
       const autoDamageRoll = getAutoDamageRoll();
 
-      const mockAutoDamage = {
-        name: 'Riposte',
-        formula: '2d6+ 1 [Superiority]',
-        damageType: 'Slashing',
-        targetName: 'Goblin',
-        attackerName: 'TestCharacter',
-      };
-
+      const mockAutoDamage = buildAutoDamage({ formula: '2d6+ 1 [Superiority]' });
       await autoDamageRoll(mockAutoDamage, true);
 
       expect(rollExpressionDoubled).toHaveBeenCalledWith('2d6');
@@ -297,7 +290,7 @@ describe('CharSpecialActions - autoDamageRoll callback', () => {
       expect(calls[0][5].playerStats).toBeDefined();
     });
 
-    it('handles formula with space after + on non-crit with different superiority value', async () => {
+    it('handles different superiority values', async () => {
       rollExpression.mockReturnValue({ total: 8, rolls: [4, 4], modifier: 0 });
 
       const playerStats = createPlayerStats({
@@ -310,13 +303,12 @@ describe('CharSpecialActions - autoDamageRoll callback', () => {
 
       const autoDamageRoll = getAutoDamageRoll();
 
-      const mockAutoDamage = {
+      const mockAutoDamage = buildAutoDamage({
         name: 'Battle Leader',
         formula: '1d8+ 2 [Superiority]',
         damageType: 'Slashing',
         targetName: 'Orc',
-        attackerName: 'TestCharacter',
-      };
+      });
 
       await autoDamageRoll(mockAutoDamage, false);
 
@@ -327,7 +319,7 @@ describe('CharSpecialActions - autoDamageRoll callback', () => {
       expect(calls[0][3]).toEqual([4, 4, 2]);
     });
 
-    it('handles standard formula without superiority suffix on non-crit', async () => {
+    it('rolls standard formula without superiority suffix on non-crit', async () => {
       rollExpression.mockReturnValue({ total: 8, rolls: [6, 2], modifier: 0 });
 
       const playerStats = createPlayerStats({
@@ -340,13 +332,10 @@ describe('CharSpecialActions - autoDamageRoll callback', () => {
 
       const autoDamageRoll = getAutoDamageRoll();
 
-      const mockAutoDamage = {
+      const mockAutoDamage = buildAutoDamage({
         name: 'Longsword Attack',
         formula: '2d6+3',
-        damageType: 'Slashing',
-        targetName: 'Goblin',
-        attackerName: 'TestCharacter',
-      };
+      });
 
       await autoDamageRoll(mockAutoDamage, false);
 
@@ -370,7 +359,7 @@ describe('CharSpecialActions - autoDamageRoll callback', () => {
       ]);
     });
 
-    it('handles standard formula doubled on crit', async () => {
+    it('doubles standard formula on crit', async () => {
       rollExpressionDoubled.mockReturnValue({ total: 16, rolls: [6, 2, 6, 2], modifier: 0, doubledRolls: [6, 2, 6, 2] });
 
       const playerStats = createPlayerStats({
@@ -383,13 +372,10 @@ describe('CharSpecialActions - autoDamageRoll callback', () => {
 
       const autoDamageRoll = getAutoDamageRoll();
 
-      const mockAutoDamage = {
+      const mockAutoDamage = buildAutoDamage({
         name: 'Longsword Attack',
         formula: '2d6+3',
-        damageType: 'Slashing',
-        targetName: 'Goblin',
-        attackerName: 'TestCharacter',
-      };
+      });
 
       await autoDamageRoll(mockAutoDamage, true);
 
@@ -412,57 +398,35 @@ describe('CharSpecialActions - autoDamageRoll callback', () => {
         },
       ]);
     });
+  });
 
-    it('falls through to standard roll when formula has no space after + in superiority', async () => {
-      rollExpression.mockReturnValue({ total: 7, rolls: [5, 2], modifier: 0 });
-
+  describe('riposte popup handling', () => {
+    function renderWithPopup(setPopupHtmlMock) {
       const playerStats = createPlayerStats({
         specialActions: [
           { name: 'Combat Superiority', description: 'Use a maneuver.', automation: { type: 'combat_superiority' } },
         ],
       });
 
-      renderWithDiceRollContext(<CharSpecialActions playerStats={playerStats} campaignName="test" characters={[]} />);
-
-      const autoDamageRoll = getAutoDamageRoll();
-
-      // Formula without space: "2d6+1 [Superiority]" won't match /\+ (\d+)/
-      const mockAutoDamage = {
-        name: 'Riposte',
-        formula: '2d6+1 [Superiority]',
-        damageType: 'Slashing',
-        targetName: 'Goblin',
-        attackerName: 'TestCharacter',
+      return {
+        autoDamageRoll: (() => {
+          render(<CharSpecialActions playerStats={playerStats} campaignName="test" characters={[]} />, {
+            wrapper: ({ children }) => (
+              <DiceRollContext.Provider value={{ popupHtml: null, setPopupHtml: setPopupHtmlMock }}>
+                {children}
+              </DiceRollContext.Provider>
+            ),
+          });
+          return getAutoDamageRoll();
+        })(),
       };
+    }
 
-      await autoDamageRoll(mockAutoDamage, false);
-
-      // Falls through to standard rollExpression
-      expect(rollExpression).toHaveBeenCalledWith('2d6+1 [Superiority]');
-      expect(rollExpressionDoubled).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('riposte popup handling', () => {
     it('shows riposte popup when autoDamage has ripostePopup as string', async () => {
       const mockSetPopupHtml = vi.fn();
       rollExpression.mockReturnValue({ total: 5, rolls: [3, 2], modifier: 0 });
 
-      const playerStats = createPlayerStats({
-        specialActions: [
-          { name: 'Combat Superiority', description: 'Use a maneuver.', automation: { type: 'combat_superiority' } },
-        ],
-      });
-
-      render(<CharSpecialActions playerStats={playerStats} campaignName="test" characters={[]} />, {
-        wrapper: ({ children }) => (
-          <DiceRollContext.Provider value={{ popupHtml: null, setPopupHtml: mockSetPopupHtml }}>
-            {children}
-          </DiceRollContext.Provider>
-        ),
-      });
-
-      const autoDamageRoll = getAutoDamageRoll();
+      const { autoDamageRoll } = renderWithPopup(mockSetPopupHtml);
 
       const mockAutoDamage = {
         name: 'Riposte',
@@ -486,21 +450,7 @@ describe('CharSpecialActions - autoDamageRoll callback', () => {
       const mockSetPopupHtml = vi.fn();
       rollExpression.mockReturnValue({ total: 5, rolls: [3, 2], modifier: 0 });
 
-      const playerStats = createPlayerStats({
-        specialActions: [
-          { name: 'Combat Superiority', description: 'Use a maneuver.', automation: { type: 'combat_superiority' } },
-        ],
-      });
-
-      render(<CharSpecialActions playerStats={playerStats} campaignName="test" characters={[]} />, {
-        wrapper: ({ children }) => (
-          <DiceRollContext.Provider value={{ popupHtml: null, setPopupHtml: mockSetPopupHtml }}>
-            {children}
-          </DiceRollContext.Provider>
-        ),
-      });
-
-      const autoDamageRoll = getAutoDamageRoll();
+      const { autoDamageRoll } = renderWithPopup(mockSetPopupHtml);
 
       const mockAutoDamage = {
         name: 'Riposte',
@@ -531,21 +481,7 @@ describe('CharSpecialActions - autoDamageRoll callback', () => {
       const mockSetPopupHtml = vi.fn();
       rollExpression.mockReturnValue({ total: 5, rolls: [3, 2], modifier: 0 });
 
-      const playerStats = createPlayerStats({
-        specialActions: [
-          { name: 'Combat Superiority', description: 'Use a maneuver.', automation: { type: 'combat_superiority' } },
-        ],
-      });
-
-      render(<CharSpecialActions playerStats={playerStats} campaignName="test" characters={[]} />, {
-        wrapper: ({ children }) => (
-          <DiceRollContext.Provider value={{ popupHtml: null, setPopupHtml: mockSetPopupHtml }}>
-            {children}
-          </DiceRollContext.Provider>
-        ),
-      });
-
-      const autoDamageRoll = getAutoDamageRoll();
+      const { autoDamageRoll } = renderWithPopup(mockSetPopupHtml);
 
       const mockAutoDamage = {
         name: 'Riposte',
@@ -571,112 +507,55 @@ describe('CharSpecialActions - autoDamageRoll callback', () => {
   });
 
   describe('autoDamageRoll null safety', () => {
-    it('does not call rollDamage when rollExpression returns null', async () => {
+    function createNullSafetyTest(overrides = {}) {
+      return {
+        playerStats: createPlayerStats({
+          specialActions: [
+            { name: 'Combat Superiority', description: 'Use a maneuver.', automation: { type: 'combat_superiority' } },
+          ],
+        }),
+        autoDamage: {
+          name: 'Test Attack',
+          formula: 'invalid formula',
+          damageType: 'Slashing',
+          targetName: 'Goblin',
+          attackerName: 'TestCharacter',
+          ...overrides,
+        },
+      };
+    }
+
+    it('does not call rollDamage when standard formula roll returns null', async () => {
       rollExpression.mockReturnValue(null);
 
-      const playerStats = createPlayerStats({
-        specialActions: [
-          { name: 'Combat Superiority', description: 'Use a maneuver.', automation: { type: 'combat_superiority' } },
-        ],
-      });
-
+      const { playerStats, autoDamage } = createNullSafetyTest();
       renderWithDiceRollContext(<CharSpecialActions playerStats={playerStats} campaignName="test" characters={[]} />);
 
       const autoDamageRoll = getAutoDamageRoll();
+      await autoDamageRoll(autoDamage, false);
 
-      const mockAutoDamage = {
-        name: 'Test Attack',
-        formula: 'invalid formula',
-        damageType: 'Slashing',
-        targetName: 'Goblin',
-        attackerName: 'TestCharacter',
-      };
-
-      await autoDamageRoll(mockAutoDamage, false);
-
-      const calls = getRollDamageCalls();
-      expect(calls).toHaveLength(0);
-    });
-
-    it('does not call rollDamage when rollExpressionDoubled returns null', async () => {
-      rollExpressionDoubled.mockReturnValue(null);
-
-      const playerStats = createPlayerStats({
-        specialActions: [
-          { name: 'Combat Superiority', description: 'Use a maneuver.', automation: { type: 'combat_superiority' } },
-        ],
-      });
-
-      renderWithDiceRollContext(<CharSpecialActions playerStats={playerStats} campaignName="test" characters={[]} />);
-
-      const autoDamageRoll = getAutoDamageRoll();
-
-      const mockAutoDamage = {
-        name: 'Test Attack',
-        formula: 'invalid formula',
-        damageType: 'Slashing',
-        targetName: 'Goblin',
-        attackerName: 'TestCharacter',
-      };
-
-      await autoDamageRoll(mockAutoDamage, true);
-
-      const calls = getRollDamageCalls();
-      expect(calls).toHaveLength(0);
+      expect(getRollDamageCalls()).toHaveLength(0);
     });
 
     it('does not call rollDamage when superiority formula base roll returns null', async () => {
       rollExpression.mockReturnValue(null);
 
-      const playerStats = createPlayerStats({
-        specialActions: [
-          { name: 'Combat Superiority', description: 'Use a maneuver.', automation: { type: 'combat_superiority' } },
-        ],
+      const { playerStats } = createNullSafetyTest({
+        name: 'Riposte',
+        formula: '2d6+ 1 [Superiority]',
       });
-
       renderWithDiceRollContext(<CharSpecialActions playerStats={playerStats} campaignName="test" characters={[]} />);
 
       const autoDamageRoll = getAutoDamageRoll();
-
-      const mockAutoDamage = {
+      await autoDamageRoll({
         name: 'Riposte',
         formula: '2d6+ 1 [Superiority]',
         damageType: 'Slashing',
         targetName: 'Goblin',
         attackerName: 'TestCharacter',
-      };
+      }, false);
 
-      await autoDamageRoll(mockAutoDamage, false);
-
-      const calls = getRollDamageCalls();
-      expect(calls).toHaveLength(0);
-    });
-
-    it('does not call rollDamage when superiority formula doubled base roll returns null', async () => {
-      rollExpressionDoubled.mockReturnValue(null);
-
-      const playerStats = createPlayerStats({
-        specialActions: [
-          { name: 'Combat Superiority', description: 'Use a maneuver.', automation: { type: 'combat_superiority' } },
-        ],
-      });
-
-      renderWithDiceRollContext(<CharSpecialActions playerStats={playerStats} campaignName="test" characters={[]} />);
-
-      const autoDamageRoll = getAutoDamageRoll();
-
-      const mockAutoDamage = {
-        name: 'Riposte',
-        formula: '2d6+ 1 [Superiority]',
-        damageType: 'Slashing',
-        targetName: 'Goblin',
-        attackerName: 'TestCharacter',
-      };
-
-      await autoDamageRoll(mockAutoDamage, true);
-
-      const calls = getRollDamageCalls();
-      expect(calls).toHaveLength(0);
+      expect(getRollDamageCalls()).toHaveLength(0);
     });
   });
 
@@ -692,7 +571,6 @@ describe('CharSpecialActions - autoDamageRoll callback', () => {
 
       renderWithDiceRollContext(<CharSpecialActions playerStats={playerStats} campaignName="test" characters={mockCharacters} />);
 
-      // Check the options passed to useLoggedDiceRoll
       const diceRollCall = useLoggedDiceRoll.mock.calls[0];
       expect(diceRollCall[0]).toBe('TestCharacter');
       expect(diceRollCall[1]).toBe('test');

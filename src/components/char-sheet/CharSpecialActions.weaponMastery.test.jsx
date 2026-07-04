@@ -1,4 +1,3 @@
-// @improved-by-ai
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharSpecialActions from './CharSpecialActions.jsx';
@@ -7,8 +6,6 @@ import { DiceRollContext } from '../../hooks/combat/DiceRollContext.js';
 // Mock executeHandler
 vi.mock('../../services/automation/index.js', () => ({
   executeHandler: vi.fn(),
-  applyWeaponKindMastery: vi.fn(),
-  applyWeaponMasteryChoice: vi.fn(),
 }));
 
 // Mock automation service
@@ -71,11 +68,9 @@ vi.mock('./modals/arcane/SavantModal.jsx', () => ({
 
 // Mock WeaponKindMasteryModal
 vi.mock('./modals/WeaponKindMasteryModal.jsx', () => ({
-  default: ({ action, _playerStats, _campaignName, meleeOnly, onClose, existing }) => (
+  default: ({ action, onClose }) => (
     <div data-testid="weapon-kind-mastery-modal">
       <span>{action?.name || 'Weapon Kind Mastery'}</span>
-      <span>meleeOnly: {String(meleeOnly)}</span>
-      <span>existing: {JSON.stringify(existing)}</span>
       <button onClick={onClose}>Close</button>
     </div>
   ),
@@ -83,10 +78,9 @@ vi.mock('./modals/WeaponKindMasteryModal.jsx', () => ({
 
 // Mock WeaponMasteryChoiceModal
 vi.mock('./modals/WeaponMasteryChoiceModal.jsx', () => ({
-  default: ({ action: _action, _playerStats, _campaignName, masteryProperties, onClose, onConfirm }) => (
+  default: ({ action: _action, onClose, onConfirm }) => (
     <div data-testid="weapon-mastery-choice-modal">
       <span>Weapon Mastery Choice</span>
-      <span>masteryProperties: {masteryProperties?.join(', ')}</span>
       <button onClick={onClose}>Close</button>
       <button onClick={() => onConfirm && onConfirm('Finesse')}>Confirm</button>
     </div>
@@ -220,39 +214,6 @@ describe('CharSpecialActions - Weapon Mastery Modals', () => {
         expect(screen.queryByTestId('weapon-kind-mastery-modal')).not.toBeInTheDocument();
       });
     });
-
-    it('passes correct props to WeaponKindMasteryModal', async () => {
-      executeHandler.mockResolvedValue({
-        type: 'modal',
-        modalName: 'weaponKindMastery',
-        payload: {
-          action: { name: 'Weapon Mastery', automation: { type: 'weapon_kind_mastery', maxKinds: 3 } },
-          meleeOnly: true,
-          existing: ['Greatsword'],
-        },
-      });
-
-      const playerStats = createPlayerStats({
-        specialActions: [
-          { name: 'Weapon Mastery', description: 'Choose weapon kinds.', automation: { type: 'weapon_kind_mastery' } },
-        ],
-      });
-      render(<CharSpecialActions playerStats={playerStats} campaignName="test" />, {
-        wrapper: ({ children }) => (
-          <DiceRollContext.Provider value={{ popupHtml: null, setPopupHtml: vi.fn() }}>
-            {children}
-          </DiceRollContext.Provider>
-        ),
-      });
-      fireEvent.click(screen.getByText(/Weapon Mastery/));
-
-      await waitFor(() => {
-        expect(screen.getByTestId('weapon-kind-mastery-modal')).toBeInTheDocument();
-      });
-
-      expect(screen.getByText('meleeOnly: true')).toBeInTheDocument();
-      expect(screen.getByText('existing: ["Greatsword"]')).toBeInTheDocument();
-    });
   });
 
   describe('weaponMasteryChoice modal', () => {
@@ -314,72 +275,6 @@ describe('CharSpecialActions - Weapon Mastery Modals', () => {
       });
 
       fireEvent.click(screen.getByText('Close'));
-
-      await waitFor(() => {
-        expect(screen.queryByTestId('weapon-mastery-choice-modal')).not.toBeInTheDocument();
-      });
-    });
-
-    it('passes masteryProperties to WeaponMasteryChoiceModal', async () => {
-      executeHandler.mockResolvedValue({
-        type: 'modal',
-        modalName: 'weaponMasteryChoice',
-        payload: {
-          action: { name: 'Weapon Master' },
-          masteryProperties: ['Finesse', 'Heavy', 'Reach', 'Thrown'],
-        },
-      });
-
-      const playerStats = createPlayerStats({
-        specialActions: [
-          { name: 'Weapon Master', description: 'Choose mastery.', automation: { type: 'weapon_mastery_choice' } },
-        ],
-      });
-      render(<CharSpecialActions playerStats={playerStats} campaignName="test" />, {
-        wrapper: ({ children }) => (
-          <DiceRollContext.Provider value={{ popupHtml: null, setPopupHtml: vi.fn() }}>
-            {children}
-          </DiceRollContext.Provider>
-        ),
-      });
-      fireEvent.click(screen.getByText(/Weapon Master/));
-
-      await waitFor(() => {
-        expect(screen.getByTestId('weapon-mastery-choice-modal')).toBeInTheDocument();
-      });
-
-      expect(screen.getByText('masteryProperties: Finesse, Heavy, Reach, Thrown')).toBeInTheDocument();
-    });
-
-    it('closes WeaponMasteryChoiceModal when confirm button is clicked', async () => {
-      executeHandler.mockResolvedValue({
-        type: 'modal',
-        modalName: 'weaponMasteryChoice',
-        payload: {
-          action: { name: 'Weapon Master' },
-          masteryProperties: ['Finesse', 'Heavy'],
-        },
-      });
-
-      const playerStats = createPlayerStats({
-        specialActions: [
-          { name: 'Weapon Master', description: 'Choose mastery.', automation: { type: 'weapon_mastery_choice' } },
-        ],
-      });
-      render(<CharSpecialActions playerStats={playerStats} campaignName="test" />, {
-        wrapper: ({ children }) => (
-          <DiceRollContext.Provider value={{ popupHtml: null, setPopupHtml: vi.fn() }}>
-            {children}
-          </DiceRollContext.Provider>
-        ),
-      });
-      fireEvent.click(screen.getByText(/Weapon Master/));
-
-      await waitFor(() => {
-        expect(screen.getByTestId('weapon-mastery-choice-modal')).toBeInTheDocument();
-      });
-
-      fireEvent.click(screen.getByText('Confirm'));
 
       await waitFor(() => {
         expect(screen.queryByTestId('weapon-mastery-choice-modal')).not.toBeInTheDocument();

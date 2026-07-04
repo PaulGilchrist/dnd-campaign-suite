@@ -1,4 +1,5 @@
 /* @improved-by-ai */
+/* @cleaned-by-ai */
 import { render, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import MonsterCardModal from './MonsterCardModal.jsx';
@@ -18,17 +19,21 @@ vi.mock('../../hooks/combat/useLoggedDiceRoll.js', () => {
   const _setPopupHtml = vi.fn((val) => { _popupHtml = val; });
   const _rollSavingThrow = vi.fn();
   const _rollDamage = vi.fn();
+  const _rollAbilityCheck = vi.fn();
+  const _rollSkillCheck = vi.fn();
+  const _rollInitiative = vi.fn();
+  const _quickRollPlayerSave = vi.fn();
 
   const mockHook = vi.fn((_monsterName, _campaignName, _opts) => ({
     get popupHtml() { return _popupHtml; },
     setPopupHtml: _setPopupHtml,
     rollAttack: vi.fn(),
     rollDamage: _rollDamage,
-    rollAbilityCheck: vi.fn(),
+    rollAbilityCheck: _rollAbilityCheck,
     rollSavingThrow: _rollSavingThrow,
-    rollSkillCheck: vi.fn(),
-    rollInitiative: vi.fn(),
-    quickRollPlayerSave: vi.fn(),
+    rollSkillCheck: _rollSkillCheck,
+    rollInitiative: _rollInitiative,
+    quickRollPlayerSave: _quickRollPlayerSave,
   }));
 
   return {
@@ -139,10 +144,11 @@ describe('MonsterCardModal - getSaveModifierForSaveType', () => {
       expect(clickableSaveLinks.length).toBeGreaterThan(0);
       fireEvent.click(clickableSaveLinks[0]);
       expect(abilityLookup.getAbilitySaveModifier).toHaveBeenCalledWith(playerChar.abilities, 'dex');
+      expect(rollSavingThrow).toHaveBeenCalledWith('DEX', 3, expect.objectContaining({ saveDc: 13, saveType: 'Dexterity' }));
     });
   });
 
-  describe('player target with saving_throws fallback', () => {
+  describe('player target fallback chain', () => {
     it('uses creature.saving_throws when player has no abilities array', () => {
       damageUtils.__setFindCreatureReturn({
         name: 'Goblin',
@@ -154,17 +160,12 @@ describe('MonsterCardModal - getSaveModifierForSaveType', () => {
         actions: [{ name: 'Web', description: 'Dexterity Saving Throw: DC 13', save_dc: 13, save_type: 'Dexterity' }],
       });
 
-      const playerChar = {
-        name: 'Player A',
-        type: 'player',
-      };
-
-      render(<MonsterCardModal {...makeProps(m, { creatures: [{ name: 'Goblin', targetName: 'Player A' }, { name: 'Player A', type: 'player' }], characters: [playerChar] })} />);
+      render(<MonsterCardModal {...makeProps(m, { creatures: [{ name: 'Goblin', targetName: 'Player A' }, { name: 'Player A', type: 'player', saving_throws: { dex: { modifier: 2 } } }], characters: [] })} />);
 
       const clickableSaveLinks = document.querySelectorAll('.mc-dice-link-save-clickable');
       expect(clickableSaveLinks.length).toBeGreaterThan(0);
       fireEvent.click(clickableSaveLinks[0]);
-      expect(rollSavingThrow).toHaveBeenCalled();
+      expect(rollSavingThrow).toHaveBeenCalledWith('DEX', 2, expect.objectContaining({ saveDc: 13, saveType: 'Dexterity' }));
     });
 
     it('uses creature.ability_score_modifiers when saving_throws is also missing', () => {
@@ -178,17 +179,12 @@ describe('MonsterCardModal - getSaveModifierForSaveType', () => {
         actions: [{ name: 'Web', description: 'Dexterity Saving Throw: DC 13', save_dc: 13, save_type: 'Dexterity' }],
       });
 
-      const playerChar = {
-        name: 'Player A',
-        type: 'player',
-      };
-
-      render(<MonsterCardModal {...makeProps(m, { creatures: [{ name: 'Goblin', targetName: 'Player A' }, { name: 'Player A', type: 'player' }], characters: [playerChar] })} />);
+      render(<MonsterCardModal {...makeProps(m, { creatures: [{ name: 'Goblin', targetName: 'Player A' }, { name: 'Player A', type: 'player', ability_score_modifiers: { dex: 4 } }], characters: [] })} />);
 
       const clickableSaveLinks = document.querySelectorAll('.mc-dice-link-save-clickable');
       expect(clickableSaveLinks.length).toBeGreaterThan(0);
       fireEvent.click(clickableSaveLinks[0]);
-      expect(rollSavingThrow).toHaveBeenCalled();
+      expect(rollSavingThrow).toHaveBeenCalledWith('DEX', 4, expect.objectContaining({ saveDc: 13, saveType: 'Dexterity' }));
     });
 
     it('returns 0 when no save modifier source is found', () => {
@@ -202,17 +198,12 @@ describe('MonsterCardModal - getSaveModifierForSaveType', () => {
         actions: [{ name: 'Web', description: 'Dexterity Saving Throw: DC 13', save_dc: 13, save_type: 'Dexterity' }],
       });
 
-      const playerChar = {
-        name: 'Player A',
-        type: 'player',
-      };
-
-      render(<MonsterCardModal {...makeProps(m, { creatures: [{ name: 'Goblin', targetName: 'Player A' }, { name: 'Player A', type: 'player' }], characters: [playerChar] })} />);
+      render(<MonsterCardModal {...makeProps(m, { creatures: [{ name: 'Goblin', targetName: 'Player A' }, { name: 'Player A', type: 'player' }], characters: [] })} />);
 
       const clickableSaveLinks = document.querySelectorAll('.mc-dice-link-save-clickable');
       expect(clickableSaveLinks.length).toBeGreaterThan(0);
       fireEvent.click(clickableSaveLinks[0]);
-      expect(rollSavingThrow).toHaveBeenCalled();
+      expect(rollSavingThrow).toHaveBeenCalledWith('DEX', 0, expect.objectContaining({ saveDc: 13, saveType: 'Dexterity' }));
     });
   });
 
@@ -233,7 +224,7 @@ describe('MonsterCardModal - getSaveModifierForSaveType', () => {
       const clickableSaveLinks = document.querySelectorAll('.mc-dice-link-save-clickable');
       expect(clickableSaveLinks.length).toBeGreaterThan(0);
       fireEvent.click(clickableSaveLinks[0]);
-      expect(rollSavingThrow).toHaveBeenCalled();
+      expect(rollSavingThrow).toHaveBeenCalledWith('CON', 4, expect.objectContaining({ saveDc: 13, saveType: 'Constitution' }));
     });
 
     it('uses target.ability_score_modifiers as fallback for non-player targets', () => {
@@ -252,7 +243,7 @@ describe('MonsterCardModal - getSaveModifierForSaveType', () => {
       const clickableSaveLinks = document.querySelectorAll('.mc-dice-link-save-clickable');
       expect(clickableSaveLinks.length).toBeGreaterThan(0);
       fireEvent.click(clickableSaveLinks[0]);
-      expect(rollSavingThrow).toHaveBeenCalled();
+      expect(rollSavingThrow).toHaveBeenCalledWith('CON', 3, expect.objectContaining({ saveDc: 13, saveType: 'Constitution' }));
     });
   });
 
@@ -303,6 +294,6 @@ describe('MonsterCardModal - handleDamage with save DC context', () => {
     }
     expect(dmgLink).toBeTruthy();
     fireEvent.click(dmgLink);
-    expect(useLoggedDiceRoll._rollSavingThrow).toHaveBeenCalled();
+    expect(rollSavingThrow).toHaveBeenCalledWith('DEX', 0, expect.objectContaining({ saveDc: 15, saveType: 'Dexterity', dcSuccess: 'half' }));
   });
 });

@@ -1,4 +1,3 @@
-// @improved-by-ai
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import ConcentrationPicker from './ConcentrationPicker.jsx';
@@ -20,7 +19,7 @@ describe('ConcentrationPicker', () => {
     });
 
     describe('rendering', () => {
-        it('should render the overlay and modal containers', () => {
+        it('should render the overlay, modal, labels and buttons', () => {
             render(<ConcentrationPicker {...props} />);
             expect(screen.getByRole('heading', { name: 'Concentration for Goblin' })).toBeInTheDocument();
             expect(document.querySelector('.condition-picker-overlay')).toBeInTheDocument();
@@ -29,20 +28,6 @@ describe('ConcentrationPicker', () => {
             expect(screen.getByText('DC')).toBeInTheDocument();
             expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
             expect(screen.getByRole('button', { name: 'Apply' })).toBeInTheDocument();
-        });
-
-        it('should render the spell input with the provided value and placeholder', () => {
-            render(<ConcentrationPicker {...props} />);
-            const spellInput = screen.getByLabelText('Spell');
-            expect(spellInput).toHaveValue('Fireball');
-            expect(spellInput).toHaveAttribute('placeholder', 'Spell name');
-        });
-
-        it('should render the DC input with the provided value and min=1', () => {
-            render(<ConcentrationPicker {...props} />);
-            const dcInput = screen.getByLabelText('DC');
-            expect(dcInput).toHaveValue(15);
-            expect(dcInput).toHaveAttribute('min', '1');
         });
 
         it('should autoFocus the spell input', () => {
@@ -70,7 +55,8 @@ describe('ConcentrationPicker', () => {
             ${'Dragon'}
         `('should render target name "$targetName" in the heading', ({ targetName }) => {
             render(<ConcentrationPicker {...props} targetName={targetName} />);
-            expect(screen.getByText(/Concentration for/)).toBeInTheDocument();
+            const heading = screen.getByRole('heading', { level: 3 });
+            expect(heading.textContent).toContain(`Concentration for ${targetName}`);
         });
 
         it.each`

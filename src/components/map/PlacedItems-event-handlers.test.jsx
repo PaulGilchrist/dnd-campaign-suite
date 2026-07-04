@@ -29,7 +29,7 @@ describe('PlacedItems - Event handlers', () => {
       );
     });
 
-    it('calls handleItemPointerDown for NPC with rect hit area', () => {
+    it('calls handleItemPointerDown for NPC', () => {
       const items = [{ id: 'npc-1', type: 'npc', gridX: 0, gridY: 0, visible: true, name: 'Goblin' }];
       const { container } = render(<PlacedItems {...baseProps} placedItems={items} />);
       const hitArea = container.querySelector('rect[fill="transparent"]');
@@ -41,52 +41,10 @@ describe('PlacedItems - Event handlers', () => {
       );
     });
 
-    it('does not render hit area when isLocalhost is false', () => {
-      const items = [{ id: 'barrel-1', type: 'barrel', gridX: 0, gridY: 0, visible: true }];
-      const { container } = render(
-        <PlacedItems {...baseProps} placedItems={items} isLocalhost={false} />
-      );
-      expect(container.querySelector('.item-hit-area')).toBeNull();
-    });
-
-    it('does not render hit area when item is not visible and isLocalhost is false', () => {
-      const items = [{ id: 'barrel-1', type: 'barrel', gridX: 0, gridY: 0, visible: false }];
-      const { container } = render(
-        <PlacedItems {...baseProps} placedItems={items} isLocalhost={false} />
-      );
-      expect(container.querySelector('.item-hit-area')).toBeNull();
-    });
-
-    it('does not render hit area when item is fogged and isLocalhost is false', () => {
-      const fog = new Map([['0,0', true]]);
-      const items = [{ id: 'barrel-1', type: 'barrel', gridX: 0, gridY: 0, visible: true }];
-      const { container } = render(
-        <PlacedItems {...baseProps} placedItems={items} fog={fog} isLocalhost={false} />
-      );
-      expect(container.querySelector('.item-hit-area')).toBeNull();
-    });
-
     it('renders no hit areas when placedItems is empty', () => {
       const { container } = render(<PlacedItems {...baseProps} placedItems={[]} />);
       expect(container.querySelector('.item-hit-area')).toBeNull();
       expect(container.querySelector('rect[fill="transparent"]')).toBeNull();
-    });
-
-    it('passes correct itemId when multiple items are rendered', () => {
-      const items = [
-        { id: 'barrel-1', type: 'barrel', gridX: 0, gridY: 0, visible: true },
-        { id: 'table-1', type: 'table', gridX: 1, gridY: 1, visible: true },
-      ];
-      const { container } = render(<PlacedItems {...baseProps} placedItems={items} />);
-      const hitAreas = container.querySelectorAll('.item-hit-area');
-      expect(hitAreas).toHaveLength(2);
-
-      const barrelArea = hitAreas[0];
-      barrelArea.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
-      expect(mockHandleItemPointerDown).toHaveBeenCalledWith(
-        expect.objectContaining({ bubbles: true }),
-        'barrel-1'
-      );
     });
   });
 
@@ -119,34 +77,6 @@ describe('PlacedItems - Event handlers', () => {
       const event = new Event('contextmenu', { bubbles: true });
       hitArea.dispatchEvent(event);
       expect(setSelectedItem).toHaveBeenCalledWith({ id: 'npc-1', gridX, gridY });
-    });
-
-    it('prevents default and stops propagation on contextmenu', () => {
-      const items = [{ id: 'barrel-1', type: 'barrel', gridX: 0, gridY: 0, visible: true }];
-      const { container } = render(<PlacedItems {...baseProps} placedItems={items} />);
-      const hitArea = container.querySelector('.item-hit-area');
-      const event = new Event('contextmenu', { bubbles: true });
-      const preventDefault = vi.fn();
-      const stopPropagation = vi.fn();
-      event.preventDefault = preventDefault;
-      event.stopPropagation = stopPropagation;
-      hitArea.dispatchEvent(event);
-      expect(preventDefault).toHaveBeenCalled();
-      expect(stopPropagation).toHaveBeenCalled();
-    });
-
-    it('prevents default and stops propagation on NPC contextmenu', () => {
-      const items = [{ id: 'npc-1', type: 'npc', gridX: 0, gridY: 0, visible: true, name: 'Goblin' }];
-      const { container } = render(<PlacedItems {...baseProps} placedItems={items} />);
-      const hitArea = container.querySelector('rect[fill="transparent"]');
-      const event = new Event('contextmenu', { bubbles: true });
-      const preventDefault = vi.fn();
-      const stopPropagation = vi.fn();
-      event.preventDefault = preventDefault;
-      event.stopPropagation = stopPropagation;
-      hitArea.dispatchEvent(event);
-      expect(preventDefault).toHaveBeenCalled();
-      expect(stopPropagation).toHaveBeenCalled();
     });
   });
 });

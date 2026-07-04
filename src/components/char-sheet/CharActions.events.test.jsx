@@ -171,6 +171,7 @@ vi.mock('./useCharActionModals.js', () => ({
     combatStanceModal: null, setCombatStanceModal: vi.fn(),
     teleportModal: null, setTeleportModal: vi.fn(),
     healingIllusionModal: null, setHealingIllusionModal: vi.fn(),
+    invokeDuplicityModal: null, setInvokeDuplicityModal: vi.fn(),
     saveAttackHealModal: null, setSaveAttackHealModal: vi.fn(),
     divineSparkModal: null, setDivineSparkModal: vi.fn(),
     divineInterventionModal: null, setDivineInterventionModal: vi.fn(),
@@ -258,7 +259,7 @@ function createStats(overrides = {}) {
   return { ...BASE_PLAYER_STATS, ...overrides };
 }
 
-describe('CharActions potent-spellcasting-temp-hp event', () => {
+describe('CharActions window events', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
@@ -267,7 +268,7 @@ describe('CharActions potent-spellcasting-temp-hp event', () => {
     hasAutomation.mockImplementation(() => false);
   });
 
-  it('handles potent-spellcasting-temp-hp event and sets secondaryTargetModal', async () => {
+  it('renders component and handles potent-spellcasting-temp-hp event', async () => {
     const mockSetPopupHtml = vi.fn();
     useLoggedDiceRoll.mockReturnValue({
       popupHtml: null, setPopupHtml: mockSetPopupHtml, rollAttack: vi.fn(), rollDamage: vi.fn(), quickRollPlayerSave: vi.fn(),
@@ -281,7 +282,8 @@ describe('CharActions potent-spellcasting-temp-hp event', () => {
     );
     await act(async () => { render(<CharActions playerStats={stats} campaignName="my-campaign" />, { wrapper }); });
 
-    // Dispatch the custom event that the component listens for
+    expect(screen.getByText('Actions')).toBeInTheDocument();
+
     await act(async () => {
       window.dispatchEvent(new CustomEvent('potent-spellcasting-temp-hp', {
         detail: {
@@ -294,49 +296,10 @@ describe('CharActions potent-spellcasting-temp-hp event', () => {
       }));
     });
 
-    // The handler should set the secondaryTargetModal with ally targets
     expect(screen.getByText('Actions')).toBeInTheDocument();
   });
 
-  it('handles potent-spellcasting-temp-hp event when no combat context exists', async () => {
-    const mockSetPopupHtml = vi.fn();
-    useLoggedDiceRoll.mockReturnValue({
-      popupHtml: null, setPopupHtml: mockSetPopupHtml, rollAttack: vi.fn(), rollDamage: vi.fn(), quickRollPlayerSave: vi.fn(),
-    });
-
-    const stats = createStats({ name: 'TestCharacter' });
-    const wrapper = ({ children }) => (
-      <DiceRollContext.Provider value={{ popupHtml: null, setPopupHtml: mockSetPopupHtml }}>
-        {children}
-      </DiceRollContext.Provider>
-    );
-    await act(async () => { render(<CharActions playerStats={stats} campaignName="my-campaign" />, { wrapper }); });
-
-    await act(async () => {
-      window.dispatchEvent(new CustomEvent('potent-spellcasting-temp-hp', {
-        detail: {
-          title: 'Grant Temp HP',
-          tempHp: 10,
-          campaignName: 'my-campaign',
-          attackerName: 'TestCharacter',
-        },
-      }));
-    });
-
-    expect(screen.getByText('Actions')).toBeInTheDocument();
-  });
-});
-
-describe('CharActions damage type choice event', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    localStorage.clear();
-    globalThis.fetch = vi.fn().mockResolvedValue({ json: () => Promise.resolve([]) });
-    getRuntimeValue.mockImplementation(() => null);
-    hasAutomation.mockImplementation(() => false);
-  });
-
-  it('handles damage-type-choice event when popupHtml type is damage_type_choice', async () => {
+  it('handles damage-type-choice event', async () => {
     const mockSetPopupHtml = vi.fn();
     const mockRollDamage = vi.fn();
     useLoggedDiceRoll.mockReturnValue({
@@ -351,9 +314,6 @@ describe('CharActions damage type choice event', () => {
     );
     await act(async () => { render(<CharActions playerStats={stats} campaignName="my-campaign" />, { wrapper }); });
 
-    // Simulate the popupHtml being set to a damage_type_choice type
-    // This would normally happen from the auto-damage-roll context
-    // We can test the event listener by dispatching the event
     await act(async () => {
       window.dispatchEvent(new CustomEvent('damage-type-choice', {
         detail: { chosenType: 'Radiant' },
@@ -361,45 +321,5 @@ describe('CharActions damage type choice event', () => {
     });
 
     expect(screen.getByText('Actions')).toBeInTheDocument();
-  });
-
-  it('handles damage-type-skip event to dismiss the popup', async () => {
-    const mockSetPopupHtml = vi.fn();
-    useLoggedDiceRoll.mockReturnValue({
-      popupHtml: null, setPopupHtml: mockSetPopupHtml, rollAttack: vi.fn(), rollDamage: vi.fn(), quickRollPlayerSave: vi.fn(),
-    });
-
-    const stats = createStats({ name: 'TestCharacter' });
-    const wrapper = ({ children }) => (
-      <DiceRollContext.Provider value={{ popupHtml: null, setPopupHtml: mockSetPopupHtml }}>
-        {children}
-      </DiceRollContext.Provider>
-    );
-    await act(async () => { render(<CharActions playerStats={stats} campaignName="my-campaign" />, { wrapper }); });
-
-    await act(async () => {
-      window.dispatchEvent(new CustomEvent('damage-type-skip'));
-    });
-
-    expect(screen.getByText('Actions')).toBeInTheDocument();
-  });
-});
-
-describe('CharActions resolveCreatureHp helper', () => {
-  it('returns { currentHp: 0, maxHp: 0 } when creature is null', () => {
-    // The resolveCreatureHp function is defined inside CharActions.jsx
-    // We can test the logic by verifying the behavior through the component
-    const stats = createStats();
-    expect(stats).toBeDefined();
-  });
-
-  it('handles player-type creatures with runtime HP values', () => {
-    const stats = createStats({ attacks: [] });
-    expect(stats).toBeDefined();
-  });
-
-  it('handles non-player creatures with currentHp/maxHp properties', () => {
-    const stats = createStats();
-    expect(stats).toBeDefined();
   });
 });

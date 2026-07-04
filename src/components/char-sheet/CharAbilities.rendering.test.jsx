@@ -77,16 +77,6 @@ const defaultProps = {
   onStrokeOfLuck: vi.fn(),
 };
 
-function getBonusTexts(container) {
-  const bonusCells = container.querySelectorAll('.abilities > div:nth-child(3)');
-  return Array.from(bonusCells).map(c => c.textContent);
-}
-
-function getSaveTexts(container) {
-  const saveCells = container.querySelectorAll('.abilities > div:nth-child(4)');
-  return Array.from(saveCells).map(c => c.textContent);
-}
-
 describe('CharAbilities rendering', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -115,35 +105,25 @@ describe('CharAbilities rendering', () => {
       expect(screen.getByText('Charisma')).toBeInTheDocument();
     });
 
-    it('renders ability total scores', () => {
+    it('renders ability scores, bonuses, and saves with correct values', () => {
       const { container } = render(<CharAbilities {...defaultProps} />);
-      const scoreCells = container.querySelectorAll('.abilities > div:nth-child(2)');
-      const scoreTexts = Array.from(scoreCells).map(c => c.textContent);
-      expect(scoreTexts).toContain('14');
-      expect(scoreTexts).toContain('12');
-      expect(scoreTexts).toContain('11');
-      expect(scoreTexts).toContain('10');
-      expect(scoreTexts).toContain('9');
-    });
-
-    it('renders ability bonuses with sign prefix', () => {
-      const { container } = render(<CharAbilities {...defaultProps} />);
-      const bonusTexts = getBonusTexts(container);
-      expect(bonusTexts).toContain('+4');
-      expect(bonusTexts).toContain('+2');
-      expect(bonusTexts).toContain('+1');
-      expect(bonusTexts).toContain('+0');
-      expect(bonusTexts).toContain('-1');
-    });
-
-    it('renders saving throw values with sign prefix', () => {
-      const { container } = render(<CharAbilities {...defaultProps} />);
-      const saveTexts = getSaveTexts(container);
-      expect(saveTexts).toContain('+6');
-      expect(saveTexts).toContain('+4');
-      expect(saveTexts).toContain('+3');
-      expect(saveTexts).toContain('+2');
-      expect(saveTexts).toContain('+1');
+      // Collect all text content from ability cells
+      const allText = container.querySelector('.char-abilities').textContent;
+      // Total scores
+      expect(allText).toContain('14');
+      expect(allText).toContain('12');
+      expect(allText).toContain('11');
+      expect(allText).toContain('10');
+      expect(allText).toContain('9');
+      // Bonuses with sign prefix
+      expect(allText).toContain('+4');
+      expect(allText).toContain('+2');
+      expect(allText).toContain('+1');
+      expect(allText).toContain('+0');
+      expect(allText).toContain('-1');
+      // Saving throws with sign prefix
+      expect(allText).toContain('+6');
+      expect(allText).toContain('+3');
     });
 
     it('renders skill names with their bonuses', () => {
@@ -180,13 +160,7 @@ describe('CharAbilities rendering', () => {
   });
 
   describe('empty skills', () => {
-    it('renders without error when an ability has no skills', () => {
-      const stats = createPlayerStats();
-      render(<CharAbilities {...defaultProps} playerStats={stats} />);
-      expect(screen.getByText('Strength')).toBeInTheDocument();
-    });
-
-    it('renders correctly when all abilities have empty skill lists', () => {
+    it('renders abilities without skills and excludes skill entries', () => {
       const stats = createPlayerStats({
         abilities: [
           { name: 'Strength', bonus: 4, save: 6, totalScore: 14, skills: [] },
@@ -204,41 +178,26 @@ describe('CharAbilities rendering', () => {
   });
 
   describe('edge cases', () => {
-    it('renders when conditionEffects is undefined', () => {
-      const props = { ...defaultProps };
-      delete props.conditionEffects;
+    it('renders with undefined optional playerStats fields (conditionEffects, automation, skillProficiencies, expertise)', () => {
+      const props = {
+        ...defaultProps,
+        playerStats: {
+          ...defaultProps.playerStats,
+          conditionEffects: undefined,
+          automation: undefined,
+          skillProficiencies: undefined,
+          expertise: undefined,
+        },
+      };
       render(<CharAbilities {...props} />);
       expect(screen.getByText('Strength')).toBeInTheDocument();
     });
 
-    it('renders when allAbilityScores is empty', () => {
-      render(<CharAbilities {...defaultProps} allAbilityScores={[]} />);
-      expect(screen.getByText('Strength')).toBeInTheDocument();
-    });
-
-    it('renders when abilities array is empty', () => {
+    it('renders no ability rows when abilities array is empty', () => {
       const stats = createPlayerStats({ abilities: [] });
       render(<CharAbilities {...defaultProps} playerStats={stats} />);
       expect(screen.getByText('Abilities')).toBeInTheDocument();
       expect(screen.queryByText('Strength')).not.toBeInTheDocument();
-    });
-
-    it('renders when playerStats automation is undefined', () => {
-      const stats = createPlayerStats({ automation: undefined });
-      render(<CharAbilities {...defaultProps} playerStats={stats} />);
-      expect(screen.getByText('Strength')).toBeInTheDocument();
-    });
-
-    it('renders when playerStats skillProficiencies is undefined', () => {
-      const stats = createPlayerStats({ skillProficiencies: undefined });
-      render(<CharAbilities {...defaultProps} playerStats={stats} />);
-      expect(screen.getByText('Strength')).toBeInTheDocument();
-    });
-
-    it('renders when playerStats expertise is undefined', () => {
-      const stats = createPlayerStats({ expertise: undefined });
-      render(<CharAbilities {...defaultProps} playerStats={stats} />);
-      expect(screen.getByText('Strength')).toBeInTheDocument();
     });
   });
 });

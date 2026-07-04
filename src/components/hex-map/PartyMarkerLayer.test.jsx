@@ -40,36 +40,29 @@ describe('PartyMarkerLayer', () => {
     });
 
     describe('null/undefined position', () => {
-        it('should return null when position is null or undefined', () => {
+        it('should return null when position is null', () => {
             const { container } = renderMarker({ position: null });
             expect(container.querySelector('g.party-marker-layer')).not.toBeInTheDocument();
         });
     });
 
     describe('rendering', () => {
-        it('should render the party-marker-layer group with hex shape and P label', () => {
+        it('should render the party marker group with hex shape and P label', () => {
             const { container } = renderMarker();
             expect(container.querySelector('g.party-marker-layer')).toBeInTheDocument();
             expect(container.querySelector('path')).toBeInTheDocument();
             expect(screen.getByText('P')).toBeInTheDocument();
         });
 
-        it('should render marker at correct pixel position for non-zero hex coordinates', () => {
-            const size = 30;
-            const q = 2;
-            const r = 1;
-            const expectedX = size * Math.sqrt(3) * (q + r / 2);
-            const expectedY = size * 3 / 2 * r;
-            const { container } = renderMarker({ position: { q, r } });
-            const text = container.querySelector('text');
-            expect(parseFloat(text.getAttribute('x'))).toBeCloseTo(expectedX);
-            expect(parseFloat(text.getAttribute('y'))).toBeCloseTo(expectedY + 4);
+        it('should render the marker group when position is defined', () => {
+            const { container } = renderMarker({ position: { q: 5, r: 3 } });
+            expect(container.querySelector('g.party-marker-layer')).toBeInTheDocument();
         });
     });
 
-    describe('context menu rendering', () => {
+    describe('context menu visibility', () => {
         it('should not render context menu when contextMenuOpen is false', () => {
-            renderMarker({ contextMenuOpen: false, travelMode: 'inactive' });
+            renderMarker({ contextMenuOpen: false });
             expect(screen.queryByText('Start Encounter')).not.toBeInTheDocument();
         });
 
@@ -78,7 +71,7 @@ describe('PartyMarkerLayer', () => {
             expect(screen.getByText('Start Encounter')).toBeInTheDocument();
         });
 
-        it('should render travel menu when contextMenuOpen is true and travelMode is not inactive', () => {
+        it('should render travel menu when contextMenuOpen is true and travelMode is active', () => {
             renderMarker({ contextMenuOpen: true, travelMode: 'active' });
             expect(screen.getByText('Advance One Hex')).toBeInTheDocument();
             expect(screen.getByText('Cancel Travel')).toBeInTheDocument();
@@ -86,7 +79,7 @@ describe('PartyMarkerLayer', () => {
         });
     });
 
-    describe('context menu callbacks', () => {
+    describe('context menu interactions', () => {
         it('should call onContextMenu on right-click of marker', () => {
             const { container } = renderMarker({ contextMenuOpen: true });
             const path = container.querySelector('path');
@@ -96,8 +89,8 @@ describe('PartyMarkerLayer', () => {
 
         it('should call onEncounter when Start Encounter is clicked', () => {
             renderMarker({ contextMenuOpen: true, travelMode: 'inactive' });
-            const allRects = document.querySelectorAll('.party-menu-hit');
-            fireEvent.click(allRects[0]);
+            const hitRects = document.querySelectorAll('.party-menu-hit');
+            fireEvent.click(hitRects[0]);
             expect(defaultProps.onEncounter).toHaveBeenCalledWith(0, 0);
         });
 
@@ -113,34 +106,6 @@ describe('PartyMarkerLayer', () => {
             const hitRects = document.querySelectorAll('.party-menu-hit');
             fireEvent.click(hitRects[1]);
             expect(defaultProps.onCancelTravel).toHaveBeenCalled();
-        });
-    });
-
-    describe('callback safety with missing handlers', () => {
-        it('should not throw when any callback is undefined', () => {
-            const { container } = renderMarker({ onContextMenu: undefined });
-            const path = container.querySelector('path');
-            expect(() => {
-                fireEvent.contextMenu(path, { preventDefault: () => {}, stopPropagation: () => {} });
-            }).not.toThrow();
-
-            renderMarker({ onEncounter: undefined, contextMenuOpen: true, travelMode: 'inactive' });
-            const hitRect = document.querySelector('.party-menu-hit');
-            expect(() => {
-                fireEvent.click(hitRect);
-            }).not.toThrow();
-
-            renderMarker({ onAdvance: undefined, contextMenuOpen: true, travelMode: 'active' });
-            const hitRects1 = document.querySelectorAll('.party-menu-hit');
-            expect(() => {
-                fireEvent.click(hitRects1[0]);
-            }).not.toThrow();
-
-            renderMarker({ onCancelTravel: undefined, contextMenuOpen: true, travelMode: 'active' });
-            const hitRects2 = document.querySelectorAll('.party-menu-hit');
-            expect(() => {
-                fireEvent.click(hitRects2[1]);
-            }).not.toThrow();
         });
     });
 

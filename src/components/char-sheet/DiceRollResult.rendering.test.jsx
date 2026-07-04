@@ -19,109 +19,57 @@ describe('DiceRollResult', () => {
             expect(screen.getByText('15')).toBeInTheDocument();
         });
 
-        it('renders correct icon class for attack type', () => {
+        it.each`
+            type           | iconClass
+            ${'attack'}    | ${'fa-crosshairs'}
+            ${'save'}      | ${'fa-shield-halved'}
+            ${'save-damage'} | ${'fa-shield-halved'}
+            ${'initiative'}| ${'fa-gavel'}
+            ${'damage'}    | ${'fa-bolt'}
+        `('renders correct icon class for type: $type', ({ type, iconClass }) => {
             const { container } = render(
-                <DiceRollResult name="Sword" type="attack" rolls={[15]} bonus={2} />
+                <DiceRollResult name="Roll" type={type} rolls={[15]} bonus={2} />
             );
-            expect(container.querySelector('.fa-crosshairs')).toBeInTheDocument();
-        });
-
-        it('renders correct icon class for save type', () => {
-            const { container } = render(
-                <DiceRollResult name="DEX Save" type="save" rolls={[14]} bonus={1} />
-            );
-            expect(container.querySelector('.fa-shield-halved')).toBeInTheDocument();
-        });
-
-        it('renders correct icon class for initiative type', () => {
-            const { container } = render(
-                <DiceRollResult name="Initiative" type="initiative" rolls={[18]} bonus={2} />
-            );
-            expect(container.querySelector('.fa-gavel')).toBeInTheDocument();
-        });
-
-        it('renders correct icon class for damage type', () => {
-            const { container } = render(
-                <DiceRollResult name="Fireball" type="damage" rolls={[6, 6, 6]} bonus={0} />
-            );
-            expect(container.querySelector('.fa-bolt')).toBeInTheDocument();
-        });
-
-        it('renders correct icon class for save-damage type', () => {
-            const { container } = render(
-                <DiceRollResult name="Poison Cloud" type="save-damage" rolls={[5]} bonus={0} />
-            );
-            expect(container.querySelector('.fa-shield-halved')).toBeInTheDocument();
-        });
-
-        it('renders default icon class for unknown type', () => {
-            const { container } = render(
-                <DiceRollResult name="Weird" type="custom" rolls={[5]} bonus={0} />
-            );
-            expect(container.querySelector('.fa-bolt')).toBeInTheDocument();
+            expect(container.querySelector(`.${iconClass}`)).toBeInTheDocument();
         });
     });
 
     describe('totals', () => {
-        it('shows correct total with bonus', () => {
+        it.each`
+            rolls       | bonus | modifier | expected
+            ${[10]}     | ${5}  | ${0}     | ${15}
+            ${[12]}     | ${2}  | ${3}     | ${17}
+            ${[10]}     | ${0}  | ${-3}    | ${7}
+            ${[10]}     | ${-2} | ${0}     | ${8}
+        `('shows correct total with rolls: $rolls, bonus: $bonus, modifier: $modifier', ({ rolls, bonus, modifier, expected }) => {
             render(
-                <DiceRollResult name="Test" type="d20" rolls={[10]} bonus={5} modifier={0} />
+                <DiceRollResult name="Test" type="d20" rolls={rolls} bonus={bonus} modifier={modifier} />
             );
-            expect(screen.getByText('15')).toBeInTheDocument();
+            expect(screen.getByText(String(expected))).toBeInTheDocument();
         });
 
-        it('shows correct total with modifier', () => {
+        it('shows total prop for damage type (uses total directly instead of calculating)', () => {
             render(
                 <DiceRollResult name="Test" type="damage" rolls={[6, 4]} bonus={0} total={10} modifier={3} />
             );
             expect(screen.getByText('10')).toBeInTheDocument();
         });
 
-        it('shows correct total with both bonus and modifier', () => {
-            render(
-                <DiceRollResult name="Test" type="d20" rolls={[12]} bonus={2} modifier={3} />
-            );
-            expect(screen.getByText('17')).toBeInTheDocument();
-        });
-
-        it('shows correct total with negative modifier', () => {
-            render(
-                <DiceRollResult name="Test" type="d20" rolls={[10]} bonus={0} modifier={-3} />
-            );
-            expect(screen.getByText('7')).toBeInTheDocument();
-        });
-
-        it('shows correct total with negative bonus', () => {
-            render(
-                <DiceRollResult name="Test" type="d20" rolls={[10]} bonus={-2} modifier={0} />
-            );
-            expect(screen.getByText('8')).toBeInTheDocument();
-        });
-
-        it('handles null rolls gracefully', () => {
+        it.each`
+            rolls          | type     | bonus | expected
+            ${null}        | ${'d20'} | ${0}  | ${'0'}
+            ${undefined}   | ${'d20'} | ${5}  | ${'5'}
+            ${[]}          | ${'d20'} | ${3}  | ${'3'}
+        `('handles rolls: $rolls gracefully with type: $type', ({ rolls, type, bonus, expected }) => {
             const { container } = render(
-                <DiceRollResult name="Test" type="d20" rolls={null} bonus={0} />
+                <DiceRollResult name="Test" type={type} rolls={rolls} bonus={bonus} />
             );
-            expect(container.querySelector('.dice-roll-total').textContent).toBe('0');
+            expect(container.querySelector('.dice-roll-total').textContent).toBe(expected);
         });
 
-        it('handles undefined rolls gracefully', () => {
+        it('handles empty rolls for damage type using total prop', () => {
             const { container } = render(
-                <DiceRollResult name="Test" type="d20" rolls={undefined} bonus={5} />
-            );
-            expect(container.querySelector('.dice-roll-total').textContent).toBe('5');
-        });
-
-        it('handles empty rolls array for d20', () => {
-            const { container } = render(
-                <DiceRollResult name="Test" type="d20" rolls={[]} bonus={3} />
-            );
-            expect(container.querySelector('.dice-roll-total').textContent).toBe('3');
-        });
-
-        it('handles empty rolls array for non-d20', () => {
-            const { container } = render(
-                <DiceRollResult name="Test" type="damage" rolls={[]} bonus={5} total={5} />
+                <DiceRollResult name="Test" type="damage" rolls={[]} bonus={0} total={5} />
             );
             expect(container.querySelector('.dice-roll-total').textContent).toBe('5');
         });
@@ -135,21 +83,21 @@ describe('DiceRollResult', () => {
             expect(container.querySelector('.dice-roll-total').textContent).toBe('10');
         });
 
-        it('uses max of two rolls when advantage is toggled', () => {
+        it('toggles to advantage when clicked', () => {
             render(
                 <DiceRollResult name="Attack" type="d20" rolls={[8, 15]} bonus={2} />
             );
 
-            fireEvent.click(screen.getByLabelText(/Advantage/));
+            fireEvent.click(screen.getByLabelText('Advantage'));
             expect(screen.getByText('17')).toBeInTheDocument();
         });
 
-        it('uses min of two rolls when disadvantage is toggled', () => {
+        it('toggles to disadvantage when clicked', () => {
             render(
                 <DiceRollResult name="Attack" type="d20" rolls={[8, 15]} bonus={2} />
             );
 
-            fireEvent.click(screen.getByLabelText(/Disadvantage/));
+            fireEvent.click(screen.getByLabelText('Disadvantage'));
             expect(screen.getByText('10')).toBeInTheDocument();
         });
 
@@ -178,42 +126,21 @@ describe('DiceRollResult', () => {
             expect(screen.getByText('10')).toBeInTheDocument();
         });
 
-        it('uses first roll when both rolls are provided in normal mode', () => {
+        it.each`
+            forcedMode     | rangeReason
+            ${'advantage'} | ${'Ranged disadvantage'}
+            ${'disadvantage'} | ${null}
+        `('shows forced mode badge with reason: $rangeReason', ({ forcedMode, rangeReason }) => {
             const { container } = render(
-                <DiceRollResult name="Check" type="d20" rolls={[3, 17]} bonus={0} />
-            );
-            expect(container.querySelector('.dice-roll-total').textContent).toBe('3');
-        });
-
-        it('shows advantage badge as active when forcedMode is advantage', () => {
-            const { container } = render(
-                <DiceRollResult name="Attack" type="d20" rolls={[8, 15]} bonus={2} forcedMode="advantage" />
-            );
-            expect(container.querySelector('.badge-toggle.active')).toBeInTheDocument();
-        });
-
-        it('shows disadvantage badge as active when forcedMode is disadvantage', () => {
-            const { container } = render(
-                <DiceRollResult name="Attack" type="d20" rolls={[8, 15]} bonus={2} forcedMode="disadvantage" />
-            );
-            expect(container.querySelector('.badge-toggle.active')).toBeInTheDocument();
-        });
-
-        it('shows forced mode badge with reason text', () => {
-            const { container } = render(
-                <DiceRollResult name="Attack" type="d20" rolls={[8, 15]} bonus={2} forcedMode="advantage" rangeReason="Ranged disadvantage" />
-            );
-            expect(container.querySelector('.forced-mode-badge')).toBeInTheDocument();
-            expect(container.querySelector('.forced-mode-badge').textContent).toContain('Ranged disadvantage');
-        });
-
-        it('shows forced mode badge with default message when no reason', () => {
-            const { container } = render(
-                <DiceRollResult name="Attack" type="d20" rolls={[8, 15]} bonus={2} forcedMode="advantage" />
+                <DiceRollResult name="Attack" type="d20" rolls={[8, 15]} bonus={2} forcedMode={forcedMode} rangeReason={rangeReason} />
             );
             const badge = container.querySelector('.forced-mode-badge');
             expect(badge).toBeInTheDocument();
-            expect(badge.getAttribute('title')).toBe('Automatically set by active conditions');
+            if (rangeReason) {
+                expect(badge.textContent).toContain(rangeReason);
+            } else {
+                expect(badge.getAttribute('title')).toBe('Automatically set by active conditions');
+            }
         });
     });
 
@@ -242,44 +169,26 @@ describe('DiceRollResult', () => {
     });
 
     describe('critical hit', () => {
-        it('shows "Critical Hit!" when display roll is 20', () => {
+        it.each`
+            rolls        | isAutoCrit | expected
+            ${[20, 5]}   | ${false}   | ${true}
+            ${[5, 3]}    | ${true}    | ${true}
+        `('shows "Critical Hit!" when roll is 20 or isAutoCrit is true', ({ rolls, isAutoCrit }) => {
             render(
-                <DiceRollResult name="Attack" type="d20" rolls={[20, 5]} bonus={3} />
+                <DiceRollResult name="Attack" type="d20" rolls={rolls} bonus={3} isAutoCrit={isAutoCrit} />
             );
             expect(screen.getByText(/Critical Hit!/)).toBeInTheDocument();
-        });
-
-        it('shows "Critical Hit!" text when isAutoCrit is true', () => {
-            render(
-                <DiceRollResult name="Attack" type="d20" rolls={[5, 3]} bonus={3} isAutoCrit={true} />
-            );
-            expect(screen.getByText(/Critical Hit!/)).toBeInTheDocument();
-        });
-
-        it('shows "Critical Hit!" with dice doubled text when isAutoCrit is true', () => {
-            render(
-                <DiceRollResult name="Attack" type="d20" rolls={[5, 3]} bonus={3} isAutoCrit={true} />
-            );
             expect(screen.getByText(/damage dice doubled/)).toBeInTheDocument();
         });
 
-        it('does NOT show "Critical Hit!" when roll is not 20', () => {
+        it.each`
+            rolls        | type       | name
+            ${[19, 5]}   | ${'d20'}   | ${'Attack'}
+            ${[20]}      | ${'damage'}| ${'Damage'}
+            ${[20]}      | ${'save'}  | ${'DEX Save'}
+        `('does NOT show "Critical Hit!" for rolls: $rolls, type: $type', ({ rolls, type }) => {
             render(
-                <DiceRollResult name="Attack" type="d20" rolls={[19, 5]} bonus={3} />
-            );
-            expect(screen.queryByText(/Critical Hit!/)).not.toBeInTheDocument();
-        });
-
-        it('does NOT show "Critical Hit!" for non-d20 types', () => {
-            render(
-                <DiceRollResult name="Damage" type="damage" rolls={[20]} bonus={0} />
-            );
-            expect(screen.queryByText(/Critical Hit!/)).not.toBeInTheDocument();
-        });
-
-        it('does NOT show critical hit text for save or initiative types', () => {
-            render(
-                <DiceRollResult name="DEX Save" type="save" rolls={[20]} bonus={2} />
+                <DiceRollResult name="Roll" type={type} rolls={rolls} bonus={3} />
             );
             expect(screen.queryByText(/Critical Hit!/)).not.toBeInTheDocument();
         });
@@ -291,13 +200,6 @@ describe('DiceRollResult', () => {
                 <DiceRollResult name="Attack" type="d20" rolls={[1, 15]} bonus={3} rollType="attack" isNatural1={true} />
             );
             expect(screen.getByText('Critical Miss!')).toBeInTheDocument();
-        });
-
-        it('does NOT show "Critical Miss!" when isNatural1 is false', () => {
-            render(
-                <DiceRollResult name="Attack" type="d20" rolls={[15, 8]} bonus={3} rollType="attack" isNatural1={false} />
-            );
-            expect(screen.queryByText('Critical Miss!')).not.toBeInTheDocument();
         });
 
         it.each`

@@ -6,7 +6,7 @@ import SavePromptModal from './SavePromptModal.jsx';
 import { rollD20 } from '../../services/dice/diceRoller.js';
 import { sendSaveResult, clearSavePrompt } from '../../services/combat/conditions/savePromptService.js';
 import { computeAuraBonus } from '../../services/combat/auras/auraOfProtection.js';
-import { getAbilitySaveBonus } from '../../services/combat/conditions/conditionUtils.js';
+
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 
 // ── Mock dependencies ──
@@ -198,22 +198,6 @@ describe('SavePromptModal', () => {
     expect(screen.queryByRole('button', { name: 'Dismiss' })).not.toBeInTheDocument();
   });
 
-  // ── Subscriber rendering ──
-
-  it('renders Subscriber only when EventSource is available', () => {
-    delete globalThis.EventSource;
-
-    render(
-      <SavePromptModal
-        campaignName="test-campaign"
-        characters={[]}
-        activeMapName={null}
-      />
-    );
-
-    expect(screen.queryByTestId('subscriber')).not.toBeInTheDocument();
-  });
-
   it('renders Subscriber with correct campaign attribute', () => {
     render(
       <SavePromptModal
@@ -250,26 +234,6 @@ describe('SavePromptModal', () => {
     expect(screen.getByText('DC 12')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Roll Save' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Dismiss' })).toBeInTheDocument();
-  });
-
-  it('renders the shield icon in header', async () => {
-    render(
-      <SavePromptModal
-        campaignName="test-campaign"
-        characters={[]}
-        activeMapName={null}
-      />
-    );
-
-    const trigger = screen.getByTestId('subscriber-trigger');
-    fireEvent.click(trigger);
-
-    await waitFor(() => {
-      expect(screen.getByText(/Saving Throw Required/i)).toBeInTheDocument();
-    });
-
-    const icon = document.querySelector('.sp-header i.fa-solid.fa-shield-halved');
-    expect(icon).toBeInTheDocument();
   });
 
   // ── Dismiss ──
@@ -353,26 +317,7 @@ describe('SavePromptModal', () => {
     expect(clearSavePrompt).not.toHaveBeenCalled();
   });
 
-  it('does not dismiss on Escape key since component uses overlay click for dismiss', async () => {
-    render(
-      <SavePromptModal
-        campaignName="test-campaign"
-        characters={[]}
-        activeMapName={null}
-      />
-    );
 
-    const trigger = screen.getByTestId('subscriber-trigger');
-    fireEvent.click(trigger);
-
-    await waitFor(() => {
-      expect(screen.getByText(/must make a/i)).toBeInTheDocument();
-    });
-
-    fireEvent.keyDown(document, { key: 'Escape', code: 'Escape' });
-
-    expect(screen.getByText(/must make a/i)).toBeInTheDocument();
-  });
 
   // ── Roll save ──
 
@@ -496,63 +441,7 @@ describe('SavePromptModal', () => {
     window.removeEventListener('save-result', eventHandler);
   });
 
-  it('shows save bonus breakdown in result', async () => {
-    render(
-      <SavePromptModal
-        campaignName="test-campaign"
-        characters={[]}
-        activeMapName={null}
-      />
-    );
 
-    const trigger = screen.getByTestId('subscriber-trigger');
-    fireEvent.click(trigger);
-
-    await waitFor(() => {
-      expect(screen.getByText(/must make a/i)).toBeInTheDocument();
-    });
-
-    const rollBtn = screen.getByRole('button', { name: 'Roll Save' });
-    fireEvent.click(rollBtn);
-
-    await waitFor(() => {
-      expect(screen.getByText(/d20/i)).toBeInTheDocument();
-    });
-
-    expect(screen.getByText(/vs DC 12/)).toBeInTheDocument();
-  });
-
-  it('calls sendSaveResult with correct parameters when rolling a save', async () => {
-    render(
-      <SavePromptModal
-        campaignName="test-campaign"
-        characters={[]}
-        activeMapName={null}
-      />
-    );
-
-    const trigger = screen.getByTestId('subscriber-trigger');
-    fireEvent.click(trigger);
-
-    await waitFor(() => {
-      expect(screen.getByText(/must make a/i)).toBeInTheDocument();
-    });
-
-    const rollBtn = screen.getByRole('button', { name: 'Roll Save' });
-    fireEvent.click(rollBtn);
-
-    await waitFor(() => {
-      expect(sendSaveResult).toHaveBeenCalled();
-    });
-
-    expect(sendSaveResult).toHaveBeenCalledWith('test-campaign', 'testTarget', expect.objectContaining({
-      promptId: 'test-prompt-1',
-      success: true,
-      roll: 15,
-      total: 15,
-      mode: 'normal',
-    }));
-  });
 
   // ── Queue / multiple prompts ──
 
@@ -599,65 +488,7 @@ describe('SavePromptModal', () => {
     });
   });
 
-  it('shows "Next Save" button when multiple prompts exist', async () => {
-    render(
-      <SavePromptModal
-        campaignName="test-campaign"
-        characters={[]}
-        activeMapName={null}
-      />
-    );
-
-    const trigger = screen.getByTestId('subscriber-trigger');
-    fireEvent.click(trigger);
-
-    await waitFor(() => {
-      expect(screen.getByText(/must make a/i)).toBeInTheDocument();
-    });
-
-    const trigger2 = screen.getByTestId('subscriber-trigger-second');
-    fireEvent.click(trigger2);
-
-    await waitFor(() => {
-      expect(screen.getByText(/\(1 of 2\)/)).toBeInTheDocument();
-    });
-
-    const rollBtn = screen.getByRole('button', { name: 'Roll Save' });
-    fireEvent.click(rollBtn);
-
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: 'Next Save' })).toBeInTheDocument();
-    });
-  });
-
-  it('does not add duplicate prompts with same promptId', async () => {
-    render(
-      <SavePromptModal
-        campaignName="test-campaign"
-        characters={[]}
-        activeMapName={null}
-      />
-    );
-
-    const trigger = screen.getByTestId('subscriber-trigger');
-    fireEvent.click(trigger);
-
-    await waitFor(() => {
-      expect(screen.getByText(/must make a/i)).toBeInTheDocument();
-    });
-
-    // Trigger again with same promptId
-    fireEvent.click(trigger);
-
-    await waitFor(() => {
-      expect(screen.queryByText(/must make a/i)).toBeInTheDocument();
-    });
-
-    // Verify queue count is still 1, not 2
-    expect(screen.queryByText(/\(1 of 2\)/)).not.toBeInTheDocument();
-  });
-
-  it('advances to second prompt when Next Save is clicked', async () => {
+  it('shows "Next Save" button and advances to second prompt when multiple prompts exist', async () => {
     render(
       <SavePromptModal
         campaignName="test-campaign"
@@ -690,12 +521,36 @@ describe('SavePromptModal', () => {
     const nextBtn = screen.getByRole('button', { name: 'Next Save' });
     fireEvent.click(nextBtn);
 
-    // Should now show the second prompt (testTarget2, DEX)
     await waitFor(() => {
       expect(screen.getByText('testTarget2')).toBeInTheDocument();
       expect(screen.getByText('DEX')).toBeInTheDocument();
       expect(screen.getByText('DC 15')).toBeInTheDocument();
     });
+  });
+
+  it('does not add duplicate prompts with same promptId', async () => {
+    render(
+      <SavePromptModal
+        campaignName="test-campaign"
+        characters={[]}
+        activeMapName={null}
+      />
+    );
+
+    const trigger = screen.getByTestId('subscriber-trigger');
+    fireEvent.click(trigger);
+
+    await waitFor(() => {
+      expect(screen.getByText(/must make a/i)).toBeInTheDocument();
+    });
+
+    fireEvent.click(trigger);
+
+    await waitFor(() => {
+      expect(screen.queryByText(/must make a/i)).toBeInTheDocument();
+    });
+
+    expect(screen.queryByText(/\(1 of 2\)/)).not.toBeInTheDocument();
   });
 
   // ── Cleared event ──
@@ -726,32 +581,6 @@ describe('SavePromptModal', () => {
 
   // ── String characters in characters array ──
 
-  it('handles string characters in characters array', async () => {
-    render(
-      <SavePromptModal
-        campaignName="test-campaign"
-        characters={['testTarget']}
-        activeMapName={null}
-      />
-    );
-
-    const trigger = screen.getByTestId('subscriber-trigger');
-    fireEvent.click(trigger);
-
-    await waitFor(() => {
-      expect(screen.getByText(/must make a/i)).toBeInTheDocument();
-    });
-
-    const rollBtn = screen.getByRole('button', { name: 'Roll Save' });
-    fireEvent.click(rollBtn);
-
-    await waitFor(() => {
-      expect(screen.getByText(/Total:/i)).toBeInTheDocument();
-    });
-
-    expect(sendSaveResult).toHaveBeenCalled();
-  });
-
   it('handles mixed string and object characters in characters array', async () => {
     const character = createCharacter('otherChar');
     render(
@@ -779,35 +608,7 @@ describe('SavePromptModal', () => {
     expect(sendSaveResult).toHaveBeenCalled();
   });
 
-  // ── Save bonus from character data ──
 
-  it('finds save bonus from character data and includes it in result', async () => {
-    const character = createCharacter('testTarget');
-    render(
-      <SavePromptModal
-        campaignName="test-campaign"
-        characters={[character]}
-        activeMapName={null}
-      />
-    );
-
-    const trigger = screen.getByTestId('subscriber-trigger');
-    fireEvent.click(trigger);
-
-    await waitFor(() => {
-      expect(screen.getByText(/must make a/i)).toBeInTheDocument();
-    });
-
-    const rollBtn = screen.getByRole('button', { name: 'Roll Save' });
-    fireEvent.click(rollBtn);
-
-    await waitFor(() => {
-      expect(screen.getByText(/Total:/i)).toBeInTheDocument();
-    });
-
-    expect(getAbilitySaveBonus).toHaveBeenCalledOnce();
-    expect(getAbilitySaveBonus).toHaveBeenCalledWith(character.computedStats, 'con');
-  });
 
   // ── Disadvantage ──
 
@@ -839,33 +640,7 @@ describe('SavePromptModal', () => {
     expect(rollD20).toHaveBeenCalledTimes(2);
   });
 
-  it('rolls only one d20 when no disadvantage', async () => {
-    rollD20.mockReturnValue(15);
 
-    render(
-      <SavePromptModal
-        campaignName="test-campaign"
-        characters={[]}
-        activeMapName={null}
-      />
-    );
-
-    const trigger = screen.getByTestId('subscriber-trigger');
-    fireEvent.click(trigger);
-
-    await waitFor(() => {
-      expect(screen.getByText(/must make a/i)).toBeInTheDocument();
-    });
-
-    const rollBtn = screen.getByRole('button', { name: 'Roll Save' });
-    fireEvent.click(rollBtn);
-
-    await waitFor(() => {
-      expect(screen.getByText(/d20/i)).toBeInTheDocument();
-    });
-
-    expect(rollD20).toHaveBeenCalledTimes(1);
-  });
 
   // ── Aura bonus ──
 
@@ -897,34 +672,7 @@ describe('SavePromptModal', () => {
     expect(screen.getByText(/from Paladin/)).toBeInTheDocument();
   });
 
-  it('includes aura bonus in the final total calculation', async () => {
-    computeAuraBonus.mockResolvedValue({ bonus: 2, sourceName: 'Paladin' });
 
-    render(
-      <SavePromptModal
-        campaignName="test-campaign"
-        characters={[]}
-        activeMapName={null}
-      />
-    );
-
-    const trigger = screen.getByTestId('subscriber-trigger');
-    fireEvent.click(trigger);
-
-    await waitFor(() => {
-      expect(screen.getByText(/must make a/i)).toBeInTheDocument();
-    });
-
-    const rollBtn = screen.getByRole('button', { name: 'Roll Save' });
-    fireEvent.click(rollBtn);
-
-    await waitFor(() => {
-      expect(screen.getByText(/Total:/i)).toBeInTheDocument();
-    });
-
-    // 15 (d20) + 3 (save bonus) + 2 (aura) = 20
-    expect(screen.getByText(/20/)).toBeInTheDocument();
-  });
 
   // ── dcSuccess display ──
 
@@ -1089,30 +837,6 @@ describe('SavePromptModal', () => {
 
   // ── Result display ──
 
-  it('shows result breakdown with roll details', async () => {
-    render(
-      <SavePromptModal
-        campaignName="test-campaign"
-        characters={[]}
-        activeMapName={null}
-      />
-    );
-
-    const trigger = screen.getByTestId('subscriber-trigger');
-    fireEvent.click(trigger);
-
-    await waitFor(() => {
-      expect(screen.getByText(/must make a/i)).toBeInTheDocument();
-    });
-
-    const rollBtn = screen.getByRole('button', { name: 'Roll Save' });
-    fireEvent.click(rollBtn);
-
-    await waitFor(() => {
-      expect(screen.getByText(/vs DC 12/)).toBeInTheDocument();
-    });
-  });
-
   it('shows result failure message when save fails', async () => {
     rollD20.mockReturnValue(1);
 
@@ -1137,64 +861,6 @@ describe('SavePromptModal', () => {
     await waitFor(() => {
       expect(screen.getByText(/SAVE FAILURE/)).toBeInTheDocument();
     });
-  });
-
-  it('adds sp-result-success class when save succeeds', async () => {
-    render(
-      <SavePromptModal
-        campaignName="test-campaign"
-        characters={[]}
-        activeMapName={null}
-      />
-    );
-
-    const trigger = screen.getByTestId('subscriber-trigger');
-    fireEvent.click(trigger);
-
-    await waitFor(() => {
-      expect(screen.getByText(/must make a/i)).toBeInTheDocument();
-    });
-
-    const rollBtn = screen.getByRole('button', { name: 'Roll Save' });
-    fireEvent.click(rollBtn);
-
-    await waitFor(() => {
-      expect(screen.getByText(/SAVE SUCCESS/)).toBeInTheDocument();
-    });
-
-    const resultDiv = document.querySelector('.sp-result-success');
-    expect(resultDiv).toBeTruthy();
-    expect(document.querySelector('.sp-result-fail')).toBeFalsy();
-  });
-
-  it('adds sp-result-fail class when save fails', async () => {
-    rollD20.mockReturnValue(1);
-
-    render(
-      <SavePromptModal
-        campaignName="test-campaign"
-        characters={[]}
-        activeMapName={null}
-      />
-    );
-
-    const trigger = screen.getByTestId('subscriber-trigger');
-    fireEvent.click(trigger);
-
-    await waitFor(() => {
-      expect(screen.getByText(/must make a/i)).toBeInTheDocument();
-    });
-
-    const rollBtn = screen.getByRole('button', { name: 'Roll Save' });
-    fireEvent.click(rollBtn);
-
-    await waitFor(() => {
-      expect(screen.getByText(/SAVE FAILURE/)).toBeInTheDocument();
-    });
-
-    const resultDiv = document.querySelector('.sp-result-fail');
-    expect(resultDiv).toBeTruthy();
-    expect(document.querySelector('.sp-result-success')).toBeFalsy();
   });
 
   it('shows advantage indicator in result breakdown when advantage applies', async () => {

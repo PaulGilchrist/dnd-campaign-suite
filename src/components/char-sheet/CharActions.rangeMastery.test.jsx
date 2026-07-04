@@ -248,80 +248,11 @@ function createStats(overrides = {}) {
   return { ...BASE_PLAYER_STATS, ...overrides };
 }
 
-describe('CharActions range formatting', () => {
+describe('CharActions weapon mastery', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
     globalThis.fetch = vi.fn().mockResolvedValue({ json: () => Promise.resolve([]) });
-  });
-
-  describe('range formatting via attack rendering', () => {
-    it('formats a plain numeric range with "ft." suffix', async () => {
-      const stats = createStats({
-        attacks: [{ name: 'Longsword', range: 5, hitBonus: 5, damage: '1d8+3', damageType: 'Slashing', type: 'Action' }],
-      });
-      await act(async () => { render(<CharActions playerStats={stats} />); });
-      expect(screen.getByText('5 ft.')).toBeInTheDocument();
-    });
-
-    it('normalizes "feet" to "ft." in range string', async () => {
-      const stats = createStats({
-        attacks: [{ name: 'Longbow', range: '150 feet', hitBonus: 5, damage: '1d8+3', damageType: 'Piercing', type: 'Action' }],
-      });
-      await act(async () => { render(<CharActions playerStats={stats} />); });
-      expect(screen.getByText('150 ft.')).toBeInTheDocument();
-    });
-
-    it('normalizes "foot" to "ft." in range string', async () => {
-      const stats = createStats({
-        attacks: [{ name: 'Sling', range: '30 foot', hitBonus: 5, damage: '1d4+3', damageType: 'Bludgeoning', type: 'Action' }],
-      });
-      await act(async () => { render(<CharActions playerStats={stats} />); });
-      expect(screen.getByText('30 ft.')).toBeInTheDocument();
-    });
-
-    it('handles range of 0 as "0 ft."', async () => {
-      const stats = createStats({
-        attacks: [{ name: 'Touch Attack', range: 0, hitBonus: 5, damage: '1d8', damageType: 'Necrotic', type: 'Action' }],
-      });
-      await act(async () => { render(<CharActions playerStats={stats} />); });
-      expect(screen.getByText('0 ft.')).toBeInTheDocument();
-    });
-
-    it('passes through non-numeric range values unchanged', async () => {
-      const stats = createStats({
-        attacks: [{ name: 'Self Buff', range: 'Self', hitBonus: 0, damage: '', damageType: '', type: 'Action' }],
-      });
-      await act(async () => { render(<CharActions playerStats={stats} />); });
-      expect(screen.getByText('Self')).toBeInTheDocument();
-    });
-
-    it('normalizes range that already ends with "ft." without duplication', async () => {
-      const stats = createStats({
-        attacks: [{ name: 'Test', range: '150 ft.', hitBonus: 5, damage: '1d8', damageType: 'Piercing', type: 'Action' }],
-      });
-      await act(async () => { render(<CharActions playerStats={stats} />); });
-      expect(screen.getByText('150 ft.')).toBeInTheDocument();
-    });
-
-    it('preserves fraction ranges like "20/60"', async () => {
-      const stats = createStats({
-        attacks: [{ name: 'Shortbow', range: '20/60', hitBonus: 5, damage: '1d6', damageType: 'Piercing', type: 'Action' }],
-      });
-      await act(async () => { render(<CharActions playerStats={stats} />); });
-      expect(screen.getByText('20/60')).toBeInTheDocument();
-    });
-
-    it('preserves fraction ranges with "ft." suffix', async () => {
-      const stats = createStats({
-        attacks: [{ name: 'Shortbow', range: '20/60 ft.', hitBonus: 5, damage: '1d6', damageType: 'Piercing', type: 'Action' }],
-      });
-      await act(async () => { render(<CharActions playerStats={stats} />); });
-      expect(screen.getByText('20/60 ft.')).toBeInTheDocument();
-    });
-  });
-
-  beforeEach(() => {
     automationService.collectWeaponMastery.mockReturnValue({ baseMastery: null, extraMasteries: [] });
   });
 

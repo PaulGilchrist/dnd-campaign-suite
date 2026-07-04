@@ -18,7 +18,7 @@ function allRiversAreValidHexKeys(rivers) {
 }
 
 function hexKeyExists(result, q, r) {
-  return result.terrain.hasOwnProperty(`${q},${r}`);
+  return Object.prototype.hasOwnProperty.call(result.terrain, `${q},${r}`);
 }
 
 describe('hexTerrainGenerator', () => {

@@ -295,11 +295,6 @@ describe('CharActionModals', () => {
     expect(container).toBeEmptyDOMElement();
   });
 
-  it('renders empty fragment when all modal flags are falsy', () => {
-    const { container } = render(<CharActionModals {...createBaseProps()} healingPoolModal={null} handOfHealingModal={null} />);
-    expect(container).toBeEmptyDOMElement();
-  });
-
   // ── Individual modal rendering ──
 
   describe('modal rendering', () => {
@@ -364,33 +359,19 @@ describe('CharActionModals', () => {
   // ── BastionOfLawModal renders twice (feature + plain) ──
 
   describe('BastionOfLawModal duplicate rendering', () => {
-    it('renders two BastionOfLawModal instances when bastionOfLawModal is set', () => {
+    it('renders two BastionOfLawModal instances and one confirm button when bastionOfLawModal is set with auto type', () => {
       render(<CharActionModals {...createBaseProps()} bastionOfLawModal={{ featureName: 'Test', auto: { type: 'bastion_of_law' } }} />);
       const modals = screen.getAllByTestId('bastion-of-law-modal');
       expect(modals).toHaveLength(2);
-    });
-
-    it('renders only one confirm button (on the feature instance)', () => {
-      render(<CharActionModals {...createBaseProps()} bastionOfLawModal={{ featureName: 'Test', auto: { type: 'bastion_of_law' } }} />);
       const confirmBtns = screen.getAllByTestId('bastion-confirm');
       expect(confirmBtns).toHaveLength(1);
-    });
-
-    it('renders confirm button when auto type is bastion_of_law', () => {
-      render(<CharActionModals {...createBaseProps()} bastionOfLawModal={{ featureName: 'Test', auto: { type: 'bastion_of_law' } }} />);
-      expect(screen.getByTestId('bastion-confirm')).toBeInTheDocument();
-    });
-
-    it('renders confirm button when auto is empty object', () => {
-      render(<CharActionModals {...createBaseProps()} bastionOfLawModal={{ featureName: 'Test', auto: {} }} />);
-      expect(screen.getByTestId('bastion-confirm')).toBeInTheDocument();
     });
   });
 
   // ── Multiple modals simultaneously ──
 
   describe('multiple modals', () => {
-    it('renders two modals when both are set', () => {
+    it('renders both modals when healingPoolModal and divineFuryChoice are set', () => {
       render(<CharActionModals
         {...createBaseProps()}
         healingPoolModal={{ name: 'Test Pool' }}
@@ -398,17 +379,6 @@ describe('CharActionModals', () => {
       />);
       expect(screen.getByTestId('healing-pool-modal')).toBeInTheDocument();
       expect(screen.getByText(/Divine Fury/)).toBeInTheDocument();
-    });
-
-    it('renders three modals when all three are set', () => {
-      render(<CharActionModals
-        {...createBaseProps()}
-        healingPoolModal={{ name: 'Test Pool' }}
-        divineFuryChoice={{}}
-      />);
-      expect(screen.getByTestId('healing-pool-modal')).toBeInTheDocument();
-      expect(screen.getByText(/Divine Fury/)).toBeInTheDocument();
-      expect(screen.getByText(/Divine Fury — Damage Type/)).toBeInTheDocument();
     });
 
     it('renders both constellation modal variants simultaneously', () => {

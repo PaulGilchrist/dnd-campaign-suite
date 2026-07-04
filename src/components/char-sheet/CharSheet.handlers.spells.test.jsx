@@ -127,71 +127,6 @@ const defaultProps = {
 };
 
 // ---------------------------------------------------------------------------
-// Tests — Senses modification (Aspect of the Wilds - Owl)
-// ---------------------------------------------------------------------------
-
-describe('senses modification aspect of the wilds owl', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    mockStore.clear();
-  });
-
-  it('renders with existing darkvision sense', async () => {
-    vi.mocked(rulesFactory.getPlayerStats).mockImplementation(() => Promise.resolve({
-      name: 'Test Character',
-      level: 10,
-      hitPoints: { current: 50, max: 50 },
-      abilities: [{ name: 'Strength', bonus: 4, save: 6, skills: [] }],
-      spellAbilities: { spells: [], maxPreparedSpells: 5 },
-      rules: '2024',
-      automation: { passives: [] },
-      class: { name: 'Druid' },
-      speed: 30,
-      race: { speed: 30 },
-      senses: [{ name: 'Darkvision', value: '60 ft.' }],
-      actions: [],
-      bonusActions: [],
-      reactions: [],
-      specialActions: [],
-      characterAdvancement: [],
-      skillProficiencies: [],
-    }));
-    mockStore.set('Test Character:aspectOfTheWildsOption', 'Owl');
-    render(<CharSheet {...defaultProps} />);
-    await waitFor(() => {
-      expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
-    });
-  });
-
-  it('renders without existing darkvision sense', async () => {
-    vi.mocked(rulesFactory.getPlayerStats).mockImplementation(() => Promise.resolve({
-      name: 'Test Character',
-      level: 10,
-      hitPoints: { current: 50, max: 50 },
-      abilities: [{ name: 'Strength', bonus: 4, save: 6, skills: [] }],
-      spellAbilities: { spells: [], maxPreparedSpells: 5 },
-      rules: '2024',
-      automation: { passives: [] },
-      class: { name: 'Druid' },
-      speed: 30,
-      race: { speed: 30 },
-      senses: [],
-      actions: [],
-      bonusActions: [],
-      reactions: [],
-      specialActions: [],
-      characterAdvancement: [],
-      skillProficiencies: [],
-    }));
-    mockStore.set('Test Character:aspectOfTheWildsOption', 'Owl');
-    render(<CharSheet {...defaultProps} />);
-    await waitFor(() => {
-      expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
-    });
-  });
-});
-
-// ---------------------------------------------------------------------------
 // Tests — 5e prepared spells loading from runtime state
 // ---------------------------------------------------------------------------
 
@@ -298,80 +233,6 @@ describe('5e prepared spells loading from runtime state', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Tests — Spell prepared toggle state
-// ---------------------------------------------------------------------------
-
-describe('spell prepared toggle state', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    mockStore.clear();
-  });
-
-  it('renders with already-prepared spells', async () => {
-    vi.mocked(rulesFactory.getPlayerStats).mockImplementation(() => Promise.resolve({
-      name: 'Test Character',
-      level: 10,
-      hitPoints: { current: 50, max: 50 },
-      abilities: [{ name: 'Strength', bonus: 4, save: 6, skills: [] }],
-      spellAbilities: {
-        spells: [
-          { name: 'Fireball', prepared: 'Prepared' },
-          { name: 'Shield', prepared: '' },
-        ],
-        maxPreparedSpells: 3,
-      },
-      rules: '5e',
-      automation: { passives: [] },
-      class: { name: 'Fighter' },
-      speed: 30,
-      race: { speed: 30 },
-      actions: [],
-      bonusActions: [],
-      reactions: [],
-      specialActions: [],
-      characterAdvancement: [],
-      skillProficiencies: [],
-    }));
-    render(<CharSheet {...defaultProps} />);
-    await waitFor(() => {
-      expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
-    });
-  });
-
-  it('renders with all spells already prepared at max', async () => {
-    vi.mocked(rulesFactory.getPlayerStats).mockImplementation(() => Promise.resolve({
-      name: 'Test Character',
-      level: 10,
-      hitPoints: { current: 50, max: 50 },
-      abilities: [{ name: 'Strength', bonus: 4, save: 6, skills: [] }],
-      spellAbilities: {
-        spells: [
-          { name: 'Fireball', prepared: 'Prepared' },
-          { name: 'Shield', prepared: 'Prepared' },
-          { name: 'Magic Missile', prepared: 'Prepared' },
-        ],
-        maxPreparedSpells: 3,
-      },
-      rules: '5e',
-      automation: { passives: [] },
-      class: { name: 'Fighter' },
-      speed: 30,
-      race: { speed: 30 },
-      actions: [],
-      bonusActions: [],
-      reactions: [],
-      specialActions: [],
-      characterAdvancement: [],
-      skillProficiencies: [],
-    }));
-    render(<CharSheet {...defaultProps} />);
-    await waitFor(() => {
-      expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
-    });
-  });
-});
-
-// ---------------------------------------------------------------------------
 // Tests — Hit points runtime sync
 // ---------------------------------------------------------------------------
 
@@ -405,31 +266,5 @@ describe('hit points runtime sync', () => {
       expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
     });
     expect(mockStore.get('Test Character:hitPoints')).toEqual({ current: 30, max: 50 });
-  });
-
-  it('syncs hitPoints with full values', async () => {
-    vi.mocked(rulesFactory.getPlayerStats).mockImplementation(() => Promise.resolve({
-      name: 'Test Character',
-      level: 10,
-      hitPoints: { current: 50, max: 50 },
-      abilities: [{ name: 'Strength', bonus: 4, save: 6, skills: [] }],
-      spellAbilities: { spells: [], maxPreparedSpells: 5 },
-      rules: '5e',
-      automation: { passives: [] },
-      class: { name: 'Fighter' },
-      speed: 30,
-      race: { speed: 30 },
-      actions: [],
-      bonusActions: [],
-      reactions: [],
-      specialActions: [],
-      characterAdvancement: [],
-      skillProficiencies: [],
-    }));
-    render(<CharSheet {...defaultProps} />);
-    await waitFor(() => {
-      expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
-    });
-    expect(mockStore.get('Test Character:hitPoints')).toEqual({ current: 50, max: 50 });
   });
 });

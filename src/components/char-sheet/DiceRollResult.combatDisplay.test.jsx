@@ -56,30 +56,20 @@ describe('DiceRollResult', () => {
             expect(screen.queryByText(/MISS/)).not.toBeInTheDocument();
         });
 
-        it('does not show hit/miss for non-attack rollType', () => {
+        it.each`
+            type           | rollType
+            ${'damage'}    | ${undefined}
+            ${'save-damage'} | ${'attack'}
+        `('does not show hit/miss for type: $type, rollType: $rollType', ({ type, rollType }) => {
             render(
                 <DiceRollResult
                     name="Fireball"
-                    type="damage"
+                    type={type}
                     rolls={[6]}
                     bonus={0}
                     targetName="Goblin"
                     hit={true}
-                />
-            );
-            expect(screen.queryByText(/HIT/)).not.toBeInTheDocument();
-        });
-
-        it('does not show hit/miss for save-damage type', () => {
-            render(
-                <DiceRollResult
-                    name="Poison Cloud"
-                    type="save-damage"
-                    rolls={[6]}
-                    bonus={0}
-                    targetName="Goblin"
-                    hit={true}
-                    rollType="attack"
+                    rollType={rollType}
                 />
             );
             expect(screen.queryByText(/HIT/)).not.toBeInTheDocument();
@@ -219,32 +209,22 @@ describe('DiceRollResult', () => {
     });
 
     describe('cover display', () => {
-        it('shows 3/4 cover when coverLevel is threeQuarter', () => {
+        it.each`
+            coverLevel      | expectedText
+            ${'threeQuarter'} | ${'3/4 Cover (+2 AC)'}
+            ${'half'}         | ${'1/2 Cover (+2 AC)'}
+        `('shows cover text for level: $coverLevel', ({ coverLevel, expectedText }) => {
             render(
                 <DiceRollResult
                     name="Longbow"
                     type="attack"
                     rolls={[12]}
                     bonus={4}
-                    coverLevel="threeQuarter"
+                    coverLevel={coverLevel}
                     coverAcBonus={2}
                 />
             );
-            expect(screen.getByText(/3\/4 Cover \(\+2 AC\)/)).toBeInTheDocument();
-        });
-
-        it('shows 1/2 cover when coverLevel is half', () => {
-            render(
-                <DiceRollResult
-                    name="Longbow"
-                    type="attack"
-                    rolls={[12]}
-                    bonus={4}
-                    coverLevel="half"
-                    coverAcBonus={2}
-                />
-            );
-            expect(screen.getByText(/1\/2 Cover \(\+2 AC\)/)).toBeInTheDocument();
+            expect(screen.getByText(expectedText)).toBeInTheDocument();
         });
 
         it('does not show cover when coverAcBonus is 0', () => {
@@ -263,46 +243,37 @@ describe('DiceRollResult', () => {
     });
 
     describe('auto damage rolling', () => {
-        it('shows auto damage indicator when autoDamage and hit are true', () => {
-            render(
-                <DiceRollResult
-                    name="Longsword"
-                    type="attack"
-                    rolls={[18]}
-                    bonus={5}
-                    autoDamage={true}
-                    hit={true}
-                />
-            );
-            expect(screen.getByText(/Rolling damage/)).toBeInTheDocument();
-        });
-
-        it('does not show auto damage when hit is false', () => {
-            render(
-                <DiceRollResult
-                    name="Longsword"
-                    type="attack"
-                    rolls={[8]}
-                    bonus={3}
-                    autoDamage={true}
-                    hit={false}
-                />
-            );
-            expect(screen.queryByText(/Rolling damage/)).not.toBeInTheDocument();
-        });
-
-        it('does not show auto damage when autoDamage is false', () => {
-            render(
-                <DiceRollResult
-                    name="Longsword"
-                    type="attack"
-                    rolls={[18]}
-                    bonus={5}
-                    autoDamage={false}
-                    hit={true}
-                />
-            );
-            expect(screen.queryByText(/Rolling damage/)).not.toBeInTheDocument();
+        it.each`
+            autoDamage | hit     | showAutoDamage
+            ${true}    | ${true} | ${true}
+            ${true}    | ${false} | ${false}
+            ${false}   | ${true} | ${false}
+        `('shows auto damage indicator when autoDamage: $autoDamage, hit: $hit', ({ autoDamage, hit, showAutoDamage }) => {
+            if (showAutoDamage) {
+                render(
+                    <DiceRollResult
+                        name="Longsword"
+                        type="attack"
+                        rolls={[18]}
+                        bonus={5}
+                        autoDamage={true}
+                        hit={true}
+                    />
+                );
+                expect(screen.getByText(/Rolling damage/)).toBeInTheDocument();
+            } else {
+                render(
+                    <DiceRollResult
+                        name="Longsword"
+                        type="attack"
+                        rolls={[8]}
+                        bonus={3}
+                        autoDamage={autoDamage}
+                        hit={hit}
+                    />
+                );
+                expect(screen.queryByText(/Rolling damage/)).not.toBeInTheDocument();
+            }
         });
     });
 
@@ -326,7 +297,7 @@ describe('DiceRollResult', () => {
             expect(waiting.textContent).toContain('DC 14');
         });
 
-        it('shows quick roll button when onQuickRoll is provided', () => {
+        it('shows quick roll button and calls onQuickRoll when clicked', () => {
             const onQuickRoll = vi.fn();
             render(
                 <DiceRollResult
@@ -342,23 +313,6 @@ describe('DiceRollResult', () => {
                 />
             );
             expect(screen.getByText(/Quick Roll/)).toBeInTheDocument();
-        });
-
-        it('calls onQuickRoll when quick roll button is clicked', () => {
-            const onQuickRoll = vi.fn();
-            render(
-                <DiceRollResult
-                    name="Fireball"
-                    type="damage"
-                    rolls={[6]}
-                    bonus={0}
-                    waitingForPlayerSave={true}
-                    targetName="Goblin"
-                    saveDc={14}
-                    saveType="DEX"
-                    onQuickRoll={onQuickRoll}
-                />
-            );
             fireEvent.click(screen.getByText(/Quick Roll/));
             expect(onQuickRoll).toHaveBeenCalled();
         });
@@ -381,7 +335,7 @@ describe('DiceRollResult', () => {
     });
 
     describe('save result display', () => {
-        it('shows save success when saveResult.success is true', () => {
+        it('shows save success with roll detail when saveResult.success is true', () => {
             render(
                 <DiceRollResult
                     name="Fireball"
@@ -394,6 +348,7 @@ describe('DiceRollResult', () => {
             );
             expect(screen.getByText(/SAVE SUCCESS/)).toBeInTheDocument();
             expect(screen.getByText(/18 vs DC 15/)).toBeInTheDocument();
+            expect(screen.getByText(/d20 14 \+ 4/)).toBeInTheDocument();
         });
 
         it('shows save failure when saveResult.success is false', () => {
@@ -410,21 +365,7 @@ describe('DiceRollResult', () => {
             expect(screen.getByText(/SAVE FAILURE/)).toBeInTheDocument();
         });
 
-        it('shows save roll detail when bonus is non-zero', () => {
-            render(
-                <DiceRollResult
-                    name="Fireball"
-                    type="damage"
-                    rolls={[6]}
-                    bonus={0}
-                    saveResult={{ success: true, total: 18, roll: 14, bonus: 4 }}
-                    saveDc={15}
-                />
-            );
-            expect(screen.getByText(/d20 14 \+ 4/)).toBeInTheDocument();
-        });
-
-        it('shows save roll detail even when bonus is zero', () => {
+        it('shows save roll detail with zero bonus', () => {
             render(
                 <DiceRollResult
                     name="Fireball"
@@ -438,8 +379,8 @@ describe('DiceRollResult', () => {
             expect(screen.getByText(/d20 14 \+ 0/)).toBeInTheDocument();
         });
 
-        it('does not show save result when saveResult is null', () => {
-            render(
+        it('does not show save result when saveResult is null or undefined', () => {
+            const { rerender } = render(
                 <DiceRollResult
                     name="Fireball"
                     type="damage"
@@ -451,10 +392,8 @@ describe('DiceRollResult', () => {
             );
             expect(screen.queryByText(/SAVE SUCCESS/)).not.toBeInTheDocument();
             expect(screen.queryByText(/SAVE FAILURE/)).not.toBeInTheDocument();
-        });
 
-        it('does not show save result when saveResult is undefined', () => {
-            render(
+            rerender(
                 <DiceRollResult
                     name="Fireball"
                     type="damage"
@@ -487,7 +426,7 @@ describe('DiceRollResult', () => {
             expect(damageEl.textContent).toContain('Goblin');
         });
 
-        it('shows damage applied with reduction', () => {
+        it('shows damage applied with reduction and HP change', () => {
             const { container } = render(
                 <DiceRollResult
                     name="Fireball"
@@ -499,6 +438,7 @@ describe('DiceRollResult', () => {
                     damageApplied={true}
                     damageReduced={true}
                     targetName="Orc"
+                    targetCurrentHp={5}
                 />
             );
             const damageEl = container.querySelector('.dice-roll-damage-applied');
@@ -506,27 +446,11 @@ describe('DiceRollResult', () => {
             expect(damageEl.textContent).toContain('damage applied');
             expect(damageEl.textContent).toContain('Orc');
             expect(damageEl.textContent).toContain('reduced from 15');
+            expect(damageEl.textContent).toContain('HP: 13 → 5');
         });
 
-        it('shows HP change when targetCurrentHp is provided', () => {
-            const { container } = render(
-                <DiceRollResult
-                    name="Fireball"
-                    type="damage"
-                    rolls={[6, 5, 4]}
-                    bonus={0}
-                    finalDamage={10}
-                    damageApplied={true}
-                    targetName="Goblin"
-                    targetCurrentHp={5}
-                />
-            );
-            const damageEl = container.querySelector('.dice-roll-damage-applied');
-            expect(damageEl.textContent).toContain('HP: 15 → 5');
-        });
-
-        it('does not show damage applied when damageApplied is false', () => {
-            render(
+        it('does not show damage applied when damageApplied is false or finalDamage is undefined', () => {
+            const { rerender } = render(
                 <DiceRollResult
                     name="Fireball"
                     type="damage"
@@ -538,10 +462,8 @@ describe('DiceRollResult', () => {
                 />
             );
             expect(screen.queryByText(/damage applied/)).not.toBeInTheDocument();
-        });
 
-        it('does not show damage applied when finalDamage is undefined', () => {
-            render(
+            rerender(
                 <DiceRollResult
                     name="Fireball"
                     type="damage"
@@ -555,7 +477,7 @@ describe('DiceRollResult', () => {
         });
     });
 
-    describe('target AC display', () => {
+    describe('target AC and reaction bonus display', () => {
         it('shows "—" when targetAc is undefined', () => {
             const { container } = render(
                 <DiceRollResult
@@ -589,7 +511,12 @@ describe('DiceRollResult', () => {
             expect(hitMiss.textContent).toContain('AC 16');
         });
 
-        it('shows baitAndSwitchBonus in reaction text when positive', () => {
+        it.each`
+            baitAndSwitch | gloriousDefense | defensiveDuelist | expectedReaction
+            ${3}          | ${0}            | ${0}             | ${'3 reaction'}
+            ${0}          | ${0}            | ${0}             | ${null}
+            ${3}          | ${2}            | ${0}             | ${'5 reaction'}
+        `('shows reaction bonus $expectedReaction when baitAndSwitch: $baitAndSwitch, gloriousDefense: $gloriousDefense, defensiveDuelist: $defensiveDuelist', ({ baitAndSwitch, gloriousDefense, defensiveDuelist, expectedReaction }) => {
             const { container } = render(
                 <DiceRollResult
                     name="Longsword"
@@ -600,47 +527,17 @@ describe('DiceRollResult', () => {
                     targetAc={14}
                     hit={true}
                     rollType="attack"
-                    baitAndSwitchBonus={3}
+                    baitAndSwitchBonus={baitAndSwitch}
+                    gloriousDefenseBonus={gloriousDefense}
+                    defensiveDuelistBonus={defensiveDuelist}
                 />
             );
             const hitMiss = container.querySelector('.dice-roll-hit-miss.hit');
-            expect(hitMiss.textContent).toContain('3 reaction');
-        });
-
-        it('does not show baitAndSwitchBonus in reaction text when zero', () => {
-            render(
-                <DiceRollResult
-                    name="Longsword"
-                    type="attack"
-                    rolls={[18]}
-                    bonus={3}
-                    targetName="Goblin"
-                    targetAc={14}
-                    hit={true}
-                    rollType="attack"
-                    baitAndSwitchBonus={0}
-                />
-            );
-            expect(screen.queryByText(/reaction/)).not.toBeInTheDocument();
-        });
-
-        it('combines baitAndSwitchBonus with other reaction bonuses', () => {
-            const { container } = render(
-                <DiceRollResult
-                    name="Longsword"
-                    type="attack"
-                    rolls={[18]}
-                    bonus={3}
-                    targetName="Goblin"
-                    targetAc={14}
-                    hit={true}
-                    rollType="attack"
-                    gloriousDefenseBonus={2}
-                    baitAndSwitchBonus={3}
-                />
-            );
-            const hitMiss = container.querySelector('.dice-roll-hit-miss.hit');
-            expect(hitMiss.textContent).toContain('5 reaction');
+            if (expectedReaction) {
+                expect(hitMiss.textContent).toContain(expectedReaction);
+            } else {
+                expect(hitMiss.textContent).not.toContain('reaction');
+            }
         });
     });
 });

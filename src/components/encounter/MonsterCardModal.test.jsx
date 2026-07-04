@@ -240,7 +240,7 @@ describe('MonsterCardModal', () => {
             { field: 'damage_resistances', value: 'bludgeoning' },
             { field: 'damage_immunities', value: 'poison, psychic' },
             { field: 'condition_immunities', value: 'charmed, frightened' },
-        ])('hides row when $field is absent', ({ field, value }) => {
+        ])('hides row when $field is absent', ({ field: _field, value }) => {
             renderModal();
             expect(screen.queryByText(value)).not.toBeInTheDocument();
         });
@@ -311,7 +311,7 @@ describe('MonsterCardModal', () => {
 
             const monsterWithRecharge = {
                 ...baseMonster,
-                actions: [{ name: 'Fire Breath', description: 'Breath weapon.', recharge: '5-6' }];
+                actions: [{ name: 'Fire Breath', description: 'Breath weapon.', recharge: '5-6' }],
             };
             render(
                 <MonsterCardModal monster={monsterWithRecharge} onClose={mockOnClose} campaignName={mockCampaignName} />
@@ -320,7 +320,7 @@ describe('MonsterCardModal', () => {
 
             const monsterWithUsage = {
                 ...baseMonster,
-                actions: [{ name: 'Unique Ability', description: 'Does something.', usage: '1/Day' }];
+                actions: [{ name: 'Unique Ability', description: 'Does something.', usage: '1/Day' }],
             };
             render(
                 <MonsterCardModal monster={monsterWithUsage} onClose={mockOnClose} campaignName={mockCampaignName} />

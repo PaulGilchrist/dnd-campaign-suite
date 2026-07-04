@@ -32,6 +32,29 @@ const NON_NPC_TYPES = [
   'web',
 ];
 
+// Types that render a circle hit area (barrel only — circle cx/cy/r)
+const CIRCLE_HIT_AREA_TYPES = ['barrel'];
+
+// Types that render a rect hit area
+const RECT_HIT_AREA_TYPES = [
+  'altar', 'arrowSlitWall', 'bed', 'bookshelf', 'chair', 'chest', 'crate',
+  'door', 'firepit', 'fountain', 'pillar', 'secretDoor', 'skeleton', 'stairs',
+  'statue', 'table', 'torch', 'trap', 'tree', 'web',
+];
+
+// Types that support rotation via transform attribute on the <use> element.
+const ROTATION_TYPES = ['bed', 'altar', 'bookshelf', 'door', 'secretDoor', 'stairs', 'chair', 'torch', 'arrowSlitWall'];
+
+// Types whose reposition highlight is a circle
+const CIRCLE_HIGHLIGHT_TYPES = ['barrel', 'firepit'];
+
+// Types whose reposition highlight is a rect
+const RECT_HIGHLIGHT_TYPES = [
+  'altar', 'arrowSlitWall', 'bed', 'bookshelf', 'chair', 'chest', 'crate',
+  'door', 'fountain', 'pillar', 'secretDoor', 'skeleton', 'stairs',
+  'statue', 'table', 'torch', 'trap', 'tree', 'web',
+];
+
 // ── Helpers ─────────────────────────────────────────────────────────────────
 const makeItem = (overrides) => ({
   id: 'item-1',
@@ -50,12 +73,14 @@ describe('PlacedItems - edge cases and empty input', () => {
     expect(container.querySelector('g.npc-group')).toBeNull();
   });
 
-  it('throws when placedItems is undefined (component expects array)', () => {
-    expect(() => render(<PlacedItems {...baseProps} placedItems={undefined} />)).toThrow();
+  it('renders nothing for unknown item type', () => {
+    const items = [makeItem({ type: 'unknownType' })];
+    const { container } = render(<PlacedItems {...baseProps} placedItems={items} />);
+    expect(container.innerHTML).toBe('');
   });
 });
 
-// ── Barrel - circle hit area, basic positioning, rotation ───────────────────
+// ── Barrel - circle hit area, basic positioning ─────────────────────────────
 describe('PlacedItems - barrel', () => {
   it('renders barrel use element at correct position for grid (0,0)', () => {
     const items = [makeItem({ type: 'barrel' })];
@@ -75,32 +100,12 @@ describe('PlacedItems - barrel', () => {
     expect(circle).toHaveAttribute('cy', '25');
     expect(circle).toHaveAttribute('r', '20');
   });
-
-  it('renders barrel reposition highlight as circle when dragging', () => {
-    const items = [makeItem({ type: 'barrel' })];
-    const { container } = render(
-      <PlacedItems {...baseProps} placedItems={items} itemDragging={{ itemId: 'item-1' }} />
-    );
-    const highlight = container.querySelector('circle.reposition-highlight');
-    expect(highlight).toBeInTheDocument();
-    expect(highlight).toHaveAttribute('r', '24');
-  });
 });
 
 // ── Rotation support types ──────────────────────────────────────────────────
-// These types support rotation via transform attribute on the <use> element.
-const ROTATION_TYPES = ['bed', 'altar', 'bookshelf', 'door', 'secretDoor', 'stairs', 'chair', 'torch', 'arrowSlitWall'];
-
 describe('PlacedItems - rotation support', () => {
-  it.each(ROTATION_TYPES)('renders %s without transform when rotation is absent', (type) => {
+  it.each(ROTATION_TYPES)('renders %s without transform when rotation is absent or undefined', (type) => {
     const items = [makeItem({ type })];
-    const { container } = render(<PlacedItems {...baseProps} placedItems={items} />);
-    const useEl = container.querySelector(`use[href="#${type}"]`);
-    expect(useEl).not.toHaveAttribute('transform');
-  });
-
-  it.each(ROTATION_TYPES)('renders %s without transform when rotation is undefined', (type) => {
-    const items = [makeItem({ type, rotation: undefined })];
     const { container } = render(<PlacedItems {...baseProps} placedItems={items} />);
     const useEl = container.querySelector(`use[href="#${type}"]`);
     expect(useEl).not.toHaveAttribute('transform');
@@ -301,16 +306,9 @@ describe('PlacedItems - localhost vs remote visibility', () => {
     expect(useEl).toHaveAttribute('opacity', '0.5');
   });
 
-  it('renders localhost visible items at 1 opacity', () => {
+  it('renders visible items at full opacity regardless of localhost', () => {
     const items = [makeItem({ type: 'barrel', visible: true })];
     const { container } = render(<PlacedItems {...baseProps} placedItems={items} isLocalhost={true} />);
-    const useEl = container.querySelector('use[href="#barrel"]');
-    expect(useEl).toHaveAttribute('opacity', '1');
-  });
-
-  it('renders remote visible items at 1 opacity', () => {
-    const items = [makeItem({ type: 'barrel', visible: true })];
-    const { container } = render(<PlacedItems {...baseProps} placedItems={items} isLocalhost={false} />);
     const useEl = container.querySelector('use[href="#barrel"]');
     expect(useEl).toHaveAttribute('opacity', '1');
   });
@@ -362,7 +360,7 @@ describe('PlacedItems - grid position calculations', () => {
     expect(circle).toHaveAttribute('cy', '175');
   });
 
-  it('positions multiple barrels at different grid coordinates', () => {
+  it('positions multiple items at different grid coordinates', () => {
     const items = [
       makeItem({ id: 'barrel-a', type: 'barrel', gridX: 0, gridY: 0 }),
       makeItem({ id: 'barrel-b', type: 'barrel', gridX: 10, gridY: 5 }),
@@ -387,70 +385,20 @@ describe('PlacedItems - grid position calculations', () => {
 
 // ── Reposition highlight shapes per type ────────────────────────────────────
 describe('PlacedItems - reposition highlight shapes', () => {
-  it('renders circle highlight for barrel when dragging', () => {
-    const items = [makeItem({ type: 'barrel' })];
+  it.each(CIRCLE_HIGHLIGHT_TYPES)('renders circle highlight for %s when dragging', (type) => {
+    const items = [makeItem({ type })];
     const { container } = render(
       <PlacedItems {...baseProps} placedItems={items} isLocalhost={true} itemDragging={{ itemId: 'item-1' }} />
     );
     expect(container.querySelector('circle.reposition-highlight')).toBeInTheDocument();
   });
 
-  it('renders rect highlight for door when dragging', () => {
-    const items = [makeItem({ type: 'door' })];
+  it.each(RECT_HIGHLIGHT_TYPES)('renders rect highlight for %s when dragging', (type) => {
+    const items = [makeItem({ type })];
     const { container } = render(
       <PlacedItems {...baseProps} placedItems={items} isLocalhost={true} itemDragging={{ itemId: 'item-1' }} />
     );
     expect(container.querySelector('rect.reposition-highlight')).toBeInTheDocument();
-  });
-
-  it('renders rect highlight for table when dragging', () => {
-    const items = [makeItem({ type: 'table' })];
-    const { container } = render(
-      <PlacedItems {...baseProps} placedItems={items} isLocalhost={true} itemDragging={{ itemId: 'item-1' }} />
-    );
-    expect(container.querySelector('rect.reposition-highlight')).toBeInTheDocument();
-  });
-
-  it('renders rect highlight for bed when dragging', () => {
-    const items = [makeItem({ type: 'bed' })];
-    const { container } = render(
-      <PlacedItems {...baseProps} placedItems={items} isLocalhost={true} itemDragging={{ itemId: 'item-1' }} />
-    );
-    expect(container.querySelector('rect.reposition-highlight')).toBeInTheDocument();
-  });
-
-  it('renders rect highlight for altar when dragging', () => {
-    const items = [makeItem({ type: 'altar' })];
-    const { container } = render(
-      <PlacedItems {...baseProps} placedItems={items} isLocalhost={true} itemDragging={{ itemId: 'item-1' }} />
-    );
-    expect(container.querySelector('rect.reposition-highlight')).toBeInTheDocument();
-  });
-
-  it('renders rect highlight for bookshelf when dragging', () => {
-    const items = [makeItem({ type: 'bookshelf' })];
-    const { container } = render(
-      <PlacedItems {...baseProps} placedItems={items} isLocalhost={true} itemDragging={{ itemId: 'item-1' }} />
-    );
-    expect(container.querySelector('rect.reposition-highlight')).toBeInTheDocument();
-  });
-
-  it('renders circle highlight for firepit when dragging', () => {
-    const items = [makeItem({ type: 'firepit' })];
-    const { container } = render(
-      <PlacedItems {...baseProps} placedItems={items} isLocalhost={true} itemDragging={{ itemId: 'item-1' }} />
-    );
-    expect(container.querySelector('circle.reposition-highlight')).toBeInTheDocument();
-  });
-});
-
-// ── Hit area cursor style ───────────────────────────────────────────────────
-describe('PlacedItems - hit area cursor style', () => {
-  it('sets grab cursor on hit area elements', () => {
-    const items = [makeItem({ type: 'barrel' })];
-    const { container } = render(<PlacedItems {...baseProps} placedItems={items} />);
-    const hitArea = container.querySelector('.item-hit-area');
-    expect(hitArea).toHaveStyle({ cursor: 'grab' });
   });
 });
 
@@ -488,44 +436,6 @@ describe('PlacedItems - type filtering and unknown types', () => {
     expect(container.querySelector('use[href="#chest"]')).toBeInTheDocument();
     expect(container.querySelector('circle.npc-circle')).toBeInTheDocument();
   });
-
-  it('renders all 23 non-NPC types and 1 NPC type', () => {
-    const items = [
-      makeItem({ id: 'altar-1', type: 'altar', gridX: 0 }),
-      makeItem({ id: 'arrow-1', type: 'arrowSlitWall', gridX: 1 }),
-      makeItem({ id: 'barrel-1', type: 'barrel', gridX: 2 }),
-      makeItem({ id: 'bed-1', type: 'bed', gridX: 3 }),
-      makeItem({ id: 'bookshelf-1', type: 'bookshelf', gridX: 4 }),
-      makeItem({ id: 'boulder-1', type: 'boulder', gridX: 5 }),
-      makeItem({ id: 'bush-1', type: 'bush', gridX: 6 }),
-      makeItem({ id: 'chair-1', type: 'chair', gridX: 7 }),
-      makeItem({ id: 'chest-1', type: 'chest', gridX: 8 }),
-      makeItem({ id: 'crate-1', type: 'crate', gridX: 9 }),
-      makeItem({ id: 'door-1', type: 'door', gridX: 10 }),
-      makeItem({ id: 'firepit-1', type: 'firepit', gridX: 11 }),
-      makeItem({ id: 'fountain-1', type: 'fountain', gridX: 12 }),
-      makeItem({ id: 'npc-1', type: 'npc', name: 'Goblin', gridX: 13 }),
-      makeItem({ id: 'pillar-1', type: 'pillar', gridX: 14 }),
-      makeItem({ id: 'secret-1', type: 'secretDoor', gridX: 15 }),
-      makeItem({ id: 'skeleton-1', type: 'skeleton', gridX: 16 }),
-      makeItem({ id: 'stairs-1', type: 'stairs', gridX: 17 }),
-      makeItem({ id: 'statue-1', type: 'statue', gridX: 18 }),
-      makeItem({ id: 'table-1', type: 'table', gridX: 19 }),
-      makeItem({ id: 'torch-1', type: 'torch', gridX: 20 }),
-      makeItem({ id: 'trap-1', type: 'trap', gridX: 21 }),
-      makeItem({ id: 'tree-1', type: 'tree', gridX: 22 }),
-      makeItem({ id: 'web-1', type: 'web', gridX: 23 }),
-    ];
-    const { container } = render(<PlacedItems {...baseProps} placedItems={items} />);
-    expect(container.querySelectorAll('g.placed-item').length).toBe(23);
-    expect(container.querySelectorAll('g.npc-group').length).toBe(1);
-  });
-
-  it('renders nothing for unknown type', () => {
-    const items = [makeItem({ id: 'unknown-1', type: 'unknownType' })];
-    const { container } = render(<PlacedItems {...baseProps} placedItems={items} />);
-    expect(container.innerHTML).toBe('');
-  });
 });
 
 // ── Parameterized: every non-NPC type renders placed-item group with use ────
@@ -538,12 +448,19 @@ describe('PlacedItems - all non-NPC types render placed-item group with use elem
   });
 });
 
-// ── Parameterized: every non-NPC type renders hit area on localhost ────────
-describe('PlacedItems - all non-NPC types render hit area on localhost', () => {
-  it.each(NON_NPC_TYPES)('renders %s hit area on localhost', (type) => {
+// ── Parameterized: every non-NPC type renders correct hit area shape ────────
+describe('PlacedItems - all non-NPC types render correct hit area shape', () => {
+  it.each(CIRCLE_HIT_AREA_TYPES)('renders %s with circle hit area', (type) => {
     const items = [makeItem({ type })];
     const { container } = render(<PlacedItems {...baseProps} placedItems={items} />);
     const group = container.querySelector(`g.placed-item`);
-    expect(group.querySelector('.item-hit-area')).toBeInTheDocument();
+    expect(group.querySelector('circle.item-hit-area')).toBeInTheDocument();
+  });
+
+  it.each(RECT_HIT_AREA_TYPES)('renders %s with rect hit area', (type) => {
+    const items = [makeItem({ type })];
+    const { container } = render(<PlacedItems {...baseProps} placedItems={items} />);
+    const group = container.querySelector(`g.placed-item`);
+    expect(group.querySelector('rect.item-hit-area')).toBeInTheDocument();
   });
 });

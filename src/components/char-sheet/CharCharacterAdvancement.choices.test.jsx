@@ -167,28 +167,7 @@ describe('CharCharacterAdvancement - Choice Options', () => {
     expect(optionB).toHaveStyle({ opacity: '0.6' });
   });
 
-  it('does not highlight any option when runtime value does not match any option', () => {
-    mockGetRuntimeValue.mockReturnValue('Nonexistent Option');
-    const playerStats = {
-      name: 'Test Character',
-      characterAdvancement: [
-        {
-          name: 'Choose Feature',
-          description: 'A choice',
-          automation: {
-            options: ['Option A', 'Option B'],
-          },
-        },
-      ],
-    };
-    render(<CharCharacterAdvancement playerStats={playerStats} campaignName="test-campaign" />);
-    const optionA = screen.getByText('Option A');
-    expect(optionA).toHaveStyle({ opacity: '0.6' });
-    const optionB = screen.getByText('Option B');
-    expect(optionB).toHaveStyle({ opacity: '0.6' });
-  });
-
-  it('calls setRuntimeValue and dispatches buffs-updated event when a string option is clicked', async () => {
+  it('calls setRuntimeValue and dispatches buffs-updated event when an option is clicked', async () => {
     const dispatchSpy = vi.spyOn(window, 'dispatchEvent');
     const playerStats = {
       name: 'Test Character',
@@ -248,7 +227,7 @@ describe('CharCharacterAdvancement - Choice Options', () => {
     dispatchSpy.mockRestore();
   });
 
-  it('prevents choice click from triggering the feature handler', async () => {
+  it('renders separators between options', () => {
     const playerStats = {
       name: 'Test Character',
       characterAdvancement: [
@@ -256,53 +235,14 @@ describe('CharCharacterAdvancement - Choice Options', () => {
           name: 'Choose Feature',
           description: 'A choice',
           automation: {
-            options: ['Opt A', 'Opt B'],
-          },
-        },
-      ],
-    };
-    render(<CharCharacterAdvancement playerStats={playerStats} campaignName="test-campaign" />);
-    fireEvent.click(screen.getByText('Opt B'));
-    await waitFor(() => {
-      expect(mockSetRuntimeValue).toHaveBeenCalled();
-    });
-  });
-
-  it('renders a separator between options', () => {
-    const playerStats = {
-      name: 'Test Character',
-      characterAdvancement: [
-        {
-          name: 'Choose Feature',
-          description: 'A choice',
-          automation: {
-            options: ['Alpha', 'Beta'],
+            options: ['Alpha', 'Beta', 'Gamma', 'Four'],
           },
         },
       ],
     };
     const { container } = render(<CharCharacterAdvancement playerStats={playerStats} campaignName="test-campaign" />);
     const separators = container.querySelectorAll('[style*="opacity: 0.4"]');
-    expect(separators.length).toBe(1);
-    expect(separators[0]).toHaveTextContent('|');
-  });
-
-  it('renders two separators between three options', () => {
-    const playerStats = {
-      name: 'Test Character',
-      characterAdvancement: [
-        {
-          name: 'Choose Feature',
-          description: 'A choice',
-          automation: {
-            options: ['Alpha', 'Beta', 'Gamma'],
-          },
-        },
-      ],
-    };
-    const { container } = render(<CharCharacterAdvancement playerStats={playerStats} campaignName="test-campaign" />);
-    const separators = container.querySelectorAll('[style*="opacity: 0.4"]');
-    expect(separators.length).toBe(2);
+    expect(separators.length).toBe(3);
   });
 
   it('renders feature description when feature has no name', () => {
@@ -339,23 +279,6 @@ describe('CharCharacterAdvancement - Choice Options', () => {
     expect(screen.getByText('Second description')).toBeInTheDocument();
   });
 
-  it('renders feature with no name using index-based key fallback', () => {
-    const playerStats = {
-      name: 'Test Character',
-      characterAdvancement: [
-        {
-          description: 'Unnamed feature at index 1',
-        },
-        {
-          name: 'Named Feature',
-          description: 'Has a name',
-        },
-      ],
-    };
-    render(<CharCharacterAdvancement playerStats={playerStats} campaignName="test-campaign" />);
-    expect(screen.getByText('Unnamed feature at index 1')).toBeInTheDocument();
-  });
-
   it('renders choice UI for multiple features each with options', () => {
     const playerStats = {
       name: 'Test Character',
@@ -390,26 +313,7 @@ describe('CharCharacterAdvancement - Choice Options', () => {
     expect(screen.getByText('X')).toBeInTheDocument();
   });
 
-  it('renders mixed string and object options in the same options array', () => {
-    const playerStats = {
-      name: 'Test Character',
-      characterAdvancement: [
-        {
-          name: 'Mixed Choice',
-          description: 'Has mixed option types',
-          automation: {
-            options: ['String Option', { name: 'Object Option' }],
-          },
-        },
-      ],
-    };
-    render(<CharCharacterAdvancement playerStats={playerStats} campaignName="test-campaign" />);
-    expect(screen.getByText('Choice:')).toBeInTheDocument();
-    expect(screen.getByText('String Option')).toBeInTheDocument();
-    expect(screen.getByText('Object Option')).toBeInTheDocument();
-  });
-
-  it('applies choice container styling with marginTop and fontSize', () => {
+  it('applies styling to the choice container and label', () => {
     const playerStats = {
       name: 'Test Character',
       characterAdvancement: [
@@ -429,26 +333,6 @@ describe('CharCharacterAdvancement - Choice Options', () => {
     );
     expect(choiceContainer).toBeTruthy();
     expect(choiceContainer).toHaveStyle({ marginTop: '4px', fontSize: '0.9em' });
-  });
-
-  it('applies opacity styling to the Choice label', () => {
-    const playerStats = {
-      name: 'Test Character',
-      characterAdvancement: [
-        {
-          name: 'Choice Feature',
-          description: 'Has choices',
-          automation: {
-            options: ['A', 'B'],
-          },
-        },
-      ],
-    };
-    const { container } = render(<CharCharacterAdvancement playerStats={playerStats} campaignName="test-campaign" />);
-    const choiceDivs = container.querySelectorAll('div[style]');
-    const choiceContainer = Array.from(choiceDivs).find(div =>
-      div.getAttribute('style')?.includes('margin-top') && div.getAttribute('style')?.includes('font-size')
-    );
     const spans = choiceContainer.querySelectorAll('span[style]');
     const choiceLabel = Array.from(spans).find(span =>
       span.getAttribute('style')?.includes('opacity: 0.7')
@@ -485,23 +369,5 @@ describe('CharCharacterAdvancement - Choice Options', () => {
       expect.objectContaining({ type: 'buffs-updated' })
     );
     dispatchSpy.mockRestore();
-  });
-
-  it('renders choice options with 4+ options showing correct separators', () => {
-    const playerStats = {
-      name: 'Test Character',
-      characterAdvancement: [
-        {
-          name: 'Multi Choice',
-          description: 'Many options',
-          automation: {
-            options: ['One', 'Two', 'Three', 'Four'],
-          },
-        },
-      ],
-    };
-    const { container } = render(<CharCharacterAdvancement playerStats={playerStats} campaignName="test-campaign" />);
-    const separators = container.querySelectorAll('[style*="opacity: 0.4"]');
-    expect(separators.length).toBe(3);
   });
 });

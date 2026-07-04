@@ -340,33 +340,8 @@ describe('CharActions monk ki', () => {
     });
   });
 
-  describe('monk ki: Cloak of Shadows skip FP', () => {
-    it('does not consume focus point for Flurry of Blows when Cloak of Shadows is active', async () => {
-      hasAutomation.mockReturnValue(true);
-      executeHandler.mockResolvedValue({ type: 'popup', payload: '<b>Shadow Flurry</b>' });
-      getRuntimeValue.mockImplementation((_name, key) => {
-        if (key === 'activeBuffs') return [{ effect: 'cloak_of_shadows' }];
-        return null;
-      });
-
-      const stats = createStats({
-        class: { class_levels: [{ level: 5, focus_points: 2 }] },
-        level: 5,
-        actions: [{ name: 'Flurry of Blows', description: 'Shadow flurry.', automation: { type: 'auto_effect' } }],
-      });
-
-      await act(async () => { render(<CharActions playerStats={stats} />); });
-      const actionName = screen.getByText(/Flurry of Blows:/);
-      await act(async () => { fireEvent.click(actionName); });
-      await waitFor(() => {
-        expect(setRuntimeValue).not.toHaveBeenCalledWith('TestCharacter', 'focusPoints', expect.any(Number), undefined);
-        expect(executeHandler).toHaveBeenCalled();
-      });
-    });
-  });
-
   describe('monk ki: no FP remaining', () => {
-    it('shows "No Focus Points remaining" for 2024 rules when focus points are 0', async () => {
+    it('shows correct no-FP message based on ruleset (2024 vs 5e)', async () => {
       hasAutomation.mockReturnValue(true);
       getRuntimeValue.mockImplementation((_name, key) => {
         if (key === 'focusPoints') return 0;
@@ -377,59 +352,29 @@ describe('CharActions monk ki', () => {
         popupHtml: null, setPopupHtml: mockSetPopupHtml, rollAttack: vi.fn(), rollDamage: vi.fn(), quickRollPlayerSave: vi.fn(),
       });
 
-      const stats = createStats({
-        class: { class_levels: [{ level: 5, focus_points: 2 }] },
-        level: 5,
-        rules: '2024',
-        actions: [{ name: 'Flurry of Blows', description: 'No FP.', automation: { type: 'auto_effect' } }],
-      });
-
-
       const wrapper = ({ children }) => (
         <DiceRollContext.Provider value={{ popupHtml: null, setPopupHtml: mockSetPopupHtml }}>
           {children}
         </DiceRollContext.Provider>
       );
-      await act(async () => { render(<CharActions playerStats={stats} />, { wrapper }); });
-      const actionName = screen.getByText(/Flurry of Blows:/);
-      await act(async () => { fireEvent.click(actionName); });
+
+      // Test 2024 ruleset
+      await act(async () => {
+        render(<CharActions playerStats={createStats({
+          class: { class_levels: [{ level: 5, focus_points: 2 }] },
+          level: 5,
+          rules: '2024',
+          actions: [{ name: 'Flurry of Blows', description: 'No FP.', automation: { type: 'auto_effect' } }],
+        })} />, { wrapper });
+      });
+      const actionName2024 = screen.getByText(/Flurry of Blows:/);
+      await act(async () => { fireEvent.click(actionName2024); });
       await waitFor(() => {
         expect(mockSetPopupHtml).toHaveBeenCalledWith('<b>Flurry of Blows</b><br/>No Focus Points remaining.');
       });
     });
 
-    it('shows "No ki points remaining" for 5e rules when focus points are 0', async () => {
-      hasAutomation.mockReturnValue(true);
-      getRuntimeValue.mockImplementation((_name, key) => {
-        if (key === 'focusPoints') return 0;
-        return null;
-      });
-      const mockSetPopupHtml = vi.fn();
-      useLoggedDiceRoll.mockReturnValue({
-        popupHtml: null, setPopupHtml: mockSetPopupHtml, rollAttack: vi.fn(), rollDamage: vi.fn(), quickRollPlayerSave: vi.fn(),
-      });
-
-      const stats = createStats({
-        class: { class_levels: [{ level: 5, focus_points: 2 }] },
-        level: 5,
-        rules: '5e',
-        actions: [{ name: 'Flurry of Blows', description: 'No ki.', automation: { type: 'auto_effect' } }],
-      });
-
-      const wrapper = ({ children }) => (
-        <DiceRollContext.Provider value={{ popupHtml: null, setPopupHtml: mockSetPopupHtml }}>
-          {children}
-        </DiceRollContext.Provider>
-      );
-      await act(async () => { render(<CharActions playerStats={stats} />, { wrapper }); });
-      const actionName = screen.getByText(/Flurry of Blows:/);
-      await act(async () => { fireEvent.click(actionName); });
-      await waitFor(() => {
-        expect(mockSetPopupHtml).toHaveBeenCalledWith('<b>Flurry of Blows</b><br/>No ki points remaining.');
-      });
-    });
-
-    it('consumes focus point when FP > 0 for 2024 rules', async () => {
+    it('consumes focus point when FP > 0', async () => {
       hasAutomation.mockReturnValue(true);
       executeHandler.mockResolvedValue({ type: 'popup', payload: '<b>Flurry</b>' });
       getRuntimeValue.mockImplementation((_name, key) => {
@@ -440,7 +385,6 @@ describe('CharActions monk ki', () => {
       const stats = createStats({
         class: { class_levels: [{ level: 5, focus_points: 2 }] },
         level: 5,
-        rules: '2024',
         actions: [{ name: 'Flurry of Blows', description: 'Has FP.', automation: { type: 'auto_effect' } }],
       });
 

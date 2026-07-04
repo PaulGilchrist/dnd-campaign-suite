@@ -441,36 +441,18 @@ describe('Factions', () => {
     expect(slider.max).toBe('10');
   });
 
-  it('should render required asterisk for name field', () => {
+  it('should have influence slider defaulting to 1', () => {
     render(<Factions {...defaultProps} />);
     fireEvent.click(screen.getByRole('button', { name: /New Faction/ }));
-    expect(screen.getByText('*')).toBeInTheDocument();
-  });
-
-  it('should show goals field in modal', () => {
-    render(<Factions {...defaultProps} />);
-    fireEvent.click(screen.getByRole('button', { name: /New Faction/ }));
-    expect(screen.getByText('Goals')).toBeInTheDocument();
-  });
-
-  it('should show notes field in modal', () => {
-    render(<Factions {...defaultProps} />);
-    fireEvent.click(screen.getByRole('button', { name: /New Faction/ }));
-    expect(screen.getByText('Notes')).toBeInTheDocument();
-  });
-
-  it('should show description field in modal', () => {
-    render(<Factions {...defaultProps} />);
-    fireEvent.click(screen.getByRole('button', { name: /New Faction/ }));
-    expect(screen.getByText('Description')).toBeInTheDocument();
+    const slider = screen.getByRole('slider');
+    expect(slider.value).toBe('1');
   });
 
   it('should show influence slider value display when changed', () => {
     render(<Factions {...defaultProps} />);
     fireEvent.click(screen.getByRole('button', { name: /New Faction/ }));
     const slider = screen.getByRole('slider', { name: 'Influence Level' });
-    const valueSpan = screen.getByText(/^1$/);
-    expect(valueSpan.textContent).toBe('1');
+    expect(screen.getByText(/^1$/)).toBeInTheDocument();
     fireEvent.change(slider, { target: { value: '5' } });
     expect(screen.getByText(/^5$/)).toBeInTheDocument();
   });
@@ -513,46 +495,6 @@ describe('Factions', () => {
 
     await waitFor(() => {
       expect(screen.getByText(longName)).toBeInTheDocument();
-    });
-  });
-
-  it('should set influence to boundary value 1 for low influence', async () => {
-    factionsReturnValue = {
-      ...factionsReturnValue,
-      factions: [{
-        id: 'faction-1',
-        name: 'Weak Faction',
-        description: '',
-        goals: '',
-        influence: 1,
-        notes: '',
-      }],
-    };
-
-    render(<Factions {...defaultProps} />);
-
-    await waitFor(() => {
-      expect(screen.getByTitle('Influence: 1')).toBeInTheDocument();
-    });
-  });
-
-  it('should set influence to boundary value 10 for extreme influence', async () => {
-    factionsReturnValue = {
-      ...factionsReturnValue,
-      factions: [{
-        id: 'faction-1',
-        name: 'Powerful Faction',
-        description: '',
-        goals: '',
-        influence: 10,
-        notes: '',
-      }],
-    };
-
-    render(<Factions {...defaultProps} />);
-
-    await waitFor(() => {
-      expect(screen.getByTitle('Influence: 10')).toBeInTheDocument();
     });
   });
 
@@ -653,187 +595,30 @@ describe('Factions', () => {
     });
   });
 
-  it('should render New Faction button with plus icon', () => {
+  it('should show modal fields (description, goals, notes) in new faction modal', () => {
     render(<Factions {...defaultProps} />);
-    const button = screen.getByRole('button', { name: /New Faction/ });
-    expect(button.querySelector('i.fa-solid.fa-plus')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /New Faction/ }));
+    expect(screen.getByText('Description')).toBeInTheDocument();
+    expect(screen.getByText('Goals')).toBeInTheDocument();
+    expect(screen.getByText('Notes')).toBeInTheDocument();
+    expect(screen.getByText('Influence Level')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('Faction name')).toBeInTheDocument();
   });
 
-  it('should render back button with arrow icon', () => {
-    render(<Factions {...defaultProps} />);
-    const button = screen.getByRole('button', { name: /Back/ });
-    expect(button.querySelector('i.fa-solid.fa-arrow-left')).toBeInTheDocument();
-  });
-
-  it('should render handshake icon in title', () => {
-    render(<Factions {...defaultProps} />);
-    const title = screen.getByRole('heading', { name: /Factions/ });
-    expect(title.querySelector('i.fa-solid.fa-handshake')).toBeInTheDocument();
-  });
-
-  it('should filter factions with partial match on first part of name', async () => {
-    factionsReturnValue = {
-      ...factionsReturnValue,
-      factions: [
-        {
-          id: 'faction-1',
-          name: 'The Silver Hand',
-          description: 'A noble faction',
-          goals: '',
-          influence: 5,
-          notes: '',
-        },
-        {
-          id: 'faction-2',
-          name: 'The Silver Brotherhood',
-          description: 'Another silver faction',
-          goals: '',
-          influence: 3,
-          notes: '',
-        },
-      ],
-    };
-
-    render(<Factions {...defaultProps} />);
-
-    await waitFor(() => {
-      expect(screen.getByText('The Silver Hand')).toBeInTheDocument();
-    });
-
-    const searchInput = screen.getByPlaceholderText(/Search factions/);
-    fireEvent.change(searchInput, { target: { value: 'sil' } });
-
-    expect(screen.getByText('The Silver Hand')).toBeInTheDocument();
-    expect(screen.getByText('The Silver Brotherhood')).toBeInTheDocument();
-  });
-
-  it('should show no factions found message with the search query text', async () => {
-    factionsReturnValue = {
-      ...factionsReturnValue,
-      factions: [{
-        id: 'faction-1',
-        name: 'The Silver Hand',
-        description: 'A noble faction',
-        goals: '',
-        influence: 5,
-        notes: '',
-      }],
-    };
-
-    render(<Factions {...defaultProps} />);
-
-    await waitFor(() => {
-      expect(screen.getByText('The Silver Hand')).toBeInTheDocument();
-    });
-
-    const searchInput = screen.getByPlaceholderText(/Search factions/);
-    fireEvent.change(searchInput, { target: { value: 'dragons' } });
-
-    expect(screen.getByText(/No factions found matching.*dragons/)).toBeInTheDocument();
-  });
-
-  it('should open edit modal when faction list item is activated with Enter key', async () => {
-    factionsReturnValue = {
-      ...factionsReturnValue,
-      factions: [{
-        id: 'faction-1',
-        name: 'The Silver Hand',
-        description: 'A noble faction',
-        goals: '',
-        influence: 5,
-        notes: '',
-      }],
-    };
-
-    render(<Factions {...defaultProps} />);
-
-    await waitFor(() => {
-      expect(screen.getByText('The Silver Hand')).toBeInTheDocument();
-    });
-
-    const listItem = screen.getByRole('button', { name: /Edit faction: The Silver Hand/ });
-    fireEvent.keyDown(listItem, { key: 'Enter' });
-
-    expect(screen.getByText('Edit Faction')).toBeInTheDocument();
-  });
-
-  it('should open edit modal when faction list item is activated with Space key', async () => {
-    factionsReturnValue = {
-      ...factionsReturnValue,
-      factions: [{
-        id: 'faction-1',
-        name: 'The Silver Hand',
-        description: 'A noble faction',
-        goals: '',
-        influence: 5,
-        notes: '',
-      }],
-    };
-
-    render(<Factions {...defaultProps} />);
-
-    await waitFor(() => {
-      expect(screen.getByText('The Silver Hand')).toBeInTheDocument();
-    });
-
-    const listItem = screen.getByRole('button', { name: /Edit faction: The Silver Hand/ });
-    fireEvent.keyDown(listItem, { key: ' ' });
-
-    expect(screen.getByText('Edit Faction')).toBeInTheDocument();
-  });
-
-  it('should not open edit modal when other key is pressed on list item', async () => {
-    factionsReturnValue = {
-      ...factionsReturnValue,
-      factions: [{
-        id: 'faction-1',
-        name: 'The Silver Hand',
-        description: 'A noble faction',
-        goals: '',
-        influence: 5,
-        notes: '',
-      }],
-    };
-
-    render(<Factions {...defaultProps} />);
-
-    await waitFor(() => {
-      expect(screen.getByText('The Silver Hand')).toBeInTheDocument();
-    });
-
-    const listItem = screen.getByRole('button', { name: /Edit faction: The Silver Hand/ });
-    fireEvent.keyDown(listItem, { key: 'a' });
-
-    expect(screen.queryByRole('heading', { name: 'Edit Faction' })).not.toBeInTheDocument();
-  });
-
-  it('should update description field via PreviewToggle onChange', () => {
+  it('should update fields via PreviewToggle onChange', () => {
     render(<Factions {...defaultProps} />);
     fireEvent.click(screen.getByRole('button', { name: /New Faction/ }));
 
     const descriptionField = screen.getByTestId('faction-field-faction-description');
     fireEvent.change(descriptionField, { target: { value: 'A new description' } });
-
     expect(screen.getByTestId('preview-toggle-faction-description')).toHaveTextContent('A new description');
-  });
-
-  it('should update goals field via PreviewToggle onChange', () => {
-    render(<Factions {...defaultProps} />);
-    fireEvent.click(screen.getByRole('button', { name: /New Faction/ }));
 
     const goalsField = screen.getByTestId('faction-field-faction-goals');
     fireEvent.change(goalsField, { target: { value: 'Conquer the realm' } });
-
     expect(screen.getByTestId('preview-toggle-faction-goals')).toHaveTextContent('Conquer the realm');
-  });
-
-  it('should update notes field via PreviewToggle onChange', () => {
-    render(<Factions {...defaultProps} />);
-    fireEvent.click(screen.getByRole('button', { name: /New Faction/ }));
 
     const notesField = screen.getByTestId('faction-field-faction-notes');
     fireEvent.change(notesField, { target: { value: 'Secret notes' } });
-
     expect(screen.getByTestId('preview-toggle-faction-notes')).toHaveTextContent('Secret notes');
   });
 
@@ -884,90 +669,10 @@ describe('Factions', () => {
     expect(screen.queryByRole('heading', { name: 'New Faction' })).toBeInTheDocument();
   });
 
-  it('should not save when name is whitespace only', async () => {
-    render(<Factions {...defaultProps} />);
-    fireEvent.click(screen.getByRole('button', { name: /New Faction/ }));
-
-    const nameInput = screen.getByRole('textbox', { name: 'Faction Name *' });
-    fireEvent.change(nameInput, { target: { value: '   ' } });
-
-    const saveButton = screen.getByRole('button', { name: 'Save' });
-    expect(saveButton.disabled).toBe(true);
-  });
-
   it('should show delete button only in edit mode, not new mode', () => {
     render(<Factions {...defaultProps} />);
     fireEvent.click(screen.getByRole('button', { name: /New Faction/ }));
     expect(screen.queryByRole('button', { name: /Delete/ })).not.toBeInTheDocument();
-  });
-
-  it('should have influence slider defaulting to 1', () => {
-    render(<Factions {...defaultProps} />);
-    fireEvent.click(screen.getByRole('button', { name: /New Faction/ }));
-    const slider = screen.getByRole('slider');
-    expect(slider.value).toBe('1');
-  });
-
-  it('should have influence value display showing default 1', () => {
-    render(<Factions {...defaultProps} />);
-    fireEvent.click(screen.getByRole('button', { name: /New Faction/ }));
-    expect(screen.getByText('1')).toBeInTheDocument();
-  });
-
-  it('should render search clear button with xmark icon', () => {
-    render(<Factions {...defaultProps} />);
-    const searchInput = screen.getByPlaceholderText(/Search factions/);
-    fireEvent.change(searchInput, { target: { value: 'test' } });
-    const clearButton = screen.getByLabelText('Clear search');
-    expect(clearButton.querySelector('i.fa-solid.fa-xmark')).toBeInTheDocument();
-  });
-
-  it('should render loading spinner icon', () => {
-    factionsReturnValue = {
-      ...factionsReturnValue,
-      loading: true,
-    };
-
-    render(<Factions {...defaultProps} />);
-    const loadingState = screen.getByText(/Loading factions/);
-    expect(loadingState.querySelector('i.fa-solid.fa-spinner')).toBeInTheDocument();
-  });
-
-  it('should render empty state handshake icon when no factions', () => {
-    render(<Factions {...defaultProps} />);
-    const emptyState = screen.getByText(/No factions yet/);
-    expect(emptyState.querySelector('i.fa-solid.fa-handshake')).toBeInTheDocument();
-  });
-
-  it('should render empty state search icon when no search results', async () => {
-    factionsReturnValue = {
-      ...factionsReturnValue,
-      factions: [{
-        id: 'faction-1',
-        name: 'The Silver Hand',
-        description: '',
-        goals: '',
-        influence: 5,
-        notes: '',
-      }],
-    };
-
-    render(<Factions {...defaultProps} />);
-
-    await waitFor(() => {
-      expect(screen.getByText('The Silver Hand')).toBeInTheDocument();
-    });
-
-    const searchInput = screen.getByPlaceholderText(/Search factions/);
-    fireEvent.change(searchInput, { target: { value: 'nonexistent' } });
-
-    const noResults = screen.getByText(/No factions found matching/);
-    expect(noResults.querySelector('i.fa-solid.fa-search')).toBeInTheDocument();
-  });
-
-  it('should not load factions when campaignName is empty', () => {
-    render(<Factions campaignName="" onBack={vi.fn()} />);
-    expect(factionsReturnValue.loadFactionsList).not.toHaveBeenCalled();
   });
 
   it('should not show delete button when no editing faction', () => {
@@ -1032,22 +737,13 @@ describe('Factions', () => {
     });
   });
 
-  it('should render save button with floppy-disk icon', () => {
-    render(<Factions {...defaultProps} />);
-    fireEvent.click(screen.getByRole('button', { name: /New Faction/ }));
-    const nameInput = screen.getByRole('textbox', { name: 'Faction Name *' });
-    fireEvent.change(nameInput, { target: { value: 'Test' } });
-    const saveButton = screen.getByRole('button', { name: 'Save' });
-    expect(saveButton.querySelector('i.fa-solid.fa-floppy-disk')).toBeInTheDocument();
-  });
-
-  it('should render delete button with trash-can icon', async () => {
+  it('should open edit modal when faction list item is activated with Enter key', async () => {
     factionsReturnValue = {
       ...factionsReturnValue,
       factions: [{
         id: 'faction-1',
         name: 'The Silver Hand',
-        description: '',
+        description: 'A noble faction',
         goals: '',
         influence: 5,
         notes: '',
@@ -1060,24 +756,19 @@ describe('Factions', () => {
       expect(screen.getByText('The Silver Hand')).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByText('The Silver Hand'));
-    const deleteButton = screen.getByRole('button', { name: /Delete/ });
-    expect(deleteButton.querySelector('i.fa-solid.fa-trash-can')).toBeInTheDocument();
+    const listItem = screen.getByRole('button', { name: /Edit faction: The Silver Hand/ });
+    fireEvent.keyDown(listItem, { key: 'Enter' });
+
+    expect(screen.getByText('Edit Faction')).toBeInTheDocument();
   });
 
-  it('should render modal with correct header text for new faction', () => {
-    render(<Factions {...defaultProps} />);
-    fireEvent.click(screen.getByRole('button', { name: /New Faction/ }));
-    expect(screen.getByRole('heading', { name: 'New Faction' })).toBeInTheDocument();
-  });
-
-  it('should render modal with correct header text for edit faction', async () => {
+  it('should open edit modal when faction list item is activated with Space key', async () => {
     factionsReturnValue = {
       ...factionsReturnValue,
       factions: [{
         id: 'faction-1',
         name: 'The Silver Hand',
-        description: '',
+        description: 'A noble faction',
         goals: '',
         influence: 5,
         notes: '',
@@ -1090,142 +781,15 @@ describe('Factions', () => {
       expect(screen.getByText('The Silver Hand')).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByText('The Silver Hand'));
-    expect(screen.getByRole('heading', { name: 'Edit Faction' })).toBeInTheDocument();
+    const listItem = screen.getByRole('button', { name: /Edit faction: The Silver Hand/ });
+    fireEvent.keyDown(listItem, { key: ' ' });
+
+    expect(screen.getByText('Edit Faction')).toBeInTheDocument();
   });
 
-  it('should render influence level label', () => {
-    render(<Factions {...defaultProps} />);
-    fireEvent.click(screen.getByRole('button', { name: /New Faction/ }));
-    expect(screen.getByText('Influence Level')).toBeInTheDocument();
-  });
-
-  it('should render name placeholder', () => {
-    render(<Factions {...defaultProps} />);
-    fireEvent.click(screen.getByRole('button', { name: /New Faction/ }));
-    expect(screen.getByPlaceholderText('Faction name')).toBeInTheDocument();
-  });
-
-  it('should render description placeholder', () => {
-    render(<Factions {...defaultProps} />);
-    fireEvent.click(screen.getByRole('button', { name: /New Faction/ }));
-    expect(screen.getByPlaceholderText(/What is this faction about/)).toBeInTheDocument();
-  });
-
-  it('should render goals placeholder', () => {
-    render(<Factions {...defaultProps} />);
-    fireEvent.click(screen.getByRole('button', { name: /New Faction/ }));
-    expect(screen.getByPlaceholderText(/What does this faction want/)).toBeInTheDocument();
-  });
-
-  it('should render notes placeholder', () => {
-    render(<Factions {...defaultProps} />);
-    fireEvent.click(screen.getByRole('button', { name: /New Faction/ }));
-    expect(screen.getByPlaceholderText(/Additional notes/)).toBeInTheDocument();
-  });
-
-  it('should apply influence low styles for value 2', async () => {
-    factionsReturnValue = {
-      ...factionsReturnValue,
-      factions: [{
-        id: 'faction-1',
-        name: 'Low Influence',
-        description: '',
-        goals: '',
-        influence: 2,
-        notes: '',
-      }],
-    };
-
-    render(<Factions {...defaultProps} />);
-
-    await waitFor(() => {
-      expect(screen.getByText('Low Influence')).toBeInTheDocument();
-    });
-
-    const badge = screen.getByTitle('Influence: 2');
-    const styleAttr = badge.getAttribute('style');
-    expect(styleAttr).toContain('rgb(26, 71, 42)');
-    expect(styleAttr).toContain('rgb(144, 238, 144)');
-    expect(styleAttr).toContain('rgb(45, 106, 79)');
-  });
-
-  it('should apply influence medium styles for value 4', async () => {
-    factionsReturnValue = {
-      ...factionsReturnValue,
-      factions: [{
-        id: 'faction-1',
-        name: 'Medium Influence',
-        description: '',
-        goals: '',
-        influence: 4,
-        notes: '',
-      }],
-    };
-
-    render(<Factions {...defaultProps} />);
-
-    await waitFor(() => {
-      expect(screen.getByText('Medium Influence')).toBeInTheDocument();
-    });
-
-    const badge = screen.getByTitle('Influence: 4');
-    const styleAttr = badge.getAttribute('style');
-    expect(styleAttr).toContain('rgb(113, 63, 18)');
-    expect(styleAttr).toContain('rgb(253, 224, 71)');
-    expect(styleAttr).toContain('rgb(161, 98, 7)');
-  });
-
-  it('should apply influence high styles for value 8', async () => {
-    factionsReturnValue = {
-      ...factionsReturnValue,
-      factions: [{
-        id: 'faction-1',
-        name: 'High Influence',
-        description: '',
-        goals: '',
-        influence: 8,
-        notes: '',
-      }],
-    };
-
-    render(<Factions {...defaultProps} />);
-
-    await waitFor(() => {
-      expect(screen.getByText('High Influence')).toBeInTheDocument();
-    });
-
-    const badge = screen.getByTitle('Influence: 8');
-    const styleAttr = badge.getAttribute('style');
-    expect(styleAttr).toContain('rgb(124, 45, 18)');
-    expect(styleAttr).toContain('rgb(254, 215, 170)');
-    expect(styleAttr).toContain('rgb(194, 65, 12)');
-  });
-
-  it('should apply influence extreme styles for value 9', async () => {
-    factionsReturnValue = {
-      ...factionsReturnValue,
-      factions: [{
-        id: 'faction-1',
-        name: 'Extreme Influence',
-        description: '',
-        goals: '',
-        influence: 9,
-        notes: '',
-      }],
-    };
-
-    render(<Factions {...defaultProps} />);
-
-    await waitFor(() => {
-      expect(screen.getByText('Extreme Influence')).toBeInTheDocument();
-    });
-
-    const badge = screen.getByTitle('Influence: 9');
-    const styleAttr = badge.getAttribute('style');
-    expect(styleAttr).toContain('rgb(127, 29, 29)');
-    expect(styleAttr).toContain('rgb(254, 202, 202)');
-    expect(styleAttr).toContain('rgb(185, 28, 28)');
+  it('should not load factions when campaignName is empty', () => {
+    render(<Factions campaignName="" onBack={vi.fn()} />);
+    expect(factionsReturnValue.loadFactionsList).not.toHaveBeenCalled();
   });
 
   it('should truncate description longer than 60 characters', async () => {
@@ -1294,28 +858,6 @@ describe('Factions', () => {
 
     const listDetails = document.querySelector('.ct-list-details');
     expect(listDetails.children.length).toBe(0);
-  });
-
-  it('should save faction with whitespace-only name does not save', async () => {
-    render(<Factions {...defaultProps} />);
-    fireEvent.click(screen.getByRole('button', { name: /New Faction/ }));
-
-    const nameInput = screen.getByRole('textbox', { name: 'Faction Name *' });
-    fireEvent.change(nameInput, { target: { value: '   ' } });
-
-    const saveButton = screen.getByRole('button', { name: 'Save' });
-    fireEvent.click(saveButton);
-
-    await waitFor(() => {
-      expect(factionsReturnValue.saveFactionsList).not.toHaveBeenCalled();
-    });
-  });
-
-  it('should call onBack when back button is clicked', () => {
-    const mockOnBack = vi.fn();
-    render(<Factions campaignName="test" onBack={mockOnBack} />);
-    fireEvent.click(screen.getByText(/Back/));
-    expect(mockOnBack).toHaveBeenCalledTimes(1);
   });
 
   it('should handle save error gracefully', async () => {

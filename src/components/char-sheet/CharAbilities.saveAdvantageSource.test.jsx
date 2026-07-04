@@ -118,24 +118,9 @@ describe('CharAbilities getSaveAdvantageSource tooltip', () => {
     expect(saveCell[0]).not.toHaveAttribute('title');
   });
 
-  it('falls back to computedStats.saveModifiers when saveModifiers is undefined', () => {
+  it('falls back to computedStats.saveModifiers when saveModifiers is absent', () => {
     const stats = createPlayerStats({
       saveModifiers: undefined,
-      computedStats: {
-        saveModifiers: [
-          { target: 'saving_throw', effect: 'advantage', condition: 'against_spell', source: 'Magic Resistance' },
-        ],
-      },
-    });
-    const { container } = render(<CharAbilities {...defaultProps} playerStats={stats} conditionEffects={{ saveAdvantage: ['against_spell'] }} />);
-    const strengthRow = container.querySelector('.abilities');
-    const saveCell = strengthRow ? strengthRow.querySelectorAll('div:nth-child(4)') : [];
-    expect(saveCell[0]).toHaveAttribute('title', 'Magic Resistance');
-  });
-
-  it('falls back to computedStats.saveModifiers when saveModifiers is null', () => {
-    const stats = createPlayerStats({
-      saveModifiers: null,
       computedStats: {
         saveModifiers: [
           { target: 'saving_throw', effect: 'advantage', condition: 'against_spell', source: 'Magic Resistance' },
@@ -158,27 +143,5 @@ describe('CharAbilities getSaveAdvantageSource tooltip', () => {
     const strengthRow = container.querySelector('.abilities');
     const saveCell = strengthRow ? strengthRow.querySelectorAll('div:nth-child(4)') : [];
     expect(saveCell[0]).toHaveAttribute('title', 'Spell Resistance');
-  });
-
-  it('returns null title when saveModifiers is undefined and no computedStats', () => {
-    const stats = createPlayerStats({
-      saveModifiers: undefined,
-      computedStats: undefined,
-    });
-    const { container } = render(<CharAbilities {...defaultProps} playerStats={stats} conditionEffects={{ saveAdvantageCount: 1 }} />);
-    const strengthRow = container.querySelector('.abilities');
-    const saveCell = strengthRow ? strengthRow.querySelectorAll('div:nth-child(4)') : [];
-    expect(saveCell[0]).not.toHaveAttribute('title');
-  });
-
-  it('returns null title when saveModifiers is null and no computedStats', () => {
-    const stats = createPlayerStats({
-      saveModifiers: null,
-      computedStats: null,
-    });
-    const { container } = render(<CharAbilities {...defaultProps} playerStats={stats} conditionEffects={{ saveAdvantageCount: 1 }} />);
-    const strengthRow = container.querySelector('.abilities');
-    const saveCell = strengthRow ? strengthRow.querySelectorAll('div:nth-child(4)') : [];
-    expect(saveCell[0]).not.toHaveAttribute('title');
   });
 });

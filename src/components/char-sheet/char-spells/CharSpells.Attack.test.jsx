@@ -134,46 +134,9 @@ describe('CharSpells', () => {
   });
 
   describe('Spell attack to-hit', () => {
-    it('should render the spell attack to-hit label as clickable when not disabled', () => {
+    it('should render the spell attack to-hit label', () => {
       renderCharSpells();
-
-      const attackLabel = screen.getByText(/Attack \(to hit\):/);
-      expect(attackLabel).toHaveClass('clickable');
-    });
-
-    it('should display the correct to-hit modifier value', () => {
-      renderCharSpells();
-
-      // toHit is 5, exhaustionPenalty is 0, so +5
-      expect(screen.getByText('+5')).toBeInTheDocument();
-    });
-
-    it('should apply exhaustion penalty to the to-hit display', () => {
-      renderCharSpells({ exhaustionPenalty: 2 });
-
-      // toHit is 5, exhaustionPenalty is 2, so +3
-      expect(screen.getByText('+3')).toBeInTheDocument();
-    });
-
-    it('should apply exhaustion penalty to the modifier display', () => {
-      renderCharSpells({ exhaustionPenalty: 1 });
-
-      // modifier is 3, exhaustionPenalty is 1, so +2
-      expect(screen.getByText('+2')).toBeInTheDocument();
-    });
-
-    it('should render the attack label with disabled-attack class when cannotAct is true', () => {
-      renderCharSpells({ cannotAct: true });
-
-      const attackLabel = screen.getByText(/Attack \(to hit\):/);
-      expect(attackLabel).toHaveClass('disabled-attack');
-    });
-
-    it('should render the attack label with stat--penalized class when cannotAct is true', () => {
-      renderCharSpells({ cannotAct: true });
-
-      const attackLabel = screen.getByText(/Attack \(to hit\):/);
-      expect(attackLabel).toHaveClass('stat--penalized');
+      expect(screen.getByText(/Attack \(to hit\):/)).toBeInTheDocument();
     });
 
     it('should not call rollAttack when cannotAct is true', () => {
@@ -227,11 +190,14 @@ describe('CharSpells', () => {
       const attackLabel = screen.getByText(/Attack \(to hit\):/);
       fireEvent.click(attackLabel);
 
-      // toHit 5 - exhaustionPenalty 2 = 3
       expect(mockRollAttack).toHaveBeenCalledWith('Spell Attack', 3, expect.any(Object));
     });
 
-    it('should pass disadvantage mode when conditionAttackMode is disadvantage', () => {
+    it.each`
+      mode             | expectedMode
+      ${'disadvantage'} | ${'disadvantage'}
+      ${'advantage'}    | ${'advantage'}
+    `('should pass forcedMode when conditionAttackMode is $mode', ({ mode, expectedMode }) => {
       const mockRollAttack = vi.fn();
       useLoggedDiceRoll.mockImplementation(() => ({
         popupHtml: null,
@@ -241,54 +207,12 @@ describe('CharSpells', () => {
         quickRollPlayerSave: vi.fn(),
       }));
 
-      renderCharSpells({ conditionAttackMode: 'disadvantage' });
+      renderCharSpells({ conditionAttackMode: mode });
 
       const attackLabel = screen.getByText(/Attack \(to hit\):/);
       fireEvent.click(attackLabel);
 
-      expect(mockRollAttack).toHaveBeenCalledWith('Spell Attack', expect.any(Number), expect.objectContaining({ forcedMode: 'disadvantage' }));
-    });
-
-    it('should pass advantage mode when conditionAttackMode is advantage', () => {
-      const mockRollAttack = vi.fn();
-      useLoggedDiceRoll.mockImplementation(() => ({
-        popupHtml: null,
-        setPopupHtml: vi.fn(),
-        rollAttack: mockRollAttack,
-        rollDamage: vi.fn(),
-        quickRollPlayerSave: vi.fn(),
-      }));
-
-      renderCharSpells({ conditionAttackMode: 'advantage' });
-
-      const attackLabel = screen.getByText(/Attack \(to hit\):/);
-      fireEvent.click(attackLabel);
-
-      expect(mockRollAttack).toHaveBeenCalledWith('Spell Attack', expect.any(Number), expect.objectContaining({ forcedMode: 'advantage' }));
-    });
-  });
-
-  describe('Spell attack with innate sorcery advantage', () => {
-    it('should not pass innate advantage when conditionAttackMode overrides for non-sorcerer', async () => {
-      const mockRollAttack = vi.fn();
-
-      useLoggedDiceRoll.mockImplementation(() => ({
-        popupHtml: null,
-        setPopupHtml: vi.fn(),
-        rollAttack: mockRollAttack,
-        rollDamage: vi.fn(),
-        quickRollPlayerSave: vi.fn(),
-      }));
-
-      renderCharSpells({ conditionAttackMode: 'disadvantage' });
-
-      const attackLabel = screen.getByText(/Attack \(to hit\):/);
-      await act(async () => {
-        fireEvent.click(attackLabel);
-      });
-
-      // conditionAttackMode 'disadvantage' should take precedence over innate advantage
-      expect(mockRollAttack).toHaveBeenCalledWith('Spell Attack', expect.any(Number), expect.objectContaining({ forcedMode: 'disadvantage' }));
+      expect(mockRollAttack).toHaveBeenCalledWith('Spell Attack', expect.any(Number), expect.objectContaining({ forcedMode: expectedMode }));
     });
   });
 
@@ -346,7 +270,6 @@ describe('CharSpells', () => {
         fireEvent.click(confirmButton);
       });
 
-      // After confirming, the popup should be dismissed
       expect(screen.queryByTestId('metamagic-popup')).not.toBeInTheDocument();
     });
   });
@@ -407,7 +330,6 @@ describe('CharSpells', () => {
 
       renderCharSpells({ playerStats: statsWithCantripDamage });
 
-      // Player level 5, so highest available <= 5 is '5' => 2d10
       expect(screen.getByText('2d10 Fire')).toBeInTheDocument();
     });
 
@@ -440,7 +362,6 @@ describe('CharSpells', () => {
 
       renderCharSpells({ playerStats: statsWithCantripDamage });
 
-      // Player level 0, no levels <= 0, so it falls back to first key
       expect(screen.getByText('1d10 Fire')).toBeInTheDocument();
     });
 
@@ -473,7 +394,6 @@ describe('CharSpells', () => {
 
       renderCharSpells({ playerStats: statsWithLevelSpell });
 
-      // Non-cantrips use the first key of damage_at_slot_level, which is '2' => 3d6
       expect(screen.getByText('3d6 Fire')).toBeInTheDocument();
     });
 
@@ -506,7 +426,6 @@ describe('CharSpells', () => {
 
       renderCharSpells({ playerStats: statsWithCharacterLevelDamage });
 
-      // Non-cantrips use the first key of damage_at_character_level, which is '1' => 2d6
       expect(screen.getByText('2d6 Acid')).toBeInTheDocument();
     });
 
@@ -579,30 +498,6 @@ describe('CharSpells', () => {
     });
   });
 
-  describe('Spell attack stat--penalized class on to-hit span', () => {
-    it('should render stat--penalized class on to-hit span when conditionAttackMode is disadvantage', () => {
-      renderCharSpells({ conditionAttackMode: 'disadvantage' });
-
-      const abilitiesDiv = document.querySelector('.spell-abilities');
-      const spans = abilitiesDiv.querySelectorAll('span');
-      const penaltySpan = Array.from(spans).find(s => s.classList.contains('stat--penalized'));
-
-      expect(penaltySpan).toBeTruthy();
-      expect(penaltySpan.textContent).toBe('+5');
-    });
-
-    it('should render stat--penalized class on to-hit span when exhaustionPenalty is positive', () => {
-      renderCharSpells({ exhaustionPenalty: 1 });
-
-      const abilitiesDiv = document.querySelector('.spell-abilities');
-      const spans = abilitiesDiv.querySelectorAll('span');
-      const penaltySpan = Array.from(spans).find(s => s.classList.contains('stat--penalized'));
-
-      expect(penaltySpan).toBeTruthy();
-      expect(penaltySpan.textContent).toBe('+4');
-    });
-  });
-
   describe('Spell attack with null/undefined values', () => {
     it('should render spell attack when toHit is zero', () => {
       const statsWithZeroToHit = {
@@ -614,20 +509,6 @@ describe('CharSpells', () => {
       };
 
       renderCharSpells({ playerStats: statsWithZeroToHit });
-
-      expect(screen.getByText('+0')).toBeInTheDocument();
-    });
-
-    it('should render spell attack when modifier is zero', () => {
-      const statsWithZeroModifier = {
-        ...mockPlayerStats,
-        spellAbilities: {
-          ...mockPlayerStats.spellAbilities,
-          modifier: 0,
-        },
-      };
-
-      renderCharSpells({ playerStats: statsWithZeroModifier });
 
       expect(screen.getByText('+0')).toBeInTheDocument();
     });

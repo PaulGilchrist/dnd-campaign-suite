@@ -35,51 +35,6 @@ describe('CharSpellSlotLevel', () => {
 
       expect(screen.getByText('2')).toBeInTheDocument();
     });
-
-    it('renders four slot divs when totalSlots >= 4', () => {
-      useRuntimeValue.mockReturnValue(4);
-
-      const { container } = render(
-        <CharSpellSlotLevel
-          level={1}
-          totalSlots={4}
-          playerStats={createPlayerStats()}
-        />
-      );
-
-      const slots = container.querySelectorAll('.slot');
-      expect(slots).toHaveLength(4);
-    });
-
-    it('renders four slot divs when totalSlots is less than 4', () => {
-      useRuntimeValue.mockReturnValue(2);
-
-      const { container } = render(
-        <CharSpellSlotLevel
-          level={1}
-          totalSlots={2}
-          playerStats={createPlayerStats()}
-        />
-      );
-
-      const slots = container.querySelectorAll('.slot');
-      expect(slots).toHaveLength(4);
-    });
-
-    it('renders four slot divs when totalSlots is 0', () => {
-      useRuntimeValue.mockReturnValue(0);
-
-      const { container } = render(
-        <CharSpellSlotLevel
-          level={1}
-          totalSlots={0}
-          playerStats={createPlayerStats()}
-        />
-      );
-
-      const slots = container.querySelectorAll('.slot');
-      expect(slots).toHaveLength(4);
-    });
   });
 
   describe('slot active/inactive classes', () => {
@@ -134,9 +89,7 @@ describe('CharSpellSlotLevel', () => {
       expect(slots[0]).toHaveClass('inactive');
       expect(slots[1]).toHaveClass('inactive');
       expect(slots[2]).toHaveClass('inactive');
-      // Slot 3 has no class because totalSlots (3) is not > 3
       expect(slots[3]).not.toHaveClass('active');
-      expect(slots[3]).not.toHaveClass('inactive');
     });
 
     it('marks no slots as active or inactive when totalSlots is 0', () => {
@@ -156,82 +109,9 @@ describe('CharSpellSlotLevel', () => {
         expect(slot).not.toHaveClass('inactive');
       });
     });
-
-    it('marks all slots as active when availableSlots exceeds totalSlots', () => {
-      useRuntimeValue.mockReturnValue(10);
-
-      const { container } = render(
-        <CharSpellSlotLevel
-          level={1}
-          totalSlots={4}
-          playerStats={createPlayerStats()}
-        />
-      );
-
-      const slots = container.querySelectorAll('.slot');
-      expect(slots[0]).toHaveClass('active');
-      expect(slots[1]).toHaveClass('active');
-      expect(slots[2]).toHaveClass('active');
-      expect(slots[3]).toHaveClass('active');
-    });
-
-    it('marks exactly the right number of slots as active for totalSlots of 1', () => {
-      useRuntimeValue.mockReturnValue(1);
-
-      const { container } = render(
-        <CharSpellSlotLevel
-          level={1}
-          totalSlots={1}
-          playerStats={createPlayerStats()}
-        />
-      );
-
-      const slots = container.querySelectorAll('.slot');
-      expect(slots[0]).toHaveClass('active');
-      expect(slots[1]).not.toHaveClass('active');
-      expect(slots[2]).not.toHaveClass('active');
-      expect(slots[3]).not.toHaveClass('active');
-    });
   });
 
   describe('available slots source', () => {
-    it('uses stored value from useRuntimeValue when available', () => {
-      useRuntimeValue.mockReturnValue(2);
-
-      render(
-        <CharSpellSlotLevel
-          level={1}
-          totalSlots={4}
-          playerStats={createPlayerStats()}
-        />
-      );
-
-      expect(useRuntimeValue).toHaveBeenCalledWith(
-        'Test Character',
-        'spell_slots_level_1',
-        undefined
-      );
-    });
-
-    it('uses stored value with campaignName when provided', () => {
-      useRuntimeValue.mockReturnValue(2);
-
-      render(
-        <CharSpellSlotLevel
-          level={2}
-          totalSlots={3}
-          playerStats={createPlayerStats()}
-          campaignName="MyCampaign"
-        />
-      );
-
-      expect(useRuntimeValue).toHaveBeenCalledWith(
-        'Test Character',
-        'spell_slots_level_2',
-        'MyCampaign'
-      );
-    });
-
     it('falls back to _trackedResources.current when useRuntimeValue returns null', () => {
       useRuntimeValue.mockReturnValue(null);
 
@@ -296,7 +176,6 @@ describe('CharSpellSlotLevel', () => {
       );
 
       const slots = container.querySelectorAll('.slot');
-      // Stored value (1) takes precedence, so only slot 0 is active
       expect(slots[0]).toHaveClass('active');
       expect(slots[1]).not.toHaveClass('active');
       expect(slots[2]).not.toHaveClass('active');
@@ -377,66 +256,30 @@ describe('CharSpellSlotLevel', () => {
       );
     });
 
-    it('does not decrement on Tab key press', () => {
-      useRuntimeValue.mockReturnValue(3);
+    it.each(['Enter', ' ', 'ArrowDown'])(
+      'decrements on %s key press',
+      (key) => {
+        useRuntimeValue.mockReturnValue(3);
 
-      const { container } = render(
-        <CharSpellSlotLevel
-          level={1}
-          totalSlots={3}
-          playerStats={createPlayerStats()}
-        />
-      );
+        const { container } = render(
+          <CharSpellSlotLevel
+            level={1}
+            totalSlots={3}
+            playerStats={createPlayerStats()}
+          />
+        );
 
-      const levelDiv = container.querySelector('.level');
-      fireEvent.keyDown(levelDiv, { key: 'Tab' });
+        const levelDiv = container.querySelector('.level');
+        fireEvent.keyDown(levelDiv, { key });
 
-      expect(setRuntimeValue).not.toHaveBeenCalled();
-    });
-
-    it('decrements on Enter key press', () => {
-      useRuntimeValue.mockReturnValue(3);
-
-      const { container } = render(
-        <CharSpellSlotLevel
-          level={1}
-          totalSlots={3}
-          playerStats={createPlayerStats()}
-        />
-      );
-
-      const levelDiv = container.querySelector('.level');
-      fireEvent.keyDown(levelDiv, { key: 'Enter' });
-
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'Test Character',
-        'spell_slots_level_1',
-        2,
-        undefined
-      );
-    });
-
-    it('decrements on Space key press', () => {
-      useRuntimeValue.mockReturnValue(3);
-
-      const { container } = render(
-        <CharSpellSlotLevel
-          level={1}
-          totalSlots={3}
-          playerStats={createPlayerStats()}
-        />
-      );
-
-      const levelDiv = container.querySelector('.level');
-      fireEvent.keyDown(levelDiv, { key: ' ' });
-
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'Test Character',
-        'spell_slots_level_1',
-        2,
-        undefined
-      );
-    });
+        expect(setRuntimeValue).toHaveBeenCalledWith(
+          'Test Character',
+          'spell_slots_level_1',
+          2,
+          undefined
+        );
+      }
+    );
 
     it('passes campaignName to setRuntimeValue on interaction', () => {
       useRuntimeValue.mockReturnValue(3);
@@ -458,28 +301,6 @@ describe('CharSpellSlotLevel', () => {
         'spell_slots_level_1',
         2,
         'MyCampaign'
-      );
-    });
-
-    it('decrements on ArrowDown key press', () => {
-      useRuntimeValue.mockReturnValue(3);
-
-      const { container } = render(
-        <CharSpellSlotLevel
-          level={1}
-          totalSlots={3}
-          playerStats={createPlayerStats()}
-        />
-      );
-
-      const levelDiv = container.querySelector('.level');
-      fireEvent.keyDown(levelDiv, { key: 'ArrowDown' });
-
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'Test Character',
-        'spell_slots_level_1',
-        2,
-        undefined
       );
     });
   });

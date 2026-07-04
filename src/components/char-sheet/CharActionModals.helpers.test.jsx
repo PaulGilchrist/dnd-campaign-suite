@@ -316,30 +316,23 @@ describe('CharActionModals helper functions', () => {
     vi.clearAllMocks();
   });
 
-  // ── HealingIllusionModal rendering (uses SecondaryTargetModal inline) ──
+  // ── HealingIllusionModal (SecondaryTargetModal) ──
 
   describe('HealingIllusionModal (SecondaryTargetModal)', () => {
-    it('renders with title "Healing Illusion"', () => {
-      render(<CharActionModals
-        {...createBaseProps()}
-        healingIllusionModal={{ action: { name: 'Healing Illusion' }, playerStats: { name: 'Caster', level: 5 } }}
-        characters={[{ name: 'Ally1' }]}
-        playerStats={{ name: 'Caster', level: 5 }}
-      />);
-      expect(screen.getByText('Healing Illusion')).toBeInTheDocument();
-    });
-
-    it('displays description with player level as heal amount', () => {
+    it('renders title, description with heal amount, target list, and skip/heal buttons', () => {
       render(<CharActionModals
         {...createBaseProps()}
         healingIllusionModal={{ action: { name: 'Healing Illusion' }, playerStats: { name: 'Caster', level: 7 } }}
         characters={[{ name: 'Ally1' }]}
         playerStats={{ name: 'Caster', level: 7 }}
       />);
+      expect(screen.getByText('Healing Illusion')).toBeInTheDocument();
       expect(screen.getByText(/regain 7 HP/)).toBeInTheDocument();
+      expect(screen.getByText('Ally1')).toBeInTheDocument();
+      expect(screen.getByText('Skip')).toBeInTheDocument();
     });
 
-    it('excludes the caster from target list', () => {
+    it('excludes the caster from the target list', () => {
       render(<CharActionModals
         {...createBaseProps()}
         healingIllusionModal={{ action: { name: 'Healing Illusion' }, playerStats: { name: 'Caster', level: 5 } }}
@@ -350,14 +343,14 @@ describe('CharActionModals helper functions', () => {
       expect(screen.queryByText('Caster')).not.toBeInTheDocument();
     });
 
-    it('includes combatSummary creatures in target list', () => {
+    it('does not show size since showSize is false', () => {
       render(<CharActionModals
         {...createBaseProps()}
         healingIllusionModal={{ action: { name: 'Healing Illusion' }, playerStats: { name: 'Caster', level: 5 } }}
-        characters={[{ name: 'Ally1' }]}
+        characters={[{ name: 'Ally1', size: 'Medium' }]}
         playerStats={{ name: 'Caster', level: 5 }}
       />);
-      expect(screen.getByText('Ally1')).toBeInTheDocument();
+      expect(screen.queryByText('(Medium)')).not.toBeInTheDocument();
     });
 
     it('calls setHealingIllusionModal(null) and dispatches buffs-updated on skip', () => {
@@ -393,59 +386,25 @@ describe('CharActionModals helper functions', () => {
       expect(dispatchSpy).toHaveBeenCalledWith(new CustomEvent('buffs-updated'));
       dispatchSpy.mockRestore();
     });
-
-    it('shows HP for player characters with currentHp and maxHp', () => {
-      render(<CharActionModals
-        {...createBaseProps()}
-        healingIllusionModal={{ action: { name: 'Healing Illusion' }, playerStats: { name: 'Caster', level: 5 } }}
-        characters={[{ name: 'Ally1', currentHp: 10, maxHp: 20 }]}
-        playerStats={{ name: 'Caster', level: 5 }}
-      />);
-      expect(screen.getByText('Ally1')).toBeInTheDocument();
-    });
-
-    it('does not show size since showSize is false', () => {
-      render(<CharActionModals
-        {...createBaseProps()}
-        healingIllusionModal={{ action: { name: 'Healing Illusion' }, playerStats: { name: 'Caster', level: 5 } }}
-        characters={[{ name: 'Ally1', size: 'Medium' }]}
-        playerStats={{ name: 'Caster', level: 5 }}
-      />);
-      expect(screen.queryByText('(Medium)')).not.toBeInTheDocument();
-    });
   });
 
   // ── InvokeDuplicityModal (CreatureSelectionModal) ──
 
   describe('InvokeDuplicityModal (CreatureSelectionModal)', () => {
-    it('renders with correct title', () => {
+    it('renders title, description, note, checkbox inputs, confirm button, and icon', () => {
       render(<CharActionModals
         {...createBaseProps()}
         invokeDuplicityModal={{ action: { name: 'Improved Duplicity' }, playerStats: { name: 'Caster' } }}
-        characters={[{ name: 'Ally1' }]}
+        characters={[{ name: 'Ally1' }, { name: 'Ally2' }]}
         playerStats={{ name: 'Caster' }}
       />);
       expect(screen.getByText('Improved Duplicity — Choose Allies')).toBeInTheDocument();
-    });
-
-    it('displays the description text', () => {
-      render(<CharActionModals
-        {...createBaseProps()}
-        invokeDuplicityModal={{ action: { name: 'Improved Duplicity' }, playerStats: { name: 'Caster' } }}
-        characters={[{ name: 'Ally1' }]}
-        playerStats={{ name: 'Caster' }}
-      />);
       expect(screen.getByText(/within 5 feet of a creature/)).toBeInTheDocument();
-    });
-
-    it('shows note about selecting allies', () => {
-      render(<CharActionModals
-        {...createBaseProps()}
-        invokeDuplicityModal={{ action: { name: 'Improved Duplicity' }, playerStats: { name: 'Caster' } }}
-        characters={[{ name: 'Ally1' }]}
-        playerStats={{ name: 'Caster' }}
-      />);
       expect(screen.getByText(/Select all allies/)).toBeInTheDocument();
+      expect(screen.getByText(/Grant Advantage/)).toBeInTheDocument();
+      const checkboxes = document.querySelectorAll('input[type="checkbox"]');
+      expect(checkboxes).toHaveLength(2);
+      expect(document.querySelector('.sp-header .fa-people-arrows')).toBeInTheDocument();
     });
 
     it('excludes the caster from target list', () => {
@@ -472,37 +431,6 @@ describe('CharActionModals helper functions', () => {
       expect(setInvokeDuplicityModal).toHaveBeenCalledWith(null);
       expect(dispatchSpy).toHaveBeenCalledWith(new CustomEvent('buffs-updated'));
       dispatchSpy.mockRestore();
-    });
-
-    it('renders confirm button with correct label', () => {
-      render(<CharActionModals
-        {...createBaseProps()}
-        invokeDuplicityModal={{ action: { name: 'Improved Duplicity' }, playerStats: { name: 'Caster' } }}
-        characters={[{ name: 'Ally1' }]}
-        playerStats={{ name: 'Caster' }}
-      />);
-      expect(screen.getByText(/Grant Advantage/)).toBeInTheDocument();
-    });
-
-    it('renders checkbox inputs for multi-select', () => {
-      render(<CharActionModals
-        {...createBaseProps()}
-        invokeDuplicityModal={{ action: { name: 'Improved Duplicity' }, playerStats: { name: 'Caster' } }}
-        characters={[{ name: 'Ally1' }, { name: 'Ally2' }]}
-        playerStats={{ name: 'Caster' }}
-      />);
-      const checkboxes = document.querySelectorAll('input[type="checkbox"]');
-      expect(checkboxes).toHaveLength(2);
-    });
-
-    it('renders with people-arrows icon', () => {
-      render(<CharActionModals
-        {...createBaseProps()}
-        invokeDuplicityModal={{ action: { name: 'Improved Duplicity' }, playerStats: { name: 'Caster' } }}
-        characters={[{ name: 'Ally1' }]}
-        playerStats={{ name: 'Caster' }}
-      />);
-      expect(document.querySelector('.sp-header .fa-people-arrows')).toBeInTheDocument();
     });
   });
 });

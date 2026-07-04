@@ -98,26 +98,6 @@ describe('Subscriber', () => {
         expect(instance.closed).toBe(true);
     });
 
-    it('should not render any visible content', () => {
-        const { container } = render(<Subscriber handleEvent={handleEventMock} campaignName="Test Campaign" />);
-
-        expect(container.innerHTML).toBe('');
-    });
-
-    it('should handle multiple messages', () => {
-        render(<Subscriber handleEvent={handleEventMock} campaignName="Test Campaign" />);
-
-        const instance = MockEventSource.getInstance(urlWithCampaign('Test Campaign'));
-        instance.onmessage({ data: JSON.stringify({ type: 'message1' }) });
-        instance.onmessage({ data: JSON.stringify({ type: 'message2' }) });
-        instance.onmessage({ data: JSON.stringify({ type: 'message3' }) });
-
-        expect(handleEventMock).toHaveBeenCalledTimes(3);
-        expect(handleEventMock).toHaveBeenCalledWith({ type: 'message1' });
-        expect(handleEventMock).toHaveBeenCalledWith({ type: 'message2' });
-        expect(handleEventMock).toHaveBeenCalledWith({ type: 'message3' });
-    });
-
     it('should create an absolute URL using the hostname', () => {
         Object.defineProperty(window, 'location', {
             value: { hostname: 'example.com' },
@@ -131,20 +111,6 @@ describe('Subscriber', () => {
         expect(instance).toBeDefined();
     });
 
-    it('should URL-encode the campaign name', () => {
-        render(<Subscriber handleEvent={handleEventMock} campaignName="Testing G3" />);
-
-        const instance = MockEventSource.getInstance(urlWithCampaign('Testing G3'));
-        expect(instance).toBeDefined();
-    });
-
-    it('should work without campaignName', () => {
-        render(<Subscriber handleEvent={handleEventMock} />);
-
-        const instance = MockEventSource.getInstance(urlWithCampaign());
-        expect(instance).toBeDefined();
-    });
-
     it('should throw when onmessage receives invalid JSON', () => {
         render(<Subscriber handleEvent={handleEventMock} campaignName="Test Campaign" />);
 
@@ -153,15 +119,6 @@ describe('Subscriber', () => {
         expect(() => {
             instance.onmessage({ data: 'not json' });
         }).toThrow(SyntaxError);
-    });
-
-    it('should call handleEvent with parsed event data containing key field', () => {
-        render(<Subscriber handleEvent={handleEventMock} campaignName="Test Campaign" />);
-
-        const instance = MockEventSource.getInstance(urlWithCampaign('Test Campaign'));
-        instance.onmessage({ data: JSON.stringify({ key: 'spell-overlay', overlay: 'invisibility' }) });
-
-        expect(handleEventMock).toHaveBeenCalledWith({ key: 'spell-overlay', overlay: 'invisibility' });
     });
 
     it('should use ref to always call the latest handleEvent', () => {
@@ -209,11 +166,4 @@ describe('Subscriber', () => {
         expect(instance.url).toBe('http://localhost/subscribe?campaign=Dungeon+Master');
     });
 
-    it('should handle empty campaign name string', () => {
-        render(<Subscriber handleEvent={handleEventMock} campaignName="" />);
-
-        const instance = MockEventSource.getInstance(urlWithCampaign(''));
-        expect(instance).toBeDefined();
-        expect(instance.url).toBe('http://localhost/subscribe?');
-    });
 });

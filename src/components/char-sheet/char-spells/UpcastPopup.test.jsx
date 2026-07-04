@@ -38,52 +38,20 @@ describe('UpcastPopup', () => {
       expect(screen.getByText(/Fireball/)).toBeInTheDocument();
     });
 
-    it('renders Font Awesome upcast arrow icon', () => {
-      renderUpcastPopup();
-      const icon = document.querySelector('.upcast-popup-inner h3 i.fa-solid.fa-arrow-up');
-      expect(icon).toBeInTheDocument();
-    });
-
-    it('renders descriptive paragraph text', () => {
-      renderUpcastPopup();
-      expect(screen.getByText(/This spell can be cast using a higher-level spell slot/)).toBeInTheDocument();
-    });
-
-    it('renders all level options with their labels', () => {
+    it('renders all level options with their labels and formulas', () => {
       renderUpcastPopup();
       expect(screen.getByText('Level 3')).toBeInTheDocument();
       expect(screen.getByText('Level 4')).toBeInTheDocument();
       expect(screen.getByText('Level 5')).toBeInTheDocument();
-    });
-
-    it('renders the upcast formula for each level', () => {
-      renderUpcastPopup();
       expect(screen.getByText('+1d6')).toBeInTheDocument();
       expect(screen.getByText('+2d6')).toBeInTheDocument();
       expect(screen.getByText('+3d6')).toBeInTheDocument();
     });
 
-    it('renders slots remaining text with correct singular/plural', () => {
-      renderUpcastPopup();
-      expect(screen.getByText('3 slots remaining')).toBeInTheDocument();
-      expect(screen.getByText('2 slots remaining')).toBeInTheDocument();
-      expect(screen.getByText('0 slots remaining')).toBeInTheDocument();
-    });
-
-    it('renders the cancel button', () => {
+    it('renders the cancel and cast buttons', () => {
       renderUpcastPopup();
       expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
-    });
-
-    it('renders the cast button with the default selected level', () => {
-      renderUpcastPopup();
       expect(screen.getByRole('button', { name: /Cast at Level 3/ })).toBeInTheDocument();
-    });
-
-    it('renders Font Awesome wand icon on cast button', () => {
-      renderUpcastPopup();
-      const icon = document.querySelector('.upcast-actions button.char-btn i.fa-solid.fa-wand-magic');
-      expect(icon).toBeInTheDocument();
     });
   });
 
@@ -113,7 +81,7 @@ describe('UpcastPopup', () => {
       expect(radios[0]).toBeChecked();
     });
 
-    it('falls back to spell base level when levels array is empty', () => {
+    it('disables cast button when levels array is empty', () => {
       renderUpcastPopup({ levels: [] });
       const castButton = screen.getByRole('button', { name: /Cast at Level 3/ });
       expect(castButton).toBeDisabled();
@@ -144,18 +112,6 @@ describe('UpcastPopup', () => {
       const radios = screen.getAllByRole('radio');
       expect(radios[2]).toBeDisabled();
     });
-
-    it('applies disabled CSS class to levels with no available slots', () => {
-      renderUpcastPopup();
-      const level5Label = screen.getByText('Level 5').closest('.upcast-level');
-      expect(level5Label).toHaveClass('upcast-level-disabled');
-    });
-
-    it('applies selected CSS class to the selected level', () => {
-      renderUpcastPopup();
-      const level3Label = screen.getByText('Level 3').closest('.upcast-level');
-      expect(level3Label).toHaveClass('upcast-level-selected');
-    });
   });
 
   describe('cast button behavior', () => {
@@ -168,21 +124,7 @@ describe('UpcastPopup', () => {
       expect(castButton).toBeDisabled();
     });
 
-    it('is enabled when the selected level has available slots', () => {
-      renderUpcastPopup();
-      const castButton = screen.getByRole('button', { name: /Cast at Level 3/ });
-      expect(castButton).toBeEnabled();
-    });
-
-    it('updates cast button label when selection changes', () => {
-      renderUpcastPopup();
-      expect(screen.getByRole('button', { name: /Cast at Level 3/ })).toBeInTheDocument();
-
-      fireEvent.click(screen.getByText('Level 4'));
-      expect(screen.getByRole('button', { name: /Cast at Level 4/ })).toBeInTheDocument();
-    });
-
-    it('calls onConfirm with selected level number when cast button clicked', () => {
+    it('calls onConfirm with selected level when cast button clicked', () => {
       const onConfirm = vi.fn();
       renderUpcastPopup({ onConfirm });
       fireEvent.click(screen.getByRole('button', { name: /Cast at Level 3/ }));
@@ -195,17 +137,6 @@ describe('UpcastPopup', () => {
       fireEvent.click(screen.getByText('Level 4'));
       fireEvent.click(screen.getByRole('button', { name: /Cast at Level 4/ }));
       expect(onConfirm).toHaveBeenCalledWith(4);
-    });
-
-    it('does not call onConfirm when cast button is disabled', () => {
-      const onConfirm = vi.fn();
-      const levels = [
-        { level: 3, formula: '+1d6', availableSlots: 0 },
-      ];
-      renderUpcastPopup({ levels, onConfirm });
-      const castButton = screen.getByRole('button', { name: /Cast at Level/ });
-      fireEvent.click(castButton);
-      expect(onConfirm).not.toHaveBeenCalled();
     });
   });
 

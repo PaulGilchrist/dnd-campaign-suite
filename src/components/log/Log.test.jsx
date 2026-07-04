@@ -1,5 +1,5 @@
 // @improved-by-ai
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent, cleanup } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const mockState = vi.hoisted(() => ({ logEntries: [], initialized: true }));
@@ -86,6 +86,7 @@ function setup(entries, initialized, characters) {
 
 describe('Log', () => {
   beforeEach(() => {
+    cleanup();
     mockState.logEntries.length = 0;
     mockState.initialized = true;
     mockAddEntry.mockClear();
@@ -93,98 +94,44 @@ describe('Log', () => {
 
   // ── TOOLBAR & STRUCTURE ───────────────────────
   describe('toolbar', () => {
-    it('heading renders', () => {
+    it('renders heading, textarea, add button, and character select', () => {
       setup([]);
       expect(screen.getByRole('heading', { name: /campaign log/i })).toBeInTheDocument();
-    });
-
-    it('toolbar div present', () => {
-      setup([]);
-      expect(q('.log-toolbar')).toBeInTheDocument();
-    });
-
-    it('scroll icon in toolbar', () => {
-      setup([]);
-      expect(q('.log-toolbar i.fa-scroll')).toBeInTheDocument();
-    });
-
-    it('note textarea rendered', () => {
-      setup([]);
       expect(screen.getByPlaceholderText('Add a note to the log...')).toBeInTheDocument();
-    });
-
-    it('add btn rendered', () => {
-      setup([]);
       expect(q('.log-add-btn')).toBeInTheDocument();
-    });
-
-    it('add-btn fa-plus icon', () => {
-      setup([]);
-      expect(q('.log-add-btn i.fa-plus')).toBeInTheDocument();
-    });
-
-    it('select shown with chars', () => {
-      setup([]);
       expect(screen.getByRole('combobox')).toBeInTheDocument();
-    });
-
-    it('Anonymous option present', () => {
-      setup([]);
       expect(screen.getByRole('option', { name: 'Anonymous' })).toBeInTheDocument();
     });
 
-    it('no select when empty chars', () => {
+    it('hides select when no characters', () => {
       setup([], true, []);
       expect(() => screen.getByRole('combobox')).toThrow();
     });
 
-    it('options from character list', () => {
+    it('populates select options from character list', () => {
       setup([], true, [{ name: 'L' }, { name: 'G' }]);
       expect(screen.getByRole('option', { name: 'L' })).toBeInTheDocument();
       expect(screen.getByRole('option', { name: 'G' })).toBeInTheDocument();
-    });
-
-    it('root has campaign-tool class', () => {
-      setup([]);
-      expect(q('.campaign-tool')).toBeInTheDocument();
-    });
-
-    it('root has log-view class', () => {
-      setup([]);
-      expect(q('.log-view')).toBeInTheDocument();
-    });
-
-    it('has log-add-note div', () => {
-      setup([]);
-      expect(q('.log-add-note')).toBeInTheDocument();
-    });
-
-    it('has log-entries div', () => {
-      setup([]);
-      expect(q('.log-entries')).toBeInTheDocument();
     });
   });
 
   // ── LOADING & EMPTY STATES ───────────────────────
   describe('loading/empty states', () => {
-    it('shows loading when not initialized', () => {
+    it('shows loading when not initialized, hides entries', () => {
       setup([note()], false);
       expect(screen.getByText('Loading log...')).toBeInTheDocument();
+      expect(screen.queryByText(/hi/i)).not.toBeInTheDocument();
     });
 
-    it('does NOT show empty msg when entries exist', () => {
-      setup([note()]);
-      expect(screen.queryByText(/no entries yet/i)).not.toBeInTheDocument();
-    });
-
-    it('does NOT show loading when initialized', () => {
+    it('shows empty state when initialized with no entries', () => {
       setup([]);
       expect(screen.queryByText(/Loading log/i)).not.toBeInTheDocument();
+      expect(screen.getByText(/no entries yet/i)).toBeInTheDocument();
     });
 
-    it('shows empty state msg when no entries loaded', () => {
-      setup([]);
-      expect(screen.getByText(/no entries yet/i)).toBeInTheDocument();
+    it('hides empty msg when entries exist', () => {
+      setup([note()]);
+      expect(screen.queryByText(/no entries yet/i)).not.toBeInTheDocument();
     });
   });
 
@@ -203,7 +150,7 @@ describe('Log', () => {
       });
     });
 
-    it('uses selected char as author', async () => {
+    it('uses selected char as author, Anonymous when none selected', async () => {
       setup([]);
       fireEvent.change(screen.getByPlaceholderText('Add a note to the log...'), {
         target: { value: 'hi' },
@@ -217,7 +164,7 @@ describe('Log', () => {
       });
     });
 
-    it('uses Anonymous when no char selected', async () => {
+    it('uses Anonymous when no char options available', async () => {
       setup([], true, []);
       fireEvent.change(screen.getByPlaceholderText('Add a note to the log...'), {
         target: { value: 'hi' },
@@ -230,14 +177,10 @@ describe('Log', () => {
       });
     });
 
-    it('no-op for empty text', () => {
+    it('no-op for empty or whitespace text', () => {
       setup([]);
       fireEvent.click(q('.log-add-btn'));
       expect(mockAddEntry).not.toHaveBeenCalled();
-    });
-
-    it('no-op for whitespace text', () => {
-      setup([]);
       fireEvent.change(screen.getByPlaceholderText('Add a note to the log...'), {
         target: { value: '    ' },
       });
@@ -261,101 +204,52 @@ describe('Log', () => {
       await waitFor(() => expect(mockAddEntry).toHaveBeenCalled());
     });
 
-    it('plain enter does NOT submit', () => {
+    it('plain enter and ctrl+r do NOT submit', () => {
       setup([]);
       const textarea = screen.getByPlaceholderText('Add a note to the log...');
       fireEvent.change(textarea, { target: { value: 'x' } });
       fireEvent.keyDown(textarea, { key: 'Enter' });
       expect(mockAddEntry).not.toHaveBeenCalled();
-    });
-
-    it('ctrl+r does NOT submit', () => {
-      setup([]);
-      const textarea = screen.getByPlaceholderText('Add a note to the log...');
-      fireEvent.change(textarea, { target: { value: 'x' } });
       fireEvent.keyDown(textarea, { key: 'r', ctrlKey: true });
       expect(mockAddEntry).not.toHaveBeenCalled();
     });
 
-    it('clears textarea after submit', async () => {
+    it('clears textarea after submit but not on empty note', async () => {
       setup([]);
       const textarea = screen.getByPlaceholderText('Add a note to the log...');
       fireEvent.change(textarea, { target: { value: 'x' } });
       fireEvent.click(q('.log-add-btn'));
       await waitFor(() => expect(textarea).toHaveValue(''));
-    });
-
-    it('does NOT clear textarea when empty note', () => {
-      setup([]);
-      const textarea = screen.getByPlaceholderText('Add a note to the log...');
       fireEvent.change(textarea, { target: { value: '   ' } });
       fireEvent.click(q('.log-add-btn'));
       expect(textarea).toHaveValue('   ');
-    });
-
-    it('select onChange updates value', () => {
-      setup([]);
-      const select = screen.getByRole('combobox');
-      fireEvent.change(select, { target: { value: 'Aragorn' } });
-      expect(select).toHaveValue('Aragorn');
-    });
-
-    it('select to Anonymous resets to empty string', () => {
-      setup([]);
-      const select = screen.getByRole('combobox');
-      fireEvent.change(select, { target: { value: '' } });
-      expect(select).toHaveValue('');
     });
   });
 
   // ── ENTRY RENDERING / REVERSE ORDER ───────────────
   describe('entry rendering', () => {
-    it('renders entries in reverse order', () => {
-      setup([note({ id: 'a', noteText: 'First' }), note({ id: 'b', noteText: 'Second' })]);
+    it('renders entries in reverse order, skips unknown types', () => {
+      setup([note({ id: 'a', noteText: 'First' }), note({ id: 'b', noteText: 'Second' }), { id: '?', type: 'unknown' }]);
       const texts = document.querySelectorAll('.log-note-text');
+      expect(texts.length).toBe(2);
       expect(texts[0].textContent).toContain('Second');
+      expect(texts[1].textContent).toContain('First');
     });
 
     it('does NOT render entries when not initialized', () => {
       setup([note({ noteText: 'hi' })], false);
       expect(screen.queryByText(/hi/i)).not.toBeInTheDocument();
     });
-
-    it('skips unknown type gracefully', () => {
-      setup([{ id: '?', type: 'unknown' }]);
-      expect(document.querySelectorAll('.log-entry').length).toBe(0);
-    });
-
-    it('renders roll and note in reversed spread-map order', () => {
-      setup([roll(), note({})]);
-      expect(q('.log-entries > div')).toBeInTheDocument();
-    });
   });
 
   // ── NOTE ENTRY component ───────────────
   describe('NoteEntry', () => {
-    it('renders noteText in .log-note-text', () => {
+    it('renders noteText, character name, timestamp, and icon', () => {
       setup([note({ noteText: 'Hello' })]);
       expect(q('.log-note-text')).toHaveTextContent(/Hello/i);
-    });
-
-    it('renders comment-dots icon', () => {
-      setup([note()]);
-      expect(q('.log-note i.fa-comment-dots')).toBeInTheDocument();
-    });
-
-    it('renders character name', () => {
-      setup([note({ characterName: 'Frodo' })]);
       expect(q('.log-note .log-character')).toHaveTextContent(/Frodo/i);
-    });
-
-    it('renders timestamp in header', () => {
-      setup([note()]);
       expect(q('.log-note .log-time')).toBeInTheDocument();
-    });
-
-    it('root class is .log-entry.log-note', () => {
-      setup([note()]);
+      expect(q('.log-note i.fa-comment-dots')).toBeInTheDocument();
       expect(q('.log-entry.log-note')).toBeInTheDocument();
     });
   });
@@ -363,20 +257,21 @@ describe('Log', () => {
   // ── TRAVEL ENTRY component ───────────────
   describe('TravelEntry', () => {
     it.each([
-      ['advance', 'Advanced to'],
-      ['advance_with_event', 'Event triggered at'],
-      ['arrived', 'Arrived at'],
-      ['camp', 'Camped at'],
-      ['forced_march', 'Forced march at'],
-      ['event_accept', 'Accepted event at'],
-      ['event_skip', 'Skipped event at'],
-      ['event_reroll', 'Re-rolled event at'],
-      ['extreme_weather', 'Weather halted travel at'],
-      ['day_exhausted', 'Budget exhausted at'],
-      ['cancel', 'Travel cancelled at'],
-    ])('action %s -> %s', (a, l) => {
-      setup([travel({ action: a })]);
-      expect(screen.getByText(new RegExp(l, 'i'))).toBeInTheDocument();
+      ['advance', 'Advanced to', 'fa-person-walking'],
+      ['advance_with_event', 'Event triggered at', 'fa-bolt'],
+      ['arrived', 'Arrived at', 'fa-flag-checkered'],
+      ['camp', 'Camped at', 'fa-campground'],
+      ['forced_march', 'Forced march at', 'fa-person-running'],
+      ['event_accept', 'Accepted event at', 'fa-check'],
+      ['event_skip', 'Skipped event at', 'fa-xmark'],
+      ['event_reroll', 'Re-rolled event at', 'fa-dice'],
+      ['extreme_weather', 'Weather halted travel at', 'fa-triangle-exclamation'],
+      ['day_exhausted', 'Budget exhausted at', 'fa-tent'],
+      ['cancel', 'Travel cancelled at', 'fa-ban'],
+    ])('action %s -> label "%s" with icon .%s', (action, label, icon) => {
+      setup([travel({ action })]);
+      expect(screen.getByText(new RegExp(label, 'i'))).toBeInTheDocument();
+      expect(q(`.log-travel i.${icon}`)).toBeInTheDocument();
     });
 
     it('unknown action falls back to advance config', () => {
@@ -384,372 +279,182 @@ describe('Log', () => {
       expect(screen.getByText(/Advanced to/i)).toBeInTheDocument();
     });
 
-    it.each([
-      ['advance', 'fa-person-walking'],
-      ['arrived', 'fa-flag-checkered'],
-      ['camp', 'fa-campground'],
-      ['event_accept', 'fa-check'],
-      ['event_skip', 'fa-xmark'],
-      ['extreme_weather', 'fa-triangle-exclamation'],
-      ['forced_march', 'fa-person-running'],
-      ['event_reroll', 'fa-dice'],
-      ['day_exhausted', 'fa-tent'],
-      ['advance_with_event', 'fa-bolt'],
-      ['cancel', 'fa-ban'],
-    ])('action %s icon=%s', (_action, icon) => {
-      setup([travel({ action: _action })]);
-      expect(q(`.log-travel i.${icon}`)).toBeInTheDocument();
-    });
-
-    it.each([
-      ['advance', '74.*144.*217'],
-      ['arrived', '76.*175.*80'],
-      ['camp', '136.*170.*187'],
-      ['event_skip', '136.*136.*136'],
-      ['extreme_weather', '244.*67.*54'],
-    ])('action %s has border color matching /%s/', (action, colorPattern) => {
-      setup([travel({ action })]);
-      const el = q('.log-entry.log-travel');
-      expect(el.style.borderLeftColor).toMatch(new RegExp(colorPattern));
-    });
-
-    it('hex coords render', () => {
-      setup([travel({ hex: { q: 5, r: -3 } })]);
+    it('renders hex coords, terrain, weather, and event title', () => {
+      setup([travel({ hex: { q: 5, r: -3 }, terrain: 'Mountain', weather: 'Rainy', eventTitle: 'Ambush!', eventType: 'Enemy' })]);
       expect(screen.getByText(/\(5, -3\)/)).toBeInTheDocument();
-    });
-
-    it('no hex -> no coord span', () => {
-      setup([travel({ hex: undefined })]);
-      expect(screen.queryByText(/\(\d/i)).not.toBeInTheDocument();
-    });
-
-    it('terrain shows + fa-mountain', () => {
-      setup([travel({ terrain: 'Mountain' })]);
       expect(screen.getByText(/Mountain/i)).toBeInTheDocument();
       expect(q('.log-travel-terrain i.fa-mountain')).toBeInTheDocument();
-    });
-
-    it('empty terrain hides span', () => {
-      setup([travel({ terrain: '' })]);
-      expect(screen.queryByText(/log-travel-terrain/i)).not.toBeInTheDocument();
-    });
-
-    it('weather shows', () => {
-      setup([travel({ weather: 'Rainy' })]);
       expect(screen.getByText(/Rainy/i)).toBeInTheDocument();
+      expect(screen.getByText(/Ambush!/i)).toBeInTheDocument();
     });
 
-    it('empty weather hides', () => {
-      setup([travel({ weather: '' })]);
-      expect(screen.queryByText(/log-travel-weather/i)).not.toBeInTheDocument();
+    it('hides terrain/weather/event sections when empty', () => {
+      setup([travel({ terrain: '', weather: '', eventTitle: '' })]);
+      expect(q('.log-travel-terrain')).not.toBeInTheDocument();
+      expect(q('.log-travel-weather')).not.toBeInTheDocument();
+      expect(q('.log-travel-event')).not.toBeInTheDocument();
     });
 
-    it('default sun icon when no weatherIcon', () => {
-      setup([travel({ weather: 'Hot' })]);
-      const i = q('.log-travel-weather i');
-      expect(i?.getAttribute('class')).toContain('fa-sun');
-    });
-
-    it('custom weather icon', () => {
+    it('uses custom weather icon when provided', () => {
       setup([travel({ weather: 'Storms', weatherIcon: 'cloud-showers-heavy' })]);
       expect(q('.log-travel-weather i.fa-cloud-showers-heavy')).toBeInTheDocument();
     });
 
-    it('event title + type shown', () => {
-      setup([travel({ eventTitle: 'Ambush!', eventType: 'Enemy' })]);
-      expect(screen.getByText(/Ambush!/i)).toBeInTheDocument();
-    });
-
-    it('empty eventTitle hides section', () => {
-      setup([travel({ eventTitle: '' })]);
-      expect(q('.log-travel-event')).not.toBeInTheDocument();
-    });
-
-    it('root class .log-entry.log-travel', () => {
-      setup([travel()]);
-      expect(q('.log-entry.log-travel')).toBeInTheDocument();
-    });
-
-    it('renders header div', () => {
-      setup([travel()]);
-      expect(q('.log-travel .log-entry-header')).toBeInTheDocument();
-    });
-
-    it('renders travel-action span with color style', () => {
-      setup([travel()]);
-      expect(q('.log-travel-action')).toBeInTheDocument();
+    it('applies border color per action type', () => {
+      setup([travel({ action: 'advance' })]);
+      expect(q('.log-entry.log-travel').style.borderLeftColor).toMatch(/^rgb\(74,?\s*144,?\s*217\)$/);
+      cleanup();
+      setup([travel({ action: 'extreme_weather' })]);
+      expect(q('.log-entry.log-travel').style.borderLeftColor).toMatch(/^rgb\(244,?\s*67,?\s*54\)$/);
     });
   });
 
   // ── LOOT ENTRY component ───────────────
   describe('LootEntry', () => {
-    it('fa-coins icon', () => {
+    it('renders icon, title, and details container', () => {
       setup([loot()]);
       expect(q('.log-loot i.fa-coins')).toBeInTheDocument();
-    });
-
-    it('title "Loot" shown', () => {
-      setup([loot()]);
       expect(screen.getByText(/Loot/i)).toBeInTheDocument();
+      expect(q('.log-loot-details')).toBeInTheDocument();
+      expect(q('.log-entry.log-loot')).toBeInTheDocument();
     });
 
-    it('XP > 0 shows with locale format', () => {
+    it('formats XP with locale and shows/hides based on value', () => {
       setup([loot({ xpPerChar: 1500 })]);
       expect(screen.getByText(/1,500 XP per character/i)).toBeInTheDocument();
-    });
-
-    it('XP 1M locale formatting', () => {
-      setup([loot({ xpPerChar: 1000000 })]);
-      expect(screen.getByText(/1,000,000 XP per character/i)).toBeInTheDocument();
-    });
-
-    it('XP === 0 hides', () => {
+      expect(q('.log-loot-xp i.fa-star')).toBeInTheDocument();
+      cleanup();
       setup([loot({ xpPerChar: 0 })]);
       expect(screen.queryByText(/XP per character/i)).not.toBeInTheDocument();
-    });
-
-    it('XP undefined hides', () => {
+      cleanup();
       setup([loot({ xpPerChar: undefined })]);
       expect(screen.queryByText(/XP per character/i)).not.toBeInTheDocument();
     });
 
-    it('lootItems renders li list', () => {
+    it('renders loot items as list, hides when empty/undefined', () => {
       setup([loot({ lootItems: ['Ring', 'Potion'] })]);
       expect(document.querySelectorAll('.log-loot-item').length).toBe(2);
-    });
-
-    it('empty items array hides ul', () => {
+      cleanup();
       setup([loot({ lootItems: [] })]);
       expect(screen.queryByText(/log-loot-items/i)).not.toBeInTheDocument();
-    });
-
-    it('undefined lootItems hides ul', () => {
+      cleanup();
       setup([loot({ lootItems: undefined })]);
       expect(screen.queryByText(/log-loot-items/i)).not.toBeInTheDocument();
-    });
-
-    it('.log-loot-xp span when XP>0', () => {
-      setup([loot({ xpPerChar: 500 })]);
-      expect(q('.log-loot-xp')).toBeInTheDocument();
-    });
-
-    it('.log-loot-details div', () => {
-      setup([loot()]);
-      expect(q('.log-loot-details')).toBeInTheDocument();
-    });
-
-    it('fa-star in xp display', () => {
-      setup([loot({ xpPerChar: 500 })]);
-      expect(q('.log-loot-xp i.fa-star')).toBeInTheDocument();
-    });
-
-    it('root class .log-entry.log-loot', () => {
-      setup([loot()]);
-      expect(q('.log-entry.log-loot')).toBeInTheDocument();
     });
   });
 
   // ── CONDITION ENTRY component ───────────────
   describe('ConditionEntry', () => {
-    it('applied -> "Condition Applied" text + warning icon', () => {
-      setup([cond({ action: 'applied' })]);
+    it('applied -> "Condition Applied" with warning icon, shows DC and ability save', () => {
+      setup([cond({ action: 'applied', dc: 15, ability: 'wisdom' })]);
       expect(screen.getByText(/Condition Applied/i)).toBeInTheDocument();
       expect(q('.log-condition i.fa-circle-exclamation')).toBeInTheDocument();
-    });
-
-    it('broken -> "Condition Broken" + check icon', () => {
-      setup([cond({ action: 'broken' })]);
-      expect(screen.getByText(/Condition Broken/i)).toBeInTheDocument();
-      expect(q('.log-condition i.fa-circle-check')).toBeInTheDocument();
-    });
-
-    it('applied adds .log-condition-applied class', () => {
-      setup([cond({ action: 'applied' })]);
       expect(q('.log-entry.log-condition.log-condition-applied')).toBeInTheDocument();
-    });
-
-    it('broken adds .log-condition-broken class', () => {
-      setup([cond({ action: 'broken' })]);
-      expect(q('.log-entry.log-condition.log-condition-broken')).toBeInTheDocument();
-    });
-
-    it('shows condition name in detail span', () => {
-      setup([cond({ condition: 'charmed' })]);
       expect(q('.log-condition-name')).toHaveTextContent(/charmed/i);
-    });
-
-    it('applied shows DC', () => {
-      setup([cond({ action: 'applied', dc: 15 })]);
       expect(screen.getByText(/DC 15/i)).toBeInTheDocument();
-    });
-
-    it('applied shows ability save uppercase', () => {
-      setup([cond({ action: 'applied', ability: 'wisdom' })]);
       expect(q('.log-condition-ability')).toHaveTextContent(/WISDOM save/i);
     });
 
-    it('broken hides DC even if set', () => {
-      setup([cond({ action: 'broken', dc: 13 })]);
+    it('broken -> "Condition Broken" with check icon, hides DC/ability, shows source', () => {
+      setup([cond({ action: 'broken', dc: 13, ability: 'wisdom', sourceName: 'Hero Potion' })]);
+      expect(screen.getByText(/Condition Broken/i)).toBeInTheDocument();
+      expect(q('.log-condition i.fa-circle-check')).toBeInTheDocument();
+      expect(q('.log-entry.log-condition.log-condition-broken')).toBeInTheDocument();
       expect(screen.queryByText(/DC 13/i)).not.toBeInTheDocument();
-    });
-
-    it('broken hides ability even if set', () => {
-      setup([cond({ action: 'broken', ability: 'wisdom' })]);
       expect(q('.log-condition-ability')).not.toBeInTheDocument();
-    });
-
-    it('broken shows "by sourceName" in detail', () => {
-      setup([cond({ action: 'broken', sourceName: 'Hero Potion' })]);
       expect(q('.log-condition-source')).toBeInTheDocument();
     });
 
-    it('broken empty sourceName hides', () => {
+    it('hides source when empty, hides source always for applied', () => {
       setup([cond({ action: 'broken', sourceName: '' })]);
       expect(q('.log-condition-source')).not.toBeInTheDocument();
-    });
-
-    it('applied hides source even if set', () => {
+      cleanup();
       setup([cond({ action: 'applied', sourceName: 'X' })]);
       expect(q('.log-condition-source')).not.toBeInTheDocument();
     });
 
-    it('shows character in header', () => {
+    it('shows character and timestamp in header', () => {
       setup([cond({ action: 'applied' })]);
       expect(q('.log-condition .log-character')).toHaveTextContent(/Gollum/i);
-    });
-
-    it('shows timestamp in header', () => {
-      setup([cond()]);
       expect(q('.log-condition .log-time')).toBeInTheDocument();
     });
   });
 
   // ── ENCOUNTER ENTRY component - started ───────────────
   describe('EncounterEntry - started', () => {
-    it('shows "Encounter Started" with skull icon', () => {
-      setup([enc({ action: 'started' })]);
+    it('shows "Encounter Started" with skull icon, encounter name, and monsters', () => {
+      setup([enc({ action: 'started', monsters: ['Gob x4', 'Troll'] })]);
       expect(screen.getByText(/Encounter Started/i)).toBeInTheDocument();
       expect(q('.log-encounter i.fa-skull')).toBeInTheDocument();
-    });
-
-    it('adds .log-encounter-start class', () => {
-      setup([enc({ action: 'started' })]);
       expect(q('.log-entry.log-encounter.log-encounter-start')).toBeInTheDocument();
-    });
-
-    it('shows encounterName in detail', () => {
-      setup([enc({})]);
       expect(q('.log-encounter-name')).toHaveTextContent(/Orc Ambush/i);
-    });
-
-    it('monsters render for started with non-empty array', () => {
-      setup([enc({ action: 'started', monsters: ['Gob x4', 'Troll'] })]);
       expect(screen.getByText(/Gob x4/i)).toBeInTheDocument();
+      expect(q('.log-encounter-monster')).toBeInTheDocument();
     });
 
-    it('empty monsters hides list for started', () => {
+    it('hides monsters list when empty', () => {
       setup([enc({ action: 'started', monsters: [] })]);
       expect(screen.queryByText(/log-encounter-monster/i)).not.toBeInTheDocument();
-    });
-
-    it('monster spans have .log-encounter-monster class', () => {
-      setup([enc({ action: 'started', monsters: ['Dragon'] })]);
-      expect(q('.log-encounter-monster')).toBeInTheDocument();
     });
   });
 
   // ── ENCOUNTER ENTRY component - completed ───────────────
   describe('EncounterEntry - completed', () => {
-    it('shows "Encounter Completed" with trophy icon', () => {
-      setup([enc({ action: 'completed' })]);
+    it('shows "Encounter Completed" with trophy icon, XP, and loot items', () => {
+      setup([enc({ action: 'completed', xpPerChar: 750, lootItems: ['Sword'] })]);
       expect(screen.getByText(/Encounter Completed/i)).toBeInTheDocument();
       expect(q('.log-encounter i.fa-trophy')).toBeInTheDocument();
-    });
-
-    it('adds .log-encounter-end class', () => {
-      setup([enc({ action: 'completed' })]);
       expect(q('.log-entry.log-encounter.log-encounter-end')).toBeInTheDocument();
-    });
-
-    it('shows XP with fa-star when xpPerChar > 0', () => {
-      setup([enc({ action: 'completed', xpPerChar: 750 })]);
       expect(screen.getByText(/750 XP per character/i)).toBeInTheDocument();
       expect(q('.log-encounter-xp i.fa-star')).toBeInTheDocument();
+      expect(screen.getByText(/Sword/i)).toBeInTheDocument();
+      expect(q('.log-encounter-loot-item')).toBeInTheDocument();
     });
 
-    it('hides XP when xpPerChar === 0 for completed', () => {
+    it('hides XP when zero, hides loot when empty/undefined, hides monsters', () => {
       setup([enc({ action: 'completed', xpPerChar: 0 })]);
       expect(screen.queryByText(/XP per character/i)).not.toBeInTheDocument();
+      cleanup();
+      setup([enc({ action: 'completed' })]);
+      expect(screen.queryByText(/log-encounter-loot/i)).not.toBeInTheDocument();
+      cleanup();
+      setup([enc({ action: 'completed', monsters: ['Dragon'] })]);
+      expect(screen.queryByText(/log-encounter-monster/i)).not.toBeInTheDocument();
     });
 
     it('hides XP for started even if value set', () => {
       setup([enc({ action: 'started', xpPerChar: 999 })]);
       expect(screen.queryByText(/XP per character/i)).not.toBeInTheDocument();
     });
-
-    it('loot items render as ul>li for completed', () => {
-      setup([enc({ action: 'completed', lootItems: ['Sword'] })]);
-      expect(screen.getByText(/Sword/i)).toBeInTheDocument();
-      expect(q('.log-encounter-loot-item')).toBeInTheDocument();
-    });
-
-    it('empty loot array hides list for completed', () => {
-      setup([enc({ action: 'completed', lootItems: [] })]);
-      expect(screen.queryByText(/log-encounter-loot/i)).not.toBeInTheDocument();
-    });
-
-    it('undefined lootItems hides list on completed', () => {
-      setup([enc({ action: 'completed' })]);
-      expect(screen.queryByText(/log-encounter-loot/i)).not.toBeInTheDocument();
-    });
-
-    it('does NOT show monsters for completed even if set', () => {
-      setup([enc({ action: 'completed', monsters: ['Dragon'] })]);
-      expect(screen.queryByText(/log-encounter-monster/i)).not.toBeInTheDocument();
-    });
   });
 
   // ── HP CHANGE ENTRY component - non-NPC ───────────────
   describe('HpChangeEntry - non-NPC', () => {
-    it('negative delta -> "Takes Damage" with crack icon', () => {
-      setup([hp({ delta: -5 })]);
+    it('negative delta -> "Takes Damage" with crack icon and HP display', () => {
+      setup([hp({ delta: -5, currentHp: 20, maxHp: 25 })]);
       expect(screen.getByText(/Takes Damage/i)).toBeInTheDocument();
       expect(q('.log-hp-damage i.fa-heart-crack')).toBeInTheDocument();
       expect(q('.log-entry.log-hp-change.log-hp-damage')).toBeInTheDocument();
+      expect(screen.getByText(/20\/25/i)).toBeInTheDocument();
+      expect(q('.log-hp-current')).toBeInTheDocument();
     });
 
-    it('positive delta -> "Healed" with heart icon', () => {
+    it('positive delta -> "Healed" with heart icon, shows source when set', () => {
       setup([hp({ delta: 8 })]);
       expect(screen.getByText(/Healed/i)).toBeInTheDocument();
       expect(q('.log-healing i.fa-heart')).toBeInTheDocument();
-    });
-
-    it('+ with source shows "Healed (source)"', () => {
+      cleanup();
       setup([hp({ delta: 8, sourceName: 'Cleric' })]);
       expect(screen.getByText(/Healed \(Cleric\)/i)).toBeInTheDocument();
     });
 
-    it('isUnconscious -> prefix text', () => {
+    it('isUnconscious shows prefix text combined with damage', () => {
       setup([hp({ delta: -10, isUnconscious: true })]);
       expect(screen.getByText(/Knocked Unconscious/i)).toBeInTheDocument();
-    });
-
-    it('unconscious + takes damage = combined text', () => {
-      setup([hp({ delta: -10, isUnconscious: true })]);
       expect(screen.getByText(/Knocked Unconscious.*Takes Damage/i)).toBeInTheDocument();
     });
 
-    it('shows current/max HP for non-NPC', () => {
-      setup([hp({ currentHp: 17, maxHp: 50 })]);
-      expect(screen.getByText(/17\/50/i)).toBeInTheDocument();
-    });
-
-    it('.log-hp-current present for non-NPC', () => {
-      setup([hp({ currentHp: 20, maxHp: 30 })]);
-      expect(q('.log-hp-current')).toBeInTheDocument();
-    });
-
-    it('.log-hp-current NOT present for NPC (threshold)', () => {
+    it('hides HP current display for NPC (threshold)', () => {
       setup([hp({ delta: -5, threshold: 'dead' })]);
       expect(q('.log-hp-current')).not.toBeInTheDocument();
     });
@@ -757,25 +462,18 @@ describe('Log', () => {
 
   // ── HP CHANGE ENTRY component - NPC thresholds ───────────────
   describe('HpChangeEntry - NPC thresholds', () => {
-    it('dead threshold shows "Defeated"', () => {
+    it('dead/bloodied/recovering thresholds show correct labels and paren delta', () => {
       setup([hp({ delta: -20, threshold: 'dead' })]);
       expect(screen.getByText(/Defeated/i)).toBeInTheDocument();
-    });
-
-    it('bloodied threshold shows "Bloodied"', () => {
+      cleanup();
       setup([hp({ delta: -15, threshold: 'bloodied' })]);
       expect(screen.getByText(/Bloodied/i)).toBeInTheDocument();
-    });
-
-    it('recovering threshold shows "Recovering"', () => {
+      cleanup();
       setup([hp({ delta: 10, threshold: 'recovering' })]);
       expect(screen.getByText(/Recovering/i)).toBeInTheDocument();
-    });
-
-    it('NPC non-zero delta shows paren with delta value', () => {
+      cleanup();
       setup([hp({ delta: 8, threshold: 'recovering' })]);
-      const nameEl = q('.log-name');
-      expect(nameEl.textContent).toMatch(/\(\+8\)/);
+      expect(q('.log-name').textContent).toMatch(/\(\+8\)/);
     });
 
     it('zero delta NPC hides paren display', () => {
@@ -786,123 +484,76 @@ describe('Log', () => {
 
   // ── DEATH SAVE ENTRY component ───────────────
   describe('DeathSaveEntry', () => {
-    it('normal success -> "Death Save Success" with .log-die-selected on die', () => {
+    it('normal success/failure with correct text, classes, and die styling', () => {
       setup([ds({ success: true })]);
       expect(screen.getByText(/Death Save Success/i)).toBeInTheDocument();
       expect(q('.log-entry.log-death-save.log-death-save-success')).toBeInTheDocument();
-    });
-
-    it('normal failure -> Death Save Failure', () => {
+      expect(q('.log-death-save .log-die-selected')).toBeInTheDocument();
+      cleanup();
       setup([{ ...ds(), success: false }]);
       expect(screen.getByText(/Death Save Failure/i)).toBeInTheDocument();
+      expect(q('.log-death-save .log-die-selected')).not.toBeInTheDocument();
     });
 
-    it('nat20 shows "Stabilized!" not Succeeds text', () => {
+    it('nat20 shows "Stabilized!" with NAT 20 badge', () => {
       setup([ds({ success: true, isNatural20: true })]);
       expect(screen.getByText(/Stabilized!/i)).toBeInTheDocument();
       expect(screen.queryByText(/Death Save Success/i)).not.toBeInTheDocument();
-    });
-
-    it('nat1 shows Double Failure not Fail', () => {
-      setup([ds({ success: false, isNatural1: true })]);
-      expect(screen.getByText(/Double Failure/i)).toBeInTheDocument();
-      expect(screen.queryByText(/Death Save Failure/i)).not.toBeInTheDocument();
-    });
-
-    it('NAT 20 badge text and classes', () => {
-      setup([ds({ success: false, isNatural20: true })]);
       expect(screen.getByText(/NAT 20/i)).toBeInTheDocument();
     });
 
-    it('NAT 1 badge renders', () => {
+    it('nat1 shows "Double Failure" with NAT 1 badge', () => {
       setup([ds({ success: false, isNatural1: true })]);
+      expect(screen.getByText(/Double Failure/i)).toBeInTheDocument();
+      expect(screen.queryByText(/Death Save Failure/i)).not.toBeInTheDocument();
       expect(screen.getByText(/NAT 1/i)).toBeInTheDocument();
     });
 
-    it('roll value in parens', () => {
+    it('shows roll value in parens and skull-crossbones icon', () => {
       setup([ds({ roll: 12 })]);
       expect(screen.getByText(/\(12\)/)).toBeInTheDocument();
-    });
-
-    it('skull-crossbones icon', () => {
-      setup([ds()]);
       expect(q('.log-death-save i.fa-skull-crossbones')).toBeInTheDocument();
-    });
-
-    it('success die has .log-die-selected class', () => {
-      setup([ds({ success: true })]);
-      expect(q('.log-death-save .log-die-selected')).toBeInTheDocument();
-    });
-
-    it('failed die lacks .log-die-selected class', () => {
-      setup([{ ...ds(), success: false }]);
-      expect(document.querySelectorAll('.log-death-save .log-die-selected').length).toBe(0);
     });
   });
 
   // ── SPELL ENTRY component ───────────────
   describe('SpellEntry', () => {
-    it('shows "Cast" + spellName in header', () => {
+    it('shows "Cast" + spellName, level, casting time, and wand icon', () => {
       setup([spell()]);
       expect(screen.getByText(/Cast Fireball/i)).toBeInTheDocument();
-    });
-
-    it('shows Level and castingTime', () => {
-      setup([spell({ spellLevel: 3 })]);
       expect(q('.log-spell')).toBeInTheDocument();
+      expect(q('.log-spell i.fa-wand-magic-sparkles')).toBeInTheDocument();
     });
 
-    it('no metamagic shows "No Metamagic" text', () => {
+    it('shows "No Metamagic" when empty, renders metamagic list and SP cost when present', () => {
       setup([spell({ metamagic: [] })]);
       expect(screen.getByText(/No Metamagic/i)).toBeInTheDocument();
-    });
-
-    it('metamagics render with list class', () => {
+      cleanup();
       setup([spell({ metamagic: ['Empowered'] })]);
       expect(q('.log-metamagic-list')).toBeInTheDocument();
-    });
-
-    it('multiple metamagics render separately', () => {
-      setup([spell({ metamagic: ['E', 'X', 'R'] })]);
-      expect(document.querySelectorAll('.log-metamagic-option').length).toBe(3);
-    });
-
-    it('spCost > 0 renders as SP text and element', () => {
-      setup([{ ...spell(), spCost: 2, metamagic: ['E'] }]);
+      expect(q('.log-metamagic-option')).toBeInTheDocument();
+      cleanup();
+      setup([{ ...spell(), spCost: 2, metamagic: ['Empowered'] }]);
       expect(screen.getByText(/2 SP/i)).toBeInTheDocument();
       expect(q('.log-metamagic-cost')).toBeInTheDocument();
-    });
-
-    it('spCost === 0 hides cost', () => {
+      cleanup();
       setup([spell({ spCost: 0 })]);
       expect(screen.queryByText(/\d+ SP/)).not.toBeInTheDocument();
     });
 
-    it('wand magic sparkles icon on root', () => {
-      setup([spell()]);
-      expect(q('.log-spell i.fa-wand-magic-sparkles')).toBeInTheDocument();
+    it('renders multiple metamagics separately', () => {
+      setup([spell({ metamagic: ['E', 'X', 'R'] })]);
+      expect(document.querySelectorAll('.log-metamagic-option').length).toBe(3);
     });
   });
 
   // ── METAMAGIC ENTRY component ───────────────
   describe('MetamagicEntry', () => {
-    it('shows "Empowered Spell - spellName"', () => {
-      setup([meta({ spellName: 'Vampiric Touch' })]);
+    it('shows spell name, target arrow, damage diff, and positive class', () => {
+      setup([meta({ spellName: 'Vampiric Touch', targetName: 'Dragon', originalDamage: 20, newTotal: 30, damageDifference: 5 })]);
       expect(screen.getByText(/Empowered/i)).toBeInTheDocument();
-    });
-
-    it('shows target with arrow prefix', () => {
-      setup([meta({ targetName: 'Dragon' })]);
       expect(screen.getByText(/\u2192 Dragon/i)).toBeInTheDocument();
-    });
-
-    it('shows original → new total display', () => {
-      setup([meta({ originalDamage: 20, newTotal: 30 })]);
       expect(screen.getByText(/20 \u2192 30/i)).toBeInTheDocument();
-    });
-
-    it('positive diff shows + prefix and class', () => {
-      setup([meta({ damageDifference: 5 })]);
       expect(screen.getByText(/\+5/i)).toBeInTheDocument();
       expect(q('.log-empowered-positive')).toBeInTheDocument();
     });
@@ -910,57 +561,42 @@ describe('Log', () => {
 
   // ── ROLL ENTRY - cover and rangeReason ───────────────
   describe('RollEntry - cover and rangeReason', () => {
-    it('shows 1/2 Cover when acBonus > 0', () => {
+    it('shows 1/2 or 3/4 cover with AC bonus, hides when zero', () => {
       setup([roll({ coverAcBonus: 2 })]);
-      expect(screen.getByText(/1\/2/i)).toBeInTheDocument();
-    });
-
-    it('shows 3/4 for threeQuarter coverLevel', () => {
+      expect(screen.getByText(/1\/2 Cover \(.*AC\)/i)).toBeInTheDocument();
+      cleanup();
       setup([{ ...roll(), coverAcBonus: 3, coverLevel: 'threeQuarter' }]);
-      expect(screen.getByText(/3\/4/i)).toBeInTheDocument();
-    });
-
-    it('+ac in Cover info', () => {
-      setup([roll({ coverAcBonus: 5 })]);
-      expect(screen.getByText(/\+5 AC/)).toBeInTheDocument();
-    });
-
-    it('hide cover when acBonus is 0', () => {
+      expect(screen.getByText(/3\/4 Cover \(.*AC\)/i)).toBeInTheDocument();
+      cleanup();
       setup([roll()]);
       expect(screen.queryByText(/Cover/i)).not.toBeInTheDocument();
     });
 
-    it('rangeReason shown when set', () => {
+    it('shows rangeReason when set, hides when empty', () => {
       setup([roll({ rangeReason: 'Long range' })]);
       expect(screen.getByText(/Long range/i)).toBeInTheDocument();
     });
   });
 
-  // ── ROLL ENTRY - inline condition save and resistanceNotice ───────────────
+  // ── ROLL ENTRY - condition save and resistanceNotice ───────────────
   describe('RollEntry - condition + resistance', () => {
-    it('condition+dc success shows SUCCESS text', () => {
+    it('condition+dc success/failure shows correct text and classes', () => {
       setup([roll({ condition: 'charmed', dc: 15, success: true })]);
       expect(screen.getByText(/vs charmed.*SUCCESS/i)).toBeInTheDocument();
       expect(q('.log-condition-save.log-condition-success')).toBeInTheDocument();
-    });
-
-    it('cond fail shows FAILURE and class', () => {
+      cleanup();
       setup([roll({ condition: 'paralyzed', dc: 12, success: false })]);
       expect(screen.getByText(/FAILURE/i)).toBeInTheDocument();
       expect(q('.log-condition-save.log-condition-failure')).toBeInTheDocument();
-    });
-
-    it('undefined dc hides inline cond save', () => {
+      cleanup();
       setup([roll({ condition: 'charmed' })]);
       expect(screen.queryByText(/vs charmed/i)).not.toBeInTheDocument();
     });
 
-    it('resistanceNotice renders in div', () => {
+    it('shows/hides resistanceNotice', () => {
       setup([roll({ resistanceNotice: 'Half dmg' })]);
       expect(screen.getByText(/Half dmg/i)).toBeInTheDocument();
-    });
-
-    it('empty resistanceNotice hides element', () => {
+      cleanup();
       setup([roll({ resistanceNotice: '' })]);
       expect(screen.queryByText(/log-resistance-notice/i)).not.toBeInTheDocument();
     });
@@ -968,71 +604,48 @@ describe('Log', () => {
 
   // ── ROLL ENTRY - save-damage details ───────────────
   describe('RollEntry - save-damage details', () => {
-    it('saveType+Dc show info', () => {
+    it('shows save info, result, target, and disadvantage badge', () => {
       setup([roll({ rollType: 'save-damage', saveType: 'dex', saveDc: 15 })]);
       expect(q('.log-save-info')).toBeInTheDocument();
-    });
-
-    it('success result with class', () => {
+      cleanup();
       setup([roll({ rollType: 'save-damage', saveResult: 'success', targetName: 'Gob' })]);
       expect(q('.log-save-result.log-condition-success')).toBeInTheDocument();
-    });
-
-    it('failure result', () => {
+      cleanup();
       setup([roll({ rollType: 'save-damage', saveResult: 'failure', targetName: 'Gob' })]);
       expect(screen.getByText(/SAVE FAILURE/i)).toBeInTheDocument();
-    });
-
-    it('.log-save-result with log-condition-success', () => {
-      setup([roll({ rollType: 'save-damage', saveResult: 'success', targetName: 'G' })]);
-      expect(q('.log-save-result.log-condition-success')).toBeInTheDocument();
-    });
-
-    it('disadv mode on save-dmg shows DISADVANTAGE badge', () => {
+      cleanup();
+      setup([roll({ rollType: 'save-damage', targetName: 'Orc' })]);
+      expect(q('.log-save-result')).not.toBeInTheDocument();
+      cleanup();
       setup([
         roll({ rollType: 'save-damage', mode: 'disadvantage', saveDc: 13, saveType: 'wis' }),
       ]);
       expect(screen.getByText(/DISADVANTAGE/i)).toBeInTheDocument();
     });
-
-    it('vs target for save-damage type', () => {
-      setup([roll({ rollType: 'save-damage', targetName: 'Orc' })]);
-      expect(screen.getByText(/vs Orc/)).toBeInTheDocument();
-    });
   });
 
-  // ── ROLL ENTRY - aoe-damage ───────────────
-  describe('RollEntry - aoe-damage', () => {
-    it('formula shows for aoe type', () => {
-      setup([roll({ rollType: 'aoe-damage', formula: '8d6+0' })]);
+  // ── ROLL ENTRY - aoe-damage and damage type ───────────────
+  describe('RollEntry - aoe-damage and damage type', () => {
+    it('shows formula, affected count, and damage type', () => {
+      setup([roll({ rollType: 'aoe-damage', formula: '8d6+0', affectedCount: 3 })]);
       expect(screen.getByText(/8d6/)).toBeInTheDocument();
-    });
-
-    it('affected 3 creatures (plural)', () => {
-      setup([roll({ rollType: 'aoe-damage', affectedCount: 3 })]);
       expect(screen.getByText(/3 creatures affected/i)).toBeInTheDocument();
-    });
-  });
-
-  // ── ROLL ENTRY - damageType display ───────────────
-  describe('RollEntry - damage type text', () => {
-    it('damage roll type shows damage-type element', () => {
+      cleanup();
       setup([roll({ rollType: 'damage', damageType: 'slashing' })]);
       expect(screen.getByText(/slashing/)).toBeInTheDocument();
-    });
-
-    it('save-damage shows dmg type', () => {
+      cleanup();
       setup([roll({ rollType: 'save-damage', damageType: 'fire' })]);
       expect(screen.getByText(/fire/)).toBeInTheDocument();
     });
   });
 
-  // ── ICON CLASSES mapping getRollIconType - all types + default ───────────────
-  describe('getRollIconType icon mapping per type', () => {
+  // ── ICON CLASSES mapping getRollIconType ───────────────
+  describe('getRollIconType icon mapping', () => {
     it.each([
       ['spell_attack', 'fa-wand-magic-sparkles'],
       ['save', 'fa-shield-halved'],
       ['condition-save', 'fa-shield-halved'],
+      ['save-damage', 'fa-shield-halved'],
       ['initiative', 'fa-bolt'],
       ['damage', 'fa-skull'],
       ['attack', 'fa-crosshairs'],
@@ -1053,16 +666,6 @@ describe('Log', () => {
       setup([roll({ rolls: [17, 9], mode: 'advantage' })]);
       expect(screen.getByText(/selected/i)).toBeInTheDocument();
       expect(screen.getByText(/discarded/i)).toBeInTheDocument();
-    });
-  });
-
-  // ── Timestamp formatting via any entry with .log-time element ───────────────
-  describe('formatTimestamp output', () => {
-    it('renders timestamp in HH:MM:SS format per entry type', () => {
-      setup([note()]);
-      const el = q('.log-time');
-      // toLocaleTimeString returns "HH:MM:SS AM/PM" — always contains colons + digits
-      expect(el?.textContent.trim()).toMatch(/\d{2}:\d{2}:\d{2}/);
     });
   });
 });

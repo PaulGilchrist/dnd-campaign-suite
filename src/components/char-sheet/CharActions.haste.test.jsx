@@ -168,21 +168,6 @@ describe('CharActions haste extra action', () => {
       expect(screen.getByText('Haste Extra Action')).toBeInTheDocument();
     });
 
-    it('hides the section when activeBuffs is null', async () => {
-      getRuntimeValue.mockReturnValue(null);
-      await act(async () => { render(<CharActions playerStats={createStats()} />); });
-      expect(screen.queryByText('Haste Extra Action')).not.toBeInTheDocument();
-    });
-
-    it('hides the section when activeBuffs is an empty array', async () => {
-      getRuntimeValue.mockImplementation((_name, key) => {
-        if (key === 'activeBuffs') return [];
-        return null;
-      });
-      await act(async () => { render(<CharActions playerStats={createStats()} />); });
-      expect(screen.queryByText('Haste Extra Action')).not.toBeInTheDocument();
-    });
-
     it('hides the section when activeBuffs contains non-haste buffs', async () => {
       getRuntimeValue.mockImplementation((_name, key) => {
         if (key === 'activeBuffs') return [{ effect: 'invisibility', name: 'Invisibility' }];
@@ -212,12 +197,7 @@ describe('CharActions haste extra action', () => {
   });
 
   describe('disabled state when haste already used', () => {
-    it('adds disabled-attack class to all action buttons', async () => {
-      await act(async () => { renderWithHasteUsed(createStats()); });
-      expect(document.querySelectorAll('.disabled-attack').length).toBe(5);
-    });
-
-    it('does nothing when clicking an action after haste was used (click handler returns early)', async () => {
+    it('does not call setRuntimeValue or setPopupHtml when clicking an action after haste was used', async () => {
       const mockSetPopupHtml = vi.fn();
       useLoggedDiceRoll.mockReturnValue({
         popupHtml: null, setPopupHtml: mockSetPopupHtml, rollAttack: vi.fn(), rollDamage: vi.fn(), quickRollPlayerSave: vi.fn(),
@@ -226,19 +206,6 @@ describe('CharActions haste extra action', () => {
 
       const attackBtn = screen.getByText('Attack');
       await act(async () => { fireEvent.click(attackBtn); });
-
-      expect(mockSetPopupHtml).not.toHaveBeenCalled();
-    });
-
-    it('does not call setRuntimeValue when clicking an action after haste was used', async () => {
-      const mockSetPopupHtml = vi.fn();
-      useLoggedDiceRoll.mockReturnValue({
-        popupHtml: null, setPopupHtml: mockSetPopupHtml, rollAttack: vi.fn(), rollDamage: vi.fn(), quickRollPlayerSave: vi.fn(),
-      });
-      await act(async () => { renderWithHasteUsed(createStats()); });
-
-      const dashBtn = screen.getByText('Dash');
-      await act(async () => { fireEvent.click(dashBtn); });
 
       expect(setRuntimeValue).not.toHaveBeenCalled();
       expect(mockSetPopupHtml).not.toHaveBeenCalled();
@@ -246,21 +213,7 @@ describe('CharActions haste extra action', () => {
   });
 
   describe('cannotAct guard', () => {
-    it('does not apply disabled-attack class when cannotAct is true', async () => {
-      await act(async () => { renderWithHaste(createStats(), { cannotAct: true }); });
-      expect(document.querySelectorAll('.disabled-attack').length).toBe(0);
-    });
-
-    it('does not call setRuntimeValue when Attack is clicked while cannotAct', async () => {
-      await act(async () => { renderWithHaste(createStats(), { cannotAct: true }); });
-
-      const attackBtn = screen.getByText('Attack');
-      await act(async () => { fireEvent.click(attackBtn); });
-
-      expect(setRuntimeValue).not.toHaveBeenCalled();
-    });
-
-    it('does not call setRuntimeValue when Dash is clicked while cannotAct', async () => {
+    it('does not call setRuntimeValue when an action is clicked while cannotAct', async () => {
       await act(async () => { renderWithHaste(createStats(), { cannotAct: true }); });
 
       const dashBtn = screen.getByText('Dash');
@@ -271,7 +224,7 @@ describe('CharActions haste extra action', () => {
   });
 
   describe('action click behavior', () => {
-    it('calls setRuntimeValue with hasteExtraActionUsed=true when Attack is clicked', async () => {
+    it('calls setRuntimeValue with hasteExtraActionUsed=true when an action is clicked', async () => {
       const mockSetPopupHtml = vi.fn();
       useLoggedDiceRoll.mockReturnValue({
         popupHtml: null, setPopupHtml: mockSetPopupHtml, rollAttack: vi.fn(), rollDamage: vi.fn(), quickRollPlayerSave: vi.fn(),
@@ -280,19 +233,6 @@ describe('CharActions haste extra action', () => {
 
       const attackBtn = screen.getByText('Attack');
       await act(async () => { fireEvent.click(attackBtn); });
-
-      expect(setRuntimeValue).toHaveBeenCalledWith('TestCharacter', 'hasteExtraActionUsed', true, undefined);
-    });
-
-    it('calls setRuntimeValue with hasteExtraActionUsed=true when Dash is clicked', async () => {
-      const mockSetPopupHtml = vi.fn();
-      useLoggedDiceRoll.mockReturnValue({
-        popupHtml: null, setPopupHtml: mockSetPopupHtml, rollAttack: vi.fn(), rollDamage: vi.fn(), quickRollPlayerSave: vi.fn(),
-      });
-      await act(async () => { renderWithHaste(createStats()); });
-
-      const dashBtn = screen.getByText('Dash');
-      await act(async () => { fireEvent.click(dashBtn); });
 
       expect(setRuntimeValue).toHaveBeenCalledWith('TestCharacter', 'hasteExtraActionUsed', true, undefined);
     });

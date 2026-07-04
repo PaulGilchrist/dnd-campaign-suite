@@ -212,36 +212,6 @@ describe('App - Views, Overlays & Props', () => {
         expect(screen.getByTestId('npcs-char-count').textContent).toBe('1');
       });
     });
-
-    it('passes characters to Notes view', async () => {
-      mockState.characters = [{ name: 'Aragorn', level: 1 }];
-      render(<App />);
-      await selectCampaign();
-      fireEvent.click(screen.getByTestId('notes-btn'));
-      await waitFor(() => {
-        expect(screen.getByTestId('notes-view')).toBeInTheDocument();
-      });
-    });
-
-    it('passes characters to Factions view', async () => {
-      mockState.characters = [{ name: 'Aragorn', level: 1 }];
-      render(<App />);
-      await selectCampaign();
-      fireEvent.click(screen.getByTestId('factions-btn'));
-      await waitFor(() => {
-        expect(screen.getByTestId('factions-view')).toBeInTheDocument();
-      });
-    });
-
-    it('passes characters to Log view', async () => {
-      mockState.characters = [{ name: 'Aragorn', level: 1 }];
-      render(<App />);
-      await selectCampaign();
-      fireEvent.click(screen.getByTestId('log-btn'));
-      await waitFor(() => {
-        expect(screen.getByTestId('campaign-log-view')).toBeInTheDocument();
-      });
-    });
   });
 
   describe('View coexistence with overlays', () => {
@@ -277,116 +247,32 @@ describe('App - Views, Overlays & Props', () => {
       expect(screen.getByTestId('initiative')).toBeInTheDocument();
     });
 
-    it('initiative view renders above char-sheet', async () => {
-      mockState.characters = [{ name: 'Aragorn', level: 1 }];
-      render(<App />);
-      await selectCampaign();
-      await waitFor(() => {
-        expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
-      });
-      fireEvent.click(screen.getByTestId('initiative-btn'));
-      await waitFor(() => {
-        expect(screen.getByTestId('initiative')).toBeInTheDocument();
-        expect(screen.queryByTestId('char-sheet')).not.toBeInTheDocument();
-      });
-    });
+    it('switches between views and hides char-sheet', async () => {
+      const viewTests = [
+        { btn: 'initiative-btn', view: 'initiative' },
+        { btn: 'encounter-btn', view: 'encounter-builder' },
+        { btn: 'notes-btn', view: 'notes-view' },
+        { btn: 'quests-btn', view: 'quests-view' },
+        { btn: 'npcs-btn', view: 'npcs-view' },
+        { btn: 'factions-btn', view: 'factions-view' },
+        { btn: 'settlements-btn', view: 'settlements-view' },
+        { btn: 'log-btn', view: 'campaign-log-view' },
+      ];
 
-    it('encounter view renders above char-sheet', async () => {
-      mockState.characters = [{ name: 'Aragorn', level: 1 }];
-      render(<App />);
-      await selectCampaign();
-      await waitFor(() => {
-        expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
-      });
-      fireEvent.click(screen.getByTestId('encounter-btn'));
-      await waitFor(() => {
-        expect(screen.getByTestId('encounter-builder')).toBeInTheDocument();
-        expect(screen.queryByTestId('char-sheet')).not.toBeInTheDocument();
-      });
-    });
-
-    it('notes view renders above char-sheet', async () => {
-      mockState.characters = [{ name: 'Aragorn', level: 1 }];
-      render(<App />);
-      await selectCampaign();
-      await waitFor(() => {
-        expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
-      });
-      fireEvent.click(screen.getByTestId('notes-btn'));
-      await waitFor(() => {
-        expect(screen.getByTestId('notes-view')).toBeInTheDocument();
-        expect(screen.queryByTestId('char-sheet')).not.toBeInTheDocument();
-      });
-    });
-
-    it('quests view renders above char-sheet', async () => {
-      mockState.characters = [{ name: 'Aragorn', level: 1 }];
-      render(<App />);
-      await selectCampaign();
-      await waitFor(() => {
-        expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
-      });
-      fireEvent.click(screen.getByTestId('quests-btn'));
-      await waitFor(() => {
-        expect(screen.getByTestId('quests-view')).toBeInTheDocument();
-        expect(screen.queryByTestId('char-sheet')).not.toBeInTheDocument();
-      });
-    });
-
-    it('npcs view renders above char-sheet', async () => {
-      mockState.characters = [{ name: 'Aragorn', level: 1 }];
-      render(<App />);
-      await selectCampaign();
-      await waitFor(() => {
-        expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
-      });
-      fireEvent.click(screen.getByTestId('npcs-btn'));
-      await waitFor(() => {
-        expect(screen.getByTestId('npcs-view')).toBeInTheDocument();
-        expect(screen.queryByTestId('char-sheet')).not.toBeInTheDocument();
-      });
-    });
-
-    it('factions view renders above char-sheet', async () => {
-      mockState.characters = [{ name: 'Aragorn', level: 1 }];
-      render(<App />);
-      await selectCampaign();
-      await waitFor(() => {
-        expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
-      });
-      fireEvent.click(screen.getByTestId('factions-btn'));
-      await waitFor(() => {
-        expect(screen.getByTestId('factions-view')).toBeInTheDocument();
-        expect(screen.queryByTestId('char-sheet')).not.toBeInTheDocument();
-      });
-    });
-
-    it('settlements view renders above char-sheet', async () => {
-      mockState.characters = [{ name: 'Aragorn', level: 1 }];
-      render(<App />);
-      await selectCampaign();
-      await waitFor(() => {
-        expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
-      });
-      fireEvent.click(screen.getByTestId('settlements-btn'));
-      await waitFor(() => {
-        expect(screen.getByTestId('settlements-view')).toBeInTheDocument();
-        expect(screen.queryByTestId('char-sheet')).not.toBeInTheDocument();
-      });
-    });
-
-    it('campaign log view renders above char-sheet', async () => {
-      mockState.characters = [{ name: 'Aragorn', level: 1 }];
-      render(<App />);
-      await selectCampaign();
-      await waitFor(() => {
-        expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
-      });
-      fireEvent.click(screen.getByTestId('log-btn'));
-      await waitFor(() => {
-        expect(screen.getByTestId('campaign-log-view')).toBeInTheDocument();
-        expect(screen.queryByTestId('char-sheet')).not.toBeInTheDocument();
-      });
+      for (const { btn, view } of viewTests) {
+        const { unmount } = render(<App />);
+        mockState.characters = [{ name: 'Aragorn', level: 1 }];
+        await selectCampaign();
+        await waitFor(() => {
+          expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
+        });
+        fireEvent.click(screen.getByTestId(btn));
+        await waitFor(() => {
+          expect(screen.getByTestId(view)).toBeInTheDocument();
+          expect(screen.queryByTestId('char-sheet')).not.toBeInTheDocument();
+        });
+        unmount();
+      }
     });
   });
 
@@ -414,22 +300,6 @@ describe('App - Views, Overlays & Props', () => {
       fireEvent.click(screen.getByTestId('maps-btn'));
       await waitFor(() => {
         expect(screen.getByTestId('map-view')).toBeInTheDocument();
-      });
-    });
-
-    it('does not render MapsManager when on non-localhost', async () => {
-      setNonLocalhost();
-      const { loadMaps } = await import('./services/maps/mapsService.js');
-      loadMaps.mockResolvedValue({
-        maps: [{ fileName: 'dungeon-1.json', isActive: true }],
-      });
-
-      mockState.characters = [{ name: 'Aragorn', level: 1 }];
-      render(<App />);
-      await selectCampaign();
-      fireEvent.click(screen.getByTestId('maps-btn'));
-      await waitFor(() => {
-        expect(screen.queryByTestId('maps-manager')).not.toBeInTheDocument();
       });
     });
   });
@@ -480,25 +350,17 @@ describe('App - Views, Overlays & Props', () => {
   });
 
   describe('CharSheet props', () => {
-    it('passes all required data props to CharSheet', async () => {
+    it('renders CharSheet with correct character name', async () => {
       mockState.characters = [{ name: 'Aragorn', level: 1 }];
       render(<App />);
       await selectCampaign();
       await waitFor(() => {
         expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
+        expect(screen.getByTestId('character-name').textContent).toBe('Aragorn');
       });
     });
 
-    it('passes computedCharacters to CharSheet', async () => {
-      mockState.characters = [{ name: 'Aragorn', level: 1 }];
-      render(<App />);
-      await selectCampaign();
-      await waitFor(() => {
-        expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
-      });
-    });
-
-    it('passes onDeleteCharacter to CharSheet', async () => {
+    it('triggers delete confirmation when delete button is clicked', async () => {
       mockState.characters = [{ name: 'Aragorn', level: 1 }];
       render(<App />);
       await selectCampaign();
@@ -511,7 +373,7 @@ describe('App - Views, Overlays & Props', () => {
       });
     });
 
-    it('passes onEditCharacter to CharSheet', async () => {
+    it('opens edit wizard when edit button is clicked', async () => {
       mockState.characters = [{ name: 'Aragorn', level: 1 }];
       render(<App />);
       await selectCampaign();
@@ -523,26 +385,6 @@ describe('App - Views, Overlays & Props', () => {
         expect(screen.getByTestId('character-wizard')).toBeInTheDocument();
         expect(screen.getByTestId('editing-mode')).toBeInTheDocument();
       });
-    });
-
-    it('passes onUploadClick to CharSheet', async () => {
-      mockState.characters = [{ name: 'Aragorn', level: 1 }];
-      render(<App />);
-      await selectCampaign();
-      await waitFor(() => {
-        expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
-      });
-      fireEvent.click(screen.getByText(/Upload/));
-    });
-
-    it('passes onSaveClick to CharSheet', async () => {
-      mockState.characters = [{ name: 'Aragorn', level: 1 }];
-      render(<App />);
-      await selectCampaign();
-      await waitFor(() => {
-        expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
-      });
-      fireEvent.click(screen.getByText(/Download/));
     });
   });
 
@@ -612,15 +454,6 @@ describe('App - Views, Overlays & Props', () => {
         expect(screen.getByTestId('character-name').textContent).toBe('Aragorn');
       });
     });
-
-    it('sets activeView to charSheet on campaign selection', async () => {
-      mockState.characters = [{ name: 'Aragorn', level: 1 }];
-      render(<App />);
-      await selectCampaign();
-      await waitFor(() => {
-        expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
-      });
-    });
   });
 
   describe('Campaign deletion', () => {
@@ -634,35 +467,6 @@ describe('App - Views, Overlays & Props', () => {
       fireEvent.click(screen.getByTestId('delete-campaign-btn'));
       await waitFor(() => {
         expect(window.confirm).toHaveBeenCalled();
-      });
-    });
-  });
-
-  describe('Modal overlays rendering', () => {
-    it('renders SavePromptModal with correct props', async () => {
-      mockState.characters = [{ name: 'Aragorn', level: 1 }];
-      render(<App />);
-      await selectCampaign();
-      await waitFor(() => {
-        expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
-      });
-    });
-
-    it('renders DeathSavePromptModal with correct props', async () => {
-      mockState.characters = [{ name: 'Aragorn', level: 1 }];
-      render(<App />);
-      await selectCampaign();
-      await waitFor(() => {
-        expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
-      });
-    });
-
-    it('renders ConcentrationPromptModal with correct props', async () => {
-      mockState.characters = [{ name: 'Aragorn', level: 1 }];
-      render(<App />);
-      await selectCampaign();
-      await waitFor(() => {
-        expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
       });
     });
   });

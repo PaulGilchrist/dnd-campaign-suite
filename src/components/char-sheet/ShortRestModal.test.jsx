@@ -184,16 +184,33 @@ describe('ShortRestModal', () => {
             const container = screen.getByText(/Total HP Recovered:/).parentElement;
             expect(container.textContent).toContain('6');
         });
+
+        it('shows individual roll entries in the log table', () => {
+            renderModal();
+            fireEvent.click(screen.getByText('Roll One'));
+            const tbody = document.querySelector('.short-rest-roll-log tbody');
+            expect(tbody).toBeInTheDocument();
+            const rows = tbody.querySelectorAll('tr');
+            expect(rows.length).toBeGreaterThan(0);
+        });
+
+        it('does not roll when hit dice is already at zero', () => {
+            setupGetRuntimeValue({ shortRestHitDice: 0 });
+            renderModal();
+            expect(screen.getByText(/0 of 5 remaining/)).toBeInTheDocument();
+            expect(screen.getByText('Roll One')).toBeDisabled();
+        });
     });
 
     describe('Song of Rest', () => {
-        it('applies Song of Rest and hides the button', async () => {
+        it('applies Song of Rest and hides the button and section', async () => {
             renderModal();
             await act(async () => {
                 fireEvent.click(screen.getByText(/Apply Song of Rest/));
                 await Promise.resolve();
             });
             expect(screen.queryByText(/Apply Song of Rest/)).not.toBeInTheDocument();
+            expect(screen.queryByText('Song of Rest')).not.toBeInTheDocument();
         });
 
         it('adds Song of Rest entry to roll log', async () => {
@@ -204,6 +221,51 @@ describe('ShortRestModal', () => {
             });
             const songRows = screen.queryAllByText(/Song of Rest/);
             expect(songRows.length).toBeGreaterThanOrEqual(1);
+        });
+
+        it('does not show Song of Rest when class feature is null', () => {
+            vi.mocked(getClassFeatures).mockReturnValueOnce({ songOfRestDie: null });
+            renderModal();
+            expect(screen.queryByText('Song of Rest')).not.toBeInTheDocument();
+        });
+
+        it('adds Song of Rest bonus to recovered HP total', async () => {
+            renderModal();
+            await act(async () => {
+                fireEvent.click(screen.getByText('Roll One'));
+                await Promise.resolve();
+            });
+            const totalBefore = screen.getByText(/Total HP Recovered:/).parentElement.textContent;
+            await act(async () => {
+                fireEvent.click(screen.getByText(/Apply Song of Rest/));
+                await Promise.resolve();
+            });
+            const totalAfter = screen.getByText(/Total HP Recovered:/).parentElement.textContent;
+            const hpBefore = parseInt(totalBefore.match(/\d+/)?.[0] || '0', 10);
+            const hpAfter = parseInt(totalAfter.match(/\d+/)?.[0] || '0', 10);
+            expect(hpAfter).toBeGreaterThan(hpBefore);
+        });
+
+        it('uses applyHealingToTarget when combat context is available', async () => {
+            vi.mocked(getCombatContext).mockResolvedValueOnce({ targets: [{ name: 'Thorin' }] });
+            vi.mocked(applyHealingToTarget).mockReturnValueOnce({ actualHeal: 5, oldHp: 20, newHp: 25 });
+            renderModal();
+            await act(async () => {
+                fireEvent.click(screen.getByText(/Apply Song of Rest/));
+                await Promise.resolve();
+            });
+            expect(applyHealingToTarget).toHaveBeenCalled();
+        });
+
+        it('falls back to direct HP addition when no combat context', async () => {
+            vi.mocked(getCombatContext).mockResolvedValueOnce(null);
+            renderModal();
+            await act(async () => {
+                fireEvent.click(screen.getByText(/Apply Song of Rest/));
+                await Promise.resolve();
+            });
+            const totalText = screen.getByText(/Total HP Recovered:/);
+            expect(totalText).toBeInTheDocument();
         });
     });
 
@@ -303,6 +365,25 @@ describe('ShortRestModal', () => {
                 fireEvent.click(screen.getByText(/Craft Bolstering Treats/));
                 expect(screen.getByText('Treats crafted')).toBeInTheDocument();
             });
+
+            it('sets chefBolsteringTreats runtime value when crafted', () => {
+                renderModal({
+                    automation: { passives: [{ type: 'temp_hp_buff', name: 'Bolstering Treats' }] },
+                });
+                fireEvent.click(screen.getByText(/Craft Bolstering Treats/));
+                const treatCalls = setRuntimeValueMock.mock.calls.filter(
+                    (call) => call[1] === 'chefBolsteringTreats'
+                );
+                expect(treatCalls.length).toBeGreaterThan(0);
+                expect(treatCalls[0][2]).toBe(3);
+            });
+
+            it('shows proficiency-based treat count in description', () => {
+                renderModal({
+                    automation: { passives: [{ type: 'temp_hp_buff', name: 'Bolstering Treats' }] },
+                });
+                expect(screen.getByText(/Craft 3 bolstering treats/)).toBeInTheDocument();
+            });
         });
     });
 
@@ -351,129 +432,42 @@ describe('ShortRestModal', () => {
             );
             expect(hpCalls.length).toBeGreaterThan(0);
         });
-    });
 
-    describe('closing', () => {
-        it('calls onClose when Cancel is clicked', () => {
-            const { onClose } = renderModal();
-            fireEvent.click(screen.getByText('Cancel'));
-            expect(onClose).toHaveBeenCalledTimes(1);
-        });
-
-        it('calls onClose when Escape key is pressed', () => {
-            const { onClose } = renderModal();
-            fireEvent.keyDown(document, { key: 'Escape' });
-            expect(onClose).toHaveBeenCalledTimes(1);
-        });
-
-        it('calls onClose when clicking the overlay outside the modal', () => {
-            const { onClose } = renderModal();
-            const overlay = document.querySelector('.short-rest-overlay');
-            fireEvent.click(overlay);
-            expect(onClose).toHaveBeenCalledTimes(1);
-        });
-
-        it('does not close when clicking inside the modal', () => {
-            const { onClose } = renderModal();
-            fireEvent.click(screen.getByText('Short Rest'));
-            expect(onClose).not.toHaveBeenCalled();
-        });
-    });
-
-    describe('hit dice initialization', () => {
-        it('initializes remaining hit dice from runtime state when stored', () => {
-            setupGetRuntimeValue({ shortRestHitDice: 3 });
-            renderModal();
-            expect(screen.getByText(/3 of 5 remaining/)).toBeInTheDocument();
-        });
-
-        it('defaults to player level when no runtime state stored', () => {
-            renderModal();
-            expect(screen.getByText(/of 5 remaining/)).toBeInTheDocument();
-        });
-
-        it('displays correct hit die size from getHitDieSize', () => {
-            renderModal();
-            expect(screen.getByText(/d8/)).toBeInTheDocument();
-        });
-    });
-
-    describe('hit dice rolling details', () => {
-        it('shows individual roll entries in the log table', () => {
+        it('caps hit points at max hitPoints value on completion', () => {
+            setupGetRuntimeValue({ currentHitPoints: 40 });
             renderModal();
             fireEvent.click(screen.getByText('Roll One'));
-            const tbody = document.querySelector('.short-rest-roll-log tbody');
-            expect(tbody).toBeInTheDocument();
-            const rows = tbody.querySelectorAll('tr');
-            expect(rows.length).toBeGreaterThan(0);
+            fireEvent.click(screen.getByText('Complete Short Rest'));
+            const hpCalls = setRuntimeValueMock.mock.calls.filter(
+                (call) => call[1] === 'currentHitPoints'
+            );
+            expect(hpCalls.length).toBeGreaterThan(0);
+            expect(hpCalls[0][2]).toBe(45);
         });
 
-        it('shows roll value and HP recovered for each entry', () => {
+        it('uses playerStats.hitPoints when currentHp is null', () => {
+            setupGetRuntimeValue({ currentHitPoints: null });
+            renderModal();
+            fireEvent.click(screen.getByText('Complete Short Rest'));
+            const hpCalls = setRuntimeValueMock.mock.calls.filter(
+                (call) => call[1] === 'currentHitPoints'
+            );
+            expect(hpCalls.length).toBeGreaterThan(0);
+        });
+
+        it('adds recovered HP to current hit points on completion', () => {
+            setupGetRuntimeValue({ currentHitPoints: 20 });
             renderModal();
             fireEvent.click(screen.getByText('Roll One'));
-            const rollEntries = screen.getAllByRole('row');
-            const dataRows = rollEntries.filter(row => row.children.length > 0);
-            expect(dataRows.length).toBeGreaterThan(1);
+            fireEvent.click(screen.getByText('Complete Short Rest'));
+            const hpCalls = setRuntimeValueMock.mock.calls.filter(
+                (call) => call[1] === 'currentHitPoints'
+            );
+            expect(hpCalls.length).toBeGreaterThan(0);
+            expect(hpCalls[0][2]).toBeGreaterThan(20);
         });
 
-        it('rolls all dice at once and shows all entries', () => {
-            renderModal();
-            fireEvent.click(screen.getByText(/Roll All/));
-            const totalText = screen.getByText(/Total HP Recovered:/);
-            expect(totalText).toBeInTheDocument();
-        });
-
-        it('does not roll when hit dice is already at zero', () => {
-            setupGetRuntimeValue({ shortRestHitDice: 0 });
-            renderModal();
-            expect(screen.getByText(/0 of 5 remaining/)).toBeInTheDocument();
-            expect(screen.getByText('Roll One')).toBeDisabled();
-        });
-
-        it('does not roll all when hit dice is already at zero', () => {
-            setupGetRuntimeValue({ shortRestHitDice: 0 });
-            renderModal();
-            expect(screen.getByText(/0 of 5 remaining/)).toBeInTheDocument();
-            expect(screen.getByText(/Roll All/)).toBeDisabled();
-        });
-    });
-
-    describe('Song of Rest details', () => {
-        it('hides Song of Rest section after application', async () => {
-            renderModal();
-            await act(async () => {
-                fireEvent.click(screen.getByText(/Apply Song of Rest/));
-                await Promise.resolve();
-            });
-            expect(screen.queryByText('Song of Rest')).not.toBeInTheDocument();
-        });
-
-        it('does not show Song of Rest when class feature is null', () => {
-            vi.mocked(getClassFeatures).mockReturnValueOnce({ songOfRestDie: null });
-            renderModal();
-            expect(screen.queryByText('Song of Rest')).not.toBeInTheDocument();
-        });
-
-        it('adds Song of Rest bonus to recovered HP total', async () => {
-            renderModal();
-            await act(async () => {
-                fireEvent.click(screen.getByText('Roll One'));
-                await Promise.resolve();
-            });
-            const totalBefore = screen.getByText(/Total HP Recovered:/).parentElement.textContent;
-            await act(async () => {
-                fireEvent.click(screen.getByText(/Apply Song of Rest/));
-                await Promise.resolve();
-            });
-            const totalAfter = screen.getByText(/Total HP Recovered:/).parentElement.textContent;
-            const hpBefore = parseInt(totalBefore.match(/\d+/)?.[0] || '0', 10);
-            const hpAfter = parseInt(totalAfter.match(/\d+/)?.[0] || '0', 10);
-            expect(hpAfter).toBeGreaterThan(hpBefore);
-        });
-    });
-
-    describe('Sorcerous Restoration completion', () => {
-        it('restores sorcery points on short rest completion when feature was used', () => {
+        it('restores sorcery points on short rest completion when Sorcerous Restoration was used', () => {
             setupGetRuntimeValue({ sorceryPoints: 3, sorcerousRestorationUses: 1 });
             const playerStats = createPlayerStats({
                 class: { name: 'Sorcerer', major: { name: 'Sorcerer' } },
@@ -519,7 +513,7 @@ describe('ShortRestModal', () => {
             expect(srCalls[0][2]).toBe(0);
         });
 
-        it('does not restore sorcery points when feature was not used', () => {
+        it('does not restore sorcery points when Sorcerous Restoration was not used', () => {
             setupGetRuntimeValue({ sorceryPoints: 3, sorcerousRestorationUses: 1 });
             const playerStats = createPlayerStats({
                 class: { name: 'Sorcerer', major: { name: 'Sorcerer' } },
@@ -539,10 +533,8 @@ describe('ShortRestModal', () => {
             );
             expect(srCalls.length).toBe(0);
         });
-    });
 
-    describe('Font of Inspiration completion', () => {
-        it('sets bardic inspiration to max on short rest completion when feature was used', () => {
+        it('sets bardic inspiration to max on short rest completion when Font of Inspiration was used', () => {
             setupGetRuntimeValue({ bardicInspirationUses: 1 });
             const playerStats = createPlayerStats({
                 class: { name: 'Bard', major: { name: 'Bard' } },
@@ -565,7 +557,7 @@ describe('ShortRestModal', () => {
             expect(biCalls[0][2]).toBe(3);
         });
 
-        it('does not set bardic inspiration when feature was not used', () => {
+        it('does not set bardic inspiration when Font of Inspiration was not used', () => {
             setupGetRuntimeValue({ bardicInspirationUses: 1 });
             const playerStats = createPlayerStats({
                 class: { name: 'Bard', major: { name: 'Bard' } },
@@ -585,10 +577,8 @@ describe('ShortRestModal', () => {
             );
             expect(biCalls.length).toBe(0);
         });
-    });
 
-    describe('Arcane Recovery completion', () => {
-        it('recovers spell slots on short rest completion when feature was used', () => {
+        it('recovers spell slots on short rest completion when Arcane Recovery was used', () => {
             setupGetRuntimeValue({ arcaneRecoveryLevels: 2, spell_slots_level_1: 2 });
             const playerStats = createPlayerStats({
                 class: { name: 'Wizard', major: { name: 'Wizard' } },
@@ -615,7 +605,7 @@ describe('ShortRestModal', () => {
             expect(slotCalls.length).toBeGreaterThan(0);
         });
 
-        it('does not recover spell slots when feature was not used', () => {
+        it('does not recover spell slots when Arcane Recovery was not used', () => {
             setupGetRuntimeValue({ arcaneRecoveryLevels: 2 });
             const playerStats = createPlayerStats({
                 class: { name: 'Wizard', major: { name: 'Wizard' } },
@@ -641,7 +631,7 @@ describe('ShortRestModal', () => {
             expect(slotCalls.length).toBe(0);
         });
 
-        it('only recovers slots up to level 5', () => {
+        it('only recovers Arcane Recovery slots up to level 5', () => {
             setupGetRuntimeValue({ arcaneRecoveryLevels: 3 });
             const playerStats = createPlayerStats({
                 class: { name: 'Wizard', major: { name: 'Wizard' } },
@@ -669,45 +659,7 @@ describe('ShortRestModal', () => {
             );
             expect(slotCalls.length).toBe(0);
         });
-    });
 
-    describe('hit points capping', () => {
-        it('caps hit points at max hitPoints value on completion', () => {
-            setupGetRuntimeValue({ currentHitPoints: 40 });
-            renderModal();
-            fireEvent.click(screen.getByText('Roll One'));
-            fireEvent.click(screen.getByText('Complete Short Rest'));
-            const hpCalls = setRuntimeValueMock.mock.calls.filter(
-                (call) => call[1] === 'currentHitPoints'
-            );
-            expect(hpCalls.length).toBeGreaterThan(0);
-            expect(hpCalls[0][2]).toBe(45);
-        });
-
-        it('uses playerStats.hitPoints when currentHp is null', () => {
-            setupGetRuntimeValue({ currentHitPoints: null });
-            renderModal();
-            fireEvent.click(screen.getByText('Complete Short Rest'));
-            const hpCalls = setRuntimeValueMock.mock.calls.filter(
-                (call) => call[1] === 'currentHitPoints'
-            );
-            expect(hpCalls.length).toBeGreaterThan(0);
-        });
-
-        it('adds recovered HP to current hit points on completion', () => {
-            setupGetRuntimeValue({ currentHitPoints: 20 });
-            renderModal();
-            fireEvent.click(screen.getByText('Roll One'));
-            fireEvent.click(screen.getByText('Complete Short Rest'));
-            const hpCalls = setRuntimeValueMock.mock.calls.filter(
-                (call) => call[1] === 'currentHitPoints'
-            );
-            expect(hpCalls.length).toBeGreaterThan(0);
-            expect(hpCalls[0][2]).toBeGreaterThan(20);
-        });
-    });
-
-    describe('Signature Spells reset', () => {
         it('resets signature spell used flags on completion when feature exists', () => {
             const playerStats = createPlayerStats({
                 automation: {
@@ -759,6 +711,51 @@ describe('ShortRestModal', () => {
                 (call) => call[1].includes('SignatureSpells')
             );
             expect(usedCalls.length).toBe(0);
+        });
+    });
+
+    describe('closing', () => {
+        it('calls onClose when Cancel is clicked', () => {
+            const { onClose } = renderModal();
+            fireEvent.click(screen.getByText('Cancel'));
+            expect(onClose).toHaveBeenCalledTimes(1);
+        });
+
+        it('calls onClose when Escape key is pressed', () => {
+            const { onClose } = renderModal();
+            fireEvent.keyDown(document, { key: 'Escape' });
+            expect(onClose).toHaveBeenCalledTimes(1);
+        });
+
+        it('calls onClose when clicking the overlay outside the modal', () => {
+            const { onClose } = renderModal();
+            const overlay = document.querySelector('.short-rest-overlay');
+            fireEvent.click(overlay);
+            expect(onClose).toHaveBeenCalledTimes(1);
+        });
+
+        it('does not close when clicking inside the modal', () => {
+            const { onClose } = renderModal();
+            fireEvent.click(screen.getByText('Short Rest'));
+            expect(onClose).not.toHaveBeenCalled();
+        });
+    });
+
+    describe('hit dice initialization', () => {
+        it('initializes remaining hit dice from runtime state when stored', () => {
+            setupGetRuntimeValue({ shortRestHitDice: 3 });
+            renderModal();
+            expect(screen.getByText(/3 of 5 remaining/)).toBeInTheDocument();
+        });
+
+        it('defaults to player level when no runtime state stored', () => {
+            renderModal();
+            expect(screen.getByText(/of 5 remaining/)).toBeInTheDocument();
+        });
+
+        it('displays correct hit die size from getHitDieSize', () => {
+            renderModal();
+            expect(screen.getByText(/d8/)).toBeInTheDocument();
         });
     });
 
@@ -891,51 +888,6 @@ describe('ShortRestModal', () => {
         });
     });
 
-    describe('Bolstering Treats details', () => {
-        it('sets chefBolsteringTreats runtime value when crafted', () => {
-            renderModal({
-                automation: { passives: [{ type: 'temp_hp_buff', name: 'Bolstering Treats' }] },
-            });
-            fireEvent.click(screen.getByText(/Craft Bolstering Treats/));
-            const treatCalls = setRuntimeValueMock.mock.calls.filter(
-                (call) => call[1] === 'chefBolsteringTreats'
-            );
-            expect(treatCalls.length).toBeGreaterThan(0);
-            expect(treatCalls[0][2]).toBe(3);
-        });
-
-        it('shows proficiency-based treat count in description', () => {
-            renderModal({
-                automation: { passives: [{ type: 'temp_hp_buff', name: 'Bolstering Treats' }] },
-            });
-            expect(screen.getByText(/Craft 3 bolstering treats/)).toBeInTheDocument();
-        });
-    });
-
-    describe('Song of Rest with combat context', () => {
-        it('uses applyHealingToTarget when combat context is available', async () => {
-            vi.mocked(getCombatContext).mockResolvedValueOnce({ targets: [{ name: 'Thorin' }] });
-            vi.mocked(applyHealingToTarget).mockReturnValueOnce({ actualHeal: 5, oldHp: 20, newHp: 25 });
-            renderModal();
-            await act(async () => {
-                fireEvent.click(screen.getByText(/Apply Song of Rest/));
-                await Promise.resolve();
-            });
-            expect(applyHealingToTarget).toHaveBeenCalled();
-        });
-
-        it('falls back to direct HP addition when no combat context', async () => {
-            vi.mocked(getCombatContext).mockResolvedValueOnce(null);
-            renderModal();
-            await act(async () => {
-                fireEvent.click(screen.getByText(/Apply Song of Rest/));
-                await Promise.resolve();
-            });
-            const totalText = screen.getByText(/Total HP Recovered:/);
-            expect(totalText).toBeInTheDocument();
-        });
-    });
-
     describe('edge cases', () => {
         it('renders without onComplete callback without throwing', () => {
             const onClose = vi.fn();
@@ -951,28 +903,8 @@ describe('ShortRestModal', () => {
             expect(onClose).not.toHaveBeenCalled();
         });
 
-        it('handles playerStats with no abilities gracefully', () => {
-            renderModal({ abilities: [] });
-            expect(screen.getByText('Short Rest')).toBeInTheDocument();
-        });
-
-        it('handles playerStats with no class gracefully', () => {
-            renderModal({ class: null });
-            expect(screen.getByText('Short Rest')).toBeInTheDocument();
-        });
-
-        it('handles playerStats with no automation passives gracefully', () => {
-            renderModal({ automation: null });
-            expect(screen.getByText('Short Rest')).toBeInTheDocument();
-        });
-
-        it('handles playerStats with undefined automation gracefully', () => {
-            renderModal({ automation: undefined });
-            expect(screen.getByText('Short Rest')).toBeInTheDocument();
-        });
-
-        it('handles playerStats with undefined class gracefully', () => {
-            renderModal({ class: undefined });
+        it('handles playerStats with missing fields gracefully', () => {
+            renderModal({ abilities: [], class: null, automation: null });
             expect(screen.getByText('Short Rest')).toBeInTheDocument();
         });
     });

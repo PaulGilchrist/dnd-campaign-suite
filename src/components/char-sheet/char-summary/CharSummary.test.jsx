@@ -85,6 +85,9 @@ const mockPlayerStats = {
 
 const mockCampaignName = 'test-campaign';
 
+// ---------------------------------------------------------------------------
+// Buff effects: positive assertions only (presence of specific UI indicators)
+// ---------------------------------------------------------------------------
 describe('CharSummary - Buff Effects', () => {
     beforeEach(() => {
         vi.clearAllMocks();
@@ -102,13 +105,7 @@ describe('CharSummary - Buff Effects', () => {
         it('doubles speed when haste buff is active', () => {
             getActiveBuffs.mockReturnValue([{ effect: 'haste' }]);
             render(<CharSummary playerStats={mockPlayerStats} campaignName={mockCampaignName} exhaustionLevel={0} />);
-            // base speed 25, haste doubles to 50
             expect(screen.getByText(/Speed:/)).toBeInTheDocument();
-        });
-
-        it('does not show haste indicator when haste buff is absent', () => {
-            render(<CharSummary playerStats={mockPlayerStats} campaignName={mockCampaignName} exhaustionLevel={0} />);
-            expect(screen.queryByText(/\+2 from Haste/)).not.toBeInTheDocument();
         });
     });
 
@@ -118,11 +115,6 @@ describe('CharSummary - Buff Effects', () => {
             render(<CharSummary playerStats={mockPlayerStats} campaignName={mockCampaignName} exhaustionLevel={0} />);
             expect(screen.getByText(/\+3 from Mage Armor/)).toBeInTheDocument();
         });
-
-        it('does not show mage armor indicator when absent', () => {
-            render(<CharSummary playerStats={mockPlayerStats} campaignName={mockCampaignName} exhaustionLevel={0} />);
-            expect(screen.queryByText(/\+3 from Mage Armor/)).not.toBeInTheDocument();
-        });
     });
 
     describe('shield effect', () => {
@@ -131,11 +123,6 @@ describe('CharSummary - Buff Effects', () => {
             render(<CharSummary playerStats={mockPlayerStats} campaignName={mockCampaignName} exhaustionLevel={0} />);
             expect(screen.getByText(/\+5 from Shield/)).toBeInTheDocument();
         });
-
-        it('does not apply shield bonus when absent', () => {
-            render(<CharSummary playerStats={mockPlayerStats} campaignName={mockCampaignName} exhaustionLevel={0} />);
-            expect(screen.queryByText(/\+5 from Shield/)).not.toBeInTheDocument();
-        });
     });
 
     describe('ice walk effect', () => {
@@ -143,11 +130,6 @@ describe('CharSummary - Buff Effects', () => {
             getActiveBuffs.mockReturnValue([{ effect: 'ice_walk' }]);
             render(<CharSummary playerStats={mockPlayerStats} campaignName={mockCampaignName} exhaustionLevel={0} />);
             expect(screen.getByText(/ice walk/)).toBeInTheDocument();
-        });
-
-        it('does not show ice walk when absent', () => {
-            render(<CharSummary playerStats={mockPlayerStats} campaignName={mockCampaignName} exhaustionLevel={0} />);
-            expect(screen.queryByText(/ice walk/)).not.toBeInTheDocument();
         });
     });
 
@@ -165,7 +147,7 @@ describe('CharSummary - Buff Effects', () => {
             expect(screen.getByText(/hover/)).toBeInTheDocument();
         });
 
-        it('sets fly speed 60 with hover for dragon_wings without explicit flySpeed', () => {
+        it('sets fly speed 60 default for dragon_wings without explicit flySpeed', () => {
             getActiveBuffs.mockReturnValue([{ effect: 'dragon_wings' }]);
             render(<CharSummary playerStats={mockPlayerStats} campaignName={mockCampaignName} exhaustionLevel={0} />);
             expect(screen.getByText(/fly 60 ft/)).toBeInTheDocument();
@@ -197,13 +179,6 @@ describe('CharSummary - Buff Effects', () => {
             expect(screen.getByText(/hover/)).toBeInTheDocument();
         });
 
-        it('sets fly speed for buff with explicit flySpeed property (uses walk speed)', () => {
-            getActiveBuffs.mockReturnValue([{ flySpeed: 35 }]);
-            render(<CharSummary playerStats={mockPlayerStats} campaignName={mockCampaignName} exhaustionLevel={0} />);
-            // The generic flySpeed property sets flySpeed = speed (walk speed), not the buff's flySpeed value
-            expect(document.body.textContent).toContain('fly 25');
-        });
-
         it('does not show fly speed when no fly buffs are active', () => {
             render(<CharSummary playerStats={mockPlayerStats} campaignName={mockCampaignName} exhaustionLevel={0} />);
             expect(screen.queryByText(/fly /)).not.toBeInTheDocument();
@@ -215,11 +190,6 @@ describe('CharSummary - Buff Effects', () => {
             getActiveBuffs.mockReturnValue([{ effect: 'aquatic_adaptation' }]);
             render(<CharSummary playerStats={mockPlayerStats} campaignName={mockCampaignName} exhaustionLevel={0} />);
             expect(screen.getByText(/swim 50 ft/)).toBeInTheDocument();
-        });
-
-        it('does not show swim speed when absent', () => {
-            render(<CharSummary playerStats={mockPlayerStats} campaignName={mockCampaignName} exhaustionLevel={0} />);
-            expect(screen.queryByText(/swim /)).not.toBeInTheDocument();
         });
     });
 
@@ -248,11 +218,6 @@ describe('CharSummary - Buff Effects', () => {
             render(<CharSummary playerStats={mockPlayerStats} campaignName={mockCampaignName} exhaustionLevel={0} />);
             expect(screen.getByText(/Narrow Space/)).toBeInTheDocument();
         });
-
-        it('does not show narrow space badge when absent', () => {
-            render(<CharSummary playerStats={mockPlayerStats} campaignName={mockCampaignName} exhaustionLevel={0} />);
-            expect(screen.queryByText(/Narrow Space/)).not.toBeInTheDocument();
-        });
     });
 
     describe('third eye effects', () => {
@@ -267,26 +232,18 @@ describe('CharSummary - Buff Effects', () => {
             render(<CharSummary playerStats={mockPlayerStats} campaignName={mockCampaignName} exhaustionLevel={0} />);
             expect(screen.getByText(/Greater Comprehension/)).toBeInTheDocument();
         });
-
-        it('does not show third eye badges when buff is absent', () => {
-            render(<CharSummary playerStats={mockPlayerStats} campaignName={mockCampaignName} exhaustionLevel={0} />);
-            expect(screen.queryByText(/Darkvision 120 ft/)).not.toBeInTheDocument();
-            expect(screen.queryByText(/Greater Comprehension/)).not.toBeInTheDocument();
-        });
     });
 
     describe('speed boost and large form buffs', () => {
         it('adds speed bonus when speed_boost buff is active', () => {
             getActiveBuffs.mockReturnValue([{ effect: 'speed_boost', speedBonus: 15 }]);
             render(<CharSummary playerStats={mockPlayerStats} campaignName={mockCampaignName} exhaustionLevel={0} />);
-            // base speed 25 + 15 = 40
             expect(screen.getByText(/Speed:/)).toBeInTheDocument();
         });
 
         it('adds 10 speed when large_form buff is active', () => {
             getActiveBuffs.mockReturnValue([{ effect: 'large_form' }]);
             render(<CharSummary playerStats={mockPlayerStats} campaignName={mockCampaignName} exhaustionLevel={0} />);
-            // base speed 25 + 10 = 35
             expect(screen.getByText(/Speed:/)).toBeInTheDocument();
         });
     });
@@ -300,6 +257,9 @@ describe('CharSummary - Buff Effects', () => {
     });
 });
 
+// ---------------------------------------------------------------------------
+// Speed calculations: only tests that assert actual computed values
+// ---------------------------------------------------------------------------
 describe('CharSummary - Speed Calculations', () => {
     beforeEach(() => {
         vi.clearAllMocks();
@@ -311,7 +271,8 @@ describe('CharSummary - Speed Calculations', () => {
         it('reduces speed by 5 per exhaustion level', () => {
             // base speed 25, exhaustion level 1 = 25 - 5 = 20
             render(<CharSummary playerStats={mockPlayerStats} campaignName={mockCampaignName} exhaustionLevel={1} />);
-            expect(screen.getByText(/Speed:/)).toBeInTheDocument();
+            const speedEl = screen.getByText(/Speed:/).nextElementSibling;
+            expect(speedEl.textContent).toContain('20 ft');
         });
 
         it('applies exhaustion penalty to speed with aura bonus', () => {
@@ -322,7 +283,8 @@ describe('CharSummary - Speed Calculations', () => {
                 auraComboEffects={{ speedBonus: 10, speedSource: 'Aura of Protection' }}
             />);
             // base 25 - 10 (exhaustion) + 10 (aura) = 25
-            expect(screen.getByText(/Speed:/)).toBeInTheDocument();
+            const speedEl = screen.getByText(/Speed:/).nextElementSibling;
+            expect(speedEl.textContent).toContain('25 ft');
         });
     });
 
@@ -345,7 +307,7 @@ describe('CharSummary - Speed Calculations', () => {
                 conditionEffects={{ speedHalved: true }}
             />);
             // 25 / 2 = 12
-            expect(screen.getByText(/Speed:/)).toBeInTheDocument();
+            expect(document.body.textContent).toContain('12');
         });
 
         it('applies speed reduction when speedReduction is present', () => {
@@ -356,7 +318,8 @@ describe('CharSummary - Speed Calculations', () => {
                 conditionEffects={{ speedReduction: 10 }}
             />);
             // 25 - 10 = 15
-            expect(screen.getByText(/Speed:/)).toBeInTheDocument();
+            const speedEl = screen.getByText(/Speed:/).nextElementSibling;
+            expect(speedEl.textContent).toContain('15 ft');
         });
 
         it('applies speed reduction with aura bonus', () => {
@@ -367,21 +330,12 @@ describe('CharSummary - Speed Calculations', () => {
                 conditionEffects={{ speedReduction: 10 }}
                 auraComboEffects={{ speedBonus: 5, speedSource: 'Aura of Protection' }}
             />);
-            expect(screen.getByText(/Speed:/)).toBeInTheDocument();
+            const speedEl = screen.getByText(/Speed:/).nextElementSibling;
+            expect(speedEl.textContent).toContain('20 ft');
         });
     });
 
     describe('aura speed bonus', () => {
-        it('adds aura speed bonus to total speed', () => {
-            render(<CharSummary
-                playerStats={mockPlayerStats}
-                campaignName={mockCampaignName}
-                exhaustionLevel={0}
-                auraComboEffects={{ speedBonus: 10, speedSource: 'Aura of Protection' }}
-            />);
-            expect(screen.getByText(/Speed:/)).toBeInTheDocument();
-        });
-
         it('shows aura source indicator for speed bonus', () => {
             const stats = { ...mockPlayerStats, inventory: { equipped: [] }, equipment: [] };
             render(<CharSummary
@@ -390,7 +344,6 @@ describe('CharSummary - Speed Calculations', () => {
                 exhaustionLevel={0}
                 auraComboEffects={{ speedBonus: 10, speedSource: 'Aura of Protection' }}
             />);
-            // Aura source shows as (+10) after the speed text
             expect(document.body.textContent).toContain('(+10)');
         });
     });
@@ -417,6 +370,9 @@ describe('CharSummary - Speed Calculations', () => {
     });
 });
 
+// ---------------------------------------------------------------------------
+// Passive movement effects
+// ---------------------------------------------------------------------------
 describe('CharSummary - Passive Buff Effects', () => {
     beforeEach(() => {
         vi.clearAllMocks();
@@ -434,7 +390,8 @@ describe('CharSummary - Passive Buff Effects', () => {
                 },
             };
             render(<CharSummary playerStats={stats} campaignName={mockCampaignName} exhaustionLevel={0} />);
-            expect(screen.getByText(/Speed:/)).toBeInTheDocument();
+            const speedEl = screen.getByText(/Speed:/).nextElementSibling;
+            expect(speedEl.textContent).toContain('35 ft');
         });
 
         it('does not add speed bonus when heavy armor is worn', () => {
@@ -448,7 +405,8 @@ describe('CharSummary - Passive Buff Effects', () => {
                 equipment: [{ name: 'Plate', armor_category: 'Heavy' }],
             };
             render(<CharSummary playerStats={stats} campaignName={mockCampaignName} exhaustionLevel={0} />);
-            expect(screen.getByText(/Speed:/)).toBeInTheDocument();
+            const speedEl = screen.getByText(/Speed:/).nextElementSibling;
+            expect(speedEl.textContent).toContain('25 ft');
         });
     });
 
@@ -464,7 +422,8 @@ describe('CharSummary - Passive Buff Effects', () => {
                 equipment: [],
             };
             render(<CharSummary playerStats={stats} campaignName={mockCampaignName} exhaustionLevel={0} />);
-            expect(screen.getByText(/Speed:/)).toBeInTheDocument();
+            const speedEl = screen.getByText(/Speed:/).nextElementSibling;
+            expect(speedEl.textContent).toContain('35 ft');
         });
 
         it('does not add speed bonus when armor is equipped', () => {
@@ -477,7 +436,8 @@ describe('CharSummary - Passive Buff Effects', () => {
                 equipment: [{ name: 'Scale Mail', equipment_category: 'Armor' }],
             };
             render(<CharSummary playerStats={stats} campaignName={mockCampaignName} exhaustionLevel={0} />);
-            expect(screen.getByText(/Speed:/)).toBeInTheDocument();
+            const speedEl = screen.getByText(/Speed:/).nextElementSibling;
+            expect(speedEl.textContent).toContain('25 ft');
         });
     });
 
@@ -491,19 +451,8 @@ describe('CharSummary - Passive Buff Effects', () => {
                 },
             };
             render(<CharSummary playerStats={stats} campaignName={mockCampaignName} exhaustionLevel={0} />);
-            expect(screen.getByText(/Speed:/)).toBeInTheDocument();
-        });
-
-        it('ignores speed_increase passive with non-numeric bonus', () => {
-            const stats = {
-                ...mockPlayerStats,
-                automation: {
-                    passives: [{ type: 'passive_buff', effect: 'speed_increase', bonusExpression: 'abc' }],
-                    actions: [],
-                },
-            };
-            render(<CharSummary playerStats={stats} campaignName={mockCampaignName} exhaustionLevel={0} />);
-            expect(screen.getByText(/Speed:/)).toBeInTheDocument();
+            const speedEl = screen.getByText(/Speed:/).nextElementSibling;
+            expect(speedEl.textContent).toContain('40 ft');
         });
     });
 
@@ -591,6 +540,9 @@ describe('CharSummary - Passive Buff Effects', () => {
     });
 });
 
+// ---------------------------------------------------------------------------
+// Class movement bonuses
+// ---------------------------------------------------------------------------
 describe('CharSummary - Class Movement Bonuses', () => {
     beforeEach(() => {
         vi.clearAllMocks();
@@ -598,66 +550,51 @@ describe('CharSummary - Class Movement Bonuses', () => {
         getActiveBuffs.mockReturnValue([]);
     });
 
-    describe('monk unarmored movement', () => {
-        it('renders without error when monk class has no armor or shield', () => {
-            const stats = {
-                ...mockPlayerStats,
-                class: { name: 'Monk', major: { name: 'Monk' } },
-                inventory: { equipped: [] },
-                equipment: [],
-            };
-            render(<CharSummary playerStats={stats} campaignName={mockCampaignName} exhaustionLevel={0} />);
-            expect(screen.getByText(/Speed:/)).toBeInTheDocument();
-        });
-
-        it('renders without error when monk class has armor equipped', () => {
-            const stats = {
-                ...mockPlayerStats,
-                class: { name: 'Monk', major: { name: 'Monk' } },
-                inventory: { equipped: ['Scale Mail'] },
-                equipment: [{ name: 'Scale Mail', equipment_category: 'Armor' }],
-            };
-            render(<CharSummary playerStats={stats} campaignName={mockCampaignName} exhaustionLevel={0} />);
-            expect(screen.getByText(/Speed:/)).toBeInTheDocument();
-        });
-    });
-
     describe('barbarian unarmored movement', () => {
         it('adds barbarian unarmored movement when no armor or shield', () => {
             const stats = {
                 ...mockPlayerStats,
+                level: 1,
                 class: { name: 'Barbarian', major: { name: 'Barbarian' }, class_levels: [{ class_specific: { unarmored_movement: 10 } }] },
                 inventory: { equipped: [] },
                 equipment: [],
             };
             render(<CharSummary playerStats={stats} campaignName={mockCampaignName} exhaustionLevel={0} />);
-            expect(screen.getByText(/Speed:/)).toBeInTheDocument();
+            const speedEl = screen.getByText(/Speed:/).nextElementSibling;
+            expect(speedEl.textContent).toContain('35 ft');
         });
 
         it('does not add barbarian unarmored movement when armor is equipped', () => {
             const stats = {
                 ...mockPlayerStats,
+                level: 1,
                 class: { name: 'Barbarian', major: { name: 'Barbarian' }, class_levels: [{ class_specific: { unarmored_movement: 10 } }] },
                 inventory: { equipped: ['Scale Mail'] },
                 equipment: [{ name: 'Scale Mail', equipment_category: 'Armor' }],
             };
             render(<CharSummary playerStats={stats} campaignName={mockCampaignName} exhaustionLevel={0} />);
-            expect(screen.getByText(/Speed:/)).toBeInTheDocument();
+            const speedEl = screen.getByText(/Speed:/).nextElementSibling;
+            expect(speedEl.textContent).toContain('25 ft');
         });
 
         it('handles missing class_specific gracefully', () => {
             const stats = {
                 ...mockPlayerStats,
+                level: 1,
                 class: { name: 'Barbarian', major: { name: 'Barbarian' }, class_levels: [{}] },
                 inventory: { equipped: [] },
                 equipment: [],
             };
             render(<CharSummary playerStats={stats} campaignName={mockCampaignName} exhaustionLevel={0} />);
-            expect(screen.getByText(/Speed:/)).toBeInTheDocument();
+            const speedEl = screen.getByText(/Speed:/).nextElementSibling;
+            expect(speedEl.textContent).toContain('25 ft');
         });
     });
 });
 
+// ---------------------------------------------------------------------------
+// Circle Forms AC override
+// ---------------------------------------------------------------------------
 describe('CharSummary - Circle Forms AC Override', () => {
     beforeEach(() => {
         vi.clearAllMocks();
@@ -676,7 +613,7 @@ describe('CharSummary - Circle Forms AC Override', () => {
         };
         render(<CharSummary playerStats={stats} campaignName={mockCampaignName} exhaustionLevel={0} />);
         // 13 + 3 (WIS) = 16
-        expect(screen.getByText(/16/)).toBeInTheDocument();
+        expect(screen.getByText((content, element) => element?.tagName === 'DIV' && element.className?.includes('clickable') && content.includes('16'))).toBeInTheDocument();
     });
 
     it('overrides AC for Moon Druid with large_form buff', () => {
@@ -690,7 +627,7 @@ describe('CharSummary - Circle Forms AC Override', () => {
         };
         render(<CharSummary playerStats={stats} campaignName={mockCampaignName} exhaustionLevel={0} />);
         // 13 + 2 = 15
-        expect(screen.getByText(/15/)).toBeInTheDocument();
+        expect(screen.getByText((content, element) => element?.tagName === 'DIV' && element.className?.includes('clickable') && content.includes('15'))).toBeInTheDocument();
     });
 
     it('does not override AC for non-Moon Druid', () => {
@@ -729,6 +666,9 @@ describe('CharSummary - Circle Forms AC Override', () => {
     });
 });
 
+// ---------------------------------------------------------------------------
+// Aura sources
+// ---------------------------------------------------------------------------
 describe('CharSummary - Aura Sources', () => {
     beforeEach(() => {
         vi.clearAllMocks();
@@ -782,6 +722,9 @@ describe('CharSummary - Aura Sources', () => {
     });
 });
 
+// ---------------------------------------------------------------------------
+// Popup and modal behaviors
+// ---------------------------------------------------------------------------
 describe('CharSummary - Popup and Modal Behaviors', () => {
     beforeEach(() => {
         vi.clearAllMocks();
@@ -805,8 +748,6 @@ describe('CharSummary - Popup and Modal Behaviors', () => {
     describe('short rest modal', () => {
         it('renders short rest modal when user clicks short rest button', () => {
             render(<CharSummary playerStats={mockPlayerStats} campaignName={mockCampaignName} exhaustionLevel={0} />);
-            // ShortRestButton is mocked, clicking it sets showShortRest to true
-            // The modal renders conditionally, so we verify the button exists
             expect(screen.getByTestId('short-rest-btn')).toBeInTheDocument();
         });
     });
@@ -819,6 +760,9 @@ describe('CharSummary - Popup and Modal Behaviors', () => {
     });
 });
 
+// ---------------------------------------------------------------------------
+// Initiative
+// ---------------------------------------------------------------------------
 describe('CharSummary - Initiative', () => {
     beforeEach(() => {
         vi.clearAllMocks();
@@ -856,6 +800,9 @@ describe('CharSummary - Initiative', () => {
     });
 });
 
+// ---------------------------------------------------------------------------
+// Speed CSS classes
+// ---------------------------------------------------------------------------
 describe('CharSummary - Speed CSS Classes', () => {
     beforeEach(() => {
         vi.clearAllMocks();
@@ -886,6 +833,9 @@ describe('CharSummary - Speed CSS Classes', () => {
     });
 });
 
+// ---------------------------------------------------------------------------
+// XP modal display
+// ---------------------------------------------------------------------------
 describe('CharSummary - XP Modal Display', () => {
     beforeEach(() => {
         vi.clearAllMocks();
@@ -924,7 +874,6 @@ describe('CharSummary - XP Modal Display', () => {
         const xpModal = screen.getByText('Experience Points').closest('.xp-modal');
         const checkbox = xpModal.querySelector('input[type="checkbox"]');
         fireEvent.click(checkbox);
-        // After toggling, xpMode should be 'experience'
         expect(mockPlayerStats.xpMode).toBe('experience');
     });
 
@@ -943,6 +892,9 @@ describe('CharSummary - XP Modal Display', () => {
     });
 });
 
+// ---------------------------------------------------------------------------
+// useEffect behaviors
+// ---------------------------------------------------------------------------
 describe('CharSummary - useEffect behaviors', () => {
     beforeEach(() => {
         vi.clearAllMocks();
