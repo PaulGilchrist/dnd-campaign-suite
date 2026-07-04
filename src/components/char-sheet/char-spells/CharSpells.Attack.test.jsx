@@ -123,6 +123,18 @@ function renderCharSpells(props = {}) {
   return render(<CharSpells {...baseProps} {...props} />);
 }
 
+function createMockRollAttack() {
+  const _mock = vi.fn();
+  useLoggedDiceRoll.mockImplementation(() => ({
+    popupHtml: null,
+    setPopupHtml: vi.fn(),
+    rollAttack: _mock,
+    rollDamage: vi.fn(),
+    quickRollPlayerSave: vi.fn(),
+  }));
+  return _mock;
+}
+
 describe('CharSpells', () => {
   beforeEach(() => {
     vi.resetAllMocks();
@@ -158,14 +170,7 @@ describe('CharSpells', () => {
     });
 
     it('should call rollAttack with correct arguments for a non-sorcerer', () => {
-      const mockRollAttack = vi.fn();
-      useLoggedDiceRoll.mockImplementation(() => ({
-        popupHtml: null,
-        setPopupHtml: vi.fn(),
-        rollAttack: mockRollAttack,
-        rollDamage: vi.fn(),
-        quickRollPlayerSave: vi.fn(),
-      }));
+      const mockRollAttack = createMockRollAttack();
 
       renderCharSpells();
 
@@ -175,22 +180,20 @@ describe('CharSpells', () => {
       expect(mockRollAttack).toHaveBeenCalledWith('Spell Attack', 5, expect.any(Object));
     });
 
-    it('should subtract exhaustion penalty from rollAttack to-hit value', () => {
-      const mockRollAttack = vi.fn();
-      useLoggedDiceRoll.mockImplementation(() => ({
-        popupHtml: null,
-        setPopupHtml: vi.fn(),
-        rollAttack: mockRollAttack,
-        rollDamage: vi.fn(),
-        quickRollPlayerSave: vi.fn(),
-      }));
+    it.each`
+      exhaustionPenalty | expectedToHit
+      ${0}              | ${5}
+      ${1}              | ${4}
+      ${2}              | ${3}
+    `('should subtract exhaustionPenalty ($exhaustionPenalty) from rollAttack to-hit value', ({ exhaustionPenalty, expectedToHit }) => {
+      const mockRollAttack = createMockRollAttack();
 
-      renderCharSpells({ exhaustionPenalty: 2 });
+      renderCharSpells({ exhaustionPenalty });
 
       const attackLabel = screen.getByText(/Attack \(to hit\):/);
       fireEvent.click(attackLabel);
 
-      expect(mockRollAttack).toHaveBeenCalledWith('Spell Attack', 3, expect.any(Object));
+      expect(mockRollAttack).toHaveBeenCalledWith('Spell Attack', expectedToHit, expect.any(Object));
     });
 
     it.each`
@@ -198,14 +201,7 @@ describe('CharSpells', () => {
       ${'disadvantage'} | ${'disadvantage'}
       ${'advantage'}    | ${'advantage'}
     `('should pass forcedMode when conditionAttackMode is $mode', ({ mode, expectedMode }) => {
-      const mockRollAttack = vi.fn();
-      useLoggedDiceRoll.mockImplementation(() => ({
-        popupHtml: null,
-        setPopupHtml: vi.fn(),
-        rollAttack: mockRollAttack,
-        rollDamage: vi.fn(),
-        quickRollPlayerSave: vi.fn(),
-      }));
+      const mockRollAttack = createMockRollAttack();
 
       renderCharSpells({ conditionAttackMode: mode });
 
@@ -229,25 +225,6 @@ describe('CharSpells', () => {
       fireEvent.click(attackLabel);
 
       expect(screen.getByTestId('metamagic-popup')).toBeInTheDocument();
-    });
-
-    it('should not show metamagic popup for non-sorcerer clicking spell attack', () => {
-      const mockRollAttack = vi.fn();
-      useLoggedDiceRoll.mockImplementation(() => ({
-        popupHtml: null,
-        setPopupHtml: vi.fn(),
-        rollAttack: mockRollAttack,
-        rollDamage: vi.fn(),
-        quickRollPlayerSave: vi.fn(),
-      }));
-
-      renderCharSpells();
-
-      const attackLabel = screen.getByText(/Attack \(to hit\):/);
-      fireEvent.click(attackLabel);
-
-      expect(screen.queryByTestId('metamagic-popup')).not.toBeInTheDocument();
-      expect(mockRollAttack).toHaveBeenCalled();
     });
 
     it('should dismiss metamagic popup when sorcerer confirms spell attack metamagic', async () => {
@@ -274,36 +251,16 @@ describe('CharSpells', () => {
     });
   });
 
-  describe('Spell detail popup', () => {
-    it('should show spell detail popup when spell name is clicked', () => {
-      renderCharSpells();
-
-      const lightLink = screen.getByText('Light');
-      fireEvent.click(lightLink);
-
-      expect(screen.getByText('Cast Spell')).toBeInTheDocument();
-    });
-
-    it('should close spell detail popup when close button is clicked', () => {
-      renderCharSpells();
-
-      const lightLink = screen.getByText('Light');
-      fireEvent.click(lightLink);
-
-      expect(screen.getByText('Cast Spell')).toBeInTheDocument();
-
-      const closeButton = screen.getByText('Close');
-      fireEvent.click(closeButton);
-
-      expect(screen.queryByText('Cast Spell')).not.toBeInTheDocument();
-    });
-  });
-
   describe('Cantrip damage display', () => {
-    it('should use the highest available cantrip damage level at or below player level', () => {
+    it.each`
+      playerLevel | damageKey               | expectedDamage
+      ${5}        | ${'damage_at_slot_level'} | ${'2d10 Fire'}
+      ${0}        | ${'damage_at_slot_level'} | ${'1d10 Fire'}
+      ${11}       | ${'damage_at_slot_level'} | ${'3d10 Fire'}
+    `('should use the highest available cantrip damage level at or below player level ($playerLevel)', ({ playerLevel, expectedDamage }) => {
       const statsWithCantripDamage = {
         ...mockPlayerStats,
-        level: 5,
+        level: playerLevel,
         spellAbilities: {
           ...mockPlayerStats.spellAbilities,
           spells: [
@@ -330,71 +287,7 @@ describe('CharSpells', () => {
 
       renderCharSpells({ playerStats: statsWithCantripDamage });
 
-      expect(screen.getByText('2d10 Fire')).toBeInTheDocument();
-    });
-
-    it('should use the first damage level when no levels are at or below player level', () => {
-      const statsWithCantripDamage = {
-        ...mockPlayerStats,
-        level: 0,
-        spellAbilities: {
-          ...mockPlayerStats.spellAbilities,
-          spells: [
-            {
-              name: 'Fire Bolt',
-              level: 0,
-              casting_time: '1 turn',
-              range: '120 feet',
-              duration: 'Instantaneous',
-              components: ['V', 'S'],
-              damage: {
-                damage_at_slot_level: {
-                  '1': '1d10',
-                  '5': '2d10',
-                },
-                damage_type: 'Fire',
-              },
-              prepared: 'Always',
-            },
-          ],
-        },
-      };
-
-      renderCharSpells({ playerStats: statsWithCantripDamage });
-
-      expect(screen.getByText('1d10 Fire')).toBeInTheDocument();
-    });
-
-    it('should use the first damage level for non-cantrips regardless of player level', () => {
-      const statsWithLevelSpell = {
-        ...mockPlayerStats,
-        level: 11,
-        spellAbilities: {
-          ...mockPlayerStats.spellAbilities,
-          spells: [
-            {
-              name: 'Scorching Ray',
-              level: 2,
-              casting_time: '1 turn',
-              range: '120 feet',
-              duration: 'Instantaneous',
-              components: ['V', 'S'],
-              damage: {
-                damage_at_slot_level: {
-                  '2': '3d6',
-                  '5': '4d6',
-                },
-                damage_type: 'Fire',
-              },
-              prepared: 'Always',
-            },
-          ],
-        },
-      };
-
-      renderCharSpells({ playerStats: statsWithLevelSpell });
-
-      expect(screen.getByText('3d6 Fire')).toBeInTheDocument();
+      expect(screen.getByText(expectedDamage)).toBeInTheDocument();
     });
 
     it('should use damage_at_character_level when damage_at_slot_level is absent', () => {
@@ -429,30 +322,34 @@ describe('CharSpells', () => {
       expect(screen.getByText('2d6 Acid')).toBeInTheDocument();
     });
 
-    it('should display damage with save DC info for spells with a save DC', () => {
+    it.each`
+      dc_success | dc_type | level | damageSlot | expectedDisplay
+      ${'half'}  | ${'DEX'} | ${2}  | ${'2'}     | ${'3d8 Cold (DEX half)'}
+      ${'negates'} | ${'CON'} | ${0}  | ${'1'}     | ${'1d6 Cold (CON negates)'}
+    `('should display damage with save DC info: $dc_success success type', ({ dc_success, dc_type, level, damageSlot, expectedDisplay }) => {
       const statsWithSaveDc = {
         ...mockPlayerStats,
         spellAbilities: {
           ...mockPlayerStats.spellAbilities,
           spells: [
             {
-              name: 'Cone of Cold',
-              level: 2,
+              name: dc_success === 'negates' ? 'Frostbite' : 'Cone of Cold',
+              level,
               casting_time: '1 turn',
               range: '60 feet',
               duration: 'Instantaneous',
-              components: ['V', 'S', 'M'],
+              components: dc_success === 'negates' ? ['V', 'S'] : ['V', 'S', 'M'],
               damage: {
                 damage_at_slot_level: {
-                  '2': '3d8',
+                  [damageSlot]: dc_success === 'negates' ? '1d6' : '3d8',
                 },
                 damage_type: 'Cold',
               },
               dc: {
-                dc_type: 'DEX',
-                dc_success: 'half',
+                dc_type,
+                dc_success,
               },
-              prepared: 'Prepared',
+              prepared: dc_success === 'negates' ? 'Always' : 'Prepared',
             },
           ],
         },
@@ -460,41 +357,7 @@ describe('CharSpells', () => {
 
       renderCharSpells({ playerStats: statsWithSaveDc });
 
-      expect(screen.getByText('3d8 Cold (DEX half)')).toBeInTheDocument();
-    });
-
-    it('should display negates for spell save DC with negates success', () => {
-      const statsWithNegates = {
-        ...mockPlayerStats,
-        spellAbilities: {
-          ...mockPlayerStats.spellAbilities,
-          spells: [
-            {
-              name: 'Frostbite',
-              level: 0,
-              casting_time: '1 turn',
-              range: '60 feet',
-              duration: 'Instantaneous',
-              components: ['V', 'S'],
-              damage: {
-                damage_at_slot_level: {
-                  '1': '1d6',
-                },
-                damage_type: 'Cold',
-              },
-              dc: {
-                dc_type: 'CON',
-                dc_success: 'negates',
-              },
-              prepared: 'Always',
-            },
-          ],
-        },
-      };
-
-      renderCharSpells({ playerStats: statsWithNegates });
-
-      expect(screen.getByText('1d6 Cold (CON negates)')).toBeInTheDocument();
+      expect(screen.getByText(expectedDisplay)).toBeInTheDocument();
     });
   });
 

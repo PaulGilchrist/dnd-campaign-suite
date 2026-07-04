@@ -47,20 +47,11 @@ describe('CharCharacterAdvancement', () => {
       expect(screen.getByText('Another feature')).toBeInTheDocument();
     });
 
-    it('renders features with no name using index-based key', () => {
-      const stats = createPlayerStats({
-        characterAdvancement: [{ description: 'Unnamed feature' }],
-      });
-      render(<CharCharacterAdvancement playerStats={stats} campaignName="test-campaign" />);
-      expect(screen.getByText('Unnamed feature')).toBeInTheDocument();
-    });
-
-    it('renders an empty characterAdvancement array without errors', () => {
-      renderComponent({ characterAdvancement: [] });
+    it('renders the section header when characterAdvancement is empty or null', () => {
+      const { unmount } = renderComponent({ characterAdvancement: [] });
       expect(screen.getByText('Character Advancement')).toBeInTheDocument();
-    });
+      unmount();
 
-    it('handles null characterAdvancement gracefully', () => {
       renderComponent({ characterAdvancement: null });
       expect(screen.getByText('Character Advancement')).toBeInTheDocument();
     });

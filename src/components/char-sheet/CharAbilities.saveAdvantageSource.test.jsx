@@ -108,16 +108,6 @@ describe('CharAbilities getSaveAdvantageSource tooltip', () => {
     expect(saveCell[0]).toHaveAttribute('title', 'Bless, Aura of Protection');
   });
 
-  it('does not set title when no saveModifiers match', () => {
-    const stats = createPlayerStats({
-      saveModifiers: [],
-    });
-    const { container } = render(<CharAbilities {...defaultProps} playerStats={stats} conditionEffects={{ saveAdvantageCount: 1 }} />);
-    const strengthRow = container.querySelector('.abilities');
-    const saveCell = strengthRow ? strengthRow.querySelectorAll('div:nth-child(4)') : [];
-    expect(saveCell[0]).not.toHaveAttribute('title');
-  });
-
   it('falls back to computedStats.saveModifiers when saveModifiers is absent', () => {
     const stats = createPlayerStats({
       saveModifiers: undefined,

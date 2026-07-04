@@ -199,62 +199,30 @@ describe('CharActions state and modals', () => {
     });
   });
 
-  describe('popup rendering', () => {
-    it('renders the Actions section header on mount', async () => {
-      vi.mocked(getInnateSorceryBonus).mockReturnValue({ saveDcBonus: 0 });
-      const stats = createStats({});
-      await act(async () => { render(<CharActions playerStats={stats} />); });
-      expect(screen.getByText('Actions')).toBeInTheDocument();
-    });
-  });
-
   describe('feature choice modal', () => {
-    function setupFeatureChoiceAction(actionName, automation) {
-      hasAutomation.mockReturnValue(true);
-      vi.mocked(getRuntimeValue).mockReturnValue(null);
+    const featureChoiceCases = [
+      { name: 'Blessed Strikes', automation: { type: 'damage_bonus', options: ['Lightning', 'Thunder'] }, actionText: /Blessed Strikes:/, shouldShowModal: true },
+      { name: 'Elemental Attunement', automation: { type: 'save_attack', hasOptions: true, options: ['Fire', 'Cold'] }, actionText: /Elemental Attunement:/, shouldShowModal: true },
+      { name: "Hunter's Prey", automation: { type: 'hunter_prey' }, actionText: /Hunter's Prey:/, shouldShowModal: true },
+      { name: 'Defensive Tactics', automation: { type: 'defensive_tactics' }, actionText: /Defensive Tactics:/, shouldShowModal: true },
+    ];
 
-      const stats = createStats({
-        actions: [{ name: actionName, description: 'Choose an option.', automation }],
-      });
+    it.each(featureChoiceCases)(
+      'shows feature choice modal for $name ($automation.type)',
+      async ({ name, automation, actionText }) => {
+        hasAutomation.mockReturnValue(true);
+        vi.mocked(getRuntimeValue).mockReturnValue(null);
 
-      return stats;
-    }
+        const stats = createStats({
+          actions: [{ name, description: 'Choose an option.', automation }],
+        });
 
-    it('shows feature choice modal when damage_bonus action has options and no chosen option', async () => {
-      const stats = setupFeatureChoiceAction('Blessed Strikes', { type: 'damage_bonus', options: ['Lightning', 'Thunder'] });
-
-      await act(async () => { render(<CharActions playerStats={stats} />); });
-      const actionName = screen.getByText(/Blessed Strikes:/);
-      await act(async () => { fireEvent.click(actionName); });
-      await waitFor(() => { expect(screen.getByText(/Choose your option/)).toBeInTheDocument(); });
-    });
-
-    it('shows feature choice modal for save_attack with hasOptions flag', async () => {
-      const stats = setupFeatureChoiceAction('Elemental Attunement', { type: 'save_attack', hasOptions: true, options: ['Fire', 'Cold'] });
-
-      await act(async () => { render(<CharActions playerStats={stats} />); });
-      const actionName = screen.getByText(/Elemental Attunement:/);
-      await act(async () => { fireEvent.click(actionName); });
-      await waitFor(() => { expect(screen.getByText(/Choose your option/)).toBeInTheDocument(); });
-    });
-
-    it('shows feature choice modal for hunter_prey type with predefined options', async () => {
-      const stats = setupFeatureChoiceAction('Hunter\'s Prey', { type: 'hunter_prey' });
-
-      await act(async () => { render(<CharActions playerStats={stats} />); });
-      const actionName = screen.getByText(/Hunter's Prey:/);
-      await act(async () => { fireEvent.click(actionName); });
-      await waitFor(() => { expect(screen.getByText(/Choose your option/)).toBeInTheDocument(); });
-    });
-
-    it('shows feature choice modal for defensive_tactics type with predefined options', async () => {
-      const stats = setupFeatureChoiceAction('Defensive Tactics', { type: 'defensive_tactics' });
-
-      await act(async () => { render(<CharActions playerStats={stats} />); });
-      const actionName = screen.getByText(/Defensive Tactics:/);
-      await act(async () => { fireEvent.click(actionName); });
-      await waitFor(() => { expect(screen.getByText(/Choose your option/)).toBeInTheDocument(); });
-    });
+        await act(async () => { render(<CharActions playerStats={stats} />); });
+        const actionName = screen.getByText(actionText);
+        await act(async () => { fireEvent.click(actionName); });
+        await waitFor(() => { expect(screen.getByText(/Choose your option/)).toBeInTheDocument(); });
+      }
+    );
 
     it('does not show feature choice modal when option was already chosen', async () => {
       hasAutomation.mockReturnValue(true);
@@ -291,25 +259,6 @@ describe('CharActions state and modals', () => {
       await waitFor(() => {
         expect(setRuntimeValue).toHaveBeenCalledWith('TestCharacter', '_Blessed_Strikes_option', 'Lightning', undefined);
       });
-    });
-
-    it('skips feature choice modal when Cancel is clicked', async () => {
-      hasAutomation.mockReturnValue(true);
-      vi.mocked(getRuntimeValue).mockReturnValue(null);
-
-      const stats = createStats({
-        actions: [{ name: 'Blessed Strikes', description: 'Choose a damage type.', automation: { type: 'damage_bonus', options: ['Lightning', 'Thunder'] } }],
-      });
-
-      await act(async () => { render(<CharActions playerStats={stats} />); });
-      const actionName = screen.getByText(/Blessed Strikes:/);
-      await act(async () => { fireEvent.click(actionName); });
-      await waitFor(() => { expect(screen.getByText(/Choose your option/)).toBeInTheDocument(); });
-
-      const cancelBtn = screen.getByText('Cancel');
-      await act(async () => { fireEvent.click(cancelBtn); });
-
-      expect(screen.queryByText(/Choose your option/)).not.toBeInTheDocument();
     });
   });
 
@@ -359,34 +308,6 @@ describe('CharActions state and modals', () => {
       expect(screen.getByTestId('metamagic-popup')).toBeInTheDocument();
     });
 
-    it('does not render MetamagicPopup when no metamagic is pending', async () => {
-      useSpellMetamagicFlow.mockReturnValue({
-        pendingMetamagic: null,
-        gateMetamagic: vi.fn(),
-        handleConfirm: vi.fn(),
-        handleSkip: vi.fn(),
-        pendingAid: null,
-        handleAidConfirm: vi.fn(),
-        handleAidSkip: vi.fn(),
-        pendingGreaterRestoration: null,
-        handleGreaterRestorationConfirm: vi.fn(),
-        handleGreaterRestorationSkip: vi.fn(),
-        pendingRemoveCurse: null,
-        handleRemoveCurseConfirm: vi.fn(),
-        handleRemoveCurseSkip: vi.fn(),
-      });
 
-      useActionSpellMetamagic.mockReturnValue({
-        pendingActionMetamagic: null,
-        handleActionMetamagicConfirm: vi.fn(),
-        handleActionMetamagicSkip: vi.fn(),
-        handleActionSpellDamageClick: vi.fn(),
-        handleSpellAttackClick: vi.fn(),
-        handleSpellDamageClick: vi.fn(),
-      });
-
-      await act(async () => { render(<CharActions playerStats={createStats()} />); });
-      expect(screen.queryByTestId('metamagic-popup')).not.toBeInTheDocument();
-    });
   });
 });

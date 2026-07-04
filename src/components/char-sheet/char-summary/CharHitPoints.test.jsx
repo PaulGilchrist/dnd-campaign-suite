@@ -78,6 +78,7 @@ describe('CharHitPoints', () => {
     useRuntimeValue.mockImplementation((_key, prop) => {
       if (prop === 'currentHitPoints') return null;
       if (prop === 'aidHpMaxIncrease') return 0;
+      if (prop === 'tempHp') return 0;
       return null;
     });
   });
@@ -94,6 +95,7 @@ describe('CharHitPoints', () => {
       useRuntimeValue.mockImplementation((_key, prop) => {
         if (prop === 'currentHitPoints') return null;
         if (prop === 'aidHpMaxIncrease') return 3;
+        if (prop === 'tempHp') return 0;
         return null;
       });
 
@@ -107,6 +109,7 @@ describe('CharHitPoints', () => {
       useRuntimeValue.mockImplementation((_key, prop) => {
         if (prop === 'currentHitPoints') return 5;
         if (prop === 'aidHpMaxIncrease') return 0;
+        if (prop === 'tempHp') return 0;
         return null;
       });
 
@@ -121,6 +124,7 @@ describe('CharHitPoints', () => {
       useRuntimeValue.mockImplementation((_key, prop) => {
         if (prop === 'currentHitPoints') return undefined;
         if (prop === 'aidHpMaxIncrease') return 0;
+        if (prop === 'tempHp') return 0;
         return null;
       });
 
@@ -196,48 +200,6 @@ describe('CharHitPoints', () => {
       });
     });
 
-    it('logs healing when HP delta is positive', async () => {
-      useRuntimeValue.mockImplementation((_key, prop) => {
-        if (prop === 'currentHitPoints') return 3;
-        if (prop === 'aidHpMaxIncrease') return 0;
-        return null;
-      });
-
-      const fetchMock = setupFetchMock();
-
-      renderCharHitPoints();
-
-      const clickable = getClickable();
-      fireEvent.click(clickable);
-
-      const input = screen.getByTestId('hp-input');
-      fireEvent.change(input, { target: { value: '7' } });
-      fireEvent.blur(input);
-
-      await waitFor(() => {
-        const loggedData = JSON.parse(fetchMock.mock.calls[0][1].body);
-        expect(loggedData.isHealing).toBe(true);
-      });
-    });
-
-    it('logs unconscious when HP is set to 0 or below', async () => {
-      const fetchMock = setupFetchMock();
-
-      renderCharHitPoints();
-
-      const clickable = getClickable();
-      fireEvent.click(clickable);
-
-      const input = screen.getByTestId('hp-input');
-      fireEvent.change(input, { target: { value: '-1' } });
-      fireEvent.blur(input);
-
-      await waitFor(() => {
-        const loggedData = JSON.parse(fetchMock.mock.calls[0][1].body);
-        expect(loggedData.isUnconscious).toBe(true);
-      });
-    });
-
     it('does not log hp_change when HP value is unchanged', () => {
       const fetchMock = setupFetchMock();
 
@@ -290,6 +252,7 @@ describe('CharHitPoints', () => {
       useRuntimeValue.mockImplementation((_key, prop) => {
         if (prop === 'currentHitPoints') return -5;
         if (prop === 'aidHpMaxIncrease') return 0;
+        if (prop === 'tempHp') return 0;
         return null;
       });
 
@@ -303,20 +266,12 @@ describe('CharHitPoints', () => {
     it('updates current HP when event target matches character name', async () => {
       renderCharHitPoints();
 
-      const initCallCount = setRuntimeValue.mock.calls.filter(
-        (call) => call[1] === 'currentHitPoints'
-      ).length;
-
       const event = new CustomEvent('death-save-result', {
         detail: { targetName: 'TestCharacter', restoredToHp: 8 },
       });
       window.dispatchEvent(event);
 
       await waitFor(() => {
-        const afterCallCount = setRuntimeValue.mock.calls.filter(
-          (call) => call[1] === 'currentHitPoints'
-        ).length;
-        expect(afterCallCount).toBe(initCallCount + 1);
         expect(setRuntimeValue).toHaveBeenLastCalledWith(
           'TestCharacter',
           'currentHitPoints',

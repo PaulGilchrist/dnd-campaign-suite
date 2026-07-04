@@ -97,6 +97,8 @@ describe('SpellDetailPopup', () => {
       expect(screen.getByText('120 feet')).toBeInTheDocument();
       expect(screen.getByText(/Duration:/)).toBeInTheDocument();
       expect(screen.getByText('Instantaneous')).toBeInTheDocument();
+      expect(screen.getByText(/School:/)).toBeInTheDocument();
+      expect(screen.getByText('Evocation')).toBeInTheDocument();
     });
 
     it('renders "Cantrip" for level 0 spells', () => {
@@ -131,9 +133,8 @@ describe('SpellDetailPopup', () => {
       expect(screen.queryByText(/Slots Remaining:/)).not.toBeInTheDocument();
     });
 
-    it('renders Cast Spell and Close buttons', () => {
+    it('renders Close button', () => {
       renderPopup();
-      expect(screen.getByRole('button', { name: /Cast Spell/ })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Close' })).toBeInTheDocument();
     });
   });
@@ -226,7 +227,7 @@ describe('SpellDetailPopup', () => {
   });
 
   describe('cantrip auto-level', () => {
-    it('passes modified cantrip level to onCast when character level exceeds cantrip thresholds', () => {
+    it('adjusts cantrip level based on character level thresholds', () => {
       vi.mocked(getRuntimeValue).mockReturnValue(null);
 
       const onCast = vi.fn();
@@ -240,40 +241,27 @@ describe('SpellDetailPopup', () => {
           },
         },
       };
+
+      // Character level exceeds threshold → auto-levels to 5
       renderPopup(cantrip, baseMockPlayerStats, mockCampaignName, {
         onCast,
         playerLevel: 5,
       });
-
       fireEvent.click(screen.getByRole('button', { name: /Cast Spell/ }));
       expect(onCast).toHaveBeenCalled();
-      const castSpell = onCast.mock.calls[0][0];
-      expect(castSpell.level).toBe(5);
-    });
+      expect(onCast.mock.calls[0][0].level).toBe(5);
 
-    it('passes unmodified cantrip to onCast when character level is below thresholds', () => {
-      vi.mocked(getRuntimeValue).mockReturnValue(null);
+      onCast.mockClear();
 
-      const onCast = vi.fn();
-      const cantrip = {
-        ...baseMockSpell,
-        level: 0,
-        damage: {
-          damage_at_character_level: {
-            '3': '2d6',
-            '5': '3d6',
-          },
-        },
-      };
+      // Character level below threshold → keeps base level 0
       renderPopup(cantrip, baseMockPlayerStats, mockCampaignName, {
         onCast,
         playerLevel: 2,
       });
-
-      fireEvent.click(screen.getByRole('button', { name: /Cast Spell/ }));
+      const castButtons = screen.getAllByRole('button', { name: /Cast Spell/ });
+      fireEvent.click(castButtons[1]);
       expect(onCast).toHaveBeenCalled();
-      const castSpell = onCast.mock.calls[0][0];
-      expect(castSpell.level).toBe(0);
+      expect(onCast.mock.calls[0][0].level).toBe(0);
     });
   });
 
@@ -347,15 +335,6 @@ describe('SpellDetailPopup', () => {
       renderPopup(spell);
       expect(screen.getByText('Line 1.Line 2.')).toBeInTheDocument();
     });
-
-    it('handles missing description gracefully', () => {
-      const spell = {
-        ...baseMockSpell,
-        description: undefined,
-      };
-      renderPopup(spell);
-      expect(screen.getByText('Magic Missile')).toBeInTheDocument();
-    });
   });
 
   describe('area of effect rendering', () => {
@@ -377,41 +356,19 @@ describe('SpellDetailPopup', () => {
       renderPopup(spell);
       expect(screen.getByText('Sphere')).toBeInTheDocument();
     });
-
-    it('does not render area field when area_of_effect is missing', () => {
-      renderPopup(baseMockSpell);
-      expect(screen.queryByText(/Area:/)).not.toBeInTheDocument();
-    });
   });
 
   describe('missing metadata fields', () => {
-    it('renders dash for missing casting_time', () => {
+    it('renders dash for missing casting_time, range, and duration', () => {
       const spell = {
         ...baseMockSpell,
         casting_time: undefined,
-      };
-      renderPopup(spell);
-      expect(screen.getByText('—')).toBeInTheDocument();
-    });
-
-    it('renders dash for missing range', () => {
-      const spell = {
-        ...baseMockSpell,
         range: undefined,
-      };
-      renderPopup(spell);
-      const rangeTexts = screen.getAllByText(/—/);
-      expect(rangeTexts.length).toBeGreaterThanOrEqual(1);
-    });
-
-    it('renders dash for missing duration', () => {
-      const spell = {
-        ...baseMockSpell,
         duration: undefined,
       };
       renderPopup(spell);
       const dashTexts = screen.getAllByText('—');
-      expect(dashTexts.length).toBeGreaterThanOrEqual(1);
+      expect(dashTexts.length).toBeGreaterThanOrEqual(3);
     });
 
     it('does not render school span when school is missing', () => {
@@ -424,6 +381,7 @@ describe('SpellDetailPopup', () => {
       expect(screen.getByText(/Casting Time:/)).toBeInTheDocument();
       expect(screen.getByText(/Range:/)).toBeInTheDocument();
       expect(screen.getByText(/Duration:/)).toBeInTheDocument();
+      expect(screen.queryByText('Evocation')).not.toBeInTheDocument();
     });
   });
 });

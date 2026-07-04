@@ -178,13 +178,6 @@ describe('CharActions rendering', () => {
     });
   });
 
-  describe('section headers and structure', () => {
-    it('renders CharBonusActions child component', () => {
-      render(<CharActions playerStats={createStats({ bonusActions: [{ name: 'Cunning Action', description: 'Dash, Disengage, or Hide.' }] })} />);
-      expect(screen.getByTestId('char-bonus-actions')).toBeInTheDocument();
-    });
-  });
-
   describe('attack rendering', () => {
     const baseAttack = {
       name: 'Longsword',
@@ -235,10 +228,10 @@ describe('CharActions rendering', () => {
       expect(screen.getByText('+5')).toBeInTheDocument();
     });
 
-    it('subtracts exhaustion penalty from hit bonus and applies penalized class', () => {
+    it('subtracts exhaustion penalty from hit bonus and applies penalized styling', () => {
       render(<CharActions playerStats={createStats({ attacks: [baseAttack] })} exhaustionPenalty={2} />);
       expect(screen.getByText('+3')).toBeInTheDocument();
-      expect(document.querySelector('.stat--penalized')).toBeInTheDocument();
+      expect(screen.getByText('+3')).toHaveClass('stat--penalized');
     });
 
     it('computes negative hit bonus correctly with high exhaustion', () => {
@@ -246,17 +239,20 @@ describe('CharActions rendering', () => {
       expect(screen.getByText('-3')).toBeInTheDocument();
     });
 
-    it('applies stat--penalized class for disadvantage and cannotAct conditions', () => {
+    it('applies penalized styling for disadvantage condition', () => {
       render(<CharActions playerStats={createStats({ attacks: [baseAttack] })} conditionAttackMode="disadvantage" exhaustionPenalty={0} />);
-      expect(document.querySelector('.stat--penalized')).toBeInTheDocument();
-
-      render(<CharActions playerStats={createStats({ attacks: [baseAttack] })} cannotAct={true} />);
-      expect(document.querySelector('.stat--penalized')).toBeInTheDocument();
+      expect(screen.getByText('+5')).toHaveClass('stat--penalized');
     });
 
-    it('does not apply stat--penalized class when exhaustionPenalty is zero and no disadvantage', () => {
+    it('applies penalized styling and disabled class when cannotAct is true', () => {
+      render(<CharActions playerStats={createStats({ attacks: [baseAttack] })} cannotAct={true} />);
+      expect(screen.getByText('+5')).toHaveClass('stat--penalized');
+      expect(screen.getByText('+5')).toHaveClass('disabled-attack');
+    });
+
+    it('does not apply penalized styling when exhaustionPenalty is zero and no disadvantage', () => {
       render(<CharActions playerStats={createStats({ attacks: [baseAttack] })} exhaustionPenalty={0} />);
-      expect(document.querySelector('.stat--penalized')).not.toBeInTheDocument();
+      expect(screen.getByText('+5')).not.toHaveClass('stat--penalized');
     });
   });
 
@@ -308,12 +304,13 @@ describe('CharActions rendering', () => {
       ['5e', false],
     ])('shows Mastery column and mastery-enabled class for %s rules', (rules, shouldShow) => {
       render(<CharActions playerStats={createStats({ rules, attacks: [baseAttack] })} />);
+      const attacksContainer = document.querySelector('.char-actions .attacks');
       if (shouldShow) {
         expect(screen.getByText('Mastery')).toBeInTheDocument();
-        expect(document.querySelector('.attacks.mastery-enabled')).toBeInTheDocument();
+        expect(attacksContainer).toHaveClass('mastery-enabled');
       } else {
         expect(screen.queryByText('Mastery')).not.toBeInTheDocument();
-        expect(document.querySelector('.attacks.mastery-enabled')).not.toBeInTheDocument();
+        expect(attacksContainer).not.toHaveClass('mastery-enabled');
       }
     });
   });
@@ -330,15 +327,12 @@ describe('CharActions rendering', () => {
 
     it('applies disabled-attack class and renders Incapacitated label when cannotAct is true', () => {
       render(<CharActions playerStats={createStats({ attacks: [baseAttack] })} cannotAct={true} />);
-      expect(document.querySelector('.disabled-attack')).toBeInTheDocument();
       expect(screen.getByText('(Incapacitated)')).toBeInTheDocument();
+      expect(screen.getByText('+5')).toHaveClass('disabled-attack');
     });
 
-    it('does not show Incapacitated label when cannotAct is false or undefined', () => {
+    it('does not show Incapacitated label when cannotAct is false', () => {
       render(<CharActions playerStats={createStats({ attacks: [baseAttack] })} cannotAct={false} />);
-      expect(screen.queryByText('(Incapacitated)')).not.toBeInTheDocument();
-
-      render(<CharActions playerStats={createStats({ attacks: [baseAttack] })} />);
       expect(screen.queryByText('(Incapacitated)')).not.toBeInTheDocument();
     });
   });
@@ -352,7 +346,7 @@ describe('CharActions rendering', () => {
       expect(screen.getByText(/Second Wind:/)).toBeInTheDocument();
     });
 
-    it('renders action description via dangerouslySetInnerHTML', () => {
+    it('renders action description text', () => {
       const stats = createStats({
         actions: [{ name: 'Second Wind', description: 'Regain hit points.', details: 'Heal 1d10+1 HP.' }],
       });
@@ -363,7 +357,6 @@ describe('CharActions rendering', () => {
     it('does not render feature actions when actions array is empty', () => {
       render(<CharActions playerStats={createStats({ actions: [] })} />);
       expect(screen.queryByText(/Second Wind:/)).not.toBeInTheDocument();
-      expect(screen.queryByText(/Rage:/)).not.toBeInTheDocument();
     });
   });
 
@@ -510,13 +503,6 @@ describe('CharActions rendering', () => {
       expect(screen.getByText('Longsword')).toBeInTheDocument();
       expect(screen.getByText(/Second Wind:/)).toBeInTheDocument();
       expect(screen.getByText('Fireball')).toBeInTheDocument();
-    });
-
-    it('renders all three sections with empty arrays gracefully', () => {
-      const stats = createStats({ attacks: [], actions: [], spellAbilities: { spells: [] } });
-      render(<CharActions playerStats={stats} />);
-      expect(screen.getByText('Actions')).toBeInTheDocument();
-      expect(screen.getByText('Base Actions:')).toBeInTheDocument();
     });
   });
 });

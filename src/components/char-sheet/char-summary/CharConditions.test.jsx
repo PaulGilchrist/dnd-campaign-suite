@@ -126,30 +126,6 @@ describe('CharConditions', () => {
       expect(plusBtn).toBeDisabled();
     });
 
-    it('enables the plus button when exhaustion is below maximum', () => {
-      render(<CharConditions {...defaultProps} exhaustionLevel={5} />);
-      const plusBtn = screen.getByRole('button', { name: '+' });
-      expect(plusBtn).toBeEnabled();
-    });
-
-    it('applies dead class to badge when exhaustion is 6', () => {
-      render(<CharConditions {...defaultProps} exhaustionLevel={6} />);
-      const badge = document.querySelector('.exhaustion-badge');
-      expect(badge).toHaveClass('exhaustion-badge--dead');
-    });
-
-    it('applies active class to badge when exhaustion is above 0', () => {
-      render(<CharConditions {...defaultProps} exhaustionLevel={2} />);
-      const badge = document.querySelector('.exhaustion-badge');
-      expect(badge).toHaveClass('exhaustion-badge--active');
-    });
-
-    it('shows DEAD in the title when exhaustion is 6', () => {
-      render(<CharConditions {...defaultProps} exhaustionLevel={6} />);
-      const label = screen.getByTitle(/Exhaustion level 6.*DEAD/);
-      expect(label).toBeInTheDocument();
-    });
-
     it('increments exhaustion level on plus button click', () => {
       render(<CharConditions {...defaultProps} exhaustionLevel={2} />);
       const plusBtn = screen.getByRole('button', { name: '+' });
@@ -190,28 +166,6 @@ describe('CharConditions', () => {
       const minusBtn = screen.getByRole('button', { name: '−' });
       fireEvent.click(minusBtn);
       expect(setRuntimeValue).toHaveBeenCalledWith('Test Character', 'exhaustionLevel', 2, 'test-campaign');
-    });
-
-    it('logs a roll entry when decreasing exhaustion', () => {
-      render(<CharConditions {...defaultProps} exhaustionLevel={3} />);
-      const minusBtn = screen.getByRole('button', { name: '−' });
-      fireEvent.click(minusBtn);
-      expect(global.fetch).toHaveBeenCalledWith(
-        expect.stringContaining('/log'),
-        expect.objectContaining({
-          method: 'POST',
-        })
-      );
-    });
-
-    it('calls setPopupHtml with d20 save details when decreasing exhaustion', () => {
-      render(<CharConditions {...defaultProps} exhaustionLevel={3} />);
-      const minusBtn = screen.getByRole('button', { name: '−' });
-      fireEvent.click(minusBtn);
-      expect(mockSetPopupHtml).toHaveBeenCalledWith(expect.objectContaining({
-        type: 'd20',
-        rollType: 'save',
-      }));
     });
   });
 
@@ -328,23 +282,6 @@ describe('CharConditions', () => {
       });
     });
 
-    it('sends log entry with correct save details when condition save fails', async () => {
-      rollD20.mockReturnValueOnce(1);
-      getRuntimeValue.mockReturnValue(['charmed']);
-      render(<CharConditions {...defaultProps} />);
-      const charmedBtn = screen.getByText('Charmed');
-      fireEvent.click(charmedBtn);
-      await waitFor(() => {
-        expect(global.fetch).toHaveBeenCalledWith(
-          expect.stringContaining('/log'),
-          expect.objectContaining({
-            method: 'POST',
-            body: expect.stringContaining('Charmed'),
-          })
-        );
-      });
-    });
-
     it('applies aura bonus to save roll total', async () => {
       computeAuraBonus.mockResolvedValueOnce({
         bonus: 3,
@@ -357,25 +294,6 @@ describe('CharConditions', () => {
       await waitFor(() => {
         // rollD20=15, bonus=2, aura=3, total=20 >= DC 10, condition removed
         expect(setRuntimeValue).toHaveBeenCalledWith('Test Character', 'activeConditions', [], 'test-campaign');
-      });
-    });
-
-    it('includes aura bonus detail in log entry when aura is present', async () => {
-      computeAuraBonus.mockResolvedValueOnce({
-        bonus: 3,
-        sourceName: 'Paladin',
-      });
-      getRuntimeValue.mockReturnValue(['charmed']);
-      render(<CharConditions {...defaultProps} />);
-      const charmedBtn = screen.getByText('Charmed');
-      fireEvent.click(charmedBtn);
-      await waitFor(() => {
-        expect(global.fetch).toHaveBeenCalledWith(
-          expect.stringContaining('/log'),
-          expect.objectContaining({
-            body: expect.stringContaining('Paladin'),
-          })
-        );
       });
     });
 

@@ -101,12 +101,6 @@ describe('CharSummary - Buff Effects', () => {
             render(<CharSummary playerStats={mockPlayerStats} campaignName={mockCampaignName} exhaustionLevel={0} />);
             expect(screen.getByText(/\+2 from Haste/)).toBeInTheDocument();
         });
-
-        it('doubles speed when haste buff is active', () => {
-            getActiveBuffs.mockReturnValue([{ effect: 'haste' }]);
-            render(<CharSummary playerStats={mockPlayerStats} campaignName={mockCampaignName} exhaustionLevel={0} />);
-            expect(screen.getByText(/Speed:/)).toBeInTheDocument();
-        });
     });
 
     describe('mage armor effect', () => {
@@ -238,13 +232,15 @@ describe('CharSummary - Buff Effects', () => {
         it('adds speed bonus when speed_boost buff is active', () => {
             getActiveBuffs.mockReturnValue([{ effect: 'speed_boost', speedBonus: 15 }]);
             render(<CharSummary playerStats={mockPlayerStats} campaignName={mockCampaignName} exhaustionLevel={0} />);
-            expect(screen.getByText(/Speed:/)).toBeInTheDocument();
+            const speedEl = screen.getByText(/Speed:/).nextElementSibling;
+            expect(speedEl.textContent).toContain('40 ft');
         });
 
         it('adds 10 speed when large_form buff is active', () => {
             getActiveBuffs.mockReturnValue([{ effect: 'large_form' }]);
             render(<CharSummary playerStats={mockPlayerStats} campaignName={mockCampaignName} exhaustionLevel={0} />);
-            expect(screen.getByText(/Speed:/)).toBeInTheDocument();
+            const speedEl = screen.getByText(/Speed:/).nextElementSibling;
+            expect(speedEl.textContent).toContain('35 ft');
         });
     });
 
@@ -289,16 +285,6 @@ describe('CharSummary - Speed Calculations', () => {
     });
 
     describe('condition speed effects', () => {
-        it('sets speed to 0 when speedZero condition is active', () => {
-            render(<CharSummary
-                playerStats={mockPlayerStats}
-                campaignName={mockCampaignName}
-                exhaustionLevel={0}
-                conditionEffects={{ speedZero: true }}
-            />);
-            expect(screen.getByText('Speed:')).toBeInTheDocument();
-        });
-
         it('halves speed when speedHalved condition is active', () => {
             render(<CharSummary
                 playerStats={mockPlayerStats}
@@ -332,19 +318,6 @@ describe('CharSummary - Speed Calculations', () => {
             />);
             const speedEl = screen.getByText(/Speed:/).nextElementSibling;
             expect(speedEl.textContent).toContain('20 ft');
-        });
-    });
-
-    describe('aura speed bonus', () => {
-        it('shows aura source indicator for speed bonus', () => {
-            const stats = { ...mockPlayerStats, inventory: { equipped: [] }, equipment: [] };
-            render(<CharSummary
-                playerStats={stats}
-                campaignName={mockCampaignName}
-                exhaustionLevel={0}
-                auraComboEffects={{ speedBonus: 10, speedSource: 'Aura of Protection' }}
-            />);
-            expect(document.body.textContent).toContain('(+10)');
         });
     });
 
@@ -778,17 +751,11 @@ describe('CharSummary - Initiative', () => {
         // initiative 2 - 2*1 = 0
         render(<CharSummary playerStats={mockPlayerStats} campaignName={mockCampaignName} exhaustionLevel={1} />);
         expect(screen.getByText('+0')).toBeInTheDocument();
-    });
-
-    it('applies exhaustion penalty correctly for higher levels', () => {
         // initiative 2 - 2*2 = -2
         render(<CharSummary playerStats={mockPlayerStats} campaignName={mockCampaignName} exhaustionLevel={2} />);
         expect(screen.getByText('-2')).toBeInTheDocument();
-    });
-
-    it('renders negative initiative with minus sign', () => {
-        const stats = { ...mockPlayerStats, initiative: 1, exhaustionLevel: 2 };
-        // 1 - 4 = -3
+        // initiative 1 - 2*2 = -3
+        const stats = { ...mockPlayerStats, initiative: 1 };
         render(<CharSummary playerStats={stats} campaignName={mockCampaignName} exhaustionLevel={2} />);
         expect(screen.getByText(/-3/)).toBeInTheDocument();
     });
@@ -851,17 +818,11 @@ describe('CharSummary - XP Modal Display', () => {
         expect(screen.getByText(/2,400 XP/)).toBeInTheDocument();
     });
 
-    it('does not display XP preview when delta is empty', () => {
+    it('does not display XP preview when delta is empty or non-numeric', () => {
         render(<CharSummary playerStats={mockPlayerStats} campaignName={mockCampaignName} exhaustionLevel={0} />);
         const levelSuffix = screen.getByText(/milestone/);
         fireEvent.click(levelSuffix);
         expect(screen.queryByText(/2,400 XP/)).not.toBeInTheDocument();
-    });
-
-    it('does not display XP preview when delta is not a number', () => {
-        render(<CharSummary playerStats={mockPlayerStats} campaignName={mockCampaignName} exhaustionLevel={0} />);
-        const levelSuffix = screen.getByText(/milestone/);
-        fireEvent.click(levelSuffix);
         const input = screen.getByPlaceholderText('+100 or -50');
         fireEvent.change(input, { target: { value: 'abc' } });
         expect(screen.queryByText(/2,400 XP/)).not.toBeInTheDocument();

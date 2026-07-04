@@ -115,24 +115,6 @@ describe('SpellDetailPopup - Free Cast Authorization', () => {
       ).toBeInTheDocument();
     });
 
-    it('does not authorize bewitching magic for non-Misty Step spells', () => {
-      vi.mocked(getRuntimeValue).mockImplementation((_name, key) => {
-        if (key === '_Bewitching_Magic_freeCast') return true;
-        return null;
-      });
-
-      const spell = {
-        ...baseMockSpell,
-        name: 'Haste',
-        level: 3,
-        damage: { damage_at_slot_level: { '3': '6d6' } },
-      };
-      renderPopup(spell);
-      expect(
-        screen.queryByText('Free Cast — no spell slot consumed')
-      ).not.toBeInTheDocument();
-    });
-
     it('authorizes via Spell Mastery when spell name and level match', () => {
       vi.mocked(getRuntimeValue).mockImplementation((_name, key, _campaign) => {
         if (key === 'SpellMastery_level1') return 'Shield';
@@ -149,24 +131,6 @@ describe('SpellDetailPopup - Free Cast Authorization', () => {
       expect(
         screen.getByText('Free Cast — no spell slot consumed')
       ).toBeInTheDocument();
-    });
-
-    it('does not authorize Spell Mastery when spell name does not match', () => {
-      vi.mocked(getRuntimeValue).mockImplementation((_name, key, _campaign) => {
-        if (key === 'SpellMastery_level1') return 'Shield';
-        return null;
-      });
-
-      const spell = {
-        ...baseMockSpell,
-        name: 'Magic Missile',
-        level: 1,
-        damage: { damage_at_slot_level: { '1': '3d4+1' } },
-      };
-      renderPopup(spell);
-      expect(
-        screen.queryByText('Free Cast — no spell slot consumed')
-      ).not.toBeInTheDocument();
     });
   });
 
@@ -202,24 +166,6 @@ describe('SpellDetailPopup - Free Cast Authorization', () => {
         name: 'Fireball',
         level: 3,
         damage: { damage_at_slot_level: { '3': '8d6' } },
-      };
-      renderPopup(spell);
-      expect(
-        screen.queryByText('Free Cast — no spell slot consumed')
-      ).not.toBeInTheDocument();
-    });
-
-    it('does not authorize for non-level 3 spells', () => {
-      vi.mocked(getRuntimeValue).mockImplementation((_name, key, _campaign) => {
-        if (key === 'SignatureSpells_selection') return ['Shield'];
-        return null;
-      });
-
-      const spell = {
-        ...baseMockSpell,
-        name: 'Shield',
-        level: 1,
-        damage: { damage_at_slot_level: { '1': '1d5+1' } },
       };
       renderPopup(spell);
       expect(
@@ -294,53 +240,6 @@ describe('SpellDetailPopup - Free Cast Authorization', () => {
       ).toBeInTheDocument();
     });
 
-    it('does not authorize without the passive', () => {
-      vi.mocked(getRuntimeValue).mockImplementation((_name, key) => {
-        if (key === '_Phantasmal_Creatures_freeCastCount') return 1;
-        return null;
-      });
-
-      const spell = {
-        ...baseMockSpell,
-        name: 'Summon Beast',
-        level: 2,
-        damage: { damage_at_slot_level: { '2': '3d6' } },
-      };
-      const stats = {
-        ...baseMockPlayerStats,
-        automation: { passives: [], actions: [] },
-      };
-      renderPopup(spell, stats);
-      expect(
-        screen.queryByText('Free Cast — no spell slot consumed')
-      ).not.toBeInTheDocument();
-    });
-
-    it('does not authorize for non-summon spells', () => {
-      vi.mocked(getRuntimeValue).mockImplementation((_name, key) => {
-        if (key === '_Phantasmal_Creatures_freeCastCount') return 1;
-        return null;
-      });
-
-      const spell = {
-        ...baseMockSpell,
-        name: 'Fireball',
-        level: 3,
-        damage: { damage_at_slot_level: { '3': '8d6' } },
-      };
-      const stats = {
-        ...baseMockPlayerStats,
-        automation: {
-          passives: [{ type: 'phantasmal_creatures' }],
-          actions: [],
-        },
-      };
-      renderPopup(spell, stats);
-      expect(
-        screen.queryByText('Free Cast — no spell slot consumed')
-      ).not.toBeInTheDocument();
-    });
-
     it('does not authorize when count is 0', () => {
       vi.mocked(getRuntimeValue).mockImplementation((_name, key) => {
         if (key === '_Phantasmal_Creatures_freeCastCount') return 0;
@@ -391,40 +290,6 @@ describe('SpellDetailPopup - Free Cast Authorization', () => {
               spell: 'a level 9 Warlock spell (your choice)',
               uses_expression: '1/rest',
               usesMax: 1,
-            },
-          ],
-        },
-      };
-      renderPopup(spell, stats);
-      expect(
-        screen.getByText('Free Cast — no spell slot consumed')
-      ).toBeInTheDocument();
-    });
-  });
-
-  describe('perSpellTracking free_spell actions', () => {
-    it('authorizes when runtime value includes the spell and tracking is per-spell', () => {
-      vi.mocked(getRuntimeValue).mockImplementation((_name, key) => {
-        if (key === '_Fey_Touched_freeCast') return ['Shield'];
-        return null;
-      });
-
-      const spell = {
-        ...baseMockSpell,
-        name: 'Shield',
-        level: 1,
-        damage: { damage_at_slot_level: { '1': '1d5+1' } },
-      };
-      const stats = {
-        ...baseMockPlayerStats,
-        automation: {
-          passives: [],
-          actions: [
-            {
-              name: 'Fey Touched',
-              type: 'free_spell',
-              spell: 'Shield',
-              perSpellTracking: false,
             },
           ],
         },

@@ -137,11 +137,6 @@ describe('CharClassFeatures', () => {
             expect(container.innerHTML).toBe('');
         });
 
-        it('renders druid container at level 5', () => {
-            renderComponent(druidStats(5));
-            expect(screen.getByTestId('char-class-druid')).toBeInTheDocument();
-        });
-
         it('renders natural recovery section when resource_restoration passive exists', () => {
             const stats = makeStats({
                 level: 5,
@@ -178,6 +173,7 @@ describe('CharClassFeatures', () => {
 
         it('renders wild shape features', () => {
             renderComponent(druidStats(5));
+            expect(screen.getByTestId('char-class-druid')).toBeInTheDocument();
             expect(screen.getByText(/Wild Shape Limitations:/)).toBeInTheDocument();
             expect(screen.getByText(/Beast Forms Known:/)).toBeInTheDocument();
             expect(screen.getByText(/Wild Shape Max Challenge Rating:/)).toBeInTheDocument();
@@ -257,77 +253,30 @@ describe('CharClassFeatures', () => {
             expect(screen.queryByText(/Energy Dice/)).not.toBeInTheDocument();
         });
 
-        it('renders superiority dice and die type for Battle Master subclass', () => {
-            const stats = makeStats({
-                level: 5,
-                class: {
-                    name: 'Fighter',
-                    class_levels: [
-                        { level: 1 }, { level: 2 }, { level: 3 }, { level: 4 },
-                        { level: 5, extra_attacks: 2, weapon_mastery: 'Mercy' },
-                    ],
-                    major: { name: 'Battle Master' },
-                    fightingStyles: [],
-                },
-                automation: { passives: [] },
-            });
-            const { container } = renderComponent(stats);
-            expect(container.querySelector('[data-testid="tracked-resource-Superiority Dice"]')).toBeInTheDocument();
-            const dieDiv = [...container.querySelectorAll('div')].find(d => d.textContent.includes('Superiority Die'));
-            expect(dieDiv.textContent).toContain('d8');
-        });
+        it('renders superiority dice and die type based on subclass and level', () => {
+            const cases = [
+                { level: 5, major: 'Battle Master', expectedDie: 'd8' },
+                { level: 10, major: 'Battle Master', expectedDie: 'd10' },
+                { level: 18, major: 'Battle Master', expectedDie: 'd12' },
+                { level: 5, major: null, fightingStyles: ['Superior Technique'], expectedDie: 'd6' },
+            ];
 
-        it('renders superiority die type d10 for Battle Master level 10+', () => {
-            const stats = makeStats({
-                level: 10,
-                class: {
-                    name: 'Fighter',
-                    class_levels: Array.from({ length: 10 }, (_, i) => ({ level: i + 1, extra_attacks: 2, weapon_mastery: 'Mercy' })),
-                    major: { name: 'Battle Master' },
-                    fightingStyles: [],
-                },
-                automation: { passives: [] },
-            });
-            const { container } = renderComponent(stats);
-            expect(container.querySelector('[data-testid="tracked-resource-Superiority Dice"]')).toBeInTheDocument();
-            const dieDiv = [...container.querySelectorAll('div')].find(d => d.textContent.includes('Superiority Die'));
-            expect(dieDiv.textContent).toContain('d10');
-        });
-
-        it('renders superiority die type d12 for Battle Master level 18+', () => {
-            const stats = makeStats({
-                level: 18,
-                class: {
-                    name: 'Fighter',
-                    class_levels: Array.from({ length: 18 }, (_, i) => ({ level: i + 1, extra_attacks: 2, weapon_mastery: 'Mercy' })),
-                    major: { name: 'Battle Master' },
-                    fightingStyles: [],
-                },
-                automation: { passives: [] },
-            });
-            const { container } = renderComponent(stats);
-            expect(container.querySelector('[data-testid="tracked-resource-Superiority Dice"]')).toBeInTheDocument();
-            const dieDiv = [...container.querySelectorAll('div')].find(d => d.textContent.includes('Superiority Die'));
-            expect(dieDiv.textContent).toContain('d12');
-        });
-
-        it('renders superiority dice for Superior Technique fighting style', () => {
-            const stats = makeStats({
-                level: 5,
-                class: {
-                    name: 'Fighter',
-                    class_levels: [
-                        { level: 1 }, { level: 2 }, { level: 3 }, { level: 4 },
-                        { level: 5, extra_attacks: 2, weapon_mastery: 'Mercy' },
-                    ],
-                    fightingStyles: ['Superior Technique'],
-                },
-                automation: { passives: [] },
-            });
-            const { container } = renderComponent(stats);
-            expect(container.querySelector('[data-testid="tracked-resource-Superiority Dice"]')).toBeInTheDocument();
-            const dieDiv = [...container.querySelectorAll('div')].find(d => d.textContent.includes('Superiority Die'));
-            expect(dieDiv.textContent).toContain('d6');
+            for (const c of cases) {
+                const stats = makeStats({
+                    level: c.level,
+                    class: {
+                        name: 'Fighter',
+                        class_levels: Array.from({ length: c.level }, (_, i) => ({ level: i + 1, extra_attacks: 2, weapon_mastery: 'Mercy' })),
+                        major: c.major ? { name: c.major } : undefined,
+                        fightingStyles: c.fightingStyles || [],
+                    },
+                    automation: { passives: [] },
+                });
+                const { container } = renderComponent(stats);
+                expect(container.querySelector('[data-testid="tracked-resource-Superiority Dice"]')).toBeInTheDocument();
+                const dieDiv = [...container.querySelectorAll('div')].find(d => d.textContent.includes('Superiority Die'));
+                expect(dieDiv.textContent).toContain(c.expectedDie);
+            }
         });
 
         it('renders 2024 ruleset fighter with action surge based on level', () => {
@@ -376,32 +325,24 @@ describe('CharClassFeatures', () => {
             expect(screen.getByText(/Fighting Styles.*/));
         });
 
-        it('renders extra attacks from classLevel', () => {
-            renderComponent(fighterStats());
-            expect(screen.getByText(/Extra Attacks.*/));
-        });
-
-        it('renders action surge tracked resource', () => {
-            renderComponent(fighterStats());
-            expect(screen.getByTestId('tracked-resource-Action Surge Uses')).toBeInTheDocument();
-        });
-
-        it('renders second wind tracked resource', () => {
+        it('renders tracked resources and weapon mastery', () => {
             const stats = makeStats({
                 level: 5,
                 class: {
                     name: 'Fighter',
-                    class_levels: [{ level: 1 }, { level: 2 }, { level: 3 }, { level: 4 }, { level: 5, second_wind: 1 }],
+                    class_levels: [
+                        { level: 1 }, { level: 2 }, { level: 3 }, { level: 4 },
+                        { level: 5, extra_attacks: 2, weapon_mastery: 'Mercy' },
+                    ],
+                    major: { name: 'Battle Master' },
                     fightingStyles: [],
                 },
                 automation: { passives: [] },
             });
             renderComponent(stats);
+            expect(screen.getByTestId('tracked-resource-Action Surge Uses')).toBeInTheDocument();
             expect(screen.getByTestId('tracked-resource-Second Wind')).toBeInTheDocument();
-        });
-
-        it('renders weapon mastery clickable', () => {
-            renderComponent(fighterStats());
+            expect(screen.getByTestId('tracked-resource-Superiority Dice')).toBeInTheDocument();
             const weaponMasterySpan = screen.getByText(/Weapon Mastery:/).nextSibling;
             expect(weaponMasterySpan).toHaveAttribute('class', 'clickable');
         });
@@ -419,13 +360,9 @@ describe('CharClassFeatures', () => {
             expect(container.innerHTML).toBe('');
         });
 
-        it('renders monk container at level 5', () => {
-            renderComponent(monkStats(5));
-            expect(screen.getByTestId('char-class-monk')).toBeInTheDocument();
-        });
-
         it('renders monk features', () => {
             renderComponent(monkStats(5));
+            expect(screen.getByTestId('char-class-monk')).toBeInTheDocument();
             expect(screen.getByText(/Focus Save DC.*/)).toBeInTheDocument();
             expect(screen.getByText(/Unarmored Movement:/)).toBeInTheDocument();
             expect(screen.getByText(/Martial Arts Die:/)).toBeInTheDocument();
@@ -455,14 +392,15 @@ describe('CharClassFeatures', () => {
             automation: { passives: [] },
         });
 
-        it('renders paladin container', () => {
+        it('renders paladin features', () => {
             renderComponent(paladinStats());
             expect(screen.getByTestId('char-class-paladin')).toBeInTheDocument();
         });
 
-        it('renders lay on hands pool tracked resource', () => {
+        it('renders lay on hands pool and channel divinity tracked resources', () => {
             renderComponent(paladinStats());
             expect(screen.getByTestId('tracked-resource-Lay On Hands Pool')).toBeInTheDocument();
+            expect(screen.getByTestId('tracked-resource-Channel Divinity Charges')).toBeInTheDocument();
         });
 
         it('renders aura of protection with charisma bonus', () => {
@@ -471,12 +409,10 @@ describe('CharClassFeatures', () => {
             expect(screen.getByText(/\+3/)).toBeInTheDocument();
         });
 
-        it('shows locked aura range at level < 6', () => {
+        it('shows locked aura range at level < 6 and 10 ft at level >= 6', () => {
             renderComponent(paladinStats());
             expect(screen.getByText(/locked/)).toBeInTheDocument();
-        });
 
-        it('shows 10 ft aura range at level >= 6', () => {
             const stats = makeStats({
                 level: 6,
                 class: { name: 'Paladin', class_levels: [{ level: 6 }] },
@@ -505,11 +441,6 @@ describe('CharClassFeatures', () => {
             expect(screen.getByText(/Extra Attacks.*/));
         });
 
-        it('renders channel divinity charges tracked resource', () => {
-            renderComponent(paladinStats());
-            expect(screen.getByTestId('tracked-resource-Channel Divinity Charges')).toBeInTheDocument();
-        });
-
         it('does not render aura of protection when charisma ability is missing', () => {
             const stats = makeStats({
                 level: 5,
@@ -530,7 +461,7 @@ describe('CharClassFeatures', () => {
             automation: { passives: [] },
         });
 
-        it('renders ranger container', () => {
+        it('renders ranger features', () => {
             renderComponent(rangerStats());
             expect(screen.getByTestId('char-class-ranger')).toBeInTheDocument();
         });
@@ -594,7 +525,7 @@ describe('CharClassFeatures', () => {
             automation: { passives: [] },
         });
 
-        it('renders rogue container at level 9', () => {
+        it('renders rogue container', () => {
             renderComponent(rogueStats(9));
             expect(screen.getByTestId('char-class-rogue')).toBeInTheDocument();
         });
@@ -609,13 +540,10 @@ describe('CharClassFeatures', () => {
             expect(screen.queryByTitle(/Supreme Sneak/)).not.toBeInTheDocument();
         });
 
-        it('renders sneak attack damage display', () => {
+        it('renders sneak attack damage display and button with dice count', () => {
             renderComponent(rogueStats(9));
             expect(screen.getByText(/Sneak Attack Damage:/)).toBeInTheDocument();
-        });
-
-        it('renders sneak attack button with dice count', () => {
-            renderComponent(rogueStats(9));
+            expect(screen.getByText(/Sneak Attack \(5d6\)/)).toBeInTheDocument();
             const allButtons = screen.getAllByTitle(/Sneak Attack/);
             expect(allButtons.length).toBeGreaterThan(0);
         });
@@ -625,7 +553,7 @@ describe('CharClassFeatures', () => {
             expect(screen.getByText(/Expertise:/)).toBeInTheDocument();
         });
 
-        it('renders supreme sneak as active when stealth attack cost > 0', () => {
+        it('toggles supreme sneak active state based on stealth attack cost', () => {
             vi.mocked(useRuntimeValue).mockImplementation((_name, key) => {
                 if (key === 'stealthAttackCost') return 1;
                 return null;
@@ -635,7 +563,7 @@ describe('CharClassFeatures', () => {
             expect(btn).toHaveClass('automation-badge--active');
         });
 
-        it('does not render supreme sneak when stealth attack cost is 0', () => {
+        it('does not show supreme sneak active when stealth attack cost is 0', () => {
             vi.mocked(useRuntimeValue).mockImplementation((_name, key) => {
                 if (key === 'stealthAttackCost') return 0;
                 return null;
@@ -643,11 +571,6 @@ describe('CharClassFeatures', () => {
             renderComponent(rogueStats(9));
             const btn = screen.getByTitle(/Supreme Sneak/);
             expect(btn).not.toHaveClass('automation-badge--active');
-        });
-
-        it('renders sneak attack dice from class features', () => {
-            renderComponent(rogueStats(9));
-            expect(screen.getByText(/Sneak Attack \(5d6\)/)).toBeInTheDocument();
         });
 
         it('renders rogue at level 1 without supreme sneak', () => {

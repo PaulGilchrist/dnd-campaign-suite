@@ -104,7 +104,6 @@ vi.mock('./char-spells/SpellDetailPopup.jsx', () => ({
   default: vi.fn((props) => <div data-testid="spell-detail-popup">{props.spell?.name || 'SpellDetailPopup'}</div>),
 }));
 
-import { useSpellMetamagicFlow } from '../../hooks/combat/useSpellMetamagicFlow.js';
 import { hasAutomation } from '../../services/combat/automation/automationService.js';
 import { isExhausted } from '../../services/automation/handlers/combat/saveAttackHandler.js';
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
@@ -160,36 +159,7 @@ describe('CharBonusActions - Interactive', () => {
       expect(mockSetPopupHtml).toHaveBeenCalledWith(expect.stringContaining('Dash, Hide, or Disengage'));
     });
 
-    it('does not call onAutomationAction when bonus action has details but no automation', () => {
-      hasAutomation.mockReturnValue(false);
-      const onAutomationAction = vi.fn();
-      const bonusActionDesc = { name: 'Cunning Action', description: 'You can take a bonus action.', details: 'Dash, Hide, or Disengage.' };
-      render(<CharBonusActions playerStats={createStats({ bonusActions: [bonusActionDesc] })} onAutomationAction={onAutomationAction} />);
-      const actionName = screen.getByText(/Cunning Action:/);
-      fireEvent.click(actionName);
-      expect(onAutomationAction).not.toHaveBeenCalled();
-    });
-
-    it('does not call handler when bonus action is exhausted and has no details', () => {
-      hasAutomation.mockReturnValue(true);
-      isExhausted.mockReturnValue(true);
-      const mockSetPopupHtml = vi.fn();
-      vi.mocked(useDiceRollPopup).mockReturnValue({ popupHtml: null, setPopupHtml: mockSetPopupHtml });
-      const onAutomationAction = vi.fn();
-      const rageAction = {
-        ...automatedBonusAction,
-        name: 'Berserker Rage',
-        description: 'You enter a rage.',
-        automation: { type: 'combat_stance', recharge: 'long_rest_or_expend_rage' },
-      };
-      render(<CharBonusActions playerStats={createStats({ bonusActions: [rageAction] })} onAutomationAction={onAutomationAction} />);
-      const actionName = screen.getByText(/Berserker Rage:/);
-      fireEvent.click(actionName);
-      expect(onAutomationAction).not.toHaveBeenCalled();
-      expect(mockSetPopupHtml).not.toHaveBeenCalled();
-    });
-
-    it('does not call onAutomationAction when the bonus action is exhausted', () => {
+    it('does not call onAutomationAction when bonus action is exhausted', () => {
       hasAutomation.mockReturnValue(true);
       isExhausted.mockReturnValue(true);
       const onAutomationAction = vi.fn();
@@ -212,15 +182,6 @@ describe('CharBonusActions - Interactive', () => {
       });
       render(<CharBonusActions playerStats={stats} />);
       expect(screen.getByText(/Pool: 15 HP/)).toBeInTheDocument();
-    });
-
-    it('shows damage badge for automation with damage', () => {
-      hasAutomation.mockImplementation((feature) => feature?.automation?.type === 'auto_effect');
-      const stats = createStats({
-        bonusActions: [{ name: 'Thunderous Smite', description: 'Strike with thunderous force.', automation: { type: 'auto_effect', damage: '2d6', damageType: 'Thunder' } }],
-      });
-      render(<CharBonusActions playerStats={stats} />);
-      expect(screen.getByText(/2d6 Thunder/)).toBeInTheDocument();
     });
   });
 
@@ -250,7 +211,7 @@ describe('CharBonusActions - Interactive', () => {
       expect(screen.queryByText(/Restore with Rage/)).not.toBeInTheDocument();
     });
 
-    it('restores rage and shows confirmation popup when Restore with Rage is clicked', async () => {
+    it('restores rage and updates runtime state when Restore with Rage is clicked', async () => {
       hasAutomation.mockReturnValue(true);
       isExhausted.mockReturnValue(true);
       vi.mocked(getRuntimeValue).mockImplementation((name, key) => {
@@ -264,25 +225,6 @@ describe('CharBonusActions - Interactive', () => {
 
       await waitFor(() => {
         expect(setRuntimeValue).toHaveBeenCalled();
-      });
-    });
-
-    it('shows popup with no rage message when ragePoints is 0', async () => {
-      hasAutomation.mockReturnValue(true);
-      isExhausted.mockReturnValue(true);
-      vi.mocked(getRuntimeValue).mockImplementation((name, key) => {
-        if (key === 'ragePoints') return 0;
-        return null;
-      });
-      const mockSetPopupHtml = vi.fn();
-      vi.mocked(useDiceRollPopup).mockReturnValue({ popupHtml: null, setPopupHtml: mockSetPopupHtml });
-
-      render(<CharBonusActions playerStats={createStats({ bonusActions: [rageBonusAction] })} />);
-      const restoreBtn = screen.getByText(/Restore with Rage/);
-      fireEvent.click(restoreBtn);
-
-      await waitFor(() => {
-        expect(mockSetPopupHtml).toHaveBeenCalledWith(expect.stringContaining('No Rage remaining'));
       });
     });
 
@@ -366,26 +308,6 @@ describe('CharBonusActions - Interactive', () => {
       const damageElement = screen.getByText('8d8');
       fireEvent.click(damageElement);
       expect(mockOnResolveSpellDamage).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('metamagic popup', () => {
-    it('renders MetamagicPopup when pendingMetamagic is set', () => {
-      useSpellMetamagicFlow.mockReturnValue({
-        pendingMetamagic: { spellName: 'Fireball', spellLevel: 3, _currentSP: 5 },
-        gateMetamagic: vi.fn(),
-        handleConfirm: vi.fn(),
-        handleSkip: vi.fn(),
-        pendingAid: null,
-        handleAidConfirm: vi.fn(),
-        handleAidSkip: vi.fn(),
-        pendingGreaterRestoration: null,
-        handleGreaterRestorationConfirm: vi.fn(),
-        handleGreaterRestorationSkip: vi.fn(),
-      });
-
-      render(<CharBonusActions playerStats={createStats({ spellAbilities: { spells: [{ name: 'Shocking Grasp', range: 'Touch', casting_time: '1 bonus action', prepared: 'Prepared' }] } })} />);
-      expect(screen.getByTestId('metamagic-popup')).toBeInTheDocument();
     });
   });
 

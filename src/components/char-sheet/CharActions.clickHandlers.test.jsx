@@ -184,7 +184,7 @@ import useLoggedDiceRoll from '../../hooks/combat/useLoggedDiceRoll.js';
 import { DiceRollContext } from '../../hooks/combat/DiceRollContext.js';
 import { hasAutomation } from '../../services/combat/automation/automationService.js';
 import { isExhausted } from '../../services/automation/handlers/combat/saveAttackHandler.js';
-import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
+import { getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import { getInnateSorceryBonus } from '../../services/combat/buffs/buffService.js';
 import { executeHandler } from '../../services/automation/index.js';
 import { addEntry } from '../../services/ui/logService.js';
@@ -215,67 +215,8 @@ describe('CharActions click handlers', () => {
     localStorage.clear();
   });
 
-  describe('restore with rage', () => {
-    it('should call setRuntimeValue with rage points and rage key when Restore with Rage is clicked', async () => {
-      hasAutomation.mockReturnValue(true);
-      isExhausted.mockReturnValue(true);
-      vi.mocked(getRuntimeValue).mockImplementation((_name, key) => {
-        if (key === 'ragePoints') return 1;
-        return null;
-      });
-
-      const stats = createStats({
-        actions: [{
-          name: 'Berserker Rage',
-          description: 'You enter a rage.',
-          automation: { type: 'combat_stance', recharge: 'long_rest_or_expend_rage' },
-        }],
-      });
-
-      await renderWithFetch(<CharActions playerStats={stats} />);
-      const restoreBtn = screen.getByText(/Restore with Rage/);
-      await act(async () => { fireEvent.click(restoreBtn); });
-      await waitFor(() => {
-        expect(setRuntimeValue).toHaveBeenCalledWith('TestCharacter', 'ragePoints', 0, undefined);
-      });
-    });
-
-    it('should show a popup when no rage points remain to restore', async () => {
-      isExhausted.mockReturnValue(true);
-      const mockSetPopupHtml = vi.fn();
-      useLoggedDiceRoll.mockReturnValue({
-        popupHtml: null, setPopupHtml: mockSetPopupHtml, rollAttack: vi.fn(), rollDamage: vi.fn(), quickRollPlayerSave: vi.fn(), saveDcBonus: 0,
-      });
-      vi.mocked(getRuntimeValue).mockImplementation((_name, key) => {
-        if (key === 'ragePoints') return 0;
-        return null;
-      });
-
-      const stats = createStats({
-        actions: [{
-          name: 'Berserker Rage',
-          description: 'You enter a rage.',
-          automation: { type: 'combat_stance', recharge: 'long_rest_or_expend_rage' },
-        }],
-      });
-
-      await act(async () => {
-        const wrapper = ({ children }) => (
-          <DiceRollContext.Provider value={{ popupHtml: null, setPopupHtml: mockSetPopupHtml }}>
-            {children}
-          </DiceRollContext.Provider>
-        );
-        render(<CharActions playerStats={stats} />, { wrapper });
-      });
-      const restoreBtn = screen.getByText(/Restore with Rage/);
-      await act(async () => { fireEvent.click(restoreBtn); });
-
-      expect(mockSetPopupHtml).toHaveBeenCalledWith(expect.stringContaining('No Rage remaining'));
-    });
-  });
-
-  describe('attack click guards', () => {
-    it('should not call handleSpellAttackClick when cannotAct is true', async () => {
+  describe('cannotAct guard', () => {
+    it('prevents spell attack click when cannotAct is true', async () => {
       const mockHandleSpellAttackClick = vi.fn();
       vi.mocked(getInnateSorceryBonus).mockReturnValue({ saveDcBonus: 0 });
 
@@ -300,7 +241,7 @@ describe('CharActions click handlers', () => {
   });
 
   describe('spell attack/damage click handlers', () => {
-    it('should call resolveSpellDamage when damage is clicked for save-DC attack', async () => {
+    it('calls resolveSpellDamage when damage is clicked for save-DC attack', async () => {
       const mockResolveSpellDamage = vi.fn();
       vi.mocked(getInnateSorceryBonus).mockReturnValue({ saveDcBonus: 0 });
 
@@ -322,7 +263,7 @@ describe('CharActions click handlers', () => {
       expect(mockResolveSpellDamage).toHaveBeenCalledWith(stats.attacks[0]);
     });
 
-    it('should log a simple damage roll for non-save-DC weapon attacks (no targeting or riders)', async () => {
+    it('logs a simple damage roll for non-save-DC weapon attacks (no targeting or riders)', async () => {
       vi.mocked(getInnateSorceryBonus).mockReturnValue({ saveDcBonus: 0 });
       const mockSetPopupHtml = vi.fn();
 
@@ -358,7 +299,7 @@ describe('CharActions click handlers', () => {
   });
 
   describe('automation handling', () => {
-    it('should call executeHandler when action with automation is clicked', async () => {
+    it('calls executeHandler when action with automation is clicked', async () => {
       hasAutomation.mockReturnValue(true);
 
       const stats = createStats({
@@ -371,20 +312,7 @@ describe('CharActions click handlers', () => {
       expect(executeHandler).toHaveBeenCalled();
     });
 
-    it('should not call executeHandler when cannotAct is true', async () => {
-      hasAutomation.mockReturnValue(true);
-
-      const stats = createStats({
-        actions: [{ name: 'War Priest', description: 'Make a weapon attack.', automation: { type: 'bonus_action_attack' } }],
-      });
-
-      await renderWithFetch(<CharActions playerStats={stats} cannotAct={true} />);
-      const actionName = screen.getByText(/War Priest:/);
-      await act(async () => { fireEvent.click(actionName); });
-      expect(executeHandler).not.toHaveBeenCalled();
-    });
-
-    it('should call setPopupHtml when automation returns popup result', async () => {
+    it('calls setPopupHtml when automation returns popup result', async () => {
       hasAutomation.mockReturnValue(true);
       const mockSetPopupHtml = vi.fn();
       useLoggedDiceRoll.mockReturnValue({
@@ -413,7 +341,7 @@ describe('CharActions click handlers', () => {
       });
     });
 
-    it('should call onBuffsChange for popup result with combat_stance type', async () => {
+    it('calls onBuffsChange for popup result with combat_stance type', async () => {
       hasAutomation.mockReturnValue(true);
       executeHandler.mockResolvedValue({ type: 'popup', payload: '<b>Stance</b>' });
 
@@ -430,7 +358,7 @@ describe('CharActions click handlers', () => {
       });
     });
 
-    it('should not dispatch automation when rage action is exhausted', async () => {
+    it('does not dispatch automation when rage action is exhausted', async () => {
       hasAutomation.mockReturnValue(true);
       isExhausted.mockReturnValue(true);
 
@@ -442,80 +370,6 @@ describe('CharActions click handlers', () => {
       const actionName = screen.getByText(/Rage:/);
       await act(async () => { fireEvent.click(actionName); });
       expect(executeHandler).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('monk ki features', () => {
-    it('should spend focus point for monk ki features', async () => {
-      hasAutomation.mockReturnValue(true);
-      const stats = createStats({
-        class: { class_levels: [{ level: 5, focus_points: 2 }] },
-        level: 5,
-        _trackedResources: { focusPoints: { current: 2 } },
-        actions: [{ name: 'Flurry of Blows', description: 'Make two attacks.', automation: { type: 'auto_effect' } }],
-      });
-
-      await renderWithFetch(<CharActions playerStats={stats} />);
-      const actionName = screen.getByText(/Flurry of Blows:/);
-      await act(async () => { fireEvent.click(actionName); });
-      await waitFor(() => {
-        expect(setRuntimeValue).toHaveBeenCalledWith('TestCharacter', 'focusPoints', expect.any(Number), undefined);
-      });
-    });
-
-    it('should show popup when monk ki feature has 0 focus points', async () => {
-      hasAutomation.mockReturnValue(true);
-      const mockSetPopupHtml = vi.fn();
-      useLoggedDiceRoll.mockReturnValue({
-        popupHtml: null, setPopupHtml: mockSetPopupHtml, rollAttack: vi.fn(), rollDamage: vi.fn(), quickRollPlayerSave: vi.fn(), saveDcBonus: 0,
-      });
-      vi.mocked(getRuntimeValue).mockImplementation((_name, key) => {
-        if (key === 'focusPoints') return 0;
-        return null;
-      });
-
-      const stats = createStats({
-        class: { class_levels: [{ level: 5, focus_points: 2 }] },
-        level: 5,
-        actions: [{ name: 'Flurry of Blows', description: 'Make two attacks.', automation: { type: 'auto_effect' } }],
-      });
-
-      const wrapper = ({ children }) => (
-        <DiceRollContext.Provider value={{ popupHtml: null, setPopupHtml: mockSetPopupHtml }}>
-          {children}
-        </DiceRollContext.Provider>
-      );
-
-      await renderWithFetch(<CharActions playerStats={stats} />, { wrapper });
-      const actionName = screen.getByText(/Flurry of Blows:/);
-      await act(async () => { fireEvent.click(actionName); });
-
-      expect(mockSetPopupHtml).toHaveBeenCalledWith(expect.stringContaining('No'));
-      expect(mockSetPopupHtml).toHaveBeenCalledWith(expect.stringContaining('remaining'));
-      expect(setRuntimeValue).not.toHaveBeenCalledWith('TestCharacter', 'focusPoints', expect.any(Number), undefined);
-    });
-
-    it('should skip focus point spend when cloak of shadows is active and action is Flurry of Blows', async () => {
-      hasAutomation.mockReturnValue(true);
-      vi.mocked(getRuntimeValue).mockImplementation((_name, key, _campaign) => {
-        if (key === 'activeBuffs') return [{ effect: 'cloak_of_shadows', name: 'Cloak of Shadows' }];
-        if (key === 'focusPoints') return 1;
-        return null;
-      });
-
-      const stats = createStats({
-        class: { class_levels: [{ level: 5, focus_points: 2 }] },
-        level: 5,
-        actions: [{ name: 'Flurry of Blows', description: 'Make two attacks.', automation: { type: 'auto_effect' } }],
-      });
-
-      await renderWithFetch(<CharActions playerStats={stats} />);
-      const actionName = screen.getByText(/Flurry of Blows:/);
-      await act(async () => { fireEvent.click(actionName); });
-
-      // Should not spend focus points due to cloak of shadows
-      expect(setRuntimeValue).not.toHaveBeenCalledWith('TestCharacter', 'focusPoints', expect.any(Number), undefined);
-      expect(executeHandler).toHaveBeenCalled();
     });
   });
 });

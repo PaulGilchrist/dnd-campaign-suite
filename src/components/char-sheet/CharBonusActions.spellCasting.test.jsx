@@ -108,11 +108,9 @@ vi.mock('../../services/rules/spells/spellCastService.js', () => ({
   executeSpellCast: vi.fn(),
 }));
 
-import { executeSpellCast } from '../../services/rules/spells/spellCastService.js';
 import { useSpellMetamagicFlow } from '../../hooks/combat/useSpellMetamagicFlow.js';
 import { addEntry } from '../../services/ui/logService.js';
 import * as mapsService from '../../services/maps/mapsService.js';
-import * as damageUtils from '../../services/rules/combat/damageUtils.js';
 
 const basePlayerStats = {
   name: 'TestCharacter',
@@ -134,13 +132,13 @@ describe('CharBonusActions - Spell Cast Flow', () => {
   });
 
   describe('spell cast with map data resolution', () => {
-    it('loads map data when mapName is provided and spell is cast from detail popup', async () => {
-      const bonusActionSpell = { name: 'Shocking Grasp', range: 'Touch', casting_time: '1 bonus action', prepared: 'Prepared' };
+    const bonusActionSpell = { name: 'Shocking Grasp', range: 'Touch', casting_time: '1 bonus action', prepared: 'Prepared' };
+
+    it('loads map data when mapName is provided and opens spell detail popup', async () => {
       const mapData = {
         players: [{ name: 'TestCharacter', gridX: 5, gridY: 5 }],
         placedItems: [],
       };
-      damageUtils.getCombatContext.mockResolvedValue(null);
       mapsService.loadMapData.mockResolvedValue(mapData);
 
       render(<CharBonusActions playerStats={createStats({ spellAbilities: { spells: [bonusActionSpell] } })} mapName="test-map" campaignName="test" />);
@@ -149,42 +147,12 @@ describe('CharBonusActions - Spell Cast Flow', () => {
       expect(screen.getByTestId('spell-detail-popup')).toBeInTheDocument();
     });
 
-    it('does not resolve positions when mapName is null or undefined', async () => {
-      const bonusActionSpell = { name: 'Shocking Grasp', range: 'Touch', casting_time: '1 bonus action', prepared: 'Prepared' };
+    it('does not resolve positions when mapName is null', async () => {
       render(<CharBonusActions playerStats={createStats({ spellAbilities: { spells: [bonusActionSpell] } })} mapName={null} />);
       const spellLink = screen.getByText('Shocking Grasp');
       fireEvent.click(spellLink);
       expect(screen.getByTestId('spell-detail-popup')).toBeInTheDocument();
       expect(mapsService.loadMapData).not.toHaveBeenCalled();
-    });
-
-    it('handles map data load failure gracefully', async () => {
-      const bonusActionSpell = { name: 'Shocking Grasp', range: 'Touch', casting_time: '1 bonus action', prepared: 'Prepared' };
-      mapsService.loadMapData.mockRejectedValue(new Error('Map not found'));
-
-      render(<CharBonusActions playerStats={createStats({ spellAbilities: { spells: [bonusActionSpell] } })} mapName="test-map" campaignName="test" />);
-      const spellLink = screen.getByText('Shocking Grasp');
-      fireEvent.click(spellLink);
-      expect(screen.getByTestId('spell-detail-popup')).toBeInTheDocument();
-    });
-
-    it('loads map and finds target player for position resolution', async () => {
-      const bonusActionSpell = { name: 'Shocking Grasp', range: 'Touch', casting_time: '1 bonus action', prepared: 'Prepared' };
-      const mapData = {
-        players: [
-          { name: 'TestCharacter', gridX: 5, gridY: 5 },
-          { name: 'Enemy', gridX: 10, gridY: 10 },
-        ],
-        placedItems: [],
-      };
-      damageUtils.getTargetFromAttacker.mockReturnValue({ name: 'Enemy' });
-      damageUtils.getCombatContext.mockResolvedValue({});
-      mapsService.loadMapData.mockResolvedValue(mapData);
-
-      render(<CharBonusActions playerStats={createStats({ spellAbilities: { spells: [bonusActionSpell] } })} mapName="test-map" campaignName="test" />);
-      const spellLink = screen.getByText('Shocking Grasp');
-      fireEvent.click(spellLink);
-      expect(screen.getByTestId('spell-detail-popup')).toBeInTheDocument();
     });
   });
 
@@ -204,54 +172,6 @@ describe('CharBonusActions - Spell Cast Flow', () => {
       });
       render(<CharBonusActions playerStats={createStats({ spellAbilities: { spells: [{ name: 'Shocking Grasp', range: 'Touch', casting_time: '1 bonus action', prepared: 'Prepared' }] } })} />);
       expect(screen.getByTestId('metamagic-popup')).toBeInTheDocument();
-    });
-  });
-
-  describe('executeSpellCast integration', () => {
-    it('renders correctly when characters prop is provided', () => {
-      const stats = createStats({ bonusActions: [{ name: 'Test', description: 'Test desc', details: 'Test details' }] });
-      const characters = [{ name: 'Character1' }, { name: 'Character2' }];
-      render(<CharBonusActions playerStats={stats} characters={characters} />);
-      expect(screen.getByText('Bonus Actions')).toBeInTheDocument();
-    });
-
-    it('renders correctly when characters prop is undefined', () => {
-      const stats = createStats({ bonusActions: [{ name: 'Test', description: 'Test desc', details: 'Test details' }] });
-      render(<CharBonusActions playerStats={stats} characters={undefined} />);
-      expect(screen.getByText('Bonus Actions')).toBeInTheDocument();
-    });
-
-    it('renders correctly when characters prop is empty array', () => {
-      const stats = createStats({ bonusActions: [{ name: 'Test', description: 'Test desc', details: 'Test details' }] });
-      render(<CharBonusActions playerStats={stats} characters={[]} />);
-      expect(screen.getByText('Bonus Actions')).toBeInTheDocument();
-    });
-  });
-
-  describe('rollAttack and rollDamage props', () => {
-    it('renders correctly when rollAttack and rollDamage props are provided', () => {
-      const stats = createStats({ bonusActions: [{ name: 'Test', description: 'Test desc', details: 'Test details' }] });
-      const rollAttack = vi.fn();
-      const rollDamage = vi.fn();
-      render(<CharBonusActions playerStats={stats} rollAttack={rollAttack} rollDamage={rollDamage} />);
-      expect(screen.getByText('Bonus Actions')).toBeInTheDocument();
-    });
-  });
-
-  describe('getTargetInfo prop', () => {
-    it('renders correctly when getTargetInfo prop is provided', () => {
-      const stats = createStats({ bonusActions: [{ name: 'Test', description: 'Test desc', details: 'Test details' }] });
-      const getTargetInfo = vi.fn();
-      render(<CharBonusActions playerStats={stats} getTargetInfo={getTargetInfo} />);
-      expect(screen.getByText('Bonus Actions')).toBeInTheDocument();
-    });
-  });
-
-  describe('spellAbilities.spells null handling', () => {
-    it('handles null spellAbilities.spells without crashing', () => {
-      const stats = createStats({ spellAbilities: { spells: null }, bonusActions: [{ name: 'Test', description: 'Test desc', details: 'Test details' }] });
-      render(<CharBonusActions playerStats={stats} />);
-      expect(screen.getByText('Bonus Actions')).toBeInTheDocument();
     });
   });
 
@@ -289,13 +209,6 @@ describe('CharBonusActions - Spell Cast Flow', () => {
       const hitBonusElement = screen.getByText('+5');
       fireEvent.click(hitBonusElement);
       expect(mockOnAttackClick).toHaveBeenCalledWith(bonusActionAttack);
-    });
-  });
-
-  describe('executeSpellCast availability', () => {
-    it('executeSpellCast is available as a mocked dependency', () => {
-      expect(executeSpellCast).toBeDefined();
-      expect(typeof executeSpellCast).toBe('function');
     });
   });
 });

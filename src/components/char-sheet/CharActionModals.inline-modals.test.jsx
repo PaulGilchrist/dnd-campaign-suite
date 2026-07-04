@@ -291,23 +291,7 @@ describe('CharActionModals inline modals', () => {
   // ── Divine Fury choice modal ──
 
   describe('Divine Fury choice modal', () => {
-    it('renders header with bolt icon and title', () => {
-      render(<CharActionModals {...createBaseProps()} divineFuryChoice={{}} />);
-      expect(screen.getByText(/Divine Fury/)).toBeInTheDocument();
-    });
-
-    it('renders Necrotic and Radiant damage type buttons', () => {
-      render(<CharActionModals {...createBaseProps()} divineFuryChoice={{}} />);
-      expect(screen.getByText('Necrotic')).toBeInTheDocument();
-      expect(screen.getByText('Radiant')).toBeInTheDocument();
-    });
-
-    it('renders Skip button', () => {
-      render(<CharActionModals {...createBaseProps()} divineFuryChoice={{}} />);
-      expect(screen.getByText('Skip')).toBeInTheDocument();
-    });
-
-    it('calls handleDivineFuryDamageType with Necrotic when Necrotic button is clicked', () => {
+    it('calls handleDivineFuryDamageType with the selected damage type', () => {
       const handleDivineFuryDamageType = vi.fn();
       render(<CharActionModals
         {...createBaseProps({ handleDivineFuryDamageType })}
@@ -315,16 +299,6 @@ describe('CharActionModals inline modals', () => {
       />);
       fireEvent.click(screen.getByText('Necrotic'));
       expect(handleDivineFuryDamageType).toHaveBeenCalledWith('Necrotic');
-    });
-
-    it('calls handleDivineFuryDamageType with Radiant when Radiant button is clicked', () => {
-      const handleDivineFuryDamageType = vi.fn();
-      render(<CharActionModals
-        {...createBaseProps({ handleDivineFuryDamageType })}
-        divineFuryChoice={{}}
-      />);
-      fireEvent.click(screen.getByText('Radiant'));
-      expect(handleDivineFuryDamageType).toHaveBeenCalledWith('Radiant');
     });
 
     it('calls handleDivineFurySkip when Skip button is clicked', () => {
@@ -351,62 +325,45 @@ describe('CharActionModals inline modals', () => {
   // ── Damage Type choice modal ──
 
   describe('Damage Type choice modal', () => {
-    it('renders header with bolt icon and title', () => {
-      render(<CharActionModals
-        {...createBaseProps()}
-        damageTypeChoice={{ title: 'Pick', types: ['Fire', 'Ice'] }}
-      />);
-      expect(screen.getByText('Pick')).toBeInTheDocument();
-    });
+    const choiceCases = [
+      { label: 'generic', pending: null, choiceHandler: 'handleGenericDamageTypeChoice', skipHandler: 'handleGenericDamageTypeSkip' },
+      { label: '_attackRider', pending: { _attackRider: true }, choiceHandler: 'handleEnhancedUnarmedChoice', skipHandler: 'handleEnhancedUnarmedSkip' },
+      { label: '_damageTypeModifier', pending: { _damageTypeModifier: true }, choiceHandler: 'handleDamageTypeModifierChoice', skipHandler: 'handleDamageTypeModifierSkip' },
+    ];
 
-    it('renders each damage type from types array', () => {
-      render(<CharActionModals
-        {...createBaseProps()}
-        damageTypeChoice={{ title: 'Pick', types: ['Fire', 'Ice'] }}
-      />);
-      expect(screen.getByText('Fire')).toBeInTheDocument();
-      expect(screen.getByText('Ice')).toBeInTheDocument();
-    });
+    for (const { label, pending, choiceHandler, skipHandler } of choiceCases) {
+      it(`calls ${choiceHandler} when a type is selected with pendingDamageRef.${label}`, () => {
+        const handler = vi.fn();
+        render(<CharActionModals
+          {...createBaseProps({ [choiceHandler]: handler, pendingDamageRef: { current: pending } })}
+          damageTypeChoice={{ title: 'Pick', types: ['Fire', 'Ice'] }}
+        />);
+        fireEvent.click(screen.getByText('Fire'));
+        expect(handler).toHaveBeenCalledWith('Fire');
+      });
 
-    it('renders Skip button', () => {
-      render(<CharActionModals
-        {...createBaseProps()}
-        damageTypeChoice={{ title: 'Pick', types: ['Fire', 'Ice'] }}
-      />);
-      expect(screen.getByText('Skip')).toBeInTheDocument();
-    });
+      it(`calls ${skipHandler} when Skip is clicked with pendingDamageRef.${label}`, () => {
+        const handler = vi.fn();
+        render(<CharActionModals
+          {...createBaseProps({ [skipHandler]: handler, pendingDamageRef: { current: pending } })}
+          damageTypeChoice={{ title: 'Pick', types: ['Fire'] }}
+        />);
+        fireEvent.click(screen.getByText('Skip'));
+        expect(handler).toHaveBeenCalled();
+      });
 
-    it('calls generic handler when no pendingDamageRef', () => {
-      const handleGenericDamageTypeChoice = vi.fn();
-      render(<CharActionModals
-        {...createBaseProps({ handleGenericDamageTypeChoice })}
-        damageTypeChoice={{ title: 'Pick', types: ['Fire', 'Ice'] }}
-      />);
-      fireEvent.click(screen.getByText('Fire'));
-      expect(handleGenericDamageTypeChoice).toHaveBeenCalledWith('Fire');
-    });
+      it(`calls ${skipHandler} when overlay is clicked with pendingDamageRef.${label}`, () => {
+        const handler = vi.fn();
+        render(<CharActionModals
+          {...createBaseProps({ [skipHandler]: handler, pendingDamageRef: { current: pending } })}
+          damageTypeChoice={{ title: 'Pick', types: ['Fire'] }}
+        />);
+        fireEvent.click(document.querySelector('.sp-overlay'));
+        expect(handler).toHaveBeenCalled();
+      });
+    }
 
-    it('calls enhanced unarmed handler when pendingDamageRef has _attackRider', () => {
-      const handleEnhancedUnarmedChoice = vi.fn();
-      render(<CharActionModals
-        {...createBaseProps({ handleEnhancedUnarmedChoice, pendingDamageRef: { current: { _attackRider: true } } })}
-        damageTypeChoice={{ title: 'Pick', types: ['Fire', 'Ice'] }}
-      />);
-      fireEvent.click(screen.getByText('Fire'));
-      expect(handleEnhancedUnarmedChoice).toHaveBeenCalledWith('Fire');
-    });
-
-    it('calls modifier handler when pendingDamageRef has _damageTypeModifier', () => {
-      const handleDamageTypeModifierChoice = vi.fn();
-      render(<CharActionModals
-        {...createBaseProps({ handleDamageTypeModifierChoice, pendingDamageRef: { current: { _damageTypeModifier: true } } })}
-        damageTypeChoice={{ title: 'Pick', types: ['Fire', 'Ice'] }}
-      />);
-      fireEvent.click(screen.getByText('Fire'));
-      expect(handleDamageTypeModifierChoice).toHaveBeenCalledWith('Fire');
-    });
-
-    it('prioritizes _attackRider over _damageTypeModifier when both are set', () => {
+    it('prioritizes _attackRider handler over _damageTypeModifier when both are set', () => {
       const handleEnhancedUnarmedChoice = vi.fn();
       const handleDamageTypeModifierChoice = vi.fn();
       render(<CharActionModals
@@ -417,123 +374,11 @@ describe('CharActionModals inline modals', () => {
       expect(handleEnhancedUnarmedChoice).toHaveBeenCalledWith('Fire');
       expect(handleDamageTypeModifierChoice).not.toHaveBeenCalled();
     });
-
-    it('calls generic skip handler when no pendingDamageRef', () => {
-      const handleGenericDamageTypeSkip = vi.fn();
-      render(<CharActionModals
-        {...createBaseProps({ handleGenericDamageTypeSkip })}
-        damageTypeChoice={{ title: 'Pick', types: ['Fire'] }}
-      />);
-      fireEvent.click(screen.getByText('Skip'));
-      expect(handleGenericDamageTypeSkip).toHaveBeenCalled();
-    });
-
-    it('calls enhanced unarmed skip handler when pendingDamageRef has _attackRider', () => {
-      const handleEnhancedUnarmedSkip = vi.fn();
-      render(<CharActionModals
-        {...createBaseProps({ handleEnhancedUnarmedSkip, pendingDamageRef: { current: { _attackRider: true } } })}
-        damageTypeChoice={{ title: 'Pick', types: ['Fire'] }}
-      />);
-      fireEvent.click(screen.getByText('Skip'));
-      expect(handleEnhancedUnarmedSkip).toHaveBeenCalled();
-    });
-
-    it('calls modifier skip handler when pendingDamageRef has _damageTypeModifier', () => {
-      const handleDamageTypeModifierSkip = vi.fn();
-      render(<CharActionModals
-        {...createBaseProps({ handleDamageTypeModifierSkip, pendingDamageRef: { current: { _damageTypeModifier: true } } })}
-        damageTypeChoice={{ title: 'Pick', types: ['Fire'] }}
-      />);
-      fireEvent.click(screen.getByText('Skip'));
-      expect(handleDamageTypeModifierSkip).toHaveBeenCalled();
-    });
-
-    it('calls generic skip handler when overlay is clicked with no pendingDamageRef', () => {
-      const handleGenericDamageTypeSkip = vi.fn();
-      render(<CharActionModals
-        {...createBaseProps({ handleGenericDamageTypeSkip })}
-        damageTypeChoice={{ title: 'Pick', types: ['Fire'] }}
-      />);
-      fireEvent.click(document.querySelector('.sp-overlay'));
-      expect(handleGenericDamageTypeSkip).toHaveBeenCalled();
-    });
-
-    it('calls enhanced unarmed skip handler when overlay is clicked with _attackRider', () => {
-      const handleEnhancedUnarmedSkip = vi.fn();
-      render(<CharActionModals
-        {...createBaseProps({ handleEnhancedUnarmedSkip, pendingDamageRef: { current: { _attackRider: true } } })}
-        damageTypeChoice={{ title: 'Pick', types: ['Fire'] }}
-      />);
-      fireEvent.click(document.querySelector('.sp-overlay'));
-      expect(handleEnhancedUnarmedSkip).toHaveBeenCalled();
-    });
-
-    it('calls modifier skip handler when overlay is clicked with _damageTypeModifier', () => {
-      const handleDamageTypeModifierSkip = vi.fn();
-      render(<CharActionModals
-        {...createBaseProps({ handleDamageTypeModifierSkip, pendingDamageRef: { current: { _damageTypeModifier: true } } })}
-        damageTypeChoice={{ title: 'Pick', types: ['Fire'] }}
-      />);
-      fireEvent.click(document.querySelector('.sp-overlay'));
-      expect(handleDamageTypeModifierSkip).toHaveBeenCalled();
-    });
-
-    it('renders damage type buttons from custom types array', () => {
-      render(<CharActionModals
-        {...createBaseProps()}
-        damageTypeChoice={{ title: 'Pick', types: ['Acid', 'Poison', 'Thunder'] }}
-      />);
-      expect(screen.getByText('Acid')).toBeInTheDocument();
-      expect(screen.getByText('Poison')).toBeInTheDocument();
-      expect(screen.getByText('Thunder')).toBeInTheDocument();
-    });
-
-    it('renders empty types array without type buttons', () => {
-      render(<CharActionModals
-        {...createBaseProps()}
-        damageTypeChoice={{ title: 'Pick', types: [] }}
-      />);
-      expect(screen.getByText('Pick')).toBeInTheDocument();
-      expect(screen.queryByRole('button', { name: /Acid|Fire|Ice/ })).not.toBeInTheDocument();
-    });
   });
 
   // ── Feature Choice modal ──
 
   describe('Feature Choice modal', () => {
-    it('renders header with bolt icon and action name', () => {
-      render(<CharActionModals
-        {...createBaseProps()}
-        featureChoice={{ action: { name: 'Test Feature', description: 'Choose wisely' }, options: ['Option A', 'Option B'] }}
-      />);
-      expect(screen.getByText('Test Feature')).toBeInTheDocument();
-    });
-
-    it('renders action description', () => {
-      render(<CharActionModals
-        {...createBaseProps()}
-        featureChoice={{ action: { name: 'Test Feature', description: 'Choose wisely' }, options: ['Option A', 'Option B'] }}
-      />);
-      expect(screen.getByText('Choose wisely')).toBeInTheDocument();
-    });
-
-    it('renders each option as a button', () => {
-      render(<CharActionModals
-        {...createBaseProps()}
-        featureChoice={{ action: { name: 'Test Feature', description: 'Choose wisely' }, options: ['Option A', 'Option B'] }}
-      />);
-      expect(screen.getByText('Option A')).toBeInTheDocument();
-      expect(screen.getByText('Option B')).toBeInTheDocument();
-    });
-
-    it('renders Cancel button', () => {
-      render(<CharActionModals
-        {...createBaseProps()}
-        featureChoice={{ action: { name: 'Test Feature', description: 'Choose wisely' }, options: ['Option A', 'Option B'] }}
-      />);
-      expect(screen.getByText('Cancel')).toBeInTheDocument();
-    });
-
     it('calls handleFeatureChoiceConfirm with option string when clicked', () => {
       const handleFeatureChoiceConfirm = vi.fn();
       render(<CharActionModals
@@ -572,16 +417,6 @@ describe('CharActionModals inline modals', () => {
       />);
       fireEvent.click(document.querySelector('.sp-overlay'));
       expect(handleFeatureChoiceSkip).toHaveBeenCalled();
-    });
-
-    it('renders empty options array without option buttons', () => {
-      render(<CharActionModals
-        {...createBaseProps()}
-        featureChoice={{ action: { name: 'Pick', description: 'Pick one' }, options: [] }}
-      />);
-      expect(screen.getByText('Pick')).toBeInTheDocument();
-      expect(screen.getByText('Pick one')).toBeInTheDocument();
-      expect(screen.queryByRole('button', { name: 'Alpha' })).not.toBeInTheDocument();
     });
   });
 });

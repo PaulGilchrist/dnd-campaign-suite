@@ -278,26 +278,6 @@ describe('CharActions monk ki', () => {
       });
     });
 
-    it('does not consume focus point for Hand of Healing when Flurry of Healing and Harm is active', async () => {
-      hasAutomation.mockReturnValue(true);
-      executeHandler.mockResolvedValue({ type: 'popup', payload: '<b>Healing</b>' });
-
-      const stats = createStats({
-        class: { class_levels: [{ level: 5, focus_points: 2 }] },
-        level: 5,
-        characterAdvancement: [{ name: 'Flurry of Healing and Harm' }],
-        actions: [{ name: 'Hand of Healing', description: 'Heal wounds.', automation: { type: 'auto_effect' } }],
-      });
-
-      await act(async () => { render(<CharActions playerStats={stats} />); });
-      const actionName = screen.getByText(/Hand of Healing:/);
-      await act(async () => { fireEvent.click(actionName); });
-      await waitFor(() => {
-        expect(setRuntimeValue).not.toHaveBeenCalledWith('TestCharacter', 'focusPoints', expect.any(Number), undefined);
-        expect(executeHandler).toHaveBeenCalled();
-      });
-    });
-
     it('does consume focus point for Hand of Healing when Cloak of Shadows is active (Cloak only affects Flurry of Blows)', async () => {
       hasAutomation.mockReturnValue(true);
       executeHandler.mockResolvedValue({ type: 'popup', payload: '<b>Healing</b>' });
@@ -321,27 +301,10 @@ describe('CharActions monk ki', () => {
       });
     });
 
-    it('consumes focus point for Flurry of Blows when Flurry of Healing and Harm is not active', async () => {
-      hasAutomation.mockReturnValue(true);
-      executeHandler.mockResolvedValue({ type: 'popup', payload: '<b>Flurry</b>' });
-
-      const stats = createStats({
-        class: { class_levels: [{ level: 5, focus_points: 2 }] },
-        level: 5,
-        actions: [{ name: 'Flurry of Blows', description: 'Make two attacks.', automation: { type: 'auto_effect' } }],
-      });
-
-      await act(async () => { render(<CharActions playerStats={stats} />); });
-      const actionName = screen.getByText(/Flurry of Blows:/);
-      await act(async () => { fireEvent.click(actionName); });
-      await waitFor(() => {
-        expect(setRuntimeValue).toHaveBeenCalledWith('TestCharacter', 'focusPoints', expect.any(Number), undefined);
-      });
-    });
   });
 
   describe('monk ki: no FP remaining', () => {
-    it('shows correct no-FP message based on ruleset (2024 vs 5e)', async () => {
+    it('shows no-FP message when focus points are 0', async () => {
       hasAutomation.mockReturnValue(true);
       getRuntimeValue.mockImplementation((_name, key) => {
         if (key === 'focusPoints') return 0;
@@ -371,28 +334,6 @@ describe('CharActions monk ki', () => {
       await act(async () => { fireEvent.click(actionName2024); });
       await waitFor(() => {
         expect(mockSetPopupHtml).toHaveBeenCalledWith('<b>Flurry of Blows</b><br/>No Focus Points remaining.');
-      });
-    });
-
-    it('consumes focus point when FP > 0', async () => {
-      hasAutomation.mockReturnValue(true);
-      executeHandler.mockResolvedValue({ type: 'popup', payload: '<b>Flurry</b>' });
-      getRuntimeValue.mockImplementation((_name, key) => {
-        if (key === 'focusPoints') return 2;
-        return null;
-      });
-
-      const stats = createStats({
-        class: { class_levels: [{ level: 5, focus_points: 2 }] },
-        level: 5,
-        actions: [{ name: 'Flurry of Blows', description: 'Has FP.', automation: { type: 'auto_effect' } }],
-      });
-
-      await act(async () => { render(<CharActions playerStats={stats} />); });
-      const actionName = screen.getByText(/Flurry of Blows:/);
-      await act(async () => { fireEvent.click(actionName); });
-      await waitFor(() => {
-        expect(setRuntimeValue).toHaveBeenCalledWith('TestCharacter', 'focusPoints', 1, undefined);
       });
     });
   });

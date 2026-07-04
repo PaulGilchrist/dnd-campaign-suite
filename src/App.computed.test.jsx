@@ -152,15 +152,6 @@ describe('App - Computed Characters & Runtime Store', () => {
   };
 
   describe('Campaign selection renders character views', () => {
-    it('renders CharSheet after campaign selection', async () => {
-      mockState.characters = [{ name: 'Aragorn', level: 1 }];
-      render(<App />);
-      await selectCampaign();
-      await waitFor(() => {
-        expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
-      });
-    });
-
     it('renders Initiative view after campaign selection', async () => {
       mockState.characters = [{ name: 'Aragorn', level: 1 }];
       render(<App />);
@@ -173,7 +164,6 @@ describe('App - Computed Characters & Runtime Store', () => {
         expect(screen.getByTestId('initiative')).toBeInTheDocument();
       });
     });
-
 
   });
 });

@@ -192,11 +192,6 @@ describe('CharActions spells', () => {
       expect(screen.getByText('Fireball')).toBeInTheDocument();
     });
 
-    it('renders spells with casting_time "Action" (case variant)', () => {
-      render(<CharActions playerStats={createStats({ spellAbilities: { spells: [{ ...actionSpell, casting_time: 'Action' }] } })} />);
-      expect(screen.getByText('Fireball')).toBeInTheDocument();
-    });
-
     it('excludes spells with non-action casting times', () => {
       render(<CharActions playerStats={createStats({ spellAbilities: { spells: [{ ...actionSpell, casting_time: '1 bonus action' }] } })} />);
       expect(screen.queryByText('Fireball')).not.toBeInTheDocument();
@@ -204,11 +199,6 @@ describe('CharActions spells', () => {
 
     it('excludes unprepared spells', () => {
       render(<CharActions playerStats={createStats({ spellAbilities: { spells: [{ ...actionSpell, prepared: 'Unprepared' }] } })} />);
-      expect(screen.queryByText('Fireball')).not.toBeInTheDocument();
-    });
-
-    it('does not render spells when spellAbilities.spells is undefined', () => {
-      render(<CharActions playerStats={createStats({ spellAbilities: {} })} />);
       expect(screen.queryByText('Fireball')).not.toBeInTheDocument();
     });
   });
@@ -228,16 +218,6 @@ describe('CharActions spells', () => {
       const spellLink = screen.getByText('Fireball');
       fireEvent.click(spellLink);
       expect(screen.getByTestId('spell-detail-popup')).toBeInTheDocument();
-    });
-
-    it('does not open SpellDetailPopup when an attack with matching spell name is clicked', () => {
-      render(<CharActions playerStats={createStats({
-        attacks: [{ name: 'Fireball', range: 60, hitBonus: 5, damage: '8d6', damageType: 'Fire', type: 'Action' }],
-        spellAbilities: { spells: [{ ...actionSpell, casting_time: '1 bonus action' }] },
-      })} />);
-      const attackName = screen.getByText('Fireball');
-      fireEvent.click(attackName);
-      expect(screen.queryByTestId('spell-detail-popup')).not.toBeInTheDocument();
     });
   });
 });

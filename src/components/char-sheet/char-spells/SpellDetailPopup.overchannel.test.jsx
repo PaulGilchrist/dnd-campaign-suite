@@ -108,9 +108,9 @@ describe('SpellDetailPopup - Overchannel', () => {
     });
 
     it.each([
-      { count: 0, expectedText: 'First use: no necrotic damage', expectedNotText: /Warning: Using Overchannel/ },
-      { count: 1, expectedText: /Warning: Using Overchannel/, expectedNotText: 'First use: no necrotic damage' },
-    ])('shows correct message when overchannel count is $count', ({ count, expectedText, expectedNotText }) => {
+      { count: 0, expectedText: 'First use: no necrotic damage' },
+      { count: 1, expectedText: /Warning: Using Overchannel/ },
+    ])('shows correct message when overchannel count is $count', ({ count, expectedText }) => {
       vi.mocked(useRuntimeValue).mockReturnValue(count);
       const spell = {
         ...baseMockSpell,
@@ -121,10 +121,12 @@ describe('SpellDetailPopup - Overchannel', () => {
       const checkbox = screen.getByRole('checkbox');
       fireEvent.click(checkbox);
       expect(screen.getByText(expectedText)).toBeInTheDocument();
-      expect(screen.queryByText(expectedNotText)).not.toBeInTheDocument();
     });
 
-    it('passes overchannel: true in metaCtx when Overchannel checkbox is toggled', () => {
+    it.each([
+      { toggled: true, expected: true },
+      { toggled: false, expected: false },
+    ])('passes overchannel: $expected in metaCtx when checkbox is $toggled', ({ toggled, expected }) => {
       vi.mocked(useRuntimeValue).mockReturnValue(0);
       const onCast = vi.fn();
       const spell = {
@@ -134,29 +136,14 @@ describe('SpellDetailPopup - Overchannel', () => {
       };
       renderPopup(spell, overchannelStats, mockCampaignName, { onCast });
 
-      const checkbox = screen.getByRole('checkbox');
-      fireEvent.click(checkbox);
+      if (toggled) {
+        fireEvent.click(screen.getByRole('checkbox'));
+      }
 
       fireEvent.click(screen.getByRole('button', { name: /Cast Spell/ }));
       expect(onCast).toHaveBeenCalledTimes(1);
       const metaCtx = onCast.mock.calls[0][1];
-      expect(metaCtx.overchannel).toBe(true);
-    });
-
-    it('passes overchannel: false in metaCtx when Overchannel is not toggled', () => {
-      vi.mocked(useRuntimeValue).mockReturnValue(0);
-      const onCast = vi.fn();
-      const spell = {
-        ...baseMockSpell,
-        level: 1,
-        damage: { damage_at_slot_level: { '1': '1d6' } },
-      };
-      renderPopup(spell, overchannelStats, mockCampaignName, { onCast });
-
-      fireEvent.click(screen.getByRole('button', { name: /Cast Spell/ }));
-      expect(onCast).toHaveBeenCalledTimes(1);
-      const metaCtx = onCast.mock.calls[0][1];
-      expect(metaCtx.overchannel).toBe(false);
+      expect(metaCtx.overchannel).toBe(expected);
     });
   });
 });

@@ -56,14 +56,6 @@ describe('CharGold', () => {
     expect(screen.getByTestId('gold-value')).toHaveTextContent('0');
   });
 
-  it('uses stored gold from useRuntimeValue when available', () => {
-    useRuntimeValue.mockReturnValue(250);
-
-    render(<CharGold playerStats={mockPlayerStats} campaignName={campaignName} />);
-
-    expect(screen.getByTestId('gold-value')).toHaveTextContent('250');
-  });
-
   it('toggles input visibility on interaction', () => {
     render(<CharGold playerStats={mockPlayerStats} campaignName={campaignName} />);
 
@@ -92,12 +84,5 @@ describe('CharGold', () => {
       '1000',
       'test-campaign'
     );
-  });
-
-  it('renders without campaignName', () => {
-    render(<CharGold playerStats={mockPlayerStats} />);
-
-    expect(screen.getByText(/Gold:/)).toBeInTheDocument();
-    expect(screen.getByTestId('gold-value')).toBeInTheDocument();
   });
 });

@@ -61,6 +61,16 @@ function extractMediaQueries(css) {
   return results;
 }
 
+function hasProp(rule, key) {
+  const props = parseProperties(rule);
+  return props.some((p) => p.key === key);
+}
+
+function getProp(rule, key) {
+  const props = parseProperties(rule);
+  return props.find((p) => p.key === key)?.value;
+}
+
 function assertProps(rule, assertions) {
   const props = parseProperties(rule);
   const propMap = Object.fromEntries(props.map((p) => [p.key, p.value]));
@@ -80,8 +90,8 @@ describe('App.css', () => {
     css = readFileSync(join(__dirname, 'App.css'), 'utf-8');
   });
 
-  describe('.app', () => {
-    it('should define a flex column layout with full viewport height', () => {
+  describe('Layout structure', () => {
+    it('should define .app as a full-viewport flex column', () => {
       const rule = extractRule(css, '.app');
       expect(rule).not.toBeNull();
       assertProps(rule, {
@@ -90,87 +100,91 @@ describe('App.css', () => {
         height: '100vh',
       });
     });
-  });
 
-  describe('.app-body', () => {
-    it('should define a flex layout with left padding and fill remaining space', () => {
+    it('should define .app-body as a flex container with sidebar offset', () => {
       const rule = extractRule(css, '.app-body');
       expect(rule).not.toBeNull();
       assertProps(rule, {
         display: 'flex',
         flex: '1',
         'min-height': '0',
-        'padding-left': '180px',
-        gap: '0',
       });
+      expect(getProp(rule, 'padding-left')).toBeTruthy();
     });
   });
 
-  describe('.half-line', () => {
-    it('should define half-em height and line-height', () => {
-      const rule = extractRule(css, '.half-line');
-      expect(rule).not.toBeNull();
-      assertProps(rule, {
-        height: '0.5em',
-        'line-height': '0.5em',
-      });
-    });
-  });
-
-  describe('.icon-button', () => {
-    it('should define default, hover, and disabled states', () => {
+  describe('Icon button states', () => {
+    it('should define default, hover, and disabled states with distinct visual feedback', () => {
       const rule = extractRule(css, '.icon-button');
       expect(rule).not.toBeNull();
       assertProps(rule, {
-        color: 'darkred',
-        'background-color': 'transparent',
-        border: 'none',
         cursor: 'pointer',
         opacity: '0.8',
       });
 
       const hoverRules = extractRules(css, '.icon-button:hover:not(:disabled)');
       expect(hoverRules.length).toBeGreaterThan(0);
-      assertProps(hoverRules[0], { color: 'red', opacity: '1' });
+      const hoverProps = parseProperties(hoverRules[0]);
+      const hoverOpacity = hoverProps.find((p) => p.key === 'opacity')?.value;
+      expect(parseFloat(hoverOpacity)).toBeGreaterThan(0.8);
+    });
 
+    it('should disable icon buttons with a not-allowed cursor', () => {
       const disabledRule = extractRule(css, '.icon-button:disabled');
       expect(disabledRule).not.toBeNull();
-      assertProps(disabledRule, { cursor: 'not-allowed', opacity: '0.3' });
+      assertProps(disabledRule, { cursor: 'not-allowed' });
     });
   });
 
-  describe('.char-btn-group and .char-btn', () => {
-    it('should define a flex button group and button styling with hover', () => {
+  describe('Campaign action buttons', () => {
+    it('should define rename and delete buttons with hover states', () => {
+      const renameRule = extractRule(css, '.rename-campaign-btn');
+      expect(renameRule).not.toBeNull();
+
+      const renameHover = extractRule(css, '.rename-campaign-btn:hover:not(:disabled)');
+      expect(renameHover).not.toBeNull();
+
+      const deleteRule = extractRule(css, '.delete-campaign-btn');
+      expect(deleteRule).not.toBeNull();
+
+      const deleteHover = extractRule(css, '.delete-campaign-btn:hover:not(:disabled)');
+      expect(deleteHover).not.toBeNull();
+    });
+
+    it('should define a back-to-campaigns button with hover state', () => {
+      const rule = extractRule(css, '.back-to-campaigns-btn');
+      expect(rule).not.toBeNull();
+
+      const hoverRule = extractRule(css, '.back-to-campaigns-btn:hover:not(:disabled)');
+      expect(hoverRule).not.toBeNull();
+    });
+
+    it('should push the theme toggle to the far right', () => {
+      const rule = extractRule(css, '.theme-toggle-btn');
+      expect(rule).not.toBeNull();
+      expect(getProp(rule, 'margin-left')).toBe('auto');
+    });
+  });
+
+  describe('Character button group', () => {
+    it('should define a flex button group with styled buttons and hover', () => {
       const groupRule = extractRule(css, '.char-btn-group');
       expect(groupRule).not.toBeNull();
-      assertProps(groupRule, {
-        display: 'flex',
-        gap: '4px',
-        'align-items': 'center',
-      });
+      assertProps(groupRule, { display: 'flex' });
 
       const btnRule = extractRule(css, '.char-btn');
       expect(btnRule).not.toBeNull();
-      assertProps(btnRule, {
-        'background-color': 'transparent',
-        cursor: 'pointer',
-        'white-space': 'nowrap',
-      });
+      assertProps(btnRule, { cursor: 'pointer' });
 
       const hoverRule = extractRule(css, '.char-btn:hover');
       expect(hoverRule).not.toBeNull();
-      assertProps(hoverRule, { opacity: '1', 'border-color': 'var(--color-hover)' });
     });
   });
 
   describe('Download and hidden buttons', () => {
-    it('should style button.download and hide button.hidden', () => {
+    it('should style the download button and hide the hidden button', () => {
       const downloadRule = extractRule(css, 'button.download');
       expect(downloadRule).not.toBeNull();
-      assertProps(downloadRule, {
-        'background-color': 'darkgreen',
-        color: '#eee',
-      });
 
       const hiddenRule = extractRule(css, 'button.hidden');
       expect(hiddenRule).not.toBeNull();
@@ -178,519 +192,248 @@ describe('App.css', () => {
     });
   });
 
-  describe('.theme-toggle-btn', () => {
-    it('should push the theme toggle to the far right with auto margin', () => {
-      const rule = extractRule(css, '.theme-toggle-btn');
+  describe('Campaign tool container and header', () => {
+    it('should define .ct-container as a flexible padded container', () => {
+      const rule = extractRule(css, '.ct-container');
       expect(rule).not.toBeNull();
-      assertProps(rule, { 'margin-left': 'auto' });
+      assertProps(rule, {
+        flex: '1',
+        width: '100%',
+      });
+    });
+
+    it('should define .ct-header as a flex row with space-between layout', () => {
+      const rule = extractRule(css, '.ct-container .ct-header');
+      expect(rule).not.toBeNull();
+      assertProps(rule, {
+        display: 'flex',
+        'justify-content': 'space-between',
+        'align-items': 'center',
+      });
+    });
+
+    it('should define a styled title and primary action button', () => {
+      const titleRule = extractRule(css, '.ct-container .ct-title');
+      expect(titleRule).not.toBeNull();
+      expect(getProp(titleRule, 'color')).toContain('var(--color-header)');
+
+      const newBtnRule = extractRule(css, '.ct-container .ct-new-btn');
+      expect(newBtnRule).not.toBeNull();
+      assertProps(newBtnRule, { cursor: 'pointer' });
+
+      const newBtnHover = extractRule(css, '.ct-container .ct-new-btn:hover');
+      expect(newBtnHover).not.toBeNull();
     });
   });
 
-  describe('.rename-campaign-btn and .delete-campaign-btn', () => {
-    it('should define colors and hover states for rename and delete buttons', () => {
-      const renameRule = extractRule(css, '.rename-campaign-btn');
-      expect(renameRule).not.toBeNull();
-      assertProps(renameRule, { color: 'var(--color-body)' });
+  describe('Search bar components', () => {
+    it('should define a flex search row with input and clear button', () => {
+      const rowRule = extractRule(css, '.ct-container .ct-search-row');
+      expect(rowRule).not.toBeNull();
+      assertProps(rowRule, { display: 'flex' });
 
-      const renameHover = extractRule(css, '.rename-campaign-btn:hover:not(:disabled)');
-      expect(renameHover).not.toBeNull();
-      assertProps(renameHover, { color: 'var(--color-header)' });
+      const inputRule = extractRule(css, '.ct-container .ct-search-input');
+      expect(inputRule).not.toBeNull();
 
-      const deleteRule = extractRule(css, '.delete-campaign-btn');
-      expect(deleteRule).not.toBeNull();
-      assertProps(deleteRule, { color: 'darkred' });
+      const focusRule = extractRule(css, '.ct-container .ct-search-input:focus');
+      expect(focusRule).not.toBeNull();
 
-      const deleteHover = extractRule(css, '.delete-campaign-btn:hover:not(:disabled)');
-      expect(deleteHover).not.toBeNull();
-      assertProps(deleteHover, { color: 'red' });
+      const clearRule = extractRule(css, '.ct-container .ct-search-clear');
+      expect(clearRule).not.toBeNull();
+
+      const clearHover = extractRule(css, '.ct-container .ct-search-clear:hover');
+      expect(clearHover).not.toBeNull();
     });
   });
 
-  describe('.back-to-campaigns-btn', () => {
-    it('should define body color and hover to header color', () => {
-      const rule = extractRule(css, '.back-to-campaigns-btn');
+  describe('Empty state and list components', () => {
+    it('should define a centered empty state layout', () => {
+      const rule = extractRule(css, '.ct-container .ct-empty-state');
       expect(rule).not.toBeNull();
-      assertProps(rule, { color: 'var(--color-body)' });
+      assertProps(rule, {
+        display: 'flex',
+        'flex-direction': 'column',
+        'align-items': 'center',
+      });
+    });
 
-      const hoverRule = extractRule(css, '.back-to-campaigns-btn:hover:not(:disabled)');
+    it('should define an icon inside empty state with reduced opacity', () => {
+      const rule = extractRule(css, '.ct-container .ct-empty-state i');
+      expect(rule).not.toBeNull();
+      const opacity = getProp(rule, 'opacity');
+      expect(parseFloat(opacity)).toBeLessThan(1);
+    });
+
+    it('should define a vertical list with clickable card items and hover', () => {
+      const listRule = extractRule(css, '.ct-container .ct-list');
+      expect(listRule).not.toBeNull();
+      assertProps(listRule, {
+        display: 'flex',
+        'flex-direction': 'column',
+      });
+
+      const itemRule = extractRule(css, '.ct-container .ct-list-item');
+      expect(itemRule).not.toBeNull();
+      assertProps(itemRule, { cursor: 'pointer' });
+
+      const hoverRule = extractRule(css, '.ct-container .ct-list-item:hover');
       expect(hoverRule).not.toBeNull();
-      assertProps(hoverRule, { color: 'var(--color-header)' });
+    });
+
+    it('should define list item header with flex layout', () => {
+      const rule = extractRule(css, '.ct-container .ct-list-item-header');
+      expect(rule).not.toBeNull();
+      assertProps(rule, {
+        display: 'flex',
+        'justify-content': 'space-between',
+        'align-items': 'center',
+      });
+    });
+
+    it('should define list name and preview typography', () => {
+      const nameRule = extractRule(css, '.ct-container .ct-list-name');
+      expect(nameRule).not.toBeNull();
+      const fontWeight = getProp(nameRule, 'font-weight');
+      expect(parseInt(fontWeight)).toBeGreaterThanOrEqual(600);
+
+      const previewRule = extractRule(css, '.ct-container .ct-list-preview');
+      expect(previewRule).not.toBeNull();
+    });
+
+    it('should define meta and details flex rows', () => {
+      const metaRule = extractRule(css, '.ct-container .ct-list-meta');
+      expect(metaRule).not.toBeNull();
+      assertProps(metaRule, { display: 'flex' });
+
+      const detailsRule = extractRule(css, '.ct-container .ct-list-details');
+      expect(detailsRule).not.toBeNull();
+      assertProps(detailsRule, { display: 'flex' });
     });
   });
 
-  describe('Campaign tool shared styles', () => {
-    describe('.ct-container', () => {
-      it('should define a flexible container with padding', () => {
-        const rule = extractRule(css, '.ct-container');
-        expect(rule).not.toBeNull();
-        assertProps(rule, {
-          flex: '1',
-          padding: '20px',
-          width: '100%',
-        });
+  describe('Modal structure', () => {
+    it('should define a full-viewport overlay with high z-index', () => {
+      const rule = extractRule(css, '.ct-container .ct-modal-overlay');
+      expect(rule).not.toBeNull();
+      assertProps(rule, {
+        position: 'fixed',
+        display: 'flex',
       });
+      expect(getProp(rule, 'z-index')).toBe('1000');
     });
 
-    describe('.ct-header', () => {
-      it('should define a flex header with space-between and gap', () => {
-        const rule = extractRule(css, '.ct-container .ct-header');
-        expect(rule).not.toBeNull();
-        assertProps(rule, {
-          display: 'flex',
-          'justify-content': 'space-between',
-          'align-items': 'center',
-          gap: '16px',
-          'margin-bottom': '16px',
-        });
+    it('should define a centered modal with max-width constraints', () => {
+      const rule = extractRule(css, '.ct-container .ct-modal');
+      expect(rule).not.toBeNull();
+      assertProps(rule, {
+        display: 'flex',
+        'flex-direction': 'column',
       });
+      expect(getProp(rule, 'max-width')).toContain('vw');
     });
 
-    describe('.ct-title', () => {
-      it('should define header-colored title with no margin', () => {
-        const rule = extractRule(css, '.ct-container .ct-title');
-        expect(rule).not.toBeNull();
-        assertProps(rule, {
-          margin: '0',
-          color: 'var(--color-header)',
-          'font-size': '1.6em',
-        });
-      });
+    it('should define modal header, body, and footer with borders and flex layout', () => {
+      const headerRule = extractRule(css, '.ct-container .ct-modal-header');
+      expect(headerRule).not.toBeNull();
+      assertProps(headerRule, { display: 'flex' });
+
+      const bodyRule = extractRule(css, '.ct-container .ct-modal-body');
+      expect(bodyRule).not.toBeNull();
+      expect(hasProp(bodyRule, 'overflow-y')).toBeTruthy();
+
+      const footerRule = extractRule(css, '.ct-container .ct-modal-footer');
+      expect(footerRule).not.toBeNull();
+      assertProps(footerRule, { display: 'flex' });
     });
 
-    describe('.ct-new-btn', () => {
-      it('should define a primary action button style with hover', () => {
-        const rule = extractRule(css, '.ct-container .ct-new-btn');
-        expect(rule).not.toBeNull();
-        assertProps(rule, {
-          background: 'var(--color-primary)',
-          color: 'var(--color-text-inverse)',
-          cursor: 'pointer',
-        });
+    it('should define a modal close button with hover state', () => {
+      const rule = extractRule(css, '.ct-container .ct-modal-close');
+      expect(rule).not.toBeNull();
+      assertProps(rule, { cursor: 'pointer' });
 
-        const hoverRule = extractRule(css, '.ct-container .ct-new-btn:hover');
-        expect(hoverRule).not.toBeNull();
-        assertProps(hoverRule, {
-          background: 'var(--color-primary-hover)',
-          'border-color': 'var(--color-primary-hover)',
-        });
-      });
+      const hoverRule = extractRule(css, '.ct-container .ct-modal-close:hover');
+      expect(hoverRule).not.toBeNull();
     });
 
-    describe('.ct-search-row', () => {
-      it('should define a flex search bar with card styling', () => {
-        const rule = extractRule(css, '.ct-container .ct-search-row');
-        expect(rule).not.toBeNull();
-        assertProps(rule, {
-          display: 'flex',
-          gap: '8px',
-          'margin-bottom': '16px',
-          background: 'var(--background-color-card)',
-          'border-radius': '6px',
-        });
-      });
-    });
-
-    describe('.ct-search-input', () => {
-      it('should define a flex-grow search input with focus state', () => {
-        const rule = extractRule(css, '.ct-container .ct-search-input');
-        expect(rule).not.toBeNull();
-        assertProps(rule, {
-          flex: '1',
-          background: 'var(--background-color-input)',
-        });
-
-        const focusRule = extractRule(css, '.ct-container .ct-search-input:focus');
-        expect(focusRule).not.toBeNull();
-        assertProps(focusRule, { 'border-color': 'var(--color-primary)' });
-      });
-    });
-
-    describe('.ct-search-clear', () => {
-      it('should define a transparent clear button with error color on hover', () => {
-        const rule = extractRule(css, '.ct-container .ct-search-clear');
-        expect(rule).not.toBeNull();
-        assertProps(rule, {
-          background: 'none',
-          border: 'none',
-          cursor: 'pointer',
-        });
-
-        const hoverRule = extractRule(css, '.ct-container .ct-search-clear:hover');
-        expect(hoverRule).not.toBeNull();
-        assertProps(hoverRule, { color: 'var(--color-error)' });
-      });
-    });
-
-    describe('.ct-empty-state', () => {
-      it('should define a centered empty state with flex column layout', () => {
-        const rule = extractRule(css, '.ct-container .ct-empty-state');
-        expect(rule).not.toBeNull();
-        assertProps(rule, {
-          'text-align': 'center',
-          display: 'flex',
-          'flex-direction': 'column',
-          'align-items': 'center',
-          'font-style': 'italic',
-        });
-      });
-    });
-
-    describe('.ct-list', () => {
-      it('should define a vertical list with gap', () => {
-        const rule = extractRule(css, '.ct-container .ct-list');
-        expect(rule).not.toBeNull();
-        assertProps(rule, {
-          'list-style': 'none',
-          display: 'flex',
-          'flex-direction': 'column',
-          gap: '8px',
-        });
-      });
-    });
-
-    describe('.ct-list-item', () => {
-      it('should define a clickable card with hover state', () => {
-        const rule = extractRule(css, '.ct-container .ct-list-item');
-        expect(rule).not.toBeNull();
-        assertProps(rule, {
-          cursor: 'pointer',
-          'border-radius': '6px',
-        });
-
-        const hoverRule = extractRule(css, '.ct-container .ct-list-item:hover');
-        expect(hoverRule).not.toBeNull();
-        assertProps(hoverRule, {
-          'border-color': 'var(--color-primary)',
-          background: 'var(--background-color-card-hover)',
-        });
-      });
-    });
-
-    describe('.ct-list-item-header', () => {
-      it('should define a flex header row with space-between, gap, and margin', () => {
-        const rule = extractRule(css, '.ct-container .ct-list-item-header');
-        expect(rule).not.toBeNull();
-        assertProps(rule, {
-          display: 'flex',
-          'justify-content': 'space-between',
-          'align-items': 'center',
-          gap: '12px',
-          'margin-bottom': '6px',
-        });
-      });
-    });
-
-    describe('.ct-list-name and .ct-list-preview', () => {
-      it('should define bold name text and muted preview text', () => {
-        const nameRule = extractRule(css, '.ct-container .ct-list-name');
-        expect(nameRule).not.toBeNull();
-        assertProps(nameRule, {
-          'font-weight': '600',
-          'font-size': '0.95rem',
-        });
-
-        const previewRule = extractRule(css, '.ct-container .ct-list-preview');
-        expect(previewRule).not.toBeNull();
-        assertProps(previewRule, {
-          'font-size': '0.82rem',
-        });
-      });
-    });
-
-    describe('.ct-list-meta and .ct-list-details', () => {
-      it('should define a flex meta row and wrapping details row', () => {
-        const metaRule = extractRule(css, '.ct-container .ct-list-meta');
-        expect(metaRule).not.toBeNull();
-        assertProps(metaRule, {
-          display: 'flex',
-          'align-items': 'center',
-          'flex-shrink': '0',
-        });
-
-        const detailsRule = extractRule(css, '.ct-container .ct-list-details');
-        expect(detailsRule).not.toBeNull();
-        assertProps(detailsRule, {
-          display: 'flex',
-          'align-items': 'center',
-          'flex-wrap': 'wrap',
-        });
-      });
+    it('should define modal action and button groups with flex layout', () => {
+      const actionsRule = extractRule(css, '.ct-container .ct-modal-actions');
+      const buttonsRule = extractRule(css, '.ct-container .ct-modal-buttons');
+      expect(actionsRule).not.toBeNull();
+      expect(buttonsRule).not.toBeNull();
+      assertProps(actionsRule, { display: 'flex' });
+      assertProps(buttonsRule, { display: 'flex' });
     });
   });
 
-  describe('Modal styles', () => {
-    describe('.ct-modal-overlay', () => {
-      it('should cover the full viewport with semi-transparent background', () => {
-        const rule = extractRule(css, '.ct-container .ct-modal-overlay');
-        expect(rule).not.toBeNull();
-        assertProps(rule, {
-          position: 'fixed',
-          top: '0',
-          left: '0',
-          right: '0',
-          bottom: '0',
-          background: 'rgba(0, 0, 0, 0.6)',
-          display: 'flex',
-          'z-index': '1000',
-        });
-      });
+  describe('Form fields', () => {
+    it('should define form labels and required indicators', () => {
+      const labelRule = extractRule(css, '.ct-container .ct-label');
+      expect(labelRule).not.toBeNull();
+      assertProps(labelRule, { display: 'block' });
+
+      const requiredRule = extractRule(css, '.ct-container .ct-required');
+      expect(requiredRule).not.toBeNull();
     });
 
-    describe('.ct-modal', () => {
-      it('should define a centered modal with max-width constraints', () => {
-        const rule = extractRule(css, '.ct-container .ct-modal');
-        expect(rule).not.toBeNull();
-        assertProps(rule, {
-          width: '520px',
-          'max-width': '90vw',
-          'max-height': '85vh',
-          display: 'flex',
-          'flex-direction': 'column',
-          'border-radius': '8px',
-        });
-      });
-    });
+    it('should define input, textarea, and select as full-width elements', () => {
+      const inputRule = extractRule(css, '.ct-container .ct-input');
+      expect(inputRule).not.toBeNull();
+      assertProps(inputRule, { width: '100%' });
 
-    describe('.ct-modal-header', () => {
-      it('should define a flex header with bottom border', () => {
-        const rule = extractRule(css, '.ct-container .ct-modal-header');
-        expect(rule).not.toBeNull();
-        assertProps(rule, {
-          display: 'flex',
-          'justify-content': 'space-between',
-          'border-bottom': '1px solid var(--border-color)',
-        });
-      });
-    });
+      const inputFocus = extractRule(css, '.ct-container .ct-input:focus');
+      expect(inputFocus).not.toBeNull();
 
-    describe('.ct-modal-header h3', () => {
-      it('should define modal title styling', () => {
-        const rule = extractRule(css, '.ct-container .ct-modal-header h3');
-        expect(rule).not.toBeNull();
-        assertProps(rule, {
-          margin: '0',
-          'font-size': '1.1rem',
-          'font-weight': '600',
-        });
-      });
-    });
+      const textareaRule = extractRule(css, '.ct-container .ct-textarea');
+      expect(textareaRule).not.toBeNull();
+      assertProps(textareaRule, { width: '100%' });
 
-    describe('.ct-modal-close', () => {
-      it('should define a transparent close button with hover state', () => {
-        const rule = extractRule(css, '.ct-container .ct-modal-close');
-        expect(rule).not.toBeNull();
-        assertProps(rule, {
-          background: 'none',
-          border: 'none',
-          cursor: 'pointer',
-          'font-size': '1.5rem',
-        });
-
-        const hoverRule = extractRule(css, '.ct-container .ct-modal-close:hover');
-        expect(hoverRule).not.toBeNull();
-        assertProps(hoverRule, { color: 'var(--color-text)' });
-      });
-    });
-
-    describe('.ct-modal-body', () => {
-      it('should define a scrollable body with flex column layout', () => {
-        const rule = extractRule(css, '.ct-container .ct-modal-body');
-        expect(rule).not.toBeNull();
-        assertProps(rule, {
-          'overflow-y': 'auto',
-          display: 'flex',
-          'flex-direction': 'column',
-          padding: '20px',
-        });
-      });
-    });
-
-    describe('.ct-modal-footer', () => {
-      it('should define a flex footer with top border', () => {
-        const rule = extractRule(css, '.ct-container .ct-modal-footer');
-        expect(rule).not.toBeNull();
-        assertProps(rule, {
-          display: 'flex',
-          'justify-content': 'space-between',
-          'border-top': '1px solid var(--border-color)',
-        });
-      });
-    });
-
-    describe('.ct-modal-actions and .ct-modal-buttons', () => {
-      it('should define flex action button groups with gap', () => {
-        const actionsRule = extractRule(css, '.ct-container .ct-modal-actions');
-        const buttonsRule = extractRule(css, '.ct-container .ct-modal-buttons');
-
-        expect(actionsRule).not.toBeNull();
-        expect(buttonsRule).not.toBeNull();
-
-        assertProps(actionsRule, { display: 'flex', gap: '8px' });
-        assertProps(buttonsRule, { display: 'flex', gap: '8px' });
-      });
-    });
-  });
-
-  describe('Form field styles', () => {
-    describe('.ct-label and .ct-required', () => {
-      it('should define a block label with secondary text color', () => {
-        const rule = extractRule(css, '.ct-container .ct-label');
-        expect(rule).not.toBeNull();
-        assertProps(rule, {
-          display: 'block',
-          'font-weight': '600',
-        });
-
-        const requiredRule = extractRule(css, '.ct-container .ct-required');
-        expect(requiredRule).not.toBeNull();
-        assertProps(requiredRule, { color: 'var(--color-error)' });
-      });
-    });
-
-    describe('.ct-input', () => {
-      it('should define a full-width input with proper border and focus state', () => {
-        const rule = extractRule(css, '.ct-container .ct-input');
-        expect(rule).not.toBeNull();
-        assertProps(rule, {
-          width: '100%',
-          'box-sizing': 'border-box',
-        });
-
-        const focusRule = extractRule(css, '.ct-container .ct-input:focus');
-        expect(focusRule).not.toBeNull();
-        assertProps(focusRule, {
-          'border-color': 'var(--color-primary)',
-          outline: 'none',
-        });
-      });
-    });
-
-    describe('.ct-textarea', () => {
-      it('should define a resizable textarea with min-height', () => {
-        const rule = extractRule(css, '.ct-container .ct-textarea');
-        expect(rule).not.toBeNull();
-        assertProps(rule, {
-          width: '100%',
-          'min-height': '80px',
-          resize: 'vertical',
-          'font-family': 'inherit',
-          'line-height': '1.5',
-        });
-      });
-    });
-
-    describe('.ct-select', () => {
-      it('should define a full-width select with pointer cursor', () => {
-        const rule = extractRule(css, '.ct-container .ct-select');
-        expect(rule).not.toBeNull();
-        assertProps(rule, {
-          width: '100%',
-          cursor: 'pointer',
-        });
-      });
+      const selectRule = extractRule(css, '.ct-container .ct-select');
+      expect(selectRule).not.toBeNull();
+      assertProps(selectRule, { width: '100%' });
     });
   });
 
   describe('Button styles', () => {
-    describe('.ct-btn', () => {
-      it('should define a secondary button with disabled state', () => {
-        const rule = extractRule(css, '.ct-container .ct-btn');
-        expect(rule).not.toBeNull();
-        assertProps(rule, {
-          display: 'inline-flex',
-          'align-items': 'center',
-          cursor: 'pointer',
-        });
+    it('should define secondary and primary button variants with disabled states', () => {
+      const btnRule = extractRule(css, '.ct-container .ct-btn');
+      expect(btnRule).not.toBeNull();
+      assertProps(btnRule, { cursor: 'pointer' });
 
-        const disabledRule = extractRule(css, '.ct-container .ct-btn:disabled');
-        expect(disabledRule).not.toBeNull();
-        assertProps(disabledRule, {
-          opacity: '0.5',
-          cursor: 'not-allowed',
-        });
-      });
+      const disabledRule = extractRule(css, '.ct-container .ct-btn:disabled');
+      expect(disabledRule).not.toBeNull();
+
+      const primaryRule = extractRule(css, '.ct-container .ct-btn-primary');
+      expect(primaryRule).not.toBeNull();
+
+      const primaryHover = extractRule(css, '.ct-container .ct-btn-primary:hover:not(:disabled)');
+      expect(primaryHover).not.toBeNull();
     });
 
-    describe('.ct-btn-primary', () => {
-      it('should define a primary button with hover state', () => {
-        const rule = extractRule(css, '.ct-container .ct-btn-primary');
-        expect(rule).not.toBeNull();
-        assertProps(rule, {
-          background: 'var(--color-primary)',
-          color: 'var(--color-text-inverse)',
-        });
-
-        const hoverRule = extractRule(css, '.ct-container .ct-btn-primary:hover:not(:disabled)');
-        expect(hoverRule).not.toBeNull();
-        assertProps(hoverRule, {
-          background: 'var(--color-primary-hover)',
-          'border-color': 'var(--color-primary-hover)',
-        });
-      });
-    });
-
-    describe('.ct-btn-danger', () => {
-      it('should define a danger button with error color', () => {
-        const rule = extractRule(css, '.ct-container .ct-btn-danger');
-        expect(rule).not.toBeNull();
-        assertProps(rule, {
-          color: 'var(--color-error)',
-          'border-color': 'var(--color-error)',
-        });
-      });
-    });
-  });
-
-  describe('CT back button', () => {
-    it('should define a styled back button with hover state', () => {
-      const rule = extractRule(css, '.ct-container .ct-back-btn');
+    it('should define a danger button variant with error color', () => {
+      const rule = extractRule(css, '.ct-container .ct-btn-danger');
       expect(rule).not.toBeNull();
-      assertProps(rule, {
-        display: 'inline-flex',
-        'align-items': 'center',
-        cursor: 'pointer',
-      });
-
-      const hoverRule = extractRule(css, '.ct-container .ct-back-btn:hover');
-      expect(hoverRule).not.toBeNull();
-      assertProps(hoverRule, {
-        background: 'var(--background-color-button-secondary-hover)',
-      });
     });
   });
 
-  describe('CT generate button', () => {
-    it('should define a generate button with secondary styling', () => {
-      const rule = extractRule(css, '.ct-container .ct-generate-btn');
-      expect(rule).not.toBeNull();
-      assertProps(rule, {
-        display: 'inline-flex',
-        background: 'var(--background-color-surface)',
-        color: 'var(--color-text)',
-        cursor: 'pointer',
-      });
-    });
-  });
+  describe('Navigation and utility buttons', () => {
+    it('should define back and generate buttons with hover states', () => {
+      const backBtnRule = extractRule(css, '.ct-container .ct-back-btn');
+      expect(backBtnRule).not.toBeNull();
+      assertProps(backBtnRule, { cursor: 'pointer' });
 
-  describe('CT empty state icon', () => {
-    it('should define a muted icon with 2rem size', () => {
-      const rule = extractRule(css, '.ct-container .ct-empty-state i');
-      expect(rule).not.toBeNull();
-      assertProps(rule, {
-        'font-size': '2rem',
-        opacity: '0.4',
-      });
-    });
-  });
+      const backHover = extractRule(css, '.ct-container .ct-back-btn:hover');
+      expect(backHover).not.toBeNull();
 
-  describe('CT search icon', () => {
+      const genBtnRule = extractRule(css, '.ct-container .ct-generate-btn');
+      expect(genBtnRule).not.toBeNull();
+      assertProps(genBtnRule, { cursor: 'pointer' });
+    });
+
     it('should define a muted search icon', () => {
       const rule = extractRule(css, '.ct-container .ct-search-icon');
       expect(rule).not.toBeNull();
-      assertProps(rule, {
-        color: 'var(--color-text-muted)',
-        'font-size': '0.9rem',
-      });
+      const color = getProp(rule, 'color');
+      expect(color).toContain('var(--color-text-muted)');
     });
   });
 

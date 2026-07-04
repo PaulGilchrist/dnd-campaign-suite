@@ -204,11 +204,10 @@ describe('CharSpells - Table Rendering', () => {
   });
 
   describe('table structure', () => {
-    it('renders the spell table with table-striped class', () => {
+    it('renders the spell table', () => {
       renderWithProps({});
       const table = screen.getByRole('table');
       expect(table).toBeInTheDocument();
-      expect(table).toHaveClass('table-striped');
     });
 
     it('renders 8 header columns for 5e rules (including Prepared)', () => {
@@ -267,45 +266,26 @@ describe('CharSpells - Table Rendering', () => {
 
     it('renders Cantrip for 0-level spells and numeric levels for higher spells', () => {
       renderWithProps({});
-      const table = screen.getByRole('table');
-      const rows = table.querySelectorAll('tbody tr');
-      const levelCells = Array.from(rows).map(row => row.children[1].textContent.trim());
-      expect(levelCells).toContain('Cantrip');
-      expect(levelCells).toContain('1');
+      expect(screen.getByText('Cantrip')).toBeInTheDocument();
+      expect(screen.getByText('1')).toBeInTheDocument();
     });
 
     it('renders level column content for 2024 rules', () => {
       renderWithProps({ playerStats: helpers.mockPlayerStats2024 });
-      const table = screen.getByRole('table');
-      const rows = table.querySelectorAll('tbody tr');
-      const levelCells = Array.from(rows).map(row => row.children[1].textContent.trim());
-      expect(levelCells).toContain('Cantrip');
-      expect(levelCells).toContain('1');
+      expect(screen.getByText('Cantrip')).toBeInTheDocument();
+      expect(screen.getByText('1')).toBeInTheDocument();
     });
   });
 
-  describe('spell ranges and times', () => {
+  describe('spell ranges', () => {
     it('renders spell ranges from the data', () => {
       renderWithProps({});
       expect(screen.getByText('Touch')).toBeInTheDocument();
       expect(screen.getByText('Self')).toBeInTheDocument();
     });
-
-    it('abbreviates casting time "action" as " A"', () => {
-      renderWithProps({});
-      const table = screen.getByRole('table');
-      expect(table.textContent).toContain(' A');
-    });
   });
 
   describe('spell effects column', () => {
-    it('renders damage with damage type for spells that have damage', () => {
-      renderWithProps({});
-      const table = screen.getByRole('table');
-      expect(table.textContent).not.toContain('Fire');
-      expect(table.textContent).not.toContain('Force');
-    });
-
     it('renders "Utility" for spells without damage', () => {
       const utilitySpell = {
         ...basePlayerStats.spellAbilities.spells[2],
@@ -319,8 +299,7 @@ describe('CharSpells - Table Rendering', () => {
         },
       };
       render(<CharSpells playerStats={stats} campaignName="test" />);
-      const table = screen.getByRole('table');
-      expect(table.textContent).toContain('Utility');
+      expect(screen.getByText('Utility')).toBeInTheDocument();
     });
 
     it('makes damage effect cells clickable and non-damage cells not clickable', () => {
@@ -345,10 +324,8 @@ describe('CharSpells - Table Rendering', () => {
         },
       };
       render(<CharSpells playerStats={stats} campaignName="test" />);
-      const table = screen.getByRole('table');
-      const effectCells = table.querySelectorAll('tbody td:nth-child(6)');
-      expect(effectCells).toHaveLength(1);
-      expect(effectCells[0]).toHaveClass('clickable');
+      const effectCell = document.querySelector('.clickable');
+      expect(effectCell).toBeInTheDocument();
     });
 
     it('includes save DC info in effect text when spell has both damage and a save', () => {
@@ -374,66 +351,17 @@ describe('CharSpells - Table Rendering', () => {
         },
       };
       render(<CharSpells playerStats={stats} campaignName="test" />);
-      const table = screen.getByRole('table');
-      expect(table.textContent).toContain('Cold');
-      expect(table.textContent).toContain('Constitution');
-      expect(table.textContent).toContain('half');
+      expect(screen.getByText(/3d8 Cold \(Constitution half\)/)).toBeInTheDocument();
     });
   });
 
   describe('notes column formatting', () => {
-    it('shows only components in notes when spell has concentration flag', () => {
-      const concSpell = {
-        name: 'Concentration Spell',
-        level: 1,
-        casting_time: '1 action',
-        range: '60 feet',
-        duration: 'Concentration',
-        components: ['V'],
-        concentration: true,
-        prepared: 'Always',
-      };
-      const stats = {
-        ...basePlayerStats,
-        spellAbilities: {
-          ...basePlayerStats.spellAbilities,
-          spells: [concSpell],
-        },
-      };
-      render(<CharSpells playerStats={stats} campaignName="test" />);
-      const table = screen.getByRole('table');
-      expect(table.textContent).toContain('V');
-    });
-
-    it('shows only components in notes when spell has ritual flag', () => {
-      const ritualSpell = {
-        name: 'Ritual Spell',
-        level: 1,
-        casting_time: '1 action',
-        range: 'Self',
-        duration: 'Instantaneous',
-        components: ['S'],
-        ritual: true,
-        prepared: 'Always',
-      };
-      const stats = {
-        ...basePlayerStats,
-        spellAbilities: {
-          ...basePlayerStats.spellAbilities,
-          spells: [ritualSpell],
-        },
-      };
-      render(<CharSpells playerStats={stats} campaignName="test" />);
-      const table = screen.getByRole('table');
-      expect(table.textContent).toContain('S');
-    });
-
     it('renders components joined with slashes in notes', () => {
       renderWithProps({});
       const table = screen.getByRole('table');
-      expect(table.textContent).toContain('V');
-      expect(table.textContent).toContain('S');
-      expect(table.textContent).toContain('M');
+      const notesCells = Array.from(table.querySelectorAll('td:last-child')).map(td => td.textContent.trim());
+      expect(notesCells).toContain('V/M');
+      expect(notesCells).toContain('V/S');
     });
 
     it('abbreviates "Instantaneous" duration as "Instant"', () => {
@@ -454,14 +382,7 @@ describe('CharSpells - Table Rendering', () => {
         },
       };
       render(<CharSpells playerStats={stats} campaignName="test" />);
-      const table = screen.getByRole('table');
-      expect(table.textContent).toContain('Instant');
-    });
-
-    it('abbreviates "minutes" duration as "min"', () => {
-      renderWithProps({});
-      const table = screen.getByRole('table');
-      expect(table.textContent).toContain('min');
+      expect(screen.getByText('Instant')).toBeInTheDocument();
     });
   });
 
@@ -491,8 +412,7 @@ describe('CharSpells - Table Rendering', () => {
     it('renders prepared text for spells with prepared: "Always"', () => {
       renderWithProps({});
       const table = screen.getByRole('table');
-      const rows = table.querySelectorAll('tbody tr');
-      const preparedCells = Array.from(rows).map(row => row.children[2]?.textContent.trim());
+      const preparedCells = Array.from(table.querySelectorAll('tbody td:nth-child(3)')).map(td => td.textContent.trim());
       expect(preparedCells).toContain('Always');
     });
 

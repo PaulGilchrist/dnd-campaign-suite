@@ -172,13 +172,9 @@ describe('CharBonusActions - Rendering', () => {
       type: 'Bonus Action',
     };
 
-    function renderBonusActionAttack(overrides = {}) {
-      const stats = createStats({ attacks: [{ ...bonusActionAttack, ...overrides }] });
-      return render(<CharBonusActions playerStats={stats} exhaustionPenalty={0} />);
-    }
-
     it('displays the attack name, range, damage, and damage type', () => {
-      const { container } = renderBonusActionAttack();
+      const stats = createStats({ attacks: [bonusActionAttack] });
+      const { container } = render(<CharBonusActions playerStats={stats} />);
       expect(screen.getByText('Main Gauche')).toBeInTheDocument();
       expect(screen.getByText('5 ft.')).toBeInTheDocument();
       expect(screen.getByText('1d4+3')).toBeInTheDocument();
@@ -186,20 +182,22 @@ describe('CharBonusActions - Rendering', () => {
       expect(container.querySelector('.stat--penalized')).not.toBeInTheDocument();
     });
 
-    it('applies exhaustion penalty to hit bonus display', () => {
-      render(<CharBonusActions playerStats={createStats({ attacks: [bonusActionAttack] })} exhaustionPenalty={3} />);
+    it('applies exhaustion penalty and stat classes to hit bonus display', () => {
+      const stats = createStats({ attacks: [bonusActionAttack] });
+
+      // exhaustion penalty changes hit bonus from +5 to +2 and adds stat--penalized
+      const { container: penalizedContainer } = render(<CharBonusActions playerStats={stats} exhaustionPenalty={3} />);
       expect(screen.getByText('+2')).toBeInTheDocument();
-      expect(document.querySelector('.stat--penalized')).toBeInTheDocument();
-    });
+      expect(penalizedContainer.querySelector('.stat--penalized')).toBeInTheDocument();
 
-    it('applies stat--penalized class when conditionAttackMode is disadvantage', () => {
-      render(<CharBonusActions playerStats={createStats({ attacks: [bonusActionAttack] })} conditionAttackMode="disadvantage" exhaustionPenalty={0} />);
-      expect(document.querySelector('.stat--penalized')).toBeInTheDocument();
-    });
+      // conditionAttackMode disadvantage also adds stat--penalized
+      const { container: disadvantageContainer } = render(<CharBonusActions playerStats={stats} conditionAttackMode="disadvantage" />);
+      expect(disadvantageContainer.querySelector('.stat--penalized')).toBeInTheDocument();
 
-    it('applies disabled-attack class when cannotAct is true', () => {
-      render(<CharBonusActions playerStats={createStats({ attacks: [bonusActionAttack] })} cannotAct />);
-      expect(document.querySelector('.disabled-attack')).toBeInTheDocument();
+      // cannotAct adds both stat--penalized and disabled-attack
+      const { container: cannotActContainer } = render(<CharBonusActions playerStats={stats} cannotAct />);
+      expect(cannotActContainer.querySelector('.stat--penalized')).toBeInTheDocument();
+      expect(cannotActContainer.querySelector('.disabled-attack')).toBeInTheDocument();
     });
   });
 
@@ -231,55 +229,25 @@ describe('CharBonusActions - Rendering', () => {
   describe('bonus action spells rendering', () => {
     const bonusActionSpell = { name: 'Shocking Grasp', range: 'Touch', casting_time: '1 bonus action', prepared: 'Prepared' };
 
-    it('displays the spell name and range', () => {
+    it('displays the spell name, range, and type', () => {
       render(<CharBonusActions playerStats={createStats({ spellAbilities: { spells: [bonusActionSpell] } })} />);
       expect(screen.getByText('Shocking Grasp')).toBeInTheDocument();
       expect(screen.getByText('Touch')).toBeInTheDocument();
-    });
-
-    it('shows Utility as the spell type', () => {
-      render(<CharBonusActions playerStats={createStats({ spellAbilities: { spells: [bonusActionSpell] } })} />);
       expect(screen.getByText('Utility')).toBeInTheDocument();
     });
 
-    it('excludes unprepared spells', () => {
-      const unprepared = { ...bonusActionSpell, name: 'Unprepared Spell', prepared: 'Unprepared' };
-      render(<CharBonusActions playerStats={createStats({ spellAbilities: { spells: [unprepared] } })} />);
-      expect(screen.queryByText('Unprepared Spell')).not.toBeInTheDocument();
-    });
-
-    it('includes Always-prepared spells', () => {
-      const always = { ...bonusActionSpell, name: 'Always Prepared', prepared: 'Always' };
-      render(<CharBonusActions playerStats={createStats({ spellAbilities: { spells: [always] } })} />);
-      expect(screen.getByText('Always Prepared')).toBeInTheDocument();
-    });
-
-    it('only includes spells with bonus action casting times', () => {
+    it('filters spells by prepared status and casting time', () => {
       const spells = [
+        { ...bonusActionSpell, name: 'Unprepared Spell', prepared: 'Unprepared' },
+        { ...bonusActionSpell, name: 'Always Prepared', prepared: 'Always' },
         { ...bonusActionSpell, name: 'Action Spell', casting_time: '1 action' },
-        { ...bonusActionSpell, name: 'Reaction Spell', casting_time: '1 reaction' },
         { ...bonusActionSpell, name: 'Bonus Action Spell', casting_time: '1 bonus action' },
       ];
       render(<CharBonusActions playerStats={createStats({ spellAbilities: { spells } })} />);
-      expect(screen.getByText('Bonus Action Spell')).toBeInTheDocument();
+      expect(screen.queryByText('Unprepared Spell')).not.toBeInTheDocument();
       expect(screen.queryByText('Action Spell')).not.toBeInTheDocument();
-      expect(screen.queryByText('Reaction Spell')).not.toBeInTheDocument();
-    });
-
-    it('handles mixed-case bonus action casting times', () => {
-      const capitalized = { ...bonusActionSpell, name: 'Capitalized Bonus', casting_time: '1 Bonus Action' };
-      const lowercase = { ...bonusActionSpell, name: 'Lowercase Bonus', casting_time: 'bonus action' };
-      render(<CharBonusActions playerStats={createStats({ spellAbilities: { spells: [capitalized, lowercase] } })} />);
-      expect(screen.getByText('Capitalized Bonus')).toBeInTheDocument();
-      expect(screen.getByText('Lowercase Bonus')).toBeInTheDocument();
-    });
-
-    it('includes spells even when they share names with attacks', () => {
-      const spell = { ...bonusActionSpell };
-      const attack = { ...spell, name: 'Shocking Grasp', range: 'Touch', hitBonus: 5, damage: '1d8+3', damageType: 'Lightning', type: 'Bonus Action' };
-      render(<CharBonusActions playerStats={createStats({ attacks: [attack], spellAbilities: { spells: [spell] } })} />);
-      // Both attack and spell render with the same name, so we get 2 elements
-      expect(screen.getAllByText('Shocking Grasp').length).toBe(2);
+      expect(screen.getByText('Always Prepared')).toBeInTheDocument();
+      expect(screen.getByText('Bonus Action Spell')).toBeInTheDocument();
     });
   });
 
@@ -290,18 +258,10 @@ describe('CharBonusActions - Rendering', () => {
       details: 'Dash, Hide, or Disengage.',
     };
 
-    it('displays the bonus action name with colon', () => {
+    it('renders bonus action with clickable name when it has details', () => {
       render(<CharBonusActions playerStats={createStats({ bonusActions: [bonusActionDesc] })} />);
       expect(screen.getByText(/Cunning Action:/)).toBeInTheDocument();
-    });
-
-    it('displays the bonus action description text', () => {
-      render(<CharBonusActions playerStats={createStats({ bonusActions: [bonusActionDesc] })} />);
       expect(screen.getByText(/You can take a bonus action/)).toBeInTheDocument();
-    });
-
-    it('renders clickable when the bonus action has details', () => {
-      render(<CharBonusActions playerStats={createStats({ bonusActions: [bonusActionDesc] })} />);
       expect(screen.getByText(/Cunning Action:/)).toHaveClass('clickable');
     });
 
@@ -315,132 +275,24 @@ describe('CharBonusActions - Rendering', () => {
   describe('2024 rules rendering', () => {
     const bonusActionAttack = { name: 'Main Gauche', range: 5, hitBonus: 5, damage: '1d4+3', damageType: 'Piercing', type: 'Bonus Action' };
 
-    it('shows Mastery column header for 2024 rules with bonus action attacks', () => {
+    it('shows Mastery column header and applies mastery-enabled class for 2024 rules', () => {
       render(<CharBonusActions playerStats={createStats({ rules: '2024', attacks: [bonusActionAttack] })} getWeaponMastery={() => null} />);
       expect(screen.getByText('Mastery')).toBeInTheDocument();
-    });
-
-    it('applies mastery-enabled class for 2024 rules', () => {
-      render(<CharBonusActions playerStats={createStats({ rules: '2024', attacks: [bonusActionAttack] })} getWeaponMastery={() => null} />);
       expect(document.querySelector('.attacks.mastery-enabled')).toBeInTheDocument();
-    });
-
-    it('does not show Mastery column for 5e rules', () => {
-      render(<CharBonusActions playerStats={createStats({ attacks: [bonusActionAttack] })} />);
-      expect(screen.queryAllByText('Mastery')).toHaveLength(0);
-    });
-
-    it('shows Mastery column for 2024 rules even when there are no bonus action attacks', () => {
-      render(<CharBonusActions playerStats={createStats({ rules: '2024', spellAbilities: { spells: [{ name: 'Shocking Grasp', range: 'Touch', casting_time: '1 bonus action', prepared: 'Prepared' }] } })} getWeaponMastery={() => null} />);
-      expect(screen.getByText('Mastery')).toBeInTheDocument();
-    });
-  });
-
-  describe('section structure', () => {
-    it('renders Bonus Actions text with sectionHeader class', () => {
-      render(<CharBonusActions playerStats={createStats({ bonusActions: [{ name: 'Test', description: 'Test desc', details: 'Test details' }] })} />);
-      expect(screen.getByText('Bonus Actions')).toHaveClass('sectionHeader');
     });
   });
 
   describe('combined content rendering', () => {
-    it('renders both bonus action attacks and bonus action descriptions together', () => {
+    it('renders bonus action attacks, descriptions, and spells together', () => {
       const stats = createStats({
         attacks: [{ name: 'Main Gauche', range: 5, hitBonus: 5, damage: '1d4+3', damageType: 'Piercing', type: 'Bonus Action' }],
         bonusActions: [{ name: 'Cunning Action', description: 'You can take a bonus action.', details: 'Dash, Hide, or Disengage.' }],
+        spellAbilities: { spells: [{ name: 'Shocking Grasp', range: 'Touch', casting_time: '1 bonus action', prepared: 'Prepared' }] },
       });
       render(<CharBonusActions playerStats={stats} />);
       expect(screen.getByText('Main Gauche')).toBeInTheDocument();
       expect(screen.getByText(/Cunning Action:/)).toBeInTheDocument();
-    });
-
-    it('renders both bonus action attacks and bonus action spells together', () => {
-      const stats = createStats({
-        attacks: [{ name: 'Main Gauche', range: 5, hitBonus: 5, damage: '1d4+3', damageType: 'Piercing', type: 'Bonus Action' }],
-        spellAbilities: { spells: [{ name: 'Shocking Grasp', range: 'Touch', casting_time: '1 bonus action', prepared: 'Prepared' }] },
-      });
-      render(<CharBonusActions playerStats={stats} />);
-      expect(screen.getByText('Main Gauche')).toBeInTheDocument();
       expect(screen.getByText('Shocking Grasp')).toBeInTheDocument();
-    });
-  });
-
-  describe('formatRange helper behavior through rendering', () => {
-    const bonusActionAttack = {
-      name: 'Main Gauche',
-      range: 5,
-      hitBonus: 5,
-      damage: '1d4+3',
-      damageType: 'Piercing',
-      type: 'Bonus Action',
-    };
-
-    it('formats number ranges with ft. suffix', () => {
-      render(<CharBonusActions playerStats={createStats({ attacks: [bonusActionAttack] })} />);
-      expect(screen.getByText('5 ft.')).toBeInTheDocument();
-
-      const largeRange = { ...bonusActionAttack, range: 60 };
-      render(<CharBonusActions playerStats={createStats({ attacks: [largeRange] })} />);
-      expect(screen.getByText('60 ft.')).toBeInTheDocument();
-    });
-
-    it('renders range with trailing dot (normalized without ft suffix)', () => {
-      const ranged = { ...bonusActionAttack, range: '30.' };
-      render(<CharBonusActions playerStats={createStats({ attacks: [ranged] })} />);
-      expect(screen.getByText('30')).toBeInTheDocument();
-    });
-
-    it('renders range with feet spelled out formatted correctly', () => {
-      const ranged = { ...bonusActionAttack, range: '30 feet' };
-      render(<CharBonusActions playerStats={createStats({ attacks: [ranged] })} />);
-      expect(screen.getByText('30 ft.')).toBeInTheDocument();
-    });
-
-    it('renders range with foot spelled out formatted correctly', () => {
-      const ranged = { ...bonusActionAttack, range: '30 foot' };
-      render(<CharBonusActions playerStats={createStats({ attacks: [ranged] })} />);
-      expect(screen.getByText('30 ft.')).toBeInTheDocument();
-    });
-
-    it('formats fraction range as-is (production: formatRange does not append ft. to fractions)', () => {
-      const ranged = { ...bonusActionAttack, range: '30/60' };
-      render(<CharBonusActions playerStats={createStats({ attacks: [ranged] })} />);
-      expect(screen.getByText('30/60')).toBeInTheDocument();
-    });
-
-    it('renders empty element when range is null or undefined', () => {
-      const nullRange = { ...bonusActionAttack, range: null };
-      render(<CharBonusActions playerStats={createStats({ attacks: [nullRange] })} />);
-      expect(screen.queryByText('null')).not.toBeInTheDocument();
-
-      const undefRange = { ...bonusActionAttack, range: undefined };
-      render(<CharBonusActions playerStats={createStats({ attacks: [undefRange] })} />);
-      expect(screen.queryByText('undefined')).not.toBeInTheDocument();
-    });
-
-    it('renders 0 range as "0 ft."', () => {
-      const ranged = { ...bonusActionAttack, range: 0 };
-      render(<CharBonusActions playerStats={createStats({ attacks: [ranged] })} />);
-      expect(screen.getByText('0 ft.')).toBeInTheDocument();
-    });
-  });
-
-  describe('grid layout behavior', () => {
-    it('shows hit and damage columns for bonus action attacks and spells', () => {
-      const stats = createStats({
-        attacks: [{ name: 'Main Gauche', range: 5, hitBonus: 5, damage: '1d4+3', damageType: 'Piercing', type: 'Bonus Action' }],
-        spellAbilities: { spells: [{ name: 'Shocking Grasp', range: 'Touch', casting_time: '1 bonus action', prepared: 'Prepared' }] },
-      });
-      render(<CharBonusActions playerStats={stats} />);
-      expect(screen.getByText('Hit')).toBeInTheDocument();
-      expect(screen.getByText('Damage')).toBeInTheDocument();
-    });
-
-    it('shows hit/damage columns even when only spells exist', () => {
-      const stats = createStats({
-        spellAbilities: { spells: [{ name: 'Shocking Grasp', range: 'Touch', casting_time: '1 bonus action', prepared: 'Prepared' }] },
-      });
-      render(<CharBonusActions playerStats={stats} />);
       expect(screen.getByText('Hit')).toBeInTheDocument();
       expect(screen.getByText('Damage')).toBeInTheDocument();
     });

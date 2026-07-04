@@ -172,16 +172,6 @@ vi.mock('./modals/shared/HypnoticPatternShakeModal.jsx', () => ({
     return <div data-testid="hypnotic-pattern-shake-modal"><button data-testid="hypnotic-close" onClick={onClose}>Close</button></div>;
   },
 }));
-vi.mock('./modals/WeaponKindMasteryModal.jsx', () => ({
-  default: function TestModal({ onClose }) {
-    return <div data-testid="weapon-kind-mastery-modal"><button data-testid="weapon-kind-mastery-close" onClick={onClose}>Close</button></div>;
-  },
-}));
-vi.mock('./modals/arcane/ArcaneWardRestoreModal.jsx', () => ({
-  default: function TestModal({ onClose }) {
-    return <div data-testid="arcane-ward-restore-modal"><button data-testid="arcane-ward-close" onClick={onClose}>Close</button></div>;
-  },
-}));
 vi.mock('./modals/CombatSuperiorityModal.jsx', () => ({
   default: function TestModal({ onClose }) {
     return <div data-testid="combat-superiority-modal"><button data-testid="combat-superiority-close" onClick={onClose}>Close</button></div>;
@@ -321,63 +311,41 @@ describe('CharActionModals handlers', () => {
   // ── Constellation Selection modal ──
 
   describe('Constellation Selection modal', () => {
-    it('renders ConstellationSelectionModal for starry form', () => {
-      render(<CharActionModals
-        {...createBaseProps()}
-        starryFormConstellationModal={{ payload: { action: {}, playerStats: {}, campaignName: 'test' } }}
-      />);
-      expect(screen.getByTestId('constellation-selection-modal')).toBeInTheDocument();
-    });
+    const constellationCases = [
+      { modalProp: 'starryFormConstellationModal', closeSetter: 'setStarryFormConstellationModal' },
+      { modalProp: 'twinklingConstellationModal', closeSetter: 'setTwinklingConstellationModal' },
+    ];
 
-    it('renders ConstellationSelectionModal for twinkling form', () => {
-      render(<CharActionModals
-        {...createBaseProps()}
-        twinklingConstellationModal={{ payload: { action: {}, playerStats: {}, campaignName: 'test' } }}
-      />);
-      expect(screen.getByTestId('constellation-selection-modal')).toBeInTheDocument();
-    });
+    for (const { modalProp, closeSetter } of constellationCases) {
+      it(`renders ${modalProp}`, () => {
+        render(<CharActionModals
+          {...createBaseProps()}
+          {...{ [modalProp]: { payload: { action: {}, playerStats: {}, campaignName: 'test' } } }}
+        />);
+        expect(screen.getByTestId('constellation-selection-modal')).toBeInTheDocument();
+      });
 
-    it('starry confirm calls handleConstellationSelect with payload and option', () => {
-      const handleConstellationSelect = vi.fn();
-      const payload = { action: {}, playerStats: {}, campaignName: 'test' };
-      render(<CharActionModals
-        {...createBaseProps({ handleConstellationSelect })}
-        starryFormConstellationModal={{ payload }}
-      />);
-      fireEvent.click(screen.getByTestId('const-confirm'));
-      expect(handleConstellationSelect).toHaveBeenCalledWith(payload, 'test-option');
-    });
+      it(`${modalProp}: confirm calls handleConstellationSelect with payload and option`, () => {
+        const handleConstellationSelect = vi.fn();
+        const payload = { action: {}, playerStats: {}, campaignName: 'test' };
+        render(<CharActionModals
+          {...createBaseProps({ handleConstellationSelect })}
+          {...{ [modalProp]: { payload } }}
+        />);
+        fireEvent.click(screen.getByTestId('const-confirm'));
+        expect(handleConstellationSelect).toHaveBeenCalledWith(payload, 'test-option');
+      });
 
-    it('starry close calls setStarryFormConstellationModal with null', () => {
-      const setStarryFormConstellationModal = vi.fn();
-      render(<CharActionModals
-        {...createBaseProps({ setStarryFormConstellationModal })}
-        starryFormConstellationModal={{ payload: { action: {}, playerStats: {}, campaignName: 'test' } }}
-      />);
-      fireEvent.click(screen.getByTestId('const-close'));
-      expect(setStarryFormConstellationModal).toHaveBeenCalledWith(null);
-    });
-
-    it('twinkling confirm calls handleConstellationSelect with payload and option', () => {
-      const handleConstellationSelect = vi.fn();
-      const payload = { action: {}, playerStats: {}, campaignName: 'test' };
-      render(<CharActionModals
-        {...createBaseProps({ handleConstellationSelect })}
-        twinklingConstellationModal={{ payload }}
-      />);
-      fireEvent.click(screen.getByTestId('const-confirm'));
-      expect(handleConstellationSelect).toHaveBeenCalledWith(payload, 'test-option');
-    });
-
-    it('twinkling close calls setTwinklingConstellationModal with null', () => {
-      const setTwinklingConstellationModal = vi.fn();
-      render(<CharActionModals
-        {...createBaseProps({ setTwinklingConstellationModal })}
-        twinklingConstellationModal={{ payload: { action: {}, playerStats: {}, campaignName: 'test' } }}
-      />);
-      fireEvent.click(screen.getByTestId('const-close'));
-      expect(setTwinklingConstellationModal).toHaveBeenCalledWith(null);
-    });
+      it(`${modalProp}: close calls ${closeSetter} with null`, () => {
+        const closeSetterFn = vi.fn();
+        render(<CharActionModals
+          {...createBaseProps({ [closeSetter]: closeSetterFn })}
+          {...{ [modalProp]: { payload: { action: {}, playerStats: {}, campaignName: 'test' } } }}
+        />);
+        fireEvent.click(screen.getByTestId('const-close'));
+        expect(closeSetterFn).toHaveBeenCalledWith(null);
+      });
+    }
   });
 
   // ── Weapon Mastery modal ──
@@ -431,76 +399,48 @@ describe('CharActionModals handlers', () => {
   // ── Close/dismiss behavior ──
 
   describe('modal close/dismiss behavior', () => {
-    it('HealingPoolModal: close button calls setHealingPoolModal(null)', () => {
-      const setHealingPoolModal = vi.fn();
+    const closeTests = [
+      { name: 'HealingPoolModal', prop: 'healingPoolModal', value: { name: 'Test Pool' }, closeBtn: 'healing-close', setter: 'setHealingPoolModal' },
+      { name: 'AttackRiderModal', prop: 'attackRiderModal', value: {}, closeBtn: 'attack-rider-close', setter: 'setAttackRiderModal' },
+      { name: 'OpenHandTechniqueModal', prop: 'openHandTechniqueModal', value: {}, closeBtn: 'open-hand-close', setter: 'setOpenHandTechniqueModal' },
+      { name: 'CombatStanceModal', prop: 'combatStanceModal', value: {}, closeBtn: 'combat-stance-close', setter: 'setCombatStanceModal' },
+      { name: 'RevelationInFleshModal', prop: 'revelationInFleshModal', value: {}, closeBtn: 'revelation-close', setter: 'setRevelationInFleshModal' },
+      { name: 'TeleportModal', prop: 'teleportModal', value: {}, closeBtn: 'teleport-close', setter: 'setTeleportModal' },
+      { name: 'FiendishLegacyModal', prop: 'fiendishLegacyModal', value: {}, closeBtn: 'fiendish-close', setter: 'setFiendishLegacyModal' },
+      { name: 'BreathWeaponShapeModal', prop: 'breathWeaponShapeModal', value: {}, closeBtn: 'breath-close', setter: 'setBreathWeaponShapeModal' },
+      { name: 'HypnoticPatternShakeModal', prop: 'hypnoticPatternShakeModal', value: {}, closeBtn: 'hypnotic-close', setter: 'setHypnoticPatternShakeModal' },
+    ];
+
+    for (const { name, prop, value, closeBtn, setter } of closeTests) {
+      it(`${name}: close button calls ${setter}(null)`, () => {
+        const setterFn = vi.fn();
+        render(<CharActionModals
+          {...createBaseProps({ [setter]: setterFn })}
+          {...{ [prop]: value }}
+        />);
+        fireEvent.click(screen.getByTestId(closeBtn));
+        expect(setterFn).toHaveBeenCalledWith(null);
+      });
+    }
+
+    it('WeaponKindMasteryModal: close button calls handleWeaponKindMasteryClose', () => {
+      const handleWeaponKindMasteryClose = vi.fn();
       render(<CharActionModals
-        {...createBaseProps({ setHealingPoolModal })}
-        healingPoolModal={{ name: 'Test Pool' }}
+        {...createBaseProps({ handleWeaponKindMasteryClose })}
+        weaponKindMasteryModal={{}}
       />);
-      fireEvent.click(screen.getByTestId('healing-close'));
-      expect(setHealingPoolModal).toHaveBeenCalledWith(null);
+      fireEvent.click(screen.getByTestId('weapon-kind-mastery-close'));
+      expect(handleWeaponKindMasteryClose).toHaveBeenCalled();
     });
 
-    it('AttackRiderModal: close dismisses the modal', () => {
-      const setAttackRiderModal = vi.fn();
+    it('AttackRiderManeuverPrompt: skip button calls handleAttackRiderManeuverSkip', () => {
+      const handleAttackRiderManeuverSkip = vi.fn();
       render(<CharActionModals
-        {...createBaseProps({ setAttackRiderModal })}
-        attackRiderModal={{}}
+        {...createBaseProps({ handleAttackRiderManeuverSkip })}
+        attackRiderManeuverPrompt={{ maneuvers: [], attack: {}, isMiss: false }}
       />);
-      fireEvent.click(screen.getByTestId('attack-rider-close'));
-      expect(setAttackRiderModal).toHaveBeenCalledWith(null);
-    });
-
-    it('OpenHandTechniqueModal: close dismisses the modal', () => {
-      const setOpenHandTechniqueModal = vi.fn();
-      render(<CharActionModals
-        {...createBaseProps({ setOpenHandTechniqueModal })}
-        openHandTechniqueModal={{}}
-      />);
-      fireEvent.click(screen.getByTestId('open-hand-close'));
-      expect(setOpenHandTechniqueModal).toHaveBeenCalledWith(null);
-    });
-
-    it('CombatStanceModal: close dismisses the modal', () => {
-      const setCombatStanceModal = vi.fn();
-      render(<CharActionModals
-        {...createBaseProps({ setCombatStanceModal })}
-        combatStanceModal={{}}
-      />);
-      fireEvent.click(screen.getByTestId('combat-stance-close'));
-      expect(setCombatStanceModal).toHaveBeenCalledWith(null);
-    });
-
-    it('RevelationInFleshModal: close dismisses the modal', () => {
-      const setRevelationInFleshModal = vi.fn();
-      render(<CharActionModals
-        {...createBaseProps({ setRevelationInFleshModal })}
-        revelationInFleshModal={{}}
-      />);
-      fireEvent.click(screen.getByTestId('revelation-close'));
-      expect(setRevelationInFleshModal).toHaveBeenCalledWith(null);
-    });
-
-    it('TeleportModal: close dismisses the modal', () => {
-      const setTeleportModal = vi.fn();
-      render(<CharActionModals
-        {...createBaseProps({ setTeleportModal })}
-        teleportModal={{}}
-      />);
-      fireEvent.click(screen.getByTestId('teleport-close'));
-      expect(setTeleportModal).toHaveBeenCalledWith(null);
-    });
-
-    it('HealingIllusionModal: skip dismisses the modal', () => {
-      const setHealingIllusionModal = vi.fn();
-      render(<CharActionModals
-        {...createBaseProps({ setHealingIllusionModal })}
-        healingIllusionModal={{}}
-        characters={[{ name: 'Ally1' }]}
-        playerStats={{ name: 'Player1' }}
-      />);
-      fireEvent.click(screen.getByRole('button', { name: 'Skip' }));
-      expect(setHealingIllusionModal).toHaveBeenCalledWith(null);
+      fireEvent.click(screen.getByTestId('maneuver-skip'));
+      expect(handleAttackRiderManeuverSkip).toHaveBeenCalled();
     });
 
     it('DivineInterventionModal: close clears both modal and action state', () => {
@@ -538,56 +478,6 @@ describe('CharActionModals handlers', () => {
       fireEvent.click(screen.getByTestId('elder-close'));
       expect(handleElderChampionRestore).not.toHaveBeenCalled();
       expect(setElderChampionRestoreModal).toHaveBeenCalledWith(null);
-    });
-
-    it('FiendishLegacyModal: close button calls setFiendishLegacyModal(null)', () => {
-      const setFiendishLegacyModal = vi.fn();
-      render(<CharActionModals
-        {...createBaseProps({ setFiendishLegacyModal })}
-        fiendishLegacyModal={{}}
-      />);
-      fireEvent.click(screen.getByTestId('fiendish-close'));
-      expect(setFiendishLegacyModal).toHaveBeenCalledWith(null);
-    });
-
-    it('BreathWeaponShapeModal: close button calls setBreathWeaponShapeModal(null)', () => {
-      const setBreathWeaponShapeModal = vi.fn();
-      render(<CharActionModals
-        {...createBaseProps({ setBreathWeaponShapeModal })}
-        breathWeaponShapeModal={{}}
-      />);
-      fireEvent.click(screen.getByTestId('breath-close'));
-      expect(setBreathWeaponShapeModal).toHaveBeenCalledWith(null);
-    });
-
-    it('HypnoticPatternShakeModal: close button calls setHypnoticPatternShakeModal(null)', () => {
-      const setHypnoticPatternShakeModal = vi.fn();
-      render(<CharActionModals
-        {...createBaseProps({ setHypnoticPatternShakeModal })}
-        hypnoticPatternShakeModal={{}}
-      />);
-      fireEvent.click(screen.getByTestId('hypnotic-close'));
-      expect(setHypnoticPatternShakeModal).toHaveBeenCalledWith(null);
-    });
-
-    it('WeaponKindMasteryModal: close button calls handleWeaponKindMasteryClose', () => {
-      const handleWeaponKindMasteryClose = vi.fn();
-      render(<CharActionModals
-        {...createBaseProps({ handleWeaponKindMasteryClose })}
-        weaponKindMasteryModal={{}}
-      />);
-      fireEvent.click(screen.getByTestId('weapon-kind-mastery-close'));
-      expect(handleWeaponKindMasteryClose).toHaveBeenCalled();
-    });
-
-    it('AttackRiderManeuverPrompt: skip button calls handleAttackRiderManeuverSkip', () => {
-      const handleAttackRiderManeuverSkip = vi.fn();
-      render(<CharActionModals
-        {...createBaseProps({ handleAttackRiderManeuverSkip })}
-        attackRiderManeuverPrompt={{ maneuvers: [], attack: {}, isMiss: false }}
-      />);
-      fireEvent.click(screen.getByTestId('maneuver-skip'));
-      expect(handleAttackRiderManeuverSkip).toHaveBeenCalled();
     });
   });
 });

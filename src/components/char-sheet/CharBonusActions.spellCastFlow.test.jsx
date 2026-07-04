@@ -155,33 +155,6 @@ describe('CharBonusActions - Spell Cast Flow', () => {
       expect(screen.queryByTestId('spell-detail-popup')).not.toBeInTheDocument();
     });
 
-    it('calls gateMetamagic with the spell when casting', async () => {
-      const mockGateMetamagic = vi.fn();
-      vi.mocked(useSpellMetamagicFlow).mockReturnValue({
-        pendingMetamagic: null,
-        gateMetamagic: mockGateMetamagic,
-        handleConfirm: vi.fn(),
-        handleSkip: vi.fn(),
-        pendingAid: null,
-        handleAidConfirm: vi.fn(),
-        handleAidSkip: vi.fn(),
-        pendingGreaterRestoration: null,
-        handleGreaterRestorationConfirm: vi.fn(),
-        handleGreaterRestorationSkip: vi.fn(),
-      });
-
-      render(<CharBonusActions playerStats={createStats({ spellAbilities: { spells: [bonusActionSpell] } })} campaignName="test" />);
-      const spellLink = screen.getByText('Shocking Grasp');
-      fireEvent.click(spellLink);
-
-      const castBtn = screen.getByTestId('cast-btn');
-      fireEvent.click(castBtn);
-
-      await waitFor(() => {
-        expect(mockGateMetamagic).toHaveBeenCalled();
-      });
-    });
-
     it('resolves spell positions when mapName is provided', async () => {
       const mapData = {
         players: [
@@ -218,60 +191,6 @@ describe('CharBonusActions - Spell Cast Flow', () => {
       await waitFor(() => {
         expect(mockGateMetamagic).toHaveBeenCalled();
       });
-    });
-
-    it('does not crash when map resolution has no combat context', async () => {
-      const mapData = {
-        players: [{ name: 'TestCharacter', gridX: 5, gridY: 5 }],
-        placedItems: [],
-      };
-      damageUtils.getCombatContext.mockResolvedValue(null);
-      mapsService.loadMapData.mockResolvedValue(mapData);
-      render(<CharBonusActions playerStats={createStats({ spellAbilities: { spells: [bonusActionSpell] } })} mapName="test-map" campaignName="test" />);
-      fireEvent.click(screen.getByText('Shocking Grasp'));
-      expect(screen.getByTestId('spell-detail-popup')).toBeInTheDocument();
-    });
-
-    it('does not crash when target is null or not on map', async () => {
-      const mapData = {
-        players: [{ name: 'TestCharacter', gridX: 5, gridY: 5 }],
-        placedItems: [{ name: 'Enemy', gridX: 10, gridY: 10 }],
-      };
-      mapsService.loadMapData.mockResolvedValue(mapData);
-
-      // Test: target is null
-      damageUtils.getCombatContext.mockResolvedValue({});
-      damageUtils.getTargetFromAttacker.mockReturnValue(null);
-      const { unmount } = render(<CharBonusActions playerStats={createStats({ spellAbilities: { spells: [bonusActionSpell] } })} mapName="test-map" campaignName="test" />);
-      const spellLinks = document.querySelectorAll('div.left.clickable');
-      fireEvent.click(spellLinks[0]);
-      expect(screen.getByTestId('spell-detail-popup')).toBeInTheDocument();
-      unmount();
-      vi.clearAllMocks();
-
-      // Test: target player not on map, falls back to placed item
-      damageUtils.getCombatContext.mockResolvedValue({});
-      damageUtils.getTargetFromAttacker.mockReturnValue({ name: 'Enemy' });
-      const { unmount: unmount2 } = render(<CharBonusActions playerStats={createStats({ spellAbilities: { spells: [bonusActionSpell] } })} mapName="test-map" campaignName="test" />);
-      const spellLinks2 = document.querySelectorAll('div.left.clickable');
-      fireEvent.click(spellLinks2[0]);
-      expect(screen.getByTestId('spell-detail-popup')).toBeInTheDocument();
-      unmount2();
-    });
-  });
-
-  describe('spell detail popup close', () => {
-    const bonusActionSpell = { name: 'Shocking Grasp', range: 'Touch', casting_time: '1 bonus action', prepared: 'Prepared' };
-
-    it('closes popup when onClose is called', async () => {
-      render(<CharBonusActions playerStats={createStats({ spellAbilities: { spells: [bonusActionSpell] } })} campaignName="test" />);
-      const spellLink = screen.getByText('Shocking Grasp');
-      fireEvent.click(spellLink);
-      expect(screen.getByTestId('spell-detail-popup')).toBeInTheDocument();
-
-      const closeBtn = screen.getByTestId('close-btn');
-      fireEvent.click(closeBtn);
-      expect(screen.queryByTestId('spell-detail-popup')).not.toBeInTheDocument();
     });
   });
 

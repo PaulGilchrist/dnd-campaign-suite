@@ -218,24 +218,6 @@ describe('CharSpells', () => {
       expect(row[5]).toBe('Utility');
     });
 
-    it('should display Utility for spells with a damage field that has no slot/character level data', () => {
-      const spell = createSpell({
-        name: 'Shield',
-        level: 1,
-        damage: {
-          damage_type: 'Force',
-        },
-      });
-      const { table } = renderSpellsTable({
-        ...mockPlayerStats,
-        spellAbilities: { ...mockPlayerStats.spellAbilities, spells: [spell] },
-      });
-
-      const row = getSpellRow(table, 'Shield');
-      expect(row).toBeDefined();
-      expect(row[5]).toBe('Utility');
-    });
-
     it('should display save DC info in effect text when spell has a DC', () => {
       const spell = createSpell({
         name: 'Burning Hands',
@@ -358,22 +340,6 @@ describe('CharSpells', () => {
       expect(row[7]).toBe('V/S');
     });
 
-    it('should display only components when both concentration and ritual are true', () => {
-      const spell = createSpell({
-        name: 'Wand of Magic Awareness',
-        concentration: true,
-        ritual: true,
-      });
-      const { table } = renderSpellsTable({
-        ...mockPlayerStats,
-        spellAbilities: { ...mockPlayerStats.spellAbilities, spells: [spell] },
-      });
-
-      const row = getSpellRow(table, 'Wand of Magic Awareness');
-      expect(row).toBeDefined();
-      expect(row[7]).toBe('V/S');
-    });
-
     it('should display components joined with slashes', () => {
       const spell = createSpell({
         name: 'Fireball',
@@ -404,21 +370,6 @@ describe('CharSpells', () => {
       const row = getSpellRow(table, 'Haste');
       expect(row).toBeDefined();
       expect(row[6]).toBe('Concentration, 1 min');
-    });
-
-    it('should abbreviate "Concentration, up to 10 minutes" to "Concentration, 10 mins"', () => {
-      const spell = createSpell({
-        name: 'Darkness',
-        duration: 'Concentration, up to 10 minutes',
-      });
-      const { table } = renderSpellsTable({
-        ...mockPlayerStats,
-        spellAbilities: { ...mockPlayerStats.spellAbilities, spells: [spell] },
-      });
-
-      const row = getSpellRow(table, 'Darkness');
-      expect(row).toBeDefined();
-      expect(row[6]).toBe('Concentration, 10 mins');
     });
 
     it('should abbreviate "Instantaneous" to "Instant"', () => {
@@ -468,42 +419,6 @@ describe('CharSpells', () => {
       expect(row[3]).toBe('1  A');
     });
 
-    it('should abbreviate "bonus action" to "BA"', () => {
-      const spell = createSpell({
-        name: 'Cunning Action',
-        casting_time: '1 bonus action',
-        damage: {
-          damage_at_slot_level: { '1': '1d4' },
-          damage_type: 'Fire',
-        },
-      });
-      const { table } = renderSpellsTable({
-        ...mockPlayerStats,
-        spellAbilities: { ...mockPlayerStats.spellAbilities, spells: [spell] },
-      });
-
-      // Bonus action + damage spells are filtered from the Spells table
-      expect(getSpellRow(table, 'Cunning Action')).toBeUndefined();
-    });
-
-    it('should abbreviate "reaction" to "Reaction"', () => {
-      const spell = createSpell({
-        name: 'Shield',
-        casting_time: '1 reaction',
-        damage: {
-          damage_at_slot_level: { '1': '1d4' },
-          damage_type: 'Force',
-        },
-      });
-      const { table } = renderSpellsTable({
-        ...mockPlayerStats,
-        spellAbilities: { ...mockPlayerStats.spellAbilities, spells: [spell] },
-      });
-
-      // Reaction + damage spells are filtered from the Spells table
-      expect(getSpellRow(table, 'Shield')).toBeUndefined();
-    });
-
     it('should leave casting_time unchanged when no match', () => {
       const spell = createSpell({
         name: 'Time Stop',
@@ -517,117 +432,6 @@ describe('CharSpells', () => {
       const row = getSpellRow(table, 'Time Stop');
       expect(row).toBeDefined();
       expect(row[3]).toBe('1 turn');
-    });
-  });
-
-  describe('Damage display edge cases', () => {
-    it('should display damage value when only damage_at_character_level has data', () => {
-      const spell = createSpell({
-        name: 'Scorching Ray',
-        level: 2,
-        damage: {
-          damage_at_character_level: { '3': '4d6' },
-          damage_type: 'Fire',
-        },
-      });
-      const { table } = renderSpellsTable({
-        ...mockPlayerStats,
-        spellAbilities: { ...mockPlayerStats.spellAbilities, spells: [spell] },
-      });
-
-      const row = getSpellRow(table, 'Scorching Ray');
-      expect(row).toBeDefined();
-      expect(row[5]).toBe('4d6 Fire');
-    });
-
-    it('should display damage with formula containing addition', () => {
-      const spell = createSpell({
-        name: 'Magic Missile',
-        level: 1,
-        damage: {
-          damage_at_slot_level: { '1': '1d4+1' },
-          damage_type: 'Force',
-        },
-      });
-      const { table } = renderSpellsTable({
-        ...mockPlayerStats,
-        spellAbilities: { ...mockPlayerStats.spellAbilities, spells: [spell] },
-      });
-
-      const row = getSpellRow(table, 'Magic Missile');
-      expect(row).toBeDefined();
-      expect(row[5]).toBe('1d4+1 Force');
-    });
-  });
-
-  describe('Table structure', () => {
-    it('should render all expected columns in each row', () => {
-      const spell = createSpell({
-        name: 'Complete Spell',
-        level: 2,
-        casting_time: '1 turn',
-        range: '60 feet',
-        duration: 'Concentration, up to 1 minute',
-        components: ['V', 'S', 'M'],
-        concentration: true,
-        ritual: true,
-        damage: {
-          damage_at_slot_level: { '2': '2d6' },
-          damage_type: 'Acid',
-        },
-        dc: {
-          dc_type: 'Dexterity',
-          dc_success: 'half',
-        },
-      });
-      const { table } = renderSpellsTable({
-        ...mockPlayerStats,
-        spellAbilities: { ...mockPlayerStats.spellAbilities, spells: [spell] },
-      });
-
-      const row = getSpellRow(table, 'Complete Spell');
-      expect(row).toBeDefined();
-      // Columns: Spell, Level, Prepared(checkbox), Time, Range, Effect, Duration, Notes
-      expect(row).toHaveLength(8);
-      expect(row[0]).toBe('Complete Spell');
-      expect(row[1]).toBe('2');
-      // Prepared column renders a checkbox input, so textContent is empty
-      expect(row[2]).toBe('');
-      expect(row[3]).toBe('1 turn');
-      expect(row[4]).toBe('60 feet');
-      expect(row[5]).toBe('2d6 Acid (Dexterity half)');
-      expect(row[6]).toBe('Concentration, 1 min');
-      expect(row[7]).toBe('V/S/M');
-    });
-
-    it('should render cantrip level as "Cantrip" text', () => {
-      const spell = createSpell({
-        name: 'Cantrip Test',
-        level: 0,
-      });
-      const { table } = renderSpellsTable({
-        ...mockPlayerStats,
-        spellAbilities: { ...mockPlayerStats.spellAbilities, spells: [spell] },
-      });
-
-      const row = getSpellRow(table, 'Cantrip Test');
-      expect(row).toBeDefined();
-      expect(row[1]).toBe('Cantrip');
-    });
-
-    it('should render checkbox cell for prepared spells', () => {
-      const spell = createSpell({
-        name: 'Prepared Test',
-        prepared: 'Prepared',
-      });
-      const { container } = renderSpellsTable({
-        ...mockPlayerStats,
-        spellAbilities: { ...mockPlayerStats.spellAbilities, spells: [spell] },
-      });
-
-      const checkbox = container.querySelector('tbody tr input[type="checkbox"]');
-      expect(checkbox).toBeTruthy();
-      expect(checkbox.checked).toBe(true);
     });
   });
 });

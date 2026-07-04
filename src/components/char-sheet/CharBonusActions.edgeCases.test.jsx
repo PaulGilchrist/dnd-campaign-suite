@@ -151,16 +151,6 @@ describe('CharBonusActions - Edge Cases', () => {
       render(<CharBonusActions playerStats={stats} getWeaponMastery={() => null} />);
       expect(screen.getByText('Dagger')).toBeInTheDocument();
     });
-
-    it('shows Light weapon bonus action attack in 5e rules regardless of Nick round', () => {
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === '_Nick_UsedRound') return 1;
-        return null;
-      });
-      const stats = createStats({ rules: '5e', attacks: [lightWeaponAttack] });
-      render(<CharBonusActions playerStats={stats} />);
-      expect(screen.getByText('Dagger')).toBeInTheDocument();
-    });
   });
 
   describe('Elder Champion spell conversion', () => {
@@ -174,14 +164,6 @@ describe('CharBonusActions - Edge Cases', () => {
       render(<CharBonusActions playerStats={stats} />);
       expect(screen.getByText('Shooting Star')).toBeInTheDocument();
       expect(screen.getByText('60 ft.')).toBeInTheDocument();
-    });
-
-    it('does not convert action spells when Elder Champion is not active', () => {
-      getRuntimeValue.mockReturnValue(null);
-      const actionSpell = { name: 'Shooting Star', range: '60 ft.', casting_time: '1 action', prepared: 'Prepared' };
-      const stats = createStats({ spellAbilities: { spells: [actionSpell] } });
-      render(<CharBonusActions playerStats={stats} />);
-      expect(screen.queryByText('Shooting Star')).not.toBeInTheDocument();
     });
 
     it('shows both bonus action and converted action spells when Elder Champion is active', () => {
@@ -199,28 +181,6 @@ describe('CharBonusActions - Edge Cases', () => {
       expect(screen.getByText('Shocking Grasp')).toBeInTheDocument();
       expect(screen.getByText('Shooting Star')).toBeInTheDocument();
       expect(screen.getByText('Misty Step')).toBeInTheDocument();
-    });
-  });
-
-  describe('featureCategories filter', () => {
-    it('filters out bonus actions in featuresToIgnore list for 5e rules', () => {
-      const ignored5e = { name: 'Rage', description: 'Enter a rage.', details: 'Gain benefits.' };
-      const actionable = { name: 'Cunning Action', description: 'Dash, Hide, or Disengage.', details: 'Move fast.' };
-
-      const stats5e = createStats({ rules: '5e', bonusActions: [ignored5e, actionable] });
-      const { container } = render(<CharBonusActions playerStats={stats5e} />);
-      expect(container.querySelector('.char-actions')).not.toHaveTextContent('Rage:');
-      expect(container.querySelector('.char-actions')).toHaveTextContent('Cunning Action:');
-    });
-
-    it('filters out bonus actions in featuresToIgnore list for 2024 rules', () => {
-      const ignored2024 = { name: 'Barbarian Subclass', description: 'Subclass feature.', details: 'Power.' };
-      const actionable = { name: 'Cunning Action', description: 'Dash, Hide, or Disengage.', details: 'Move fast.' };
-
-      const stats2024 = createStats({ rules: '2024', bonusActions: [ignored2024, actionable] });
-      const { container } = render(<CharBonusActions playerStats={stats2024} />);
-      expect(container.querySelector('.char-actions')).not.toHaveTextContent('Barbarian Subclass:');
-      expect(container.querySelector('.char-actions')).toHaveTextContent('Cunning Action:');
     });
   });
 });

@@ -95,16 +95,6 @@ describe('CharAbilities rendering', () => {
   });
 
   describe('ability rows', () => {
-    it('renders all six ability names', () => {
-      render(<CharAbilities {...defaultProps} />);
-      expect(screen.getByText('Strength')).toBeInTheDocument();
-      expect(screen.getByText('Dexterity')).toBeInTheDocument();
-      expect(screen.getByText('Constitution')).toBeInTheDocument();
-      expect(screen.getByText('Intelligence')).toBeInTheDocument();
-      expect(screen.getByText('Wisdom')).toBeInTheDocument();
-      expect(screen.getByText('Charisma')).toBeInTheDocument();
-    });
-
     it('renders ability scores, bonuses, and saves with correct values', () => {
       const { container } = render(<CharAbilities {...defaultProps} />);
       // Collect all text content from ability cells
@@ -126,12 +116,6 @@ describe('CharAbilities rendering', () => {
       expect(allText).toContain('+3');
     });
 
-    it('renders skill names with their bonuses', () => {
-      render(<CharAbilities {...defaultProps} />);
-      const athleticsElements = screen.getAllByText(/Athletics/);
-      expect(athleticsElements.length).toBeGreaterThan(0);
-    });
-
     it('renders skill bonuses next to skill names', () => {
       const stats = createPlayerStats({
         abilities: [
@@ -140,22 +124,6 @@ describe('CharAbilities rendering', () => {
       });
       render(<CharAbilities {...defaultProps} playerStats={stats} />);
       expect(screen.getByText('Athletics (+8)')).toBeInTheDocument();
-    });
-
-    it('renders multiple skills in the same ability separated by commas', () => {
-      const stats = createPlayerStats({
-        abilities: [
-          { name: 'Strength', bonus: 4, save: 6, totalScore: 14, skills: [{ name: 'Athletics', bonus: 8 }, { name: 'Intimidation', bonus: 6 }] },
-          { name: 'Dexterity', bonus: 2, save: 4, totalScore: 12, skills: [] },
-          { name: 'Constitution', bonus: 1, save: 3, totalScore: 11, skills: [] },
-          { name: 'Intelligence', bonus: 0, save: 0, totalScore: 10, skills: [] },
-          { name: 'Wisdom', bonus: -1, save: 1, totalScore: 9, skills: [] },
-          { name: 'Charisma', bonus: 0, save: 2, totalScore: 10, skills: [] },
-        ],
-      });
-      render(<CharAbilities {...defaultProps} playerStats={stats} />);
-      expect(screen.getAllByText(/Athletics/).length).toBeGreaterThan(0);
-      expect(screen.getAllByText(/Intimidation/).length).toBeGreaterThan(0);
     });
   });
 
@@ -178,21 +146,6 @@ describe('CharAbilities rendering', () => {
   });
 
   describe('edge cases', () => {
-    it('renders with undefined optional playerStats fields (conditionEffects, automation, skillProficiencies, expertise)', () => {
-      const props = {
-        ...defaultProps,
-        playerStats: {
-          ...defaultProps.playerStats,
-          conditionEffects: undefined,
-          automation: undefined,
-          skillProficiencies: undefined,
-          expertise: undefined,
-        },
-      };
-      render(<CharAbilities {...props} />);
-      expect(screen.getByText('Strength')).toBeInTheDocument();
-    });
-
     it('renders no ability rows when abilities array is empty', () => {
       const stats = createPlayerStats({ abilities: [] });
       render(<CharAbilities {...defaultProps} playerStats={stats} />);

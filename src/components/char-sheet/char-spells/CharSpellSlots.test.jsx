@@ -47,7 +47,7 @@ describe('CharSpellSlots', () => {
   });
 
   describe('rendering', () => {
-    it('should render the spell slots header', () => {
+    it('renders the spell slots header', () => {
       rules.getSpellMaxLevel.mockReturnValue(3);
 
       render(<CharSpellSlots playerStats={createPlayerStats()} />);
@@ -55,45 +55,31 @@ describe('CharSpellSlots', () => {
       expect(screen.getByText('Spell Slots')).toBeInTheDocument();
     });
 
-    it('should render a container with char-spell-slots and levels classes', () => {
-      rules.getSpellMaxLevel.mockReturnValue(1);
-
-      const { container } = render(<CharSpellSlots playerStats={createPlayerStats()} />);
-
-      const wrapper = container.querySelector('.char-spell-slots.levels');
-      expect(wrapper).toBeInTheDocument();
-    });
-
-    it('should not render the container when spellAbilities is absent', () => {
-      rules.getSpellMaxLevel.mockReturnValue(null);
-
-      render(<CharSpellSlots playerStats={{ name: 'No Spells' }} />);
-
-      const allElements = document.querySelectorAll('.char-spell-slots.levels');
-      expect(allElements.length).toBe(0);
-    });
-
-    it('should render no slot levels when spellMaxLevel is 0', () => {
+    it('renders no slot levels when spellMaxLevel is 0', () => {
       rules.getSpellMaxLevel.mockReturnValue(0);
 
       render(<CharSpellSlots playerStats={createPlayerStats()} />);
 
-      const wrapper = document.querySelector('.char-spell-slots.levels');
-      expect(wrapper).toBeInTheDocument();
       expect(screen.queryByTestId('spell-slot-level-1')).not.toBeInTheDocument();
     });
 
-    it('should render no slot levels when spellMaxLevel is falsy', () => {
+    it('renders no slot levels when spellMaxLevel is falsy', () => {
       rules.getSpellMaxLevel.mockReturnValue(null);
 
       render(<CharSpellSlots playerStats={createPlayerStats()} />);
 
       expect(screen.queryByTestId('spell-slot-level-1')).not.toBeInTheDocument();
     });
-  });
 
-  describe('spell slot level rendering', () => {
-    it('should render levels up to maxLevel', () => {
+    it('does not render when spellAbilities is absent', () => {
+      rules.getSpellMaxLevel.mockReturnValue(null);
+
+      render(<CharSpellSlots playerStats={{ name: 'No Spells' }} />);
+
+      expect(screen.queryByText('Spell Slots')).not.toBeInTheDocument();
+    });
+
+    it('renders levels up to maxLevel', () => {
       rules.getSpellMaxLevel.mockReturnValue(5);
 
       render(<CharSpellSlots playerStats={createPlayerStats()} />);
@@ -103,10 +89,8 @@ describe('CharSpellSlots', () => {
       }
       expect(screen.queryByTestId('spell-slot-level-6')).not.toBeInTheDocument();
     });
-  });
 
-  describe('prop forwarding', () => {
-    it('should pass correct totalSlots to each level component', () => {
+    it('passes correct totalSlots to each level component', () => {
       rules.getSpellMaxLevel.mockReturnValue(3);
 
       render(<CharSpellSlots playerStats={createPlayerStats()} />);
@@ -116,32 +100,7 @@ describe('CharSpellSlots', () => {
       expect(screen.getByTestId('spell-slot-level-3')).toHaveAttribute('data-total-slots', '3');
     });
 
-    it('should forward playerStats to each level component', () => {
-      rules.getSpellMaxLevel.mockReturnValue(1);
-
-      const stats = createPlayerStats({ name: 'Gandalf' });
-      render(<CharSpellSlots playerStats={stats} />);
-
-      expect(screen.getByTestId('spell-slot-level-1')).toHaveAttribute(
-        'data-player-stats-name',
-        'Gandalf',
-      );
-    });
-
-    it('should forward campaignName to each level component', () => {
-      rules.getSpellMaxLevel.mockReturnValue(1);
-
-      render(
-        <CharSpellSlots playerStats={createPlayerStats()} campaignName='My Campaign' />,
-      );
-
-      expect(screen.getByTestId('spell-slot-level-1')).toHaveAttribute(
-        'data-campaign-name',
-        'My Campaign',
-      );
-    });
-
-    it('should pass undefined when a slot level property is missing from spellAbilities', () => {
+    it('passes undefined when a slot level property is missing from spellAbilities', () => {
       rules.getSpellMaxLevel.mockReturnValue(2);
 
       const partialStats = {

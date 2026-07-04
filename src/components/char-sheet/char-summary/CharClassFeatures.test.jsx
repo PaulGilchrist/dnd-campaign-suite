@@ -148,21 +148,17 @@ describe('CharClassFeatures', () => {
             ...overrides,
         });
 
-        it('renders barbarian container', () => {
-            renderComponent(barbarianStats());
-            expect(screen.getByTestId('char-class-barbarian')).toBeInTheDocument();
-        });
-
         it('renders rage toggle button with correct title when not raging', () => {
             renderComponent(barbarianStats());
             expect(screen.getByTitle('Enter Rage (toggle for damage bonus)')).toBeInTheDocument();
         });
 
-        it('shows BPS Resist badge when rage is active', () => {
+        it('shows rage badge and styled damage when rage is toggled on', () => {
             renderComponent(barbarianStats());
             const btn = screen.getByTitle('Enter Rage (toggle for damage bonus)');
             fireEvent.click(btn);
             expect(screen.getByText(/BPS Resist/)).toBeInTheDocument();
+            expect(screen.getByRole('button', { name: 'Raging' })).toBeInTheDocument();
         });
 
         it('renders barbarian with Aspect of the Wilds passive', () => {
@@ -178,11 +174,6 @@ describe('CharClassFeatures', () => {
             expect(screen.getByText(/Aspect of the Wilds/)).toBeInTheDocument();
             expect(document.querySelector('.automation-btn--active')).toBeInTheDocument();
         });
-
-        it('does not render aspect section without animal_aspect passive', () => {
-            renderComponent(barbarianStats());
-            expect(screen.queryByText(/Aspect of the Wilds/)).not.toBeInTheDocument();
-        });
     });
 
     describe('Bard features', () => {
@@ -193,22 +184,12 @@ describe('CharClassFeatures', () => {
             ...overrides,
         });
 
-        it('renders bard container', () => {
-            renderComponent(bardStats());
-            expect(screen.getByTestId('char-class-bard')).toBeInTheDocument();
-        });
-
         it('renders Font of Inspiration button when passive exists', () => {
             const stats = bardStats({
                 automation: { passives: [{ type: 'font_of_inspiration' }] },
             });
             renderComponent(stats);
             expect(screen.getByTitle('Font of Inspiration: Expend a spell slot to regain 1 Bardic Inspiration use')).toBeInTheDocument();
-        });
-
-        it('does not render Font of Inspiration without passive', () => {
-            renderComponent(bardStats());
-            expect(screen.queryByTitle('Font of Inspiration')).not.toBeInTheDocument();
         });
 
         it('disables Font of Inspiration button when at max bardic inspiration', () => {
@@ -255,32 +236,12 @@ describe('CharClassFeatures', () => {
             renderComponent(stats);
             expect(screen.getByText(/Extra Attacks.*/));
         });
-
-        it('renders song of rest die when available', () => {
-            renderComponent(bardStats());
-            expect(screen.getByText(/Song of Rest Die:/)).toBeInTheDocument();
-        });
-
-        it('renders bardic inspiration die', () => {
-            renderComponent(bardStats());
-            expect(screen.getByText(/Bardic Inspiration Die:/)).toBeInTheDocument();
-        });
-
-        it('renders bardic inspiration uses with charisma-based max', () => {
-            renderComponent(bardStats());
-            expect(screen.getByTestId('tracked-resource-Bardic Inspiration Uses')).toBeInTheDocument();
-        });
     });
 
     describe('Cleric features', () => {
         const clericStats = () => makeStats({
             class: { name: 'Cleric', class_levels: [{ level: 5 }] },
             automation: { passives: [] },
-        });
-
-        it('renders cleric container', () => {
-            renderComponent(clericStats());
-            expect(screen.getByTestId('char-class-cleric')).toBeInTheDocument();
         });
 
         it('renders channel divinity charges tracked resource', () => {

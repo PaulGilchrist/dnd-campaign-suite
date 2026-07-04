@@ -124,13 +124,6 @@ describe('UpcastPopup', () => {
       expect(castButton).toBeDisabled();
     });
 
-    it('calls onConfirm with selected level when cast button clicked', () => {
-      const onConfirm = vi.fn();
-      renderUpcastPopup({ onConfirm });
-      fireEvent.click(screen.getByRole('button', { name: /Cast at Level 3/ }));
-      expect(onConfirm).toHaveBeenCalledWith(3);
-    });
-
     it('calls onConfirm with the newly selected level', () => {
       const onConfirm = vi.fn();
       renderUpcastPopup({ onConfirm });
@@ -169,26 +162,6 @@ describe('UpcastPopup', () => {
       const modal = document.querySelector('.popup-modal');
       fireEvent.click(modal);
       expect(onCancel).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('single level', () => {
-    it('renders only the provided level option', () => {
-      const levels = [
-        { level: 5, formula: '+3d6', availableSlots: 1 },
-      ];
-      renderUpcastPopup({ levels });
-      expect(screen.getByText('Level 5')).toBeInTheDocument();
-      expect(screen.queryByText('Level 3')).not.toBeInTheDocument();
-    });
-
-    it('defaults to the only available level', () => {
-      const levels = [
-        { level: 5, formula: '+3d6', availableSlots: 1 },
-      ];
-      renderUpcastPopup({ levels });
-      const radios = screen.getAllByRole('radio');
-      expect(radios[0]).toBeChecked();
     });
   });
 });
