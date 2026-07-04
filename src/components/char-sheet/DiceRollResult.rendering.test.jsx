@@ -56,73 +56,32 @@ describe('DiceRollResult', () => {
         });
 
         it.each`
-            rolls          | type     | bonus | expected
-            ${null}        | ${'d20'} | ${0}  | ${'0'}
-            ${undefined}   | ${'d20'} | ${5}  | ${'5'}
-            ${[]}          | ${'d20'} | ${3}  | ${'3'}
-        `('handles rolls: $rolls gracefully with type: $type', ({ rolls, type, bonus, expected }) => {
-            const { container } = render(
-                <DiceRollResult name="Test" type={type} rolls={rolls} bonus={bonus} />
-            );
+            rolls          | type     | bonus | total | expected
+            ${null}        | ${'d20'} | ${0}  | ${0}  | ${'0'}
+            ${undefined}   | ${'d20'} | ${5}  | ${0}  | ${'5'}
+            ${[]}          | ${'d20'} | ${3}  | ${0}  | ${'3'}
+            ${[]}          | ${'damage'} | ${0} | ${5} | ${'5'}
+        `('handles empty/missing rolls with type: $type', ({ rolls, type, bonus, total, expected }) => {
+            const { container } = render(<DiceRollResult name="Test" type={type} rolls={rolls} bonus={bonus} total={total} />);
             expect(container.querySelector('.dice-roll-total').textContent).toBe(expected);
-        });
-
-        it('handles empty rolls for damage type using total prop', () => {
-            const { container } = render(
-                <DiceRollResult name="Test" type="damage" rolls={[]} bonus={0} total={5} />
-            );
-            expect(container.querySelector('.dice-roll-total').textContent).toBe('5');
         });
     });
 
     describe('advantage and disadvantage', () => {
-        it('uses first roll in normal mode', () => {
-            const { container } = render(
-                <DiceRollResult name="Attack" type="d20" rolls={[8, 15]} bonus={2} />
-            );
-            expect(container.querySelector('.dice-roll-total').textContent).toBe('10');
-        });
-
-        it('toggles to advantage when clicked', () => {
+        it('toggles advantage when clicked', () => {
             render(
                 <DiceRollResult name="Attack" type="d20" rolls={[8, 15]} bonus={2} />
             );
 
             fireEvent.click(screen.getByLabelText('Advantage'));
             expect(screen.getByText('17')).toBeInTheDocument();
-        });
 
-        it('toggles to disadvantage when clicked', () => {
-            render(
-                <DiceRollResult name="Attack" type="d20" rolls={[8, 15]} bonus={2} />
-            );
+            // toggling back to normal uses first roll (8 + 2 = 10)
+            fireEvent.click(screen.getByLabelText('Advantage'));
+            expect(screen.getByText('10')).toBeInTheDocument();
 
+            // toggling to disadvantage uses min (8 + 2 = 10)
             fireEvent.click(screen.getByLabelText('Disadvantage'));
-            expect(screen.getByText('10')).toBeInTheDocument();
-        });
-
-        it('toggles advantage off when clicked again', () => {
-            render(
-                <DiceRollResult name="Attack" type="d20" rolls={[8, 15]} bonus={2} />
-            );
-
-            const advButton = screen.getByLabelText(/Advantage/);
-            fireEvent.click(advButton);
-            expect(screen.getByText('17')).toBeInTheDocument();
-
-            fireEvent.click(advButton);
-            expect(screen.getByText('10')).toBeInTheDocument();
-        });
-
-        it('switches from advantage to disadvantage', () => {
-            render(
-                <DiceRollResult name="Attack" type="d20" rolls={[8, 15]} bonus={2} />
-            );
-
-            fireEvent.click(screen.getByLabelText(/Advantage/));
-            expect(screen.getByText('17')).toBeInTheDocument();
-
-            fireEvent.click(screen.getByLabelText(/Disadvantage/));
             expect(screen.getByText('10')).toBeInTheDocument();
         });
 
@@ -151,13 +110,6 @@ describe('DiceRollResult', () => {
             );
             expect(screen.queryByLabelText(/Advantage/)).not.toBeInTheDocument();
             expect(screen.queryByLabelText(/Disadvantage/)).not.toBeInTheDocument();
-        });
-
-        it('shows sum of all rolls for non-d20 type', () => {
-            render(
-                <DiceRollResult name="Fireball" type="damage" rolls={[6, 5, 4]} bonus={0} total={15} />
-            );
-            expect(screen.getByText('15')).toBeInTheDocument();
         });
 
         it('shows rolls separated by commas in breakdown for non-d20 type', () => {

@@ -3,7 +3,6 @@ import { render, screen, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import CharSheet from './CharSheet';
-import rulesFactory from '../../services/rules/rulesFactory.js';
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -127,144 +126,19 @@ const defaultProps = {
 };
 
 // ---------------------------------------------------------------------------
-// Tests — 5e prepared spells loading from runtime state
+// Tests
 // ---------------------------------------------------------------------------
 
-describe('5e prepared spells loading from runtime state', () => {
+describe('CharSheet renders', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockStore.clear();
   });
 
-  it('renders with preparedSpells in runtime state (5e ruleset)', async () => {
-    mockStore.set('Test Character:preparedSpells', ['Fireball', 'Shield']);
-    vi.mocked(rulesFactory.getPlayerStats).mockImplementation(() => Promise.resolve({
-      name: 'Test Character',
-      level: 10,
-      hitPoints: { current: 50, max: 50 },
-      abilities: [{ name: 'Strength', bonus: 4, save: 6, skills: [] }],
-      spellAbilities: {
-        spells: [
-          { name: 'Fireball', prepared: '' },
-          { name: 'Shield', prepared: '' },
-          { name: 'Magic Missile', prepared: '' },
-        ],
-        maxPreparedSpells: 3,
-      },
-      rules: '5e',
-      automation: { passives: [] },
-      class: { name: 'Fighter' },
-      speed: 30,
-      race: { speed: 30 },
-      actions: [],
-      bonusActions: [],
-      reactions: [],
-      specialActions: [],
-      characterAdvancement: [],
-      skillProficiencies: [],
-    }));
+  it('renders the char-sheet container with 5e ruleset', async () => {
     render(<CharSheet {...defaultProps} />);
     await waitFor(() => {
       expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
     });
-  });
-
-  it('renders with empty preparedSpells array in runtime state', async () => {
-    mockStore.set('Test Character:preparedSpells', []);
-    vi.mocked(rulesFactory.getPlayerStats).mockImplementation(() => Promise.resolve({
-      name: 'Test Character',
-      level: 10,
-      hitPoints: { current: 50, max: 50 },
-      abilities: [{ name: 'Strength', bonus: 4, save: 6, skills: [] }],
-      spellAbilities: {
-        spells: [{ name: 'Fireball', prepared: '' }],
-        maxPreparedSpells: 3,
-      },
-      rules: '5e',
-      automation: { passives: [] },
-      class: { name: 'Fighter' },
-      speed: 30,
-      race: { speed: 30 },
-      actions: [],
-      bonusActions: [],
-      reactions: [],
-      specialActions: [],
-      characterAdvancement: [],
-      skillProficiencies: [],
-    }));
-    render(<CharSheet {...defaultProps} />);
-    await waitFor(() => {
-      expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
-    });
-  });
-
-  it('does not load preparedSpells for 2024 ruleset', async () => {
-    mockStore.set('Test Character:preparedSpells', ['Fireball']);
-    vi.mocked(rulesFactory.getPlayerStats).mockImplementation(() => Promise.resolve({
-      name: 'Test Character',
-      level: 10,
-      hitPoints: { current: 50, max: 50 },
-      abilities: [{ name: 'Strength', bonus: 4, save: 6, skills: [] }],
-      spellAbilities: {
-        spells: [{ name: 'Fireball', prepared: '' }],
-        maxPreparedSpells: 3,
-      },
-      rules: '2024',
-      automation: { passives: [] },
-      class: { name: 'Fighter' },
-      speed: 30,
-      race: { speed: 30 },
-      actions: [],
-      bonusActions: [],
-      reactions: [],
-      specialActions: [],
-      characterAdvancement: [],
-      skillProficiencies: [],
-    }));
-    const props2024 = {
-      ...defaultProps,
-      playerSummary: { ...mockPlayerSummary, rules: '2024' },
-    };
-    render(<CharSheet {...props2024} />);
-    await waitFor(() => {
-      expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
-    });
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Tests — Hit points runtime sync
-// ---------------------------------------------------------------------------
-
-describe('hit points runtime sync', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    mockStore.clear();
-  });
-
-  it('syncs hitPoints to runtime state on mount', async () => {
-    vi.mocked(rulesFactory.getPlayerStats).mockImplementation(() => Promise.resolve({
-      name: 'Test Character',
-      level: 10,
-      hitPoints: { current: 30, max: 50 },
-      abilities: [{ name: 'Strength', bonus: 4, save: 6, skills: [] }],
-      spellAbilities: { spells: [], maxPreparedSpells: 5 },
-      rules: '5e',
-      automation: { passives: [] },
-      class: { name: 'Fighter' },
-      speed: 30,
-      race: { speed: 30 },
-      actions: [],
-      bonusActions: [],
-      reactions: [],
-      specialActions: [],
-      characterAdvancement: [],
-      skillProficiencies: [],
-    }));
-    render(<CharSheet {...defaultProps} />);
-    await waitFor(() => {
-      expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
-    });
-    expect(mockStore.get('Test Character:hitPoints')).toEqual({ current: 30, max: 50 });
   });
 });

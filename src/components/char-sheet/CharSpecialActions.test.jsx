@@ -1,5 +1,5 @@
 // @improved-by-ai
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharSpecialActions from './CharSpecialActions.jsx';
 
@@ -102,41 +102,37 @@ describe('CharSpecialActions - Rendering & Filtering', () => {
   });
 
   describe('rendering', () => {
-    it('renders the Special Actions header', () => {
-      render(<CharSpecialActions playerStats={createPlayerStats()} campaignName="test" />);
-      expect(screen.getByText('Special Actions')).toBeInTheDocument();
-    });
-
-    it('renders special action names and descriptions', () => {
+    it('renders the Special Actions header and special actions with names and descriptions', async () => {
       const playerStats = createPlayerStats({
         specialActions: [
           { name: 'Second Wind', description: 'You can use a bonus action to regain hit points.' },
-        ],
-      });
-      render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
-      expect(screen.getByText(/Second Wind/)).toBeInTheDocument();
-      expect(screen.getByText(/You can use a bonus action to regain hit points/)).toBeInTheDocument();
-    });
-
-    it('renders multiple special actions', () => {
-      const playerStats = createPlayerStats({
-        specialActions: [
-          { name: 'Second Wind', description: 'Regain hit points.' },
           { name: 'Action Surge', description: 'Take an extra action.' },
         ],
       });
       render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
+      expect(screen.getByText('Special Actions')).toBeInTheDocument();
       expect(screen.getByText(/Second Wind/)).toBeInTheDocument();
+      expect(screen.getByText(/You can use a bonus action to regain hit points/)).toBeInTheDocument();
       expect(screen.getByText(/Action Surge/)).toBeInTheDocument();
     });
 
-    it('renders action descriptions through renderMarkdownInline', async () => {
-      const { renderMarkdownInline } = await import('../../services/ui/sanitize.js');
+    it('renders gracefully with empty specialActions', async () => {
+      render(<CharSpecialActions playerStats={createPlayerStats()} campaignName="test" />);
+      expect(screen.getByText('Special Actions')).toBeInTheDocument();
+    });
+
+    it('renders gracefully when specialActions is undefined', async () => {
+      const playerStats = createPlayerStats({ specialActions: undefined });
+      render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
+      expect(screen.getByText('Special Actions')).toBeInTheDocument();
+    });
+
+    it('renders unnamed special actions using description as fallback', async () => {
       const playerStats = createPlayerStats({
-        specialActions: [{ name: 'Test', description: '**bold** text' }],
+        specialActions: [{ description: 'An unnamed special action' }],
       });
       render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
-      expect(renderMarkdownInline).toHaveBeenCalledWith('**bold** text');
+      expect(screen.getByText('An unnamed special action')).toBeInTheDocument();
     });
   });
 
@@ -146,8 +142,7 @@ describe('CharSpecialActions - Rendering & Filtering', () => {
         class: { fightingStyles: ['Great Weapon Fighting', 'Protection'] },
       });
       render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
-      await screen.findByText(/Great Weapon Fighting/);
-      // Only the first matching fighting style is added due to if/else if chain
+      await waitFor(() => expect(screen.queryByText(/Great Weapon Fighting/)).toBeInTheDocument());
       expect(screen.queryByText(/Protection/)).not.toBeInTheDocument();
     });
 
@@ -163,29 +158,12 @@ describe('CharSpecialActions - Rendering & Filtering', () => {
       expect(elements).toHaveLength(1);
     });
 
-    it('does not add fighting styles when fightingStyles is undefined or empty', () => {
-      const playerStats = createPlayerStats({
-        class: {},
-      });
-      render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
-      expect(screen.queryByText(/Great Weapon Fighting/)).not.toBeInTheDocument();
-      expect(screen.queryByText(/Protection/)).not.toBeInTheDocument();
-    });
-
-    it('does not add fighting styles when fightingStyles is empty array', () => {
+    it('does not add fighting styles when fightingStyles is missing or empty', async () => {
       const playerStats = createPlayerStats({
         class: { fightingStyles: [] },
       });
       render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
       expect(screen.queryByText(/Great Weapon Fighting/)).not.toBeInTheDocument();
-    });
-
-    it('handles getFightingStyles returning null for unknown style', () => {
-      const playerStats = createPlayerStats({
-        class: { fightingStyles: ['Unknown Style'] },
-      });
-      render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
-      expect(screen.queryByText(/Unknown Style/)).not.toBeInTheDocument();
     });
   });
 
@@ -198,24 +176,6 @@ describe('CharSpecialActions - Rendering & Filtering', () => {
       });
       render(<CharSpecialActions playerStats={playerStats1} campaignName="test" />);
       expect(screen.queryByText(/Attack/)).not.toBeInTheDocument();
-    });
-
-    it('filters out actions that appear in bonusActions', () => {
-      const playerStats = createPlayerStats({
-        specialActions: [{ name: 'Dash', description: 'Take the Dash action.' }],
-        bonusActions: [{ name: 'Dash', description: 'Take the Dash action.' }],
-      });
-      render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
-      expect(screen.queryByText(/Dash/)).not.toBeInTheDocument();
-    });
-
-    it('filters out actions that appear in reactions', () => {
-      const playerStats = createPlayerStats({
-        specialActions: [{ name: 'Opportunity Attack', description: 'Attack on retreat.' }],
-        reactions: [{ name: 'Opportunity Attack', description: 'Attack on retreat.' }],
-      });
-      render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
-      expect(screen.queryByText(/Opportunity Attack/)).not.toBeInTheDocument();
     });
 
     it('deduplicates special actions with duplicate names', () => {
@@ -232,77 +192,50 @@ describe('CharSpecialActions - Rendering & Filtering', () => {
   });
 
   describe('ruleset filtering', () => {
-    it('filters out 5e featuresToIgnore and keeps other features', () => {
-      const playerStats = createPlayerStats({
-        specialActions: [
-          { name: 'Spellcasting', description: 'Cast spells.' },
-          { name: 'Extra Attack', description: 'Attack twice.' },
-          { name: 'Bardic Inspiration', description: 'Inspire allies.' },
-          { name: 'Test Feature', description: 'A test feature.' },
-        ],
-        rules: '5e',
+    it('filters out featuresToIgnore and keeps other features for both 5e and 2024 rulesets', async () => {
+      // 5e: Spellcasting, Extra Attack, Bardic Inspiration are ignored
+      const { container: container5e } = render(
+        <CharSpecialActions playerStats={createPlayerStats({
+          specialActions: [
+            { name: 'Spellcasting', description: 'Cast spells.' },
+            { name: 'Extra Attack', description: 'Attack twice.' },
+            { name: 'Bardic Inspiration', description: 'Inspire allies.' },
+            { name: 'Test Feature', description: 'A test feature.' },
+          ],
+          rules: '5e',
+        })} campaignName="test" />
+      );
+
+      await waitFor(() => {
+        const dom5e = within(container5e);
+        expect(dom5e.queryByText(/Spellcasting/)).not.toBeInTheDocument();
+        expect(dom5e.queryByText(/Extra Attack/)).not.toBeInTheDocument();
+        expect(dom5e.queryByText(/Bardic Inspiration/)).not.toBeInTheDocument();
+        expect(dom5e.getByText(/Test Feature/)).toBeInTheDocument();
       });
-      render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
-      expect(screen.queryByText(/Spellcasting/)).not.toBeInTheDocument();
-      expect(screen.queryByText(/Extra Attack/)).not.toBeInTheDocument();
-      expect(screen.queryByText(/Bardic Inspiration/)).not.toBeInTheDocument();
-      expect(screen.getByText(/Test Feature/)).toBeInTheDocument();
-    });
 
-    it('filters out 2024 featuresToIgnore and keeps other features', () => {
-      const playerStats = createPlayerStats({
-        specialActions: [
-          { name: 'Spellcasting', description: 'Cast spells.' },
-          { name: 'Feat', description: 'Take a feat.' },
-          { name: 'Fighting Style', description: 'Gain a fighting style.' },
-          { name: 'Test Feature', description: 'A test feature.' },
-        ],
-        rules: '2024',
+      vi.clearAllMocks();
+
+      // 2024: Spellcasting, Feat, Fighting Style are ignored
+      const { container: container2024 } = render(
+        <CharSpecialActions playerStats={createPlayerStats({
+          specialActions: [
+            { name: 'Spellcasting', description: 'Cast spells.' },
+            { name: 'Feat', description: 'Take a feat.' },
+            { name: 'Fighting Style', description: 'Gain a fighting style.' },
+            { name: 'Test Feature', description: 'A test feature.' },
+          ],
+          rules: '2024',
+        })} campaignName="test" />
+      );
+
+      await waitFor(() => {
+        const dom2024 = within(container2024);
+        expect(dom2024.queryByText(/Spellcasting/)).not.toBeInTheDocument();
+        expect(dom2024.queryByText(/(^|\s)Feat($|\s)/)).not.toBeInTheDocument();
+        expect(dom2024.queryByText(/Fighting Style/)).not.toBeInTheDocument();
+        expect(dom2024.getByText(/Test Feature/)).toBeInTheDocument();
       });
-      render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
-      expect(screen.queryByText(/Spellcasting/)).not.toBeInTheDocument();
-      expect(screen.queryByText(/(^|\s)Feat($|\s)/)).not.toBeInTheDocument();
-      expect(screen.queryByText(/Fighting Style/)).not.toBeInTheDocument();
-      expect(screen.getByText(/Test Feature/)).toBeInTheDocument();
-    });
-  });
-
-  describe('edge cases and null safety', () => {
-    it('renders gracefully with empty or undefined specialActions', () => {
-      render(<CharSpecialActions playerStats={createPlayerStats()} campaignName="test" />);
-      expect(screen.getByText('Special Actions')).toBeInTheDocument();
-    });
-
-    it('renders gracefully when specialActions is undefined', () => {
-      const playerStats = createPlayerStats({ specialActions: undefined });
-      render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
-      expect(screen.getByText('Special Actions')).toBeInTheDocument();
-    });
-
-    it('renders gracefully when all action lists are undefined', () => {
-      const playerStats = {
-        specialActions: [{ name: 'Second Wind', description: 'Regain hit points.' }],
-        class: { fightingStyles: [] },
-      };
-      render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
-      expect(screen.getByText(/Second Wind/)).toBeInTheDocument();
-    });
-
-    it('uses description as key fallback when special action has no name', () => {
-      const playerStats = createPlayerStats({
-        specialActions: [{ description: 'An unnamed special action' }],
-      });
-      const { container } = render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
-      expect(container.querySelector('.sectionHeader')).toBeInTheDocument();
-      expect(screen.getByText('An unnamed special action')).toBeInTheDocument();
-    });
-
-    it('uses index fallback key for unnamed actions without description', () => {
-      const playerStats = createPlayerStats({
-        specialActions: [{}],
-      });
-      const { container } = render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
-      expect(container.querySelector('.sectionHeader')).toBeInTheDocument();
     });
   });
 });

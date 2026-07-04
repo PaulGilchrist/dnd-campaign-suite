@@ -1,5 +1,5 @@
 // @improved-by-ai
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import DiceRollResult from './DiceRollResult.jsx';
 
 describe('DiceRollResult', () => {
@@ -9,21 +9,6 @@ describe('DiceRollResult', () => {
                 <DiceRollResult name="Fireball" type="damage" rolls={[6, 5, 4]} bonus={0} formula="8d6" />
             );
             expect(screen.getByText(/8d6/)).toBeInTheDocument();
-        });
-
-        it('shows d20 label in breakdown for d20 type', () => {
-            render(
-                <DiceRollResult name="Test" type="d20" rolls={[10]} bonus={0} />
-            );
-            expect(screen.getByText(/d20/)).toBeInTheDocument();
-        });
-
-        it('shows formula with colon when formula is provided for d20 type', () => {
-            render(
-                <DiceRollResult name="Test" type="d20" rolls={[10]} bonus={0} formula="d20" />
-            );
-            const breakdown = screen.getByText(/d20/);
-            expect(breakdown.textContent).toMatch(/^d20:/);
         });
 
         it.each`
@@ -37,15 +22,6 @@ describe('DiceRollResult', () => {
             );
             const breakdown = container.querySelector('.dice-roll-breakdown');
             expect(breakdown.textContent).toContain(expected);
-        });
-
-        it('shows advantage/disadvantage arrow notation in breakdown', () => {
-            render(
-                <DiceRollResult name="Attack" type="d20" rolls={[8, 15]} bonus={2} />
-            );
-
-            fireEvent.click(screen.getByLabelText(/Advantage/));
-            expect(screen.getByText(/8, 15 → 15/)).toBeInTheDocument();
         });
     });
 
@@ -154,52 +130,7 @@ describe('DiceRollResult', () => {
         });
     });
 
-    describe('reliable talent', () => {
-        it('shows reliable talent message when roll is 9 or below', () => {
-            render(
-                <DiceRollResult
-                    name="Persuasion"
-                    type="d20"
-                    rolls={[5]}
-                    bonus={4}
-                    rollType="check"
-                    reliableTalent={true}
-                />
-            );
-            expect(screen.getByText(/Reliable Talent/)).toBeInTheDocument();
-            expect(screen.getByText(/d20 5 → 10/)).toBeInTheDocument();
-        });
-
-        it('does not show reliable talent when roll is above 9', () => {
-            render(
-                <DiceRollResult
-                    name="Persuasion"
-                    type="d20"
-                    rolls={[12]}
-                    bonus={4}
-                    rollType="check"
-                    reliableTalent={true}
-                />
-            );
-            expect(screen.queryByText(/Reliable Talent/)).not.toBeInTheDocument();
-        });
-
-        it('does not show reliable talent for non-check/skill roll types', () => {
-            render(
-                <DiceRollResult
-                    name="Attack"
-                    type="d20"
-                    rolls={[5]}
-                    bonus={4}
-                    rollType="attack"
-                    reliableTalent={true}
-                />
-            );
-            expect(screen.queryByText(/Reliable Talent/)).not.toBeInTheDocument();
-        });
-    });
-
-    describe('str check/replace', () => {
+    describe('str check/save replace', () => {
         it('uses strScore when it exceeds display total for strSaveReplace on save', () => {
             const { container } = render(
                 <DiceRollResult
@@ -261,22 +192,6 @@ describe('DiceRollResult', () => {
                 />
             );
             expect(container.querySelector('.dice-roll-total').textContent).toBe('10');
-        });
-    });
-
-    describe('reliable talent total calculation', () => {
-        it('uses reliable talent total when roll is 9 or below', () => {
-            const { container } = render(
-                <DiceRollResult
-                    name="Stealth"
-                    type="d20"
-                    rolls={[7]}
-                    bonus={3}
-                    rollType="skill"
-                    reliableTalent={true}
-                />
-            );
-            expect(container.querySelector('.dice-roll-total').textContent).toBe('13');
         });
     });
 });

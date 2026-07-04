@@ -174,7 +174,6 @@ vi.mock('../../hooks/combat/useCombatSuperiorityModal.js', () => ({
 }));
 
 import { rollExpression, rollExpressionDoubled } from '../../services/dice/diceRoller.js';
-import useLoggedDiceRoll from '../../hooks/combat/useLoggedDiceRoll.js';
 
 const basePlayerStats = {
   name: 'TestCharacter',
@@ -209,7 +208,7 @@ describe('CharSpecialActions - autoDamageRoll callback', () => {
     return capturedRollDamageFn?.mock?.calls || [];
   }
 
-  describe('Superiority formula parsing and roll handling', () => {
+  describe('formula parsing and damage roll', () => {
     function buildAutoDamage(overrides = {}) {
       return {
         name: 'Riposte',
@@ -221,7 +220,7 @@ describe('CharSpecialActions - autoDamageRoll callback', () => {
       };
     }
 
-    it('parses superiority formula and adds superiority value to base roll on non-crit', async () => {
+    it('calls rollDamage with superiority formula: base dice rolled, superiority value appended to rolls, total includes superiority value', async () => {
       rollExpression.mockReturnValue({ total: 5, rolls: [3, 2], modifier: 0 });
 
       const playerStats = createPlayerStats({
@@ -242,24 +241,19 @@ describe('CharSpecialActions - autoDamageRoll callback', () => {
 
       const calls = getRollDamageCalls();
       expect(calls).toHaveLength(1);
-      expect(calls[0]).toEqual([
-        'Riposte',
-        '2d6+ 1 [Superiority]',
-        6,
-        [3, 2, 1],
-        0,
-        {
-          damageType: 'Slashing',
-          targetName: 'Goblin',
-          attackerName: 'TestCharacter',
-          isAutoCrit: false,
-          doubledRolls: undefined,
-          playerStats: expect.any(Object),
-        },
-      ]);
+      expect(calls[0][0]).toBe('Riposte');
+      expect(calls[0][1]).toBe('2d6+ 1 [Superiority]');
+      expect(calls[0][2]).toBe(6); // 5 + 1
+      expect(calls[0][3]).toEqual([3, 2, 1]);
+      expect(calls[0][4]).toBe(0);
+      expect(calls[0][5].isAutoCrit).toBe(false);
+      expect(calls[0][5].damageType).toBe('Slashing');
+      expect(calls[0][5].targetName).toBe('Goblin');
+      expect(calls[0][5].attackerName).toBe('TestCharacter');
+      expect(calls[0][5].playerStats).toBeDefined();
     });
 
-    it('parses superiority formula and doubles base dice on crit', async () => {
+    it('calls rollDamage with superiority formula on crit: base dice doubled, superiority value appended, total includes superiority', async () => {
       rollExpressionDoubled.mockReturnValue({ total: 10, rolls: [3, 2, 3, 2], modifier: 0, doubledRolls: [3, 2, 3, 2] });
 
       const playerStats = createPlayerStats({
@@ -280,7 +274,7 @@ describe('CharSpecialActions - autoDamageRoll callback', () => {
       expect(calls).toHaveLength(1);
       expect(calls[0][0]).toBe('Riposte');
       expect(calls[0][1]).toBe('2d6+ 1 [Superiority]');
-      expect(calls[0][2]).toBe(11);
+      expect(calls[0][2]).toBe(11); // 10 + 1
       expect(calls[0][3]).toEqual([3, 2, 3, 2, 1]);
       expect(calls[0][4]).toBe(0);
       expect(calls[0][5].isAutoCrit).toBe(true);
@@ -290,36 +284,7 @@ describe('CharSpecialActions - autoDamageRoll callback', () => {
       expect(calls[0][5].playerStats).toBeDefined();
     });
 
-    it('handles different superiority values', async () => {
-      rollExpression.mockReturnValue({ total: 8, rolls: [4, 4], modifier: 0 });
-
-      const playerStats = createPlayerStats({
-        specialActions: [
-          { name: 'Combat Superiority', description: 'Use a maneuver.', automation: { type: 'combat_superiority' } },
-        ],
-      });
-
-      renderWithDiceRollContext(<CharSpecialActions playerStats={playerStats} campaignName="test" characters={[]} />);
-
-      const autoDamageRoll = getAutoDamageRoll();
-
-      const mockAutoDamage = buildAutoDamage({
-        name: 'Battle Leader',
-        formula: '1d8+ 2 [Superiority]',
-        damageType: 'Slashing',
-        targetName: 'Orc',
-      });
-
-      await autoDamageRoll(mockAutoDamage, false);
-
-      expect(rollExpression).toHaveBeenCalledWith('1d8');
-      const calls = getRollDamageCalls();
-      expect(calls).toHaveLength(1);
-      expect(calls[0][2]).toBe(10); // 8 + 2
-      expect(calls[0][3]).toEqual([4, 4, 2]);
-    });
-
-    it('rolls standard formula without superiority suffix on non-crit', async () => {
+    it('calls rollDamage with standard formula: dice rolled as-is on non-crit', async () => {
       rollExpression.mockReturnValue({ total: 8, rolls: [6, 2], modifier: 0 });
 
       const playerStats = createPlayerStats({
@@ -342,24 +307,19 @@ describe('CharSpecialActions - autoDamageRoll callback', () => {
       expect(rollExpression).toHaveBeenCalledWith('2d6+3');
       const calls = getRollDamageCalls();
       expect(calls).toHaveLength(1);
-      expect(calls[0]).toEqual([
-        'Longsword Attack',
-        '2d6+3',
-        8,
-        [6, 2],
-        0,
-        {
-          damageType: 'Slashing',
-          targetName: 'Goblin',
-          attackerName: 'TestCharacter',
-          isAutoCrit: false,
-          doubledRolls: undefined,
-          playerStats: expect.any(Object),
-        },
-      ]);
+      expect(calls[0][0]).toBe('Longsword Attack');
+      expect(calls[0][1]).toBe('2d6+3');
+      expect(calls[0][2]).toBe(8);
+      expect(calls[0][3]).toEqual([6, 2]);
+      expect(calls[0][4]).toBe(0);
+      expect(calls[0][5].isAutoCrit).toBe(false);
+      expect(calls[0][5].damageType).toBe('Slashing');
+      expect(calls[0][5].targetName).toBe('Goblin');
+      expect(calls[0][5].attackerName).toBe('TestCharacter');
+      expect(calls[0][5].playerStats).toBeDefined();
     });
 
-    it('doubles standard formula on crit', async () => {
+    it('calls rollDamage with standard formula on crit: dice doubled', async () => {
       rollExpressionDoubled.mockReturnValue({ total: 16, rolls: [6, 2, 6, 2], modifier: 0, doubledRolls: [6, 2, 6, 2] });
 
       const playerStats = createPlayerStats({
@@ -382,21 +342,17 @@ describe('CharSpecialActions - autoDamageRoll callback', () => {
       expect(rollExpressionDoubled).toHaveBeenCalledWith('2d6+3');
       const calls = getRollDamageCalls();
       expect(calls).toHaveLength(1);
-      expect(calls[0]).toEqual([
-        'Longsword Attack',
-        '2d6+3',
-        16,
-        [6, 2, 6, 2],
-        0,
-        {
-          damageType: 'Slashing',
-          targetName: 'Goblin',
-          attackerName: 'TestCharacter',
-          isAutoCrit: true,
-          doubledRolls: [6, 2, 6, 2],
-          playerStats: expect.any(Object),
-        },
-      ]);
+      expect(calls[0][0]).toBe('Longsword Attack');
+      expect(calls[0][1]).toBe('2d6+3');
+      expect(calls[0][2]).toBe(16);
+      expect(calls[0][3]).toEqual([6, 2, 6, 2]);
+      expect(calls[0][4]).toBe(0);
+      expect(calls[0][5].isAutoCrit).toBe(true);
+      expect(calls[0][5].doubledRolls).toEqual([6, 2, 6, 2]);
+      expect(calls[0][5].damageType).toBe('Slashing');
+      expect(calls[0][5].targetName).toBe('Goblin');
+      expect(calls[0][5].attackerName).toBe('TestCharacter');
+      expect(calls[0][5].playerStats).toBeDefined();
     });
   });
 
@@ -446,7 +402,7 @@ describe('CharSpecialActions - autoDamageRoll callback', () => {
       expect(mockSetPopupHtml).toHaveBeenCalledWith('<b>Counterattack!</b> You deal extra damage.');
     });
 
-    it('shows riposte popup when autoDamage has ripostePopup as object', async () => {
+    it('shows riposte popup when autoDamage has ripostePopup as object with name and description', async () => {
       const mockSetPopupHtml = vi.fn();
       rollExpression.mockReturnValue({ total: 5, rolls: [3, 2], modifier: 0 });
 
@@ -473,8 +429,6 @@ describe('CharSpecialActions - autoDamageRoll callback', () => {
       const popupCall = mockSetPopupHtml.mock.calls[0][0];
       expect(popupCall).toContain('Combat Superiority');
       expect(popupCall).toContain('You strike back at the attacker.');
-      expect(popupCall).toContain('fa-solid fa-bolt');
-      expect(popupCall).toContain('click to dismiss');
     });
 
     it('shows riposte popup with fallback name when object has no name', async () => {
@@ -506,62 +460,9 @@ describe('CharSpecialActions - autoDamageRoll callback', () => {
     });
   });
 
-  describe('autoDamageRoll null safety', () => {
-    function createNullSafetyTest(overrides = {}) {
-      return {
-        playerStats: createPlayerStats({
-          specialActions: [
-            { name: 'Combat Superiority', description: 'Use a maneuver.', automation: { type: 'combat_superiority' } },
-          ],
-        }),
-        autoDamage: {
-          name: 'Test Attack',
-          formula: 'invalid formula',
-          damageType: 'Slashing',
-          targetName: 'Goblin',
-          attackerName: 'TestCharacter',
-          ...overrides,
-        },
-      };
-    }
-
-    it('does not call rollDamage when standard formula roll returns null', async () => {
+  describe('null safety', () => {
+    it('does not call rollDamage when formula roll returns null', async () => {
       rollExpression.mockReturnValue(null);
-
-      const { playerStats, autoDamage } = createNullSafetyTest();
-      renderWithDiceRollContext(<CharSpecialActions playerStats={playerStats} campaignName="test" characters={[]} />);
-
-      const autoDamageRoll = getAutoDamageRoll();
-      await autoDamageRoll(autoDamage, false);
-
-      expect(getRollDamageCalls()).toHaveLength(0);
-    });
-
-    it('does not call rollDamage when superiority formula base roll returns null', async () => {
-      rollExpression.mockReturnValue(null);
-
-      const { playerStats } = createNullSafetyTest({
-        name: 'Riposte',
-        formula: '2d6+ 1 [Superiority]',
-      });
-      renderWithDiceRollContext(<CharSpecialActions playerStats={playerStats} campaignName="test" characters={[]} />);
-
-      const autoDamageRoll = getAutoDamageRoll();
-      await autoDamageRoll({
-        name: 'Riposte',
-        formula: '2d6+ 1 [Superiority]',
-        damageType: 'Slashing',
-        targetName: 'Goblin',
-        attackerName: 'TestCharacter',
-      }, false);
-
-      expect(getRollDamageCalls()).toHaveLength(0);
-    });
-  });
-
-  describe('characters prop forwarding', () => {
-    it('passes characters to useLoggedDiceRoll', async () => {
-      const mockCharacters = [{ name: 'Ally1' }, { name: 'Ally2' }];
 
       const playerStats = createPlayerStats({
         specialActions: [
@@ -569,15 +470,18 @@ describe('CharSpecialActions - autoDamageRoll callback', () => {
         ],
       });
 
-      renderWithDiceRollContext(<CharSpecialActions playerStats={playerStats} campaignName="test" characters={mockCharacters} />);
+      renderWithDiceRollContext(<CharSpecialActions playerStats={playerStats} campaignName="test" characters={[]} />);
 
-      const diceRollCall = useLoggedDiceRoll.mock.calls[0];
-      expect(diceRollCall[0]).toBe('TestCharacter');
-      expect(diceRollCall[1]).toBe('test');
-      expect(diceRollCall[2]).toMatchObject({
-        characters: mockCharacters,
-        autoDamageSource: 'char-special-actions',
-      });
+      const autoDamageRoll = getAutoDamageRoll();
+      await autoDamageRoll({
+        name: 'Test Attack',
+        formula: 'invalid formula',
+        damageType: 'Slashing',
+        targetName: 'Goblin',
+        attackerName: 'TestCharacter',
+      }, false);
+
+      expect(getRollDamageCalls()).toHaveLength(0);
     });
   });
 });

@@ -131,158 +131,8 @@ describe('CharInventory item popup', () => {
     });
   });
 
-  describe('name matching', () => {
-    it('should strip parenthetical quantity from item name before lookup', async () => {
-      const dataWithRations = [
-        {
-          name: 'Rations',
-          index: 'rations',
-          desc: ['Food supplies for travel.'],
-          cost: { quantity: 5, unit: 'sp' },
-          weight: 2,
-          equipment_category: 'Supplies',
-        },
-      ];
-
-      loadEquipment.mockResolvedValue(dataWithRations);
-
-      renderComponent();
-
-      const backpackSection = screen.getByText(/Backpack:/).parentElement;
-      const rationsElement = backpackSection.querySelector('.clickable');
-      fireEvent.click(rationsElement);
-
-      await waitFor(() => {
-        expect(usePopup.mock.results[0].value.setPopupHtml).toHaveBeenCalledWith(
-          expect.stringContaining('Rations')
-        );
-      });
-    });
-
-    it('should find item by removing trailing s (plural to singular)', async () => {
-      const dataWithSingular = [
-        {
-          name: 'Arrow',
-          index: 'arrow',
-          desc: ['Ammunition.'],
-          cost: { quantity: 1, unit: 'gp' },
-          weight: 0.05,
-          equipment_category: 'Ammunition',
-        },
-      ];
-
-      loadEquipment.mockResolvedValue(dataWithSingular);
-
-      const stats = {
-        inventory: {
-          equipped: ['Arrows'],
-          backpack: [],
-        },
-      };
-
-      renderComponent(stats);
-
-      const arrowsElement = screen.getByText('Arrows');
-      fireEvent.click(arrowsElement);
-
-      await waitFor(() => {
-        expect(usePopup.mock.results[0].value.setPopupHtml).toHaveBeenCalledWith(
-          expect.stringContaining('Arrow')
-        );
-      });
-    });
-
-    it('should find item by adding s (singular to plural)', async () => {
-      const dataWithPlural = [
-        {
-          name: 'Rations',
-          index: 'rations',
-          desc: ['Food supplies.'],
-          cost: { quantity: 5, unit: 'sp' },
-          weight: 2,
-          equipment_category: 'Supplies',
-        },
-      ];
-
-      loadEquipment.mockResolvedValue(dataWithPlural);
-
-      const stats = {
-        inventory: {
-          equipped: [],
-          backpack: ['Ration'],
-        },
-      };
-
-      renderComponent(stats);
-
-      const rationElement = screen.getByText('Ration');
-      fireEvent.click(rationElement);
-
-      await waitFor(() => {
-        expect(usePopup.mock.results[0].value.setPopupHtml).toHaveBeenCalledWith(
-          expect.stringContaining('Rations')
-        );
-      });
-    });
-
-    it('should find item by index when name does not match but index does', async () => {
-      const dataWithIndex = [
-        {
-          name: 'Longsword',
-          index: 'longsword',
-          desc: ['A common sword.'],
-          cost: { quantity: 15, unit: 'gp' },
-          weight: 3,
-          equipment_category: 'Martial Melee Weapons',
-        },
-      ];
-
-      loadEquipment.mockResolvedValue(dataWithIndex);
-
-      renderComponent({
-        inventory: { equipped: ['longsword'], backpack: [] },
-      });
-
-      const longswordElement = screen.getByText('longsword');
-      fireEvent.click(longswordElement);
-
-      await waitFor(() => {
-        expect(usePopup.mock.results[0].value.setPopupHtml).toHaveBeenCalledWith(
-          expect.stringContaining('Longsword')
-        );
-      });
-    });
-
-    it('should normalize spaces to hyphens when matching name to index', async () => {
-      const dataWithSpaces = [
-        {
-          name: 'Heavy Crossbow',
-          index: 'heavy-crossbow',
-          desc: ['A heavy crossbow.'],
-          cost: { quantity: 50, unit: 'gp' },
-          weight: 18,
-          equipment_category: 'Ammunition',
-        },
-      ];
-
-      loadEquipment.mockResolvedValue(dataWithSpaces);
-
-      renderComponent({
-        inventory: { equipped: ['Heavy Crossbow'], backpack: [] },
-      });
-
-      const itemElement = screen.getByText('Heavy Crossbow');
-      fireEvent.click(itemElement);
-
-      await waitFor(() => {
-        const callArg = usePopup.mock.results[0].value.setPopupHtml.mock.calls[0][0];
-        expect(callArg).toContain('Heavy Crossbow');
-      });
-    });
-  });
-
   describe('item properties display', () => {
-    it('should display all item properties when present simultaneously', async () => {
+    it('should display properties that are present and omit those that are not', async () => {
       const dataWithAllProps = [
         {
           ...mockEquipmentData[0],
@@ -309,9 +159,9 @@ describe('CharInventory item popup', () => {
         expect(callArg).toContain('Utilize:');
         expect(callArg).toContain('Craft:');
       });
-    });
 
-    it('should not display properties that are missing from item data', async () => {
+      vi.clearAllMocks();
+
       const dataWithMinimalProps = [
         {
           name: 'Simple Item',

@@ -89,12 +89,12 @@ vi.mock('../../services/rules/rulesFactory.js', () => ({
 const mockStore = new Map();
 
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
-  getRuntimeValue: vi.fn((key, prop) => mockStore.get(`${key}:${prop}`) ?? null),
+  getRuntimeValue: vi.fn((key, prop, _camp) => mockStore.get(`${key}:${prop}`) ?? null),
   setRuntimeValue: vi.fn((_key, _prop, _val, _camp) => mockStore.set(`${_key}:${_prop}`, _val)),
-  useRuntimeValue: vi.fn((_key, prop) => {
+  useRuntimeValue: vi.fn((key, prop) => {
     if (prop === 'exhaustionLevel') return 0;
-    if (prop === 'bardicInspirationDie') return mockStore.get(`${_key}:bardicInspirationDie`) ?? null;
-    if (prop === 'bardicInspirationCombatOptions') return mockStore.get(`${_key}:bardicInspirationCombatOptions`) ?? null;
+    if (prop === 'bardicInspirationDie') return mockStore.get(`${key}:bardicInspirationDie`) ?? null;
+    if (prop === 'bardicInspirationCombatOptions') return mockStore.get(`${key}:bardicInspirationCombatOptions`) ?? null;
     if (prop === 'activeConditions') return [];
     if (prop === 'activeBuffs') return [];
     if (prop === 'targetEffects') return [];
@@ -142,52 +142,23 @@ describe('bardic inspiration feature injection', () => {
     mockStore.clear();
   });
 
-  it('does not inject "Use Bardic Inspiration" when bardicInspirationDie is null', async () => {
-    mockStore.set('Test Bard:bardicInspirationDie', null);
-    render(<CharSheet {...defaultProps} />);
-    await waitFor(() => {
-      expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
-    });
-    expect(screen.getByTestId('advancement-count')).toHaveTextContent('0');
-  });
+  it.each([
+    { die: null, combatOptions: [], expectedCount: 0, label: 'no die, no options' },
+    { die: 'd6', combatOptions: [], expectedCount: 1, label: 'die only' },
+    { die: 'd6', combatOptions: ['defense_add_to_ac'], expectedCount: 2, label: 'die + defense' },
+    { die: 'd6', combatOptions: ['offense_add_to_damage'], expectedCount: 2, label: 'die + offense' },
+    { die: 'd6', combatOptions: ['defense_add_to_ac', 'offense_add_to_damage'], expectedCount: 3, label: 'die + both' },
+  ])('advancement count is $expectedCount when $label', async ({ die, combatOptions, expectedCount }) => {
+    mockStore.set('Test Bard:bardicInspirationDie', die);
+    mockStore.set('Test Bard:bardicInspirationCombatOptions', JSON.stringify(combatOptions));
 
-  it('injects "Use Bardic Inspiration" when bardicInspirationDie is set', async () => {
-    mockStore.set('Test Bard:bardicInspirationDie', 'd6');
     render(<CharSheet {...defaultProps} />);
-    await waitFor(() => {
-      expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
-    });
-    expect(screen.getByTestId('advancement-count')).toHaveTextContent('1');
-  });
 
-  it('adds defense and offense combat options when both are in combatOptions', async () => {
-    mockStore.set('Test Bard:bardicInspirationDie', 'd6');
-    mockStore.set('Test Bard:bardicInspirationCombatOptions', JSON.stringify(['defense_add_to_ac', 'offense_add_to_damage']));
-    render(<CharSheet {...defaultProps} />);
     await waitFor(() => {
       expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
     });
-    expect(screen.getByTestId('advancement-count')).toHaveTextContent('3');
-  });
 
-  it('adds only defense combat option when defense_add_to_ac is in combatOptions', async () => {
-    mockStore.set('Test Bard:bardicInspirationDie', 'd6');
-    mockStore.set('Test Bard:bardicInspirationCombatOptions', JSON.stringify(['defense_add_to_ac']));
-    render(<CharSheet {...defaultProps} />);
-    await waitFor(() => {
-      expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
-    });
-    expect(screen.getByTestId('advancement-count')).toHaveTextContent('2');
-  });
-
-  it('adds only offense combat option when offense_add_to_damage is in combatOptions', async () => {
-    mockStore.set('Test Bard:bardicInspirationDie', 'd6');
-    mockStore.set('Test Bard:bardicInspirationCombatOptions', JSON.stringify(['offense_add_to_damage']));
-    render(<CharSheet {...defaultProps} />);
-    await waitFor(() => {
-      expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
-    });
-    expect(screen.getByTestId('advancement-count')).toHaveTextContent('2');
+    expect(screen.getByTestId('advancement-count')).toHaveTextContent(String(expectedCount));
   });
 
   it('does not duplicate "Use Bardic Inspiration" if already in characterAdvancement', async () => {
@@ -195,10 +166,13 @@ describe('bardic inspiration feature injection', () => {
       characterAdvancement: [{ name: 'Use Bardic Inspiration', description: 'existing' }],
     })));
     mockStore.set('Test Bard:bardicInspirationDie', 'd6');
+
     render(<CharSheet {...defaultProps} />);
+
     await waitFor(() => {
       expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
     });
+
     expect(screen.getByTestId('advancement-count')).toHaveTextContent('1');
   });
 });

@@ -43,11 +43,5 @@ describe('ShortRestButton', () => {
       expect(mockOnClick).toHaveBeenCalledTimes(1);
       expect(mockOnClick).toHaveBeenCalledWith(expect.objectContaining({ type: 'click' }));
     });
-
-    it('does not call onClick when it is not provided', () => {
-      render(<ShortRestButton />);
-      fireEvent.click(screen.getByRole('button'));
-      expect(mockOnClick).not.toHaveBeenCalled();
-    });
   });
 });

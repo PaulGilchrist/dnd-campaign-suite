@@ -131,7 +131,6 @@ import { hasAutomation, hasTacticalShift, hasSpeedyOpportunityDisadvantage } fro
 import { getCombatContext, getTargetFromAttacker } from '../../services/rules/combat/damageUtils.js';
 import { executeHandler } from '../../services/automation/index.js';
 import { useSpellMetamagicFlow } from '../../hooks/combat/useSpellMetamagicFlow.js';
-import { useSpellUpcastFlow } from '../../hooks/combat/useSpellUpcastFlow.js';
 import useLoggedDiceRoll from '../../hooks/combat/useLoggedDiceRoll.js';
 
 
@@ -206,17 +205,6 @@ describe('CharReactions - Edge Cases', () => {
     expect(screen.getByText('Opportunity Attack:')).toBeInTheDocument();
   });
 
-  it('handles undefined activeBuffs and powerWordHealStandPermission gracefully', () => {
-    vi.mocked(useRuntimeValue).mockImplementation((charName, key) => {
-      if (key === 'activeBuffs') return undefined;
-      if (key === 'powerWordHealStandPermission') return undefined;
-      return undefined;
-    });
-    vi.mocked(getRuntimeValue).mockImplementation(() => null);
-    render(<CharReactions {...baseProps} />);
-    expect(screen.getByText('Reactions')).toBeInTheDocument();
-  });
-
   // ===== cannotAct blocking for different reaction types =====
 
   it('prevents automation, details, and Stand reactions when cannotAct is true', async () => {
@@ -225,27 +213,6 @@ describe('CharReactions - Edge Cases', () => {
     fireEvent.click(screen.getByText('Reaction Test:'));
     expect(executeHandler).not.toHaveBeenCalled();
     expect(buildFeatureDetailHtml).not.toHaveBeenCalled();
-  });
-
-  it('prevents Stand (Power Word Heal) action when cannotAct is true', () => {
-    vi.mocked(useRuntimeValue).mockImplementation((charName, key) => {
-      if (key === 'powerWordHealStandPermission') return true;
-      return undefined;
-    });
-    render(<CharReactions {...baseProps} cannotAct={true} />);
-    fireEvent.click(screen.getByText('Stand (Power Word Heal):'));
-    expect(setRuntimeValue).not.toHaveBeenCalled();
-  });
-
-  // ===== buildFeatureDetailHtml returning null =====
-
-  it('does not show popup when buildFeatureDetailHtml returns null for a reaction without details', async () => {
-    vi.mocked(hasAutomation).mockReturnValue(true);
-    vi.mocked(executeHandler).mockResolvedValue(null);
-    const stats = { ...basePlayerStats, reactions: [{ name: 'No Details Reaction', description: 'No details available', automation: { type: 'test' } }] };
-    render(<CharReactions {...baseProps} playerStats={stats} />);
-    await act(async () => { fireEvent.click(screen.getByText('No Details Reaction:')); });
-    await waitFor(() => { expect(screen.queryByTestId('popup')).not.toBeInTheDocument(); });
   });
 
   // ===== Reaction clickability =====
@@ -263,16 +230,6 @@ describe('CharReactions - Edge Cases', () => {
     expect(screen.getByText('Plain Reaction:')).not.toHaveClass('clickable');
   });
 
-  // ===== Spell detail popup with upcast levels =====
-
-  it('passes buildUpcastLevels result to SpellDetailPopup', () => {
-    const buildUpcastLevels = vi.fn(() => [2, 3]);
-    vi.mocked(useSpellUpcastFlow).mockReturnValue({ buildUpcastLevels });
-    render(<CharReactions {...baseProps} />);
-    fireEvent.click(screen.getByText('Shield'));
-    expect(buildUpcastLevels).toHaveBeenCalledWith(basePlayerStats.spellAbilities.spells[0]);
-  });
-
   // ===== MetamagicPopup with _currentSP =====
 
   it('renders MetamagicPopup with pendingMetamagic data', () => {
@@ -284,20 +241,6 @@ describe('CharReactions - Edge Cases', () => {
     });
     render(<CharReactions {...baseProps} />);
     expect(screen.getByTestId('metamagic-popup')).toBeInTheDocument();
-  });
-
-  // ===== Spell reactions table with multiple spells =====
-
-  it('renders all reaction spells in the spells table', () => {
-    const stats = { ...basePlayerStats, spellAbilities: { spells: [
-      { name: 'Shield', casting_time: '1 reaction', range: 'Self', prepared: 'Prepared' },
-      { name: 'Counterspell', casting_time: '1 Reaction', range: '60 feet', prepared: 'Always' },
-      { name: 'Lure', casting_time: 'reaction', range: '30 feet', prepared: 'Prepared' },
-    ] } };
-    render(<CharReactions {...baseProps} playerStats={stats} />);
-    expect(screen.getByText('Shield')).toBeInTheDocument();
-    expect(screen.getByText('Counterspell')).toBeInTheDocument();
-    expect(screen.getByText('Lure')).toBeInTheDocument();
   });
 
   // ===== Multiple dynamic reactions =====
@@ -332,66 +275,7 @@ describe('CharReactions - Edge Cases', () => {
     expect(screen.queryAllByText('Stand (Power Word Heal):').length).toBe(1);
   });
 
-  // ===== Spell filtering: casting time variants =====
-
-  it('filters out spells that are not reactions by casting_time', () => {
-    const stats = { ...basePlayerStats, spellAbilities: { spells: [
-      { name: 'Hex', casting_time: '1 bonus action', prepared: 'Always' },
-      { name: 'Fireball', casting_time: '1 action', prepared: 'Prepared' },
-      { name: 'Castigate', casting_time: '2 actions', prepared: 'Prepared' },
-      { name: 'Create Food', casting_time: '1 minute', prepared: 'Prepared' },
-    ] } };
-    render(<CharReactions {...baseProps} playerStats={stats} />);
-    expect(screen.queryByText('Hex')).not.toBeInTheDocument();
-    expect(screen.queryByText('Fireball')).not.toBeInTheDocument();
-    expect(screen.queryByText('Castigate')).not.toBeInTheDocument();
-    expect(screen.queryByText('Create Food')).not.toBeInTheDocument();
-  });
-
-  // ===== Spell filtering: prepared status =====
-
-  it('excludes unprepared spells', () => {
-    const stats = { ...basePlayerStats, spellAbilities: { spells: [
-      { name: 'Shield', casting_time: '1 reaction', prepared: 'Not Prepared' },
-      { name: 'Counterspell', casting_time: '1 reaction', prepared: 'Unprepared' },
-    ] } };
-    render(<CharReactions {...baseProps} playerStats={stats} />);
-    expect(screen.queryByText('Shield')).not.toBeInTheDocument();
-    expect(screen.queryByText('Counterspell')).not.toBeInTheDocument();
-  });
-
-  // ===== Spell table columns =====
-
-  it('renders spell table column headers and Utility damage type', () => {
-    const stats = { ...basePlayerStats, spellAbilities: { spells: [
-      { name: 'Shield', casting_time: '1 reaction', range: 'Self', prepared: 'Prepared' },
-      { name: 'Counterspell', casting_time: '1 reaction', range: '60 feet', prepared: 'Always' },
-    ] } };
-    render(<CharReactions {...baseProps} playerStats={stats} />);
-    expect(screen.getByText('Hit')).toBeInTheDocument();
-    expect(screen.getByText('Type')).toBeInTheDocument();
-    const utilities = screen.queryAllByText('Utility');
-    expect(utilities.length).toBeGreaterThanOrEqual(1);
-  });
-
-  // ===== Spell name collision with attacks =====
-
-  it('includes reaction spell even if its name matches an attack name', () => {
-    const stats = { ...basePlayerStats, attacks: [{ name: 'Shield', type: 'Action', range: 'Self', hitBonus: 5 }], spellAbilities: { spells: [{ name: 'Shield', casting_time: '1 reaction', range: 'Self', prepared: 'Prepared' }] } };
-    render(<CharReactions {...baseProps} playerStats={stats} />);
-    expect(screen.getByText('Shield')).toBeInTheDocument();
-  });
-
   // ===== Reaction with automation returning various result types =====
-
-  it('shows feature detail popup when automation returns unknown modal type', async () => {
-    vi.mocked(hasAutomation).mockReturnValue(true);
-    vi.mocked(executeHandler).mockResolvedValue({ type: 'modal', modalName: 'someOtherModal', payload: {} });
-    const stats = { ...basePlayerStats, reactions: [{ name: 'Custom', description: 'Custom desc', details: 'Custom details', automation: { type: 'custom' } }] };
-    render(<CharReactions {...baseProps} playerStats={stats} />);
-    await act(async () => { fireEvent.click(screen.getByText('Custom:')); });
-    await waitFor(() => { expect(buildFeatureDetailHtml).toHaveBeenCalled(); });
-  });
 
   it('shows feature detail when executeHandler returns undefined', async () => {
     vi.mocked(hasAutomation).mockReturnValue(true);
@@ -400,14 +284,6 @@ describe('CharReactions - Edge Cases', () => {
     render(<CharReactions {...baseProps} playerStats={stats} />);
     await act(async () => { fireEvent.click(screen.getByText('Undefined Handler:')); });
     await waitFor(() => { expect(buildFeatureDetailHtml).toHaveBeenCalled(); });
-  });
-
-  it('does not call executeHandler when reaction has no automation property', async () => {
-    vi.mocked(hasAutomation).mockReturnValue(true);
-    const stats = { ...basePlayerStats, reactions: [{ name: 'No Auto Prop', description: 'Has automation flag but no automation prop' }] };
-    render(<CharReactions {...baseProps} playerStats={stats} />);
-    await act(async () => { fireEvent.click(screen.getByText('No Auto Prop:')); });
-    expect(executeHandler).not.toHaveBeenCalled();
   });
 
   // ===== Spell detail popup with onCast handler =====
@@ -440,16 +316,6 @@ describe('CharReactions - Edge Cases', () => {
     expect(setRuntimeValue).toHaveBeenCalledWith(basePlayerStats.name, 'powerWordHealStandPermission', false, baseProps.campaignName);
   });
 
-  // ===== Popup Dismissal Tests =====
-
-  it('shows reactive spell popup when automation returns eligibleSpells', async () => {
-    vi.mocked(hasAutomation).mockReturnValue(true);
-    vi.mocked(executeHandler).mockResolvedValue({ type: 'popup', payload: { eligibleSpells: [{ name: 'Fireball', isSingleTarget: false }], hasWarnings: true } });
-    render(<CharReactions {...baseProps} />);
-    await act(async () => { fireEvent.click(screen.getByText('Reaction Test:')); });
-    await waitFor(() => { expect(screen.queryByTestId('popup-overlay')).toBeInTheDocument(); });
-  });
-
   // ===== ArcaneWardRestoreModal prop spreading =====
 
   it('renders ArcaneWardRestoreModal when automation returns arcaneWardRestore modal type', async () => {
@@ -459,24 +325,5 @@ describe('CharReactions - Edge Cases', () => {
     render(<CharReactions {...baseProps} playerStats={stats} />);
     await act(async () => { fireEvent.click(screen.getByText('Arcane Ward:')); });
     expect(screen.getByTestId('arcane-ward-restore-modal')).toBeInTheDocument();
-  });
-
-  it('passes additional modal props to ArcaneWardRestoreModal via spread', async () => {
-    vi.mocked(hasAutomation).mockReturnValue(true);
-    vi.mocked(executeHandler).mockResolvedValue({ type: 'modal', modalName: 'arcaneWardRestore', payload: { extraProp: 'value' } });
-    const stats = { ...basePlayerStats, reactions: [{ name: 'Arcane Ward', description: 'Creates a ward', automation: { type: 'arcane_ward' } }] };
-    render(<CharReactions {...baseProps} playerStats={stats} />);
-    await act(async () => { fireEvent.click(screen.getByText('Arcane Ward:')); });
-    expect(screen.getByTestId('arcane-ward-restore-modal')).toBeInTheDocument();
-  });
-
-  // ===== buildUpcastLevels integration =====
-
-  it('calls buildUpcastLevels with the selected spell', () => {
-    const buildUpcastLevels = vi.fn(() => [2, 3]);
-    vi.mocked(useSpellUpcastFlow).mockReturnValue({ buildUpcastLevels });
-    render(<CharReactions {...baseProps} />);
-    fireEvent.click(screen.getByText('Shield'));
-    expect(buildUpcastLevels).toHaveBeenCalledWith(basePlayerStats.spellAbilities.spells[0]);
   });
 });

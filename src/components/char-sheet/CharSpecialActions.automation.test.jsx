@@ -111,13 +111,17 @@ function createPlayerStats(overrides = {}) {
   return { ...basePlayerStats, ...overrides };
 }
 
+function createSpecialAction(name, automation) {
+  return { name, description: `${name} description.`, automation };
+}
+
 describe('CharSpecialActions - Automation', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
   describe('automation behavior', () => {
-    it('executes automation when a special action with interactive automation is clicked', async () => {
+    it('executes automation when clicked and cannotAct is false', async () => {
       executeHandler.mockResolvedValue({
         type: 'popup',
         payload: { type: 'automation_info', name: 'Blink Steps', description: 'Teleported 30 ft.' },
@@ -125,11 +129,11 @@ describe('CharSpecialActions - Automation', () => {
 
       const playerStats = createPlayerStats({
         specialActions: [
-          { name: 'Blink Steps', description: 'Teleport up to 30 feet.', automation: { type: 'teleport', distance: '30 ft' } },
+          createSpecialAction('Blink Steps', { type: 'teleport', distance: '30 ft' }),
         ],
       });
-      render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
-      fireEvent.click(screen.getByText(/Blink Steps/));
+      render(<CharSpecialActions playerStats={playerStats} campaignName="test" cannotAct={false} />);
+      fireEvent.click(screen.getAllByText(/Blink Steps/)[0]);
 
       await waitFor(() => {
         expect(executeHandler).toHaveBeenCalledWith(
@@ -146,30 +150,14 @@ describe('CharSpecialActions - Automation', () => {
 
       const playerStats = createPlayerStats({
         specialActions: [
-          { name: 'Blink Steps', description: 'Teleport up to 30 feet.', automation: { type: 'teleport', distance: '30 ft' } },
+          createSpecialAction('Blink Steps', { type: 'teleport', distance: '30 ft' }),
         ],
       });
       render(<CharSpecialActions playerStats={playerStats} campaignName="test" cannotAct={true} />);
-      fireEvent.click(screen.getByText(/Blink Steps/));
+      fireEvent.click(screen.getAllByText(/Blink Steps/)[0]);
 
       await waitFor(() => {
         expect(executeHandler).not.toHaveBeenCalled();
-      });
-    });
-
-    it('allows automation execution when cannotAct is false', async () => {
-      executeHandler.mockResolvedValue(null);
-
-      const playerStats = createPlayerStats({
-        specialActions: [
-          { name: 'Blink Steps', description: 'Teleport up to 30 feet.', automation: { type: 'teleport', distance: '30 ft' } },
-        ],
-      });
-      render(<CharSpecialActions playerStats={playerStats} campaignName="test" cannotAct={false} />);
-      fireEvent.click(screen.getByText(/Blink Steps/));
-
-      await waitFor(() => {
-        expect(executeHandler).toHaveBeenCalled();
       });
     });
 
@@ -188,11 +176,11 @@ describe('CharSpecialActions - Automation', () => {
 
       const playerStats = createPlayerStats({
         specialActions: [
-          { name: 'Misty Step', description: 'Teleport 30 ft.', automation: { type: 'teleport', distance: '30 ft' } },
+          createSpecialAction('Misty Step', { type: 'teleport', distance: '30 ft' }),
         ],
       });
       render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
-      fireEvent.click(screen.getByText(/Misty Step/));
+      fireEvent.click(screen.getAllByText(/Misty Step/)[0]);
 
       await waitFor(() => {
         expect(screen.getByTestId('teleport-modal')).toBeInTheDocument();
@@ -213,11 +201,11 @@ describe('CharSpecialActions - Automation', () => {
 
       const playerStats = createPlayerStats({
         specialActions: [
-          { name: 'Abjuration Savant', description: 'Choose two abjuration spells.', automation: { type: 'passive_rule', effect: 'abjuration_savant' } },
+          createSpecialAction('Abjuration Savant', { type: 'passive_rule', effect: 'abjuration_savant' }),
         ],
       });
       render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
-      fireEvent.click(screen.getByText(/Abjuration Savant/));
+      fireEvent.click(screen.getAllByText(/Abjuration Savant/)[0]);
 
       await waitFor(() => {
         expect(screen.getByTestId('abjuration-savant-modal')).toBeInTheDocument();
@@ -229,11 +217,11 @@ describe('CharSpecialActions - Automation', () => {
 
       const playerStats = createPlayerStats({
         specialActions: [
-          { name: 'Blink Steps', description: 'Teleport up to 30 feet.', automation: { type: 'teleport', distance: '30 ft' } },
+          createSpecialAction('Blink Steps', { type: 'teleport', distance: '30 ft' }),
         ],
       });
       render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
-      fireEvent.click(screen.getByText(/Blink Steps/));
+      fireEvent.click(screen.getAllByText(/Blink Steps/)[0]);
 
       await waitFor(() => {
         expect(executeHandler).toHaveBeenCalled();

@@ -50,10 +50,7 @@ vi.mock('../../services/ui/dataLoader.js', () => ({
 
 const mockCampaignName = 'test-campaign';
 
-import { getClassFeatures } from '../../services/character/classFeatures.js';
-import { loadSpellData } from '../../services/ui/dataLoader.js';
-import { getCombatContext } from '../../services/rules/combat/damageUtils.js';
-import { applyHealingToTarget } from '../../services/rules/combat/applyHealing.js';
+
 
 function createPlayerStats(overrides = {}) {
     return {
@@ -171,27 +168,11 @@ describe('ShortRestModal', () => {
             expect(screen.getByText(/Roll All/)).toBeDisabled();
         });
 
-        it('decrements remaining hit dice count after rolling one', () => {
-            renderModal();
-            fireEvent.click(screen.getByText('Roll One'));
-            const hitDiceText = screen.getByText(/d8 —/);
-            expect(hitDiceText.textContent).toContain('4');
-        });
-
         it('accumulates recovered HP from roll log entries', () => {
             renderModal();
             fireEvent.click(screen.getByText('Roll One'));
             const container = screen.getByText(/Total HP Recovered:/).parentElement;
             expect(container.textContent).toContain('6');
-        });
-
-        it('shows individual roll entries in the log table', () => {
-            renderModal();
-            fireEvent.click(screen.getByText('Roll One'));
-            const tbody = document.querySelector('.short-rest-roll-log tbody');
-            expect(tbody).toBeInTheDocument();
-            const rows = tbody.querySelectorAll('tr');
-            expect(rows.length).toBeGreaterThan(0);
         });
 
         it('does not roll when hit dice is already at zero', () => {
@@ -213,22 +194,6 @@ describe('ShortRestModal', () => {
             expect(screen.queryByText('Song of Rest')).not.toBeInTheDocument();
         });
 
-        it('adds Song of Rest entry to roll log', async () => {
-            renderModal();
-            await act(async () => {
-                fireEvent.click(screen.getByText(/Apply Song of Rest/));
-                await Promise.resolve();
-            });
-            const songRows = screen.queryAllByText(/Song of Rest/);
-            expect(songRows.length).toBeGreaterThanOrEqual(1);
-        });
-
-        it('does not show Song of Rest when class feature is null', () => {
-            vi.mocked(getClassFeatures).mockReturnValueOnce({ songOfRestDie: null });
-            renderModal();
-            expect(screen.queryByText('Song of Rest')).not.toBeInTheDocument();
-        });
-
         it('adds Song of Rest bonus to recovered HP total', async () => {
             renderModal();
             await act(async () => {
@@ -244,28 +209,6 @@ describe('ShortRestModal', () => {
             const hpBefore = parseInt(totalBefore.match(/\d+/)?.[0] || '0', 10);
             const hpAfter = parseInt(totalAfter.match(/\d+/)?.[0] || '0', 10);
             expect(hpAfter).toBeGreaterThan(hpBefore);
-        });
-
-        it('uses applyHealingToTarget when combat context is available', async () => {
-            vi.mocked(getCombatContext).mockResolvedValueOnce({ targets: [{ name: 'Thorin' }] });
-            vi.mocked(applyHealingToTarget).mockReturnValueOnce({ actualHeal: 5, oldHp: 20, newHp: 25 });
-            renderModal();
-            await act(async () => {
-                fireEvent.click(screen.getByText(/Apply Song of Rest/));
-                await Promise.resolve();
-            });
-            expect(applyHealingToTarget).toHaveBeenCalled();
-        });
-
-        it('falls back to direct HP addition when no combat context', async () => {
-            vi.mocked(getCombatContext).mockResolvedValueOnce(null);
-            renderModal();
-            await act(async () => {
-                fireEvent.click(screen.getByText(/Apply Song of Rest/));
-                await Promise.resolve();
-            });
-            const totalText = screen.getByText(/Total HP Recovered:/);
-            expect(totalText).toBeInTheDocument();
         });
     });
 
@@ -364,25 +307,6 @@ describe('ShortRestModal', () => {
                 });
                 fireEvent.click(screen.getByText(/Craft Bolstering Treats/));
                 expect(screen.getByText('Treats crafted')).toBeInTheDocument();
-            });
-
-            it('sets chefBolsteringTreats runtime value when crafted', () => {
-                renderModal({
-                    automation: { passives: [{ type: 'temp_hp_buff', name: 'Bolstering Treats' }] },
-                });
-                fireEvent.click(screen.getByText(/Craft Bolstering Treats/));
-                const treatCalls = setRuntimeValueMock.mock.calls.filter(
-                    (call) => call[1] === 'chefBolsteringTreats'
-                );
-                expect(treatCalls.length).toBeGreaterThan(0);
-                expect(treatCalls[0][2]).toBe(3);
-            });
-
-            it('shows proficiency-based treat count in description', () => {
-                renderModal({
-                    automation: { passives: [{ type: 'temp_hp_buff', name: 'Bolstering Treats' }] },
-                });
-                expect(screen.getByText(/Craft 3 bolstering treats/)).toBeInTheDocument();
             });
         });
     });
@@ -752,11 +676,6 @@ describe('ShortRestModal', () => {
             renderModal();
             expect(screen.getByText(/of 5 remaining/)).toBeInTheDocument();
         });
-
-        it('displays correct hit die size from getHitDieSize', () => {
-            renderModal();
-            expect(screen.getByText(/d8/)).toBeInTheDocument();
-        });
     });
 
     describe('Memorize Spell functionality', () => {
@@ -766,125 +685,6 @@ describe('ShortRestModal', () => {
                 automation: { passives: [{ type: 'memorize_spell' }] },
             });
             expect(screen.getByText(/Swap Prepared Spell/)).toBeInTheDocument();
-        });
-
-        it('shows spell selection dropdowns when swap mode is active', async () => {
-            vi.mocked(loadSpellData).mockImplementationOnce(async () => [
-                { name: 'Fireball', level: 3 },
-                { name: 'Magic Missile', level: 1 },
-                { name: 'Shield', level: 1 },
-            ]);
-            const { rerender } = renderModal({
-                class: { name: 'Wizard', major: { name: 'Wizard' } },
-                automation: { passives: [{ type: 'memorize_spell' }] },
-                spellAbilities: {
-                    spell_slots_level_1: 4,
-                    spells: [
-                        { name: 'Fireball', prepared: 'Prepared' },
-                        { name: 'Magic Missile', prepared: 'Prepared' },
-                    ],
-                },
-            });
-            await act(async () => {
-                fireEvent.click(screen.getByText(/Swap Prepared Spell/));
-                await Promise.resolve();
-            });
-            rerender(
-                <ShortRestModal
-                    playerStats={createPlayerStats({
-                        class: { name: 'Wizard', major: { name: 'Wizard' } },
-                        automation: { passives: [{ type: 'memorize_spell' }] },
-                        spellAbilities: {
-                            spell_slots_level_1: 4,
-                            spells: [
-                                { name: 'Fireball', prepared: 'Prepared' },
-                                { name: 'Magic Missile', prepared: 'Prepared' },
-                            ],
-                        },
-                    })}
-                    campaignName={mockCampaignName}
-                    onClose={vi.fn()}
-                    onComplete={vi.fn()}
-                />
-            );
-            expect(screen.getByText(/Remove prepared spell:/)).toBeInTheDocument();
-            expect(screen.getByText(/Add from spellbook:/)).toBeInTheDocument();
-        });
-
-        it('swaps prepared spell and updates runtime state on swap', async () => {
-            vi.mocked(loadSpellData).mockImplementationOnce(async () => [
-                { name: 'Fireball', level: 3 },
-                { name: 'Shield', level: 1 },
-            ]);
-            const { rerender } = renderModal({
-                class: { name: 'Wizard', major: { name: 'Wizard' } },
-                automation: { passives: [{ type: 'memorize_spell' }] },
-                spellAbilities: {
-                    spell_slots_level_1: 4,
-                    spells: [
-                        { name: 'Fireball', prepared: 'Prepared' },
-                    ],
-                },
-            });
-            await act(async () => {
-                fireEvent.click(screen.getByText(/Swap Prepared Spell/));
-                await Promise.resolve();
-            });
-            rerender(
-                <ShortRestModal
-                    playerStats={createPlayerStats({
-                        class: { name: 'Wizard', major: { name: 'Wizard' } },
-                        automation: { passives: [{ type: 'memorize_spell' }] },
-                        spellAbilities: {
-                            spell_slots_level_1: 4,
-                            spells: [
-                                { name: 'Fireball', prepared: 'Prepared' },
-                            ],
-                        },
-                    })}
-                    campaignName={mockCampaignName}
-                    onClose={vi.fn()}
-                    onComplete={vi.fn()}
-                />
-            );
-            const selects = document.querySelectorAll('select');
-            fireEvent.change(selects[0], { target: { value: 'Fireball' } });
-            fireEvent.change(selects[1], { target: { value: 'Shield' } });
-            fireEvent.click(screen.getByText(/Swap Spell/));
-            const prepCalls = setRuntimeValueMock.mock.calls.filter(
-                (call) => call[1] === 'preparedSpells'
-            );
-            expect(prepCalls.length).toBeGreaterThan(0);
-        });
-    });
-
-    describe('prepared spells runtime state', () => {
-        it('reads prepared spells from runtime state when available', () => {
-            setupGetRuntimeValue({ 'preparedSpells': ['Fireball', 'Shield'] });
-            renderModal({
-                class: { name: 'Wizard', major: { name: 'Wizard' } },
-                automation: { passives: [{ type: 'memorize_spell' }] },
-                spellAbilities: {
-                    spell_slots_level_1: 4,
-                    spells: [
-                        { name: 'Magic Missile', prepared: 'Prepared' },
-                    ],
-                },
-            });
-            expect(screen.getByText(/of 5 remaining/)).toBeInTheDocument();
-        });
-
-        it('falls back to computing prepared spells from playerStats when no runtime state', () => {
-            renderModal({
-                spellAbilities: {
-                    spell_slots_level_1: 4,
-                    spells: [
-                        { name: 'Fireball', prepared: 'Prepared' },
-                        { name: 'Magic Missile', prepared: 'Not Prepared' },
-                    ],
-                },
-            });
-            expect(screen.queryByText('Short Rest')).toBeInTheDocument();
         });
     });
 

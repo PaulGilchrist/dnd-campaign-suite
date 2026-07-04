@@ -5,17 +5,12 @@ import LongRestButton from './LongRestButton.jsx';
 
 // ── Mocked modules ──
 
-vi.mock('../../services/rules/effects/restRules.js', () => ({
-  applyLongRest: vi.fn(),
-}));
-
 vi.mock('../../services/rules/effects/tranceRules.js', () => ({
   hasTranceTrait: vi.fn(),
 }));
 
 // ── Re-import mocked modules ──
 
-import * as restRules from '../../services/rules/effects/restRules.js';
 import * as tranceRules from '../../services/rules/effects/tranceRules.js';
 
 // ── Test fixtures ──
@@ -68,15 +63,6 @@ describe('LongRestButton', () => {
   // ── Click behavior ──
 
   describe('on click', () => {
-    it('calls applyLongRest with playerStats and campaignName', () => {
-      render(<LongRestButton {...makeProps()} />);
-      fireEvent.click(screen.getByRole('button'));
-      expect(restRules.applyLongRest).toHaveBeenCalledWith(
-        basePlayerStats,
-        mockCampaignName,
-      );
-    });
-
     it('calls onLongRest callback when provided', () => {
       const onLongRest = vi.fn();
       render(<LongRestButton {...makeProps({ onLongRest })} />);

@@ -142,7 +142,7 @@ describe('CharSpecialActions - SignatureSpells Confirm Popup', () => {
   });
 
   describe('SignatureSpells confirm handler popup result', () => {
-    it('displays popup when onSignatureSpellsSelected returns a popup result', async () => {
+    it('displays popup and closes modal when onSignatureSpellsSelected returns a popup result', async () => {
       const mockSetPopupHtml = vi.fn();
 
       executeHandler.mockResolvedValue({
@@ -190,9 +190,10 @@ describe('CharSpecialActions - SignatureSpells Confirm Popup', () => {
       const popupCall = mockSetPopupHtml.mock.calls[0][0];
       expect(popupCall).toContain('Signature Spells');
       expect(popupCall).toContain('Spells prepared and ready to cast.');
+      expect(screen.queryByTestId('signature-spells-modal')).not.toBeInTheDocument();
     });
 
-    it('uses payload name fallback when popup has no name in signature spells', async () => {
+    it('uses payload name fallback when popup has no name', async () => {
       const mockSetPopupHtml = vi.fn();
 
       executeHandler.mockResolvedValue({

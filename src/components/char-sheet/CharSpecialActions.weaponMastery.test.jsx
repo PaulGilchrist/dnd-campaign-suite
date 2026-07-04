@@ -149,7 +149,7 @@ describe('CharSpecialActions - Weapon Mastery Modals', () => {
   });
 
   describe('weaponKindMastery modal', () => {
-    it('renders WeaponKindMasteryModal when automation returns it', async () => {
+    it('renders and closes WeaponKindMasteryModal when automation returns it', async () => {
       executeHandler.mockResolvedValue({
         type: 'modal',
         modalName: 'weaponKindMastery',
@@ -157,36 +157,6 @@ describe('CharSpecialActions - Weapon Mastery Modals', () => {
           action: { name: 'Weapon Mastery', automation: { type: 'weapon_kind_mastery' } },
           meleeOnly: true,
           existing: ['Longsword'],
-        },
-      });
-
-      const playerStats = createPlayerStats({
-        specialActions: [
-          { name: 'Weapon Mastery', description: 'Choose weapon kinds.', automation: { type: 'weapon_kind_mastery' } },
-        ],
-      });
-      render(<CharSpecialActions playerStats={playerStats} campaignName="test" />, {
-        wrapper: ({ children }) => (
-          <DiceRollContext.Provider value={{ popupHtml: null, setPopupHtml: vi.fn() }}>
-            {children}
-          </DiceRollContext.Provider>
-        ),
-      });
-      fireEvent.click(screen.getByText(/Weapon Mastery/));
-
-      await waitFor(() => {
-        expect(screen.getByTestId('weapon-kind-mastery-modal')).toBeInTheDocument();
-      });
-    });
-
-    it('closes WeaponKindMasteryModal when close button is clicked', async () => {
-      executeHandler.mockResolvedValue({
-        type: 'modal',
-        modalName: 'weaponKindMastery',
-        payload: {
-          action: { name: 'Weapon Mastery' },
-          meleeOnly: false,
-          existing: [],
         },
       });
 
@@ -217,42 +187,13 @@ describe('CharSpecialActions - Weapon Mastery Modals', () => {
   });
 
   describe('weaponMasteryChoice modal', () => {
-    it('renders WeaponMasteryChoiceModal when automation returns it', async () => {
+    it('renders and closes WeaponMasteryChoiceModal when automation returns it', async () => {
       executeHandler.mockResolvedValue({
         type: 'modal',
         modalName: 'weaponMasteryChoice',
         payload: {
           action: { name: 'Weapon Master', automation: { type: 'weapon_mastery_choice' } },
           masteryProperties: ['Finesse', 'Heavy', 'Reach'],
-        },
-      });
-
-      const playerStats = createPlayerStats({
-        specialActions: [
-          { name: 'Weapon Master', description: 'Choose mastery.', automation: { type: 'weapon_mastery_choice' } },
-        ],
-      });
-      render(<CharSpecialActions playerStats={playerStats} campaignName="test" />, {
-        wrapper: ({ children }) => (
-          <DiceRollContext.Provider value={{ popupHtml: null, setPopupHtml: vi.fn() }}>
-            {children}
-          </DiceRollContext.Provider>
-        ),
-      });
-      fireEvent.click(screen.getByText(/Weapon Master/));
-
-      await waitFor(() => {
-        expect(screen.getByTestId('weapon-mastery-choice-modal')).toBeInTheDocument();
-      });
-    });
-
-    it('closes WeaponMasteryChoiceModal when close button is clicked', async () => {
-      executeHandler.mockResolvedValue({
-        type: 'modal',
-        modalName: 'weaponMasteryChoice',
-        payload: {
-          action: { name: 'Weapon Master' },
-          masteryProperties: ['Finesse', 'Heavy'],
         },
       });
 

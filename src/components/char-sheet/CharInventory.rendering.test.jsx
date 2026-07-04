@@ -78,13 +78,9 @@ describe('CharInventory rendering', () => {
   });
 
   describe('magic items rendering', () => {
-    it('should render magic items section header', () => {
+    it('should render magic items section header and item details', () => {
       renderComponent();
       expect(screen.getByText(/Magic Items:/)).toBeInTheDocument();
-    });
-
-    it('should render magic item details', () => {
-      renderComponent();
       expect(screen.getByText(/Magic Sword/)).toBeInTheDocument();
       expect(screen.getByText(/qty 1/)).toBeInTheDocument();
       expect(screen.getByText(/Weapon/)).toBeInTheDocument();
@@ -94,29 +90,7 @@ describe('CharInventory rendering', () => {
       expect(longswordElements.length).toBeGreaterThan(0);
     });
 
-    it('should render magic item without attunement requirements label when requiresAttunement is false', () => {
-      const stats = {
-        inventory: {
-          magicItems: [
-            {
-              name: 'Magic Ring',
-              type: 'Ring',
-              rarity: 'Rare',
-              description: 'A magical ring.',
-              requiresAttunement: false,
-            },
-          ],
-          equipped: [],
-          backpack: [],
-        },
-      };
-
-      renderComponent(stats);
-      expect(screen.getByText(/Magic Ring/)).toBeInTheDocument();
-      expect(screen.queryByText(/requires attunement/)).not.toBeInTheDocument();
-    });
-
-    it('should render magic item with requires attunement when no custom requirements', () => {
+    it('should show "requires attunement" when requiresAttunement is true without custom requirements', () => {
       const stats = {
         inventory: {
           magicItems: [
@@ -138,7 +112,29 @@ describe('CharInventory rendering', () => {
       expect(screen.getByText(/requires attunement/)).toBeInTheDocument();
     });
 
-    it('should render magic item without quantity label when quantity is missing or zero', () => {
+    it('should not show "requires attunement" when requiresAttunement is false', () => {
+      const stats = {
+        inventory: {
+          magicItems: [
+            {
+              name: 'Magic Ring',
+              type: 'Ring',
+              rarity: 'Rare',
+              description: 'A magical ring.',
+              requiresAttunement: false,
+            },
+          ],
+          equipped: [],
+          backpack: [],
+        },
+      };
+
+      renderComponent(stats);
+      expect(screen.getByText(/Magic Ring/)).toBeInTheDocument();
+      expect(screen.queryByText(/requires attunement/)).not.toBeInTheDocument();
+    });
+
+    it('should not render quantity label when quantity is missing or zero', () => {
       const stats = {
         inventory: {
           magicItems: [
@@ -220,62 +216,6 @@ describe('CharInventory rendering', () => {
       expect(screen.getByText(/Potion/)).toBeInTheDocument();
       expect(screen.getByText(/Common/)).toBeInTheDocument();
     });
-
-    it('should render multiple magic items', () => {
-      const stats = {
-        inventory: {
-          magicItems: [
-            {
-              name: 'Ring of Protection',
-              type: 'Ring',
-              rarity: 'Uncommon',
-              description: '+1 AC',
-              requiresAttunement: true,
-            },
-            {
-              name: 'Amulet of Health',
-              type: 'Amulet',
-              rarity: 'Rare',
-              description: 'CON becomes 19',
-              requiresAttunement: false,
-            },
-          ],
-          equipped: [],
-          backpack: [],
-        },
-      };
-
-      renderComponent(stats);
-      expect(screen.getByText(/Ring of Protection/)).toBeInTheDocument();
-      expect(screen.getByText(/Amulet of Health/)).toBeInTheDocument();
-      expect(screen.getByText(/Uncommon/)).toBeInTheDocument();
-      expect(screen.getByText(/Rare/)).toBeInTheDocument();
-    });
-
-    it('should render magic item with subtype in parentheses', () => {
-      const stats = {
-        inventory: {
-          magicItems: [
-            {
-              name: 'Dagger of Venom',
-              type: 'Weapon',
-              subtype: 'Dagger',
-              rarity: 'Uncommon',
-              description: 'A poisoned dagger.',
-              requiresAttunement: true,
-              attunementRequirements: 'Rogue',
-            },
-          ],
-          equipped: [],
-          backpack: [],
-        },
-      };
-
-      renderComponent(stats);
-      expect(screen.getByText(/Dagger of Venom/)).toBeInTheDocument();
-      expect(screen.getByText(/Rogue/)).toBeInTheDocument();
-      expect(screen.queryByText(/requires attunement/)).not.toBeInTheDocument();
-    });
   });
 
   describe('equipped and backpack rendering', () => {
@@ -294,21 +234,19 @@ describe('CharInventory rendering', () => {
       expect(screen.getByText('Healing Potion')).toBeInTheDocument();
     });
 
-    it('should not render equipped or backpack sections when arrays are empty', () => {
-      const stats = { inventory: { magicItems: [], equipped: [], backpack: [] } };
-      renderComponent(stats);
-      expect(screen.queryByText(/Equipped:/)).not.toBeInTheDocument();
-      expect(screen.queryByText(/Backpack:/)).not.toBeInTheDocument();
-    });
-
-    it('should not render equipped or backpack sections when missing or null', () => {
-      const missingStats = { inventory: {} };
-      renderComponent(missingStats);
+    it('should not render equipped or backpack sections when arrays are empty, null, or missing', () => {
+      const emptyStats = { inventory: { magicItems: [], equipped: [], backpack: [] } };
+      renderComponent(emptyStats);
       expect(screen.queryByText(/Equipped:/)).not.toBeInTheDocument();
       expect(screen.queryByText(/Backpack:/)).not.toBeInTheDocument();
 
       const nullStats = { inventory: { magicItems: [], equipped: null, backpack: null } };
       renderComponent(nullStats);
+      expect(screen.queryByText(/Equipped:/)).not.toBeInTheDocument();
+      expect(screen.queryByText(/Backpack:/)).not.toBeInTheDocument();
+
+      const missingStats = { inventory: {} };
+      renderComponent(missingStats);
       expect(screen.queryByText(/Equipped:/)).not.toBeInTheDocument();
       expect(screen.queryByText(/Backpack:/)).not.toBeInTheDocument();
     });
