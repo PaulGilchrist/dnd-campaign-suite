@@ -4,7 +4,6 @@
 const categories5e = {
     featuresToIgnore: [
         "Ability Score Improvement",
-        "Bardic Inspiration",
         "Brutal Critical",
         "Channel Divinity",
         "Divine Domain",
@@ -140,7 +139,6 @@ const categories2024 = {
         "Ability Score Improvement",
         "Barbarian Subclass",
         "Bard Subclass",
-        "Bardic Inspiration",
         "Body and Mind",
         "Channel Divinity",
         "Cleric Subclass",

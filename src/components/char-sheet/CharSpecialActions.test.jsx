@@ -193,7 +193,7 @@ describe('CharSpecialActions - Rendering & Filtering', () => {
       await waitFor(() => {
         expect(within(container).queryByText(/Spellcasting/)).not.toBeInTheDocument();
         expect(within(container).queryByText(/Extra Attack/)).not.toBeInTheDocument();
-        expect(within(container).queryByText(/Bardic Inspiration/)).not.toBeInTheDocument();
+        expect(within(container).getByText(/Bardic Inspiration/)).toBeInTheDocument();
         expect(within(container).getByText(/Test Feature/)).toBeInTheDocument();
       });
     });

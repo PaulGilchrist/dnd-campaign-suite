@@ -12,8 +12,6 @@ vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(() => null)
 }));
 
-import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
-
 describe('raceRules 2024 (direct module)', () => {
   describe('getImmunities', () => {
     it('returns empty array when playerSummary has no race', () => {

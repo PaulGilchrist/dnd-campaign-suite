@@ -228,6 +228,8 @@ export default function CharActionModals({
     handleRadianceOfDawnConfirm,
     tricksterBlessingModal,
     handleTricksterBlessingConfirm,
+    bardicInspirationTargetModal,
+    handleBardicInspirationConfirm,
     handleDivineInterventionCast,
     pendingDamageRef,
     buildCtx,
@@ -881,6 +883,18 @@ export default function CharActionModals({
                     showHp={false}
                     onTargetSelected={handleTricksterBlessingConfirm}
                     onSkip={() => handleTricksterBlessingConfirm(null)}
+                />
+            )}
+            {bardicInspirationTargetModal && (
+                <SecondaryTargetModal
+                    title="Bardic Inspiration — Choose Target"
+                    targets={bardicInspirationTargetModal.creatureTargets}
+                    confirmLabel="Grant Inspiration"
+                    confirmIcon="fa-music"
+                    description={`Grant a Bardic Inspiration die (d${bardicInspirationTargetModal.dieSize}) to the target. The creature can roll it on one ability check.`}
+                    showHp={false}
+                    onTargetSelected={handleBardicInspirationConfirm}
+                    onSkip={() => handleBardicInspirationConfirm(null)}
                 />
             )}
         </>

@@ -69,6 +69,7 @@ export default function useCharActionModals({
     const [coronaEnemySelectionModal, setCoronaEnemySelectionModal] = useState(null);
     const [radianceOfDawnModal, setRadianceOfDawnModal] = useState(null);
     const [tricksterBlessingModal, setTricksterBlessingModal] = useState(null);
+    const [bardicInspirationTargetModal, setBardicInspirationTargetModal] = useState(null);
     const [secondaryTargetModal, setSecondaryTargetModal] = useState(null);
     const [invokeDuplicityModal, setInvokeDuplicityModal] = useState(null);
     const [stealthAttackModal, setStealthAttackModal] = useState(null);
@@ -188,6 +189,7 @@ export default function useCharActionModals({
         coronaEnemySelectionModal, setCoronaEnemySelectionModal,
         radianceOfDawnModal, setRadianceOfDawnModal,
         tricksterBlessingModal, setTricksterBlessingModal,
+        bardicInspirationTargetModal, setBardicInspirationTargetModal,
         secondaryTargetModal, setSecondaryTargetModal,
         invokeDuplicityModal, setInvokeDuplicityModal,
         stealthAttackModal, setStealthAttackModal,

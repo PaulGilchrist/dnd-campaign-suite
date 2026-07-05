@@ -19,7 +19,6 @@ describe('featureCategories5e', () => {
     it('should contain key class feature categories to ignore', () => {
       const expectedItems = [
         'Ability Score Improvement',
-        'Bardic Inspiration',
         'Channel Divinity',
         'Divine Domain',
         'Extra Attack',

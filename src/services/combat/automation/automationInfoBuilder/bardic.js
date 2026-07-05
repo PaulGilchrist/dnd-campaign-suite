@@ -7,7 +7,7 @@ export const bardicHandlers = {
             ? evaluateAutoExpression(auto.uses_expression, playerStats)
             : 0
         const classLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level);
-        const dieSize = classLevel?.bardic_die || 6;
+        const dieSize = classLevel?.bardic_die || classLevel?.class_specific?.bardic_inspiration_die || 6;
         return {
             type: 'bardic_inspiration',
             name: feature.name,

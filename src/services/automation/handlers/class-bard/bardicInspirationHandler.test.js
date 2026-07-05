@@ -1,12 +1,6 @@
-// @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ── Mocks ──────────────────────────────────────────────────────────
-
-vi.mock('../../common/targetResolver.js', () => ({
-  resolveTarget: vi.fn(),
-  resolveMapPositions: vi.fn(),
-}));
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(),
@@ -21,25 +15,27 @@ vi.mock('../../../combat/automation/automationService.js', () => ({
   evaluateAutoExpression: vi.fn(),
 }));
 
-vi.mock('../../../rules/combat/rangeValidation.js', () => ({
-  getDistanceFeet: vi.fn(),
-  rangeToFeet: vi.fn(),
+vi.mock('../../../rules/combat/damageUtils.js', () => ({
+  getCombatContext: vi.fn(),
+}));
+
+vi.mock('../../../shared/logPoster.js', () => ({
+  postLogEntry: vi.fn(),
 }));
 
 // ── Imports ────────────────────────────────────────────────────────
 
-import { handle } from './bardicInspirationHandler.js';
+import { handle, applyBardicInspiration } from './bardicInspirationHandler.js';
 
-import * as targetResolver from '../../common/targetResolver.js';
 import * as useRuntimeState from '../../../../hooks/runtime/useRuntimeState.js';
 import * as expirations from '../../../rules/effects/expirations.js';
 import * as automationService from '../../../combat/automation/automationService.js';
-import * as rangeValidation from '../../../rules/combat/rangeValidation.js';
+import { getCombatContext } from '../../../rules/combat/damageUtils.js';
+import { postLogEntry } from '../../../shared/logPoster.js';
 
 // ── Helpers ────────────────────────────────────────────────────────
 
 const campaignName = 'TestCampaign';
-const mapName = 'TestMap';
 
 function makePlayerStats(overrides = {}) {
   return {
@@ -61,7 +57,11 @@ function makeAction(overrides = {}) {
   };
 }
 
-// ── Tests ──────────────────────────────────────────────────────────
+function makeCombatSummary(creatures = []) {
+  return { creatures };
+}
+
+// ── handle() Tests ─────────────────────────────────────────────────
 
 describe('bardicInspirationHandler.handle', () => {
   let action;
@@ -74,24 +74,17 @@ describe('bardicInspirationHandler.handle', () => {
     playerStats = makePlayerStats();
 
     automationService.evaluateAutoExpression.mockReturnValue(4);
-    useRuntimeState.getRuntimeValue.mockReturnValue(0);
-    targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Ally' } });
-    rangeValidation.rangeToFeet.mockReturnValue(60);
-    targetResolver.resolveMapPositions.mockResolvedValue({
-      attackerPos: { x: 0, y: 0 },
-      targetPos: { x: 10, y: 10 },
-    });
-    rangeValidation.getDistanceFeet.mockReturnValue(14);
+    useRuntimeState.getRuntimeValue.mockReturnValue(3);
+    getCombatContext.mockResolvedValue(makeCombatSummary([
+      { name: 'Fighter', currentHp: 20, maxHp: 30, size: 'Medium', type: 'humanoid' },
+    ]));
   });
-
-  // ── Uses exhaustion ────────────────────────────────────────────
 
   describe('uses exhaustion', () => {
     it('returns info popup when uses are exhausted', async () => {
-      automationService.evaluateAutoExpression.mockReturnValue(2);
       useRuntimeState.getRuntimeValue.mockReturnValue(0);
 
-      const result = await handle(action, playerStats, campaignName, mapName);
+      const result = await handle(action, playerStats, campaignName);
 
       expect(result).toEqual({
         type: 'popup',
@@ -103,19 +96,147 @@ describe('bardicInspirationHandler.handle', () => {
         },
       });
       expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
-      expect(targetResolver.resolveTarget).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('no combat context', () => {
+    it('returns info popup when getCombatContext returns null', async () => {
+      getCombatContext.mockResolvedValue(null);
+
+      const result = await handle(action, playerStats, campaignName);
+
+      expect(result.type).toBe('popup');
+      expect(result.payload.description).toContain('requires a target');
     });
 
-    it('decrements uses and proceeds when uses are available', async () => {
-      automationService.evaluateAutoExpression.mockReturnValue(2);
-      useRuntimeState.getRuntimeValue.mockReturnValue(1);
+    it('returns info popup when combat context has no creatures', async () => {
+      getCombatContext.mockResolvedValue(makeCombatSummary([]));
 
-      await handle(action, playerStats, campaignName, mapName);
+      const result = await handle(action, playerStats, campaignName);
+
+      expect(result.type).toBe('popup');
+      expect(result.payload.description).toContain('requires a target');
+    });
+  });
+
+  describe('no valid targets', () => {
+    it('returns info popup when only the caster is in combat', async () => {
+      getCombatContext.mockResolvedValue(makeCombatSummary([
+        { name: 'Bard', currentHp: 30, maxHp: 30, size: 'Medium', type: 'humanoid' },
+      ]));
+
+      const result = await handle(action, playerStats, campaignName);
+
+      expect(result.type).toBe('popup');
+      expect(result.payload.description).toContain('No valid targets');
+    });
+  });
+
+  describe('successful modal return', () => {
+    it('returns a modal with creatureTargets filtered to exclude self', async () => {
+      getCombatContext.mockResolvedValue(makeCombatSummary([
+        { name: 'Bard', currentHp: 30, maxHp: 30, size: 'Medium', type: 'humanoid' },
+        { name: 'Fighter', currentHp: 20, maxHp: 30, size: 'Medium', type: 'humanoid' },
+        { name: 'Wizard', currentHp: 15, maxHp: 20, size: 'Small', type: 'humanoid' },
+      ]));
+
+      const result = await handle(action, playerStats, campaignName);
+
+      expect(result.type).toBe('modal');
+      expect(result.modalName).toBe('bardicInspirationTarget');
+      expect(result.payload.creatureTargets).toEqual([
+        { name: 'Fighter', currentHp: 20, maxHp: 30, size: 'Medium', type: 'humanoid' },
+        { name: 'Wizard', currentHp: 15, maxHp: 20, size: 'Small', type: 'humanoid' },
+      ]);
+      expect(result.payload.dieSize).toBe(8);
+      expect(result.payload.hasCombatOptions).toBe(false);
+      expect(result.payload.campaignName).toBe(campaignName);
+      expect(result.payload.action).toEqual(action);
+      expect(result.payload.playerStats).toEqual(playerStats);
+    });
+
+    it('includes the action and playerStats in the modal payload', async () => {
+      const result = await handle(action, playerStats, campaignName);
+
+      expect(result.payload.action).toBe(action);
+      expect(result.payload.playerStats).toBe(playerStats);
+    });
+  });
+
+  describe('die size in modal payload', () => {
+    it('uses the bardic_die from class_levels matching the player level', async () => {
+      const result = await handle(action, playerStats, campaignName);
+
+      expect(result.payload.dieSize).toBe(8);
+    });
+
+    it('falls back to die size 6 when class data has no matching level', async () => {
+      playerStats.class = { class_levels: [{ level: 1, bardic_die: 4 }] };
+
+      const result = await handle(action, playerStats, campaignName);
+
+      expect(result.payload.dieSize).toBe(6);
+    });
+
+    it('falls back to die size 6 when class_levels is missing', async () => {
+      playerStats.class = {};
+
+      const result = await handle(action, playerStats, campaignName);
+
+      expect(result.payload.dieSize).toBe(6);
+    });
+  });
+
+  describe('combat options in modal payload', () => {
+    it('sets hasCombatOptions true when passive is present', async () => {
+      playerStats.automation.passives = [{ effect: 'bardic_inspiration_combat_options' }];
+
+      const result = await handle(action, playerStats, campaignName);
+
+      expect(result.payload.hasCombatOptions).toBe(true);
+    });
+
+    it('sets hasCombatOptions false when passive is absent', async () => {
+      const result = await handle(action, playerStats, campaignName);
+
+      expect(result.payload.hasCombatOptions).toBe(false);
+    });
+  });
+
+  describe('uses available but not decremented by handle()', () => {
+    it('does NOT decrement uses (that happens in applyBardicInspiration)', async () => {
+      await handle(action, playerStats, campaignName);
+
+      expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
+    });
+  });
+});
+
+// ── applyBardicInspiration() Tests ─────────────────────────────────
+
+describe('bardicInspirationHandler.applyBardicInspiration', () => {
+  let action;
+  let playerStats;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+
+    action = makeAction();
+    playerStats = makePlayerStats();
+
+    automationService.evaluateAutoExpression.mockReturnValue(4);
+    useRuntimeState.getRuntimeValue.mockReturnValue(3);
+    postLogEntry.mockResolvedValue(undefined);
+  });
+
+  describe('uses decrement', () => {
+    it('decrements uses when uses_expression is present', async () => {
+      await applyBardicInspiration(action, playerStats, campaignName, 'Fighter', 8, false);
 
       expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
         'Bard',
         'bardicInspirationUses',
-        0,
+        2,
         campaignName,
       );
     });
@@ -123,7 +244,7 @@ describe('bardicInspirationHandler.handle', () => {
     it('does not decrement uses when uses_expression is absent', async () => {
       action.automation.uses_expression = undefined;
 
-      await handle(action, playerStats, campaignName, mapName);
+      await applyBardicInspiration(action, playerStats, campaignName, 'Fighter', 8, false);
 
       expect(automationService.evaluateAutoExpression).not.toHaveBeenCalled();
       expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalledWith(
@@ -135,79 +256,23 @@ describe('bardicInspirationHandler.handle', () => {
     });
   });
 
-  // ── No target ──────────────────────────────────────────────────
+  describe('runtime values', () => {
+    it('sets bardicInspirationDie on the target', async () => {
+      await applyBardicInspiration(action, playerStats, campaignName, 'Fighter', 8, false);
 
-  describe('no target', () => {
-    it('returns info popup when resolveTarget returns null or missing target', async () => {
-      useRuntimeState.getRuntimeValue.mockReturnValue(2);
-      targetResolver.resolveTarget.mockResolvedValue(null);
-
-      const result = await handle(action, playerStats, campaignName, mapName);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.description).toContain('requires a target');
-
-      targetResolver.resolveTarget.mockResolvedValue({});
-      const result2 = await handle(action, playerStats, campaignName, mapName);
-
-      expect(result2.type).toBe('popup');
-      expect(result2.payload.description).toContain('requires a target');
-    });
-  });
-
-  // ── Range validation ───────────────────────────────────────────
-
-  describe('range validation', () => {
-    it('returns info popup when target is out of range', async () => {
-      useRuntimeState.getRuntimeValue.mockReturnValue(2);
-      rangeValidation.rangeToFeet.mockReturnValue(60);
-      rangeValidation.getDistanceFeet.mockReturnValue(100);
-
-      const result = await handle(action, playerStats, campaignName, mapName);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.description).toContain('is out of range');
-      expect(result.payload.description).toContain('100 ft');
-      expect(result.payload.description).toContain('60 ft');
-    });
-
-    it('skips range check when mapName is null, positions are missing, or incomplete', async () => {
-      useRuntimeState.getRuntimeValue.mockReturnValue(2);
-      rangeValidation.getDistanceFeet.mockReturnValue(1000);
-
-      let result = await handle(action, playerStats, campaignName, null);
-      expect(result.type).toBe('popup');
-      expect(result.payload.description).toContain('granted to Ally');
-      expect(rangeValidation.getDistanceFeet).not.toHaveBeenCalled();
-
-      targetResolver.resolveMapPositions.mockResolvedValue(null);
-      result = await handle(action, playerStats, campaignName, mapName);
-      expect(result.type).toBe('popup');
-      expect(result.payload.description).toContain('granted to Ally');
-
-      targetResolver.resolveMapPositions.mockResolvedValue({ attackerPos: { x: 0, y: 0 } });
-      result = await handle(action, playerStats, campaignName, mapName);
-      expect(result.type).toBe('popup');
-      expect(result.payload.description).toContain('granted to Ally');
-    });
-
-    it('allows the action when target is within range', async () => {
-      useRuntimeState.getRuntimeValue.mockReturnValue(2);
-      rangeValidation.rangeToFeet.mockReturnValue(60);
-      rangeValidation.getDistanceFeet.mockReturnValue(14);
-
-      const result = await handle(action, playerStats, campaignName, mapName);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.description).toContain('granted to Ally');
       expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-        'Ally',
+        'Fighter',
         'bardicInspirationDie',
         '8',
         campaignName,
       );
+    });
+
+    it('sets bardicInspirationGrantedBy on the target', async () => {
+      await applyBardicInspiration(action, playerStats, campaignName, 'Rogue', 6, false);
+
       expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-        'Ally',
+        'Rogue',
         'bardicInspirationGrantedBy',
         'Bard',
         campaignName,
@@ -215,79 +280,40 @@ describe('bardicInspirationHandler.handle', () => {
     });
   });
 
-  // ── Die size ───────────────────────────────────────────────────
-
-  describe('die size', () => {
-    it('uses the bardic_die from class_levels matching the player level', async () => {
-      useRuntimeState.getRuntimeValue.mockReturnValue(2);
-
-      await handle(action, playerStats, campaignName, mapName);
-
-      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-        'Ally',
-        'bardicInspirationDie',
-        '8',
-        campaignName,
-      );
-    });
-
-    it('falls back to die size 6 when class data is missing or no matching level', async () => {
-      useRuntimeState.getRuntimeValue.mockReturnValue(2);
-      playerStats.class = { class_levels: [{ level: 1, bardic_die: 4 }] };
-
-      await handle(action, playerStats, campaignName, mapName);
-
-      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-        'Ally',
-        'bardicInspirationDie',
-        '6',
-        campaignName,
-      );
-    });
-  });
-
-  // ── Combat options ─────────────────────────────────────────────
-
   describe('combat options', () => {
-    it('sets combat options when passive is present and options are specified', async () => {
-      useRuntimeState.getRuntimeValue.mockReturnValue(2);
-      playerStats.automation.passives = [{ effect: 'bardic_inspiration_combat_options' }];
+    it('sets combat options when hasCombatOptions and options are specified', async () => {
       action.automation.options = ['custom_option'];
 
-      await handle(action, playerStats, campaignName, mapName);
+      await applyBardicInspiration(action, playerStats, campaignName, 'Fighter', 8, true);
 
       expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-        'Ally',
+        'Fighter',
         'bardicInspirationCombatOptions',
         JSON.stringify(['custom_option']),
         campaignName,
       );
     });
 
-    it('sets default combat options when passive is present but no options specified', async () => {
-      useRuntimeState.getRuntimeValue.mockReturnValue(2);
-      playerStats.automation.passives = [{ effect: 'bardic_inspiration_combat_options' }];
+    it('sets default combat options when hasCombatOptions but no options specified', async () => {
       delete action.automation.options;
 
-      await handle(action, playerStats, campaignName, mapName);
+      await applyBardicInspiration(action, playerStats, campaignName, 'Fighter', 8, true);
 
       expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-        'Ally',
+        'Fighter',
         'bardicInspirationCombatOptions',
         JSON.stringify(['defense_add_to_ac', 'offense_add_to_damage']),
         campaignName,
       );
     });
 
-    it('does not set combat options when passive is absent', async () => {
-      useRuntimeState.getRuntimeValue.mockReturnValue(2);
-      playerStats.automation.passives = [];
+    it('does not set combat options when hasCombatOptions is false', async () => {
       action.automation.options = ['some_option'];
 
-      await handle(action, playerStats, campaignName, mapName);
+      await applyBardicInspiration(action, playerStats, campaignName, 'Fighter', 8, false);
 
       expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalledWith(
-        'Ally',
+        'Fighter',
         'bardicInspirationCombatOptions',
         expect.any(String),
         campaignName,
@@ -295,17 +321,13 @@ describe('bardicInspirationHandler.handle', () => {
     });
   });
 
-  // ── Expiration ─────────────────────────────────────────────────
-
   describe('expiration', () => {
     it('creates an expiration for the granted inspiration', async () => {
-      useRuntimeState.getRuntimeValue.mockReturnValue(2);
-
-      await handle(action, playerStats, campaignName, mapName);
+      await applyBardicInspiration(action, playerStats, campaignName, 'Fighter', 8, false);
 
       expect(expirations.addExpiration).toHaveBeenCalledWith(
         'Bard',
-        'Ally',
+        'Fighter',
         [{ type: 'remove_bardic_inspiration' }],
         campaignName,
         100,
@@ -313,46 +335,37 @@ describe('bardicInspirationHandler.handle', () => {
     });
   });
 
-  // ── Return value ───────────────────────────────────────────────
+  describe('log entry', () => {
+    it('posts a log entry with the die size and target name', async () => {
+      await applyBardicInspiration(action, playerStats, campaignName, 'Fighter', 8, false);
+
+      expect(postLogEntry).toHaveBeenCalledWith(campaignName, {
+        type: 'ability_use',
+        characterName: 'Bard',
+        abilityName: 'Bardic Inspiration',
+        description: 'Bard granted Bardic Inspiration (d8) to Fighter.',
+      });
+    });
+  });
 
   describe('return value', () => {
     it('returns a popup with the correct die size in the description', async () => {
-      useRuntimeState.getRuntimeValue.mockReturnValue(2);
-
-      const result = await handle(action, playerStats, campaignName, mapName);
+      const result = await applyBardicInspiration(action, playerStats, campaignName, 'Fighter', 8, false);
 
       expect(result.type).toBe('popup');
       expect(result.payload.type).toBe('automation_info');
       expect(result.payload.name).toBe(action.name);
       expect(result.payload.description).toContain('d8');
-      expect(result.payload.description).toContain('granted to Ally');
+      expect(result.payload.description).toContain('granted to Fighter');
       expect(result.payload.description).toContain('one ability check');
       expect(result.payload.automation).toEqual(action.automation);
     });
 
-    it('uses the target name from resolveTarget in the description', async () => {
-      useRuntimeState.getRuntimeValue.mockReturnValue(2);
-      targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Rogue' } });
+    it('uses the provided die size in the popup description', async () => {
+      const result = await applyBardicInspiration(action, playerStats, campaignName, 'Rogue', 6, false);
 
-      const result = await handle(action, playerStats, campaignName, mapName);
-
+      expect(result.payload.description).toContain('d6');
       expect(result.payload.description).toContain('granted to Rogue');
-    });
-
-    it('uses custom action name in all popup payloads', async () => {
-      useRuntimeState.getRuntimeValue.mockReturnValue(2);
-      targetResolver.resolveTarget.mockResolvedValue(null);
-      const customName = 'Musical Encouragement';
-
-      const result = await handle(
-        { ...action, name: customName },
-        playerStats,
-        campaignName,
-        mapName,
-      );
-
-      expect(result.payload.name).toBe(customName);
-      expect(result.payload.description).toContain('requires a target');
     });
   });
 });

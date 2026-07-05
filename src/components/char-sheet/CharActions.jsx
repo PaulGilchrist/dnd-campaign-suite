@@ -35,6 +35,7 @@ import { executeSweepingAttack, executeBaitAndSwitchChoice, executeCommanderStri
 import { activateBulwarkOfForce } from '../../services/automation/handlers/class-sorcerer/bulwarkOfForceHandler.js';
 import { activateCoronaOfLight } from '../../services/automation/handlers/class-cleric-paladin/coronaOfLightHandler.js';
 import { confirmRadianceOfDawn } from '../../services/automation/handlers/class-cleric-paladin/radianceOfDawnHandler.js';
+import { applyBardicInspiration } from '../../services/automation/handlers/class-bard/bardicInspirationHandler.js';
 import { endFriendsOnHostileAction } from '../../services/rules/features/friendsService.js';
 import { endInvisibilityOnHostileAction } from '../../services/rules/features/invisibilityService.js';
 import { applyDamageToTarget } from '../../services/rules/combat/applyDamage.js';
@@ -741,6 +742,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         coronaEnemySelectionModal, setCoronaEnemySelectionModal,
         radianceOfDawnModal, setRadianceOfDawnModal,
         tricksterBlessingModal, setTricksterBlessingModal,
+        bardicInspirationTargetModal, setBardicInspirationTargetModal,
         secondaryTargetModal, setSecondaryTargetModal,
         handleAttackRiderManeuverUse,
         handleAttackRiderManeuverSkip,
@@ -1155,6 +1157,18 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         setTricksterBlessingModal(null);
     }, [setPopupHtml, tricksterBlessingModal, setTricksterBlessingModal]);
 
+    const handleBardicInspirationConfirm = React.useCallback(async (targetName) => {
+        if (!bardicInspirationTargetModal) return;
+        const { action, playerStats: biPlayerStats, campaignName: biCampaignName, dieSize, hasCombatOptions } = bardicInspirationTargetModal;
+        setBardicInspirationTargetModal(null);
+        if (!targetName) return;
+        const result = await applyBardicInspiration(action, biPlayerStats, biCampaignName, targetName, dieSize, hasCombatOptions);
+        if (!result) return;
+        if (result.type === 'popup') {
+            setPopupHtml(result.payload);
+        }
+    }, [bardicInspirationTargetModal, setBardicInspirationTargetModal, setPopupHtml]);
+
     async function handleAutomationAction(action) {
         if (cannotAct) return;
 
@@ -1372,6 +1386,9 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                         break;
                     case 'tricksterBlessing':
                         setTricksterBlessingModal(result.payload);
+                        break;
+                    case 'bardicInspirationTarget':
+                        setBardicInspirationTargetModal(result.payload);
                         break;
                     case 'arcaneWardRestore':
                         setArcaneWardRestoreModal(result.payload);
@@ -1709,6 +1726,8 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     handleRadianceOfDawnConfirm={handleRadianceOfDawnConfirm}
                     tricksterBlessingModal={tricksterBlessingModal} setTricksterBlessingModal={setTricksterBlessingModal}
                     handleTricksterBlessingConfirm={handleTricksterBlessingConfirm}
+                    bardicInspirationTargetModal={bardicInspirationTargetModal}
+                    handleBardicInspirationConfirm={handleBardicInspirationConfirm}
                     handleCombatSuperiorityConfirm={handleCombatSuperiorityConfirm}
                     handleAttackRiderManeuverUse={handleAttackRiderManeuverUse}
                     handleAttackRiderManeuverSkip={handleAttackRiderManeuverSkip}
