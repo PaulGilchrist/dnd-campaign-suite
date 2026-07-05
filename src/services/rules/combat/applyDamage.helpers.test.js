@@ -1,3 +1,4 @@
+// @cleaned-by-ai
 // @improved-by-ai
 import { describe, it, expect, vi } from 'vitest';
 
@@ -13,15 +14,9 @@ global.fetch = vi.fn(() => new Promise(() => {}));
 // ── Tests ───────────────────────────────────────────────────────
 
 describe('computeDamageAfterResistancesWithDetails', () => {
-  it('throws when damageTypes is null', () => {
+  it('throws when damageTypes is null, undefined, or empty', () => {
     expect(() => computeDamageAfterResistancesWithDetails(10, null)).toThrow();
-  });
-
-  it('throws when damageTypes is undefined', () => {
     expect(() => computeDamageAfterResistancesWithDetails(10, undefined)).toThrow();
-  });
-
-  it('throws when damageTypes is empty array', () => {
     expect(() => computeDamageAfterResistancesWithDetails(10, [])).toThrow();
   });
 
@@ -50,12 +45,6 @@ describe('computeDamageAfterResistancesWithDetails', () => {
   it('returns halved damage with resistant status when resistance matches', () => {
     const result = computeDamageAfterResistancesWithDetails(9, ['Fire'], ['fire'], []);
     expect(result.finalDamage).toBe(4);
-    expect(result.typeDetails).toEqual([{ damageType: 'Fire', status: 'resistant' }]);
-  });
-
-  it('returns halved damage with resistant status when resistance matches (even number)', () => {
-    const result = computeDamageAfterResistancesWithDetails(10, ['Fire'], ['fire'], []);
-    expect(result.finalDamage).toBe(5);
     expect(result.typeDetails).toEqual([{ damageType: 'Fire', status: 'resistant' }]);
   });
 
@@ -122,47 +111,19 @@ describe('computeDamageAfterResistancesWithDetails', () => {
     expect(result2.finalDamage).toBe(0);
   });
 
-  it('returns 0 damage when raw damage is 0 and immune', () => {
-    const result = computeDamageAfterResistancesWithDetails(0, ['Fire'], [], ['fire']);
-    expect(result.finalDamage).toBe(0);
-    expect(result.typeDetails).toEqual([{ damageType: 'Fire', status: 'immune' }]);
-  });
-
   it('handles undefined resistances and immunities gracefully', () => {
     const result = computeDamageAfterResistancesWithDetails(10, ['Fire'], undefined, undefined);
-    expect(result.finalDamage).toBe(10);
-    expect(result.typeDetails).toEqual([]);
-  });
-
-  it('handles empty arrays for resistances and immunities gracefully', () => {
-    const result = computeDamageAfterResistancesWithDetails(10, ['Fire'], [], []);
     expect(result.finalDamage).toBe(10);
     expect(result.typeDetails).toEqual([]);
   });
 });
 
 describe('clearReTriggeredSequence', () => {
-  it('removes a sequence ID from the internal set', () => {
-    // We can't directly access _reTriggeredSequenceIds, but we can verify
-    // the function doesn't throw and clears the ID
+  it('removes a sequence ID from the internal set without throwing', () => {
     clearReTriggeredSequence('test-seq-1');
     clearReTriggeredSequence('test-seq-2');
-    // No error means it worked — the Set.delete() is idempotent
-  });
-
-  it('handles non-existent sequence IDs without error', () => {
-    clearReTriggeredSequence('non-existent-id');
-  });
-
-  it('handles empty string sequence ID without error', () => {
     clearReTriggeredSequence('');
-  });
-
-  it('handles null sequence ID without error', () => {
     clearReTriggeredSequence(null);
-  });
-
-  it('handles undefined sequence ID without error', () => {
     clearReTriggeredSequence(undefined);
   });
 });

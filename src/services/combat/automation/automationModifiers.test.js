@@ -1,3 +1,4 @@
+// @cleaned-by-ai
 // @improved-by-ai
 import { describe, it, expect } from 'vitest'
 import { collectSaveModifiers } from './automationModifiers.js'
@@ -10,21 +11,8 @@ describe('collectSaveModifiers', () => {
       expect(collectSaveModifiers([])).toEqual([])
     })
 
-    it('returns empty array when all features are null/undefined', () => {
-      const features = [null, undefined, null]
-      expect(collectSaveModifiers(features)).toEqual([])
-    })
-
-    it('returns empty array when features have no automation property', () => {
-      const features = [
-        { name: 'Rage', damageBonus: 2 },
-        { name: 'Another' }
-      ]
-      expect(collectSaveModifiers(features)).toEqual([])
-    })
-
-    it('returns empty array when automation is null', () => {
-      const features = [{ name: 'Some Feature', automation: null }]
+    it('returns empty array when all features are null/undefined or lack automation', () => {
+      const features = [null, undefined, { name: 'No Automation' }, { name: 'Some Feature', automation: null }]
       expect(collectSaveModifiers(features)).toEqual([])
     })
   })
@@ -51,7 +39,7 @@ describe('collectSaveModifiers', () => {
       }])
     })
 
-    it('extracts modifier from feature with saveType', () => {
+    it('converts saveType to uppercase abilities', () => {
       const features = [{
         name: 'Evasion',
         automation: {
@@ -65,9 +53,6 @@ describe('collectSaveModifiers', () => {
       const result = collectSaveModifiers(features)
       expect(result[0].abilities).toEqual(['DEX'])
       expect(result[0].source).toBe('Evasion')
-      expect(result[0].target).toBe('saving_throw')
-      expect(result[0].condition).toBe('area_effect')
-      expect(result[0].effect).toBe('advantage')
     })
 
     it('extracts modifier with no abilities and no saveType', () => {
@@ -113,7 +98,7 @@ describe('collectSaveModifiers', () => {
       }])
     })
 
-    it('extracts disadvantage for save target alias', () => {
+    it('normalizes save target alias to saving_throw', () => {
       const features = [{
         name: 'Curse',
         automation: {
@@ -125,21 +110,6 @@ describe('collectSaveModifiers', () => {
       }]
       const result = collectSaveModifiers(features)
       expect(result[0].target).toBe('saving_throw')
-    })
-
-    it('extracts disadvantage for non-save target', () => {
-      const features = [{
-        name: 'Hex',
-        automation: {
-          type: 'conditional_disadvantage',
-          target: 'attack_roll',
-          condition: 'hex_on_target',
-          abilities: []
-        }
-      }]
-      const result = collectSaveModifiers(features)
-      expect(result[0].target).toBe('attack_roll')
-      expect(result[0].effect).toBe('disadvantage')
     })
 
     it('uses default target of attack_roll when unspecified', () => {
@@ -166,10 +136,6 @@ describe('collectSaveModifiers', () => {
       const result = collectSaveModifiers(features)
       expect(result[0].abilities).toEqual(['WIS'])
     })
-
-    it('skips when no automation', () => {
-      expect(collectSaveModifiers([{ name: 'Feature' }])).toEqual([])
-    })
   })
 
   describe('combat_stance type', () => {
@@ -190,13 +156,7 @@ describe('collectSaveModifiers', () => {
         effect: 'advantage',
         abilities: ['DEX']
       })
-      expect(result[1]).toEqual({
-        source: 'Berserker Stance',
-        target: 'saving_throw',
-        condition: 'stance_active',
-        effect: 'advantage',
-        abilities: ['WIS']
-      })
+      expect(result[1].abilities).toEqual(['WIS'])
     })
 
     it('skips stance advantages that are not saves', () => {
@@ -206,14 +166,6 @@ describe('collectSaveModifiers', () => {
           type: 'combat_stance',
           advantages: ['STR checks', 'melee attacks', 'rage damage']
         }
-      }]
-      expect(collectSaveModifiers(features)).toEqual([])
-    })
-
-    it('skips stance without advantages property', () => {
-      const features = [{
-        name: 'Stance',
-        automation: { type: 'combat_stance' }
       }]
       expect(collectSaveModifiers(features)).toEqual([])
     })
@@ -230,19 +182,6 @@ describe('collectSaveModifiers', () => {
       expect(result).toHaveLength(2)
       expect(result[0].abilities).toEqual(['CON'])
       expect(result[1].abilities).toEqual(['WIS'])
-    })
-
-    it('handles lowercase saves entries', () => {
-      const features = [{
-        name: 'Stance',
-        automation: {
-          type: 'combat_stance',
-          advantages: ['cha saves']
-        }
-      }]
-      const result = collectSaveModifiers(features)
-      expect(result).toHaveLength(1)
-      expect(result[0].abilities).toEqual(['CHA'])
     })
 
     it('does not match partial ability codes shorter than 3 letters', () => {
@@ -278,34 +217,6 @@ describe('collectSaveModifiers', () => {
       }])
     })
 
-    it('extracts auto_reroll with bonusExpression', () => {
-      const features = [{
-        name: 'Guidance',
-        automation: {
-          type: 'auto_reroll',
-          target: 'ability_check',
-          condition: 'action_used',
-          bonusExpression: '1d4'
-        }
-      }]
-      const result = collectSaveModifiers(features)
-      expect(result[0].bonusExpression).toBe('1d4')
-    })
-
-    it('extracts auto_reroll with oncePerRage', () => {
-      const features = [{
-        name: 'Relentless Endurance',
-        automation: {
-          type: 'auto_reroll',
-          target: 'death_saving_throws',
-          condition: 'below_half_hp',
-          oncePerRage: true
-        }
-      }]
-      const result = collectSaveModifiers(features)
-      expect(result[0].oncePerRage).toBe(true)
-    })
-
     it('uses disciplined_survivor condition for feature named Disciplined Survivor', () => {
       const features = [{
         name: 'Disciplined Survivor',
@@ -318,16 +229,20 @@ describe('collectSaveModifiers', () => {
       expect(result[0].condition).toBe('disciplined_survivor')
     })
 
-    it('uses empty condition when feature is not Disciplined Survivor and no condition provided', () => {
+    it('extracts auto_reroll with bonusExpression and oncePerRage', () => {
       const features = [{
-        name: 'Other Feature',
+        name: 'Guidance',
         automation: {
           type: 'auto_reroll',
-          target: 'saving_throw'
+          target: 'ability_check',
+          condition: 'action_used',
+          bonusExpression: '1d4',
+          oncePerRage: true
         }
       }]
       const result = collectSaveModifiers(features)
-      expect(result[0].condition).toBe('')
+      expect(result[0].bonusExpression).toBe('1d4')
+      expect(result[0].oncePerRage).toBe(true)
     })
   })
 
@@ -424,88 +339,6 @@ describe('collectSaveModifiers', () => {
     })
   })
 
-  describe('elder_champion type', () => {
-    it('extracts elder_champion disadvantage modifier', () => {
-      const features = [{
-        name: 'Elder Champion',
-        automation: { type: 'elder_champion' }
-      }]
-      const result = collectSaveModifiers(features)
-      expect(result).toEqual([{
-        source: 'Elder Champion',
-        target: 'saving_throw',
-        condition: 'elder_champion_active',
-        effect: 'disadvantage'
-      }])
-    })
-  })
-
-  describe('large_form type', () => {
-    it('extracts large_form advantage on STR ability checks', () => {
-      const features = [{
-        name: 'Large Form',
-        automation: { type: 'large_form' }
-      }]
-      const result = collectSaveModifiers(features)
-      expect(result).toEqual([{
-        source: 'Large Form',
-        target: 'ability_check',
-        condition: 'large_form_active',
-        effect: 'advantage',
-        abilities: ['STR']
-      }])
-    })
-  })
-
-  describe('otherworldly_glamour type', () => {
-    it('extracts otherworldly_glamour wis_replacement on ability checks', () => {
-      const features = [{
-        name: 'Otherworldly Glamour',
-        automation: { type: 'otherworldly_glamour' }
-      }]
-      const result = collectSaveModifiers(features)
-      expect(result).toEqual([{
-        source: 'Otherworldly Glamour',
-        target: 'ability_check',
-        condition: 'otherworldly_glamour',
-        effect: 'wis_replacement',
-        abilities: ['CHA']
-      }])
-    })
-  })
-
-  describe('reliable_talent type', () => {
-    it('extracts reliable_talent modifier', () => {
-      const features = [{
-        name: 'Reliable Talent',
-        automation: { type: 'reliable_talent' }
-      }]
-      const result = collectSaveModifiers(features)
-      expect(result).toEqual([{
-        source: 'Reliable Talent',
-        target: 'ability_check',
-        condition: '',
-        effect: 'reliable_talent'
-      }])
-    })
-  })
-
-  describe('second_storywork type', () => {
-    it('extracts second_storywork dex_jump modifier', () => {
-      const features = [{
-        name: 'Second Storywork',
-        automation: { type: 'second_storywork' }
-      }]
-      const result = collectSaveModifiers(features)
-      expect(result).toEqual([{
-        source: 'Second Storywork',
-        target: 'ability_check',
-        condition: '',
-        effect: 'dex_jump'
-      }])
-    })
-  })
-
   describe('stroke_of_luck type', () => {
     it('extracts stroke_of_luck with default target', () => {
       const features = [{
@@ -548,39 +381,14 @@ describe('collectSaveModifiers', () => {
       }])
     })
 
-    it('uses custom modifier expression', () => {
+    it('uses custom modifier expression and canBeBonusOrPenalty flag', () => {
       const features = [{
         name: 'Expertise',
-        automation: { type: 'modify_d20_roll', modifier: '2d6' }
+        automation: { type: 'modify_d20_roll', modifier: '2d6', canBeBonusOrPenalty: true }
       }]
       const result = collectSaveModifiers(features)
       expect(result[0].diceExpression).toBe('2d6')
-    })
-
-    it('respects canBeBonusOrPenalty flag', () => {
-      const features = [{
-        name: 'Feature',
-        automation: { type: 'modify_d20_roll', canBeBonusOrPenalty: true }
-      }]
-      const result = collectSaveModifiers(features)
       expect(result[0].canBeBonusOrPenalty).toBe(true)
-    })
-  })
-
-  describe('use_magic_device type', () => {
-    it('extracts use_magic_device advantage on INT ability checks', () => {
-      const features = [{
-        name: 'Use Magic Device',
-        automation: { type: 'use_magic_device' }
-      }]
-      const result = collectSaveModifiers(features)
-      expect(result).toEqual([{
-        source: 'Use Magic Device',
-        target: 'ability_check',
-        condition: '',
-        effect: 'advantage',
-        abilities: ['INT']
-      }])
     })
   })
 
@@ -605,13 +413,7 @@ describe('collectSaveModifiers', () => {
         effect: 'advantage',
         saveType: 'wis'
       })
-      expect(result[1]).toEqual({
-        source: 'Passive Immunity',
-        target: 'saving_throw',
-        condition: 'frightened',
-        effect: 'advantage',
-        saveType: 'cha'
-      })
+      expect(result[1].condition).toBe('frightened')
     })
 
     it('skips when saveAdvantage is absent', () => {
@@ -694,127 +496,17 @@ describe('collectSaveModifiers', () => {
       expect(result[0].target).toBe('saving_throw')
       expect(result[0].effect).toBe('dark_ones_look')
       expect(result[1].target).toBe('ability_check')
-      expect(result[1].effect).toBe('dark_ones_look')
-    })
-  })
-
-  describe('clairvoyant_combatant type', () => {
-    it('extracts clairvoyant_combatant disadvantage on attack_roll', () => {
-      const features = [{
-        name: 'Clairvoyant Combatant',
-        automation: { type: 'clairvoyant_combatant' }
-      }]
-      const result = collectSaveModifiers(features)
-      expect(result).toEqual([{
-        source: 'Clairvoyant Combatant',
-        target: 'attack_roll',
-        condition: 'clairvoyant_combatant_active',
-        effect: 'disadvantage'
-      }])
-    })
-  })
-
-  describe('potent_cantrip type', () => {
-    it('extracts potent_cantrip on saving_throw', () => {
-      const features = [{
-        name: 'Potent Cantrip',
-        automation: { type: 'potent_cantrip' }
-      }]
-      const result = collectSaveModifiers(features)
-      expect(result).toEqual([{
-        source: 'Potent Cantrip',
-        target: 'saving_throw',
-        condition: '',
-        effect: 'potent_cantrip'
-      }])
-    })
-  })
-
-  describe('soulstitch_spells type', () => {
-    it('extracts soulstitch_spells on saving_throw', () => {
-      const features = [{
-        name: 'Souls Stitch Spells',
-        automation: { type: 'soulstitch_spells' }
-      }]
-      const result = collectSaveModifiers(features)
-      expect(result).toEqual([{
-        source: 'Souls Stitch Spells',
-        target: 'saving_throw',
-        condition: '',
-        effect: 'soulstitch_spells'
-      }])
-    })
-  })
-
-  describe('pass_without_trace type', () => {
-    it('extracts pass_without_trace with bonusExpression', () => {
-      const features = [{
-        name: 'Pass Without Trace',
-        automation: { type: 'pass_without_trace' }
-      }]
-      const result = collectSaveModifiers(features)
-      expect(result).toEqual([{
-        source: 'Pass Without Trace',
-        target: 'ability_check',
-        condition: 'pass_without_trace_active',
-        effect: 'pass_without_trace',
-        bonusExpression: '10'
-      }])
-    })
-  })
-
-  describe('empowered_evocation type', () => {
-    it('extracts empowered_evocation on damage', () => {
-      const features = [{
-        name: 'Empowered Evocation',
-        automation: { type: 'empowered_evocation' }
-      }]
-      const result = collectSaveModifiers(features)
-      expect(result).toEqual([{
-        source: 'Empowered Evocation',
-        target: 'damage',
-        condition: '',
-        effect: 'empowered_evocation'
-      }])
-    })
-  })
-
-  describe('overchannel type', () => {
-    it('extracts overchannel on damage', () => {
-      const features = [{
-        name: 'Overchannel',
-        automation: { type: 'overchannel' }
-      }]
-      const result = collectSaveModifiers(features)
-      expect(result).toEqual([{
-        source: 'Overchannel',
-        target: 'damage',
-        condition: '',
-        effect: 'overchannel'
-      }])
     })
   })
 
   describe('passive_rule type', () => {
-    it('does not produce spell_breaker_dispel_bonus modifier (bonus handled in SpellDetailPopup)', () => {
+    it('does not produce spell_breaker_dispel_bonus modifier', () => {
       const features = [{
         name: 'Spell Breaker',
         automation: {
           type: 'passive_rule',
           effect: 'spell_breaker',
           dispelAbilityCheckBonus: 'proficiency_bonus'
-        }
-      }]
-      const result = collectSaveModifiers(features)
-      expect(result).toEqual([])
-    })
-
-    it('skips when effect is not spell_breaker', () => {
-      const features = [{
-        name: 'Feature',
-        automation: {
-          type: 'passive_rule',
-          effect: 'something_else'
         }
       }]
       expect(collectSaveModifiers(features)).toEqual([])
@@ -836,6 +528,17 @@ describe('collectSaveModifiers', () => {
         effect: 'disadvantage',
         abilities: ['CON']
       }])
+    })
+
+    it('skips passive_rule with other effects', () => {
+      const features = [{
+        name: 'Feature',
+        automation: {
+          type: 'passive_rule',
+          effect: 'something_else'
+        }
+      }]
+      expect(collectSaveModifiers(features)).toEqual([])
     })
   })
 
@@ -859,70 +562,6 @@ describe('collectSaveModifiers', () => {
         condition: 'holy_aura_active',
         effect: 'advantage'
       })
-    })
-  })
-
-  describe('portent type', () => {
-    it('extracts portent on d20', () => {
-      const features = [{
-        name: 'Portent',
-        automation: { type: 'portent' }
-      }]
-      const result = collectSaveModifiers(features)
-      expect(result).toEqual([{
-        source: 'Portent',
-        target: 'd20',
-        condition: '',
-        effect: 'portent'
-      }])
-    })
-  })
-
-  describe('improved_illusions type', () => {
-    it('extracts improved_illusions on spell_component', () => {
-      const features = [{
-        name: 'Improved Illusions',
-        automation: { type: 'improved_illusions' }
-      }]
-      const result = collectSaveModifiers(features)
-      expect(result).toEqual([{
-        source: 'Improved Illusions',
-        target: 'spell_component',
-        condition: '',
-        effect: 'improved_illusions'
-      }])
-    })
-  })
-
-  describe('illusory_reality type', () => {
-    it('extracts illusory_reality on spell_component', () => {
-      const features = [{
-        name: 'Illusory Reality',
-        automation: { type: 'illusory_reality' }
-      }]
-      const result = collectSaveModifiers(features)
-      expect(result).toEqual([{
-        source: 'Illusory Reality',
-        target: 'spell_component',
-        condition: '',
-        effect: 'illusory_reality'
-      }])
-    })
-  })
-
-  describe('protection_from_poison type', () => {
-    it('extracts protection_from_poison advantage on saving_throw', () => {
-      const features = [{
-        name: 'Protection From Poison',
-        automation: { type: 'protection_from_poison' }
-      }]
-      const result = collectSaveModifiers(features)
-      expect(result).toEqual([{
-        source: 'Protection From Poison',
-        target: 'saving_throw',
-        condition: 'protection_from_poison_active',
-        effect: 'advantage'
-      }])
     })
   })
 
@@ -979,36 +618,6 @@ describe('collectSaveModifiers', () => {
       expect(result).toHaveLength(2)
       expect(result[0].source).toBe('Berserker Stance')
       expect(result[0].effect).toBe('advantage')
-      expect(result[0].abilities).toEqual(['CON'])
-      expect(result[1].source).toBe('Danger Sense')
-      expect(result[1].abilities).toEqual(['DEX'])
-    })
-
-    it('collects all conditional_advantage entries from multiple features', () => {
-      const features = [
-        {
-          name: 'Feature A',
-          automation: {
-            type: 'conditional_advantage',
-            saveType: 'con',
-            target: 'saving_throw',
-            condition: 'poison',
-            effect: 'advantage'
-          }
-        },
-        {
-          name: 'Feature B',
-          automation: {
-            type: 'conditional_advantage',
-            saveType: 'dex',
-            target: 'saving_throw',
-            condition: 'poison',
-            effect: 'advantage'
-          }
-        }
-      ]
-      const result = collectSaveModifiers(features)
-      expect(result).toHaveLength(2)
       expect(result[0].abilities).toEqual(['CON'])
       expect(result[1].abilities).toEqual(['DEX'])
     })

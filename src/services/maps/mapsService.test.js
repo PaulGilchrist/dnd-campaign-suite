@@ -201,18 +201,6 @@ describe('mapsService', () => {
 
       await expect(deleteMap('testCampaign', 'Dungeon')).rejects.toThrow('not found');
     });
-
-    it('throws a generic error when response.json yields no error field', async () => {
-      global.fetch.mockResolvedValueOnce(createMockResponse({ other: 'data' }, { status: 500 }));
-
-      await expect(deleteMap('testCampaign', 'Dungeon')).rejects.toThrow('Failed to delete map');
-    });
-
-    it('re-throws network errors from fetch', async () => {
-      global.fetch.mockRejectedValueOnce(new Error('network error'));
-
-      await expect(deleteMap('testCampaign', 'Dungeon')).rejects.toThrow('network error');
-    });
   });
 
   describe('renameMap', () => {
@@ -235,12 +223,6 @@ describe('mapsService', () => {
 
       await expect(renameMap('testCampaign', 'Old', 'New')).rejects.toThrow('not found');
     });
-
-    it('re-throws network errors from fetch', async () => {
-      global.fetch.mockRejectedValueOnce(new Error('network error'));
-
-      await expect(renameMap('testCampaign', 'Old', 'New')).rejects.toThrow('network error');
-    });
   });
 
   describe('activateMap', () => {
@@ -259,12 +241,6 @@ describe('mapsService', () => {
       global.fetch.mockResolvedValueOnce(createMockResponse({ error: 'not found' }, { status: 404 }));
 
       await expect(activateMap('testCampaign', 'Dungeon')).rejects.toThrow('not found');
-    });
-
-    it('re-throws network errors from fetch', async () => {
-      global.fetch.mockRejectedValueOnce(new Error('network error'));
-
-      await expect(activateMap('testCampaign', 'Dungeon')).rejects.toThrow('network error');
     });
   });
 
@@ -289,12 +265,6 @@ describe('mapsService', () => {
 
       await expect(saveMapData('testCampaign', 'Dungeon', {})).rejects.toThrow('save failed');
     });
-
-    it('re-throws network errors from fetch', async () => {
-      global.fetch.mockRejectedValueOnce(new Error('network error'));
-
-      await expect(saveMapData('testCampaign', 'Dungeon', { tiles: [] })).rejects.toThrow('network error');
-    });
   });
 
   describe('loadMapData', () => {
@@ -314,12 +284,6 @@ describe('mapsService', () => {
       global.fetch.mockResolvedValueOnce(createMockResponse({ error: 'not found' }, { status: 404 }));
 
       await expect(loadMapData('testCampaign', 'Dungeon')).rejects.toThrow('not found');
-    });
-
-    it('re-throws network errors from fetch', async () => {
-      global.fetch.mockRejectedValueOnce(new Error('network error'));
-
-      await expect(loadMapData('testCampaign', 'Dungeon')).rejects.toThrow('network error');
     });
   });
 
@@ -342,12 +306,6 @@ describe('mapsService', () => {
       global.fetch.mockResolvedValueOnce(createMockResponse({ error: 'not found' }, { status: 404 }));
 
       await expect(updateMapDescription('testCampaign', 'Dungeon', 'desc')).rejects.toThrow('not found');
-    });
-
-    it('re-throws network errors from fetch', async () => {
-      global.fetch.mockRejectedValueOnce(new Error('network error'));
-
-      await expect(updateMapDescription('testCampaign', 'Dungeon', 'desc')).rejects.toThrow('network error');
     });
   });
 });

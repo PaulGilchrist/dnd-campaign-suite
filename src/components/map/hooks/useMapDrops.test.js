@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { renderHook, act } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import useMapDrops from './useMapDrops.js';
@@ -35,30 +35,21 @@ describe('useMapDrops', () => {
     return result;
   };
 
-  describe('handleDrop return value', () => {
-    it('should return handleDrop function', () => {
+  describe('early returns', () => {
+    it('should not call setMapData or setPlacedItems when dragData is empty', () => {
       createMocks();
       const result = getHook();
-      expect(result.current.handleDrop).toBeDefined();
-      expect(typeof result.current.handleDrop).toBe('function');
-    });
-
-    it('should prevent default on drop event', () => {
-      createMocks();
-      const result = getHook();
-      const preventDefault = vi.fn();
       act(() => {
         result.current.handleDrop({
-          preventDefault,
+          preventDefault: vi.fn(),
           dataTransfer: { getData: () => '' },
         });
       });
-      expect(preventDefault).toHaveBeenCalled();
+      expect(setMapData).not.toHaveBeenCalled();
+      expect(setPlacedItems).not.toHaveBeenCalled();
     });
-  });
 
-  describe('early return cases', () => {
-    it('should return early when getGridFromEvent returns null', () => {
+    it('should not call setMapData or setPlacedItems when grid is null', () => {
       createMocks();
       const result = getHook();
       getGridFromEvent.mockReturnValue(null);
@@ -71,19 +62,6 @@ describe('useMapDrops', () => {
       expect(setMapData).not.toHaveBeenCalled();
       expect(setPlacedItems).not.toHaveBeenCalled();
     });
-
-    it('should return early when dragData is empty', () => {
-      createMocks();
-      const result = getHook();
-      act(() => {
-        result.current.handleDrop({
-          preventDefault: vi.fn(),
-          dataTransfer: { getData: () => '' },
-        });
-      });
-      expect(setMapData).not.toHaveBeenCalled();
-      expect(setPlacedItems).not.toHaveBeenCalled();
-    });
   });
 
   describe('character drops', () => {
@@ -91,9 +69,9 @@ describe('useMapDrops', () => {
       createMocks();
     });
 
-    it('should add a character to map players when dragData starts with character:', () => {
-      const result = getHook();
+    it('should add a character to map players', () => {
       getGridFromEvent.mockReturnValue({ gridX: 5, gridY: 3 });
+      const result = getHook();
       act(() => {
         result.current.handleDrop({
           preventDefault: vi.fn(),
@@ -104,27 +82,11 @@ describe('useMapDrops', () => {
       expect(setPlacedItems).not.toHaveBeenCalled();
     });
 
-    it('should create character entry with correct id format', () => {
-      const result = getHook();
-      getGridFromEvent.mockReturnValue({ gridX: 2, gridY: 4 });
-      act(() => {
-        result.current.handleDrop({
-          preventDefault: vi.fn(),
-          dataTransfer: { getData: () => 'character:Test Character' },
-        });
-      });
-      expect(setMapData).toHaveBeenCalledWith(
-        expect.any(Function),
-      );
-    });
-
-    it('should not add duplicate character to map players', () => {
+    it('should not add a duplicate character', () => {
       setMapData = vi.fn((fn) => {
         if (typeof fn === 'function') {
           const prev = {
-            players: [
-              { id: 'gandalf', name: 'Gandalf', gridX: 1, gridY: 1 },
-            ],
+            players: [{ id: 'gandalf', name: 'Gandalf', gridX: 1, gridY: 1 }],
           };
           return fn(prev);
         }
@@ -138,30 +100,7 @@ describe('useMapDrops', () => {
           dataTransfer: { getData: () => 'character:Gandalf' },
         });
       });
-      expect(setMapData).toHaveBeenCalled();
-    });
-
-    it('should not add duplicate character with different casing', () => {
-      setMapData = vi.fn((fn) => {
-        if (typeof fn === 'function') {
-          const prev = {
-            players: [
-              { id: 'gandalf', name: 'Gandalf', gridX: 1, gridY: 1 },
-            ],
-          };
-          return fn(prev);
-        }
-        return fn;
-      });
-      const result = getHook();
-      getGridFromEvent.mockReturnValue({ gridX: 5, gridY: 3 });
-      act(() => {
-        result.current.handleDrop({
-          preventDefault: vi.fn(),
-          dataTransfer: { getData: () => 'character:Gandalf' },
-        });
-      });
-      expect(setMapData).toHaveBeenCalled();
+      expect(setMapData).toHaveBeenCalledWith(expect.any(Function));
     });
   });
 
@@ -170,9 +109,9 @@ describe('useMapDrops', () => {
       createMocks();
     });
 
-    it('should add NPC when dragData is npc', () => {
-      const result = getHook();
+    it('should add an NPC to placed items', () => {
       getGridFromEvent.mockReturnValue({ gridX: 3, gridY: 6 });
+      const result = getHook();
       act(() => {
         result.current.handleDrop({
           preventDefault: vi.fn(),
@@ -183,29 +122,33 @@ describe('useMapDrops', () => {
       expect(setPlacedItems).toHaveBeenCalled();
     });
 
-    it('should create NPC with visible based on isLocalhost', () => {
-      const result = getHook();
+    it('should set visible based on isLocalhost', () => {
       getGridFromEvent.mockReturnValue({ gridX: 1, gridY: 1 });
+      const result = getHook();
       act(() => {
         result.current.handleDrop({
           preventDefault: vi.fn(),
           dataTransfer: { getData: () => 'npc' },
         });
       });
-      expect(setPlacedItems).toHaveBeenCalled();
+      const [fn] = setPlacedItems.mock.calls[0];
+      const newItem = fn([])[0];
+      expect(newItem.visible).toBe(true);
     });
 
-    it('should create NPC with visible false when not localhost', () => {
+    it('should set visible false when not localhost', () => {
       isLocalhost = false;
-      const result = getHook();
       getGridFromEvent.mockReturnValue({ gridX: 1, gridY: 1 });
+      const result = getHook();
       act(() => {
         result.current.handleDrop({
           preventDefault: vi.fn(),
           dataTransfer: { getData: () => 'npc' },
         });
       });
-      expect(setPlacedItems).toHaveBeenCalled();
+      const [fn] = setPlacedItems.mock.calls[0];
+      const newItem = fn([])[0];
+      expect(newItem.visible).toBe(false);
     });
   });
 
@@ -214,9 +157,9 @@ describe('useMapDrops', () => {
       createMocks();
     });
 
-    it('should add furniture items to placed items', () => {
-      const result = getHook();
+    it('should add furniture to placed items', () => {
       getGridFromEvent.mockReturnValue({ gridX: 7, gridY: 2 });
+      const result = getHook();
       act(() => {
         result.current.handleDrop({
           preventDefault: vi.fn(),
@@ -227,7 +170,22 @@ describe('useMapDrops', () => {
       expect(setPlacedItems).toHaveBeenCalled();
     });
 
-    it('should set rotation 0 for rotation-specific items', () => {
+    it('should floor grid coordinates', () => {
+      getGridFromEvent.mockReturnValue({ gridX: 3.9, gridY: 7.1 });
+      const result = getHook();
+      act(() => {
+        result.current.handleDrop({
+          preventDefault: vi.fn(),
+          dataTransfer: { getData: () => 'table' },
+        });
+      });
+      const [fn] = setPlacedItems.mock.calls[0];
+      const newItem = fn([])[0];
+      expect(newItem.gridX).toBe(3);
+      expect(newItem.gridY).toBe(7);
+    });
+
+    it('should set rotation for items that support it', () => {
       const rotationItems = ['table', 'bed', 'stairs', 'altar', 'bookshelf', 'torch', 'chair', 'arrowSlitWall'];
       for (const item of rotationItems) {
         setPlacedItems.mockClear();
@@ -239,44 +197,24 @@ describe('useMapDrops', () => {
             dataTransfer: { getData: () => item },
           });
         });
-        expect(setPlacedItems).toHaveBeenCalled();
+        const [fn] = setPlacedItems.mock.calls[0];
+        const newItem = fn([])[0];
+        expect(newItem.rotation).toBe(0);
       }
     });
 
-    it('should set rotation undefined for non-specified items', () => {
-      const result = getHook();
+    it('should set rotation undefined for items without rotation', () => {
       getGridFromEvent.mockReturnValue({ gridX: 0, gridY: 0 });
+      const result = getHook();
       act(() => {
         result.current.handleDrop({
           preventDefault: vi.fn(),
           dataTransfer: { getData: () => 'wall' },
         });
       });
-      expect(setPlacedItems).toHaveBeenCalled();
-    });
-
-    it('should floor grid coordinates', () => {
-      const result = getHook();
-      getGridFromEvent.mockReturnValue({ gridX: 3.9, gridY: 7.1 });
-      act(() => {
-        result.current.handleDrop({
-          preventDefault: vi.fn(),
-          dataTransfer: { getData: () => 'table' },
-        });
-      });
-      expect(setPlacedItems).toHaveBeenCalled();
-    });
-
-    it('should pass type as dragData for furniture items', () => {
-      const result = getHook();
-      getGridFromEvent.mockReturnValue({ gridX: 0, gridY: 0 });
-      act(() => {
-        result.current.handleDrop({
-          preventDefault: vi.fn(),
-          dataTransfer: { getData: () => 'table' },
-        });
-      });
-      expect(setPlacedItems).toHaveBeenCalled();
+      const [fn] = setPlacedItems.mock.calls[0];
+      const newItem = fn([])[0];
+      expect(newItem.rotation).toBe(undefined);
     });
   });
 });

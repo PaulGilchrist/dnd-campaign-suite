@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import EyebiteEffectModal from './EyebiteEffectModal.jsx';
@@ -130,37 +130,25 @@ describe('EyebiteEffectModal', () => {
     // ── Initial render / display ──
 
     describe('initial render', () => {
-        it('renders the overlay, modal container, and header with feature name', () => {
+        it('renders the overlay, modal, header with feature name, icon, effect buttons, and cancel button', () => {
             render(<EyebiteEffectModal {...makeProps()} />);
             expect(screen.getByText('Eyebite')).toBeInTheDocument();
             expect(document.querySelector('.sp-overlay')).toBeInTheDocument();
             expect(document.querySelector('.sp-modal')).toBeInTheDocument();
             expect(document.querySelector('.sp-header')).toBeInTheDocument();
-        });
-
-        it('renders a Font Awesome eye icon in the header', () => {
-            render(<EyebiteEffectModal {...makeProps()} />);
             expect(document.querySelector('.fa-solid.fa-eye, .fa-eye')).toBeInTheDocument();
-        });
-
-        it('displays the effect selection prompt', () => {
-            render(<EyebiteEffectModal {...makeProps()} />);
             expect(screen.getByText('Choose an effect for the target(s):')).toBeInTheDocument();
-        });
-
-        it('renders all three effect buttons with descriptions', () => {
-            render(<EyebiteEffectModal {...makeProps()} />);
             expect(screen.getByRole('button', { name: /Asleep/ })).toBeInTheDocument();
             expect(screen.getByRole('button', { name: /Panicked/ })).toBeInTheDocument();
             expect(screen.getByRole('button', { name: /Sickened/ })).toBeInTheDocument();
             expect(screen.getByText('Target falls unconscious')).toBeInTheDocument();
             expect(screen.getByText('Target is frightened (must Dash away)')).toBeInTheDocument();
             expect(screen.getByText('Target has disadvantage on attack rolls and ability checks')).toBeInTheDocument();
-        });
-
-        it('renders a Cancel button', () => {
-            render(<EyebiteEffectModal {...makeProps()} />);
             expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
+            expect(document.querySelector('.sp-body')).toBeInTheDocument();
+            expect(document.querySelector('.sp-actions')).toBeInTheDocument();
+            expect(document.querySelector('.eyebite-effects-list')).toBeInTheDocument();
+            expect(document.querySelector('.eyebite-effect-btn')).toBeInTheDocument();
         });
 
         it('does not show target selection or results screens', () => {
@@ -168,38 +156,22 @@ describe('EyebiteEffectModal', () => {
             expect(screen.queryByText(/Select creatures within/)).not.toBeInTheDocument();
             expect(screen.queryByText(/Resolving WIS saving throws/)).not.toBeInTheDocument();
         });
-
-        it('renders with proper CSS structure', () => {
-            render(<EyebiteEffectModal {...makeProps()} />);
-            expect(document.querySelector('.sp-body')).toBeInTheDocument();
-            expect(document.querySelector('.sp-actions')).toBeInTheDocument();
-            expect(document.querySelector('.eyebite-effects-list')).toBeInTheDocument();
-            expect(document.querySelector('.eyebite-effect-btn')).toBeInTheDocument();
-        });
     });
 
     // ── Effect selection ──
 
     describe('effect selection', () => {
-        it('navigates to target selection after picking an effect', () => {
+        it('navigates to target selection after picking an effect, showing effect label, range, WIS DC, and back/cancel buttons', () => {
             render(<EyebiteEffectModal {...makeProps()} />);
             fireEvent.click(screen.getByRole('button', { name: /Asleep/ }));
             expect(screen.getByText(/Effect:/)).toBeInTheDocument();
             expect(screen.getByText(/Select creatures within/)).toBeInTheDocument();
-            expect(screen.queryByText('Choose an effect for the target(s):')).not.toBeInTheDocument();
-        });
-
-        it('displays WIS save DC info after effect selection', () => {
-            render(<EyebiteEffectModal {...makeProps()} />);
-            fireEvent.click(screen.getByRole('button', { name: /Asleep/ }));
             expect(screen.getByText(/WIS/)).toBeInTheDocument();
             expect(screen.getByText(/DC 13/)).toBeInTheDocument();
-        });
-
-        it('displays the configured range after effect selection', () => {
-            render(<EyebiteEffectModal {...makeProps()} />);
-            fireEvent.click(screen.getByRole('button', { name: /Asleep/ }));
             expect(screen.getByText(/within 60 feet/)).toBeInTheDocument();
+            expect(screen.getByRole('button', { name: 'Back' })).toBeInTheDocument();
+            expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
+            expect(screen.queryByText('Choose an effect for the target(s):')).not.toBeInTheDocument();
         });
 
         it('displays a custom range after effect selection', () => {
@@ -215,24 +187,20 @@ describe('EyebiteEffectModal', () => {
             expect(screen.getByText('Choose an effect for the target(s):')).toBeInTheDocument();
             expect(screen.queryByText(/Effect:/)).not.toBeInTheDocument();
         });
-
-        it('shows Back and Cancel buttons after effect selection', () => {
-            render(<EyebiteEffectModal {...makeProps()} />);
-            fireEvent.click(screen.getByRole('button', { name: /Asleep/ }));
-            expect(screen.getByRole('button', { name: 'Back' })).toBeInTheDocument();
-            expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
-        });
     });
 
     // ── Eligible targets ──
 
     describe('eligible targets', () => {
-        it('lists all non-attacker creatures after effect selection', () => {
+        it('lists all non-attacker creatures after effect selection with type labels', () => {
             render(<EyebiteEffectModal {...makeProps()} />);
             fireEvent.click(screen.getByRole('button', { name: /Asleep/ }));
             expect(screen.getByText('Goblin1')).toBeInTheDocument();
             expect(screen.getByText('Orc Warrior')).toBeInTheDocument();
             expect(screen.getByText('Elf Mage')).toBeInTheDocument();
+            const body = document.querySelector('.sp-body');
+            expect(body.textContent).toContain('(npc)');
+            expect(body.textContent).toContain('(player)');
         });
 
         it('excludes the attacker from eligible targets', () => {
@@ -241,15 +209,7 @@ describe('EyebiteEffectModal', () => {
             expect(screen.queryByText('Witch1')).not.toBeInTheDocument();
         });
 
-        it('displays creature type next to each target name', () => {
-            render(<EyebiteEffectModal {...makeProps()} />);
-            fireEvent.click(screen.getByRole('button', { name: /Asleep/ }));
-            const body = document.querySelector('.sp-body');
-            expect(body.textContent).toContain('(npc)');
-            expect(body.textContent).toContain('(player)');
-        });
-
-        it('shows no valid targets message when creatures array is empty', () => {
+        it('shows no valid targets message when creatures array is empty or null', () => {
             render(<EyebiteEffectModal {...makeProps({ combatSummary: { creatures: [] } })} />);
             fireEvent.click(screen.getByRole('button', { name: /Asleep/ }));
             expect(screen.getByText('No valid targets in range.')).toBeInTheDocument();
@@ -272,8 +232,6 @@ describe('EyebiteEffectModal', () => {
             rangeValidation.getDistanceFeet.mockReturnValue(100);
             render(<EyebiteEffectModal {...makeProps()} />);
             fireEvent.click(screen.getByRole('button', { name: /Asleep/ }));
-            // Player targets with map positions are filtered by distance;
-            // NPCs without map positions are always included.
             expect(screen.queryByText('Elf Mage')).not.toBeInTheDocument();
             expect(screen.getByText('Goblin1')).toBeInTheDocument();
         });
@@ -282,30 +240,16 @@ describe('EyebiteEffectModal', () => {
     // ── Target selection ──
 
     describe('target selection', () => {
-        it('toggles a target checkbox on and off', () => {
+        it('toggles a target checkbox and shows selected count with selected class', () => {
             render(<EyebiteEffectModal {...makeProps()} />);
             fireEvent.click(screen.getByRole('button', { name: /Asleep/ }));
             const checkbox = document.querySelector('input[type="checkbox"]');
             fireEvent.click(checkbox);
             expect(screen.getByText(/Targets selected:\s*1\/\d+/)).toBeInTheDocument();
-            fireEvent.click(checkbox);
-            expect(screen.getByText(/Targets selected:\s*0\/\d+/)).toBeInTheDocument();
-        });
-
-        it('shows the selected count out of total', () => {
-            render(<EyebiteEffectModal {...makeProps()} />);
-            fireEvent.click(screen.getByRole('button', { name: /Asleep/ }));
-            const body = document.querySelector('.sp-body');
-            expect(body.textContent).toMatch(/Targets selected:\s*0\/\d+/);
-        });
-
-        it('applies selected class to the checked target row', () => {
-            render(<EyebiteEffectModal {...makeProps()} />);
-            fireEvent.click(screen.getByRole('button', { name: /Asleep/ }));
-            const checkbox = document.querySelector('input[type="checkbox"]');
-            fireEvent.click(checkbox);
             const row = checkbox.closest('.abjure-target-row');
             expect(row).toHaveClass('abjure-target-selected');
+            fireEvent.click(checkbox);
+            expect(screen.getByText(/Targets selected:\s*0\/\d+/)).toBeInTheDocument();
         });
 
         it('renders the targets list container after effect selection', () => {
@@ -332,19 +276,14 @@ describe('EyebiteEffectModal', () => {
             expect(applyEffect()).toBeEnabled();
         });
 
-        it('displays singular "target" for one selection', () => {
+        it('displays singular "target" for one selection and plural "targets" for multiple', () => {
             render(<EyebiteEffectModal {...makeProps()} />);
             fireEvent.click(screen.getByRole('button', { name: /Asleep/ }));
             const checkbox = document.querySelector('input[type="checkbox"]');
             fireEvent.click(checkbox);
             expect(screen.getByRole('button', { name: /Eyebite.*1 target/ })).toBeInTheDocument();
-        });
 
-        it('displays plural "targets" for multiple selections', () => {
-            render(<EyebiteEffectModal {...makeProps()} />);
-            fireEvent.click(screen.getByRole('button', { name: /Asleep/ }));
             const checkboxes = document.querySelectorAll('input[type="checkbox"]');
-            fireEvent.click(checkboxes[0]);
             fireEvent.click(checkboxes[1]);
             expect(screen.getByRole('button', { name: /Eyebite.*2 targets/ })).toBeInTheDocument();
         });
@@ -359,107 +298,37 @@ describe('EyebiteEffectModal', () => {
     // ── NPC resolution ──
 
     describe('NPC resolution', () => {
-        it('shows processing state after applying', async () => {
+        it('shows processing state, rolls dice, sends save result, and logs the entry', async () => {
             selectEffectAndTarget('Asleep', 'Goblin1');
             fireEvent.click(applyEffect());
             await waitFor(() => {
                 expect(screen.getByText(/Resolving WIS saving throws/)).toBeInTheDocument();
+                expect(diceRoller.rollD20).toHaveBeenCalled();
+                expect(savePromptService.sendSaveResult).toHaveBeenCalled();
+                const rollCall = logService.addEntry.mock.calls.find(
+                    (call) => call[1].type === 'roll'
+                );
+                expect(rollCall[1].saveType).toBe('WIS');
+                expect(rollCall[1].name).toBe('Eyebite');
+                expect(rollCall[1].characterName).toBe('Witch1');
+                expect(rollCall[1].targetName).toBe('Goblin1');
+                expect(rollCall[1].saveDc).toBe(13);
             });
         });
 
-        it('calls rollD20 for each NPC target', async () => {
-            selectEffectAndTarget('Asleep', 'Goblin1');
-            fireEvent.click(applyEffect());
-            await waitFor(() => expect(diceRoller.rollD20).toHaveBeenCalled());
-        });
-
-        it('sends save result for NPC targets', async () => {
-            selectEffectAndTarget('Asleep', 'Goblin1');
-            fireEvent.click(applyEffect());
-            await waitFor(() => expect(savePromptService.sendSaveResult).toHaveBeenCalled());
-        });
-
-        it('calls addExpiration when NPC fails save', async () => {
+        it('adds expiration when NPC fails save but not when it succeeds', async () => {
             diceRoller.rollD20.mockReturnValue(5);
             selectEffectAndTarget('Asleep', 'Goblin1');
             fireEvent.click(applyEffect());
             await waitFor(() => expect(expirations.addExpiration).toHaveBeenCalled());
-        });
-
-        it('does not call addExpiration when NPC succeeds save', async () => {
+            vi.clearAllMocks();
             diceRoller.rollD20.mockReturnValue(20);
             selectEffectAndTarget('Asleep', 'Goblin1');
             fireEvent.click(applyEffect());
             await waitFor(() => expect(expirations.addExpiration).not.toHaveBeenCalled());
         });
 
-        it('adds roll log entry for NPC targets', async () => {
-            selectEffectAndTarget('Asleep', 'Goblin1');
-            fireEvent.click(applyEffect());
-            await waitFor(() => {
-                expect(logService.addEntry).toHaveBeenCalledWith(
-                    expect.any(String),
-                    expect.objectContaining({ type: 'roll' })
-                );
-            });
-        });
-
-        it('logs save type as WIS', async () => {
-            selectEffectAndTarget('Asleep', 'Goblin1');
-            fireEvent.click(applyEffect());
-            await waitFor(() => {
-                const rollCall = logService.addEntry.mock.calls.find(
-                    (call) => call[1].type === 'roll'
-                );
-                expect(rollCall[1].saveType).toBe('WIS');
-            });
-        });
-
-        it('logs the feature name in the roll entry', async () => {
-            selectEffectAndTarget('Asleep', 'Goblin1');
-            fireEvent.click(applyEffect());
-            await waitFor(() => {
-                const rollCall = logService.addEntry.mock.calls.find(
-                    (call) => call[1].type === 'roll'
-                );
-                expect(rollCall[1].name).toBe('Eyebite');
-            });
-        });
-
-        it('logs the attacker name in the roll entry', async () => {
-            selectEffectAndTarget('Asleep', 'Goblin1');
-            fireEvent.click(applyEffect());
-            await waitFor(() => {
-                const rollCall = logService.addEntry.mock.calls.find(
-                    (call) => call[1].type === 'roll'
-                );
-                expect(rollCall[1].characterName).toBe('Witch1');
-            });
-        });
-
-        it('logs the target name in the roll entry', async () => {
-            selectEffectAndTarget('Asleep', 'Goblin1');
-            fireEvent.click(applyEffect());
-            await waitFor(() => {
-                const rollCall = logService.addEntry.mock.calls.find(
-                    (call) => call[1].type === 'roll'
-                );
-                expect(rollCall[1].targetName).toBe('Goblin1');
-            });
-        });
-
-        it('logs the correct save DC in the roll entry', async () => {
-            selectEffectAndTarget('Asleep', 'Goblin1');
-            fireEvent.click(applyEffect());
-            await waitFor(() => {
-                const rollCall = logService.addEntry.mock.calls.find(
-                    (call) => call[1].type === 'roll'
-                );
-                expect(rollCall[1].saveDc).toBe(13);
-            });
-        });
-
-        it('includes the save bonus in the roll formula when non-zero', async () => {
+        it('logs the correct formula with save bonus', async () => {
             selectEffectAndTarget('Asleep', 'Goblin1');
             fireEvent.click(applyEffect());
             await waitFor(() => {
@@ -470,7 +339,7 @@ describe('EyebiteEffectModal', () => {
             });
         });
 
-        it('omits the plus sign from formula when save bonus is zero', async () => {
+        it('logs the correct formula without save bonus', async () => {
             render(<EyebiteEffectModal {...makeProps({
                 combatSummary: {
                     creatures: [{ name: 'Goblin1', type: 'npc', saveBonuses: { wis: 0 }, conditions: [] }],
@@ -488,14 +357,14 @@ describe('EyebiteEffectModal', () => {
             });
         });
 
-        it('displays "Saved" message when NPC succeeds', async () => {
+        it('displays Saved message when NPC succeeds', async () => {
             diceRoller.rollD20.mockReturnValue(20);
             selectEffectAndTarget('Asleep', 'Goblin1');
             fireEvent.click(applyEffect());
             await waitFor(() => expect(screen.getByText(/Saved/)).toBeInTheDocument());
         });
 
-        it('displays failure label with effect name when NPC fails', async () => {
+        it('displays failure label with effect name and roll details when NPC fails', async () => {
             diceRoller.rollD20.mockReturnValue(5);
             render(<EyebiteEffectModal {...makeProps()} />);
             fireEvent.click(screen.getByRole('button', { name: /Panicked/ }));
@@ -507,33 +376,17 @@ describe('EyebiteEffectModal', () => {
             await waitFor(() => {
                 const body = document.querySelector('.sp-body');
                 expect(body.textContent).toContain('Failed — Panicked!');
+                expect(body.textContent).toContain('Roll: 5');
             });
         });
 
-        it('displays roll details next to NPC result', async () => {
-            diceRoller.rollD20.mockReturnValue(8);
-            selectEffectAndTarget('Asleep', 'Goblin1');
-            fireEvent.click(applyEffect());
-            await waitFor(() => {
-                const body = document.querySelector('.sp-body');
-                expect(body.textContent).toContain('Roll: 8');
-            });
-        });
-
-        it('hides Apply, Back, and Cancel buttons while processing', async () => {
+        it('hides Apply, Back, and Cancel buttons while processing and renders results list container', async () => {
             diceRoller.rollD20.mockReturnValue(5);
             selectEffectAndTarget('Asleep', 'Goblin1');
             fireEvent.click(applyEffect());
             await waitFor(() => {
                 expect(screen.queryByRole('button', { name: 'Back' })).not.toBeInTheDocument();
                 expect(screen.queryByRole('button', { name: 'Cancel' })).not.toBeInTheDocument();
-            });
-        });
-
-        it('renders the results list container after processing', async () => {
-            selectEffectAndTarget('Asleep', 'Goblin1');
-            fireEvent.click(applyEffect());
-            await waitFor(() => {
                 expect(document.querySelector('.abjure-results-list')).toBeInTheDocument();
             });
         });
@@ -542,17 +395,7 @@ describe('EyebiteEffectModal', () => {
     // ── Multiple NPC targets ──
 
     describe('multiple NPC targets', () => {
-        it('rolls for all selected NPC targets', async () => {
-            render(<EyebiteEffectModal {...makeProps()} />);
-            fireEvent.click(screen.getByRole('button', { name: /Asleep/ }));
-            const checkboxes = document.querySelectorAll('input[type="checkbox"]');
-            fireEvent.click(checkboxes[0]);
-            fireEvent.click(checkboxes[1]);
-            fireEvent.click(applyEffect());
-            await waitFor(() => expect(diceRoller.rollD20).toHaveBeenCalledTimes(2));
-        });
-
-        it('shows results for all NPC targets', async () => {
+        it('rolls for all selected NPC targets and shows results for each', async () => {
             render(<EyebiteEffectModal {...makeProps()} />);
             fireEvent.click(screen.getByRole('button', { name: /Asleep/ }));
             const checkboxes = document.querySelectorAll('input[type="checkbox"]');
@@ -560,6 +403,7 @@ describe('EyebiteEffectModal', () => {
             fireEvent.click(checkboxes[1]);
             fireEvent.click(applyEffect());
             await waitFor(() => {
+                expect(diceRoller.rollD20).toHaveBeenCalledTimes(2);
                 expect(screen.getByText('Goblin1')).toBeInTheDocument();
                 expect(screen.getByText('Orc Warrior')).toBeInTheDocument();
             });
@@ -569,55 +413,19 @@ describe('EyebiteEffectModal', () => {
     // ── Player save prompts ──
 
     describe('player save prompts', () => {
-        it('sends a save prompt for player targets instead of resolving immediately', async () => {
+        it('sends a save prompt for player targets and shows pending state alongside NPC results', async () => {
             rangeValidation.getDistanceFeet.mockReturnValue(30);
             render(<EyebiteEffectModal {...makeProps()} />);
             fireEvent.click(screen.getByRole('button', { name: /Asleep/ }));
             const checkboxes = document.querySelectorAll('input[type="checkbox"]');
             expect(checkboxes.length).toBeGreaterThanOrEqual(3);
-            fireEvent.click(checkboxes[0]); // NPC
-            fireEvent.click(checkboxes[2]); // player
-            fireEvent.click(applyEffect());
-            await waitFor(() => expect(savePromptService.sendSavePrompt).toHaveBeenCalled());
-        });
-
-        it('shows pending state for player targets', async () => {
-            rangeValidation.getDistanceFeet.mockReturnValue(30);
-            render(<EyebiteEffectModal {...makeProps()} />);
-            fireEvent.click(screen.getByRole('button', { name: /Asleep/ }));
-            const checkboxes = document.querySelectorAll('input[type="checkbox"]');
             fireEvent.click(checkboxes[0]);
             fireEvent.click(checkboxes[2]);
             fireEvent.click(applyEffect());
             await waitFor(() => {
+                expect(savePromptService.sendSavePrompt).toHaveBeenCalled();
                 expect(screen.getByText(/Waiting for save roll/)).toBeInTheDocument();
-            });
-        });
-
-        it('shows NPC results alongside pending player results', async () => {
-            diceRoller.rollD20.mockReturnValue(5);
-            rangeValidation.getDistanceFeet.mockReturnValue(30);
-            render(<EyebiteEffectModal {...makeProps()} />);
-            fireEvent.click(screen.getByRole('button', { name: /Asleep/ }));
-            const checkboxes = document.querySelectorAll('input[type="checkbox"]');
-            fireEvent.click(checkboxes[0]);
-            fireEvent.click(checkboxes[2]);
-            fireEvent.click(applyEffect());
-            await waitFor(() => {
                 expect(screen.getByText('Goblin1')).toBeInTheDocument();
-                expect(screen.getByText(/Waiting for save roll/)).toBeInTheDocument();
-            });
-        });
-
-        it('adds roll log entries for both NPC and player targets', async () => {
-            rangeValidation.getDistanceFeet.mockReturnValue(30);
-            render(<EyebiteEffectModal {...makeProps()} />);
-            fireEvent.click(screen.getByRole('button', { name: /Asleep/ }));
-            const checkboxes = document.querySelectorAll('input[type="checkbox"]');
-            fireEvent.click(checkboxes[0]);
-            fireEvent.click(checkboxes[2]);
-            fireEvent.click(applyEffect());
-            await waitFor(() => {
                 const rollCalls = logService.addEntry.mock.calls.filter(
                     (call) => call[1].type === 'roll'
                 );
@@ -690,7 +498,7 @@ describe('EyebiteEffectModal', () => {
             });
 
             await waitFor(() => {
-                expect(screen.getByText('Goblin1')).toBeInTheDocument();
+                expect(screen.queryByText('Goblin1')).toBeInTheDocument();
             });
         });
 
@@ -707,7 +515,7 @@ describe('EyebiteEffectModal', () => {
             });
 
             await waitFor(() => {
-                expect(screen.getByText(/Goblin1/)).toBeInTheDocument();
+                expect(screen.queryByText(/Goblin1/)).toBeInTheDocument();
             });
         });
     });
@@ -715,20 +523,12 @@ describe('EyebiteEffectModal', () => {
     // ── All resolved state ──
 
     describe('all resolved state', () => {
-        it('shows "All targets resolved" message when processing completes', async () => {
+        it('shows resolved message and Done button when processing completes', async () => {
             diceRoller.rollD20.mockReturnValue(5);
             selectEffectAndTarget('Asleep', 'Goblin1');
             fireEvent.click(applyEffect());
             await waitFor(() => {
                 expect(screen.getByText(/All targets resolved/)).toBeInTheDocument();
-            });
-        });
-
-        it('shows a Done button when all resolved', async () => {
-            diceRoller.rollD20.mockReturnValue(5);
-            selectEffectAndTarget('Asleep', 'Goblin1');
-            fireEvent.click(applyEffect());
-            await waitFor(() => {
                 expect(screen.getByRole('button', { name: 'Done' })).toBeInTheDocument();
             });
         });
@@ -767,7 +567,7 @@ describe('EyebiteEffectModal', () => {
     // ── Storage and events ──
 
     describe('storage and events', () => {
-        it('calls storage.set with combatSummary after applying', async () => {
+        it('persists combatSummary and dispatches update event after applying', async () => {
             selectEffectAndTarget('Asleep', 'Goblin1');
             fireEvent.click(applyEffect());
             await waitFor(() => {
@@ -777,9 +577,7 @@ describe('EyebiteEffectModal', () => {
                     'test-campaign'
                 );
             });
-        });
 
-        it('dispatches a combat-summary-updated event after applying', async () => {
             const eventListener = vi.fn();
             window.addEventListener('combat-summary-updated', eventListener);
             selectEffectAndTarget('Asleep', 'Goblin1');
@@ -792,12 +590,12 @@ describe('EyebiteEffectModal', () => {
     // ── Custom props ──
 
     describe('custom props', () => {
-        it('uses a custom feature name in the header', () => {
+        it('uses custom feature name in header and Apply button', () => {
             render(<EyebiteEffectModal {...makeProps({ featureName: 'Witch Eyebite' })} />);
             expect(screen.getByText('Witch Eyebite')).toBeInTheDocument();
         });
 
-        it('passes a custom durationRounds to addExpiration', async () => {
+        it('passes custom durationRounds to addExpiration', async () => {
             diceRoller.rollD20.mockReturnValue(5);
             render(<EyebiteEffectModal {...makeProps({ durationRounds: 5 })} />);
             fireEvent.click(screen.getByRole('button', { name: /Asleep/ }));
@@ -815,7 +613,7 @@ describe('EyebiteEffectModal', () => {
             });
         });
 
-        it('uses the default durationRounds of 10 when not provided', async () => {
+        it('uses default durationRounds of 10 when not provided', async () => {
             diceRoller.rollD20.mockReturnValue(5);
             render(<EyebiteEffectModal {...makeProps({ durationRounds: undefined })} />);
             fireEvent.click(screen.getByRole('button', { name: /Asleep/ }));

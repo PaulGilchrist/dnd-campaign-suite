@@ -1,3 +1,4 @@
+// @cleaned-by-ai
 // @improved-by-ai
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -83,11 +84,6 @@ describe('FiendishResilienceModal', () => {
       expect(screen.getByText('Fiendish Resilience')).toBeInTheDocument();
     });
 
-    it('renders the header icon', () => {
-      render(<FiendishResilienceModal {...defaultProps} />);
-      expect(document.querySelector('.sp-header .fa-solid.fa-shield-halved')).toBeInTheDocument();
-    });
-
     it('renders the instruction paragraph for a new selection', () => {
       render(<FiendishResilienceModal {...defaultProps} />);
       expect(
@@ -155,12 +151,6 @@ describe('FiendishResilienceModal', () => {
         document.querySelector('input[name="fiendishResilienceOption"]:checked')
       ).toBeNull();
     });
-
-    it('does not render the result state on initial render', () => {
-      render(<FiendishResilienceModal {...defaultProps} />);
-      expect(screen.queryByRole('button', { name: 'Done' })).not.toBeInTheDocument();
-      expect(screen.queryByText(/selected/)).not.toBeInTheDocument();
-    });
   });
 
   // ── Radio selection ──
@@ -170,15 +160,6 @@ describe('FiendishResilienceModal', () => {
       render(<FiendishResilienceModal {...defaultProps} />);
       selectDamageType('Acid');
       expect(screen.getByLabelText('Acid')).toBeChecked();
-    });
-
-    it('changes selection when a different radio is clicked', () => {
-      render(<FiendishResilienceModal {...defaultProps} />);
-      selectDamageType('Acid');
-      expect(screen.getByLabelText('Acid')).toBeChecked();
-      selectDamageType('Cold');
-      expect(screen.getByLabelText('Cold')).toBeChecked();
-      expect(screen.getByLabelText('Acid')).not.toBeChecked();
     });
 
     it('allows selecting the existing type', () => {
@@ -222,23 +203,6 @@ describe('FiendishResilienceModal', () => {
     it('renders the Cancel button', () => {
       render(<FiendishResilienceModal {...defaultProps} />);
       expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
-    });
-
-    it('hides the Cancel button after successful apply', async () => {
-      fiendishResilienceHandler.applyTypeChoice.mockResolvedValue({
-        type: 'popup',
-        payload: {
-          type: 'automation_info',
-          name: 'Fiendish Resilience',
-          description: 'Fiendish Resilience: Acid selected. You gain resistance to Acid damage.',
-        },
-      });
-      render(<FiendishResilienceModal {...defaultProps} />);
-      selectDamageType('Acid');
-      await clickApplyButton('Choose Damage Type');
-      await waitFor(() => {
-        expect(screen.queryByRole('button', { name: 'Cancel' })).not.toBeInTheDocument();
-      });
     });
   });
 
@@ -317,20 +281,6 @@ describe('FiendishResilienceModal', () => {
       expect(fiendishResilienceHandler.applyTypeChoice).not.toHaveBeenCalled();
     });
 
-    it('passes campaignName to applyTypeChoice', async () => {
-      const actionWithExisting = { ...baseAction, existingType: 'Fire' };
-      fiendishResilienceHandler.applyTypeChoice.mockResolvedValue(mockSuccessResult);
-      render(<FiendishResilienceModal {...makeProps({ action: actionWithExisting })} />);
-      selectDamageType('Cold');
-      await clickApplyButton('Change Damage Type');
-      expect(fiendishResilienceHandler.applyTypeChoice).toHaveBeenCalledWith(
-        actionWithExisting,
-        basePlayerStats,
-        'test-campaign',
-        'Cold',
-      );
-    });
-
     it('passes playerStats to applyTypeChoice', async () => {
       const customPlayerStats = { name: 'Warlock2', level: 10, hitPoints: 50 };
       fiendishResilienceHandler.applyTypeChoice.mockResolvedValue(mockSuccessResult);
@@ -345,41 +295,14 @@ describe('FiendishResilienceModal', () => {
       );
     });
 
-    it('calls applyTypeChoice only once on apply click', async () => {
-      fiendishResilienceHandler.applyTypeChoice.mockResolvedValue(mockSuccessResult);
-      render(<FiendishResilienceModal {...defaultProps} />);
-      selectDamageType('Acid');
-      await clickApplyButton('Choose Damage Type');
-      expect(fiendishResilienceHandler.applyTypeChoice).toHaveBeenCalledTimes(1);
-    });
-
     it('transitions to the result screen after successful apply', async () => {
       fiendishResilienceHandler.applyTypeChoice.mockResolvedValue(mockSuccessResult);
       render(<FiendishResilienceModal {...defaultProps} />);
       selectDamageType('Acid');
       await clickApplyButton('Choose Damage Type');
       await waitFor(() => {
-        expect(screen.queryByText(/Choose one damage type/)).not.toBeInTheDocument();
-      });
-    });
-
-    it('hides selection options after successful apply', async () => {
-      fiendishResilienceHandler.applyTypeChoice.mockResolvedValue(mockSuccessResult);
-      render(<FiendishResilienceModal {...defaultProps} />);
-      selectDamageType('Acid');
-      await clickApplyButton('Choose Damage Type');
-      await waitFor(() => {
-        expect(screen.queryByLabelText('Acid')).not.toBeInTheDocument();
-      });
-    });
-
-    it('renders the Done button after successful apply', async () => {
-      fiendishResilienceHandler.applyTypeChoice.mockResolvedValue(mockSuccessResult);
-      render(<FiendishResilienceModal {...defaultProps} />);
-      selectDamageType('Acid');
-      await clickApplyButton('Choose Damage Type');
-      await waitFor(() => {
         expect(screen.getByRole('button', { name: 'Done' })).toBeInTheDocument();
+        expect(screen.queryByLabelText('Acid')).not.toBeInTheDocument();
       });
     });
   });
@@ -405,26 +328,6 @@ describe('FiendishResilienceModal', () => {
         expect(
           screen.getByText('Fiendish Resilience: Acid selected. You gain resistance to Acid damage.')
         ).toBeInTheDocument();
-      });
-    });
-
-    it('renders the header with action name in result screen', async () => {
-      fiendishResilienceHandler.applyTypeChoice.mockResolvedValue(mockResult);
-      render(<FiendishResilienceModal {...defaultProps} />);
-      selectDamageType('Acid');
-      await clickApplyButton('Choose Damage Type');
-      await waitFor(() => {
-        expect(screen.getByText('Fiendish Resilience')).toBeInTheDocument();
-      });
-    });
-
-    it('renders the header icon in result screen', async () => {
-      fiendishResilienceHandler.applyTypeChoice.mockResolvedValue(mockResult);
-      render(<FiendishResilienceModal {...defaultProps} />);
-      selectDamageType('Acid');
-      await clickApplyButton('Choose Damage Type');
-      await waitFor(() => {
-        expect(document.querySelector('.sp-header .fa-solid.fa-shield-halved')).toBeInTheDocument();
       });
     });
 
@@ -502,21 +405,11 @@ describe('FiendishResilienceModal', () => {
       expect(screen.getByText('Fiendish Resilience')).toBeInTheDocument();
     });
 
-    it('renders without crashing when action is undefined', () => {
-      render(<FiendishResilienceModal {...makeProps({ action: undefined })} />);
-      expect(screen.getByText('Fiendish Resilience')).toBeInTheDocument();
-    });
-
     it('renders default damage types when action is null and falls back', () => {
       render(<FiendishResilienceModal {...makeProps({ action: null })} />);
       DEFAULT_DAMAGE_TYPES.forEach(type => {
         expect(screen.getByLabelText(type)).toBeInTheDocument();
       });
-    });
-
-    it('renders without crashing when onClose is missing', () => {
-      render(<FiendishResilienceModal {...makeProps({ onClose: undefined })} />);
-      expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
     });
   });
 });

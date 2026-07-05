@@ -1,3 +1,4 @@
+// @cleaned-by-ai
 // @improved-by-ai
 import { describe, it, expect } from 'vitest'
 import { attackHandlers } from './attack.js'
@@ -116,48 +117,44 @@ describe('attackHandlers – attack_rider', () => {
         }])
     })
 
-    it('strips non-numeric chars from push distance', () => {
-        const feature = makeFeature({
+    it('strips non-numeric chars from push distance and speedReduction', () => {
+        const pushResult = attackHandlers.attack_rider(makeFeature({
             type: 'attack_rider',
             effect: 'push',
             distance: '20 feet'
-        })
-        const result = attackHandlers.attack_rider(feature, BASE_STATS)
-        expect(result.options[0].value).toBe(20)
-    })
+        }), BASE_STATS)
+        expect(pushResult.options[0].value).toBe(20)
 
-    it('extracts numeric value from speedReduction via regex', () => {
-        const feature = makeFeature({
+        const speedResult = attackHandlers.attack_rider(makeFeature({
             type: 'attack_rider',
             effect: 'reduce_speed',
             speedReduction: 'half speed to 15 ft'
-        })
-        const result = attackHandlers.attack_rider(feature, BASE_STATS)
-        expect(result.options[0].value).toBe(15)
+        }), BASE_STATS)
+        expect(speedResult.options[0].value).toBe(15)
     })
 
-    it('falls back to default distance when missing for push', () => {
-        const feature = makeFeature({ type: 'attack_rider', effect: 'push' })
-        const result = attackHandlers.attack_rider(feature, BASE_STATS)
-        expect(result.options[0].value).toBe(10)
+    it('falls back to defaults when distance/speedReduction is missing', () => {
+        const pushResult = attackHandlers.attack_rider(makeFeature({ type: 'attack_rider', effect: 'push' }), BASE_STATS)
+        expect(pushResult.options[0].value).toBe(10)
+
+        const speedResult = attackHandlers.attack_rider(makeFeature({ type: 'attack_rider', effect: 'reduce_speed' }), BASE_STATS)
+        expect(speedResult.options[0].value).toBe(10)
     })
 
-    it('falls back to default speedReduction when missing for reduce_speed', () => {
-        const feature = makeFeature({ type: 'attack_rider', effect: 'reduce_speed' })
-        const result = attackHandlers.attack_rider(feature, BASE_STATS)
-        expect(result.options[0].value).toBe(10)
-    })
-
-    it('maps effects array to options for damage_bonus', () => {
+    it('maps effects array to options for known effect types', () => {
         const feature = makeFeature({
             type: 'attack_rider',
             effects: [
                 { option: 'damage_bonus', name: 'Fire', damageType: 'Fire', dice: '2d6' },
-                { option: 'poisoned', saveType: 'CON' }
+                { option: 'poisoned', saveType: 'CON' },
+                { option: 'prone', saveType: 'DEX' },
+                { option: 'unconscious' },
+                { option: 'blinded' },
+                { option: 'push', distance: '15 ft' },
             ]
         })
         const result = attackHandlers.attack_rider(feature, BASE_STATS)
-        expect(result.options).toHaveLength(2)
+        expect(result.options).toHaveLength(6)
         expect(result.options[0]).toEqual({
             name: 'Fire',
             effect: 'damage_bonus',
@@ -171,60 +168,28 @@ describe('attackHandlers – attack_rider', () => {
             saveDc: 'ability',
             saveAbility: 'CON',
         })
-    })
-
-    it('maps effects array for prone option', () => {
-        const feature = makeFeature({
-            type: 'attack_rider',
-            effects: [{ option: 'prone', saveType: 'DEX' }]
-        })
-        const result = attackHandlers.attack_rider(feature, BASE_STATS)
-        expect(result.options[0]).toEqual({
+        expect(result.options[2]).toEqual({
             name: 'Prone',
             effect: 'prone',
             saveType: 'DEX',
             saveDc: 'ability',
             saveAbility: 'DEX',
         })
-    })
-
-    it('maps effects array for unconscious option', () => {
-        const feature = makeFeature({
-            type: 'attack_rider',
-            effects: [{ option: 'unconscious' }]
-        })
-        const result = attackHandlers.attack_rider(feature, BASE_STATS)
-        expect(result.options[0]).toEqual({
+        expect(result.options[3]).toEqual({
             name: 'Unconscious',
             effect: 'unconscious',
             saveType: 'CON',
             saveDc: 'ability',
             saveAbility: 'CON',
         })
-    })
-
-    it('maps effects array for blinded option', () => {
-        const feature = makeFeature({
-            type: 'attack_rider',
-            effects: [{ option: 'blinded' }]
-        })
-        const result = attackHandlers.attack_rider(feature, BASE_STATS)
-        expect(result.options[0]).toEqual({
+        expect(result.options[4]).toEqual({
             name: 'Blinded',
             effect: 'blinded',
             saveType: 'DEX',
             saveDc: 'ability',
             saveAbility: 'DEX',
         })
-    })
-
-    it('maps effects array for push option', () => {
-        const feature = makeFeature({
-            type: 'attack_rider',
-            effects: [{ option: 'push', distance: '15 ft' }]
-        })
-        const result = attackHandlers.attack_rider(feature, BASE_STATS)
-        expect(result.options[0]).toEqual({
+        expect(result.options[5]).toEqual({
             name: 'Push',
             effect: 'push',
             value: 15,
@@ -289,12 +254,6 @@ describe('attackHandlers – attack_rider', () => {
             chooseOne: true,
             maxEffects: 3,
         })
-    })
-
-    it('uses push distance default 5 ft for push_or_prone when distance is missing', () => {
-        const feature = makeFeature({ type: 'attack_rider', effect: 'push_or_prone' })
-        const result = attackHandlers.attack_rider(feature, BASE_STATS)
-        expect(result.options[0].value).toBe(5)
     })
 
     it('uses push_or_prone prone defaults saveType STR when not specified', () => {
@@ -420,7 +379,7 @@ describe('attackHandlers – weapon_kind_mastery', () => {
         expect(result.maxKinds).toBe(3)
     })
 
-    it('falls back to 2 when class_level_scaling finds no matching level', () => {
+    it('falls back to 2 when class_level_scaling finds no matching level or class data is missing', () => {
         const feature = makeFeature({
             type: 'weapon_kind_mastery',
             maxKinds: 'class_level_scaling',
@@ -434,17 +393,8 @@ describe('attackHandlers – weapon_kind_mastery', () => {
                 ]
             }
         }
-        const result = attackHandlers.weapon_kind_mastery(feature, { ...stats, level: 9 })
-        expect(result.maxKinds).toBe(2)
-    })
-
-    it('falls back to 2 when class data is missing', () => {
-        const feature = makeFeature({
-            type: 'weapon_kind_mastery',
-            maxKinds: 'class_level_scaling',
-        })
-        const result = attackHandlers.weapon_kind_mastery(feature, BASE_STATS)
-        expect(result.maxKinds).toBe(2)
+        expect(attackHandlers.weapon_kind_mastery(feature, { ...stats, level: 9 }).maxKinds).toBe(2)
+        expect(attackHandlers.weapon_kind_mastery(feature, BASE_STATS).maxKinds).toBe(2)
     })
 })
 

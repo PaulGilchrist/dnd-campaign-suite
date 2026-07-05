@@ -106,23 +106,12 @@ describe('getPreSelectedSpells', () => {
       expect(result).toContain('Magic Missile');
     });
 
-    it('handles missing class property gracefully', async () => {
-      const formData = {
-        rules: '5e',
-        level: 3,
-      };
-      const result = await getPreSelectedSpells(formData);
-      expect(result).toEqual([]);
-    });
+    it('handles missing class or subclass properties gracefully', async () => {
+      const noClass = { rules: '5e', level: 3 };
+      expect(await getPreSelectedSpells(noClass)).toEqual([]);
 
-    it('handles missing subclass property gracefully', async () => {
-      const formData = {
-        rules: '5e',
-        level: 3,
-        class: { name: 'Wizard' },
-      };
-      const result = await getPreSelectedSpells(formData);
-      expect(result).toEqual([]);
+      const noSubclass = { rules: '5e', level: 3, class: { name: 'Wizard' } };
+      expect(await getPreSelectedSpells(noSubclass)).toEqual([]);
     });
   });
 
@@ -148,33 +137,12 @@ describe('getPreSelectedSpells', () => {
       expect(result).toContain('Guidance');
     });
 
-    it('handles race with no traits', async () => {
-      const formData = {
-        rules: '5e',
-        level: 1,
-        race: { name: 'Human' },
-      };
-      const result = await getPreSelectedSpells(formData);
-      expect(result).toEqual([]);
-    });
+    it('handles missing race data or property gracefully', async () => {
+      const noRace = { rules: '5e', level: 1 };
+      expect(await getPreSelectedSpells(noRace)).toEqual([]);
 
-    it('handles missing race data gracefully', async () => {
-      const formData = {
-        rules: '5e',
-        level: 1,
-        race: { name: 'NonExistentRace' },
-      };
-      const result = await getPreSelectedSpells(formData);
-      expect(result).toEqual([]);
-    });
-
-    it('handles missing race property gracefully', async () => {
-      const formData = {
-        rules: '5e',
-        level: 1,
-      };
-      const result = await getPreSelectedSpells(formData);
-      expect(result).toEqual([]);
+      const missingRaceData = { rules: '5e', level: 1, race: { name: 'NonExistentRace' } };
+      expect(await getPreSelectedSpells(missingRaceData)).toEqual([]);
     });
 
     it('finds subrace in 2024 from parent race subraces', async () => {
@@ -256,40 +224,22 @@ describe('getPreSelectedSpells', () => {
       expect(result).toContain('Misty Step');
     });
 
+    it('handles missing, null, or empty feats gracefully', async () => {
+      const noFeats = { rules: '5e', level: 1 };
+      expect(await getPreSelectedSpells(noFeats)).toEqual([]);
+
+      const nullFeats = { rules: '5e', level: 1, feats: null };
+      expect(await getPreSelectedSpells(nullFeats)).toEqual([]);
+
+      const emptyFeats = { rules: '5e', level: 1, feats: [] };
+      expect(await getPreSelectedSpells(emptyFeats)).toEqual([]);
+    });
+
     it('handles non-existent feat gracefully', async () => {
       const formData = {
         rules: '5e',
         level: 1,
         feats: ['NonExistentFeat'],
-      };
-      const result = await getPreSelectedSpells(formData);
-      expect(result).toEqual([]);
-    });
-
-    it('handles empty feats array', async () => {
-      const formData = {
-        rules: '5e',
-        level: 1,
-        feats: [],
-      };
-      const result = await getPreSelectedSpells(formData);
-      expect(result).toEqual([]);
-    });
-
-    it('handles missing feats property gracefully', async () => {
-      const formData = {
-        rules: '5e',
-        level: 1,
-      };
-      const result = await getPreSelectedSpells(formData);
-      expect(result).toEqual([]);
-    });
-
-    it('handles null feats property gracefully', async () => {
-      const formData = {
-        rules: '5e',
-        level: 1,
-        feats: null,
       };
       const result = await getPreSelectedSpells(formData);
       expect(result).toEqual([]);
@@ -345,142 +295,57 @@ describe('getPreSelectedSpells', () => {
   });
 
   describe('level parsing', () => {
-    it('parses numeric level as number', async () => {
-      const formData = {
-        rules: '5e',
-        level: 3,
-        class: { name: 'Wizard', subclass: { name: 'School of Evocation' } },
-      };
-      const result = await getPreSelectedSpells(formData);
-      expect(result).toContain('Magic Missile');
+    it('parses numeric and string levels', async () => {
+      const base = { class: { name: 'Wizard', subclass: { name: 'School of Evocation' } } };
+      const numeric = await getPreSelectedSpells({ rules: '5e', level: 3, ...base });
+      expect(numeric).toContain('Magic Missile');
+
+      const stringLevel = await getPreSelectedSpells({ rules: '5e', level: '3', ...base });
+      expect(stringLevel).toContain('Magic Missile');
     });
 
-    it('parses level from numeric string', async () => {
-      const formData = {
-        rules: '5e',
-        level: '3',
-        class: { name: 'Wizard', subclass: { name: 'School of Evocation' } },
-      };
-      const result = await getPreSelectedSpells(formData);
-      expect(result).toContain('Magic Missile');
-    });
+    it('defaults to level 1 for invalid, zero, or empty string levels', async () => {
+      const base = { rules: '5e', class: { name: 'Wizard', subclass: { name: 'School of Evocation' } } };
+      const invalid = await getPreSelectedSpells({ ...base, level: 'invalid' });
+      expect(invalid).not.toContain('Magic Missile');
 
-    it('defaults to level 1 for invalid level string', async () => {
-      const formData = {
-        rules: '5e',
-        level: 'invalid',
-        class: { name: 'Wizard', subclass: { name: 'School of Evocation' } },
-      };
-      const result = await getPreSelectedSpells(formData);
-      expect(result).not.toContain('Magic Missile');
-    });
+      const zero = await getPreSelectedSpells({ ...base, level: 0 });
+      expect(zero).not.toContain('Magic Missile');
 
-    it('defaults to level 1 for zero level', async () => {
-      const formData = {
-        rules: '5e',
-        level: 0,
-        class: { name: 'Wizard', subclass: { name: 'School of Evocation' } },
-      };
-      const result = await getPreSelectedSpells(formData);
-      expect(result).not.toContain('Magic Missile');
-    });
-
-    it('defaults to level 1 for empty string level', async () => {
-      const formData = {
-        rules: '5e',
-        level: '',
-        class: { name: 'Wizard', subclass: { name: 'School of Evocation' } },
-      };
-      const result = await getPreSelectedSpells(formData);
-      expect(result).not.toContain('Magic Missile');
+      const empty = await getPreSelectedSpells({ ...base, level: '' });
+      expect(empty).not.toContain('Magic Missile');
     });
   });
 
   describe('ruleset selection', () => {
     it('defaults to 5e when rules is missing', async () => {
-      const formData = {
-        level: 1,
-        race: { name: 'High Elf' },
-      };
-      await getPreSelectedSpells(formData);
+      await getPreSelectedSpells({ level: 1, race: { name: 'High Elf' } });
       expect(loadRaceData).toHaveBeenCalledWith('5e');
     });
 
-    it('uses 2024 rules when specified', async () => {
-      const formData = {
-        rules: '2024',
-        level: 1,
-        race: { name: 'High Elf' },
-      };
-      await getPreSelectedSpells(formData);
+    it('uses 2024 rules when specified for race, class, and feats', async () => {
+      await getPreSelectedSpells({ rules: '2024', level: 1, race: { name: 'High Elf' } });
       expect(loadRaceData).toHaveBeenCalledWith('2024');
-    });
 
-    it('loads class data with the correct ruleset version', async () => {
-      const formData = {
-        rules: '2024',
-        level: 3,
-        class: { name: 'Wizard', subclass: { name: 'School of Evocation' } },
-      };
-      await getPreSelectedSpells(formData);
+      await getPreSelectedSpells({ rules: '2024', level: 3, class: { name: 'Wizard', subclass: { name: 'School of Evocation' } } });
       expect(loadClassData).toHaveBeenCalledWith('2024');
-    });
 
-    it('loads feat data with the correct ruleset version', async () => {
-      const formData = {
-        rules: '2024',
-        level: 1,
-        feats: ['Magic Initiate'],
-      };
-      await getPreSelectedSpells(formData);
+      await getPreSelectedSpells({ rules: '2024', level: 1, feats: ['Magic Initiate'] });
       expect(loadFeatData).toHaveBeenCalledWith('2024');
     });
   });
 
   describe('Druidic feature (2024 ruleset)', () => {
-    it('adds Speak with Animals for Druid in 2024 ruleset', async () => {
-      const formData = {
-        rules: '2024',
-        level: 1,
-        class: { name: 'Druid' },
-      };
-      const result = await getPreSelectedSpells(formData);
-      expect(result).toContain('Speak with Animals');
-    });
+    it('adds Speak with Animals for Druid in 2024 but not 5e', async () => {
+      const druid2024 = await getPreSelectedSpells({ rules: '2024', level: 1, class: { name: 'Druid' } });
+      expect(druid2024).toContain('Speak with Animals');
 
-    it('does not add Speak with Animals for Druid in 5e ruleset', async () => {
-      const formData = {
-        rules: '5e',
-        level: 1,
-        class: { name: 'Druid' },
-      };
-      const result = await getPreSelectedSpells(formData);
-      expect(result).not.toContain('Speak with Animals');
-    });
-
-    it('adds Speak with Animals for Druid with subclass in 2024', async () => {
-      const mockClassesWithDruid = [
-        ...mockClasses,
-        { name: 'Druid', index: 'druid', subclasses: [{ name: 'Circle of the Land' }] },
-      ];
-      vi.mocked(loadClassData).mockResolvedValue(mockClassesWithDruid);
-
-      const formData = {
-        rules: '2024',
-        level: 1,
-        class: { name: 'Druid', subclass: { name: 'Circle of the Land' } },
-      };
-      const result = await getPreSelectedSpells(formData);
-      expect(result).toContain('Speak with Animals');
+      const druid5e = await getPreSelectedSpells({ rules: '5e', level: 1, class: { name: 'Druid' } });
+      expect(druid5e).not.toContain('Speak with Animals');
     });
 
     it('does not add Speak with Animals for non-Druid classes in 2024', async () => {
-      const formData = {
-        rules: '2024',
-        level: 1,
-        class: { name: 'Wizard' },
-      };
-      const result = await getPreSelectedSpells(formData);
+      const result = await getPreSelectedSpells({ rules: '2024', level: 1, class: { name: 'Wizard' } });
       expect(result).not.toContain('Speak with Animals');
     });
   });

@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import MistyWandererModal from './MistyWandererModal.jsx';
@@ -46,7 +46,7 @@ describe('MistyWandererModal', () => {
     vi.clearAllMocks();
   });
 
-  // ── Initial render ──
+  // ── Rendering ──
 
   describe('initial render', () => {
     it('renders the modal overlay, container, header, body, and actions sections', () => {
@@ -64,7 +64,7 @@ describe('MistyWandererModal', () => {
       expect(document.querySelector('.sp-header .fa-solid.fa-cloud')).toBeInTheDocument();
     });
 
-    it('renders the Misty Step description paragraph', () => {
+    it('renders the Misty Step description with teleport details', () => {
       render(<MistyWandererModal {...makeProps()} />);
       const body = document.querySelector('.sp-body p');
       expect(body.textContent).toContain('Cast');
@@ -72,13 +72,9 @@ describe('MistyWandererModal', () => {
       expect(body.textContent).toContain('teleport up to 30 feet');
     });
 
-    it('renders the ally selection prompt', () => {
+    it('renders the ally selection prompt and description', () => {
       render(<MistyWandererModal {...makeProps()} />);
       expect(screen.getByText(/Bring a willing creature within 5 feet/)).toBeInTheDocument();
-    });
-
-    it('renders the ally description text', () => {
-      render(<MistyWandererModal {...makeProps()} />);
       expect(screen.getByText(/The creature appears in an unoccupied space within 5 feet/)).toBeInTheDocument();
     });
 

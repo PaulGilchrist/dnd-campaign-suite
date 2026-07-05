@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import AttackRiderModal from './AttackRiderModal.jsx';
@@ -112,49 +112,13 @@ describe('AttackRiderModal - Versatile Trickster', () => {
       });
     });
 
-    it('shows Versatile Trickster target names with sizes', async () => {
-      render(<AttackRiderModal {...makeProps()} />);
-      selectSingleOption('Burning Hands');
-      clickApplySingle();
-
-      await waitFor(() => {
-        const labels = document.querySelectorAll('label');
-        const orcALabel = Array.from(labels).find(l => l.textContent.includes('Orc A'));
-        expect(orcALabel.textContent).toContain('Medium');
-      });
-    });
-
-    it('renders radio inputs for Versatile Trickster target selection', async () => {
-      render(<AttackRiderModal {...makeProps()} />);
-      selectSingleOption('Burning Hands');
-      clickApplySingle();
-
-      await waitFor(() => {
-        const radios = document.querySelectorAll('input[name="secondaryTarget"]');
-        expect(radios).toHaveLength(2);
-      });
-    });
-
-    it('selects a Versatile Trickster target when clicked', async () => {
+    it('selects a Versatile Trickster target and enables the confirm button', async () => {
       render(<AttackRiderModal {...makeProps()} />);
       selectSingleOption('Burning Hands');
       clickApplySingle();
 
       await waitFor(() => {
         const labels = document.querySelectorAll('label.secondary-target-row');
-        const orcLabel = Array.from(labels).find(l => l.textContent.includes('Orc A'));
-        fireEvent.click(orcLabel);
-        expect(orcLabel).toHaveClass('secondary-target-selected');
-      });
-    });
-
-    it('enables the trip button after selecting a Versatile Trickster target', async () => {
-      render(<AttackRiderModal {...makeProps()} />);
-      selectSingleOption('Burning Hands');
-      clickApplySingle();
-
-      await waitFor(() => {
-        const labels = document.querySelectorAll('label');
         const orcLabel = Array.from(labels).find(l => l.textContent.includes('Orc A'));
         fireEvent.click(orcLabel);
       });
@@ -165,19 +129,20 @@ describe('AttackRiderModal - Versatile Trickster', () => {
       });
     });
 
-    it('calls applyVersatileTrickster when Trip Secondary Target is clicked', async () => {
+    it('calls applyVersatileTrickster when Trip Secondary Target is clicked and closes on Done', async () => {
+      const onClose = vi.fn();
       const { applyVersatileTrickster } = await import('../../../../services/automation/handlers/class-fighter-rogue/versatileTricksterHandler.js');
       applyVersatileTrickster.mockResolvedValue({
         type: 'popup',
         payload: { type: 'automation_info', name: 'Trip', description: 'Secondary target tripped.' },
       });
 
-      render(<AttackRiderModal {...makeProps()} />);
+      render(<AttackRiderModal {...makeProps({ onClose })} />);
       selectSingleOption('Burning Hands');
       clickApplySingle();
 
       await waitFor(() => {
-        const labels = document.querySelectorAll('label');
+        const labels = document.querySelectorAll('label.secondary-target-row');
         const orcLabel = Array.from(labels).find(l => l.textContent.includes('Orc A'));
         fireEvent.click(orcLabel);
       });
@@ -188,61 +153,11 @@ describe('AttackRiderModal - Versatile Trickster', () => {
 
       await waitFor(() => {
         expect(applyVersatileTrickster).toHaveBeenCalled();
-      });
-    });
-
-    it('shows result after applying Versatile Trickster', async () => {
-      const { applyVersatileTrickster } = await import('../../../../services/automation/handlers/class-fighter-rogue/versatileTricksterHandler.js');
-      applyVersatileTrickster.mockResolvedValue({
-        type: 'popup',
-        payload: { type: 'automation_info', name: 'Trip', description: 'Secondary target tripped.' },
-      });
-
-      render(<AttackRiderModal {...makeProps()} />);
-      selectSingleOption('Burning Hands');
-      clickApplySingle();
-
-      await waitFor(() => {
-        const labels = document.querySelectorAll('label');
-        const orcLabel = Array.from(labels).find(l => l.textContent.includes('Orc A'));
-        fireEvent.click(orcLabel);
-      });
-
-      await waitFor(() => {
-        fireEvent.click(screen.getByRole('button', { name: /Trip Secondary Target/ }));
-      });
-
-      await waitFor(() => {
         expect(screen.getByText('Done')).toBeInTheDocument();
       });
-    });
 
-    it('calls onClose when Done is clicked after Versatile Trickster apply', async () => {
-      const onClose = vi.fn();
-      const { applyVersatileTrickster } = await import('../../../../services/automation/handlers/class-fighter-rogue/versatileTricksterHandler.js');
-      applyVersatileTrickster.mockResolvedValue({
-        type: 'popup',
-        payload: { type: 'automation_info', name: 'Trip', description: 'Done.' },
-      });
-
-      render(<AttackRiderModal {...makeProps({ onClose })} />);
-      selectSingleOption('Burning Hands');
-      clickApplySingle();
-
-      await waitFor(() => {
-        const labels = document.querySelectorAll('label');
-        const orcLabel = Array.from(labels).find(l => l.textContent.includes('Orc A'));
-        fireEvent.click(orcLabel);
-      });
-
-      await waitFor(() => {
-        fireEvent.click(screen.getByRole('button', { name: /Trip Secondary Target/ }));
-      });
-
-      await waitFor(() => {
-        fireEvent.click(screen.getByText('Done'));
-        expect(onClose).toHaveBeenCalledTimes(1);
-      });
+      fireEvent.click(screen.getByText('Done'));
+      expect(onClose).toHaveBeenCalledTimes(1);
     });
 
     it('skips Versatile Trickster when Skip is clicked', async () => {

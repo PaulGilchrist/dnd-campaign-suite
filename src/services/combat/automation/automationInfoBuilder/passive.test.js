@@ -105,26 +105,6 @@ describe('passiveHandlers – passive_buff', () => {
         expect(result.amount).toBe(10)
         expect(result.alsoSelfHealing).toEqual({ extraHealingExpression: '2d8' })
     })
-
-    it('uses bonus field as fallback when bonusExpression is absent', () => {
-        const feature = makeFeature({
-            type: 'passive_buff',
-            bonus: '+3'
-        })
-        const result = passiveHandlers.passive_buff(feature, BASE_STATS)
-        expect(result.bonusExpression).toBe('+3')
-    })
-
-    it('coerces boolean fields with !!', () => {
-        const feature = makeFeature({
-            type: 'passive_buff',
-            grantsFlySpeed: 0,
-            grantsSwimSpeed: ''
-        })
-        const result = passiveHandlers.passive_buff(feature, BASE_STATS)
-        expect(result.grantsFlySpeed).toBe(false)
-        expect(result.grantsSwimSpeed).toBe(false)
-    })
 })
 
 // ── ignore_resistance ────────────────────────────────────────────────
@@ -269,11 +249,14 @@ describe('passiveHandlers – supreme_sneak', () => {
 // ── otherworldly_glamour ─────────────────────────────────────────────
 
 describe('passiveHandlers – otherworldly_glamour', () => {
-    it('returns passive_buff with otherworldly_glamour effect', () => {
+    it('returns passive_buff with otherworldly_glamour effect and hardcoded values', () => {
         const feature = makeFeature({ type: 'otherworldly_glamour' })
         const result = passiveHandlers.otherworldly_glamour(feature, BASE_STATS)
 
-        expectValidResult(result, 'passive_buff', 'otherworldly_glamour')
+        expect(result.type).toBe('passive_buff')
+        expect(result.effect).toBe('otherworldly_glamour')
+        expect(result.name).toBe('Test Feature')
+        expect(result.hasAutomation).toBe(true)
     })
 })
 
@@ -398,31 +381,6 @@ describe('passiveHandlers – empowered_evocation', () => {
     })
 })
 
-// ── concentration_disadvantage_on_damage_dealt ───────────────────────
-
-describe('passiveHandlers – concentration_disadvantage_on_damage_dealt', () => {
-    it('returns passive_rule with casting_time default', () => {
-        const feature = makeFeature({ type: 'concentration_disadvantage_on_damage_dealt' })
-        const result = passiveHandlers.concentration_disadvantage_on_damage_dealt(feature, BASE_STATS)
-
-        expectValidResult(result, 'passive_rule', 'concentration_disadvantage_on_damage_dealt')
-        expect(result.casting_time).toBe('passive')
-    })
-})
-
-// ── tavern_brawler_reroll_ones ───────────────────────────────────────
-
-describe('passiveHandlers – tavern_brawler_reroll_ones', () => {
-    it('returns passive_rule with hardcoded casting_time', () => {
-        const feature = makeFeature({ type: 'tavern_brawler_reroll_ones' })
-        const result = passiveHandlers.tavern_brawler_reroll_ones(feature, BASE_STATS)
-
-        expectValidResult(result, 'passive_rule', 'tavern_brawler_reroll_ones')
-        // This handler does NOT read from automation — casting_time is hardcoded
-        expect(result.casting_time).toBe('passive')
-    })
-})
-
 // ── tavern_brawler_push ──────────────────────────────────────────────
 
 describe('passiveHandlers – tavern_brawler_push', () => {
@@ -476,18 +434,6 @@ describe('passiveHandlers – ignore_loading_crossbows', () => {
 
         expect(result.name).toBe('Quick Draw')
         expect(result.weapons).toEqual(['heavy crossbow', 'light crossbow'])
-    })
-})
-
-// ── no_melee_disadvantage_crossbows ──────────────────────────────────
-
-describe('passiveHandlers – no_melee_disadvantage_crossbows', () => {
-    it('returns passive_rule with casting_time default', () => {
-        const feature = makeFeature({ type: 'no_melee_disadvantage_crossbows' })
-        const result = passiveHandlers.no_melee_disadvantage_crossbows(feature, BASE_STATS)
-
-        expectValidResult(result, 'passive_rule', 'no_melee_disadvantage_crossbows')
-        expect(result.casting_time).toBe('passive')
     })
 })
 

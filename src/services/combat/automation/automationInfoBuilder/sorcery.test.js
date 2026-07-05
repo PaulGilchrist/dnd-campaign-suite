@@ -1,3 +1,4 @@
+// @cleaned-by-ai
 // @improved-by-ai
 import { describe, it, expect } from 'vitest'
 import { sorceryHandlers } from './sorcery.js'
@@ -18,35 +19,22 @@ describe('sorceryHandlers – sorcery_aura', () => {
         })
     })
 
-    it('passes through custom automation fields', () => {
-        const feature = makeFeature({
-            type: 'sorcery_aura',
-            recharge: 'short_rest',
-            casting_time: '1 action',
-        })
+    it('passes through custom fields', () => {
+        const feature = makeFeature({ type: 'sorcery_aura', recharge: 'short_rest', casting_time: '1 action' })
         const result = sorceryHandlers.sorcery_aura(feature, BASE_STATS)
-
         expect(result.recharge).toBe('short_rest')
         expect(result.casting_time).toBe('1 action')
     })
 
     it('falls back to defaults when automation fields are empty strings', () => {
-        const feature = makeFeature({
-            type: 'sorcery_aura',
-            recharge: '',
-            casting_time: '',
-        })
+        const feature = makeFeature({ type: 'sorcery_aura', recharge: '', casting_time: '' })
         const result = sorceryHandlers.sorcery_aura(feature, BASE_STATS)
-
         expect(result.recharge).toBe('long_rest')
         expect(result.casting_time).toBe('1 bonus action')
     })
 
     it('uses custom name from feature', () => {
-        const feature = makeFeature({ type: 'sorcery_aura' }, 'Custom Aura')
-        const result = sorceryHandlers.sorcery_aura(feature, BASE_STATS)
-
-        expect(result.name).toBe('Custom Aura')
+        expect(sorceryHandlers.sorcery_aura(makeFeature({ type: 'sorcery_aura' }, 'Custom Aura'), BASE_STATS).name).toBe('Custom Aura')
     })
 })
 
@@ -64,26 +52,16 @@ describe('sorceryHandlers – sorcery_incarnate', () => {
         })
     })
 
-    it('passes through custom automation fields', () => {
-        const feature = makeFeature({
-            type: 'sorcery_incarnate',
-            casting_time: '1 action',
-            cost: 3,
-        })
+    it('passes through custom fields', () => {
+        const feature = makeFeature({ type: 'sorcery_incarnate', casting_time: '1 action', cost: 3 })
         const result = sorceryHandlers.sorcery_incarnate(feature, BASE_STATS)
-
         expect(result.casting_time).toBe('1 action')
         expect(result.cost).toBe(3)
     })
 
-    it('falls back to defaults when automation fields are empty strings', () => {
-        const feature = makeFeature({
-            type: 'sorcery_incarnate',
-            casting_time: '',
-            cost: 0,
-        })
+    it('falls back to defaults when automation fields are empty strings or zero', () => {
+        const feature = makeFeature({ type: 'sorcery_incarnate', casting_time: '', cost: 0 })
         const result = sorceryHandlers.sorcery_incarnate(feature, BASE_STATS)
-
         expect(result.casting_time).toBe('1 bonus action')
         expect(result.cost).toBe(2)
     })
@@ -107,17 +85,9 @@ describe('sorceryHandlers – bastion_of_law', () => {
         })
     })
 
-    it('passes through custom automation fields', () => {
-        const feature = makeFeature({
-            type: 'bastion_of_law',
-            range: '60_ft',
-            action: 'bonus_action',
-            resourceCost: 'channel_divinity',
-            maxSP: 10,
-            minSP: 2,
-        })
+    it('passes through custom fields', () => {
+        const feature = makeFeature({ type: 'bastion_of_law', range: '60_ft', action: 'bonus_action', resourceCost: 'channel_divinity', maxSP: 10, minSP: 2 })
         const result = sorceryHandlers.bastion_of_law(feature, BASE_STATS)
-
         expect(result.range).toBe('60_ft')
         expect(result.action).toBe('bonus_action')
         expect(result.resourceCost).toBe('channel_divinity')
@@ -126,16 +96,8 @@ describe('sorceryHandlers – bastion_of_law', () => {
     })
 
     it('falls back to defaults when automation fields are empty strings or zero', () => {
-        const feature = makeFeature({
-            type: 'bastion_of_law',
-            range: '',
-            action: '',
-            resourceCost: '',
-            maxSP: 0,
-            minSP: 0,
-        })
+        const feature = makeFeature({ type: 'bastion_of_law', range: '', action: '', resourceCost: '', maxSP: 0, minSP: 0 })
         const result = sorceryHandlers.bastion_of_law(feature, BASE_STATS)
-
         expect(result.range).toBe('30_ft')
         expect(result.action).toBe('action')
         expect(result.resourceCost).toBe('sorcery_points')
@@ -159,29 +121,17 @@ describe('sorceryHandlers – transe_of_order', () => {
         })
     })
 
-    it('passes through custom automation fields', () => {
-        const feature = makeFeature({
-            type: 'transe_of_order',
-            duration: '10_minutes',
-            action: 'action',
-            restoreCost: 10,
-        })
+    it('passes through custom fields', () => {
+        const feature = makeFeature({ type: 'transe_of_order', duration: '10_minutes', action: 'action', restoreCost: 10 })
         const result = sorceryHandlers.transe_of_order(feature, BASE_STATS)
-
         expect(result.duration).toBe('10_minutes')
         expect(result.action).toBe('action')
         expect(result.restoreCost).toBe(10)
     })
 
     it('falls back to defaults when automation fields are empty strings or zero', () => {
-        const feature = makeFeature({
-            type: 'transe_of_order',
-            duration: '',
-            action: '',
-            restoreCost: 0,
-        })
+        const feature = makeFeature({ type: 'transe_of_order', duration: '', action: '', restoreCost: 0 })
         const result = sorceryHandlers.transe_of_order(feature, BASE_STATS)
-
         expect(result.duration).toBe('1_minute')
         expect(result.action).toBe('bonus_action')
         expect(result.restoreCost).toBe(5)
@@ -204,16 +154,9 @@ describe('sorceryHandlers – clockwork_cavalcade', () => {
         })
     })
 
-    it('passes through custom automation fields', () => {
-        const feature = makeFeature({
-            type: 'clockwork_cavalcade',
-            action: 'bonus_action',
-            range: '15_ft_cube',
-            maxHeal: 50,
-            restoreCost: 5,
-        })
+    it('passes through custom fields', () => {
+        const feature = makeFeature({ type: 'clockwork_cavalcade', action: 'bonus_action', range: '15_ft_cube', maxHeal: 50, restoreCost: 5 })
         const result = sorceryHandlers.clockwork_cavalcade(feature, BASE_STATS)
-
         expect(result.action).toBe('bonus_action')
         expect(result.range).toBe('15_ft_cube')
         expect(result.maxHeal).toBe(50)
@@ -221,15 +164,8 @@ describe('sorceryHandlers – clockwork_cavalcade', () => {
     })
 
     it('falls back to defaults when automation fields are empty strings or zero', () => {
-        const feature = makeFeature({
-            type: 'clockwork_cavalcade',
-            action: '',
-            range: '',
-            maxHeal: 0,
-            restoreCost: 0,
-        })
+        const feature = makeFeature({ type: 'clockwork_cavalcade', action: '', range: '', maxHeal: 0, restoreCost: 0 })
         const result = sorceryHandlers.clockwork_cavalcade(feature, BASE_STATS)
-
         expect(result.action).toBe('action')
         expect(result.range).toBe('30_ft_cube')
         expect(result.maxHeal).toBe(100)
@@ -267,52 +203,25 @@ describe('sorceryHandlers – warping_implosion', () => {
     it('returns correct defaults', () => {
         const feature = makeFeature({ type: 'warping_implosion' })
         const result = sorceryHandlers.warping_implosion(feature, BASE_STATS)
-
         expect(result).toMatchObject(expectedDefaults)
     })
 
-    it('calculates saveDc from ability when saveDc is "ability"', () => {
-        const feature = makeFeature({
-            type: 'warping_implosion',
-            saveDc: 'ability',
-            saveAbility: 'CHA',
-        })
-        const result = sorceryHandlers.warping_implosion(feature, BASE_STATS)
-
+    it('calculates saveDc from ability', () => {
         // CHA bonus=2, proficiency=3 => 8 + 2 + 3 = 13
-        expect(result.saveDc).toBe(13)
-    })
-
-    it('calculates saveDc from ability with different ability score', () => {
-        const feature = makeFeature({
-            type: 'warping_implosion',
-            saveDc: 'ability',
-            saveAbility: 'WIS',
-        })
-        const result = sorceryHandlers.warping_implosion(feature, BASE_STATS)
-
+        expect(sorceryHandlers.warping_implosion(makeFeature({ type: 'warping_implosion', saveDc: 'ability', saveAbility: 'CHA' }), BASE_STATS).saveDc).toBe(13)
         // WIS bonus=5, proficiency=3 => 8 + 5 + 3 = 16
-        expect(result.saveDc).toBe(16)
+        expect(sorceryHandlers.warping_implosion(makeFeature({ type: 'warping_implosion', saveDc: 'ability', saveAbility: 'WIS' }), BASE_STATS).saveDc).toBe(16)
     })
 
     it('uses explicit saveDc value when not "ability"', () => {
-        const feature = makeFeature({
-            type: 'warping_implosion',
-            saveDc: 15,
-        })
-        const result = sorceryHandlers.warping_implosion(feature, BASE_STATS)
-
-        expect(result.saveDc).toBe(15)
+        expect(sorceryHandlers.warping_implosion(makeFeature({ type: 'warping_implosion', saveDc: 15 }), BASE_STATS).saveDc).toBe(15)
     })
 
     it('defaults saveDc to 10 when not specified and not "ability"', () => {
-        const feature = makeFeature({ type: 'warping_implosion' })
-        const result = sorceryHandlers.warping_implosion(feature, BASE_STATS)
-
-        expect(result.saveDc).toBe(10)
+        expect(sorceryHandlers.warping_implosion(makeFeature({ type: 'warping_implosion' }), BASE_STATS).saveDc).toBe(10)
     })
 
-    it('passes through custom automation fields', () => {
+    it('passes through custom fields', () => {
         const feature = makeFeature({
             type: 'warping_implosion',
             action: 'bonus_action',
@@ -329,7 +238,6 @@ describe('sorceryHandlers – warping_implosion', () => {
             restoreCost: 3,
         })
         const result = sorceryHandlers.warping_implosion(feature, BASE_STATS)
-
         expect(result.action).toBe('bonus_action')
         expect(result.damage).toBe('4d6')
         expect(result.damageType).toBe('Force')
@@ -345,34 +253,21 @@ describe('sorceryHandlers – warping_implosion', () => {
         expect(result.restoreCost).toBe(3)
     })
 
-    it('passes through hasOptions, options, and optionDetails', () => {
-        const feature = makeFeature({
+    it('passes through options, optionDetails, dcSuccess, and custom name', () => {
+        const result = sorceryHandlers.warping_implosion(makeFeature({
             type: 'warping_implosion',
             hasOptions: true,
             options: ['option_a', 'option_b'],
             optionDetails: { option_a: 'Detail A' },
-        })
-        const result = sorceryHandlers.warping_implosion(feature, BASE_STATS)
-
+            dcSuccess: 'half damage',
+        }), BASE_STATS)
         expect(result.hasOptions).toBe(true)
         expect(result.options).toEqual(['option_a', 'option_b'])
         expect(result.optionDetails).toEqual({ option_a: 'Detail A' })
-    })
-
-    it('passes through dcSuccess', () => {
-        const feature = makeFeature({
-            type: 'warping_implosion',
-            dcSuccess: 'half damage',
-        })
-        const result = sorceryHandlers.warping_implosion(feature, BASE_STATS)
-
         expect(result.dcSuccess).toBe('half damage')
     })
 
-    it('passes through custom name from feature', () => {
-        const feature = makeFeature({ type: 'warping_implosion' }, 'Warping Doom')
-        const result = sorceryHandlers.warping_implosion(feature, BASE_STATS)
-
-        expect(result.name).toBe('Warping Doom')
+    it('uses custom name from feature', () => {
+        expect(sorceryHandlers.warping_implosion(makeFeature({ type: 'warping_implosion' }, 'Warping Doom'), BASE_STATS).name).toBe('Warping Doom')
     })
 })

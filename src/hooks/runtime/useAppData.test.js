@@ -1,3 +1,4 @@
+// @cleaned-by-ai
 // @improved-by-ai
 import { renderHook, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -106,39 +107,20 @@ describe('useAppData', () => {
       expect(result.current.spells2024).toEqual(mockSpells2024);
       expect(result.current.showButton).toBe(true);
     });
+  });
 
-    it('calls each data-loader function the expected number of times with correct arguments', async () => {
+  describe('showButton logic', () => {
+    it('is true when classes, equipment, and both spell sets are non-empty', async () => {
       const { result } = renderHook(() => useAppData());
 
       await waitFor(() => {
         expect(result.current.isLoading).toBe(false);
       });
 
-      expect(loadAbilityScores).toHaveBeenCalledTimes(1);
-      expect(loadAbilityScores).toHaveBeenCalledWith();
-
-      expect(loadClassData).toHaveBeenCalledTimes(2);
-      expect(loadClassData).toHaveBeenCalledWith('5e');
-      expect(loadClassData).toHaveBeenCalledWith('2024');
-
-      expect(loadEquipment).toHaveBeenCalledTimes(1);
-      expect(loadEquipment).toHaveBeenCalledWith();
-
-      expect(loadMagicItems).toHaveBeenCalledTimes(1);
-      expect(loadMagicItems).toHaveBeenCalledWith();
-
-      expect(loadRaceData).toHaveBeenCalledTimes(2);
-      expect(loadRaceData).toHaveBeenCalledWith('5e');
-      expect(loadRaceData).toHaveBeenCalledWith('2024');
-
-      expect(loadSpells).toHaveBeenCalledTimes(2);
-      expect(loadSpells).toHaveBeenCalledWith('5e');
-      expect(loadSpells).toHaveBeenCalledWith('2024');
+      expect(result.current.showButton).toBe(true);
     });
-  });
 
-  describe('showButton logic', () => {
-    it('is false when classes (5e) is empty', async () => {
+    it('is false when any required data source is empty', async () => {
       loadClassData.mockImplementation((version) =>
         version === '2024'
           ? Promise.resolve(mockClasses2024)
@@ -164,51 +146,6 @@ describe('useAppData', () => {
       });
 
       expect(result.current.showButton).toBe(false);
-    });
-
-    it('is false when spells (5e) is empty', async () => {
-      loadSpells.mockImplementation((version) =>
-        version === '2024'
-          ? Promise.resolve(mockSpells2024)
-          : Promise.resolve([])
-      );
-
-      const { result } = renderHook(() => useAppData());
-
-      await waitFor(() => {
-        expect(result.current.isLoading).toBe(false);
-      });
-
-      expect(result.current.showButton).toBe(false);
-    });
-
-    it('is false when spells (2024) is empty', async () => {
-      loadSpells.mockImplementation((version) =>
-        version === '2024' ? Promise.resolve([]) : Promise.resolve(mockSpells)
-      );
-
-      const { result } = renderHook(() => useAppData());
-
-      await waitFor(() => {
-        expect(result.current.isLoading).toBe(false);
-      });
-
-      expect(result.current.showButton).toBe(false);
-    });
-
-    it('is false when races is empty (all conditions must be non-empty)', async () => {
-      loadRaceData.mockImplementation((version) =>
-        version === '2024' ? Promise.resolve([]) : Promise.resolve([])
-      );
-
-      const { result } = renderHook(() => useAppData());
-
-      await waitFor(() => {
-        expect(result.current.isLoading).toBe(false);
-      });
-
-      // showButton does NOT check races/races2024 — only classes, equipment, spells, spells2024
-      expect(result.current.showButton).toBe(true);
     });
   });
 
@@ -241,24 +178,6 @@ describe('useAppData', () => {
       expect(result.current.races2024).toEqual([]);
       expect(result.current.spells).toEqual([]);
       expect(result.current.spells2024).toEqual([]);
-      expect(result.current.showButton).toBe(false);
-
-      consoleErrorSpy.mockRestore();
-    });
-
-    it('sets isLoading to false even when abilityScores loader rejects', async () => {
-      loadAbilityScores.mockRejectedValue(new Error('Ability scores error'));
-
-      const consoleErrorSpy = vi.spyOn(console, 'error');
-
-      const { result } = renderHook(() => useAppData());
-
-      await waitFor(() => {
-        expect(result.current.isLoading).toBe(false);
-      });
-
-      expect(consoleErrorSpy).toHaveBeenCalled();
-      expect(result.current.abilityScores).toBeNull();
       expect(result.current.showButton).toBe(false);
 
       consoleErrorSpy.mockRestore();

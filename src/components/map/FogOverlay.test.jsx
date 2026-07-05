@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { render } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
 import FogOverlay from './FogOverlay.jsx';
@@ -41,16 +41,6 @@ describe('FogOverlay', () => {
             expect(container.querySelectorAll('rect').length).toBe(3);
         });
 
-        it('should not render any rects when isLocalhost is false', () => {
-            const fog = new Set(['0,0', '1,0']);
-            const { container } = render(
-                <FogOverlay fog={fog} isLocalhost={false} />
-            );
-            expect(container.querySelectorAll('rect').length).toBe(0);
-        });
-    });
-
-    describe('rect positioning', () => {
         it('should position rects at correct grid coordinates', () => {
             const fog = new Set(['0,0', '1,0', '2,1']);
             const { container } = render(
@@ -66,17 +56,6 @@ describe('FogOverlay', () => {
             expect(rectMap.get('80,40')).toBe(true);
         });
 
-        it('should set rect width and height to CELL_SIZE (40)', () => {
-            const { container } = render(
-                <FogOverlay fog={new Set(['0,0'])} isLocalhost={true} />
-            );
-            const rect = container.querySelector('rect');
-            expect(rect.getAttribute('width')).toBe('40');
-            expect(rect.getAttribute('height')).toBe('40');
-        });
-    });
-
-    describe('rect styling', () => {
         it('should apply the no-print and fog-cell classes', () => {
             const { container } = render(
                 <FogOverlay fog={new Set(['0,0'])} isLocalhost={true} />

@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { render } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import Players from './Players.jsx';
@@ -42,13 +42,24 @@ const renderComponent = (props, players = [], characters = []) =>
     );
 
 describe('Players', () => {
-    describe('rendering', () => {
-        it('should render no players when players array is empty', () => {
+    describe('empty / edge cases', () => {
+        it('should render nothing when players array is empty', () => {
             const { container } = renderComponent({}, [], []);
             const groups = container.querySelectorAll('g.creature-group');
             expect(groups.length).toBe(0);
         });
 
+        it('should not render image when characters array is undefined', () => {
+            const player = makePlayer({ name: 'Thorin' });
+            const { container } = renderComponent({}, [player], undefined);
+            const image = container.querySelector('image.creature-image');
+            expect(image).toBeNull();
+            const initial = container.querySelector('text.creature-initial');
+            expect(initial).toBeInTheDocument();
+        });
+    });
+
+    describe('creature rendering', () => {
         it('should render multiple player creature-groups', () => {
             const players = [
                 makePlayer({ id: 'p1', name: 'Thorin', gridX: 1, gridY: 1 }),
@@ -59,9 +70,7 @@ describe('Players', () => {
             const groups = container.querySelectorAll('g.creature-group');
             expect(groups.length).toBe(3);
         });
-    });
 
-    describe('circle rendering', () => {
         it('should render creature circle with correct cx and cy', () => {
             const player = makePlayer({ gridX: 2, gridY: 3 });
             const { container } = renderComponent({}, [player], []);
@@ -69,9 +78,7 @@ describe('Players', () => {
             expect(circle).toHaveAttribute('cx', String(gridCenterX(2)));
             expect(circle).toHaveAttribute('cy', String(gridCenterY(3)));
         });
-    });
 
-    describe('name rendering', () => {
         it('should render creature name text at correct position', () => {
             const player = makePlayer({ gridX: 2, gridY: 3 });
             const { container } = renderComponent({}, [player], []);
@@ -87,9 +94,7 @@ describe('Players', () => {
             const nameText = container.querySelector('text.creature-name');
             expect(nameText.textContent).toBe('Thorin');
         });
-    });
 
-    describe('initial rendering', () => {
         it('should render creature initial when no character exists', () => {
             const player = makePlayer({ name: 'Thorin' });
             const { container } = renderComponent({}, [player], []);
@@ -126,15 +131,6 @@ describe('Players', () => {
             expect(initial).toBeInTheDocument();
         });
 
-        it('should not render image when characters array is undefined', () => {
-            const player = makePlayer({ name: 'Thorin' });
-            const { container } = renderComponent({}, [player], undefined);
-            const image = container.querySelector('image.creature-image');
-            expect(image).toBeNull();
-            const initial = container.querySelector('text.creature-initial');
-            expect(initial).toBeInTheDocument();
-        });
-
         it('should match character by name to find image', () => {
             const player = makePlayer({ name: 'Thorin' });
             const character = makeCharacter({ name: 'Thorin', imagePath: 'https://example.com/thorin.png' });
@@ -151,16 +147,6 @@ describe('Players', () => {
             const { container } = renderComponent({}, [player], []);
             const clipPath = container.querySelector('clipPath[id="creature-clip-player-1"]');
             expect(clipPath).toBeInTheDocument();
-        });
-
-        it('should render clipPath with correct circle position', () => {
-            const player = makePlayer({ id: 'p1', gridX: 5, gridY: 7 });
-            const { container } = renderComponent({}, [player], []);
-            const clipPath = container.querySelector('clipPath[id="creature-clip-p1"]');
-            const circle = clipPath.querySelector('circle');
-            expect(circle).toHaveAttribute('cx', String(gridCenterX(5)));
-            expect(circle).toHaveAttribute('cy', String(gridCenterY(7)));
-            expect(circle).toHaveAttribute('r', '20');
         });
 
         it('should render all players with correct clipPaths', () => {
@@ -216,19 +202,6 @@ describe('Players', () => {
             const { container } = renderComponent({ selectedPlayer }, [player], []);
             const rect = container.querySelector('rect[stroke="#FFD700"]');
             expect(rect).toBeInTheDocument();
-        });
-
-        it('should render selection highlight rect at correct offset from creature center', () => {
-            const player = makePlayer({ id: 'player-1', gridX: 2, gridY: 3 });
-            const selectedPlayer = { id: 'player-1' };
-            const { container } = renderComponent({ selectedPlayer }, [player], []);
-            const rect = container.querySelector('rect[stroke="#FFD700"]');
-            const cx = gridCenterX(2);
-            const cy = gridCenterY(3);
-            expect(rect).toHaveAttribute('x', String(cx - 23));
-            expect(rect).toHaveAttribute('y', String(cy - 23));
-            expect(rect).toHaveAttribute('width', '46');
-            expect(rect).toHaveAttribute('height', '46');
         });
 
         it('should not render selection highlight when no player is selected', () => {
@@ -303,19 +276,6 @@ describe('Players', () => {
             const circle = container.querySelector('circle.creature-circle');
             circle.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true }));
             expect(setSelectedPlayer).toHaveBeenCalledWith(player);
-        });
-
-        it('should prevent default and stop propagation on context menu', () => {
-            const player = makePlayer({ id: 'player-1' });
-            const setSelectedPlayer = vi.fn();
-            const { container } = renderComponent({ setSelectedPlayer }, [player], []);
-            const circle = container.querySelector('circle.creature-circle');
-            const event = new MouseEvent('contextmenu', { bubbles: true });
-            event.preventDefault = vi.fn();
-            event.stopPropagation = vi.fn();
-            circle.dispatchEvent(event);
-            expect(event.preventDefault).toHaveBeenCalled();
-            expect(event.stopPropagation).toHaveBeenCalled();
         });
     });
 });

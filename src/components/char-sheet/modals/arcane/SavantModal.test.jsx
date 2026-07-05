@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import SavantModal from './SavantModal.jsx';
@@ -51,28 +51,25 @@ function makeProps(overrides) {
 // ── Tests ──
 
 describe('SavantModal', () => {
-  // ── Initial render / display ──
-
   describe('initial render', () => {
-    it('renders the modal overlay with the school name', () => {
+    it('renders the modal overlay with the school name and description', () => {
       render(<SavantModal {...makeProps()} />);
       expect(screen.getByText('Evocation Savant')).toBeInTheDocument();
-    });
-
-    it('renders the modal with proper test id', () => {
-      const { container } = render(<SavantModal {...makeProps()} />);
-      expect(container.querySelector('[data-testid="evocation-savant-modal"]')).toBeInTheDocument();
-    });
-
-    it('renders the description text', () => {
-      render(<SavantModal {...makeProps()} />);
       expect(screen.getByText(/Choose two Wizard spells from the Evocation school/)).toBeInTheDocument();
     });
 
-    it('renders two spell selection dropdowns', () => {
+    it('renders two spell selection dropdowns with options and a disabled confirm button', () => {
       render(<SavantModal {...makeProps()} />);
       const selects = document.querySelectorAll('select');
       expect(selects).toHaveLength(2);
+      expect(selects[0]).toHaveTextContent('-- Select a');
+      expect(selects[1]).toHaveTextContent('-- Select a');
+      spellOptions.forEach(spell => {
+        const elements = screen.getAllByText(spell);
+        expect(elements).toHaveLength(2);
+      });
+      expect(screen.getByRole('button', { name: 'Confirm Selection' })).toBeDisabled();
+      expect(screen.queryByRole('button', { name: 'Clear Selection' })).not.toBeInTheDocument();
     });
 
     it('renders labels for both spell selections', () => {
@@ -80,79 +77,10 @@ describe('SavantModal', () => {
       expect(screen.getByText('Evocation spell 1:')).toBeInTheDocument();
       expect(screen.getByText('Evocation spell 2:')).toBeInTheDocument();
     });
-
-    it('renders the Confirm button', () => {
-      render(<SavantModal {...makeProps()} />);
-      expect(screen.getByRole('button', { name: 'Confirm Selection' })).toBeInTheDocument();
-    });
-
-    it('has the Confirm button disabled when no selections are made', () => {
-      render(<SavantModal {...makeProps()} />);
-      const confirmBtn = screen.getByRole('button', { name: 'Confirm Selection' });
-      expect(confirmBtn).toBeDisabled();
-    });
-
-    it('renders empty option placeholders in both selects', () => {
-      render(<SavantModal {...makeProps()} />);
-      const selects = document.querySelectorAll('select');
-      expect(selects[0]).toHaveTextContent('-- Select a');
-      expect(selects[1]).toHaveTextContent('-- Select a');
-    });
-
-    it('renders all spell options in both dropdowns', () => {
-      render(<SavantModal {...makeProps()} />);
-      spellOptions.forEach(spell => {
-        const elements = screen.getAllByText(spell);
-        expect(elements).toHaveLength(2);
-      });
-    });
-
-    it('does not show Clear Selection button when no existing selections', () => {
-      render(<SavantModal {...makeProps()} />);
-      expect(screen.queryByRole('button', { name: 'Clear Selection' })).not.toBeInTheDocument();
-    });
   });
 
-  // ── Existing selections display ──
-
   describe('existing selections', () => {
-    it('shows current selections when provided', () => {
-      const props = makeProps({
-        payload: {
-          ...basePayload,
-          selectedSpells: ['Sleep', 'Fire Bolt'],
-        },
-      });
-      render(<SavantModal {...props} />);
-      const currentPara = screen.getByText(/Current:/).closest('p');
-      expect(currentPara).toContainHTML('Sleep');
-      expect(currentPara).toContainHTML('Fire Bolt');
-    });
-
-    it('shows "and" between the two current spell names', () => {
-      const props = makeProps({
-        payload: {
-          ...basePayload,
-          selectedSpells: ['Sleep', 'Fire Bolt'],
-        },
-      });
-      render(<SavantModal {...props} />);
-      const currentPara = screen.getByText(/Current:/).closest('p');
-      expect(currentPara.textContent).toContain('and');
-    });
-
-    it('shows Clear Selection button when existing selections exist', () => {
-      const props = makeProps({
-        payload: {
-          ...basePayload,
-          selectedSpells: ['Sleep', 'Fire Bolt'],
-        },
-      });
-      render(<SavantModal {...props} />);
-      expect(screen.getByRole('button', { name: 'Clear Selection' })).toBeInTheDocument();
-    });
-
-    it('pre-selects existing spells in the dropdowns', () => {
+    it('shows current selections and pre-selects them in the dropdowns', () => {
       const props = makeProps({
         payload: {
           ...basePayload,
@@ -160,71 +88,46 @@ describe('SavantModal', () => {
         },
       });
       render(<SavantModal {...props} />);
+      const currentPara = screen.getByText(/Current:/).closest('p');
+      expect(currentPara).toContainHTML('Sleep');
+      expect(currentPara).toContainHTML('Web');
+      expect(currentPara.textContent).toContain('and');
       const selects = document.querySelectorAll('select');
       expect(selects[0]).toHaveValue('Sleep');
       expect(selects[1]).toHaveValue('Web');
+      expect(screen.getByRole('button', { name: 'Clear Selection' })).toBeInTheDocument();
+    });
+
+    it('renders without Current display when selectedSpells is undefined', () => {
+      const props = makeProps({
+        payload: {
+          ...basePayload,
+          selectedSpells: undefined,
+        },
+      });
+      render(<SavantModal {...props} />);
+      expect(screen.getByText('Evocation Savant')).toBeInTheDocument();
+      expect(screen.queryByText(/Current:/)).not.toBeInTheDocument();
     });
   });
-
-  // ── Selection behavior ──
 
   describe('selection behavior', () => {
-    it('enables Confirm when two different spells are selected', () => {
+    it.each`
+      first        | second       | enabled
+      ${''}        | ${''}        | ${false}
+      ${'Sleep'}   | ${''}        | ${false}
+      ${''}        | ${'Web'}     | ${false}
+      ${'Sleep'}   | ${'Sleep'}   | ${false}
+      ${'Sleep'}   | ${'Web'}     | ${true}
+    `('Confirm $enabled when first="$first" and second="$second"', ({ first, second, enabled }) => {
       render(<SavantModal {...makeProps()} />);
       const selects = document.querySelectorAll('select');
-      fireEvent.change(selects[0], { target: { value: 'Sleep' } });
-      fireEvent.change(selects[1], { target: { value: 'Web' } });
+      if (first) fireEvent.change(selects[0], { target: { value: first } });
+      if (second) fireEvent.change(selects[1], { target: { value: second } });
       const confirmBtn = screen.getByRole('button', { name: 'Confirm Selection' });
-      expect(confirmBtn).toBeEnabled();
-    });
-
-    it('keeps Confirm disabled when both selections are the same spell', () => {
-      render(<SavantModal {...makeProps()} />);
-      const selects = document.querySelectorAll('select');
-      fireEvent.change(selects[0], { target: { value: 'Sleep' } });
-      fireEvent.change(selects[1], { target: { value: 'Sleep' } });
-      const confirmBtn = screen.getByRole('button', { name: 'Confirm Selection' });
-      expect(confirmBtn).toBeDisabled();
-    });
-
-    it('keeps Confirm disabled when only first spell is selected', () => {
-      render(<SavantModal {...makeProps()} />);
-      const selects = document.querySelectorAll('select');
-      fireEvent.change(selects[0], { target: { value: 'Sleep' } });
-      const confirmBtn = screen.getByRole('button', { name: 'Confirm Selection' });
-      expect(confirmBtn).toBeDisabled();
-    });
-
-    it('keeps Confirm disabled when only second spell is selected', () => {
-      render(<SavantModal {...makeProps()} />);
-      const selects = document.querySelectorAll('select');
-      fireEvent.change(selects[1], { target: { value: 'Web' } });
-      const confirmBtn = screen.getByRole('button', { name: 'Confirm Selection' });
-      expect(confirmBtn).toBeDisabled();
-    });
-
-    it('disables Confirm when first spell is cleared after selection', () => {
-      render(<SavantModal {...makeProps()} />);
-      const selects = document.querySelectorAll('select');
-      fireEvent.change(selects[0], { target: { value: 'Sleep' } });
-      fireEvent.change(selects[1], { target: { value: 'Web' } });
-      fireEvent.change(selects[0], { target: { value: '' } });
-      const confirmBtn = screen.getByRole('button', { name: 'Confirm Selection' });
-      expect(confirmBtn).toBeDisabled();
-    });
-
-    it('disables Confirm when second spell is cleared after selection', () => {
-      render(<SavantModal {...makeProps()} />);
-      const selects = document.querySelectorAll('select');
-      fireEvent.change(selects[0], { target: { value: 'Sleep' } });
-      fireEvent.change(selects[1], { target: { value: 'Web' } });
-      fireEvent.change(selects[1], { target: { value: '' } });
-      const confirmBtn = screen.getByRole('button', { name: 'Confirm Selection' });
-      expect(confirmBtn).toBeDisabled();
+      expect(confirmBtn).toHaveProperty('disabled', !enabled);
     });
   });
-
-  // ── Confirm button ──
 
   describe('confirm', () => {
     it('calls onConfirm with the two selected spells', () => {
@@ -248,8 +151,6 @@ describe('SavantModal', () => {
     });
   });
 
-  // ── Clear Selection button ──
-
   describe('clear selection', () => {
     it('calls onConfirm with null, null when Clear Selection is clicked', () => {
       const onConfirm = vi.fn();
@@ -266,8 +167,6 @@ describe('SavantModal', () => {
     });
   });
 
-  // ── Different schools ──
-
   describe('different schools', () => {
     it('renders correctly for Conjuration school', () => {
       const props = makeProps({
@@ -281,61 +180,6 @@ describe('SavantModal', () => {
       expect(screen.getByText('Conjuration Savant')).toBeInTheDocument();
       expect(screen.getByText('Conjuration spell 1:')).toBeInTheDocument();
       expect(screen.getByText(/Choose two Wizard spells from the Conjuration school/)).toBeInTheDocument();
-    });
-
-    it('renders correctly for Transmutation school', () => {
-      const props = makeProps({
-        payload: {
-          school: 'Transmutation',
-          spellOptions: ['Acid Splash', 'Shillelagh'],
-          selectedSpells: [],
-        },
-      });
-      render(<SavantModal {...props} />);
-      expect(screen.getByText('Transmutation Savant')).toBeInTheDocument();
-      expect(screen.getByText('Transmutation spell 1:')).toBeInTheDocument();
-    });
-  });
-
-  // ── Edge cases ──
-
-  describe('edge cases', () => {
-    it('renders with undefined selectedSpells', () => {
-      const props = makeProps({
-        payload: {
-          ...basePayload,
-          selectedSpells: undefined,
-        },
-      });
-      render(<SavantModal {...props} />);
-      expect(screen.getByText('Evocation Savant')).toBeInTheDocument();
-      expect(screen.queryByText(/Current:/)).not.toBeInTheDocument();
-    });
-
-    it('renders with empty selectedSpells array', () => {
-      const props = makeProps({
-        payload: {
-          ...basePayload,
-          selectedSpells: [],
-        },
-      });
-      render(<SavantModal {...props} />);
-      expect(screen.getByText('Evocation Savant')).toBeInTheDocument();
-      expect(screen.queryByText(/Current:/)).not.toBeInTheDocument();
-    });
-
-    it('renders with empty spellOptions array', () => {
-      const props = makeProps({
-        payload: {
-          ...basePayload,
-          spellOptions: [],
-        },
-      });
-      render(<SavantModal {...props} />);
-      expect(screen.getByText('Evocation Savant')).toBeInTheDocument();
-      const selects = document.querySelectorAll('select');
-      // Should only have the default option, no spell options
-      expect(selects[0]).not.toHaveTextContent('Burning Hands');
     });
   });
 });

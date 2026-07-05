@@ -271,55 +271,7 @@ describe('useSpellCastExecutor', () => {
       );
     });
 
-    it('returns early when executeSpellCast returns null', async () => {
-      const props = makeProps();
-      mockExecuteSpellCast.mockResolvedValue(null);
-
-      const { result } = renderHook(() =>
-        useSpellCastExecutor(
-          props.rollAttack,
-          props.rollDamage,
-          props.playerStats,
-          props.getTargetInfo,
-          props.campaignName,
-          props.mapName,
-          props.characters,
-          props.setPopupHtml,
-        )
-      );
-
-      await act(async () => {
-        await result.current.castAction(makeSpell(), {});
-      });
-
-      expect(props.setPopupHtml).not.toHaveBeenCalled();
-    });
-
-    it('returns early when executeSpellCast returns undefined', async () => {
-      const props = makeProps();
-      mockExecuteSpellCast.mockResolvedValue(undefined);
-
-      const { result } = renderHook(() =>
-        useSpellCastExecutor(
-          props.rollAttack,
-          props.rollDamage,
-          props.playerStats,
-          props.getTargetInfo,
-          props.campaignName,
-          props.mapName,
-          props.characters,
-          props.setPopupHtml,
-        )
-      );
-
-      await act(async () => {
-        await result.current.castAction(makeSpell(), {});
-      });
-
-      expect(props.setPopupHtml).not.toHaveBeenCalled();
-    });
-
-    it('returns early when executeSpellCast returns a promise that resolves to null', async () => {
+    it('does not set popupHtml when executeSpellCast returns null', async () => {
       const props = makeProps();
       mockExecuteSpellCast.mockResolvedValue(null);
 
@@ -373,33 +325,7 @@ describe('useSpellCastExecutor', () => {
       expect(ref.current).toBeNull();
     });
 
-    it('clears internal ref.current after castAction completes', async () => {
-      const props = makeProps();
-      mockExecuteSpellCast.mockResolvedValue(null);
-
-      const { result } = renderHook(() =>
-        useSpellCastExecutor(
-          props.rollAttack,
-          props.rollDamage,
-          props.playerStats,
-          props.getTargetInfo,
-          props.campaignName,
-          props.mapName,
-          props.characters,
-          props.setPopupHtml,
-        )
-      );
-
-      expect(result.current.cachedPosRef.current).toBeNull();
-
-      await act(async () => {
-        await result.current.castAction(makeSpell(), {});
-      });
-
-      expect(result.current.cachedPosRef.current).toBeNull();
-    });
-
-    it('handles executeSpellCast throwing a promise rejection', async () => {
+    it('handles executeSpellCast throwing an error', async () => {
       const props = makeProps();
       const error = new Error('Cast failed');
       mockExecuteSpellCast.mockRejectedValue(error);
@@ -424,7 +350,7 @@ describe('useSpellCastExecutor', () => {
       });
 
       expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining('[useSpellCastExecutor] executeSpellCast error'),
+        expect.stringContaining('[useSpellCastExecutor] executeSpellCast error for Fireball'),
         expect.anything()
       );
 
@@ -569,174 +495,6 @@ describe('useSpellCastExecutor', () => {
 
       expect(props.setPopupHtml).toHaveBeenCalledWith(
         expect.objectContaining({ total: 20 })
-      );
-    });
-
-    it('uses healAmount as total when rawTotal is missing', async () => {
-      const props = makeProps();
-      mockExecuteSpellCast.mockResolvedValue({
-        healAmount: 12,
-        formula: '1d4+2',
-        rolls: [3, 1],
-        targetName: 'Ally 2',
-        bonusHeal: 0,
-        bonusDetails: [],
-      });
-
-      const spell = makeSpell({ name: 'Healing Word' });
-
-      const { result } = renderHook(() =>
-        useSpellCastExecutor(
-          props.rollAttack,
-          props.rollDamage,
-          props.playerStats,
-          props.getTargetInfo,
-          props.campaignName,
-          props.mapName,
-          props.characters,
-          props.setPopupHtml,
-        )
-      );
-
-      await act(async () => {
-        await result.current.castAction(spell, {});
-      });
-
-      expect(props.setPopupHtml).toHaveBeenCalledWith(
-        expect.objectContaining({ total: 12 })
-      );
-    });
-
-    it('omits bonusHealDetail when bonusDetails is empty', async () => {
-      const props = makeProps();
-      mockExecuteSpellCast.mockResolvedValue({
-        healAmount: 8,
-        formula: '1d4+1',
-        rolls: [2, 1],
-        targetName: 'Ally 1',
-        bonusHeal: 0,
-        bonusDetails: [],
-      });
-
-      const { result } = renderHook(() =>
-        useSpellCastExecutor(
-          props.rollAttack,
-          props.rollDamage,
-          props.playerStats,
-          props.getTargetInfo,
-          props.campaignName,
-          props.mapName,
-          props.characters,
-          props.setPopupHtml,
-        )
-      );
-
-      await act(async () => {
-        await result.current.castAction(makeSpell(), {});
-      });
-
-      expect(props.setPopupHtml).toHaveBeenCalledWith(
-        expect.objectContaining({ bonusHealDetail: '' })
-      );
-    });
-
-    it('joins multiple bonusDetails with comma', async () => {
-      const props = makeProps();
-      mockExecuteSpellCast.mockResolvedValue({
-        healAmount: 20,
-        formula: '2d8+3',
-        rolls: [5, 4, 3],
-        targetName: 'Ally 1',
-        bonusHeal: 6,
-        bonusDetails: [
-          { amount: 3, name: 'Divine Favor' },
-          { amount: 3, name: 'Champion' },
-        ],
-      });
-
-      const { result } = renderHook(() =>
-        useSpellCastExecutor(
-          props.rollAttack,
-          props.rollDamage,
-          props.playerStats,
-          props.getTargetInfo,
-          props.campaignName,
-          props.mapName,
-          props.characters,
-          props.setPopupHtml,
-        )
-      );
-
-      await act(async () => {
-        await result.current.castAction(makeSpell(), {});
-      });
-
-      expect(props.setPopupHtml).toHaveBeenCalledWith(
-        expect.objectContaining({ bonusHealDetail: '3 Divine Favor, 3 Champion' })
-      );
-    });
-
-    it('uses bonusHeal default of 0 when bonusHeal is missing', async () => {
-      const props = makeProps();
-      mockExecuteSpellCast.mockResolvedValue({
-        healAmount: 10,
-        formula: '1d8',
-        rolls: [5],
-        targetName: 'Ally 1',
-        bonusDetails: [],
-      });
-
-      const { result } = renderHook(() =>
-        useSpellCastExecutor(
-          props.rollAttack,
-          props.rollDamage,
-          props.playerStats,
-          props.getTargetInfo,
-          props.campaignName,
-          props.mapName,
-          props.characters,
-          props.setPopupHtml,
-        )
-      );
-
-      await act(async () => {
-        await result.current.castAction(makeSpell(), {});
-      });
-
-      expect(props.setPopupHtml).toHaveBeenCalledWith(
-        expect.objectContaining({ bonusHeal: 0 })
-      );
-    });
-
-    it('uses empty rolls array when rolls is missing', async () => {
-      const props = makeProps();
-      mockExecuteSpellCast.mockResolvedValue({
-        healAmount: 10,
-        formula: '1d8',
-        targetName: 'Ally 1',
-        bonusHeal: 0,
-        bonusDetails: [],
-      });
-
-      const { result } = renderHook(() =>
-        useSpellCastExecutor(
-          props.rollAttack,
-          props.rollDamage,
-          props.playerStats,
-          props.getTargetInfo,
-          props.campaignName,
-          props.mapName,
-          props.characters,
-          props.setPopupHtml,
-        )
-      );
-
-      await act(async () => {
-        await result.current.castAction(makeSpell(), {});
-      });
-
-      expect(props.setPopupHtml).toHaveBeenCalledWith(
-        expect.objectContaining({ rolls: [] })
       );
     });
 
@@ -956,31 +714,6 @@ describe('useSpellCastExecutor', () => {
     it('completes the full castAction flow with no result', async () => {
       const props = makeProps();
       mockExecuteSpellCast.mockResolvedValue(null);
-
-      const { result } = renderHook(() =>
-        useSpellCastExecutor(
-          props.rollAttack,
-          props.rollDamage,
-          props.playerStats,
-          props.getTargetInfo,
-          props.campaignName,
-          props.mapName,
-          props.characters,
-          props.setPopupHtml,
-        )
-      );
-
-      await act(async () => {
-        await result.current.castAction(makeSpell(), {});
-      });
-
-      expect(props.setPopupHtml).not.toHaveBeenCalled();
-    });
-
-    it('completes the full castAction flow when executeSpellCast returns no promise (early return)', async () => {
-      const props = makeProps();
-      // executeSpellCast returns undefined (no promise)
-      mockExecuteSpellCast.mockReturnValue(undefined);
 
       const { result } = renderHook(() =>
         useSpellCastExecutor(

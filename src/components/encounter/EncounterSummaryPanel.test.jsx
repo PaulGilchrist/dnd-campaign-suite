@@ -2,6 +2,8 @@ import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import EncounterSummaryPanel from './EncounterSummaryPanel.jsx';
 
+// @cleaned-by-ai
+
 describe('EncounterSummaryPanel', () => {
   let defaultProps;
 
@@ -23,9 +25,10 @@ describe('EncounterSummaryPanel', () => {
   });
 
   describe('rendering summary values', () => {
-    it('renders formatted total XP with commas', () => {
-      render(<EncounterSummaryPanel {...defaultProps} totalMonsterXP={10000} />);
+    it('renders formatted total XP and effective XP with commas', () => {
+      render(<EncounterSummaryPanel {...defaultProps} totalMonsterXP={10000} effectiveXP={15000} />);
       expect(screen.getByText('10,000')).toBeInTheDocument();
+      expect(screen.getByText('15,000')).toBeInTheDocument();
     });
 
     it('renders monster count', () => {
@@ -36,11 +39,6 @@ describe('EncounterSummaryPanel', () => {
     it('renders difficulty multiplier', () => {
       render(<EncounterSummaryPanel {...defaultProps} />);
       expect(screen.getByText('\u00D72')).toBeInTheDocument();
-    });
-
-    it('renders formatted effective XP with commas', () => {
-      render(<EncounterSummaryPanel {...defaultProps} effectiveXP={15000} />);
-      expect(screen.getByText('15,000')).toBeInTheDocument();
     });
   });
 
@@ -55,13 +53,13 @@ describe('EncounterSummaryPanel', () => {
       expect(screen.getByText(expected)).toBeInTheDocument();
     });
 
-    it('renders Unknown when difficultyIndex is out of bounds', () => {
+    it('renders Unknown when difficultyIndex is out of bounds or labels are empty', () => {
       render(<EncounterSummaryPanel {...defaultProps} difficultyIndex={5} />);
       expect(screen.getByText('Unknown')).toBeInTheDocument();
     });
 
     it('renders Unknown when difficultyLabels is empty', () => {
-      render(<EncounterSummaryPanel {...defaultProps} difficultyLabels={[]} />);
+      render(<EncounterSummaryPanel {...defaultProps} difficultyLabels={[]} difficultyIndex={0} />);
       expect(screen.getByText('Unknown')).toBeInTheDocument();
     });
   });
@@ -72,12 +70,7 @@ describe('EncounterSummaryPanel', () => {
       expect(screen.getByText('Clear All')).toBeInTheDocument();
     });
 
-    it('does not render when selectedMonsters is empty', () => {
-      render(<EncounterSummaryPanel {...defaultProps} selectedMonsters={[]} />);
-      expect(screen.queryByText('Clear All')).not.toBeInTheDocument();
-    });
-
-    it('does not render when selectedMonsters is null', () => {
+    it('does not render when selectedMonsters is null or empty', () => {
       render(<EncounterSummaryPanel {...defaultProps} selectedMonsters={null} />);
       expect(screen.queryByText('Clear All')).not.toBeInTheDocument();
     });

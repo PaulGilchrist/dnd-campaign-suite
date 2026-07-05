@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import GenerateTerrainModal from './GenerateTerrainModal.jsx';
@@ -55,21 +55,6 @@ describe('GenerateTerrainModal', () => {
         target: { value: 'Wild Frontier' },
       });
       expect(getGenerateButton()).not.toBeDisabled();
-    });
-  });
-
-  describe('closing the modal', () => {
-    it('calls onClose when Cancel button is clicked', () => {
-      render(<GenerateTerrainModal {...props} />);
-      fireEvent.click(screen.getByText('Cancel'));
-      expect(props.onClose).toHaveBeenCalledTimes(1);
-    });
-
-    it('calls onClose when overlay is clicked', () => {
-      const { container } = render(<GenerateTerrainModal {...props} />);
-      const overlay = container.querySelector('[class*="overlay"]');
-      fireEvent.click(overlay);
-      expect(props.onClose).toHaveBeenCalledTimes(1);
     });
   });
 

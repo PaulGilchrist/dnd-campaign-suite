@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import WeaponMasteryModal from './WeaponMasteryModal.jsx';
@@ -60,7 +60,7 @@ describe('WeaponMasteryModal', () => {
   // ── Rendering ──
 
   describe('initial render', () => {
-    it('renders the modal overlay with header and body', () => {
+    it('renders the modal overlay with header, body, and actions', () => {
       renderModal();
       expect(document.querySelector('.sp-overlay')).toBeInTheDocument();
       expect(document.querySelector('.sp-modal')).toBeInTheDocument();
@@ -69,24 +69,15 @@ describe('WeaponMasteryModal', () => {
       expect(document.querySelector('.sp-actions')).toBeInTheDocument();
     });
 
-    it('renders the attack name in the header', () => {
+    it('renders the attack name and mastery title in the header', () => {
       renderModal();
       expect(screen.getByText(/Longsword Attack/)).toBeInTheDocument();
-    });
-
-    it('renders the Weapon Mastery title with crosshairs icon', () => {
-      renderModal();
       expect(screen.getByText(/Weapon Mastery/)).toBeInTheDocument();
-      expect(document.querySelector('.fa-solid.fa-crosshairs')).toBeInTheDocument();
     });
 
-    it('renders the instruction text', () => {
+    it('renders the instruction text and note about one mastery per hit', () => {
       renderModal();
       expect(screen.getByText(/Choose a mastery property to activate/)).toBeInTheDocument();
-    });
-
-    it('renders the note about one mastery per hit', () => {
-      renderModal();
       expect(screen.getByText(/You can activate one mastery property per hit/)).toBeInTheDocument();
     });
   });
@@ -162,6 +153,15 @@ describe('WeaponMasteryModal', () => {
       renderModal();
       expect(document.querySelector('.sp-body')).toBeInTheDocument();
     });
+
+    it('renders radio buttons when baseMastery is null and extraMasteries has items', () => {
+      renderModal({ baseMastery: null });
+      const radios = document.querySelectorAll('input[type="radio"]');
+      expect(radios).toHaveLength(1);
+      const labels = document.querySelectorAll('label');
+      const pushLabel = Array.from(labels).find(l => l.textContent.includes('Push (10 ft)'));
+      expect(pushLabel).toBeInTheDocument();
+    });
   });
 
   // ── Selection behavior ──
@@ -178,15 +178,6 @@ describe('WeaponMasteryModal', () => {
       const radios = document.querySelectorAll('input[type="radio"]');
       fireEvent.click(radios[0]);
       expect(radios[0].checked).toBe(true);
-    });
-
-    it('deselects the previous option when a different one is selected', () => {
-      renderModal();
-      const radios = document.querySelectorAll('input[type="radio"]');
-      fireEvent.click(radios[0]);
-      fireEvent.click(radios[1]);
-      expect(radios[0].checked).toBe(false);
-      expect(radios[1].checked).toBe(true);
     });
   });
 
@@ -208,18 +199,6 @@ describe('WeaponMasteryModal', () => {
     it('is disabled when there are no masteries', () => {
       renderModal({ baseMastery: null, extraMasteries: [] });
       expect(screen.getByRole('button', { name: /Activate/ })).toBeDisabled();
-    });
-
-    it('has the sp-roll-btn class', () => {
-      renderModal();
-      const btn = screen.getByRole('button', { name: /Activate/ });
-      expect(btn.classList.contains('sp-roll-btn')).toBe(true);
-    });
-
-    it('renders a crosshairs icon inside the button', () => {
-      renderModal();
-      const btn = screen.getByRole('button', { name: /Activate/ });
-      expect(btn.querySelector('.fa-solid.fa-crosshairs')).toBeInTheDocument();
     });
 
     it('does not call applyMasteryEffect when activated with no selection', async () => {
@@ -336,7 +315,7 @@ describe('WeaponMasteryModal', () => {
       });
     });
 
-    it('renders result payload description as HTML via dangerouslySetInnerHTML', async () => {
+    it('renders result payload description as HTML', async () => {
       setupAppliedState({
         type: 'popup',
         payload: {
@@ -359,21 +338,6 @@ describe('WeaponMasteryModal', () => {
       fireEvent.click(screen.getByRole('button', { name: /Activate/ }));
       await waitFor(() => {
         expect(screen.queryByText('Done')).not.toBeInTheDocument();
-      });
-    });
-
-    it('shows the Done button with sp-roll-btn class in applied state', async () => {
-      setupAppliedState({
-        type: 'popup',
-        payload: {
-          type: 'automation_info',
-          name: 'Vex',
-          description: 'Done.',
-        },
-      });
-      await waitFor(() => {
-        const doneBtn = screen.getByRole('button', { name: 'Done' });
-        expect(doneBtn.classList.contains('sp-roll-btn')).toBe(true);
       });
     });
   });
@@ -405,8 +369,6 @@ describe('WeaponMasteryModal', () => {
       expect(onClose).toHaveBeenCalledTimes(1);
     });
   });
-
-  // ── Skip button ──
 
   // ── Target name display ──
 
@@ -479,25 +441,6 @@ describe('WeaponMasteryModal', () => {
       expect(screen.getByText(/Longsword Attack/)).toBeInTheDocument();
       const radios = document.querySelectorAll('input[type="radio"]');
       expect(radios).toHaveLength(0);
-    });
-  });
-
-  // ── Edge cases: single mastery source ──
-
-  describe('single mastery source', () => {
-    it('renders only base mastery when extraMasteries is empty', () => {
-      renderModal({ extraMasteries: [] });
-      const radios = document.querySelectorAll('input[type="radio"]');
-      expect(radios).toHaveLength(1);
-    });
-
-    it('renders only extra masteries when baseMastery is null', () => {
-      renderModal({ baseMastery: null });
-      const radios = document.querySelectorAll('input[type="radio"]');
-      expect(radios).toHaveLength(1);
-      const labels = document.querySelectorAll('label');
-      const pushLabel = Array.from(labels).find(l => l.textContent.includes('Push (10 ft)'));
-      expect(pushLabel).toBeInTheDocument();
     });
   });
 

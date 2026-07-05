@@ -1,3 +1,4 @@
+// @cleaned-by-ai
 // @improved-by-ai
 import { describe, it, expect, vi } from 'vitest';
 
@@ -81,16 +82,9 @@ describe('savePromptService', () => {
       );
     });
 
-    it('returns undefined (fire-and-forget)', () => {
-      mockFetchResolved();
-      const result = sendSavePrompt('C', { targetName: 'T' });
-      expect(result).toBeUndefined();
-    });
-
-    it('does not propagate fetch rejections to the caller', () => {
+    it('returns undefined (fire-and-forget) and does not propagate fetch rejections', () => {
       mockFetchRejected();
-      const result = sendSavePrompt('C', { targetName: 'T' });
-      expect(result).toBeUndefined();
+      expect(sendSavePrompt('C', { targetName: 'T' })).toBeUndefined();
     });
   });
 
@@ -109,8 +103,7 @@ describe('savePromptService', () => {
 
     it('does not propagate fetch rejections to the caller', () => {
       mockFetchRejected();
-      const result = sendSaveResult('C', 'T', {});
-      expect(result).toBeUndefined();
+      expect(sendSaveResult('C', 'T', {})).toBeUndefined();
     });
   });
 
@@ -132,7 +125,7 @@ describe('savePromptService', () => {
       expect(callArgs.body).toBeUndefined();
     });
 
-    it('URL-encodes special characters in the campaign name', () => {
+    it('URL-encodes special characters and does not propagate fetch rejections', () => {
       mockFetchResolved();
       clearSavePrompt('Campaign #1', 'T');
 
@@ -141,12 +134,9 @@ describe('savePromptService', () => {
         expectedUrl,
         expect.any(Object)
       );
-    });
 
-    it('does not propagate fetch rejections to the caller', () => {
       mockFetchRejected();
-      const result = clearSavePrompt('C', 'T');
-      expect(result).toBeUndefined();
+      expect(clearSavePrompt('C', 'T')).toBeUndefined();
     });
   });
 
@@ -165,8 +155,7 @@ describe('savePromptService', () => {
 
     it('does not propagate fetch rejections to the caller', () => {
       mockFetchRejected();
-      const result = sendDeathSavePrompt('C', { targetName: 'T' });
-      expect(result).toBeUndefined();
+      expect(sendDeathSavePrompt('C', { targetName: 'T' })).toBeUndefined();
     });
   });
 
@@ -188,7 +177,7 @@ describe('savePromptService', () => {
       expect(callArgs.body).toBeUndefined();
     });
 
-    it('URL-encodes special characters in the campaign name', () => {
+    it('URL-encodes special characters and does not propagate fetch rejections', () => {
       mockFetchResolved();
       clearDeathSavePrompt('Campaign #1', 'T');
 
@@ -197,12 +186,9 @@ describe('savePromptService', () => {
         expectedUrl,
         expect.any(Object)
       );
-    });
 
-    it('does not propagate fetch rejections to the caller', () => {
       mockFetchRejected();
-      const result = clearDeathSavePrompt('C', 'T');
-      expect(result).toBeUndefined();
+      expect(clearDeathSavePrompt('C', 'T')).toBeUndefined();
     });
   });
 
@@ -221,8 +207,7 @@ describe('savePromptService', () => {
 
     it('does not propagate fetch rejections to the caller', () => {
       mockFetchRejected();
-      const result = sendDeathSaveResult('C', 'T', {});
-      expect(result).toBeUndefined();
+      expect(sendDeathSaveResult('C', 'T', {})).toBeUndefined();
     });
   });
 
@@ -241,8 +226,7 @@ describe('savePromptService', () => {
 
     it('does not propagate fetch rejections to the caller', () => {
       mockFetchRejected();
-      const result = sendConcentrationPrompt('C', { targetName: 'T' });
-      expect(result).toBeUndefined();
+      expect(sendConcentrationPrompt('C', { targetName: 'T' })).toBeUndefined();
     });
   });
 
@@ -261,8 +245,7 @@ describe('savePromptService', () => {
 
     it('does not propagate fetch rejections to the caller', () => {
       mockFetchRejected();
-      const result = sendConcentrationResult('C', 'T', {});
-      expect(result).toBeUndefined();
+      expect(sendConcentrationResult('C', 'T', {})).toBeUndefined();
     });
   });
 
@@ -284,7 +267,7 @@ describe('savePromptService', () => {
       expect(callArgs.body).toBeUndefined();
     });
 
-    it('URL-encodes special characters in the campaign name', () => {
+    it('URL-encodes special characters and does not propagate fetch rejections', () => {
       mockFetchResolved();
       clearConcentrationPrompt('Campaign #1', 'T');
 
@@ -293,12 +276,9 @@ describe('savePromptService', () => {
         expectedUrl,
         expect.any(Object)
       );
-    });
 
-    it('does not propagate fetch rejections to the caller', () => {
       mockFetchRejected();
-      const result = clearConcentrationPrompt('C', 'T');
-      expect(result).toBeUndefined();
+      expect(clearConcentrationPrompt('C', 'T')).toBeUndefined();
     });
   });
 });

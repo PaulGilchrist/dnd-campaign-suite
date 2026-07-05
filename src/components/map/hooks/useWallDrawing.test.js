@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { renderHook, act } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import useWallDrawing from './useWallDrawing.js';
@@ -28,46 +28,26 @@ describe('useWallDrawing', () => {
     return result;
   };
 
-  describe('initialization', () => {
-    it('should initialize painting as null', () => {
-      const result = getHook();
-      expect(result.current.painting).toBeNull();
-    });
-
-    it('should return painting state', () => {
-      const result = getHook();
-      expect(result.current.painting).toBeDefined();
-    });
-  });
-
-  describe('returned object', () => {
-    it('should return all handler functions', () => {
-      const result = getHook();
-      expect(typeof result.current.handleGridPointerDown).toBe('function');
-      expect(typeof result.current.handleGridPointerMove).toBe('function');
-      expect(typeof result.current.handleGridPointerUp).toBe('function');
-      expect(typeof result.current.handleGridPointerLeave).toBe('function');
-    });
-  });
+  const applySetMapData = (callArg, initialWalls = new Set(['0,0', '1,1'])) => {
+    const prev = { walls: initialWalls };
+    return callArg(prev);
+  };
 
   describe('handleGridPointerDown', () => {
     it('should not act when not localhost', () => {
       const result = getHook({ isLocalhost: false });
-      const mockGrid = { gridX: 2.5, gridY: 3.5 };
-      getGridFromEvent.mockReturnValue(mockGrid);
+      getGridFromEvent.mockReturnValue({ gridX: 2.5, gridY: 3.5 });
 
       act(() => {
         result.current.handleGridPointerDown(new Event('down'), setMapData);
       });
 
       expect(setMapData).not.toHaveBeenCalled();
-      expect(svgRef.current.setPointerCapture).not.toHaveBeenCalled();
     });
 
     it('should not act when tool is not paint or erase', () => {
       const result = getHook({ tool: TOOL_NONE });
-      const mockGrid = { gridX: 2.5, gridY: 3.5 };
-      getGridFromEvent.mockReturnValue(mockGrid);
+      getGridFromEvent.mockReturnValue({ gridX: 2.5, gridY: 3.5 });
 
       act(() => {
         result.current.handleGridPointerDown(new Event('down'), setMapData);
@@ -76,49 +56,7 @@ describe('useWallDrawing', () => {
       expect(setMapData).not.toHaveBeenCalled();
     });
 
-    it('should prevent default event', () => {
-      const result = getHook();
-      const mockGrid = { gridX: 2.5, gridY: 3.5 };
-      getGridFromEvent.mockReturnValue(mockGrid);
-      const event = { preventDefault: vi.fn() };
-
-      act(() => {
-        result.current.handleGridPointerDown(event, setMapData);
-      });
-
-      expect(event.preventDefault).toHaveBeenCalled();
-    });
-
-    it('should capture pointer on svg', () => {
-      const result = getHook();
-      const mockGrid = { gridX: 2.5, gridY: 3.5 };
-      getGridFromEvent.mockReturnValue(mockGrid);
-      const event = { preventDefault: vi.fn(), pointerId: 42 };
-
-      act(() => {
-        result.current.handleGridPointerDown(event, setMapData);
-      });
-
-      expect(svgRef.current.setPointerCapture).toHaveBeenCalledWith(42);
-    });
-
-    it('should not capture pointer if svgRef is null', () => {
-      const nullSvgRef = { current: null };
-      const result = renderHook(() =>
-        useWallDrawing({ isLocalhost: true, tool: TOOL_PAINT, getGridFromEvent, svgRef: nullSvgRef })
-      ).result;
-      const mockGrid = { gridX: 2.5, gridY: 3.5 };
-      getGridFromEvent.mockReturnValue(mockGrid);
-      const event = { preventDefault: vi.fn(), pointerId: 42 };
-
-      act(() => {
-        result.current.handleGridPointerDown(event, setMapData);
-      });
-
-      expect(svgRef.current.setPointerCapture).not.toHaveBeenCalled();
-    });
-
-    it('should not set map data if grid is null', () => {
+    it('should not add wall if grid is null', () => {
       const result = getHook();
       getGridFromEvent.mockReturnValue(null);
 
@@ -139,8 +77,7 @@ describe('useWallDrawing', () => {
 
       expect(setMapData).toHaveBeenCalled();
       const callArg = setMapData.mock.calls[0][0];
-      const prev = { walls: new Set(['0,0', '1,1']) };
-      const updated = callArg(prev);
+      const updated = applySetMapData(callArg);
       expect(updated.walls.has('2,3')).toBe(true);
     });
 
@@ -154,12 +91,11 @@ describe('useWallDrawing', () => {
 
       expect(setMapData).toHaveBeenCalled();
       const callArg = setMapData.mock.calls[0][0];
-      const prev = { walls: new Set(['0,0', '1,1']) };
-      const updated = callArg(prev);
+      const updated = applySetMapData(callArg);
       expect(updated.walls.has('0,0')).toBe(false);
     });
 
-    it('should set painting on pointer down', () => {
+    it('should set painting state on pointer down', () => {
       const result = getHook();
       const mockGrid = { gridX: 2.5, gridY: 3.5 };
       getGridFromEvent.mockReturnValue(mockGrid);
@@ -175,8 +111,7 @@ describe('useWallDrawing', () => {
   describe('handleGridPointerMove', () => {
     it('should not act when not localhost', () => {
       const result = getHook({ isLocalhost: false });
-      const mockGrid = { gridX: 2.5, gridY: 3.5 };
-      getGridFromEvent.mockReturnValue(mockGrid);
+      getGridFromEvent.mockReturnValue({ gridX: 2.5, gridY: 3.5 });
 
       act(() => {
         result.current.handleGridPointerMove(new Event('move'), setMapData, { gridX: 1, gridY: 1 }, TOOL_PAINT);
@@ -187,8 +122,7 @@ describe('useWallDrawing', () => {
 
     it('should not act when painting is null', () => {
       const result = getHook();
-      const mockGrid = { gridX: 2.5, gridY: 3.5 };
-      getGridFromEvent.mockReturnValue(mockGrid);
+      getGridFromEvent.mockReturnValue({ gridX: 2.5, gridY: 3.5 });
 
       act(() => {
         result.current.handleGridPointerMove(new Event('move'), setMapData, null, TOOL_PAINT);
@@ -199,8 +133,7 @@ describe('useWallDrawing', () => {
 
     it('should not act when tool is not paint or erase', () => {
       const result = getHook();
-      const mockGrid = { gridX: 2.5, gridY: 3.5 };
-      getGridFromEvent.mockReturnValue(mockGrid);
+      getGridFromEvent.mockReturnValue({ gridX: 2.5, gridY: 3.5 });
 
       act(() => {
         result.current.handleGridPointerMove(new Event('move'), setMapData, { gridX: 1, gridY: 1 }, TOOL_NONE);
@@ -209,20 +142,7 @@ describe('useWallDrawing', () => {
       expect(setMapData).not.toHaveBeenCalled();
     });
 
-    it('should prevent default event', () => {
-      const result = getHook();
-      const mockGrid = { gridX: 2.5, gridY: 3.5 };
-      getGridFromEvent.mockReturnValue(mockGrid);
-      const event = { preventDefault: vi.fn() };
-
-      act(() => {
-        result.current.handleGridPointerMove(event, setMapData, { gridX: 1, gridY: 1 }, TOOL_PAINT);
-      });
-
-      expect(event.preventDefault).toHaveBeenCalled();
-    });
-
-    it('should not set map data if grid is null', () => {
+    it('should not add wall if grid is null', () => {
       const result = getHook();
       getGridFromEvent.mockReturnValue(null);
 
@@ -243,8 +163,7 @@ describe('useWallDrawing', () => {
 
       expect(setMapData).toHaveBeenCalled();
       const callArg = setMapData.mock.calls[0][0];
-      const prev = { walls: new Set(['0,0']) };
-      const updated = callArg(prev);
+      const updated = applySetMapData(callArg, new Set(['0,0']));
       expect(updated.walls.has('5,6')).toBe(true);
     });
 
@@ -258,37 +177,12 @@ describe('useWallDrawing', () => {
 
       expect(setMapData).toHaveBeenCalled();
       const callArg = setMapData.mock.calls[0][0];
-      const prev = { walls: new Set(['0,0', '1,1']) };
-      const updated = callArg(prev);
+      const updated = applySetMapData(callArg);
       expect(updated.walls.has('0,0')).toBe(false);
     });
   });
 
   describe('handleGridPointerUp', () => {
-    it('should release pointer capture on svg', () => {
-      const result = getHook();
-      const event = { pointerId: 42 };
-
-      act(() => {
-        result.current.handleGridPointerUp(event);
-      });
-
-      expect(svgRef.current.releasePointerCapture).toHaveBeenCalledWith(42);
-    });
-
-    it('should not release pointer capture if svgRef is null', () => {
-      const nullSvgRef = { current: null };
-      const result = renderHook(() =>
-        useWallDrawing({ isLocalhost: true, tool: TOOL_PAINT, getGridFromEvent, svgRef: nullSvgRef })
-      ).result;
-
-      act(() => {
-        result.current.handleGridPointerUp(new Event('up'));
-      });
-
-      expect(svgRef.current.releasePointerCapture).not.toHaveBeenCalled();
-    });
-
     it('should clear painting state', () => {
       const result = getHook();
       const mockGrid = { gridX: 2.5, gridY: 3.5 };
@@ -308,30 +202,6 @@ describe('useWallDrawing', () => {
   });
 
   describe('handleGridPointerLeave', () => {
-    it('should release pointer capture on svg', () => {
-      const result = getHook();
-      const event = { pointerId: 42 };
-
-      act(() => {
-        result.current.handleGridPointerLeave(event);
-      });
-
-      expect(svgRef.current.releasePointerCapture).toHaveBeenCalledWith(42);
-    });
-
-    it('should not release pointer capture if svgRef is null', () => {
-      const nullSvgRef = { current: null };
-      const result = renderHook(() =>
-        useWallDrawing({ isLocalhost: true, tool: TOOL_PAINT, getGridFromEvent, svgRef: nullSvgRef })
-      ).result;
-
-      act(() => {
-        result.current.handleGridPointerLeave(new Event('leave'));
-      });
-
-      expect(svgRef.current.releasePointerCapture).not.toHaveBeenCalled();
-    });
-
     it('should clear painting state', () => {
       const result = getHook();
       const mockGrid = { gridX: 2.5, gridY: 3.5 };

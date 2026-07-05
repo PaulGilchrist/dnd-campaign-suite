@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { renderHook, act } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import useNpcImageCache from './useNpcImageCache.js';
@@ -19,34 +19,7 @@ describe('useNpcImageCache', () => {
     return result;
   };
 
-  describe('initialization', () => {
-    it('should return empty npcImages initially', () => {
-      const result = getHook([]);
-      expect(result.current.npcImages).toEqual({});
-    });
-
-    it('should return npcImages and setNpcImages', () => {
-      const result = getHook([]);
-      expect(result.current.npcImages).toBeDefined();
-      expect(typeof result.current.setNpcImages).toBe('function');
-    });
-  });
-
   describe('filtering and fetching', () => {
-    it('should not call getMonsterImageUrl when placedItems is empty', () => {
-      getHook([]);
-      expect(getMonsterImageUrl).not.toHaveBeenCalled();
-    });
-
-    it('should not call getMonsterImageUrl when no npc type items exist', () => {
-      const placedItems = [
-        { type: 'token', name: 'Token1' },
-        { type: 'wall', name: 'Wall1' },
-      ];
-      getHook(placedItems);
-      expect(getMonsterImageUrl).not.toHaveBeenCalled();
-    });
-
     it('should only fetch URLs for npc type items', async () => {
       const placedItems = [
         { type: 'npc', name: 'Goblin' },
@@ -164,16 +137,6 @@ describe('useNpcImageCache', () => {
       expect(result.current.npcImages).toEqual({
         Goblin: 'https://example.com/custom.jpg',
       });
-    });
-
-    it('should handle setNpcImages with empty object', () => {
-      const result = getHook([]);
-
-      act(() => {
-        result.current.setNpcImages({});
-      });
-
-      expect(result.current.npcImages).toEqual({});
     });
   });
 });

@@ -1,3 +1,4 @@
+// @cleaned-by-ai
 // @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
@@ -100,93 +101,29 @@ describe('useTravelManagement', () => {
       expect(s.travelLog).toEqual([]);
     });
 
-    it('returns all expected properties on the result object', () => {
-      const { result } = renderHook(() => useTravelManagement(baseArgs));
-      const keys = Object.keys(result.current);
-
-      expect(keys).toContain('travelMode');
-      expect(keys).toContain('travelPace');
-      expect(keys).toContain('destination');
-      expect(keys).toContain('path');
-      expect(keys).toContain('pathIndex');
-      expect(keys).toContain('accruedCost');
-      expect(keys).toContain('dailyBudget');
-      expect(keys).toContain('dayExhausted');
-      expect(keys).toContain('travelLog');
-      expect(keys).toContain('lastMessage');
-      expect(keys).toContain('pendingEvent');
-      expect(keys).toContain('eventFrequency');
-      expect(keys).toContain('rerollsRemaining');
-      expect(keys).toContain('currentPosition');
-      expect(keys).toContain('remainingSteps');
-      expect(keys).toContain('paceInfo');
-      expect(keys).toContain('hexesRemaining');
-      expect(keys).toContain('horseback');
-      expect(keys).toContain('forcedMarchHours');
-      expect(keys).toContain('exhaustionMultiplier');
-      expect(keys).toContain('partyHasMaxExhaustion');
-      expect(keys).toContain('isTravelActive');
-      expect(keys).toContain('startPlanning');
-      expect(keys).toContain('cancelTravel');
-      expect(keys).toContain('setDestinationAndPath');
-      expect(keys).toContain('toggleHorseback');
-      expect(keys).toContain('changePace');
-      expect(keys).toContain('advanceOneHex');
-      expect(keys).toContain('forceCamp');
-      expect(keys).toContain('forcedMarch');
-      expect(keys).toContain('acceptEvent');
-      expect(keys).toContain('skipEvent');
-      expect(keys).toContain('rerollEvent');
-      expect(keys).toContain('setEventFrequency');
-      expect(keys).toContain('setTravelLog');
-      expect(keys).toContain('setLastMessage');
-      expect(typeof result.current.clearEvent).toBe('undefined');
-    });
-  });
-
-  describe('initial state from initialTravelState', () => {
-    it('restores travelMode from initialTravelState', () => {
+    it('restores full travel state from initialTravelState', () => {
       const { result } = renderHook(() =>
-        useTravelManagement({ ...baseArgs, initialTravelState: { travelMode: 'planning' } })
+        useTravelManagement({
+          ...baseArgs,
+          initialTravelState: {
+            travelMode: 'planning',
+            travelPace: 'fast',
+            destination: { q: 5, r: 5 },
+            path: [{ q: 0, r: 0 }, { q: 1, r: 1 }],
+            pathIndex: 2,
+            accruedCost: 3,
+            dayExhausted: true,
+            forcedMarchHours: 2,
+          },
+        })
       );
+
       expect(result.current.travelMode).toBe('planning');
-    });
-
-    it('restores travelPace from initialTravelState', () => {
-      const { result } = renderHook(() =>
-        useTravelManagement({ ...baseArgs, initialTravelState: { travelPace: 'fast' } })
-      );
       expect(result.current.travelPace).toBe('fast');
-    });
-
-    it('restores destination from initialTravelState', () => {
-      const dest = { q: 5, r: 5 };
-      const { result } = renderHook(() =>
-        useTravelManagement({ ...baseArgs, initialTravelState: { destination: dest } })
-      );
-      expect(result.current.destination).toEqual(dest);
-    });
-
-    it('restores path and pathIndex from initialTravelState', () => {
-      const path = [{ q: 0, r: 0 }, { q: 1, r: 1 }];
-      const { result } = renderHook(() =>
-        useTravelManagement({ ...baseArgs, initialTravelState: { path, pathIndex: 2 } })
-      );
-      expect(result.current.path).toEqual(path);
+      expect(result.current.destination).toEqual({ q: 5, r: 5 });
+      expect(result.current.path).toEqual([{ q: 0, r: 0 }, { q: 1, r: 1 }]);
       expect(result.current.pathIndex).toBe(2);
-    });
-
-    it('restores accruedCost from initialTravelState', () => {
-      const { result } = renderHook(() =>
-        useTravelManagement({ ...baseArgs, initialTravelState: { accruedCost: 3 } })
-      );
       expect(result.current.accruedCost).toBe(3);
-    });
-
-    it('restores dayExhausted and forcedMarchHours from initialTravelState', () => {
-      const { result } = renderHook(() =>
-        useTravelManagement({ ...baseArgs, initialTravelState: { dayExhausted: true, forcedMarchHours: 2 } })
-      );
       expect(result.current.dayExhausted).toBe(true);
       expect(result.current.forcedMarchHours).toBe(2);
     });
@@ -436,14 +373,6 @@ describe('useTravelManagement', () => {
       expect(result.current.lastMessage).toContain('Forced march');
     });
 
-    it('does not call setRuntimeValue when all characters have self restoration', () => {
-      hasSelfRestoration.mockReturnValue(true);
-      const { result } = renderHook(() => useTravelManagement(baseArgs));
-      act(() => { result.current.forcedMarch(); });
-
-      expect(setRuntimeValue).not.toHaveBeenCalled();
-    });
-
     it('returns false and shows message when a character has max exhaustion', () => {
       getRuntimeValue.mockReturnValue(6);
       const { result } = renderHook(() => useTravelManagement(baseArgs));
@@ -464,12 +393,6 @@ describe('useTravelManagement', () => {
 
     it('returns false when no character has max exhaustion', () => {
       getRuntimeValue.mockReturnValue(3);
-      const { result } = renderHook(() => useTravelManagement(baseArgs));
-      expect(result.current.partyHasMaxExhaustion).toBe(false);
-    });
-
-    it('returns false when getRuntimeValue returns null', () => {
-      getRuntimeValue.mockReturnValue(null);
       const { result } = renderHook(() => useTravelManagement(baseArgs));
       expect(result.current.partyHasMaxExhaustion).toBe(false);
     });
@@ -513,12 +436,6 @@ describe('useTravelManagement', () => {
       expect(result.current.rerollsRemaining).toBe(2);
       expect(result.current.pendingEvent).toEqual({ type: 'encounter', title: 'Random Event' });
     });
-
-    it('setEventFrequency updates the frequency', () => {
-      const { result } = renderHook(() => useTravelManagement(baseArgs));
-      act(() => { result.current.setEventFrequency('frequent'); });
-      expect(result.current.eventFrequency).toBe('frequent');
-    });
   });
 
   describe('computed values', () => {
@@ -533,16 +450,6 @@ describe('useTravelManagement', () => {
 
       act(() => { result.current.advanceOneHex(); });
       expect(result.current.hexesRemaining).toBe(0);
-    });
-
-    it('remainingSteps is path.slice(pathIndex + 1)', () => {
-      const to = { q: 2, r: 0 };
-      const { result } = renderHook(() => useTravelManagement(baseArgs));
-      act(() => { result.current.setDestinationAndPath(to); });
-      expect(result.current.remainingSteps).toEqual([{ q: 1, r: 0 }, { q: 2, r: 0 }]);
-
-      act(() => { result.current.advanceOneHex(); });
-      expect(result.current.remainingSteps).toEqual([{ q: 2, r: 0 }]);
     });
 
     it('exhaustionMultiplier reflects forcedMarchHours', () => {

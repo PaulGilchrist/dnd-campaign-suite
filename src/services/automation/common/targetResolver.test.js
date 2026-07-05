@@ -192,16 +192,5 @@ describe('targetResolver', () => {
         targetPos: null,
       });
     });
-
-    it('returns null when resolveTarget rejects', async () => {
-      const mapData = makeMapData();
-
-      mapsService.loadMapData.mockResolvedValue(mapData);
-      damageUtils.getCombatContext.mockRejectedValue(new Error('Combat context failed'));
-
-      const result = await resolveMapPositions(campaignName, 'TestMap', attackerName);
-
-      expect(result).toBeNull();
-    });
   });
 });

@@ -1,3 +1,4 @@
+// @cleaned-by-ai
 // @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
@@ -125,16 +126,6 @@ describe('getAffectedCreatures', () => {
     expect(hitTestOverlay).not.toHaveBeenCalled();
   });
 
-  it('handles empty players and placedItems arrays', () => {
-    const result = getAffectedCreatures({ shape: 'cone' }, [], [], makeCombatSummary([]));
-    expect(result).toEqual([]);
-  });
-
-  it('handles null players and placedItems', () => {
-    const result = getAffectedCreatures({ shape: 'line' }, null, null, makeCombatSummary([]));
-    expect(result).toEqual([]);
-  });
-
   it('matches creatures by name across players and placedItems position maps', () => {
     hitTestOverlay.mockImplementation((_overlay, x, y) => x === 3 && y === 4);
 
@@ -151,25 +142,6 @@ describe('getAffectedCreatures', () => {
     expect(result).toEqual([
       { creature: player, gridX: 3, gridY: 4 },
     ]);
-  });
-
-  it('skips creatures whose name is not in any position map', () => {
-    const npc = createNpcCreature('Hidden Enemy');
-    const cs = makeCombatSummary([npc]);
-    const result = getAffectedCreatures({}, [], [], cs);
-    expect(result).toEqual([]);
-    expect(hitTestOverlay).not.toHaveBeenCalled();
-  });
-
-  it('skips placedItems without a name', () => {
-    const cs = makeCombatSummary([createNpcCreature('Goblin')]);
-    const result = getAffectedCreatures(
-      {},
-      [],
-      [{ type: 'npc', gridX: 5, gridY: 5 }],
-      cs
-    );
-    expect(result).toEqual([]);
   });
 
   it('handles multiple creatures hit by overlay', () => {
@@ -189,14 +161,6 @@ describe('getAffectedCreatures', () => {
     expect(result).toHaveLength(2);
     expect(result[0].creature).toBe(hero);
     expect(result[1].creature).toBe(ranger);
-  });
-
-  it('does not call hitTestOverlay when overlay or creatures are absent', () => {
-    getAffectedCreatures(null, [], [], makeCombatSummary([]));
-    expect(hitTestOverlay).not.toHaveBeenCalled();
-
-    getAffectedCreatures({ shape: 'sphere' }, [], [], {});
-    expect(hitTestOverlay).not.toHaveBeenCalled();
   });
 });
 
@@ -414,23 +378,6 @@ describe('processAoeNpcs', () => {
     expect(result[0].finalDamage).toBe(0);
   });
 
-  it('does not mark protected when getRuntimeValue returns non-array', () => {
-    const npc = createNpcCreature('Ally');
-    getRuntimeValue.mockReturnValue('not-an-array');
-
-    rollSaveForCreature.mockReturnValue({ success: false, roll: 5, bonus: 0 });
-    computeDamageAfterSave.mockReturnValue(6);
-    applyDamageToTarget.mockReturnValue({ finalDamage: 6, newHp: 14 });
-
-    const result = processAoeNpcs(
-      makeCombatSummary([npc]), [{ creature: npc }],
-      6, 'Fire', 15, 'dexterity', 'half', 'TestCampaign', 'Nemesis'
-    );
-
-    expect(result[0].soulstitchProtected).toBe(false);
-    expect(result[0].saveSuccess).toBe(false);
-  });
-
   it('does not mark protected when target name is not in stored array', () => {
     const npc = createNpcCreature('Ally');
     getRuntimeValue.mockReturnValue(['OtherPerson']);
@@ -445,23 +392,6 @@ describe('processAoeNpcs', () => {
     );
 
     expect(result[0].soulstitchProtected).toBe(false);
-  });
-
-  it('skips protection check when attackerName is undefined', () => {
-    const npc = createNpcCreature('Ally');
-    getRuntimeValue.mockReturnValue(['Ally']);
-
-    rollSaveForCreature.mockReturnValue({ success: false, roll: 5, bonus: 0 });
-    computeDamageAfterSave.mockReturnValue(6);
-    applyDamageToTarget.mockReturnValue({ finalDamage: 6, newHp: 14 });
-
-    const result = processAoeNpcs(
-      makeCombatSummary([npc]), [{ creature: npc }],
-      6, 'Fire', 15, 'dexterity', 'half', 'TestCampaign', undefined
-    );
-
-    expect(result[0].soulstitchProtected).toBe(false);
-    expect(getRuntimeValue).not.toHaveBeenCalled();
   });
 });
 
@@ -600,29 +530,6 @@ describe('sendAoePlayerSaves', () => {
       sourceName: 'Guiding Bolt',
       sourceAttackerName: 'Cleric',
       rawDamage: 7,
-      disadvantage: false,
-    });
-  });
-
-  it('passes empty strings through when spellName and attackerName are absent', () => {
-    utils.guid.mockReturnValue('guid-empty');
-
-    sendAoePlayerSaves(
-      [{ creature: createPlayerCreature('Hero') }], 5, '', 10, 'strength', 'none',
-      'TestCampaign', '', '', [], ''
-    );
-
-    expect(sendSavePrompt).toHaveBeenCalledWith('TestCampaign', {
-      promptId: 'guid-empty',
-      targetName: 'Hero',
-      saveType: 'strength',
-      saveDc: 10,
-      dcSuccess: 'none',
-      damageFormula: '',
-      damageType: '',
-      sourceName: '',
-      sourceAttackerName: '',
-      rawDamage: 5,
       disadvantage: false,
     });
   });

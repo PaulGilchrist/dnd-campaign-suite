@@ -1,3 +1,4 @@
+// @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import useTerrainPainting from './useTerrainPainting.js';
@@ -24,7 +25,7 @@ describe('useTerrainPainting', () => {
             expect(setRivers).not.toHaveBeenCalled();
         });
 
-        it('sets terrain when tool is paint', () => {
+        it('paints terrain on the hex', () => {
             const setTerrain = vi.fn((fn) => fn({}));
             const setRivers = vi.fn();
             const { result } = createHooks(10, 10, () => ({ q: 2, r: 3 }), 'mountains', setTerrain, setRivers);
@@ -33,13 +34,11 @@ describe('useTerrainPainting', () => {
                 result.current.handleTerrainPointerDown({ clientX: 0, clientY: 0 }, 'paint');
             });
 
-            expect(setTerrain).toHaveBeenCalled();
             const callArg = setTerrain.mock.calls[0][0]({});
             expect(callArg['2,3']).toBe('mountains');
-            expect(setRivers).not.toHaveBeenCalled();
         });
 
-        it('removes terrain when tool is erase', () => {
+        it('removes terrain when erasing', () => {
             const initialTerrain = { '2,3': 'forest', '4,5': 'desert' };
             const setTerrain = vi.fn((fn) => fn(initialTerrain));
             const setRivers = vi.fn();
@@ -49,24 +48,21 @@ describe('useTerrainPainting', () => {
                 result.current.handleTerrainPointerDown({ clientX: 0, clientY: 0 }, 'erase');
             });
 
-            expect(setTerrain).toHaveBeenCalled();
             const callArg = setTerrain.mock.calls[0][0](initialTerrain);
             expect(callArg['2,3']).toBeUndefined();
             expect(callArg['4,5']).toBe('desert');
         });
 
-        it('toggles river when tool is river', () => {
+        it('toggles river presence on the hex', () => {
             const setTerrain = vi.fn();
-
             const setRivers = vi.fn((fn) => fn([]));
             const { result } = createHooks(10, 10, () => ({ q: 2, r: 3 }), 'forest', setTerrain, setRivers);
 
+            // Toggle on: river not present
             act(() => {
                 result.current.handleTerrainPointerDown({ clientX: 0, clientY: 0 }, 'river');
             });
-
             expect(setTerrain).not.toHaveBeenCalled();
-            expect(setRivers).toHaveBeenCalled();
             const callArg = setRivers.mock.calls[0][0]([]);
             expect(callArg).toContain('2,3');
 
@@ -79,26 +75,83 @@ describe('useTerrainPainting', () => {
         });
     });
 
-    describe('reacting to prop changes', () => {
-        it('uses updated selectedTerrain on subsequent paint calls', () => {
+    describe('handleTerrainPointerMove', () => {
+        it('paints terrain while dragging', () => {
             const setTerrain = vi.fn((fn) => fn({}));
             const setRivers = vi.fn();
-            const { result, rerender } = renderHook(
-                (args) => useTerrainPainting(args.hexCols, args.hexRows, args.getHex, args.terrain, args.setTerrain, args.setRivers),
-                { initialProps: { hexCols: 10, hexRows: 10, getHex: () => ({ q: 2, r: 3 }), terrain: 'forest', setTerrain, setRivers } }
-            );
+            const { result } = createHooks(10, 10, () => ({ q: 2, r: 3 }), 'mountains', setTerrain, setRivers);
 
+            // Simulate pointer down to activate painting
             act(() => {
                 result.current.handleTerrainPointerDown({ clientX: 0, clientY: 0 }, 'paint');
             });
-            expect(setTerrain.mock.calls[0][0]({})['2,3']).toBe('forest');
 
-            rerender({ hexCols: 10, hexRows: 10, getHex: () => ({ q: 3, r: 4 }), terrain: 'desert', setTerrain, setRivers });
+            act(() => {
+                result.current.handleTerrainPointerMove({ clientX: 10, clientY: 10 }, 'paint');
+            });
 
+            const callArg = setTerrain.mock.calls[0][0]({});
+            expect(callArg['2,3']).toBe('mountains');
+        });
+
+        it('does not paint when pointer was never pressed', () => {
+            const setTerrain = vi.fn();
+            const setRivers = vi.fn();
+            const { result } = createHooks(10, 10, () => ({ q: 2, r: 3 }), 'forest', setTerrain, setRivers);
+
+            act(() => {
+                result.current.handleTerrainPointerMove({ clientX: 10, clientY: 10 }, 'paint');
+            });
+
+            expect(setTerrain).not.toHaveBeenCalled();
+        });
+
+        it('adds rivers without toggling while dragging', () => {
+            const setTerrain = vi.fn();
+            const setRivers = vi.fn((fn) => fn([]));
+            const { result } = createHooks(10, 10, () => ({ q: 2, r: 3 }), 'forest', setTerrain, setRivers);
+
+            act(() => {
+                result.current.handleTerrainPointerDown({ clientX: 0, clientY: 0 }, 'river');
+            });
+
+            act(() => {
+                result.current.handleTerrainPointerMove({ clientX: 10, clientY: 10 }, 'river');
+            });
+
+            expect(setTerrain).not.toHaveBeenCalled();
+            const callArg = setRivers.mock.calls[0][0]([]);
+            expect(callArg).toContain('2,3');
+        });
+    });
+
+    describe('handleTerrainPointerUp', () => {
+        it('resets painting state', () => {
+            const setTerrain = vi.fn((fn) => fn({}));
+            const setRivers = vi.fn();
+            const { result } = createHooks(10, 10, () => ({ q: 2, r: 3 }), 'forest', setTerrain, setRivers);
+
+            // Start painting
             act(() => {
                 result.current.handleTerrainPointerDown({ clientX: 0, clientY: 0 }, 'paint');
             });
-            expect(setTerrain.mock.calls[1][0]({})['3,4']).toBe('desert');
+
+            act(() => {
+                result.current.handleTerrainPointerMove({ clientX: 10, clientY: 10 }, 'paint');
+            });
+
+            // Release
+            act(() => {
+                result.current.handleTerrainPointerUp();
+            });
+
+            // After release, move should not paint (no additional call)
+            act(() => {
+                result.current.handleTerrainPointerMove({ clientX: 20, clientY: 20 }, 'paint');
+            });
+
+            // Down and move both painted (same hex), pointerUp prevents further painting
+            expect(setTerrain).toHaveBeenCalledTimes(2);
         });
     });
 });

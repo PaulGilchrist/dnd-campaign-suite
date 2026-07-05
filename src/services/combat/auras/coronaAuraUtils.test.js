@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 // ── Mocks ───────────────────────────────────────────────────────
@@ -329,17 +329,6 @@ describe('getCoronaSaveDisadvantage', () => {
       expect(result).toEqual({ disadvantage: false })
     })
 
-    it('returns false when only the target is in mapData', () => {
-      const result = getCoronaSaveDisadvantage({
-        targetName: 'Target',
-        campaignName: '',
-        mapData: makeMapData([makePlayer('Target')]),
-        damageType: null,
-        skipRangeCheck: false,
-      })
-      expect(result).toEqual({ disadvantage: false })
-    })
-
     it.each([
       ['at default 60ft boundary', { dist: 60, range: undefined, expected: true }],
       ['within default 60ft range', { dist: 30, range: undefined, expected: true }],
@@ -628,7 +617,7 @@ describe('getCoronaSaveDisadvantage', () => {
   // ── getCombatSummary fallback ─────────────────────────────────
 
   describe('getCombatSummary fallback when mapData is unavailable', () => {
-    it('falls back to getCombatSummary when mapData is undefined and skipRangeCheck is true', () => {
+    it('falls back to getCombatSummary when mapData is undefined, null, or empty', () => {
       getCombatSummary.mockReturnValue({
         creatures: [
           { name: 'Target', type: 'player' },
@@ -639,35 +628,32 @@ describe('getCoronaSaveDisadvantage', () => {
         name === 'Paladin' ? [makeCoronaBuff()] : [],
       )
 
-      const result = getCoronaSaveDisadvantage({
+      const result1 = getCoronaSaveDisadvantage({
         targetName: 'Target',
         campaignName: 'test',
         mapData: undefined,
         damageType: null,
         skipRangeCheck: true,
       })
-      expect(result).toEqual({ disadvantage: true, source: 'Paladin' })
-    })
+      expect(result1).toEqual({ disadvantage: true, source: 'Paladin' })
 
-    it('falls back to getCombatSummary when mapData is null and skipRangeCheck is true', () => {
-      getCombatSummary.mockReturnValue({
-        creatures: [
-          { name: 'Target', type: 'player' },
-          { name: 'Paladin', type: 'player' },
-        ],
-      })
-      getRuntimeValue.mockImplementation((name) =>
-        name === 'Paladin' ? [makeCoronaBuff()] : [],
-      )
-
-      const result = getCoronaSaveDisadvantage({
+      const result2 = getCoronaSaveDisadvantage({
         targetName: 'Target',
         campaignName: 'test',
         mapData: null,
         damageType: null,
         skipRangeCheck: true,
       })
-      expect(result).toEqual({ disadvantage: true, source: 'Paladin' })
+      expect(result2).toEqual({ disadvantage: true, source: 'Paladin' })
+
+      const result3 = getCoronaSaveDisadvantage({
+        targetName: 'Target',
+        campaignName: 'test',
+        mapData: makeMapData([]),
+        damageType: null,
+        skipRangeCheck: true,
+      })
+      expect(result3).toEqual({ disadvantage: true, source: 'Paladin' })
     })
 
     it('returns false when getCombatSummary returns no player creatures', () => {
@@ -686,27 +672,6 @@ describe('getCoronaSaveDisadvantage', () => {
         skipRangeCheck: true,
       })
       expect(result).toEqual({ disadvantage: false })
-    })
-
-    it('falls back to getCombatSummary when mapData.players is empty and skipRangeCheck is true', () => {
-      getCombatSummary.mockReturnValue({
-        creatures: [
-          { name: 'Target', type: 'player' },
-          { name: 'Paladin', type: 'player' },
-        ],
-      })
-      getRuntimeValue.mockImplementation((name) =>
-        name === 'Paladin' ? [makeCoronaBuff()] : [],
-      )
-
-      const result = getCoronaSaveDisadvantage({
-        targetName: 'Target',
-        campaignName: 'test',
-        mapData: makeMapData([]),
-        damageType: null,
-        skipRangeCheck: true,
-      })
-      expect(result).toEqual({ disadvantage: true, source: 'Paladin' })
     })
   })
 

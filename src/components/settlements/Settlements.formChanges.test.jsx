@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import Settlements from './Settlements.jsx';
@@ -59,8 +59,6 @@ describe('Settlements - form field changes', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.spyOn(console, 'error').mockImplementation(() => {});
-    vi.spyOn(console, 'log').mockImplementation(() => {});
     vi.spyOn(globalThis, 'fetch').mockResolvedValue({
       ok: true,
       json: () => Promise.resolve({
@@ -94,15 +92,12 @@ describe('Settlements - form field changes', () => {
         },
       }),
     });
+    // Override module mock
+    Object.assign(settlementMockReturn, mockUseSettlements);
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
-  });
-
-  beforeEach(() => {
-    // Override module mock
-    Object.assign(settlementMockReturn, mockUseSettlements);
   });
 
   it('populates fields with defaults when size changes', async () => {
@@ -116,14 +111,14 @@ describe('Settlements - form field changes', () => {
     expect(popInput.value).toContain('souls');
   });
 
-  it('shows threat preview toggle only when threat is non-empty', () => {
+  it('shows or hides threat preview toggle based on threat value', () => {
+    // Empty threat — toggle should not appear
     render(<Settlements campaignName="test" onBack={() => {}} />);
     const modalOpen = screen.getByRole('button', { name: /new settlement/i });
     fireEvent.click(modalOpen);
     expect(screen.queryByText(/threats/i)).not.toBeInTheDocument();
-  });
 
-  it('shows threat preview toggle when editing a settlement with threat', () => {
+    // With threat — toggle should appear
     Object.assign(settlementMockReturn, {
       ...mockUseSettlements,
       items: [

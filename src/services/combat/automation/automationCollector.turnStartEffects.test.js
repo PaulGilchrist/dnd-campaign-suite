@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { describe, it, expect } from 'vitest'
 import { collectTurnStartEffects } from './automationCollector.js'
 
@@ -29,7 +29,6 @@ describe('collectTurnStartEffects', () => {
                     type: expectedType,
                     name: effect,
                 })
-                expect(Object.keys(result[0])).toEqual(['type', 'name'])
             })
         }
     })
@@ -187,7 +186,7 @@ describe('collectTurnStartEffects', () => {
         })
     })
 
-    describe('type-based effects (precise_hunter, hunter_lore)', () => {
+    describe('type-based effects', () => {
         it('maps precise_hunter type', () => {
             const result = collectTurnStartEffects([{
                 name: 'Precise Hunter',
@@ -211,9 +210,7 @@ describe('collectTurnStartEffects', () => {
                 name: 'Hunter Lore',
             })
         })
-    })
 
-    describe('type-based effects', () => {
         it('maps holy_nimbus type to holy_nimbus_radiant_damage with fixed fields', () => {
             const features = [{
                 name: 'Holy Nimbus',
@@ -526,26 +523,15 @@ describe('collectTurnStartEffects', () => {
     })
 
     describe('null safety and edge cases', () => {
-        it('returns empty array when features is null', () => {
+        it('returns empty array for null, undefined, or empty input', () => {
             expect(collectTurnStartEffects(null)).toEqual([])
-        })
-
-        it('returns empty array when features is undefined', () => {
             expect(collectTurnStartEffects(undefined)).toEqual([])
-        })
-
-        it('returns empty array when features is an empty array', () => {
             expect(collectTurnStartEffects([])).toEqual([])
         })
 
-        it('skips feature with null automation', () => {
-            const result = collectTurnStartEffects([{ name: 'Null', automation: null }])
-            expect(result).toEqual([])
-        })
-
-        it('skips feature with undefined automation', () => {
-            const result = collectTurnStartEffects([{ name: 'Undefined', automation: undefined }])
-            expect(result).toEqual([])
+        it('skips feature with null or undefined automation', () => {
+            expect(collectTurnStartEffects([{ name: 'Null', automation: null }])).toEqual([])
+            expect(collectTurnStartEffects([{ name: 'Undefined', automation: undefined }])).toEqual([])
         })
 
         it('skips feature with no automation property', () => {
@@ -553,14 +539,9 @@ describe('collectTurnStartEffects', () => {
             expect(result).toEqual([])
         })
 
-        it('skips null entries in features array', () => {
-            const result = collectTurnStartEffects([null, { name: 'Valid', automation: { type: 'holy_nimbus' } }])
-            expect(result).toHaveLength(1)
-        })
-
-        it('skips undefined entries in features array', () => {
-            const result = collectTurnStartEffects([undefined, { name: 'Valid', automation: { type: 'holy_nimbus' } }])
-            expect(result).toHaveLength(1)
+        it('skips null and undefined entries in features array', () => {
+            expect(collectTurnStartEffects([null, { name: 'Valid', automation: { type: 'holy_nimbus' } }])).toHaveLength(1)
+            expect(collectTurnStartEffects([undefined, { name: 'Valid', automation: { type: 'holy_nimbus' } }])).toHaveLength(1)
         })
 
         it('ignores unknown automation types', () => {

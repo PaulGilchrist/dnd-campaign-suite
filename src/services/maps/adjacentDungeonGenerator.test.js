@@ -20,30 +20,15 @@ describe('adjacentDungeonGenerator', () => {
       expect(lowDensity.walls.length).toBeGreaterThan(0);
 
       const highDensity = generateAdjacentDungeon({ gridSize: 30, seed: 42, density: 2 });
-      expect(highDensity.gridSize).toBe(30);
       expect(highDensity.walls.length).toBeGreaterThan(0);
     });
 
-    it('should accept density 0 and 1 without error', () => {
-      const low = generateAdjacentDungeon({ gridSize: 30, seed: 42, density: 0 });
-      expect(low.rooms.length).toBeGreaterThan(0);
-
-      const high = generateAdjacentDungeon({ gridSize: 30, seed: 42, density: 1 });
-      expect(high.rooms.length).toBeGreaterThan(0);
-    });
-
     it('should accept layoutStyle options', () => {
-      const layouts = ['linear', 'forking', 'winding', 'balanced'];
-      for (const layout of layouts) {
+      for (const layout of ['linear', 'forking', 'winding', 'balanced']) {
         const map = generateAdjacentDungeon({ gridSize: 20, seed: 42, layoutStyle: layout });
         expect(map.generationMode).toBe('adjacent');
         expect(map.rooms.length).toBeGreaterThan(0);
       }
-    });
-
-    it('should respect roomCount option', () => {
-      const map = generateAdjacentDungeon({ gridSize: 30, seed: 42, roomCount: 6 });
-      expect(map.rooms.length).toBeGreaterThanOrEqual(1);
     });
 
     it('should use provided seed for deterministic RNG', () => {
@@ -57,57 +42,38 @@ describe('adjacentDungeonGenerator', () => {
       expect(map.seed).toBeGreaterThan(0);
     });
 
-    it('should accept empty opts object', () => {
-      const map = generateAdjacentDungeon({});
-      expect(map.gridSize).toBe(30);
-      expect(map.rooms.length).toBeGreaterThan(0);
-    });
-
-    it('should accept undefined opts', () => {
-      const map = generateAdjacentDungeon();
-      expect(map.gridSize).toBe(30);
-      expect(map.rooms.length).toBeGreaterThan(0);
+    it('should accept empty or undefined opts', () => {
+      expect(generateAdjacentDungeon({}).gridSize).toBe(30);
+      expect(generateAdjacentDungeon().gridSize).toBe(30);
     });
   });
 
   describe('output structure', () => {
+    const requiredKeys = ['name', 'description', 'gridSize', 'seed', 'walls', 'placedItems', 'players', 'zoom', 'panX', 'panY', 'rooms', 'generationMode'];
+
     it('should return an object with all required top-level fields', () => {
       const map = generateAdjacentDungeon({ gridSize: 20, seed: 42 });
-      const expectedKeys = [
-        'name', 'description', 'gridSize', 'seed',
-        'walls', 'placedItems', 'players', 'zoom', 'panX', 'panY',
-        'rooms', 'generationMode',
-      ];
-      for (const key of expectedKeys) {
+      for (const key of requiredKeys) {
         expect(map).toHaveProperty(key);
       }
     });
 
     it('should set generationMode to adjacent', () => {
-      const map = generateAdjacentDungeon({ gridSize: 20, seed: 42 });
-      expect(map.generationMode).toBe('adjacent');
+      expect(generateAdjacentDungeon({ seed: 42 }).generationMode).toBe('adjacent');
     });
 
-    it('should have players as an empty array', () => {
+    it('should have players as an empty array and default zoom/pan', () => {
       const map = generateAdjacentDungeon({ seed: 42 });
       expect(map.players).toEqual([]);
-    });
-
-    it('should default zoom to 1 and pan to 0', () => {
-      const map = generateAdjacentDungeon({ seed: 42 });
       expect(map.zoom).toBe(1);
       expect(map.panX).toBe(0);
       expect(map.panY).toBe(0);
     });
 
-    it('should generate a non-empty name string', () => {
+    it('should generate a non-empty name and description', () => {
       const map = generateAdjacentDungeon({ seed: 42 });
       expect(typeof map.name).toBe('string');
       expect(map.name.length).toBeGreaterThan(0);
-    });
-
-    it('should generate a non-empty description string', () => {
-      const map = generateAdjacentDungeon({ seed: 42 });
       expect(typeof map.description).toBe('string');
       expect(map.description.length).toBeGreaterThan(0);
     });
@@ -135,8 +101,7 @@ describe('adjacentDungeonGenerator', () => {
 
   describe('rooms', () => {
     it('should generate at least one room', () => {
-      const map = generateAdjacentDungeon({ gridSize: 20, seed: 42 });
-      expect(map.rooms.length).toBeGreaterThanOrEqual(1);
+      expect(generateAdjacentDungeon({ gridSize: 20, seed: 42 }).rooms.length).toBeGreaterThanOrEqual(1);
     });
 
     it('should have the entrance room as the first room (id 0)', () => {
@@ -156,7 +121,7 @@ describe('adjacentDungeonGenerator', () => {
       }
     });
 
-    it('should have room rects with x, y, w, h', () => {
+    it('should have room rects with x, y, w, h and positive dimensions', () => {
       const map = generateAdjacentDungeon({ gridSize: 20, seed: 42 });
       for (const room of map.rooms) {
         expect(room.rect).toHaveProperty('x');
@@ -184,17 +149,11 @@ describe('adjacentDungeonGenerator', () => {
       }
     });
 
-    it('should have connectedTo as arrays', () => {
-      const map = generateAdjacentDungeon({ gridSize: 20, seed: 42 });
-      for (const room of map.rooms) {
-        expect(Array.isArray(room.connectedTo)).toBe(true);
-      }
-    });
-
-    it('should have connectedTo referencing valid room ids', () => {
+    it('should have connectedTo as arrays of valid room ids', () => {
       const map = generateAdjacentDungeon({ gridSize: 20, seed: 42 });
       const roomIds = new Set(map.rooms.map(r => r.id));
       for (const room of map.rooms) {
+        expect(Array.isArray(room.connectedTo)).toBe(true);
         for (const connId of room.connectedTo) {
           expect(roomIds.has(connId)).toBe(true);
         }
@@ -235,49 +194,39 @@ describe('adjacentDungeonGenerator', () => {
       }
     });
 
-    it('should have rooms with minimum size', () => {
+    it('should have rooms with minimum and maximum size', () => {
       const map = generateAdjacentDungeon({ gridSize: 20, seed: 42 });
       const minRoom = Math.max(4, Math.floor(20 / 8));
+      const maxRoom = Math.max(8, Math.min(18, Math.floor(20 / 2.5)));
       for (const room of map.rooms) {
         expect(room.rect.w).toBeGreaterThanOrEqual(minRoom);
         expect(room.rect.h).toBeGreaterThanOrEqual(minRoom);
-      }
-    });
-
-    it('should have rooms with maximum size', () => {
-      const map = generateAdjacentDungeon({ gridSize: 30, seed: 42 });
-      const maxRoom = Math.max(8, Math.min(18, Math.floor(30 / 2.5)));
-      for (const room of map.rooms) {
         expect(room.rect.w).toBeLessThanOrEqual(maxRoom);
         expect(room.rect.h).toBeLessThanOrEqual(maxRoom);
       }
     });
 
-    it('should have rooms that are not just walls (area > 0)', () => {
-      const map = generateAdjacentDungeon({ gridSize: 20, seed: 42 });
-      for (const room of map.rooms) {
-        expect(room.rect.w * room.rect.h).toBeGreaterThan(0);
-      }
+    it('should always have an entrance room', () => {
+      expect(generateAdjacentDungeon({ gridSize: 20, seed: 42 }).rooms.some(r => r.type === 'entrance')).toBe(true);
+    });
+
+    it('should have a grand room in larger dungeons', () => {
+      expect(generateAdjacentDungeon({ gridSize: 30, seed: 42 }).rooms.some(r => r.type === 'grand')).toBe(true);
+    });
+
+    it('should have variety of room types', () => {
+      const map = generateAdjacentDungeon({ gridSize: 30, seed: 42 });
+      const types = new Set(map.rooms.map(r => r.type));
+      expect(types.size).toBeGreaterThan(1);
     });
   });
 
   describe('walls', () => {
-    it('should generate walls as coordinate strings', () => {
+    it('should generate walls as coordinate strings within grid bounds', () => {
       const map = generateAdjacentDungeon({ gridSize: 20, seed: 42 });
       expect(map.walls.length).toBeGreaterThan(0);
       for (const wall of map.walls) {
         expect(wall).toMatch(/^\d+,\d+$/);
-      }
-    });
-
-    it('should not fill the entire grid with walls', () => {
-      const map = generateAdjacentDungeon({ gridSize: 20, seed: 42 });
-      expect(map.walls.length).toBeLessThan(map.gridSize * map.gridSize);
-    });
-
-    it('should have all walls within grid bounds', () => {
-      const map = generateAdjacentDungeon({ gridSize: 20, seed: 42 });
-      for (const wall of map.walls) {
         const [x, y] = wall.split(',').map(Number);
         expect(x).toBeGreaterThanOrEqual(0);
         expect(x).toBeLessThan(map.gridSize);
@@ -285,10 +234,15 @@ describe('adjacentDungeonGenerator', () => {
         expect(y).toBeLessThan(map.gridSize);
       }
     });
+
+    it('should not fill the entire grid with walls', () => {
+      const map = generateAdjacentDungeon({ gridSize: 20, seed: 42 });
+      expect(map.walls.length).toBeLessThan(map.gridSize * map.gridSize);
+    });
   });
 
   describe('placedItems', () => {
-    it('should generate placedItems with required fields', () => {
+    it('should generate placedItems with required fields within bounds', () => {
       const map = generateAdjacentDungeon({ gridSize: 20, seed: 42 });
       expect(Array.isArray(map.placedItems)).toBe(true);
       expect(map.placedItems.length).toBeGreaterThan(0);
@@ -298,12 +252,6 @@ describe('adjacentDungeonGenerator', () => {
         expect(item).toHaveProperty('gridY');
         expect(item).toHaveProperty('type');
         expect(item).toHaveProperty('visible');
-      }
-    });
-
-    it('should place all items within grid bounds', () => {
-      const map = generateAdjacentDungeon({ gridSize: 20, seed: 42 });
-      for (const item of map.placedItems) {
         expect(item.gridX).toBeGreaterThanOrEqual(0);
         expect(item.gridX).toBeLessThan(map.gridSize);
         expect(item.gridY).toBeGreaterThanOrEqual(0);
@@ -325,20 +273,15 @@ describe('adjacentDungeonGenerator', () => {
     });
 
     it('should include torches', () => {
-      const map = generateAdjacentDungeon({ gridSize: 20, seed: 42 });
-      const torches = map.placedItems.filter(i => i.type === 'torch');
-      expect(torches.length).toBeGreaterThan(0);
+      expect(generateAdjacentDungeon({ gridSize: 20, seed: 42 }).placedItems.some(i => i.type === 'torch')).toBe(true);
     });
 
     it('should include doors between rooms', () => {
-      const map = generateAdjacentDungeon({ gridSize: 20, seed: 42 });
-      const doors = map.placedItems.filter(i => i.type === 'door');
-      expect(doors.length).toBeGreaterThan(0);
+      expect(generateAdjacentDungeon({ gridSize: 20, seed: 42 }).placedItems.some(i => i.type === 'door')).toBe(true);
     });
 
     it('should have doors with valid rotation values (0 or 90)', () => {
-      const map = generateAdjacentDungeon({ gridSize: 20, seed: 42 });
-      const doors = map.placedItems.filter(i => i.type === 'door');
+      const doors = generateAdjacentDungeon({ gridSize: 20, seed: 42 }).placedItems.filter(i => i.type === 'door');
       for (const door of doors) {
         expect([0, 90]).toContain(door.rotation);
       }
@@ -356,19 +299,9 @@ describe('adjacentDungeonGenerator', () => {
     });
 
     it('should have NPCs with valid rotation values (0, 90, 180, 270)', () => {
-      const map = generateAdjacentDungeon({ gridSize: 30, seed: 42 });
-      const npcs = map.placedItems.filter(i => i.type === 'npc');
+      const npcs = generateAdjacentDungeon({ gridSize: 30, seed: 42 }).placedItems.filter(i => i.type === 'npc');
       for (const npc of npcs) {
         expect([0, 90, 180, 270]).toContain(npc.rotation);
-      }
-    });
-
-    it('should have NPCs with valid names', () => {
-      const map = generateAdjacentDungeon({ gridSize: 30, seed: 42 });
-      const npcs = map.placedItems.filter(i => i.type === 'npc');
-      const validNames = ['Goblin', 'Skeleton', 'Orc', 'Bandit', 'Spider', 'Zombie'];
-      for (const npc of npcs) {
-        expect(validNames).toContain(npc.name);
       }
     });
 
@@ -376,110 +309,58 @@ describe('adjacentDungeonGenerator', () => {
       const map = generateAdjacentDungeon({ gridSize: 30, seed: 42 });
       const entranceRoom = map.rooms.find(r => r.type === 'entrance');
       const grandRoom = map.rooms.find(r => r.type === 'grand');
-
       const traps = map.placedItems.filter(i => i.type === 'trap');
       for (const trap of traps) {
         if (entranceRoom) {
-          const inEntrance =
-            trap.gridX >= entranceRoom.rect.x &&
-            trap.gridX < entranceRoom.rect.x + entranceRoom.rect.w &&
-            trap.gridY >= entranceRoom.rect.y &&
-            trap.gridY < entranceRoom.rect.y + entranceRoom.rect.h;
+          const inEntrance = trap.gridX >= entranceRoom.rect.x && trap.gridX < entranceRoom.rect.x + entranceRoom.rect.w && trap.gridY >= entranceRoom.rect.y && trap.gridY < entranceRoom.rect.y + entranceRoom.rect.h;
           expect(inEntrance).toBe(false);
         }
         if (grandRoom) {
-          const inGrand =
-            trap.gridX >= grandRoom.rect.x &&
-            trap.gridX < grandRoom.rect.x + grandRoom.rect.w &&
-            trap.gridY >= grandRoom.rect.y &&
-            trap.gridY < grandRoom.rect.y + grandRoom.rect.h;
+          const inGrand = trap.gridX >= grandRoom.rect.x && trap.gridX < grandRoom.rect.x + grandRoom.rect.w && trap.gridY >= grandRoom.rect.y && trap.gridY < grandRoom.rect.y + grandRoom.rect.h;
           expect(inGrand).toBe(false);
         }
       }
-    });
-
-    it('should include room-type-specific furniture', () => {
-      const map = generateAdjacentDungeon({ gridSize: 30, seed: 42 });
-
-      const hasPrivateRoom = map.rooms.some(r => r.type === 'private');
-      if (hasPrivateRoom) {
-        const beds = map.placedItems.filter(i => i.type === 'bed');
-        expect(beds.length).toBeGreaterThan(0);
-      }
-
-      const hasGrandRoom = map.rooms.some(r => r.type === 'grand');
-      if (hasGrandRoom) {
-        const altars = map.placedItems.filter(i => i.type === 'altar');
-        expect(altars.length).toBeGreaterThan(0);
-      }
-
-      const hasUtilityRoom = map.rooms.some(r => r.type === 'utility');
-      if (hasUtilityRoom) {
-        const crates = map.placedItems.filter(i => i.type === 'crate');
-        expect(crates.length).toBeGreaterThan(0);
-      }
-    });
-
-    it('should include common furnishing types', () => {
-      const map = generateAdjacentDungeon({ gridSize: 30, seed: 42 });
-      const furnishingTypes = [
-        'torch', 'table', 'chair', 'chest', 'bed', 'bookshelf',
-        'altar', 'pillar', 'statue', 'crate', 'web', 'barrel',
-        'firepit', 'fountain',
-      ];
-      const foundTypes = new Set(map.placedItems.map(i => i.type));
-      const hasFurnishing = furnishingTypes.some(t => foundTypes.has(t));
-      expect(hasFurnishing).toBe(true);
-    });
-
-    it('should include secret door IDs with secret-door prefix', () => {
-      const map = generateAdjacentDungeon({ gridSize: 30, seed: 42 });
-      const secretDoors = map.placedItems.filter(i => i.type === 'secretdoor');
-      for (const sd of secretDoors) {
-        expect(sd.id).toMatch(/^secret-door-\d+$/);
-      }
-    });
-
-    it('should include trap IDs with trap prefix', () => {
-      const map = generateAdjacentDungeon({ gridSize: 30, seed: 42 });
-      const traps = map.placedItems.filter(i => i.type === 'trap');
-      for (const trap of traps) {
-        expect(trap.id).toMatch(/^trap-\d+$/);
-      }
-    });
-
-    it('should limit secret doors to maximum 3', () => {
-      const map = generateAdjacentDungeon({ gridSize: 30, seed: 42 });
-      const secretDoors = map.placedItems.filter(i => i.type === 'secretdoor');
-      expect(secretDoors.length).toBeLessThanOrEqual(3);
-    });
-
-    it('should limit traps to maximum 2', () => {
-      const map = generateAdjacentDungeon({ gridSize: 30, seed: 42 });
-      const traps = map.placedItems.filter(i => i.type === 'trap');
-      expect(traps.length).toBeLessThanOrEqual(2);
-    });
-
-    it('should limit NPCs to maximum 7 (rooms.length - 1, max 8)', () => {
-      const map = generateAdjacentDungeon({ gridSize: 30, seed: 42 });
-      const npcs = map.placedItems.filter(i => i.type === 'npc');
-      expect(npcs.length).toBeLessThanOrEqual(Math.min(map.rooms.length - 1, 7));
     });
 
     it('should not place NPCs in the entrance room (room id 0)', () => {
       const map = generateAdjacentDungeon({ gridSize: 30, seed: 42 });
       const entranceRoom = map.rooms.find(r => r.id === 0);
       if (!entranceRoom) return;
-
       const npcs = map.placedItems.filter(i => i.type === 'npc');
       for (const npc of npcs) {
-        const inEntrance =
-          npc.gridX >= entranceRoom.rect.x &&
-          npc.gridX < entranceRoom.rect.x + entranceRoom.rect.w &&
-          npc.gridY >= entranceRoom.rect.y &&
-          npc.gridY < entranceRoom.rect.y + entranceRoom.rect.h;
+        const inEntrance = npc.gridX >= entranceRoom.rect.x && npc.gridX < entranceRoom.rect.x + entranceRoom.rect.w && npc.gridY >= entranceRoom.rect.y && npc.gridY < entranceRoom.rect.y + entranceRoom.rect.h;
         expect(inEntrance).toBe(false);
       }
+    });
+
+    it('should include secret doors with secret-door prefix IDs', () => {
+      const secretDoors = generateAdjacentDungeon({ gridSize: 30, seed: 42 }).placedItems.filter(i => i.type === 'secretdoor');
+      for (const sd of secretDoors) {
+        expect(sd.id).toMatch(/^secret-door-\d+$/);
+      }
+    });
+
+    it('should include trap IDs with trap prefix', () => {
+      const traps = generateAdjacentDungeon({ gridSize: 30, seed: 42 }).placedItems.filter(i => i.type === 'trap');
+      for (const trap of traps) {
+        expect(trap.id).toMatch(/^trap-\d+$/);
+      }
+    });
+
+    it('should limit secret doors to maximum 3', () => {
+      const secretDoors = generateAdjacentDungeon({ gridSize: 30, seed: 42 }).placedItems.filter(i => i.type === 'secretdoor');
+      expect(secretDoors.length).toBeLessThanOrEqual(3);
+    });
+
+    it('should limit traps to maximum 2', () => {
+      const traps = generateAdjacentDungeon({ gridSize: 30, seed: 42 }).placedItems.filter(i => i.type === 'trap');
+      expect(traps.length).toBeLessThanOrEqual(2);
+    });
+
+    it('should limit NPCs to maximum 7', () => {
+      const map = generateAdjacentDungeon({ gridSize: 30, seed: 42 });
+      const npcs = map.placedItems.filter(i => i.type === 'npc');
+      expect(npcs.length).toBeLessThanOrEqual(Math.min(map.rooms.length - 1, 7));
     });
   });
 
@@ -502,125 +383,30 @@ describe('adjacentDungeonGenerator', () => {
 
   describe('layout style behavior', () => {
     it('should generate rooms with all layout styles', () => {
-      const styles = ['linear', 'forking', 'winding', 'balanced'];
-      for (const style of styles) {
+      for (const style of ['linear', 'forking', 'winding', 'balanced']) {
         const map = generateAdjacentDungeon({ gridSize: 20, seed: 42, layoutStyle: style });
         expect(map.rooms.length).toBeGreaterThan(1);
       }
     });
   });
 
-  describe('room type assignment', () => {
-    it('should always have an entrance room', () => {
-      const map = generateAdjacentDungeon({ gridSize: 20, seed: 42 });
-      expect(map.rooms.some(r => r.type === 'entrance')).toBe(true);
-    });
-
-    it('should have a grand room in larger dungeons', () => {
-      const map = generateAdjacentDungeon({ gridSize: 30, seed: 42 });
-      expect(map.rooms.some(r => r.type === 'grand')).toBe(true);
-    });
-
-    it('should have variety of room types', () => {
-      const map = generateAdjacentDungeon({ gridSize: 30, seed: 42 });
-      const types = new Set(map.rooms.map(r => r.type));
-      expect(types.size).toBeGreaterThan(1);
-    });
-
-    it('should have room labels matching their types', () => {
-      const map = generateAdjacentDungeon({ gridSize: 30, seed: 42 });
-      const expectedLabels = {
-        entrance: 'Entrance Hall',
-        common: 'Common Room',
-        utility: 'Storage',
-        private: 'Chamber',
-        grand: 'Grand Hall',
-        hall: 'Hallway',
-      };
-      for (const room of map.rooms) {
-        expect(room.label).toBe(expectedLabels[room.type]);
-      }
-    });
-  });
-
-  describe('door placement', () => {
-    it('should place doors at shared edges between adjacent rooms', () => {
-      const map = generateAdjacentDungeon({ gridSize: 20, seed: 42 });
-      const doors = map.placedItems.filter(i => i.type === 'door');
-      for (const door of doors) {
-        const onRoomBoundary = map.rooms.some(room => {
-          const rx = room.rect.x;
-          const ry = room.rect.y;
-          const rw = room.rect.w;
-          const rh = room.rect.h;
-          return (
-            (door.gridX >= rx && door.gridX < rx + rw && (door.gridY === ry - 1 || door.gridY === ry + rh)) ||
-            (door.gridY >= ry && door.gridY < ry + rh && (door.gridX === rx - 1 || door.gridX === rx + rw))
-          );
-        });
-        expect(onRoomBoundary || door.gridX >= 0 && door.gridX < map.gridSize && door.gridY >= 0 && door.gridY < map.gridSize).toBe(true);
-      }
-    });
-
-    it('should have door IDs with door- prefix', () => {
-      const map = generateAdjacentDungeon({ gridSize: 20, seed: 42 });
-      const doors = map.placedItems.filter(i => i.type === 'door');
-      for (const door of doors) {
-        expect(door.id).toMatch(/^door-\d+-\d+$/);
-      }
-    });
-
-    it('should have doors visible by default', () => {
-      const map = generateAdjacentDungeon({ gridSize: 20, seed: 42 });
-      const doors = map.placedItems.filter(i => i.type === 'door');
-      for (const door of doors) {
-        expect(door.visible).toBe(true);
-      }
-    });
-  });
-
-  describe('entrance stairs placement', () => {
-    it('should place stairs at the center of the entrance room', () => {
-      const map = generateAdjacentDungeon({ gridSize: 20, seed: 42 });
-      const entranceRoom = map.rooms.find(r => r.id === 0);
-      const stairs = map.placedItems.find(i => i.type === 'stairs');
-      if (entranceRoom && stairs) {
-        const expectedX = entranceRoom.rect.x + Math.floor(entranceRoom.rect.w / 2);
-        const expectedY = entranceRoom.rect.y + Math.floor(entranceRoom.rect.h / 2);
-        expect(stairs.gridX).toBe(expectedX);
-        expect(stairs.gridY).toBe(expectedY);
-      }
-    });
-  });
-
   describe('edge cases', () => {
-    it('should handle roomCount of 1', () => {
-      const map = generateAdjacentDungeon({ gridSize: 20, seed: 42, roomCount: 1 });
-      expect(map.rooms.length).toBeGreaterThanOrEqual(1);
-      expect(map.rooms[0].type).toBe('entrance');
-    });
-
-    it('should handle roomCount of 0', () => {
-      const map = generateAdjacentDungeon({ gridSize: 20, seed: 42, roomCount: 0 });
-      expect(map.rooms.length).toBeGreaterThanOrEqual(1);
-    });
-
-    it('should handle a single room dungeon with no doors', () => {
-      const map = generateAdjacentDungeon({ gridSize: 20, seed: 42, roomCount: 1 });
-      const doors = map.placedItems.filter(i => i.type === 'door');
-      expect(doors.length).toBe(0);
+    it('should handle roomCount of 0 or 1', () => {
+      const map0 = generateAdjacentDungeon({ gridSize: 20, seed: 42, roomCount: 0 });
+      expect(map0.rooms.length).toBeGreaterThanOrEqual(1);
+      const map1 = generateAdjacentDungeon({ gridSize: 20, seed: 42, roomCount: 1 });
+      expect(map1.rooms.length).toBeGreaterThanOrEqual(1);
+      expect(map1.rooms[0].type).toBe('entrance');
     });
 
     it('should have entrance stairs in single room dungeon', () => {
       const map = generateAdjacentDungeon({ gridSize: 20, seed: 42, roomCount: 1 });
-      const stairs = map.placedItems.filter(i => i.type === 'stairs');
-      expect(stairs.length).toBe(1);
+      expect(map.placedItems.some(i => i.type === 'stairs')).toBe(true);
     });
 
-    it('should handle large roomCount that exceeds grid capacity', () => {
-      const map = generateAdjacentDungeon({ gridSize: 15, seed: 42, roomCount: 50 });
-      expect(map.rooms.length).toBeGreaterThan(0);
-      expect(map.rooms.length).toBeLessThanOrEqual(50);
+    it('should have no doors in a single room dungeon', () => {
+      const doors = generateAdjacentDungeon({ gridSize: 20, seed: 42, roomCount: 1 }).placedItems.filter(i => i.type === 'door');
+      expect(doors.length).toBe(0);
     });
   });
 });

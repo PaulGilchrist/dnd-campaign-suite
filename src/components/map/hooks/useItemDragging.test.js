@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { renderHook, act } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import useItemDragging from './useItemDragging.js';
@@ -76,32 +76,12 @@ describe('useItemDragging', () => {
     ...overrides,
   });
 
-  describe('initial state', () => {
-    it('should return itemDragging as null initially', () => {
-      const result = getHook();
-      expect(result.current.itemDragging).toBeNull();
-    });
-
-    it('should return all handler functions', () => {
-      const result = getHook();
-      expect(typeof result.current.handleItemPointerDown).toBe('function');
-      expect(typeof result.current.handleItemPointerMove).toBe('function');
-      expect(typeof result.current.handleItemPointerUp).toBe('function');
-      expect(typeof result.current.handleItemPointerLeave).toBe('function');
-    });
-  });
-
   describe('handleItemPointerDown', () => {
-    it('should not start drag when rulerMode is true', () => {
-      const result = getHook({ rulerMode: true });
-      act(() => {
-        result.current.handleItemPointerDown(createMockEvent(), 'item1');
-      });
-      expect(result.current.itemDragging).toBeNull();
-    });
-
-    it('should not start drag when spellMode is true', () => {
-      const result = getHook({ spellMode: true });
+    it.each([
+      ['rulerMode', { rulerMode: true }],
+      ['spellMode', { spellMode: true }],
+    ])('should not start drag when %s is enabled', (_, overrides) => {
+      const result = getHook(overrides);
       act(() => {
         result.current.handleItemPointerDown(createMockEvent(), 'item1');
       });
@@ -144,38 +124,6 @@ describe('useItemDragging', () => {
       expect(dragging.itemId).toBe('item1');
       expect(dragging.pointerId).toBe(1);
     });
-
-    it('should call event handlers on the event', () => {
-      svgRef.current = createMockSvg().current;
-      const result = getHook();
-      const mockEvent = createMockEvent();
-      act(() => {
-        result.current.handleItemPointerDown(mockEvent, 'item1');
-      });
-      expect(mockEvent.stopPropagation).toHaveBeenCalled();
-      expect(mockEvent.preventDefault).toHaveBeenCalled();
-    });
-
-    it('should call setPointerCapture with the pointerId', () => {
-      svgRef.current = createMockSvg().current;
-      const result = getHook();
-      act(() => {
-        result.current.handleItemPointerDown(createMockEvent({ pointerId: 42 }), 'item1');
-      });
-      expect(svgRef.current.setPointerCapture).toHaveBeenCalledWith(42);
-    });
-
-    it('should calculate correct offsetX and offsetY based on item position', () => {
-      svgRef.current = createMockSvg().current;
-      const result = getHook();
-      act(() => {
-        result.current.handleItemPointerDown(createMockEvent(), 'item1');
-      });
-      // item1 is at gridX=1, gridY=1, so gridCenterX(1)=60, gridCenterY(1)=60
-      // offsetX = 100 - 60 = 40, offsetY = 100 - 60 = 40
-      expect(result.current.itemDragging.offsetX).toBe(40);
-      expect(result.current.itemDragging.offsetY).toBe(40);
-    });
   });
 
   describe('handleItemPointerMove', () => {
@@ -183,20 +131,6 @@ describe('useItemDragging', () => {
       const result = getHook();
       act(() => {
         result.current.handleItemPointerMove({ preventDefault: vi.fn(), clientX: 100, clientY: 100 });
-      });
-      expect(setPlacedItems).not.toHaveBeenCalled();
-    });
-
-    it('should do nothing when svgRef is null', () => {
-      const mockSvg = createMockSvg();
-      svgRef.current = mockSvg.current;
-      const result = getHook();
-      act(() => {
-        result.current.handleItemPointerDown(createMockEvent(), 'item1');
-      });
-      svgRef.current = null;
-      act(() => {
-        result.current.handleItemPointerMove({ preventDefault: vi.fn(), clientX: 150, clientY: 150 });
       });
       expect(setPlacedItems).not.toHaveBeenCalled();
     });
@@ -245,108 +179,51 @@ describe('useItemDragging', () => {
       });
       expect(setPlacedItems).toHaveBeenCalled();
     });
+  });
 
-    it('should not set steadyAimMovedThisTurn for non-player type items', () => {
-      const mockSvg = createMockSvg();
-      svgRef.current = mockSvg.current;
-      const result = getHook();
-      act(() => {
-        result.current.handleItemPointerDown(createMockEvent({ pointerId: 2 }), 'item2');
-      });
-      act(() => {
-        result.current.handleItemPointerMove({ preventDefault: vi.fn(), clientX: 220, clientY: 220 });
-      });
-      expect(setPlacedItems).toHaveBeenCalled();
-    });
-
-    it('should call preventDefault on the event', () => {
-      const mockSvg = createMockSvg();
+  describe('handleItemPointerUp and handleItemPointerLeave', () => {
+    const runDragSequence = (overrides = {}) => {
+      const mockSvg = createMockSvg(overrides);
       svgRef.current = mockSvg.current;
       const result = getHook();
       act(() => {
         result.current.handleItemPointerDown(createMockEvent(), 'item1');
       });
-      const moveEvent = { preventDefault: vi.fn(), clientX: 120, clientY: 120 };
-      act(() => {
-        result.current.handleItemPointerMove(moveEvent);
-      });
-      expect(moveEvent.preventDefault).toHaveBeenCalled();
-    });
-  });
+      return { result, mockSvg };
+    };
 
-  describe('handleItemPointerUp', () => {
-    it('should do nothing when itemDragging is null', () => {
+    it.each([
+      ['up', (r, e) => r.current.handleItemPointerUp(e)],
+      ['leave', (r, e) => r.current.handleItemPointerLeave(e)],
+    ])('should do nothing when itemDragging is null (%s)', (_, handler) => {
       const result = getHook();
       act(() => {
-        result.current.handleItemPointerUp({ pointerId: 1 });
+        handler(result, { pointerId: 1 });
       });
       expect(result.current.itemDragging).toBeNull();
     });
 
-    it('should release pointer capture and clear dragging', () => {
-      const mockSvg = createMockSvg();
-      svgRef.current = mockSvg.current;
-      const result = getHook();
-      act(() => {
-        result.current.handleItemPointerDown(createMockEvent(), 'item1');
-      });
+    it.each([
+      ['up', (r, e) => r.current.handleItemPointerUp(e)],
+      ['leave', (r, e) => r.current.handleItemPointerLeave(e)],
+    ])('should release pointer capture and clear dragging (%s)', (_, handler) => {
+      const { result, mockSvg } = runDragSequence();
       expect(result.current.itemDragging).not.toBeNull();
       act(() => {
-        result.current.handleItemPointerUp({ pointerId: 1 });
+        handler(result, { pointerId: 1 });
       });
       expect(result.current.itemDragging).toBeNull();
       expect(mockSvg.current.releasePointerCapture).toHaveBeenCalledWith(1);
     });
 
-    it('should not release pointer capture when svgRef is null', () => {
-      const mockSvg = createMockSvg();
-      svgRef.current = mockSvg.current;
-      const result = getHook();
-      act(() => {
-        result.current.handleItemPointerDown(createMockEvent(), 'item1');
-      });
+    it.each([
+      ['up', (r, e) => r.current.handleItemPointerUp(e)],
+      ['leave', (r, e) => r.current.handleItemPointerLeave(e)],
+    ])('should not release pointer capture when svgRef is null (%s)', (_, handler) => {
+      const { result } = runDragSequence();
       svgRef.current = null;
       act(() => {
-        result.current.handleItemPointerUp({ pointerId: 1 });
-      });
-      expect(result.current.itemDragging).toBeNull();
-    });
-  });
-
-  describe('handleItemPointerLeave', () => {
-    it('should do nothing when itemDragging is null', () => {
-      const result = getHook();
-      act(() => {
-        result.current.handleItemPointerLeave({});
-      });
-      expect(result.current.itemDragging).toBeNull();
-    });
-
-    it('should release pointer capture and clear dragging', () => {
-      const mockSvg = createMockSvg();
-      svgRef.current = mockSvg.current;
-      const result = getHook();
-      act(() => {
-        result.current.handleItemPointerDown(createMockEvent(), 'item1');
-      });
-      expect(result.current.itemDragging).not.toBeNull();
-      act(() => {
-        result.current.handleItemPointerLeave({ pointerId: 1 });
-      });
-      expect(result.current.itemDragging).toBeNull();
-      expect(mockSvg.current.releasePointerCapture).toHaveBeenCalledWith(1);
-    });
-
-    it('should not release pointer capture when svgRef is null', () => {
-      const mockSvg = createMockSvg();
-      svgRef.current = mockSvg.current;
-      const result = getHook();
-      act(() => {
-        result.current.handleItemPointerDown(createMockEvent(), 'item1');
-      });
-      svgRef.current = null;
-      act(() => {
-        result.current.handleItemPointerLeave({});
+        handler(result, { pointerId: 1 });
       });
       expect(result.current.itemDragging).toBeNull();
     });

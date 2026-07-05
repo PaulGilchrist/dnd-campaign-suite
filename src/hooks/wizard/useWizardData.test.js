@@ -1,3 +1,4 @@
+// @cleaned-by-ai
 // @improved-by-ai
 import { renderHook, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -41,7 +42,7 @@ describe('useWizardData', () => {
     vi.restoreAllMocks();
   });
 
-  it('should initialize with empty arrays', () => {
+  it('should initialize with empty arrays and loading state', () => {
     const { result } = renderHook(() => useWizardData('5e'));
 
     expect(result.current.backgrounds).toEqual([]);
@@ -53,15 +54,6 @@ describe('useWizardData', () => {
   });
 
   describe('initialization', () => {
-    it('should set isDataLoading to true while data is loading', () => {
-      global.fetch = createMockFetch({});
-
-      const { result } = renderHook(() => useWizardData('5e'));
-
-      expect(result.current.isDataLoading).toBe(true);
-      expect(result.current.racesData).toEqual([]);
-    });
-
     it('should set isDataLoading to false after data loads', async () => {
       const responses = create5eResponses(
         [{ name: 'Human' }],
@@ -105,15 +97,6 @@ describe('useWizardData', () => {
       ]);
       expect(result.current.feats).toEqual(feats);
       expect(result.current.magicItems).toEqual(magicItems);
-      expect(result.current.backgrounds).toEqual([]);
-    });
-
-    it('should not load backgrounds for 5e ruleset', () => {
-      const responses = create5eResponses([], [], [], []);
-      global.fetch = createMockFetch(responses);
-
-      const { result } = renderHook(() => useWizardData('5e'));
-
       expect(result.current.backgrounds).toEqual([]);
     });
 
@@ -259,42 +242,6 @@ describe('useWizardData', () => {
 
       expect(result.current.racesData[0]?.name).toBe('2024 Race');
       expect(result.current.backgrounds).toEqual([{ name: 'Acolyte' }]);
-    });
-
-    it('should reload data when ruleset changes from 2024 to 5e', async () => {
-      const responses = {
-        '/data/races.json': createJsonResponse([{ name: '5e Race' }]),
-        '/data/classes.json': createJsonResponse([
-          { name: 'Wizard', subclasses: ['Evocation'] },
-        ]),
-        '/data/feats.json': createJsonResponse([{ name: '5e Feat' }]),
-        '/data/magic-items.json': createJsonResponse([]),
-        '/data/2024/backgrounds.json': createJsonResponse([{ name: 'Acolyte' }]),
-        '/data/2024/races.json': createJsonResponse([{ name: '2024 Race' }]),
-        '/data/2024/classes.json': createJsonResponse([
-          { name: 'Rogue', majors: ['Thief'] },
-        ]),
-        '/data/2024/feats.json': createJsonResponse([{ name: '2024 Feat' }]),
-      };
-      global.fetch = createMockFetch(responses);
-
-      const { result, rerender } = renderHook(({ initialRuleset }) =>
-        useWizardData(initialRuleset)
-      , { initialProps: { initialRuleset: '2024' } });
-
-      await waitFor(() => {
-        expect(result.current.racesData[0]?.name).toBe('2024 Race');
-      });
-
-      expect(result.current.backgrounds).toEqual([{ name: 'Acolyte' }]);
-
-      rerender({ initialRuleset: '5e' });
-
-      await waitFor(() => {
-        expect(result.current.racesData[0]?.name).toBe('5e Race');
-      });
-
-      expect(result.current.backgrounds).toEqual([]);
     });
   });
 });

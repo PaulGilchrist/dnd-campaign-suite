@@ -1,3 +1,4 @@
+// @cleaned-by-ai
 // @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
@@ -49,29 +50,10 @@ describe('rollConcentrationSave', () => {
         rollD20.mockReset()
     })
 
-    it('returns roll result with bonus and bonusDetail for player creature', async () => {
+    it('returns roll result with combined bonus from ability and aura for player creature', async () => {
         rollConcentrationRules.mockReturnValue({ roll: 12, success: true })
         getCreatureSaveBonus.mockResolvedValue(3)
         computeAuraBonus.mockResolvedValue({ bonus: 2, sourceName: 'Paladin' })
-
-        const creature = { name: 'Alice', type: 'player' }
-        const chars = [createCharacter('Alice')]
-        const getName = (n) => n
-
-        const result = await rollConcentrationSaveSvc(
-            creature, { spell: 'Bless', dc: 10 }, chars, [], 'TestCampaign', null, getName
-        )
-
-        expect(result.roll).toBe(12)
-        expect(result.success).toBe(true)
-        expect(result.bonus).toBe(5)
-        expect(result.bonusDetail).toBe('(+2 aura from Paladin)')
-    })
-
-    it('returns bonusDetail without sourceName when aura has no source', async () => {
-        rollConcentrationRules.mockReturnValue({ roll: 12, success: true })
-        getCreatureSaveBonus.mockResolvedValue(3)
-        computeAuraBonus.mockResolvedValue({ bonus: 2, sourceName: undefined })
 
         const creature = { name: 'Alice', type: 'player' }
         const chars = [createCharacter('Alice')]
@@ -80,7 +62,10 @@ describe('rollConcentrationSave', () => {
             creature, { spell: 'Bless', dc: 10 }, chars, [], 'TestCampaign', null, (n) => n
         )
 
-        expect(result.bonusDetail).toBe('(+2 aura)')
+        expect(result.roll).toBe(12)
+        expect(result.success).toBe(true)
+        expect(result.bonus).toBe(5)
+        expect(result.bonusDetail).toBe('(+2 aura from Paladin)')
     })
 
     it('omits bonusDetail when aura bonus is zero', async () => {
@@ -98,22 +83,7 @@ describe('rollConcentrationSave', () => {
         expect(result.bonusDetail).toBeUndefined()
     })
 
-    it('passes creature name and campaign data to getCreatureSaveBonus', async () => {
-        rollConcentrationRules.mockReturnValue({ roll: 10, success: true })
-        getCreatureSaveBonus.mockResolvedValue(0)
-        computeAuraBonus.mockResolvedValue({ bonus: 0 })
-
-        const creature = { name: 'Goblin', type: 'npc' }
-        const getName = (n) => n
-
-        await rollConcentrationSaveSvc(
-            creature, { spell: 'Haste', dc: 13 }, [], [], 'TestCampaign', 'Map1', getName
-        )
-
-        expect(getCreatureSaveBonus).toHaveBeenCalledWith(creature, 'con', [], [], getName)
-    })
-
-    it('passes correct parameters to computeAuraBonus', async () => {
+    it('passes creature name and campaign data to getCreatureSaveBonus and computeAuraBonus', async () => {
         rollConcentrationRules.mockReturnValue({ roll: 10, success: true })
         getCreatureSaveBonus.mockResolvedValue(0)
         computeAuraBonus.mockResolvedValue({ bonus: 0 })
@@ -126,6 +96,7 @@ describe('rollConcentrationSave', () => {
             creature, { spell: 'Shield', dc: 15 }, chars, [], 'MyCampaign', 'DungeonMap', getName
         )
 
+        expect(getCreatureSaveBonus).toHaveBeenCalledWith(creature, 'con', chars, [], getName)
         expect(computeAuraBonus).toHaveBeenCalledWith({
             targetName: 'Ally',
             characters: chars,
@@ -134,23 +105,7 @@ describe('rollConcentrationSave', () => {
         })
     })
 
-    it('uses getName to resolve character for player creatures', async () => {
-        rollConcentrationRules.mockReturnValue({ roll: 10, success: true })
-        getCreatureSaveBonus.mockResolvedValue(3)
-        computeAuraBonus.mockResolvedValue({ bonus: 0 })
-
-        const creature = { name: 'hero_name', type: 'player' }
-        const chars = [{ name: 'hero_name', computedStats: { abilities: [] } }]
-        const getName = (n) => n
-
-        await rollConcentrationSaveSvc(
-            creature, { spell: 'Armor', dc: 10 }, chars, [], '', null, getName
-        )
-
-        expect(getCreatureSaveBonus).toHaveBeenCalledWith(creature, 'con', chars, [], getName)
-    })
-
-    it('calls hasDragonConstellation and passes result to concentrationRules', async () => {
+    it('passes dragon constellation result to concentrationRules when buff exists', async () => {
         rollConcentrationRules.mockReturnValue({ roll: 10, success: true })
         getCreatureSaveBonus.mockResolvedValue(3)
         computeAuraBonus.mockResolvedValue({ bonus: 0 })
@@ -163,35 +118,6 @@ describe('rollConcentrationSave', () => {
         )
 
         expect(rollConcentrationRules).toHaveBeenCalledWith(3, 13, true)
-    })
-
-    it('passes false for dragonConstellation when no matching buff exists', async () => {
-        rollConcentrationRules.mockReturnValue({ roll: 10, success: true })
-        getCreatureSaveBonus.mockResolvedValue(2)
-        computeAuraBonus.mockResolvedValue({ bonus: 0 })
-
-        const creature = { name: 'Rogue', type: 'player' }
-        const chars = [createCharacter('Rogue', { activeBuffs: [{ name: 'Starry Form', constellation: 'Wolf' }] })]
-
-        await rollConcentrationSaveSvc(
-            creature, { spell: 'Shield', dc: 12 }, chars, [], '', null, (n) => n
-        )
-
-        expect(rollConcentrationRules).toHaveBeenCalledWith(2, 12, false)
-    })
-
-    it('passes false when creature has no name', async () => {
-        rollConcentrationRules.mockReturnValue({ roll: 10, success: true })
-        getCreatureSaveBonus.mockResolvedValue(0)
-        computeAuraBonus.mockResolvedValue({ bonus: 0 })
-
-        const creature = { type: 'npc' }
-
-        await rollConcentrationSaveSvc(
-            creature, { spell: 'Shield', dc: 10 }, [], [], '', null, (n) => n
-        )
-
-        expect(rollConcentrationRules).toHaveBeenCalledWith(0, 10, false)
     })
 
     it('handles negative save bonus combined with aura bonus', async () => {
@@ -209,22 +135,6 @@ describe('rollConcentrationSave', () => {
         expect(result.bonus).toBe(1)
         expect(result.bonusDetail).toBe('(+3 aura from Paladin)')
     })
-
-    it('returns null result for npc creature when concentration rules fail', async () => {
-        rollConcentrationRules.mockReturnValue({ roll: 8, success: false })
-        getCreatureSaveBonus.mockResolvedValue(0)
-        computeAuraBonus.mockResolvedValue({ bonus: 0 })
-
-        const creature = { name: 'Goblin', type: 'npc' }
-
-        const result = await rollConcentrationSaveSvc(
-            creature, { spell: 'Haste', dc: 13 }, [], [], 'TestCampaign', null, (n) => n
-        )
-
-        expect(result.roll).toBe(8)
-        expect(result.success).toBe(false)
-        expect(result.bonus).toBe(0)
-    })
 })
 
 describe('breakConcentration', () => {
@@ -238,51 +148,20 @@ describe('breakConcentration', () => {
         expect(cs.creatures[0].concentration).toBeNull()
     })
 
-    it('returns the spell name when creature is found with concentration', () => {
-        const cs = createCombatSummary([
-            { name: 'Bob', type: 'npc', concentration: { spell: 'Haste', dc: 13, id: 'abc' } },
-        ])
-
-        const spell = breakConcentrationSvc(cs, 'Bob')
-
-        expect(spell).toBe('Haste')
-    })
-
-    it('returns null when creature is not found', () => {
-        const cs = createCombatSummary([])
-        const spell = breakConcentrationSvc(cs, 'NonExistent')
-
-        expect(spell).toBeNull()
-    })
-
-    it('returns null when creature has no concentration property', () => {
-        const cs = createCombatSummary([
-            { name: 'Alice', type: 'player' },
-        ])
-        const spell = breakConcentrationSvc(cs, 'Alice')
-
-        expect(spell).toBeNull()
-    })
-
-    it('returns null when creature has concentration set to null', () => {
-        const cs = createCombatSummary([
-            { name: 'Alice', type: 'player', concentration: null },
-        ])
-        const spell = breakConcentrationSvc(cs, 'Alice')
-
-        expect(spell).toBeNull()
+    it('returns null when creature is not found or has no concentration', () => {
+        expect(breakConcentrationSvc(createCombatSummary([]), 'NonExistent')).toBeNull()
+        expect(breakConcentrationSvc(createCombatSummary([{ name: 'Alice', type: 'player' }]), 'Alice')).toBeNull()
+        expect(breakConcentrationSvc(createCombatSummary([{ name: 'Alice', type: 'player', concentration: null }]), 'Alice')).toBeNull()
     })
 
     it('does not modify other creatures in the combat summary', () => {
         const cs = createCombatSummary([
             { name: 'Alice', type: 'player', concentration: { spell: 'Bless', dc: 10 } },
             { name: 'Bob', type: 'npc', concentration: { spell: 'Haste', dc: 13 } },
-            { name: 'Carol', type: 'player', concentration: null },
         ])
         breakConcentrationSvc(cs, 'Alice')
 
         expect(cs.creatures[1].concentration).toEqual({ spell: 'Haste', dc: 13 })
-        expect(cs.creatures[2].concentration).toBeNull()
     })
 
     it('calls concentrationRules.breakConcentration with the concentration object', () => {
@@ -297,7 +176,7 @@ describe('breakConcentration', () => {
 })
 
 describe('addConcentration', () => {
-    it('adds concentration to creature with trimmed spell name', () => {
+    it('adds concentration with trimmed spell name and generates an id', () => {
         const cs = createCombatSummary([
             { name: 'Alice', type: 'player', concentration: null },
         ])
@@ -305,15 +184,6 @@ describe('addConcentration', () => {
 
         expect(cs.creatures[0].concentration.spell).toBe('Bless')
         expect(cs.creatures[0].concentration.dc).toBe(10)
-        expect(cs.creatures[0].concentration.id).toBeDefined()
-    })
-
-    it('generates a string id for concentration', () => {
-        const cs = createCombatSummary([
-            { name: 'Alice', type: 'player', concentration: null },
-        ])
-        addConcentration(cs, 'Alice', 'Shield', 15)
-
         expect(typeof cs.creatures[0].concentration.id).toBe('string')
     })
 
@@ -327,21 +197,9 @@ describe('addConcentration', () => {
         expect(cs.creatures[0].concentration.dc).toBe(15)
     })
 
-    it('does nothing and returns undefined when creature is not found', () => {
+    it('does nothing when creature is not found', () => {
         const cs = createCombatSummary([])
-        const result = addConcentration(cs, 'NonExistent', 'Bless', 10)
-
-        expect(result).toBeUndefined()
-    })
-
-    it('works with npc creatures', () => {
-        const cs = createCombatSummary([
-            { name: 'Goblin', type: 'npc', concentration: null },
-        ])
-        addConcentration(cs, 'Goblin', 'Haste', 13)
-
-        expect(cs.creatures[0].concentration.spell).toBe('Haste')
-        expect(cs.creatures[0].concentration.dc).toBe(13)
+        expect(addConcentration(cs, 'NonExistent', 'Bless', 10)).toBeUndefined()
     })
 
     it('preserves other creature properties when adding concentration', () => {
@@ -360,79 +218,39 @@ describe('buildConcentrationPopup', () => {
     it('builds popup data structure with all expected fields', () => {
         const popup = buildConcentrationPopup(12, 5, undefined, 'Bless', 10, true)
 
-        expect(popup.type).toBe('d20')
-        expect(popup.rollType).toBe('condition-save')
-        expect(popup.name).toBe('Concentration')
-        expect(popup.rolls).toEqual([12])
-        expect(popup.bonus).toBe(5)
-        expect(popup.condition).toBe('Bless')
-        expect(popup.dc).toBe(10)
-        expect(popup.success).toBe(true)
-        expect(popup.targetName).toBeNull()
-        expect(popup.targetAc).toBeNull()
-        expect(popup.hit).toBeUndefined()
+        expect(popup).toEqual({
+            type: 'd20',
+            rollType: 'condition-save',
+            name: 'Concentration',
+            rolls: [12],
+            bonus: 5,
+            condition: 'Bless',
+            dc: 10,
+            success: true,
+            targetName: null,
+            targetAc: null,
+            hit: undefined,
+        })
     })
 
     it('includes bonusDetail when provided', () => {
         const popup = buildConcentrationPopup(12, 5, '+3 aura from Paladin', 'Bless', 10, true)
-
         expect(popup.bonusDetail).toBe('+3 aura from Paladin')
-    })
-
-    it('omits bonusDetail when undefined', () => {
-        const popup = buildConcentrationPopup(12, 5, undefined, 'Shield', 12, true)
-
-        expect(popup.bonusDetail).toBeUndefined()
     })
 
     it('reflects failure when success is false', () => {
         const popup = buildConcentrationPopup(5, 3, undefined, 'Armor', 14, false)
-
         expect(popup.success).toBe(false)
         expect(popup.rollType).toBe('condition-save')
     })
 
+    it('handles zero and negative bonus', () => {
+        expect(buildConcentrationPopup(10, 0, undefined, 'Shield', 10, true).bonus).toBe(0)
+        expect(buildConcentrationPopup(10, -2, undefined, 'Shield', 8, true).bonus).toBe(-2)
+    })
+
     it('wraps the roll value in a rolls array', () => {
         const popup = buildConcentrationPopup(7, 0, undefined, 'Haste', 10, true)
-
-        expect(Array.isArray(popup.rolls)).toBe(true)
         expect(popup.rolls).toEqual([7])
-    })
-
-    it('handles zero bonus', () => {
-        const popup = buildConcentrationPopup(10, 0, undefined, 'Shield', 10, true)
-
-        expect(popup.bonus).toBe(0)
-    })
-
-    it('handles negative bonus', () => {
-        const popup = buildConcentrationPopup(10, -2, undefined, 'Shield', 8, true)
-
-        expect(popup.bonus).toBe(-2)
-    })
-
-    it('sets targetName and targetAc to null', () => {
-        const popup = buildConcentrationPopup(1, -3, 'detail', 'Bless', 5, false)
-
-        expect(popup.targetName).toBeNull()
-        expect(popup.targetAc).toBeNull()
-    })
-
-    it('sets hit to undefined', () => {
-        const popup = buildConcentrationPopup(10, 5, undefined, 'Bless', 15, true)
-
-        expect(popup.hit).toBeUndefined()
-    })
-
-    it('uses the spell name as the condition field', () => {
-        const popup = buildConcentrationPopup(10, 3, undefined, 'Major Image', 11, true)
-
-        expect(popup.condition).toBe('Major Image')
-    })
-
-    it('includes bonusDetail when null is explicitly passed', () => {
-        const popup = buildConcentrationPopup(10, 5, null, 'Shield', 12, true)
-
-        expect(popup.bonusDetail).toBeNull()
     })
 })

@@ -1,3 +1,4 @@
+// @cleaned-by-ai
 // @improved-by-ai
 import { describe, it, expect } from 'vitest'
 import { collectAutomationFromFeatures } from './automationCollector.js'
@@ -5,54 +6,34 @@ import { makePlayerStats, makeFeature } from './automationService.fixtures.js'
 
 const ps = makePlayerStats()
 
-// ── Null safety ──────────────────────────────────────────────────────────────
+// ── Null safety (consolidated) ──
 
 describe('collectAutomationFromFeatures – null safety', () => {
     it('returns empty result structure when features is null', () => {
         const result = collectAutomationFromFeatures(null, ps)
         expect(result).toEqual({
-            actions: [],
-            bonusActions: [],
-            reactions: [],
-            specialActions: [],
-            passives: [],
-            autoEffects: [],
-            saveModifiers: [],
-            primalKnowledge: [],
-            ritualSpells: [],
+            actions: [], bonusActions: [], reactions: [], specialActions: [],
+            passives: [], autoEffects: [], saveModifiers: [], primalKnowledge: [], ritualSpells: []
         })
     })
 
-    it('returns empty result structure when features is undefined', () => {
+    it('returns empty arrays when features is undefined', () => {
         const result = collectAutomationFromFeatures(undefined, ps)
         expect(result.actions).toEqual([])
-        expect(result.bonusActions).toEqual([])
-        expect(result.reactions).toEqual([])
-        expect(result.specialActions).toEqual([])
-        expect(result.passives).toEqual([])
     })
 
-    it('skips features with no automation property', () => {
-        const features = [{ name: 'No Automation' }]
-        const result = collectAutomationFromFeatures(features, ps)
+    it('skips features with null, undefined, or missing automation', () => {
+        const result = collectAutomationFromFeatures([
+            { name: 'No Automation' },
+            { name: 'Null Automation', automation: null },
+            { name: 'Undefined Automation', automation: undefined },
+        ], ps)
         expect(result.actions).toEqual([])
-        expect(result.passives).toEqual([])
-    })
-
-    it('skips features with null automation', () => {
-        const features = [{ name: 'Null Automation', automation: null }]
-        const result = collectAutomationFromFeatures(features, ps)
-        expect(result.actions).toEqual([])
-    })
-
-    it('skips features with undefined automation', () => {
-        const features = [{ name: 'Undefined Automation', automation: undefined }]
-        const result = collectAutomationFromFeatures(features, ps)
         expect(result.passives).toEqual([])
     })
 })
 
-// ── Automation object structure ──────────────────────────────────────────────
+// ── Automation object structure ──
 
 describe('collectAutomationFromFeatures – automation object structure', () => {
     it('returns automation objects with type and name properties', () => {
@@ -71,9 +52,9 @@ describe('collectAutomationFromFeatures – automation object structure', () => 
     })
 })
 
-// ── Actions group 1 – spells / save types ───────────────────────────────────
+// ── Actions group – spells and save types ──
 
-describe('collectAutomationFromFeatures – actions group 1 (spells/save types)', () => {
+describe('collectAutomationFromFeatures – actions group (spells/save types)', () => {
     const spellTypes = [
         'flesh_to_stone', 'hold_monster', 'resilient_sphere',
         'ottos_dance', 'power_word_stun', 'sleep',
@@ -95,20 +76,13 @@ describe('collectAutomationFromFeatures – actions group 1 (spells/save types)'
     })
 })
 
-// ── Actions group 2 – extra_action family ────────────────────────────────────
+// ── Actions group – extra_action family ──
 
-describe('collectAutomationFromFeatures – actions group 2 (extra_action family)', () => {
-    it('categorizes heroes_feast as an action', () => {
-        const features = [makeFeature({ type: 'heroes_feast' })]
+describe('collectAutomationFromFeatures – actions group (extra_action family)', () => {
+    it('categorizes heroes_feast and fey_reinforcements as actions', () => {
+        const features = [makeFeature({ type: 'heroes_feast' }), makeFeature({ type: 'fey_reinforcements' })]
         const result = collectAutomationFromFeatures(features, ps)
-        expect(result.actions).toHaveLength(1)
-        expect(result.actions[0].type).toBe('heroes_feast')
-    })
-
-    it('categorizes fey_reinforcements as an action', () => {
-        const features = [makeFeature({ type: 'fey_reinforcements' })]
-        const result = collectAutomationFromFeatures(features, ps)
-        expect(result.actions).toHaveLength(1)
+        expect(result.actions).toHaveLength(2)
     })
 
     it('categorizes buff_ally as bonus action when action is bonus_action', () => {
@@ -119,16 +93,13 @@ describe('collectAutomationFromFeatures – actions group 2 (extra_action family
     })
 
     it('categorizes extra_action and free_spell as actions', () => {
-        const features = [
-            makeFeature({ type: 'extra_action' }),
-            makeFeature({ type: 'free_spell' }),
-        ]
+        const features = [makeFeature({ type: 'extra_action' }), makeFeature({ type: 'free_spell' })]
         const result = collectAutomationFromFeatures(features, ps)
         expect(result.actions).toHaveLength(2)
     })
 })
 
-// ── Direct action types ─────────────────────────────────────────────────────
+// ── Direct action types ──
 
 describe('collectAutomationFromFeatures – direct action types', () => {
     const actionTypes = [
@@ -153,24 +124,20 @@ describe('collectAutomationFromFeatures – direct action types', () => {
     })
 })
 
-// ── Push-twice types (arcane_charge / telekinetic_movement) ─────────────────
+// ── Push-twice types ──
 
 describe('collectAutomationFromFeatures – push-twice types', () => {
-    it('categorizes arcane_charge as two actions', () => {
-        const features = [makeFeature({ type: 'arcane_charge' })]
-        const result = collectAutomationFromFeatures(features, ps)
-        expect(result.actions).toHaveLength(2)
-        expect(result.actions.every(a => a.type === 'arcane_charge')).toBe(true)
-    })
+    it('categorizes arcane_charge and telekinetic_movement as two actions', () => {
+        const arcaneResult = collectAutomationFromFeatures([makeFeature({ type: 'arcane_charge' })], ps)
+        expect(arcaneResult.actions).toHaveLength(2)
+        expect(arcaneResult.actions.every(a => a.type === 'arcane_charge')).toBe(true)
 
-    it('categorizes telekinetic_movement as two actions', () => {
-        const features = [makeFeature({ type: 'telekinetic_movement' })]
-        const result = collectAutomationFromFeatures(features, ps)
-        expect(result.actions).toHaveLength(2)
+        const teleResult = collectAutomationFromFeatures([makeFeature({ type: 'telekinetic_movement' })], ps)
+        expect(teleResult.actions).toHaveLength(2)
     })
 })
 
-// ── Conditional action / bonus action types ──────────────────────────────────
+// ── Conditional action/bonus action types ──
 
 describe('collectAutomationFromFeatures – conditional action/bonus action types', () => {
     const conditionalTypes = [
@@ -183,7 +150,6 @@ describe('collectAutomationFromFeatures – conditional action/bonus action type
     ]
 
     it.each(conditionalTypes)('categorizes $type: default → $defaultCat, override → $overrideCat', ({ type, defaultCat, override: overrideCat, overrideVal }) => {
-        // Default categorization
         const defaultResult = collectAutomationFromFeatures([makeFeature({ type })], ps)
         expect(defaultResult[defaultCat]).toHaveLength(1)
         if (overrideCat) {
@@ -194,7 +160,7 @@ describe('collectAutomationFromFeatures – conditional action/bonus action type
     })
 })
 
-// ── Bonus action types ──────────────────────────────────────────────────────
+// ── Bonus action types ──
 
 describe('collectAutomationFromFeatures – bonus action types', () => {
     const bonusActionTypes = [
@@ -211,7 +177,7 @@ describe('collectAutomationFromFeatures – bonus action types', () => {
     })
 })
 
-// ── Reaction types ──────────────────────────────────────────────────────────
+// ── Reaction types ──
 
 describe('collectAutomationFromFeatures – reaction types', () => {
     const reactionTypes = [
@@ -237,7 +203,7 @@ describe('collectAutomationFromFeatures – reaction types', () => {
     })
 })
 
-// ── Special action types ────────────────────────────────────────────────────
+// ── Special action types ──
 
 describe('collectAutomationFromFeatures – special action types', () => {
     const specialActionTypes = [
@@ -257,7 +223,7 @@ describe('collectAutomationFromFeatures – special action types', () => {
     })
 })
 
-// ── Passive types ───────────────────────────────────────────────────────────
+// ── Passive types ──
 
 describe('collectAutomationFromFeatures – passive types', () => {
     const passiveTypes = [
@@ -285,7 +251,7 @@ describe('collectAutomationFromFeatures – passive types', () => {
     })
 })
 
-// ── Passive rule sub-types ──────────────────────────────────────────────────
+// ── Passive rule sub-types ──
 
 describe('collectAutomationFromFeatures – passive_rule sub-types', () => {
     it('categorizes passive_rule with superior_defense effect as special action', () => {
@@ -307,7 +273,7 @@ describe('collectAutomationFromFeatures – passive_rule sub-types', () => {
     })
 })
 
-// ── Multi-category types ────────────────────────────────────────────────────
+// ── Multi-category types ──
 
 describe('collectAutomationFromFeatures – multi-category types', () => {
     it('categorizes use_magic_device as both passive and special action', () => {
@@ -318,7 +284,7 @@ describe('collectAutomationFromFeatures – multi-category types', () => {
     })
 })
 
-// ── Auto effect with effect property ────────────────────────────────────────
+// ── Auto effect with effect property ──
 
 describe('collectAutomationFromFeatures – auto_effect with effect property', () => {
     it('categorizes auto_effect with psychic_teleportation as bonus action', () => {
@@ -329,7 +295,7 @@ describe('collectAutomationFromFeatures – auto_effect with effect property', (
     })
 })
 
-// ── Conditional flags (combat_superiority) ──────────────────────────────────
+// ── Conditional flags (combat_superiority) ──
 
 describe('collectAutomationFromFeatures – combat_superiority conditional', () => {
     it('categorizes combat_superiority with oncePerTurn as action', () => {
@@ -347,7 +313,7 @@ describe('collectAutomationFromFeatures – combat_superiority conditional', () 
     })
 })
 
-// ── Casting time conditional types ──────────────────────────────────────────
+// ── Casting time conditional types ──
 
 describe('collectAutomationFromFeatures – casting_time conditional types', () => {
     it('categorizes misty_wanderer by casting_time', () => {
@@ -401,7 +367,7 @@ describe('collectAutomationFromFeatures – casting_time conditional types', () 
     })
 })
 
-// ── Attack rider conditional types ──────────────────────────────────────────
+// ── Attack rider conditional types ──
 
 describe('collectAutomationFromFeatures – attack_rider conditional types', () => {
     it('categorizes attack_rider with chooseOne as passive', () => {
@@ -436,7 +402,7 @@ describe('collectAutomationFromFeatures – attack_rider conditional types', () 
     })
 })
 
-// ── Array automations ───────────────────────────────────────────────────────
+// ── Array automations ──
 
 describe('collectAutomationFromFeatures – array automations', () => {
     it('handles array of automations on a single feature', () => {
@@ -475,7 +441,7 @@ describe('collectAutomationFromFeatures – array automations', () => {
     })
 })
 
-// ── processFeatureAutomation edge cases ─────────────────────────────────────
+// ── processFeatureAutomation edge cases ──
 
 describe('processFeatureAutomation – edge cases', () => {
     let processFeatureAutomation

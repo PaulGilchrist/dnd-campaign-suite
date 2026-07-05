@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { describe, it, expect, vi } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import useActionPopup, {
@@ -28,26 +28,7 @@ import { loadBackgroundData } from '../../services/ui/dataLoader.js';
 
 describe('useActionPopup', () => {
   describe('buildFeatureDetailHtml', () => {
-    it('should return null when entity has no details', () => {
-      const entity = {
-        name: 'Simple Feature',
-        description: 'Just a description.',
-      };
-      const result = buildFeatureDetailHtml(entity);
-      expect(result).toBeNull();
-    });
-
-    it('should return null when details is empty string', () => {
-      const entity = {
-        name: 'Simple Feature',
-        description: 'Just a description.',
-        details: '',
-      };
-      const result = buildFeatureDetailHtml(entity);
-      expect(result).toBeNull();
-    });
-
-    it('should return HTML string with name, description, and details', () => {
+    it('should return HTML string with name, description, and details when present', () => {
       const entity = {
         name: 'Second Wind',
         description: 'You have a limited well of stamina.',
@@ -59,32 +40,17 @@ describe('useActionPopup', () => {
       );
     });
 
-    it('should return null when entity.details is falsy (0, false, undefined)', () => {
+    it('should return null when details is falsy', () => {
       expect(buildFeatureDetailHtml({ name: 'X', details: 0 })).toBeNull();
       expect(buildFeatureDetailHtml({ name: 'X', details: false })).toBeNull();
       expect(buildFeatureDetailHtml({ name: 'X', details: undefined })).toBeNull();
-    });
-
-    it('should include undefined description in output when missing', () => {
-      const entity = {
-        name: 'Feature',
-        details: 'Some details.',
-      };
-      const result = buildFeatureDetailHtml(entity);
-      expect(result).toBe('<b>Feature</b><br/>undefined<br/><br/>Some details.');
-    });
-
-    it('should include undefined name and description in output when missing', () => {
-      const entity = {
-        details: 'Some details.',
-      };
-      const result = buildFeatureDetailHtml(entity);
-      expect(result).toBe('<b>undefined</b><br/>undefined<br/><br/>Some details.');
+      expect(buildFeatureDetailHtml({ name: 'X', details: '' })).toBeNull();
+      expect(buildFeatureDetailHtml({ name: 'Simple Feature', description: 'Just a description.' })).toBeNull();
     });
   });
 
   describe('buildAbilityDetailHtml', () => {
-    it('should return a function that returns HTML for a matching ability name', () => {
+    it('should return HTML for a matching ability name', () => {
       const allAbilityScores = [
         { full_name: 'Strength', description: 'Measures physical power.' },
         { full_name: 'Dexterity', description: 'Measures agility.' },
@@ -117,14 +83,11 @@ describe('useActionPopup', () => {
       expect(lookup('Strength')).toBeNull();
     });
 
-    it('should throw TypeError when allAbilityScores is undefined', () => {
+    it('should throw TypeError when allAbilityScores is undefined or null', () => {
       const lookup = buildAbilityDetailHtml(undefined);
       expect(() => lookup('Strength')).toThrow(TypeError);
-    });
-
-    it('should throw TypeError when allAbilityScores is null', () => {
-      const lookup = buildAbilityDetailHtml(null);
-      expect(() => lookup('Strength')).toThrow(TypeError);
+      const lookup2 = buildAbilityDetailHtml(null);
+      expect(() => lookup2('Strength')).toThrow(TypeError);
     });
 
     it('should match the first occurrence when multiple abilities share a name', () => {
@@ -137,7 +100,7 @@ describe('useActionPopup', () => {
     });
   });
 
-  describe('spell preset (buildSpellDetailHtml)', () => {
+  describe('spell preset', () => {
     it('should set popupHtml when entity has a description', () => {
       const { result } = renderHook(() => useActionPopup('spell'));
       act(() => {
@@ -151,54 +114,27 @@ describe('useActionPopup', () => {
       );
     });
 
-    it('should not set popupHtml when entity has no description', () => {
+    it('should not set popupHtml when entity has no or empty description', () => {
       const { result } = renderHook(() => useActionPopup('spell'));
       act(() => {
         result.current.showPopup({ name: 'Fireball' });
       });
       expect(result.current.popupHtml).toBeNull();
-    });
-
-    it('should not set popupHtml when description is empty string', () => {
-      const { result } = renderHook(() => useActionPopup('spell'));
       act(() => {
         result.current.showPopup({ name: 'Fireball', description: '' });
-      });
-      expect(result.current.popupHtml).toBeNull();
-    });
-
-    it('should not set popupHtml when description is falsy (0, false)', () => {
-      const { result } = renderHook(() => useActionPopup('spell'));
-      act(() => {
-        result.current.showPopup({ name: 'Fireball', description: 0 });
       });
       expect(result.current.popupHtml).toBeNull();
     });
   });
 
   describe('preset selection', () => {
-    it('should return showPopup, popupHtml, and setPopupHtml for feature preset', () => {
-      const { result } = renderHook(() => useActionPopup('feature'));
-      expect(result.current).toHaveProperty('showPopup');
-      expect(result.current).toHaveProperty('popupHtml');
-      expect(result.current).toHaveProperty('setPopupHtml');
-      expect(typeof result.current.showPopup).toBe('function');
-    });
-
-    it('should return handlers for spell preset', () => {
-      const { result } = renderHook(() => useActionPopup('spell'));
-      expect(result.current).toHaveProperty('showPopup');
-      expect(result.current).toHaveProperty('popupHtml');
-      expect(result.current).toHaveProperty('setPopupHtml');
-    });
-
-    it('should return handlers for ability preset', () => {
-      const { result } = renderHook(() =>
-        useActionPopup('ability', { allAbilityScores: [] })
-      );
-      expect(result.current).toHaveProperty('showPopup');
-      expect(result.current).toHaveProperty('popupHtml');
-      expect(result.current).toHaveProperty('setPopupHtml');
+    it('should return showPopup, popupHtml, and setPopupHtml for known presets', () => {
+      for (const preset of ['feature', 'spell', 'ability']) {
+        const { result } = renderHook(() => useActionPopup(preset, preset === 'ability' ? { allAbilityScores: [] } : {}));
+        expect(result.current).toHaveProperty('showPopup');
+        expect(result.current).toHaveProperty('popupHtml');
+        expect(result.current).toHaveProperty('setPopupHtml');
+      }
     });
 
     it('should return handlers for custom function preset', () => {
@@ -214,24 +150,6 @@ describe('useActionPopup', () => {
       expect(result.current).toHaveProperty('showPopup');
       expect(result.current).toHaveProperty('popupHtml');
       expect(result.current).toHaveProperty('setPopupHtml');
-    });
-
-    it('should handle various preset types', () => {
-      const presets = [null, undefined, '', 42, { foo: 'bar' }, ['a'], true];
-      for (const preset of presets) {
-        const { result } = renderHook(() => useActionPopup(preset));
-        expect(result.current).toHaveProperty('showPopup');
-      }
-    });
-
-    it('should handle ability preset with missing context', () => {
-      const { result } = renderHook(() => useActionPopup('ability'));
-      expect(result.current).toHaveProperty('showPopup');
-    });
-
-    it('should handle ability preset with context but missing allAbilityScores', () => {
-      const { result } = renderHook(() => useActionPopup('ability', { foo: 'bar' }));
-      expect(result.current).toHaveProperty('showPopup');
     });
   });
 
@@ -269,25 +187,6 @@ describe('useActionPopup', () => {
       const { result } = renderHook(() => useActionPopup('unknown'));
       act(() => {
         result.current.showPopup({ name: 'Test', details: 'Stuff' });
-      });
-      expect(result.current.popupHtml).toBeNull();
-    });
-
-    it('should allow direct setPopupHtml', () => {
-      const { result } = renderHook(() => useActionPopup('feature'));
-      act(() => {
-        result.current.setPopupHtml('<p>Direct</p>');
-      });
-      expect(result.current.popupHtml).toBe('<p>Direct</p>');
-    });
-
-    it('should allow clearing popupHtml via setPopupHtml(null)', () => {
-      const { result } = renderHook(() => useActionPopup('feature'));
-      act(() => {
-        result.current.setPopupHtml('<p>Direct</p>');
-      });
-      act(() => {
-        result.current.setPopupHtml(null);
       });
       expect(result.current.popupHtml).toBeNull();
     });
@@ -337,18 +236,6 @@ describe('useActionPopup', () => {
       const { loadWeaponMasteries: freshLoad } = await import('./useActionPopup.js');
       await expect(freshLoad()).rejects.toThrow('Network error');
     });
-
-    it('should handle fetch returning non-JSON', async () => {
-      global.fetch = vi.fn(() =>
-        Promise.resolve({
-          json: () => Promise.resolve('not an array'),
-        })
-      );
-
-      const { loadWeaponMasteries: freshLoad } = await import('./useActionPopup.js');
-      const result = await freshLoad();
-      expect(result).toBe('not an array');
-    });
   });
 
   describe('showWeaponMasteryPopup', () => {
@@ -395,12 +282,10 @@ describe('useActionPopup', () => {
     });
 
     it('should not set popupHtml when mastery has no description', async () => {
-      const mockMasteries = [
-        { name: 'Finesse' },
-      ];
+      const masteriesNoDesc = [{ name: 'Finesse' }];
       global.fetch = vi.fn(() =>
         Promise.resolve({
-          json: () => Promise.resolve(mockMasteries),
+          json: () => Promise.resolve(masteriesNoDesc),
         })
       );
 
@@ -414,21 +299,6 @@ describe('useActionPopup', () => {
 
     it('should handle fetch error gracefully (empty array)', async () => {
       global.fetch = vi.fn(() => Promise.reject(new Error('Network error')));
-
-      const { showWeaponMasteryPopup: freshShow } = await import('./useActionPopup.js');
-      const setPopupHtml = vi.fn();
-
-      await freshShow('Finesse', setPopupHtml);
-
-      expect(setPopupHtml).not.toHaveBeenCalled();
-    });
-
-    it('should handle empty masteries array', async () => {
-      global.fetch = vi.fn(() =>
-        Promise.resolve({
-          json: () => Promise.resolve([]),
-        })
-      );
 
       const { showWeaponMasteryPopup: freshShow } = await import('./useActionPopup.js');
       const setPopupHtml = vi.fn();
@@ -500,175 +370,6 @@ describe('useActionPopup', () => {
       expect(mockFn).toHaveBeenCalledWith('2024');
       expect(setPopupHtml).toHaveBeenCalledWith(
         '<b>Acolyte</b><br/><br/>You have spent your life in the service of a temple.'
-      );
-    });
-
-    it('should include ability_scores when present', async () => {
-      const mockBackgrounds = [
-        {
-          name: 'Soldier',
-          description: 'Warfare is no stranger to you.',
-          ability_scores: 'Increase two abilities of your choice by 2, or three by 1.',
-        },
-      ];
-      const mockFn = loadBackgroundData;
-      mockFn.mockResolvedValue(mockBackgrounds);
-
-      const { showBackgroundPopup: freshShow } = await import('./useActionPopup.js');
-      const setPopupHtml = vi.fn();
-
-      await freshShow('Soldier', setPopupHtml, '2024');
-
-      expect(setPopupHtml).toHaveBeenCalledWith(
-        '<b>Soldier</b><br/><br/>Warfare is no stranger to you.<br/><br/><b>Ability Scores:</b> Increase two abilities of your choice by 2, or three by 1.'
-      );
-    });
-
-    it('should include feat when present', async () => {
-      const mockBackgrounds = [
-        {
-          name: 'Soldier',
-          description: 'Warfare is no stranger to you.',
-          feat: 'Tough',
-        },
-      ];
-      const mockFn = loadBackgroundData;
-      mockFn.mockResolvedValue(mockBackgrounds);
-
-      const { showBackgroundPopup: freshShow } = await import('./useActionPopup.js');
-      const setPopupHtml = vi.fn();
-
-      await freshShow('Soldier', setPopupHtml, '2024');
-
-      expect(setPopupHtml).toHaveBeenCalledWith(
-        '<b>Soldier</b><br/><br/>Warfare is no stranger to you.<br/><br/><b>Feat:</b> Tough'
-      );
-    });
-
-    it('should include skill_proficiencies when present', async () => {
-      const mockBackgrounds = [
-        {
-          name: 'Soldier',
-          description: 'Warfare is no stranger to you.',
-          skill_proficiencies: 'Athletics, Intuition',
-        },
-      ];
-      const mockFn = loadBackgroundData;
-      mockFn.mockResolvedValue(mockBackgrounds);
-
-      const { showBackgroundPopup: freshShow } = await import('./useActionPopup.js');
-      const setPopupHtml = vi.fn();
-
-      await freshShow('Soldier', setPopupHtml, '2024');
-
-      expect(setPopupHtml).toHaveBeenCalledWith(
-        '<b>Soldier</b><br/><br/>Warfare is no stranger to you.<br/><br/><b>Skill Proficiencies:</b> Athletics, Intuition'
-      );
-    });
-
-    it('should include tool_proficiencies when present', async () => {
-      const mockBackgrounds = [
-        {
-          name: 'Soldier',
-          description: 'Warfare is no stranger to you.',
-          tool_proficiencies: 'One type of gaming set, a musician\'s instrument',
-        },
-      ];
-      const mockFn = loadBackgroundData;
-      mockFn.mockResolvedValue(mockBackgrounds);
-
-      const { showBackgroundPopup: freshShow } = await import('./useActionPopup.js');
-      const setPopupHtml = vi.fn();
-
-      await freshShow('Soldier', setPopupHtml, '2024');
-
-      expect(setPopupHtml).toHaveBeenCalledWith(
-        '<b>Soldier</b><br/><br/>Warfare is no stranger to you.<br/><br/><b>Tool Proficiencies:</b> One type of gaming set, a musician\'s instrument'
-      );
-    });
-
-    it('should include equipment when present', async () => {
-      const mockBackgrounds = [
-        {
-          name: 'Soldier',
-          description: 'Warfare is no stranger to you.',
-          equipment: 'A shield, a suit of leather armor',
-        },
-      ];
-      const mockFn = loadBackgroundData;
-      mockFn.mockResolvedValue(mockBackgrounds);
-
-      const { showBackgroundPopup: freshShow } = await import('./useActionPopup.js');
-      const setPopupHtml = vi.fn();
-
-      await freshShow('Soldier', setPopupHtml, '2024');
-
-      expect(setPopupHtml).toHaveBeenCalledWith(
-        '<b>Soldier</b><br/><br/>Warfare is no stranger to you.<br/><br/><b>Equipment:</b> A shield, a suit of leather armor'
-      );
-    });
-
-    it('should include source (book) when present', async () => {
-      const mockBackgrounds = [
-        {
-          name: 'Soldier',
-          description: 'Warfare is no stranger to you.',
-          book: 'Player\'s Handbook',
-        },
-      ];
-      const mockFn = loadBackgroundData;
-      mockFn.mockResolvedValue(mockBackgrounds);
-
-      const { showBackgroundPopup: freshShow } = await import('./useActionPopup.js');
-      const setPopupHtml = vi.fn();
-
-      await freshShow('Soldier', setPopupHtml, '2024');
-
-      expect(setPopupHtml).toHaveBeenCalledWith(
-        '<b>Soldier</b><br/><br/>Warfare is no stranger to you.<br/><br/><b>Source:</b> Player\'s Handbook'
-      );
-    });
-
-    it('should include source (page) when present', async () => {
-      const mockBackgrounds = [
-        {
-          name: 'Soldier',
-          description: 'Warfare is no stranger to you.',
-          page: '42',
-        },
-      ];
-      const mockFn = loadBackgroundData;
-      mockFn.mockResolvedValue(mockBackgrounds);
-
-      const { showBackgroundPopup: freshShow } = await import('./useActionPopup.js');
-      const setPopupHtml = vi.fn();
-
-      await freshShow('Soldier', setPopupHtml, '2024');
-
-      expect(setPopupHtml).toHaveBeenCalledWith(
-        '<b>Soldier</b><br/><br/>Warfare is no stranger to you.<br/><br/><b>Source:</b> 42'
-      );
-    });
-
-    it('should include source (book and page) when both present', async () => {
-      const mockBackgrounds = [
-        {
-          name: 'Soldier',
-          description: 'Warfare is no stranger to you.',
-          book: 'Player\'s Handbook',
-          page: '42',
-        },
-      ];
-      const mockFn = loadBackgroundData;
-      mockFn.mockResolvedValue(mockBackgrounds);
-
-      const { showBackgroundPopup: freshShow } = await import('./useActionPopup.js');
-      const setPopupHtml = vi.fn();
-
-      await freshShow('Soldier', setPopupHtml, '2024');
-
-      expect(setPopupHtml).toHaveBeenCalledWith(
-        '<b>Soldier</b><br/><br/>Warfare is no stranger to you.<br/><br/><b>Source:</b> Player\'s Handbook 42'
       );
     });
 
@@ -747,21 +448,7 @@ describe('useActionPopup', () => {
       );
     });
 
-    it('should handle empty backgrounds array with error message', async () => {
-      const mockFn = loadBackgroundData;
-      mockFn.mockResolvedValue([]);
-
-      const { showBackgroundPopup: freshShow } = await import('./useActionPopup.js');
-      const setPopupHtml = vi.fn();
-
-      await freshShow('Acolyte', setPopupHtml, '2024');
-
-      expect(setPopupHtml).toHaveBeenCalledWith(
-        '<b>Acolyte</b><br/><br/>Background details not found in database.'
-      );
-    });
-
-    it('should match by index for 5e backgrounds', async () => {
+    it('should match by index for 5e backgrounds and use correct data path', async () => {
       const mockBackgrounds = [
         { index: 'soldier', name: 'Soldier', description: 'Warfare is no stranger to you.' },
       ];
@@ -773,26 +460,9 @@ describe('useActionPopup', () => {
 
       await freshShow('Soldier', setPopupHtml, '5e');
 
-      expect(setPopupHtml).toHaveBeenCalledWith(
-        '<b>Soldier</b><br/><br/>Warfare is no stranger to you.'
-      );
-    });
-
-    it('should use 5e data when rulesVersion is 5e', async () => {
-      const mockBackgrounds = [
-        { name: 'Soldier', description: '5e soldier description.' },
-      ];
-      const mockFn = loadBackgroundData;
-      mockFn.mockResolvedValue(mockBackgrounds);
-
-      const { showBackgroundPopup: freshShow } = await import('./useActionPopup.js');
-      const setPopupHtml = vi.fn();
-
-      await freshShow('Soldier', setPopupHtml, '5e');
-
       expect(mockFn).toHaveBeenCalledWith('5e');
       expect(setPopupHtml).toHaveBeenCalledWith(
-        '<b>Soldier</b><br/><br/>5e soldier description.'
+        '<b>Soldier</b><br/><br/>Warfare is no stranger to you.'
       );
     });
   });

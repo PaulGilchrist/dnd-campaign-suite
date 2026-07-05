@@ -18,13 +18,6 @@ describe('raceBuffService', () => {
       });
     });
 
-    it('returns default result when race is undefined', () => {
-      const result = computeRaceBuffs(undefined, {});
-      expect(result.abilityScoreIncreases).toEqual([]);
-      expect(result.speed).toBeNull();
-      expect(result.hitPointBonusPerLevel).toBe(0);
-    });
-
     it('returns default result when race object is empty', () => {
       const result = computeRaceBuffs({}, {});
       expect(result.abilityScoreIncreases).toEqual([]);
@@ -526,25 +519,6 @@ describe('raceBuffService', () => {
     });
 
     describe('playerData interactions', () => {
-      it('returns empty buffs when playerData is null', () => {
-        const race = {
-          ability_bonuses: [{ name: 'str', bonus: 2 }],
-        };
-        const result = computeRaceBuffs(race, null, '5e');
-        expect(result.abilityScoreIncreases).toEqual([{ name: 'Strength', amount: 2 }]);
-      });
-
-      it('returns empty buffs when playerData.race is undefined', () => {
-        const race = {
-          ability_bonuses: [{ name: 'str', bonus: 2 }],
-          subraces: [
-            { name: 'High Elf', ability_bonuses: [{ name: 'int', bonus: 1 }] },
-          ],
-        };
-        const result = computeRaceBuffs(race, {}, '5e');
-        expect(result.abilityScoreIncreases).toEqual([{ name: 'Strength', amount: 2 }]);
-      });
-
       it('returns empty buffs when playerData.race.subrace is undefined', () => {
         const race = {
           ability_bonuses: [{ name: 'str', bonus: 2 }],

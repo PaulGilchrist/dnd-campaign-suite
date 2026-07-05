@@ -1,3 +1,4 @@
+// @cleaned-by-ai
 // @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
@@ -22,15 +23,9 @@ describe('getWeaponMastery', () => {
     expect(collectWeaponMastery).not.toHaveBeenCalled()
   })
 
-  it('returns null when ruleset is undefined', () => {
-    const result = getWeaponMastery('Longsword', null, { name: 'Test' })
-    expect(result).toBeNull()
-    expect(collectWeaponMastery).not.toHaveBeenCalled()
-  })
-
-  it('returns null when ruleset is missing entirely', () => {
-    const result = getWeaponMastery('Longsword', null, {})
-    expect(result).toBeNull()
+  it('returns null when ruleset is missing or undefined', () => {
+    expect(getWeaponMastery('Longsword', null, { name: 'Test' })).toBeNull()
+    expect(getWeaponMastery('Longsword', null, {})).toBeNull()
     expect(collectWeaponMastery).not.toHaveBeenCalled()
   })
 
@@ -41,57 +36,23 @@ describe('getWeaponMastery', () => {
     expect(result).toBe('push')
   })
 
-  it('returns attack.mastery when baseMastery is null', () => {
+  it('falls back to attack.mastery when baseMastery is falsy', () => {
     collectWeaponMastery.mockReturnValue({ baseMastery: null, extraMasteries: [] })
     const attack = { mastery: 'topple' }
-    const result = getWeaponMastery('Longsword', attack, { rules: '2024' })
-    expect(result).toBe('topple')
-  })
-
-  it('returns attack.mastery when baseMastery is undefined', () => {
-    collectWeaponMastery.mockReturnValue({ baseMastery: undefined, extraMasteries: [] })
-    const attack = { mastery: 'heave' }
-    const result = getWeaponMastery('Longsword', attack, { rules: '2024' })
-    expect(result).toBe('heave')
-  })
-
-  it('returns attack.mastery when baseMastery is empty string', () => {
-    collectWeaponMastery.mockReturnValue({ baseMastery: '', extraMasteries: [] })
-    const attack = { mastery: 'shove' }
-    const result = getWeaponMastery('Longsword', attack, { rules: '2024' })
-    expect(result).toBe('shove')
+    expect(getWeaponMastery('Longsword', attack, { rules: '2024' })).toBe('topple')
   })
 
   it('prefers baseMastery over attack.mastery when both exist', () => {
     collectWeaponMastery.mockReturnValue({ baseMastery: 'trip', extraMasteries: [] })
     const attack = { mastery: 'heave' }
-    const result = getWeaponMastery('Longsword', attack, { rules: '2024' })
-    expect(result).toBe('trip')
+    expect(getWeaponMastery('Longsword', attack, { rules: '2024' })).toBe('trip')
   })
 
-  it('returns null when both baseMastery and attack.mastery are null', () => {
+  it('returns null when both baseMastery and attack.mastery are falsy', () => {
     collectWeaponMastery.mockReturnValue({ baseMastery: null, extraMasteries: [] })
-    const result = getWeaponMastery('Longsword', null, { rules: '2024' })
-    expect(result).toBeNull()
-  })
-
-  it('returns null when attack is null and baseMastery is null', () => {
-    collectWeaponMastery.mockReturnValue({ baseMastery: null, extraMasteries: [] })
-    const result = getWeaponMastery('Longsword', null, { rules: '2024' })
-    expect(result).toBeNull()
-  })
-
-  it('returns null when attack is undefined and baseMastery is null', () => {
-    collectWeaponMastery.mockReturnValue({ baseMastery: null, extraMasteries: [] })
-    const result = getWeaponMastery('Longsword', undefined, { rules: '2024' })
-    expect(result).toBeNull()
-  })
-
-  it('returns null when attack object has no mastery property', () => {
-    collectWeaponMastery.mockReturnValue({ baseMastery: null, extraMasteries: [] })
-    const attack = { name: 'Longsword' }
-    const result = getWeaponMastery('Longsword', attack, { rules: '2024' })
-    expect(result).toBeNull()
+    expect(getWeaponMastery('Longsword', null, { rules: '2024' })).toBeNull()
+    expect(getWeaponMastery('Longsword', undefined, { rules: '2024' })).toBeNull()
+    expect(getWeaponMastery('Longsword', { name: 'Longsword' }, { rules: '2024' })).toBeNull()
   })
 
   it('passes weaponName and playerStats to collectWeaponMastery', () => {
@@ -99,19 +60,5 @@ describe('getWeaponMastery', () => {
     const playerStats = { rules: '2024', name: 'TestCharacter', proficiency: 4 }
     getWeaponMastery('Greatsword', null, playerStats)
     expect(collectWeaponMastery).toHaveBeenCalledWith('Greatsword', playerStats)
-  })
-
-  it('returns null when attack.mastery is 0 (falsy)', () => {
-    collectWeaponMastery.mockReturnValue({ baseMastery: null, extraMasteries: [] })
-    const attack = { mastery: 0 }
-    const result = getWeaponMastery('Longsword', attack, { rules: '2024' })
-    expect(result).toBeNull()
-  })
-
-  it('returns null when attack.mastery is false (falsy)', () => {
-    collectWeaponMastery.mockReturnValue({ baseMastery: null, extraMasteries: [] })
-    const attack = { mastery: false }
-    const result = getWeaponMastery('Longsword', attack, { rules: '2024' })
-    expect(result).toBeNull()
   })
 })

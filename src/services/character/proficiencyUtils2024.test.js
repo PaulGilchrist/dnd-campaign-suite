@@ -4,6 +4,9 @@ import { getProficiencies, getProficiencyChoiceCount } from './proficiencyUtils2
 
 describe('proficiencyUtils2024', () => {
   describe('getProficiencies', () => {
+    // getProficiencies is re-exported from proficiencyUtils.js (shared logic)
+    // Tests live in proficiencyUtils.test.js — this file only tests 2024-specific behavior
+
     const defaultConfig = {
       raceProficiencies: () => [],
     };
@@ -15,35 +18,6 @@ describe('proficiencyUtils2024', () => {
         { choose: 1, from: ['Artisan\'s Tools', 'Thieves\' Tools'] },
       ],
     };
-
-    it('returns base class skill proficiencies with background allowance', () => {
-      const playerStats = {
-        class: { proficiencies: ['Skill: Athletics', 'Skill: Perception'] },
-        race: { starting_proficiencies: [] },
-        skillProficiencies: [],
-      };
-
-      const getChoiceCount = () => 0;
-      const [allowed, proficiencies] = getProficiencies(playerStats, true, getChoiceCount, defaultConfig);
-
-      expect(proficiencies).toEqual(['Athletics', 'Perception']);
-      expect(allowed).toBe(4);
-    });
-
-    it('returns base class non-skill proficiencies', () => {
-      const playerStats = {
-        class: { proficiencies: ['Light Armor', 'Medium Armor', 'Skill: Athletics'] },
-        race: { starting_proficiencies: ['Shields'] },
-        proficiencies: [],
-      };
-
-      const getChoiceCount = () => 0;
-      const [allowed, proficiencies] = getProficiencies(playerStats, false, getChoiceCount, defaultConfig);
-
-      expect(proficiencies).toEqual(['Light Armor', 'Medium Armor', 'Shields']);
-      expect(proficiencies).not.toContain('Athletics');
-      expect(allowed).toBe(3);
-    });
 
     it('adds background tool proficiencies for non-skill', () => {
       const playerStats = {
@@ -108,75 +82,6 @@ describe('proficiencyUtils2024', () => {
       const [allowed] = getProficiencies(playerStats, true, getChoiceCount, config);
 
       expect(allowed).toBe(5);
-    });
-
-    it('merges already-selected skill proficiencies into the available pool', () => {
-      const playerStats = {
-        class: { proficiencies: ['Skill: Stealth'] },
-        race: { starting_proficiencies: [] },
-        skillProficiencies: ['Perception', 'Insight'],
-      };
-
-      const getChoiceCount = () => 0;
-      const [, proficiencies] = getProficiencies(playerStats, true, getChoiceCount, defaultConfig);
-
-      expect(proficiencies).toEqual(['Insight', 'Perception', 'Stealth']);
-    });
-
-    it('merges already-selected non-skill proficiencies into the available pool', () => {
-      const playerStats = {
-        class: { proficiencies: ['Light Armor'] },
-        race: { starting_proficiencies: [] },
-        proficiencies: ['Medium Armor', 'Heavy Armor'],
-      };
-
-      const getChoiceCount = () => 0;
-      const [, proficiencies] = getProficiencies(playerStats, false, getChoiceCount, defaultConfig);
-
-      expect(proficiencies).toEqual(['Heavy Armor', 'Light Armor', 'Medium Armor']);
-    });
-
-    it('returns proficiencies sorted alphabetically', () => {
-      const playerStats = {
-        class: { proficiencies: ['Z Weapon', 'A Weapon', 'M Weapon'] },
-        race: { starting_proficiencies: [] },
-        proficiencies: [],
-      };
-
-      const getChoiceCount = () => 0;
-      const [, proficiencies] = getProficiencies(playerStats, false, getChoiceCount, defaultConfig);
-
-      expect(proficiencies).toEqual(['A Weapon', 'M Weapon', 'Z Weapon']);
-    });
-
-    it('deduplicates proficiencies from all sources', () => {
-      const playerStats = {
-        class: { proficiencies: ['Skill: Athletics'] },
-        race: { starting_proficiencies: ['Skill: Athletics'] },
-        skillProficiencies: ['Athletics'],
-      };
-
-      const getChoiceCount = () => 0;
-      const [, proficiencies] = getProficiencies(playerStats, true, getChoiceCount, defaultConfig);
-
-      expect(proficiencies).toEqual(['Athletics']);
-    });
-
-    it('adds race proficiencies returned by config.raceProficiencies', () => {
-      const config = {
-        raceProficiencies: () => ['Longsword'],
-      };
-
-      const playerStats = {
-        class: { proficiencies: [] },
-        race: { starting_proficiencies: [] },
-        proficiencies: [],
-      };
-
-      const getChoiceCount = () => 0;
-      const [, proficiencies] = getProficiencies(playerStats, false, getChoiceCount, config);
-
-      expect(proficiencies).toEqual(['Longsword']);
     });
 
     it('merges proficiency_choices from bonusSource', () => {
@@ -331,20 +236,12 @@ describe('proficiencyUtils2024', () => {
   });
 
   describe('getProficiencyChoiceCount', () => {
-    it('parses class skill_proficiency_choices "Choose 2" format', () => {
+    it('parses class skill_proficiency_choices "Choose X" format', () => {
       const playerStats = {
         class: { skill_proficiency_choices: 'Choose 2' },
         race: {},
       };
       expect(getProficiencyChoiceCount(playerStats, true)).toBe(2);
-    });
-
-    it('parses class skill_proficiency_choices "Choose 5" format', () => {
-      const playerStats = {
-        class: { skill_proficiency_choices: 'Choose 5' },
-        race: {},
-      };
-      expect(getProficiencyChoiceCount(playerStats, true)).toBe(5);
     });
 
     it('returns 0 when class has no skill_proficiency_choices', () => {
@@ -441,23 +338,6 @@ describe('proficiencyUtils2024', () => {
       expect(getProficiencyChoiceCount(playerStats, true)).toBe(0);
     });
 
-    it('counts race trait skill choices when skills=false', () => {
-      const playerStats = {
-        class: {},
-        race: {
-          traits: [
-            {
-              proficiency_choices: {
-                choose: 1,
-                from: ['Skill: Perception'],
-              },
-            },
-          ],
-        },
-      };
-      expect(getProficiencyChoiceCount(playerStats, false)).toBe(0);
-    });
-
     it('handles race traits with empty from array', () => {
       const playerStats = {
         class: {},
@@ -540,23 +420,6 @@ describe('proficiencyUtils2024', () => {
         race: {},
       };
       expect(getProficiencyChoiceCount(playerStats, true)).toBe(0);
-    });
-
-    it('counts subclass skill choices when skills=false', () => {
-      const playerStats = {
-        class: {
-          major: {
-            proficiency_choices: [
-              {
-                choose: 1,
-                from: ['Skill: Perception'],
-              },
-            ],
-          },
-        },
-        race: {},
-      };
-      expect(getProficiencyChoiceCount(playerStats, false)).toBe(0);
     });
 
     it('handles class.major without proficiency_choices', () => {

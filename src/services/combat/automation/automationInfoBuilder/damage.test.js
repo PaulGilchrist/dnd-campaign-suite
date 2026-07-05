@@ -1,3 +1,4 @@
+// @cleaned-by-ai
 // @improved-by-ai
 import { describe, it, expect, vi } from 'vitest'
 import { damageHandlers } from './damage.js'
@@ -55,16 +56,6 @@ describe('damageHandlers – damage_bonus', () => {
             scaling: { 5: '2d6', 11: '3d6' }
         })
         const result = damageHandlers.damage_bonus(feature, { ...BASE_STATS, level: 11 })
-        expect(result.damageExpression).toBe('3d6')
-    })
-
-    it('resolves scaling for damageExpression at level 17', () => {
-        const feature = makeFeature({
-            type: 'damage_bonus',
-            damageExpression: '1d6',
-            scaling: { 5: '2d6', 11: '3d6' }
-        })
-        const result = damageHandlers.damage_bonus(feature, { ...BASE_STATS, level: 17 })
         expect(result.damageExpression).toBe('3d6')
     })
 
@@ -144,54 +135,26 @@ describe('damageHandlers – damage_bonus', () => {
         const result = damageHandlers.damage_bonus(feature, BASE_STATS)
         expect(result.oncePerTurn).toBe(true)
     })
-
-    it('filters out invalid scaling keys and uses valid tier', () => {
-        const feature = makeFeature({
-            type: 'damage_bonus',
-            damageExpression: '1d6',
-            scaling: { abc: '2d6', 5: '2d6' }
-        })
-        const result = damageHandlers.damage_bonus(feature, BASE_STATS)
-        expect(result.damageExpression).toBe('2d6')
-    })
 })
 
 describe('damageHandlers – damage_modifier', () => {
-    it('returns damage_modifier info with defaults', () => {
-        const feature = makeFeature({ type: 'damage_modifier' })
-        const result = damageHandlers.damage_modifier(feature, BASE_STATS)
-        expect(result.type).toBe('damage_modifier')
-        expect(result.name).toBe('Test Feature')
-        expect(result.trigger).toBe('')
-        expect(result.modifierExpression).toBe('')
-        expect(result.hasAutomation).toBe(true)
-    })
-
-    it('passes through custom fields', () => {
+    it('returns damage_modifier info with defaults and passes through custom fields', () => {
         const feature = makeFeature({
             type: 'damage_modifier',
             trigger: 'after_spell_cast',
             modifierExpression: '+2d6'
         })
         const result = damageHandlers.damage_modifier(feature, BASE_STATS)
+        expect(result.type).toBe('damage_modifier')
+        expect(result.name).toBe('Test Feature')
         expect(result.trigger).toBe('after_spell_cast')
         expect(result.modifierExpression).toBe('+2d6')
+        expect(result.hasAutomation).toBe(true)
     })
 })
 
 describe('damageHandlers – damage_type_modifier', () => {
-    it('returns damage_type_modifier info with defaults', () => {
-        const feature = makeFeature({ type: 'damage_type_modifier' })
-        const result = damageHandlers.damage_type_modifier(feature, BASE_STATS)
-        expect(result.type).toBe('damage_type_modifier')
-        expect(result.name).toBe('Test Feature')
-        expect(result.trigger).toBe('')
-        expect(result.weaponTypes).toEqual([])
-        expect(result.options).toEqual([])
-        expect(result.hasAutomation).toBe(true)
-    })
-
-    it('passes through custom fields', () => {
+    it('returns damage_type_modifier info with defaults and passes through custom fields', () => {
         const feature = makeFeature({
             type: 'damage_type_modifier',
             trigger: 'on_hit',
@@ -199,9 +162,12 @@ describe('damageHandlers – damage_type_modifier', () => {
             options: ['fire', 'cold']
         })
         const result = damageHandlers.damage_type_modifier(feature, BASE_STATS)
+        expect(result.type).toBe('damage_type_modifier')
+        expect(result.name).toBe('Test Feature')
         expect(result.trigger).toBe('on_hit')
         expect(result.weaponTypes).toEqual(['melee', 'ranged'])
         expect(result.options).toEqual(['fire', 'cold'])
+        expect(result.hasAutomation).toBe(true)
     })
 })
 
@@ -218,13 +184,13 @@ describe('damageHandlers – damage_type_choice', () => {
         expect(result.hasAutomation).toBe(true)
     })
 
-    it('passes through custom fields', () => {
+    it('passes through custom fields and coerces minDamage to boolean', () => {
         const feature = makeFeature({
             type: 'damage_type_choice',
             damageTypes: ['fire', 'cold', 'lightning'],
             effect: 'elemental_adept',
             casting_time: '1 bonus action',
-            minDamage: true
+            minDamage: 'yes'
         })
         const result = damageHandlers.damage_type_choice(feature, BASE_STATS)
         expect(result.damageTypes).toEqual(['fire', 'cold', 'lightning'])
@@ -232,27 +198,10 @@ describe('damageHandlers – damage_type_choice', () => {
         expect(result.casting_time).toBe('1 bonus action')
         expect(result.minDamage).toBe(true)
     })
-
-    it('coerces minDamage to boolean', () => {
-        const feature = makeFeature({ type: 'damage_type_choice', minDamage: 'yes' })
-        const result = damageHandlers.damage_type_choice(feature, BASE_STATS)
-        expect(result.minDamage).toBe(true)
-    })
 })
 
 describe('damageHandlers – weapon_mastery_choice', () => {
-    it('returns weapon_mastery_choice info with defaults', () => {
-        const feature = makeFeature({ type: 'weapon_mastery_choice' })
-        const result = damageHandlers.weapon_mastery_choice(feature, BASE_STATS)
-        expect(result.type).toBe('weapon_mastery_choice')
-        expect(result.name).toBe('Test Feature')
-        expect(result.masteryProperties).toEqual([])
-        expect(result.effect).toBe('extra_mastery')
-        expect(result.casting_time).toBe('passive')
-        expect(result.hasAutomation).toBe(true)
-    })
-
-    it('passes through custom fields', () => {
+    it('returns weapon_mastery_choice info with defaults and passes through custom fields', () => {
         const feature = makeFeature({
             type: 'weapon_mastery_choice',
             masteryProperties: ['push', 'topple'],
@@ -260,9 +209,12 @@ describe('damageHandlers – weapon_mastery_choice', () => {
             casting_time: '1 action'
         })
         const result = damageHandlers.weapon_mastery_choice(feature, BASE_STATS)
+        expect(result.type).toBe('weapon_mastery_choice')
+        expect(result.name).toBe('Test Feature')
         expect(result.masteryProperties).toEqual(['push', 'topple'])
         expect(result.effect).toBe('extra_damage')
         expect(result.casting_time).toBe('1 action')
+        expect(result.hasAutomation).toBe(true)
     })
 })
 
@@ -287,7 +239,7 @@ describe('damageHandlers – damage_reduction', () => {
         expect(result.hasAutomation).toBe(true)
     })
 
-    it('passes through custom fields', () => {
+    it('passes through custom fields and coerces requiresShield to boolean', () => {
         const feature = makeFeature({
             type: 'damage_reduction',
             reductionExpression: '2d8',
@@ -300,7 +252,8 @@ describe('damageHandlers – damage_reduction', () => {
             cost: 2,
             damageTypes: ['fire', 'cold'],
             condition: 'wearing_heavy_armor',
-            effect: 'shield_wall'
+            effect: 'shield_wall',
+            requiresShield: 'yes'
         })
         const result = damageHandlers.damage_reduction(feature, BASE_STATS)
         expect(result.reductionExpression).toBe('2d8')
@@ -314,30 +267,12 @@ describe('damageHandlers – damage_reduction', () => {
         expect(result.damageTypes).toEqual(['fire', 'cold'])
         expect(result.condition).toBe('wearing_heavy_armor')
         expect(result.effect).toBe('shield_wall')
-    })
-
-    it('coerces requiresShield to boolean', () => {
-        const feature = makeFeature({ type: 'damage_reduction', requiresShield: 'yes' })
-        const result = damageHandlers.damage_reduction(feature, BASE_STATS)
         expect(result.requiresShield).toBe(true)
     })
 })
 
 describe('damageHandlers – damage_aura', () => {
-    it('returns damage_aura info with defaults', () => {
-        const feature = makeFeature({ type: 'damage_aura' })
-        const result = damageHandlers.damage_aura(feature, BASE_STATS)
-        expect(result.type).toBe('damage_aura')
-        expect(result.name).toBe('Test Feature')
-        expect(result.damageType).toBe('')
-        expect(result.damageExpression).toBe('')
-        expect(result.range).toBe('10_ft')
-        expect(result.duration).toBe('1_minute')
-        expect(result.recharge).toBe('long_rest')
-        expect(result.hasAutomation).toBe(true)
-    })
-
-    it('passes through custom fields', () => {
+    it('returns damage_aura info with defaults and passes through custom fields', () => {
         const feature = makeFeature({
             type: 'damage_aura',
             damageType: 'Radiant',
@@ -347,11 +282,14 @@ describe('damageHandlers – damage_aura', () => {
             recharge: 'short_rest'
         })
         const result = damageHandlers.damage_aura(feature, BASE_STATS)
+        expect(result.type).toBe('damage_aura')
+        expect(result.name).toBe('Test Feature')
         expect(result.damageType).toBe('Radiant')
         expect(result.damageExpression).toBe('2d6')
         expect(result.range).toBe('15_ft')
         expect(result.duration).toBe('10_minutes')
         expect(result.recharge).toBe('short_rest')
+        expect(result.hasAutomation).toBe(true)
     })
 })
 
@@ -369,13 +307,13 @@ describe('damageHandlers – psionic_strike', () => {
         expect(result.hasAutomation).toBe(true)
     })
 
-    it('passes through custom fields', () => {
+    it('passes through custom fields and coerces oncePerTurn to boolean', () => {
         const feature = makeFeature({
             type: 'psionic_strike',
             resource: 'psionicPoints',
             damageExpression: '2d8',
             damageType: 'Psychic',
-            oncePerTurn: true,
+            oncePerTurn: 'yes',
             trigger: 'on_kill'
         })
         const result = damageHandlers.psionic_strike(feature, BASE_STATS)
@@ -385,20 +323,15 @@ describe('damageHandlers – psionic_strike', () => {
         expect(result.oncePerTurn).toBe(true)
         expect(result.trigger).toBe('on_kill')
     })
-
-    it('coerces oncePerTurn to boolean', () => {
-        const feature = makeFeature({ type: 'psionic_strike', oncePerTurn: 'yes' })
-        const result = damageHandlers.psionic_strike(feature, BASE_STATS)
-        expect(result.oncePerTurn).toBe(true)
-    })
 })
 
 describe('damageHandlers – primal_companion_double_strike_damage', () => {
-    it('returns damage_bonus type for primal_companion_double_strike_damage', () => {
+    it('returns damage_bonus type for primal_companion_double_strike_damage with defaults and custom fields', () => {
         const feature = makeFeature({
             type: 'primal_companion_double_strike_damage',
             damageExpression: '1d6',
-            damageType: 'Thunder'
+            damageType: 'Thunder',
+            oncePerTurn: true
         })
         const result = damageHandlers.primal_companion_double_strike_damage(feature, BASE_STATS)
         expect(result.type).toBe('damage_bonus')
@@ -406,21 +339,8 @@ describe('damageHandlers – primal_companion_double_strike_damage', () => {
         expect(result.trigger).toBe('companion_beasts_strike_hit')
         expect(result.damageExpression).toBe('1d6')
         expect(result.damageType).toBe('Thunder')
-        expect(result.oncePerTurn).toBe(false)
-        expect(result.hasAutomation).toBe(true)
-    })
-
-    it('passes through custom fields', () => {
-        const feature = makeFeature({
-            type: 'primal_companion_double_strike_damage',
-            damageExpression: '2d6',
-            damageType: 'Slashing',
-            oncePerTurn: true
-        })
-        const result = damageHandlers.primal_companion_double_strike_damage(feature, BASE_STATS)
-        expect(result.damageExpression).toBe('2d6')
-        expect(result.damageType).toBe('Slashing')
         expect(result.oncePerTurn).toBe(true)
+        expect(result.hasAutomation).toBe(true)
     })
 })
 

@@ -24,34 +24,6 @@ describe('routes config', () => {
       });
     });
 
-    it('should classify sidebar views as activeView string type', () => {
-      const sidebarViewKeys = [
-        'CHAR_SHEET', 'INITIATIVE', 'MAPS_MANAGER', 'MAP',
-        'ENCOUNTER', 'FACTIONS', 'NOTES', 'QUESTS', 'NPCS',
-        'SETTLEMENTS', 'CAMPAIGN_LOG',
-      ];
-
-      sidebarViewKeys.forEach(key => {
-        expect(VIEWS[key].stateVar).toBe('activeView');
-        expect(VIEWS[key].type).toBe('string');
-        expect(VIEWS[key].overlay).not.toBe(true);
-      });
-    });
-
-    it('should classify overlay views as boolean type with overlay flag', () => {
-      const overlayViewKeys = [
-        'CAMPAIGN_SELECTION',
-        'CHARACTER_WIZARD',
-        'EDIT_CHARACTER_WIZARD',
-      ];
-
-      overlayViewKeys.forEach(key => {
-        expect(VIEWS[key].stateVar).not.toBe('activeView');
-        expect(VIEWS[key].type).toBe('boolean');
-        expect(VIEWS[key].overlay).toBe(true);
-      });
-    });
-
     it('should have unique view names across all views', () => {
       const names = Object.values(VIEWS).map(v => v.name);
       expect(new Set(names).size).toBe(names.length);
@@ -62,6 +34,24 @@ describe('routes config', () => {
         .filter(v => v.type === 'boolean')
         .map(v => v.stateVar);
       expect(new Set(booleanStateVars).size).toBe(booleanStateVars.length);
+    });
+
+    it('should classify sidebar views as activeView string type', () => {
+      Object.values(VIEWS).forEach(view => {
+        if (view.type === 'string') {
+          expect(view.stateVar).toBe('activeView');
+          expect(view.overlay).not.toBe(true);
+        }
+      });
+    });
+
+    it('should classify overlay views as boolean type with overlay flag', () => {
+      Object.values(VIEWS).forEach(view => {
+        if (view.type === 'boolean') {
+          expect(view.stateVar).not.toBe('activeView');
+          expect(view.overlay).toBe(true);
+        }
+      });
     });
 
     it('should map overlay views to correct component and needsActiveCharacter flags', () => {

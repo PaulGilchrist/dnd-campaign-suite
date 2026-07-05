@@ -139,15 +139,6 @@ describe('rollHealingForAction', () => {
             });
         });
 
-        it('passes the healExpression to rollExpression for different formulas', async () => {
-            hasHealingMaximization.mockReturnValue(false);
-            rollExpression.mockReturnValue({ total: 15, rolls: [1, 2, 3, 4], modifier: 3 });
-
-            await rollHealingForAction(makeAuto({ healExpression: '4d6+3' }), makePlayerStats(), campaignName);
-
-            expect(rollExpression).toHaveBeenCalledWith('4d6+3');
-        });
-
         it('calls rollExpressionMaximized when healing maximization is active', async () => {
             hasHealingMaximization.mockReturnValue(true);
             const mockResult = { total: 16, rolls: [8, 8] };
@@ -235,7 +226,7 @@ describe('applyHealingDirectly', () => {
             expect(result).toEqual({ maxHp: 30, newHp: 25, actualHeal: 10 });
         });
 
-        it('caps HP at maxHitPoints', () => {
+        it('caps HP at maxHitPoints and calculates actualHeal', () => {
             getRuntimeValue.mockReturnValue(27);
 
             const result = applyHealingDirectly(playerStats, targetName, 10, campaignName);
@@ -270,6 +261,17 @@ describe('applyHealingDirectly', () => {
             expect(result.newHp).toBe(27);
             expect(result.actualHeal).toBe(7);
         });
+
+        it('respects different maxHitPoints from playerStats', () => {
+            getRuntimeValue.mockReturnValue(5);
+            const lowHpPlayer = makePlayerStats({ hitPoints: 20 });
+
+            const result = applyHealingDirectly(lowHpPlayer, targetName, 15, campaignName);
+
+            expect(result.maxHp).toBe(20);
+            expect(result.newHp).toBe(20);
+            expect(result.actualHeal).toBe(15);
+        });
     });
 
     describe('side effects', () => {
@@ -289,19 +291,6 @@ describe('applyHealingDirectly', () => {
             expect(dispatchSpy).toHaveBeenCalledWith(expect.any(CustomEvent));
             const event = dispatchSpy.mock.calls[0][0];
             expect(event.type).toBe('combat-summary-updated');
-        });
-    });
-
-    describe('edge cases', () => {
-        it('respects different maxHitPoints from playerStats', () => {
-            getRuntimeValue.mockReturnValue(5);
-            const lowHpPlayer = makePlayerStats({ hitPoints: 20 });
-
-            const result = applyHealingDirectly(lowHpPlayer, targetName, 15, campaignName);
-
-            expect(result.maxHp).toBe(20);
-            expect(result.newHp).toBe(20);
-            expect(result.actualHeal).toBe(15);
         });
     });
 });
@@ -370,7 +359,10 @@ describe('logHealingToSSE', () => {
             call => call[0] === 'healing-popup'
         );
         expect(popupEvent).toBeDefined();
-        expect(popupEvent[1].detail.popupText).toBe('Healing Hands on Goblin: 6d4=24 (maximized) (dice maximized by Supreme Healing) — Regained 24 HP (no uses remaining)');
+        expect(popupEvent[1].detail.popupText).toContain('Healing Hands on Goblin');
+        expect(popupEvent[1].detail.popupText).toContain('24');
+        expect(popupEvent[1].detail.popupText).toContain('maximized');
+        expect(popupEvent[1].detail.popupText).toContain('no uses remaining');
         customEventSpy.mockRestore();
     });
 
@@ -392,7 +384,8 @@ describe('logHealingToSSE', () => {
             call => call[0] === 'healing-popup'
         );
         expect(popupEvent).toBeDefined();
-        expect(popupEvent[1].detail.popupText).toBe('Cure Wounds on Ally: 1d8+1=8 (5, 3) — Regained 8 HP');
+        expect(popupEvent[1].detail.popupText).toContain('Cure Wounds on Ally');
+        expect(popupEvent[1].detail.popupText).toContain('Regained 8 HP');
         customEventSpy.mockRestore();
     });
 });

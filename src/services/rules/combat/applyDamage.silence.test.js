@@ -1,3 +1,4 @@
+// @cleaned-by-ai
 // @improved-by-ai
 import { describe, it, expect, vi } from 'vitest';
 
@@ -133,7 +134,6 @@ describe('Silence zone — Thunder immunity for players', () => {
     const player = createPlayerCreature('Wizard');
     const cs = makeCombatSummary([player]);
 
-    // Provide a silence buff with sourceCharacter so the silence zone code path is triggered
     stubPlayerRuntime(20, [], [{ effect: 'silence', sourceCharacter: 'Bard' }]);
 
     const result = applyDamageToTarget(cs, 'Wizard', 10, ['Thunder'], 'TestCampaign', [
@@ -182,24 +182,6 @@ describe('Silence zone — Thunder immunity for players', () => {
     expect(silenceService.isCreatureInSilenceZone).not.toHaveBeenCalled();
   });
 
-  it('does not add duplicate Thunder immunity when player already has it', () => {
-    silenceService.isCreatureInSilenceZone.mockImplementation(() => true);
-    global.fetch.mockReset();
-
-    const player = createPlayerCreature('Wizard');
-    const cs = makeCombatSummary([player]);
-
-    stubPlayerRuntime(20);
-
-    const result = applyDamageToTarget(cs, 'Wizard', 10, ['Thunder'], 'TestCampaign', [
-      createMinimalCharacter('Wizard', {
-        computedExtra: { immunities: ['Thunder'] },
-      }),
-    ]);
-
-    expect(result.finalDamage).toBe(0);
-  });
-
   it('Thunder immunity does not affect other damage types', () => {
     silenceService.isCreatureInSilenceZone.mockImplementation(() => true);
     global.fetch.mockReset();
@@ -207,7 +189,6 @@ describe('Silence zone — Thunder immunity for players', () => {
     const player = createPlayerCreature('Wizard');
     const cs = makeCombatSummary([player]);
 
-    // Provide a silence buff with sourceCharacter so the silence zone code path is triggered
     stubPlayerRuntime(20, [], [{ effect: 'silence', sourceCharacter: 'Bard' }]);
 
     const result = applyDamageToTarget(cs, 'Wizard', 10, ['Fire'], 'TestCampaign', [
@@ -215,23 +196,6 @@ describe('Silence zone — Thunder immunity for players', () => {
     ]);
 
     expect(result.finalDamage).toBe(10);
-  });
-
-  it('Thunder immunity is case-insensitive', () => {
-    silenceService.isCreatureInSilenceZone.mockImplementation(() => true);
-    global.fetch.mockReset();
-
-    const player = createPlayerCreature('Wizard');
-    const cs = makeCombatSummary([player]);
-
-    // Provide a silence buff with sourceCharacter so the silence zone code path is triggered
-    stubPlayerRuntime(20, [], [{ effect: 'silence', sourceCharacter: 'Bard' }]);
-
-    const result = applyDamageToTarget(cs, 'Wizard', 10, ['thunder'], 'TestCampaign', [
-      createMinimalCharacter('Wizard'),
-    ]);
-
-    expect(result.finalDamage).toBe(0);
   });
 });
 

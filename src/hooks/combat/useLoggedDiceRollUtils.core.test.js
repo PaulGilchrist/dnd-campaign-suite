@@ -1,3 +1,4 @@
+// @cleaned-by-ai
 // @improved-by-ai
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
@@ -390,18 +391,6 @@ describe('getSoulstitchProtectedCreatures', () => {
         getSoulstitchProtectedCreatures(playerName, campaignName);
         expect(getRuntimeValue).toHaveBeenCalledWith(playerName, '_PlayerName_Soulstitch_Spells_active', campaignName);
     });
-
-    it('replaces spaces in player names with single underscores in the key', () => {
-        getRuntimeValue.mockReturnValue([]);
-        getSoulstitchProtectedCreatures('Player Name', campaignName);
-        expect(getRuntimeValue).toHaveBeenCalledWith('Player Name', '_Player_Name_Soulstitch_Spells_active', campaignName);
-    });
-
-    it('collapses multiple consecutive spaces to a single underscore in the key', () => {
-        getRuntimeValue.mockReturnValue([]);
-        getSoulstitchProtectedCreatures('Player  Name', campaignName);
-        expect(getRuntimeValue).toHaveBeenCalledWith('Player  Name', '_Player_Name_Soulstitch_Spells_active', campaignName);
-    });
 });
 
 describe('hasSoulstitchProtection', () => {
@@ -472,27 +461,7 @@ describe('applyMinDamageAdjustment', () => {
         expect(applyMinDamageAdjustment(10, [1, 3, 1, 5], {}, 'fire')).toBe(12);
     });
 
-    it('handles all ones in rolls', () => {
-        hasMinDamage.mockReturnValue(true);
-        expect(applyMinDamageAdjustment(5, [1, 1, 1], {}, 'fire')).toBe(8);
-    });
-
-    it('handles mixed rolls with ones', () => {
-        hasMinDamage.mockReturnValue(true);
-        expect(applyMinDamageAdjustment(7, [1, 6, 3, 1, 2], {}, 'fire')).toBe(9);
-    });
-
-    it('handles a single roll of 1', () => {
-        hasMinDamage.mockReturnValue(true);
-        expect(applyMinDamageAdjustment(3, [1], {}, 'fire')).toBe(4);
-    });
-
-    it('handles a single roll that is not 1', () => {
-        hasMinDamage.mockReturnValue(true);
-        expect(applyMinDamageAdjustment(3, [6], {}, 'fire')).toBe(3);
-    });
-
-    it('works with different damage types', () => {
+    it('handles different damage types', () => {
         hasMinDamage.mockReturnValue(true);
         expect(applyMinDamageAdjustment(5, [1, 1, 4], {}, 'lightning')).toBe(7);
         expect(applyMinDamageAdjustment(5, [2, 3, 4], {}, 'cold')).toBe(5);

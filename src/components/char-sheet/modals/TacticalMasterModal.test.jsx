@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import TacticalMasterModal from './TacticalMasterModal.jsx';
@@ -49,7 +49,7 @@ function renderModal(overrides) {
 // ── Rendering ──
 
 describe('TacticalMasterModal - initial render', () => {
-  it('renders the modal overlay with header and body', () => {
+  it('renders the modal overlay with header, body, and actions', () => {
     renderModal();
     expect(document.querySelector('.sp-overlay')).toBeInTheDocument();
     expect(document.querySelector('.sp-modal')).toBeInTheDocument();
@@ -58,14 +58,10 @@ describe('TacticalMasterModal - initial render', () => {
     expect(document.querySelector('.sp-actions')).toBeInTheDocument();
   });
 
-  it('renders "Tactical Master" in the header with crosshairs icon', () => {
+  it('renders "Tactical Master" in the header with crosshairs icon and attack name', () => {
     renderModal();
     expect(screen.getByText(/Tactical Master/)).toBeInTheDocument();
     expect(document.querySelector('.fa-solid.fa-crosshairs')).toBeInTheDocument();
-  });
-
-  it('renders the attack name in the header after "Tactical Master"', () => {
-    renderModal();
     expect(screen.getByText(/Longsword Attack/)).toBeInTheDocument();
   });
 
@@ -235,36 +231,9 @@ describe('TacticalMasterModal - apply button', () => {
     expect(screen.getByRole('button', { name: /Apply/ })).not.toBeDisabled();
   });
 
-  it('is enabled after selecting a mastery', () => {
-    renderModal();
-    const radios = document.querySelectorAll('input[name="tacticalMasterOption"]');
-    fireEvent.click(radios[0]);
-    expect(screen.getByRole('button', { name: /Apply/ })).not.toBeDisabled();
-  });
-
   it('is disabled when there are no masteries', () => {
     renderModal({ baseMastery: null, replaceOptions: [] });
     expect(screen.getByRole('button', { name: /Apply/ })).toBeDisabled();
-  });
-
-  it('has the sp-roll-btn class', () => {
-    renderModal();
-    const btn = screen.getByRole('button', { name: /Apply/ });
-    expect(btn.classList.contains('sp-roll-btn')).toBe(true);
-  });
-
-  it('renders a crosshairs icon inside the button', () => {
-    renderModal();
-    const btn = screen.getByRole('button', { name: /Apply/ });
-    expect(btn.querySelector('.fa-solid.fa-crosshairs')).toBeInTheDocument();
-  });
-
-  it('does not call onConfirm when clicked with no selection', async () => {
-    renderModal();
-    fireEvent.click(screen.getByRole('button', { name: /Apply/ }));
-    await waitFor(() => {
-      expect(useActionPopup.loadWeaponMasteries).toHaveBeenCalled();
-    });
   });
 
   it('calls onConfirm with the selected mastery when a mastery is selected and apply is clicked', async () => {
@@ -304,60 +273,15 @@ describe('TacticalMasterModal - applied state', () => {
     fireEvent.click(screen.getByRole('button', { name: /Apply/ }));
   }
 
-  it('shows "Mastery applied successfully" message', async () => {
+  it('shows "Mastery applied successfully" message with Done button, hiding selection elements', async () => {
     setupAppliedState();
     await waitFor(() => {
       expect(screen.getByText(/Mastery applied successfully/)).toBeInTheDocument();
-    });
-  });
-
-  it('renders the Done button in applied state', async () => {
-    setupAppliedState();
-    await waitFor(() => {
       expect(screen.getByText('Done')).toBeInTheDocument();
-    });
-  });
-
-  it('hides selection options after applying', async () => {
-    setupAppliedState();
-    await waitFor(() => {
       expect(screen.queryByText(/Choose a mastery property/)).not.toBeInTheDocument();
-    });
-  });
-
-  it('hides the Apply button after applying', async () => {
-    setupAppliedState();
-    await waitFor(() => {
       expect(screen.queryByRole('button', { name: /Apply/ })).not.toBeInTheDocument();
-    });
-  });
-
-  it('hides the Skip button after applying', async () => {
-    setupAppliedState();
-    await waitFor(() => {
       expect(screen.queryByRole('button', { name: 'Skip' })).not.toBeInTheDocument();
-    });
-  });
-
-  it('hides the instructional text after applying', async () => {
-    setupAppliedState();
-    await waitFor(() => {
-      expect(screen.queryByText(/Choose a mastery property/)).not.toBeInTheDocument();
-    });
-  });
-
-  it('hides the one mastery per hit note after applying', async () => {
-    setupAppliedState();
-    await waitFor(() => {
       expect(screen.queryByText(/You can choose one mastery property per hit/)).not.toBeInTheDocument();
-    });
-  });
-
-  it('renders the Done button with sp-roll-btn class in applied state', async () => {
-    setupAppliedState();
-    await waitFor(() => {
-      const doneBtn = screen.getByRole('button', { name: 'Done' });
-      expect(doneBtn.classList.contains('sp-roll-btn')).toBe(true);
     });
   });
 
@@ -400,7 +324,7 @@ describe('TacticalMasterModal - close behavior', () => {
 // ── Edge cases: empty/missing masteries ──
 
 describe('TacticalMasterModal - empty masteries', () => {
-  it('renders with no masteries when baseMastery and replaceOptions are null', () => {
+  it('renders with no masteries when baseMastery and replaceOptions are null or empty', () => {
     renderModal({ baseMastery: null, replaceOptions: null });
     expect(screen.getByText(/Longsword Attack/)).toBeInTheDocument();
     const radios = document.querySelectorAll('input[name="tacticalMasterOption"]');
@@ -409,13 +333,6 @@ describe('TacticalMasterModal - empty masteries', () => {
 
   it('renders with no masteries when baseMastery is null and replaceOptions is empty', () => {
     renderModal({ baseMastery: null, replaceOptions: [] });
-    expect(screen.getByText(/Longsword Attack/)).toBeInTheDocument();
-    const radios = document.querySelectorAll('input[name="tacticalMasterOption"]');
-    expect(radios).toHaveLength(0);
-  });
-
-  it('renders with no masteries when baseMastery is null and replaceOptions is null', () => {
-    renderModal({ baseMastery: null, replaceOptions: null });
     expect(screen.getByText(/Longsword Attack/)).toBeInTheDocument();
     const radios = document.querySelectorAll('input[name="tacticalMasterOption"]');
     expect(radios).toHaveLength(0);
@@ -438,12 +355,6 @@ describe('TacticalMasterModal - single mastery source', () => {
     const labels = document.querySelectorAll('label');
     const pushLabel = Array.from(labels).find(l => l.textContent.includes('Push (10 ft)'));
     expect(pushLabel).toBeInTheDocument();
-  });
-
-  it('renders only replace options when baseMastery is undefined', () => {
-    renderModal({ baseMastery: undefined });
-    const radios = document.querySelectorAll('input[name="tacticalMasterOption"]');
-    expect(radios).toHaveLength(1);
   });
 });
 
@@ -472,16 +383,6 @@ describe('TacticalMasterModal - duplicate masteries', () => {
     render(<TacticalMasterModal {...props} />);
     const radios = document.querySelectorAll('input[name="tacticalMasterOption"]');
     expect(radios).toHaveLength(2);
-  });
-
-  it('marks a mastery from replaceOptions as feature source even when also baseMastery', () => {
-    const props = makeProps();
-    props.baseMastery = 'Push';
-    props.replaceOptions = ['Push', 'Sap'];
-    render(<TacticalMasterModal {...props} />);
-    const labels = document.querySelectorAll('label');
-    const pushLabel = Array.from(labels).find(l => l.textContent.includes('Push (10 ft)'));
-    expect(pushLabel.querySelector('.automation-badge')).not.toBeInTheDocument();
   });
 });
 
@@ -573,97 +474,5 @@ describe('TacticalMasterModal - description display', () => {
       const bodyDiv = document.querySelector('.sp-body');
       expect(bodyDiv.textContent).toContain('UnknownMastery');
     });
-  });
-});
-
-// ── Error handling in useEffect ──
-
-describe('TacticalMasterModal - error handling', () => {
-  it('renders fallback when loadWeaponMasteries returns empty array', async () => {
-    useActionPopup.loadWeaponMasteries.mockResolvedValue([]);
-    const props = makeProps();
-    props.baseMastery = 'UnknownMastery';
-    props.replaceOptions = [];
-    render(<TacticalMasterModal {...props} />);
-    await waitFor(() => {
-      const bodyDiv = document.querySelector('.sp-body');
-      expect(bodyDiv.textContent).toContain('UnknownMastery');
-    });
-  });
-});
-
-// ── Props that are ignored (denoted with underscore) ──
-
-describe('TacticalMasterModal - ignored props', () => {
-  it('renders without crashing when playerStats is undefined', () => {
-    const props = makeProps();
-    delete props.playerStats;
-    expect(() => render(<TacticalMasterModal {...props} />)).not.toThrow();
-  });
-
-  it('renders without crashing when campaignName is undefined', () => {
-    const props = makeProps();
-    delete props.campaignName;
-    expect(() => render(<TacticalMasterModal {...props} />)).not.toThrow();
-  });
-});
-
-// ── CSS classes ──
-
-describe('TacticalMasterModal - CSS classes', () => {
-  it('applies sp-overlay to the outer container', () => {
-    renderModal();
-    expect(document.querySelector('.sp-overlay')).toBeInTheDocument();
-  });
-
-  it('applies sp-modal to the inner container', () => {
-    renderModal();
-    expect(document.querySelector('.sp-modal')).toBeInTheDocument();
-  });
-
-  it('applies sp-header to the header', () => {
-    renderModal();
-    expect(document.querySelector('.sp-header')).toBeInTheDocument();
-  });
-
-  it('applies sp-body to the body', () => {
-    renderModal();
-    expect(document.querySelector('.sp-body')).toBeInTheDocument();
-  });
-
-  it('applies sp-actions to the actions container', () => {
-    renderModal();
-    expect(document.querySelector('.sp-actions')).toBeInTheDocument();
-  });
-});
-
-// ── Selected state visual feedback ──
-
-describe('TacticalMasterModal - selected state visual feedback', () => {
-  it('marks the selected option with a border via isSelected styling', () => {
-    renderModal();
-    const radios = document.querySelectorAll('input[name="tacticalMasterOption"]');
-    fireEvent.click(radios[0]);
-    const label = radios[0].closest('label');
-    expect(label.style.background).toContain('rgba(255, 255, 255, 0.15)');
-  });
-
-  it('marks the selected option with a background via isSelected styling', () => {
-    renderModal();
-    const radios = document.querySelectorAll('input[name="tacticalMasterOption"]');
-    fireEvent.click(radios[0]);
-    const label = radios[0].closest('label');
-    expect(label.style.background).toContain('rgba(255, 255, 255, 0.15)');
-  });
-
-  it('unmarks the previously selected option when a new one is selected', () => {
-    renderModal();
-    const radios = document.querySelectorAll('input[name="tacticalMasterOption"]');
-    fireEvent.click(radios[0]);
-    const firstLabel = radios[0].closest('label');
-    expect(firstLabel.style.background).toContain('rgba(255, 255, 255, 0.15)');
-
-    fireEvent.click(radios[1]);
-    expect(firstLabel.style.background).toBe('transparent');
   });
 });

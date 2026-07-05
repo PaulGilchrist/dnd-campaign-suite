@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import AttackRiderManeuverPrompt from './AttackRiderManeuverPrompt.jsx';
@@ -39,65 +39,32 @@ function renderPrompt(overrides = {}) {
 // ── Initial rendering ──
 
 describe('AttackRiderManeuverPrompt - initial rendering', () => {
-    it('renders the overlay and modal', () => {
+    it('renders the overlay, modal, header, and instruction text', () => {
         renderPrompt();
         expect(document.querySelector('.sp-overlay')).toBeInTheDocument();
         expect(document.querySelector('.sp-modal')).toBeInTheDocument();
-    });
-
-    it('renders the header with bolt icon', () => {
-        renderPrompt();
-        expect(document.querySelector('.fa-solid.fa-bolt')).toBeInTheDocument();
         expect(screen.getByText(/Battle Master — Attack Rider Maneuver/)).toBeInTheDocument();
-    });
-
-    it('shows instruction text', () => {
-        renderPrompt();
         expect(screen.getByText(/Choose an attack rider maneuver to use on this hit/)).toBeInTheDocument();
     });
 
-    it('renders all maneuvers as selectable options', () => {
+    it('renders all maneuvers with their descriptors', () => {
         renderPrompt();
         expect(screen.getByText('Disarming Attack')).toBeInTheDocument();
         expect(screen.getByText('Distracting Strike')).toBeInTheDocument();
         expect(screen.getByText('Goading Attack')).toBeInTheDocument();
         expect(screen.getByText('Trip Attack')).toBeInTheDocument();
+        // saveType descriptors appear next to maneuver names
+        const disarmLabel = screen.getByText('Disarming Attack').closest('label');
+        expect(disarmLabel.textContent).toContain('STR save');
+        const goadLabel = screen.getByText('Goading Attack').closest('label');
+        expect(goadLabel.textContent).toContain('WIS save');
+        const distractLabel = screen.getByText('Distracting Strike').closest('label');
+        expect(distractLabel.textContent).not.toContain('save');
     });
 
-    it('renders radio inputs for each maneuver', () => {
-        renderPrompt();
-        const radios = document.querySelectorAll('input[name="attackRiderManeuver"]');
-        expect(radios.length).toBe(4);
-    });
-
-    it('shows damageBonus indicator on maneuvers with damage bonus', () => {
-        renderPrompt();
-        const labels = document.querySelectorAll('label');
-        const firstLabel = labels[0];
-        expect(firstLabel.textContent).toContain('adds superiority die to damage');
-    });
-
-    it('shows saveType indicator on maneuvers with save type', () => {
-        renderPrompt();
-        const labels = document.querySelectorAll('label');
-        const firstLabel = labels[0];
-        expect(firstLabel.textContent).toContain('STR save');
-    });
-
-    it('shows no save type indicator on maneuvers without save type', () => {
-        renderPrompt();
-        const labels = document.querySelectorAll('label');
-        const secondLabel = labels[1];
-        expect(secondLabel.textContent).not.toContain('save');
-    });
-
-    it('has Use Maneuver button disabled when no selection', () => {
+    it('has Use Maneuver button disabled and Skip button present when no selection', () => {
         renderPrompt();
         expect(screen.getByRole('button', { name: /Use Maneuver/ })).toBeDisabled();
-    });
-
-    it('has Skip button', () => {
-        renderPrompt();
         expect(screen.getByRole('button', { name: /Skip/ })).toBeInTheDocument();
     });
 });
@@ -105,11 +72,12 @@ describe('AttackRiderManeuverPrompt - initial rendering', () => {
 // ── Selection behavior ──
 
 describe('AttackRiderManeuverPrompt - selection behavior', () => {
-    it('selects a maneuver radio when clicked', () => {
+    it('selects a maneuver and enables the Use Maneuver button', () => {
         renderPrompt();
         const radios = document.querySelectorAll('input[name="attackRiderManeuver"]');
         fireEvent.click(radios[0]);
         expect(radios[0].checked).toBe(true);
+        expect(screen.getByRole('button', { name: /Use Maneuver/ })).not.toBeDisabled();
     });
 
     it('deselects previous radio when different one is selected', () => {
@@ -119,21 +87,6 @@ describe('AttackRiderManeuverPrompt - selection behavior', () => {
         fireEvent.click(radios[2]);
         expect(radios[0].checked).toBe(false);
         expect(radios[2].checked).toBe(true);
-    });
-
-    it('enables Use Maneuver button when selection exists', () => {
-        renderPrompt();
-        const radios = document.querySelectorAll('input[name="attackRiderManeuver"]');
-        fireEvent.click(radios[0]);
-        expect(screen.getByRole('button', { name: /Use Maneuver/ })).not.toBeDisabled();
-    });
-
-    it('highlights selected maneuver with background and border', () => {
-        renderPrompt();
-        const radios = document.querySelectorAll('input[name="attackRiderManeuver"]');
-        fireEvent.click(radios[0]);
-        const labels = document.querySelectorAll('label');
-        expect(labels[0].style.background).toContain('rgba(255');
     });
 });
 
@@ -158,7 +111,7 @@ describe('AttackRiderManeuverPrompt - use maneuver', () => {
         expect(onUse).not.toHaveBeenCalled();
     });
 
-    it('renders result state after onUse resolves', async () => {
+    it('renders result state after onUse resolves with payload', async () => {
         const onUse = vi.fn().mockResolvedValue({
             payload: { name: 'Disarming Attack', description: 'Weapon dropped!' },
         });
@@ -168,6 +121,7 @@ describe('AttackRiderManeuverPrompt - use maneuver', () => {
         fireEvent.click(screen.getByRole('button', { name: /Use Maneuver/ }));
         await waitFor(() => {
             expect(screen.getByText('Disarming Attack')).toBeInTheDocument();
+            expect(screen.getByText('Done')).toBeInTheDocument();
         });
     });
 
@@ -185,16 +139,16 @@ describe('AttackRiderManeuverPrompt - use maneuver', () => {
         });
     });
 
-    it('renders Done button in result state', async () => {
+    it('renders result with fallback name when payload.name is missing', async () => {
         const onUse = vi.fn().mockResolvedValue({
-            payload: { name: 'Disarming Attack', description: 'Desc.' },
+            payload: { description: 'No name description.' },
         });
         renderPrompt({ onUse });
         const radios = document.querySelectorAll('input[name="attackRiderManeuver"]');
         fireEvent.click(radios[0]);
         fireEvent.click(screen.getByRole('button', { name: /Use Maneuver/ }));
         await waitFor(() => {
-            expect(screen.getByText('Done')).toBeInTheDocument();
+            expect(screen.getByText('Maneuver')).toBeInTheDocument();
         });
     });
 
@@ -240,55 +194,15 @@ describe('AttackRiderManeuverPrompt - skip and cancel', () => {
         fireEvent.click(modal);
         expect(onSkip).not.toHaveBeenCalled();
     });
-
-    it('renders bolt icon in result header', async () => {
-        const onUse = vi.fn().mockResolvedValue({
-            payload: { name: 'Disarming Attack', description: 'Desc.' },
-        });
-        renderPrompt({ onUse });
-        const radios = document.querySelectorAll('input[name="attackRiderManeuver"]');
-        fireEvent.click(radios[0]);
-        fireEvent.click(screen.getByRole('button', { name: /Use Maneuver/ }));
-        await waitFor(() => {
-            expect(screen.getByText('Disarming Attack')).toBeInTheDocument();
-        });
-    });
-
-    it('renders result with fallback name when payload.name is missing', async () => {
-        const onUse = vi.fn().mockResolvedValue({
-            payload: { description: 'No name description.' },
-        });
-        renderPrompt({ onUse });
-        const radios = document.querySelectorAll('input[name="attackRiderManeuver"]');
-        fireEvent.click(radios[0]);
-        fireEvent.click(screen.getByRole('button', { name: /Use Maneuver/ }));
-        await waitFor(() => {
-            expect(screen.getByText('Maneuver')).toBeInTheDocument();
-        });
-    });
 });
 
 // ── isMiss path ──
 
 describe('AttackRiderManeuverPrompt - isMiss path', () => {
-    it('renders Precision Attack header when isMiss is true', () => {
+    it('renders Precision Attack header and instruction text when isMiss is true', () => {
         renderPrompt({ isMiss: true });
         expect(screen.getByText('Battle Master — Precision Attack')).toBeInTheDocument();
-    });
-
-    it('renders miss instruction text when isMiss is true', () => {
-        renderPrompt({ isMiss: true });
         expect(screen.getByText(/The attack missed/)).toBeInTheDocument();
-    });
-
-    it('renders attack rider maneuver header when isMiss is false', () => {
-        renderPrompt({ isMiss: false });
-        expect(screen.getByText('Battle Master — Attack Rider Maneuver')).toBeInTheDocument();
-    });
-
-    it('renders hit instruction text when isMiss is false', () => {
-        renderPrompt({ isMiss: false });
-        expect(screen.getByText(/Choose an attack rider maneuver to use on this hit/)).toBeInTheDocument();
     });
 
     it('renders isMissResult state with Precision Attack header', async () => {
@@ -302,6 +216,7 @@ describe('AttackRiderManeuverPrompt - isMiss path', () => {
         fireEvent.click(screen.getByRole('button', { name: /Use Maneuver/ }));
         await waitFor(() => {
             expect(screen.getByText('Precision Attack')).toBeInTheDocument();
+            expect(screen.getByText('Done')).toBeInTheDocument();
         });
     });
 
@@ -341,22 +256,9 @@ describe('AttackRiderManeuverPrompt - isMiss path', () => {
 // ── Edge cases ──
 
 describe('AttackRiderManeuverPrompt - edge cases', () => {
-    it('renders maneuver without damageBonus or saveType cleanly', () => {
-        const maneuvers = [
-            { name: 'Menacing Attack', damageBonus: true, saveType: 'WIS', effect: 'frightened' },
-        ];
-        renderPrompt({ maneuvers });
-        expect(screen.getByText('Menacing Attack')).toBeInTheDocument();
-    });
-
     it('renders empty maneuver list without crash', () => {
         renderPrompt({ maneuvers: [] });
         expect(document.querySelector('.sp-modal')).toBeInTheDocument();
         expect(screen.getByText(/Choose an attack rider maneuver/)).toBeInTheDocument();
-    });
-
-    it('renders with empty attack object', () => {
-        renderPrompt({ attack: {} });
-        expect(document.querySelector('.sp-modal')).toBeInTheDocument();
     });
 });

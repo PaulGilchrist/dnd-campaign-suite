@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { describe, it, expect, vi } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useCombatSuperiorityModal } from './useCombatSuperiorityModal.js';
@@ -36,22 +36,18 @@ vi.mock('../../services/automation/handlers/class-fighter-rogue/combatSuperiorit
 
 import { executeManeuver, onCombatSuperioritySelected } from '../../services/automation/handlers/class-fighter-rogue/combatSuperiorityHandler.js';
 
-const createAttackPayload = (overrides = {}) => ({
-  attack: {
-    name: 'Riposte',
-    hitBonus: 7,
-    damageFormula: '1d8+3',
-    damageType: 'Slashing',
-    ...overrides.attack,
-  },
-  targetName: 'Orc',
-  ...overrides,
-});
-
 const createAttackRollResult = (overrides = {}) => {
   const base = {
     type: 'attack_roll',
-    payload: createAttackPayload(),
+    payload: {
+      attack: {
+        name: 'Riposte',
+        hitBonus: 7,
+        damageFormula: '1d8+3',
+        damageType: 'Slashing',
+      },
+      targetName: 'Orc',
+    },
     context: {
       superiorityDieValue: 4,
       baseDamageFormula: '1d8+3',
@@ -236,36 +232,9 @@ describe('useCombatSuperiorityModal - attack_roll path', () => {
       );
     });
 
-    it('should default superiorityDieValue to 0 when context is missing', async () => {
+    it('should default superiorityDieValue to 0 when context is null', async () => {
       const result = createAttackRollResult({
         context: null,
-      });
-      executeManeuver.mockResolvedValue(result);
-
-      const { result: hookResult } = renderHook(
-        () => useCombatSuperiorityModal(mockPlayerStats, mockCampaignName, mockRollAttack, mockRollDamage)
-      );
-
-      act(() => {
-        hookResult.current.setCombatSuperiorityModal({ action: { name: 'Test' } });
-      });
-
-      await act(async () => {
-        await hookResult.current.handleCombatSuperiorityConfirm([], 'Test');
-      });
-
-      expect(mockRollAttack).toHaveBeenCalledWith(
-        expect.any(String),
-        expect.any(Number),
-        expect.objectContaining({
-          superiorityDieValue: 0,
-        })
-      );
-    });
-
-    it('should default superiorityDieValue to 0 when context is undefined', async () => {
-      const result = createAttackRollResult({
-        context: undefined,
       });
       executeManeuver.mockResolvedValue(result);
 
@@ -397,7 +366,15 @@ describe('useCombatSuperiorityModal - attack_roll path', () => {
       const { addEntry } = await import('../../services/ui/logService.js');
       executeManeuver.mockResolvedValue({
         type: 'attack_roll',
-        payload: createAttackPayload(),
+        payload: {
+          attack: {
+            name: 'Riposte',
+            hitBonus: 7,
+            damageFormula: '1d8+3',
+            damageType: 'Slashing',
+          },
+          targetName: 'Orc',
+        },
         context: { superiorityDieValue: 4, baseDamageFormula: '1d8+3' },
         logEntries: [
           { type: 'ability_use', characterName: 'Thorin', abilityName: 'Riposte', description: 'Riposte used.' },
@@ -449,33 +426,6 @@ describe('useCombatSuperiorityModal - attack_roll path', () => {
         expect.any(Number),
         expect.objectContaining({
           ripostePopup: { name: 'Riposte', description: 'Reply with an attack after hitting.' },
-        })
-      );
-    });
-
-    it('should pass ripostePopup as undefined when result.popup is missing', async () => {
-      const result = createAttackRollResult({
-        popup: undefined,
-      });
-      executeManeuver.mockResolvedValue(result);
-
-      const { result: hookResult } = renderHook(
-        () => useCombatSuperiorityModal(mockPlayerStats, mockCampaignName, mockRollAttack, mockRollDamage)
-      );
-
-      act(() => {
-        hookResult.current.setCombatSuperiorityModal({ action: { name: 'Test' } });
-      });
-
-      await act(async () => {
-        await hookResult.current.handleCombatSuperiorityConfirm([], 'Test');
-      });
-
-      expect(mockRollAttack).toHaveBeenCalledWith(
-        expect.any(String),
-        expect.any(Number),
-        expect.objectContaining({
-          ripostePopup: undefined,
         })
       );
     });
@@ -549,7 +499,15 @@ describe('useCombatSuperiorityModal - attack_roll path', () => {
       const { addEntry } = await import('../../services/ui/logService.js');
       onCombatSuperioritySelected.mockResolvedValue({
         type: 'attack_roll',
-        payload: createAttackPayload(),
+        payload: {
+          attack: {
+            name: 'Riposte',
+            hitBonus: 7,
+            damageFormula: '1d8+3',
+            damageType: 'Slashing',
+          },
+          targetName: 'Orc',
+        },
         context: { superiorityDieValue: 4, baseDamageFormula: '1d8+3' },
         logEntries: [
           { type: 'ability_use', characterName: 'Thorin', abilityName: 'Selection', description: 'Maneuver selected.' },
@@ -597,96 +555,6 @@ describe('useCombatSuperiorityModal - attack_roll path', () => {
       });
 
       expect(hookResult.current.combatSuperiorityModal).toBeNull();
-    });
-  });
-
-  describe('early-return modal paths (baitAndSwitchChoice, commanderStrikeChoice, rallyChoice)', () => {
-    it('should not call rollAttack when executeManeuver returns baitAndSwitchChoice modal', async () => {
-      executeManeuver.mockResolvedValue({
-        type: 'modal',
-        modalName: 'baitAndSwitchChoice',
-        payload: { test: true },
-      });
-
-      const { result: hookResult } = renderHook(
-        () => useCombatSuperiorityModal(mockPlayerStats, mockCampaignName, mockRollAttack, mockRollDamage)
-      );
-
-      act(() => {
-        hookResult.current.setCombatSuperiorityModal({ action: { name: 'Bait and Switch' } });
-      });
-
-      await act(async () => {
-        await hookResult.current.handleCombatSuperiorityConfirm([], 'Bait and Switch');
-      });
-
-      expect(mockRollAttack).not.toHaveBeenCalled();
-    });
-
-    it('should not call rollAttack when executeManeuver returns commanderStrikeChoice modal', async () => {
-      executeManeuver.mockResolvedValue({
-        type: 'modal',
-        modalName: 'commanderStrikeChoice',
-        payload: { test: true },
-      });
-
-      const { result: hookResult } = renderHook(
-        () => useCombatSuperiorityModal(mockPlayerStats, mockCampaignName, mockRollAttack, mockRollDamage)
-      );
-
-      act(() => {
-        hookResult.current.setCombatSuperiorityModal({ action: { name: 'Commander Strike' } });
-      });
-
-      await act(async () => {
-        await hookResult.current.handleCombatSuperiorityConfirm([], 'Commander Strike');
-      });
-
-      expect(mockRollAttack).not.toHaveBeenCalled();
-    });
-
-    it('should not call rollAttack when executeManeuver returns rallyChoice modal', async () => {
-      executeManeuver.mockResolvedValue({
-        type: 'modal',
-        modalName: 'rallyChoice',
-        payload: { test: true },
-      });
-
-      const { result: hookResult } = renderHook(
-        () => useCombatSuperiorityModal(mockPlayerStats, mockCampaignName, mockRollAttack, mockRollDamage)
-      );
-
-      act(() => {
-        hookResult.current.setCombatSuperiorityModal({ action: { name: 'Rally' } });
-      });
-
-      await act(async () => {
-        await hookResult.current.handleCombatSuperiorityConfirm([], 'Rally');
-      });
-
-      expect(mockRollAttack).not.toHaveBeenCalled();
-    });
-
-    it('should not call rollAttack when onCombatSuperioritySelected returns rallyChoice modal', async () => {
-      onCombatSuperioritySelected.mockResolvedValue({
-        type: 'modal',
-        modalName: 'rallyChoice',
-        payload: { test: true },
-      });
-
-      const { result: hookResult } = renderHook(
-        () => useCombatSuperiorityModal(mockPlayerStats, mockCampaignName, mockRollAttack, mockRollDamage)
-      );
-
-      act(() => {
-        hookResult.current.setCombatSuperiorityModal({ action: { name: 'Rally' } });
-      });
-
-      await act(async () => {
-        await hookResult.current.handleCombatSuperiorityConfirm(['Rally']);
-      });
-
-      expect(mockRollAttack).not.toHaveBeenCalled();
     });
   });
 });

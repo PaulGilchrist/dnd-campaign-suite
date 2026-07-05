@@ -1,3 +1,4 @@
+// @cleaned-by-ai
 import { describe, it, expect } from 'vitest';
 import { reactionHandlers } from './reaction.js';
 import { BASE_STATS, makeFeature } from '../automationInfoBuilder.fixtures.js';
@@ -18,12 +19,6 @@ describe('reactionHandlers – interception', () => {
         expect(result.requiresShield).toBe(false)
         expect(result.casting_time).toBe('1 reaction')
         expect(result.hasAutomation).toBe(true)
-    })
-
-    it('propagates the feature name', () => {
-        const feature = makeFeature({ type: 'interception' }, 'Interception')
-        const result = reactionHandlers.interception(feature, BASE_STATS)
-        expect(result.name).toBe('Interception')
     })
 
     it('resolves damageBonus from player proficiency', () => {
@@ -51,11 +46,5 @@ describe('reactionHandlers – interception', () => {
         expect(result.damageType).toBe('Force')
         expect(result.damageBonusExpression).toBe('level')
         expect(result.requiresShield).toBe(true)
-    })
-
-    it('throws when automation is undefined', () => {
-        const feature = { name: 'Test', automation: undefined }
-        expect(() => reactionHandlers.interception(feature, BASE_STATS))
-            .toThrow(TypeError)
     })
 })

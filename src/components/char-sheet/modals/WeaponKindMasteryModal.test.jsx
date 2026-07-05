@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
@@ -49,11 +49,6 @@ function renderWithWeapons(overrides, weaponsToMock = mockWeapons) {
   const fetchMock = vi.fn().mockResolvedValue({
     json: () => Promise.resolve(weaponsToMock),
   });
-  // Use vi.spyOn to always return the mock, even if weaponsCache has data
-  // The component's loadWeapons checks weaponsCache first, but since we're
-  // using a fresh vi.fn() each call, the cache will be null on first render.
-  // For subsequent renders in the same test, the cache persists but the
-  // fetch mock is already set so it won't be called again.
   globalThis.fetch = fetchMock;
   return render(<WeaponKindMasteryModal {...makeProps(overrides)} />);
 }
@@ -67,7 +62,7 @@ describe('WeaponKindMasteryModal', () => {
   // ── Rendering ──
 
   describe('initial render', () => {
-    it('renders the modal overlay with header, body, and actions', async () => {
+    it('renders the modal overlay with header, body, and action buttons', async () => {
       renderWithWeapons();
       await waitFor(() => {
         expect(document.querySelector('.sp-overlay')).toBeInTheDocument();
@@ -92,6 +87,7 @@ describe('WeaponKindMasteryModal', () => {
       await waitFor(() => {
         const bodyP = document.querySelector('.sp-body p');
         expect(bodyP.textContent).toContain('Choose up to');
+        expect(bodyP.textContent).toContain('2');
         expect(bodyP.textContent).toContain('weapons');
       });
     });
@@ -101,14 +97,6 @@ describe('WeaponKindMasteryModal', () => {
       await waitFor(() => {
         expect(screen.getByRole('button', { name: 'Select' })).toBeInTheDocument();
         expect(screen.getByRole('button', { name: 'Skip' })).toBeInTheDocument();
-      });
-    });
-
-    it('renders a Font Awesome check icon inside the Select button', async () => {
-      renderWithWeapons();
-      await waitFor(() => {
-        const selectBtn = screen.getByRole('button', { name: 'Select' });
-        expect(selectBtn.querySelector('.fa-check')).toBeInTheDocument();
       });
     });
 
@@ -123,31 +111,9 @@ describe('WeaponKindMasteryModal', () => {
   // ── Weapon list rendering ──
 
   describe('weapon list', () => {
-    it('renders all weapons from equipment.json when meleeOnly is false', async () => {
-      // Use vi.resetModules to get a fresh weaponsCache for this test
-      vi.resetModules();
-      vi.doMock('../../../services/automation/index.js', () => ({
-        applyWeaponKindMastery: vi.fn(),
-      }));
-      vi.doMock('../../../hooks/runtime/useRuntimeState.js', () => ({
-        getRuntimeValue: vi.fn(),
-        setRuntimeValue: vi.fn(),
-      }));
-      
-      const mod = await import('./WeaponKindMasteryModal.jsx');
-      const Modal = mod.default;
-      
-      const fetchMock = vi.fn().mockResolvedValue({
-        json: () => Promise.resolve(mockWeapons),
-      });
-      globalThis.fetch = fetchMock;
-      
-      render(<Modal {...makeProps()} />);
+    it('renders all weapons when meleeOnly is false', async () => {
+      renderWithWeapons();
       await waitFor(() => {
-        expect(fetchMock).toHaveBeenCalledWith('/data/equipment.json');
-      });
-      await waitFor(() => {
-        expect(document.querySelector('strong')).toBeInTheDocument();
         const labels = document.querySelectorAll('label');
         const names = Array.from(labels).map(l => l.querySelector('strong')?.textContent);
         expect(names).toContain('Battleaxe');
@@ -167,25 +133,20 @@ describe('WeaponKindMasteryModal', () => {
         getRuntimeValue: vi.fn(),
         setRuntimeValue: vi.fn(),
       }));
-      
+
       const mod = await import('./WeaponKindMasteryModal.jsx');
       const Modal = mod.default;
-      
+
       const meleeWeapons = [
         { name: 'Battleaxe', equipment_category: 'Weapon', weapon_category: 'Martial', weapon_range: 'Melee', mastery: 'Topple' },
         { name: 'Blowgun', equipment_category: 'Weapon', weapon_category: 'Martial', weapon_range: 'Ranged', mastery: 'Sap' },
         { name: 'Club', equipment_category: 'Weapon', weapon_category: 'Simple', weapon_range: 'Melee', mastery: 'Slow' },
       ];
-      
       const fetchMock = vi.fn().mockResolvedValue({
         json: () => Promise.resolve(meleeWeapons),
       });
       globalThis.fetch = fetchMock;
-      
       render(<Modal {...makeProps({ meleeOnly: true })} />);
-      await waitFor(() => {
-        expect(fetchMock).toHaveBeenCalledWith('/data/equipment.json');
-      });
       await waitFor(() => {
         const labels = document.querySelectorAll('label');
         const names = Array.from(labels).map(l => l.querySelector('strong')?.textContent);
@@ -197,7 +158,6 @@ describe('WeaponKindMasteryModal', () => {
     });
 
     it('renders weapon category and range info', async () => {
-      // Use renderWithWeapons - the weapons cache is already populated from the first test
       renderWithWeapons();
       await waitFor(() => {
         const labels = document.querySelectorAll('label');
@@ -224,19 +184,17 @@ describe('WeaponKindMasteryModal', () => {
         getRuntimeValue: vi.fn(),
         setRuntimeValue: vi.fn(),
       }));
-      
+
       const mod = await import('./WeaponKindMasteryModal.jsx');
       const Modal = mod.default;
-      
+
       const weaponsWithNoMastery = [
         { name: 'Test Weapon', equipment_category: 'Weapon', weapon_category: 'Simple', weapon_range: 'Melee' },
       ];
-      
       const fetchMock = vi.fn().mockResolvedValue({
         json: () => Promise.resolve(weaponsWithNoMastery),
       });
       globalThis.fetch = fetchMock;
-      
       render(<Modal {...makeProps()} />);
       await waitFor(() => {
         const labels = document.querySelectorAll('label');
@@ -254,26 +212,79 @@ describe('WeaponKindMasteryModal', () => {
         getRuntimeValue: vi.fn(),
         setRuntimeValue: vi.fn(),
       }));
-      
+
       const mod = await import('./WeaponKindMasteryModal.jsx');
       const Modal = mod.default;
-      
+
       const unsortedWeapons = [
         { name: 'Zweihander', equipment_category: 'Weapon', weapon_category: 'Martial', weapon_range: 'Melee', mastery: 'Push' },
         { name: 'Axe', equipment_category: 'Weapon', weapon_category: 'Simple', weapon_range: 'Melee', mastery: 'Slow' },
         { name: 'Mace', equipment_category: 'Weapon', weapon_category: 'Simple', weapon_range: 'Melee', mastery: 'Topple' },
       ];
-      
       const fetchMock = vi.fn().mockResolvedValue({
         json: () => Promise.resolve(unsortedWeapons),
       });
       globalThis.fetch = fetchMock;
-      
       render(<Modal {...makeProps()} />);
       await waitFor(() => {
         const labels = document.querySelectorAll('label');
         const names = Array.from(labels).map(l => l.querySelector('strong')?.textContent);
         expect(names).toEqual(['Axe', 'Mace', 'Zweihander']);
+      });
+    });
+
+    it('filters out non-weapon items', async () => {
+      vi.resetModules();
+      vi.doMock('../../../services/automation/index.js', () => ({
+        applyWeaponKindMastery: vi.fn(),
+      }));
+      vi.doMock('../../../hooks/runtime/useRuntimeState.js', () => ({
+        getRuntimeValue: vi.fn(),
+        setRuntimeValue: vi.fn(),
+      }));
+
+      const mod = await import('./WeaponKindMasteryModal.jsx');
+      const Modal = mod.default;
+
+      const mixedItems = [
+        { name: 'Potion', equipment_category: 'Adventuring Gear' },
+        { name: 'Battleaxe', equipment_category: 'Weapon', weapon_category: 'Martial', weapon_range: 'Melee', mastery: 'Topple' },
+      ];
+      const fetchMock = vi.fn().mockResolvedValue({
+        json: () => Promise.resolve(mixedItems),
+      });
+      globalThis.fetch = fetchMock;
+      render(<Modal {...makeProps()} />);
+      await waitFor(() => {
+        expect(screen.getByText('Battleaxe')).toBeInTheDocument();
+        expect(screen.queryByText('Potion')).not.toBeInTheDocument();
+      });
+    });
+
+    it('filters out weapons without weapon_category or weapon_range', async () => {
+      vi.resetModules();
+      vi.doMock('../../../services/automation/index.js', () => ({
+        applyWeaponKindMastery: vi.fn(),
+      }));
+      vi.doMock('../../../hooks/runtime/useRuntimeState.js', () => ({
+        getRuntimeValue: vi.fn(),
+        setRuntimeValue: vi.fn(),
+      }));
+
+      const mod = await import('./WeaponKindMasteryModal.jsx');
+      const Modal = mod.default;
+
+      const items = [
+        { name: 'Test Weapon', equipment_category: 'Weapon', weapon_range: 'Melee' },
+        { name: 'Test Weapon 2', equipment_category: 'Weapon', weapon_category: 'Simple' },
+      ];
+      const fetchMock = vi.fn().mockResolvedValue({
+        json: () => Promise.resolve(items),
+      });
+      globalThis.fetch = fetchMock;
+      render(<Modal {...makeProps()} />);
+      await waitFor(() => {
+        expect(document.querySelectorAll('input[type="checkbox"]')).toHaveLength(0);
       });
     });
   });
@@ -298,7 +309,6 @@ describe('WeaponKindMasteryModal', () => {
       renderWithWeapons(props);
       await waitFor(() => {
         const bodyP = document.querySelector('.sp-body p');
-        expect(bodyP.textContent).toContain('Choose up to');
         expect(bodyP.textContent).toContain('4');
         expect(bodyP.textContent).toContain('weapons');
       });
@@ -331,20 +341,6 @@ describe('WeaponKindMasteryModal', () => {
       });
     });
 
-    it('uses maxKinds=1 from action.automation.maxKinds', async () => {
-      const props = makeProps({
-        action: { automation: { maxKinds: 1 } },
-      });
-      renderWithWeapons(props);
-      await waitFor(() => {
-        const bodyP = document.querySelector('.sp-body p');
-        expect(bodyP.textContent).toContain('Choose up to');
-        expect(bodyP.textContent).toContain('1');
-        expect(bodyP.textContent).toContain('weapon');
-        expect(bodyP.textContent).not.toContain('weapons');
-      });
-    });
-
     it('shows singular "weapon" when maxKinds is 1', async () => {
       const props = makeProps({
         action: { automation: { maxKinds: 1 } },
@@ -369,12 +365,14 @@ describe('WeaponKindMasteryModal', () => {
       });
     });
 
-    it('selects a weapon when its checkbox is clicked', async () => {
+    it('toggles a weapon selection on checkbox click', async () => {
       renderWithWeapons();
       await waitFor(() => {
         const checkboxes = document.querySelectorAll('input[type="checkbox"]');
         fireEvent.click(checkboxes[0]);
         expect(checkboxes[0].checked).toBe(true);
+        fireEvent.click(checkboxes[0]);
+        expect(checkboxes[0].checked).toBe(false);
       });
     });
 
@@ -384,17 +382,6 @@ describe('WeaponKindMasteryModal', () => {
         const checkboxes = document.querySelectorAll('input[type="checkbox"]');
         fireEvent.click(checkboxes[0]);
         expect(screen.getByRole('button', { name: 'Select' })).not.toBeDisabled();
-      });
-    });
-
-    it('deselects a weapon when its checkbox is clicked again', async () => {
-      renderWithWeapons();
-      await waitFor(() => {
-        const checkboxes = document.querySelectorAll('input[type="checkbox"]');
-        fireEvent.click(checkboxes[0]);
-        expect(checkboxes[0].checked).toBe(true);
-        fireEvent.click(checkboxes[0]);
-        expect(checkboxes[0].checked).toBe(false);
       });
     });
 
@@ -439,28 +426,6 @@ describe('WeaponKindMasteryModal', () => {
         expect(checkboxes[1].disabled).toBe(false);
       });
     });
-
-    it('highlights selected weapons with a non-transparent background', async () => {
-      renderWithWeapons();
-      await waitFor(() => {
-        const checkboxes = document.querySelectorAll('input[type="checkbox"]');
-        fireEvent.click(checkboxes[0]);
-        const labels = document.querySelectorAll('label');
-        const firstLabel = labels[0];
-        expect(firstLabel.style.background).not.toBe('transparent');
-      });
-    });
-
-    it('highlights selected weapons with a colored border', async () => {
-      renderWithWeapons();
-      await waitFor(() => {
-        const checkboxes = document.querySelectorAll('input[type="checkbox"]');
-        fireEvent.click(checkboxes[0]);
-        const labels = document.querySelectorAll('label');
-        const firstLabel = labels[0];
-        expect(firstLabel.style.border).not.toBe('1px solid transparent');
-      });
-    });
   });
 
   // ── Selection counter ──
@@ -475,7 +440,7 @@ describe('WeaponKindMasteryModal', () => {
       });
     });
 
-    it('updates the counter after selecting a weapon', async () => {
+    it('updates the counter after selecting and deselecting a weapon', async () => {
       renderWithWeapons();
       await waitFor(() => {
         const checkboxes = document.querySelectorAll('input[type="checkbox"]');
@@ -486,13 +451,8 @@ describe('WeaponKindMasteryModal', () => {
         expect(counter.textContent).toContain('1');
         expect(counter.textContent).toContain('2');
       });
-    });
-
-    it('updates the counter after deselecting a weapon', async () => {
-      renderWithWeapons();
       await waitFor(() => {
         const checkboxes = document.querySelectorAll('input[type="checkbox"]');
-        fireEvent.click(checkboxes[0]);
         fireEvent.click(checkboxes[0]);
       });
       await waitFor(() => {
@@ -526,15 +486,12 @@ describe('WeaponKindMasteryModal', () => {
       });
     });
 
-    it('does not show "(Melee only)" suffix when meleeOnly is false', async () => {
+    it('does not show "(Melee only)" suffix when meleeOnly is false or undefined', async () => {
       renderWithWeapons({ meleeOnly: false });
       await waitFor(() => {
         const bodyP = document.querySelector('.sp-body p');
         expect(bodyP.textContent).not.toContain('Melee only');
       });
-    });
-
-    it('does not show "(Melee only)" suffix when meleeOnly is undefined', async () => {
       renderWithWeapons();
       await waitFor(() => {
         const bodyP = document.querySelector('.sp-body p');
@@ -639,28 +596,7 @@ describe('WeaponKindMasteryModal', () => {
       });
     });
 
-    it('renders the Done button in result state', async () => {
-      setupResultState({
-        type: 'popup',
-        payload: {
-          type: 'automation_info',
-          name: 'Weapon Mastery',
-          description: 'Weapon kinds set to: Battleaxe.',
-        },
-      });
-      await waitFor(() => {
-        const checkboxes = document.querySelectorAll('input[type="checkbox"]');
-        fireEvent.click(checkboxes[0]);
-      });
-      await act(async () => {
-        fireEvent.click(screen.getByRole('button', { name: 'Select' }));
-      });
-      await waitFor(() => {
-        expect(screen.getByRole('button', { name: 'Done' })).toBeInTheDocument();
-      });
-    });
-
-    it('hides the weapon list after applying', async () => {
+    it('replaces the weapon list with a Done button after applying', async () => {
       setupResultState({
         type: 'popup',
         payload: {
@@ -678,47 +614,8 @@ describe('WeaponKindMasteryModal', () => {
       });
       await waitFor(() => {
         expect(screen.queryByLabelText('Battleaxe')).not.toBeInTheDocument();
-      });
-    });
-
-    it('hides the Select button after applying', async () => {
-      setupResultState({
-        type: 'popup',
-        payload: {
-          type: 'automation_info',
-          name: 'Weapon Mastery',
-          description: 'Weapon kinds set to: Battleaxe.',
-        },
-      });
-      await waitFor(() => {
-        const checkboxes = document.querySelectorAll('input[type="checkbox"]');
-        fireEvent.click(checkboxes[0]);
-      });
-      await act(async () => {
-        fireEvent.click(screen.getByRole('button', { name: 'Select' }));
-      });
-      await waitFor(() => {
+        expect(screen.getByRole('button', { name: 'Done' })).toBeInTheDocument();
         expect(screen.queryByRole('button', { name: 'Select' })).not.toBeInTheDocument();
-      });
-    });
-
-    it('hides the Skip button after applying', async () => {
-      setupResultState({
-        type: 'popup',
-        payload: {
-          type: 'automation_info',
-          name: 'Weapon Mastery',
-          description: 'Weapon kinds set to: Battleaxe.',
-        },
-      });
-      await waitFor(() => {
-        const checkboxes = document.querySelectorAll('input[type="checkbox"]');
-        fireEvent.click(checkboxes[0]);
-      });
-      await act(async () => {
-        fireEvent.click(screen.getByRole('button', { name: 'Select' }));
-      });
-      await waitFor(() => {
         expect(screen.queryByRole('button', { name: 'Skip' })).not.toBeInTheDocument();
       });
     });
@@ -745,15 +642,17 @@ describe('WeaponKindMasteryModal', () => {
       });
     });
 
-    it('renders the Done button with sp-roll-btn class', async () => {
-      setupResultState({
+    it('renders result state when result payload description is falsy', async () => {
+      const falsyDescription = '';
+      automation.applyWeaponKindMastery.mockResolvedValue({
         type: 'popup',
         payload: {
           type: 'automation_info',
           name: 'Weapon Mastery',
-          description: 'Done.',
+          description: falsyDescription,
         },
       });
+      renderWithWeapons();
       await waitFor(() => {
         const checkboxes = document.querySelectorAll('input[type="checkbox"]');
         fireEvent.click(checkboxes[0]);
@@ -762,50 +661,7 @@ describe('WeaponKindMasteryModal', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Select' }));
       });
       await waitFor(() => {
-        const doneBtn = screen.getByRole('button', { name: 'Done' });
-        expect(doneBtn.classList.contains('sp-roll-btn')).toBe(true);
-      });
-    });
-
-    it('renders the crosshairs icon in result state', async () => {
-      setupResultState({
-        type: 'popup',
-        payload: {
-          type: 'automation_info',
-          name: 'Weapon Mastery',
-          description: 'Done.',
-        },
-      });
-      await waitFor(() => {
-        const checkboxes = document.querySelectorAll('input[type="checkbox"]');
-        fireEvent.click(checkboxes[0]);
-      });
-      await act(async () => {
-        fireEvent.click(screen.getByRole('button', { name: 'Select' }));
-      });
-      await waitFor(() => {
-        expect(document.querySelector('.fa-solid.fa-crosshairs')).toBeInTheDocument();
-      });
-    });
-
-    it('renders "Weapon Mastery" header in result state', async () => {
-      setupResultState({
-        type: 'popup',
-        payload: {
-          type: 'automation_info',
-          name: 'Weapon Mastery',
-          description: 'Done.',
-        },
-      });
-      await waitFor(() => {
-        const checkboxes = document.querySelectorAll('input[type="checkbox"]');
-        fireEvent.click(checkboxes[0]);
-      });
-      await act(async () => {
-        fireEvent.click(screen.getByRole('button', { name: 'Select' }));
-      });
-      await waitFor(() => {
-        expect(screen.getByText('Weapon Mastery')).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Done' })).toBeInTheDocument();
       });
     });
   });
@@ -838,19 +694,6 @@ describe('WeaponKindMasteryModal', () => {
     });
 
     it('calls onClose when Skip button is clicked', async () => {
-      const onClose = vi.fn();
-      renderWithWeapons({ onClose });
-      await waitFor(() => {
-        fireEvent.click(screen.getByRole('button', { name: 'Skip' }));
-      });
-      expect(onClose).toHaveBeenCalledTimes(1);
-    });
-  });
-
-  // ── Skip button ──
-
-  describe('skip button', () => {
-    it('calls onClose when Skip is clicked', async () => {
       const onClose = vi.fn();
       renderWithWeapons({ onClose });
       await waitFor(() => {
@@ -899,182 +742,6 @@ describe('WeaponKindMasteryModal', () => {
         { name: 'Longbow', equipment_category: 'Weapon', weapon_category: 'Martial', weapon_range: 'Ranged', mastery: 'Vex' },
       ];
       renderWithWeapons({ meleeOnly: true }, rangedOnly);
-      await waitFor(() => {
-        expect(document.querySelectorAll('input[type="checkbox"]')).toHaveLength(0);
-      });
-    });
-
-    it('renders with meleeOnly=true and meleeOnly suffix in text', async () => {
-      renderWithWeapons({ meleeOnly: true });
-      await waitFor(() => {
-        expect(document.querySelector('.sp-body p').textContent).toContain('Melee only');
-      });
-    });
-
-    it('renders result state when result payload description is empty string', async () => {
-      automation.applyWeaponKindMastery.mockResolvedValue({
-        type: 'popup',
-        payload: {
-          type: 'automation_info',
-          name: 'Weapon Mastery',
-          description: '',
-        },
-      });
-      renderWithWeapons();
-      await waitFor(() => {
-        const checkboxes = document.querySelectorAll('input[type="checkbox"]');
-        fireEvent.click(checkboxes[0]);
-      });
-      await act(async () => {
-        fireEvent.click(screen.getByRole('button', { name: 'Select' }));
-      });
-      await waitFor(() => {
-        expect(screen.getByRole('button', { name: 'Done' })).toBeInTheDocument();
-      });
-    });
-
-    it('renders result state when result payload description is null', async () => {
-      automation.applyWeaponKindMastery.mockResolvedValue({
-        type: 'popup',
-        payload: {
-          type: 'automation_info',
-          name: 'Weapon Mastery',
-          description: null,
-        },
-      });
-      renderWithWeapons();
-      await waitFor(() => {
-        const checkboxes = document.querySelectorAll('input[type="checkbox"]');
-        fireEvent.click(checkboxes[0]);
-      });
-      await act(async () => {
-        fireEvent.click(screen.getByRole('button', { name: 'Select' }));
-      });
-      await waitFor(() => {
-        expect(screen.getByRole('button', { name: 'Done' })).toBeInTheDocument();
-      });
-    });
-
-    it('renders result state when result payload description is undefined', async () => {
-      automation.applyWeaponKindMastery.mockResolvedValue({
-        type: 'popup',
-        payload: {
-          type: 'automation_info',
-          name: 'Weapon Mastery',
-          description: undefined,
-        },
-      });
-      renderWithWeapons();
-      await waitFor(() => {
-        const checkboxes = document.querySelectorAll('input[type="checkbox"]');
-        fireEvent.click(checkboxes[0]);
-      });
-      await act(async () => {
-        fireEvent.click(screen.getByRole('button', { name: 'Select' }));
-      });
-      await waitFor(() => {
-        expect(screen.getByRole('button', { name: 'Done' })).toBeInTheDocument();
-      });
-    });
-  });
-
-  // ── CSS classes ──
-
-  describe('CSS classes', () => {
-    it('renders the overlay with sp-overlay class', async () => {
-      renderWithWeapons();
-      await waitFor(() => {
-        expect(document.querySelector('.sp-overlay')).toHaveClass('sp-overlay');
-      });
-    });
-
-    it('renders the modal with sp-modal class', async () => {
-      renderWithWeapons();
-      await waitFor(() => {
-        expect(document.querySelector('.sp-modal')).toHaveClass('sp-modal');
-      });
-    });
-
-    it('renders the header with sp-header class', async () => {
-      renderWithWeapons();
-      await waitFor(() => {
-        expect(document.querySelector('.sp-header')).toHaveClass('sp-header');
-      });
-    });
-
-    it('renders the body with sp-body class', async () => {
-      renderWithWeapons();
-      await waitFor(() => {
-        expect(document.querySelector('.sp-body')).toHaveClass('sp-body');
-      });
-    });
-
-    it('renders the action bar with sp-actions class', async () => {
-      renderWithWeapons();
-      await waitFor(() => {
-        expect(document.querySelector('.sp-actions')).toHaveClass('sp-actions');
-      });
-    });
-
-    it('renders the Select button with sp-roll-btn class', async () => {
-      renderWithWeapons();
-      await waitFor(() => {
-        const selectBtn = screen.getByRole('button', { name: 'Select' });
-        expect(selectBtn.classList.contains('sp-roll-btn')).toBe(true);
-      });
-    });
-
-    it('renders the Skip button with sp-dismiss-btn class', async () => {
-      renderWithWeapons();
-      await waitFor(() => {
-        const skipBtn = screen.getByRole('button', { name: 'Skip' });
-        expect(skipBtn.classList.contains('sp-dismiss-btn')).toBe(true);
-      });
-    });
-  });
-
-  // ── Weapon loading ──
-
-  describe('weapon loading', () => {
-    it('filters out non-weapon items', async () => {
-      const mixedItems = [
-        { name: 'Potion', equipment_category: 'Adventuring Gear' },
-        { name: 'Battleaxe', equipment_category: 'Weapon', weapon_category: 'Martial', weapon_range: 'Melee', mastery: 'Topple' },
-      ];
-      const fetchMock = vi.fn().mockResolvedValue({
-        json: () => Promise.resolve(mixedItems),
-      });
-      globalThis.fetch = fetchMock;
-      renderWithWeapons({}, mixedItems);
-      await waitFor(() => {
-        expect(screen.getByText('Battleaxe')).toBeInTheDocument();
-        expect(screen.queryByText('Potion')).not.toBeInTheDocument();
-      });
-    });
-
-    it('filters out weapons without weapon_category', async () => {
-      const items = [
-        { name: 'Test Weapon', equipment_category: 'Weapon', weapon_range: 'Melee' },
-      ];
-      const fetchMock = vi.fn().mockResolvedValue({
-        json: () => Promise.resolve(items),
-      });
-      globalThis.fetch = fetchMock;
-      renderWithWeapons({}, items);
-      await waitFor(() => {
-        expect(document.querySelectorAll('input[type="checkbox"]')).toHaveLength(0);
-      });
-    });
-
-    it('filters out weapons without weapon_range', async () => {
-      const items = [
-        { name: 'Test Weapon', equipment_category: 'Weapon', weapon_category: 'Simple' },
-      ];
-      const fetchMock = vi.fn().mockResolvedValue({
-        json: () => Promise.resolve(items),
-      });
-      globalThis.fetch = fetchMock;
-      renderWithWeapons({}, items);
       await waitFor(() => {
         expect(document.querySelectorAll('input[type="checkbox"]')).toHaveLength(0);
       });

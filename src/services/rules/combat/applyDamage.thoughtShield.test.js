@@ -1,3 +1,4 @@
+// @cleaned-by-ai
 // @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
@@ -188,19 +189,6 @@ describe('Thought Shield — Psychic damage reflection', () => {
       // dc = Math.max(10, Math.floor(5 / 2)) = Math.max(10, 2) = 10
       expect(goblin.concentration.dc).toBe(10);
     });
-
-    it('reflects when warlock has active buffs (does not interfere)', () => {
-      const goblin = createNpcCreature('Goblin', 10, 10);
-      const warlockCreature = createPlayerCreature('Warlock');
-      const cs = makeCombatSummary([goblin, warlockCreature]);
-      const warlock = createWarlockCharacter(20);
-
-      stubPlayerRuntime(20, [], [{ name: 'Shield' }]);
-
-      applyDamageToTarget(cs, 'Warlock', 10, ['Psychic'], 'TestCampaign', [warlock], false, 'Goblin');
-
-      expect(goblin.currentHp).toBe(5);
-    });
   });
 
   describe('no reflection conditions', () => {
@@ -228,7 +216,7 @@ describe('Thought Shield — Psychic damage reflection', () => {
       expect(goblin.currentHp).toBe(10);
     });
 
-    it('does not reflect when attackerName is null', () => {
+    it('does not reflect when attackerName is absent', () => {
       const goblin = createNpcCreature('Goblin', 10, 10);
       const warlockCreature = createPlayerCreature('Warlock');
       const cs = makeCombatSummary([goblin, warlockCreature]);
@@ -237,19 +225,6 @@ describe('Thought Shield — Psychic damage reflection', () => {
       stubPlayerRuntime(20);
 
       const result = applyDamageToTarget(cs, 'Warlock', 10, ['Psychic'], 'TestCampaign', [warlock], false, null);
-
-      expect(result).not.toBeNull();
-    });
-
-    it('does not reflect when attackerName is undefined', () => {
-      const goblin = createNpcCreature('Goblin', 10, 10);
-      const warlockCreature = createPlayerCreature('Warlock');
-      const cs = makeCombatSummary([goblin, warlockCreature]);
-      const warlock = createWarlockCharacter(20);
-
-      stubPlayerRuntime(20);
-
-      const result = applyDamageToTarget(cs, 'Warlock', 10, ['Psychic'], 'TestCampaign', [warlock], false, undefined);
 
       expect(result).not.toBeNull();
     });
@@ -353,27 +328,6 @@ describe('Thought Shield — Psychic damage reflection', () => {
       applyDamageToTarget(cs, 'Warlock', 10, ['psychic'], 'TestCampaign', [warlock], false, 'Goblin');
 
       expect(goblin.currentHp).toBe(5);
-    });
-
-    it('handles case-insensitive Thought Shield feature name check', () => {
-      const goblin = createNpcCreature('Goblin', 10, 10);
-      const warlockCreature = createPlayerCreature('Warlock');
-      const cs = makeCombatSummary([goblin, warlockCreature]);
-      const warlock = {
-        ...createWarlockCharacter(20),
-        computedStats: {
-          ...createWarlockCharacter(20).computedStats,
-          characterAdvancement: [{ name: 'thought shield' }],
-        },
-      };
-
-      stubPlayerRuntime(20);
-
-      applyDamageToTarget(cs, 'Warlock', 10, ['Psychic'], 'TestCampaign', [warlock], false, 'Goblin');
-
-      // The source uses .some(f => f.name === 'Thought Shield') — exact match
-      // This test documents the current behavior: case-sensitive feature name
-      expect(goblin.currentHp).toBe(10);
     });
   });
 

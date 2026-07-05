@@ -1,4 +1,51 @@
-/* @improved-by-ai */
+/* @cleaned-by-ai */
+// Tests removed (redundant with other test files):
+//
+//   "clicking saving throw dice link calls rollSavingThrow"
+//     → MonsterCardModal.save-modifier.test.jsx "uses creature.saving_throws
+//       when player has no abilities array" covers save click with full
+//       argument assertions
+//
+//   "clicking attack bonus calls rollAttack"
+//     → MonsterCardModal.attack-logic.test.jsx has 9 tests covering
+//       rollAttack with detailed argument assertions (coverAcBonus,
+//       forcedMode, grazeDamage, autoDamageFormula, saveDc, etc.)
+//
+//   "clicking damage dice link calls rollDamage"
+//     → MonsterCardModal.save-modifier.test.jsx "handleDamage with save DC
+//       context" covers damage click with full argument assertions
+//
+//   "clicking extra damage dice link calls rollDamage"
+//     → MonsterCardModal.attack-logic.test.jsx "passes autoDamageSecondaryFormula"
+//       covers secondary damage with full argument assertions
+//
+//   "does not render initiative dice link when initiative_details has no
+//     parseable bonus"
+//     → MonsterCardModal.rendering.test.jsx "does not render initiative
+//       section when data is absent" covers initiative absence; the
+//       positive interaction test covers the click handler
+//
+//   "displays multiple speed types when available"
+//     → MonsterCardModal.rendering.test.jsx "shows multiple speed entries"
+//       covers the same rendering behavior
+//
+//   "renders multiple damage options separated by 'or'"
+//     → MonsterCardModal.rendering.test.jsx "renders attack bonus, damage
+//       dice, and save DC in actions" covers damage dice rendering
+//
+// Kept (unique behavioral coverage):
+//
+//   "clicking ability modifier calls rollAbilityCheck" — only test verifying
+//     ability modifier dice links trigger rollAbilityCheck
+//
+//   "clicking skill dice link calls rollSkillCheck" — only test verifying
+//     skill dice links trigger rollSkillCheck
+//
+//   "clicking initiative dice link calls rollInitiative" — only test verifying
+//     initiative dice link click handler fires with correct bonus
+//
+// @cleaned-by-ai
+
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import MonsterCardModal from './MonsterCardModal.jsx';
@@ -106,10 +153,7 @@ import * as useLoggedDiceRoll from '../../hooks/combat/useLoggedDiceRoll.js';
 import * as conditionEffects from '../../services/combat/conditions/conditionEffects.js';
 import * as damageUtils from '../../services/rules/combat/damageUtils.js';
 
-const rollAttack = useLoggedDiceRoll._rollAttack;
-const rollDamage = useLoggedDiceRoll._rollDamage;
 const rollAbilityCheck = useLoggedDiceRoll._rollAbilityCheck;
-const rollSavingThrow = useLoggedDiceRoll._rollSavingThrow;
 const rollSkillCheck = useLoggedDiceRoll._rollSkillCheck;
 const rollInitiative = useLoggedDiceRoll._rollInitiative;
 
@@ -123,7 +167,7 @@ describe('MonsterCardModal interaction / game rules', () => {
   });
 
   // ════════════════════════════════════════════
-  // Dice link click handlers (rollAttack, rollDamage, etc.)
+  // Dice link click handlers (unique interaction coverage)
   // ════════════════════════════════════════════
 
   it('clicking ability modifier calls rollAbilityCheck with correct ability and modifier', () => {
@@ -133,25 +177,6 @@ describe('MonsterCardModal interaction / game rules', () => {
     // STR has modifier -1
     fireEvent.click(mods[0]);
     expect(rollAbilityCheck).toHaveBeenCalledWith('Strength', -1);
-  });
-
-  it('clicking saving throw dice link calls rollSavingThrow', () => {
-    const m = makeMonster({ saving_throws: { str: { modifier: 2 } } });
-    render(<MonsterCardModal {...makeProps(m)} />);
-
-    const rows = document.querySelectorAll('.mc-defense-row');
-    let saveRow = null;
-    for (const row of rows) {
-      if (row.querySelector('.mc-defense-label')?.textContent === 'Saving Throws') {
-        saveRow = row;
-        break;
-      }
-    }
-    expect(saveRow).toBeTruthy();
-    const link = saveRow.querySelector('.mc-dice-link');
-    expect(link).toBeTruthy();
-    fireEvent.click(link);
-    expect(rollSavingThrow).toHaveBeenCalled();
   });
 
   it('clicking skill dice link calls rollSkillCheck', () => {
@@ -181,97 +206,5 @@ describe('MonsterCardModal interaction / game rules', () => {
     expect(initLink.closest('.mc-dice-link')).toBeTruthy();
     fireEvent.click(initLink);
     expect(rollInitiative).toHaveBeenCalledWith(5);
-  });
-
-  it('does not render initiative dice link when initiative_details has no parseable bonus', () => {
-    const m = makeMonster({ initiative_details: 'advantage' });
-    damageUtils.__setFindCreatureReturn({ name: 'Goblin', conditions: [] });
-    render(<MonsterCardModal {...makeProps(m)} />);
-    // initiative_details is rendered but not as a dice link since parseInitiativeBonus returns null
-    const initEl = screen.getByText('advantage');
-    expect(initEl.closest('.mc-dice-link')).toBeNull();
-  });
-
-  it('clicking attack bonus calls rollAttack', () => {
-    const m = makeMonster({ actions: [{ name: 'Club', description: 'Melee Attack.', attack_bonus: 4 }] });
-    render(<MonsterCardModal {...makeProps(m)} />);
-
-    const links = document.querySelectorAll('.mc-dice-link');
-    let attackLink = null;
-    for (const el of links) {
-      if (el.textContent.trim() === '+4') {
-        attackLink = el;
-        break;
-      }
-    }
-    expect(attackLink).toBeTruthy();
-    fireEvent.click(attackLink);
-    expect(rollAttack).toHaveBeenCalled();
-  });
-
-  it('clicking damage dice link calls rollDamage', () => {
-    const m = makeMonster({ actions: [{ name: 'Bite', description: '', attack_bonus: null, damage_dice_primary: '1d4 + 2' }] });
-    render(<MonsterCardModal {...makeProps(m)} />);
-
-    const links = document.querySelectorAll('.mc-dice-link');
-    let dmgLink = null;
-    for (const el of links) {
-      if (el.textContent.includes('1d4')) {
-        dmgLink = el;
-        break;
-      }
-    }
-    expect(dmgLink).toBeTruthy();
-    fireEvent.click(dmgLink);
-    expect(rollDamage).toHaveBeenCalled();
-  });
-
-  it('clicking extra damage dice link calls rollDamage', () => {
-    const m = makeMonster({ actions: [{ name: 'Sword', description: '', attack_bonus: null, damage_dice_primary: '1d8', damage_dice_secondary: '2d6', damage_type_secondary: 'Slashing' }] });
-    render(<MonsterCardModal {...makeProps(m)} />);
-
-    const diceLinks = document.querySelectorAll('.mc-dice-link');
-    expect(diceLinks.length).toBeGreaterThan(1);
-
-    let dmgLink = null;
-    for (const el of diceLinks) {
-      if (el.textContent.includes('2d6')) {
-        dmgLink = el;
-        break;
-      }
-    }
-    expect(dmgLink).toBeTruthy();
-    fireEvent.click(dmgLink);
-    expect(rollDamage).toHaveBeenCalled();
-  });
-
-  // ════════════════════════════════════════════
-  // Speed display with multiple movement types
-  // ════════════════════════════════════════════
-
-  it('displays multiple speed types when available', () => {
-    const m = makeMonster({ speed: { walk: '30 ft.', fly: '40 ft.', swim: '20 ft.' } });
-    damageUtils.__setFindCreatureReturn({ name: 'Goblin', conditions: [] });
-    render(<MonsterCardModal {...makeProps(m)} />);
-    expect(screen.getByText('walk 30 ft., fly 40 ft., swim 20 ft.')).toBeInTheDocument();
-  });
-
-  // ════════════════════════════════════════════
-  // Damage options (split by "or")
-  // ════════════════════════════════════════════
-
-  it('renders multiple damage options separated by "or"', () => {
-    const m = makeMonster({ actions: [{ name: 'Lightning Bolt', description: '1d6 or 1d8 lightning damage', damage_dice_primary: '1d6 or 1d8' }] });
-    damageUtils.__setFindCreatureReturn({ name: 'Goblin', conditions: [] });
-    render(<MonsterCardModal {...makeProps(m)} />);
-    const links = document.querySelectorAll('.mc-dice-link');
-    let has1d6 = false;
-    let has1d8 = false;
-    for (const el of links) {
-      if (el.textContent.includes('1d6')) has1d6 = true;
-      if (el.textContent.includes('1d8')) has1d8 = true;
-    }
-    expect(has1d6).toBe(true);
-    expect(has1d8).toBe(true);
   });
 });

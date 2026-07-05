@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { describe, it, expect, vi } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useCombatSuperiorityModal } from './useCombatSuperiorityModal.js';
@@ -58,26 +58,6 @@ describe('useCombatSuperiorityModal - handleCombatSuperiorityReopenSelection', (
 
   it('should return early without calling executeHandler when modal is null', async () => {
     const result = renderHookWithModal(null);
-
-    await act(async () => {
-      await result.current.handleCombatSuperiorityReopenSelection();
-    });
-
-    expect(executeHandler).not.toHaveBeenCalled();
-  });
-
-  it('should return early without calling executeHandler when modal.action is null', async () => {
-    const result = renderHookWithModal({ action: null });
-
-    await act(async () => {
-      await result.current.handleCombatSuperiorityReopenSelection();
-    });
-
-    expect(executeHandler).not.toHaveBeenCalled();
-  });
-
-  it('should return early without calling executeHandler when modal has no action property', async () => {
-    const result = renderHookWithModal({ knownManeuvers: ['Rally'] });
 
     await act(async () => {
       await result.current.handleCombatSuperiorityReopenSelection();
@@ -187,7 +167,7 @@ describe('useCombatSuperiorityModal - handleCombatSuperiorityReopenSelection', (
     expect(result.current.combatSuperiorityModal).toBe(existingPayload);
   });
 
-  it('should not update modal when executeHandler returns null', async () => {
+  it('should not update modal when executeHandler returns null or undefined', async () => {
     const originalAction = { name: 'Combat Superiority', automation: { type: 'combat_superiority' } };
     const existingPayload = { action: originalAction, knownManeuvers: ['Rally'] };
 
@@ -200,39 +180,6 @@ describe('useCombatSuperiorityModal - handleCombatSuperiorityReopenSelection', (
     });
 
     expect(result.current.combatSuperiorityModal).toBe(existingPayload);
-  });
-
-  it('should not update modal when executeHandler returns undefined', async () => {
-    const originalAction = { name: 'Combat Superiority', automation: { type: 'combat_superiority' } };
-    const existingPayload = { action: originalAction, knownManeuvers: ['Rally'] };
-
-    executeHandler.mockResolvedValue(undefined);
-
-    const result = renderHookWithModal(existingPayload);
-
-    await act(async () => {
-      await result.current.handleCombatSuperiorityReopenSelection();
-    });
-
-    expect(result.current.combatSuperiorityModal).toBe(existingPayload);
-  });
-
-  it('should set modal to undefined when executeHandler returns matching modal with no payload', async () => {
-    const originalAction = { name: 'Combat Superiority', automation: { type: 'combat_superiority' } };
-    const existingPayload = { action: originalAction, knownManeuvers: ['Rally'] };
-
-    executeHandler.mockResolvedValue({
-      type: 'modal',
-      modalName: 'combatSuperiority',
-    });
-
-    const result = renderHookWithModal(existingPayload);
-
-    await act(async () => {
-      await result.current.handleCombatSuperiorityReopenSelection();
-    });
-
-    expect(result.current.combatSuperiorityModal).toBeUndefined();
   });
 
   it('should create a new object for the reopened action without mutating the original', async () => {

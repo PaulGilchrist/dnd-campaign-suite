@@ -138,21 +138,20 @@ describe('race-rules/index', () => {
       expect(result2024.subrace).toEqual({ name: 'Wood Elf' });
     });
 
-    it('5e getResistances uses simple .sort(), 2024 uses localeCompare sort', () => {
-      const result5e = raceRulesModule.rules5e.getResistances({
-        race: { name: 'Elf' },
-        resistances: ['Zebra', 'alpha', 'Middle']
-      });
-      const result2024 = raceRulesModule.rules2024.getResistances({
-        race: { traits: [] },
-        resistances: [{ name: 'Zebra' }, { name: 'alpha' }, { name: 'Middle' }]
-      });
-      // 5e: simple string sort (uppercase before lowercase)
-      expect(result5e).toEqual(expect.arrayContaining(['Zebra', 'Middle', 'alpha', 'Charm']));
-      // 2024: localeCompare sort (case-insensitive, alphabetical order)
-      expect(result2024[0].name).toBe('alpha');
-      expect(result2024[1].name).toBe('Middle');
-      expect(result2024[2].name).toBe('Zebra');
+    it('5e getRace sets subrace to null when no subrace selected, 2024 returns subrace from data', () => {
+      const allRaces = [
+        {
+          name: 'Elf',
+          subraces: [{ name: 'High Elf' }]
+        }
+      ];
+      const playerSummary5e = { race: { name: 'Elf' } };
+      const result5e = raceRulesModule.rules5e.getRace(allRaces, playerSummary5e);
+      expect(result5e.subrace).toBeNull();
+
+      const playerSummary2024 = { race: { name: 'Elf', subrace: { name: 'High Elf' } } };
+      const result2024 = raceRulesModule.rules2024.getRace(allRaces, playerSummary2024);
+      expect(result2024.subrace).toEqual({ name: 'High Elf' });
     });
 
     it('5e getSenses uses trait name matching, 2024 uses regex on description', () => {
@@ -294,7 +293,7 @@ describe('race-rules/index', () => {
       expect(result2024.specialActions).toEqual([]);
     });
 
-    it('getTraits handles undefined race for 2024, null race for 5e', () => {
+    it('getTraits handles undefined race for 2024', () => {
       const result2024 = raceRulesModule.rules2024.getTraits({});
       expect(Object.keys(result2024)).toEqual([
         'actions',

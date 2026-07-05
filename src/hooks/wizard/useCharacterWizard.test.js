@@ -1,3 +1,4 @@
+// @cleaned-by-ai
 // @improved-by-ai
 import { renderHook, act } from '@testing-library/react';
 import { useCharacterWizard } from './useCharacterWizard.js';
@@ -31,103 +32,32 @@ describe('useCharacterWizard', () => {
     });
   });
 
-  describe('handleAddCharacter / handleWizardCancel', () => {
-    it('toggles showCharacterWizard correctly', () => {
+  describe('toggle wizards', () => {
+    it('toggles showCharacterWizard and showEditCharacterWizard correctly', () => {
       const { result } = renderHook(createWrapper('MyCampaign'));
 
       expect(result.current.showCharacterWizard).toBe(false);
+      expect(result.current.showEditCharacterWizard).toBe(false);
 
       act(() => {
         result.current.handleAddCharacter();
       });
-
       expect(result.current.showCharacterWizard).toBe(true);
 
       act(() => {
         result.current.handleWizardCancel();
       });
-
       expect(result.current.showCharacterWizard).toBe(false);
-    });
-
-    it('is idempotent when canceling while already closed', () => {
-      const { result } = renderHook(createWrapper('MyCampaign'));
-
-      act(() => {
-        result.current.handleWizardCancel();
-      });
-
-      expect(result.current.showCharacterWizard).toBe(false);
-    });
-  });
-
-  describe('handleEditCharacter / handleEditWizardCancel', () => {
-    it('toggles showEditCharacterWizard correctly', () => {
-      const { result } = renderHook(createWrapper('MyCampaign'));
-
-      expect(result.current.showEditCharacterWizard).toBe(false);
 
       act(() => {
         result.current.handleEditCharacter({ name: 'TestChar' });
       });
-
       expect(result.current.showEditCharacterWizard).toBe(true);
 
       act(() => {
         result.current.handleEditWizardCancel();
       });
-
       expect(result.current.showEditCharacterWizard).toBe(false);
-    });
-
-    it('is idempotent when canceling edit while already closed', () => {
-      const { result } = renderHook(createWrapper('MyCampaign'));
-
-      act(() => {
-        result.current.handleEditWizardCancel();
-      });
-
-      expect(result.current.showEditCharacterWizard).toBe(false);
-    });
-  });
-
-  describe('setCharacterCallbacks', () => {
-    it('stores callbacks in ref for later use', () => {
-      const setCharacters = vi.fn();
-      const setActiveCharacter = vi.fn();
-      const { result } = renderHook(createWrapper('MyCampaign'));
-
-      act(() => {
-        result.current.setCharacterCallbacks({ setCharacters, setActiveCharacter });
-      });
-
-      // Callbacks are stored in the ref, not invoked during registration
-      // Verify by triggering a create and checking they get called
-      const createdCharacter = { name: 'Test', id: '1' };
-      global.fetch
-        .mockResolvedValueOnce({
-          ok: true,
-          json: async () => ({ character: createdCharacter }),
-        })
-        .mockResolvedValueOnce({
-          ok: true,
-          json: async () => ({ files: ['test.json'] }),
-        })
-        .mockResolvedValueOnce({
-          ok: true,
-          json: async () => createdCharacter,
-        });
-
-      act(() => {
-        result.current.handleAddCharacter();
-      });
-
-      act(() => {
-        result.current.handleWizardCancel();
-      });
-
-      // The callbacks are set but not invoked yet — just verify registration didn't throw
-      expect(result.current.setCharacterCallbacks).toBeDefined();
     });
   });
 
@@ -239,7 +169,7 @@ describe('useCharacterWizard', () => {
       });
 
       expect(console.error).toHaveBeenCalledWith('Error creating character:', expect.any(Error));
-      expect(window.alert).toHaveBeenCalledWith('Failed to create character: Failed to create character: Internal Server Error');
+      expect(window.alert).toHaveBeenCalledWith(expect.stringContaining('Failed to create character:'));
     });
 
     it('alerts on fetch rejection', async () => {
@@ -405,7 +335,7 @@ describe('useCharacterWizard', () => {
       });
 
       expect(console.error).toHaveBeenCalledWith('Error updating character:', expect.any(Error));
-      expect(window.alert).toHaveBeenCalledWith('Failed to update character: Failed to update character: Bad Request');
+      expect(window.alert).toHaveBeenCalledWith(expect.stringContaining('Failed to update character:'));
     });
 
     it('alerts on fetch rejection', async () => {

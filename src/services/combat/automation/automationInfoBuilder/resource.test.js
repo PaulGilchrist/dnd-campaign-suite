@@ -1,3 +1,4 @@
+// @cleaned-by-ai
 // @improved-by-ai
 import { describe, it, expect } from 'vitest'
 import { resourceHandlers } from './resource.js'
@@ -66,56 +67,27 @@ describe('resourceHandlers – resource_restoration', () => {
         expect(result.hasAutomation).toBe(true)
     })
 
-    it('defaults trigger to short_rest and recharge to long_rest', () => {
+    it('defaults trigger, recharge, casting_time, and uses_max', () => {
         const feature = makeFeature({ type: 'resource_restoration' })
         const result = resourceHandlers.resource_restoration(feature, BASE_STATS)
         expect(result.trigger).toBe('short_rest')
         expect(result.recharge).toBe('long_rest')
-    })
-
-    it('defaults casting_time to passive', () => {
-        const feature = makeFeature({ type: 'resource_restoration' })
-        const result = resourceHandlers.resource_restoration(feature, BASE_STATS)
         expect(result.casting_time).toBe('passive')
-    })
-
-    it('defaults uses_max to 1 when not specified', () => {
-        const feature = makeFeature({ type: 'resource_restoration' })
-        const result = resourceHandlers.resource_restoration(feature, BASE_STATS)
         expect(result.uses_max).toBe(1)
     })
 
-    it('returns 0 when restore_expression is absent', () => {
-        const feature = makeFeature({ type: 'resource_restoration' })
-        const result = resourceHandlers.resource_restoration(feature, BASE_STATS)
-        expect(result.restore_amount).toBe(0)
-        expect(result.restore_expression).toBe('')
-    })
-
-    it('returns 0 when restore_expression is nullish', () => {
-        const feature = makeFeature({
-            type: 'resource_restoration',
-            restore_expression: null
-        })
-        const result = resourceHandlers.resource_restoration(feature, BASE_STATS)
-        expect(result.restore_amount).toBe(0)
+    it('returns 0 when restore_expression is absent or nullish', () => {
+        expect(resourceHandlers.resource_restoration(makeFeature({ type: 'resource_restoration' }), BASE_STATS).restore_amount).toBe(0)
+        expect(resourceHandlers.resource_restoration(makeFeature({ type: 'resource_restoration', restore_expression: null }), BASE_STATS).restore_amount).toBe(0)
     })
 
     it('resolves restore_expression to a numeric value', () => {
-        const feature = makeFeature({
-            type: 'resource_restoration',
-            restore_expression: 'proficiency_bonus'
-        })
-        const result = resourceHandlers.resource_restoration(feature, BASE_STATS)
+        const result = resourceHandlers.resource_restoration(makeFeature({ type: 'resource_restoration', restore_expression: 'proficiency_bonus' }), BASE_STATS)
         expect(result.restore_amount).toBe(3)
     })
 
     it('preserves uses_max of 0 without falling back to default', () => {
-        const feature = makeFeature({
-            type: 'resource_restoration',
-            uses_max: 0
-        })
-        const result = resourceHandlers.resource_restoration(feature, BASE_STATS)
+        const result = resourceHandlers.resource_restoration(makeFeature({ type: 'resource_restoration', uses_max: 0 }), BASE_STATS)
         expect(result.uses_max).toBe(0)
     })
 

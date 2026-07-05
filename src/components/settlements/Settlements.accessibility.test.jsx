@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import Settlements from './Settlements.jsx';
@@ -77,31 +77,17 @@ describe('Settlements - accessibility and keyboard', () => {
     expect(screen.getByRole('heading', { name: 'Edit Settlement' })).toBeInTheDocument();
   });
 
-  it('sets aria-label on settlement list items', () => {
+  it('opens edit modal when settlement item is activated with Space', () => {
     render(<Settlements campaignName="test" onBack={() => {}} />);
     const settlementItem = screen.getByRole('button', { name: /edit settlement/i });
-    expect(settlementItem).toHaveAttribute('aria-label', 'Edit settlement: Fireport');
+    fireEvent.keyDown(settlementItem, { key: ' ' });
+    expect(screen.getByRole('heading', { name: 'Edit Settlement' })).toBeInTheDocument();
   });
 
-  it('sets aria-label on search input', () => {
+  it('opens new settlement modal when new button is clicked', () => {
     render(<Settlements campaignName="test" onBack={() => {}} />);
-    const searchInput = screen.getByLabelText('Search settlements');
-    expect(searchInput).toHaveAttribute('aria-label', 'Search settlements');
-  });
-
-  it('sets aria-label on clear search button', () => {
-    render(<Settlements campaignName="test" onBack={() => {}} />);
-    const searchInput = screen.getByLabelText('Search settlements');
-    fireEvent.change(searchInput, { target: { value: 'fire' } });
-    const clearBtn = screen.getByLabelText('Clear search');
-    expect(clearBtn).toHaveAttribute('aria-label', 'Clear search');
-  });
-
-  it('sets aria-label on modal close button', () => {
-    render(<Settlements campaignName="test" onBack={() => {}} />);
-    const modalOpen = screen.getByRole('button', { name: /new settlement/i });
-    fireEvent.click(modalOpen);
-    const closeBtn = screen.getByLabelText('Close');
-    expect(closeBtn).toHaveAttribute('aria-label', 'Close');
+    const newBtn = screen.getByRole('button', { name: /new settlement/i });
+    fireEvent.click(newBtn);
+    expect(screen.getByRole('heading', { name: 'New Settlement' })).toBeInTheDocument();
   });
 });

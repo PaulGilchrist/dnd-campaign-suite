@@ -1,3 +1,4 @@
+// @cleaned-by-ai
 // @improved-by-ai
 import { describe, it, expect } from 'vitest'
 import {
@@ -31,14 +32,11 @@ describe('exhaustionRules', () => {
       expect(isDeadFromExhaustion(5)).toBe(false)
     })
 
-    it('returns true at exhaustion level 6', () => {
-      expect(isDeadFromExhaustion(6)).toBe(true)
-    })
-
-    it('returns true for exhaustion levels above 6', () => {
-      expect(isDeadFromExhaustion(7)).toBe(true)
-      expect(isDeadFromExhaustion(10)).toBe(true)
-    })
+      it('returns true for exhaustion levels at or above 6', () => {
+        expect(isDeadFromExhaustion(6)).toBe(true)
+        expect(isDeadFromExhaustion(7)).toBe(true)
+        expect(isDeadFromExhaustion(10)).toBe(true)
+      })
   })
 
   describe('getLevelAfterLongRest', () => {

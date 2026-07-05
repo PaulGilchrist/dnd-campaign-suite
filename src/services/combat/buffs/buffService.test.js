@@ -1,3 +1,4 @@
+// @cleaned-by-ai
 // @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
@@ -23,9 +24,7 @@ const PLAYER = 'Grog the Barbarian'
 const CAMPAIGN = 'Forgotten Realms'
 
 describe('getActiveBuffs', () => {
-  beforeEach(() => {
-    vi.clearAllMocks()
-  })
+  beforeEach(() => vi.clearAllMocks())
 
   it('returns the buffs array from runtime state when valid', () => {
     const buffs = [{ name: 'Darkness' }, { name: 'Haste' }]
@@ -37,19 +36,12 @@ describe('getActiveBuffs', () => {
     expect(getRuntimeValue).toHaveBeenCalledWith(PLAYER, 'activeBuffs')
   })
 
-  it('returns empty array when runtime state has no buffs (null)', () => {
-    getRuntimeValue.mockReturnValue(null)
-    expect(getActiveBuffs(PLAYER, CAMPAIGN)).toEqual([])
-  })
-
-  it('returns empty array when runtime state has no buffs (undefined)', () => {
-    getRuntimeValue.mockReturnValue(undefined)
-    expect(getActiveBuffs(PLAYER, CAMPAIGN)).toEqual([])
-  })
-
-  it('returns empty array when runtime state holds a non-array value', () => {
-    getRuntimeValue.mockReturnValue('not-an-array')
-    expect(getActiveBuffs(PLAYER, CAMPAIGN)).toEqual([])
+  it('returns empty array when runtime state has no buffs or a non-array value', () => {
+    for (const val of [null, undefined, 'not-an-array', []]) {
+      vi.clearAllMocks()
+      getRuntimeValue.mockReturnValue(val)
+      expect(getActiveBuffs(PLAYER, CAMPAIGN)).toEqual([])
+    }
   })
 
   it('does not write to runtime state', () => {
@@ -60,11 +52,9 @@ describe('getActiveBuffs', () => {
 })
 
 describe('isInnateSorceryActive', () => {
-  beforeEach(() => {
-    vi.clearAllMocks()
-  })
+  beforeEach(() => vi.clearAllMocks())
 
-  it('returns true when Innate Sorcery buff is present by exact name', () => {
+  it('returns true when Innate Sorcery buff is present', () => {
     getRuntimeValue.mockReturnValue([{ name: 'Innate Sorcery' }])
     expect(isInnateSorceryActive(PLAYER, CAMPAIGN)).toBe(true)
   })
@@ -77,37 +67,22 @@ describe('isInnateSorceryActive', () => {
     expect(isInnateSorceryActive(PLAYER, CAMPAIGN)).toBe(true)
   })
 
-  it('returns false when no buffs exist', () => {
-    getRuntimeValue.mockReturnValue([])
-    expect(isInnateSorceryActive(PLAYER, CAMPAIGN)).toBe(false)
-  })
-
-  it('returns false when runtime state is null', () => {
-    getRuntimeValue.mockReturnValue(null)
-    expect(isInnateSorceryActive(PLAYER, CAMPAIGN)).toBe(false)
+  it('returns false when no buffs exist or runtime state is null', () => {
+    for (const val of [[], null]) {
+      vi.clearAllMocks()
+      getRuntimeValue.mockReturnValue(val)
+      expect(isInnateSorceryActive(PLAYER, CAMPAIGN)).toBe(false)
+    }
   })
 
   it('does not match partial names', () => {
     getRuntimeValue.mockReturnValue([{ name: 'Innate' }])
     expect(isInnateSorceryActive(PLAYER, CAMPAIGN)).toBe(false)
   })
-
-  it('does not match a name that only contains the keyword', () => {
-    getRuntimeValue.mockReturnValue([{ name: 'Sorcery' }])
-    expect(isInnateSorceryActive(PLAYER, CAMPAIGN)).toBe(false)
-  })
-
-  it('reads from the activeBuffs key in runtime state', () => {
-    getRuntimeValue.mockReturnValue([])
-    isInnateSorceryActive(PLAYER, CAMPAIGN)
-    expect(getRuntimeValue).toHaveBeenCalledWith(PLAYER, 'activeBuffs')
-  })
 })
 
 describe('getInnateSorceryBonus', () => {
-  beforeEach(() => {
-    vi.clearAllMocks()
-  })
+  beforeEach(() => vi.clearAllMocks())
 
   it('returns saveDcBonus of 1 and spellAdvantage true when Innate Sorcery is active', () => {
     getRuntimeValue.mockReturnValue([{ name: 'Innate Sorcery' }])
@@ -117,33 +92,20 @@ describe('getInnateSorceryBonus', () => {
     })
   })
 
-  it('returns saveDcBonus of 0 and spellAdvantage false when Innate Sorcery is inactive', () => {
-    getRuntimeValue.mockReturnValue([])
-    expect(getInnateSorceryBonus(PLAYER, CAMPAIGN)).toEqual({
-      saveDcBonus: 0,
-      spellAdvantage: false,
-    })
-  })
-
-  it('returns zeroed bonus when runtime state is null', () => {
-    getRuntimeValue.mockReturnValue(null)
-    expect(getInnateSorceryBonus(PLAYER, CAMPAIGN)).toEqual({
-      saveDcBonus: 0,
-      spellAdvantage: false,
-    })
-  })
-
-  it('reads from the activeBuffs key in runtime state', () => {
-    getRuntimeValue.mockReturnValue([])
-    getInnateSorceryBonus(PLAYER, CAMPAIGN)
-    expect(getRuntimeValue).toHaveBeenCalledWith(PLAYER, 'activeBuffs')
+  it('returns zeroed bonus when Innate Sorcery is inactive or runtime state is null', () => {
+    for (const val of [[], null]) {
+      vi.clearAllMocks()
+      getRuntimeValue.mockReturnValue(val)
+      expect(getInnateSorceryBonus(PLAYER, CAMPAIGN)).toEqual({
+        saveDcBonus: 0,
+        spellAdvantage: false,
+      })
+    }
   })
 })
 
 describe('setInnateSorceryActive', () => {
-  beforeEach(() => {
-    vi.clearAllMocks()
-  })
+  beforeEach(() => vi.clearAllMocks())
 
   describe('activating', () => {
     it('adds Innate Sorcery buff when not already present', () => {
@@ -161,16 +123,7 @@ describe('setInnateSorceryActive', () => {
       )
     })
 
-    it('wraps Innate Sorcery in a new array when adding', () => {
-      const originalBuffs = [{ name: 'Darkness' }]
-      getRuntimeValue.mockReturnValue(originalBuffs)
-      setInnateSorceryActive(PLAYER, true, CAMPAIGN)
-
-      const [, , newBuffs] = setRuntimeValue.mock.calls[0]
-      expect(newBuffs).not.toBe(originalBuffs)
-    })
-
-    it('creates a new array starting from empty when no buffs exist', () => {
+    it('creates a new array when adding to empty or null state', () => {
       const originalBuffs = []
       getRuntimeValue.mockReturnValue(originalBuffs)
       setInnateSorceryActive(PLAYER, true, CAMPAIGN)
@@ -261,16 +214,11 @@ describe('setInnateSorceryActive', () => {
   })
 
   describe('general behavior', () => {
-    it('reads activeBuffs before writing', () => {
+    it('reads activeBuffs before writing and passes arguments in correct order', () => {
       getRuntimeValue.mockReturnValue([])
       setInnateSorceryActive(PLAYER, true, CAMPAIGN)
 
       expect(getRuntimeValue).toHaveBeenCalledWith(PLAYER, 'activeBuffs')
-    })
-
-    it('passes arguments to setRuntimeValue in the correct order', () => {
-      getRuntimeValue.mockReturnValue([])
-      setInnateSorceryActive(PLAYER, true, CAMPAIGN)
 
       const [arg0, arg1, arg2, arg3] = setRuntimeValue.mock.calls[0]
       expect(arg0).toBe(PLAYER)

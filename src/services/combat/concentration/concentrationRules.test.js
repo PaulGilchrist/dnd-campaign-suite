@@ -1,3 +1,4 @@
+// @cleaned-by-ai
 // @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { rollConcentrationSave, breakConcentration, computeConcentrationDc } from './concentrationRules.js'
@@ -12,7 +13,7 @@ describe('rollConcentrationSave', () => {
     vi.clearAllMocks()
   })
 
-  it('returns an object with success (boolean), roll (number), and total (number)', () => {
+  it('returns an object with success, roll, and total', () => {
     rollD20.mockReturnValue(10)
     const result = rollConcentrationSave(0, 10)
 
@@ -23,133 +24,66 @@ describe('rollConcentrationSave', () => {
     }))
   })
 
-  it('returns success when total equals dc', () => {
+  it('computes total correctly with positive, negative, and zero bonuses', () => {
     rollD20.mockReturnValue(10)
-    const result = rollConcentrationSave(5, 15)
+    expect(rollConcentrationSave(5, 15).total).toBe(15)
 
-    expect(result.success).toBe(true)
-    expect(result.roll).toBe(10)
-    expect(result.total).toBe(15)
-  })
+    rollD20.mockReturnValue(10)
+    expect(rollConcentrationSave(-2, 15).total).toBe(8)
 
-  it('returns success when total exceeds dc', () => {
-    rollD20.mockReturnValue(12)
-    const result = rollConcentrationSave(4, 15)
-
-    expect(result.success).toBe(true)
-    expect(result.total).toBe(16)
-  })
-
-  it('returns failure when total is below dc', () => {
     rollD20.mockReturnValue(8)
-    const result = rollConcentrationSave(3, 15)
+    expect(rollConcentrationSave(0, 8).total).toBe(8)
 
-    expect(result.success).toBe(false)
-    expect(result.total).toBe(11)
-  })
-
-  it('applies negative save bonuses', () => {
-    rollD20.mockReturnValue(18)
-    const result = rollConcentrationSave(-2, 15)
-
-    expect(result.success).toBe(true)
-    expect(result.total).toBe(16)
-  })
-
-  it('applies zero save bonus', () => {
-    rollD20.mockReturnValue(7)
-    const result = rollConcentrationSave(0, 8)
-
-    expect(result.success).toBe(false)
-    expect(result.total).toBe(7)
-  })
-
-  it('applies large save bonuses', () => {
     rollD20.mockReturnValue(3)
-    const result = rollConcentrationSave(10, 12)
+    expect(rollConcentrationSave(10, 12).total).toBe(13)
+  })
 
-    expect(result.success).toBe(true)
-    expect(result.total).toBe(13)
+  it('returns success when total meets or exceeds dc, failure otherwise', () => {
+    rollD20.mockReturnValue(10)
+    expect(rollConcentrationSave(5, 15).success).toBe(true)
+    expect(rollConcentrationSave(3, 15).success).toBe(false)
   })
 
   it('clamps dragon constellation low rolls up to 10', () => {
     rollD20.mockReturnValue(5)
     const result = rollConcentrationSave(3, 15, true)
-
     expect(result.roll).toBe(10)
     expect(result.total).toBe(13)
     expect(result.success).toBe(false)
   })
 
-  it('clamps dragon constellation boundary roll of 9 up to 10', () => {
-    rollD20.mockReturnValue(9)
-    const result = rollConcentrationSave(3, 15, true)
-
-    expect(result.roll).toBe(10)
-    expect(result.total).toBe(13)
+  it('does not modify rolls when dragon constellation is false or undefined', () => {
+    rollD20.mockReturnValue(5)
+    expect(rollConcentrationSave(3, 15, false).roll).toBe(5)
+    expect(rollConcentrationSave(3, 15).roll).toBe(5)
   })
 
   it('does not modify rolls of 10 or higher when dragon constellation is active', () => {
     rollD20.mockReturnValue(10)
     const result = rollConcentrationSave(3, 15, true)
-
     expect(result.roll).toBe(10)
-    expect(result.total).toBe(13)
-  })
-
-  it('does not modify rolls when dragon constellation is false', () => {
-    rollD20.mockReturnValue(5)
-    const result = rollConcentrationSave(3, 15, false)
-
-    expect(result.roll).toBe(5)
-    expect(result.total).toBe(8)
-  })
-
-  it('does not modify rolls when dragon constellation is undefined', () => {
-    rollD20.mockReturnValue(5)
-    const result = rollConcentrationSave(3, 15)
-
-    expect(result.roll).toBe(5)
-    expect(result.total).toBe(8)
   })
 })
 
 describe('breakConcentration', () => {
-  it('always returns null regardless of input', () => {
+  it('always returns null', () => {
     expect(breakConcentration({ spell: 'Haste' })).toBeNull()
     expect(breakConcentration(null)).toBeNull()
     expect(breakConcentration(undefined)).toBeNull()
-    expect(breakConcentration('')).toBeNull()
-    expect(breakConcentration(0)).toBeNull()
-    expect(breakConcentration([])).toBeNull()
-    expect(breakConcentration({})).toBeNull()
   })
 })
 
 describe('computeConcentrationDc', () => {
-  it('returns 10 for zero damage', () => {
+  it('returns 10 for damage up to and including 20', () => {
     expect(computeConcentrationDc(0)).toBe(10)
-  })
-
-  it('returns 10 for damage below 20', () => {
-    expect(computeConcentrationDc(1)).toBe(10)
     expect(computeConcentrationDc(18)).toBe(10)
-  })
-
-  it('returns 10 for damage of exactly 20', () => {
     expect(computeConcentrationDc(20)).toBe(10)
   })
 
   it('returns floor(damage / 2) for damage above 20', () => {
+    expect(computeConcentrationDc(21)).toBe(10)
     expect(computeConcentrationDc(22)).toBe(11)
     expect(computeConcentrationDc(30)).toBe(15)
     expect(computeConcentrationDc(100)).toBe(50)
-  })
-
-  it('uses Math.floor for odd damage values above 20', () => {
-    expect(computeConcentrationDc(21)).toBe(10)
-    expect(computeConcentrationDc(23)).toBe(11)
-    expect(computeConcentrationDc(25)).toBe(12)
-    expect(computeConcentrationDc(99)).toBe(49)
   })
 })

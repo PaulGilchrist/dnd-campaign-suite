@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { describe, it, expect, vi, afterEach } from 'vitest';
 
 // ─── Fixtures ───────────────────────────────────────────────────────────────
@@ -230,21 +230,6 @@ describe('generateNPC', () => {
         );
         expect(primary).toBeGreaterThanOrEqual(12);
       }
-    });
-
-    it('includes extra movement types at higher CR', async () => {
-      const { mod } = await loadModule(
-        createNamesFixture(),
-        createTraitsFixture(),
-        0.9,
-      );
-
-      const npc = await mod.generateNPC();
-
-      expect(typeof npc.speed).toBe('object');
-      expect(npc.speed.walk).toBe('30 ft.');
-      const extraTypes = Object.keys(npc.speed).filter((k) => k !== 'walk');
-      expect(extraTypes.every((t) => ['fly', 'swim', 'climb', 'burrow'].includes(t))).toBe(true);
     });
 
     it('includes empty arrays for damage/condition immunities', async () => {

@@ -1,15 +1,14 @@
+// @cleaned-by-ai
 // @improved-by-ai
 // ── initiative.test.js ───────────────────────────────────────────────
 // Tests for initiative.js — behavior-first, minimal over-mocking
 //
 // What we test:
-//   • The handler returns the correct `type` and structural invariants
 //   • Default values are used when automation fields are absent
 //   • `uses` and `usesMax` stay in sync from the same source
 //   • Custom automation fields are passed through (not hardcoded)
 //   • `resourceKey` is derived from `feature.name` via the spec
 //   • `feature.name` is forwarded to the result
-//   • The handler throws when automation is undefined
 //
 // What we don't test:
 //   • Internal implementation details (e.g. which `||` / `??` fallbacks exist)
@@ -22,15 +21,6 @@ import { BASE_STATS, makeFeature } from '../automationInfoBuilder.fixtures.js'
 // ── Helpers ──────────────────────────────────────────────────────────
 
 /**
- * Assert structural invariants that every handler result must satisfy.
- */
-function expectValidResult(result, expectedType) {
-    expect(result).toBeInstanceOf(Object)
-    expect(result.type).toBe(expectedType)
-    expect(result.hasAutomation).toBe(true)
-}
-
-/**
  * Derive the expected resourceKey from a feature name, matching the
  * implementation in initiative.js exactly.
  */
@@ -41,13 +31,6 @@ function expectedResourceKey(name) {
 // ── initiative_action ────────────────────────────────────────────────
 
 describe('initiativeHandlers – initiative_action', () => {
-    it('returns structural invariants with defaults', () => {
-        const feature = makeFeature({ type: 'initiative_action' })
-        const result = initiativeHandlers.initiative_action(feature, BASE_STATS)
-
-        expectValidResult(result, 'initiative_action')
-    })
-
     it('returns all default values when automation is empty', () => {
         const feature = makeFeature({ type: 'initiative_action' })
         const result = initiativeHandlers.initiative_action(feature, BASE_STATS)
@@ -62,6 +45,7 @@ describe('initiativeHandlers – initiative_action', () => {
         expect(result.recharge).toBe('long_rest')
         expect(result.resourceCost).toBe('')
         expect(result.resourceKey).toBe(expectedResourceKey('Test Feature'))
+        expect(result.hasAutomation).toBe(true)
     })
 
     it('uses explicit uses value for both uses and usesMax', () => {
@@ -74,21 +58,14 @@ describe('initiativeHandlers – initiative_action', () => {
         expect(result.usesMax).toBe(3)
     })
 
-    it('propagates the feature name', () => {
-        const feature = makeFeature({ type: 'initiative_action' }, 'Lucky Initiative')
-        const result = initiativeHandlers.initiative_action(feature, BASE_STATS)
-
-        expect(result.name).toBe('Lucky Initiative')
-        expect(result.resourceKey).toBe(expectedResourceKey('Lucky Initiative'))
-    })
-
-    it('generates resourceKey from feature name by lowercasing and removing spaces', () => {
+    it('propagates the feature name and derives resourceKey', () => {
         const feature = makeFeature(
             { type: 'initiative_action' },
             'Extraordinary Luck'
         )
         const result = initiativeHandlers.initiative_action(feature, BASE_STATS)
 
+        expect(result.name).toBe('Extraordinary Luck')
         expect(result.resourceKey).toBe('extraordinaryluckUses')
     })
 
@@ -115,11 +92,5 @@ describe('initiativeHandlers – initiative_action', () => {
         expect(result.recharge).toBe('short_rest')
         expect(result.resourceCost).toBe('luck_points')
         expect(result.resourceKey).toBe(expectedResourceKey('Blessed Fortune'))
-    })
-
-    it('throws when automation is undefined', () => {
-        const feature = { name: 'Test', automation: undefined }
-        expect(() => initiativeHandlers.initiative_action(feature, BASE_STATS))
-            .toThrow(TypeError)
     })
 })

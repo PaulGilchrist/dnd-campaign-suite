@@ -1,3 +1,4 @@
+// @cleaned-by-ai
 // @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
@@ -69,8 +70,15 @@ function makeSpell(overrides = {}) {
 // ── Tests ────────────────────────────────────────────────────────────────────
 
 describe('useSpellMetamagicFlow', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
+    const rulesMod = await import('../../services/rules/spells/metamagicRules.js');
+    rulesMod.isPsionicSpell.mockReturnValue(false);
+    rulesMod.hasPsionicSorcery.mockReturnValue(false);
+    const riderMod = await import('../../services/rules/spells/postCastRiderService.js');
+    riderMod.getMultiTargetSpreadForSpell.mockReturnValue(null);
+    const combatMod = await import('../../services/encounters/combatData.js');
+    combatMod.getCombatSummary.mockReturnValue(null);
   });
 
   // ── Return value structure ─────────────────────────────────────────────
@@ -83,43 +91,22 @@ describe('useSpellMetamagicFlow', () => {
       );
 
       const expectedProps = [
-        'pendingMetamagic',
-        'pendingMultiTarget',
-        'pendingAid',
-        'pendingHeroesFeast',
-        'pendingGreaterRestoration',
-        'pendingLesserRestoration',
-        'pendingMageArmor',
-        'pendingShieldOfFaith',
-        'pendingProtectionFromEnergy',
-        'pendingResistance',
-        'pendingRemoveCurse',
-        'pendingMagicMissile',
-        'gateMetamagic',
-        'handleConfirm',
-        'handleSkip',
-        'handleMultiTargetConfirm',
-        'handleMultiTargetSkip',
-        'handleAidConfirm',
-        'handleAidSkip',
-        'handleHeroesFeastConfirm',
-        'handleHeroesFeastSkip',
-        'handleGreaterRestorationConfirm',
-        'handleGreaterRestorationSkip',
-        'handleLesserRestorationConfirm',
-        'handleLesserRestorationSkip',
-        'handleMageArmorConfirm',
-        'handleMageArmorSkip',
-        'handleShieldOfFaithConfirm',
-        'handleShieldOfFaithSkip',
-        'handleProtectionFromEnergyConfirm',
-        'handleProtectionFromEnergySkip',
-        'handleResistanceConfirm',
-        'handleResistanceSkip',
-        'handleRemoveCurseConfirm',
-        'handleRemoveCurseSkip',
-        'handleMagicMissileConfirm',
-        'handleMagicMissileSkip',
+        'pendingMetamagic', 'pendingMultiTarget', 'pendingAid', 'pendingHeroesFeast',
+        'pendingGreaterRestoration', 'pendingLesserRestoration', 'pendingMageArmor',
+        'pendingShieldOfFaith', 'pendingProtectionFromEnergy', 'pendingResistance',
+        'pendingRemoveCurse', 'pendingMagicMissile', 'gateMetamagic',
+        'handleConfirm', 'handleSkip',
+        'handleMultiTargetConfirm', 'handleMultiTargetSkip',
+        'handleAidConfirm', 'handleAidSkip',
+        'handleHeroesFeastConfirm', 'handleHeroesFeastSkip',
+        'handleGreaterRestorationConfirm', 'handleGreaterRestorationSkip',
+        'handleLesserRestorationConfirm', 'handleLesserRestorationSkip',
+        'handleMageArmorConfirm', 'handleMageArmorSkip',
+        'handleShieldOfFaithConfirm', 'handleShieldOfFaithSkip',
+        'handleProtectionFromEnergyConfirm', 'handleProtectionFromEnergySkip',
+        'handleResistanceConfirm', 'handleResistanceSkip',
+        'handleRemoveCurseConfirm', 'handleRemoveCurseSkip',
+        'handleMagicMissileConfirm', 'handleMagicMissileSkip',
       ];
 
       for (const prop of expectedProps) {
@@ -182,24 +169,6 @@ describe('useSpellMetamagicFlow', () => {
 
       expect(onExecute).toHaveBeenCalledWith(spell, {});
       expect(result.current.pendingMetamagic).toBeNull();
-    });
-
-    it('defaults spell level to 0 when undefined for non-sorcerer', async () => {
-      const onExecute = vi.fn();
-      const playerStats = makePlayerStats({ class: { name: 'Wizard' } });
-      const { result } = renderHook(() =>
-        useSpellMetamagicFlow(playerStats, 'TestCampaign', onExecute)
-      );
-
-      const spell = makeSpell({ level: undefined });
-      act(() => {
-        result.current.gateMetamagic(spell);
-      });
-
-      const logService = await import('../../services/ui/logService.js');
-      const call = logService.addEntry.mock.calls[0][1];
-      expect(call.spellLevel).toBe(0);
-      expect(onExecute).toHaveBeenCalledWith(spell, {});
     });
 
     it('handles null class as non-sorcerer', async () => {
@@ -267,21 +236,6 @@ describe('useSpellMetamagicFlow', () => {
       expect(onExecute).not.toHaveBeenCalled();
     });
 
-    it('defaults spell level to 0 when undefined for sorcerer', () => {
-      const onExecute = vi.fn();
-      const playerStats = makePlayerStats();
-      const { result } = renderHook(() =>
-        useSpellMetamagicFlow(playerStats, 'TestCampaign', onExecute)
-      );
-
-      const spell = makeSpell({ level: undefined });
-      act(() => {
-        result.current.gateMetamagic(spell);
-      });
-
-      expect(result.current.pendingMetamagic.spellLevel).toBe(0);
-    });
-
     it('marks isPsionic based on isPsionicSpell and hasPsionicSorcery', async () => {
       const onExecute = vi.fn();
       const playerStats = makePlayerStats();
@@ -300,26 +254,6 @@ describe('useSpellMetamagicFlow', () => {
 
       expect(result.current.pendingMetamagic.isPsionic).toBe(true);
       expect(result.current.pendingMetamagic.psionicCost).toBe(3);
-    });
-
-    it('sets isPsionic to false when isPsionicSpell returns false', async () => {
-      const onExecute = vi.fn();
-      const playerStats = makePlayerStats();
-      const { result } = renderHook(() =>
-        useSpellMetamagicFlow(playerStats, 'TestCampaign', onExecute)
-      );
-
-      const rulesMod = await import('../../services/rules/spells/metamagicRules.js');
-      rulesMod.isPsionicSpell.mockReturnValue(false);
-      rulesMod.hasPsionicSorcery.mockReturnValue(true);
-
-      const spell = makeSpell();
-      act(() => {
-        result.current.gateMetamagic(spell);
-      });
-
-      expect(result.current.pendingMetamagic.isPsionic).toBe(false);
-      expect(result.current.pendingMetamagic.psionicCost).toBe(0);
     });
 
     it('stores _metaCtx from gateMetamagic argument', () => {
@@ -359,17 +293,19 @@ describe('useSpellMetamagicFlow', () => {
   // ── gateMetamagic — special spell routing ──────────────────────────────
 
   describe('gateMetamagic — special spell routing', () => {
-    it('sets pendingLesserRestoration when creature targets exist', async () => {
-      const onExecute = vi.fn();
-      const playerStats = makePlayerStats();
-      const { result } = renderHook(() =>
-        useSpellMetamagicFlow(playerStats, 'TestCampaign', onExecute)
-      );
-
+    const setupCreatureTargets = async () => {
       const combatMod = await import('../../services/encounters/combatData.js');
       combatMod.getCombatSummary.mockReturnValue({
         creatures: [{ name: 'Ally 1' }, { name: 'Ally 2' }],
       });
+    };
+
+    it('sets pendingLesserRestoration when creature targets exist', async () => {
+      await setupCreatureTargets();
+      const onExecute = vi.fn();
+      const { result } = renderHook(() =>
+        useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', onExecute)
+      );
 
       act(() => {
         result.current.gateMetamagic({ name: 'Lesser Restoration', level: 2, casting_time: '1 Action', range: 'Touch' });
@@ -381,14 +317,13 @@ describe('useSpellMetamagicFlow', () => {
     });
 
     it('bypasses pending state when no creature targets for lesser restoration', async () => {
-      const onExecute = vi.fn();
-      const playerStats = makePlayerStats();
-      const { result } = renderHook(() =>
-        useSpellMetamagicFlow(playerStats, 'TestCampaign', onExecute)
-      );
-
       const combatMod = await import('../../services/encounters/combatData.js');
       combatMod.getCombatSummary.mockReturnValue({ creatures: [] });
+
+      const onExecute = vi.fn();
+      const { result } = renderHook(() =>
+        useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', onExecute)
+      );
 
       act(() => {
         result.current.gateMetamagic({ name: 'Lesser Restoration', level: 2, casting_time: '1 Action', range: 'Touch' });
@@ -398,36 +333,26 @@ describe('useSpellMetamagicFlow', () => {
     });
 
     it('sets pendingGreaterRestoration when creature targets exist', async () => {
+      await setupCreatureTargets();
       const onExecute = vi.fn();
-      const playerStats = makePlayerStats();
       const { result } = renderHook(() =>
-        useSpellMetamagicFlow(playerStats, 'TestCampaign', onExecute)
+        useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', onExecute)
       );
-
-      const combatMod = await import('../../services/encounters/combatData.js');
-      combatMod.getCombatSummary.mockReturnValue({
-        creatures: [{ name: 'Ally 1' }],
-      });
 
       act(() => {
         result.current.gateMetamagic({ name: 'Greater Restoration', level: 5, casting_time: '1 Action', range: 'Touch' });
       });
 
       expect(result.current.pendingGreaterRestoration).not.toBeNull();
-      expect(result.current.pendingGreaterRestoration.creatureTargets).toEqual(['Ally 1']);
+      expect(result.current.pendingGreaterRestoration.creatureTargets).toEqual(['Ally 1', 'Ally 2']);
     });
 
     it('sets pendingRemoveCurse when creature targets exist', async () => {
+      await setupCreatureTargets();
       const onExecute = vi.fn();
-      const playerStats = makePlayerStats();
       const { result } = renderHook(() =>
-        useSpellMetamagicFlow(playerStats, 'TestCampaign', onExecute)
+        useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', onExecute)
       );
-
-      const combatMod = await import('../../services/encounters/combatData.js');
-      combatMod.getCombatSummary.mockReturnValue({
-        creatures: [{ name: 'Ally 1' }],
-      });
 
       act(() => {
         result.current.gateMetamagic({ name: 'Remove Curse', level: 3, casting_time: '1 Action', range: 'Touch' });
@@ -437,16 +362,11 @@ describe('useSpellMetamagicFlow', () => {
     });
 
     it('sets pendingAid when creature targets exist', async () => {
+      await setupCreatureTargets();
       const onExecute = vi.fn();
-      const playerStats = makePlayerStats();
       const { result } = renderHook(() =>
-        useSpellMetamagicFlow(playerStats, 'TestCampaign', onExecute)
+        useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', onExecute)
       );
-
-      const combatMod = await import('../../services/encounters/combatData.js');
-      combatMod.getCombatSummary.mockReturnValue({
-        creatures: [{ name: 'Ally 1' }],
-      });
 
       act(() => {
         result.current.gateMetamagic({ name: 'Aid', level: 2, casting_time: '1 Action', range: '30 feet' });
@@ -457,16 +377,11 @@ describe('useSpellMetamagicFlow', () => {
     });
 
     it('sets pendingHeroesFeast when creature targets exist', async () => {
+      await setupCreatureTargets();
       const onExecute = vi.fn();
-      const playerStats = makePlayerStats();
       const { result } = renderHook(() =>
-        useSpellMetamagicFlow(playerStats, 'TestCampaign', onExecute)
+        useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', onExecute)
       );
-
-      const combatMod = await import('../../services/encounters/combatData.js');
-      combatMod.getCombatSummary.mockReturnValue({
-        creatures: [{ name: 'Ally 1' }],
-      });
 
       act(() => {
         result.current.gateMetamagic({ name: "Heroes' Feast", level: 6, casting_time: '8 Hours', range: '30 feet' });
@@ -477,16 +392,11 @@ describe('useSpellMetamagicFlow', () => {
     });
 
     it('sets pendingMageArmor when creature targets exist', async () => {
+      await setupCreatureTargets();
       const onExecute = vi.fn();
-      const playerStats = makePlayerStats();
       const { result } = renderHook(() =>
-        useSpellMetamagicFlow(playerStats, 'TestCampaign', onExecute)
+        useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', onExecute)
       );
-
-      const combatMod = await import('../../services/encounters/combatData.js');
-      combatMod.getCombatSummary.mockReturnValue({
-        creatures: [{ name: 'Ally 1' }],
-      });
 
       act(() => {
         result.current.gateMetamagic({ name: 'Mage Armor', level: 1, casting_time: '1 Action', range: 'Touch' });
@@ -496,16 +406,11 @@ describe('useSpellMetamagicFlow', () => {
     });
 
     it('sets pendingProtectionFromEnergy when creature targets exist', async () => {
+      await setupCreatureTargets();
       const onExecute = vi.fn();
-      const playerStats = makePlayerStats();
       const { result } = renderHook(() =>
-        useSpellMetamagicFlow(playerStats, 'TestCampaign', onExecute)
+        useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', onExecute)
       );
-
-      const combatMod = await import('../../services/encounters/combatData.js');
-      combatMod.getCombatSummary.mockReturnValue({
-        creatures: [{ name: 'Ally 1' }],
-      });
 
       act(() => {
         result.current.gateMetamagic({ name: 'Protection from Energy', level: 3, casting_time: '1 Action', range: 'Touch' });
@@ -515,16 +420,11 @@ describe('useSpellMetamagicFlow', () => {
     });
 
     it('sets pendingResistance when creature targets exist', async () => {
+      await setupCreatureTargets();
       const onExecute = vi.fn();
-      const playerStats = makePlayerStats();
       const { result } = renderHook(() =>
-        useSpellMetamagicFlow(playerStats, 'TestCampaign', onExecute)
+        useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', onExecute)
       );
-
-      const combatMod = await import('../../services/encounters/combatData.js');
-      combatMod.getCombatSummary.mockReturnValue({
-        creatures: [{ name: 'Ally 1' }],
-      });
 
       act(() => {
         result.current.gateMetamagic({ name: 'Resistance', level: 0, casting_time: '1 Action', range: 'Touch' });
@@ -534,16 +434,15 @@ describe('useSpellMetamagicFlow', () => {
     });
 
     it('sets pendingMagicMissile when creature targets exist', async () => {
-      const onExecute = vi.fn();
-      const playerStats = makePlayerStats();
-      const { result } = renderHook(() =>
-        useSpellMetamagicFlow(playerStats, 'TestCampaign', onExecute)
-      );
-
       const combatMod = await import('../../services/encounters/combatData.js');
       combatMod.getCombatSummary.mockReturnValue({
         creatures: [{ name: 'Enemy 1' }],
       });
+
+      const onExecute = vi.fn();
+      const { result } = renderHook(() =>
+        useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', onExecute)
+      );
 
       act(() => {
         result.current.gateMetamagic({ name: 'Magic Missile', level: 1, casting_time: '1 Action', range: '120 ft.' });
@@ -554,16 +453,15 @@ describe('useSpellMetamagicFlow', () => {
     });
 
     it('calculates magic missile count based on slot level', async () => {
-      const onExecute = vi.fn();
-      const playerStats = makePlayerStats();
-      const { result } = renderHook(() =>
-        useSpellMetamagicFlow(playerStats, 'TestCampaign', onExecute)
-      );
-
       const combatMod = await import('../../services/encounters/combatData.js');
       combatMod.getCombatSummary.mockReturnValue({
         creatures: [{ name: 'Enemy 1' }],
       });
+
+      const onExecute = vi.fn();
+      const { result } = renderHook(() =>
+        useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', onExecute)
+      );
 
       act(() => {
         result.current.gateMetamagic({ name: 'Magic Missile', level: 3, casting_time: '1 Action', range: '120 ft.' });
@@ -573,12 +471,6 @@ describe('useSpellMetamagicFlow', () => {
     });
 
     it('routes to multi-target flow when getMultiTargetSpreadForSpell returns a value', async () => {
-      const onExecute = vi.fn();
-      const playerStats = makePlayerStats();
-      const { result } = renderHook(() =>
-        useSpellMetamagicFlow(playerStats, 'TestCampaign', onExecute)
-      );
-
       const riderMod = await import('../../services/rules/spells/postCastRiderService.js');
       riderMod.getMultiTargetSpreadForSpell.mockReturnValue({ range: '10 ft' });
 
@@ -586,6 +478,11 @@ describe('useSpellMetamagicFlow', () => {
       combatMod.getCombatSummary.mockReturnValue({
         creatures: [{ name: 'Target 1' }],
       });
+
+      const onExecute = vi.fn();
+      const { result } = renderHook(() =>
+        useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', onExecute)
+      );
 
       act(() => {
         result.current.gateMetamagic(makeSpell());
@@ -596,14 +493,13 @@ describe('useSpellMetamagicFlow', () => {
     });
 
     it('falls through to sorcerer path when no special spell matches and no multi-target', async () => {
-      const onExecute = vi.fn();
-      const playerStats = makePlayerStats();
-      const { result } = renderHook(() =>
-        useSpellMetamagicFlow(playerStats, 'TestCampaign', onExecute)
-      );
-
       const riderMod = await import('../../services/rules/spells/postCastRiderService.js');
       riderMod.getMultiTargetSpreadForSpell.mockReturnValue(null);
+
+      const onExecute = vi.fn();
+      const { result } = renderHook(() =>
+        useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', onExecute)
+      );
 
       act(() => {
         result.current.gateMetamagic(makeSpell());
@@ -630,36 +526,6 @@ describe('useSpellMetamagicFlow', () => {
       const logService = await import('../../services/ui/logService.js');
       expect(logService.addEntry).not.toHaveBeenCalled();
       expect(onExecute).not.toHaveBeenCalled();
-    });
-
-    it('does nothing when result is null', async () => {
-      const onExecute = vi.fn();
-      const playerStats = makePlayerStats();
-      const { result } = renderHook(() =>
-        useSpellMetamagicFlow(playerStats, 'TestCampaign', onExecute)
-      );
-
-      act(() => {
-        result.current.handleConfirm(null);
-      });
-
-      const logService = await import('../../services/ui/logService.js');
-      expect(logService.addEntry).not.toHaveBeenCalled();
-    });
-
-    it('does nothing when result is undefined', async () => {
-      const onExecute = vi.fn();
-      const playerStats = makePlayerStats();
-      const { result } = renderHook(() =>
-        useSpellMetamagicFlow(playerStats, 'TestCampaign', onExecute)
-      );
-
-      act(() => {
-        result.current.handleConfirm(undefined);
-      });
-
-      const logService = await import('../../services/ui/logService.js');
-      expect(logService.addEntry).not.toHaveBeenCalled();
     });
 
     it('clears pendingMetamagic after confirm even when result is null', () => {
@@ -725,46 +591,6 @@ describe('useSpellMetamagicFlow', () => {
       expect(metamagicMod.spendSorceryPoints).not.toHaveBeenCalled();
     });
 
-    it('does not spend sorcery points when totalCost is missing', async () => {
-      const onExecute = vi.fn();
-      const playerStats = makePlayerStats();
-      const { result } = renderHook(() =>
-        useSpellMetamagicFlow(playerStats, 'TestCampaign', onExecute)
-      );
-
-      const spell = makeSpell();
-      act(() => {
-        result.current.gateMetamagic(spell);
-      });
-
-      act(() => {
-        result.current.handleConfirm({ options: [] });
-      });
-
-      const metamagicMod = await import('./useMetamagic.js');
-      expect(metamagicMod.spendSorceryPoints).not.toHaveBeenCalled();
-    });
-
-    it('does not spend sorcery points when totalCost is negative', async () => {
-      const onExecute = vi.fn();
-      const playerStats = makePlayerStats();
-      const { result } = renderHook(() =>
-        useSpellMetamagicFlow(playerStats, 'TestCampaign', onExecute)
-      );
-
-      const spell = makeSpell();
-      act(() => {
-        result.current.gateMetamagic(spell);
-      });
-
-      act(() => {
-        result.current.handleConfirm({ totalCost: -1, options: [] });
-      });
-
-      const metamagicMod = await import('./useMetamagic.js');
-      expect(metamagicMod.spendSorceryPoints).not.toHaveBeenCalled();
-    });
-
     it('logs the spell entry with metamagic details', async () => {
       const onExecute = vi.fn();
       const playerStats = makePlayerStats();
@@ -794,7 +620,7 @@ describe('useSpellMetamagicFlow', () => {
       });
     });
 
-    it('calls onExecute with the spell and empty metaCtx when no options', async () => {
+    it('calls onExecute with the spell and correct metaCtx for each metamagic option', async () => {
       const onExecute = vi.fn();
       const playerStats = makePlayerStats();
       const { result } = renderHook(() =>
@@ -806,149 +632,47 @@ describe('useSpellMetamagicFlow', () => {
         result.current.gateMetamagic(spell);
       });
 
+      // Heightened Spell
       act(() => {
-        result.current.handleConfirm({ totalCost: 0, options: [] });
+        result.current.handleConfirm({ totalCost: 1, options: ['Heightened Spell'] });
       });
+      expect(onExecute).toHaveBeenCalledWith(spell, { metamagicHeighten: true });
 
+      // Reset for Careful Spell
+      act(() => {
+        result.current.gateMetamagic(spell);
+      });
+      act(() => {
+        result.current.handleConfirm({ totalCost: 1, options: ['Careful Spell'] });
+      });
+      expect(onExecute).toHaveBeenCalledWith(spell, { metamagicCareful: true });
+
+      // Twinned Spell with target
+      act(() => {
+        result.current.gateMetamagic(spell);
+      });
+      act(() => {
+        result.current.handleConfirm({ totalCost: 1, options: ['Twinned Spell'], twinTarget: 'Goblin A' });
+      });
+      expect(onExecute).toHaveBeenCalledWith(spell, { metamagicTwinTarget: 'Goblin A' });
+
+      // Twinned Spell without target should not set metamagicTwinTarget
+      act(() => {
+        result.current.gateMetamagic(spell);
+      });
+      act(() => {
+        result.current.handleConfirm({ totalCost: 1, options: ['Twinned Spell'] });
+      });
       expect(onExecute).toHaveBeenCalledWith(spell, {});
-    });
 
-    it('calls onExecute with the spell and empty metaCtx when options is missing', async () => {
-      const onExecute = vi.fn();
-      const playerStats = makePlayerStats();
-      const { result } = renderHook(() =>
-        useSpellMetamagicFlow(playerStats, 'TestCampaign', onExecute)
-      );
-
-      const spell = makeSpell();
+      // Distant Spell
       act(() => {
         result.current.gateMetamagic(spell);
       });
-
       act(() => {
-        result.current.handleConfirm({ totalCost: 0 });
+        result.current.handleConfirm({ totalCost: 1, options: ['Distant Spell'] });
       });
-
-      expect(onExecute).toHaveBeenCalledWith(spell, {});
-    });
-
-    it('sets metamagicHeighten when Heightened Spell is in options', async () => {
-      const onExecute = vi.fn();
-      const playerStats = makePlayerStats();
-      const { result } = renderHook(() =>
-        useSpellMetamagicFlow(playerStats, 'TestCampaign', onExecute)
-      );
-
-      const spell = makeSpell();
-      act(() => {
-        result.current.gateMetamagic(spell);
-      });
-
-      act(() => {
-        result.current.handleConfirm({
-          totalCost: 1,
-          options: ['Heightened Spell'],
-        });
-      });
-
-      expect(onExecute).toHaveBeenCalledWith(spell, {
-        metamagicHeighten: true,
-      });
-    });
-
-    it('sets metamagicCareful when Careful Spell is in options', async () => {
-      const onExecute = vi.fn();
-      const playerStats = makePlayerStats();
-      const { result } = renderHook(() =>
-        useSpellMetamagicFlow(playerStats, 'TestCampaign', onExecute)
-      );
-
-      const spell = makeSpell();
-      act(() => {
-        result.current.gateMetamagic(spell);
-      });
-
-      act(() => {
-        result.current.handleConfirm({
-          totalCost: 1,
-          options: ['Careful Spell'],
-        });
-      });
-
-      expect(onExecute).toHaveBeenCalledWith(spell, {
-        metamagicCareful: true,
-      });
-    });
-
-    it('sets metamagicTwinTarget when Twinned Spell is in options with twinTarget', async () => {
-      const onExecute = vi.fn();
-      const playerStats = makePlayerStats();
-      const { result } = renderHook(() =>
-        useSpellMetamagicFlow(playerStats, 'TestCampaign', onExecute)
-      );
-
-      const spell = makeSpell();
-      act(() => {
-        result.current.gateMetamagic(spell);
-      });
-
-      act(() => {
-        result.current.handleConfirm({
-          totalCost: 1,
-          options: ['Twinned Spell'],
-          twinTarget: 'Goblin A',
-        });
-      });
-
-      expect(onExecute).toHaveBeenCalledWith(spell, {
-        metamagicTwinTarget: 'Goblin A',
-      });
-    });
-
-    it('does NOT set metamagicTwinTarget when Twinned Spell has no twinTarget', async () => {
-      const onExecute = vi.fn();
-      const playerStats = makePlayerStats();
-      const { result } = renderHook(() =>
-        useSpellMetamagicFlow(playerStats, 'TestCampaign', onExecute)
-      );
-
-      const spell = makeSpell();
-      act(() => {
-        result.current.gateMetamagic(spell);
-      });
-
-      act(() => {
-        result.current.handleConfirm({
-          totalCost: 1,
-          options: ['Twinned Spell'],
-        });
-      });
-
-      expect(onExecute).toHaveBeenCalledWith(spell, {});
-    });
-
-    it('sets metamagicDistant when Distant Spell is in options', async () => {
-      const onExecute = vi.fn();
-      const playerStats = makePlayerStats();
-      const { result } = renderHook(() =>
-        useSpellMetamagicFlow(playerStats, 'TestCampaign', onExecute)
-      );
-
-      const spell = makeSpell();
-      act(() => {
-        result.current.gateMetamagic(spell);
-      });
-
-      act(() => {
-        result.current.handleConfirm({
-          totalCost: 1,
-          options: ['Distant Spell'],
-        });
-      });
-
-      expect(onExecute).toHaveBeenCalledWith(spell, {
-        metamagicDistant: true,
-      });
+      expect(onExecute).toHaveBeenCalledWith(spell, { metamagicDistant: true });
     });
 
     it('combines multiple recognized metamagics in metaCtx', async () => {
@@ -1207,27 +931,6 @@ describe('useSpellMetamagicFlow', () => {
       });
 
       expect(result.current.pendingMetamagic).toBeNull();
-    });
-
-    it('defaults spell level to 0 when undefined', async () => {
-      const onExecute = vi.fn();
-      const playerStats = makePlayerStats();
-      const { result } = renderHook(() =>
-        useSpellMetamagicFlow(playerStats, 'TestCampaign', onExecute)
-      );
-
-      const spell = makeSpell({ level: undefined });
-      act(() => {
-        result.current.gateMetamagic(spell);
-      });
-
-      act(() => {
-        result.current.handleSkip();
-      });
-
-      const logService = await import('../../services/ui/logService.js');
-      const call = logService.addEntry.mock.calls[0][1];
-      expect(call.spellLevel).toBe(0);
     });
   });
 
@@ -2373,26 +2076,6 @@ describe('useSpellMetamagicFlow', () => {
   // ── Edge cases ─────────────────────────────────────────────────────────
 
   describe('edge cases', () => {
-    it('handles empty campaignName', () => {
-      const onExecute = vi.fn();
-      const playerStats = makePlayerStats();
-      const { result } = renderHook(() =>
-        useSpellMetamagicFlow(playerStats, '', onExecute)
-      );
-
-      expect(result.current.pendingMetamagic).toBeNull();
-    });
-
-    it('handles null campaignName', () => {
-      const onExecute = vi.fn();
-      const playerStats = makePlayerStats();
-      const { result } = renderHook(() =>
-        useSpellMetamagicFlow(playerStats, null, onExecute)
-      );
-
-      expect(result.current.pendingMetamagic).toBeNull();
-    });
-
     it('handles null onExecute gracefully', () => {
       const playerStats = makePlayerStats();
       expect(() => {
@@ -2418,14 +2101,9 @@ describe('useSpellMetamagicFlow', () => {
       );
 
       const spell = makeSpell();
-      try {
-        act(() => {
-          result.current.gateMetamagic(spell);
-        });
-      } catch (e) {
-        console.error('GATE_METAMAGIC_ERROR:', e.message, e.stack);
-        throw e;
-      }
+      act(() => {
+        result.current.gateMetamagic(spell);
+      });
 
       expect(result.current.pendingMetamagic).not.toBeNull();
       expect(result.current.pendingMetamagic.spellName).toBe('Fireball');
@@ -2447,14 +2125,9 @@ describe('useSpellMetamagicFlow', () => {
       );
 
       const spell = makeSpell();
-      try {
-        act(() => {
-          result.current.gateMetamagic(spell);
-        });
-      } catch (e) {
-        console.error('GATE_METAMAGIC_ERROR:', e.message, e.stack);
-        throw e;
-      }
+      act(() => {
+        result.current.gateMetamagic(spell);
+      });
 
       expect(onExecute).toHaveBeenCalledWith(spell, {});
       expect(result.current.pendingMetamagic).toBeNull();

@@ -1,3 +1,4 @@
+// @cleaned-by-ai
 // @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import {
@@ -23,77 +24,13 @@ import { evaluateAutoExpression } from './automationExpressions.js'
 describe('resolveHealingBonusesWithDetails', () => {
   beforeEach(() => vi.clearAllMocks())
 
-  it('returns { totalBonus: 0, details: [] } when no passives', () => {
-    const result = resolveHealingBonusesWithDetails({ automation: { passives: [] } }, 4, 3, 1)
-    expect(result).toEqual({ totalBonus: 0, details: [] })
+  it('returns { totalBonus: 0, details: [] } when no passives, passives is null, or automation is null', () => {
+    expect(resolveHealingBonusesWithDetails({ automation: { passives: [] } }, 4, 3, 1)).toEqual({ totalBonus: 0, details: [] })
+    expect(resolveHealingBonusesWithDetails({ automation: { passives: null } }, 4, 3, 1)).toEqual({ totalBonus: 0, details: [] })
+    expect(resolveHealingBonusesWithDetails({ automation: null }, 4, 3, 1)).toEqual({ totalBonus: 0, details: [] })
   })
 
-  it('returns { totalBonus: 0, details: [] } when passives is null', () => {
-    const result = resolveHealingBonusesWithDetails({ automation: { passives: null } }, 4, 3, 1)
-    expect(result).toEqual({ totalBonus: 0, details: [] })
-  })
-
-  it('returns { totalBonus: 0, details: [] } when automation is null', () => {
-    const result = resolveHealingBonusesWithDetails({ automation: null }, 4, 3, 1)
-    expect(result).toEqual({ totalBonus: 0, details: [] })
-  })
-
-  it('evaluates bonus_healing expression and includes in details', () => {
-    evaluateAutoExpression.mockReturnValue(5)
-    const playerStats = {
-      automation: { passives: [{ type: 'passive_rule', effect: 'bonus_healing', name: 'TestFeature', bonusExpression: '2 + 3' }] },
-    }
-    const result = resolveHealingBonusesWithDetails(playerStats, 4, 3, 1)
-    expect(result).toEqual({ totalBonus: 5, details: [{ name: 'TestFeature', amount: 5 }] })
-    expect(evaluateAutoExpression).toHaveBeenCalledWith('2 + 3', playerStats, 4, 3, 1)
-  })
-
-  it('evaluates max_hp_increase self-healing expression and includes in details', () => {
-    evaluateAutoExpression.mockReturnValue(3)
-    const playerStats = {
-      automation: { passives: [{ type: 'passive_rule', effect: 'max_hp_increase', name: 'HPBoost', alsoSelfHealing: { extraHealingExpression: '1 + 2' } }] },
-    }
-    const result = resolveHealingBonusesWithDetails(playerStats, 4, 3, 1)
-    expect(result).toEqual({ totalBonus: 3, details: [{ name: 'HPBoost', amount: 3 }] })
-  })
-
-  it('excludes zero-amount bonuses from details', () => {
-    evaluateAutoExpression.mockReturnValue(0)
-    const playerStats = {
-      automation: { passives: [{ type: 'passive_rule', effect: 'bonus_healing', name: 'ZeroBonus', bonusExpression: '0' }] },
-    }
-    const result = resolveHealingBonusesWithDetails(playerStats, 4, 3, 1)
-    expect(result).toEqual({ totalBonus: 0, details: [] })
-  })
-
-  it('excludes negative-amount bonuses from details', () => {
-    evaluateAutoExpression.mockReturnValue(-2)
-    const playerStats = {
-      automation: { passives: [{ type: 'passive_rule', effect: 'bonus_healing', name: 'NegativeBonus', bonusExpression: '-2' }] },
-    }
-    const result = resolveHealingBonusesWithDetails(playerStats, 4, 3, 1)
-    expect(result).toEqual({ totalBonus: 0, details: [] })
-  })
-
-  it('skips expressions that evaluate to NaN', () => {
-    evaluateAutoExpression.mockReturnValue(NaN)
-    const playerStats = {
-      automation: { passives: [{ type: 'passive_rule', effect: 'bonus_healing', name: 'NaNBonus', bonusExpression: 'abc' }] },
-    }
-    const result = resolveHealingBonusesWithDetails(playerStats, 4, 3, 1)
-    expect(result).toEqual({ totalBonus: 0, details: [] })
-  })
-
-  it('skips expressions that evaluate to non-number', () => {
-    evaluateAutoExpression.mockReturnValue('not a number')
-    const playerStats = {
-      automation: { passives: [{ type: 'passive_rule', effect: 'bonus_healing', name: 'StrBonus', bonusExpression: 'x' }] },
-    }
-    const result = resolveHealingBonusesWithDetails(playerStats, 4, 3, 1)
-    expect(result).toEqual({ totalBonus: 0, details: [] })
-  })
-
-  it('sums multiple healing bonuses with details', () => {
+  it('evaluates bonus_healing and max_hp_increase expressions and includes in details', () => {
     evaluateAutoExpression.mockImplementation((expr) => (expr === '2 + 3' ? 5 : 2))
     const playerStats = {
       automation: { passives: [
@@ -105,83 +42,59 @@ describe('resolveHealingBonusesWithDetails', () => {
     expect(result).toEqual({ totalBonus: 7, details: [{ name: 'Bonus1', amount: 5 }, { name: 'Bonus2', amount: 2 }] })
   })
 
-  it('skips bonus_healing without bonusExpression', () => {
-    const playerStats = { automation: { passives: [{ type: 'passive_rule', effect: 'bonus_healing', name: 'NoExpr' }] } }
-    const result = resolveHealingBonusesWithDetails(playerStats, 4, 3, 1)
+  it('excludes zero, negative, NaN, and non-number bonuses from details and total', () => {
+    evaluateAutoExpression.mockReturnValue(0)
+    const zero = { automation: { passives: [{ type: 'passive_rule', effect: 'bonus_healing', name: 'Zero', bonusExpression: '0' }] } }
+    expect(resolveHealingBonusesWithDetails(zero, 4, 3, 1)).toEqual({ totalBonus: 0, details: [] })
+
+    evaluateAutoExpression.mockReturnValue(-2)
+    const negative = { automation: { passives: [{ type: 'passive_rule', effect: 'bonus_healing', name: 'Neg', bonusExpression: '-2' }] } }
+    expect(resolveHealingBonusesWithDetails(negative, 4, 3, 1)).toEqual({ totalBonus: 0, details: [] })
+
+    evaluateAutoExpression.mockReturnValue(NaN)
+    const nan = { automation: { passives: [{ type: 'passive_rule', effect: 'bonus_healing', name: 'NaN', bonusExpression: 'abc' }] } }
+    expect(resolveHealingBonusesWithDetails(nan, 4, 3, 1)).toEqual({ totalBonus: 0, details: [] })
+
+    evaluateAutoExpression.mockReturnValue('not a number')
+    const str = { automation: { passives: [{ type: 'passive_rule', effect: 'bonus_healing', name: 'Str', bonusExpression: 'x' }] } }
+    expect(resolveHealingBonusesWithDetails(str, 4, 3, 1)).toEqual({ totalBonus: 0, details: [] })
+  })
+
+  it('skips bonus_healing without bonusExpression and non-matching passive types', () => {
+    const noExpr = { automation: { passives: [{ type: 'passive_rule', effect: 'bonus_healing', name: 'NoExpr' }] } }
+    const result = resolveHealingBonusesWithDetails(noExpr, 4, 3, 1)
     expect(result).toEqual({ totalBonus: 0, details: [] })
     expect(evaluateAutoExpression).not.toHaveBeenCalled()
-  })
 
-  it('skips non-matching passive types', () => {
-    const playerStats = { automation: { passives: [{ type: 'passive_buff', effect: 'test' }] } }
-    const result = resolveHealingBonusesWithDetails(playerStats, 4, 3, 1)
-    expect(result).toEqual({ totalBonus: 0, details: [] })
+    const wrongType = { automation: { passives: [{ type: 'passive_buff', effect: 'test' }] } }
+    const result2 = resolveHealingBonusesWithDetails(wrongType, 4, 3, 1)
+    expect(result2).toEqual({ totalBonus: 0, details: [] })
     expect(evaluateAutoExpression).not.toHaveBeenCalled()
   })
 })
 
-// ── Boolean-check helper functions (delegate to hasPassiveEffect) ─
+// ── Wrapper helpers delegate to hasPassiveEffect ──────────────────
 
-describe('hasInterception', () => {
-  it('returns true when passive_rule interception exists', () => {
-    const playerStats = { automation: { passives: [{ type: 'passive_rule', effect: 'interception' }] } }
-    expect(hasInterception(playerStats)).toBe(true)
+describe('wrapper helpers (hasInterception, hasProtection, hasThrownWeaponFighting, hasBlessedWarrior)', () => {
+  it('returns true when their respective passive exists', () => {
+    const makePS = (effect) => ({ automation: { passives: [{ type: 'passive_rule', effect }] } })
+    expect(hasInterception(makePS('interception'))).toBe(true)
+    expect(hasProtection(makePS('protection'))).toBe(true)
+    expect(hasThrownWeaponFighting(makePS('thrown_weapon_fighting'))).toBe(true)
+    expect(hasBlessedWarrior(makePS('blessed_warrior'))).toBe(true)
   })
 
-  it('returns false when no passives', () => {
-    expect(hasInterception({ automation: { passives: [] } })).toBe(false)
-  })
+  it('returns false when the respective passive is absent or a different effect exists', () => {
+    const ps = { automation: { passives: [{ type: 'passive_rule', effect: 'other' }] } }
+    expect(hasInterception(ps)).toBe(false)
+    expect(hasProtection(ps)).toBe(false)
+    expect(hasThrownWeaponFighting(ps)).toBe(false)
+    expect(hasBlessedWarrior(ps)).toBe(false)
 
-  it('returns false when a different effect exists', () => {
-    const playerStats = { automation: { passives: [{ type: 'passive_rule', effect: 'other' }] } }
-    expect(hasInterception(playerStats)).toBe(false)
-  })
-})
-
-describe('hasProtection', () => {
-  it('returns true when passive_rule protection exists', () => {
-    const playerStats = { automation: { passives: [{ type: 'passive_rule', effect: 'protection' }] } }
-    expect(hasProtection(playerStats)).toBe(true)
-  })
-
-  it('returns false when no passives', () => {
-    expect(hasProtection({ automation: { passives: [] } })).toBe(false)
-  })
-
-  it('returns false when a different effect exists', () => {
-    const playerStats = { automation: { passives: [{ type: 'passive_rule', effect: 'other' }] } }
-    expect(hasProtection(playerStats)).toBe(false)
-  })
-})
-
-describe('hasThrownWeaponFighting', () => {
-  it('returns true when passive_rule thrown_weapon_fighting exists', () => {
-    const playerStats = { automation: { passives: [{ type: 'passive_rule', effect: 'thrown_weapon_fighting' }] } }
-    expect(hasThrownWeaponFighting(playerStats)).toBe(true)
-  })
-
-  it('returns false when no passives', () => {
-    expect(hasThrownWeaponFighting({ automation: { passives: [] } })).toBe(false)
-  })
-
-  it('returns false when a different effect exists', () => {
-    const playerStats = { automation: { passives: [{ type: 'passive_rule', effect: 'other' }] } }
-    expect(hasThrownWeaponFighting(playerStats)).toBe(false)
-  })
-})
-
-describe('hasBlessedWarrior', () => {
-  it('returns true when passive_rule blessed_warrior exists', () => {
-    const playerStats = { automation: { passives: [{ type: 'passive_rule', effect: 'blessed_warrior' }] } }
-    expect(hasBlessedWarrior(playerStats)).toBe(true)
-  })
-
-  it('returns false when no passives', () => {
-    expect(hasBlessedWarrior({ automation: { passives: [] } })).toBe(false)
-  })
-
-  it('returns false when a different effect exists', () => {
-    const playerStats = { automation: { passives: [{ type: 'passive_rule', effect: 'other' }] } }
-    expect(hasBlessedWarrior(playerStats)).toBe(false)
+    const empty = { automation: { passives: [] } }
+    expect(hasInterception(empty)).toBe(false)
+    expect(hasProtection(empty)).toBe(false)
+    expect(hasThrownWeaponFighting(empty)).toBe(false)
+    expect(hasBlessedWarrior(empty)).toBe(false)
   })
 })

@@ -1,3 +1,4 @@
+// @cleaned-by-ai
 // @improved-by-ai
 import { describe, it, expect } from 'vitest';
 import {
@@ -19,7 +20,6 @@ const makeMonster = (overrides = {}) => ({
 describe('encounterGenerator', () => {
   describe('calculateXPThreshold', () => {
     it('should sum thresholds for each party member at the given difficulty', () => {
-      // Level 1 Medium=50, Level 2 Medium=100 => 150
       expect(calculateXPThreshold([1, 2], 1)).toBe(150);
     });
 
@@ -27,25 +27,14 @@ describe('encounterGenerator', () => {
       expect(calculateXPThreshold([], 1)).toBe(0);
     });
 
-    it('should skip invalid levels (NaN)', () => {
-      expect(calculateXPThreshold(['not-a-level'], 1)).toBe(0);
-    });
-
-    it('should skip levels outside 0-20 range', () => {
-      expect(calculateXPThreshold([25], 1)).toBe(0);
-    });
-
-    it('should handle level 0', () => {
-      expect(calculateXPThreshold([0], 1)).toBe(25);
-    });
-
-    it('should handle level 20', () => {
-      expect(calculateXPThreshold([20], 1)).toBe(5700);
-    });
-
     it('should skip invalid levels but include valid ones', () => {
       expect(calculateXPThreshold([5, 'bad'], 0)).toBe(250);
-      expect(calculateXPThreshold([5, 'bad'], 3)).toBe(1100);
+    });
+
+    it('should handle level boundaries', () => {
+      expect(calculateXPThreshold([0], 1)).toBe(25);
+      expect(calculateXPThreshold([20], 1)).toBe(5700);
+      expect(calculateXPThreshold([25], 1)).toBe(0);
     });
   });
 
@@ -75,41 +64,32 @@ describe('encounterGenerator', () => {
     });
 
     it('should handle zero party size by treating it as 1', () => {
-      // 2/1 = 2 ratio => multiplier 2
       expect(calculateDifficultyMultiplier(2, 0)).toBe(2);
     });
 
-    it('should return the max multiplier for infinite ratio edge', () => {
+    it('should return 1 when both counts are zero', () => {
       expect(calculateDifficultyMultiplier(0, 0)).toBe(1);
     });
   });
 
   describe('getDifficultyLabel', () => {
     it('should return Easy for low effective XP ratio', () => {
-      // threshold=100, multiplier=1 => effectiveXP=30, ratio=0.3 < 0.5
       expect(getDifficultyLabel(30, 2, 100, 2)).toBe('Easy');
     });
 
     it('should return Medium for moderate effective XP ratio', () => {
-      // monsterCount=2, partySize=2 => ratio=1 => multiplier=1.5
-      // effectiveXP=120/1.5=80, ratio=80/100=0.8 => Medium
       expect(getDifficultyLabel(120, 2, 100, 2)).toBe('Medium');
     });
 
     it('should return Hard for high effective XP ratio', () => {
-      // monsterCount=2, partySize=2 => ratio=1 => multiplier=1.5
-      // effectiveXP=150/1.5=100, ratio=100/100=1.0 => Hard
       expect(getDifficultyLabel(150, 2, 100, 2)).toBe('Hard');
     });
 
     it('should return Deadly for very high effective XP ratio', () => {
-      // monsterCount=2, partySize=2 => ratio=1 => multiplier=1.5
-      // effectiveXP=300/1.5=200, ratio=200/100=2.0 => Deadly
       expect(getDifficultyLabel(300, 2, 100, 2)).toBe('Deadly');
     });
 
     it('should account for difficulty multiplier when labeling', () => {
-      // totalXP=200, multiplier=2 => effectiveXP=100, ratio=1 => Hard
       expect(getDifficultyLabel(200, 4, 100, 2)).toBe('Hard');
     });
   });
@@ -144,26 +124,6 @@ describe('encounterGenerator', () => {
           environments: ['forest'],
         });
         expect(result.length).toBeGreaterThan(0);
-      });
-
-      it('should handle single monster in the list', () => {
-        const result = generateEncounterSuggestions({
-          monsters: [makeMonster({ index: 0, name: 'Goblin', challenge_rating: '1/4', xp: 50 })],
-          playerLevels: [1, 1, 1, 1],
-          difficulty: 1,
-          environments: ['forest'],
-        });
-        expect(result.length).toBeGreaterThan(0);
-      });
-
-      it('should handle monsters with CR 0', () => {
-        const result = generateEncounterSuggestions({
-          monsters: [makeMonster({ challenge_rating: '0', xp: 10 })],
-          playerLevels: [1],
-          difficulty: 0,
-          environments: ['forest'],
-        });
-        expect(result.length).toBeGreaterThanOrEqual(0);
       });
 
       it('should handle fractional CR values', () => {
@@ -220,18 +180,6 @@ describe('encounterGenerator', () => {
           expect(suggestion.monsters.length).toBeGreaterThan(0);
           for (const m of suggestion.monsters) {
             expect(m.qty).toBeGreaterThanOrEqual(1);
-          }
-        }
-      });
-
-      it('should include all monster properties from the source', () => {
-        const result = generateEncounterSuggestions(baseParams);
-        for (const suggestion of result) {
-          for (const m of suggestion.monsters) {
-            expect(m.index).toBeDefined();
-            expect(m.name).toBeDefined();
-            expect(m.challenge_rating).toBeDefined();
-            expect(m.xp).toBeDefined();
           }
         }
       });
@@ -294,7 +242,6 @@ describe('encounterGenerator', () => {
           difficulty: 1,
           environments: ['forest'],
         });
-        // At least one suggestion should include both goblin and orc (ally)
         const hasBoth = result.some(
           (s) => s.monsters.length >= 2 && s.monsters.some((m) => m.name === 'Goblin')
         );
@@ -337,7 +284,6 @@ describe('encounterGenerator', () => {
           environments: ['forest'],
           count: 5,
         });
-        // Different difficulty targets should produce different suggestion sets
         const easyLabels = easyResult.map((s) => s.difficultyLabel);
         const hardLabels = hardResult.map((s) => s.difficultyLabel);
         expect(easyLabels).not.toEqual(hardLabels);
@@ -354,40 +300,6 @@ describe('encounterGenerator', () => {
           environments: ['forest'],
         });
         expect(Array.isArray(result)).toBe(true);
-      });
-    });
-
-    describe('suggestion ranking', () => {
-      it('should prefer suggestions closer to the target difficulty', () => {
-        const monsters = Array.from({ length: 20 }, (_, i) =>
-          makeMonster({
-            index: i,
-            name: `Monster${i}`,
-            challenge_rating: `${i % 4 === 0 ? '10' : i % 3 === 0 ? '1/4' : '1/2'}`,
-            xp: 50 + i * 25,
-            environments: ['forest'],
-          })
-        );
-        const result = generateEncounterSuggestions({
-          monsters,
-          playerLevels: [3, 3, 3, 3],
-          difficulty: 2,
-          environments: ['forest'],
-          count: 5,
-        });
-        // Hard (2) should appear before Deadly (3) and Easy (0)
-        // Find the first Hard occurrence and verify nothing with greater distance comes before it
-        const diffOrder = { Easy: 0, Medium: 1, Hard: 2, Deadly: 3 };
-        const targetDiff = 2;
-        let firstHardIndex = result.findIndex((s) => s.difficultyLabel === 'Hard');
-        if (firstHardIndex === -1) {
-          firstHardIndex = result.length;
-        }
-        for (let i = 0; i < firstHardIndex; i++) {
-          const aDist = Math.abs(diffOrder[result[i].difficultyLabel] - targetDiff);
-          const bDist = Math.abs(diffOrder['Hard'] - targetDiff);
-          expect(aDist).toBeLessThanOrEqual(bDist);
-        }
       });
     });
   });

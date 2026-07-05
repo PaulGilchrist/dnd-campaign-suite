@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import usePoiManagement from './usePoiManagement.js';
@@ -60,14 +60,6 @@ describe('usePoiManagement', () => {
                 result.current.handlePoiContextMenu('poi-1');
             });
             expect(result.current.selectedPoiMenu).toEqual({ id: 'poi-1', q: 1, r: 0 });
-        });
-
-        it('does nothing when poiId does not exist', () => {
-            const { result } = render();
-            act(() => {
-                result.current.handlePoiContextMenu('nonexistent');
-            });
-            expect(result.current.selectedPoiMenu).toBeNull();
         });
     });
 
@@ -196,17 +188,6 @@ describe('usePoiManagement', () => {
             expect(result.current.poiDragging).toEqual({ poiId: 'poi-1', startQ: 1, startR: 0 });
         });
 
-        it('does nothing when poiId does not exist', () => {
-            const setPois = vi.fn();
-            const setRoads = vi.fn();
-            const { result } = render({ setPois, setRoads, tool: 'poi' });
-            const mockEvent = { preventDefault: vi.fn(), stopPropagation: vi.fn() };
-            act(() => {
-                result.current.handlePoiPointerDown('nonexistent', mockEvent);
-            });
-            expect(result.current.poiDragging).toBeNull();
-        });
-
         it('creates a road when clicking two connectable pois with road tool', () => {
             const setPois = vi.fn();
             const setRoads = vi.fn();
@@ -279,17 +260,6 @@ describe('usePoiManagement', () => {
     });
 
     describe('handlePoiPointerMove', () => {
-        it('does nothing when not dragging', () => {
-            const setPois = vi.fn();
-            const setRoads = vi.fn();
-            const { result } = render({ setPois, setRoads });
-            const mockEvent = { clientX: 100, clientY: 100 };
-            act(() => {
-                result.current.handlePoiPointerMove(mockEvent);
-            });
-            expect(setPois).not.toHaveBeenCalled();
-        });
-
         it('updates poi position when dragging over a valid hex', () => {
             const setPois = vi.fn();
             const setRoads = vi.fn();

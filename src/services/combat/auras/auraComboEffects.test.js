@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ── Mocks BEFORE imports (hoisted by vitest) ───────────────────
@@ -45,7 +45,6 @@ function mockCannotActSequence(values) {
     const result = values[i++] ?? false;
     return result;
   });
-  // Also set the default return to false for any calls beyond the array
   hasCannotActCondition.mockReturnValue(false);
 }
 
@@ -96,31 +95,12 @@ describe('computeAuraComboEffects', () => {
       });
     });
 
-    it('returns defaults when only Aura of Protection is present without any secondary aura', async () => {
-    setupDefaults();
-      const chars = [
-        makeCharacter('Alice', []),
-        makeCharacter('Paladin', [AURA_OF_PROTECTION]),
-      ];
-      const result = await computeAuraComboEffects({
-        targetName: 'Alice',
-        characters: chars,
-        campaignName: 'test',
-        activeMapName: null,
-      });
-      expect(result.speedBonus).toBe(0);
-      expect(result.speedSource).toBeNull();
-      expect(result.immunities).toEqual([]);
-      expect(result.immunitySources).toEqual({});
-      expect(result.resistances).toEqual([]);
-      expect(result.resistanceSource).toBeNull();
-    });
-
-    it('skips entries with no computedStats', async () => {
-    setupDefaults();
+    it('skips entries with no computedStats or null computedStats', async () => {
+      setupDefaults();
       const chars = [
         makeCharacter('Alice', []),
         { name: 'Ghost' },
+        { name: 'Phantom', computedStats: null },
       ];
       const result = await computeAuraComboEffects({
         targetName: 'Alice',
@@ -132,25 +112,12 @@ describe('computeAuraComboEffects', () => {
       expect(result.speedSource).toBeNull();
     });
 
-    it('skips entries with null computedStats', async () => {
-      const chars = [
-        makeCharacter('Alice', []),
-        { name: 'Ghost', computedStats: null },
-      ];
-      const result = await computeAuraComboEffects({
-        targetName: 'Alice',
-        characters: chars,
-        campaignName: 'test',
-        activeMapName: null,
-      });
-      expect(result.speedBonus).toBe(0);
-    });
-
-    it('skips entries with empty passives array', async () => {
+    it('handles missing automation or passives gracefully', async () => {
       hasAuraOfProtection.mockReturnValue(false);
       const chars = [
         makeCharacter('Alice', []),
-        makeCharacter('Paladin', []),
+        { name: 'Paladin', computedStats: {} },
+        { name: 'Wizard', computedStats: { automation: {} } },
       ];
       const result = await computeAuraComboEffects({
         targetName: 'Alice',
@@ -164,7 +131,7 @@ describe('computeAuraComboEffects', () => {
 
   describe('Aura of Alacrity — speed bonus', () => {
     it('applies speed bonus from a single Paladin', async () => {
-    setupDefaults();
+      setupDefaults();
       const chars = [
         makeCharacter('Alice', []),
         makeCharacter('Paladin', [AURA_OF_PROTECTION, AURA_OF_ALACRITY]),
@@ -180,7 +147,7 @@ describe('computeAuraComboEffects', () => {
     });
 
     it('defaults to 10 when bonusExpression is missing', async () => {
-    setupDefaults();
+      setupDefaults();
       const chars = [
         makeCharacter('Alice', []),
         makeCharacter('Paladin', [AURA_OF_PROTECTION, AURA_OF_ALACRITY_NO_BONUS]),
@@ -195,31 +162,14 @@ describe('computeAuraComboEffects', () => {
       expect(result.speedSource).toBe('Paladin');
     });
 
-    it('picks highest speed bonus from multiple sources', async () => {
-    setupDefaults();
+    it('picks highest speed bonus from multiple sources regardless of order', async () => {
+      setupDefaults();
       const auraAlacrity15 = { name: 'Aura of Alacrity', type: 'passive_buff', effect: 'speed_bonus', bonusExpression: '+15 ft.' };
-      const chars = [
-        makeCharacter('Alice', []),
-        makeCharacter('Paladin1', [AURA_OF_PROTECTION, AURA_OF_ALACRITY]),
-        makeCharacter('Paladin2', [AURA_OF_PROTECTION, auraAlacrity15]),
-      ];
-      const result = await computeAuraComboEffects({
-        targetName: 'Alice',
-        characters: chars,
-        campaignName: 'test',
-        activeMapName: null,
-      });
-      expect(result.speedBonus).toBe(15);
-      expect(result.speedSource).toBe('Paladin2');
-    });
-
-    it('picks higher bonus even when it comes first', async () => {
-    setupDefaults();
       const auraAlacrity20 = { name: 'Aura of Alacrity', type: 'passive_buff', effect: 'speed_bonus', bonusExpression: '+20 ft.' };
       const chars = [
         makeCharacter('Alice', []),
         makeCharacter('Paladin1', [AURA_OF_PROTECTION, auraAlacrity20]),
-        makeCharacter('Paladin2', [AURA_OF_PROTECTION, AURA_OF_ALACRITY]),
+        makeCharacter('Paladin2', [AURA_OF_PROTECTION, auraAlacrity15]),
       ];
       const result = await computeAuraComboEffects({
         targetName: 'Alice',
@@ -232,7 +182,7 @@ describe('computeAuraComboEffects', () => {
     });
 
     it('applies effects to the aura bearer themselves', async () => {
-    setupDefaults();
+      setupDefaults();
       const chars = [
         makeCharacter('Paladin', [AURA_OF_PROTECTION, AURA_OF_ALACRITY]),
       ];
@@ -247,7 +197,7 @@ describe('computeAuraComboEffects', () => {
     });
 
     it('ignores non-speed-bonus passives on the same character', async () => {
-    setupDefaults();
+      setupDefaults();
       const passiveWithoutSpeed = { name: 'Aura of Fortitude', type: 'passive_buff', effect: 'hp_boost' };
       const chars = [
         makeCharacter('Alice', []),
@@ -264,12 +214,13 @@ describe('computeAuraComboEffects', () => {
     });
   });
 
-  describe('Aura of Courage — frightened immunity', () => {
-    it('adds frightened to immunities with correct source', async () => {
-    setupDefaults();
+  describe('Aura of Courage / Devotion — condition immunities', () => {
+    it('adds frightened and charmed immunities with correct sources', async () => {
+      setupDefaults();
       const chars = [
         makeCharacter('Alice', []),
-        makeCharacter('Paladin', [AURA_OF_PROTECTION, AURA_OF_COURAGE]),
+        makeCharacter('Paladin1', [AURA_OF_PROTECTION, AURA_OF_COURAGE]),
+        makeCharacter('Paladin2', [AURA_OF_PROTECTION, AURA_OF_DEVOTION]),
       ];
       const result = await computeAuraComboEffects({
         targetName: 'Alice',
@@ -278,11 +229,13 @@ describe('computeAuraComboEffects', () => {
         activeMapName: null,
       });
       expect(result.immunities).toContain('frightened');
-      expect(result.immunitySources.frightened).toBe('Paladin');
+      expect(result.immunities).toContain('charmed');
+      expect(result.immunitySources.frightened).toBe('Paladin1');
+      expect(result.immunitySources.charmed).toBe('Paladin2');
     });
 
-    it('overwrites source when a second Paladin also grants it', async () => {
-    setupDefaults();
+    it('overwrites source when a second Paladin grants the same immunity', async () => {
+      setupDefaults();
       const chars = [
         makeCharacter('Alice', []),
         makeCharacter('Paladin1', [AURA_OF_PROTECTION, AURA_OF_COURAGE]),
@@ -294,16 +247,16 @@ describe('computeAuraComboEffects', () => {
         campaignName: 'test',
         activeMapName: null,
       });
-      expect(result.immunities).toContain('frightened');
       expect(result.immunitySources.frightened).toBe('Paladin2');
     });
 
-    it('does not add immunity when aura is not present', async () => {
-    setupDefaults();
-      const passiveWithoutCourage = { name: 'Aura of Fortitude', type: 'passive_buff' };
+    it('ignores passives with wrong name or wrong conditionImmunity', async () => {
+      const fakeCourage = { name: 'Aura of Courage', type: 'passive_buff', conditionImmunity: 'poisoned' };
+      const fakeCourageName = { name: 'Other Courage', type: 'passive_buff', conditionImmunity: 'frightened' };
       const chars = [
         makeCharacter('Alice', []),
-        makeCharacter('Paladin', [AURA_OF_PROTECTION, passiveWithoutCourage]),
+        makeCharacter('Paladin1', [AURA_OF_PROTECTION, fakeCourage]),
+        makeCharacter('Paladin2', [AURA_OF_PROTECTION, fakeCourageName]),
       ];
       const result = await computeAuraComboEffects({
         targetName: 'Alice',
@@ -312,48 +265,12 @@ describe('computeAuraComboEffects', () => {
         activeMapName: null,
       });
       expect(result.immunities).not.toContain('frightened');
-      expect(result.immunitySources.frightened).toBeUndefined();
-    });
-  });
-
-  describe('Aura of Devotion — charmed immunity', () => {
-    it('adds charmed to immunities with correct source', async () => {
-    setupDefaults();
-      const chars = [
-        makeCharacter('Alice', []),
-        makeCharacter('Paladin', [AURA_OF_PROTECTION, AURA_OF_DEVOTION]),
-      ];
-      const result = await computeAuraComboEffects({
-        targetName: 'Alice',
-        characters: chars,
-        campaignName: 'test',
-        activeMapName: null,
-      });
-      expect(result.immunities).toContain('charmed');
-      expect(result.immunitySources.charmed).toBe('Paladin');
-    });
-
-    it('overwrites source when a second Paladin also grants it', async () => {
-    setupDefaults();
-      const chars = [
-        makeCharacter('Alice', []),
-        makeCharacter('Paladin1', [AURA_OF_PROTECTION, AURA_OF_DEVOTION]),
-        makeCharacter('Paladin2', [AURA_OF_PROTECTION, AURA_OF_DEVOTION]),
-      ];
-      const result = await computeAuraComboEffects({
-        targetName: 'Alice',
-        characters: chars,
-        campaignName: 'test',
-        activeMapName: null,
-      });
-      expect(result.immunities).toContain('charmed');
-      expect(result.immunitySources.charmed).toBe('Paladin2');
     });
   });
 
   describe('Aura of Warding — resistances', () => {
     it('applies resistances with correct source', async () => {
-    setupDefaults();
+      setupDefaults();
       const chars = [
         makeCharacter('Alice', []),
         makeCharacter('Paladin', [AURA_OF_PROTECTION, AURA_OF_WARDING]),
@@ -368,8 +285,8 @@ describe('computeAuraComboEffects', () => {
       expect(result.resistanceSource).toBe('Paladin');
     });
 
-    it('deduplicates resistances from multiple sources', async () => {
-    setupDefaults();
+    it('deduplicates and merges resistances from multiple sources', async () => {
+      setupDefaults();
       const auraWarding2 = { name: 'Aura of Warding', type: 'passive_buff', resistances: ['Necrotic', 'Fire'] };
       const chars = [
         makeCharacter('Alice', []),
@@ -387,44 +304,41 @@ describe('computeAuraComboEffects', () => {
       expect(result.resistanceSource).toBe('Paladin2');
     });
 
-    it('does not add resistances when resistances array is empty', async () => {
-    setupDefaults();
+    it('does not add resistances when array is empty or missing', async () => {
+      setupDefaults();
       const auraWardingEmpty = { name: 'Aura of Warding', type: 'passive_buff', resistances: [] };
-      const chars = [
-        makeCharacter('Alice', []),
-        makeCharacter('Paladin', [AURA_OF_PROTECTION, auraWardingEmpty]),
-      ];
-      const result = await computeAuraComboEffects({
-        targetName: 'Alice',
-        characters: chars,
-        campaignName: 'test',
-        activeMapName: null,
-      });
-      expect(result.resistances).toEqual([]);
-      expect(result.resistanceSource).toBeNull();
-    });
-
-    it('does not add resistances when resistances property is missing', async () => {
-    setupDefaults();
       const auraWardingMissing = { name: 'Aura of Warding', type: 'passive_buff' };
-      const chars = [
+      const charsEmpty = [
         makeCharacter('Alice', []),
-        makeCharacter('Paladin', [AURA_OF_PROTECTION, auraWardingMissing]),
+        makeCharacter('Paladin1', [AURA_OF_PROTECTION, auraWardingEmpty]),
       ];
-      const result = await computeAuraComboEffects({
+      const result1 = await computeAuraComboEffects({
         targetName: 'Alice',
-        characters: chars,
+        characters: charsEmpty,
         campaignName: 'test',
         activeMapName: null,
       });
-      expect(result.resistances).toEqual([]);
-      expect(result.resistanceSource).toBeNull();
+      expect(result1.resistances).toEqual([]);
+      expect(result1.resistanceSource).toBeNull();
+
+      const charsMissing = [
+        makeCharacter('Alice', []),
+        makeCharacter('Paladin2', [AURA_OF_PROTECTION, auraWardingMissing]),
+      ];
+      const result2 = await computeAuraComboEffects({
+        targetName: 'Alice',
+        characters: charsMissing,
+        campaignName: 'test',
+        activeMapName: null,
+      });
+      expect(result2.resistances).toEqual([]);
+      expect(result2.resistanceSource).toBeNull();
     });
   });
 
-  describe('combining multiple aura types from a single source', () => {
+  describe('combining multiple aura types', () => {
     it('applies all combo effects from a single Paladin', async () => {
-    setupDefaults();
+      setupDefaults();
       const chars = [
         makeCharacter('Alice', []),
         makeCharacter('Paladin', [AURA_OF_PROTECTION, AURA_OF_ALACRITY, AURA_OF_COURAGE, AURA_OF_DEVOTION, AURA_OF_WARDING]),
@@ -442,34 +356,14 @@ describe('computeAuraComboEffects', () => {
       expect(result.resistances).toEqual(expect.arrayContaining(['Necrotic', 'Psychic', 'Radiant']));
       expect(result.resistanceSource).toBe('Paladin');
     });
-  });
 
-  describe('combining effects from multiple sources', () => {
-    it('combines different immunities from multiple Paladins', async () => {
-    setupDefaults();
-      const chars = [
-        makeCharacter('Alice', []),
-        makeCharacter('Paladin1', [AURA_OF_PROTECTION, AURA_OF_COURAGE]),
-        makeCharacter('Paladin2', [AURA_OF_PROTECTION, AURA_OF_DEVOTION]),
-      ];
-      const result = await computeAuraComboEffects({
-        targetName: 'Alice',
-        characters: chars,
-        campaignName: 'test',
-        activeMapName: null,
-      });
-      expect(result.immunities).toContain('frightened');
-      expect(result.immunities).toContain('charmed');
-      expect(result.immunitySources.frightened).toBe('Paladin1');
-      expect(result.immunitySources.charmed).toBe('Paladin2');
-    });
-
-    it('combines speed bonus with immunities from different sources', async () => {
-    setupDefaults();
+    it('combines speed, immunities, and resistances from different Paladins', async () => {
+      setupDefaults();
       const chars = [
         makeCharacter('Alice', []),
         makeCharacter('Paladin1', [AURA_OF_PROTECTION, AURA_OF_ALACRITY]),
         makeCharacter('Paladin2', [AURA_OF_PROTECTION, AURA_OF_COURAGE]),
+        makeCharacter('Paladin3', [AURA_OF_PROTECTION, AURA_OF_WARDING]),
       ];
       const result = await computeAuraComboEffects({
         targetName: 'Alice',
@@ -481,25 +375,8 @@ describe('computeAuraComboEffects', () => {
       expect(result.speedSource).toBe('Paladin1');
       expect(result.immunities).toContain('frightened');
       expect(result.immunitySources.frightened).toBe('Paladin2');
-    });
-
-    it('combines immunities and resistances from different sources', async () => {
-    setupDefaults();
-      const chars = [
-        makeCharacter('Alice', []),
-        makeCharacter('Paladin1', [AURA_OF_PROTECTION, AURA_OF_COURAGE]),
-        makeCharacter('Paladin2', [AURA_OF_PROTECTION, AURA_OF_WARDING]),
-      ];
-      const result = await computeAuraComboEffects({
-        targetName: 'Alice',
-        characters: chars,
-        campaignName: 'test',
-        activeMapName: null,
-      });
-      expect(result.immunities).toContain('frightened');
       expect(result.resistances).toEqual(expect.arrayContaining(['Necrotic', 'Psychic', 'Radiant']));
-      expect(result.immunitySources.frightened).toBe('Paladin1');
-      expect(result.resistanceSource).toBe('Paladin2');
+      expect(result.resistanceSource).toBe('Paladin3');
     });
   });
 
@@ -523,7 +400,6 @@ describe('computeAuraComboEffects', () => {
     it('still applies effects from other sources when one is incapacitated', async () => {
       hasAuraOfProtection.mockImplementation(() => true);
       isWithinRange.mockImplementation(async () => true);
-      hasCannotActCondition.mockImplementation(() => false);
       let cannotActIndex = 0;
       const cannotActValues = [true, false];
       hasCannotActCondition.mockImplementation(() => cannotActValues[cannotActIndex++] ?? false);
@@ -580,6 +456,7 @@ describe('computeAuraComboEffects', () => {
 
     it('still applies effects from in-range sources when one is out of range', async () => {
       hasAuraOfProtection.mockImplementation(() => true);
+      isWithinRange.mockImplementation(async () => true);
       let rangeIndex = 0;
       const rangeValues = [false, true];
       isWithinRange.mockImplementation(async () => rangeValues[rangeIndex++] ?? true);
@@ -617,7 +494,7 @@ describe('computeAuraComboEffects', () => {
     });
 
     it('calls isWithinRange even when activeMapName is null', async () => {
-    setupDefaults();
+      setupDefaults();
       const chars = [
         makeCharacter('Alice', []),
         makeCharacter('Paladin', [AURA_OF_PROTECTION, AURA_OF_ALACRITY]),
@@ -629,87 +506,6 @@ describe('computeAuraComboEffects', () => {
         activeMapName: null,
       });
       expect(isWithinRange).toHaveBeenCalled();
-    });
-  });
-
-  describe('passive matching edge cases', () => {
-    it('ignores passives with wrong name even if they have conditionImmunity', async () => {
-    setupDefaults();
-      const fakeCourage = { name: 'Other Courage', type: 'passive_buff', conditionImmunity: 'frightened' };
-      const chars = [
-        makeCharacter('Alice', []),
-        makeCharacter('Paladin', [AURA_OF_PROTECTION, fakeCourage]),
-      ];
-      const result = await computeAuraComboEffects({
-        targetName: 'Alice',
-        characters: chars,
-        campaignName: 'test',
-        activeMapName: null,
-      });
-      expect(result.immunities).not.toContain('frightened');
-    });
-
-    it('ignores passives with wrong effect even if Aura of Alacrity name', async () => {
-    setupDefaults();
-      const fakeAlacrity = { name: 'Aura of Alacrity', type: 'passive_buff', effect: 'not_speed_bonus' };
-      const chars = [
-        makeCharacter('Alice', []),
-        makeCharacter('Paladin', [AURA_OF_PROTECTION, fakeAlacrity]),
-      ];
-      const result = await computeAuraComboEffects({
-        targetName: 'Alice',
-        characters: chars,
-        campaignName: 'test',
-        activeMapName: null,
-      });
-      expect(result.speedBonus).toBe(0);
-    });
-
-    it('ignores passives with wrong conditionImmunity even if Aura of Courage name', async () => {
-      const fakeCourage = { name: 'Aura of Courage', type: 'passive_buff', conditionImmunity: 'poisoned' };
-      const chars = [
-        makeCharacter('Alice', []),
-        makeCharacter('Paladin', [AURA_OF_PROTECTION, fakeCourage]),
-      ];
-      const result = await computeAuraComboEffects({
-        targetName: 'Alice',
-        characters: chars,
-        campaignName: 'test',
-        activeMapName: null,
-      });
-      expect(result.immunities).not.toContain('frightened');
-    });
-  });
-
-  describe('automation passives shape edge cases', () => {
-    it('handles missing automation gracefully', async () => {
-      hasAuraOfProtection.mockReturnValue(false);
-      const chars = [
-        makeCharacter('Alice', []),
-        { name: 'Paladin', computedStats: {} },
-      ];
-      const result = await computeAuraComboEffects({
-        targetName: 'Alice',
-        characters: chars,
-        campaignName: 'test',
-        activeMapName: null,
-      });
-      expect(result.speedBonus).toBe(0);
-    });
-
-    it('handles automation without passives gracefully', async () => {
-      hasAuraOfProtection.mockReturnValue(false);
-      const chars = [
-        makeCharacter('Alice', []),
-        { name: 'Paladin', computedStats: { automation: {} } },
-      ];
-      const result = await computeAuraComboEffects({
-        targetName: 'Alice',
-        characters: chars,
-        campaignName: 'test',
-        activeMapName: null,
-      });
-      expect(result.speedBonus).toBe(0);
     });
   });
 });

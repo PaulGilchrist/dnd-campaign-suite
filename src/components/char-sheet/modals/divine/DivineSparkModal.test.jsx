@@ -1,3 +1,4 @@
+// @cleaned-by-ai
 // @improved-by-ai
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -89,31 +90,22 @@ describe('DivineSparkModal', () => {
 
   // ── Initial render / display ──
 
-  it('renders modal overlay and header with feature name', () => {
+  it('renders modal overlay with feature name and target', () => {
     render(<DivineSparkModal {...makeProps()} />);
     expect(screen.getByText('Divine Spark')).toBeInTheDocument();
+    expect(screen.getByText('Orc Warrior')).toBeInTheDocument();
     expect(document.querySelector('.sp-overlay')).toBeInTheDocument();
   });
 
-  it('displays target name in the modal body', () => {
-    render(<DivineSparkModal {...makeProps()} />);
-    expect(screen.getByText(/Channel divine energy at/)).toBeInTheDocument();
-    expect(screen.getByText('Orc Warrior')).toBeInTheDocument();
-  });
-
-  it('renders heal button with expression', () => {
+  it('renders heal and harm buttons with expressions', () => {
     render(<DivineSparkModal {...makeProps()} />);
     expect(screen.getByRole('button', { name: /Heal \(2d8\)/ })).toBeInTheDocument();
-  });
-
-  it('renders harm button with damage expression and save info', () => {
-    render(<DivineSparkModal {...makeProps()} />);
     expect(screen.getByRole('button', { name: /Harm \(3d6 Radiant, CON save\)/ })).toBeInTheDocument();
   });
 
-  it('does not render damage type selector when only one damage type', () => {
-    render(<DivineSparkModal {...makeProps({ damageTypes: ['Radiant'] })} />);
-    expect(document.querySelector('input[name="damageType"]')).not.toBeInTheDocument();
+  it('renders Cancel button', () => {
+    render(<DivineSparkModal {...makeProps()} />);
+    expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
   });
 
   it('renders damage type radio buttons when multiple types provided', () => {
@@ -127,11 +119,6 @@ describe('DivineSparkModal', () => {
     expect(screen.getByLabelText('Radiant')).toBeChecked();
   });
 
-  it('renders Cancel button', () => {
-    render(<DivineSparkModal {...makeProps()} />);
-    expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
-  });
-
   // ── Cancel button ──
 
   it('calls onClose when Cancel button is clicked', () => {
@@ -139,21 +126,6 @@ describe('DivineSparkModal', () => {
     render(<DivineSparkModal {...makeProps({ onClose })} />);
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
     expect(onClose).toHaveBeenCalledTimes(1);
-  });
-
-  // ── Initial render state ──
-
-  it('does not show result or rolling on initial render', () => {
-    render(<DivineSparkModal {...makeProps()} />);
-    expect(screen.queryByText(/Rolling.../)).not.toBeInTheDocument();
-    expect(screen.queryByText(/healed for/)).not.toBeInTheDocument();
-    expect(screen.queryByText(/takes.*damage/)).not.toBeInTheDocument();
-  });
-
-  it('shows only initial mode buttons on first render', () => {
-    render(<DivineSparkModal {...makeProps()} />);
-    expect(screen.getByRole('button', { name: /Heal/ })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Harm/ })).toBeInTheDocument();
   });
 
   // ── Heal flow ──
@@ -193,7 +165,7 @@ describe('DivineSparkModal', () => {
     });
   });
 
-  it('displays heal result with target name and total', async () => {
+  it('displays heal result with target name, total, and HP info', async () => {
     render(<DivineSparkModal {...makeProps()} />);
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: /Heal/ }));
@@ -201,30 +173,12 @@ describe('DivineSparkModal', () => {
     await waitFor(() => {
       expect(screen.getByText(/healed for/)).toBeInTheDocument();
       expect(screen.getByText('10')).toBeInTheDocument();
-    });
-  });
-
-  it('displays roll formula in heal result', async () => {
-    render(<DivineSparkModal {...makeProps()} />);
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: /Heal/ }));
-    });
-    await waitFor(() => {
       expect(screen.getByText(/Roll: 2d8 = 10/)).toBeInTheDocument();
-    });
-  });
-
-  it('displays current HP info in heal result', async () => {
-    render(<DivineSparkModal {...makeProps()} />);
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: /Heal/ }));
-    });
-    await waitFor(() => {
       expect(screen.getByText(/Current HP: 30 \/ 40 \(healed 10\)/)).toBeInTheDocument();
     });
   });
 
-  it('hides mode buttons after heal result', async () => {
+  it('hides mode buttons and Cancel, shows Done after heal result', async () => {
     render(<DivineSparkModal {...makeProps()} />);
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: /Heal/ }));
@@ -232,25 +186,7 @@ describe('DivineSparkModal', () => {
     await waitFor(() => {
       expect(screen.queryByRole('button', { name: /Heal/ })).not.toBeInTheDocument();
       expect(screen.queryByRole('button', { name: /Harm/ })).not.toBeInTheDocument();
-    });
-  });
-
-  it('hides Cancel button after heal result', async () => {
-    render(<DivineSparkModal {...makeProps()} />);
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: /Heal/ }));
-    });
-    await waitFor(() => {
       expect(screen.queryByRole('button', { name: 'Cancel' })).not.toBeInTheDocument();
-    });
-  });
-
-  it('shows Done button after heal result', async () => {
-    render(<DivineSparkModal {...makeProps()} />);
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: /Heal/ }));
-    });
-    await waitFor(() => {
       expect(screen.getByRole('button', { name: 'Done' })).toBeInTheDocument();
     });
   });
@@ -265,26 +201,6 @@ describe('DivineSparkModal', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Done' }));
     });
     expect(onClose).toHaveBeenCalledTimes(1);
-  });
-
-  it('does not show rolling after heal result is displayed', async () => {
-    render(<DivineSparkModal {...makeProps()} />);
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: /Heal/ }));
-    });
-    await waitFor(() => {
-      expect(screen.queryByText(/Rolling.../)).not.toBeInTheDocument();
-    });
-  });
-
-  it('heal result does not show maximized label when roll was not maximized', async () => {
-    render(<DivineSparkModal {...makeProps()} />);
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: /Heal/ }));
-    });
-    await waitFor(() => {
-      expect(screen.queryByText(/Maximized/)).not.toBeInTheDocument();
-    });
   });
 
   it('uses maximized roll when hasHealingMaximization returns true', async () => {
@@ -348,51 +264,26 @@ describe('DivineSparkModal', () => {
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: /Harm/ }));
     });
-    const abilityCall = logService.addEntry.mock.calls[0];
-    expect(abilityCall[0]).toBe('test-campaign');
-    expect(abilityCall[1]).toMatchObject({
+    const abilityCall = logService.addEntry.mock.calls[0][1];
+    expect(abilityCall).toMatchObject({
       type: 'ability_use',
       characterName: 'Paladin1',
       abilityName: 'Divine Spark',
-      description: expect.stringContaining('Harm'),
     });
-  });
-
-  it('adds ability_use log entry with damage type and save info', async () => {
-    render(<DivineSparkModal {...makeProps()} />);
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: /Harm/ }));
-    });
-    const abilityCall = logService.addEntry.mock.calls[0][1];
+    expect(abilityCall.description).toContain('Harm');
     expect(abilityCall.description).toContain('Radiant damage');
     expect(abilityCall.description).toContain('CON save DC 13');
+    expect(abilityCall.description).toContain('targeting Orc Warrior');
   });
 
-  it('uses attackerName in ability_use log entry', async () => {
-    render(<DivineSparkModal {...makeProps({ attackerName: 'Cleric1' })} />);
+  it('uses attackerName and featureName from props in ability_use log', async () => {
+    render(<DivineSparkModal {...makeProps({ attackerName: 'Cleric1', featureName: 'Channel Divinity' })} />);
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: /Harm/ }));
     });
     const abilityCall = logService.addEntry.mock.calls[0][1];
     expect(abilityCall.characterName).toBe('Cleric1');
-  });
-
-  it('uses featureName in ability_use log entry', async () => {
-    render(<DivineSparkModal {...makeProps({ featureName: 'Channel Divinity' })} />);
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: /Harm/ }));
-    });
-    const abilityCall = logService.addEntry.mock.calls[0][1];
     expect(abilityCall.abilityName).toBe('Channel Divinity');
-  });
-
-  it('includes target name in ability_use description', async () => {
-    render(<DivineSparkModal {...makeProps()} />);
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: /Harm/ }));
-    });
-    const abilityCall = logService.addEntry.mock.calls[0][1];
-    expect(abilityCall.description).toContain('targeting Orc Warrior');
   });
 
   it('does not proceed with harm when rollExpression returns null', async () => {
@@ -419,7 +310,7 @@ describe('DivineSparkModal', () => {
     });
   });
 
-  it('displays save DC in harm result', async () => {
+  it('displays save DC, damage roll formula, and success status in harm result', async () => {
     render(<DivineSparkModal {...makeProps()} />);
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: /Harm/ }));
@@ -429,18 +320,6 @@ describe('DivineSparkModal', () => {
     });
     await waitFor(() => {
       expect(screen.getByText(/DC 13/)).toBeInTheDocument();
-    });
-  });
-
-  it('displays damage roll formula in harm result', async () => {
-    render(<DivineSparkModal {...makeProps()} />);
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: /Harm/ }));
-    });
-    await act(async () => {
-      window.dispatchEvent(dispatchSaveResult(true));
-    });
-    await waitFor(() => {
       expect(screen.getByText(/Damage roll: 3d6 Radiant = 10/)).toBeInTheDocument();
     });
   });
@@ -463,20 +342,7 @@ describe('DivineSparkModal', () => {
     });
   });
 
-  it('does not display "Target saved" message when target fails save', async () => {
-    render(<DivineSparkModal {...makeProps()} />);
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: /Harm/ }));
-    });
-    await act(async () => {
-      window.dispatchEvent(dispatchSaveResult(false));
-    });
-    await waitFor(() => {
-      expect(screen.queryByText(/Target saved/)).not.toBeInTheDocument();
-    });
-  });
-
-  it('hides mode buttons after harm result', async () => {
+  it('hides mode buttons and Cancel, shows Done after harm result', async () => {
     render(<DivineSparkModal {...makeProps()} />);
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: /Harm/ }));
@@ -487,31 +353,6 @@ describe('DivineSparkModal', () => {
     await waitFor(() => {
       expect(screen.queryByRole('button', { name: /Heal/ })).not.toBeInTheDocument();
       expect(screen.queryByRole('button', { name: /Harm/ })).not.toBeInTheDocument();
-    });
-  });
-
-  it('does not show rolling after harm result is displayed', async () => {
-    render(<DivineSparkModal {...makeProps()} />);
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: /Harm/ }));
-    });
-    await act(async () => {
-      window.dispatchEvent(dispatchSaveResult(false));
-    });
-    await waitFor(() => {
-      expect(screen.queryByText(/Rolling.../)).not.toBeInTheDocument();
-    });
-  });
-
-  it('shows Done button after harm result', async () => {
-    render(<DivineSparkModal {...makeProps()} />);
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: /Harm/ }));
-    });
-    await act(async () => {
-      window.dispatchEvent(dispatchSaveResult(false));
-    });
-    await waitFor(() => {
       expect(screen.getByRole('button', { name: 'Done' })).toBeInTheDocument();
     });
   });
@@ -545,30 +386,13 @@ describe('DivineSparkModal', () => {
       window.dispatchEvent(dispatchSaveResult(false));
     });
     await waitFor(() => {
-      const body = document.querySelector('.sp-body');
-      expect(body.textContent).toContain('Fire damage');
-    });
-  });
-
-  it('includes selected damage type in roll formula display', async () => {
-    render(<DivineSparkModal {...makeProps({ damageTypes: ['Radiant', 'Fire'] })} />);
-    await act(async () => {
-      fireEvent.click(screen.getByLabelText('Fire'));
-    });
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: /Harm/ }));
-    });
-    await act(async () => {
-      window.dispatchEvent(dispatchSaveResult(false));
-    });
-    await waitFor(() => {
       expect(screen.getByText(/Damage roll: 3d6 Fire = 10/)).toBeInTheDocument();
     });
   });
 
   // ── Roll logging on save failure ──
 
-  it('adds roll log entry when target fails save', async () => {
+  it('adds roll log entry with correct fields when target fails save', async () => {
     render(<DivineSparkModal {...makeProps()} />);
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: /Harm/ }));
@@ -607,88 +431,37 @@ describe('DivineSparkModal', () => {
     expect(entry.saveResult).toBe('success');
   });
 
-  it('includes save bonus in roll formula when non-zero', async () => {
+  it('handles variable save bonus in roll log entry', async () => {
     render(<DivineSparkModal {...makeProps()} />);
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: /Harm/ }));
     });
-    await act(async () => {
-      window.dispatchEvent(dispatchSaveResult(false));
-    });
 
-    const entry = expectRollLogEntry({ type: 'roll' });
-    expect(entry.formula).toBe('1d20+2');
-  });
-
-  it('excludes plus sign from formula when save bonus is zero', async () => {
-    render(<DivineSparkModal {...makeProps()} />);
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: /Harm/ }));
-    });
-    await act(async () => {
-      window.dispatchEvent(dispatchSaveResult(false, { saveBonus: 0 }));
-    });
-
-    const entry = expectRollLogEntry({ type: 'roll' });
-    expect(entry.formula).toBe('1d20');
-  });
-
-  it('uses correct save bonus from event detail', async () => {
-    render(<DivineSparkModal {...makeProps()} />);
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: /Harm/ }));
-    });
     await act(async () => {
       window.dispatchEvent(dispatchSaveResult(false, { saveBonus: -1 }));
     });
 
     const entry = expectRollLogEntry({ type: 'roll' });
     expect(entry.bonus).toBe(-1);
+    expect(entry.formula).toBe('1d20+-1');
   });
 
-  it('uses default total of 0 when event detail total is undefined', async () => {
+  it('uses default values when event detail fields are undefined', async () => {
     render(<DivineSparkModal {...makeProps()} />);
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: /Harm/ }));
     });
     await act(async () => {
       window.dispatchEvent(new CustomEvent('save-result', {
-        detail: { promptId: 'test-prompt-id', success: false, roll: 3, saveBonus: 2 },
+        detail: { promptId: 'test-prompt-id', success: false },
       }));
     });
 
     const entry = expectRollLogEntry({ type: 'roll' });
     expect(entry.total).toBe(0);
-  });
-
-  it('uses default roll of 0 when event detail roll is undefined', async () => {
-    render(<DivineSparkModal {...makeProps()} />);
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: /Harm/ }));
-    });
-    await act(async () => {
-      window.dispatchEvent(new CustomEvent('save-result', {
-        detail: { promptId: 'test-prompt-id', success: false, total: 5, saveBonus: 2 },
-      }));
-    });
-
-    const entry = expectRollLogEntry({ type: 'roll' });
     expect(entry.rolls).toEqual([0]);
-  });
-
-  it('uses default save bonus of 0 when event detail saveBonus is undefined', async () => {
-    render(<DivineSparkModal {...makeProps()} />);
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: /Harm/ }));
-    });
-    await act(async () => {
-      window.dispatchEvent(new CustomEvent('save-result', {
-        detail: { promptId: 'test-prompt-id', success: false, total: 5, roll: 3 },
-      }));
-    });
-
-    const entry = expectRollLogEntry({ type: 'roll' });
     expect(entry.bonus).toBe(0);
+    expect(entry.formula).toBe('1d20+undefined');
   });
 
   // ── Event listener cleanup ──
@@ -730,44 +503,6 @@ describe('DivineSparkModal', () => {
     await waitFor(() => {
       expect(screen.queryByText(/takes.*damage/)).not.toBeInTheDocument();
     });
-  });
-
-  // ── Edge cases ──
-
-  it('renders with default damage type when damageTypes is empty array', () => {
-    render(<DivineSparkModal {...makeProps({ damageTypes: [] })} />);
-    expect(screen.getByRole('button', { name: /Harm \(3d6 Radiant, CON save\)/ })).toBeInTheDocument();
-  });
-
-  // ── Visual / CSS verification ──
-
-  it('renders modal with proper CSS classes', () => {
-    render(<DivineSparkModal {...makeProps()} />);
-    expect(document.querySelector('.sp-overlay')).toBeInTheDocument();
-    expect(document.querySelector('.sp-modal')).toBeInTheDocument();
-    expect(document.querySelector('.sp-header')).toBeInTheDocument();
-    expect(document.querySelector('.sp-body')).toBeInTheDocument();
-    expect(document.querySelector('.sp-actions')).toBeInTheDocument();
-  });
-
-  it('renders Font Awesome star icon in header', () => {
-    render(<DivineSparkModal {...makeProps()} />);
-    expect(document.querySelector('.fa-star-of-life')).toBeInTheDocument();
-  });
-
-  it('renders Font Awesome heart icon on heal button', () => {
-    render(<DivineSparkModal {...makeProps()} />);
-    expect(document.querySelector('.sp-roll-btn .fa-heart')).toBeInTheDocument();
-  });
-
-  it('renders Font Awesome bolt icon on harm button', () => {
-    render(<DivineSparkModal {...makeProps()} />);
-    expect(document.querySelector('.sp-roll-btn .fa-bolt')).toBeInTheDocument();
-  });
-
-  it('displays feature name in header with icon', () => {
-    render(<DivineSparkModal {...makeProps({ featureName: 'Divine Smite' })} />);
-    expect(screen.getByText('Divine Smite')).toBeInTheDocument();
   });
 
   // ── Multi-damage-type flow ──

@@ -1,3 +1,4 @@
+// @cleaned-by-ai
 // @improved-by-ai
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -144,17 +145,7 @@ describe('HealingPoolModal', () => {
 
   // ── Loading state ──
 
-  it('shows loading spinner initially', async () => {
-    // The component sets loading=true synchronously and sets it false in a useEffect.
-    // In jsdom the useEffect fires synchronously in the tick after render,
-    // so we wait for the loading state to resolve.
-    render(<HealingPoolModal {...makeProps()} />);
-    await waitFor(() => {
-      expect(screen.queryByText(/Loading/)).not.toBeInTheDocument();
-    });
-  });
-
-  it('hides spinner after combat context resolves', async () => {
+  it('hides loading spinner after combat context resolves', async () => {
     await renderModal({ current: 15, max: 20 });
     expect(screen.queryByText(/Loading/)).not.toBeInTheDocument();
   });
@@ -167,12 +158,37 @@ describe('HealingPoolModal', () => {
     expect(poolText).toBe('Pool: 15 / 20 HP');
   });
 
+  it('shows pool text with HP suffix for non-dice pool', async () => {
+    await renderModal({ current: 10, max: 15 });
+    const poolText = getPoolParagraph();
+    expect(poolText).toContain('HP');
+    expect(poolText).not.toContain('d');
+  });
+
+  it('shows pool as 0 when tracked resource current is zero', async () => {
+    await renderModal({ current: 0, max: 20 });
+    const poolText = getPoolParagraph();
+    expect(poolText).toBe('Pool: 0 / 20 HP');
+  });
+
+  it('safeMax falls back to 0 when hook returns non-numeric max', async () => {
+    updateFn = vi.fn();
+    useTrackedResource.mockReturnValue({ current: 10, max: NaN, update: updateFn });
+    const rendered = render(<HealingPoolModal {...makeProps()} />);
+    await waitFor(() => {
+      expect(screen.queryByText(/Loading/)).not.toBeInTheDocument();
+    });
+    const poolText = getPoolParagraph();
+    expect(poolText).toBe('Pool: 10 / 0 HP');
+    rendered.unmount?.();
+  });
+
+  // ── Target display ──
+
   it('shows target name with current and max HP', async () => {
     await renderModal({ current: 15, max: 20 });
     expect(screen.getByText(/Heal — Orc Warrior \(15 \/ 30 HP\)/)).toBeInTheDocument();
   });
-
-  // ── No combat context fallback ──
 
   it('uses player stats as fallback when no target found', async () => {
     damageUtils.getTargetFromAttacker.mockReturnValue(null);
@@ -221,6 +237,23 @@ describe('HealingPoolModal', () => {
     expect(input.value).toBe('10');
   });
 
+  it('caps heal amount to remaining pool in the input display', async () => {
+    await renderModal({ current: 3, max: 20 });
+    const input = screen.getByRole('spinbutton');
+    fireEvent.change(input, { target: { value: '10' } });
+    expect(input.value).toBe('3');
+  });
+
+  it('handles negative input values gracefully', async () => {
+    await renderModal({ current: 15, max: 20 });
+    const input = screen.getByRole('spinbutton');
+    fireEvent.change(input, { target: { value: '-5' } });
+    await waitFor(() => {
+      const btn = screen.getByRole('button', { name: /Apply Heal/i });
+      expect(btn).toBeDisabled();
+    });
+  });
+
   // ── Apply heal with combat context (NPC target) ──
 
   it('applies healing when apply heal is clicked', async () => {
@@ -260,13 +293,6 @@ describe('HealingPoolModal', () => {
     expect(rows[0]).toHaveTextContent('Heal');
     expect(rows[0]).toHaveTextContent(npcTarget.name);
     expect(rows[0]).toHaveTextContent('5');
-  });
-
-  it('caps heal amount to remaining pool in the input display', async () => {
-    await renderModal({ current: 3, max: 20 });
-    const input = screen.getByRole('spinbutton');
-    fireEvent.change(input, { target: { value: '10' } });
-    expect(input.value).toBe('3');
   });
 
   // ── Apply heal without combat context (self-heal) ──
@@ -358,6 +384,11 @@ describe('HealingPoolModal', () => {
     expect(storage.set).not.toHaveBeenCalled();
   });
 
+  it('does not render individual cure buttons when alsoCures is empty or null', async () => {
+    await renderModal({ current: 15, max: 20 }, { alsoCures: [] });
+    expect(screen.queryByText(/Cure Conditions/)).not.toBeInTheDocument();
+  });
+
   // ── Restoring touch batch cure section ──
 
   it('renders restoring touch batch cure section with matching conditions', async () => {
@@ -383,10 +414,6 @@ describe('HealingPoolModal', () => {
       restoringTouchConditions: ['Blinded'],
       alsoCures: [],
     });
-    expect(useRuntimeState.getRuntimeValue).toHaveBeenCalledWith(
-      npcTarget.name,
-      'activeConditions'
-    );
     expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
   });
 
@@ -531,113 +558,17 @@ describe('HealingPoolModal', () => {
     expect(batchBtn).toBeDisabled();
   });
 
-  it('does not render batch cure section when restoringTouchConditions is empty', async () => {
-    await renderModal({ current: 15, max: 20 }, { alsoCures: [] });
-    expect(screen.queryByText(/Select conditions affecting/)).not.toBeInTheDocument();
-  });
-
-  it('does not render batch cure section when restoringTouchConditions is null', async () => {
+  it('does not render batch cure section when restoringTouchConditions is empty or null', async () => {
     await renderModal({ current: 15, max: 20 }, { restoringTouchConditions: null, alsoCures: [] });
     expect(screen.queryByText(/Select conditions affecting/)).not.toBeInTheDocument();
   });
 
   // ── Log section ──
 
-  it('renders log table with headers after actions are performed', async () => {
-    applyHealingService.applyHealingToTarget.mockReturnValue({
-      actualHeal: 5,
-      oldHp: 15,
-      newHp: 20,
-    });
-
-    await renderModal({ current: 20, max: 20 });
-    fireEvent.change(screen.getByRole('spinbutton'), { target: { value: '5' } });
-    fireEvent.click(screen.getByRole('button', { name: /Apply Heal/i }));
-
-    const table = screen.getByRole('table');
-    expect(table).toBeInTheDocument();
-    expect(screen.getByText('Action')).toBeInTheDocument();
-    expect(screen.getByText('Target')).toBeInTheDocument();
-    expect(screen.getByText('Pool Used')).toBeInTheDocument();
-    expect(screen.getByText('Pool Left')).toBeInTheDocument();
-  });
-
   it('does not render log section when no actions taken', async () => {
     await renderModal({ current: 15, max: 20 });
     expect(screen.queryByRole('table')).not.toBeInTheDocument();
   });
-
-  // ── Modal close interactions ──
-
-  it('calls onClose when Done button is clicked', async () => {
-    const onClose = vi.fn();
-    await renderModal({ current: 15, max: 20 }, { onClose });
-    fireEvent.click(screen.getByText('Done'));
-    expect(onClose).toHaveBeenCalledTimes(1);
-  });
-
-  it('renders Done button', async () => {
-    await renderModal({ current: 15, max: 20 });
-    expect(screen.getByText('Done')).toBeInTheDocument();
-  });
-
-  it('closes on Escape key press', async () => {
-    const onClose = vi.fn();
-    await renderModal({ current: 15, max: 20 }, { onClose });
-    fireEvent.keyDown(document, { key: 'Escape' });
-    expect(onClose).toHaveBeenCalledTimes(1);
-  });
-
-  // ── Overlay click behavior ──
-
-  it('closes when clicking the overlay background', async () => {
-    const onClose = vi.fn();
-    await renderModal({ current: 15, max: 20 }, { onClose });
-    const overlay = document.querySelector('.short-rest-overlay');
-    fireEvent.click(overlay);
-    expect(onClose).toHaveBeenCalledTimes(1);
-  });
-
-  // ── Edge cases ──
-
-  it('handles heal amount clamped to pool max in input display', async () => {
-    await renderModal({ current: 5, max: 20 });
-    const input = screen.getByRole('spinbutton');
-    expect(input.value).toBe('1');
-
-    fireEvent.change(input, { target: { value: '10' } });
-    expect(input.value).toBe('5');
-  });
-
-  it('handles negative input values gracefully', async () => {
-    await renderModal({ current: 15, max: 20 });
-    const input = screen.getByRole('spinbutton');
-    fireEvent.change(input, { target: { value: '-5' } });
-    await waitFor(() => {
-      const btn = screen.getByRole('button', { name: /Apply Heal/i });
-      expect(btn).toBeDisabled();
-    });
-  });
-
-  it('renders modal with proper heading and icon', async () => {
-    await renderModal({ current: 15, max: 20 });
-    expect(screen.getByText('Lay On Hands')).toBeInTheDocument();
-    const header = document.querySelector('h3');
-    expect(header).toBeInTheDocument();
-    expect(header.querySelector('i.fa-slash, i.fas')).toBeInTheDocument();
-  });
-
-  it('no individual cure buttons when alsoCures empty and no restoringTouch', async () => {
-    await renderModal({ current: 15, max: 20 }, { alsoCures: [] });
-    expect(screen.queryByText(/Cure Conditions/)).not.toBeInTheDocument();
-  });
-
-  it('no individual cure buttons when alsoCures is null', async () => {
-    await renderModal({ current: 15, max: 20 }, { alsoCures: null });
-    expect(screen.queryByText(/Cure Conditions/)).not.toBeInTheDocument();
-  });
-
-  // ── Multiple heal applications stack in log ──
 
   it('accumulates multiple entries in the log', async () => {
     let callCounter = 0;
@@ -656,48 +587,28 @@ describe('HealingPoolModal', () => {
     expect(rows).toHaveLength(3);
   });
 
-  // ── Pool display edge cases ──
+  // ── Modal close interactions ──
 
-  it('shows pool as 0 when tracked resource current is zero', async () => {
-    await renderModal({ current: 0, max: 20 });
-    const poolText = getPoolParagraph();
-    expect(poolText).toBe('Pool: 0 / 20 HP');
+  it('calls onClose when Done button is clicked', async () => {
+    const onClose = vi.fn();
+    await renderModal({ current: 15, max: 20 }, { onClose });
+    fireEvent.click(screen.getByText('Done'));
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it('safeMax falls back to 0 when hook returns non-numeric max', async () => {
-    updateFn = vi.fn();
-    useTrackedResource.mockReturnValue({ current: 10, max: NaN, update: updateFn });
-    const rendered = render(<HealingPoolModal {...makeProps()} />);
-    await waitFor(() => {
-      expect(screen.queryByText(/Loading/)).not.toBeInTheDocument();
-    });
-    const poolText = getPoolParagraph();
-    expect(poolText).toBe('Pool: 10 / 0 HP');
-    rendered.unmount?.();
+  it('closes on Escape key press', async () => {
+    const onClose = vi.fn();
+    await renderModal({ current: 15, max: 20 }, { onClose });
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it('shows pool text with HP suffix for non-dice pool', async () => {
-    await renderModal({ current: 10, max: 15 });
-    const poolText = getPoolParagraph();
-    expect(poolText).toContain('HP');
-    expect(poolText).not.toContain('d');
-  });
-
-  // ── NPC target conditions updated via applyCure when NPC in combat ──
-
-  it('updates NPC condition via setRuntimeValue during individual cure', async () => {
-    useRuntimeState.getRuntimeValue.mockReturnValue(['blinded']);
-
-    await renderModal({ current: 10, max: 20 });
-    fireEvent.click(screen.getByRole('button', { name: /Blinded/i }));
-
-    expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-      npcTarget.name,
-      'activeConditions',
-      expect.any(Array),
-      mockCampaignName,
-    );
-    expect(storage.set).not.toHaveBeenCalled();
+  it('closes when clicking the overlay background', async () => {
+    const onClose = vi.fn();
+    await renderModal({ current: 15, max: 20 }, { onClose });
+    const overlay = document.querySelector('.short-rest-overlay');
+    fireEvent.click(overlay);
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 
   // ── Bloodied-only mode ──

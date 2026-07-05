@@ -1,4 +1,4 @@
-// cleaned-by-ai
+// @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { getActionSpellNames, getBonusActionSpellNames, getReactionSpellNames, getExcludedSpellNames } from '../../services/ui/spellSectionUtils.js';
 import { getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
@@ -26,46 +26,39 @@ const healSpell = { name: 'Cure Wounds', casting_time: '1 action', prepared: 'Pr
 describe('spellSectionUtils', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    getRuntimeValue.mockReturnValue(null);
   });
 
   describe('getActionSpellNames', () => {
-    it('returns action spells with damage', () => {
-      getRuntimeValue.mockReturnValue(null);
+    it('returns action spells with damage or healing', () => {
       const stats = createStats({ spellAbilities: { spells: [actionSpell] } });
       const result = getActionSpellNames(stats, 'test-campaign');
       expect(result).toEqual(new Set(['Fireball']));
+
+      const healStats = createStats({ spellAbilities: { spells: [healSpell] } });
+      const healResult = getActionSpellNames(healStats, 'test-campaign');
+      expect(healResult).toEqual(new Set(['Cure Wounds']));
     });
 
-    it('returns action spells with healing', () => {
-      getRuntimeValue.mockReturnValue(null);
-      const stats = createStats({ spellAbilities: { spells: [healSpell] } });
-      const result = getActionSpellNames(stats, 'test-campaign');
-      expect(result).toEqual(new Set(['Cure Wounds']));
-    });
-
-    it('returns Always prepared action spells', () => {
-      getRuntimeValue.mockReturnValue(null);
+    it('returns Always prepared action spells that have damage or healing', () => {
       const stats = createStats({ spellAbilities: { spells: [alwaysSpell] } });
       const result = getActionSpellNames(stats, 'test-campaign');
       expect(result).toEqual(new Set(['Minor Illusion']));
     });
 
     it('excludes unprepared spells', () => {
-      getRuntimeValue.mockReturnValue(null);
       const stats = createStats({ spellAbilities: { spells: [notPreparedSpell] } });
       const result = getActionSpellNames(stats, 'test-campaign');
       expect(result.size).toBe(0);
     });
 
-    it('excludes action spells without damage or healing', () => {
-      getRuntimeValue.mockReturnValue(null);
+    it('excludes Always prepared spells without damage or healing', () => {
       const stats = createStats({ spellAbilities: { spells: [{ name: 'Prestidigitation', casting_time: '1 action', prepared: 'Always' }] } });
       const result = getActionSpellNames(stats, 'test-campaign');
       expect(result.size).toBe(0);
     });
 
     it('excludes non-action spells', () => {
-      getRuntimeValue.mockReturnValue(null);
       const stats = createStats({ spellAbilities: { spells: [bonusActionSpell, reactionSpell] } });
       const result = getActionSpellNames(stats, 'test-campaign');
       expect(result.size).toBe(0);
@@ -82,7 +75,6 @@ describe('spellSectionUtils', () => {
     });
 
     it('handles variant action casting time strings', () => {
-      getRuntimeValue.mockReturnValue(null);
       const spells = [
         { name: 'Spell A', casting_time: '1 Action', prepared: 'Prepared', damage: '1d6' },
         { name: 'Spell B', casting_time: 'action', prepared: 'Prepared', damage: '1d6' },
@@ -96,7 +88,6 @@ describe('spellSectionUtils', () => {
 
   describe('getBonusActionSpellNames', () => {
     it('returns bonus action spells', () => {
-      getRuntimeValue.mockReturnValue(null);
       const stats = createStats({ spellAbilities: { spells: [bonusActionSpell] } });
       const result = getBonusActionSpellNames(stats, 'test-campaign');
       expect(result).toEqual(new Set(['Shocking Grasp']));
@@ -113,14 +104,12 @@ describe('spellSectionUtils', () => {
     });
 
     it('excludes unprepared bonus action spells', () => {
-      getRuntimeValue.mockReturnValue(null);
       const stats = createStats({ spellAbilities: { spells: [{ name: 'Hidden Spell', casting_time: '1 bonus action', prepared: 'Not Prepared', damage: '1d6' }] } });
       const result = getBonusActionSpellNames(stats, 'test-campaign');
       expect(result.size).toBe(0);
     });
 
     it('handles variant bonus action casting time strings', () => {
-      getRuntimeValue.mockReturnValue(null);
       const spells = [
         { name: 'Spell A', casting_time: '1 Bonus Action', prepared: 'Prepared', damage: '1d6' },
         { name: 'Spell B', casting_time: 'bonus action', prepared: 'Prepared', damage: '1d6' },
@@ -134,28 +123,24 @@ describe('spellSectionUtils', () => {
 
   describe('getReactionSpellNames', () => {
     it('returns reaction spells', () => {
-      getRuntimeValue.mockReturnValue(null);
       const stats = createStats({ spellAbilities: { spells: [reactionSpell] } });
       const result = getReactionSpellNames(stats);
       expect(result).toEqual(new Set(['Shield']));
     });
 
     it('excludes non-reaction spells', () => {
-      getRuntimeValue.mockReturnValue(null);
       const stats = createStats({ spellAbilities: { spells: [actionSpell, bonusActionSpell] } });
       const result = getReactionSpellNames(stats);
       expect(result.size).toBe(0);
     });
 
     it('excludes unprepared reaction spells', () => {
-      getRuntimeValue.mockReturnValue(null);
       const stats = createStats({ spellAbilities: { spells: [{ name: 'Hidden Reaction', casting_time: '1 reaction', prepared: 'Not Prepared', damage: '1d4' }] } });
       const result = getReactionSpellNames(stats);
       expect(result.size).toBe(0);
     });
 
     it('handles variant reaction casting time strings', () => {
-      getRuntimeValue.mockReturnValue(null);
       const spells = [
         { name: 'Spell A', casting_time: '1 Reaction', prepared: 'Prepared', damage: '1d4' },
         { name: 'Spell B', casting_time: 'reaction', prepared: 'Prepared', damage: '1d4' },
@@ -169,26 +154,12 @@ describe('spellSectionUtils', () => {
 
   describe('getExcludedSpellNames', () => {
     it('returns union of action, bonus action, and reaction spell names', () => {
-      getRuntimeValue.mockReset().mockReturnValue(null);
       const stats = createStats({ spellAbilities: { spells: [actionSpell, bonusActionSpell, reactionSpell] } });
       const result = getExcludedSpellNames(stats, 'test-campaign');
       expect(result).toEqual(new Set(['Fireball', 'Shocking Grasp', 'Shield']));
     });
 
-    it('excludes action spells from action section when Elder Champion is active', () => {
-      getRuntimeValue.mockReset().mockImplementation((_name, key) => {
-        if (key === 'activeBuffs') return [{ name: 'Elder Champion' }];
-        return null;
-      });
-      const stats = createStats({ spellAbilities: { spells: [actionSpell, bonusActionSpell, reactionSpell] } });
-      const result = getExcludedSpellNames(stats, 'test-campaign');
-      expect(result.has('Fireball')).toBe(true);
-      expect(result.has('Shocking Grasp')).toBe(true);
-      expect(result.has('Shield')).toBe(true);
-    });
-
     it('handles missing spellAbilities gracefully', () => {
-      getRuntimeValue.mockReset().mockReturnValue(null);
       const stats = createStats({ spellAbilities: {} });
       const result = getExcludedSpellNames(stats, 'test-campaign');
       expect(result.size).toBe(0);

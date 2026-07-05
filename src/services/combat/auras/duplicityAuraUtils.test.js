@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 // ── Mocks ───────────────────────────────────────────────────────
@@ -63,7 +63,7 @@ describe('getDuplicityAdvantageAgainst', () => {
       expect(result).toEqual({ advantage: false })
     })
 
-    it('returns false when mapData.players is missing', () => {
+    it('returns false when mapData.players is missing or empty', () => {
       const result = getDuplicityAdvantageAgainst({
         targetPos: { gridX: 1, gridY: 1 },
         attackerName: 'Attacker',
@@ -72,33 +72,20 @@ describe('getDuplicityAdvantageAgainst', () => {
         skipRangeCheck: false,
       })
       expect(result).toEqual({ advantage: false })
-    })
 
-    it('returns false when mapData.players is empty', () => {
-      const result = getDuplicityAdvantageAgainst({
+      const result2 = getDuplicityAdvantageAgainst({
         targetPos: { gridX: 1, gridY: 1 },
         attackerName: 'Attacker',
         campaignName: '',
         mapData: makeMapData([]),
         skipRangeCheck: false,
       })
-      expect(result).toEqual({ advantage: false })
+      expect(result2).toEqual({ advantage: false })
     })
 
-    it('returns false when targetPos is null', () => {
+    it.each([null, undefined])('returns false when targetPos is %s', (targetPos) => {
       const result = getDuplicityAdvantageAgainst({
-        targetPos: null,
-        attackerName: 'Attacker',
-        campaignName: '',
-        mapData: makeMapData([makePlayer('Cleric')]),
-        skipRangeCheck: false,
-      })
-      expect(result).toEqual({ advantage: false })
-    })
-
-    it('returns false when targetPos is undefined', () => {
-      const result = getDuplicityAdvantageAgainst({
-        targetPos: undefined,
+        targetPos,
         attackerName: 'Attacker',
         campaignName: '',
         mapData: makeMapData([makePlayer('Cleric')]),
@@ -122,18 +109,7 @@ describe('getDuplicityAdvantageAgainst', () => {
       expect(result).toEqual({ advantage: false })
     })
 
-    it('returns false when getRuntimeValue returns null or undefined', () => {
-      const result = getDuplicityAdvantageAgainst({
-        targetPos: { gridX: 1, gridY: 1 },
-        attackerName: 'Attacker',
-        campaignName: '',
-        mapData: makeMapData([makePlayer('Attacker'), makePlayer('Cleric')]),
-        skipRangeCheck: true,
-      })
-      expect(result).toEqual({ advantage: false })
-    })
-
-    it('returns false when getRuntimeValue returns a non-array', () => {
+    it('returns false when getRuntimeValue returns null, undefined, or a non-array', () => {
       getRuntimeValue.mockReturnValue('not-an-array')
 
       const result = getDuplicityAdvantageAgainst({
@@ -311,13 +287,13 @@ describe('getDuplicityAdvantageAgainst', () => {
       expect(result).toEqual({ advantage: true, source: 'Cleric' })
     })
 
-    it('returns true when distance is under 5ft', () => {
+    it('returns true when distance is under 5ft or zero (same square)', () => {
       getRuntimeValue.mockImplementation((name) =>
         name === 'Cleric' ? [makeImprovedDuplicityBuff()] : [],
       )
-      getDistanceFeet.mockReturnValue(3)
 
-      const result = getDuplicityAdvantageAgainst({
+      getDistanceFeet.mockReturnValue(3)
+      const result1 = getDuplicityAdvantageAgainst({
         targetPos: { gridX: 1, gridY: 1 },
         attackerName: 'Attacker',
         campaignName: '',
@@ -327,16 +303,10 @@ describe('getDuplicityAdvantageAgainst', () => {
         ]),
         skipRangeCheck: false,
       })
-      expect(result).toEqual({ advantage: true, source: 'Cleric' })
-    })
+      expect(result1).toEqual({ advantage: true, source: 'Cleric' })
 
-    it('returns true when distance is zero (same square)', () => {
-      getRuntimeValue.mockImplementation((name) =>
-        name === 'Cleric' ? [makeImprovedDuplicityBuff()] : [],
-      )
       getDistanceFeet.mockReturnValue(0)
-
-      const result = getDuplicityAdvantageAgainst({
+      const result2 = getDuplicityAdvantageAgainst({
         targetPos: { gridX: 1, gridY: 1 },
         attackerName: 'Attacker',
         campaignName: '',
@@ -346,16 +316,16 @@ describe('getDuplicityAdvantageAgainst', () => {
         ]),
         skipRangeCheck: false,
       })
-      expect(result).toEqual({ advantage: true, source: 'Cleric' })
+      expect(result2).toEqual({ advantage: true, source: 'Cleric' })
     })
 
-    it('returns false when distance is over 5ft', () => {
+    it('returns false when distance is over 5ft or just over (5.5)', () => {
       getRuntimeValue.mockImplementation((name) =>
         name === 'Cleric' ? [makeImprovedDuplicityBuff()] : [],
       )
-      getDistanceFeet.mockReturnValue(10)
 
-      const result = getDuplicityAdvantageAgainst({
+      getDistanceFeet.mockReturnValue(10)
+      const result1 = getDuplicityAdvantageAgainst({
         targetPos: { gridX: 1, gridY: 1 },
         attackerName: 'Attacker',
         campaignName: '',
@@ -365,16 +335,10 @@ describe('getDuplicityAdvantageAgainst', () => {
         ]),
         skipRangeCheck: false,
       })
-      expect(result).toEqual({ advantage: false })
-    })
+      expect(result1).toEqual({ advantage: false })
 
-    it('returns false when distance is just over 5ft (5.5)', () => {
-      getRuntimeValue.mockImplementation((name) =>
-        name === 'Cleric' ? [makeImprovedDuplicityBuff()] : [],
-      )
       getDistanceFeet.mockReturnValue(5.5)
-
-      const result = getDuplicityAdvantageAgainst({
+      const result2 = getDuplicityAdvantageAgainst({
         targetPos: { gridX: 1, gridY: 1 },
         attackerName: 'Attacker',
         campaignName: '',
@@ -384,7 +348,7 @@ describe('getDuplicityAdvantageAgainst', () => {
         ]),
         skipRangeCheck: false,
       })
-      expect(result).toEqual({ advantage: false })
+      expect(result2).toEqual({ advantage: false })
     })
 
     it('returns false when getDistanceFeet returns null', () => {
@@ -400,36 +364,6 @@ describe('getDuplicityAdvantageAgainst', () => {
         mapData: makeMapData([
           makePlayer('Attacker', 0, 0),
           makePlayer('Cleric', null, null),
-        ]),
-        skipRangeCheck: false,
-      })
-      expect(result).toEqual({ advantage: false })
-    })
-
-    it('returns false when getRuntimeValue returns a non-array', () => {
-      getRuntimeValue.mockReturnValue('not-an-array')
-
-      const result = getDuplicityAdvantageAgainst({
-        targetPos: { gridX: 1, gridY: 1 },
-        attackerName: 'Attacker',
-        campaignName: '',
-        mapData: makeMapData([
-          makePlayer('Attacker', 0, 0),
-          makePlayer('Cleric', 1, 0),
-        ]),
-        skipRangeCheck: false,
-      })
-      expect(result).toEqual({ advantage: false })
-    })
-
-    it('returns false when getRuntimeValue returns null or undefined', () => {
-      const result = getDuplicityAdvantageAgainst({
-        targetPos: { gridX: 1, gridY: 1 },
-        attackerName: 'Attacker',
-        campaignName: '',
-        mapData: makeMapData([
-          makePlayer('Attacker', 0, 0),
-          makePlayer('Cleric', 1, 0),
         ]),
         skipRangeCheck: false,
       })
@@ -613,22 +547,6 @@ describe('getDuplicityAdvantageAgainst', () => {
       })
 
       expect(result).toEqual({ advantage: true, source: 'Cleric' })
-    })
-
-    it('returns false when only the attacker is in mapData', () => {
-      getRuntimeValue.mockImplementation((name) =>
-        name === 'Attacker' ? [makeImprovedDuplicityBuff()] : [],
-      )
-
-      const result = getDuplicityAdvantageAgainst({
-        targetPos: { gridX: 1, gridY: 1 },
-        attackerName: 'Attacker',
-        campaignName: '',
-        mapData: makeMapData([makePlayer('Attacker')]),
-        skipRangeCheck: false,
-      })
-
-      expect(result).toEqual({ advantage: false })
     })
   })
 })

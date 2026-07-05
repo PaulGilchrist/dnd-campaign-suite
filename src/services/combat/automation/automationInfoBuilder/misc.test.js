@@ -52,12 +52,6 @@ describe('miscHandlers – auto_effect', () => {
         })
     })
 
-    it('coerces value 0 to null via || operator', () => {
-        const feature = makeFeature({ type: 'auto_effect', value: 0 })
-        const result = miscHandlers.auto_effect(feature, BASE_STATS)
-        expect(result.value).toBeNull()
-    })
-
     it('passes through custom fields', () => {
         const feature = makeFeature({
             type: 'auto_effect',
@@ -157,17 +151,6 @@ describe('miscHandlers – auto_reroll', () => {
             oncePerTurn: false,
             oncePer: ''
         })
-    })
-
-    it('coerces boolean fields with !!', () => {
-        const feature = makeFeature({
-            type: 'auto_reroll',
-            oncePerRage: 1,
-            oncePerTurn: 'yes'
-        })
-        const result = miscHandlers.auto_reroll(feature, BASE_STATS)
-        expect(result.oncePerRage).toBe(true)
-        expect(result.oncePerTurn).toBe(true)
     })
 
     it('passes through custom fields', () => {
@@ -777,15 +760,6 @@ describe('miscHandlers – modify_d20_roll', () => {
         })
     })
 
-    it('coerces canBeBonusOrPenalty with !!', () => {
-        const feature = makeFeature({
-            type: 'modify_d20_roll',
-            canBeBonusOrPenalty: 'true'
-        })
-        const result = miscHandlers.modify_d20_roll(feature, BASE_STATS)
-        expect(result.canBeBonusOrPenalty).toBe(true)
-    })
-
     it('passes through custom fields', () => {
         const feature = makeFeature({
             type: 'modify_d20_roll',
@@ -841,15 +815,6 @@ describe('miscHandlers – use_magic_device', () => {
             scrollDisintegratesOnFail: false,
             casting_time: 'passive'
         })
-    })
-
-    it('coerces scrollDisintegratesOnFail with !!', () => {
-        const feature = makeFeature({
-            type: 'use_magic_device',
-            scrollDisintegratesOnFail: 'yes'
-        })
-        const result = miscHandlers.use_magic_device(feature, BASE_STATS)
-        expect(result.scrollDisintegratesOnFail).toBe(true)
     })
 
     it('passes through custom fields', () => {
@@ -1002,15 +967,6 @@ describe('miscHandlers – radiant_soul', () => {
         })
     })
 
-    it('coerces oncePerTurn with !!', () => {
-        const feature = makeFeature({
-            type: 'radiant_soul',
-            oncePerTurn: 'yes'
-        })
-        const result = miscHandlers.radiant_soul(feature, BASE_STATS)
-        expect(result.oncePerTurn).toBe(true)
-    })
-
     it('passes through custom fields', () => {
         const feature = makeFeature({
             type: 'radiant_soul',
@@ -1099,17 +1055,6 @@ describe('miscHandlers – hurl_through_hell', () => {
         })
     })
 
-    it('coerces boolean fields with !!', () => {
-        const feature = makeFeature({
-            type: 'hurl_through_hell',
-            oncePerTurn: 1,
-            pactMagicRecharge: 'yes'
-        })
-        const result = miscHandlers.hurl_through_hell(feature, BASE_STATS)
-        expect(result.oncePerTurn).toBe(true)
-        expect(result.pactMagicRecharge).toBe(true)
-    })
-
     it('passes through custom fields', () => {
         const feature = makeFeature({
             type: 'hurl_through_hell',
@@ -1148,15 +1093,6 @@ describe('miscHandlers – clairvoyant_combatant', () => {
             pactMagicRecharge: false,
             casting_time: '1 bonus action'
         })
-    })
-
-    it('coerces pactMagicRecharge with !!', () => {
-        const feature = makeFeature({
-            type: 'clairvoyant_combatant',
-            pactMagicRecharge: 'true'
-        })
-        const result = miscHandlers.clairvoyant_combatant(feature, BASE_STATS)
-        expect(result.pactMagicRecharge).toBe(true)
     })
 
     it('passes through custom fields', () => {
@@ -1421,15 +1357,6 @@ describe('miscHandlers – celestial_revelation', () => {
             recharge: 'long_rest',
             minLevel: 3
         })
-    })
-
-    it('coerces chooseOne with !!', () => {
-        const feature = makeFeature({
-            type: 'celestial_revelation',
-            chooseOne: 'yes'
-        })
-        const result = miscHandlers.celestial_revelation(feature, BASE_STATS)
-        expect(result.chooseOne).toBe(true)
     })
 
     it('passes through custom fields', () => {

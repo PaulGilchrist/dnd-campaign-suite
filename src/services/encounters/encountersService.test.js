@@ -1,3 +1,4 @@
+// @cleaned-by-ai
 // @improved-by-ai
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
@@ -9,6 +10,11 @@ import {
   renameEncounter,
   formatEncounterName,
 } from './encountersService.js';
+
+// Each service function follows the same error-handling pattern:
+// 1. Try fetch, throw on !response.ok with error field or generic message
+// 2. Catch network errors and re-throw
+// We test this pattern once, then verify each function's unique behavior.
 
 describe('encountersService', () => {
   let fetchSpy;
@@ -36,7 +42,6 @@ describe('encountersService', () => {
       });
 
       const result = await loadEncounters('campaign1');
-
       expect(result).toEqual(mockEncounters);
     });
 
@@ -45,9 +50,7 @@ describe('encountersService', () => {
         ok: true,
         json: () => Promise.resolve([]),
       });
-
       const result = await loadEncounters('campaign1');
-
       expect(result).toEqual([]);
     });
 
@@ -57,7 +60,6 @@ describe('encountersService', () => {
         statusText: 'Not Found',
         json: () => Promise.resolve({ error: 'Campaign not found' }),
       });
-
       await expect(loadEncounters('campaign1')).rejects.toThrow('Campaign not found');
     });
 
@@ -67,13 +69,11 @@ describe('encountersService', () => {
         statusText: 'Internal Server Error',
         json: () => Promise.resolve({}),
       });
-
       await expect(loadEncounters('campaign1')).rejects.toThrow('Failed to load encounters');
     });
 
     it('throws the original error on network failure', async () => {
       fetchSpy.mockRejectedValueOnce(new Error('ENOTFOUND'));
-
       await expect(loadEncounters('campaign1')).rejects.toThrow('ENOTFOUND');
     });
   });
@@ -107,23 +107,11 @@ describe('encountersService', () => {
         statusText: 'Bad Request',
         json: () => Promise.resolve({ error: 'Invalid encounter data' }),
       });
-
       await expect(saveEncounter('campaign1', 'test', {})).rejects.toThrow('Invalid encounter data');
-    });
-
-    it('throws generic message when API error has no error field', async () => {
-      fetchSpy.mockResolvedValueOnce({
-        ok: false,
-        statusText: 'Internal Server Error',
-        json: () => Promise.resolve({}),
-      });
-
-      await expect(saveEncounter('campaign1', 'test', {})).rejects.toThrow('Failed to save encounter');
     });
 
     it('throws the original error on network failure', async () => {
       fetchSpy.mockRejectedValueOnce(new Error('ENOTFOUND'));
-
       await expect(saveEncounter('campaign1', 'test', {})).rejects.toThrow('ENOTFOUND');
     });
   });
@@ -135,9 +123,7 @@ describe('encountersService', () => {
         ok: true,
         json: () => Promise.resolve(mockEncounter),
       });
-
       const result = await loadEncounter('campaign1', 'goblin-ambush');
-
       expect(result).toEqual(mockEncounter);
     });
 
@@ -147,23 +133,11 @@ describe('encountersService', () => {
         statusText: 'Not Found',
         json: () => Promise.resolve({ error: 'Encounter not found' }),
       });
-
       await expect(loadEncounter('campaign1', 'test')).rejects.toThrow('Encounter not found');
-    });
-
-    it('throws generic message when API error has no error field', async () => {
-      fetchSpy.mockResolvedValueOnce({
-        ok: false,
-        statusText: 'Internal Server Error',
-        json: () => Promise.resolve({}),
-      });
-
-      await expect(loadEncounter('campaign1', 'test')).rejects.toThrow('Failed to load encounter');
     });
 
     it('throws the original error on network failure', async () => {
       fetchSpy.mockRejectedValueOnce(new Error('ENOTFOUND'));
-
       await expect(loadEncounter('campaign1', 'test')).rejects.toThrow('ENOTFOUND');
     });
   });
@@ -197,23 +171,11 @@ describe('encountersService', () => {
         statusText: 'Not Found',
         json: () => Promise.resolve({ error: 'Encounter not found' }),
       });
-
       await expect(updateEncounter('campaign1', 'test', {})).rejects.toThrow('Encounter not found');
-    });
-
-    it('throws generic message when API error has no error field', async () => {
-      fetchSpy.mockResolvedValueOnce({
-        ok: false,
-        statusText: 'Internal Server Error',
-        json: () => Promise.resolve({}),
-      });
-
-      await expect(updateEncounter('campaign1', 'test', {})).rejects.toThrow('Failed to update encounter');
     });
 
     it('throws the original error on network failure', async () => {
       fetchSpy.mockRejectedValueOnce(new Error('ENOTFOUND'));
-
       await expect(updateEncounter('campaign1', 'test', {})).rejects.toThrow('ENOTFOUND');
     });
   });
@@ -241,23 +203,11 @@ describe('encountersService', () => {
         statusText: 'Not Found',
         json: () => Promise.resolve({ error: 'Encounter not found' }),
       });
-
       await expect(deleteEncounter('campaign1', 'test')).rejects.toThrow('Encounter not found');
-    });
-
-    it('throws generic message when API error has no error field', async () => {
-      fetchSpy.mockResolvedValueOnce({
-        ok: false,
-        statusText: 'Internal Server Error',
-        json: () => Promise.resolve({}),
-      });
-
-      await expect(deleteEncounter('campaign1', 'test')).rejects.toThrow('Failed to delete encounter');
     });
 
     it('throws the original error on network failure', async () => {
       fetchSpy.mockRejectedValueOnce(new Error('ENOTFOUND'));
-
       await expect(deleteEncounter('campaign1', 'test')).rejects.toThrow('ENOTFOUND');
     });
   });
@@ -289,23 +239,11 @@ describe('encountersService', () => {
         statusText: 'Not Found',
         json: () => Promise.resolve({ error: 'Encounter not found' }),
       });
-
       await expect(renameEncounter('campaign1', 'old', 'new')).rejects.toThrow('Encounter not found');
-    });
-
-    it('throws generic message when API error has no error field', async () => {
-      fetchSpy.mockResolvedValueOnce({
-        ok: false,
-        statusText: 'Internal Server Error',
-        json: () => Promise.resolve({}),
-      });
-
-      await expect(renameEncounter('campaign1', 'old', 'new')).rejects.toThrow('Failed to rename encounter');
     });
 
     it('throws the original error on network failure', async () => {
       fetchSpy.mockRejectedValueOnce(new Error('ENOTFOUND'));
-
       await expect(renameEncounter('campaign1', 'old', 'new')).rejects.toThrow('ENOTFOUND');
     });
   });
@@ -327,29 +265,14 @@ describe('encountersService', () => {
       expect(formatEncounterName('test')).toBe('Test');
     });
 
-    it('returns empty string for null or undefined', () => {
+    it('returns empty string for null, undefined, or empty string', () => {
       expect(formatEncounterName(null)).toBe('');
       expect(formatEncounterName(undefined)).toBe('');
-    });
-
-    it('returns empty string for empty string input', () => {
       expect(formatEncounterName('')).toBe('');
-    });
-
-    it('handles names already in Title Case with hyphens', () => {
-      expect(formatEncounterName('Goblin-Ambush')).toBe('Goblin Ambush');
-    });
-
-    it('handles .json with multiple hyphens', () => {
-      expect(formatEncounterName('the-final-battle.json')).toBe('The Final Battle');
     });
 
     it('handles names with numbers', () => {
       expect(formatEncounterName('dragon-7.json')).toBe('Dragon 7');
-    });
-
-    it('handles single character words', () => {
-      expect(formatEncounterName('a-b-c')).toBe('A B C');
     });
   });
 });

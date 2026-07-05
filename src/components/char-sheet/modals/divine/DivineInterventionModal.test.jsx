@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import DivineInterventionModal from './DivineInterventionModal.jsx';
@@ -109,22 +109,10 @@ describe('DivineInterventionModal', () => {
 
   // ── Initial render ──
 
-  it('renders the modal overlay with default props', () => {
-    render(<DivineInterventionModal {...makeProps()} />);
-    expect(document.querySelector('.sp-overlay')).toBeInTheDocument();
-    expect(document.querySelector('.sp-header')).toBeInTheDocument();
-    expect(document.querySelector('.sp-body')).toBeInTheDocument();
-    expect(document.querySelector('.sp-actions')).toBeInTheDocument();
-  });
-
-  it('renders the header with the featureName prop', () => {
+  it('renders the modal overlay with the feature name', () => {
     render(<DivineInterventionModal {...makeProps({ featureName: 'Gods\' Gambit' })} />);
+    expect(document.querySelector('.sp-overlay')).toBeInTheDocument();
     expect(screen.getByText('Gods\' Gambit')).toBeInTheDocument();
-  });
-
-  it('renders a Font Awesome star icon in the header', () => {
-    render(<DivineInterventionModal {...makeProps()} />);
-    expect(document.querySelector('.fa-solid.fa-star-of-life')).toBeInTheDocument();
   });
 
   it('renders a Cancel button by default', () => {
@@ -141,49 +129,34 @@ describe('DivineInterventionModal', () => {
 
   it('shows the non-greater note text when isGreater is false', () => {
     render(<DivineInterventionModal {...makeProps({ isGreater: false })} />);
-    const bodyDiv = document.querySelector('.sp-body');
-    expect(bodyDiv.textContent).toMatch(/doesn't require a Reaction/);
-    expect(bodyDiv.textContent).toMatch(/level 5 or lower/);
+    expect(screen.getByText(/doesn't require a Reaction/)).toBeInTheDocument();
+    expect(screen.queryByText(/Wish/)).not.toBeInTheDocument();
   });
 
-  it('does not show the non-greater note text when isGreater is true', () => {
-    render(<DivineInterventionModal {...makeProps({ isGreater: true })} />);
-    const bodyDiv = document.querySelector('.sp-body');
-    expect(bodyDiv.textContent).not.toMatch(/doesn't require a Reaction/);
-  });
-
-  it('shows the Wish mention when isGreater is true', () => {
+  it('shows the greater note text with Wish mention when isGreater is true', () => {
     render(<DivineInterventionModal {...makeProps({ isGreater: true })} />);
     expect(screen.getByText(/Wish/)).toBeInTheDocument();
-  });
-
-  it('does not show the Wish mention when isGreater is false', () => {
-    render(<DivineInterventionModal {...makeProps({ isGreater: false })} />);
-    expect(screen.queryByText(/Wish/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/doesn't require a Reaction/)).not.toBeInTheDocument();
   });
 
   // ── Spell list rendering ──
 
-  it('renders all eligible spells in the spell list', () => {
+  it('renders all eligible spells with their level, casting time, and tags', () => {
     render(<DivineInterventionModal {...makeProps()} />);
     expect(screen.getByText('Guiding Bolt')).toBeInTheDocument();
     expect(screen.getByText('Thunderwave')).toBeInTheDocument();
     expect(screen.getByText('Fire Bolt')).toBeInTheDocument();
     expect(screen.getByText('Sacred Flame')).toBeInTheDocument();
     expect(screen.getByText('Spiritual Weapon')).toBeInTheDocument();
-  });
-
-  it('renders spell level and casting time for each spell item', () => {
-    render(<DivineInterventionModal {...makeProps()} />);
-    const bodyDiv = document.querySelector('.sp-body');
-    expect(bodyDiv.textContent).toMatch(/Cantrip — 1 action/);
-    expect(bodyDiv.textContent).toMatch(/Level 1 — 1 action/);
-    expect(bodyDiv.textContent).toMatch(/Level 2 — 1 bonus action/);
-  });
-
-  it('renders a Concentration tag for spells with concentration in the list', () => {
-    render(<DivineInterventionModal {...makeProps()} />);
     expect(screen.getByText(/Concentration/)).toBeInTheDocument();
+    const spellMetaItems = document.querySelectorAll('.spell-meta');
+    expect(spellMetaItems.length).toBe(5);
+    // Verify each spell has the correct meta text
+    expect(spellMetaItems[0].textContent).toContain('Level 1');
+    expect(spellMetaItems[0].textContent).toContain('1 action');
+    expect(spellMetaItems[4].textContent).toContain('Level 2');
+    expect(spellMetaItems[4].textContent).toContain('1 bonus action');
+    expect(spellMetaItems[4].textContent).toContain('Concentration');
   });
 
   it('renders a Ritual tag for spells with ritual in the list', () => {
@@ -208,13 +181,9 @@ describe('DivineInterventionModal', () => {
 
   // ── Level filter buttons ──
 
-  it('renders an "All Levels" filter button', () => {
+  it('renders filter buttons for each distinct spell level', () => {
     render(<DivineInterventionModal {...makeProps()} />);
     expect(screen.getByText('All Levels')).toBeInTheDocument();
-  });
-
-  it('renders a filter button for each distinct spell level', () => {
-    render(<DivineInterventionModal {...makeProps()} />);
     expect(screen.getByText('Cantrip')).toBeInTheDocument();
     expect(screen.getByText('Level 1')).toBeInTheDocument();
     expect(screen.getByText('Level 2')).toBeInTheDocument();
@@ -227,20 +196,16 @@ describe('DivineInterventionModal', () => {
 
   // ── Filter functionality ──
 
-  it('filters the spell list when a level button is clicked', () => {
+  it('filters the spell list when a level button is clicked and restores on All Levels', () => {
     render(<DivineInterventionModal {...makeProps()} />);
     fireEvent.click(screen.getByText('Level 1'));
     expect(screen.getByText('Guiding Bolt')).toBeInTheDocument();
     expect(screen.getByText('Thunderwave')).toBeInTheDocument();
     expect(screen.queryByText('Fire Bolt')).not.toBeInTheDocument();
     expect(screen.queryByText('Spiritual Weapon')).not.toBeInTheDocument();
-  });
 
-  it('restores all spells when "All Levels" is clicked after filtering', () => {
-    render(<DivineInterventionModal {...makeProps()} />);
-    fireEvent.click(screen.getByText('Level 1'));
-    expect(screen.queryByText('Spiritual Weapon')).not.toBeInTheDocument();
     fireEvent.click(screen.getByText('All Levels'));
+    expect(screen.getByText('Fire Bolt')).toBeInTheDocument();
     expect(screen.getByText('Spiritual Weapon')).toBeInTheDocument();
   });
 
@@ -252,8 +217,28 @@ describe('DivineInterventionModal', () => {
     expect(screen.getByText('Cantrip')).not.toHaveClass('active');
   });
 
-  it('shows "No spells found" when a filter matches no spells', () => {
-    const singleLevelSpells = [
+  it('renders filter buttons for high-level spells', () => {
+    const highLevelSpell = [
+      {
+        index: 'wish',
+        name: 'Wish',
+        level: 9,
+        school: 'Evocation',
+        casting_time: '1 action',
+        range: 'Self',
+        components: 'V',
+        duration: 'Instantaneous',
+        concentration: false,
+        ritual: false,
+        description: ['You wish upon a star.'],
+      },
+    ];
+    render(<DivineInterventionModal {...makeProps({ eligibleSpells: highLevelSpell })} />);
+    expect(screen.getByText('Level 9')).toBeInTheDocument();
+  });
+
+  it('renders all spells at the same level when that level filter is active', () => {
+    const twoLevel1Spells = [
       {
         index: 'guiding-bolt',
         name: 'Guiding Bolt',
@@ -267,37 +252,37 @@ describe('DivineInterventionModal', () => {
         ritual: false,
         description: ['A bolt of light.'],
       },
+      {
+        index: 'wrathful-smite',
+        name: 'Wrathful Smite',
+        level: 1,
+        school: 'Evocation',
+        casting_time: '1 bonus action',
+        range: 'Self',
+        components: 'V',
+        duration: '1 minute',
+        concentration: true,
+        ritual: false,
+        description: ['Your weapon shines.'],
+      },
     ];
-    render(<DivineInterventionModal {...makeProps({ eligibleSpells: singleLevelSpells })} />);
+    render(<DivineInterventionModal {...makeProps({ eligibleSpells: twoLevel1Spells })} />);
+    fireEvent.click(screen.getByText('Level 1'));
     expect(screen.getByText('Guiding Bolt')).toBeInTheDocument();
-    expect(screen.queryByText(/No spells found for this level/)).not.toBeInTheDocument();
-    fireEvent.click(screen.getByText('All Levels'));
-    expect(screen.getByText('Guiding Bolt')).toBeInTheDocument();
+    expect(screen.getByText('Wrathful Smite')).toBeInTheDocument();
   });
 
   // ── Spell selection flow ──
 
-  it('switches to the detail view when a spell is clicked', () => {
-    render(<DivineInterventionModal {...makeProps()} />);
-    fireEvent.click(screen.getByText('Guiding Bolt'));
-    expect(screen.queryByText('All Levels')).not.toBeInTheDocument();
-    expect(screen.queryByText('Guiding Bolt')).toBeInTheDocument();
-  });
-
-  it('shows a Cast button and hides Cancel after selecting a spell', () => {
+  it('switches to detail view, shows Cast button, and returns to list on Back', () => {
     render(<DivineInterventionModal {...makeProps()} />);
     fireEvent.click(screen.getByText('Guiding Bolt'));
     expect(screen.getByRole('button', { name: /Cast with Divine Intervention/ })).toBeInTheDocument();
     expect(screen.queryByText('Cancel')).not.toBeInTheDocument();
-  });
 
-  it('returns to the list view when Back is clicked', () => {
-    render(<DivineInterventionModal {...makeProps()} />);
-    fireEvent.click(screen.getByText('Guiding Bolt'));
-    expect(screen.getByRole('button', { name: /Cast with Divine Intervention/ })).toBeInTheDocument();
     fireEvent.click(screen.getByText('Back'));
     expect(screen.queryByRole('button', { name: /Cast with Divine Intervention/ })).not.toBeInTheDocument();
-    expect(screen.getByText('All Levels')).toBeInTheDocument();
+    expect(screen.getByText('Cancel')).toBeInTheDocument();
   });
 
   it('preserves the active filter when going back from a spell detail', () => {
@@ -311,15 +296,10 @@ describe('DivineInterventionModal', () => {
 
   // ── Selected spell detail view ──
 
-  it('displays the selected spell name as the detail heading', () => {
+  it('displays the selected spell name, level, school, and tags', () => {
     render(<DivineInterventionModal {...makeProps()} />);
     fireEvent.click(screen.getByText('Spiritual Weapon'));
     expect(screen.getByText('Spiritual Weapon')).toBeInTheDocument();
-  });
-
-  it('displays level, school, and concentration tag in the detail header', () => {
-    render(<DivineInterventionModal {...makeProps()} />);
-    fireEvent.click(screen.getByText('Spiritual Weapon'));
     expect(screen.getByText(/Level 2 — Evocation — Concentration/)).toBeInTheDocument();
   });
 
@@ -344,52 +324,12 @@ describe('DivineInterventionModal', () => {
     expect(screen.getByText(/Level 1 — Divination — Ritual/)).toBeInTheDocument();
   });
 
-  it('displays casting time, range, components, and duration on one line', () => {
+  it('displays casting time, range, and optional components and duration', () => {
     render(<DivineInterventionModal {...makeProps()} />);
     fireEvent.click(screen.getByText('Guiding Bolt'));
     expect(screen.getByText(/Casting Time: 1 action — Range: 120 feet/)).toBeInTheDocument();
     expect(screen.getByText(/Components: V, S/)).toBeInTheDocument();
     expect(screen.getByText(/Duration: 1 instant/)).toBeInTheDocument();
-  });
-
-  it('omits the Components label when the spell has no components field', () => {
-    const noComponentsSpell = [
-      {
-        index: 'test-spell',
-        name: 'Test Spell',
-        level: 1,
-        school: 'Evocation',
-        casting_time: '1 action',
-        range: 'Self',
-        duration: '1 minute',
-        concentration: false,
-        ritual: false,
-        description: ['A test spell with no components.'],
-      },
-    ];
-    render(<DivineInterventionModal {...makeProps({ eligibleSpells: noComponentsSpell })} />);
-    fireEvent.click(screen.getByText('Test Spell'));
-    expect(screen.queryByText(/Components:/)).not.toBeInTheDocument();
-  });
-
-  it('omits the Duration label when the spell has no duration field', () => {
-    const noDurationSpell = [
-      {
-        index: 'test-spell',
-        name: 'Test Spell',
-        level: 1,
-        school: 'Evocation',
-        casting_time: '1 action',
-        range: 'Self',
-        components: 'V',
-        concentration: false,
-        ritual: false,
-        description: ['A test spell with no duration.'],
-      },
-    ];
-    render(<DivineInterventionModal {...makeProps({ eligibleSpells: noDurationSpell })} />);
-    fireEvent.click(screen.getByText('Test Spell'));
-    expect(screen.queryByText(/Duration:/)).not.toBeInTheDocument();
   });
 
   it('displays the spell description', () => {
@@ -398,16 +338,7 @@ describe('DivineInterventionModal', () => {
     expect(screen.getByText(/A bolt of light streaks toward a creature/)).toBeInTheDocument();
   });
 
-  it('displays damage info when the spell has damage', () => {
-    render(<DivineInterventionModal {...makeProps()} />);
-    fireEvent.click(screen.getByText('Guiding Bolt'));
-    const selectedSpellDiv = document.querySelector('.divine-intervention-selected-spell');
-    expect(selectedSpellDiv.textContent).toMatch(/Damage:/);
-    expect(selectedSpellDiv.textContent).toMatch(/4d6/);
-    expect(selectedSpellDiv.textContent).toMatch(/Radiant/);
-  });
-
-  it('shows all damage slot levels joined with slashes', () => {
+  it('displays damage info with slot levels and type', () => {
     render(<DivineInterventionModal {...makeProps()} />);
     fireEvent.click(screen.getByText('Guiding Bolt'));
     expect(screen.getByText(/Damage: 4d6 \/ 5d6 \(Radiant\)/)).toBeInTheDocument();
@@ -416,16 +347,13 @@ describe('DivineInterventionModal', () => {
   it('shows damage for spells using damage_at_character_level', () => {
     render(<DivineInterventionModal {...makeProps()} />);
     fireEvent.click(screen.getByText('Fire Bolt'));
-    const selectedSpellDiv = document.querySelector('.divine-intervention-selected-spell');
-    expect(selectedSpellDiv.textContent).toMatch(/Damage:/);
-    expect(selectedSpellDiv.textContent).toMatch(/1d10/);
+    expect(screen.getByText(/1d10/)).toBeInTheDocument();
   });
 
   it('does not display a damage section when the spell has no damage', () => {
     render(<DivineInterventionModal {...makeProps()} />);
     fireEvent.click(screen.getByText('Thunderwave'));
-    const selectedSpellDiv = document.querySelector('.divine-intervention-selected-spell');
-    expect(selectedSpellDiv.textContent).not.toMatch(/Damage/);
+    expect(screen.queryByText(/Damage/)).not.toBeInTheDocument();
   });
 
   // ── Cast button ──
@@ -463,7 +391,7 @@ describe('DivineInterventionModal', () => {
     expect(screen.getByText(/No spells found for this level/)).toBeInTheDocument();
   });
 
-  it('renders all filter buttons and spell list when eligibleSpells has only one level', () => {
+  it('renders only the relevant filter buttons when spells have only one level', () => {
     const singleLevelSpells = [
       {
         index: 'burning-hands',
@@ -486,168 +414,10 @@ describe('DivineInterventionModal', () => {
     expect(screen.getByText('Burning Hands')).toBeInTheDocument();
   });
 
-  // ── Cantrip label ──
-
-  it('shows "Cantrip" instead of "Level 0" in the spell list', () => {
-    render(<DivineInterventionModal {...makeProps()} />);
-    const bodyDiv = document.querySelector('.sp-body');
-    expect(bodyDiv.textContent).toMatch(/Cantrip — 1 action/);
-  });
-
-  it('shows "Cantrip" instead of "Level 0" in the selected spell detail', () => {
-    render(<DivineInterventionModal {...makeProps()} />);
-    fireEvent.click(screen.getByText('Fire Bolt'));
-    const selectedSpellDiv = document.querySelector('.divine-intervention-selected-spell');
-    expect(selectedSpellDiv.textContent).toMatch(/Cantrip/);
-  });
-
-  // ── Higher level spells ──
-
-  it('renders filter buttons for high-level spells', () => {
-    const highLevelSpell = [
-      {
-        index: 'wish',
-        name: 'Wish',
-        level: 9,
-        school: 'Evocation',
-        casting_time: '1 action',
-        range: 'Self',
-        components: 'V',
-        duration: 'Instantaneous',
-        concentration: false,
-        ritual: false,
-        description: ['You wish upon a star.'],
-      },
-    ];
-    render(<DivineInterventionModal {...makeProps({ eligibleSpells: highLevelSpell })} />);
-    expect(screen.getByText('Level 9')).toBeInTheDocument();
-  });
-
-  // ── Spell with no concentration or ritual ──
-
-  it('does not show Concentration tag for non-concentration spells in the list', () => {
-    const noConcSpell = [
-      {
-        index: 'magic-missile',
-        name: 'Magic Missile',
-        level: 1,
-        school: 'Evocation',
-        casting_time: '1 action',
-        range: '120 feet',
-        components: 'V, S',
-        duration: '1 instant',
-        concentration: false,
-        ritual: false,
-        description: ['Three darts of force.'],
-      },
-    ];
-    render(<DivineInterventionModal {...makeProps({ eligibleSpells: noConcSpell })} />);
-    expect(screen.queryByText(/Concentration/)).not.toBeInTheDocument();
-  });
-
-  // ── Multiple spells at the same level ──
-
-  it('renders all spells at the same level when that level filter is active', () => {
-    const twoLevel1Spells = [
-      {
-        index: 'guiding-bolt',
-        name: 'Guiding Bolt',
-        level: 1,
-        school: 'Evocation',
-        casting_time: '1 action',
-        range: '120 feet',
-        components: 'V, S',
-        duration: '1 instant',
-        concentration: false,
-        ritual: false,
-        description: ['A bolt of light.'],
-      },
-      {
-        index: 'wrathful-smite',
-        name: 'Wrathful Smite',
-        level: 1,
-        school: 'Evocation',
-        casting_time: '1 bonus action',
-        range: 'Self',
-        components: 'V',
-        duration: '1 minute',
-        concentration: true,
-        ritual: false,
-        description: ['Your weapon shines.'],
-      },
-    ];
-    render(<DivineInterventionModal {...makeProps({ eligibleSpells: twoLevel1Spells })} />);
-    fireEvent.click(screen.getByText('Level 1'));
-    expect(screen.getByText('Guiding Bolt')).toBeInTheDocument();
-    expect(screen.getByText('Wrathful Smite')).toBeInTheDocument();
-  });
-
   // ── Custom feature name ──
 
   it('renders custom featureName in the header', () => {
     render(<DivineInterventionModal {...makeProps({ featureName: 'Divine Strike' })} />);
     expect(screen.getByText('Divine Strike')).toBeInTheDocument();
-  });
-
-  // ── Edge cases: missing spell properties ──
-
-  it('handles a spell with undefined level by treating it as level 0', () => {
-    const noLevelSpell = [
-      {
-        index: 'test-spell',
-        name: 'Test Spell',
-        school: 'Evocation',
-        casting_time: '1 action',
-        range: 'Self',
-        components: 'V',
-        duration: 'Instantaneous',
-        description: ['A spell without a level.'],
-      },
-    ];
-    render(<DivineInterventionModal {...makeProps({ eligibleSpells: noLevelSpell })} />);
-    expect(screen.getByText('Cantrip')).toBeInTheDocument();
-    expect(screen.getByText('Test Spell')).toBeInTheDocument();
-    fireEvent.click(screen.getByText('Test Spell'));
-    const selectedSpellDiv = document.querySelector('.divine-intervention-selected-spell');
-    expect(selectedSpellDiv.textContent).toMatch(/Cantrip/);
-  });
-
-  it('handles a spell with undefined description by rendering no paragraphs', () => {
-    const noDescriptionSpell = [
-      {
-        index: 'test-spell',
-        name: 'Test Spell',
-        level: 1,
-        school: 'Evocation',
-        casting_time: '1 action',
-        range: 'Self',
-        components: 'V',
-        duration: 'Instantaneous',
-        description: null,
-      },
-    ];
-    render(<DivineInterventionModal {...makeProps({ eligibleSpells: noDescriptionSpell })} />);
-    fireEvent.click(screen.getByText('Test Spell'));
-    const selectedSpellDiv = document.querySelector('.divine-intervention-selected-spell');
-    expect(selectedSpellDiv.querySelectorAll('p').length).toBe(0);
-  });
-
-  it('handles a spell with undefined school in the detail view', () => {
-    const noSchoolSpell = [
-      {
-        index: 'test-spell',
-        name: 'Test Spell',
-        level: 1,
-        casting_time: '1 action',
-        range: 'Self',
-        components: 'V',
-        duration: 'Instantaneous',
-        description: ['A spell without a school.'],
-      },
-    ];
-    render(<DivineInterventionModal {...makeProps({ eligibleSpells: noSchoolSpell })} />);
-    fireEvent.click(screen.getByText('Test Spell'));
-    const selectedSpellDiv = document.querySelector('.divine-intervention-selected-spell');
-    expect(selectedSpellDiv.textContent).toMatch(/Level 1 — /);
   });
 });

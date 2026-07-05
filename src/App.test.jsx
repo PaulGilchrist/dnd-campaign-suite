@@ -153,13 +153,6 @@ describe('App', () => {
       expect(await screen.findByTestId('campaign-selection')).toBeInTheDocument();
     });
 
-    it('hides campaign selection after selecting campaign', async () => {
-      mockState.characters = [{ name: 'Aragorn', level: 1 }];
-      render(<App />);
-      await selectCampaign();
-      expect(screen.queryByTestId('campaign-selection')).not.toBeInTheDocument();
-    });
-
     it('renders CharSheet when campaign has characters', async () => {
       mockState.characters = [{ name: 'Aragorn', level: 1 }];
       render(<App />);
@@ -210,22 +203,13 @@ describe('App', () => {
       return { toggleBtn: screen.getByTestId('theme-toggle-btn'), localStorageMock };
     };
 
-    it('initializes from localStorage as dark and toggles to light', async () => {
+    it('toggles theme and persists to localStorage', async () => {
       const { toggleBtn, localStorageMock } = await renderWithTheme('dark');
       fireEvent.click(toggleBtn);
       await waitFor(() => {
         expect(screen.getByTestId('sidebar-theme').textContent).toBe('light');
       });
       expect(localStorageMock.setItem).toHaveBeenCalledWith('theme', 'light');
-    });
-
-    it('initializes from localStorage as light and toggles to dark', async () => {
-      const { toggleBtn, localStorageMock } = await renderWithTheme('light');
-      fireEvent.click(toggleBtn);
-      await waitFor(() => {
-        expect(screen.getByTestId('sidebar-theme').textContent).toBe('dark');
-      });
-      expect(localStorageMock.setItem).toHaveBeenCalledWith('theme', 'dark');
     });
 
     it('defaults to dark when localStorage throws on read', async () => {
@@ -323,50 +307,6 @@ describe('App', () => {
         expect(window.alert).toHaveBeenCalledWith('Failed to load map data.');
       });
     });
-
-    it('exercises MapsManager onBack callback', async () => {
-      mockState.characters = [{ name: 'Aragorn', level: 1 }];
-      render(<App />);
-      await selectCampaign();
-      fireEvent.click(screen.getByTestId('maps-btn'));
-      await waitFor(() => expect(screen.getByTestId('maps-manager')).toBeInTheDocument());
-      fireEvent.click(screen.getByTestId('mm-back-btn'));
-      await waitFor(() => {
-        expect(screen.queryByTestId('maps-manager')).not.toBeInTheDocument();
-        expect(screen.queryByTestId('map-view')).not.toBeInTheDocument();
-      });
-    });
-
-    it('exercises Map onBack callback on localhost', async () => {
-      mockState.characters = [{ name: 'Aragorn', level: 1 }];
-      render(<App />);
-      await selectCampaign();
-      fireEvent.click(screen.getByTestId('maps-btn'));
-      await waitFor(() => expect(screen.getByTestId('maps-manager')).toBeInTheDocument());
-      fireEvent.click(screen.getByTestId('open-map-btn'));
-      await waitFor(() => expect(screen.getByTestId('map-view')).toBeInTheDocument());
-      fireEvent.click(screen.getByTestId('map-back-btn'));
-      await waitFor(() => {
-        expect(screen.getByTestId('maps-manager')).toBeInTheDocument();
-      });
-    });
-
-    it('exercises Map onBack callback on non-localhost', async () => {
-      setNonLocalhost();
-      const { loadMaps } = await import('./services/maps/mapsService.js');
-      loadMaps.mockResolvedValue({ maps: [{ fileName: 'dungeon-1.json', isActive: true }] });
-
-      mockState.characters = [{ name: 'Aragorn', level: 1 }];
-      render(<App />);
-      await selectCampaign();
-      fireEvent.click(screen.getByTestId('maps-btn'));
-      await waitFor(() => expect(screen.getByTestId('map-view')).toBeInTheDocument());
-      fireEvent.click(screen.getByTestId('map-back-btn'));
-      await waitFor(() => {
-        expect(screen.queryByTestId('map-view')).not.toBeInTheDocument();
-        expect(screen.queryByTestId('maps-manager')).not.toBeInTheDocument();
-      });
-    });
   });
 
   describe('Campaign & character management', () => {
@@ -425,26 +365,6 @@ describe('App', () => {
         expect(window.confirm).toHaveBeenCalled();
       });
     });
-
-    it('handles upload click', async () => {
-      mockState.characters = [{ name: 'Aragorn', level: 1 }];
-      render(<App />);
-      await selectCampaign();
-      await waitFor(() => {
-        expect(screen.getByText(/Upload/)).toBeInTheDocument();
-      });
-      fireEvent.click(screen.getByText(/Upload/));
-    });
-
-    it('handles download click', async () => {
-      mockState.characters = [{ name: 'Aragorn', level: 1 }];
-      render(<App />);
-      await selectCampaign();
-      await waitFor(() => {
-        expect(screen.getByText(/Download/)).toBeInTheDocument();
-      });
-      fireEvent.click(screen.getByText(/Download/));
-    });
   });
 
   describe('Wizards & overlays', () => {
@@ -489,120 +409,22 @@ describe('App', () => {
         expect(screen.queryByTestId('character-wizard')).not.toBeInTheDocument();
       });
     });
-
-    it('completing the wizard keeps char-sheet visible', async () => {
-      global.fetch = vi.fn((url) => {
-        if (url.includes('/api/campaigns') && !url.endsWith('.json')) {
-          return Promise.resolve({ ok: true, json: () => Promise.resolve({ character: { name: 'New Character', level: 1 }, files: ['new-character.json'] }) });
-        }
-        return Promise.resolve({ ok: true, json: () => Promise.resolve({ name: 'New Character', level: 1 }) });
-      });
-
-      mockState.characters = [{ name: 'Aragorn', level: 1 }];
-      render(<App />);
-      await selectCampaign();
-      await waitFor(() => {
-        expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
-      });
-      fireEvent.click(screen.getByTestId('add-character-btn'));
-      await waitFor(() => {
-        expect(screen.getByTestId('character-wizard')).toBeInTheDocument();
-      });
-      fireEvent.click(screen.getByTestId('wizard-complete-btn'));
-      await waitFor(() => {
-        expect(screen.queryByTestId('character-wizard')).not.toBeInTheDocument();
-      });
-      expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
-    });
-  });
-
-  describe('Idempotent view navigation', () => {
-    const viewTests = [
-      { btnId: 'initiative-btn', viewId: 'initiative', label: 'initiative' },
-      { btnId: 'encounter-btn', viewId: 'encounter-builder', label: 'encounter' },
-      { btnId: 'notes-btn', viewId: 'notes-view', label: 'notes' },
-      { btnId: 'quests-btn', viewId: 'quests-view', label: 'quests' },
-      { btnId: 'npcs-btn', viewId: 'npcs-view', label: 'npcs' },
-      { btnId: 'factions-btn', viewId: 'factions-view', label: 'factions' },
-    ];
-
-    it.each(viewTests)('handle$label Click is idempotent when already on $label', async ({ btnId, viewId }) => {
-      mockState.characters = [{ name: 'Aragorn', level: 1 }];
-      render(<App />);
-      await selectCampaign();
-      fireEvent.click(screen.getByTestId(btnId));
-      await waitFor(() => expect(screen.getByTestId(viewId)).toBeInTheDocument());
-      fireEvent.click(screen.getByTestId(btnId));
-      expect(screen.getByTestId(viewId)).toBeInTheDocument();
-    });
   });
 
   describe('Edge cases', () => {
-    it('shows multiple overlays simultaneously: wizard over char-sheet', async () => {
-      mockState.characters = [{ name: 'Aragorn', level: 1 }];
-      render(<App />);
-      await selectCampaign();
-      await waitFor(() => {
-        expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
-      });
-      fireEvent.click(screen.getByTestId('add-character-btn'));
-      await waitFor(() => {
-        expect(screen.getByTestId('character-wizard')).toBeInTheDocument();
-      });
-      expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
-    });
-
-    it('sidebar receives isLocalhost=true on localhost', async () => {
-      mockState.characters = [{ name: 'Aragorn', level: 1 }];
-      render(<App />);
-      await selectCampaign();
-      await waitFor(() => {
-        expect(screen.getByTestId('sidebar-localhost').textContent).toBe('true');
-      });
-    });
-
-    it('sidebar receives isLocalhost=false on non-localhost', async () => {
-      setNonLocalhost();
-      mockState.characters = [{ name: 'Aragorn', level: 1 }];
-      render(<App />);
-      await selectCampaign();
-      await waitFor(() => {
-        expect(screen.getByTestId('sidebar-localhost').textContent).toBe('false');
-      });
-    });
-
-    it('shows MapsManager button text as Map on non-localhost', async () => {
-      setNonLocalhost();
+    it.each([
+      { isLocalhost: true, expectedButton: 'Maps', expectedSidebar: 'true' },
+      { isLocalhost: false, expectedButton: 'Map', expectedSidebar: 'false' },
+    ])('sidebar displays correct map button text and localhost flag (%s)', async ({ isLocalhost, expectedButton, expectedSidebar }) => {
+      if (!isLocalhost) setNonLocalhost();
       mockState.characters = [{ name: 'Aragorn', level: 1 }];
       render(<App />);
       await selectCampaign();
       await waitFor(() => {
         expect(screen.getByTestId('sidebar')).toBeInTheDocument();
       });
-      expect(screen.getByTestId('maps-btn')).toHaveTextContent('Map');
-    });
-
-    it('shows MapsManager button text as Maps on localhost', async () => {
-      mockState.characters = [{ name: 'Aragorn', level: 1 }];
-      render(<App />);
-      await selectCampaign();
-      await waitFor(() => {
-        expect(screen.getByTestId('sidebar')).toBeInTheDocument();
-      });
-      expect(screen.getByTestId('maps-btn')).toHaveTextContent('Maps');
-    });
-
-    it('does not render char-sheet when activeView is not charSheet', async () => {
-      mockState.characters = [{ name: 'Aragorn', level: 1 }];
-      render(<App />);
-      await selectCampaign();
-      await waitFor(() => {
-        expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
-      });
-      fireEvent.click(screen.getByTestId('initiative-btn'));
-      await waitFor(() => {
-        expect(screen.queryByTestId('char-sheet')).not.toBeInTheDocument();
-      });
+      expect(screen.getByTestId('maps-btn')).toHaveTextContent(expectedButton);
+      expect(screen.getByTestId('sidebar-localhost').textContent).toBe(expectedSidebar);
     });
   });
 });

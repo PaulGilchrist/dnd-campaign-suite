@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { renderHook, act } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import usePlacedItems from './usePlacedItems.js';
@@ -34,6 +34,13 @@ describe('usePlacedItems', () => {
         result.current.handleToggleItemVisibility('item1');
       });
       expect(setPlacedItems).toHaveBeenCalled();
+      const callArg = setPlacedItems.mock.calls[0][0];
+      const updated = callArg([
+        { id: 'item1', visible: true, rotation: 0, gridX: 1, gridY: 1 },
+        { id: 'item2', visible: false, rotation: 90, gridX: 2, gridY: 2 },
+        { id: 'item3', type: 'door', open: false, rotation: 0, gridX: 3, gridY: 3 },
+      ]);
+      expect(updated.find(i => i.id === 'item1').visible).toBe(false);
     });
   });
 
@@ -45,38 +52,45 @@ describe('usePlacedItems', () => {
       });
       expect(setPlacedItems).toHaveBeenCalled();
       expect(setSelectedItem).toHaveBeenCalledWith(null);
+      const callArg = setPlacedItems.mock.calls[0][0];
+      const updated = callArg([
+        { id: 'item1', visible: true, rotation: 0, gridX: 1, gridY: 1 },
+        { id: 'item2', visible: false, rotation: 90, gridX: 2, gridY: 2 },
+        { id: 'item3', type: 'door', open: false, rotation: 0, gridX: 3, gridY: 3 },
+      ]);
+      expect(updated.find(i => i.id === 'item1')).toBeUndefined();
     });
   });
 
   describe('handleRotate', () => {
-    it('should rotate item from 0 to 90 degrees', () => {
+    it('should rotate item by 90 degrees', () => {
       const result = getHook();
       act(() => {
         result.current.handleRotate('item1');
       });
       expect(setPlacedItems).toHaveBeenCalled();
       const callArg = setPlacedItems.mock.calls[0][0];
-      const updated = callArg([{ id: 'item1', rotation: 0 }]);
+      const updated = callArg([
+        { id: 'item1', visible: true, rotation: 0, gridX: 1, gridY: 1 },
+        { id: 'item2', visible: false, rotation: 90, gridX: 2, gridY: 2 },
+        { id: 'item3', type: 'door', open: false, rotation: 0, gridX: 3, gridY: 3 },
+      ]);
       expect(updated.find(i => i.id === 'item1').rotation).toBe(90);
     });
 
-    it('should rotate item from 90 to 180 degrees', () => {
+    it('should wrap rotation at 360 degrees', () => {
       const result = getHook();
       act(() => {
         result.current.handleRotate('item2');
       });
       expect(setPlacedItems).toHaveBeenCalled();
       const callArg = setPlacedItems.mock.calls[0][0];
-      const updated = callArg([{ id: 'item2', rotation: 90 }]);
+      const updated = callArg([
+        { id: 'item1', visible: true, rotation: 0, gridX: 1, gridY: 1 },
+        { id: 'item2', visible: false, rotation: 90, gridX: 2, gridY: 2 },
+        { id: 'item3', type: 'door', open: false, rotation: 0, gridX: 3, gridY: 3 },
+      ]);
       expect(updated.find(i => i.id === 'item2').rotation).toBe(180);
-    });
-
-    it('should not close context menu on rotate', () => {
-      const result = getHook();
-      act(() => {
-        result.current.handleRotate('item1');
-      });
-      expect(setSelectedItem).not.toHaveBeenCalledWith(null);
     });
   });
 
@@ -88,6 +102,13 @@ describe('usePlacedItems', () => {
       });
       expect(setPlacedItems).toHaveBeenCalled();
       expect(setSelectedItem).toHaveBeenCalledWith(null);
+      const callArg = setPlacedItems.mock.calls[0][0];
+      const updated = callArg([
+        { id: 'item1', visible: true, rotation: 0, gridX: 1, gridY: 1 },
+        { id: 'item2', visible: false, rotation: 90, gridX: 2, gridY: 2 },
+        { id: 'item3', type: 'door', open: false, rotation: 0, gridX: 3, gridY: 3 },
+      ]);
+      expect(updated.find(i => i.id === 'item3').open).toBe(true);
     });
 
     it('should not toggle non-door items', () => {
@@ -97,8 +118,12 @@ describe('usePlacedItems', () => {
       });
       expect(setPlacedItems).toHaveBeenCalled();
       const callArg = setPlacedItems.mock.calls[0][0];
-      const updated = callArg([{ id: 'item1', type: 'token', open: false }]);
-      expect(updated.find(i => i.id === 'item1').open).toBe(false);
+      const updated = callArg([
+        { id: 'item1', visible: true, rotation: 0, gridX: 1, gridY: 1 },
+        { id: 'item2', visible: false, rotation: 90, gridX: 2, gridY: 2 },
+        { id: 'item3', type: 'door', open: false, rotation: 0, gridX: 3, gridY: 3 },
+      ]);
+      expect(updated.find(i => i.id === 'item1').open).toBeUndefined();
     });
   });
 });

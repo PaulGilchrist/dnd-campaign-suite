@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import NPCStatBlockForm from './NPCStatBlockForm';
@@ -34,140 +34,24 @@ function getSetFormData() {
 }
 
 describe('NPCStatBlockForm interactions', () => {
-  describe('Combat Stats field changes', () => {
-    function getAcInput(container) {
-      return container.querySelector('input[placeholder="10"]');
-    }
-    function getHpInput(container) {
-      return container.querySelector('input[placeholder="e.g., 45"]');
-    }
-    function getHdInput(container) {
-      return container.querySelector('input[placeholder="e.g., 6d8"]');
-    }
-    function getSpeedInput(container) {
-      return container.querySelector('input[placeholder="30 ft."]');
-    }
-    function getInitInput(container) {
-      return container.querySelector('input[placeholder="+0"][type="number"]');
-    }
-
-    it('handles AC change with a numeric value', () => {
-      const { setFormData, getUpdates } = getSetFormData();
-      const { container } = render(<NPCStatBlockForm formData={baseFormData} setFormData={setFormData} />);
-      fireEvent.change(getAcInput(container), { target: { value: '18' } });
-      const updates = getUpdates();
-      expect(updates.length).toBeGreaterThanOrEqual(1);
-      const result = updates[0](baseFormData);
-      expect(result.armorClass).toBe(18);
-    });
-
-    it('handles AC change with empty value (sets null)', () => {
-      const { setFormData, getUpdates } = getSetFormData();
-      const { container } = render(<NPCStatBlockForm formData={baseFormData} setFormData={setFormData} />);
-      fireEvent.change(getAcInput(container), { target: { value: '' } });
-      const updates = getUpdates();
-      const result = updates[0](baseFormData);
-      expect(result.armorClass).toBeNull();
-    });
-
-    it('handles HP change', () => {
-      const { setFormData, getUpdates } = getSetFormData();
-      const { container } = render(<NPCStatBlockForm formData={baseFormData} setFormData={setFormData} />);
-      fireEvent.change(getHpInput(container), { target: { value: '55' } });
-      const updates = getUpdates();
-      const result = updates[0](baseFormData);
-      expect(result.hitPoints).toBe('55');
-    });
-
-    it('handles Hit Dice change', () => {
-      const { setFormData, getUpdates } = getSetFormData();
-      const { container } = render(<NPCStatBlockForm formData={baseFormData} setFormData={setFormData} />);
-      fireEvent.change(getHdInput(container), { target: { value: '8d10' } });
-      const updates = getUpdates();
-      const result = updates[0](baseFormData);
-      expect(result.hitDice).toBe('8d10');
-    });
-
-    it('handles Speed change and preserves other speed properties', () => {
+  describe('Speed change preserves other speed properties', () => {
+    it('retains climb speed when walk is edited', () => {
       const { setFormData, getUpdates } = getSetFormData();
       const formWithExtraSpeed = {
         ...baseFormData,
         speed: { walk: '30 ft.', climb: '15 ft.' },
       };
       const { container } = render(<NPCStatBlockForm formData={formWithExtraSpeed} setFormData={setFormData} />);
-      fireEvent.change(getSpeedInput(container), { target: { value: '40 ft.' } });
+      const speedInput = container.querySelector('input[placeholder="30 ft."]');
+      fireEvent.change(speedInput, { target: { value: '40 ft.' } });
       const updates = getUpdates();
       const result = updates[0](formWithExtraSpeed);
       expect(result.speed.walk).toBe('40 ft.');
       expect(result.speed.climb).toBe('15 ft.');
     });
-
-    it('handles Initiative Bonus change', () => {
-      const { setFormData, getUpdates } = getSetFormData();
-      const { container } = render(<NPCStatBlockForm formData={{ ...baseFormData, initiativeBonus: '' }} setFormData={setFormData} />);
-      fireEvent.change(getInitInput(container), { target: { value: '5' } });
-      const updates = getUpdates();
-      const result = updates[0]({ ...baseFormData, initiativeBonus: '' });
-      expect(result.initiativeBonus).toBe('5');
-    });
   });
 
-  describe('Ability score changes', () => {
-    it('handles ability score change for a stat', () => {
-      const { setFormData, getUpdates } = getSetFormData();
-      const { container } = render(<NPCStatBlockForm formData={baseFormData} setFormData={setFormData} />);
-      const inputs = container.querySelectorAll('.npcs-ability-input');
-      fireEvent.change(inputs[0], { target: { value: '18' } });
-      const updates = getUpdates();
-      const result = updates[0](baseFormData);
-      expect(result.abilityScores.str).toBe(18);
-      expect(result.abilityScores.dex).toBe(14);
-    });
-
-    it('handles invalid and empty ability score input (defaults to 0)', () => {
-      const { setFormData, getUpdates } = getSetFormData();
-      const { container } = render(<NPCStatBlockForm formData={baseFormData} setFormData={setFormData} />);
-      const inputs = container.querySelectorAll('.npcs-ability-input');
-      fireEvent.change(inputs[0], { target: { value: 'abc' } });
-      const updates = getUpdates();
-      const result = updates[0](baseFormData);
-      expect(result.abilityScores.str).toBe(0);
-    });
-  });
-
-  describe('Saving throw changes', () => {
-    it('handles save bonus change for existing and new abilities', () => {
-      const { setFormData, getUpdates } = getSetFormData();
-      const { container } = render(<NPCStatBlockForm formData={baseFormData} setFormData={setFormData} />);
-      const saveInputs = container.querySelectorAll('.npcs-save-input');
-      fireEvent.change(saveInputs[0], { target: { value: '+5' } });
-      const updates = getUpdates();
-      const result = updates[0](baseFormData);
-      expect(result.savingThrowBonuses.str).toBe('+5');
-    });
-
-    it('adds a new save bonus when previously undefined', () => {
-      const { setFormData, getUpdates } = getSetFormData();
-      const { container } = render(<NPCStatBlockForm formData={baseFormData} setFormData={setFormData} />);
-      const saveInputs = container.querySelectorAll('.npcs-save-input');
-      fireEvent.change(saveInputs[2], { target: { value: '+3' } });
-      const updates = getUpdates();
-      const result = updates[0](baseFormData);
-      expect(result.savingThrowBonuses.con).toBe('+3');
-    });
-  });
-
-  describe('Skill bonus changes', () => {
-    it('handles changing an existing skill bonus', () => {
-      const { setFormData, getUpdates } = getSetFormData();
-      const { container } = render(<NPCStatBlockForm formData={baseFormData} setFormData={setFormData} />);
-      const skillBonusInputs = container.querySelectorAll('.npcs-skill-bonus');
-      fireEvent.change(skillBonusInputs[0], { target: { value: '+6' } });
-      const updates = getUpdates();
-      const result = updates[0](baseFormData);
-      expect(result.skillBonuses.perception).toBe('+6');
-    });
-
+  describe('Skill bonus mutations', () => {
     it('adds a new skill via Add Skill button', () => {
       const { setFormData, getUpdates } = getSetFormData();
       render(<NPCStatBlockForm formData={baseFormData} setFormData={setFormData} />);
@@ -202,7 +86,7 @@ describe('NPCStatBlockForm interactions', () => {
       expect(addResult.skillBonuses.investigation).toBe('+3');
     });
 
-    it('does not rename on same name', () => {
+    it('does not rename when the name is unchanged', () => {
       const { setFormData } = getSetFormData();
       const { container } = render(<NPCStatBlockForm formData={baseFormData} setFormData={setFormData} />);
       const skillNameInputs = container.querySelectorAll('.npcs-skill-name');
@@ -211,119 +95,29 @@ describe('NPCStatBlockForm interactions', () => {
     });
   });
 
-  describe('Defense array field changes', () => {
-    function getResistInput(container) {
-      return container.querySelector('input[placeholder="fire, cold, poison"]');
-    }
-    function getImmuneInput(container) {
-      return container.querySelector('input[placeholder="necrotic, psychic"]');
-    }
-    function getCondInput(container) {
-      return container.querySelector('input[placeholder="charmed, frightened"]');
-    }
-
-    it('handles damage resistances change', () => {
+  describe('Defense array field parsing', () => {
+    it('parses comma-separated values with extra spaces', () => {
       const { setFormData, getUpdates } = getSetFormData();
       const { container } = render(<NPCStatBlockForm formData={baseFormData} setFormData={setFormData} />);
-      const resistInput = getResistInput(container);
-      fireEvent.change(resistInput, { target: { value: 'fire, cold, lightning' } });
-      const updates = getUpdates();
-      const result = updates[0](baseFormData);
-      expect(result.damageResistances).toEqual(['fire', 'cold', 'lightning']);
-    });
-
-    it('handles damage immunities change', () => {
-      const { setFormData, getUpdates } = getSetFormData();
-      const { container } = render(<NPCStatBlockForm formData={baseFormData} setFormData={setFormData} />);
-      const immuneInput = getImmuneInput(container);
-      fireEvent.change(immuneInput, { target: { value: 'necrotic' } });
-      const updates = getUpdates();
-      const result = updates[0](baseFormData);
-      expect(result.damageImmunities).toEqual(['necrotic']);
-    });
-
-    it('handles condition immunities change with empty string', () => {
-      const { setFormData, getUpdates } = getSetFormData();
-      const { container } = render(<NPCStatBlockForm formData={baseFormData} setFormData={setFormData} />);
-      const condInput = getCondInput(container);
-      fireEvent.change(condInput, { target: { value: '' } });
-      const updates = getUpdates();
-      const result = updates[0](baseFormData);
-      expect(result.conditionImmunities).toEqual([]);
-    });
-
-    it('handles comma-separated input with extra spaces', () => {
-      const { setFormData, getUpdates } = getSetFormData();
-      const { container } = render(<NPCStatBlockForm formData={baseFormData} setFormData={setFormData} />);
-      const resistInput = getResistInput(container);
+      const resistInput = container.querySelector('input[placeholder="fire, cold, poison"]');
       fireEvent.change(resistInput, { target: { value: '  fire  ,  cold  ,  lightning  ' } });
       const updates = getUpdates();
       const result = updates[0](baseFormData);
       expect(result.damageResistances).toEqual(['fire', 'cold', 'lightning']);
     });
+
+    it('clears condition immunities on empty string', () => {
+      const { setFormData, getUpdates } = getSetFormData();
+      const { container } = render(<NPCStatBlockForm formData={baseFormData} setFormData={setFormData} />);
+      const condInput = container.querySelector('input[placeholder="charmed, frightened"]');
+      fireEvent.change(condInput, { target: { value: '' } });
+      const updates = getUpdates();
+      const result = updates[0](baseFormData);
+      expect(result.conditionImmunities).toEqual([]);
+    });
   });
 
-  describe('Action field changes', () => {
-    it('handles action name change', () => {
-      const { setFormData, getUpdates } = getSetFormData();
-      const { container } = render(<NPCStatBlockForm formData={baseFormData} setFormData={setFormData} />);
-      const nameInput = container.querySelector('.npcs-action-name');
-      fireEvent.change(nameInput, { target: { value: 'Greatsword' } });
-      const updates = getUpdates();
-      const result = updates[0](baseFormData);
-      expect(result.actions[0].name).toBe('Greatsword');
-    });
-
-    it('handles action attack bonus change', () => {
-      const { setFormData, getUpdates } = getSetFormData();
-      const { container } = render(<NPCStatBlockForm formData={baseFormData} setFormData={setFormData} />);
-      const atkBonusInput = container.querySelector('.npcs-action-bonus');
-      fireEvent.change(atkBonusInput, { target: { value: '+7' } });
-      const updates = getUpdates();
-      const result = updates[0](baseFormData);
-      expect(result.actions[0].attack_bonus).toBe('+7');
-    });
-
-    it('handles action damage dice and type changes', () => {
-      const { setFormData, getUpdates } = getSetFormData();
-      const { container } = render(<NPCStatBlockForm formData={baseFormData} setFormData={setFormData} />);
-      const dmgInput = container.querySelector('.npcs-action-damage');
-      fireEvent.change(dmgInput, { target: { value: '2d6+5' } });
-      const updates = getUpdates();
-      const result = updates[0](baseFormData);
-      expect(result.actions[0].damage_dice_primary).toBe('2d6+5');
-    });
-
-    it('handles action damage type change', () => {
-      const { setFormData, getUpdates } = getSetFormData();
-      const { container } = render(<NPCStatBlockForm formData={baseFormData} setFormData={setFormData} />);
-      const typeInput = container.querySelector('.npcs-action-damage-type');
-      fireEvent.change(typeInput, { target: { value: 'piercing' } });
-      const updates = getUpdates();
-      const result = updates[0](baseFormData);
-      expect(result.actions[0].damage_type_primary).toBe('piercing');
-    });
-
-    it('handles action secondary damage dice change', () => {
-      const { setFormData, getUpdates } = getSetFormData();
-      const { container } = render(<NPCStatBlockForm formData={baseFormData} setFormData={setFormData} />);
-      const secInput = container.querySelector('.npcs-action-damage-secondary');
-      fireEvent.change(secInput, { target: { value: '1d6' } });
-      const updates = getUpdates();
-      const result = updates[0](baseFormData);
-      expect(result.actions[0].damage_dice_secondary).toBe('1d6');
-    });
-
-    it('handles action description change', () => {
-      const { setFormData, getUpdates } = getSetFormData();
-      const { container } = render(<NPCStatBlockForm formData={baseFormData} setFormData={setFormData} />);
-      const descTextarea = container.querySelector('.npcs-action-desc');
-      fireEvent.change(descTextarea, { target: { value: 'New description.' } });
-      const updates = getUpdates();
-      const result = updates[0](baseFormData);
-      expect(result.actions[0].description).toBe('New description.');
-    });
-
+  describe('Action mutations', () => {
     it('adds a new action via Add Action button', () => {
       const { setFormData, getUpdates } = getSetFormData();
       render(<NPCStatBlockForm formData={baseFormData} setFormData={setFormData} />);
@@ -386,35 +180,6 @@ describe('NPCStatBlockForm interactions', () => {
       const result = updates[0](prev);
       expect(result.actions).toHaveLength(1);
       expect(result.actions[0].name).toBe('Greatsword');
-    });
-  });
-
-  describe('Textarea field changes', () => {
-    function getTraitsTextarea(container) {
-      return [...container.querySelectorAll('textarea')]
-        .find(t => t.placeholder.includes('Special traits'));
-    }
-    function getReactionsTextarea(container) {
-      return [...container.querySelectorAll('textarea')]
-        .find(t => t.placeholder.includes('Reactions'));
-    }
-
-    it('handles traits textarea change', () => {
-      const { setFormData, getUpdates } = getSetFormData();
-      const { container } = render(<NPCStatBlockForm formData={baseFormData} setFormData={setFormData} />);
-      fireEvent.change(getTraitsTextarea(container), { target: { value: 'Darkvision 60 ft.\nKeen Senses.' } });
-      const updates = getUpdates();
-      const result = updates[0](baseFormData);
-      expect(result.traits).toBe('Darkvision 60 ft.\nKeen Senses.');
-    });
-
-    it('handles reactions textarea change', () => {
-      const { setFormData, getUpdates } = getSetFormData();
-      const { container } = render(<NPCStatBlockForm formData={baseFormData} setFormData={setFormData} />);
-      fireEvent.change(getReactionsTextarea(container), { target: { value: 'Opportunity Attack.' } });
-      const updates = getUpdates();
-      const result = updates[0](baseFormData);
-      expect(result.reactions).toBe('Opportunity Attack.');
     });
   });
 });

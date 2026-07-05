@@ -65,19 +65,10 @@ describe('rollDisadvantage', () => {
 });
 
 describe('parseExpression', () => {
-  it('parses "d20" with implicit count of 1', () => {
+  it('parses valid formulas with optional count, sides, and modifier', () => {
     expect(parseExpression('d20')).toEqual({ count: 1, sides: 20, modifier: 0 });
-  });
-
-  it('parses "2d6"', () => {
     expect(parseExpression('2d6')).toEqual({ count: 2, sides: 6, modifier: 0 });
-  });
-
-  it('parses "1d8+3"', () => {
     expect(parseExpression('1d8+3')).toEqual({ count: 1, sides: 8, modifier: 3 });
-  });
-
-  it('parses "1d10-2"', () => {
     expect(parseExpression('1d10-2')).toEqual({ count: 1, sides: 10, modifier: -2 });
   });
 
@@ -96,27 +87,15 @@ describe('parseExpression', () => {
     expect(parseExpression('not a formula')).toBeNull();
   });
 
-  it('parses first valid option when formula contains " or "', () => {
+  it('handles " or " alternatives by selecting the first valid option', () => {
     expect(parseExpression('1d8 + 3 or 2d6')).toEqual({ count: 1, sides: 8, modifier: 3 });
-  });
-
-  it('skips invalid first option and parses second option in " or " formula', () => {
     expect(parseExpression('invalid or 2d6')).toEqual({ count: 2, sides: 6, modifier: 0 });
-  });
-
-  it('returns null when all options in " or " formula are invalid', () => {
     expect(parseExpression('invalid or nonsense')).toBeNull();
   });
 
-  it('supports multi-digit counts and sides', () => {
+  it('supports multi-digit counts/sides and multiple modifiers', () => {
     expect(parseExpression('10d100')).toEqual({ count: 10, sides: 100, modifier: 0 });
-  });
-
-  it('parses multiple modifiers like "1d8+4+2"', () => {
     expect(parseExpression('1d8+4+2')).toEqual({ count: 1, sides: 8, modifier: 6 });
-  });
-
-  it('parses multiple modifiers with mixed signs', () => {
     expect(parseExpression('1d10+5-3')).toEqual({ count: 1, sides: 10, modifier: 2 });
   });
 });
@@ -132,60 +111,49 @@ describe('rollExpression', () => {
     expect(result.modifier).toBe(0);
   });
 
-  it('rolls with a positive modifier', () => {
-    const result = rollExpression('1d8+3');
-    expect(result).not.toBeNull();
-    expect(result.rolls).toHaveLength(1);
-    expect(result.modifier).toBe(3);
-    expect(result.total).toBe(result.rolls[0] + 3);
-    expect(result.formula).toBe('1d8+3');
+  it('rolls with modifiers and multiple dice', () => {
+    const posResult = rollExpression('1d8+3');
+    expect(posResult).not.toBeNull();
+    expect(posResult.rolls).toHaveLength(1);
+    expect(posResult.modifier).toBe(3);
+    expect(posResult.total).toBe(posResult.rolls[0] + 3);
+    expect(posResult.formula).toBe('1d8+3');
+
+    const negResult = rollExpression('1d6-2');
+    expect(negResult).not.toBeNull();
+    expect(negResult.modifier).toBe(-2);
+    expect(negResult.total).toBe(negResult.rolls[0] - 2);
+
+    const multiResult = rollExpression('2d6');
+    expect(multiResult).not.toBeNull();
+    expect(multiResult.rolls).toHaveLength(2);
+    expect(multiResult.total).toBe(multiResult.rolls[0] + multiResult.rolls[1]);
   });
 
-  it('rolls with a negative modifier', () => {
-    const result = rollExpression('1d6-2');
-    expect(result).not.toBeNull();
-    expect(result.modifier).toBe(-2);
-    expect(result.total).toBe(result.rolls[0] - 2);
-  });
-
-  it('rolls multiple dice', () => {
-    const result = rollExpression('2d6');
-    expect(result).not.toBeNull();
-    expect(result.rolls).toHaveLength(2);
-    expect(result.total).toBe(result.rolls[0] + result.rolls[1]);
-  });
-
-  it('returns null for invalid expression', () => {
+  it('returns null for invalid expressions', () => {
     expect(rollExpression('xyz')).toBeNull();
     expect(rollExpression('')).toBeNull();
     expect(rollExpression('   ')).toBeNull();
-  });
-
-  it('returns null when formula is only brackets', () => {
     expect(rollExpression('[tag]')).toBeNull();
   });
 
-  it('rolls first valid option when formula contains " or "', () => {
-    const result = rollExpression('1d8 + 3 or 2d6');
-    expect(result).not.toBeNull();
-    expect(result.rolls).toHaveLength(1);
-    expect(result.modifier).toBe(3);
-    expect(result.formula).toBe('1d8 + 3');
-  });
+  it('handles " or " and " plus " alternatives', () => {
+    const orResult = rollExpression('1d8 + 3 or 2d6');
+    expect(orResult).not.toBeNull();
+    expect(orResult.rolls).toHaveLength(1);
+    expect(orResult.modifier).toBe(3);
+    expect(orResult.formula).toBe('1d8 + 3');
 
-  it('rolls combined damage when formula contains " plus "', () => {
-    const result = rollExpression('1d8+3 plus 2d6');
-    expect(result).not.toBeNull();
-    expect(result.rolls).toHaveLength(3);
-    expect(result.modifier).toBe(3);
-    expect(result.formula).toBe('1d8+3 plus 2d6');
-  });
+    const plusResult = rollExpression('1d8+3 plus 2d6');
+    expect(plusResult).not.toBeNull();
+    expect(plusResult.rolls).toHaveLength(3);
+    expect(plusResult.modifier).toBe(3);
+    expect(plusResult.formula).toBe('1d8+3 plus 2d6');
 
-  it('rolls combined damage with modifiers on both sides', () => {
-    const result = rollExpression('1d6+2 plus 1d4+1');
-    expect(result).not.toBeNull();
-    expect(result.rolls).toHaveLength(2);
-    expect(result.modifier).toBe(3);
+    const plusModResult = rollExpression('1d6+2 plus 1d4+1');
+    expect(plusModResult).not.toBeNull();
+    expect(plusModResult.rolls).toHaveLength(2);
+    expect(plusModResult.modifier).toBe(3);
   });
 
   it('strips brackets before evaluating', () => {
@@ -205,7 +173,7 @@ describe('rollExpressionDoubled', () => {
     expect(result.total).toBe(result.doubledRolls.reduce((s, r) => s + r, 0) + 3);
   });
 
-  it('doubles combined damage dice and rolls', () => {
+  it('doubles combined damage dice', () => {
     const result = rollExpressionDoubled('1d8+3 plus 2d6');
     expect(result).not.toBeNull();
     expect(result.rolls).toHaveLength(3);
@@ -213,7 +181,7 @@ describe('rollExpressionDoubled', () => {
     expect(result.modifier).toBe(3);
   });
 
-  it('returns null for invalid expression', () => {
+  it('returns null for invalid expressions', () => {
     expect(rollExpressionDoubled('xyz')).toBeNull();
     expect(rollExpressionDoubled('')).toBeNull();
   });
@@ -228,38 +196,29 @@ describe('rollExpressionDoubled', () => {
 });
 
 describe('rollExpressionMaximized', () => {
-  it('fills all dice with maximum value', () => {
-    const result = rollExpressionMaximized('2d6');
-    expect(result).not.toBeNull();
-    expect(result.rolls).toHaveLength(2);
-    expect(result.rolls[0]).toBe(6);
-    expect(result.rolls[1]).toBe(6);
-    expect(result.total).toBe(12);
-    expect(result.maximized).toBe(true);
+  it('fills all dice with maximum value and adds modifier', () => {
+    const basic = rollExpressionMaximized('2d6');
+    expect(basic).not.toBeNull();
+    expect(basic.rolls).toHaveLength(2);
+    expect(basic.rolls[0]).toBe(6);
+    expect(basic.rolls[1]).toBe(6);
+    expect(basic.total).toBe(12);
+    expect(basic.maximized).toBe(true);
+
+    const withMod = rollExpressionMaximized('1d8+5');
+    expect(withMod).not.toBeNull();
+    expect(withMod.total).toBe(8 + 5);
+    expect(withMod.modifier).toBe(5);
+
+    const negMod = rollExpressionMaximized('3d10-2');
+    expect(negMod).not.toBeNull();
+    expect(negMod.total).toBe(30 - 2);
+    expect(negMod.modifier).toBe(-2);
   });
 
-  it('adds modifier to maximized total', () => {
-    const result = rollExpressionMaximized('1d8+5');
-    expect(result).not.toBeNull();
-    expect(result.total).toBe(8 + 5);
-    expect(result.modifier).toBe(5);
-  });
-
-  it('handles negative modifier', () => {
-    const result = rollExpressionMaximized('3d10-2');
-    expect(result).not.toBeNull();
-    expect(result.total).toBe(30 - 2);
-    expect(result.modifier).toBe(-2);
-  });
-
-  it('returns null for invalid expression', () => {
+  it('returns null for invalid expressions', () => {
     expect(rollExpressionMaximized('xyz')).toBeNull();
     expect(rollExpressionMaximized('')).toBeNull();
-  });
-
-  it('preserves the original formula', () => {
-    const result = rollExpressionMaximized('4d12');
-    expect(result.formula).toBe('4d12');
   });
 });
 

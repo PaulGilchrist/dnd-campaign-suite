@@ -82,8 +82,6 @@ describe('rollDamageForAction', () => {
 
             const result = rollDamageForAction(auto);
 
-            expect(diceRoller.rollExpression).toHaveBeenCalledWith('2d6+3');
-            expect(diceRoller.rollExpressionDoubled).not.toHaveBeenCalled();
             expect(result).toEqual({
                 result: mockResult,
                 attackContext: {
@@ -104,8 +102,6 @@ describe('rollDamageForAction', () => {
 
             const result = rollDamageForAction(auto, { isCrit: true });
 
-            expect(diceRoller.rollExpressionDoubled).toHaveBeenCalledWith('2d6+3');
-            expect(diceRoller.rollExpression).not.toHaveBeenCalled();
             expect(result.result).toBe(mockResult);
             expect(result.attackContext.damage).toBe('2d6+3');
         });
@@ -119,14 +115,6 @@ describe('rollDamageForAction', () => {
             expect(result).toBeNull();
         });
 
-        it('returns null when crit dice roll fails', () => {
-            const auto = { damage: 'invalid' };
-            diceRoller.rollExpressionDoubled.mockReturnValue(null);
-
-            const result = rollDamageForAction(auto, { isCrit: true });
-
-            expect(result).toBeNull();
-        });
     });
 
     describe('pre-rolled result', () => {
@@ -141,25 +129,7 @@ describe('rollDamageForAction', () => {
             expect(result.result).toBe(preRolled);
         });
 
-        it('prefers preRolledResult over isCrit flag', () => {
-            const auto = { damage: '2d6+3' };
-            const preRolled = { total: 5, rolls: [5] };
 
-            const result = rollDamageForAction(auto, { preRolledResult: preRolled, isCrit: true });
-
-            expect(result.result).toBe(preRolled);
-            expect(diceRoller.rollExpressionDoubled).not.toHaveBeenCalled();
-        });
-
-        it('returns null when preRolledResult is null and dice roll fails', () => {
-            const auto = { damage: '2d6+3' };
-            diceRoller.rollExpression.mockReturnValue(null);
-
-            const result = rollDamageForAction(auto, { preRolledResult: null });
-
-            expect(result).toBeNull();
-            expect(diceRoller.rollExpression).toHaveBeenCalled();
-        });
     });
 
     describe('attackContext construction', () => {

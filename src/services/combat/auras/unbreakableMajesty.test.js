@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 // ── Mocks BEFORE imports (hoisted by vitest) ───────────────────
@@ -34,32 +34,23 @@ describe('isUnbreakableMajestyActive', () => {
     vi.clearAllMocks()
   })
 
-  it('returns true when runtime value is strictly true', () => {
+  it('returns true only when runtime value is strictly true', () => {
     getRuntimeValue.mockReturnValue(true)
     expect(isUnbreakableMajestyActive('Paladin', 'Campaign')).toBe(true)
-  })
 
-  it('returns false when runtime value is false', () => {
     getRuntimeValue.mockReturnValue(false)
     expect(isUnbreakableMajestyActive('Paladin', 'Campaign')).toBe(false)
-  })
 
-  it('returns false when runtime value is null', () => {
     getRuntimeValue.mockReturnValue(null)
     expect(isUnbreakableMajestyActive('Paladin', 'Campaign')).toBe(false)
-  })
 
-  it('returns false when runtime value is undefined', () => {
     getRuntimeValue.mockReturnValue(undefined)
     expect(isUnbreakableMajestyActive('Paladin', 'Campaign')).toBe(false)
-  })
 
-  it('uses strict equality — does not treat truthy strings as true', () => {
+    // Truthy strings and numbers should not be treated as true
     getRuntimeValue.mockReturnValue('true')
     expect(isUnbreakableMajestyActive('Paladin', 'Campaign')).toBe(false)
-  })
 
-  it('uses strict equality — does not treat 1 as true', () => {
     getRuntimeValue.mockReturnValue(1)
     expect(isUnbreakableMajestyActive('Paladin', 'Campaign')).toBe(false)
   })
@@ -70,32 +61,26 @@ describe('getUnbreakableMajestySaveDc', () => {
     vi.clearAllMocks()
   })
 
-  it('returns the numeric DC from runtime', () => {
+  it('returns the numeric DC from runtime or coerces numeric strings', () => {
     getRuntimeValue.mockReturnValue(15)
     expect(getUnbreakableMajestySaveDc('Paladin', 'Campaign')).toBe(15)
-  })
 
-  it('returns 0 when runtime value is null', () => {
-    getRuntimeValue.mockReturnValue(null)
-    expect(getUnbreakableMajestySaveDc('Paladin', 'Campaign')).toBe(0)
-  })
-
-  it('returns 0 when runtime value is undefined', () => {
-    getRuntimeValue.mockReturnValue(undefined)
-    expect(getUnbreakableMajestySaveDc('Paladin', 'Campaign')).toBe(0)
-  })
-
-  it('returns 0 when runtime value is an empty string', () => {
-    getRuntimeValue.mockReturnValue('')
-    expect(getUnbreakableMajestySaveDc('Paladin', 'Campaign')).toBe(0)
-  })
-
-  it('coerces a numeric string to its number', () => {
     getRuntimeValue.mockReturnValue('18')
     expect(getUnbreakableMajestySaveDc('Paladin', 'Campaign')).toBe(18)
   })
 
-  it('returns NaN for a non-numeric string via Number coercion (|| 0 only catches nullish)', () => {
+  it('returns 0 when runtime value is null, undefined, or empty string', () => {
+    getRuntimeValue.mockReturnValue(null)
+    expect(getUnbreakableMajestySaveDc('Paladin', 'Campaign')).toBe(0)
+
+    getRuntimeValue.mockReturnValue(undefined)
+    expect(getUnbreakableMajestySaveDc('Paladin', 'Campaign')).toBe(0)
+
+    getRuntimeValue.mockReturnValue('')
+    expect(getUnbreakableMajestySaveDc('Paladin', 'Campaign')).toBe(0)
+  })
+
+  it('returns NaN for a non-numeric string via Number coercion', () => {
     getRuntimeValue.mockReturnValue('abc')
     expect(getUnbreakableMajestySaveDc('Paladin', 'Campaign')).toBeNaN()
   })
@@ -106,14 +91,13 @@ describe('clearUnbreakableMajesty', () => {
     vi.clearAllMocks()
   })
 
-  it('clears both the active flag and the save DC', () => {
+  it('clears both the active flag and the save DC with correct arguments', () => {
     clearUnbreakableMajesty('Paladin', 'Campaign')
 
     expect(setRuntimeValue).toHaveBeenNthCalledWith(1, 'Paladin', 'unbreakableMajestyActive', null, 'Campaign')
     expect(setRuntimeValue).toHaveBeenNthCalledWith(2, 'Paladin', 'unbreakableMajestySaveDc', null, 'Campaign')
-  })
 
-  it('uses correct character and campaign names in calls', () => {
+    vi.clearAllMocks()
     clearUnbreakableMajesty('MyPaladin', 'MyCampaign')
 
     expect(setRuntimeValue).toHaveBeenNthCalledWith(1, 'MyPaladin', 'unbreakableMajestyActive', null, 'MyCampaign')
@@ -132,21 +116,19 @@ describe('hasAttackerTriggeredMajesty', () => {
     expect(hasAttackerTriggeredMajesty('Paladin', 'Goblin', 'Campaign')).toBe(true)
   })
 
-  it('returns false when attacker triggered in a different round', () => {
+  it('returns false when attacker triggered in a different round or has not triggered yet', () => {
     getCurrentCombatRound.mockReturnValue(4)
     getRuntimeValue.mockReturnValue({ round: 3 })
     expect(hasAttackerTriggeredMajesty('Paladin', 'Goblin', 'Campaign')).toBe(false)
-  })
 
-  it('returns false when attacker has not triggered yet (null stored value)', () => {
     getCurrentCombatRound.mockReturnValue(3)
     getRuntimeValue.mockReturnValue(null)
     expect(hasAttackerTriggeredMajesty('Paladin', 'Goblin', 'Campaign')).toBe(false)
-  })
 
-  it('returns false when stored value is undefined', () => {
-    getCurrentCombatRound.mockReturnValue(3)
     getRuntimeValue.mockReturnValue(undefined)
+    expect(hasAttackerTriggeredMajesty('Paladin', 'Goblin', 'Campaign')).toBe(false)
+
+    getRuntimeValue.mockReturnValue({ other: 'data' })
     expect(hasAttackerTriggeredMajesty('Paladin', 'Goblin', 'Campaign')).toBe(false)
   })
 
@@ -159,12 +141,6 @@ describe('hasAttackerTriggeredMajesty', () => {
     expect(hasAttackerTriggeredMajesty('Paladin', 'Goblin', 'Campaign')).toBe(true)
     expect(hasAttackerTriggeredMajesty('Paladin', 'Orc', 'Campaign')).toBe(false)
   })
-
-  it('returns false when stored value lacks a round property', () => {
-    getCurrentCombatRound.mockReturnValue(3)
-    getRuntimeValue.mockReturnValue({ other: 'data' })
-    expect(hasAttackerTriggeredMajesty('Paladin', 'Goblin', 'Campaign')).toBe(false)
-  })
 })
 
 describe('markAttackerTriggeredMajesty', () => {
@@ -172,7 +148,7 @@ describe('markAttackerTriggeredMajesty', () => {
     vi.clearAllMocks()
   })
 
-  it('marks the attacker with the current round', () => {
+  it('marks the attacker with the current round using the correct storage key', () => {
     getCurrentCombatRound.mockReturnValue(5)
     markAttackerTriggeredMajesty('Paladin', 'Goblin', 'Campaign')
     expect(setRuntimeValue).toHaveBeenCalledWith(
@@ -181,9 +157,8 @@ describe('markAttackerTriggeredMajesty', () => {
       { round: 5 },
       'Campaign',
     )
-  })
 
-  it('uses the attacker name in the storage key', () => {
+    vi.clearAllMocks()
     getCurrentCombatRound.mockReturnValue(3)
     markAttackerTriggeredMajesty('MyPaladin', 'Drake', 'MyCampaign')
     expect(setRuntimeValue).toHaveBeenCalledWith(
@@ -198,7 +173,6 @@ describe('markAttackerTriggeredMajesty', () => {
     getCurrentCombatRound.mockReturnValue(1)
     markAttackerTriggeredMajesty('Paladin', 'Goblin', 'Campaign')
     getCurrentCombatRound.mockReturnValue(99)
-    // The stored value should be 1, not 99 — proving round is captured once
     expect(setRuntimeValue).toHaveBeenCalledWith(
       'Paladin',
       'unbreakableMajestyBlocked_Goblin',
@@ -214,7 +188,7 @@ describe('clearPerRoundMajestyTrackers', () => {
     window.localStorage.clear()
   })
 
-  it('clears trackers whose round does not match the current round', () => {
+  it('clears outdated trackers and keeps current ones', () => {
     getCurrentCombatRound.mockReturnValue(3)
 
     const keyFn = vi.fn((i) => (i === 0 ? '0' : '1'))
@@ -225,7 +199,6 @@ describe('clearPerRoundMajestyTrackers', () => {
       'runtime:Campaign:Paladin:unbreakableMajestyBlocked_Orc': JSON.stringify({ round: 3 }),
     }
 
-    // Replace Object.keys to return our test keys
     const originalKeys = Object.keys
     Object.keys = (obj) => {
       if (obj === localStorage) return Object.keys(localStorage.__store)
@@ -251,33 +224,6 @@ describe('clearPerRoundMajestyTrackers', () => {
       null,
       'Campaign',
     )
-
-    Object.keys = originalKeys
-  })
-
-  it('keeps trackers whose round matches the current round', () => {
-    getCurrentCombatRound.mockReturnValue(2)
-
-    Object.defineProperty(window.localStorage, 'length', { value: 1, writable: true, configurable: true })
-    const keyFn1 = vi.fn((i) => (i === 0 ? '0' : ''))
-    Object.defineProperty(window.localStorage, 'key', { value: keyFn1, writable: true, configurable: true })
-    localStorage.__store = {
-      'runtime:Campaign:Paladin:unbreakableMajestyBlocked_Goblin': JSON.stringify({ round: 2 }),
-    }
-
-    const originalKeys = Object.keys
-    Object.keys = (obj) => {
-      if (obj === localStorage) return Object.keys(localStorage.__store)
-      return originalKeys(obj)
-    }
-
-    getRuntimeValue.mockImplementation((_, key) => {
-      const raw = localStorage.__store[`runtime:Campaign:Paladin:${key}`]
-      return raw ? JSON.parse(raw) : null
-    })
-
-    clearPerRoundMajestyTrackers('Paladin', 'Campaign')
-    expect(setRuntimeValue).not.toHaveBeenCalled()
 
     Object.keys = originalKeys
   })
@@ -380,7 +326,7 @@ describe('clearPerRoundMajestyTrackers', () => {
 })
 
 describe('buildMajestyPromptData', () => {
-  it('returns correct prompt data structure', () => {
+  it('returns correct prompt data structure with attacker as target and defender as source', () => {
     const result = buildMajestyPromptData('Paladin', 'Goblin', 15)
     expect(result).toEqual({
       targetName: 'Goblin',
@@ -388,21 +334,18 @@ describe('buildMajestyPromptData', () => {
       saveDc: 15,
       sourceName: 'Paladin',
     })
-  })
 
-  it('swaps defender and attacker names into sourceName and targetName', () => {
-    const result = buildMajestyPromptData('My Paladin', 'Dragon', 20)
-    expect(result.sourceName).toBe('My Paladin')
-    expect(result.targetName).toBe('Dragon')
-  })
+    // Verify name swapping
+    const result2 = buildMajestyPromptData('My Paladin', 'Dragon', 20)
+    expect(result2.sourceName).toBe('My Paladin')
+    expect(result2.targetName).toBe('Dragon')
 
-  it('always uses CHA as the save type', () => {
-    const result = buildMajestyPromptData('Paladin', 'Goblin', 10)
-    expect(result.saveType).toBe('CHA')
-  })
+    // Verify saveType is always CHA
+    const result3 = buildMajestyPromptData('Paladin', 'Goblin', 10)
+    expect(result3.saveType).toBe('CHA')
 
-  it('passes the saveDc through unchanged', () => {
-    const result = buildMajestyPromptData('Paladin', 'Goblin', 25)
-    expect(result.saveDc).toBe(25)
+    // Verify saveDc passes through unchanged
+    const result4 = buildMajestyPromptData('Paladin', 'Goblin', 25)
+    expect(result4.saveDc).toBe(25)
   })
 })

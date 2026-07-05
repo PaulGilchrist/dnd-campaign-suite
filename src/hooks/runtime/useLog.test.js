@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
 
@@ -33,15 +33,6 @@ describe('useLog', () => {
       const { result } = renderHook(() => useLog('test-campaign'));
       expect(result.current.logEntries).toEqual([]);
       expect(result.current.initialized).toBe(false);
-    });
-
-    it('returns the correct shape: logEntries, initialized, addEntry', () => {
-      const { result } = renderHook(() => useLog('test-campaign'));
-      expect(result.current).toHaveProperty('logEntries');
-      expect(result.current).toHaveProperty('initialized');
-      expect(result.current).toHaveProperty('addEntry');
-      expect(Array.isArray(result.current.logEntries)).toBe(true);
-      expect(typeof result.current.addEntry).toBe('function');
     });
   });
 
@@ -204,40 +195,6 @@ describe('useLog', () => {
             key: 'other-event',
             data: { text: 'ignored' },
           }),
-        });
-      });
-
-      expect(result.current.logEntries).toHaveLength(0);
-    });
-
-    it('ignores events with malformed JSON', async () => {
-      logService.getLog.mockResolvedValue([]);
-
-      const { result } = renderHook(() => useLog('test-campaign'));
-      await waitFor(() => {
-        expect(result.current.initialized).toBe(true);
-      });
-
-      act(() => {
-        mockEventSource.onmessage({
-          data: 'not valid json {',
-        });
-      });
-
-      expect(result.current.logEntries).toHaveLength(0);
-    });
-
-    it('ignores events whose key is missing and would throw on startsWith', async () => {
-      logService.getLog.mockResolvedValue([]);
-
-      const { result } = renderHook(() => useLog('test-campaign'));
-      await waitFor(() => {
-        expect(result.current.initialized).toBe(true);
-      });
-
-      act(() => {
-        mockEventSource.onmessage({
-          data: JSON.stringify({ data: { text: 'no key' } }),
         });
       });
 

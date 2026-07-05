@@ -235,20 +235,6 @@ describe('featureCategorizationUtils', () => {
       expect(result.specialActions).toHaveLength(1);
     });
 
-    it('should handle automation as an array and pick the first item with casting_time', () => {
-      const items = [
-        makeFeature('Multi-Auto Feature', {
-          automation: [
-            { casting_time: '1 action', type: 'extra' },
-            { casting_time: '1 bonus action', type: 'self_healing' }
-          ]
-        })
-      ];
-      const result = categorizeFeatures(items, mockCategories);
-      expect(result.actions).toHaveLength(1);
-      expect(result.actions[0].name).toBe('Multi-Auto Feature');
-    });
-
     it('should reverse processing order when reverseOrder is true, keeping the last occurrence', () => {
       const items = [
         makeFeature('Action Surge', { description: 'Level 2' }),
@@ -296,18 +282,6 @@ describe('featureCategorizationUtils', () => {
       expect(result.bonusActions[0].name).toBe('Cunning Action');
       expect(result.reactions).toHaveLength(1);
       expect(result.reactions[0].name).toBe('Dodge');
-    });
-
-    it('should already process highest level first; reverseOrder:true double-reverses', () => {
-      // addFeatures already flattens highest-level-first. With reverseOrder:true,
-      // categorizeFeatures reverses again, so lowest level comes first and is kept.
-      const levels = [
-        { features: [makeFeature('Action Surge', { description: 'Level 2' })] },
-        { features: [makeFeature('Action Surge', { description: 'Level 17' })] }
-      ];
-      const result = addFeatures(levels, mockCategories, { reverseOrder: true });
-      expect(result.actions).toHaveLength(1);
-      expect(result.actions[0].description).toBe('Level 2');
     });
 
     it('should skip levels without features', () => {

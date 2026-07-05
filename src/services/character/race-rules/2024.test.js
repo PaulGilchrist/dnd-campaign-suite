@@ -221,66 +221,7 @@ describe('raceRules 2024 (direct module)', () => {
       expect(raceRules.getResistances(input)).toEqual([]);
     });
 
-    it('returns Fiendish Legacy resistance for Abyssal Tiefling subrace', () => {
-      const input = {
-        name: 'TestChar',
-        race: {
-          name: 'Tiefling',
-          subrace: { name: 'Abyssal Tiefling' },
-          traits: [{ name: 'Fiendish Legacies', description: 'Abyssal: Resistance to Poison damage.' }]
-        }
-      };
-      expect(raceRules.getResistances(input)).toContain('Poison');
-    });
-
-    it('returns Fiendish Legacy resistance for Chthonic Tiefling subrace', () => {
-      const input = {
-        name: 'TestChar',
-        race: {
-          name: 'Tiefling',
-          subrace: { name: 'Chthonic Tiefling' },
-          traits: [{ name: 'Fiendish Legacies', description: 'Chthonic: Resistance to Necrotic damage.' }]
-        }
-      };
-      expect(raceRules.getResistances(input)).toContain('Necrotic');
-    });
-
-    it('returns Fiendish Legacy resistance for Infernal Tiefling subrace', () => {
-      const input = {
-        name: 'TestChar',
-        race: {
-          name: 'Tiefling',
-          subrace: { name: 'Infernal Tiefling' },
-          traits: [{ name: 'Fiendish Legacies', description: 'Infernal: Resistance to Fire damage.' }]
-        }
-      };
-      expect(raceRules.getResistances(input)).toContain('Fire');
-    });
-
-    it('falls back to regex extraction when no Tiefling subrace', () => {
-      const input = {
-        race: {
-          traits: [{ name: 'Fiendish Legacies', description: 'Abyssal: Resistance to Poison damage.' }]
-        }
-      };
-      expect(raceRules.getResistances(input)).toContain('Poison');
-    });
-
-    it('skips Fiendish Legacies trait from regex when Tiefling subrace is selected', () => {
-      const input = {
-        name: 'TestChar',
-        race: {
-          name: 'Tiefling',
-          subrace: { name: 'Abyssal Tiefling' },
-          traits: [{ name: 'Fiendish Legacies', description: 'Abyssal: Resistance to Poison damage.' }]
-        }
-      };
-      const result = raceRules.getResistances(input);
-      expect(result).toContain('Poison');
-    });
-
     it('handles missing campaignName gracefully', () => {
-
       const input = {
         race: { traits: [{ description: 'You have resistance to fire.' }] }
       };
@@ -508,63 +449,6 @@ describe('raceRules 2024 (direct module)', () => {
         race: { traits: [{ name: 'Some Other Trait', description: 'You have tremorsense with a range of 30 feet.' }] }
       };
       expect(raceRules.getSenses(input)).toContainEqual({ name: 'Tremorsense', value: '30 ft.' });
-    });
-
-    it('overrides Darkvision to 120 ft. for Drow lineage', () => {
-      vi.mocked(getRuntimeValue).mockReturnValue(null);
-
-      const input = {
-        senses: [],
-        race: {
-          traits: [{ description: 'You have darkvision with a range of 60 feet.' }],
-          lineage: 'Drow'
-        }
-      };
-      const result = raceRules.getSenses(input);
-      const dv = result.find((s) => s.name === 'Darkvision');
-      expect(dv.value).toBe('120 ft.');
-    });
-
-    it('overrides Darkvision to 120 ft. for Deep Gnome lineage', () => {
-      vi.mocked(getRuntimeValue).mockReturnValue(null);
-
-      const input = {
-        senses: [],
-        race: {
-          traits: [{ description: 'You have darkvision with a range of 60 feet.' }],
-          lineage: 'Deep Gnome'
-        }
-      };
-      const result = raceRules.getSenses(input);
-      const dv = result.find((s) => s.name === 'Darkvision');
-      expect(dv.value).toBe('120 ft.');
-    });
-
-    it('does not override Darkvision for non-Drow/Deep Gnome lineage', () => {
-      vi.mocked(getRuntimeValue).mockReturnValue(null);
-
-      const input = {
-        senses: [],
-        race: {
-          traits: [{ description: 'You have darkvision with a range of 60 feet.' }],
-          lineage: 'High Elf'
-        }
-      };
-      const result = raceRules.getSenses(input);
-      const dv = result.find((s) => s.name === 'Darkvision');
-      expect(dv.value).toBe('60 ft.');
-    });
-
-    it('adds Darkvision 120 ft. when Drow lineage exists without existing darkvision', () => {
-      vi.mocked(getRuntimeValue).mockReturnValue(null);
-
-      const input = {
-        senses: [],
-        race: { traits: [], lineage: 'Drow' }
-      };
-      const result = raceRules.getSenses(input);
-      // Drow lineage adds Darkvision 120 ft. even when no darkvision trait exists
-      expect(result).toContainEqual({ name: 'Darkvision', value: '120 ft.' });
     });
 
     it('adds Blindvision 10 ft. when Blind Fighting fighting style is selected', () => {

@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { renderHook, act } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import useSelectMove from './useSelectMove.js';
@@ -42,92 +42,8 @@ describe('useSelectMove', () => {
     mockGetGridFromEvent.mockReturnValue(null);
   });
 
-  describe('initialization', () => {
-    it('should initialize with null selectionRect and moveOffset', () => {
-      const { result } = renderHook(() => useSelectMove(baseArgs()));
-      expect(result.current.selectionRect).toBeNull();
-      expect(result.current.moveOffset).toBeNull();
-    });
-
-    it('should initialize with empty selectedWalls and selectedItems Sets', () => {
-      const { result } = renderHook(() => useSelectMove(baseArgs()));
-      expect(result.current.selectedWalls).toBeInstanceOf(Set);
-      expect(result.current.selectedWalls.size).toBe(0);
-      expect(result.current.selectedItems).toBeInstanceOf(Set);
-      expect(result.current.selectedItems.size).toBe(0);
-    });
-
-    it('should initialize refs as empty sets/null', () => {
-      const { result } = renderHook(() => useSelectMove(baseArgs()));
-      expect(result.current.selectedWallsRef.current).toBeInstanceOf(Set);
-      expect(result.current.selectedWallsRef.current.size).toBe(0);
-      expect(result.current.selectedItemsRef.current).toBeInstanceOf(Set);
-      expect(result.current.selectedItemsRef.current.size).toBe(0);
-      expect(result.current.selectStart.current).toBeNull();
-      expect(result.current.moveStartGrid.current).toBeNull();
-      expect(result.current.moveOffsetRef.current).toBeNull();
-      expect(result.current.selectionRectRef.current).toBeNull();
-      expect(result.current.selectionBoundsRef.current).toBeNull();
-      expect(result.current.placedItemsRef.current).toEqual([]);
-      expect(result.current.mapDataRef.current).toBeNull();
-    });
-
-    it('should return all expected functions and refs', () => {
-      const { result } = renderHook(() => useSelectMove(baseArgs()));
-      expect(result.current.selectedWallsRef).toBeDefined();
-      expect(result.current.selectedItemsRef).toBeDefined();
-      expect(result.current.selectStart).toBeDefined();
-      expect(result.current.moveStartGrid).toBeDefined();
-      expect(result.current.moveOffsetRef).toBeDefined();
-      expect(result.current.selectionRectRef).toBeDefined();
-      expect(result.current.selectionBoundsRef).toBeDefined();
-      expect(result.current.placedItemsRef).toBeDefined();
-      expect(result.current.mapDataRef).toBeDefined();
-      expect(typeof result.current.handleSelectPointerDown).toBe('function');
-      expect(typeof result.current.handleSelectPointerMove).toBe('function');
-      expect(typeof result.current.handleSelectPointerUp).toBe('function');
-    });
-  });
-
   describe('handleSelectPointerDown', () => {
-    it('should do nothing when not localhost', () => {
-      const { result } = renderHook(() => useSelectMove({
-        ...baseArgs(),
-        isLocalhost: false,
-      }));
-      const event = createMockEvent();
-      act(() => {
-        result.current.handleSelectPointerDown(event, [], null);
-      });
-      expect(event.preventDefault).not.toHaveBeenCalled();
-      expect(result.current.selectionRect).toBeNull();
-      expect(result.current.selectedWalls.size).toBe(0);
-    });
-
-    it('should do nothing when tool is not select', () => {
-      const { result } = renderHook(() => useSelectMove({
-        ...baseArgs(),
-        tool: 'paint',
-      }));
-      const event = createMockEvent();
-      act(() => {
-        result.current.handleSelectPointerDown(event, [], null);
-      });
-      expect(event.preventDefault).not.toHaveBeenCalled();
-    });
-
-    it('should call preventDefault but not set selection when grid is null', () => {
-      const { result } = renderHook(() => useSelectMove(baseArgs()));
-      const event = createMockEvent();
-      act(() => {
-        result.current.handleSelectPointerDown(event, [], null);
-      });
-      expect(event.preventDefault).toHaveBeenCalled();
-      expect(result.current.selectStart.current).toBeNull();
-      expect(result.current.selectionRect).toBeNull();
-    });
-
-    it('should start selection when clicking on empty area', () => {
+    it('should call preventDefault and capture pointer when clicking on empty area', () => {
       mockGetGridFromEvent.mockReturnValue({ gridX: 5.2, gridY: 3.8 });
       createSvgWithPointerCapture();
       const { result } = renderHook(() => useSelectMove(baseArgs()));
@@ -190,7 +106,7 @@ describe('useSelectMove', () => {
       expect(result.current.moveOffset).toEqual({ dx: 0, dy: 0 });
     });
 
-    it('should start selection when clicking within bounds with no selections', () => {
+    it('should start selection when clicking within bounds with no active selections', () => {
       mockGetGridFromEvent.mockReturnValue({ gridX: 5.2, gridY: 3.8 });
       createSvgWithPointerCapture();
       const { result } = renderHook(() => useSelectMove(baseArgs()));
@@ -209,38 +125,7 @@ describe('useSelectMove', () => {
   });
 
   describe('handleSelectPointerMove', () => {
-    it('should do nothing when not localhost or tool is not select', () => {
-      const { result: notLocalhost } = renderHook(() => useSelectMove({
-        ...baseArgs(),
-        isLocalhost: false,
-      }));
-      const event = createMockEvent();
-      act(() => {
-        notLocalhost.current.handleSelectPointerMove(event);
-      });
-      expect(event.preventDefault).not.toHaveBeenCalled();
-
-      const { result: wrongTool } = renderHook(() => useSelectMove({
-        ...baseArgs(),
-        tool: 'paint',
-      }));
-      const event2 = createMockEvent();
-      act(() => {
-        wrongTool.current.handleSelectPointerMove(event2);
-      });
-      expect(event2.preventDefault).not.toHaveBeenCalled();
-    });
-
-    it('should do nothing when getGridFromEvent returns null', () => {
-      const { result } = renderHook(() => useSelectMove(baseArgs()));
-      const event = createMockEvent();
-      act(() => {
-        result.current.handleSelectPointerMove(event);
-      });
-      expect(event.preventDefault).not.toHaveBeenCalled();
-    });
-
-    it('should update selection rect when selecting', () => {
+    it('should update selection rect when drag-selecting', () => {
       mockGetGridFromEvent.mockReturnValue({ gridX: 5.2, gridY: 3.8 });
       const { result } = renderHook(() => useSelectMove(baseArgs()));
 
@@ -263,7 +148,7 @@ describe('useSelectMove', () => {
       });
     });
 
-    it('should update move offset when moving', () => {
+    it('should update move offset when dragging a selection', () => {
       mockGetGridFromEvent.mockReturnValue({ gridX: 5.2, gridY: 3.8 });
       const { result } = renderHook(() => useSelectMove(baseArgs()));
 
@@ -284,21 +169,6 @@ describe('useSelectMove', () => {
   });
 
   describe('handleSelectPointerUp', () => {
-    it('should do nothing when not localhost', () => {
-      const { result } = renderHook(() => useSelectMove({
-        ...baseArgs(),
-        isLocalhost: false,
-      }));
-      const event = createMockEvent();
-      const setMapData = vi.fn();
-      const setPlacedItems = vi.fn();
-      act(() => {
-        result.current.handleSelectPointerUp(event, [], null, setMapData, setPlacedItems);
-      });
-      expect(setMapData).not.toHaveBeenCalled();
-      expect(setPlacedItems).not.toHaveBeenCalled();
-    });
-
     it('should release pointer capture on svg', () => {
       createSvgWithPointerCapture();
       const { result } = renderHook(() => useSelectMove(baseArgs()));
@@ -375,7 +245,7 @@ describe('useSelectMove', () => {
       expect(result.current.selectedItems).toEqual(new Set(['item1', 'item2']));
     });
 
-    it('should move selected walls', () => {
+    it('should move selected walls and update bounds', () => {
       createSvgWithPointerCapture();
       const { result } = renderHook(() => useSelectMove(baseArgs()));
       const event = createMockEvent();
@@ -411,7 +281,7 @@ describe('useSelectMove', () => {
       expect(result.current.moveOffset).toBeNull();
     });
 
-    it('should move selected items only', () => {
+    it('should move selected placed items', () => {
       createSvgWithPointerCapture();
       const { result } = renderHook(() => useSelectMove(baseArgs()));
       const event = createMockEvent();

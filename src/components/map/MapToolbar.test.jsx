@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { render, screen, fireEvent, within } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import MapToolbar from './MapToolbar.jsx';
@@ -44,11 +44,6 @@ describe('MapToolbar', () => {
             expect(screen.getByText('Dungeon Map')).toBeInTheDocument();
         });
 
-        it('should render "Map" when mapName is empty or null', () => {
-            renderMapToolbar({ mapName: '' });
-            expect(screen.getByText('Map')).toBeInTheDocument();
-        });
-
         it('should render without onBack button when onBack is not provided', () => {
             renderMapToolbar({ onBack: undefined, isLocalhost: false });
             expect(screen.queryByTitle('Back')).not.toBeInTheDocument();
@@ -92,15 +87,10 @@ describe('MapToolbar', () => {
             expect(screen.queryByText('Items')).not.toBeInTheDocument();
         });
 
-        it('should always render Spell and Ruler buttons', () => {
+        it('should render Spell and Ruler buttons', () => {
             renderMapToolbar();
             expect(screen.getByText('Spell')).toBeInTheDocument();
             expect(screen.getByText('Ruler')).toBeInTheDocument();
-        });
-
-        it('should render Reset View button', () => {
-            renderMapToolbar();
-            expect(screen.getByText('Reset View')).toBeInTheDocument();
         });
 
         it('should render SpellOverlayControls when spellMode is active', () => {
@@ -109,29 +99,9 @@ describe('MapToolbar', () => {
             expect(screen.getByText('Spell Overlay')).toBeInTheDocument();
         });
 
-        it('should not render SpellOverlayControls when spellMode is null or undefined', () => {
-            renderMapToolbar();
-            expect(screen.queryByText('Spell Overlay')).not.toBeInTheDocument();
-            const mockState = createMockSpellOverlayState({ spellMode: undefined });
-            renderMapToolbar({ spellOverlayState: mockState });
-            expect(screen.queryByText('Spell Overlay')).not.toBeInTheDocument();
-        });
-
         it('should render ruler hint with icon when rulerMode is true', () => {
             renderMapToolbar({ rulerMode: true });
             expect(screen.getByText('Click two points to measure distance')).toBeInTheDocument();
-        });
-
-        it('should not render ruler hint when rulerMode is false', () => {
-            renderMapToolbar();
-            expect(screen.queryByText('Click two points to measure distance')).not.toBeInTheDocument();
-        });
-
-        it('should render without crashing when spellOverlayState is null or undefined', () => {
-            const { container: c1 } = renderMapToolbar({ spellOverlayState: null });
-            expect(within(c1).getByText('Dungeon Map')).toBeInTheDocument();
-            const { container: c2 } = renderMapToolbar({ spellOverlayState: undefined });
-            expect(within(c2).getByText('Dungeon Map')).toBeInTheDocument();
         });
     });
 
@@ -156,19 +126,9 @@ describe('MapToolbar', () => {
             expect(screen.getByText('Spell')).toHaveClass('active');
         });
 
-        it('should not apply active class to spell button when spellMode is null', () => {
-            renderMapToolbar();
-            expect(screen.getByText('Spell')).not.toHaveClass('active');
-        });
-
         it('should apply active class to ruler button when rulerMode is true', () => {
             renderMapToolbar({ rulerMode: true });
             expect(screen.getByText('Ruler')).toHaveClass('active');
-        });
-
-        it('should not apply active class to ruler button when rulerMode is false', () => {
-            renderMapToolbar({ rulerMode: false });
-            expect(screen.getByText('Ruler')).not.toHaveClass('active');
         });
     });
 

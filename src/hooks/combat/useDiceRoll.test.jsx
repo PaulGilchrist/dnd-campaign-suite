@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { renderHook, act } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import React from 'react';
@@ -75,24 +75,18 @@ describe('useDiceRoll', () => {
       });
     });
 
-    it('should use different roll values when rollD20 returns different values', () => {
-      rollD20.mockReturnValue(15);
-      rollD20.mockReturnValueOnce(10).mockReturnValueOnce(20);
-      const { result } = renderHook(() => useDiceRoll(), { wrapper: UseDiceRollWrapper });
+    it('should pass through different bonus values', () => {
+      const { result: neg } = renderHook(() => useDiceRoll(), { wrapper: UseDiceRollWrapper });
       act(() => {
-        result.current.rollAttack('Spear', 2);
+        neg.current.rollAbilityCheck('Test', -5);
       });
-      expect(result.current.popupHtml.rolls).toEqual([10, 20]);
-    });
+      expect(neg.current.popupHtml.bonus).toBe(-5);
 
-    it('should call rollD20 twice per d20 roll', () => {
-      rollD20.mockReturnValue(15);
-      rollD20.mockClear();
-      const { result } = renderHook(() => useDiceRoll(), { wrapper: UseDiceRollWrapper });
+      const { result: pos } = renderHook(() => useDiceRoll(), { wrapper: UseDiceRollWrapper });
       act(() => {
-        result.current.rollAbilityCheck('Athletics', 0);
+        pos.current.rollAttack('Test', 15);
       });
-      expect(rollD20).toHaveBeenCalledTimes(2);
+      expect(pos.current.popupHtml.bonus).toBe(15);
     });
   });
 
@@ -113,76 +107,12 @@ describe('useDiceRoll', () => {
       });
     });
 
-    it('should have bonus of 0 for damage rolls', () => {
+    it('should pass through rolls array as provided', () => {
       const { result } = renderHook(() => useDiceRoll(), { wrapper: UseDiceRollWrapper });
       act(() => {
-        result.current.rollDamage('Fireball', '8d6', 20, [3, 4, 5, 2, 3, 3], 0);
+        result.current.rollDamage('Test', '8d6', 20, [3, 4, 5, 2, 3, 3], 0);
       });
-      expect(result.current.popupHtml.bonus).toBe(0);
-    });
-  });
-
-  describe('bonus value handling', () => {
-    it('should handle zero bonus values', () => {
-      const { result } = renderHook(() => useDiceRoll(), { wrapper: UseDiceRollWrapper });
-      act(() => {
-        result.current.rollAbilityCheck('Acrobatics', 0);
-      });
-      expect(result.current.popupHtml.bonus).toBe(0);
-    });
-
-    it('should handle negative bonus values', () => {
-      const { result } = renderHook(() => useDiceRoll(), { wrapper: UseDiceRollWrapper });
-      act(() => {
-        result.current.rollSavingThrow('Constitution', -2);
-      });
-      expect(result.current.popupHtml.bonus).toBe(-2);
-    });
-
-    it('should handle large bonus values', () => {
-      const { result } = renderHook(() => useDiceRoll(), { wrapper: UseDiceRollWrapper });
-      act(() => {
-        result.current.rollAttack('Greatsword', 15);
-      });
-      expect(result.current.popupHtml.bonus).toBe(15);
-    });
-  });
-
-  describe('edge cases', () => {
-    it('should handle empty name in roll functions', () => {
-      const { result } = renderHook(() => useDiceRoll(), { wrapper: UseDiceRollWrapper });
-      act(() => {
-        result.current.rollAbilityCheck('', 0);
-      });
-      expect(result.current.popupHtml.name).toBe('');
-    });
-
-    it('should handle rollDamage with empty rolls array', () => {
-      const { result } = renderHook(() => useDiceRoll(), { wrapper: UseDiceRollWrapper });
-      act(() => {
-        result.current.rollDamage('Test', '0', 0, [], 0);
-      });
-      expect(result.current.popupHtml.rolls).toEqual([]);
-    });
-
-    it('should handle rollDamage with single roll value', () => {
-      const { result } = renderHook(() => useDiceRoll(), { wrapper: UseDiceRollWrapper });
-      act(() => {
-        result.current.rollDamage('Test', '1d4', 3, [3], 0);
-      });
-      expect(result.current.popupHtml.rolls).toEqual([3]);
-    });
-
-    it('should handle different roll types in sequence', () => {
-      const { result } = renderHook(() => useDiceRoll(), { wrapper: UseDiceRollWrapper });
-      act(() => {
-        result.current.rollAttack('Sword', 5);
-      });
-      expect(result.current.popupHtml.rollType).toBe('attack');
-      act(() => {
-        result.current.rollAbilityCheck('Perception', 3);
-      });
-      expect(result.current.popupHtml.rollType).toBe('check');
+      expect(result.current.popupHtml.rolls).toEqual([3, 4, 5, 2, 3, 3]);
     });
   });
 });

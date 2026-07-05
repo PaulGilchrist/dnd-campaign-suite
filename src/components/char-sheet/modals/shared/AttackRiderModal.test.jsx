@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import AttackRiderModal from './AttackRiderModal.jsx';
@@ -27,6 +27,14 @@ import { applyRiderOption } from '../../../../services/automation/handlers/comba
 const defaultPlayerStats = { name: 'TestCharacter' };
 const defaultCampaignName = 'test-campaign';
 const defaultTargetName = 'Goblin A';
+const defaultResult = {
+  type: 'popup',
+  payload: {
+    type: 'automation_info',
+    name: 'Test Action',
+    description: 'Effect applied successfully.',
+  },
+};
 
 function makeProps(overrides) {
   return {
@@ -72,15 +80,6 @@ function makeMultiSelectAction(overrides) {
   };
 }
 
-const defaultResult = {
-  type: 'popup',
-  payload: {
-    type: 'automation_info',
-    name: 'Test Action',
-    description: 'Effect applied successfully.',
-  },
-};
-
 // ── Helpers ──
 
 function selectSingleOption(labelText) {
@@ -112,7 +111,7 @@ describe('AttackRiderModal', () => {
   // ── Initial render ──
 
   describe('initial render', () => {
-    it('renders the modal overlay, modal container, and header with action name', () => {
+    it('renders the modal overlay, modal container, header, and action name', () => {
       render(<AttackRiderModal {...makeProps()} />);
       expect(screen.getByText('Divine Smite')).toBeInTheDocument();
       expect(document.querySelector('.sp-overlay')).toBeInTheDocument();
@@ -120,10 +119,6 @@ describe('AttackRiderModal', () => {
       expect(document.querySelector('.sp-header')).toBeInTheDocument();
       expect(document.querySelector('.sp-body')).toBeInTheDocument();
       expect(document.querySelector('.sp-actions')).toBeInTheDocument();
-    });
-
-    it('renders the bolt icon in the header', () => {
-      render(<AttackRiderModal {...makeProps()} />);
       expect(document.querySelector('.sp-header .fa-solid.fa-bolt')).toBeInTheDocument();
     });
 
@@ -181,174 +176,127 @@ describe('AttackRiderModal', () => {
   // ── Effect description rendering ──
 
   describe('effect descriptions', () => {
-    it('renders effect description for disadvantage_on_next_save', () => {
-      const action = makeMultiSelectAction();
-      render(<AttackRiderModal {...makeProps({ action })} />);
-      expect(screen.getByText(/— Disadvantage on next save/)).toBeInTheDocument();
-    });
-
-    it('renders effect description for noOpportunityAttacks', () => {
-      const action = makeMultiSelectAction();
-      render(<AttackRiderModal {...makeProps({ action })} />);
-      expect(screen.getByText(/— Cannot make Opportunity Attacks/)).toBeInTheDocument();
-    });
-
-    it('renders effect description for speed_reduction', () => {
-      const action = makeMultiSelectAction();
-      render(<AttackRiderModal {...makeProps({ action })} />);
-      expect(screen.getByText(/— Speed reduced by 15 ft/)).toBeInTheDocument();
-    });
-
-    it('renders effect description with custom value for next_attack_advantage', () => {
-      const action = {
-        name: 'Custom Smite',
-        automation: {
-          type: 'attack_rider',
-          options: [{ name: 'Power Strike', effect: 'next_attack_advantage', value: 10 }],
-          maxEffects: 1,
-        },
-      };
-      render(<AttackRiderModal {...makeProps({ action })} />);
-      expect(screen.getByText(/— \+10 to next attack/)).toBeInTheDocument();
-    });
-
-    it('renders effect description with default value when value is missing for next_attack_advantage', () => {
-      const action = {
-        name: 'Default Value Smite',
-        automation: {
-          type: 'attack_rider',
-          options: [{ name: 'Basic Strike', effect: 'next_attack_advantage' }],
-          maxEffects: 1,
-        },
-      };
-      render(<AttackRiderModal {...makeProps({ action })} />);
-      expect(screen.getByText(/— \+5 to next attack/)).toBeInTheDocument();
-    });
-
-    it('renders effect description for sudden_strike', () => {
-      const action = {
+    const effectTests = [
+      { action: () => makeMultiSelectAction(), name: 'Disadvantage Curse', desc: /— Disadvantage on next save/ },
+      { action: () => makeMultiSelectAction(), name: 'No Opportunity', desc: /— Cannot make Opportunity Attacks/ },
+      { action: () => makeMultiSelectAction(), name: 'Speed Drain', desc: /— Speed reduced by 15 ft/ },
+      {
+        action: () => ({
+          name: 'Custom Smite',
+          automation: { type: 'attack_rider', options: [{ name: 'Power Strike', effect: 'next_attack_advantage', value: 10 }], maxEffects: 1 },
+        }),
+        name: 'Power Strike',
+        desc: /— \+10 to next attack/,
+      },
+      {
+        action: () => ({
+          name: 'Default Value Smite',
+          automation: { type: 'attack_rider', options: [{ name: 'Basic Strike', effect: 'next_attack_advantage' }], maxEffects: 1 },
+        }),
+        name: 'Basic Strike',
+        desc: /— \+5 to next attack/,
+      },
+      {
+        action: () => ({
+          name: 'Sudden Strike',
+          automation: { type: 'attack_rider', options: [{ name: 'Sudden Strike', effect: 'sudden_strike' }], maxEffects: 1 },
+        }),
         name: 'Sudden Strike',
-        automation: {
-          type: 'attack_rider',
-          options: [{ name: 'Sudden Strike', effect: 'sudden_strike' }],
-          maxEffects: 1,
-        },
-      };
-      render(<AttackRiderModal {...makeProps({ action })} />);
-      expect(screen.getByText(/— Make another attack vs\. different creature within 5 ft/)).toBeInTheDocument();
-    });
-
-    it('renders effect description for mass_fear', () => {
-      const action = {
+        desc: /— Make another attack vs\. different creature within 5 ft/,
+      },
+      {
+        action: () => ({
+          name: 'Mass Fear',
+          automation: { type: 'attack_rider', options: [{ name: 'Mass Fear', effect: 'mass_fear' }], maxEffects: 1 },
+        }),
         name: 'Mass Fear',
-        automation: {
-          type: 'attack_rider',
-          options: [{ name: 'Mass Fear', effect: 'mass_fear' }],
-          maxEffects: 1,
-        },
-      };
-      render(<AttackRiderModal {...makeProps({ action })} />);
-      expect(screen.getByText(/— Target \+ creatures within 10 ft make WIS save or be Frightened/)).toBeInTheDocument();
-    });
+        desc: /— Target \+ creatures within 10 ft make WIS save or be Frightened/,
+      },
+      {
+        action: () => makeSingleSelectAction({ options: [{ name: 'Trip', effect: 'prone' }] }),
+        name: 'Trip',
+        desc: /— Target makes DEX save or gains Prone condition/,
+      },
+      {
+        action: () => ({
+          name: 'Cunning Strike Poison',
+          automation: { type: 'attack_rider', options: [{ name: 'Poison', effect: 'poisoned' }], maxEffects: 1 },
+        }),
+        name: 'Poison',
+        desc: /— Target makes CON save or becomes Poisoned \(1 min, repeating\)/,
+      },
+      {
+        action: () => ({
+          name: 'Charger',
+          automation: { type: 'attack_rider', options: [{ name: 'Charger Move', effect: 'no_opportunity_attacks', movement: 30 }], maxEffects: 1 },
+        }),
+        name: 'Charger Move',
+        desc: /— Move up to 30 without provoking OAs/,
+      },
+      {
+        action: () => ({
+          name: 'Daze Attack',
+          automation: { type: 'attack_rider', options: [{ name: 'Daze', effect: 'daze' }], maxEffects: 1 },
+        }),
+        name: 'Daze',
+        desc: /— Target makes CON save or on next turn can only do one of: move, action, or Bonus Action/,
+      },
+      {
+        action: () => ({
+          name: 'Unconscious Strike',
+          automation: { type: 'attack_rider', options: [{ name: 'Unconscious', effect: 'unconscious' }], maxEffects: 1 },
+        }),
+        name: 'Unconscious',
+        desc: /— Target makes CON save or becomes Unconscious \(1 min, repeating\)/,
+      },
+      {
+        action: () => ({
+          name: 'Blinding Strike',
+          automation: { type: 'attack_rider', options: [{ name: 'Blinded', effect: 'blinded' }], maxEffects: 1 },
+        }),
+        name: 'Blinded',
+        desc: /— Target makes DEX save or becomes Blinded \(until end of its next turn\)/,
+      },
+      {
+        action: () => ({
+          name: 'Elemental Attack',
+          automation: { type: 'attack_rider', options: [{ name: 'Fire Damage', effect: 'damage_bonus' }], maxEffects: 1 },
+        }),
+        name: 'Fire Damage',
+        desc: /— 1d6 damage/,
+      },
+      {
+        action: () => ({
+          name: 'Elemental Attack',
+          automation: { type: 'attack_rider', options: [{ name: 'Fire Damage', effect: 'damage_bonus', damageExpression: '2d6' }], maxEffects: 1 },
+        }),
+        name: 'Fire Damage',
+        desc: /— 2d6 damage/,
+      },
+      {
+        action: () => ({
+          name: 'Push Attack',
+          automation: { type: 'attack_rider', options: [{ name: 'Push', effect: 'push', value: 15 }], maxEffects: 1 },
+        }),
+        name: 'Push',
+        desc: /— Push 15 ft/,
+      },
+      {
+        action: () => ({
+          name: 'Push Attack',
+          automation: { type: 'attack_rider', options: [{ name: 'Push', effect: 'push' }], maxEffects: 1 },
+        }),
+        name: 'Push',
+        desc: /— Push 10 ft/,
+      },
+    ];
 
-    it('renders effect description for prone', () => {
-      const action = makeSingleSelectAction({
-        options: [{ name: 'Trip', effect: 'prone' }],
+    for (const { action, name, desc } of effectTests) {
+      it(`renders effect description for ${name}`, () => {
+        render(<AttackRiderModal {...makeProps({ action: action() })} />);
+        expect(screen.getByText(desc)).toBeInTheDocument();
       });
-      render(<AttackRiderModal {...makeProps({ action })} />);
-      expect(screen.getByText(/— Target makes DEX save or gains Prone condition/)).toBeInTheDocument();
-    });
-
-    it('renders effect description for poisoned', () => {
-      const action = {
-        name: 'Cunning Strike Poison',
-        automation: {
-          type: 'attack_rider',
-          options: [{ name: 'Poison', effect: 'poisoned' }],
-          maxEffects: 1,
-        },
-      };
-      render(<AttackRiderModal {...makeProps({ action })} />);
-      expect(screen.getByText(/— Target makes CON save or becomes Poisoned \(1 min, repeating\)/)).toBeInTheDocument();
-    });
-
-    it('renders effect description for no_opportunity_attacks with movement', () => {
-      const action = {
-        name: 'Charger',
-        automation: {
-          type: 'attack_rider',
-          options: [{ name: 'Charger Move', effect: 'no_opportunity_attacks', movement: 30 }],
-          maxEffects: 1,
-        },
-      };
-      render(<AttackRiderModal {...makeProps({ action })} />);
-      expect(screen.getByText(/— Move up to 30 without provoking OAs/)).toBeInTheDocument();
-    });
-
-    it('renders effect description for daze', () => {
-      const action = {
-        name: 'Daze Attack',
-        automation: {
-          type: 'attack_rider',
-          options: [{ name: 'Daze', effect: 'daze' }],
-          maxEffects: 1,
-        },
-      };
-      render(<AttackRiderModal {...makeProps({ action })} />);
-      expect(screen.getByText(/— Target makes CON save or on next turn can only do one of: move, action, or Bonus Action/)).toBeInTheDocument();
-    });
-
-    it('renders effect description for unconscious', () => {
-      const action = {
-        name: 'Unconscious Strike',
-        automation: {
-          type: 'attack_rider',
-          options: [{ name: 'Unconscious', effect: 'unconscious' }],
-          maxEffects: 1,
-        },
-      };
-      render(<AttackRiderModal {...makeProps({ action })} />);
-      expect(screen.getByText(/— Target makes CON save or becomes Unconscious \(1 min, repeating\)/)).toBeInTheDocument();
-    });
-
-    it('renders effect description for blinded', () => {
-      const action = {
-        name: 'Blinding Strike',
-        automation: {
-          type: 'attack_rider',
-          options: [{ name: 'Blinded', effect: 'blinded' }],
-          maxEffects: 1,
-        },
-      };
-      render(<AttackRiderModal {...makeProps({ action })} />);
-      expect(screen.getByText(/— Target makes DEX save or becomes Blinded \(until end of its next turn\)/)).toBeInTheDocument();
-    });
-
-    it('renders effect description for damage_bonus with default expression', () => {
-      const action = {
-        name: 'Elemental Attack',
-        automation: {
-          type: 'attack_rider',
-          options: [{ name: 'Fire Damage', effect: 'damage_bonus' }],
-          maxEffects: 1,
-        },
-      };
-      render(<AttackRiderModal {...makeProps({ action })} />);
-      expect(screen.getByText(/— 1d6 damage/)).toBeInTheDocument();
-    });
-
-    it('renders effect description for damage_bonus with custom expression', () => {
-      const action = {
-        name: 'Elemental Attack',
-        automation: {
-          type: 'attack_rider',
-          options: [{ name: 'Fire Damage', effect: 'damage_bonus', damageExpression: '2d6' }],
-          maxEffects: 1,
-        },
-      };
-      render(<AttackRiderModal {...makeProps({ action })} />);
-      expect(screen.getByText(/— 2d6 damage/)).toBeInTheDocument();
-    });
+    }
 
     it('renders cost description for Cunning Strike', () => {
       const action = {
@@ -362,32 +310,6 @@ describe('AttackRiderModal', () => {
       render(<AttackRiderModal {...makeProps({ action })} />);
       const bodyDiv = document.querySelector('.sp-body');
       expect(bodyDiv.textContent).toContain('Cost: 2d6 Sneak Attack dice');
-    });
-
-    it('renders effect description for push with custom value', () => {
-      const action = {
-        name: 'Push Attack',
-        automation: {
-          type: 'attack_rider',
-          options: [{ name: 'Push', effect: 'push', value: 15 }],
-          maxEffects: 1,
-        },
-      };
-      render(<AttackRiderModal {...makeProps({ action })} />);
-      expect(screen.getByText(/— Push 15 ft/)).toBeInTheDocument();
-    });
-
-    it('renders effect description for push with default value', () => {
-      const action = {
-        name: 'Push Attack',
-        automation: {
-          type: 'attack_rider',
-          options: [{ name: 'Push', effect: 'push' }],
-          maxEffects: 1,
-        },
-      };
-      render(<AttackRiderModal {...makeProps({ action })} />);
-      expect(screen.getByText(/— Push 10 ft/)).toBeInTheDocument();
     });
   });
 
@@ -461,11 +383,6 @@ describe('AttackRiderModal', () => {
       expect(document.querySelectorAll('input[type="checkbox"]')).toHaveLength(3);
     });
 
-    it('renders radio inputs (none)', () => {
-      render(<AttackRiderModal {...makeProps({ action })} />);
-      expect(document.querySelectorAll('input[type="radio"]')).toHaveLength(0);
-    });
-
     it('renders multi-select label with max count and target name', () => {
       render(<AttackRiderModal {...makeProps({ action })} />);
       const bodyDiv = document.querySelector('.sp-body');
@@ -504,11 +421,6 @@ describe('AttackRiderModal', () => {
       expect(screen.getByRole('button', { name: /Apply Effects$/ })).not.toBeDisabled();
     });
 
-    it('disables apply button when no options selected', () => {
-      render(<AttackRiderModal {...makeProps({ action })} />);
-      expect(screen.getByRole('button', { name: /Apply Effects$/ })).toBeDisabled();
-    });
-
     it('highlights selected options with background and border styles', () => {
       render(<AttackRiderModal {...makeProps({ action })} />);
       const checkboxes = screen.getAllByRole('checkbox');
@@ -533,11 +445,7 @@ describe('AttackRiderModal', () => {
       clickCheckbox(0);
       clickCheckbox(1);
       clickCheckbox(2);
-      // maxEffects is 3, so all three are selected
       expect(screen.getByText(/3\/3 selected/)).toBeInTheDocument();
-      // Clicking a fourth (non-existent) would require a 4th option;
-      // the toggleMultiSelect guard prevents exceeding maxEffects.
-      // Verify the guard by checking the selected count stays at max.
       expect(screen.queryByText(/4\/3 selected/)).not.toBeInTheDocument();
     });
   });
@@ -703,28 +611,6 @@ describe('AttackRiderModal', () => {
       });
     });
 
-    it('shows result screen after applying', async () => {
-      render(<AttackRiderModal {...makeProps({ action })} />);
-      clickCheckbox(0);
-      clickCheckbox(1);
-      clickApplyMulti();
-
-      await waitFor(() => {
-        expect(screen.getByText('Done')).toBeInTheDocument();
-      });
-    });
-
-    it('hides selection options after applying', async () => {
-      render(<AttackRiderModal {...makeProps({ action })} />);
-      clickCheckbox(0);
-      clickCheckbox(1);
-      clickApplyMulti();
-
-      await waitFor(() => {
-        expect(screen.queryByText(/Choose up to 3 effects/)).not.toBeInTheDocument();
-      });
-    });
-
     it('calls onClose when Done is clicked after multi-select apply', async () => {
       const onClose = vi.fn();
       render(<AttackRiderModal {...makeProps({ action, onClose })} />);
@@ -763,17 +649,22 @@ describe('AttackRiderModal', () => {
       expect(screen.getByRole('button', { name: /Apply Effect$/ })).toBeDisabled();
     });
 
-    it('handles undefined automation options gracefully', () => {
+    it('handles undefined automation gracefully', () => {
       const action = { name: 'No Automation Action' };
       render(<AttackRiderModal {...makeProps({ action })} />);
       expect(screen.getByText('No Automation Action')).toBeInTheDocument();
       expect(document.querySelectorAll('input[type="radio"]')).toHaveLength(0);
     });
 
-    it('handles undefined automation gracefully', () => {
-      const action = { name: 'No Automation Action' };
-      render(<AttackRiderModal {...makeProps({ action })} />);
-      expect(screen.getByText('No Automation Action')).toBeInTheDocument();
+    it('handles null result from applyRiderOption gracefully (stays open)', async () => {
+      applyRiderOption.mockResolvedValue(null);
+      render(<AttackRiderModal {...makeProps()} />);
+      selectSingleOption('Burning Hands');
+      clickApplySingle();
+
+      await waitFor(() => {
+        expect(screen.queryByText('Done')).not.toBeInTheDocument();
+      });
     });
 
     it('uses radio inputs when maxEffects is 1 (default)', () => {
@@ -792,17 +683,6 @@ describe('AttackRiderModal', () => {
       const action = makeMultiSelectAction();
       render(<AttackRiderModal {...makeProps({ action })} />);
       expect(document.querySelectorAll('input[type="checkbox"]')).toHaveLength(3);
-    });
-
-    it('handles null result from applyRiderOption gracefully (stays open)', async () => {
-      applyRiderOption.mockResolvedValue(null);
-      render(<AttackRiderModal {...makeProps()} />);
-      selectSingleOption('Burning Hands');
-      clickApplySingle();
-
-      await waitFor(() => {
-        expect(screen.queryByText('Done')).not.toBeInTheDocument();
-      });
     });
   });
 
@@ -872,7 +752,6 @@ describe('AttackRiderModal', () => {
       clickCheckbox(0);
       clickCheckbox(1);
       expect(screen.getByText(/2\/2 selected/)).toBeInTheDocument();
-      // Third checkbox should not be selectable
       clickCheckbox(2);
       expect(screen.getByText(/2\/2 selected/)).toBeInTheDocument();
     });

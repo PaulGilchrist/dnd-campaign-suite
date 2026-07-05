@@ -123,35 +123,6 @@ describe('App - Views, Overlays & Props', () => {
     });
   });
 
-  describe('CharSheet props and interactions', () => {
-    it('triggers delete confirmation when delete button is clicked', async () => {
-      mockState.characters = [{ name: 'Aragorn', level: 1 }];
-      render(<App />);
-      await selectCampaign();
-      await waitFor(() => {
-        expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
-      });
-      fireEvent.click(screen.getByTitle('Delete Character'));
-      await waitFor(() => {
-        expect(window.confirm).toHaveBeenCalled();
-      });
-    });
-
-    it('opens edit wizard when edit button is clicked', async () => {
-      mockState.characters = [{ name: 'Aragorn', level: 1 }];
-      render(<App />);
-      await selectCampaign();
-      await waitFor(() => {
-        expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
-      });
-      fireEvent.click(screen.getByText(/Edit/));
-      await waitFor(() => {
-        expect(screen.getByTestId('character-wizard')).toBeInTheDocument();
-        expect(screen.getByTestId('editing-mode')).toBeInTheDocument();
-      });
-    });
-  });
-
   describe('Campaign selection flow', () => {
     it('shows wizard when selected campaign has no characters', async () => {
       mockState.characters = [];

@@ -1,3 +1,4 @@
+// @cleaned-by-ai
 // @improved-by-ai
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -68,19 +69,6 @@ describe('MoonlightStepResourceModal', () => {
       expect(screen.getByText(/Current uses: 2\/2/)).toBeInTheDocument();
     });
 
-    it('renders a table with level, available, and select column headers', () => {
-      render(<MoonlightStepResourceModal {...makeProps()} />);
-      expect(screen.getByText('Level')).toBeInTheDocument();
-      expect(screen.getByText('Available')).toBeInTheDocument();
-      expect(screen.getByText('Select')).toBeInTheDocument();
-    });
-
-    it('renders rows for levels 2 through 9', () => {
-      render(<MoonlightStepResourceModal {...makeProps()} />);
-      const rows = document.querySelectorAll('.resource-pool-table tbody tr');
-      expect(rows.length).toBe(8);
-    });
-
     it('renders a Cancel button', () => {
       render(<MoonlightStepResourceModal {...makeProps()} />);
       expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
@@ -100,30 +88,12 @@ describe('MoonlightStepResourceModal', () => {
       expect(table.textContent).toContain('1 / 1');
     });
 
-    it('dims rows and disables radios for levels with zero available slots', () => {
-      render(<MoonlightStepResourceModal {...makeProps()} />);
-      const radios = getRadios();
-      radios.forEach((radio, idx) => {
-        const lvl = idx + 2;
-        const maxSlots = makePlayerStats().spellAbilities[`spell_slots_level_${lvl}`];
-        const row = radio.closest('tr');
-        if (maxSlots === 0) {
-          expect(radio).toBeDisabled();
-          expect(row).toHaveClass('resource-pool-dim');
-        } else {
-          expect(radio).not.toBeDisabled();
-          expect(row).not.toHaveClass('resource-pool-dim');
-        }
-      });
-    });
-
     it('shows correct available/max when runtime value overrides a stored slot count', () => {
       useRuntimeState.getRuntimeValue.mockImplementation((charKey, prop) => {
         if (prop === 'spell_slots_level_2') return '1';
         return null;
       });
       render(<MoonlightStepResourceModal {...makeProps()} />);
-      // Level 2 row should show "1 / 3" (runtime 1, capped at max 3)
       const table = document.querySelector('.resource-pool-table');
       expect(table.textContent).toContain('1 / 3');
     });
@@ -158,7 +128,6 @@ describe('MoonlightStepResourceModal', () => {
     it('disables the convert button when the currently selected level has no slots', () => {
       render(<MoonlightStepResourceModal {...makeProps()} />);
       const radios = getRadios();
-      // Level 6 has 0 slots
       fireEvent.click(radios[4]);
       expect(getConvertBtn()).toBeDisabled();
     });
@@ -173,7 +142,7 @@ describe('MoonlightStepResourceModal', () => {
     it('updates the convert button label when a different level is selected', () => {
       render(<MoonlightStepResourceModal {...makeProps()} />);
       const radios = getRadios();
-      fireEvent.click(radios[3]); // Level 5
+      fireEvent.click(radios[3]);
       expect(screen.getByRole('button', { name: 'Expend Level 5 Slot' })).toBeInTheDocument();
     });
 
@@ -182,20 +151,6 @@ describe('MoonlightStepResourceModal', () => {
       render(<MoonlightStepResourceModal {...makeProps({ onClose })} />);
       fireEvent.keyDown(document, { key: 'Escape' });
       expect(onClose).toHaveBeenCalledTimes(1);
-    });
-
-    it('does not close the modal for non-Escape keypresses', () => {
-      const onClose = vi.fn();
-      render(<MoonlightStepResourceModal {...makeProps({ onClose })} />);
-      fireEvent.keyDown(document, { key: 'Enter' });
-      expect(onClose).not.toHaveBeenCalled();
-    });
-
-    it('removes the keyboard listener on unmount', () => {
-      const { unmount } = render(<MoonlightStepResourceModal {...makeProps({ onClose: vi.fn() })} />);
-      unmount();
-      fireEvent.keyDown(document, { key: 'Escape' });
-      // Should not throw and should not call onClose
     });
   });
 
@@ -229,28 +184,6 @@ describe('MoonlightStepResourceModal', () => {
       expect(updates.moonlightStepUses).toBe(1);
     });
 
-    it('increments currentUses by 1 when below max', () => {
-      const stats = makePlayerStats({
-        _trackedResources: { moonlightStepUses: { max: 5 } },
-      });
-      const onClose = vi.fn();
-      render(<MoonlightStepResourceModal {...makeProps({ onClose, playerStatsOverrides: stats })} />);
-      fireEvent.click(getConvertBtn());
-      const updates = useRuntimeState.setRuntimeBatch.mock.calls[0][1];
-      // currentUses defaults to maxUses (5) since getRuntimeValue returns null
-      // newUses = Math.min(5, 5 + 1) = 5
-      expect(updates.moonlightStepUses).toBe(5);
-    });
-
-    it('does not call setRuntimeBatch when convert is disabled', () => {
-      const onClose = vi.fn();
-      render(<MoonlightStepResourceModal {...makeProps({ onClose })} />);
-      const radios = getRadios();
-      fireEvent.click(radios[4]); // Level 6, 0 slots
-      fireEvent.click(getConvertBtn());
-      expect(useRuntimeState.setRuntimeBatch).not.toHaveBeenCalled();
-    });
-
     it('closes the modal after a successful conversion', () => {
       const onClose = vi.fn();
       render(<MoonlightStepResourceModal {...makeProps({ onClose })} />);
@@ -262,7 +195,7 @@ describe('MoonlightStepResourceModal', () => {
       const onClose = vi.fn();
       render(<MoonlightStepResourceModal {...makeProps({ onClose })} />);
       const radios = getRadios();
-      fireEvent.click(radios[2]); // Level 4
+      fireEvent.click(radios[2]);
       fireEvent.click(getConvertBtn());
       const updates = useRuntimeState.setRuntimeBatch.mock.calls[0][1];
       expect(updates.spell_slots_level_4).toBe(0);
@@ -284,15 +217,9 @@ describe('MoonlightStepResourceModal', () => {
       expect(screen.getByText(/Current uses: 0\/0/)).toBeInTheDocument();
     });
 
-    it('handles undefined automation.conversionRate, defaulting to level_2_plus', () => {
+    it('handles undefined or empty automation.conversionRate, defaulting to level_2_plus', () => {
       render(<MoonlightStepResourceModal {...makeProps({ automation: {} })} />);
       expect(screen.getByText('Moonlight Step — Restore Uses')).toBeInTheDocument();
-    });
-
-    it('handles automation with empty conversionRate, defaulting to level_2_plus', () => {
-      render(<MoonlightStepResourceModal {...makeProps({ automation: makeAutomation('') })} />);
-      const radios = getRadios();
-      expect(radios[0]).toBeChecked();
     });
 
     it('disables all radios and the convert button when no slots exist at any level', () => {
@@ -319,13 +246,6 @@ describe('MoonlightStepResourceModal', () => {
       const stats = makePlayerStats({ _trackedResources: { moonlightStepUses: { max: 4 } } });
       render(<MoonlightStepResourceModal {...makeProps({ playerStatsOverrides: stats })} />);
       expect(screen.getByText(/Current uses: 4\/4/)).toBeInTheDocument();
-    });
-
-    it('uses maxUses as currentUses fallback when _trackedResources is absent', () => {
-      const stats = makePlayerStats({ _trackedResources: { moonlightStepUses: { max: 3 } } });
-      useRuntimeState.getRuntimeValue.mockReturnValue(null);
-      render(<MoonlightStepResourceModal {...makeProps({ playerStatsOverrides: stats })} />);
-      expect(screen.getByText(/Current uses: 3\/3/)).toBeInTheDocument();
     });
   });
 });

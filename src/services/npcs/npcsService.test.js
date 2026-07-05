@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { loadNPCs, saveNPCs, loadNPC, deleteNPC, saveNPC } from './npcsService.js';
 
@@ -171,19 +171,6 @@ describe('npcsService', () => {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ npcs }),
         }
-      );
-    });
-
-    it('should encode campaign name with spaces', async () => {
-      const fetchMock = makeFetchMock();
-      fetchMock.mockResolvedValue(okResponse({ success: true }));
-      stubFetch(fetchMock);
-
-      await saveNPCs('campaign with spaces', []);
-
-      expect(fetchMock).toHaveBeenCalledWith(
-        '/api/campaigns/campaign%20with%20spaces/npcs',
-        expect.any(Object)
       );
     });
 

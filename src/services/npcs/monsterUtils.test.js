@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import { loadMonsters } from '../ui/dataLoader.js';
@@ -72,7 +72,7 @@ describe('monsterUtils', () => {
       await expect(getMonsterImageUrl('Goblin', npcs)).resolves.toBe('/custom/goblin.png');
     });
 
-    it('skips campaign NPCs with falsy imagePath and falls back to monster data', async () => {
+    it('falls back to monster data when campaign NPC has falsy imagePath', async () => {
       const { getMonsterImageUrl } = await import('./monsterUtils.js');
       const npcs = [
         makeNpc('Goblin', { imagePath: null }),

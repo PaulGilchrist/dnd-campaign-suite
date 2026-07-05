@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { render } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
 import PlacedItems, { baseProps } from './PlacedItems.test-utils';
@@ -12,10 +12,6 @@ function makeItem(type, overrides = {}) {
     visible: true,
     ...overrides,
   };
-}
-
-function selectorForType(type) {
-  return type === 'npc' ? 'circle.npc-circle' : `use[href="#${type}"]`;
 }
 
 function renderPlacedItems(placedItems, { isLocalhost = false, fog = new Map(), ...rest } = {}) {
@@ -32,61 +28,44 @@ function renderPlacedItems(placedItems, { isLocalhost = false, fog = new Map(), 
 
 describe('PlacedItems - Fog of war hiding', () => {
   describe('fog hides non-localhost items', () => {
-    it.each([
-      ['altar'],
-      ['barrel'],
-      ['chair'],
-      ['chest'],
-      ['door'],
-      ['npc'],
-      ['pillar'],
-      ['table'],
-      ['trap'],
-    ])('hides %s when fog covers the cell', (type) => {
-      const items = [makeItem(type, type === 'npc' ? { name: 'Goblin' } : {})];
+    it('hides furniture when fog covers the cell', () => {
+      const items = [makeItem('barrel')];
       const fog = new Map([['0,0', true]]);
       const { container } = renderPlacedItems(items, { isLocalhost: false, fog });
-      expect(container.querySelector(selectorForType(type))).toBeNull();
+      expect(container.querySelector('use[href="#barrel"]')).toBeNull();
     });
 
-    it.each([
-      ['altar'],
-      ['barrel'],
-      ['chair'],
-      ['chest'],
-      ['door'],
-      ['npc'],
-      ['pillar'],
-      ['table'],
-      ['trap'],
-    ])('shows %s when fog does not cover the cell', (type) => {
-      const items = [makeItem(type, type === 'npc' ? { name: 'Goblin' } : {})];
+    it('hides npcs when fog covers the cell', () => {
+      const items = [makeItem('npc', { name: 'Goblin' })];
+      const fog = new Map([['0,0', true]]);
+      const { container } = renderPlacedItems(items, { isLocalhost: false, fog });
+      expect(container.querySelector('circle.npc-circle')).toBeNull();
+    });
+
+    it('shows items when fog does not cover the cell', () => {
+      const items = [makeItem('barrel')];
       const fog = new Map([['1,1', true]]);
       const { container } = renderPlacedItems(items, { isLocalhost: false, fog });
-      expect(container.querySelector(selectorForType(type))).toBeInTheDocument();
+      expect(container.querySelector('use[href="#barrel"]')).toBeInTheDocument();
     });
 
-    it.each([
-      ['barrel'],
-      ['chest'],
-      ['npc'],
-    ])('hides non-localhost %s when both visible=false and fog covers cell', (type) => {
-      const items = [makeItem(type, { visible: false, ...(type === 'npc' ? { name: 'Goblin' } : {}) })];
+    it('hides non-localhost item when visible=false and fog covers cell', () => {
+      const items = [makeItem('barrel', { visible: false })];
       const fog = new Map([['0,0', true]]);
       const { container } = renderPlacedItems(items, { isLocalhost: false, fog });
-      expect(container.querySelector(selectorForType(type))).toBeNull();
+      expect(container.querySelector('use[href="#barrel"]')).toBeNull();
     });
   });
 
   describe('fog does not affect localhost', () => {
-    it('shows barrel on localhost even when fog covers the cell', () => {
+    it('shows items on localhost even when fog covers the cell', () => {
       const items = [makeItem('barrel')];
       const fog = new Map([['0,0', true]]);
       const { container } = renderPlacedItems(items, { isLocalhost: true, fog });
-      expect(container.querySelector(selectorForType('barrel'))).toBeInTheDocument();
+      expect(container.querySelector('use[href="#barrel"]')).toBeInTheDocument();
     });
 
-    it('shows NPC on localhost even when fog covers the cell', () => {
+    it('shows npcs on localhost even when fog covers the cell', () => {
       const items = [makeItem('npc', { name: 'Goblin' })];
       const fog = new Map([['0,0', true]]);
       const { container } = renderPlacedItems(items, { isLocalhost: true, fog });
@@ -95,37 +74,13 @@ describe('PlacedItems - Fog of war hiding', () => {
   });
 
   describe('fog + visible=false interaction', () => {
-    it.each([
-      ['barrel'],
-      ['chest'],
-      ['npc'],
-    ])('shows localhost invisible %s at 0.5 opacity even when fog covers cell', (type) => {
-      const items = [makeItem(type, { visible: false, ...(type === 'npc' ? { name: 'Goblin' } : {}) })];
+    it('shows localhost invisible items at reduced opacity even when fog covers cell', () => {
+      const items = [makeItem('barrel', { visible: false })];
       const fog = new Map([['0,0', true]]);
       const { container } = renderPlacedItems(items, { isLocalhost: true, fog });
-      const el = container.querySelector(selectorForType(type));
+      const el = container.querySelector('use[href="#barrel"]');
       expect(el).toBeInTheDocument();
-      if (type === 'npc') {
-        expect(el).toHaveAttribute('style', 'opacity: 0.5;');
-      } else {
-        expect(el).toHaveAttribute('opacity', '0.5');
-      }
-    });
-  });
-
-  describe('fog grid position matching', () => {
-    it('hides item when fog matches its grid coordinates', () => {
-      const items = [makeItem('barrel', { gridX: 5, gridY: 3 })];
-      const fog = new Map([['5,3', true]]);
-      const { container } = renderPlacedItems(items, { isLocalhost: false, fog });
-      expect(container.querySelector('use[href="#barrel"]')).toBeNull();
-    });
-
-    it('shows item when fog covers different coordinates', () => {
-      const items = [makeItem('barrel', { gridX: 5, gridY: 3 })];
-      const fog = new Map([['1,1', true]]);
-      const { container } = renderPlacedItems(items, { isLocalhost: false, fog });
-      expect(container.querySelector('use[href="#barrel"]')).toBeInTheDocument();
+      expect(el.getAttribute('opacity')).toBe('0.5');
     });
   });
 

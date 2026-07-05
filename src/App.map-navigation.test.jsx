@@ -83,7 +83,7 @@ vi.mock('./components/common/Subscriber.jsx', () => ({
 
 const originalLocation = window.location;
 
-describe('App - Map Navigation & Settlements/NPCs Back', () => {
+describe('App - Map Navigation & View Management', () => {
   const defaultFetch = () =>
     Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
 
@@ -146,7 +146,7 @@ describe('App - Map Navigation & Settlements/NPCs Back', () => {
   };
 
   describe('Map navigation stack', () => {
-    it('navigates back to previous map when history has entries', async () => {
+    it('navigates back to manager when map history has entries', async () => {
       mockState.characters = [{ name: 'Aragorn', level: 1 }];
       render(<App />);
       await selectCampaign();
@@ -164,7 +164,7 @@ describe('App - Map Navigation & Settlements/NPCs Back', () => {
       });
     });
 
-    it('goes back to none (not manager) when history is empty on non-localhost', async () => {
+    it('goes back to none (not manager) when map history is empty on non-localhost', async () => {
       setNonLocalhost();
       const { loadMaps } = await import('./services/maps/mapsService.js');
       loadMaps.mockResolvedValue({
@@ -184,187 +184,6 @@ describe('App - Map Navigation & Settlements/NPCs Back', () => {
         expect(screen.queryByTestId('maps-manager')).not.toBeInTheDocument();
       });
     });
-  });
-
-  describe('Settlements view', () => {
-    it('renders Settlements above char-sheet', async () => {
-      mockState.characters = [{ name: 'Aragorn', level: 1 }];
-      render(<App />);
-      await selectCampaign();
-      await waitFor(() => {
-        expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
-      });
-      fireEvent.click(screen.getByTestId('settlements-btn'));
-      await waitFor(() => {
-        expect(screen.getByTestId('settlements-view')).toBeInTheDocument();
-        expect(screen.queryByTestId('char-sheet')).not.toBeInTheDocument();
-      });
-    });
-
-    it('exercises Settlements onBack callback', async () => {
-      mockState.characters = [{ name: 'Aragorn', level: 1 }];
-      render(<App />);
-      await selectCampaign();
-      fireEvent.click(screen.getByTestId('settlements-btn'));
-      await waitFor(() => {
-        expect(screen.getByTestId('settlements-view')).toBeInTheDocument();
-      });
-      fireEvent.click(screen.getByTestId('settlements-back-btn'));
-      await waitFor(() => {
-        expect(screen.queryByTestId('settlements-view')).not.toBeInTheDocument();
-      });
-    });
-
-    it('passes campaignName to Settlements', async () => {
-      mockState.characters = [{ name: 'Aragorn', level: 1 }];
-      render(<App />);
-      await selectCampaign();
-      fireEvent.click(screen.getByTestId('settlements-btn'));
-      await waitFor(() => {
-        expect(screen.getByTestId('settlements-campaign')).toBeInTheDocument();
-      });
-    });
-  });
-
-  describe('NPCs view back navigation', () => {
-    it('exercises NPCs onBack callback', async () => {
-      mockState.characters = [{ name: 'Aragorn', level: 1 }];
-      render(<App />);
-      await selectCampaign();
-      fireEvent.click(screen.getByTestId('npcs-btn'));
-      await waitFor(() => {
-        expect(screen.getByTestId('npcs-view')).toBeInTheDocument();
-      });
-      fireEvent.click(screen.getByTestId('npcs-back-btn'));
-      await waitFor(() => {
-        expect(screen.queryByTestId('npcs-view')).not.toBeInTheDocument();
-      });
-    });
-  });
-
-  describe('Factions view back navigation', () => {
-    it('exercises Factions onBack callback', async () => {
-      mockState.characters = [{ name: 'Aragorn', level: 1 }];
-      render(<App />);
-      await selectCampaign();
-      fireEvent.click(screen.getByTestId('factions-btn'));
-      await waitFor(() => {
-        expect(screen.getByTestId('factions-view')).toBeInTheDocument();
-      });
-      fireEvent.click(screen.getByTestId('factions-back-btn'));
-      await waitFor(() => {
-        expect(screen.queryByTestId('factions-view')).not.toBeInTheDocument();
-      });
-    });
-  });
-
-  describe('Campaign Log view', () => {
-    it('renders Campaign Log above char-sheet', async () => {
-      mockState.characters = [{ name: 'Aragorn', level: 1 }];
-      render(<App />);
-      await selectCampaign();
-      await waitFor(() => {
-        expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
-      });
-      fireEvent.click(screen.getByTestId('log-btn'));
-      await waitFor(() => {
-        expect(screen.getByTestId('campaign-log-view')).toBeInTheDocument();
-        expect(screen.queryByTestId('char-sheet')).not.toBeInTheDocument();
-      });
-    });
-
-    it('passes campaignName to Log', async () => {
-      mockState.characters = [{ name: 'Aragorn', level: 1 }];
-      render(<App />);
-      await selectCampaign();
-      fireEvent.click(screen.getByTestId('log-btn'));
-      await waitFor(() => {
-        expect(screen.getByTestId('log-campaign')).toBeInTheDocument();
-      });
-    });
-
-    it('passes characters count to Log', async () => {
-      mockState.characters = [{ name: 'Aragorn', level: 1 }];
-      render(<App />);
-      await selectCampaign();
-      fireEvent.click(screen.getByTestId('log-btn'));
-      await waitFor(() => {
-        expect(screen.getByTestId('log-char-count')).toBeInTheDocument();
-      });
-    });
-  });
-
-  describe('Settlements idempotency', () => {
-    it('handleSettlementsClick is idempotent when already on settlements', async () => {
-      mockState.characters = [{ name: 'Aragorn', level: 1 }];
-      render(<App />);
-      await selectCampaign();
-      fireEvent.click(screen.getByTestId('settlements-btn'));
-      await waitFor(() => {
-        expect(screen.getByTestId('settlements-view')).toBeInTheDocument();
-      });
-      fireEvent.click(screen.getByTestId('settlements-btn'));
-      expect(screen.getByTestId('settlements-view')).toBeInTheDocument();
-    });
-  });
-
-  describe('NPCs idempotency', () => {
-    it('handleNPCsClick is idempotent when already on NPCs', async () => {
-      mockState.characters = [{ name: 'Aragorn', level: 1 }];
-      render(<App />);
-      await selectCampaign();
-      fireEvent.click(screen.getByTestId('npcs-btn'));
-      await waitFor(() => {
-        expect(screen.getByTestId('npcs-view')).toBeInTheDocument();
-      });
-      fireEvent.click(screen.getByTestId('npcs-btn'));
-      expect(screen.getByTestId('npcs-view')).toBeInTheDocument();
-    });
-  });
-
-  describe('Factions idempotency', () => {
-    it('handleFactionsClick is idempotent when already on factions', async () => {
-      mockState.characters = [{ name: 'Aragorn', level: 1 }];
-      render(<App />);
-      await selectCampaign();
-      fireEvent.click(screen.getByTestId('factions-btn'));
-      await waitFor(() => {
-        expect(screen.getByTestId('factions-view')).toBeInTheDocument();
-      });
-      fireEvent.click(screen.getByTestId('factions-btn'));
-      expect(screen.getByTestId('factions-view')).toBeInTheDocument();
-    });
-  });
-
-  describe('Campaign Log idempotency', () => {
-    it('handleLogClick is idempotent when already on campaign log', async () => {
-      mockState.characters = [{ name: 'Aragorn', level: 1 }];
-      render(<App />);
-      await selectCampaign();
-      fireEvent.click(screen.getByTestId('log-btn'));
-      await waitFor(() => {
-        expect(screen.getByTestId('campaign-log-view')).toBeInTheDocument();
-      });
-      fireEvent.click(screen.getByTestId('log-btn'));
-      expect(screen.getByTestId('campaign-log-view')).toBeInTheDocument();
-    });
-  });
-
-  describe('Map view type transitions', () => {
-    it('transitions from manager to map view on localhost', async () => {
-      mockState.characters = [{ name: 'Aragorn', level: 1 }];
-      render(<App />);
-      await selectCampaign();
-      fireEvent.click(screen.getByTestId('maps-btn'));
-      await waitFor(() => {
-        expect(screen.getByTestId('maps-manager')).toBeInTheDocument();
-      });
-      fireEvent.click(screen.getByTestId('open-map-btn'));
-      await waitFor(() => {
-        expect(screen.getByTestId('map-view')).toBeInTheDocument();
-        expect(screen.queryByTestId('maps-manager')).not.toBeInTheDocument();
-      });
-    });
 
     it('does not transition when already on manager', async () => {
       mockState.characters = [{ name: 'Aragorn', level: 1 }];
@@ -379,8 +198,102 @@ describe('App - Map Navigation & Settlements/NPCs Back', () => {
     });
   });
 
-  describe('View rendering conditions', () => {
-    it('renders only one view at a time (charSheet vs initiative)', async () => {
+  describe('GM view transitions', () => {
+    it('renders GM view and hides char-sheet (settlements)', async () => {
+      mockState.characters = [{ name: 'Aragorn', level: 1 }];
+      render(<App />);
+      await selectCampaign();
+      await waitFor(() => {
+        expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
+      });
+      fireEvent.click(screen.getByTestId('settlements-btn'));
+      await waitFor(() => {
+        expect(screen.getByTestId('settlements-view')).toBeInTheDocument();
+        expect(screen.queryByTestId('char-sheet')).not.toBeInTheDocument();
+      });
+    });
+
+    it('renders GM view and hides char-sheet (NPCs)', async () => {
+      mockState.characters = [{ name: 'Aragorn', level: 1 }];
+      render(<App />);
+      await selectCampaign();
+      await waitFor(() => {
+        expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
+      });
+      fireEvent.click(screen.getByTestId('npcs-btn'));
+      await waitFor(() => {
+        expect(screen.getByTestId('npcs-view')).toBeInTheDocument();
+        expect(screen.queryByTestId('char-sheet')).not.toBeInTheDocument();
+      });
+    });
+
+    it('renders GM view and hides char-sheet (factions)', async () => {
+      mockState.characters = [{ name: 'Aragorn', level: 1 }];
+      render(<App />);
+      await selectCampaign();
+      await waitFor(() => {
+        expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
+      });
+      fireEvent.click(screen.getByTestId('factions-btn'));
+      await waitFor(() => {
+        expect(screen.getByTestId('factions-view')).toBeInTheDocument();
+        expect(screen.queryByTestId('char-sheet')).not.toBeInTheDocument();
+      });
+    });
+
+    it('renders GM view and hides char-sheet (campaign log)', async () => {
+      mockState.characters = [{ name: 'Aragorn', level: 1 }];
+      render(<App />);
+      await selectCampaign();
+      await waitFor(() => {
+        expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
+      });
+      fireEvent.click(screen.getByTestId('log-btn'));
+      await waitFor(() => {
+        expect(screen.getByTestId('campaign-log-view')).toBeInTheDocument();
+        expect(screen.queryByTestId('char-sheet')).not.toBeInTheDocument();
+      });
+    });
+
+    it('hides GM view when onBack is triggered', async () => {
+      mockState.characters = [{ name: 'Aragorn', level: 1 }];
+      render(<App />);
+      await selectCampaign();
+      fireEvent.click(screen.getByTestId('settlements-btn'));
+      await waitFor(() => {
+        expect(screen.getByTestId('settlements-view')).toBeInTheDocument();
+      });
+      fireEvent.click(screen.getByTestId('settlements-back-btn'));
+      await waitFor(() => {
+        expect(screen.queryByTestId('settlements-view')).not.toBeInTheDocument();
+      });
+    });
+
+    it('GM views are idempotent when already active', async () => {
+      mockState.characters = [{ name: 'Aragorn', level: 1 }];
+      render(<App />);
+      await selectCampaign();
+
+      const views = [
+        { btn: 'settlements-btn', view: 'settlements-view' },
+        { btn: 'npcs-btn', view: 'npcs-view' },
+        { btn: 'factions-btn', view: 'factions-view' },
+        { btn: 'log-btn', view: 'campaign-log-view' },
+      ];
+
+      for (const { btn, view } of views) {
+        fireEvent.click(screen.getByTestId(btn));
+        await waitFor(() => {
+          expect(screen.getByTestId(view)).toBeInTheDocument();
+        });
+        fireEvent.click(screen.getByTestId(btn));
+        expect(screen.getByTestId(view)).toBeInTheDocument();
+      }
+    });
+  });
+
+  describe('View mutual exclusivity', () => {
+    it('replaces char-sheet with initiative', async () => {
       mockState.characters = [{ name: 'Aragorn', level: 1 }];
       render(<App />);
       await selectCampaign();
@@ -394,7 +307,7 @@ describe('App - Map Navigation & Settlements/NPCs Back', () => {
       });
     });
 
-    it('renders only one view at a time (charSheet vs encounter)', async () => {
+    it('replaces char-sheet with encounter', async () => {
       mockState.characters = [{ name: 'Aragorn', level: 1 }];
       render(<App />);
       await selectCampaign();

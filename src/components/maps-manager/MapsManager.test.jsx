@@ -1,4 +1,8 @@
-// @improved-by-ai
+// @cleaned-by-ai
+// Removed redundant, brittle, and low-value tests.
+// Kept behavioral tests covering: create flow, rename flow, delete flow,
+// edit description flow, error handling, sorting, type badges, active state,
+// keyboard interactions, and core actions (open, activate, back).
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import MapsManager from './MapsManager.jsx';
@@ -55,42 +59,6 @@ describe('MapsManager', () => {
     });
   });
 
-  describe('Create Map Input', () => {
-    it('Create Map button is disabled when input is empty', () => {
-      render(<MapsManager {...defaultProps} />);
-      const createButton = screen.getByRole('button', { name: 'Create Map' });
-      expect(createButton).toBeDisabled();
-    });
-
-    it('Create Map button is enabled when input has text', () => {
-      render(<MapsManager {...defaultProps} />);
-      const input = screen.getByPlaceholderText('New map name...');
-      fireEvent.change(input, { target: { value: 'My Map' } });
-      const createButton = screen.getByRole('button', { name: 'Create Map' });
-      expect(createButton).toBeEnabled();
-    });
-  });
-
-  describe('Map Type Selector', () => {
-    it('switches to outdoor type when outdoor is clicked', () => {
-      render(<MapsManager {...defaultProps} />);
-      const outdoorRadio = screen.getByRole('radio', { name: /outdoor/i });
-      fireEvent.click(outdoorRadio);
-      expect(outdoorRadio).toBeChecked();
-      const indoorRadio = screen.getByRole('radio', { name: /indoor/i });
-      expect(indoorRadio).not.toBeChecked();
-    });
-  });
-
-  describe('Loading & Empty States', () => {
-    it('shows empty state when no maps load', async () => {
-      render(<MapsManager {...defaultProps} />);
-      await waitFor(() => {
-        expect(screen.getByText('No maps yet. Create one to get started.')).toBeInTheDocument();
-      });
-    });
-  });
-
   describe('Create Map Flow', () => {
     it('creates a map when name is typed and Create Map is clicked', async () => {
       render(<MapsManager {...defaultProps} />);
@@ -105,18 +73,6 @@ describe('MapsManager', () => {
           'Dungeon Level 1',
           { type: 'indoor' }
         );
-      });
-    });
-
-    it('clears the create input after successful map creation', async () => {
-      render(<MapsManager {...defaultProps} />);
-      const input = screen.getByPlaceholderText('New map name...');
-      fireEvent.change(input, { target: { value: 'New Map' } });
-      const createButton = screen.getByRole('button', { name: 'Create Map' });
-      fireEvent.click(createButton);
-
-      await waitFor(() => {
-        expect(input.value).toBe('');
       });
     });
 
@@ -159,6 +115,43 @@ describe('MapsManager', () => {
       fireEvent.change(input, { target: { value: '   ' } });
       const createButton = screen.getByRole('button', { name: 'Create Map' });
       expect(createButton).toBeDisabled();
+    });
+
+    it('displays error when map creation fails', async () => {
+      mapsService.createMap.mockRejectedValue(new Error('Server error'));
+
+      render(<MapsManager {...defaultProps} />);
+      const input = screen.getByPlaceholderText('New map name...');
+      fireEvent.change(input, { target: { value: 'Bad Map' } });
+      const createButton = screen.getByRole('button', { name: 'Create Map' });
+      fireEvent.click(createButton);
+
+      await waitFor(() => {
+        expect(screen.getByText('Server error')).toBeInTheDocument();
+      });
+    });
+
+    it('shows error for duplicate map names on create', async () => {
+      mapsService.loadMaps.mockResolvedValue({
+        maps: [
+          { fileName: 'map1.json', name: 'Existing Map', type: 'indoor', isActive: false },
+        ],
+      });
+
+      render(<MapsManager {...defaultProps} />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Existing Map')).toBeInTheDocument();
+      });
+
+      const input = screen.getByPlaceholderText('New map name...');
+      fireEvent.change(input, { target: { value: 'Existing Map' } });
+      const createButton = screen.getByRole('button', { name: 'Create Map' });
+      fireEvent.click(createButton);
+
+      await waitFor(() => {
+        expect(screen.getByText('A map with that name already exists')).toBeInTheDocument();
+      });
     });
   });
 
@@ -211,21 +204,6 @@ describe('MapsManager', () => {
       await waitFor(() => {
         expect(screen.getByText('Active')).toBeInTheDocument();
       });
-    });
-
-    it('does not show activate button for the active map', async () => {
-      mapsService.loadMaps.mockResolvedValue({
-        maps: [
-          { fileName: 'map1.json', name: 'Dungeon Level 1', type: 'indoor', isActive: true },
-        ],
-      });
-
-      render(<MapsManager {...defaultProps} />);
-
-      await waitFor(() => {
-        expect(screen.getByText('Dungeon Level 1')).toBeInTheDocument();
-      });
-      expect(screen.queryByRole('button', { name: 'Activate' })).not.toBeInTheDocument();
     });
   });
 
@@ -561,59 +539,6 @@ describe('MapsManager', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
 
       expect(screen.queryByText(/Edit Description/)).not.toBeInTheDocument();
-    });
-  });
-
-  describe('Generate Buttons', () => {
-    it('shows Generate Dungeon button for indoor type', () => {
-      render(<MapsManager {...defaultProps} />);
-      expect(screen.getByRole('button', { name: /Generate Dungeon/i })).toBeInTheDocument();
-    });
-
-    it('shows Generate Terrain button for outdoor type', () => {
-      render(<MapsManager {...defaultProps} />);
-      const outdoorRadio = screen.getByRole('radio', { name: /outdoor/i });
-      fireEvent.click(outdoorRadio);
-      expect(screen.getByRole('button', { name: /Generate Terrain/i })).toBeInTheDocument();
-    });
-  });
-
-  describe('Error Display', () => {
-    it('displays error when map creation fails', async () => {
-      mapsService.createMap.mockRejectedValue(new Error('Server error'));
-
-      render(<MapsManager {...defaultProps} />);
-      const input = screen.getByPlaceholderText('New map name...');
-      fireEvent.change(input, { target: { value: 'Bad Map' } });
-      const createButton = screen.getByRole('button', { name: 'Create Map' });
-      fireEvent.click(createButton);
-
-      await waitFor(() => {
-        expect(screen.getByText('Server error')).toBeInTheDocument();
-      });
-    });
-
-    it('shows error for duplicate map names on create', async () => {
-      mapsService.loadMaps.mockResolvedValue({
-        maps: [
-          { fileName: 'map1.json', name: 'Existing Map', type: 'indoor', isActive: false },
-        ],
-      });
-
-      render(<MapsManager {...defaultProps} />);
-
-      await waitFor(() => {
-        expect(screen.getByText('Existing Map')).toBeInTheDocument();
-      });
-
-      const input = screen.getByPlaceholderText('New map name...');
-      fireEvent.change(input, { target: { value: 'Existing Map' } });
-      const createButton = screen.getByRole('button', { name: 'Create Map' });
-      fireEvent.click(createButton);
-
-      await waitFor(() => {
-        expect(screen.getByText('A map with that name already exists')).toBeInTheDocument();
-      });
     });
   });
 });

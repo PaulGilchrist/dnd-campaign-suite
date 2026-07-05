@@ -1,4 +1,6 @@
 // @cleaned-by-ai
+// Already minimal — kept as-is. Only happy-path tests exist; error handling is
+// implicit (service throws on error). No redundant or brittle tests to remove.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { loadQuests, saveQuests, loadQuest, deleteQuest } from './questsService.js';
 

@@ -1,3 +1,4 @@
+// @cleaned-by-ai
 // @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
@@ -36,12 +37,10 @@ describe('applyHealingToTarget', () => {
   });
 
   describe('return value', () => {
-    it('returns null when modifyHitPoints returns null', () => {
+    it('returns null when modifyHitPoints returns null or undefined', () => {
       modifyHitPoints.mockReturnValue(null);
       expect(applyHealingToTarget({}, 'Goblin', 5, 'TestCampaign')).toBeNull();
-    });
 
-    it('returns null when modifyHitPoints returns undefined', () => {
       modifyHitPoints.mockReturnValue(undefined);
       expect(applyHealingToTarget({}, 'Goblin', 5, 'TestCampaign')).toBeNull();
     });
@@ -55,6 +54,7 @@ describe('applyHealingToTarget', () => {
 
   describe('death save reset', () => {
     it('resets deathSaves and deathFailures when player heals from <=0 to >0', () => {
+      // from 0 to positive
       modifyHitPoints.mockReturnValue(
         makeResult({ isPlayer: true, oldHp: 0, newHp: 5, delta: 5, creature: { name: 'Fighter' } })
       );
@@ -65,9 +65,9 @@ describe('applyHealingToTarget', () => {
       expect(setRuntimeValue).toHaveBeenCalledWith(
         'Fighter', 'deathFailures', [false, false, false], 'TestCampaign'
       );
-    });
 
-    it('resets death saves when player heals from negative to positive', () => {
+      // from negative to positive
+      setRuntimeValue.mockClear();
       modifyHitPoints.mockReturnValue(
         makeResult({ isPlayer: true, oldHp: -3, newHp: 2, delta: 5, creature: { name: 'Cleric' } })
       );
@@ -88,15 +88,16 @@ describe('applyHealingToTarget', () => {
       expect(setRuntimeValue).not.toHaveBeenCalled();
     });
 
-    it('does not reset death saves when player remains at 0', () => {
+    it('does not reset death saves when player remains at or below 0', () => {
+      // remains at 0
       modifyHitPoints.mockReturnValue(
         makeResult({ isPlayer: true, oldHp: 0, newHp: 0, delta: 0, creature: { name: 'Rogue' } })
       );
       applyHealingToTarget({}, 'Rogue', 5, 'TestCampaign');
       expect(setRuntimeValue).not.toHaveBeenCalled();
-    });
 
-    it('does not reset death saves when player remains below 0', () => {
+      // remains below 0
+      setRuntimeValue.mockClear();
       modifyHitPoints.mockReturnValue(
         makeResult({ isPlayer: true, oldHp: -5, newHp: -2, delta: 3, creature: { name: 'Barbarian' } })
       );
@@ -123,17 +124,18 @@ describe('applyHealingToTarget', () => {
       expect(storage.set).toHaveBeenCalledWith('combatSummary', cs, 'TestCampaign');
     });
 
-    it('does not save combatSummary when NPC delta is zero', () => {
+    it('does not save combatSummary when NPC delta is zero or for player healing', () => {
       const cs = { round: 1, creatures: [] };
+
+      // NPC with zero delta
       modifyHitPoints.mockReturnValue(
         makeResult({ isPlayer: false, oldHp: 10, newHp: 10, delta: 0, creature: { name: 'Goblin' } })
       );
       applyHealingToTarget(cs, 'Goblin', 0, 'TestCampaign');
       expect(storage.set).not.toHaveBeenCalled();
-    });
 
-    it('does not save combatSummary for player healing', () => {
-      const cs = { round: 1, creatures: [] };
+      // Player healing
+      storage.set.mockClear();
       modifyHitPoints.mockReturnValue(
         makeResult({ isPlayer: true, oldHp: 10, newHp: 15, delta: 5, creature: { name: 'Cleric' } })
       );

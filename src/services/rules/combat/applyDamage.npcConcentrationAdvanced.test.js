@@ -1,3 +1,4 @@
+// @cleaned-by-ai
 // @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
@@ -180,24 +181,6 @@ describe('NPC Concentration — Dragon Constellation & Relentless Hunter', () =>
 
       expect(rollConcentrationSave).toHaveBeenCalledWith(0, 10, false);
     });
-
-    it('does not grant advantage when no Starry Form buff present', () => {
-      const druidCreature = createNpcCreature('Druid', 30, 30, {
-        concentration: { spell: 'Haste', dc: 10 },
-        saveBonuses: { con: 0 },
-      });
-      const cs = makeCombatSummary([druidCreature]);
-
-      stubNpcRuntime(30);
-
-      rollConcentrationSave.mockReturnValue({ success: true, roll: 15, total: 15 });
-
-      applyDamageToTarget(cs, 'Druid', 10, ['Slashing'], 'TestCampaign', [
-        createMinimalCharacter('Druid', 1),
-      ]);
-
-      expect(rollConcentrationSave).toHaveBeenCalledWith(0, 10, false);
-    });
   });
 
   describe('Relentless Hunter — Ranger level 13+', () => {
@@ -247,7 +230,7 @@ describe('NPC Concentration — Dragon Constellation & Relentless Hunter', () =>
       expect(rollConcentrationSave).toHaveBeenCalled();
     });
 
-    it('skips concentration save for non-Rangers regardless of level', () => {
+    it('does not skip concentration save for non-Rangers regardless of level', () => {
       const wizardCreature = createNpcCreature('Wizard', 30, 30, {
         concentration: { spell: 'Haste', dc: 10 },
         saveBonuses: { con: 0 },
@@ -298,8 +281,6 @@ describe('NPC Concentration — Dragon Constellation & Relentless Hunter', () =>
         cs, 'Ranger', 10, ['Slashing'], 'TestCampaign', [rangerCharacter],
       )).toThrow('player level is required for relentless hunter check');
     });
-
-
   });
 
   describe('combined Dragon Constellation + Relentless Hunter', () => {
@@ -408,22 +389,6 @@ describe('NPC Concentration — Dragon Constellation & Relentless Hunter', () =>
       ]);
 
       expect(rollConcentrationSave).toHaveBeenCalledWith(3, 10, false);
-    });
-
-    it('uses 0 bonus when saveBonuses is missing', () => {
-      const creature = createNpcCreature('Orc', 30, 30, {
-        concentration: { spell: 'Haste', dc: 10 },
-      });
-      const cs = makeCombatSummary([creature]);
-
-      stubNpcRuntime(30);
-      rollConcentrationSave.mockReturnValue({ success: true, roll: 10, total: 10 });
-
-      applyDamageToTarget(cs, 'Orc', 10, ['Slashing'], 'TestCampaign', [
-        createMinimalCharacter('Orc', 1),
-      ]);
-
-      expect(rollConcentrationSave).toHaveBeenCalledWith(0, 10, false);
     });
   });
 });

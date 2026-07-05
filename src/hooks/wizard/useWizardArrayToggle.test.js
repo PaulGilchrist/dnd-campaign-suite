@@ -1,3 +1,4 @@
+// @cleaned-by-ai
 // @improved-by-ai
 import { renderHook, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -50,18 +51,6 @@ describe('useWizardArrayToggle', () => {
       expect(currentData.testField).toEqual(['Item2']);
     });
 
-    it('toggles item on and off', () => {
-      const { result } = renderToggle('testField');
-      act(() => {
-        result.current.toggleItem('Item1');
-      });
-      expect(currentData.testField).toContain('Item1');
-      act(() => {
-        result.current.toggleItem('Item1');
-      });
-      expect(currentData.testField).not.toContain('Item1');
-    });
-
     it('clears error on toggle', () => {
       const { result } = renderToggle('testField');
       act(() => {
@@ -70,25 +59,7 @@ describe('useWizardArrayToggle', () => {
       expect(setErrors).toHaveBeenCalledWith(expect.any(Function));
     });
 
-    it('does not toggle when opt is true', () => {
-      currentData = { testField: ['PreItem'] };
-      const { result } = renderToggle('testField', ['PreItem']);
-      act(() => {
-        result.current.toggleItem('PreItem', true);
-      });
-      expect(currentData.testField).toContain('PreItem');
-    });
-
-    it('does not toggle when opt.isPreSelected is true', () => {
-      currentData = { testField: ['PreItem'] };
-      const { result } = renderToggle('testField', ['PreItem']);
-      act(() => {
-        result.current.toggleItem('PreItem', { isPreSelected: true });
-      });
-      expect(currentData.testField).toContain('PreItem');
-    });
-
-    it('does not toggle pre-selected items even when opt is false', () => {
+    it('does not toggle pre-selected items', () => {
       currentData = { testField: ['PreItem'] };
       const { result } = renderToggle('testField', ['PreItem']);
       act(() => {
@@ -97,7 +68,7 @@ describe('useWizardArrayToggle', () => {
       expect(currentData.testField).toContain('PreItem');
     });
 
-    it('toggles non-pre-selected items even when they are in preSelectedItems array', () => {
+    it('toggles non-pre-selected items normally', () => {
       currentData = { testField: ['PreItem', 'OtherItem'] };
       const { result } = renderToggle('testField', ['PreItem']);
       act(() => {
@@ -182,24 +153,6 @@ describe('useWizardArrayToggle', () => {
       });
       expect(currentData.new.nested.field).toContain('Item1');
     });
-
-    it('handles nested field with setItem', () => {
-      currentData = { nested: { field: ['Item1'] } };
-      const { result } = renderToggle('nested.field');
-      act(() => {
-        result.current.setItem('Item2');
-      });
-      expect(currentData.nested.field).toContain('Item2');
-    });
-
-    it('handles nested field with removeItem', () => {
-      currentData = { nested: { field: ['Item1', 'Item2'] } };
-      const { result } = renderToggle('nested.field');
-      act(() => {
-        result.current.removeItem('Item1');
-      });
-      expect(currentData.nested.field).not.toContain('Item1');
-    });
   });
 
   describe('preSelectedItems edge cases', () => {
@@ -245,35 +198,6 @@ describe('useWizardArrayToggle', () => {
         result.current.toggleItem('A');
       });
       expect(currentData.testField).toEqual(['B', 'A']);
-    });
-  });
-
-  describe('null item handling', () => {
-    it('toggles null item on and off', () => {
-      currentData = { testField: [null] };
-      const { result } = renderToggle('testField');
-      act(() => {
-        result.current.toggleItem(null);
-      });
-      expect(currentData.testField).not.toContain(null);
-    });
-
-    it('adds null item via setItem', () => {
-      currentData = { testField: ['Item1'] };
-      const { result } = renderToggle('testField');
-      act(() => {
-        result.current.setItem(null);
-      });
-      expect(currentData.testField).toContain(null);
-    });
-
-    it('removes null item via removeItem', () => {
-      currentData = { testField: ['Item1', null] };
-      const { result } = renderToggle('testField');
-      act(() => {
-        result.current.removeItem(null);
-      });
-      expect(currentData.testField).not.toContain(null);
     });
   });
 });

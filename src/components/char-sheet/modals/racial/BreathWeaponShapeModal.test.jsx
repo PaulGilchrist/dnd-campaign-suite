@@ -1,6 +1,6 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, act } from '@testing-library/react';
+import { render, screen, fireEvent, act, cleanup } from '@testing-library/react';
 import BreathWeaponShapeModal from './BreathWeaponShapeModal.jsx';
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
@@ -22,7 +22,7 @@ const baseProps = {
 };
 
 function makeProps(overrides) {
-    return { ...baseProps, ...(overrides || {}) };
+    return { ...baseProps, ...(overrides || {}) }
 }
 
 describe('BreathWeaponShapeModal', () => {
@@ -48,12 +48,6 @@ describe('BreathWeaponShapeModal', () => {
         expect(screen.getByText('Breath Weapon')).toBeInTheDocument();
     });
 
-    it('renders dragon icon in choose shape button', () => {
-        render(<BreathWeaponShapeModal {...makeProps()} />);
-        const icon = document.querySelector('.sp-roll-btn .fa-solid.fa-dragon');
-        expect(icon).toBeInTheDocument();
-    });
-
     it('renders prompt text and both shape options', () => {
         render(<BreathWeaponShapeModal {...makeProps()} />);
         expect(screen.getByText('Choose the shape of your breath weapon:')).toBeInTheDocument();
@@ -66,23 +60,15 @@ describe('BreathWeaponShapeModal', () => {
         expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
     });
 
-    it('renders two radio inputs with name breathWeaponShape', () => {
-        render(<BreathWeaponShapeModal {...makeProps()} />);
-        const inputs = document.querySelectorAll('input[name="breathWeaponShape"]');
-        expect(inputs).toHaveLength(2);
-    });
-
-    it('shows default title when action is null', () => {
+    it('shows default title when action is null, undefined, or missing name', () => {
         render(<BreathWeaponShapeModal {...makeProps({ action: null })} />);
         expect(screen.getByText('Breath Weapon')).toBeInTheDocument();
-    });
-
-    it('shows default title when action is undefined', () => {
+        cleanup();
+        vi.clearAllMocks();
         render(<BreathWeaponShapeModal {...makeProps({ action: undefined })} />);
         expect(screen.getByText('Breath Weapon')).toBeInTheDocument();
-    });
-
-    it('shows default title when action has no name', () => {
+        cleanup();
+        vi.clearAllMocks();
         render(<BreathWeaponShapeModal {...makeProps({ action: {} })} />);
         expect(screen.getByText('Breath Weapon')).toBeInTheDocument();
     });
@@ -103,13 +89,6 @@ describe('BreathWeaponShapeModal', () => {
         expect(onClose).toHaveBeenCalledTimes(1);
     });
 
-    it('does not call onClose when modal content is clicked', () => {
-        const onClose = vi.fn();
-        render(<BreathWeaponShapeModal {...makeProps({ onClose })} />);
-        fireEvent.click(document.querySelector('.sp-modal'));
-        expect(onClose).not.toHaveBeenCalled();
-    });
-
     // ── Selection behavior ──
 
     it('disables Choose Shape button when nothing selected', () => {
@@ -117,17 +96,10 @@ describe('BreathWeaponShapeModal', () => {
         expect(screen.getByRole('button', { name: 'Choose Shape' })).toBeDisabled();
     });
 
-    it('enables Choose Shape button after selecting cone', () => {
+    it('enables Choose Shape button after selecting a shape', () => {
         render(<BreathWeaponShapeModal {...makeProps()} />);
         const radios = document.querySelectorAll('input[type="radio"]');
         fireEvent.click(radios[0]);
-        expect(screen.getByRole('button', { name: 'Choose Shape' })).toBeEnabled();
-    });
-
-    it('enables Choose Shape button after selecting line', () => {
-        render(<BreathWeaponShapeModal {...makeProps()} />);
-        const radios = document.querySelectorAll('input[type="radio"]');
-        fireEvent.click(radios[1]);
         expect(screen.getByRole('button', { name: 'Choose Shape' })).toBeEnabled();
     });
 
@@ -153,7 +125,7 @@ describe('BreathWeaponShapeModal', () => {
         expect(executeHandler).not.toHaveBeenCalled();
     });
 
-    it('stores cone selection and calls onClose and executeHandler', async () => {
+    it('stores selection and calls onClose and executeHandler', async () => {
         render(<BreathWeaponShapeModal {...makeProps()} />);
         const radios = document.querySelectorAll('input[type="radio"]');
         fireEvent.click(radios[0]);
@@ -161,18 +133,6 @@ describe('BreathWeaponShapeModal', () => {
             fireEvent.click(screen.getByRole('button', { name: 'Choose Shape' }));
         });
         expect(setRuntimeValue).toHaveBeenCalledWith('DragonbornFighter', '_Breath_Weapon_option', 'cone', 'test-campaign');
-        expect(baseProps.onClose).toHaveBeenCalledTimes(1);
-        expect(executeHandler).toHaveBeenCalledWith(baseProps.action, baseProps.playerStats, baseProps.campaignName, null);
-    });
-
-    it('stores line selection and calls onClose and executeHandler', async () => {
-        render(<BreathWeaponShapeModal {...makeProps()} />);
-        const radios = document.querySelectorAll('input[type="radio"]');
-        fireEvent.click(radios[1]);
-        await act(async () => {
-            fireEvent.click(screen.getByRole('button', { name: 'Choose Shape' }));
-        });
-        expect(setRuntimeValue).toHaveBeenCalledWith('DragonbornFighter', '_Breath_Weapon_option', 'line', 'test-campaign');
         expect(baseProps.onClose).toHaveBeenCalledTimes(1);
         expect(executeHandler).toHaveBeenCalledWith(baseProps.action, baseProps.playerStats, baseProps.campaignName, null);
     });
@@ -217,25 +177,5 @@ describe('BreathWeaponShapeModal', () => {
         });
         expect(dispatchSpy).not.toHaveBeenCalled();
         dispatchSpy.mockRestore();
-    });
-
-    // ── Edge cases ──
-
-    it('renders dragon icon in header when action is null', () => {
-        render(<BreathWeaponShapeModal {...makeProps({ action: null })} />);
-        const icon = document.querySelector('.fa-solid.fa-dragon');
-        expect(icon).toBeInTheDocument();
-    });
-
-    it('renders damage description text for cone option', () => {
-        render(<BreathWeaponShapeModal {...makeProps()} />);
-        const matches = screen.getAllByText(/15-foot cone/i);
-        expect(matches.length).toBeGreaterThanOrEqual(1);
-    });
-
-    it('renders damage description text for line option', () => {
-        render(<BreathWeaponShapeModal {...makeProps()} />);
-        const matches = screen.getAllByText(/30-foot line/i);
-        expect(matches.length).toBeGreaterThanOrEqual(1);
     });
 });

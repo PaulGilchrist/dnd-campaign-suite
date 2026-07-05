@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { describe, it, expect, vi } from 'vitest';
 import {
   ABILITY_ABBR,
@@ -12,11 +12,11 @@ import {
 
 describe('npcFormUtils', () => {
   describe('constants', () => {
-    it('ABILITY_ABBR should list all six ability scores', () => {
+    it('ABILITY_ABBR lists all six ability scores', () => {
       expect(ABILITY_ABBR).toEqual(['str', 'dex', 'con', 'int', 'wis', 'cha']);
     });
 
-    it('ABILITY_LABELS should map each abbreviation to its uppercase label', () => {
+    it('ABILITY_LABELS maps each abbreviation to its uppercase label', () => {
       expect(ABILITY_LABELS).toEqual({
         str: 'STR',
         dex: 'DEX',
@@ -27,8 +27,9 @@ describe('npcFormUtils', () => {
       });
     });
 
-    it('ATTITUDE_OPTIONS should have 5 options with value and label strings', () => {
-      expect(ATTITUDE_OPTIONS).toHaveLength(5);
+    it('ATTITUDE_OPTIONS has 5 options with matching ATTITUDE_COLORS keys', () => {
+      const attitudeValues = ATTITUDE_OPTIONS.map((o) => o.value);
+      expect(attitudeValues).toEqual(Object.keys(ATTITUDE_COLORS));
       for (const option of ATTITUDE_OPTIONS) {
         expect(option).toHaveProperty('value');
         expect(option).toHaveProperty('label');
@@ -37,13 +38,7 @@ describe('npcFormUtils', () => {
       }
     });
 
-    it('ATTITUDE_OPTIONS values should match ATTITUDE_COLORS keys', () => {
-      const attitudeValues = ATTITUDE_OPTIONS.map((o) => o.value);
-      const colorKeys = Object.keys(ATTITUDE_COLORS);
-      expect(attitudeValues).toEqual(colorKeys);
-    });
-
-    it('ATTITUDE_COLORS should have bg, color, and border strings for each attitude', () => {
+    it('ATTITUDE_COLORS has bg, color, and border strings for each attitude', () => {
       for (const [, colors] of Object.entries(ATTITUDE_COLORS)) {
         expect(colors).toHaveProperty('bg');
         expect(colors).toHaveProperty('color');
@@ -56,7 +51,7 @@ describe('npcFormUtils', () => {
   });
 
   describe('getDefaultFormData', () => {
-    it('should return correct default values for all fields', () => {
+    it('returns correct default values for all fields', () => {
       const form = getDefaultFormData();
       expect(form).toEqual({
         name: '',
@@ -89,7 +84,7 @@ describe('npcFormUtils', () => {
       });
     });
 
-    it('should apply override scalar, object, and array fields', () => {
+    it('applies override scalar, object, and array fields', () => {
       const form = getDefaultFormData({
         name: 'Grog',
         hitPoints: 20,
@@ -108,7 +103,7 @@ describe('npcFormUtils', () => {
       expect(form.actions).toEqual([{ name: 'Longsword' }]);
     });
 
-    it('should return a fresh object each call with independent mutable fields', () => {
+    it('returns a fresh object each call with independent mutable fields', () => {
       const form1 = getDefaultFormData();
       const form2 = getDefaultFormData();
       form1.abilityScores.str = 20;
@@ -121,7 +116,7 @@ describe('npcFormUtils', () => {
   });
 
   describe('cleanNPCData', () => {
-    it('should return a clone with AC unchanged when valid', () => {
+    it('returns a clone with AC unchanged when valid', () => {
       const data = { name: 'Grog', armorClass: 16, race: 'Orc' };
       const cleaned = cleanNPCData(data);
       expect(cleaned).not.toBe(data);
@@ -129,7 +124,7 @@ describe('npcFormUtils', () => {
       expect(cleaned.name).toBe('Grog');
     });
 
-    it('should default AC to 10 for null, undefined, and empty string without logging', () => {
+    it('defaults AC to 10 for null, undefined, and empty string without logging', () => {
       const silentValues = [null, undefined, ''];
       const consoleSpy = vi.spyOn(console, 'error');
 
@@ -142,7 +137,7 @@ describe('npcFormUtils', () => {
       consoleSpy.mockRestore();
     });
 
-    it('should default AC to 10 for non-number types and log an error', () => {
+    it('defaults AC to 10 for non-number types and logs an error', () => {
       const noisyValues = ['16', true, NaN];
       const consoleSpy = vi.spyOn(console, 'error');
       const expectedCalls = noisyValues.map(
@@ -158,19 +153,19 @@ describe('npcFormUtils', () => {
       consoleSpy.mockRestore();
     });
 
-    it('should accept AC of 0 and negative values as valid', () => {
+    it('accepts AC of 0 and negative values as valid', () => {
       expect(cleanNPCData({ name: 'Grog', armorClass: 0 }).armorClass).toBe(0);
       expect(cleanNPCData({ name: 'Grog', armorClass: -5 }).armorClass).toBe(-5);
     });
 
-    it('should not mutate the original data object', () => {
+    it('does not mutate the original data object', () => {
       const data = { name: 'Grog', armorClass: null };
       const cleaned = cleanNPCData(data);
       expect(data.armorClass).toBe(null);
       expect(cleaned.armorClass).toBe(10);
     });
 
-    it('should log error with "undefined" name when name is missing', () => {
+    it('logs error with "undefined" name when name is missing', () => {
       const consoleSpy = vi.spyOn(console, 'error');
       const cleaned = cleanNPCData({ armorClass: 'bad' });
       expect(cleaned.armorClass).toBe(10);
@@ -182,14 +177,14 @@ describe('npcFormUtils', () => {
   });
 
   describe('getAttitudeStyle', () => {
-    it('should return a style object with backgroundColor, color, and borderColor', () => {
+    it('returns a style object with backgroundColor, color, and borderColor', () => {
       const style = getAttitudeStyle('neutral');
       expect(style).toHaveProperty('backgroundColor');
       expect(style).toHaveProperty('color');
       expect(style).toHaveProperty('borderColor');
     });
 
-    it('should return correct style for each known attitude', () => {
+    it('returns correct style for each known attitude', () => {
       expect(getAttitudeStyle('deep bonds')).toEqual({
         backgroundColor: '#1a472a',
         color: '#90ee90',
@@ -217,7 +212,7 @@ describe('npcFormUtils', () => {
       });
     });
 
-    it('should return neutral style for unknown, null, undefined, and empty string attitudes', () => {
+    it('returns neutral style for unknown, null, undefined, and empty string attitudes', () => {
       const neutralStyle = getAttitudeStyle('neutral');
       expect(getAttitudeStyle('unknown-value')).toEqual(neutralStyle);
       expect(getAttitudeStyle(null)).toEqual(neutralStyle);
@@ -225,7 +220,7 @@ describe('npcFormUtils', () => {
       expect(getAttitudeStyle('')).toEqual(neutralStyle);
     });
 
-    it('should return a new object on each call (not reused)', () => {
+    it('returns a new object on each call (not reused)', () => {
       const style1 = getAttitudeStyle('neutral');
       const style2 = getAttitudeStyle('neutral');
       expect(style1).not.toBe(style2);

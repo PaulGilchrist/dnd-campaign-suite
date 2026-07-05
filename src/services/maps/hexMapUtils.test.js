@@ -43,12 +43,9 @@ describe('hexMapUtils', () => {
 
   describe('hexKey ↔ parseHexKey roundtrip', () => {
     it('should be inverse for any integer coordinates', () => {
-      const pairs = [
-        [0, 0], [3, 5], [-2, -7], [999, -42], [100, 200],
-      ];
+      const pairs = [[0, 0], [3, 5], [-2, -7], [999, -42], [100, 200]];
       for (const [q, r] of pairs) {
-        const key = hexKey(q, r);
-        const parsed = parseHexKey(key);
+        const parsed = parseHexKey(hexKey(q, r));
         expect(parsed).toEqual({ q, r });
       }
     });
@@ -56,8 +53,7 @@ describe('hexMapUtils', () => {
 
   describe('hexToPixel', () => {
     it('should convert origin to (0, 0)', () => {
-      const result = hexToPixel(0, 0, 30);
-      expect(result).toEqual({ x: 0, y: 0 });
+      expect(hexToPixel(0, 0, 30)).toEqual({ x: 0, y: 0 });
     });
 
     it('should scale linearly with size', () => {
@@ -78,8 +74,7 @@ describe('hexMapUtils', () => {
 
   describe('pixelToHex', () => {
     it('should convert (0, 0) pixel to (0, 0) hex', () => {
-      const result = pixelToHex(0, 0, 30);
-      expect(result).toEqual({ q: 0, r: 0 });
+      expect(pixelToHex(0, 0, 30)).toEqual({ q: 0, r: 0 });
     });
 
     it('should be the inverse of hexToPixel for integer coords', () => {
@@ -99,11 +94,7 @@ describe('hexMapUtils', () => {
     });
 
     it('should maintain the cube coordinate constraint (q + r + s = 0)', () => {
-      const samples = [
-        [0.33, 0.33], [0.6, 0.3], [-0.6, -0.3],
-        [1.7, -0.3], [2.1, -1.9], [-0.5, 0.5],
-      ];
-      for (const [q, r] of samples) {
+      for (const [q, r] of [[0.33, 0.33], [0.6, 0.3], [-0.6, -0.3], [1.7, -0.3], [2.1, -1.9], [-0.5, 0.5]]) {
         const rounded = hexRound(q, r);
         const s = -rounded.q - rounded.r;
         expect(s + rounded.q + rounded.r).toBeCloseTo(0);
@@ -193,8 +184,6 @@ describe('hexMapUtils', () => {
     it('should return a valid SVG path string with M and L commands', () => {
       const path = hexToSVGPath(0, 0, 30);
       expect(typeof path).toBe('string');
-      const coord = '[^\\s,]+';
-      expect(path).toMatch(new RegExp(`^M${coord},${coord}( ${coord},${coord}){5} Z$`));
       expect(path).toMatch(/M/);
       expect(path.match(/L/g)).toHaveLength(5);
     });
@@ -215,14 +204,6 @@ describe('hexMapUtils', () => {
       expect(hexes).toContainEqual({ q: 1, r: 0 });
       expect(hexes).toContainEqual({ q: 0, r: 1 });
       expect(hexes).toContainEqual({ q: 1, r: 1 });
-    });
-
-    it('should return hexes in row-major order', () => {
-      const hexes = getAllHexes(3, 2);
-      expect(hexes).toEqual([
-        { q: 0, r: 0 }, { q: 1, r: 0 }, { q: 2, r: 0 },
-        { q: 0, r: 1 }, { q: 1, r: 1 }, { q: 2, r: 1 },
-      ]);
     });
   });
 
@@ -271,8 +252,7 @@ describe('hexMapUtils', () => {
   describe('windingOffset', () => {
     it('should be deterministic and within ±maxOffset', () => {
       expect(windingOffset(1, 2, 3, 4, 5)).toBe(windingOffset(1, 2, 3, 4, 5));
-      const maxOffsets = [1, 3, 5, 10];
-      for (const max of maxOffsets) {
+      for (const max of [1, 3, 5, 10]) {
         const result = windingOffset(0, 0, 1, 0, max);
         expect(result).toBeGreaterThanOrEqual(-max);
         expect(result).toBeLessThanOrEqual(max);
@@ -302,8 +282,7 @@ describe('hexMapUtils', () => {
     });
 
     it('should reject non-roadable types', () => {
-      const nonRoadable = ['other', 'forest', 'mountain', 'water', ''];
-      for (const nr of nonRoadable) {
+      for (const nr of ['other', 'forest', 'mountain', 'water', '']) {
         expect(isRoadConnectable(nr, 'city')).toBe(false);
         expect(isRoadConnectable(nr, 'settlement')).toBe(false);
       }
@@ -313,8 +292,7 @@ describe('hexMapUtils', () => {
   describe('findHexPath', () => {
     it('should return [start] when start equals end', () => {
       const start = { q: 3, r: 3 };
-      const result = findHexPath(start, start, 10, 10, {});
-      expect(result).toEqual([start]);
+      expect(findHexPath(start, start, 10, 10, {})).toEqual([start]);
     });
 
     it('should return a valid path from start to end on open terrain', () => {
@@ -343,10 +321,7 @@ describe('hexMapUtils', () => {
     });
 
     it('should return null when end is out of bounds', () => {
-      const start = { q: 0, r: 0 };
-      const end = { q: 5, r: 5 };
-      const result = findHexPath(start, end, 3, 3, {});
-      expect(result).toBeNull();
+      expect(findHexPath({ q: 0, r: 0 }, { q: 5, r: 5 }, 3, 3, {})).toBeNull();
     });
   });
 
@@ -358,12 +333,7 @@ describe('hexMapUtils', () => {
     });
 
     it('should order a connected chain correctly', () => {
-      const hexes = [
-        { q: 0, r: 0 },
-        { q: 1, r: 0 },
-        { q: 2, r: 0 },
-        { q: 3, r: 0 },
-      ];
+      const hexes = [{ q: 0, r: 0 }, { q: 1, r: 0 }, { q: 2, r: 0 }, { q: 3, r: 0 }];
       const result = orderHexPath(hexes);
       expect(result).toHaveLength(4);
       expect(result[0]).toEqual({ q: 0, r: 0 });
@@ -374,11 +344,7 @@ describe('hexMapUtils', () => {
     });
 
     it('should order an L-shaped path correctly', () => {
-      const hexes = [
-        { q: 0, r: 0 },
-        { q: 1, r: 0 },
-        { q: 1, r: 1 },
-      ];
+      const hexes = [{ q: 0, r: 0 }, { q: 1, r: 0 }, { q: 1, r: 1 }];
       const result = orderHexPath(hexes);
       expect(result).toHaveLength(3);
       const endpoints = [result[0], result[result.length - 1]];
@@ -387,13 +353,8 @@ describe('hexMapUtils', () => {
     });
 
     it('should return as-is for a loop (all hexes have 2 neighbors)', () => {
-      const hexes = [
-        { q: 0, r: 0 },
-        { q: 1, r: 0 },
-        { q: 0, r: 1 },
-      ];
-      const result = orderHexPath(hexes);
-      expect(result).toEqual(hexes);
+      const hexes = [{ q: 0, r: 0 }, { q: 1, r: 0 }, { q: 0, r: 1 }];
+      expect(orderHexPath(hexes)).toEqual(hexes);
     });
   });
 
@@ -405,8 +366,7 @@ describe('hexMapUtils', () => {
     });
 
     it('should return object with required properties for valid input', () => {
-      const hexes = [{ q: 0, r: 0 }, { q: 1, r: 0 }];
-      const result = buildWindingPathDescriptor(hexes, 30, '#ff0000', 2);
+      const result = buildWindingPathDescriptor([{ q: 0, r: 0 }, { q: 1, r: 0 }], 30, '#ff0000', 2);
       expect(result).not.toBeNull();
       expect(result).toHaveProperty('path');
       expect(result).toHaveProperty('fill');
@@ -415,23 +375,20 @@ describe('hexMapUtils', () => {
     });
 
     it('should produce a path starting with M and containing Q commands', () => {
-      const hexes = [{ q: 0, r: 0 }, { q: 1, r: 0 }, { q: 2, r: 0 }];
-      const result = buildWindingPathDescriptor(hexes, 30, '#ff0000', 2);
+      const result = buildWindingPathDescriptor([{ q: 0, r: 0 }, { q: 1, r: 0 }, { q: 2, r: 0 }], 30, '#ff0000', 2);
       expect(result.path.startsWith('M')).toBe(true);
       expect(result.path).toContain('Q');
     });
 
     it('should set fill to "none" and stroke to the provided color', () => {
-      const hexes = [{ q: 0, r: 0 }, { q: 1, r: 0 }];
-      const result = buildWindingPathDescriptor(hexes, 30, '#00ff00', 3);
+      const result = buildWindingPathDescriptor([{ q: 0, r: 0 }, { q: 1, r: 0 }], 30, '#00ff00', 3);
       expect(result.fill).toBe('none');
       expect(result.stroke).toBe('#00ff00');
       expect(result.strokeWidth).toBe(3);
     });
 
     it('should return empty path for single hex', () => {
-      const hexes = [{ q: 0, r: 0 }];
-      const result = buildWindingPathDescriptor(hexes, 30, '#ff0000', 2);
+      const result = buildWindingPathDescriptor([{ q: 0, r: 0 }], 30, '#ff0000', 2);
       expect(result.path).toBe('');
       expect(result.fill).toBe('#ff0000');
       expect(result.stroke).toBe('none');

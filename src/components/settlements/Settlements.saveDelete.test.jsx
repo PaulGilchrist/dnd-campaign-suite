@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import Settlements from './Settlements.jsx';
@@ -59,21 +59,15 @@ describe('Settlements - save and delete behavior', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.spyOn(console, 'error').mockImplementation(() => {});
-    vi.spyOn(console, 'log').mockImplementation(() => {});
     vi.spyOn(globalThis, 'fetch').mockResolvedValue({
       ok: true,
       json: () => Promise.resolve({}),
     });
+    Object.assign(settlementMockReturn, mockUseSettlements);
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
-  });
-
-  beforeEach(() => {
-    // Override module mock
-    Object.assign(settlementMockReturn, mockUseSettlements);
   });
 
   it('closes modal after successful save', async () => {

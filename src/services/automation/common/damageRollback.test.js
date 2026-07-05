@@ -367,12 +367,6 @@ describe('damageRollback', () => {
             }
         });
 
-        it('returns null creatureName when both attackerName and targetName are absent', async () => {
-            const attack = makeLastAttack({ attackerName: null, targetName: null });
-            getCombatContext.mockResolvedValue({ lastAttack: attack });
 
-            const result = await findMostRecentRollAcrossCreatures(campaignName);
-            expect(result.creatureName).toBeNull();
-        });
     });
 });

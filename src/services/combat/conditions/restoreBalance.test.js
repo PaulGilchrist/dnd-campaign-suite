@@ -1,3 +1,4 @@
+// @cleaned-by-ai
 // @improved-by-ai
 import { describe, it, expect } from 'vitest';
 import { collectSaveModifiers } from '../automation/automationModifiers.js';
@@ -170,35 +171,20 @@ describe('restore_balance feature', () => {
   });
 
   describe('getNetAttackMode with restoreBalance', () => {
-    it('neutralizes one advantage', () => {
+    it('neutralizes one advantage or disadvantage', () => {
       expect(getNetAttackMode(1, 0, true)).toBe('normal');
-    });
-
-    it('neutralizes one disadvantage', () => {
       expect(getNetAttackMode(0, 1, true)).toBe('normal');
     });
 
-    it('leaves excess advantage after neutralization', () => {
+    it('leaves excess advantage or disadvantage after neutralization', () => {
       expect(getNetAttackMode(2, 1, true)).toBe('advantage');
-    });
-
-    it('leaves excess disadvantage after neutralization', () => {
       expect(getNetAttackMode(1, 2, true)).toBe('disadvantage');
-    });
-
-    it('leaves excess advantage when advantage far exceeds disadvantage', () => {
       expect(getNetAttackMode(5, 1, true)).toBe('advantage');
-    });
-
-    it('leaves excess disadvantage when disadvantage far exceeds advantage', () => {
       expect(getNetAttackMode(1, 5, true)).toBe('disadvantage');
     });
 
-    it('returns normal when both counts are zero', () => {
+    it('returns normal when both counts are zero or equal', () => {
       expect(getNetAttackMode(0, 0, true)).toBe('normal');
-    });
-
-    it('returns normal when advantage equals disadvantage with restoreBalance', () => {
       expect(getNetAttackMode(3, 3, true)).toBe('normal');
     });
 
@@ -207,26 +193,21 @@ describe('restore_balance feature', () => {
       expect(getNetAttackMode(0, 1, false)).toBe('disadvantage');
     });
 
-    it('returns advantage when restoreBalance reduces but advantage remains', () => {
+    it('returns advantage/disadvantage when restoreBalance reduces but excess remains', () => {
       expect(getNetAttackMode(3, 1, true)).toBe('advantage');
-    });
-
-    it('returns disadvantage when restoreBalance reduces but disadvantage remains', () => {
       expect(getNetAttackMode(1, 3, true)).toBe('disadvantage');
     });
   });
 
   describe('combineAttackModes with restoreBalance', () => {
-    it('neutralizes a single attacker advantage from restoreBalance on attacker', () => {
+    it('neutralizes a single advantage from restoreBalance on attacker or target', () => {
       const attacker = { attackAdvantageCount: 1, attackDisadvantageCount: 0, restoreBalance: true };
       const target = { targetAdvantageCount: 0, targetDisadvantageCount: 0 };
       expect(combineAttackModes(attacker, target, 10)).toBe('normal');
-    });
 
-    it('neutralizes a single target advantage from restoreBalance on target', () => {
-      const attacker = { attackAdvantageCount: 0, attackDisadvantageCount: 0, restoreBalance: false };
-      const target = { targetAdvantageCount: 1, targetDisadvantageCount: 0, restoreBalance: true };
-      expect(combineAttackModes(attacker, target, 10)).toBe('normal');
+      const targetRB = { targetAdvantageCount: 1, targetDisadvantageCount: 0, restoreBalance: true };
+      const attacker0 = { attackAdvantageCount: 0, attackDisadvantageCount: 0, restoreBalance: false };
+      expect(combineAttackModes(attacker0, targetRB, 10)).toBe('normal');
     });
 
     it('does not neutralize when both sides have advantage', () => {
@@ -247,28 +228,22 @@ describe('restore_balance feature', () => {
       expect(combineAttackModes(attacker, target, 10)).toBe('normal');
     });
 
-    it('handles restoreBalance with prone positioning advantage', () => {
+    it('handles restoreBalance with prone positioning advantage/disadvantage', () => {
       const attacker = { attackAdvantageCount: 0, attackDisadvantageCount: 0, restoreBalance: true };
-      const target = { targetAdvantageCount: 0, targetDisadvantageCount: 0, targetAdvantageIfWithin5ft: true };
-      expect(combineAttackModes(attacker, target, 5)).toBe('normal');
+      const targetWithin = { targetAdvantageCount: 0, targetDisadvantageCount: 0, targetAdvantageIfWithin5ft: true };
+      const targetBeyond = { targetAdvantageCount: 0, targetDisadvantageCount: 0, targetDisadvantageIfBeyond5ft: true };
+
+      expect(combineAttackModes(attacker, targetWithin, 5)).toBe('normal');
+      expect(combineAttackModes(attacker, targetBeyond, 10)).toBe('normal');
     });
 
-    it('handles restoreBalance with prone disadvantage beyond 5ft', () => {
-      const attacker = { attackAdvantageCount: 0, attackDisadvantageCount: 0, restoreBalance: true };
-      const target = { targetAdvantageCount: 0, targetDisadvantageCount: 0, targetDisadvantageIfBeyond5ft: true };
-      expect(combineAttackModes(attacker, target, 10)).toBe('normal');
-    });
-
-    it('leaves excess advantage when restoreBalance cannot cancel all', () => {
+    it('leaves excess advantage or disadvantage when restoreBalance cannot cancel all', () => {
       const attacker = { attackAdvantageCount: 1, attackDisadvantageCount: 0, restoreBalance: true };
-      const target = { targetAdvantageCount: 2, targetDisadvantageCount: 0 };
-      expect(combineAttackModes(attacker, target, 10)).toBe('advantage');
-    });
+      const targetAdv = { targetAdvantageCount: 2, targetDisadvantageCount: 0 };
+      expect(combineAttackModes(attacker, targetAdv, 10)).toBe('advantage');
 
-    it('leaves excess disadvantage when restoreBalance cannot cancel all', () => {
-      const attacker = { attackAdvantageCount: 0, attackDisadvantageCount: 0, restoreBalance: true };
-      const target = { targetAdvantageCount: 0, targetDisadvantageCount: 3 };
-      expect(combineAttackModes(attacker, target, 10)).toBe('disadvantage');
+      const targetDis = { targetAdvantageCount: 0, targetDisadvantageCount: 3 };
+      expect(combineAttackModes(attacker, targetDis, 10)).toBe('disadvantage');
     });
   });
 
@@ -281,16 +256,19 @@ describe('restore_balance feature', () => {
     it('returns true when advantage count exceeds restoreBalance cancellation', () => {
       const effects = { saveAdvantageCount: 2, saveDisadvantageCount: 0 };
       expect(hasSaveAdvantage(effects, 'con', true)).toBe(true);
+
+      const effects3 = { saveAdvantageCount: 3, saveDisadvantageCount: 0 };
+      expect(hasSaveAdvantage(effects3, 'con', true)).toBe(true);
     });
 
-    it('returns true for condition-specific advantage despite restoreBalance', () => {
-      const effects = { saveAdvantageCount: 0, saveDisadvantageCount: 0, saveAdvantage: ['charmed'] };
-      expect(hasSaveAdvantage(effects, 'charmed', true)).toBe(true);
-    });
+    it('returns true for condition-specific and ability-specific advantage despite restoreBalance', () => {
+      const condEffects = { saveAdvantageCount: 0, saveDisadvantageCount: 0, saveAdvantage: ['charmed'] };
+      expect(hasSaveAdvantage(condEffects, 'charmed', true)).toBe(true);
+      expect(hasSaveAdvantage(condEffects, 'con', true)).toBe(false);
 
-    it('returns false for non-matching condition-specific advantage with restoreBalance', () => {
-      const effects = { saveAdvantageCount: 0, saveDisadvantageCount: 0, saveAdvantage: ['charmed'] };
-      expect(hasSaveAdvantage(effects, 'con', true)).toBe(false);
+      const abEffects = { saveAdvantageCount: 0, saveDisadvantageCount: 0, saveAdvantageAbilities: ['CON'] };
+      expect(hasSaveAdvantage(abEffects, 'con', true)).toBe(true);
+      expect(hasSaveAdvantage({ ...abEffects, saveAdvantageAbilities: ['STR'] }, 'con', true)).toBe(false);
     });
 
     it('returns false when no advantages exist and restoreBalance is true', () => {
@@ -298,22 +276,7 @@ describe('restore_balance feature', () => {
       expect(hasSaveAdvantage(effects, 'con', true)).toBe(false);
     });
 
-    it('returns true for ability-specific advantage despite restoreBalance', () => {
-      const effects = { saveAdvantageCount: 0, saveDisadvantageCount: 0, saveAdvantageAbilities: ['CON'] };
-      expect(hasSaveAdvantage(effects, 'con', true)).toBe(true);
-    });
-
-    it('returns false for non-matching ability with restoreBalance', () => {
-      const effects = { saveAdvantageCount: 0, saveDisadvantageCount: 0, saveAdvantageAbilities: ['STR'] };
-      expect(hasSaveAdvantage(effects, 'con', true)).toBe(false);
-    });
-
-    it('returns true when advantage count exceeds with restoreBalance', () => {
-      const effects = { saveAdvantageCount: 3, saveDisadvantageCount: 0 };
-      expect(hasSaveAdvantage(effects, 'con', true)).toBe(true);
-    });
-
-    it('returns false for against_spell advantage with restoreBalance (no-op, always true)', () => {
+    it('returns true for against_spell advantage with restoreBalance (no-op, always true)', () => {
       const effects = { saveAdvantageCount: 0, saveAdvantage: ['against_spell'] };
       expect(hasSaveAdvantage(effects, 'con', true)).toBe(true);
     });

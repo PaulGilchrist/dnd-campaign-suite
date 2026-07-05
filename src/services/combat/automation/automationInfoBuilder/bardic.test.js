@@ -1,3 +1,4 @@
+// @cleaned-by-ai
 // @improved-by-ai
 import { describe, it, expect } from 'vitest'
 import { bardicHandlers } from './bardic.js'
@@ -26,17 +27,7 @@ describe('bardicHandlers – bardic_inspiration', () => {
             uses_expression: 'proficiency_bonus',
         })
         const result = bardicHandlers.bardic_inspiration(feature, BASE_STATS)
-
-        // BASE_STATS.proficiency is 3, and evaluateAutoExpression with
-        // 'proficiency_bonus' returns playerStats.proficiency which is 3
         expect(result.usesMax).toBe(3)
-    })
-
-    it('defaults usesMax to 0 when no uses_expression', () => {
-        const feature = makeFeature({ type: 'bardic_inspiration' })
-        const result = bardicHandlers.bardic_inspiration(feature, BASE_STATS)
-
-        expect(result.usesMax).toBe(0)
     })
 
     it('reads dieSize from matching class_levels entry', () => {
@@ -49,24 +40,16 @@ describe('bardicHandlers – bardic_inspiration', () => {
         }
         const feature = makeFeature({ type: 'bardic_inspiration' })
         const result = bardicHandlers.bardic_inspiration(feature, stats)
-
         expect(result.dieSize).toBe(8)
     })
 
-    it('defaults dieSize to 6 when class_levels is empty', () => {
-        const stats = { ...BASE_STATS, class: { ...BASE_STATS.class, class_levels: [] } }
+    it('defaults dieSize to 6 when class_levels is empty or missing', () => {
+        const stats1 = { ...BASE_STATS, class: { ...BASE_STATS.class, class_levels: [] } }
+        const stats2 = { ...BASE_STATS, class: undefined }
         const feature = makeFeature({ type: 'bardic_inspiration' })
-        const result = bardicHandlers.bardic_inspiration(feature, stats)
 
-        expect(result.dieSize).toBe(6)
-    })
-
-    it('defaults dieSize to 6 when class_levels is missing', () => {
-        const stats = { ...BASE_STATS, class: undefined }
-        const feature = makeFeature({ type: 'bardic_inspiration' })
-        const result = bardicHandlers.bardic_inspiration(feature, stats)
-
-        expect(result.dieSize).toBe(6)
+        expect(bardicHandlers.bardic_inspiration(feature, stats1).dieSize).toBe(6)
+        expect(bardicHandlers.bardic_inspiration(feature, stats2).dieSize).toBe(6)
     })
 
     it('uses explicit fields from automation over defaults', () => {

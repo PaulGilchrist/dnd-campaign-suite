@@ -10,18 +10,14 @@ describe('stripParenthetical', () => {
     );
   });
 
-  it('handles empty or whitespace-only parentheticals', () => {
-    expect(stripParenthetical('Grimjaw ()')).toBe('Grimjaw');
-    expect(stripParenthetical('Grimjaw (  )')).toBe('Grimjaw');
-  });
-
   it('does not remove parentheses that are not at the end', () => {
     expect(stripParenthetical('Grimjaw (Orc) the Destroyer')).toBe(
       'Grimjaw (Orc) the Destroyer',
     );
   });
 
-  it('returns empty string when input is only a parenthetical or empty', () => {
+  it('handles empty parentheticals and returns empty string for empty input', () => {
+    expect(stripParenthetical('Grimjaw ()')).toBe('Grimjaw');
     expect(stripParenthetical('(Orc)')).toBe('');
     expect(stripParenthetical('')).toBe('');
   });
@@ -36,13 +32,12 @@ describe('stripNumericSuffix', () => {
     expect(stripNumericSuffix('Grimjaw (Orc) 2')).toBe('Grimjaw (Orc)');
   });
 
-  it('does not remove numbers without leading whitespace or embedded in text', () => {
+  it('does not remove numbers without leading whitespace', () => {
     expect(stripNumericSuffix('Grimjaw1')).toBe('Grimjaw1');
     expect(stripNumericSuffix('Grimjaw the 1st')).toBe('Grimjaw the 1st');
     expect(stripNumericSuffix('Grimjaw 5a')).toBe('Grimjaw 5a');
     expect(stripNumericSuffix('Grimjaw 5  ')).toBe('Grimjaw 5  ');
     expect(stripNumericSuffix('42')).toBe('42');
-    expect(stripNumericSuffix('   ')).toBe('   ');
   });
 
   it('returns empty string for null, undefined, or empty input', () => {

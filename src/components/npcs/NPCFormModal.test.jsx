@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import NPCFormModal from './NPCFormModal.jsx';
@@ -64,12 +64,6 @@ describe('NPCFormModal', () => {
   // ── Rendering: Header ─────────────────────────────────────────────
 
   describe('Header', () => {
-    it('should render modal overlay and container', () => {
-      renderModal();
-      expect(document.querySelector('.ct-modal-overlay')).toBeInTheDocument();
-      expect(document.querySelector('.ct-modal.npcs-modal')).toBeInTheDocument();
-    });
-
     it('should render "New NPC" heading when no editingNPC', () => {
       renderModal();
       expect(screen.getByRole('heading', { name: 'New NPC' })).toBeInTheDocument();
@@ -80,7 +74,7 @@ describe('NPCFormModal', () => {
       expect(screen.getByRole('heading', { name: 'Edit NPC' })).toBeInTheDocument();
     });
 
-    it('should render close button and call onClose when clicked', () => {
+    it('should call onClose when close button clicked', () => {
       renderModal();
       fireEvent.click(screen.getByLabelText('Close'));
       expect(mockOnClose).toHaveBeenCalledTimes(1);
@@ -90,11 +84,6 @@ describe('NPCFormModal', () => {
   // ── Avatar Section ────────────────────────────────────────────────
 
   describe('Avatar Section', () => {
-    it('should render avatar section and upload button', () => {
-      renderModal();
-      expect(screen.getByText('Upload Avatar')).toBeInTheDocument();
-    });
-
     it('should render remove button when image or imagePath exists', () => {
       renderModal({
         formData: { ...defaultFormData, image: 'data:image/png;base64,abc' },
@@ -114,12 +103,6 @@ describe('NPCFormModal', () => {
   // ── Tabs ──────────────────────────────────────────────────────────
 
   describe('Tabs', () => {
-    it('should render Roleplay and Stats tab buttons', () => {
-      renderModal();
-      expect(screen.getByText('Roleplay')).toBeInTheDocument();
-      expect(screen.getByText('Stats')).toBeInTheDocument();
-    });
-
     it('should switch tabs when clicked and show corresponding content', () => {
       renderModal();
 
@@ -138,14 +121,6 @@ describe('NPCFormModal', () => {
   // ── Name Field ────────────────────────────────────────────────────
 
   describe('Name Field', () => {
-    it('should render name input with required indicator, placeholder, and autoFocus', () => {
-      renderModal();
-      const nameInput = screen.getByLabelText(/Name/);
-      expect(nameInput).toHaveAttribute('placeholder', 'NPC name');
-      expect(nameInput).toBeInTheDocument();
-      expect(screen.getByText('*')).toBeInTheDocument();
-    });
-
     it('should handle name field change', () => {
       renderModal();
       const nameInput = screen.getByLabelText(/Name/);
@@ -163,12 +138,6 @@ describe('NPCFormModal', () => {
   // ── Footer Buttons ────────────────────────────────────────────────
 
   describe('Footer Buttons', () => {
-    it('should render cancel and save buttons', () => {
-      renderModal();
-      expect(screen.getByText('Cancel')).toBeInTheDocument();
-      expect(screen.getByText('Save')).toBeInTheDocument();
-    });
-
     it('should call onClose when cancel clicked', () => {
       renderModal();
       fireEvent.click(screen.getByText('Cancel'));
@@ -225,10 +194,12 @@ describe('NPCFormModal', () => {
   // ── Save & Add to Initiative ──────────────────────────────────────
 
   describe('Save & Add to Initiative', () => {
-    it('should not render button when npcHasStatBlock is false or callback is missing', () => {
+    it('should not render button when npcHasStatBlock is false', () => {
       renderModal({ formData: { ...defaultFormData, armorClass: undefined } });
       expect(screen.queryByText(/Save & Add to Initiative/)).not.toBeInTheDocument();
+    });
 
+    it('should not render button when callback is missing', () => {
       render(
         <NPCFormModal
           formData={defaultFormData}

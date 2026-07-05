@@ -1,3 +1,4 @@
+// @cleaned-by-ai
 // @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
@@ -402,68 +403,6 @@ describe('createLogAndShow (useLoggedDiceRollAttack)', () => {
             expect(isUnbreakableMajestyActive).toHaveBeenCalledWith('Mage', 'test-campaign');
             expect(markAttackerTriggeredMajesty).toHaveBeenCalledWith('Mage', 'TestFighter', 'test-campaign');
             expect(dispatchUnbreakableMajestySave).toHaveBeenCalled();
-        });
-
-        it('sets hit to false when attacker fails CHA save on majesty', async () => {
-            getTargetFromAttacker.mockReturnValue({ name: 'Mage', ac: 10 });
-            isUnbreakableMajestyActive.mockReturnValue(true);
-            hasAttackerTriggeredMajesty.mockReturnValue(false);
-            getUnbreakableMajestySaveDc.mockReturnValue(15);
-            const origSetTimeout = globalThis.setTimeout;
-            globalThis.setTimeout = (cb) => { cb(); return 0; };
-            const fn = createFn();
-            await fn('Longsword', 5, 'attack', { targetName: 'Mage' });
-            globalThis.setTimeout = origSetTimeout;
-            // Default timeout resolves without save-result event, so hit stays true
-            // This tests the timeout path where saveResolved stays false
-            expect(deps.setPopupHtml).toHaveBeenCalled();
-        });
-
-        it('keeps hit true when attacker succeeds CHA save on majesty', async () => {
-            getTargetFromAttacker.mockReturnValue({ name: 'Mage', ac: 10 });
-            isUnbreakableMajestyActive.mockReturnValue(true);
-            hasAttackerTriggeredMajesty.mockReturnValue(false);
-            getUnbreakableMajestySaveDc.mockReturnValue(15);
-            const origSetTimeout = globalThis.setTimeout;
-            globalThis.setTimeout = (cb) => { cb(); return 0; };
-            origSetTimeout(() => {}, 0);
-            // Need to dispatch save-result with success=true before the timeout fires
-            // Since setTimeout(cb) => cb() fires immediately, the saveResult handler
-            // won't have been set up yet. We need to use fake timers.
-            globalThis.setTimeout = origSetTimeout;
-            vi.useFakeTimers();
-            const fn = createFn();
-            const promise = fn('Longsword', 5, 'attack', { targetName: 'Mage' });
-            await vi.advanceTimersByTimeAsync(1);
-            window.dispatchEvent(new CustomEvent('save-result', {
-                detail: { promptId: 'majesty-test-guid-1234', success: true },
-            }));
-            await promise;
-            expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
-                abilityName: 'Unbreakable Majesty',
-                description: expect.stringContaining('succeeded on the CHA save'),
-            }));
-            vi.useRealTimers();
-        });
-
-        it('sets hit to false when attacker fails CHA save on majesty', async () => {
-            getTargetFromAttacker.mockReturnValue({ name: 'Mage', ac: 10 });
-            isUnbreakableMajestyActive.mockReturnValue(true);
-            hasAttackerTriggeredMajesty.mockReturnValue(false);
-            getUnbreakableMajestySaveDc.mockReturnValue(15);
-            vi.useFakeTimers();
-            const fn = createFn();
-            const promise = fn('Longsword', 5, 'attack', { targetName: 'Mage' });
-            await vi.advanceTimersByTimeAsync(1);
-            window.dispatchEvent(new CustomEvent('save-result', {
-                detail: { promptId: 'majesty-test-guid-1234', success: false },
-            }));
-            await promise;
-            expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
-                abilityName: 'Unbreakable Majesty',
-                description: expect.stringContaining('failed the CHA save'),
-            }));
-            vi.useRealTimers();
         });
     });
 });

@@ -196,23 +196,14 @@ describe('playerIsImmuneToCondition', () => {
 
   // ── Null / missing argument guards ──
 
-  it('returns false when conditionKey is null', () => {
+  it('returns false when conditionKey is null, undefined, or empty string', () => {
     expect(playerIsImmuneToCondition({ conditionKey: null, playerStats })).toBe(false)
-  })
-
-  it('returns false when conditionKey is undefined', () => {
     expect(playerIsImmuneToCondition({ conditionKey: undefined, playerStats })).toBe(false)
-  })
-
-  it('returns false when conditionKey is empty string', () => {
     expect(playerIsImmuneToCondition({ conditionKey: '', playerStats })).toBe(false)
   })
 
-  it('returns false when playerStats is null', () => {
+  it('returns false when playerStats is null or undefined', () => {
     expect(playerIsImmuneToCondition({ conditionKey: 'charmed', playerStats: null })).toBe(false)
-  })
-
-  it('returns false when playerStats is undefined', () => {
     expect(playerIsImmuneToCondition({ conditionKey: 'charmed', playerStats: undefined })).toBe(false)
   })
 
@@ -456,7 +447,7 @@ describe('playerIsImmuneToCondition', () => {
 
   // ── Protection from Evil and Good ──
 
-  it('returns true when Protection from Evil and Good blocks charmed from warded creature', async () => {
+  it('returns true when Protection from Evil and Good blocks charmed/frightened from warded creature', async () => {
     const pfegModule = await import('../../automation/handlers/buffs/protectionFromEvilAndGoodHandler.js')
     pfegModule.isProtectionFromEvilAndGoodActive.mockReturnValue(true)
     pfegModule.isCreatureWarded.mockReturnValue(true)
@@ -467,15 +458,6 @@ describe('playerIsImmuneToCondition', () => {
       campaignName: 'TestCampaign',
       sourceCreatureType: 'fiend',
     })).toBe(true)
-
-    pfegModule.isProtectionFromEvilAndGoodActive.mockReturnValue(false)
-    pfegModule.isCreatureWarded.mockReturnValue(false)
-  })
-
-  it('returns true when Protection from Evil and Good blocks frightened from warded creature', async () => {
-    const pfegModule = await import('../../automation/handlers/buffs/protectionFromEvilAndGoodHandler.js')
-    pfegModule.isProtectionFromEvilAndGoodActive.mockReturnValue(true)
-    pfegModule.isCreatureWarded.mockReturnValue(true)
 
     expect(playerIsImmuneToCondition({
       conditionKey: 'frightened',
@@ -488,7 +470,7 @@ describe('playerIsImmuneToCondition', () => {
     pfegModule.isCreatureWarded.mockReturnValue(false)
   })
 
-  it('returns false when Protection from Evil and Good is active but creature is not warded', async () => {
+  it('returns false when Protection from Evil and Good is active but creature is not warded or condition is not charmed/frightened', async () => {
     const pfegModule = await import('../../automation/handlers/buffs/protectionFromEvilAndGoodHandler.js')
     pfegModule.isProtectionFromEvilAndGoodActive.mockReturnValue(true)
     pfegModule.isCreatureWarded.mockReturnValue(false)
@@ -500,15 +482,7 @@ describe('playerIsImmuneToCondition', () => {
       sourceCreatureType: 'aberration',
     })).toBe(false)
 
-    pfegModule.isProtectionFromEvilAndGoodActive.mockReturnValue(false)
-    pfegModule.isCreatureWarded.mockReturnValue(false)
-  })
-
-  it('returns false when Protection from Evil and Good is active but condition is not charmed/frightened', async () => {
-    const pfegModule = await import('../../automation/handlers/buffs/protectionFromEvilAndGoodHandler.js')
-    pfegModule.isProtectionFromEvilAndGoodActive.mockReturnValue(true)
     pfegModule.isCreatureWarded.mockReturnValue(true)
-
     expect(playerIsImmuneToCondition({
       conditionKey: 'poisoned',
       playerStats,

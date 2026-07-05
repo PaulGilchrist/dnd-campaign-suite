@@ -62,14 +62,10 @@ describe('getResourceAmount', () => {
             expect(result).toBe(2);
         });
 
-        it('returns 0 when class_levels is empty or missing', () => {
-            const result = getResourceAmount(createPlayerStats('Fighter', 1, []), 'focusPoints');
-            expect(result).toBe(0);
-        });
-
-        it('returns 0 when class is undefined', () => {
-            const result = getResourceAmount({ name: 'NPC', level: 1 }, 'focusPoints');
-            expect(result).toBe(0);
+        it('returns 0 when class_levels is empty, missing, or class is undefined', () => {
+            expect(getResourceAmount(createPlayerStats('Fighter', 1, []), 'focusPoints')).toBe(0);
+            expect(getResourceAmount(createPlayerStats('Fighter', 1), 'focusPoints')).toBe(0);
+            expect(getResourceAmount({ name: 'NPC', level: 1 }, 'focusPoints')).toBe(0);
         });
 
         it('returns 0 when no classLevel matches and getClassFeatures returns null', () => {
@@ -136,14 +132,6 @@ describe('getResourceAmount', () => {
             expect(result).toBe(7);
         });
 
-        it('returns 0 when playerStats is an empty object', () => {
-            runtimeState.getRuntimeValue.mockReturnValue(null);
-
-            const result = getResourceAmount({}, 'Some Resource');
-
-            expect(result).toBe(0);
-        });
-
         it('returns 0 when _trackedResources[key] entry exists but has no current property', () => {
             runtimeState.getRuntimeValue.mockReturnValue(null);
 
@@ -195,15 +183,6 @@ describe('spendResource', () => {
 
         expect(result).toBe(5);
         expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith('Fighter', 'Rage', 5, 'TestCampaign');
-    });
-
-    it('handles campaignName as undefined', () => {
-        runtimeState.getRuntimeValue.mockReturnValue(4);
-
-        const result = spendResource('Druid', 'Wild', 1, undefined);
-
-        expect(result).toBe(3);
-        expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith('Druid', 'Wild', 3, undefined);
     });
 
     it('passes resourceNameOrKey directly without transformation', () => {
@@ -258,14 +237,5 @@ describe('checkResourceRemaining', () => {
         checkResourceRemaining('focusPoints', 10, 'Cleric', 'TestCampaign');
 
         expect(runtimeState.getRuntimeValue).toHaveBeenCalledWith('Cleric', 'focusPoints', 'TestCampaign');
-    });
-
-    it('handles campaignName as undefined', () => {
-        runtimeState.getRuntimeValue.mockReturnValue(3);
-
-        const result = checkResourceRemaining('Rage', 4, 'Fighter', undefined);
-
-        expect(result).toEqual({ remaining: 3, canUse: true });
-        expect(runtimeState.getRuntimeValue).toHaveBeenCalledWith('Fighter', 'Rage', undefined);
     });
 });

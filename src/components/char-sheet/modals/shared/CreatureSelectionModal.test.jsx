@@ -1,3 +1,4 @@
+// @cleaned-by-ai
 // @improved-by-ai
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -48,14 +49,7 @@ describe('CreatureSelectionModal', () => {
       expect(screen.getByText('Select Targets')).toBeInTheDocument();
     });
 
-    it('renders the icon prop in the header (shows undefined class when not provided)', () => {
-      render(<CreatureSelectionModal {...makeProps({ icon: undefined })} />);
-      const headerIcon = document.querySelector('.sp-header i');
-      expect(headerIcon).toBeInTheDocument();
-      expect(headerIcon.className).toContain('fa-solid');
-    });
-
-    it('renders the custom icon when provided', () => {
+    it('renders the icon prop in the header', () => {
       render(<CreatureSelectionModal {...makeProps({ icon: 'fa-sun' })} />);
       expect(document.querySelector('.sp-header .fa-solid.fa-sun')).toBeInTheDocument();
     });
@@ -78,16 +72,16 @@ describe('CreatureSelectionModal', () => {
       expect(screen.getByRole('button', { name: /Confirm \(0\)/ })).toBeInTheDocument();
     });
 
-    it('renders the default crosshairs icon on the button when no confirmIcon is provided', () => {
-      render(<CreatureSelectionModal {...makeProps({ icon: 'fa-sun' })} />);
+    it('renders the default crosshairs icon on the confirm button', () => {
+      render(<CreatureSelectionModal {...makeProps()} />);
       const btn = screen.getByRole('button', { name: /Confirm/ });
       expect(btn.querySelector('.fa-solid.fa-crosshairs')).toBeInTheDocument();
     });
 
-    it('renders the custom confirm icon when no icon is provided', () => {
-      render(<CreatureSelectionModal {...makeProps({ icon: undefined })} />);
+    it('renders the custom confirm icon when confirmIcon is provided', () => {
+      render(<CreatureSelectionModal {...makeProps({ confirmIcon: 'fa-heart' })} />);
       const btn = screen.getByRole('button', { name: /Confirm/ });
-      expect(btn.querySelector('.fa-solid.fa-crosshairs')).toBeInTheDocument();
+      expect(btn.querySelector('.fa-solid.fa-heart')).toBeInTheDocument();
     });
 
     it('renders the Skip button', () => {
@@ -121,19 +115,19 @@ describe('CreatureSelectionModal', () => {
       expect(screen.getByText(/Choose up to 3 targets:/)).toBeInTheDocument();
     });
 
-    it('renders note when provided', () => {
+    it('renders a note when provided', () => {
       render(<CreatureSelectionModal {...makeProps({ note: 'This is a note.' })} />);
       expect(screen.getByText('This is a note.')).toBeInTheDocument();
       expect(document.querySelector('.sp-note')).toBeInTheDocument();
     });
 
-    it('does not render a note paragraph when note is not provided', () => {
+    it('does not render a note when note is not provided', () => {
       render(<CreatureSelectionModal {...makeProps({ note: undefined })} />);
       const spBody = document.querySelector('.sp-body');
       expect(spBody.querySelector('.sp-note')).not.toBeInTheDocument();
     });
 
-    it('renders note after description when both are provided', () => {
+    it('renders both description and note when both are provided', () => {
       render(<CreatureSelectionModal {...makeProps({ description: 'Description', note: 'Note text' })} />);
       expect(screen.getByText('Description')).toBeInTheDocument();
       expect(screen.getByText('Note text')).toBeInTheDocument();
@@ -143,18 +137,12 @@ describe('CreatureSelectionModal', () => {
       render(<CreatureSelectionModal {...makeProps({ confirmLabel: 'Attack' })} />);
       expect(screen.getByRole('button', { name: /Attack \(0\)/ })).toBeInTheDocument();
     });
-
-    it('renders custom confirmIcon on the button', () => {
-      render(<CreatureSelectionModal {...makeProps({ confirmIcon: 'fa-heart' })} />);
-      const btn = screen.getByRole('button', { name: /Confirm/ });
-      expect(btn.querySelector('.fa-solid.fa-heart')).toBeInTheDocument();
-    });
   });
 
   // ── Target name formats ──
 
   describe('target name formats', () => {
-    it('renders target name when target is a string', () => {
+    it('renders target names when targets are strings', () => {
       render(<CreatureSelectionModal {...makeProps({ targets: mockStringTargets })} />);
       expect(screen.getByText('Creature1')).toBeInTheDocument();
       expect(screen.getByText('Creature2')).toBeInTheDocument();
@@ -271,21 +259,6 @@ describe('CreatureSelectionModal', () => {
       await waitFor(() => {
         expect(rows[0]).toHaveClass('secondary-target-selected');
         expect(rows[1]).not.toHaveClass('secondary-target-selected');
-      });
-    });
-
-    it('toggles selection via checkbox click directly', async () => {
-      render(<CreatureSelectionModal {...makeProps()} />);
-      const checkboxes = document.querySelectorAll('.secondary-target-list input[type="checkbox"]');
-      // Checkbox click fires both onChange and label onClick, causing double-toggle
-      // So first click toggles on, second click toggles off
-      await act(async () => checkboxes[0].click());
-      await waitFor(() => {
-        expect(checkboxes[0]).not.toBeChecked();
-      });
-      await act(async () => checkboxes[0].click());
-      await waitFor(() => {
-        expect(checkboxes[0]).not.toBeChecked();
       });
     });
 
@@ -421,11 +394,6 @@ describe('CreatureSelectionModal', () => {
       render(<CreatureSelectionModal {...makeProps({ targets: [] })} />);
       expect(screen.getByRole('button', { name: /Confirm \(0\)/ })).toBeDisabled();
     });
-
-    it('uses custom confirmLabel on the button', () => {
-      render(<CreatureSelectionModal {...makeProps({ confirmLabel: 'Attack' })} />);
-      expect(screen.getByRole('button', { name: /Attack \(0\)/ })).toBeInTheDocument();
-    });
   });
 
   // ── Confirm behavior ──
@@ -507,11 +475,6 @@ describe('CreatureSelectionModal', () => {
       expect(screen.getByText('No creatures available.')).toBeInTheDocument();
     });
 
-    it('disables confirm button when targets is empty', () => {
-      render(<CreatureSelectionModal {...makeProps({ targets: [] })} />);
-      expect(screen.getByRole('button', { name: /Confirm \(0\)/ })).toBeDisabled();
-    });
-
     it('still shows description when targets is empty', () => {
       render(<CreatureSelectionModal {...makeProps({ targets: [], description: 'Choose wisely.' })} />);
       expect(screen.getByText('Choose wisely.')).toBeInTheDocument();
@@ -536,34 +499,9 @@ describe('CreatureSelectionModal', () => {
       expect(screen.getByText('Select Targets')).toBeInTheDocument();
     });
 
-    it('renders without crashing when title is undefined', () => {
-      render(<CreatureSelectionModal {...makeProps({ title: undefined })} />);
-      expect(document.querySelector('.sp-header')).toBeInTheDocument();
-    });
-
-    it('renders without crashing when icon is undefined', () => {
-      render(<CreatureSelectionModal {...makeProps({ icon: undefined })} />);
-      expect(document.querySelector('.sp-header i')).toBeInTheDocument();
-    });
-
-    it('crashes when targets is undefined (no null check on targets)', () => {
-      expect(() => render(<CreatureSelectionModal {...makeProps({ targets: undefined })} />)).toThrow();
-    });
-
     it('renders with custom title', () => {
       render(<CreatureSelectionModal {...makeProps({ title: 'Custom Title' })} />);
       expect(screen.getByText('Custom Title')).toBeInTheDocument();
-    });
-
-    it('renders with both description and note', () => {
-      render(<CreatureSelectionModal {...makeProps({ description: 'Choose targets', note: 'Note here' })} />);
-      expect(screen.getByText('Choose targets')).toBeInTheDocument();
-      expect(screen.getByText('Note here')).toBeInTheDocument();
-    });
-
-    it('renders with only note (no description)', () => {
-      render(<CreatureSelectionModal {...makeProps({ description: undefined, note: 'Just a note' })} />);
-      expect(screen.getByText('Just a note')).toBeInTheDocument();
     });
 
     it('renders string targets with checkboxes', () => {

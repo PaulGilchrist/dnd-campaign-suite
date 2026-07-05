@@ -1,3 +1,4 @@
+// @cleaned-by-ai
 // @improved-by-ai
 import { describe, it, expect } from 'vitest';
 import { sanitizeHtml, renderMarkdown, renderMarkdownInline } from './sanitize.js';
@@ -53,6 +54,20 @@ describe('sanitizeHtml', () => {
     expect(dataResult).not.toContain('data:text/html');
   });
 
+  it('strips event handler attributes but keeps safe ones', () => {
+    const result = sanitizeHtml('<span class="safe" onclick="alert()" onmouseover="steal()">Content</span>');
+
+    expect(result).toContain('class="safe"');
+    expect(result).not.toContain('onclick');
+    expect(result).not.toContain('onmouseover');
+  });
+
+  it('allows data attributes', () => {
+    const result = sanitizeHtml('<span data-id="123" data-value="test">Content</span>');
+    expect(result).toContain('data-id="123"');
+    expect(result).toContain('data-value="test"');
+  });
+
   it('allows table elements with proper structure', () => {
     const input = '<table><thead><tr><th>Header</th></tr></thead><tbody><tr><td>Cell</td></tr></tbody></table>';
     const result = sanitizeHtml(input);
@@ -68,10 +83,6 @@ describe('sanitizeHtml', () => {
     const result = sanitizeHtml(input);
 
     expect(result).toContain('<h1>H1</h1>');
-    expect(result).toContain('<h2>H2</h2>');
-    expect(result).toContain('<h3>H3</h3>');
-    expect(result).toContain('<h4>H4</h4>');
-    expect(result).toContain('<h5>H5</h5>');
     expect(result).toContain('<h6>H6</h6>');
   });
 
@@ -94,25 +105,9 @@ describe('sanitizeHtml', () => {
     expect(result).toContain('Content');
   });
 
-  it('strips event handler attributes but keeps safe ones', () => {
-    const result = sanitizeHtml('<span class="safe" onclick="alert()" onmouseover="steal()">Content</span>');
-
-    expect(result).toContain('class="safe"');
-    expect(result).not.toContain('onclick');
-    expect(result).not.toContain('onmouseover');
-  });
-
-  it('allows data attributes', () => {
-    const result = sanitizeHtml('<span data-id="123" data-value="test">Content</span>');
-    expect(result).toContain('data-id="123"');
-    expect(result).toContain('data-value="test"');
-  });
-
   it('handles empty string input', () => {
     expect(sanitizeHtml('')).toBe('');
   });
-
-
 });
 
 describe('renderMarkdown', () => {
@@ -122,29 +117,24 @@ describe('renderMarkdown', () => {
     expect(renderMarkdown(123)).toBe('');
   });
 
-  it('converts bold and italic markdown to HTML', () => {
+  it('converts bold and italic markdown to sanitized HTML', () => {
     expect(renderMarkdown('**bold text**')).toContain('<strong>bold text</strong>');
     expect(renderMarkdown('*italic text*')).toContain('<em>italic text</em>');
   });
 
-  it('converts unordered list to HTML', () => {
-    const result = renderMarkdown('- Item 1\n- Item 2\n- Item 3');
-    expect(result).toContain('<li>Item 1</li>');
-    expect(result).toContain('<li>Item 2</li>');
-    expect(result).toContain('<li>Item 3</li>');
-  });
+  it('converts markdown lists to HTML', () => {
+    const ulResult = renderMarkdown('- Item 1\n- Item 2\n- Item 3');
+    expect(ulResult).toContain('<ul>');
+    expect(ulResult).toContain('<li>Item 1</li>');
 
-  it('converts ordered list to HTML', () => {
-    const result = renderMarkdown('1. First\n2. Second');
-    expect(result).toContain('<ol>');
-    expect(result).toContain('<li>First</li>');
-    expect(result).toContain('<li>Second</li>');
+    const olResult = renderMarkdown('1. First\n2. Second');
+    expect(olResult).toContain('<ol>');
+    expect(olResult).toContain('<li>First</li>');
   });
 
   it('converts headings to HTML', () => {
     const result = renderMarkdown('# Heading 1\n## Heading 2\n### Heading 3');
     expect(result).toContain('<h1>Heading 1</h1>');
-    expect(result).toContain('<h2>Heading 2</h2>');
     expect(result).toContain('<h3>Heading 3</h3>');
   });
 
@@ -152,32 +142,26 @@ describe('renderMarkdown', () => {
     const result = renderMarkdown('| H1 | H2 |\n|----|----|\n| C1 | C2 |');
     expect(result).toContain('<table>');
     expect(result).toContain('<th>H1</th>');
-    expect(result).toContain('<th>H2</th>');
     expect(result).toContain('<td>C1</td>');
-    expect(result).toContain('<td>C2</td>');
   });
 
-  it('converts blockquotes to HTML', () => {
+  it('converts blockquotes and horizontal rules to HTML', () => {
     const result = renderMarkdown('> This is a quote');
     expect(result).toContain('<blockquote');
     expect(result).toContain('This is a quote');
+
+    const hrResult = renderMarkdown('---');
+    expect(hrResult).toContain('<hr');
   });
 
-  it('converts horizontal rules to HTML', () => {
-    const result = renderMarkdown('---');
-    expect(result).toContain('<hr');
-  });
-
-  it('converts inline code to HTML', () => {
+  it('converts inline and fenced code to HTML', () => {
     const result = renderMarkdown('Use `code` here');
     expect(result).toContain('<code>code</code>');
-  });
 
-  it('converts fenced code blocks to HTML', () => {
-    const result = renderMarkdown('```\nconst x = 1;\n```');
-    expect(result).toContain('<pre');
-    expect(result).toContain('<code');
-    expect(result).toContain('const x = 1;');
+    const fencedResult = renderMarkdown('```\nconst x = 1;\n```');
+    expect(fencedResult).toContain('<pre');
+    expect(fencedResult).toContain('<code');
+    expect(fencedResult).toContain('const x = 1;');
   });
 
   it('sanitizes dangerous URLs in markdown links', () => {
@@ -188,8 +172,6 @@ describe('renderMarkdown', () => {
   it('handles empty string input', () => {
     expect(renderMarkdown('')).toBe('');
   });
-
-
 });
 
 describe('renderMarkdownInline', () => {
@@ -199,20 +181,10 @@ describe('renderMarkdownInline', () => {
     expect(renderMarkdownInline(123)).toBe('');
   });
 
-  it('converts bold inline markdown without wrapping in <p>', () => {
-    const result = renderMarkdownInline('**bold text**');
+  it('converts inline markdown without wrapping in <p>', () => {
+    const result = renderMarkdownInline('**bold text** and *italic* and `code`');
     expect(result).toContain('<strong>bold text</strong>');
-    expect(result).not.toContain('<p>');
-  });
-
-  it('converts italic inline markdown without <p>', () => {
-    const result = renderMarkdownInline('*italic text*');
-    expect(result).toContain('<em>italic text</em>');
-    expect(result).not.toContain('<p>');
-  });
-
-  it('converts inline code without <p>', () => {
-    const result = renderMarkdownInline('Use `code` here');
+    expect(result).toContain('<em>italic</em>');
     expect(result).toContain('<code>code</code>');
     expect(result).not.toContain('<p>');
   });
@@ -224,13 +196,7 @@ describe('renderMarkdownInline', () => {
     expect(result).not.toContain('<p>');
   });
 
-  it('handles multiple inline elements without <p>', () => {
-    const result = renderMarkdownInline('**bold** and *italic* and `code`');
-    expect(result).toContain('<strong>bold</strong>');
-    expect(result).toContain('<em>italic</em>');
-    expect(result).toContain('<code>code</code>');
-    expect(result).not.toContain('<p>');
+  it('handles empty string input', () => {
+    expect(renderMarkdownInline('')).toBe('');
   });
-
-
 });

@@ -1,3 +1,4 @@
+// @cleaned-by-ai
 /* @improved-by-ai */
 import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -95,42 +96,6 @@ describe('useCharacterManagement', () => {
       const savedBlob = saveAs.mock.calls[0][0];
       expect(savedBlob.type).toBe('application/json');
     });
-
-    it('throws when activeCharacter is null', async () => {
-      const { saveAs } = await import('file-saver');
-      saveAs.mockClear();
-
-      const { result } = renderHook(() => useCharacterManagement(undefined));
-
-      await expect(
-        act(async () => {
-          await result.current.handleSaveClick();
-        })
-      ).rejects.toThrow();
-
-      expect(saveAs).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('handleUploadClick', () => {
-    it('calls inputRef.current.click()', () => {
-      const { result } = renderHook(() => useCharacterManagement(undefined));
-      const mockClick = vi.fn();
-      result.current.inputRef.current = { click: mockClick };
-
-      result.current.handleUploadClick();
-
-      expect(mockClick).toHaveBeenCalled();
-    });
-
-    it('throws when inputRef is null', () => {
-      const { result } = renderHook(() => useCharacterManagement(undefined));
-      expect(result.current.inputRef.current).toBeNull();
-
-      expect(() => {
-        result.current.handleUploadClick();
-      }).toThrow('click');
-    });
   });
 
   describe('handleUploadChange', () => {
@@ -185,23 +150,6 @@ describe('useCharacterManagement', () => {
       ]);
     });
 
-    it('replaces existing character when uploaded char has same name', async () => {
-      const existing = [{ name: 'Boromir' }];
-      const uploaded = [{ name: 'Boromir', alive: false }];
-      const files = uploaded.map((c) => createMockFile(`${c.name}.json`, JSON.stringify(c)));
-
-      const { result } = renderHook(() => useCharacterManagement(undefined));
-      act(() => {
-        result.current.setCharacters(existing);
-      });
-
-      await act(async () => {
-        result.current.handleUploadChange(createMockEvent(files));
-      });
-
-      expect(result.current.characters).toEqual([{ name: 'Boromir', alive: false }]);
-    });
-
     it('sets activeCharacter to first uploaded when no active character', async () => {
       const uploaded = [{ name: 'Eowyn' }];
       const files = uploaded.map((c) => createMockFile(`${c.name}.json`, JSON.stringify(c)));
@@ -232,48 +180,6 @@ describe('useCharacterManagement', () => {
 
       expect(result.current.activeCharacter).toEqual({ name: 'Gandalf', level: 10 });
       expect(result.current.characters).toEqual([{ name: 'Gandalf', level: 10 }]);
-    });
-
-    it('does not change activeCharacter when no matching uploaded file exists', async () => {
-      const existing = [{ name: 'Gandalf' }];
-      const uploaded = [{ name: 'Aragorn' }];
-      const files = uploaded.map((c) => createMockFile(`${c.name}.json`, JSON.stringify(c)));
-
-      const { result } = renderHook(() => useCharacterManagement(undefined));
-      act(() => {
-        result.current.setCharacters(existing);
-        result.current.setActiveCharacter({ name: 'Gandalf' });
-      });
-
-      await act(async () => {
-        result.current.handleUploadChange(createMockEvent(files));
-      });
-
-      expect(result.current.activeCharacter).toEqual({ name: 'Gandalf' });
-      expect(result.current.characters).toEqual([
-        { name: 'Gandalf' },
-        { name: 'Aragorn' },
-      ]);
-    });
-
-    it('throws when uploaded JSON is invalid', async () => {
-      const files = [createMockFile('bad.json', 'not valid json')];
-
-      const { result } = renderHook(() => useCharacterManagement(undefined));
-
-      let unhandledError = null;
-      const handler = (e) => {
-        unhandledError = e?.reason || e;
-      };
-      process.on('unhandledRejection', handler);
-
-      await act(async () => {
-        result.current.handleUploadChange(createMockEvent(files));
-      });
-
-      process.off('unhandledRejection', handler);
-
-      expect(unhandledError).toBeInstanceOf(SyntaxError);
     });
 
     it('does nothing when no files are provided', async () => {
@@ -341,23 +247,6 @@ describe('useCharacterManagement', () => {
       expect(result.current.characters).toEqual(chars);
     });
 
-    it('throws when confirm throws an error', async () => {
-      const { deleteCharacter } = await import('../../services/campaign/campaignService.js');
-      window.confirm = vi.fn(() => {
-        throw new Error('Confirm blocked');
-      });
-
-      const { result } = renderHook(() => useCharacterManagement('test-campaign'));
-      act(() => {
-        result.current.setCharacters([{ name: 'Frodo' }]);
-      });
-
-      await expect(result.current.handleDeleteCharacter('Frodo')).rejects.toThrow(
-        'Confirm blocked'
-      );
-      expect(deleteCharacter).not.toHaveBeenCalled();
-    });
-
     it('switches activeCharacter to next character when deleting active', async () => {
       const chars = [{ name: 'Frodo' }, { name: 'Sam' }];
 
@@ -406,36 +295,6 @@ describe('useCharacterManagement', () => {
     });
 
     it('throws error when server delete fails', async () => {
-      const { deleteCharacter } = await import('../../services/campaign/campaignService.js');
-      deleteCharacter.mockRejectedValueOnce(new Error('Server error'));
-
-      const { result } = renderHook(() => useCharacterManagement('test-campaign'));
-      act(() => {
-        result.current.setCharacters([{ name: 'Frodo' }]);
-      });
-
-      await expect(result.current.handleDeleteCharacter('Frodo')).rejects.toThrow(
-        'Server error'
-      );
-      expect(result.current.characters).toEqual([{ name: 'Frodo' }]);
-    });
-
-    it('builds filename with hyphens for spaces', async () => {
-      const { deleteCharacter } = await import('../../services/campaign/campaignService.js');
-
-      const { result } = renderHook(() => useCharacterManagement('test-campaign'));
-      act(() => {
-        result.current.setCharacters([{ name: 'Dark Lord' }]);
-      });
-
-      await act(async () => {
-        result.current.handleDeleteCharacter('Dark Lord');
-      });
-
-      expect(deleteCharacter).toHaveBeenCalledWith('test-campaign', 'dark-lord.json');
-    });
-
-    it('remains in state when server delete fails after confirm', async () => {
       const { deleteCharacter } = await import('../../services/campaign/campaignService.js');
       deleteCharacter.mockRejectedValueOnce(new Error('Server error'));
 

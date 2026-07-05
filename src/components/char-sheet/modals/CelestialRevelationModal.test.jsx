@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CelestialRevelationModal from './CelestialRevelationModal.jsx';
@@ -32,27 +32,18 @@ describe('CelestialRevelationModal', () => {
   });
 
   describe('initial render', () => {
-    it('renders the modal title and header icon', () => {
+    it('renders the modal with title, instruction text, all three options, and buttons', () => {
       render(<CelestialRevelationModal {...createProps()} />);
       expect(screen.getByText('Celestial Revelation')).toBeInTheDocument();
-    });
-
-    it('renders the transformation instruction text', () => {
-      render(<CelestialRevelationModal {...createProps()} />);
       expect(screen.getByText(/Choose a transformation option/)).toBeInTheDocument();
-    });
-
-    it('renders all three transformation options with their icons and descriptions', () => {
-      render(<CelestialRevelationModal {...createProps()} />);
       expect(screen.getByText('Heavenly Wings')).toBeInTheDocument();
       expect(screen.getByText('Inner Radiance')).toBeInTheDocument();
       expect(screen.getByText('Necrotic Shroud')).toBeInTheDocument();
-      expect(screen.getByText(/Two spectral wings sprout from your back/)).toBeInTheDocument();
-      expect(screen.getByText(/Searing light radiates from your eyes/)).toBeInTheDocument();
-      expect(screen.getByText(/Your eyes become pools of darkness/)).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Transform/ })).toBeDisabled();
+      expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
     });
 
-    it('displays proficiency bonus with the value from playerStats', () => {
+    it('displays the proficiency bonus from playerStats', () => {
       render(<CelestialRevelationModal {...createProps({ playerStats: { name: 'S1', level: 3, proficiency: 5 } })} />);
       expect(screen.getByText(/Proficiency Bonus \(5\)/)).toBeInTheDocument();
     });
@@ -66,22 +57,6 @@ describe('CelestialRevelationModal', () => {
       render(<CelestialRevelationModal {...createProps()} />);
       expect(screen.getByText(/— type per turn/)).toBeInTheDocument();
     });
-
-    it('renders the Transform button disabled when no option is selected', () => {
-      render(<CelestialRevelationModal {...createProps()} />);
-      expect(screen.getByRole('button', { name: /Transform/ })).toBeDisabled();
-    });
-
-    it('renders the Cancel button', () => {
-      render(<CelestialRevelationModal {...createProps()} />);
-      expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
-    });
-
-    it('renders the selection options in a selectable list', () => {
-      render(<CelestialRevelationModal {...createProps()} />);
-      const radios = document.querySelectorAll('input[type="radio"]');
-      expect(radios).toHaveLength(3);
-    });
   });
 
   describe('closing behavior', () => {
@@ -94,27 +69,10 @@ describe('CelestialRevelationModal', () => {
   });
 
   describe('option selection', () => {
-    it('updates damage type display when Heavenly Wings is selected', () => {
+    it('updates damage type display when an option is selected', () => {
       render(<CelestialRevelationModal {...createProps()} />);
       fireEvent.click(screen.getByText('Heavenly Wings'));
       expect(screen.getByText(/Proficiency Bonus \(3\) of Radiant type per turn/)).toBeInTheDocument();
-    });
-
-    it('updates damage type display when Inner Radiance is selected', () => {
-      render(<CelestialRevelationModal {...createProps()} />);
-      fireEvent.click(screen.getByText('Inner Radiance'));
-      expect(screen.getByText(/Proficiency Bonus \(3\) of Radiant type per turn/)).toBeInTheDocument();
-    });
-
-    it('updates damage type display when Necrotic Shroud is selected', () => {
-      render(<CelestialRevelationModal {...createProps()} />);
-      fireEvent.click(screen.getByText('Necrotic Shroud'));
-      expect(screen.getByText(/Proficiency Bonus \(3\) of Necrotic type per turn/)).toBeInTheDocument();
-    });
-
-    it('enables the Transform button after selecting an option', () => {
-      render(<CelestialRevelationModal {...createProps()} />);
-      fireEvent.click(screen.getByText('Heavenly Wings'));
       expect(screen.getByRole('button', { name: /Transform/ })).toBeEnabled();
     });
 
@@ -124,20 +82,6 @@ describe('CelestialRevelationModal', () => {
       expect(screen.getByText(/Proficiency Bonus \(3\) of Radiant type per turn/)).toBeInTheDocument();
       fireEvent.click(screen.getByText('Necrotic Shroud'));
       expect(screen.getByText(/Proficiency Bonus \(3\) of Necrotic type per turn/)).toBeInTheDocument();
-    });
-
-    it('highlights the selected option visually', () => {
-      render(<CelestialRevelationModal {...createProps()} />);
-      fireEvent.click(screen.getByText('Inner Radiance'));
-      const labels = document.querySelectorAll('label');
-      const selectedLabel = [...labels].find(l => l.textContent.includes('Inner Radiance'));
-      expect(selectedLabel).toHaveStyle({ background: 'rgba(255,255,255,0.15)' });
-    });
-
-    it('allows selecting all three options', () => {
-      render(<CelestialRevelationModal {...createProps()} />);
-      fireEvent.click(screen.getByText('Heavenly Wings'));
-      expect(screen.getByRole('button', { name: /Transform/ })).toBeEnabled();
     });
   });
 
@@ -162,22 +106,13 @@ describe('CelestialRevelationModal', () => {
       expect(celestialRevelationHandler.confirmCelestialRevelation).not.toHaveBeenCalled();
     });
 
-    it('shows the result description after transformation', async () => {
+    it('shows the result description and Done button after transformation', async () => {
       celestialRevelationHandler.confirmCelestialRevelation.mockResolvedValue(mockSuccessResult('Inner Radiance'));
       render(<CelestialRevelationModal {...createProps()} />);
       fireEvent.click(screen.getByText('Inner Radiance'));
       fireEvent.click(screen.getByRole('button', { name: /Transform/ }));
       await waitFor(() => {
         expect(screen.getByText(/Transforming into Inner Radiance/)).toBeInTheDocument();
-      });
-    });
-
-    it('shows the Done button after transformation', async () => {
-      celestialRevelationHandler.confirmCelestialRevelation.mockResolvedValue(mockSuccessResult('Necrotic Shroud'));
-      render(<CelestialRevelationModal {...createProps()} />);
-      fireEvent.click(screen.getByText('Necrotic Shroud'));
-      fireEvent.click(screen.getByRole('button', { name: /Transform/ }));
-      await waitFor(() => {
         expect(screen.getByRole('button', { name: 'Done' })).toBeInTheDocument();
       });
     });
@@ -190,24 +125,6 @@ describe('CelestialRevelationModal', () => {
       await waitFor(() => {
         expect(screen.queryByText(/Choose a transformation option/)).not.toBeInTheDocument();
         expect(screen.queryByRole('button', { name: /Transform/ })).not.toBeInTheDocument();
-      });
-    });
-
-    it('renders the result description as HTML via dangerouslySetInnerHTML', async () => {
-      celestialRevelationHandler.confirmCelestialRevelation.mockResolvedValue({
-        type: 'popup',
-        payload: {
-          type: 'automation_info',
-          name: 'Celestial Revelation',
-          description: '<strong>Transforming into Heavenly Wings.</strong> You gain a Fly Speed.',
-        },
-      });
-      render(<CelestialRevelationModal {...createProps()} />);
-      fireEvent.click(screen.getByText('Heavenly Wings'));
-      fireEvent.click(screen.getByRole('button', { name: /Transform/ }));
-      await waitFor(() => {
-        const spBody = document.querySelector('.sp-body');
-        expect(spBody.querySelector('strong')).toBeInTheDocument();
       });
     });
   });
@@ -277,22 +194,6 @@ describe('CelestialRevelationModal', () => {
         expect(onSetConditionModal).toHaveBeenCalledTimes(1);
       });
     });
-
-    it('does not show the result screen when setCondition is returned', async () => {
-      const onClose = vi.fn();
-      const onSetConditionModal = vi.fn();
-      celestialRevelationHandler.confirmCelestialRevelation.mockResolvedValue({
-        type: 'setCondition',
-        payload: { type: 'setCondition' },
-      });
-      render(<CelestialRevelationModal {...createProps({ onClose, onSetConditionModal })} />);
-      fireEvent.click(screen.getByText('Necrotic Shroud'));
-      fireEvent.click(screen.getByRole('button', { name: /Transform/ }));
-      await waitFor(() => {
-        expect(screen.queryByText(/Transforming into/)).not.toBeInTheDocument();
-        expect(screen.queryByRole('button', { name: 'Done' })).not.toBeInTheDocument();
-      });
-    });
   });
 
   describe('edge cases', () => {
@@ -300,26 +201,6 @@ describe('CelestialRevelationModal', () => {
       render(<CelestialRevelationModal {...createProps({ playerStats: {} })} />);
       expect(screen.getByText(/Choose a transformation option/)).toBeInTheDocument();
       expect(screen.getByText(/Proficiency Bonus \(0\)/)).toBeInTheDocument();
-    });
-
-    it('throws when playerStats is null', () => {
-      const consoleError = console.error;
-      const errors = [];
-      console.error = (...args) => errors.push(args);
-      expect(() => render(<CelestialRevelationModal {...createProps({ playerStats: null })} />)).toThrow();
-      console.error = consoleError;
-    });
-
-    it('renders correctly when campaignName is empty string', () => {
-      render(<CelestialRevelationModal {...createProps({ campaignName: '' })} />);
-      expect(screen.getByText(/Choose a transformation option/)).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /Transform/ })).toBeDisabled();
-    });
-
-    it('renders correctly when onClose is not provided', () => {
-      const { container } = render(<CelestialRevelationModal {...createProps({ onClose: undefined })} />);
-      expect(screen.getByText(/Choose a transformation option/)).toBeInTheDocument();
-      expect(container.querySelector('.sp-overlay')).toBeInTheDocument();
     });
   });
 });

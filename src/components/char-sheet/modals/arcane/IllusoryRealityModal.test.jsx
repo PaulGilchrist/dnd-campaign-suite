@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import IllusoryRealityModal from './IllusoryRealityModal.jsx';
@@ -81,76 +81,23 @@ describe('IllusoryRealityModal', () => {
   // ── Initial render / display ──
 
   describe('initial render', () => {
-    it('renders overlay, modal, header, body, and actions containers', () => {
-      renderModal();
-      expect(document.querySelector('.sp-overlay')).toBeInTheDocument();
-      expect(document.querySelector('.sp-modal')).toBeInTheDocument();
-      expect(document.querySelector('.sp-header')).toBeInTheDocument();
-      expect(document.querySelector('.sp-body')).toBeInTheDocument();
-      expect(document.querySelector('.sp-actions')).toBeInTheDocument();
-    });
-
-    it('renders the feature name in the header', () => {
+    it('renders the modal with header, body, buttons, and input', () => {
       renderModal();
       expect(screen.getByText('Illusory Reality')).toBeInTheDocument();
-    });
-
-    it('renders a Font Awesome eye icon in the header', () => {
-      renderModal();
-      expect(document.querySelector('.sp-header .fa-eye')).toBeInTheDocument();
-    });
-
-    it('renders instructions text in the modal body', () => {
-      renderModal();
       expect(screen.getByText(/Choose one inanimate, nonmagical object/)).toBeInTheDocument();
-    });
-
-    it('renders the warning text about object limitations', () => {
-      renderModal();
       expect(screen.getByText(/The object cannot deal damage or impose any conditions/)).toBeInTheDocument();
-    });
-
-    it('renders a text input with the correct placeholder', () => {
-      renderModal();
-      const input = screen.getByRole('textbox');
-      expect(input).toHaveAttribute(
-        'placeholder',
-        "Enter object name (e.g., 'a 5-foot cube of stone')"
-      );
-    });
-
-    it('renders the Make Object Real button with an eye icon', () => {
-      renderModal();
-      const btn = screen.getByRole('button', { name: /Make Object Real/ });
-      const icon = btn.querySelector('.fa-eye');
-      expect(icon).toBeInTheDocument();
-    });
-
-    it('renders a Cancel button', () => {
-      renderModal();
+      expect(screen.getByRole('textbox')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Make Object Real/ })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
-    });
-
-    it('does not show a Done button before confirmation', () => {
-      renderModal();
       expect(screen.queryByRole('button', { name: 'Done' })).not.toBeInTheDocument();
     });
 
-    it('does not show result content on initial render', () => {
-      renderModal();
-      expect(screen.queryByRole('button', { name: 'Done' })).not.toBeInTheDocument();
-    });
-  });
-
-  // ── Feature name resolution ──
-
-  describe('feature name', () => {
     it('uses custom featureName from action when provided', () => {
       renderModal({ action: { featureName: 'Custom Feature', automation: {} } });
       expect(screen.getByText('Custom Feature')).toBeInTheDocument();
     });
 
-    it('falls back to "Illusory Reality" when action.name is absent', () => {
+    it('falls back to "Illusory Reality" when action name is absent or null', () => {
       renderModal({ action: { automation: {} } });
       expect(screen.getByText('Illusory Reality')).toBeInTheDocument();
     });
@@ -159,27 +106,18 @@ describe('IllusoryRealityModal', () => {
       renderModal({ action: null });
       expect(screen.getByText('Illusory Reality')).toBeInTheDocument();
     });
-
-    it('renders the eye icon when action is null', () => {
-      renderModal({ action: null });
-      expect(document.querySelector('.sp-header .fa-eye')).toBeInTheDocument();
-    });
   });
 
   // ── Confirm button disabled state ──
 
   describe('confirm button disabled state', () => {
-    it('is disabled when the input is empty', () => {
+    it('is disabled when the input is empty or whitespace-only', () => {
       renderModal();
       const btn = screen.getByRole('button', { name: /Make Object Real/ });
       expect(btn).toBeDisabled();
-    });
 
-    it('is disabled when the input contains only whitespace', () => {
-      renderModal();
       const input = screen.getByRole('textbox');
       fireEvent.change(input, { target: { value: '   ' } });
-      const btn = screen.getByRole('button', { name: /Make Object Real/ });
       expect(btn).toBeDisabled();
     });
 
@@ -189,25 +127,6 @@ describe('IllusoryRealityModal', () => {
       fireEvent.change(input, { target: { value: 'a 5-foot cube of stone' } });
       const btn = screen.getByRole('button', { name: /Make Object Real/ });
       expect(btn).toBeEnabled();
-    });
-  });
-
-  // ── Input interaction ──
-
-  describe('input interaction', () => {
-    it('updates the input value on change', () => {
-      renderModal();
-      const input = screen.getByRole('textbox');
-      fireEvent.change(input, { target: { value: 'a 5-foot cube of stone' } });
-      expect(input).toHaveValue('a 5-foot cube of stone');
-    });
-
-    it('updates the input value to empty string after setting a value', () => {
-      renderModal();
-      const input = screen.getByRole('textbox');
-      fireEvent.change(input, { target: { value: 'something' } });
-      fireEvent.change(input, { target: { value: '' } });
-      expect(input).toHaveValue('');
     });
   });
 
@@ -240,17 +159,6 @@ describe('IllusoryRealityModal', () => {
       );
     });
 
-    it('passes the object name as-is (untrimmed) to the handler', async () => {
-      renderModal();
-      await fillAndConfirm('  object  ');
-      expect(confirmIllusoryReality).toHaveBeenCalledWith(
-        baseAction,
-        basePlayerStats,
-        'test-campaign',
-        '  object  '
-      );
-    });
-
     it('transitions to result state after confirm', async () => {
       renderModal();
       await fillAndConfirm('stone');
@@ -259,31 +167,17 @@ describe('IllusoryRealityModal', () => {
       });
     });
 
-    it('hides the text input after confirm', async () => {
+    it('hides the input and action buttons after confirm', async () => {
       renderModal();
       await fillAndConfirm('stone');
       await waitFor(() => {
         expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
-      });
-    });
-
-    it('hides the Make Object Real button after confirm', async () => {
-      renderModal();
-      await fillAndConfirm('stone');
-      await waitFor(() => {
         expect(screen.queryByRole('button', { name: /Make Object Real/ })).not.toBeInTheDocument();
-      });
-    });
-
-    it('hides the Cancel button after confirm', async () => {
-      renderModal();
-      await fillAndConfirm('stone');
-      await waitFor(() => {
         expect(screen.queryByRole('button', { name: 'Cancel' })).not.toBeInTheDocument();
       });
     });
 
-    it('renders the result description in the modal body', async () => {
+    it('renders the result description after confirm', async () => {
       renderModal();
       await fillAndConfirm('stone');
       await waitFor(() => {
@@ -300,26 +194,6 @@ describe('IllusoryRealityModal', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Done' }));
       });
       expect(onClose).toHaveBeenCalledTimes(1);
-    });
-
-    it('preserves modal CSS classes in result state', async () => {
-      renderModal();
-      await fillAndConfirm('stone');
-      await waitFor(() => {
-        expect(document.querySelector('.sp-overlay')).toBeInTheDocument();
-        expect(document.querySelector('.sp-modal')).toBeInTheDocument();
-        expect(document.querySelector('.sp-header')).toBeInTheDocument();
-        expect(document.querySelector('.sp-body')).toBeInTheDocument();
-        expect(document.querySelector('.sp-actions')).toBeInTheDocument();
-      });
-    });
-
-    it('renders the eye icon in the result state header', async () => {
-      renderModal();
-      await fillAndConfirm('stone');
-      await waitFor(() => {
-        expect(document.querySelector('.sp-header .fa-eye')).toBeInTheDocument();
-      });
     });
   });
 

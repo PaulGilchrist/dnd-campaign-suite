@@ -1,3 +1,4 @@
+// @cleaned-by-ai
 // @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
@@ -197,30 +198,26 @@ describe('Dark One\'s Blessing', () => {
     expect(tempHpCalls).toHaveLength(0);
   });
 
-  it('does not grant temp HP when the feature is missing from characterAdvancement', () => {
+  it('does not grant temp HP when the feature is missing or lacks automation config', () => {
     const goblin = createCreature('Goblin', 5, 5);
     const cs = makeCombatSummary([goblin]);
-    const warlock = {
+
+    // Test: no characterAdvancement
+    const warlockNoFeature = {
       ...createFiendWarlock('NoFeatureWarlock', 5, 16, 5),
       computedStats: {
         ...createFiendWarlock('NoFeatureWarlock', 5, 16, 5).computedStats,
         characterAdvancement: [],
       },
     };
-
     stubPlayerRuntime(0);
-    applyDamageToTarget(cs, 'Goblin', 10, ['Slashing'], 'TestCampaign', [warlock, createMinimalCharacter('Goblin')]);
+    applyDamageToTarget(cs, 'Goblin', 10, ['Slashing'], 'TestCampaign', [warlockNoFeature, createMinimalCharacter('Goblin')]);
 
-    const tempHpCalls = setRuntimeValue.mock.calls.filter(
-      (call) => call[1] === 'tempHp'
-    );
+    let tempHpCalls = setRuntimeValue.mock.calls.filter((call) => call[1] === 'tempHp');
     expect(tempHpCalls).toHaveLength(0);
-  });
 
-  it('does not grant temp HP when the feature lacks automation config', () => {
-    const goblin = createCreature('Goblin', 5, 5);
-    const cs = makeCombatSummary([goblin]);
-    const warlock = {
+    // Test: feature exists but automation is null
+    const warlockNoAutomation = {
       ...createFiendWarlock('NoAutomationWarlock', 5, 16, 5),
       computedStats: {
         ...createFiendWarlock('NoAutomationWarlock', 5, 16, 5).computedStats,
@@ -230,13 +227,10 @@ describe('Dark One\'s Blessing', () => {
         }],
       },
     };
+    setRuntimeValue.mockClear();
+    applyDamageToTarget(cs, 'Goblin', 10, ['Slashing'], 'TestCampaign', [warlockNoAutomation, createMinimalCharacter('Goblin')]);
 
-    stubPlayerRuntime(0);
-    applyDamageToTarget(cs, 'Goblin', 10, ['Slashing'], 'TestCampaign', [warlock, createMinimalCharacter('Goblin')]);
-
-    const tempHpCalls = setRuntimeValue.mock.calls.filter(
-      (call) => call[1] === 'tempHp'
-    );
+    tempHpCalls = setRuntimeValue.mock.calls.filter((call) => call[1] === 'tempHp');
     expect(tempHpCalls).toHaveLength(0);
   });
 

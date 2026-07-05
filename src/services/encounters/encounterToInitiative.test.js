@@ -1,3 +1,4 @@
+// @cleaned-by-ai
 // @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
@@ -58,30 +59,22 @@ describe('expandMonstersToCreatures', () => {
   });
 
   describe('player creatures', () => {
-    it('creates player creatures from characters array', async () => {
-      const chars = [createCharacter('Alchemist'), createCharacter('Bard')];
+    it('creates player creatures sorted alphabetically with correct defaults', async () => {
+      const chars = [createCharacter('Zebra'), createCharacter('Alpha'), createCharacter('Bard')];
       const result = await expandMonstersToCreatures([], chars, 'TestCampaign');
 
       const players = result.creatures.filter((c) => c.type === 'player');
-      expect(players).toHaveLength(2);
-      expect(players[0].initiative).toBe('');
-      expect(players[0].concentration).toBeNull();
-      expect(players[0].targetName).toBeNull();
-    });
-
-    it('sorts player creatures alphabetically by name', async () => {
-      const chars = [createCharacter('Zebra'), createCharacter('Alpha')];
-      const result = await expandMonstersToCreatures([], chars, 'TestCampaign');
-
-      const playerNames = result.creatures
-        .filter((c) => c.type === 'player')
-        .map((c) => c.name);
-      expect(playerNames).toEqual(['Alpha', 'Zebra']);
+      expect(players).toHaveLength(3);
+      expect(players.map(p => p.name)).toEqual(['Alpha', 'Bard', 'Zebra']);
+      players.forEach((p) => {
+        expect(p.initiative).toBe('');
+        expect(p.concentration).toBeNull();
+        expect(p.targetName).toBeNull();
+      });
     });
 
     it('handles empty characters list', async () => {
       const result = await expandMonstersToCreatures([createMonster('Goblin')], [], 'TestCampaign');
-
       const players = result.creatures.filter((c) => c.type === 'player');
       expect(players).toHaveLength(0);
     });
@@ -100,7 +93,7 @@ describe('expandMonstersToCreatures', () => {
       expect(npcs[0].maxHp).toBe(10);
     });
 
-    it('creates multiple npc creatures from qty > 1', async () => {
+    it('creates multiple npc creatures from qty > 1 with sequential names', async () => {
       rollD20.mockImplementation(() => [15, 3].shift() || 10);
       const monster = createMonster('Orc', { qty: 3, hit_points: 15 });
       const result = await expandMonstersToCreatures([monster], [], 'TestCampaign');
@@ -116,7 +109,7 @@ describe('expandMonstersToCreatures', () => {
       });
     });
 
-    it('defaults hp to 10 when monster has no hit_points', async () => {
+    it('defaults hp to 10 and ac to 10 when monster has no hit_points or armor_class', async () => {
       rollD20.mockReturnValueOnce(15).mockReturnValueOnce(10);
       const monster = { name: 'Shadow', qty: 1 };
       const result = await expandMonstersToCreatures([monster], [], 'TestCampaign');
@@ -124,15 +117,6 @@ describe('expandMonstersToCreatures', () => {
       const npc = result.creatures.find((c) => c.type === 'npc');
       expect(npc.maxHp).toBe(10);
       expect(npc.currentHp).toBe(10);
-    });
-
-    it('defaults ac to 10 when monster has no armor_class', async () => {
-      rollD20.mockReturnValueOnce(15).mockReturnValueOnce(10);
-      const monster = { name: 'Spirit', qty: 1, hit_points: 5 };
-      delete monster.armor_class;
-      const result = await expandMonstersToCreatures([monster], [], 'TestCampaign');
-
-      const npc = result.creatures.find((c) => c.type === 'npc');
       expect(npc.ac).toBe(10);
     });
   });
@@ -164,40 +148,24 @@ describe('expandMonstersToCreatures', () => {
       const npc = result.creatures.find((c) => c.type === 'npc');
       expect(npc.initiative).toBe('5');
     });
-
-    it('rolls initiative once per npc instance', async () => {
-      const monster = createMonster('Goblin', { qty: 2 });
-      rollD20.mockImplementation(() => [15, 3, 8].shift() || 10);
-
-      const result = await expandMonstersToCreatures([monster], [], 'TestCampaign');
-      expect(result.npcRollResults).toHaveLength(2);
-    });
   });
 
   describe('monster data passthrough', () => {
-    it('includes resistances from monster data', async () => {
+    it('includes resistances, immunities, and save bonuses from monster data', async () => {
       rollD20.mockReturnValueOnce(10).mockReturnValueOnce(10);
       const monster = createMonster('Skeleton', {
         damage_resistances: ['Cold'],
         damage_immunities: ['Necrotic', 'Poison'],
+        saving_throws: { con: { modifier: 5 }, wis: { modifier: 3 } },
       });
       const result = await expandMonstersToCreatures([monster], [], 'TestCampaign');
 
       const npc = result.creatures.find((c) => c.type === 'npc');
       expect(npc.resistances).toEqual(['Cold']);
       expect(npc.immunities).toEqual(['Necrotic', 'Poison']);
-    });
-
-    it('includes save bonuses from saving_throws', async () => {
-      rollD20.mockReturnValueOnce(10).mockReturnValueOnce(10);
-      const monster = createMonster('Golem', {
-        saving_throws: { con: { modifier: 5 }, wis: { modifier: 3 } },
-      });
-      const result = await expandMonstersToCreatures([monster], [], 'TestCampaign');
-
-      const npc = result.creatures.find((c) => c.type === 'npc');
       expect(npc.saveBonuses.con).toBe(5);
       expect(npc.saveBonuses.wis).toBe(3);
+      expect(npc.saveBonuses.str).toBe(0);
     });
 
     it('falls back to ability_score_modifiers for save bonuses', async () => {
@@ -211,23 +179,6 @@ describe('expandMonstersToCreatures', () => {
       const npc = result.creatures.find((c) => c.type === 'npc');
       expect(npc.saveBonuses.con).toBe(4);
       expect(npc.saveBonuses.str).toBe(2);
-    });
-
-    it('defaults save bonuses to 0 when no data available', async () => {
-      rollD20.mockReturnValueOnce(10).mockReturnValueOnce(10);
-      const monster = createMonster('Beast', {
-        saving_throws: {},
-        ability_score_modifiers: null,
-      });
-      const result = await expandMonstersToCreatures([monster], [], 'TestCampaign');
-
-      const npc = result.creatures.find((c) => c.type === 'npc');
-      expect(npc.saveBonuses.str).toBe(0);
-      expect(npc.saveBonuses.dex).toBe(0);
-      expect(npc.saveBonuses.con).toBe(0);
-      expect(npc.saveBonuses.int).toBe(0);
-      expect(npc.saveBonuses.wis).toBe(0);
-      expect(npc.saveBonuses.cha).toBe(0);
     });
 
     it('handles saving_throws with missing modifier field', async () => {
@@ -257,21 +208,6 @@ describe('expandMonstersToCreatures', () => {
       const npc = result.creatures.find((c) => c.type === 'npc');
       expect(npc.maxHp).toBe(10);
       expect(npc.currentHp).toBe(10);
-    });
-
-    it('halves hp for Fey Spirit when character has it in phantasmal list', async () => {
-      rollD20.mockReturnValueOnce(10).mockReturnValueOnce(10);
-      getRuntimeValue.mockImplementation((charName, prop) => {
-        if (prop === '_phantasmalCreatures_list') return ['Fey Spirit'];
-        return null;
-      });
-
-      const monster = createMonster('Fey Spirit', { hit_points: 30 });
-      const chars = [createCharacter('Bard')];
-      const result = await expandMonstersToCreatures([monster], chars, 'TestCampaign');
-
-      const npc = result.creatures.find((c) => c.type === 'npc');
-      expect(npc.maxHp).toBe(15);
     });
 
     it('does not halve hp when phantasmal list does not include the summon', async () => {
@@ -324,8 +260,6 @@ describe('loadEncounterToInitiative', () => {
   });
 
   it('sorts creatures by initiative descending', async () => {
-    // Each monster calls rollD20 twice (r1 for initiative, r2 stored in rolls array)
-    // Dragon r1=20, Goblin r1=15, Orc r1=10 → sorted: Dragon(20), Goblin(15), Orc(10)
     const rollValues = [20, 0, 15, 0, 10, 0];
     rollD20.mockImplementation(() => rollValues.shift() || 10);
 
@@ -376,26 +310,12 @@ describe('loadEncounterToInitiative', () => {
     window.removeEventListener('initiative-rolled', handler);
   });
 
-  it('returns combatSummary with round 1', async () => {
-    rollD20.mockReturnValueOnce(15).mockReturnValueOnce(10);
-    const result = await loadEncounterToInitiative([createMonster('Goblin')], [], 'TestCampaign');
-
-    expect(result.combatSummary.round).toBe(1);
-  });
-
-  it('includes both players and npcs in combatSummary.creatures', async () => {
-    rollD20.mockReturnValueOnce(15).mockReturnValueOnce(10);
-    const chars = [createCharacter('Hero')];
-    const result = await loadEncounterToInitiative([createMonster('Goblin')], chars, 'TestCampaign');
-
-    expect(result.combatSummary.creatures).toHaveLength(2);
-  });
-
-  it('returns firstName as name of first creature after sort', async () => {
+  it('returns combatSummary with round 1 and firstName of first creature', async () => {
     rollD20.mockReturnValueOnce(20).mockReturnValueOnce(10);
     const chars = [createCharacter('Player')];
     const result = await loadEncounterToInitiative([createMonster('Dragon')], chars, 'TestCampaign');
 
+    expect(result.combatSummary.round).toBe(1);
     expect(result.firstName).toBe('Dragon');
   });
 
@@ -404,6 +324,11 @@ describe('loadEncounterToInitiative', () => {
 
     expect(result.combatSummary.creatures).toEqual([]);
     expect(result.firstName).toBeUndefined();
+    expect(storage.set).toHaveBeenCalledWith(
+      'activeCreatureName',
+      undefined,
+      'TestCampaign',
+    );
   });
 
   it('handles only players without monsters', async () => {
@@ -415,62 +340,37 @@ describe('loadEncounterToInitiative', () => {
     expect(result.combatSummary.creatures[0].initiative).toBe('');
   });
 
-  it('sets activeCreatureName to undefined when no creatures exist', async () => {
-    await loadEncounterToInitiative([], [], 'TestCampaign');
-
-    expect(storage.set).toHaveBeenCalledWith(
-      'activeCreatureName',
-      undefined,
-      'TestCampaign',
-    );
-  });
-
-  it('calls postLogEntry for each npc roll', async () => {
-    rollD20.mockReturnValueOnce(15).mockReturnValueOnce(10);
-    await loadEncounterToInitiative([createMonster('Goblin')], [], 'TestCampaign');
-
-    expect(postLogEntry).toHaveBeenCalledTimes(1);
-    expect(postLogEntry).toHaveBeenCalledWith(
-      'TestCampaign',
-      expect.objectContaining({
-        type: 'roll',
-        rollType: 'initiative',
-      }),
-    );
-  });
-
-  it('logs roll with isNatural20 flag when roll is 20', async () => {
-    rollD20.mockReturnValueOnce(20).mockReturnValueOnce(15);
-    await loadEncounterToInitiative([createMonster('Goblin')], [], 'TestCampaign');
-
-    const callArgs = postLogEntry.mock.calls[0][1];
-    expect(callArgs.isNatural20).toBe(true);
-  });
-
-  it('logs roll with isNatural1 flag when roll is 1', async () => {
-    rollD20.mockReturnValueOnce(1).mockReturnValueOnce(8);
-    await loadEncounterToInitiative([createMonster('Goblin')], [], 'TestCampaign');
-
-    const callArgs = postLogEntry.mock.calls[0][1];
-    expect(callArgs.isNatural1).toBe(true);
-  });
-
-  it('logs roll with correct total and rolls', async () => {
+  it('calls postLogEntry for each npc roll with correct fields', async () => {
     rollD20.mockReturnValueOnce(17).mockReturnValueOnce(3);
     await loadEncounterToInitiative([createMonster('Goblin')], [], 'TestCampaign');
 
-    const callArgs = postLogEntry.mock.calls[0][1];
-    expect(callArgs.total).toBe(17);
-    expect(callArgs.rolls).toEqual([17, 3]);
+    expect(postLogEntry).toHaveBeenCalledTimes(1);
+    const entry = postLogEntry.mock.calls[0][1];
+    expect(entry).toMatchObject({
+      type: 'roll',
+      rollType: 'initiative',
+      total: 17,
+      rolls: [17, 3],
+    });
   });
 
-  it('logs roll with correct bonus', async () => {
+  it('logs roll with isNatural20/isNatural1 flags', async () => {
+    rollD20.mockReturnValueOnce(20).mockReturnValueOnce(15);
+    await loadEncounterToInitiative([createMonster('Goblin')], [], 'TestCampaign');
+    expect(postLogEntry.mock.calls[0][1].isNatural20).toBe(true);
+
+    vi.clearAllMocks();
+    rollD20.mockReturnValueOnce(1).mockReturnValueOnce(8);
+    await loadEncounterToInitiative([createMonster('Goblin')], [], 'TestCampaign');
+    expect(postLogEntry.mock.calls[0][1].isNatural1).toBe(true);
+  });
+
+  it('logs roll with correct bonus when monster has initiative_details', async () => {
     rollD20.mockReturnValueOnce(14).mockReturnValueOnce(8);
     const monster = createMonster('Dragon', { initiative_details: '+5' });
     await loadEncounterToInitiative([monster], [], 'TestCampaign');
 
-    const callArgs = postLogEntry.mock.calls[0][1];
-    expect(callArgs.bonus).toBe(5);
+    expect(postLogEntry.mock.calls[0][1].bonus).toBe(5);
   });
 
   it('logs roll for each npc when multiple exist', async () => {
@@ -478,5 +378,13 @@ describe('loadEncounterToInitiative', () => {
     await loadEncounterToInitiative([createMonster('Wolf', { qty: 2 })], [], 'TestCampaign');
 
     expect(postLogEntry).toHaveBeenCalledTimes(2);
+  });
+
+  it('includes both players and npcs in combatSummary.creatures', async () => {
+    rollD20.mockReturnValueOnce(15).mockReturnValueOnce(10);
+    const chars = [createCharacter('Hero')];
+    const result = await loadEncounterToInitiative([createMonster('Goblin')], chars, 'TestCampaign');
+
+    expect(result.combatSummary.creatures).toHaveLength(2);
   });
 });

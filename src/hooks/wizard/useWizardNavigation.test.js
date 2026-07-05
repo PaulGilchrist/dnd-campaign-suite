@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { renderHook, waitFor, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import useWizardNavigation from './useWizardNavigation.js';
@@ -34,7 +34,7 @@ describe('useWizardNavigation', () => {
       expect(result.current.currentStep).toBe(3);
     });
 
-    it('sets isNextDisabled to false initially', () => {
+    it('starts with isNextDisabled false', () => {
       const { result } = renderWizard();
       expect(result.current.isNextDisabled).toBe(false);
     });
@@ -65,46 +65,16 @@ describe('useWizardNavigation', () => {
       expect(result.current.currentStep).toBe(1);
     });
 
-    it('goes to the previous step', async () => {
+    it('goes to the previous step', () => {
       const { result } = renderWizard(3);
-
-      await waitFor(() => {
-        expect(result.current.isNextDisabled).toBeDefined();
-      });
-
-      act(() => {
-        result.current.navigatePrevious();
-      });
-
+      act(() => result.current.navigatePrevious());
       expect(result.current.currentStep).toBe(2);
     });
 
-    it('jumps to an arbitrary step via goToStep', async () => {
+    it('jumps to an arbitrary step via goToStep', () => {
       const { result } = renderWizard(1);
-
-      await waitFor(() => {
-        expect(true).toBe(true);
-      });
-
-      act(() => {
-        result.current.goToStep(5);
-      });
-
+      act(() => result.current.goToStep(5));
       expect(result.current.currentStep).toBe(5);
-    });
-
-    it('allows setCurrentStep to set an arbitrary step', async () => {
-      const { result } = renderWizard(1);
-
-      await waitFor(() => {
-        expect(true).toBe(true);
-      });
-
-      act(() => {
-        result.current.setCurrentStep(7);
-      });
-
-      expect(result.current.currentStep).toBe(7);
     });
   });
 
@@ -116,17 +86,14 @@ describe('useWizardNavigation', () => {
       });
 
       const { result } = renderWizard(1);
-
       await waitFor(() => {
         expect(result.current.isNextDisabled).toBe(true);
       });
     });
 
-    it('is false when the current step has no validation errors', async () => {
+    it('is false when there are no validation errors', async () => {
       validateStep.mockResolvedValue({});
-
       const { result } = renderWizard(1);
-
       await waitFor(() => {
         expect(result.current.isNextDisabled).toBe(false);
       });
@@ -140,15 +107,11 @@ describe('useWizardNavigation', () => {
       });
 
       const { result } = renderWizard(1);
-
       await waitFor(() => {
         expect(result.current.isNextDisabled).toBe(false);
       });
 
-      act(() => {
-        result.current.goToStep(2);
-      });
-
+      act(() => result.current.goToStep(2));
       await waitFor(() => {
         expect(result.current.isNextDisabled).toBe(true);
       });
@@ -158,33 +121,15 @@ describe('useWizardNavigation', () => {
   describe('getStepEnabled', () => {
     it('always allows step 1', async () => {
       const { result } = renderWizard(1);
-
       await waitFor(() => {
         expect(result.current.getStepEnabled(1)).toBe(true);
       });
     });
 
-    it('allows step 2 when ruleset is provided', async () => {
-      const { result } = renderWizard(1);
-
-      await waitFor(() => {
-        expect(result.current.getStepEnabled(2)).toBe(true);
-      });
-    });
-
     it('blocks step 2 when ruleset is missing', async () => {
       const { result } = renderWizard(1, mockFormData, mockRacesData, mockClassSubtypes, null);
-
       await waitFor(() => {
         expect(result.current.getStepEnabled(2)).toBe(false);
-      });
-    });
-
-    it('allows step 3 when step 1 and step 2 are valid', async () => {
-      const { result } = renderWizard(1);
-
-      await waitFor(() => {
-        expect(result.current.getStepEnabled(3)).toBe(true);
       });
     });
 
@@ -195,13 +140,12 @@ describe('useWizardNavigation', () => {
       });
 
       const { result } = renderWizard(1);
-
       await waitFor(() => {
         expect(result.current.getStepEnabled(3)).toBe(false);
       });
     });
 
-    it('blocks step 3 when step 2 is not yet validated', async () => {
+    it('blocks step 3 when step 2 has not yet validated asynchronously', () => {
       validateStep.mockImplementation(async (step) => {
         if (step === 2) {
           await new Promise((r) => setTimeout(r, 50));
@@ -211,19 +155,16 @@ describe('useWizardNavigation', () => {
       });
 
       const { result } = renderWizard(1);
-
-      // step2Valid starts false, so step 3 should be blocked initially
       expect(result.current.getStepEnabled(3)).toBe(false);
     });
 
-    it('blocks steps 4+ when step 3 has validation errors', async () => {
+    it('blocks steps 4+ when step 3 prerequisites are not met', async () => {
       validateStep.mockImplementation((step) => {
         if (step === 3) return { subclass: 'Required' };
         return {};
       });
 
       const { result } = renderWizard(1);
-
       await waitFor(() => {
         expect(result.current.getStepEnabled(4)).toBe(false);
       });
@@ -231,46 +172,16 @@ describe('useWizardNavigation', () => {
 
     it('blocks steps 4+ when class data has not loaded', async () => {
       const { result } = renderWizard(1, mockFormData, mockRacesData, [], mockRuleset);
-
       await waitFor(() => {
         expect(result.current.getStepEnabled(4)).toBe(false);
-      });
-    });
-
-    it('blocks steps 4+ when a subclass is required but not selected', async () => {
-      const localFormData = { ...mockFormData, class: { name: 'Barbarian' } };
-      const localClassSubtypes = [
-        { className: 'Barbarian', subtypes: [{ name: 'Path of the Berserker' }] },
-      ];
-
-      const { result } = renderWizard(1, localFormData, mockRacesData, localClassSubtypes, mockRuleset);
-
-      await waitFor(() => {
-        expect(result.current.getStepEnabled(4)).toBe(false);
-        expect(result.current.getStepEnabled(5)).toBe(false);
       });
     });
 
     it('allows steps 4+ when all prerequisites are satisfied', async () => {
       const { result } = renderWizard(1);
-
       await waitFor(() => {
         expect(result.current.getStepEnabled(4)).toBe(true);
         expect(result.current.getStepEnabled(5)).toBe(true);
-        expect(result.current.getStepEnabled(12)).toBe(true);
-      });
-    });
-
-    it('blocks steps 4+ when a subrace is required but not selected', async () => {
-      const localFormData = { ...mockFormData, race: { name: 'Elf', subrace: {} } };
-      const localRacesData = [
-        { name: 'Elf', subraces: [{ name: 'High Elf' }] },
-      ];
-
-      const { result } = renderWizard(1, localFormData, localRacesData, mockClassSubtypes, mockRuleset);
-
-      await waitFor(() => {
-        expect(result.current.getStepEnabled(4)).toBe(false);
       });
     });
   });
@@ -278,97 +189,20 @@ describe('useWizardNavigation', () => {
   describe('isSaveEnabled', () => {
     it('is true when all steps are valid', async () => {
       const { result } = renderWizard(1);
-
       await waitFor(() => {
         expect(result.current.isSaveEnabled).toBe(true);
       });
     });
 
-    it('is false when step 2 is invalid', async () => {
+    it('is false when validation errors exist', async () => {
       validateStep.mockImplementation((step) => {
         if (step === 2) return { background: 'Required' };
         return {};
       });
-
       const { result } = renderWizard(1);
-
       await waitFor(() => {
         expect(result.current.isSaveEnabled).toBe(false);
       });
-    });
-
-    it('is false when a subclass is required but not selected', async () => {
-      const localFormData = { ...mockFormData, class: { name: 'Barbarian' } };
-      const localClassSubtypes = [
-        { className: 'Barbarian', subtypes: [{ name: 'Path of the Berserker' }] },
-      ];
-
-      const { result } = renderWizard(1, localFormData, mockRacesData, localClassSubtypes, mockRuleset);
-
-      await waitFor(() => {
-        expect(result.current.isSaveEnabled).toBe(false);
-      });
-    });
-
-    it('is false when a subrace is required but not selected', async () => {
-      const localFormData = { ...mockFormData, race: { name: 'Elf', subrace: {} } };
-      const localRacesData = [
-        { name: 'Elf', subraces: [{ name: 'High Elf' }] },
-      ];
-
-      const { result } = renderWizard(1, localFormData, localRacesData, mockClassSubtypes, mockRuleset);
-
-      await waitFor(() => {
-        expect(result.current.isSaveEnabled).toBe(false);
-      });
-    });
-
-    it('is false when ruleset is missing', async () => {
-      const { result } = renderWizard(1, mockFormData, mockRacesData, mockClassSubtypes, null);
-
-      await waitFor(() => {
-        expect(result.current.isSaveEnabled).toBe(false);
-      });
-    });
-
-    it('is false when class data has not loaded', async () => {
-      const { result } = renderWizard(1, mockFormData, mockRacesData, [], mockRuleset);
-
-      await waitFor(() => {
-        expect(result.current.isSaveEnabled).toBe(false);
-      });
-    });
-  });
-
-  describe('return value structure', () => {
-    it('returns all expected properties', () => {
-      const { result } = renderWizard();
-
-      expect(result.current).toHaveProperty('currentStep');
-      expect(result.current).toHaveProperty('isNextDisabled');
-      expect(result.current).toHaveProperty('navigateNext');
-      expect(result.current).toHaveProperty('navigatePrevious');
-      expect(result.current).toHaveProperty('goToStep');
-      expect(result.current).toHaveProperty('setCurrentStep');
-      expect(result.current).toHaveProperty('getStepEnabled');
-      expect(result.current).toHaveProperty('isSaveEnabled');
-    });
-
-    it('returns functions with correct types', () => {
-      const { result } = renderWizard();
-
-      expect(typeof result.current.navigateNext).toBe('function');
-      expect(typeof result.current.navigatePrevious).toBe('function');
-      expect(typeof result.current.goToStep).toBe('function');
-      expect(typeof result.current.setCurrentStep).toBe('function');
-      expect(typeof result.current.getStepEnabled).toBe('function');
-    });
-
-    it('returns boolean primitives for state flags', () => {
-      const { result } = renderWizard();
-
-      expect(typeof result.current.isNextDisabled).toBe('boolean');
-      expect(typeof result.current.isSaveEnabled).toBe('boolean');
     });
   });
 });

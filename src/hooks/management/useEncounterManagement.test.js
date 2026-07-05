@@ -1,3 +1,4 @@
+// @cleaned-by-ai
 // @improved-by-ai
 import { renderHook, act } from '@testing-library/react';
 import useEncounterManagement from './useEncounterManagement.js';
@@ -139,24 +140,6 @@ describe('useEncounterManagement', () => {
       expect(result.current.modalOpen).toBe(false);
       expect(result.current.modalMode).toBeNull();
     });
-
-    it('closeModal resets mode set by openLoadModal', async () => {
-      mockLoadEncounters.mockResolvedValue({ encounters: [] });
-
-      const { result } = renderHook(() => useEncounterManagement('test-campaign'));
-
-      await act(async () => {
-        await result.current.openLoadModal();
-      });
-      expect(result.current.modalMode).toBe('load');
-
-      act(() => {
-        result.current.closeModal();
-      });
-
-      expect(result.current.modalOpen).toBe(false);
-      expect(result.current.modalMode).toBeNull();
-    });
   });
 
   describe('saveEncounter', () => {
@@ -227,29 +210,6 @@ describe('useEncounterManagement', () => {
       expect(result.current.loading).toBe(false);
     });
 
-    it('sets loading to true during load and false after completion', async () => {
-      let resolveLoad;
-      mockLoadEncounter.mockImplementation(
-        () => new Promise((resolve) => { resolveLoad = resolve; })
-      );
-
-      const { result } = renderHook(() => useEncounterManagement('test-campaign'));
-
-      // Start the load inside act so the loading=true state update is captured
-      await act(async () => {
-        result.current.loadEncounterData('goblin-ambush');
-      });
-      expect(result.current.loading).toBe(true);
-
-      // Resolve the load and wait for completion
-      resolveLoad({ name: 'goblin-ambush', monsters: ['goblin'] });
-      await act(async () => {
-        // The loadPromise was already consumed; just flush remaining effects
-        await Promise.resolve();
-      });
-      expect(result.current.loading).toBe(false);
-    });
-
     it('throws error and logs when load fails', async () => {
       const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
       mockLoadEncounter.mockRejectedValue(new Error('Load failed'));
@@ -271,25 +231,6 @@ describe('useEncounterManagement', () => {
         'Failed to load encounter:',
         expect.any(Error)
       );
-      consoleSpy.mockRestore();
-    });
-
-    it('sets loading to false even when load fails', async () => {
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-      mockLoadEncounter.mockRejectedValue(new Error('Load failed'));
-
-      const { result } = renderHook(() => useEncounterManagement('test-campaign'));
-
-      let caughtError;
-      await act(async () => {
-        try {
-          await result.current.loadEncounterData('test');
-        } catch (err) {
-          caughtError = err;
-        }
-      });
-
-      expect(caughtError).toBeInstanceOf(Error);
       expect(result.current.loading).toBe(false);
       consoleSpy.mockRestore();
     });

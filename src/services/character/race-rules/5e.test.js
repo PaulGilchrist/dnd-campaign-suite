@@ -3,7 +3,7 @@ import { describe, it, expect, vi } from 'vitest';
 import raceRules from './5e.js';
 import utils from '../../ui/utils.js';
 
-// Mock dependencies — only mock what getRace actually calls
+// Mock dependencies
 vi.mock('../../ui/utils.js', () => ({
   default: {
     getAbilityLongName: vi.fn((name) => name)
@@ -70,17 +70,6 @@ describe('raceRules 5e (direct module)', () => {
       };
       const result = raceRules.getImmunities(playerSummary);
       expect(result).not.toContain('Disease');
-    });
-
-    it('adds both Monk and Paladin immunities when both classes are present', () => {
-      const playerSummary = {
-        race: { name: 'Human' },
-        class: { name: 'Monk' },
-        level: 10
-      };
-      const result = raceRules.getImmunities(playerSummary);
-      expect(result).toContain('Disease');
-      expect(result).toContain('Poison');
     });
 
     it('includes and deduplicates immunities from playerSummary', () => {

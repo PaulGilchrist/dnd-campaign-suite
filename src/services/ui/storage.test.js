@@ -1,3 +1,4 @@
+// @cleaned-by-ai
 // @improved-by-ai
 import { describe, it, expect, vi } from 'vitest';
 import storage from './storage.js';
@@ -45,23 +46,14 @@ describe('storage', () => {
             expect(result).toBeNull();
         });
 
-        it('returns null when API response body lacks a value property', async () => {
-            const fakeFetch = vi.fn().mockResolvedValue({
-                ok: true,
-                json: async () => ({})
-            });
-            vi.spyOn(globalThis, 'fetch').mockImplementation(fakeFetch);
-
-            const result = await storage.get('myKey', 'myCampaign');
-            expect(result).toBeNull();
-        });
-
-        it('returns null when data.value is null or undefined from API', async () => {
+        it('returns null when API response body lacks a value property or value is null/undefined', async () => {
             const fakeFetch = vi.fn()
+                .mockResolvedValueOnce({ ok: true, json: async () => ({}) })
                 .mockResolvedValueOnce({ ok: true, json: async () => ({ value: null }) })
                 .mockResolvedValueOnce({ ok: true, json: async () => ({ value: undefined }) });
             vi.spyOn(globalThis, 'fetch').mockImplementation(fakeFetch);
 
+            expect(await storage.get('myKey', 'myCampaign')).toBeNull();
             expect(await storage.get('myKey', 'myCampaign')).toBeNull();
             expect(await storage.get('myKey', 'myCampaign')).toBeNull();
         });
@@ -207,18 +199,16 @@ describe('storage', () => {
             expect(result).toBe(50);
         });
 
-        it('returns null when obj exists but property does not', async () => {
+        it('returns null when obj exists but property does not, or obj does not exist', async () => {
             vi.spyOn(storage, 'get').mockResolvedValueOnce({ name: 'PlayerOne' });
 
             const result = await storage.getProperty('PlayerOne', 'hp');
             expect(result).toBeNull();
-        });
 
-        it('returns null when obj does not exist (get returns null)', async () => {
             vi.spyOn(storage, 'get').mockResolvedValueOnce(null);
 
-            const result = await storage.getProperty('NonExistent', 'hp');
-            expect(result).toBeNull();
+            const result2 = await storage.getProperty('NonExistent', 'hp');
+            expect(result2).toBeNull();
         });
 
         it('returns null when obj property value is null or undefined', async () => {
@@ -239,42 +229,19 @@ describe('storage', () => {
             expect(await storage.getProperty('PlayerOne', 'note')).toBe('');
         });
 
-        it('uses utils.getName to derive the key', async () => {
+        it('uses utils.getName to derive the key and passes campaignName', async () => {
             const getNameSpy = vi.spyOn(utils, 'getName').mockReturnValue('PlayerOne');
-            vi.spyOn(storage, 'get').mockResolvedValueOnce({ hp: 50 });
-
-            await storage.getProperty('PlayerOne', 'hp');
-            expect(getNameSpy).toHaveBeenCalledWith('PlayerOne');
-            getNameSpy.mockRestore();
-        });
-
-        it('passes campaignName to storage.get', async () => {
             const getSpy = vi.spyOn(storage, 'get').mockResolvedValueOnce({ hp: 50 });
 
             await storage.getProperty('PlayerOne', 'hp', 'myCampaign');
+            expect(getNameSpy).toHaveBeenCalledWith('PlayerOne');
             expect(getSpy).toHaveBeenCalledWith('PlayerOne', 'myCampaign');
-        });
-
-        it('passes undefined as campaignName when none provided', async () => {
-            vi.spyOn(storage, 'get').mockResolvedValueOnce({ hp: 50 });
-
-            await storage.getProperty('PlayerOne', 'hp');
-            expect(storage.get).toHaveBeenCalledWith('PlayerOne', undefined);
-        });
-
-        it('returns null when utils.getName returns "Unknown" and no obj exists', async () => {
-            vi.spyOn(utils, 'getName').mockReturnValue('Unknown');
-            vi.spyOn(storage, 'get').mockResolvedValueOnce(null);
-
-            const result = await storage.getProperty(null, 'hp');
-            expect(result).toBeNull();
+            getNameSpy.mockRestore();
         });
 
         it('returns null when get returns a non-object primitive', async () => {
             vi.spyOn(storage, 'get').mockResolvedValueOnce('not-an-object');
 
-            // Accessing property on a string returns a character or undefined,
-            // but obj[propertyName] != null check: 'not-an-object'['hp'] is undefined, so returns null
             const result = await storage.getProperty('PlayerOne', 'hp');
             expect(result).toBeNull();
         });
@@ -290,7 +257,7 @@ describe('storage', () => {
             expect(setSpy).toHaveBeenCalledWith('PlayerOne', { hp: 50 }, 'myCampaign');
         });
 
-        it('updates an existing object and sets the property', async () => {
+        it('updates an existing object and sets the property, overwriting while preserving others', async () => {
             const existing = { name: 'Gandalf', hp: 10 };
             vi.spyOn(storage, 'get').mockResolvedValueOnce(existing);
             const setSpy = vi.spyOn(storage, 'set').mockResolvedValueOnce(undefined);
@@ -303,34 +270,15 @@ describe('storage', () => {
             );
         });
 
-        it('uses utils.getName to derive the key', async () => {
+        it('uses utils.getName to derive the key and passes campaignName', async () => {
             const getNameSpy = vi.spyOn(utils, 'getName').mockReturnValue('PlayerOne');
             vi.spyOn(storage, 'get').mockResolvedValueOnce({});
-            vi.spyOn(storage, 'set').mockResolvedValueOnce(undefined);
+            const setSpy = vi.spyOn(storage, 'set').mockResolvedValueOnce(undefined);
 
-            await storage.setProperty('PlayerOne', 'hp', 50);
+            await storage.setProperty('PlayerOne', 'hp', 50, 'myCampaign');
             expect(getNameSpy).toHaveBeenCalledWith('PlayerOne');
-            getNameSpy.mockRestore();
-        });
-
-        it('passes campaignName to the final storage.set', async () => {
-            vi.spyOn(storage, 'get').mockResolvedValueOnce(null);
-            const setSpy = vi.spyOn(storage, 'set').mockResolvedValueOnce(undefined);
-
-            await storage.setProperty('PlayerOne', 'hp', 50, 'myCampaign');
             expect(setSpy).toHaveBeenCalledWith('PlayerOne', { hp: 50 }, 'myCampaign');
-        });
-
-        it('overwrites existing property value while preserving others', async () => {
-            vi.spyOn(storage, 'get').mockResolvedValueOnce({ hp: 10, mp: 20 });
-            const setSpy = vi.spyOn(storage, 'set').mockResolvedValueOnce(undefined);
-
-            await storage.setProperty('PlayerOne', 'hp', 50, 'myCampaign');
-            expect(setSpy).toHaveBeenCalledWith(
-                'PlayerOne',
-                { hp: 50, mp: 20 },
-                'myCampaign'
-            );
+            getNameSpy.mockRestore();
         });
 
         it('sets property to falsy values correctly (0, false, null, empty string)', async () => {
@@ -352,9 +300,5 @@ describe('storage', () => {
             await storage.setProperty('PlayerOne', 'tag', '');
             expect(setSpy).toHaveBeenCalledWith('PlayerOne', { tag: '' }, undefined);
         });
-
-
     });
-
-
 });

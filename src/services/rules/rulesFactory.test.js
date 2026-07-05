@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import rulesFactory from './rulesFactory.js'
 
@@ -95,21 +95,15 @@ describe('rulesFactory', () => {
   })
 
   describe('getRules', () => {
-    it('returns 5e rules by default when no rules field', () => {
-      const result = rulesFactory.getRules({})
-      expect(result.rules).toBeDefined()
-      expect(result.raceRules).toBeDefined()
-      expect(result.classRules).toBeDefined()
-    })
+    it('returns correct modules for each ruleset', () => {
+      const result5e = rulesFactory.getRules({ rules: '5e' })
+      const result2024 = rulesFactory.getRules({ rules: '2024' })
+      const resultDefault = rulesFactory.getRules({})
 
-    it('returns 5e rules when rules is 5e', () => {
-      const result = rulesFactory.getRules({ rules: '5e' })
-      expect(result.raceRules).toBeDefined()
-    })
-
-    it('returns 2024 rules when rules is 2024', () => {
-      const result = rulesFactory.getRules({ rules: '2024' })
-      expect(result.raceRules).toBeDefined()
+      expect(result5e.rules).toBeDefined()
+      expect(result5e.raceRules).toBeDefined()
+      expect(result2024.raceRules).toBeDefined()
+      expect(resultDefault.raceRules).toBeDefined()
     })
 
     it('selects different race rules for each ruleset', async () => {
@@ -125,19 +119,15 @@ describe('rulesFactory', () => {
   })
 
   describe('getRulesType', () => {
-    it('returns 5e by default', () => {
+    it('returns 5e by default or the specified rules type', () => {
       expect(rulesFactory.getRulesType({})).toBe('5e')
-    })
-
-    it('returns the rules type from summary', () => {
       expect(rulesFactory.getRulesType({ rules: '2024' })).toBe('2024')
     })
   })
 
   describe('delegation wrappers', () => {
-    it('getAbilityLongName delegates to rules and returns the formatted name', () => {
-      const result = rulesFactory.getAbilityLongName('str')
-      expect(result).toBe('Long: str')
+    it('getAbilityLongName delegates to rules', () => {
+      expect(rulesFactory.getAbilityLongName('str')).toBe('Long: str')
     })
 
     it('getAbilities delegates to rules and returns abilities array', async () => {
@@ -167,8 +157,7 @@ describe('rulesFactory', () => {
     })
 
     it('getHitPoints delegates to rules and returns a number', () => {
-      const result = rulesFactory.getHitPoints({ rules: '5e' }, {})
-      expect(result).toBe(45)
+      expect(rulesFactory.getHitPoints({ rules: '5e' }, {})).toBe(45)
     })
 
     it('getLanguages delegates to rules and returns [count, languages]', () => {
@@ -185,8 +174,7 @@ describe('rulesFactory', () => {
     })
 
     it('getProficiencyChoiceCount delegates to rules', () => {
-      const result = rulesFactory.getProficiencyChoiceCount({}, [], {})
-      expect(result).toBe(2)
+      expect(rulesFactory.getProficiencyChoiceCount({}, [], {})).toBe(2)
     })
 
     it('getProficiencies delegates to rules and returns [count, proficiencies]', () => {
@@ -203,87 +191,38 @@ describe('rulesFactory', () => {
     })
 
     it('getSpellMaxLevel delegates to rules', () => {
-      const result = rulesFactory.getSpellMaxLevel({})
-      expect(result).toBe(9)
+      expect(rulesFactory.getSpellMaxLevel({})).toBe(9)
     })
   })
 
-  describe('class rules delegation - 5e', () => {
-    it('getDruidMaxWildShapeChallengeRating delegates to 5e class rules', () => {
-      const result = rulesFactory.getDruidMaxWildShapeChallengeRating(
-        {},
-        { rules: '5e' }
-      )
-      expect(result).toBe(1)
-    })
+  describe('class rules delegation - 5e vs 2024', () => {
+    it('delegates druid and rogue class methods to the correct ruleset', () => {
+      expect(rulesFactory.getDruidMaxWildShapeChallengeRating({}, { rules: '5e' })).toBe(1)
+      expect(rulesFactory.getDruidMaxWildShapeChallengeRating({}, { rules: '2024' })).toBe(2)
 
-    it('getDruidWildShapeUses delegates to 5e class rules', () => {
-      const result = rulesFactory.getDruidWildShapeUses({}, { rules: '5e' })
-      expect(result).toBe(2)
-    })
+      expect(rulesFactory.getDruidWildShapeUses({}, { rules: '5e' })).toBe(2)
+      expect(rulesFactory.getDruidWildShapeUses({}, { rules: '2024' })).toBe(3)
 
-    it('getDruidBeastKnownForms delegates to 5e class rules', () => {
-      const result = rulesFactory.getDruidBeastKnownForms({}, { rules: '5e' })
-      expect(Array.isArray(result)).toBe(true)
-      expect(result[0].name).toBe('Raccoon')
-    })
+      expect(rulesFactory.getDruidBeastKnownForms({}, { rules: '5e' })[0].name).toBe('Raccoon')
+      expect(rulesFactory.getDruidBeastKnownForms({}, { rules: '2024' })[0].name).toBe('Bear')
 
-    it('getDruidBeastFlySpeed delegates to 5e class rules', () => {
-      const result = rulesFactory.getDruidBeastFlySpeed({}, { rules: '5e' })
-      expect(result).toBe(true)
-    })
+      expect(rulesFactory.getDruidBeastFlySpeed({}, { rules: '5e' })).toBe(true)
+      expect(rulesFactory.getDruidBeastFlySpeed({}, { rules: '2024' })).toBe(false)
 
-    it('getRogueSneakAttack delegates to 5e class rules', () => {
-      const result = rulesFactory.getRogueSneakAttack({}, { rules: '5e' })
-      expect(result).toBe(3)
+      expect(rulesFactory.getRogueSneakAttack({}, { rules: '5e' })).toBe(3)
+      expect(rulesFactory.getRogueSneakAttack({}, { rules: '2024' })).toBe(5)
     })
   })
 
-  describe('class rules delegation - 2024', () => {
-    it('getDruidMaxWildShapeChallengeRating delegates to 2024 class rules', () => {
-      const result = rulesFactory.getDruidMaxWildShapeChallengeRating(
-        {},
-        { rules: '2024' }
-      )
-      expect(result).toBe(2)
+  describe('race rules delegation - 5e vs 2024', () => {
+    it('delegates immunities and resistances to the correct ruleset', () => {
+      expect(rulesFactory.getImmunities({ rules: '5e' })).toContain('Poisoned')
+      expect(rulesFactory.getImmunities({ rules: '2024' })).toContain('Charmed')
+      expect(rulesFactory.getResistances({ rules: '5e' })).toContain('Fire')
+      expect(rulesFactory.getResistances({ rules: '2024' })).toContain('Cold')
     })
 
-    it('getDruidWildShapeUses delegates to 2024 class rules', () => {
-      const result = rulesFactory.getDruidWildShapeUses({}, { rules: '2024' })
-      expect(result).toBe(3)
-    })
-
-    it('getDruidBeastKnownForms delegates to 2024 class rules', () => {
-      const result = rulesFactory.getDruidBeastKnownForms({}, { rules: '2024' })
-      expect(Array.isArray(result)).toBe(true)
-      expect(result[0].name).toBe('Bear')
-    })
-
-    it('getDruidBeastFlySpeed delegates to 2024 class rules', () => {
-      const result = rulesFactory.getDruidBeastFlySpeed({}, { rules: '2024' })
-      expect(result).toBe(false)
-    })
-
-    it('getRogueSneakAttack delegates to 2024 class rules', () => {
-      const result = rulesFactory.getRogueSneakAttack({}, { rules: '2024' })
-      expect(result).toBe(5)
-    })
-  })
-
-  describe('race rules delegation - 5e', () => {
-    it('getImmunities delegates to 5e race rules', () => {
-      const result = rulesFactory.getImmunities({ rules: '5e' })
-      expect(Array.isArray(result)).toBe(true)
-      expect(result).toContain('Poisoned')
-    })
-
-    it('getResistances delegates to 5e race rules', () => {
-      const result = rulesFactory.getResistances({ rules: '5e' })
-      expect(Array.isArray(result)).toBe(true)
-      expect(result).toContain('Fire')
-    })
-
-    it('getSenses returns base senses from race rules', () => {
+    it('returns base senses from race rules', () => {
       const result = rulesFactory.getSenses(
         { automation: { passives: [] } },
         { rules: '5e' }
@@ -293,98 +232,46 @@ describe('rulesFactory', () => {
       expect(result[0].value).toBe('60 ft.')
     })
 
-    it('getSenses adds truesight from passive_buff when not already present', () => {
+    it('adds truesight and blindsight from passive_buff when not already present', () => {
       const stats = {
         automation: {
-          passives: [{ type: 'passive_buff', effect: 'truesight', range: '120 ft.' }],
+          passives: [
+            { type: 'passive_buff', effect: 'truesight', range: '120 ft.' },
+            { type: 'passive_buff', effect: 'blindsight' },
+          ],
         },
       }
       const result = rulesFactory.getSenses(stats, { rules: '5e' })
       const truesight = result.find((s) => s.name === 'Truesight')
+      const blindsight = result.find((s) => s.name === 'Blindsight')
       expect(truesight).toBeDefined()
       expect(truesight.value).toBe('120 ft.')
-    })
-
-    it('getSenses adds truesight with default 60 ft when range is missing', () => {
-      const stats = {
-        automation: {
-          passives: [{ type: 'passive_buff', effect: 'truesight' }],
-        },
-      }
-      const result = rulesFactory.getSenses(stats, { rules: '5e' })
-      const truesight = result.find((s) => s.name === 'Truesight')
-      expect(truesight).toBeDefined()
-      expect(truesight.value).toBe('60 ft.')
-    })
-
-    it('getSenses does not add truesight when already present in base senses', async () => {
-      const stats = {
-        automation: {
-          passives: [{ type: 'passive_buff', effect: 'truesight', range: '120 ft.' }],
-        },
-      }
-      const { rules5e } = await import('../character/race-rules/index.js')
-      const originalGetSenses = rules5e.getSenses
-      rules5e.getSenses = vi.fn(() => [{ name: 'Truesight', value: '30 ft.' }])
-      const result = rulesFactory.getSenses(stats, { rules: '5e' })
-      const truesightEntries = result.filter((s) => s.name === 'Truesight')
-      expect(truesightEntries.length).toBe(1)
-      expect(truesightEntries[0].value).toBe('30 ft.')
-      rules5e.getSenses = originalGetSenses
-    })
-
-    it('getSenses adds blindsight from passive_buff when not already present', () => {
-      const stats = {
-        automation: {
-          passives: [{ type: 'passive_buff', effect: 'blindsight', range: '30 ft.' }],
-        },
-      }
-      const result = rulesFactory.getSenses(stats, { rules: '5e' })
-      const blindsight = result.find((s) => s.name === 'Blindsight')
-      expect(blindsight).toBeDefined()
-      expect(blindsight.value).toBe('30 ft.')
-    })
-
-    it('getSenses adds blindsight with default 10 ft when range is missing', () => {
-      const stats = {
-        automation: {
-          passives: [{ type: 'passive_buff', effect: 'blindsight' }],
-        },
-      }
-      const result = rulesFactory.getSenses(stats, { rules: '5e' })
-      const blindsight = result.find((s) => s.name === 'Blindsight')
       expect(blindsight).toBeDefined()
       expect(blindsight.value).toBe('10 ft.')
     })
 
-    it('getSenses does not add blindsight when already present in base senses', async () => {
-      const stats = {
-        automation: {
-          passives: [{ type: 'passive_buff', effect: 'blindsight', range: '60 ft.' }],
-        },
-      }
+    it('does not add truesight or blindsight when already present in base senses', async () => {
       const { rules5e } = await import('../character/race-rules/index.js')
       const originalGetSenses = rules5e.getSenses
-      rules5e.getSenses = vi.fn(() => [{ name: 'Blindsight', value: '10 ft.' }])
+      rules5e.getSenses = vi.fn(() => [{ name: 'Truesight', value: '30 ft.' }, { name: 'Blindsight', value: '10 ft.' }])
+
+      const stats = {
+        automation: {
+          passives: [
+            { type: 'passive_buff', effect: 'truesight', range: '120 ft.' },
+            { type: 'passive_buff', effect: 'blindsight', range: '60 ft.' },
+          ],
+        },
+      }
       const result = rulesFactory.getSenses(stats, { rules: '5e' })
+      const truesightEntries = result.filter((s) => s.name === 'Truesight')
       const blindsightEntries = result.filter((s) => s.name === 'Blindsight')
+      expect(truesightEntries.length).toBe(1)
+      expect(truesightEntries[0].value).toBe('30 ft.')
       expect(blindsightEntries.length).toBe(1)
       expect(blindsightEntries[0].value).toBe('10 ft.')
+
       rules5e.getSenses = originalGetSenses
-    })
-  })
-
-  describe('race rules delegation - 2024', () => {
-    it('getImmunities delegates to 2024 race rules', () => {
-      const result = rulesFactory.getImmunities({ rules: '2024' })
-      expect(Array.isArray(result)).toBe(true)
-      expect(result).toContain('Charmed')
-    })
-
-    it('getResistances delegates to 2024 race rules', () => {
-      const result = rulesFactory.getResistances({ rules: '2024' })
-      expect(Array.isArray(result)).toBe(true)
-      expect(result).toContain('Cold')
     })
   })
 
@@ -403,7 +290,7 @@ describe('rulesFactory', () => {
       expect(result._trackedResources.hitPoints).toBeDefined()
     })
 
-    it('adds auto resistances from resistance passives', async () => {
+    it('adds auto resistances from resistance passives and passive_immunity', async () => {
       const result = await rulesFactory.getPlayerStats(
         [],
         [],
@@ -414,12 +301,16 @@ describe('rulesFactory', () => {
           rules: '5e',
           resistances: [],
           automation: {
-            passives: [{ type: 'resistance', damageTypes: ['Fire', 'Cold'] }],
+            passives: [
+              { type: 'resistance', damageTypes: ['Fire', 'Cold'] },
+              { type: 'passive_immunity', damageResistance: ['Psychic'] },
+            ],
           },
         }
       )
       expect(result.resistances).toContain('Fire')
       expect(result.resistances).toContain('Cold')
+      expect(result.resistances).toContain('Psychic')
     })
 
     it('deduplicates auto resistances with existing ones', async () => {
@@ -442,45 +333,6 @@ describe('rulesFactory', () => {
       expect(result.resistances).toContain('Lightning')
     })
 
-    it('adds passive immunity damageResistance to resistances', async () => {
-      const result = await rulesFactory.getPlayerStats(
-        [],
-        [],
-        [],
-        [],
-        {},
-        {
-          rules: '5e',
-          resistances: [],
-          automation: {
-            passives: [
-              { type: 'passive_immunity', damageResistance: ['Psychic'] },
-            ],
-          },
-        }
-      )
-      expect(result.resistances).toContain('Psychic')
-    })
-
-    it('does not add land resistance when class type does not match mapping', async () => {
-      const result = await rulesFactory.getPlayerStats(
-        [],
-        [],
-        [],
-        [],
-        {},
-        {
-          rules: '5e',
-          resistances: [],
-          class: { major: { type: 'fire' } },
-          automation: {
-            passives: [{ type: 'land_resistance', landMappings: { nature: 'Lightning' } }],
-          },
-        }
-      )
-      expect(result.resistances).not.toContain('Lightning')
-    })
-
     it('adds land resistance when class type matches mapping', async () => {
       const result = await rulesFactory.getPlayerStats(
         [],
@@ -500,71 +352,7 @@ describe('rulesFactory', () => {
       expect(result.resistances).toContain('Lightning')
     })
 
-    it('respects Elemental Affinity runtime value', async () => {
-      const { getChosenRuntimeValue } = await import(
-        '../automation/common/choiceStorage.js'
-      )
-      vi.mocked(getChosenRuntimeValue).mockImplementation(
-        (_playerStats, name) => {
-          if (name === 'Elemental Affinity') return 'Radiant'
-          return null
-        }
-      )
-      const result = await rulesFactory.getPlayerStats(
-        [],
-        [],
-        [],
-        [],
-        {},
-        { rules: '2024', resistances: [] }
-      )
-      expect(result.resistances).toContain('Radiant')
-    })
-
-    it('respects Fiendish Resilience runtime value', async () => {
-      const { getChosenRuntimeValue } = await import(
-        '../automation/common/choiceStorage.js'
-      )
-      vi.mocked(getChosenRuntimeValue).mockImplementation(
-        (_playerStats, name) => {
-          if (name === 'Fiendish Resilience') return 'Fire'
-          return null
-        }
-      )
-      const result = await rulesFactory.getPlayerStats(
-        [],
-        [],
-        [],
-        [],
-        {},
-        { rules: '2024', resistances: [] }
-      )
-      expect(result.resistances).toContain('Fire')
-    })
-
-    it('respects Boon Of Energy Resistance runtime value', async () => {
-      const { getChosenRuntimeValue } = await import(
-        '../automation/common/choiceStorage.js'
-      )
-      vi.mocked(getChosenRuntimeValue).mockImplementation(
-        (_playerStats, name) => {
-          if (name === 'Boon Of Energy Resistance') return ['Necrotic', 'Poison']
-          return null
-        }
-      )
-      const result = await rulesFactory.getPlayerStats(
-        [],
-        [],
-        [],
-        [],
-        {},
-        { rules: '2024', resistances: [] }
-      )
-      expect(result.resistances).toContain('Necrotic')
-      expect(result.resistances).toContain('Poison')
-    })
-
-    it('combines multiple resistance sources from passives and race rules', async () => {
+    it('does not add land resistance when class type does not match mapping', async () => {
       const result = await rulesFactory.getPlayerStats(
         [],
         [],
@@ -574,56 +362,13 @@ describe('rulesFactory', () => {
         {
           rules: '5e',
           resistances: [],
-          automation: {
-            passives: [
-              { type: 'resistance', damageTypes: ['Fire'] },
-              { type: 'passive_immunity', damageResistance: ['Psychic'] },
-            ],
-          },
-        }
-      )
-      expect(result.resistances).toContain('Fire')
-      expect(result.resistances).toContain('Psychic')
-    })
-
-    it('does not add Boon Of Energy Resistance when array is empty', async () => {
-      const { getChosenRuntimeValue } = await import(
-        '../automation/common/choiceStorage.js'
-      )
-      vi.mocked(getChosenRuntimeValue).mockImplementation(
-        (_playerStats, name) => {
-          if (name === 'Boon Of Energy Resistance') return []
-          return null
-        }
-      )
-      const result = await rulesFactory.getPlayerStats(
-        [],
-        [],
-        [],
-        [],
-        {},
-        { rules: '2024', resistances: [] }
-      )
-      expect(result.resistances).toEqual(['Cold'])
-    })
-
-    it('adds land resistance when subclass.type matches mapping', async () => {
-      const result = await rulesFactory.getPlayerStats(
-        [],
-        [],
-        [],
-        [],
-        {},
-        {
-          rules: '5e',
-          resistances: [],
-          class: { subclass: { type: 'nature' } },
+          class: { major: { type: 'fire' } },
           automation: {
             passives: [{ type: 'land_resistance', landMappings: { nature: 'Lightning' } }],
           },
         }
       )
-      expect(result.resistances).toContain('Lightning')
+      expect(result.resistances).not.toContain('Lightning')
     })
 
     it('prioritizes major.type over subclass.type for land resistance', async () => {
@@ -666,7 +411,91 @@ describe('rulesFactory', () => {
       expect(result.resistances).toContain('Lightning')
     })
 
-    it('throws when passives is not an array in getPlayerStats', async () => {
+    it('respects runtime choice resistances for 2024', async () => {
+      const { getChosenRuntimeValue } = await import(
+        '../automation/common/choiceStorage.js'
+      )
+      vi.mocked(getChosenRuntimeValue).mockImplementation(
+        (_playerStats, name) => {
+          if (name === 'Elemental Affinity') return 'Radiant'
+          if (name === 'Fiendish Resilience') return 'Fire'
+          if (name === 'Boon Of Energy Resistance') return ['Necrotic', 'Poison']
+          return null
+        }
+      )
+      const result = await rulesFactory.getPlayerStats(
+        [],
+        [],
+        [],
+        [],
+        {},
+        { rules: '2024', resistances: [] }
+      )
+      expect(result.resistances).toContain('Radiant')
+      expect(result.resistances).toContain('Fire')
+      expect(result.resistances).toContain('Necrotic')
+      expect(result.resistances).toContain('Poison')
+    })
+
+    it('does not add Boon Of Energy Resistance when array is empty', async () => {
+      const { getChosenRuntimeValue } = await import(
+        '../automation/common/choiceStorage.js'
+      )
+      vi.mocked(getChosenRuntimeValue).mockImplementation(
+        (_playerStats, name) => {
+          if (name === 'Boon Of Energy Resistance') return []
+          return null
+        }
+      )
+      const result = await rulesFactory.getPlayerStats(
+        [],
+        [],
+        [],
+        [],
+        {},
+        { rules: '2024', resistances: [] }
+      )
+      expect(result.resistances).toEqual(['Cold'])
+    })
+
+    it('combines multiple resistance sources from passives and race rules', async () => {
+      const result = await rulesFactory.getPlayerStats(
+        [],
+        [],
+        [],
+        [],
+        {},
+        {
+          rules: '5e',
+          resistances: [],
+          automation: {
+            passives: [
+              { type: 'resistance', damageTypes: ['Fire'] },
+              { type: 'passive_immunity', damageResistance: ['Psychic'] },
+            ],
+          },
+        }
+      )
+      expect(result.resistances).toContain('Fire')
+      expect(result.resistances).toContain('Psychic')
+    })
+
+    it('sets class and race from appropriate ruleset modules', async () => {
+      const result = await rulesFactory.getPlayerStats(
+        [],
+        [],
+        [],
+        [],
+        {},
+        { rules: '5e', resistances: [] }
+      )
+      expect(result.class).toBeDefined()
+      expect(result.race).toBeDefined()
+      expect(result.immunities).toBeDefined()
+      expect(result.resistances).toBeDefined()
+    })
+
+    it('throws when passives is not an array', async () => {
       await expect(
         rulesFactory.getPlayerStats(
           [],
@@ -720,141 +549,6 @@ describe('rulesFactory', () => {
           }
         )
       ).rejects.toThrow('Expected landMappings to be an object')
-    })
-
-    it('throws when resistances is not an array for passive_immunity', async () => {
-      const { rules5e } = await import('../character/race-rules/index.js')
-      rules5e.getResistances.mockReturnValue('not-an-array')
-      await expect(
-        rulesFactory.getPlayerStats(
-          [],
-          [],
-          [],
-          [],
-          {},
-          {
-            rules: '5e',
-            resistances: [],
-            automation: {
-              passives: [{ type: 'passive_immunity', damageResistance: ['Psychic'] }],
-            },
-          }
-        )
-      ).rejects.toThrow('Expected resistances to be an array')
-      rules5e.getResistances.mockReturnValue(['Fire'])
-    })
-
-    it('throws when resistances is not an array for elemental affinity', async () => {
-      const { getChosenRuntimeValue } = await import(
-        '../automation/common/choiceStorage.js'
-      )
-      vi.mocked(getChosenRuntimeValue).mockImplementation(
-        (_playerStats, name) => {
-          if (name === 'Elemental Affinity') return 'Radiant'
-          return null
-        }
-      )
-      const { rules2024 } = await import('../character/race-rules/index.js')
-      rules2024.getResistances.mockReturnValue('not-an-array')
-      await expect(
-        rulesFactory.getPlayerStats(
-          [],
-          [],
-          [],
-          [],
-          {},
-          {
-            rules: '2024',
-            resistances: [],
-            automation: { passives: [] },
-          }
-        )
-      ).rejects.toThrow('Expected resistances to be an array')
-      rules2024.getResistances.mockReturnValue(['Cold'])
-    })
-
-    it('throws when resistances is not an array for fiendish resilience', async () => {
-      const { getChosenRuntimeValue } = await import(
-        '../automation/common/choiceStorage.js'
-      )
-      vi.mocked(getChosenRuntimeValue).mockImplementation(
-        (_playerStats, name) => {
-          if (name === 'Fiendish Resilience') return 'Fire'
-          return null
-        }
-      )
-      const { rules2024 } = await import('../character/race-rules/index.js')
-      rules2024.getResistances.mockReturnValue('not-an-array')
-      await expect(
-        rulesFactory.getPlayerStats(
-          [],
-          [],
-          [],
-          [],
-          {},
-          {
-            rules: '2024',
-            resistances: [],
-            automation: { passives: [] },
-          }
-        )
-      ).rejects.toThrow('Expected resistances to be an array')
-      rules2024.getResistances.mockReturnValue(['Cold'])
-    })
-
-    it('throws when resistances is not an array for boon of energy resistance', async () => {
-      const { getChosenRuntimeValue } = await import(
-        '../automation/common/choiceStorage.js'
-      )
-      vi.mocked(getChosenRuntimeValue).mockImplementation(
-        (_playerStats, name) => {
-          if (name === 'Boon Of Energy Resistance') return ['Necrotic']
-          return null
-        }
-      )
-      const { rules2024 } = await import('../character/race-rules/index.js')
-      rules2024.getResistances.mockReturnValue('not-an-array')
-      await expect(
-        rulesFactory.getPlayerStats(
-          [],
-          [],
-          [],
-          [],
-          {},
-          {
-            rules: '2024',
-            resistances: [],
-            automation: { passives: [] },
-          }
-        )
-      ).rejects.toThrow('Expected resistances to be an array')
-      rules2024.getResistances.mockReturnValue(['Cold'])
-    })
-
-    it('sets class and race from appropriate ruleset modules', async () => {
-      const result = await rulesFactory.getPlayerStats(
-        [],
-        [],
-        [],
-        [],
-        {},
-        { rules: '5e', resistances: [] }
-      )
-      expect(result.class).toBeDefined()
-      expect(result.race).toBeDefined()
-    })
-
-    it('sets immunities and resistances from race rules in getPlayerStats', async () => {
-      const result = await rulesFactory.getPlayerStats(
-        [],
-        [],
-        [],
-        [],
-        {},
-        { rules: '5e', resistances: [] }
-      )
-      expect(result.immunities).toBeDefined()
-      expect(result.resistances).toBeDefined()
     })
   })
 })

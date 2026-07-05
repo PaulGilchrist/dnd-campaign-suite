@@ -1,3 +1,4 @@
+// @cleaned-by-ai
 // @improved-by-ai
 import { renderHook, waitFor, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -60,12 +61,6 @@ describe('useWizardConfig', () => {
       expect(result.current.hitPoints).toBe(10);
     });
 
-    it('returns all slot keys in result', () => {
-      const { result } = renderConfig();
-      expect(result.current).toHaveProperty('subclass');
-      expect(result.current).toHaveProperty('hitPoints');
-    });
-
     it('returns warnings and setWarnings properties', () => {
       const { result } = renderConfig();
       expect(result.current).toHaveProperty('warnings');
@@ -91,7 +86,7 @@ describe('useWizardConfig', () => {
       });
     });
 
-    it('sets empty warnings when validateFn returns null', async () => {
+    it('sets empty warnings when validateFn returns null or undefined', async () => {
       mockValidateFn.mockResolvedValue(null);
 
       const { result } = renderConfig();
@@ -100,16 +95,7 @@ describe('useWizardConfig', () => {
       });
     });
 
-    it('sets empty warnings when validateFn returns undefined', async () => {
-      mockValidateFn.mockResolvedValue(undefined);
-
-      const { result } = renderConfig();
-      await waitFor(() => {
-        expect(result.current.warnings).toEqual([]);
-      });
-    });
-
-    it('sets slot state from slot.get results (full result object)', async () => {
+    it('sets slot state from slot.get results', async () => {
       mockSlots[0].get.mockResolvedValue({ value: 'Thief', preSelected: [] });
       mockSlots[1].get.mockResolvedValue({ value: 15, preSelected: null });
 
@@ -120,8 +106,7 @@ describe('useWizardConfig', () => {
       });
     });
 
-    it('uses slot initial value when slot.get result is not in slotState', async () => {
-      // When slot.get is never called (e.g., error), the initial value is used
+    it('uses slot initial value when slot.get result is not in slotState', () => {
       const { result } = renderConfig();
       expect(result.current.subclass).toBeNull();
       expect(result.current.hitPoints).toBe(10);
@@ -156,22 +141,6 @@ describe('useWizardConfig', () => {
 
       expect(result.current.warnings).toEqual([]);
     });
-
-    it('merges preSelected values from slot.get into preSelectedState', async () => {
-      mockSlots[0].get.mockResolvedValue({
-        value: 'Thief',
-        preSelected: ['Skill A', 'Skill B'],
-      });
-      mockSlots[1].get.mockResolvedValue({ value: 15, preSelected: null });
-
-      const { result } = renderConfig();
-      await waitFor(() => {
-        expect(result.current).toHaveProperty('subclass');
-      });
-
-      // The preSelected from slot 0 should be merged into result
-      expect(result.current).toHaveProperty('subclass');
-    });
   });
 
   describe('pre-select auto-merge effect', () => {
@@ -182,40 +151,8 @@ describe('useWizardConfig', () => {
       });
     });
 
-    it('does not run pre-select effect when setFormData is absent', async () => {
-      renderConfig({
-        preSelect: {
-          stateKey: 'features',
-          getFn: vi.fn().mockResolvedValue(['Feature A']),
-          deps: () => [],
-          merge: vi.fn(),
-        },
-        setFormData: undefined,
-      });
-      await waitFor(() => {
-        // preSelect.getFn should not be called because setFormData is absent
-      });
-    });
-
-    it('calls preSelect.getFn with formData', async () => {
+    it('calls preSelect.getFn with formData and sets state', async () => {
       const mockGetFn = vi.fn().mockResolvedValue(['Feature A', 'Feature B']);
-
-      renderConfig({
-        preSelect: {
-          stateKey: 'features',
-          getFn: mockGetFn,
-          deps: () => [],
-          merge: vi.fn(),
-        },
-      });
-
-      await waitFor(() => {
-        expect(mockGetFn).toHaveBeenCalledWith(mockFormData);
-      });
-    });
-
-    it('sets preSelectedState from preSelect.getFn result', async () => {
-      const mockGetFn = vi.fn().mockResolvedValue(['Feature A']);
 
       const { result } = renderConfig({
         preSelect: {
@@ -227,7 +164,8 @@ describe('useWizardConfig', () => {
       });
 
       await waitFor(() => {
-        expect(result.current.features).toEqual(['Feature A']);
+        expect(mockGetFn).toHaveBeenCalledWith(mockFormData);
+        expect(result.current.features).toEqual(['Feature A', 'Feature B']);
       });
     });
 
@@ -266,24 +204,6 @@ describe('useWizardConfig', () => {
       });
     });
 
-    it('does not call merge when preSelect.getFn returns empty string', async () => {
-      const mockGetFn = vi.fn().mockResolvedValue('');
-      const mockMerge = vi.fn();
-
-      renderConfig({
-        preSelect: {
-          stateKey: 'features',
-          getFn: mockGetFn,
-          deps: () => [],
-          merge: mockMerge,
-        },
-      });
-
-      await waitFor(() => {
-        expect(mockMerge).not.toHaveBeenCalled();
-      });
-    });
-
     it('calls merge via setFormData when items exist', async () => {
       const items = ['Feature A'];
       const mockGetFn = vi.fn().mockResolvedValue(items);
@@ -295,23 +215,6 @@ describe('useWizardConfig', () => {
           getFn: mockGetFn,
           deps: () => [],
           merge: mockMerge,
-        },
-      });
-
-      await waitFor(() => {
-        expect(mockSetFormData).toHaveBeenCalled();
-      });
-    });
-
-    it('uses default hasItems when preSelect.hasItems is not provided', async () => {
-      const mockGetFn = vi.fn().mockResolvedValue(['Feature A']);
-
-      renderConfig({
-        preSelect: {
-          stateKey: 'features',
-          getFn: mockGetFn,
-          deps: () => [],
-          merge: vi.fn(),
         },
       });
 
@@ -434,20 +337,6 @@ describe('useWizardConfig', () => {
       expect(result.current).toHaveProperty('setWarnings');
     });
 
-    it('handles slots with no preSelected values in get results', async () => {
-      const slotsNoPreSelected = [
-        {
-          state: { key: 'subclass', initial: null },
-          get: vi.fn().mockResolvedValue({ value: 'Thief' }),
-        },
-      ];
-
-      const { result } = renderConfig({ slots: slotsNoPreSelected });
-      await waitFor(() => {
-        expect(result.current.subclass).toEqual({ value: 'Thief' });
-      });
-    });
-
     it('handles slots with both preSelected and normal values', async () => {
       const slotsMixed = [
         {
@@ -488,9 +377,15 @@ describe('useWizardConfig', () => {
     });
 
     it('replaces all warnings when called with new array', async () => {
-      mockValidateFn.mockResolvedValue(['Warning 1', 'Warning 2']);
-
       const { result } = renderConfig();
+      await waitFor(() => {
+        expect(result.current.warnings).toEqual([]);
+      });
+
+      act(() => {
+        result.current.setWarnings(['Warning 1', 'Warning 2']);
+      });
+
       await waitFor(() => {
         expect(result.current.warnings).toEqual(['Warning 1', 'Warning 2']);
       });

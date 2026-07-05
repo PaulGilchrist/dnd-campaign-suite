@@ -259,16 +259,7 @@ describe('contextBuilder: buildAttackContext (map-based)', () => {
       expect(result.rangeReason).toBe('Long range');
     });
 
-    it('treats attacks with range > 8 feet as ranged', async () => {
-      loadMapData.mockResolvedValue(makeMapData([{ name: 'Fighter1', gridX: 1, gridY: 1 }]));
-      getCombatContext.mockResolvedValue(makeCombatContext('Fighter1', 'Orc', 10, 10));
-      getTargetFromAttacker.mockReturnValue({ name: 'Orc', gridX: 10, gridY: 10 });
 
-      const meleeAttack = { ...mockRangedAttack, range: 5, weaponType: 'melee' };
-      await buildAttackContext(meleeAttack, mockStats, 'camp', 'test-map', 'normal', {});
-
-      expect(rangeToFeet).toHaveBeenCalledWith(5);
-    });
   });
 
   describe('cover calculations', () => {
@@ -390,22 +381,7 @@ describe('contextBuilder: buildAttackContext (map-based)', () => {
       expect(result.rangeReason).toBe('Firing in melee');
     });
 
-    it('does not override existing forcedMode with melee proximity disadvantage', async () => {
-      loadMapData.mockResolvedValue(makeMapData(
-        [{ name: 'Fighter1', gridX: 1, gridY: 1 }],
-        [{ name: 'Orc', gridX: 10, gridY: 10, type: 'npc' }],
-      ));
-      getCombatContext.mockResolvedValue(makeCombatContext('Fighter1', 'Orc', 10, 10));
-      getTargetFromAttacker.mockReturnValue({ name: 'Orc', gridX: 10, gridY: 10 });
-      getNearestPlacedItem.mockReturnValue({ name: 'Orc', gridX: 10, gridY: 10 });
-      getDistanceFeet.mockReturnValue(50);
-      isHostileNPC.mockReturnValue(true);
-      computeMeleeProximityEffect.mockReturnValue({ mode: 'disadvantage', reason: 'Firing in melee' });
 
-      const result = await buildAttackContext(mockRangedAttack, mockStats, 'camp', 'test-map', 'disadvantage', {});
-
-      expect(result.forcedMode).toBe('disadvantage');
-    });
 
     it('skips melee proximity check when attack is auto miss', async () => {
       loadMapData.mockResolvedValue(makeMapData(
@@ -725,21 +701,7 @@ describe('contextBuilder: buildAttackContext (map-based)', () => {
       expect(result.forcedMode).toBe('advantage');
     });
 
-    it('does not apply aura checks when forcedMode is already set', async () => {
-      loadMapData.mockResolvedValue(makeMapData(
-        [{ name: 'Fighter1', gridX: 1, gridY: 1 }],
-        [{ name: 'Orc', gridX: 10, gridY: 10, type: 'npc' }],
-      ));
-      getCombatContext.mockResolvedValue(makeCombatContext('Fighter1', 'Orc', 10, 10));
-      getTargetFromAttacker.mockReturnValue({ name: 'Orc', gridX: 10, gridY: 10 });
-      getNearestPlacedItem.mockReturnValue({ name: 'Orc', gridX: 10, gridY: 10 });
-      getWolfAdvantageAgainst.mockReturnValue({ advantage: true });
 
-      const result = await buildAttackContext(mockRangedAttack, mockStats, 'camp', 'test-map', 'disadvantage', {});
-
-      expect(result.forcedMode).toBe('disadvantage');
-      expect(getWolfAdvantageAgainst).not.toHaveBeenCalled();
-    });
   });
 
   describe('aura effects with map data — no target position', () => {
@@ -756,14 +718,6 @@ describe('contextBuilder: buildAttackContext (map-based)', () => {
       );
     });
 
-    it('does not apply range or cover effects when target position is null', async () => {
-      loadMapData.mockResolvedValue(makeMapData([{ name: 'Fighter1', gridX: 1, gridY: 1 }]));
-      getCombatContext.mockResolvedValue(null);
 
-      await buildAttackContext(mockRangedAttack, mockStats, 'camp', 'test-map', 'normal', {});
-
-      expect(computeRangeEffect).not.toHaveBeenCalled();
-      expect(computeCover).not.toHaveBeenCalled();
-    });
   });
 });

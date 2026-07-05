@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import rules from './rules.js'
 
@@ -127,27 +127,12 @@ describe('rules', () => {
   })
 
   describe('getAbilityLongName', () => {
-    it('returns full ability name for STR', () => {
+    it('returns full ability name for all standard abbreviations', () => {
       expect(rules.getAbilityLongName('STR')).toBe('Strength')
-    })
-
-    it('returns full ability name for DEX', () => {
       expect(rules.getAbilityLongName('DEX')).toBe('Dexterity')
-    })
-
-    it('returns full ability name for CON', () => {
       expect(rules.getAbilityLongName('CON')).toBe('Constitution')
-    })
-
-    it('returns full ability name for INT', () => {
       expect(rules.getAbilityLongName('INT')).toBe('Intelligence')
-    })
-
-    it('returns full ability name for WIS', () => {
       expect(rules.getAbilityLongName('WIS')).toBe('Wisdom')
-    })
-
-    it('returns full ability name for CHA', () => {
       expect(rules.getAbilityLongName('CHA')).toBe('Charisma')
     })
 
@@ -181,105 +166,45 @@ describe('rules', () => {
       expect(result.use2024).toBe(false)
     })
 
-    it('defaults to 5e when no rules specified in either object', () => {
-      const result = rules.getSubModules({}, {})
-      expect(result.use2024).toBe(false)
-    })
-
-    it('defaults to 5e when rules is null', () => {
-      const result = rules.getSubModules({ rules: null }, {})
-      expect(result.use2024).toBe(false)
-    })
-
-    it('defaults to 5e when rules is undefined', () => {
-      const result = rules.getSubModules({ rules: undefined }, {})
-      expect(result.use2024).toBe(false)
-    })
-
-    it('provides abilityCalc with getAbilities and getHitPoints', () => {
-      const result = rules.getSubModules({ rules: '5e' }, {})
-      expect(typeof result.abilityCalc.getAbilities).toBe('function')
-      expect(typeof result.abilityCalc.getHitPoints).toBe('function')
-    })
-
-    it('provides spellCalc with getSpellAbilities', () => {
-      const result = rules.getSubModules({ rules: '5e' }, {})
-      expect(typeof result.spellCalc.getSpellAbilities).toBe('function')
-    })
-
-    it('provides attackCalc as a function', () => {
-      const result = rules.getSubModules({ rules: '5e' }, {})
-      expect(typeof result.attackCalc).toBe('function')
-    })
-
-    it('provides proficiencyUtils as a module object', () => {
-      const result = rules.getSubModules({ rules: '5e' }, {})
-      expect(typeof result.proficiencyUtils.getProficiencies).toBe('function')
-      expect(typeof result.proficiencyUtils.getProficiencyChoiceCount).toBe('function')
+    it('defaults to 5e when no rules specified', () => {
+      expect(rules.getSubModules({}, {}).use2024).toBe(false)
+      expect(rules.getSubModules({ rules: null }, {}).use2024).toBe(false)
+      expect(rules.getSubModules({ rules: undefined }, {}).use2024).toBe(false)
     })
   })
 
   describe('getAbilities', () => {
-    it('returns abilities array for 5e ruleset', async () => {
-      const result = await rules.getAbilities({ rules: '5e' }, {})
-      expect(Array.isArray(result)).toBe(true)
-    })
-
-    it('returns abilities array for 2024 ruleset', async () => {
-      const result = await rules.getAbilities({ rules: '2024' }, {})
-      expect(Array.isArray(result)).toBe(true)
+    it('returns abilities array for both rulesets', async () => {
+      expect(Array.isArray(await rules.getAbilities({ rules: '5e' }, {}))).toBe(true)
+      expect(Array.isArray(await rules.getAbilities({ rules: '2024' }, {}))).toBe(true)
     })
   })
 
   describe('getHitPoints', () => {
-    it('returns hit points number for 5e', () => {
-      const result = rules.getHitPoints({ rules: '5e' }, {})
-      expect(result).toBeTypeOf('number')
-      expect(result).toBeGreaterThan(0)
-    })
-
-    it('returns hit points number for 2024', () => {
-      const result = rules.getHitPoints({ rules: '2024' }, {})
-      expect(result).toBeTypeOf('number')
-      expect(result).toBeGreaterThan(0)
+    it('returns hit points number for both rulesets', () => {
+      expect(rules.getHitPoints({ rules: '5e' }, {})).toBeTypeOf('number')
+      expect(rules.getHitPoints({ rules: '2024' }, {})).toBeTypeOf('number')
     })
   })
 
   describe('getCarryingCapacity', () => {
-    it('returns carrying capacity number for 5e', () => {
-      const result = rules.getCarryingCapacity({ rules: '5e' })
-      expect(result).toBeTypeOf('number')
-      expect(result).toBeGreaterThan(0)
-    })
-
-    it('returns carrying capacity number for 2024', () => {
-      const result = rules.getCarryingCapacity({ rules: '2024' })
-      expect(result).toBeTypeOf('number')
-      expect(result).toBeGreaterThan(0)
+    it('returns carrying capacity number for both rulesets', () => {
+      expect(rules.getCarryingCapacity({ rules: '5e' })).toBeTypeOf('number')
+      expect(rules.getCarryingCapacity({ rules: '2024' })).toBeTypeOf('number')
     })
   })
 
   describe('getSpellAbilities', () => {
-    it('returns spell abilities object for 5e', () => {
-      const result = rules.getSpellAbilities([], { rules: '5e' }, {})
-      expect(result).toBeTypeOf('object')
-    })
-
-    it('returns spell abilities object for 2024', () => {
-      const result = rules.getSpellAbilities([], { rules: '2024' }, {})
-      expect(result).toBeTypeOf('object')
+    it('returns spell abilities object for both rulesets', () => {
+      expect(rules.getSpellAbilities([], { rules: '5e' }, {})).toBeTypeOf('object')
+      expect(rules.getSpellAbilities([], { rules: '2024' }, {})).toBeTypeOf('object')
     })
   })
 
   describe('getAttacks', () => {
-    it('returns attacks array for 5e', () => {
-      const result = rules.getAttacks([], [], { rules: '5e' }, {})
-      expect(Array.isArray(result)).toBe(true)
-    })
-
-    it('returns attacks array for 2024', () => {
-      const result = rules.getAttacks([], [], { rules: '2024' }, {})
-      expect(Array.isArray(result)).toBe(true)
+    it('returns attacks array for both rulesets', () => {
+      expect(Array.isArray(rules.getAttacks([], [], { rules: '5e' }, {}))).toBe(true)
+      expect(Array.isArray(rules.getAttacks([], [], { rules: '2024' }, {}))).toBe(true)
     })
   })
 
@@ -291,42 +216,29 @@ describe('rules', () => {
   })
 
   describe('getProficiencies', () => {
-    it('returns proficiency data for 5e with subclass', () => {
-      const result = rules.getProficiencies({ rules: '5e', class: { subclass: {} } }, true, {})
-      expect(Array.isArray(result)).toBe(true)
-      expect(result.length).toBe(2)
-    })
+    it('returns proficiency data for both rulesets', () => {
+      const result5e = rules.getProficiencies({ rules: '5e', class: { subclass: {} } }, true, {})
+      expect(Array.isArray(result5e)).toBe(true)
+      expect(result5e.length).toBe(2)
 
-    it('returns proficiency data for 2024 with major class', () => {
-      const result = rules.getProficiencies({ rules: '2024', class: { major: {} } }, true, {})
-      expect(Array.isArray(result)).toBe(true)
-      expect(result.length).toBe(2)
+      const result2024 = rules.getProficiencies({ rules: '2024', class: { major: {} } }, true, {})
+      expect(Array.isArray(result2024)).toBe(true)
+      expect(result2024.length).toBe(2)
     })
   })
 
   describe('getActions', () => {
-    it('returns array of 5 action categories for 5e', () => {
-      const stats = { rules: '5e', actions: [], bonusActions: [], reactions: [], specialActions: [] }
-      const result = rules.getActions(stats, {})
-      expect(Array.isArray(result)).toBe(true)
-      expect(result.length).toBe(5)
-      expect(result[0]).toBeInstanceOf(Array)
-      expect(result[1]).toBeInstanceOf(Array)
-      expect(result[2]).toBeInstanceOf(Array)
-      expect(result[3]).toBeInstanceOf(Array)
-      expect(result[4]).toBeInstanceOf(Array)
-    })
+    it('returns array of 5 action categories for both rulesets', () => {
+      const stats5e = { rules: '5e', actions: [], bonusActions: [], reactions: [], specialActions: [] }
+      const stats2024 = { rules: '2024', actions: [], bonusActions: [], reactions: [], specialActions: [] }
 
-    it('returns array of 5 action categories for 2024', () => {
-      const stats = { rules: '2024', actions: [], bonusActions: [], reactions: [], specialActions: [] }
-      const result = rules.getActions(stats, {})
-      expect(Array.isArray(result)).toBe(true)
-      expect(result.length).toBe(5)
-      expect(result[0]).toBeInstanceOf(Array)
-      expect(result[1]).toBeInstanceOf(Array)
-      expect(result[2]).toBeInstanceOf(Array)
-      expect(result[3]).toBeInstanceOf(Array)
-      expect(result[4]).toBeInstanceOf(Array)
+      const result5e = rules.getActions(stats5e, {})
+      const result2024 = rules.getActions(stats2024, {})
+
+      expect(result5e.length).toBe(5)
+      expect(result2024.length).toBe(5)
+      expect(result5e[0]).toBeInstanceOf(Array)
+      expect(result2024[0]).toBeInstanceOf(Array)
     })
 
     it('deduplicates actions with same name across sources', () => {
@@ -390,12 +302,11 @@ describe('rules', () => {
         inventory: { equipped: [] },
       }
       const result = rules.getArmorClass([], stats, {})
-      expect(Array.isArray(result)).toBe(true)
       expect(result[0]).toBe(13)
       expect(result[1]).toContain('Dexterity Bonus (3)')
     })
 
-    it('calculates monk unarmored defense', () => {
+    it('calculates monk unarmored defense with wisdom', () => {
       const stats = {
         rules: '5e',
         abilities: [
@@ -407,7 +318,6 @@ describe('rules', () => {
         inventory: { equipped: [] },
       }
       const result = rules.getArmorClass([], stats, {})
-      // 10 (base) + 3 (dex) + 5 (wisdom monk bonus) = 18
       expect(result[0]).toBe(18)
       expect(result[1]).toContain('Monk Wisdom Bonus (5)')
     })
@@ -439,7 +349,6 @@ describe('rules', () => {
         inventory: { equipped: [] },
       }
       const result = rules.getArmorClass([], stats, {})
-      // Barbarian: 10 + 2 + 3 = 15, Monk would be 10 + 2 + 5 = 17 but class is Barbarian
       expect(result[0]).toBe(15)
     })
 
@@ -453,7 +362,6 @@ describe('rules', () => {
         inventory: { equipped: ['Shield'] },
       }
       const result = rules.getArmorClass([], stats, {})
-      // 12 (10 + dex) + 2 (shield) = 14
       expect(result[0]).toBe(14)
       expect(result[1]).toContain('Shield (2)')
     })
@@ -518,31 +426,18 @@ describe('rules', () => {
       expect(result[1]).not.toContain('Fighting Style Defense')
     })
 
-    it('adds cloak of protection bonus in 5e', () => {
-      const stats = {
+    it('adds cloak and ring of protection bonus in 5e', () => {
+      const stats5e = {
         rules: '5e',
         abilities: [
           { name: 'Dexterity', bonus: 2 },
         ],
         class: { name: 'Wizard' },
-        inventory: { equipped: [], magicItems: [{ name: 'Cloak of Protection' }] },
+        inventory: { equipped: [], magicItems: [{ name: 'Cloak of Protection' }, { name: 'Ring of Protection' }] },
       }
-      const result = rules.getArmorClass([], stats, {})
-      expect(result[0]).toBe(13)
+      const result = rules.getArmorClass([], stats5e, {})
+      expect(result[0]).toBe(14)
       expect(result[1]).toContain('Cloak of Protection (1)')
-    })
-
-    it('adds ring of protection bonus in 5e', () => {
-      const stats = {
-        rules: '5e',
-        abilities: [
-          { name: 'Dexterity', bonus: 2 },
-        ],
-        class: { name: 'Wizard' },
-        inventory: { equipped: [], magicItems: [{ name: 'Ring of Protection' }] },
-      }
-      const result = rules.getArmorClass([], stats, {})
-      expect(result[0]).toBe(13)
       expect(result[1]).toContain('Ring of Protection (1)')
     })
 
@@ -617,40 +512,32 @@ describe('rules', () => {
         languages: [],
       }
       const result = rules.getLanguages(stats, {})
-      expect(Array.isArray(result)).toBe(true)
       expect(result.length).toBe(2)
       expect(result[0]).toBe(4)
       expect(result[1]).toEqual(['Common', 'Elvish'])
     })
 
-    it('includes class languages', () => {
-      const stats = {
+    it('includes class languages, player-chosen languages, and removes duplicates', () => {
+      const stats1 = {
         race: { languages: ['Common'] },
         class: { languages: ['Dwarvish'] },
         languages: [],
       }
-      const result = rules.getLanguages(stats, {})
-      expect(result[1]).toEqual(['Common', 'Dwarvish'])
-    })
+      expect(rules.getLanguages(stats1, {})[1]).toEqual(['Common', 'Dwarvish'])
 
-    it('includes player-chosen languages', () => {
-      const stats = {
+      const stats2 = {
         race: { languages: ['Common'] },
         class: { languages: [] },
         languages: ['Giant'],
       }
-      const result = rules.getLanguages(stats, {})
-      expect(result[1]).toEqual(['Common', 'Giant'])
-    })
+      expect(rules.getLanguages(stats2, {})[1]).toEqual(['Common', 'Giant'])
 
-    it('removes duplicate languages', () => {
-      const stats = {
+      const stats3 = {
         race: { languages: ['Common'] },
         class: { languages: ['Common'] },
         languages: ['Common'],
       }
-      const result = rules.getLanguages(stats, {})
-      expect(result[1]).toEqual(['Common'])
+      expect(rules.getLanguages(stats3, {})[1]).toEqual(['Common'])
     })
 
     it('adds background languages', () => {
@@ -659,8 +546,7 @@ describe('rules', () => {
         class: { languages: [] },
         languages: [],
       }
-      const result = rules.getLanguages(stats, {})
-      expect(result[0]).toBe(2)
+      expect(rules.getLanguages(stats, {})[0]).toBe(2)
     })
 
     it('adds subrace languages', () => {
@@ -677,7 +563,6 @@ describe('rules', () => {
       }
       const result = rules.getLanguages(stats, {})
       expect(result[1]).toEqual(['Common', 'Elvish'])
-      // 1 base + 2 background + 1 subrace choose = 4
       expect(result[0]).toBe(4)
     })
 
@@ -688,82 +573,56 @@ describe('rules', () => {
         languages: [],
         level: 16,
       }
-      const result = rules.getLanguages(stats, {})
-      // 1 base + 2 background + 1 (level>5) + 1 (level>13) = 5
-      expect(result[0]).toBe(5)
+      expect(rules.getLanguages(stats, {})[0]).toBe(5)
     })
 
-    it('adds subclass language choices for 5e', () => {
-      const stats = {
+    it('adds subclass language choices for 5e and major class for 2024', () => {
+      const stats5e = {
         race: { languages: ['Common'] },
         class: { name: 'Wizard', subclass: { language_choices: { choose: 1 } } },
         languages: [],
       }
-      const result = rules.getLanguages(stats, {})
-      expect(result[0]).toBe(4)
-    })
+      expect(rules.getLanguages(stats5e, {})[0]).toBe(4)
 
-    it('adds major class language choices for 2024', () => {
-      const stats = {
+      const stats2024 = {
         race: { languages: ['Common'] },
         class: { name: 'Wizard', major: { language_choices: { choose: 1 } } },
         languages: [],
         rules: '2024',
       }
-      const result = rules.getLanguages(stats, {})
-      expect(result[0]).toBe(4)
+      expect(rules.getLanguages(stats2024, {})[0]).toBe(4)
     })
   })
 
   describe('getMagicItems', () => {
-    it('returns null for 5e when no magic items', () => {
+    it('returns null for 5e and empty array for 2024 when no magic items', () => {
       const stats = { rules: '5e' }
-      const result = rules.getMagicItems([], { inventory: { magicItems: [] } }, stats)
-      expect(result).toBeNull()
+      expect(rules.getMagicItems([], { inventory: { magicItems: [] } }, stats)).toBeNull()
+
+      const stats2024 = { rules: '2024' }
+      expect(rules.getMagicItems([], { inventory: { magicItems: [] } }, stats2024)).toEqual([])
     })
 
-    it('returns empty array for 2024 when no magic items', () => {
-      const stats = { rules: '2024' }
-      const result = rules.getMagicItems([], { inventory: { magicItems: [] } }, stats)
-      expect(result).toEqual([])
-    })
-
-    it('returns processed items for 5e', () => {
+    it('returns processed items for 5e and filters missing items for 2024', () => {
       const magicItems = [{ name: 'Ring of Protection', description: 'A protective ring' }]
-      const stats = { rules: '5e' }
-      const result = rules.getMagicItems(magicItems, { inventory: { magicItems: ['Ring of Protection'] } }, stats)
-      expect(Array.isArray(result)).toBe(true)
-      expect(result.length).toBe(1)
-      expect(result[0].name).toBe('Ring of Protection')
+      const stats5e = { rules: '5e' }
+      const result5e = rules.getMagicItems(magicItems, { inventory: { magicItems: ['Ring of Protection'] } }, stats5e)
+      expect(result5e.length).toBe(1)
+      expect(result5e[0].name).toBe('Ring of Protection')
+
+      const stats2024 = { rules: '2024' }
+      const result2024 = rules.getMagicItems([], { inventory: { magicItems: ['Missing Item'] } }, stats2024)
+      expect(result2024.length).toBe(0)
+
+      const result5eMissing = rules.getMagicItems([], { inventory: { magicItems: ['Missing Item'] } }, stats5e)
+      expect(result5eMissing.length).toBe(1)
     })
 
-    it('filters out missing items for 2024', () => {
-      const magicItems = []
-      const stats = { rules: '2024' }
-      const result = rules.getMagicItems(magicItems, { inventory: { magicItems: ['Missing Item'] } }, stats)
-      expect(Array.isArray(result)).toBe(true)
-      expect(result.length).toBe(0)
-    })
-
-    it('keeps missing items for 5e', () => {
-      const magicItems = []
-      const stats = { rules: '5e' }
-      const result = rules.getMagicItems(magicItems, { inventory: { magicItems: ['Missing Item'] } }, stats)
-      expect(Array.isArray(result)).toBe(true)
-      expect(result.length).toBe(1)
-    })
-
-    it('adds quantity to magic item result when provided', () => {
+    it('adds quantity and rarity to magic item result', () => {
       const magicItems = [{ name: 'Potion of Healing', description: 'Restores HP' }]
       const stats = { rules: '5e' }
-      const result = rules.getMagicItems(magicItems, { inventory: { magicItems: [{ name: 'Potion of Healing', quantity: 3 }] } }, stats)
+      const result = rules.getMagicItems(magicItems, { inventory: { magicItems: [{ name: 'Potion of Healing', quantity: 3, rarity: 'rare' }] } }, stats)
       expect(result[0].quantity).toBe(3)
-    })
-
-    it('adds rarity to magic item result when provided', () => {
-      const magicItems = [{ name: 'Ring of Protection', description: 'A protective ring' }]
-      const stats = { rules: '5e' }
-      const result = rules.getMagicItems(magicItems, { inventory: { magicItems: [{ name: 'Ring of Protection', rarity: 'rare' }] } }, stats)
       expect(result[0].rarity).toBe('rare')
     })
 

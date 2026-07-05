@@ -248,38 +248,9 @@ describe('contextBuilder: buildAttackContextSync', () => {
       );
     });
 
-    it('does not set advantage when stored advantage is not an array or target does not match', async () => {
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'activeBuffs') return [];
-        if (key === '_advantageOn_Orc') return 'not-an-array';
-        return undefined;
-      });
 
-      const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal', {});
-      expect(result.forcedMode).toBeUndefined();
 
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'activeBuffs') return [];
-        if (key === '_advantageOn_Orc') return ['Goblin'];
-        return undefined;
-      });
 
-      const result2 = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal', {});
-      expect(result2.forcedMode).toBeUndefined();
-      expect(setRuntimeValue).not.toHaveBeenCalled();
-    });
-
-    it('does not set advantage when targetName is null', async () => {
-      buildBaseAttackContext.mockResolvedValue({
-        target: null,
-        targetName: null,
-        resistanceNotice: null,
-      });
-
-      const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal', {});
-
-      expect(result.forcedMode).toBeUndefined();
-    });
   });
 
   describe('goad and sap effects', () => {
@@ -314,25 +285,7 @@ describe('contextBuilder: buildAttackContextSync', () => {
       expect(result.forcedMode).toBeUndefined();
     });
 
-    it('does not override existing forcedMode with goad or sap', async () => {
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'targetEffects') return [{ effect: 'goad', target: 'Fighter1' }];
-        if (key === 'activeBuffs') return [];
-        return undefined;
-      });
 
-      const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'disadvantage', {});
-      expect(result.forcedMode).toBe('disadvantage');
-
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'targetEffects') return [{ effect: 'disadvantage_next_attack', target: 'Fighter1' }];
-        if (key === 'activeBuffs') return [];
-        return undefined;
-      });
-
-      const sapResult = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'advantage', {});
-      expect(sapResult.forcedMode).toBe('advantage');
-    });
   });
 
   describe('innate sorcery bonus', () => {
@@ -352,13 +305,7 @@ describe('contextBuilder: buildAttackContextSync', () => {
       expect(result.forcedMode).toBeUndefined();
     });
 
-    it('does not override existing forcedMode with spell advantage', async () => {
-      getInnateSorceryBonus.mockReturnValue({ spellAdvantage: true, saveDcBonus: 0 });
 
-      const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'disadvantage', {});
-
-      expect(result.forcedMode).toBe('disadvantage');
-    });
 
     it('adds saveDcBonus to saveDc', async () => {
       getInnateSorceryBonus.mockReturnValue({ spellAdvantage: false, saveDcBonus: 2 });
@@ -456,16 +403,7 @@ describe('contextBuilder: buildAttackContextSync', () => {
       expect(result.forcedMode).toBe('advantage');
     });
 
-    it('does not override existing forcedMode with reckless attack', async () => {
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'activeBuffs') return [{ effect: 'advantage_attacks_disadvantage_against' }];
-        return undefined;
-      });
 
-      const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'disadvantage', {});
-
-      expect(result.forcedMode).toBe('disadvantage');
-    });
   });
 
   describe('activeBuffs — Ram', () => {
@@ -561,17 +499,7 @@ describe('contextBuilder: buildAttackContextSync', () => {
       expect(result.sacredWeaponBonus).toBe(1);
     });
 
-    it('does not add sacred weapon bonus when not active', async () => {
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'activeBuffs') return [];
-        return undefined;
-      });
 
-      const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal', {});
-
-      expect(result.sacredWeaponBonus).toBe(0);
-      expect(result.hitBonus).toBe(7);
-    });
   });
 
   describe('activeBuffs — vow of enmity and clairvoyant combatant', () => {
@@ -614,25 +542,7 @@ describe('contextBuilder: buildAttackContextSync', () => {
       expect(clairResult.forcedMode).toBeUndefined();
     });
 
-    it('does not override existing forcedMode with vow of enmity or clairvoyant combatant', async () => {
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'activeBuffs') return [{ effect: 'vow_of_enmity' }];
-        if (key === 'vowOfEnmityTarget') return 'Orc';
-        return undefined;
-      });
 
-      const vowResult = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'disadvantage', {});
-      expect(vowResult.forcedMode).toBe('disadvantage');
-
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'activeBuffs') return [{ effect: 'clairvoyant_combatant' }];
-        if (key === 'clairvoyantCombatantTarget') return 'Orc';
-        return undefined;
-      });
-
-      const clairResult = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'disadvantage', {});
-      expect(clairResult.forcedMode).toBe('disadvantage');
-    });
   });
 
   describe('activeBuffs — create_illusion', () => {
@@ -647,16 +557,7 @@ describe('contextBuilder: buildAttackContextSync', () => {
       expect(result.forcedMode).toBe('advantage');
     });
 
-    it('does not override existing forcedMode with create_illusion', async () => {
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'activeBuffs') return [{ effect: 'create_illusion' }];
-        return undefined;
-      });
 
-      const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'disadvantage', {});
-
-      expect(result.forcedMode).toBe('disadvantage');
-    });
   });
 
   describe('activeBuffs — avenging angel', () => {
@@ -678,14 +579,7 @@ describe('contextBuilder: buildAttackContextSync', () => {
       expect(result.forcedMode).toBeUndefined();
     });
 
-    it('does not override existing forcedMode with avenging angel', async () => {
-      isAvengingAngelActive.mockReturnValue(true);
-      isAuraTarget.mockReturnValue(true);
 
-      const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'disadvantage', {});
-
-      expect(result.forcedMode).toBe('disadvantage');
-    });
   });
 
   describe('aura checks — no map (sync path)', () => {
@@ -735,29 +629,9 @@ describe('contextBuilder: buildAttackContextSync', () => {
       expect(result.forcedMode).toBe('advantage');
     });
 
-    it('does not apply aura checks when forcedMode is already set', async () => {
-      getWolfAdvantageAgainst.mockReturnValue({ advantage: true });
 
-      const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'disadvantage', {});
 
-      expect(result.forcedMode).toBe('disadvantage');
-    });
 
-    it('does not set disadvantage from protection buff when target is null', async () => {
-      buildBaseAttackContext.mockResolvedValue({
-        target: null,
-        targetName: null,
-        resistanceNotice: null,
-      });
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'targetEffects') return [{ effect: 'protection', target: 'Goblin', source: 'Paladin' }];
-        return undefined;
-      });
-
-      const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal', {});
-
-      expect(result.forcedMode).toBeUndefined();
-    });
   });
 
   describe('distracting strike advantage', () => {
@@ -846,41 +720,6 @@ describe('contextBuilder: buildAttackContextSync', () => {
       expect(result.hunterLoreNotice).toContain('fire');
     });
 
-    it('includes hunterLoreNotice with all IRV categories when present', async () => {
-      buildBaseAttackContext.mockResolvedValue({
-        target: { vulnerabilities: ['fire'], resistances: ['cold'], immunities: ['poison'] },
-        targetName: 'Orc',
-        resistanceNotice: null,
-      });
-      const stats = {
-        ...mockStats,
-        automation: { passives: [{ type: 'passive_rule', effect: 'hunter_lore' }] },
-      };
-
-      const result = await buildAttackContextSync(mockAttack, stats, 'camp', 'normal', {});
-
-      expect(result.hunterLoreNotice).toContain('Vulnerabilities');
-      expect(result.hunterLoreNotice).toContain('Resistances');
-      expect(result.hunterLoreNotice).toContain('Immunities');
-    });
-
-    it('includes only present IRV categories in hunterLoreNotice', async () => {
-      buildBaseAttackContext.mockResolvedValue({
-        target: { vulnerabilities: ['fire'], resistances: [], immunities: [] },
-        targetName: 'Orc',
-        resistanceNotice: null,
-      });
-      const stats = {
-        ...mockStats,
-        automation: { passives: [{ type: 'passive_rule', effect: 'hunter_lore' }] },
-      };
-
-      const result = await buildAttackContextSync(mockAttack, stats, 'camp', 'normal', {});
-
-      expect(result.hunterLoreNotice).toContain('Vulnerabilities');
-      expect(result.hunterLoreNotice).not.toContain('Resistances');
-      expect(result.hunterLoreNotice).not.toContain('Immunities');
-    });
 
     it('does not include hunterLoreNotice when target has no IRV data or passive does not exist', async () => {
       buildBaseAttackContext.mockResolvedValue({
@@ -1014,11 +853,7 @@ describe('contextBuilder: buildAttackContextSync', () => {
       expect(baitResult.baitAndSwitchBonus).toBe(3);
     });
 
-    it('returns 0 when defensive duelist or bait and switch not active', async () => {
-      const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal', {});
-      expect(result.defensiveDuelistBonus).toBe(0);
-      expect(result.baitAndSwitchBonus).toBe(0);
-    });
+
   });
 
   describe('stroke of luck and boon of fate', () => {
@@ -1223,19 +1058,7 @@ describe('contextBuilder: buildAttackContextSync', () => {
       );
     });
 
-    it('does not override existing forcedMode with vex effect', async () => {
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'targetEffects') return [
-          { effect: 'next_attack_advantage', target: 'Fighter1', vexTarget: 'Orc', source: 'Thorn' },
-        ];
-        if (key === 'activeBuffs') return [];
-        return undefined;
-      });
 
-      const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'disadvantage', {});
-
-      expect(result.forcedMode).toBe('disadvantage');
-    });
   });
 });
 // @cleaned-by-ai

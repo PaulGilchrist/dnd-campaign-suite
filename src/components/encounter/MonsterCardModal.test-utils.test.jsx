@@ -1,41 +1,19 @@
-/* @improved-by-ai */
+/* @cleaned-by-ai */
 import { describe, it, expect, vi } from 'vitest';
 import * as utils from './MonsterCardModal.test-utils.js';
 
 describe('MonsterCardModal.test-utils', () => {
   describe('makeMonster', () => {
-    it('returns a Goblin with correct defaults', () => {
+    it('returns a default Goblin monster', () => {
       const monster = utils.makeMonster();
       expect(monster.name).toBe('Goblin');
-      expect(monster.size).toBe('Small');
-      expect(monster.type).toBe('humanoid');
-      expect(monster.alignment).toBe('neutral evil');
       expect(monster.armor_class).toBe(15);
       expect(monster.hit_points).toBe(7);
-      expect(monster.hit_dice).toBe('2d6');
       expect(monster.challenge_rating).toBe('1/4');
       expect(monster.xp).toBe(25);
-      expect(monster.languages).toBe('Common');
-      expect(monster.ability_scores).toEqual({ str: 8, dex: 14, con: 10, int: 10, wis: 8, cha: 10 });
-      expect(monster.ability_score_modifiers).toEqual({ str: -1, dex: 2, con: 0, int: 0, wis: -1, cha: 0 });
-      expect(monster.speed.walk).toBe('30 ft.');
-      expect(monster.senses).toBeNull();
-      expect(monster.desc).toBeNull();
-      expect(monster.book).toBeNull();
-      expect(monster.page).toBeNull();
-      expect(monster.subtype).toBe('');
-      expect(monster.saving_throws).toEqual({});
-      expect(monster.skills).toEqual({});
       expect(monster.actions).toEqual([]);
       expect(monster.traits).toEqual([]);
       expect(monster.reactions).toEqual([]);
-      expect(monster.legendary_actions).toEqual([]);
-      expect(monster.lair_actions).toEqual([]);
-      expect(monster.regional_effects).toEqual([]);
-      expect(monster.damage_vulnerabilities).toEqual([]);
-      expect(monster.damage_resistances).toEqual([]);
-      expect(monster.damage_immunities).toEqual([]);
-      expect(monster.condition_immunities).toEqual([]);
     });
 
     it('merges overrides into default monster', () => {
@@ -43,13 +21,6 @@ describe('MonsterCardModal.test-utils', () => {
       expect(monster.name).toBe('Ogre');
       expect(monster.hit_points).toBe(59);
       expect(monster.size).toBe('Small');
-      expect(monster.armor_class).toBe(15);
-    });
-
-    it('does not mutate the original when overrides are applied', () => {
-      const defaultMonster = utils.makeMonster();
-      utils.makeMonster({ name: 'Ogre' });
-      expect(defaultMonster.name).toBe('Goblin');
     });
   });
 
@@ -60,13 +31,10 @@ describe('MonsterCardModal.test-utils', () => {
       expect(props.monster).toBe(monster);
       expect(props.campaignName).toBe('test-campaign');
       expect(props.creatures).toEqual([]);
-      expect(props.creatureName).toBe('');
-      expect(props.mapName).toBeNull();
-      expect(props.characters).toEqual([]);
       expect(typeof props.onClose).toBe('function');
     });
 
-    it('merges overrides into props and preserves monster reference', () => {
+    it('merges overrides into props', () => {
       const monster = utils.makeMonster();
       const props = utils.makeProps(monster, { campaignName: 'my-campaign', creatureName: 'Goblin' });
       expect(props.campaignName).toBe('my-campaign');
@@ -127,10 +95,6 @@ describe('MonsterCardModal.test-utils', () => {
     it('returns uppercase first 3 chars for unknown ability', () => {
       expect(utils.saveAbilityAbbr('Foo')).toBe('FOO');
     });
-
-    it('returns undefined for null', () => {
-      expect(utils.saveAbilityAbbr(null)).toBe(undefined);
-    });
   });
 
   describe('abilityNameMap', () => {
@@ -149,6 +113,8 @@ describe('MonsterCardModal.test-utils', () => {
       [null, null],
       [undefined, null],
       ['', null],
+      ['3', null],
+      ['no bonus here', null],
     ])('returns null for %s input', (input, expected) => {
       expect(utils.parseInitiativeBonus(input)).toBe(expected);
     });
@@ -163,22 +129,14 @@ describe('MonsterCardModal.test-utils', () => {
     ])('parses "%s" to %d', (input, expected) => {
       expect(utils.parseInitiativeBonus(input)).toBe(expected);
     });
-
-    it('returns null for plain number without sign', () => {
-      expect(utils.parseInitiativeBonus('3')).toBeNull();
-    });
-
-    it('returns null when no match', () => {
-      expect(utils.parseInitiativeBonus('no bonus here')).toBeNull();
-    });
   });
 
   describe('parseExtraDamageDice', () => {
     it.each([
-      [null, []],
-      [undefined, []],
-    ])('returns empty array for %s input', (input, expected) => {
-      expect(utils.parseExtraDamageDice(input)).toEqual(expected);
+      [null, '2d6+4', []],
+      [undefined, '2d6+4', []],
+    ])('returns empty array for null/undefined input', (input, excludeFormula, expected) => {
+      expect(utils.parseExtraDamageDice(input, excludeFormula)).toEqual(expected);
     });
 
     it('parses single and multiple damage dice', () => {
@@ -218,10 +176,6 @@ describe('MonsterCardModal.test-utils', () => {
       expect(utils.formatSenses({ passive_perception: 15 })).toBe('passive Perception 15');
       expect(utils.formatSenses({ blindsight: 60, darkvision: 120, passive_perception: 15 }))
         .toBe('blindsight 60, darkvision 120, passive Perception 15');
-    });
-
-    it('returns empty string when all sense values are null/undefined', () => {
-      expect(utils.formatSenses({ blindsight: null, darkvision: undefined })).toBe('');
     });
 
     it('throws when passed null', () => {

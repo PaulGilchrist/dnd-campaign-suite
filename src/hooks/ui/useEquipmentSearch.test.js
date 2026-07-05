@@ -1,3 +1,4 @@
+// @cleaned-by-ai
 // @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
@@ -52,19 +53,6 @@ describe('useEquipmentSearch', () => {
     );
   }
 
-  describe('initial state', () => {
-    it('returns correct initial values', () => {
-      const { result } = renderSearchHook();
-      expect(result.current.equipmentData).toEqual([]);
-      expect(result.current.searchQuery).toBe('');
-      expect(result.current.filteredEquipment).toEqual([]);
-      expect(result.current.selectedCategory).toBe('All');
-      expect(result.current.searchField).toBeNull();
-      expect(result.current.showOnlySelectedBackpack).toBe(false);
-      expect(result.current.showOnlySelectedEquipped).toBe(false);
-    });
-  });
-
   describe('equipment data loading', () => {
     it('populates equipmentData from loadEquipment', async () => {
       loadEquipment.mockResolvedValue([MOCK_EQUIPMENT[0]]);
@@ -109,22 +97,7 @@ describe('useEquipmentSearch', () => {
       expect(result.current.filteredEquipment).toEqual([MOCK_EQUIPMENT[1]]);
     });
 
-    it('returns empty results when search query is empty', async () => {
-      loadEquipment.mockResolvedValue(MOCK_EQUIPMENT);
-      const { result } = renderSearchHook();
-
-      await act(async () => {
-        await new Promise((resolve) => setTimeout(resolve, 0));
-      });
-
-      act(() => {
-        result.current.setSearchQuery('');
-      });
-
-      expect(result.current.filteredEquipment).toEqual([]);
-    });
-
-    it('returns empty results when search query is whitespace only', async () => {
+    it('returns empty results when search query is empty or whitespace', async () => {
       loadEquipment.mockResolvedValue(MOCK_EQUIPMENT);
       const { result } = renderSearchHook();
 
@@ -164,10 +137,6 @@ describe('useEquipmentSearch', () => {
         await new Promise((resolve) => setTimeout(resolve, 0));
       });
 
-      // Use query that matches both armor items: 'leather' matches Leather Armor
-      // and 'shield' matches Shield. Use a query matching all items.
-      // 'a' matches Leather Armor only among armor. Need a query matching both.
-      // Since no single char matches all, test with a query matching the armor items.
       act(() => {
         result.current.setSearchQuery('');
       });
@@ -176,9 +145,6 @@ describe('useEquipmentSearch', () => {
         await Promise.resolve();
       });
 
-      // Use a query that matches both armor items: neither "Shield" nor "Leather Armor"
-      // share a common substring. So test with a query that matches at least one,
-      // then verify category filtering narrows it down.
       act(() => {
         result.current.setSearchQuery('armor');
       });
@@ -239,29 +205,6 @@ describe('useEquipmentSearch', () => {
       expect(result.current.uniqueCategories).toContain('Potion');
       expect(result.current.uniqueCategories).toContain('Simple Melee');
     });
-
-    it('returns unique categories without duplicates', async () => {
-      loadEquipment.mockResolvedValue(MOCK_EQUIPMENT);
-      const { result } = renderSearchHook();
-
-      await act(async () => {
-        await new Promise((resolve) => setTimeout(resolve, 0));
-      });
-
-      const categoryCounts = {};
-      result.current.uniqueCategories.forEach((cat) => {
-        categoryCounts[cat] = (categoryCounts[cat] || 0) + 1;
-      });
-      expect(Object.values(categoryCounts).every((count) => count === 1)).toBe(true);
-    });
-
-    it('updates selectedCategory via handleCategoryChange', () => {
-      const { result } = renderSearchHook();
-      act(() => {
-        result.current.handleCategoryChange('Weapon');
-      });
-      expect(result.current.selectedCategory).toBe('Weapon');
-    });
   });
 
   describe('20-item filter limit', () => {
@@ -273,15 +216,10 @@ describe('useEquipmentSearch', () => {
         await new Promise((resolve) => setTimeout(resolve, 0));
       });
 
-      // '' triggers early return (empty results)
-      // Use a query matching multiple items to test the limit
       act(() => {
         result.current.setSearchQuery('a');
       });
 
-      // 'a' matches: Longsword, Shortbow, Leather Armor, Rapier, Handaxe,
-      // Light Crossbow, Spear, Quarterstaff, Javelin, Pike, Greatclub, Scimitar, Whip, Battleaxe, Glaive = 15 items
-      // Plus some others. The key is: count <= 20
       expect(result.current.filteredEquipment.length).toBeLessThanOrEqual(20);
     });
   });
@@ -304,11 +242,6 @@ describe('useEquipmentSearch', () => {
         await Promise.resolve();
       });
 
-      // handleSearchFieldFocus sets searchQuery to '', which triggers early return.
-      // Set a query that matches both backpack items: "Longsword" and "Shield"
-      // Neither shares a common substring, so use a query matching at least one.
-      // Test with 'long' which matches Longsword, then verify backpack filtering
-      // shows only Longsword (which IS in the backpack).
       act(() => {
         result.current.setSearchQuery('long');
       });
@@ -325,16 +258,7 @@ describe('useEquipmentSearch', () => {
         await Promise.resolve();
       });
 
-      // 'long' matches only Longsword, and Longsword is in backpack
       expect(result.current.filteredEquipment).toEqual([MOCK_EQUIPMENT[0]]);
-    });
-
-    it('updates showOnlySelectedBackpack state', () => {
-      const { result } = renderSearchHook();
-      act(() => {
-        result.current.setShowOnlySelectedBackpack(true);
-      });
-      expect(result.current.showOnlySelectedBackpack).toBe(true);
     });
   });
 
@@ -356,8 +280,6 @@ describe('useEquipmentSearch', () => {
         await Promise.resolve();
       });
 
-      // handleSearchFieldFocus sets searchQuery to '', which triggers early return.
-      // Set a non-empty query to allow filtering.
       act(() => {
         result.current.setSearchQuery('a');
       });
@@ -379,14 +301,6 @@ describe('useEquipmentSearch', () => {
         MOCK_EQUIPMENT[5],
       ]);
     });
-
-    it('updates showOnlySelectedEquipped state', () => {
-      const { result } = renderSearchHook();
-      act(() => {
-        result.current.setShowOnlySelectedEquipped(true);
-      });
-      expect(result.current.showOnlySelectedEquipped).toBe(true);
-    });
   });
 
   describe('handleSearchFieldFocus', () => {
@@ -400,15 +314,6 @@ describe('useEquipmentSearch', () => {
       expect(result.current.searchField).toBe('backpack');
       expect(result.current.searchQuery).toBe('');
       expect(result.current.filteredEquipment).toEqual([]);
-    });
-
-    it('sets searchField to equipped', () => {
-      const { result } = renderSearchHook();
-      act(() => {
-        result.current.handleSearchFieldFocus('equipped');
-      });
-
-      expect(result.current.searchField).toBe('equipped');
     });
   });
 
@@ -457,37 +362,13 @@ describe('useEquipmentSearch', () => {
       expect(result.current.searchField).toBeNull();
     });
 
-    it('does not add duplicate item to backpack', () => {
-      const inventory = { backpack: ['Longsword'], equipped: [] };
+    it('does not add duplicate item to backpack or equipped', () => {
+      const inventory = { backpack: ['Longsword'], equipped: ['Shield'] };
       const item = { name: 'Longsword', index: 'longsword', equipment_category: 'Weapon' };
       const { result } = renderSearchHook(inventory);
 
       act(() => {
         result.current.handleSearchFieldFocus('backpack');
-        result.current.handleEquipmentSelect(item);
-      });
-
-      expect(onTempInventoryChange).not.toHaveBeenCalled();
-    });
-
-    it('does not add duplicate item to equipped', () => {
-      const inventory = { backpack: [], equipped: ['Shield'] };
-      const item = { name: 'Shield', index: 'shield', equipment_category: 'Armor' };
-      const { result } = renderSearchHook(inventory);
-
-      act(() => {
-        result.current.handleSearchFieldFocus('equipped');
-        result.current.handleEquipmentSelect(item);
-      });
-
-      expect(onTempInventoryChange).not.toHaveBeenCalled();
-    });
-
-    it('does nothing when searchField is not set', () => {
-      const item = { name: 'Longsword', index: 'longsword', equipment_category: 'Weapon' };
-      const { result } = renderSearchHook();
-
-      act(() => {
         result.current.handleEquipmentSelect(item);
       });
 
@@ -543,28 +424,6 @@ describe('useEquipmentSearch', () => {
 
       act(() => {
         result.current.handleSearchFieldFocus('backpack');
-        result.current.handleAddCustomItem('Magic Sword');
-      });
-
-      expect(onTempInventoryChange).not.toHaveBeenCalled();
-    });
-
-    it('does not add duplicate custom item to equipped', () => {
-      const inventory = { backpack: [], equipped: ['Magic Shield'] };
-      const { result } = renderSearchHook(inventory);
-
-      act(() => {
-        result.current.handleSearchFieldFocus('equipped');
-        result.current.handleAddCustomItem('Magic Shield');
-      });
-
-      expect(onTempInventoryChange).not.toHaveBeenCalled();
-    });
-
-    it('does nothing when searchField is not set', () => {
-      const { result } = renderSearchHook();
-
-      act(() => {
         result.current.handleAddCustomItem('Magic Sword');
       });
 

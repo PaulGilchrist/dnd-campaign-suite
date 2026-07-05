@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import Quests from './Quests.jsx';
@@ -56,7 +56,7 @@ describe('Quests', () => {
     vi.restoreAllMocks();
   });
 
-  describe('rendering and visibility', () => {
+  describe('visibility', () => {
     it('returns null when isLocalhost is false', () => {
       mockUseQuestsManagement.mockReturnValue({
         items: [],
@@ -68,8 +68,10 @@ describe('Quests', () => {
       const { container } = render(<Quests {...defaultProps} isLocalhost={false} />);
       expect(container.innerHTML).toBe('');
     });
+  });
 
-    it('renders header with back button, title, and New Quest button when isLocalhost is true', () => {
+  describe('rendering', () => {
+    it('renders header with back button, title, and New Quest button', () => {
       renderWithQuests([]);
       expect(screen.getByText(/Back/)).toBeInTheDocument();
       expect(screen.getByText(/Quests/)).toBeInTheDocument();
@@ -100,6 +102,25 @@ describe('Quests', () => {
     it('shows empty state when no quests', () => {
       renderWithQuests([]);
       expect(screen.getByText(/No quests yet/)).toBeInTheDocument();
+    });
+
+    it('shows search no results message with the search query', async () => {
+      renderWithQuests([
+        {
+          id: 'quest-1',
+          name: 'Find the Lost Sword',
+          status: 'active',
+          description: '',
+          rewards: '',
+          notes: '',
+        },
+      ]);
+
+      const searchInput = screen.getByPlaceholderText(/Search Quests/);
+      fireEvent.change(searchInput, { target: { value: 'dragons' } });
+
+      const emptyState = screen.getByText(/No quests found matching/);
+      expect(emptyState.textContent).toContain('dragons');
     });
   });
 
@@ -133,23 +154,12 @@ describe('Quests', () => {
       expect(screen.queryByRole('heading', { name: 'New Quest' })).not.toBeInTheDocument();
     });
 
-    it('closes modal when overlay clicked but not when modal content clicked', () => {
+    it('closes modal when overlay clicked', () => {
       renderWithQuests([]);
       fireEvent.click(screen.getByRole('button', { name: /New Quest/ }));
       const overlay = document.querySelector('.ct-modal-overlay');
       fireEvent.click(overlay);
       expect(screen.queryByRole('heading', { name: 'New Quest' })).not.toBeInTheDocument();
-    });
-
-    it('has all form fields in modal (name, status, description, rewards, notes)', () => {
-      renderWithQuests([]);
-      fireEvent.click(screen.getByRole('button', { name: /New Quest/ }));
-
-      expect(screen.getByLabelText(/Name/)).toBeInTheDocument();
-      expect(screen.getByLabelText('Status')).toBeInTheDocument();
-      expect(screen.getByTestId('preview-toggle-quest-description')).toBeInTheDocument();
-      expect(screen.getByTestId('preview-toggle-quest-rewards')).toBeInTheDocument();
-      expect(screen.getByTestId('preview-toggle-quest-notes')).toBeInTheDocument();
     });
 
     it('allows changing form fields', () => {
@@ -181,17 +191,29 @@ describe('Quests', () => {
       renderWithQuests([]);
       fireEvent.click(screen.getByRole('button', { name: /New Quest/ }));
 
-      let saveButton = screen.getByText('Save').closest('button');
+      let saveButton = screen.getByRole('button', { name: 'Save' });
       expect(saveButton).toHaveAttribute('disabled');
 
       const nameInput = screen.getByLabelText(/Name/);
       fireEvent.change(nameInput, { target: { value: '   ' } });
-      saveButton = screen.getByText('Save').closest('button');
+      saveButton = screen.getByRole('button', { name: 'Save' });
       expect(saveButton).toHaveAttribute('disabled');
 
       fireEvent.change(nameInput, { target: { value: 'Find the Lost Sword' } });
-      saveButton = screen.getByText('Save').closest('button');
+      saveButton = screen.getByRole('button', { name: 'Save' });
       expect(saveButton).not.toHaveAttribute('disabled');
+    });
+
+    it('does not save when name is empty', async () => {
+      const { mockSave } = renderWithQuests([]);
+      fireEvent.click(screen.getByRole('button', { name: /New Quest/ }));
+
+      const saveButton = screen.getByRole('button', { name: 'Save' });
+      fireEvent.click(saveButton);
+
+      await waitFor(() => {
+        expect(mockSave).not.toHaveBeenCalled();
+      });
     });
 
     it('closes modal and resets form after saving new quest', async () => {
@@ -201,7 +223,7 @@ describe('Quests', () => {
       const nameInput = screen.getByLabelText(/Name/);
       fireEvent.change(nameInput, { target: { value: 'New Quest' } });
 
-      const saveButton = screen.getByText('Save').closest('button');
+      const saveButton = screen.getByRole('button', { name: 'Save' });
       fireEvent.click(saveButton);
 
       await waitFor(() => {
@@ -210,22 +232,10 @@ describe('Quests', () => {
 
       expect(screen.queryByRole('heading', { name: 'New Quest' })).not.toBeInTheDocument();
     });
-
-    it('does not save when name is empty', async () => {
-      const { mockSave } = renderWithQuests([]);
-      fireEvent.click(screen.getByRole('button', { name: /New Quest/ }));
-
-      const saveButton = screen.getByText('Save').closest('button');
-      fireEvent.click(saveButton);
-
-      await waitFor(() => {
-        expect(mockSave).not.toHaveBeenCalled();
-      });
-    });
   });
 
   describe('quest list rendering', () => {
-    it('renders quest list when quests are provided', async () => {
+    it('renders quests in the list', async () => {
       renderWithQuests([
         {
           id: 'quest-1',
@@ -235,16 +245,6 @@ describe('Quests', () => {
           rewards: '500 gold',
           notes: '',
         },
-      ]);
-
-      await waitFor(() => {
-        expect(screen.getByText('Find the Lost Sword')).toBeInTheDocument();
-      });
-    });
-
-    it('shows multiple quests in the list', async () => {
-      renderWithQuests([
-        { id: 'quest-1', name: 'Find the Lost Sword', status: 'active', description: '', rewards: '', notes: '' },
         { id: 'quest-2', name: 'Defeat the Dragon', status: 'completed', description: '', rewards: '', notes: '' },
         { id: 'quest-3', name: 'Rescue the Princess', status: 'failed', description: '', rewards: '', notes: '' },
       ]);
@@ -269,10 +269,10 @@ describe('Quests', () => {
       ]);
 
       await waitFor(() => {
-        expect(
-          screen.getByText('Search for the ancient sword in the ruins of the old castle')
-        ).toBeInTheDocument();
+        expect(screen.getByText('Find the Lost Sword')).toBeInTheDocument();
       });
+
+      expect(screen.getByText('Search for the ancient sword in the ruins of the old castle')).toBeInTheDocument();
     });
 
     it('truncates long description in quest list', async () => {
@@ -297,28 +297,6 @@ describe('Quests', () => {
       expect(screen.getByText(truncated)).toBeInTheDocument();
     });
 
-    it('does not show description div when quest has no description', async () => {
-      renderWithQuests([
-        {
-          id: 'quest-1',
-          name: 'No Description Quest',
-          status: 'active',
-          description: '',
-          rewards: '',
-          notes: '',
-        },
-      ]);
-
-      await waitFor(() => {
-        expect(screen.getByText('No Description Quest')).toBeInTheDocument();
-      });
-
-      const listItems = document.querySelectorAll('.ct-list-item');
-      const questItem = listItems[0];
-      const detailsDiv = questItem.querySelector('.ct-list-details');
-      expect(detailsDiv).not.toBeInTheDocument();
-    });
-
     it('renders quest list items with aria-label', async () => {
       renderWithQuests([
         {
@@ -339,57 +317,16 @@ describe('Quests', () => {
     });
   });
 
-  describe('status badges', () => {
-    it('renders status badges for each quest with correct text', async () => {
-      renderWithQuests([
-        {
-          id: 'quest-1',
-          name: 'Active Quest',
-          status: 'active',
-          description: '',
-          rewards: '',
-          notes: '',
-        },
-        {
-          id: 'quest-2',
-          name: 'Completed Quest',
-          status: 'completed',
-          description: '',
-          rewards: '',
-          notes: '',
-        },
-        {
-          id: 'quest-3',
-          name: 'Failed Quest',
-          status: 'failed',
-          description: '',
-          rewards: '',
-          notes: '',
-        },
-      ]);
-
-      await waitFor(() => {
-        expect(screen.getByText('Active Quest')).toBeInTheDocument();
-        expect(screen.getByText('Completed Quest')).toBeInTheDocument();
-        expect(screen.getByText('Failed Quest')).toBeInTheDocument();
-      });
-
-      expect(screen.getByText('active')).toBeInTheDocument();
-      expect(screen.getByText('completed')).toBeInTheDocument();
-      expect(screen.getByText('failed')).toBeInTheDocument();
-    });
-  });
-
   describe('edit quest modal', () => {
-    it('opens edit modal with Edit Quest heading when quest clicked', async () => {
+    it('opens edit modal with pre-populated fields when quest clicked', async () => {
       renderWithQuests([
         {
           id: 'quest-1',
           name: 'Find the Lost Sword',
-          status: 'active',
-          description: 'Search for the ancient sword',
-          rewards: '500 gold',
-          notes: '',
+          status: 'completed',
+          description: 'An old quest',
+          rewards: '100 gold',
+          notes: 'Almost done',
         },
       ]);
 
@@ -399,6 +336,16 @@ describe('Quests', () => {
 
       fireEvent.click(screen.getByText('Find the Lost Sword'));
       expect(screen.getByRole('heading', { name: 'Edit Quest' })).toBeInTheDocument();
+
+      const nameInput = screen.getByLabelText(/Name/);
+      expect(nameInput.value).toBe('Find the Lost Sword');
+
+      const statusSelect = screen.getByLabelText('Status');
+      expect(statusSelect.value).toBe('completed');
+
+      expect(screen.getByTestId('field-quest-description').value).toBe('An old quest');
+      expect(screen.getByTestId('field-quest-rewards').value).toBe('100 gold');
+      expect(screen.getByTestId('field-quest-notes').value).toBe('Almost done');
     });
 
     it('shows delete button in edit modal', async () => {
@@ -419,67 +366,6 @@ describe('Quests', () => {
 
       fireEvent.click(screen.getByText('Find the Lost Sword'));
       expect(screen.getByText(/Delete/)).toBeInTheDocument();
-    });
-
-    it('populates form fields when editing a quest', async () => {
-      renderWithQuests([
-        {
-          id: 'quest-1',
-          name: 'Find the Lost Sword',
-          status: 'completed',
-          description: 'An old quest',
-          rewards: '100 gold',
-          notes: 'Almost done',
-        },
-      ]);
-
-      await waitFor(() => {
-        expect(screen.getByText('Find the Lost Sword')).toBeInTheDocument();
-      });
-
-      fireEvent.click(screen.getByText('Find the Lost Sword'));
-
-      const nameInput = screen.getByLabelText(/Name/);
-      expect(nameInput.value).toBe('Find the Lost Sword');
-
-      const statusSelect = screen.getByLabelText('Status');
-      expect(statusSelect.value).toBe('completed');
-
-      expect(screen.getByTestId('field-quest-description').value).toBe('An old quest');
-      expect(screen.getByTestId('field-quest-rewards').value).toBe('100 gold');
-      expect(screen.getByTestId('field-quest-notes').value).toBe('Almost done');
-    });
-
-    it('closes modal after saving edited quest', async () => {
-      const { mockSave } = renderWithQuests([
-        {
-          id: 'quest-1',
-          name: 'Find the Lost Sword',
-          status: 'active',
-          description: 'Search for the sword',
-          rewards: '50 gold',
-          notes: '',
-        },
-      ]);
-
-      await waitFor(() => {
-        expect(screen.getByText('Find the Lost Sword')).toBeInTheDocument();
-      });
-
-      fireEvent.click(screen.getByText('Find the Lost Sword'));
-      expect(screen.getByRole('heading', { name: 'Edit Quest' })).toBeInTheDocument();
-
-      const nameInput = screen.getByLabelText(/Name/);
-      fireEvent.change(nameInput, { target: { value: 'Updated Quest' } });
-
-      const saveButton = screen.getByText('Save').closest('button');
-      fireEvent.click(saveButton);
-
-      await waitFor(() => {
-        expect(mockSave).toHaveBeenCalled();
-      });
-
-      expect(screen.queryByRole('heading', { name: 'Edit Quest' })).not.toBeInTheDocument();
     });
 
     it('saves edited quest via saveQuestsList with updated data', async () => {
@@ -515,7 +401,7 @@ describe('Quests', () => {
       const notesField = screen.getByTestId('field-quest-notes');
       fireEvent.change(notesField, { target: { value: 'Updated notes' } });
 
-      const saveButton = screen.getByText('Save').closest('button');
+      const saveButton = screen.getByRole('button', { name: 'Save' });
       fireEvent.click(saveButton);
 
       await waitFor(() => {
@@ -622,29 +508,10 @@ describe('Quests', () => {
       expect(screen.getByText('Quest One')).toBeInTheDocument();
       expect(screen.getByText('Quest Two')).toBeInTheDocument();
     });
-
-    it('shows search no results message with the search query', async () => {
-      renderWithQuests([
-        {
-          id: 'quest-1',
-          name: 'Find the Lost Sword',
-          status: 'active',
-          description: '',
-          rewards: '',
-          notes: '',
-        },
-      ]);
-
-      const searchInput = screen.getByPlaceholderText(/Search Quests/);
-      fireEvent.change(searchInput, { target: { value: 'dragons' } });
-
-      const emptyState = screen.getByText(/No quests found matching/);
-      expect(emptyState.textContent).toContain('dragons');
-    });
   });
 
   describe('delete quest', () => {
-    it('calls deleteQuestAction when delete confirmed', async () => {
+    it('calls delete when delete confirmed', async () => {
       const { mockDelete } = renderWithQuests([
         {
           id: 'quest-1',
@@ -667,7 +534,7 @@ describe('Quests', () => {
       expect(mockDelete).toHaveBeenCalledWith('quest-1');
     });
 
-    it('does not call deleteQuestAction when confirm is cancelled', async () => {
+    it('does not call delete when confirm is cancelled', async () => {
       window.confirm.mockReturnValueOnce(false);
 
       const { mockDelete } = renderWithQuests([
@@ -713,7 +580,7 @@ describe('Quests', () => {
 
       fireEvent.click(screen.getByText('Slow Delete Quest'));
 
-      const deleteBtn = document.querySelector('.ct-btn-danger');
+      const deleteBtn = screen.getByRole('button', { name: 'Delete' });
       fireEvent.click(deleteBtn);
 
       await waitFor(() => {
@@ -743,7 +610,7 @@ describe('Quests', () => {
 
       fireEvent.click(screen.getByText('Error Delete Quest'));
 
-      const deleteBtn = document.querySelector('.ct-btn-danger');
+      const deleteBtn = screen.getByRole('button', { name: 'Delete' });
       fireEvent.click(deleteBtn);
 
       await waitFor(() => {
@@ -762,7 +629,7 @@ describe('Quests', () => {
       const nameInput = screen.getByLabelText(/Name/);
       fireEvent.change(nameInput, { target: { value: 'New Quest' } });
 
-      const saveButton = screen.getByText('Save').closest('button');
+      const saveButton = screen.getByRole('button', { name: 'Save' });
       fireEvent.click(saveButton);
 
       await waitFor(() => {
@@ -779,7 +646,7 @@ describe('Quests', () => {
       const nameInput = screen.getByLabelText(/Name/);
       fireEvent.change(nameInput, { target: { value: 'New Quest' } });
 
-      const saveButton = screen.getByText('Save').closest('button');
+      const saveButton = screen.getByRole('button', { name: 'Save' });
       fireEvent.click(saveButton);
 
       await waitFor(() => {

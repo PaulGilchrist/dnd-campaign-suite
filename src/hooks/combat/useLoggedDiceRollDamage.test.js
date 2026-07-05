@@ -1,3 +1,4 @@
+// @cleaned-by-ai
 // @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
@@ -68,9 +69,7 @@ import { getRuntimeValue } from '../runtime/useRuntimeState.js';
 import { loadCombatSummary, getCombatSummary } from '../../services/encounters/combatData.js';
 import { hasIgnoreResistance, hasGreatWeaponFighting, applyGreatWeaponFightingToDamage } from '../../services/combat/automation/automationService.js';
 import { endInvisibilityOnHostileAction } from '../../services/rules/features/invisibilityService.js';
-import { getAffectedCreatures } from '../../services/rules/combat/aoeService.js';
 import {
-    readAoeContext,
     isMagicMissileImmune,
     hasSoulstitchProtection,
     applyMinDamageAdjustment,
@@ -121,15 +120,7 @@ describe('createLogDamageAndShow (useLoggedDiceRollDamage)', () => {
             }));
         });
 
-        it('returns early when no AOE context', async () => {
-            readAoeContext.mockReturnValue(null);
-            const fn = createFn();
-            await fn('Fireball', '8d6', 20, [3, 4, 5, 2, 3, 3], 0, {
-                targetName: 'overlay-fireball',
-                damageType: 'fire',
-            });
-            expect(getAffectedCreatures).not.toHaveBeenCalled();
-        });
+
 
         it('logs and displays auto miss', async () => {
             const fn = createFn();
@@ -140,18 +131,6 @@ describe('createLogDamageAndShow (useLoggedDiceRollDamage)', () => {
             expect(deps.setPopupHtml).toHaveBeenCalledWith(expect.objectContaining({
                 type: 'auto-miss',
             }));
-        });
-    });
-
-    describe('AOE damage', () => {
-        it('does not process AOE when no context', async () => {
-            readAoeContext.mockReturnValue(null);
-            const fn = createFn();
-            await fn('Fireball', '8d6', 20, [3, 4, 5, 2, 3, 3], 0, {
-                targetName: 'overlay-fireball',
-                damageType: 'fire',
-            });
-            expect(getAffectedCreatures).not.toHaveBeenCalled();
         });
     });
 

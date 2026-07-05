@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { renderHook, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import useSSESync from './useSSESync.js';
@@ -11,15 +11,15 @@ describe('useSSESync', () => {
   beforeEach(() => {
     setGridSize = vi.fn();
     setPlacedItems = vi.fn();
-    setMapData = vi.fn((fn) => {
-      if (typeof fn === 'function') {
+    setMapData = vi.fn((updater) => {
+      if (typeof updater === 'function') {
         const prev = {
           players: [{ id: 'player1', name: 'Hero' }],
           walls: new Set(['wall1']),
         };
-        return fn(prev);
+        return updater(prev);
       }
-      return fn;
+      return updater;
     });
   });
 
@@ -36,8 +36,13 @@ describe('useSSESync', () => {
     return result;
   };
 
-  describe('event validation', () => {
-    it('should ignore events with no data', () => {
+  const validEvent = (data = {}) => ({
+    key: 'map-data-test-campaign-test-map',
+    data,
+  });
+
+  describe('event filtering', () => {
+    it('should ignore events with no data property', () => {
       const result = getHook();
       act(() => {
         result.current.handleSSEEvent({});
@@ -47,23 +52,10 @@ describe('useSSESync', () => {
       expect(setPlacedItems).not.toHaveBeenCalled();
     });
 
-    it('should ignore events with null data', () => {
+    it('should ignore events with wrong SSE key', () => {
       const result = getHook();
       act(() => {
-        result.current.handleSSEEvent({ data: null });
-      });
-      expect(setGridSize).not.toHaveBeenCalled();
-      expect(setMapData).not.toHaveBeenCalled();
-      expect(setPlacedItems).not.toHaveBeenCalled();
-    });
-
-    it('should ignore events with wrong key', () => {
-      const result = getHook();
-      act(() => {
-        result.current.handleSSEEvent({
-          key: 'wrong-key',
-          data: { gridSize: 5 },
-        });
+        result.current.handleSSEEvent({ key: 'wrong-key', data: { gridSize: 5 } });
       });
       expect(setGridSize).not.toHaveBeenCalled();
       expect(setMapData).not.toHaveBeenCalled();
@@ -71,166 +63,105 @@ describe('useSSESync', () => {
     });
   });
 
-  describe('handleSSEEvent return value', () => {
-    it('should return handleSSEEvent function', () => {
-      const result = getHook();
-      expect(result.current.handleSSEEvent).toBeDefined();
-      expect(typeof result.current.handleSSEEvent).toBe('function');
-    });
-  });
-
-  describe('gridSize handling', () => {
-    it('should update gridSize on correct event', () => {
+  describe('gridSize', () => {
+    it('should call setGridSize with the event value', () => {
       const result = getHook();
       act(() => {
-        result.current.handleSSEEvent({
-          key: 'map-data-test-campaign-test-map',
-          data: { gridSize: 10 },
-        });
+        result.current.handleSSEEvent(validEvent({ gridSize: 10 }));
       });
       expect(setGridSize).toHaveBeenCalledWith(10);
     });
   });
 
-  describe('placedItems handling', () => {
-    it('should update placedItems on correct event', () => {
+  describe('placedItems', () => {
+    it('should call setPlacedItems with the event value', () => {
       const result = getHook();
       const items = [{ id: 'item1', x: 1, y: 2 }];
       act(() => {
-        result.current.handleSSEEvent({
-          key: 'map-data-test-campaign-test-map',
-          data: { placedItems: items },
-        });
+        result.current.handleSSEEvent(validEvent({ placedItems: items }));
       });
       expect(setPlacedItems).toHaveBeenCalledWith(items);
     });
   });
 
-  describe('walls handling', () => {
-    const createMapDataCall = () => {
+  describe('mapData (players and walls)', () => {
+    const invokeMapDataUpdater = () => {
       expect(setMapData).toHaveBeenCalled();
-      return setMapData.mock.calls[0][0];
+      const updater = setMapData.mock.calls[0][0];
+      return updater({
+        players: [{ id: 'prev', name: 'PrevPlayer' }],
+        walls: new Set(['prevWall']),
+      });
     };
 
-    it('should create Set from walls array', () => {
+    it('should convert walls array to Set', () => {
       const result = getHook();
       act(() => {
-        result.current.handleSSEEvent({
-          key: 'map-data-test-campaign-test-map',
-          data: { walls: ['wallA', 'wallB'] },
-        });
+        result.current.handleSSEEvent(validEvent({ walls: ['wallA', 'wallB'] }));
       });
-      const mapDataCall = createMapDataCall();
-      const resultValue = mapDataCall({ players: [], walls: new Set() });
+      const resultValue = invokeMapDataUpdater();
       expect(resultValue.walls instanceof Set).toBe(true);
       expect(resultValue.walls.has('wallA')).toBe(true);
       expect(resultValue.walls.has('wallB')).toBe(true);
     });
 
-    it('should use empty Set when data.walls is undefined', () => {
+    it('should replace walls with empty Set when data.walls is empty array', () => {
       const result = getHook();
       act(() => {
-        result.current.handleSSEEvent({
-          key: 'map-data-test-campaign-test-map',
-          data: { gridSize: 5 },
-        });
+        result.current.handleSSEEvent(validEvent({ walls: [] }));
       });
-      const mapDataCall = createMapDataCall();
-      const prevWalls = new Set(['preservedWall']);
-      const resultValue = mapDataCall({ players: [], walls: prevWalls });
-      expect(resultValue.walls).toBe(prevWalls);
-    });
-
-    it('should replace walls with new Set when data.walls is an empty array', () => {
-      const result = getHook();
-      act(() => {
-        result.current.handleSSEEvent({
-          key: 'map-data-test-campaign-test-map',
-          data: { walls: [] },
-        });
-      });
-      const mapDataCall = createMapDataCall();
-      const resultValue = mapDataCall({ players: [], walls: new Set(['oldWall']) });
+      const resultValue = invokeMapDataUpdater();
       expect(resultValue.walls instanceof Set).toBe(true);
       expect(resultValue.walls.size).toBe(0);
     });
 
-    it('should create Set from walls even when prev walls is undefined', () => {
+    it('should keep existing walls when data.walls is absent', () => {
       const result = getHook();
       act(() => {
-        result.current.handleSSEEvent({
-          key: 'map-data-test-campaign-test-map',
-          data: { walls: ['wall1'] },
-        });
+        result.current.handleSSEEvent(validEvent({ gridSize: 5 }));
       });
-      const mapDataCall = createMapDataCall();
-      const resultValue = mapDataCall({ players: [] });
-      expect(resultValue.walls instanceof Set).toBe(true);
-      expect(resultValue.walls.has('wall1')).toBe(true);
-    });
-  });
-
-  describe('players handling', () => {
-    it('should preserve existing players when data.players is undefined', () => {
-      const result = getHook();
-      act(() => {
-        result.current.handleSSEEvent({
-          key: 'map-data-test-campaign-test-map',
-          data: { gridSize: 5 },
-        });
+      const prevWalls = new Set(['preservedWall']);
+      const resultValue = setMapData.mock.calls[0][0]({
+        players: [],
+        walls: prevWalls,
       });
-      expect(setMapData).toHaveBeenCalled();
-      const mapDataCall = setMapData.mock.calls[0][0];
-      const resultValue = mapDataCall({
-        players: [{ id: 'existing', name: 'Player' }],
-        walls: new Set(),
-      });
-      expect(resultValue.players).toEqual([{ id: 'existing', name: 'Player' }]);
+      expect(resultValue.walls).toBe(prevWalls);
     });
 
-    it('should use data.players when provided', () => {
+    it('should replace players array when provided', () => {
       const result = getHook();
       const players = [{ id: 'new', name: 'NewPlayer' }];
       act(() => {
-        result.current.handleSSEEvent({
-          key: 'map-data-test-campaign-test-map',
-          data: { players },
-        });
+        result.current.handleSSEEvent(validEvent({ players }));
       });
-      expect(setMapData).toHaveBeenCalled();
-      const mapDataCall = setMapData.mock.calls[0][0];
-      const resultValue = mapDataCall({ players: [], walls: new Set() });
-      expect(resultValue.players).toEqual([{ id: 'new', name: 'NewPlayer' }]);
+      const resultValue = invokeMapDataUpdater();
+      expect(resultValue.players).toEqual(players);
     });
 
-    it('should default to empty array when prev players is undefined', () => {
+    it('should keep existing players when data.players is absent', () => {
       const result = getHook();
       act(() => {
-        result.current.handleSSEEvent({
-          key: 'map-data-test-campaign-test-map',
-          data: {},
-        });
+        result.current.handleSSEEvent(validEvent({ gridSize: 5 }));
       });
-      expect(setMapData).toHaveBeenCalled();
-      const mapDataCall = setMapData.mock.calls[0][0];
-      const resultValue = mapDataCall({});
-      expect(resultValue.players).toEqual([]);
+      const prevPlayers = [{ id: 'existing', name: 'Player' }];
+      const resultValue = setMapData.mock.calls[0][0]({
+        players: prevPlayers,
+        walls: new Set(),
+      });
+      expect(resultValue.players).toEqual(prevPlayers);
     });
   });
 
-  describe('multiple fields', () => {
-    it('should handle gridSize, players, walls, and placedItems in a single event', () => {
+  describe('multi-field events', () => {
+    it('should update gridSize, players, walls, and placedItems in a single event', () => {
       const result = getHook();
       act(() => {
-        result.current.handleSSEEvent({
-          key: 'map-data-test-campaign-test-map',
-          data: {
-            gridSize: 15,
-            players: [{ id: 'p1' }],
-            walls: ['w1'],
-            placedItems: [{ id: 'item1' }],
-          },
-        });
+        result.current.handleSSEEvent(validEvent({
+          gridSize: 15,
+          players: [{ id: 'p1' }],
+          walls: ['w1'],
+          placedItems: [{ id: 'item1' }],
+        }));
       });
       expect(setGridSize).toHaveBeenCalledWith(15);
       expect(setPlacedItems).toHaveBeenCalledWith([{ id: 'item1' }]);

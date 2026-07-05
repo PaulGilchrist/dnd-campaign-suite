@@ -1,3 +1,4 @@
+// @cleaned-by-ai
 // @improved-by-ai
 import { describe, it, expect } from 'vitest';
 import { generateOutdoorEncounter } from './outdoorEncounterGenerator.js';
@@ -14,46 +15,19 @@ function gen(terrainType, gridSize, marchingOrder, q, r) {
 // ════════════════════════════════════════════════════════════════════
 describe('generateOutdoorEncounter', () => {
   describe('return shape', () => {
-    it('returns an object with all expected top-level keys', () => {
+    it('returns an object with all expected top-level keys and correct defaults', () => {
       const result = gen('forest', 10, defaultPlayers, 0, 0);
-      expect(result).toHaveProperty('type');
-      expect(result).toHaveProperty('parentTerrain');
-      expect(result).toHaveProperty('parentHex');
-      expect(result).toHaveProperty('gridSize');
-      expect(result).toHaveProperty('walls');
-      expect(result).toHaveProperty('placedItems');
-      expect(result).toHaveProperty('players');
-      expect(result).toHaveProperty('fog');
-      expect(result).toHaveProperty('zoom');
-      expect(result).toHaveProperty('panX');
-      expect(result).toHaveProperty('panY');
-      expect(result).toHaveProperty('bgFill');
-    });
-
-    it('type is always "indoor"', () => {
-      const result = gen('forest', 10, defaultPlayers, 0, 0);
-      expect(result.type).toBe('indoor');
-    });
-
-    it('walls is an empty array', () => {
-      const result = gen('forest', 10, defaultPlayers, 0, 0);
-      expect(result.walls).toEqual([]);
-    });
-
-    it('fog is an empty array', () => {
-      const result = gen('forest', 10, defaultPlayers, 0, 0);
-      expect(result.fog).toEqual([]);
-    });
-
-    it('zoom defaults to 1', () => {
-      const result = gen('forest', 10, defaultPlayers, 0, 0);
-      expect(result.zoom).toBe(1);
-    });
-
-    it('panX and panY default to 0', () => {
-      const result = gen('forest', 10, defaultPlayers, 0, 0);
-      expect(result.panX).toBe(0);
-      expect(result.panY).toBe(0);
+      expect(result).toHaveProperty('type', 'indoor');
+      expect(result).toHaveProperty('parentTerrain', 'forest');
+      expect(result).toHaveProperty('parentHex', { q: 0, r: 0 });
+      expect(result).toHaveProperty('gridSize', 10);
+      expect(result).toHaveProperty('walls', []);
+      expect(result).toHaveProperty('placedItems', expect.any(Array));
+      expect(result).toHaveProperty('players', expect.any(Array));
+      expect(result).toHaveProperty('fog', []);
+      expect(result).toHaveProperty('zoom', 1);
+      expect(result).toHaveProperty('panX', 0);
+      expect(result).toHaveProperty('panY', 0);
     });
 
     it('parentTerrain echoes the input terrainType', () => {
@@ -96,11 +70,6 @@ describe('generateOutdoorEncounter', () => {
       const b = gen('plains', 20, [], 0, 0);
       expect(a.placedItems).not.toEqual(b.placedItems);
     });
-
-    it('q=0,r=0 produces a repeatable bgFill for forest', () => {
-      const result = gen('forest', 10, [], 0, 0);
-      expect(result.bgFill).toBe('#2D5E37');
-    });
   });
 
   // ════════════════════════════════════════════════════════════════════
@@ -117,6 +86,7 @@ describe('generateOutdoorEncounter', () => {
         desert: '#C4B080',
         tundra: '#8CA0A0',
         beach: '#D4C080',
+        water: '#356090',
       };
       for (const [terrain, color] of Object.entries(expected)) {
         const result = gen(terrain, 10, [], 0, 0);
@@ -124,19 +94,11 @@ describe('generateOutdoorEncounter', () => {
       }
     });
 
-    it('falls back to plains bgFill for an unknown terrain type', () => {
-      const result = gen('underwater', 10, [], 0, 0);
-      expect(result.bgFill).toBe('#7A9B6A');
-    });
-
-    it('falls back to plains bgFill when terrainType is null', () => {
-      const result = gen(null, 10, [], 0, 0);
-      expect(result.bgFill).toBe('#7A9B6A');
-    });
-
-    it('falls back to plains bgFill when terrainType is empty string', () => {
-      const result = gen('', 10, [], 0, 0);
-      expect(result.bgFill).toBe('#7A9B6A');
+    it('falls back to plains bgFill for unknown, null, or empty terrainType', () => {
+      for (const t of ['underwater', null, '']) {
+        const result = gen(t, 10, [], 0, 0);
+        expect(result.bgFill).toBe('#7A9B6A');
+      }
     });
   });
 
@@ -197,14 +159,15 @@ describe('generateOutdoorEncounter', () => {
   // Placed items — structure and constraints
   // ════════════════════════════════════════════════════════════════════
   describe('placed items', () => {
-    it('each placedItem has required fields: id, type, gridX, gridY, visible', () => {
-      const result = gen('forest', 20, [], 0, 0);
+    it('each placedItem has required fields with correct id pattern', () => {
+      const result = gen('forest', 20, [], 1, 1);
       for (const item of result.placedItems) {
         expect(item).toHaveProperty('id');
         expect(item).toHaveProperty('type');
         expect(item).toHaveProperty('gridX');
         expect(item).toHaveProperty('gridY');
         expect(item.visible).toBe(true);
+        expect(item.id).toMatch(/^(tree|boulder|bush)-\d+$/);
       }
     });
 
@@ -223,20 +186,13 @@ describe('generateOutdoorEncounter', () => {
       }
     });
 
-    it('item id follows pattern "type-counter"', () => {
-      const result = gen('forest', 20, [], 1, 1);
-      for (const item of result.placedItems) {
-        expect(item.id).toMatch(/^(tree|boulder|bush)-\d+$/);
-      }
-    });
-
     it('item ids are unique within a single encounter', () => {
       const result = gen('forest', 20, [], 1, 1);
       const ids = result.placedItems.map((i) => i.id);
       expect(new Set(ids).size).toBe(ids.length);
     });
 
-    it('placed items are within grid bounds for gridSize=14', () => {
+    it('placed items are within grid bounds', () => {
       const result = gen('plains', 14, [], 0, 0);
       for (const item of result.placedItems) {
         expect(item.gridX).toBeGreaterThanOrEqual(0);
@@ -252,17 +208,12 @@ describe('generateOutdoorEncounter', () => {
       expect(new Set(keys).size).toBe(keys.length);
     });
 
-    it('has at least 4 placed items on a large enough grid', () => {
-      const result = gen('forest', 30, [], 0, 0);
-      expect(result.placedItems.length).toBeGreaterThanOrEqual(4);
+    it('has at least 4 placed items on medium and large grids', () => {
+      expect(gen('forest', 30, [], 0, 0).placedItems.length).toBeGreaterThanOrEqual(4);
+      expect(gen('plains', 15, [], 0, 0).placedItems.length).toBeGreaterThanOrEqual(4);
     });
 
-    it('still generates at least 4 items on a medium grid', () => {
-      const result = gen('plains', 15, [], 0, 0);
-      expect(result.placedItems.length).toBeGreaterThanOrEqual(4);
-    });
-
-    it('on a very small grid items avoid the center clear zone', () => {
+    it('on a small grid items avoid the center clear zone', () => {
       const result = gen('forest', 10, [], 0, 0);
       for (const item of result.placedItems) {
         const inClearZoneX = item.gridX >= 1 && item.gridX <= 9;

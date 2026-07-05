@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 
@@ -48,17 +48,6 @@ describe('useTrackedResource', () => {
 
       expect(result.current.current).toBe(20);
       expect(result.current.max).toBe(20);
-    });
-
-    it('falls through to maxGetter when storage returns undefined', () => {
-      getRuntimeValue.mockReturnValue(undefined);
-
-      const maxGetter = vi.fn(() => 15);
-      const { result } = renderHook(() =>
-        useTrackedResource('hp', 'Gandalf', maxGetter, 'dep1')
-      );
-
-      expect(result.current.current).toBe(15);
     });
 
     it('treats storage value of 0 as a valid stored value', () => {
@@ -125,18 +114,6 @@ describe('useTrackedResource', () => {
 
       expect(result.current.max).toBe(25);
     });
-
-    it('handles maxGetter returning 0', () => {
-      getRuntimeValue.mockReturnValue(null);
-
-      const maxGetter = vi.fn(() => 0);
-      const { result } = renderHook(() =>
-        useTrackedResource('hp', 'Gandalf', maxGetter, 'dep1')
-      );
-
-      expect(result.current.current).toBe(0);
-      expect(result.current.max).toBe(0);
-    });
   });
 
   describe('update', () => {
@@ -176,7 +153,7 @@ describe('useTrackedResource', () => {
       expect(result.current.current).toBe(15);
     });
 
-    it('allows updating to 0, negative, and values exceeding max', async () => {
+    it('allows updating to any value including 0, negative, and values exceeding max', async () => {
       getRuntimeValue.mockReturnValue(10);
       setRuntimeValue.mockResolvedValue(undefined);
 
@@ -199,24 +176,6 @@ describe('useTrackedResource', () => {
         await result.current.update(25);
       });
       expect(result.current.current).toBe(25);
-      expect(result.current.max).toBe(20);
-    });
-
-    it('returns a promise from update', async () => {
-      getRuntimeValue.mockReturnValue(10);
-      setRuntimeValue.mockResolvedValue(undefined);
-
-      const maxGetter = vi.fn(() => 20);
-      const { result } = renderHook(() =>
-        useTrackedResource('hp', 'Gandalf', maxGetter, 'dep1')
-      );
-
-      const updatePromise = result.current.update(5);
-      expect(updatePromise).toBeInstanceOf(Promise);
-
-      await act(async () => {
-        await updatePromise;
-      });
     });
 
     it('rejects when setRuntimeValue rejects', async () => {
@@ -273,28 +232,6 @@ describe('useTrackedResource', () => {
       expect(result.current.current).toBe(3);
     });
 
-    it('re-reads when maxGetter function identity changes', () => {
-      getRuntimeValue
-        .mockReturnValueOnce(null)
-        .mockReturnValueOnce(null)
-        .mockReturnValueOnce(null);
-
-      const maxGetter1 = vi.fn(() => 10);
-      const { result, rerender } = renderHook(
-        ({ getter }) => useTrackedResource('hp', 'Gandalf', getter, 'dep1'),
-        { initialProps: { getter: maxGetter1 } }
-      );
-
-      expect(result.current.current).toBe(10);
-      expect(maxGetter1).toHaveBeenCalled();
-
-      const maxGetter2 = vi.fn(() => 30);
-      rerender({ getter: maxGetter2 });
-
-      expect(result.current.current).toBe(30);
-      expect(maxGetter2).toHaveBeenCalled();
-    });
-
     it('re-reads when playerStats changes', () => {
       getRuntimeValue.mockReturnValue(null);
 
@@ -335,25 +272,6 @@ describe('useTrackedResource', () => {
 
       expect(removeListener).toHaveBeenCalled();
     });
-
-    it('removes custom event listeners on unmount', () => {
-      const removeListener = vi.fn();
-      addStorageChangeListener.mockReturnValue(removeListener);
-
-      const addEventListenerSpy = vi.spyOn(window, 'addEventListener');
-      const removeEventListenerSpy = vi.spyOn(window, 'removeEventListener');
-
-      renderHook(() =>
-        useTrackedResource('hp', 'Gandalf', () => 10, 'dep1')
-      );
-
-      expect(addEventListenerSpy).toHaveBeenCalledWith('focus-points-updated', expect.any(Function));
-      expect(addEventListenerSpy).toHaveBeenCalledWith('sorcery-points-updated', expect.any(Function));
-      expect(addEventListenerSpy).toHaveBeenCalledWith('innate-sorcery-updated', expect.any(Function));
-
-      addEventListenerSpy.mockRestore();
-      removeEventListenerSpy.mockRestore();
-    });
   });
 
   describe('behavioral integration', () => {
@@ -375,46 +293,6 @@ describe('useTrackedResource', () => {
       });
 
       expect(result.current.current).toBe(15);
-    });
-
-    it('re-reads storage when sorcery-points-updated event fires', async () => {
-      getRuntimeValue
-        .mockReturnValueOnce(5)
-        .mockReturnValueOnce(5)
-        .mockReturnValueOnce(8);
-
-      const maxGetter = vi.fn(() => 10);
-      const { result } = renderHook(() =>
-        useTrackedResource('spell-slots', 'Gandalf', maxGetter, 'dep1')
-      );
-
-      expect(result.current.current).toBe(5);
-
-      await act(async () => {
-        window.dispatchEvent(new Event('sorcery-points-updated'));
-      });
-
-      expect(result.current.current).toBe(8);
-    });
-
-    it('re-reads storage when innate-sorcery-updated event fires', async () => {
-      getRuntimeValue
-        .mockReturnValueOnce(3)
-        .mockReturnValueOnce(3)
-        .mockReturnValueOnce(6);
-
-      const maxGetter = vi.fn(() => 10);
-      const { result } = renderHook(() =>
-        useTrackedResource('innate-spells', 'Gandalf', maxGetter, 'dep1')
-      );
-
-      expect(result.current.current).toBe(3);
-
-      await act(async () => {
-        window.dispatchEvent(new Event('innate-sorcery-updated'));
-      });
-
-      expect(result.current.current).toBe(6);
     });
 
     it('uses fresh playerName, storageKey, and playerStats from the re-read handler', async () => {

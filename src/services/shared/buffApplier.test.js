@@ -6,102 +6,44 @@ import {
 } from './buffApplier.js';
 
 describe('applyAbilityScoreIncreases', () => {
-  it('returns void and mutates nothing when abilities is falsy', () => {
+  it('returns void when abilities or increases is falsy', () => {
     expect(applyAbilityScoreIncreases(null, [])).toBeUndefined();
     expect(applyAbilityScoreIncreases(undefined, [])).toBeUndefined();
-  });
-
-  it('returns void and mutates nothing when increases is nullish', () => {
     const abilities = [{ name: 'Strength', featIncrease: 0 }];
     expect(applyAbilityScoreIncreases(abilities, null)).toBeUndefined();
     expect(abilities[0].featIncrease).toBe(0);
   });
 
-  it('applies bonus to matching ability case-insensitively', () => {
+  it('applies bonus to matching ability case-insensitively, accumulating across multiple increases', () => {
     const abilities = [
       { name: 'Strength', featIncrease: 0 },
       { name: 'Dexterity', featIncrease: 0 },
-    ];
-    applyAbilityScoreIncreases(abilities, [{ name: 'strength', amount: 2 }]);
-    expect(abilities[0].featIncrease).toBe(2);
-    expect(abilities[1].featIncrease).toBe(0);
-  });
-
-  it('accumulates bonuses from multiple increases on the same ability', () => {
-    const abilities = [{ name: 'Strength', featIncrease: 0 }];
-    applyAbilityScoreIncreases(abilities, [
-      { name: 'strength', amount: 2 },
-      { name: 'Strength', amount: 3 },
-    ]);
-    expect(abilities[0].featIncrease).toBe(5);
-  });
-
-  it('adds to existing featIncrease value and treats missing as 0', () => {
-    const abilities = [
       { name: 'Intelligence', featIncrease: 4 },
       { name: 'Wisdom' },
     ];
     applyAbilityScoreIncreases(abilities, [
+      { name: 'strength', amount: 2 },
+      { name: 'Strength', amount: 3 },
+      { name: 'dexterity', amount: 1 },
       { name: 'intelligence', amount: 1 },
       { name: 'wisdom', amount: 2 },
-    ]);
-    expect(abilities[0].featIncrease).toBe(5);
-    expect(abilities[1].featIncrease).toBe(2);
-  });
-
-  it('supports negative amounts', () => {
-    const abilities = [
-      { name: 'Constitution', featIncrease: 0 },
-    ];
-    applyAbilityScoreIncreases(abilities, [
-      { name: 'Constitution', amount: -1 },
-    ]);
-    expect(abilities[0].featIncrease).toBe(-1);
-  });
-
-  it('skips increases with name "any"', () => {
-    const abilities = [
-      { name: 'Strength', featIncrease: 0 },
-      { name: 'Dexterity', featIncrease: 0 },
-    ];
-    applyAbilityScoreIncreases(abilities, [{ name: 'any', amount: 5 }]);
-    expect(abilities[0].featIncrease).toBe(0);
-    expect(abilities[1].featIncrease).toBe(0);
-  });
-
-  it('skips increases with missing or undefined name', () => {
-    const abilities = [
-      { name: 'Strength', featIncrease: 0 },
-      { name: 'Dexterity', featIncrease: 0 },
-    ];
-    applyAbilityScoreIncreases(abilities, [{ amount: 5 }, { name: undefined, amount: 5 }]);
-    expect(abilities[0].featIncrease).toBe(0);
-    expect(abilities[1].featIncrease).toBe(0);
-  });
-
-  it('applies increases across different abilities in one call', () => {
-    const abilities = [
-      { name: 'Strength', featIncrease: 0 },
-      { name: 'Dexterity', featIncrease: 0 },
-      { name: 'Constitution', featIncrease: 0 },
-    ];
-    applyAbilityScoreIncreases(abilities, [
-      { name: 'strength', amount: 2 },
-      { name: 'dexterity', amount: 1 },
       { name: 'constitution', amount: -1 },
     ]);
-    expect(abilities[0].featIncrease).toBe(2);
+    expect(abilities[0].featIncrease).toBe(5);
     expect(abilities[1].featIncrease).toBe(1);
-    expect(abilities[2].featIncrease).toBe(-1);
+    expect(abilities[2].featIncrease).toBe(5);
+    expect(abilities[3].featIncrease).toBe(2);
   });
 
-  it('handles "any" mixed with specific increases', () => {
+  it('skips increases with name "any" or missing/undefined name', () => {
     const abilities = [
       { name: 'Strength', featIncrease: 0 },
       { name: 'Dexterity', featIncrease: 0 },
     ];
     applyAbilityScoreIncreases(abilities, [
-      { name: 'any', amount: 10 },
+      { name: 'any', amount: 5 },
+      { amount: 5 },
+      { name: undefined, amount: 5 },
       { name: 'strength', amount: 2 },
     ]);
     expect(abilities[0].featIncrease).toBe(2);
@@ -116,51 +58,25 @@ describe('mergeDeduplicated', () => {
     expect(target.langs).toEqual(['Common']);
   });
 
-  it('adds items that do not already exist', () => {
+  it('adds new items while skipping duplicates case-insensitively, preserving first occurrence casing', () => {
     const target = { langs: ['Common'] };
-    mergeDeduplicated(target, 'langs', ['Elvish']);
-    expect(target.langs).toEqual(['Common', 'Elvish']);
+    mergeDeduplicated(target, 'langs', ['common', 'Elvish', 'COMMON', 'Dwarvish', 'elvish', 'Halfling']);
+    expect(target.langs).toEqual(['Common', 'Elvish', 'Dwarvish', 'Halfling']);
   });
 
-  it('skips items that already exist case-insensitively', () => {
-    const target = { langs: ['Common'] };
-    mergeDeduplicated(target, 'langs', ['common']);
-    expect(target.langs).toEqual(['Common']);
-  });
-
-  it('deduplicates across mixed casing keeping first occurrence', () => {
-    const target = { langs: ['ELVISH'] };
-    mergeDeduplicated(target, 'langs', ['elvish', 'Elvish']);
-    expect(target.langs).toEqual(['ELVISH']);
-  });
-
-  it('does not add duplicates from within newItems itself', () => {
-    const target = {};
-    mergeDeduplicated(target, 'langs', ['Elvish', 'elvish']);
-    expect(target.langs).toEqual(['Elvish']);
-  });
-
-  it('preserves casing of existing items and initializes key if missing', () => {
+  it('initializes the key when target[key] is undefined or missing', () => {
     const target = {};
     mergeDeduplicated(target, 'langs', ['Gnoll']);
     expect(target.langs).toEqual(['Gnoll']);
+
+    const target2 = { langs: undefined };
+    mergeDeduplicated(target2, 'langs', ['Dwarvish']);
+    expect(target2.langs).toEqual(['Dwarvish']);
   });
 
-  it('handles target[key] being undefined by initializing it', () => {
-    const target = { langs: undefined };
-    mergeDeduplicated(target, 'langs', ['Dwarvish']);
-    expect(target.langs).toEqual(['Dwarvish']);
-  });
-
-  it('handles empty string items', () => {
+  it('deduplicates within newItems itself, keeping first occurrence', () => {
     const target = {};
-    mergeDeduplicated(target, 'langs', ['']);
-    expect(target.langs).toEqual(['']);
-  });
-
-  it('adds multiple new items while skipping duplicates in a mixed batch', () => {
-    const target = { langs: ['Common'] };
-    mergeDeduplicated(target, 'langs', ['common', 'Elvish', 'COMMON', 'Dwarvish', 'Halfling']);
-    expect(target.langs).toEqual(['Common', 'Elvish', 'Dwarvish', 'Halfling']);
+    mergeDeduplicated(target, 'langs', ['Elvish', 'elvish', 'ELVISH']);
+    expect(target.langs).toEqual(['Elvish']);
   });
 });

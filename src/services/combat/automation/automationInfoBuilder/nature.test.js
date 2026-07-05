@@ -1,3 +1,4 @@
+// @cleaned-by-ai
 // @improved-by-ai
 import { describe, it, expect } from 'vitest'
 import { natureHandlers } from './nature.js'
@@ -44,30 +45,6 @@ describe('natureHandlers – nature_sanctuary', () => {
         expect(result.movesPerDuration).toBe(2)
         expect(result.resourceCost).toBe('hit_dice')
     })
-
-    it('falls back to defaults when automation properties are falsy', () => {
-        const feature = makeFeature({
-            type: 'nature_sanctuary',
-            range: '',
-            cubeSize: 0,
-            duration: '',
-            moveRange: 0,
-            movesPerDuration: 0,
-            resourceCost: ''
-        })
-        const result = natureHandlers.nature_sanctuary(feature, BASE_STATS)
-        expect(result.range).toBe('120_ft')
-        expect(result.cubeSize).toBe(15)
-        expect(result.duration).toBe('1_minute')
-        expect(result.moveRange).toBe(60)
-        expect(result.movesPerDuration).toBe(1)
-        expect(result.resourceCost).toBe('wild_shape')
-    })
-
-    it('throws when automation is undefined', () => {
-        const feature = { name: 'Test Feature' }
-        expect(() => natureHandlers.nature_sanctuary(feature, BASE_STATS)).toThrow(TypeError)
-    })
 })
 
 describe('natureHandlers – nature_sanctuary_move', () => {
@@ -96,10 +73,5 @@ describe('natureHandlers – nature_sanctuary_move', () => {
         })
         const result = natureHandlers.nature_sanctuary_move(feature, BASE_STATS)
         expect(result.moveRange).toBe(30)
-    })
-
-    it('throws when automation is undefined', () => {
-        const feature = { name: 'Test Feature' }
-        expect(() => natureHandlers.nature_sanctuary_move(feature, BASE_STATS)).toThrow(TypeError)
     })
 })

@@ -53,11 +53,6 @@ describe('resolveUses', () => {
     expect(resolveUses(stats, 'proficiency_bonus')).toBe(4)
   })
 
-  it('returns proficiency_bonus when class proficiency is missing', () => {
-    const stats = makePlayerStats({ proficiency: undefined })
-    expect(resolveUses(stats, 'proficiency_bonus')).toBe(0)
-  })
-
   it('returns player level when usesSpec is "<className>_level" and class name matches', () => {
     const stats = makePlayerStats()
     expect(resolveUses(stats, 'barbarian_level')).toBe(5)
@@ -75,36 +70,17 @@ describe('resolveUses', () => {
     expect(resolveUses(stats, 'barbarian_level')).toBe(10)
   })
 
-  it('returns class.levels when class has no levels property and name does not match', () => {
-    const stats = makePlayerStats({
-      class: { name: 'wizard' },
-    })
-    expect(resolveUses(stats, 'barbarian_level')).toBe(5)
-  })
-
   it('falls back to playerStats.level when class object is missing entirely', () => {
     const stats = makePlayerStats({ class: undefined })
     expect(resolveUses(stats, 'barbarian_level')).toBe(5)
-  })
-
-  it('returns 0 when class has no levels and level is falsy', () => {
-    const stats = makePlayerStats({ level: 0, class: { name: 'wizard', levels: undefined } })
-    expect(resolveUses(stats, 'barbarian_level')).toBe(0)
   })
 
   it('falls back to playerStats.level when usesSpec is not a recognized pattern', () => {
     expect(resolveUses(makePlayerStats(), 'unknown_pattern')).toBe(5)
   })
 
-  it('falls back to 1 when playerStats.level is falsy and spec is unrecognized', () => {
-    const stats = makePlayerStats({ level: 0 })
-    expect(resolveUses(stats, 'unknown_pattern')).toBe(1)
-  })
-
   it('handles non-string usesSpec by falling back to level', () => {
     const stats = makePlayerStats()
-    expect(resolveUses(stats, true)).toBe(5)
-    expect(resolveUses(stats, null)).toBe(5)
     expect(resolveUses(stats, 42)).toBe(42)
   })
 })

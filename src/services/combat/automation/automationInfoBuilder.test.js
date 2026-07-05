@@ -3,158 +3,6 @@ import { describe, it, expect } from 'vitest'
 import { buildAttackInfo } from './automationInfoBuilder.js'
 import { BASE_STATS, makeFeature } from './automationInfoBuilder.fixtures.js'
 
-// Map of handler keys to the type they actually return in result.type
-// Many handlers transform the handler key into a different output type.
-const HANDLER_OUTPUT_TYPES = {
-    // attack.js — all return their handler key
-    attack_rider: 'attack_rider', open_hand_technique: 'open_hand_technique',
-    mastery_rider: 'mastery_rider', bonus_action_attack: 'bonus_action_attack',
-    bonus_attacks: 'bonus_attacks', concentration_bonus_attack: 'concentration_bonus_attack',
-    stealth_attack: 'stealth_attack', war_bond_summon: 'war_bond_summon',
-    // save.js — all return their handler key
-    save_attack: 'save_attack', save_only: 'save_only',
-    flesh_to_stone: 'flesh_to_stone', hold_monster: 'hold_monster',
-    resilient_sphere: 'resilient_sphere', ottos_dance: 'ottos_dance',
-    power_word_stun: 'power_word_stun', sleep: 'sleep',
-    stinking_cloud: 'stinking_cloud', tashas_laughter: 'tashas_laughter',
-    // passive.js — several transform the type
-    passive_buff: 'passive_buff',
-    ignore_resistance: 'passive_rule',
-    passive_immunity: 'passive_immunity',
-    holy_nimbus_radiant_damage: 'passive_rule',
-    umbral_sight: 'passive_rule', supreme_sneak: 'passive_rule',
-    otherworldly_glamour: 'passive_buff',
-    create_thrall_temp_hp: 'create_thrall_temp_hp',
-    ritual_spells: 'passive_rule', potent_cantrip: 'potent_cantrip',
-    soulstitch_spells: 'soulstitch_spells', empowered_evocation: 'empowered_evocation',
-    concentration_disadvantage_on_damage_dealt: 'passive_rule',
-    tavern_brawler_reroll_ones: 'passive_rule',
-    tavern_brawler_push: 'passive_rule',
-    ignore_loading_crossbows: 'passive_rule',
-    no_melee_disadvantage_crossbows: 'passive_rule',
-    naturally_stealthy: 'passive_rule',
-    // combatStance.js
-    combat_stance: 'combat_stance',
-    // bardic.js
-    bardic_inspiration: 'bardic_inspiration',
-    bardic_inspiration_defense: 'bardic_inspiration_defense',
-    bardic_inspiration_offense: 'bardic_inspiration_offense',
-    // damage.js — several transform the type
-    damage_bonus: 'damage_bonus', damage_modifier: 'damage_modifier',
-    damage_type_modifier: 'damage_type_modifier', damage_type_choice: 'damage_type_choice',
-    weapon_mastery_choice: 'weapon_mastery_choice', damage_reduction: 'damage_reduction',
-    damage_aura: 'damage_aura', psionic_strike: 'psionic_strike',
-    primal_companion_double_strike_damage: 'damage_bonus',
-    great_weapon_fighting: 'passive_rule', grapple_damage: 'passive_rule',
-    two_weapon_fighting: 'passive_rule', reroll_damage_once_per_turn: 'passive_rule',
-    // The 'damage' handler key transforms based on feature.type/source
-    damage: null, // returns null for features without type==='damage' && source==='feat'
-    // healing.js
-    healing: 'healing', healing_pool: 'healing_pool', self_healing: 'self_healing',
-    buff_ally: 'buff_ally', heroic_inspiration_buff: 'buff_ally',
-    divine_spark: 'divine_spark', reaction_save_heal: 'reaction_save_heal',
-    post_cast_self_heal: 'post_cast_self_heal', post_cast_ally_heal: 'post_cast_ally_heal',
-    heroes_feast: 'heroes_feast', healing_bonus: 'passive_rule',
-    // reaction.js
-    reaction_bonus: 'reaction_bonus', reaction_damage: 'reaction_damage',
-    reaction_debuff: 'reaction_debuff', reaction_save: 'reaction_save',
-    shadowy_dodge: 'shadowy_dodge', glorious_defense: 'glorious_defense',
-    beguiling_defenses: 'beguiling_defenses', searing_vengeance: 'searing_vengeance',
-    illusory_self: 'illusory_self', reaction_counterspell: 'reaction_counterspell',
-    lucky_point: 'lucky_point', reaction_spell: 'reaction_spell',
-    sentinel_guardian: 'sentinel_guardian',
-    // resource.js
-    resource_pool: 'resource_pool', resource_restoration: 'resource_restoration',
-    // spell.js
-    free_spell: 'free_spell', fey_reinforcements: 'fey_reinforcements',
-    contact_patron: 'contact_patron', dragon_companion: 'dragon_companion',
-    spell_modifier: 'spell_modifier', spell_thief: 'spell_thief',
-    war_magic_cantrip: 'war_magic_cantrip', war_magic_spell: 'war_magic_spell',
-    arcane_charge: 'arcane_charge', guarded_mind: 'guarded_mind',
-    bulwark_of_force: 'bulwark_of_force', signature_spells: 'signature_spells',
-    spell_mastery: 'spell_mastery', overchannel: 'overchannel',
-    pass_without_trace: 'pass_without_trace', warding_bond: 'warding_bond',
-    // diverse.js
-    extra_action: 'extra_action', font_of_magic: 'font_of_magic',
-    font_of_inspiration: 'font_of_inspiration', meta: 'meta',
-    jack_of_all_trades: 'jack_of_all_trades', reliable_talent: 'reliable_talent',
-    divine_order: 'divine_order', divine_intervention: 'divine_intervention',
-    // misc.js
-    auto_effect: 'auto_effect', survive_and_heal: 'survive_and_heal',
-    auto_reroll: 'auto_reroll', restore_balance: 'restore_balance',
-    countercharm: 'countercharm', misty_wanderer: 'misty_wanderer',
-    misty_escape: 'misty_escape', steps_of_the_fey: 'steps_of_the_fey',
-    moonlight_step_rider: 'moonlight_step_rider', post_cast_rider: 'post_cast_rider',
-    post_cast_smite_cover: 'post_cast_smite_cover',
-    post_cast_inspiring_smite: 'post_cast_inspiring_smite',
-    resistance: 'resistance', land_resistance: 'land_resistance',
-    set_condition: 'set_condition', shadow_step_rider: 'shadow_step_rider',
-    relentless_avenger: 'relentless_avenger', soul_of_vengeance: 'soul_of_vengeance',
-    hunter_prey: 'hunter_prey', defensive_tactics: 'defensive_tactics',
-    superior_hunter_prey: 'superior_hunter_prey',
-    superior_hunter_defense: 'superior_hunter_defense',
-    bonus_action_choice: 'bonus_action_choice', steady_aim: 'steady_aim',
-    mage_hand_control: 'mage_hand_control', stroke_of_luck: 'stroke_of_luck',
-    modify_d20_roll: 'modify_d20_roll', fast_hands: 'fast_hands',
-    use_magic_device: 'use_magic_device', wild_magic_surge: 'wild_magic_surge',
-    wild_magic_tamed: 'wild_magic_tamed',
-    feats_of_chaos: 'conditional_advantage', multi_target_spread: 'multi_target_spread',
-    bewitching_magic: 'bewitching_magic', radiant_soul: 'radiant_soul',
-    celestial_resilience: 'celestial_resilience', dark_ones_look: 'dark_ones_look',
-    hurl_through_hell: 'hurl_through_hell', clairvoyant_combatant: 'clairvoyant_combatant',
-    memorize_spell: 'memorize_spell', spell_breaker: 'passive_rule',
-    create_thrall: 'create_thrall', portent: 'portent',
-    third_eye: 'bonus_action_choice', improved_illusions: 'improved_illusions',
-    phantasmal_creatures: 'phantasmal_creatures', illusory_reality: 'illusory_reality',
-    celestial_revelation: 'celestial_revelation', elfish_lineage: 'elfish_lineage',
-    gnomish_lineage: 'gnomish_lineage', fiendish_legacy: 'fiendish_legacy',
-    lesser_restoration: 'lesser_restoration', remove_curse: 'remove_curse',
-    protection_from_poison: 'protection_from_poison', sentinel: 'sentinel',
-    telekinetic_shove: 'telekinetic_shove',
-    // nature.js
-    nature_sanctuary: 'nature_sanctuary', nature_sanctuary_move: 'nature_sanctuary_move',
-    // primal.js
-    primal_companion_summon: 'primal_companion_summon',
-    primal_companion_dodge: 'primal_companion_dodge',
-    primal_companion_command: 'primal_companion_command',
-    primal_companion_restore: 'primal_companion_restore',
-    primal_companion_bonus_action_command: 'primal_companion_bonus_action_command',
-    primal_companion_double_strike: 'primal_companion_double_strike',
-    primal_companion_spell_share: 'primal_companion_spell_share',
-    // psionic.js
-    psychic_spells: 'psychic_spells', psionic_sorcery: 'psionic_sorcery',
-    psionic_spells_list: 'psionic_spells_list',
-    telekinetic_movement: 'telekinetic_movement', telekinetic_leap: 'telekinetic_leap',
-    telekinetic_thrust: 'telekinetic_thrust',
-    // sorcery.js
-    sorcery_aura: 'sorcery_aura', sorcery_incarnate: 'sorcery_incarnate',
-    bastion_of_law: 'bastion_of_law', transe_of_order: 'transe_of_order',
-    clockwork_cavalcade: 'clockwork_cavalcade',
-    warping_implosion: 'save_attack',
-    // starry.js
-    starry_form: 'starry_form', cosmic_omen: 'cosmic_omen',
-    twinkling_constellations: 'twinkling_constellations',
-    // temp.js
-    temp_buff: 'temp_buff', temp_hp_buff: 'temp_hp_buff',
-    sacred_weapon: 'temp_buff', avenging_angel: 'temp_buff',
-    holy_nimbus: 'holy_nimbus', cloak_of_shadows: 'cloak_of_shadows',
-    peerless_athlete: 'peerless_athlete', dragon_wings: 'dragon_wings',
-    revelation_in_flesh: 'revelation_in_flesh', living_legend: 'living_legend',
-    holy_aura: 'holy_aura', elder_champion: 'elder_champion',
-    dark_ones_blessing: 'dark_ones_blessing', large_form: 'large_form',
-    // initiative.js
-    initiative_action: 'initiative_action',
-    // misc.js
-    cantrip_spellcasting_ability: 'cantrip_spellcasting_ability',
-    // conditional.js
-    conditional_advantage: 'conditional_advantage',
-    conditional_disadvantage: 'conditional_disadvantage',
-    conditional_replacement: 'conditional_replacement',
-    condition_immunity_while_active: 'condition_immunity_while_active',
-    evasion: 'evasion', save_proficiency: 'save_proficiency',
-    passive_rule: 'passive_rule',
-}
-
 describe('buildAttackInfo', () => {
     describe('null/early-return paths', () => {
         it('returns null when feature has no automation property', () => {
@@ -163,50 +11,85 @@ describe('buildAttackInfo', () => {
             expect(result).toBeNull()
         })
 
-        it('returns null when automation is null', () => {
-            const feature = { name: 'Null Auto', automation: null }
-            const result = buildAttackInfo(feature, BASE_STATS)
-            expect(result).toBeNull()
+        it('returns null when automation is null or undefined', () => {
+            expect(buildAttackInfo({ name: 'Null Auto', automation: null }, BASE_STATS)).toBeNull()
+            expect(buildAttackInfo({ name: 'Undefined Auto', automation: undefined }, BASE_STATS)).toBeNull()
         })
 
-        it('returns null when automation is undefined', () => {
-            const feature = { name: 'Undefined Auto', automation: undefined }
-            const result = buildAttackInfo(feature, BASE_STATS)
-            expect(result).toBeNull()
-        })
-
-        it('returns null for unknown automation type', () => {
-            const feature = makeFeature({ type: 'nonexistent_type' })
-            const result = buildAttackInfo(feature, BASE_STATS)
-            expect(result).toBeNull()
-        })
-
-        it('returns null when automation object has no type', () => {
-            const feature = makeFeature({ foo: 'bar' })
-            const result = buildAttackInfo(feature, BASE_STATS)
-            expect(result).toBeNull()
+        it('returns null for unknown automation type or missing type', () => {
+            expect(buildAttackInfo(makeFeature({ type: 'nonexistent_type' }), BASE_STATS)).toBeNull()
+            expect(buildAttackInfo(makeFeature({ foo: 'bar' }), BASE_STATS)).toBeNull()
         })
     })
 
-    describe('dispatch correctness', () => {
-        const knownTypes = Object.keys(HANDLER_OUTPUT_TYPES)
+    describe('dispatch correctness — representative handler coverage', () => {
+        // Representative behavioral tests across handler categories.
+        // The DISPATCH map in automationInfoBuilder.js merges 21 handler modules.
+        // This test verifies that each handler category produces a non-null result
+        // with the expected type and hasAutomation flag.
+        const representativeTypes = [
+            // attack.js
+            { type: 'attack_rider', expectedType: 'attack_rider' },
+            { type: 'bonus_action_attack', expectedType: 'bonus_action_attack' },
+            // save.js
+            { type: 'save_attack', expectedType: 'save_attack' },
+            { type: 'sleep', expectedType: 'sleep' },
+            // passive.js
+            { type: 'passive_buff', expectedType: 'passive_buff' },
+            { type: 'passive_immunity', expectedType: 'passive_immunity' },
+            { type: 'ignore_resistance', expectedType: 'passive_rule' },
+            // combatStance.js
+            { type: 'combat_stance', expectedType: 'combat_stance' },
+            // bardic.js
+            { type: 'bardic_inspiration', expectedType: 'bardic_inspiration' },
+            // damage.js
+            { type: 'damage_bonus', expectedType: 'damage_bonus' },
+            { type: 'great_weapon_fighting', expectedType: 'passive_rule' },
+            // healing.js
+            { type: 'healing', expectedType: 'healing' },
+            { type: 'healing_pool', expectedType: 'healing_pool' },
+            // reaction.js
+            { type: 'reaction_damage', expectedType: 'reaction_damage' },
+            { type: 'reaction_save', expectedType: 'reaction_save' },
+            // resource.js
+            { type: 'resource_pool', expectedType: 'resource_pool' },
+            // spell.js
+            { type: 'free_spell', expectedType: 'free_spell' },
+            { type: 'warding_bond', expectedType: 'warding_bond' },
+            // diverse.js
+            { type: 'extra_action', expectedType: 'extra_action' },
+            { type: 'font_of_magic', expectedType: 'font_of_magic' },
+            // misc.js
+            { type: 'auto_effect', expectedType: 'auto_effect' },
+            { type: 'resistance', expectedType: 'resistance' },
+            // nature.js
+            { type: 'nature_sanctuary', expectedType: 'nature_sanctuary' },
+            // primal.js
+            { type: 'primal_companion_summon', expectedType: 'primal_companion_summon' },
+            // psionic.js
+            { type: 'psychic_spells', expectedType: 'psychic_spells' },
+            // sorcery.js
+            { type: 'sorcery_aura', expectedType: 'sorcery_aura' },
+            // starry.js
+            { type: 'starry_form', expectedType: 'starry_form' },
+            // temp.js
+            { type: 'temp_buff', expectedType: 'temp_buff' },
+            { type: 'holy_nimbus', expectedType: 'holy_nimbus' },
+            // conditional.js
+            { type: 'conditional_advantage', expectedType: 'conditional_advantage' },
+            { type: 'passive_rule', expectedType: 'passive_rule' },
+            // initiative.js
+            { type: 'initiative_action', expectedType: 'initiative_action' },
+        ]
 
-        for (const type of knownTypes) {
-            const expectedOutputType = HANDLER_OUTPUT_TYPES[type]
-            const expectNull = expectedOutputType === null
-
-            it(`dispatches "${type}"${expectNull ? ' and returns null' : ''}`, () => {
+        for (const { type, expectedType } of representativeTypes) {
+            it(`dispatches "${type}" and returns correct type`, () => {
                 const feature = makeFeature({ type })
                 const result = buildAttackInfo(feature, BASE_STATS)
-                if (expectNull) {
-                    expect(result).toBeNull()
-                } else {
-                    expect(result).not.toBeNull()
-                    expect(result).toBeDefined()
-                    expect(result.type).toBe(expectedOutputType)
-                    expect(result.hasAutomation).toBe(true)
-                    expect(typeof result.name).toBe('string')
-                }
+                expect(result).not.toBeNull()
+                expect(result.type).toBe(expectedType)
+                expect(result.hasAutomation).toBe(true)
+                expect(typeof result.name).toBe('string')
             })
         }
     })

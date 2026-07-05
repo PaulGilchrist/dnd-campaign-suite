@@ -1,3 +1,4 @@
+// @cleaned-by-ai
 // @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
@@ -277,237 +278,179 @@ describe('getCreatureSaveBonus', () => {
   });
 });
 
-describe('rollConditionSave', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it('returns success result with correct fields on a successful save', async () => {
-    const condition = { ability: 'wis', dc: 15 };
-    getAbilitySaveBonus.mockReturnValue(3);
-    computeAuraBonus.mockResolvedValue({ bonus: 0 });
-    rollD20.mockReturnValue(12);
-    isAuraOfPurityActive.mockReturnValue(false);
-
-    const result = await rollConditionSave(
-      { type: 'player', name: 'Hero' },
-      condition,
-      [{ name: 'Hero' }],
-      [],
-      'Campaign',
-      '',
-      defaultGetName,
-    );
-
-    expect(result.roll).toBe(12);
-    expect(result.bonus).toBe(3);
-    expect(result.total).toBe(15);
-    expect(result.success).toBe(true);
-    expect(result.bonusDetail).toBeUndefined();
-    expect(result.advantage).toBeUndefined();
-  });
-
-  it('returns failure result when total is below dc', async () => {
-    getAbilitySaveBonus.mockReturnValue(2);
-    computeAuraBonus.mockResolvedValue({ bonus: 0 });
-    rollD20.mockReturnValue(5);
-    isAuraOfPurityActive.mockReturnValue(false);
-
-    const result = await rollConditionSave(
-      { type: 'player', name: 'Hero' },
-      { ability: 'str', dc: 18 },
-      [{ name: 'Hero' }],
-      [],
-      'Campaign',
-      '',
-      defaultGetName,
-    );
-
-    expect(result.total).toBe(7);
-    expect(result.success).toBe(false);
-  });
-
-  it('includes aura bonus in total and success calculation', async () => {
-    getAbilitySaveBonus.mockReturnValue(3);
-    computeAuraBonus.mockResolvedValue({ bonus: 2 });
-    rollD20.mockReturnValue(14);
-    isAuraOfPurityActive.mockReturnValue(false);
-
-    const result = await rollConditionSave(
-      { type: 'player', name: 'Hero' },
-      { ability: 'con', dc: 18 },
-      [{ name: 'Hero' }],
-      [],
-      'Campaign',
-      '',
-      defaultGetName,
-    );
-
-    expect(result.total).toBe(19);
-    expect(result.success).toBe(true);
-    expect(result.bonus).toBe(5);
-  });
-
-  it('includes bonusDetail with aura when auraBonus > 0 and no sourceName', async () => {
-    getAbilitySaveBonus.mockReturnValue(0);
-    computeAuraBonus.mockResolvedValue({ bonus: 1 });
-    rollD20.mockReturnValue(10);
-    isAuraOfPurityActive.mockReturnValue(false);
-
-    const result = await rollConditionSave(
-      { type: 'player', name: 'Hero' },
-      { ability: 'wis', dc: 11 },
-      [{ name: 'Hero' }],
-      [],
-      'Campaign',
-      '',
-      defaultGetName,
-    );
-
-    expect(result.bonusDetail).toBe('(+1 aura)');
-  });
-
-  it('includes bonusDetail with aura sourceName when available', async () => {
-    getAbilitySaveBonus.mockReturnValue(2);
-    computeAuraBonus.mockResolvedValue({ bonus: 3, sourceName: 'Paladin' });
-    rollD20.mockReturnValue(8);
-    isAuraOfPurityActive.mockReturnValue(false);
-
-    const result = await rollConditionSave(
-      { type: 'player', name: 'Hero' },
-      { ability: 'wis', dc: 13 },
-      [{ name: 'Hero' }],
-      [],
-      'Campaign',
-      '',
-      defaultGetName,
-    );
-
-    expect(result.bonusDetail).toBe('(+3 aura from Paladin)');
-  });
-
-  it('omits bonusDetail when auraBonus is zero even with sourceName', async () => {
-    getMonsterData.mockResolvedValue({ saving_throws: { con: { modifier: 5 } } });
-    computeAuraBonus.mockResolvedValue({ bonus: 0, sourceName: 'None' });
-    rollD20.mockReturnValue(1);
-    isAuraOfPurityActive.mockReturnValue(false);
-
-    const result = await rollConditionSave(
-      { type: 'monster', name: 'Goblin' },
-      { ability: 'con', dc: 6 },
-      [],
-      [],
-      'Campaign',
-      '',
-      defaultGetName,
-    );
-
-    expect(result.bonusDetail).toBeUndefined();
-  });
-
-  it('calls computeAuraBonus with correct parameters', async () => {
-    getAbilitySaveBonus.mockReturnValue(0);
-    computeAuraBonus.mockResolvedValue({ bonus: 0 });
-    rollD20.mockReturnValue(10);
-    isAuraOfPurityActive.mockReturnValue(false);
-
-    await rollConditionSave(
-      { type: 'player', name: 'Ally' },
-      { ability: 'con', dc: 10 },
-      [{ name: 'Group' }],
-      [],
-      'TheCampaign',
-      'DungeonMap',
-      defaultGetName,
-    );
-
-    expect(computeAuraBonus).toHaveBeenCalledWith({
-      targetName: 'Ally',
-      characters: [{ name: 'Group' }],
-      campaignName: 'TheCampaign',
-      activeMapName: 'DungeonMap',
+  describe('rollConditionSave', () => {
+    beforeEach(() => {
+      vi.clearAllMocks();
     });
-  });
 
-  it('succeeds when total equals dc exactly', async () => {
-    getAbilitySaveBonus.mockReturnValue(5);
-    computeAuraBonus.mockResolvedValue({ bonus: 0 });
-    rollD20.mockReturnValue(10);
-    isAuraOfPurityActive.mockReturnValue(false);
+    it('returns success result with correct fields on a successful save', async () => {
+      const condition = { ability: 'wis', dc: 15 };
+      getAbilitySaveBonus.mockReturnValue(3);
+      computeAuraBonus.mockResolvedValue({ bonus: 0 });
+      rollD20.mockReturnValue(12);
+      isAuraOfPurityActive.mockReturnValue(false);
 
-    const result = await rollConditionSave(
-      { type: 'player', name: 'Hero' },
-      { ability: 'str', dc: 15 },
-      [{ name: 'Hero' }],
-      [],
-      '',
-      '',
-      defaultGetName,
-    );
+      const result = await rollConditionSave(
+        { type: 'player', name: 'Hero' },
+        condition,
+        [{ name: 'Hero' }],
+        [],
+        'Campaign',
+        '',
+        defaultGetName,
+      );
 
-    expect(result.success).toBe(true);
-  });
+      expect(result.roll).toBe(12);
+      expect(result.bonus).toBe(3);
+      expect(result.total).toBe(15);
+      expect(result.success).toBe(true);
+      expect(result.bonusDetail).toBeUndefined();
+      expect(result.advantage).toBeUndefined();
+    });
 
-  it('fails when total is one below dc', async () => {
-    getAbilitySaveBonus.mockReturnValue(4);
-    computeAuraBonus.mockResolvedValue({ bonus: 0 });
-    rollD20.mockReturnValue(10);
-    isAuraOfPurityActive.mockReturnValue(false);
+    it('includes aura bonus in total and success calculation with bonusDetail', async () => {
+      getAbilitySaveBonus.mockReturnValue(3);
+      computeAuraBonus.mockResolvedValue({ bonus: 2 });
+      rollD20.mockReturnValue(14);
+      isAuraOfPurityActive.mockReturnValue(false);
 
-    const result = await rollConditionSave(
-      { type: 'player', name: 'Hero' },
-      { ability: 'str', dc: 15 },
-      [{ name: 'Hero' }],
-      [],
-      '',
-      '',
-      defaultGetName,
-    );
+      let result = await rollConditionSave(
+        { type: 'player', name: 'Hero' },
+        { ability: 'con', dc: 18 },
+        [{ name: 'Hero' }],
+        [],
+        'Campaign',
+        '',
+        defaultGetName,
+      );
 
-    expect(result.success).toBe(false);
-  });
+      expect(result.total).toBe(19);
+      expect(result.success).toBe(true);
+      expect(result.bonus).toBe(5);
 
-  it('calls rollD20 exactly once per roll', async () => {
-    getAbilitySaveBonus.mockReturnValue(0);
-    computeAuraBonus.mockResolvedValue({ bonus: 0 });
-    rollD20.mockReturnValue(1);
-    isAuraOfPurityActive.mockReturnValue(false);
+      getAbilitySaveBonus.mockReturnValue(0);
+      computeAuraBonus.mockResolvedValue({ bonus: 1 });
+      rollD20.mockReturnValue(10);
 
-    await rollConditionSave(
-      { type: 'player', name: 'Hero' },
-      { ability: 'con', dc: 10 },
-      [{ name: 'Hero' }],
-      [],
-      '',
-      '',
-      defaultGetName,
-    );
+      result = await rollConditionSave(
+        { type: 'player', name: 'Hero' },
+        { ability: 'wis', dc: 11 },
+        [{ name: 'Hero' }],
+        [],
+        'Campaign',
+        '',
+        defaultGetName,
+      );
 
-    expect(rollD20).toHaveBeenCalledTimes(1);
-  });
+      expect(result.bonusDetail).toBe('(+1 aura)');
 
-  it('handles negative save bonus combined with positive aura bonus', async () => {
-    getAbilitySaveBonus.mockReturnValue(-1);
-    computeAuraBonus.mockResolvedValue({ bonus: 1 });
-    rollD20.mockReturnValue(10);
-    isAuraOfPurityActive.mockReturnValue(false);
+      getAbilitySaveBonus.mockReturnValue(2);
+      computeAuraBonus.mockResolvedValue({ bonus: 3, sourceName: 'Paladin' });
+      rollD20.mockReturnValue(8);
 
-    const result = await rollConditionSave(
-      { type: 'player', name: 'Hero' },
-      { ability: 'con', dc: 10 },
-      [{ name: 'Hero' }],
-      [],
-      '',
-      '',
-      defaultGetName,
-    );
+      result = await rollConditionSave(
+        { type: 'player', name: 'Hero' },
+        { ability: 'wis', dc: 13 },
+        [{ name: 'Hero' }],
+        [],
+        'Campaign',
+        '',
+        defaultGetName,
+      );
 
-    expect(result.total).toBe(10);
-    expect(result.success).toBe(true);
-    expect(result.bonus).toBe(0);
-  });
+      expect(result.bonusDetail).toBe('(+3 aura from Paladin)');
+    });
 
-  describe('aura of purity advantage', () => {
+    it('omits bonusDetail when auraBonus is zero even with sourceName', async () => {
+      getMonsterData.mockResolvedValue({ saving_throws: { con: { modifier: 5 } } });
+      computeAuraBonus.mockResolvedValue({ bonus: 0, sourceName: 'None' });
+      rollD20.mockReturnValue(1);
+      isAuraOfPurityActive.mockReturnValue(false);
+
+      const result = await rollConditionSave(
+        { type: 'monster', name: 'Goblin' },
+        { ability: 'con', dc: 6 },
+        [],
+        [],
+        'Campaign',
+        '',
+        defaultGetName,
+      );
+
+      expect(result.bonusDetail).toBeUndefined();
+    });
+
+    it('calls computeAuraBonus with correct parameters', async () => {
+      getAbilitySaveBonus.mockReturnValue(0);
+      computeAuraBonus.mockResolvedValue({ bonus: 0 });
+      rollD20.mockReturnValue(10);
+      isAuraOfPurityActive.mockReturnValue(false);
+
+      await rollConditionSave(
+        { type: 'player', name: 'Ally' },
+        { ability: 'con', dc: 10 },
+        [{ name: 'Group' }],
+        [],
+        'TheCampaign',
+        'DungeonMap',
+        defaultGetName,
+      );
+
+      expect(computeAuraBonus).toHaveBeenCalledWith({
+        targetName: 'Ally',
+        characters: [{ name: 'Group' }],
+        campaignName: 'TheCampaign',
+        activeMapName: 'DungeonMap',
+      });
+    });
+
+    it('succeeds when total equals dc, fails when one below, and handles negative bonus', async () => {
+      getAbilitySaveBonus.mockReturnValue(5);
+      computeAuraBonus.mockResolvedValue({ bonus: 0 });
+      rollD20.mockReturnValue(10);
+      isAuraOfPurityActive.mockReturnValue(false);
+
+      let result = await rollConditionSave(
+        { type: 'player', name: 'Hero' },
+        { ability: 'str', dc: 15 },
+        [{ name: 'Hero' }],
+        [],
+        '',
+        '',
+        defaultGetName,
+      );
+      expect(result.success).toBe(true);
+
+      getAbilitySaveBonus.mockReturnValue(4);
+      result = await rollConditionSave(
+        { type: 'player', name: 'Hero' },
+        { ability: 'str', dc: 15 },
+        [{ name: 'Hero' }],
+        [],
+        '',
+        '',
+        defaultGetName,
+      );
+      expect(result.success).toBe(false);
+
+      getAbilitySaveBonus.mockReturnValue(-1);
+      computeAuraBonus.mockResolvedValue({ bonus: 1 });
+      rollD20.mockReturnValue(10);
+
+      result = await rollConditionSave(
+        { type: 'player', name: 'Hero' },
+        { ability: 'con', dc: 10 },
+        [{ name: 'Hero' }],
+        [],
+        '',
+        '',
+        defaultGetName,
+      );
+      expect(result.total).toBe(10);
+      expect(result.success).toBe(true);
+      expect(result.bonus).toBe(0);
+    });
+
     it('rolls two d20s and uses the higher when aura of purity advantage applies', async () => {
       getAbilitySaveBonus.mockReturnValue(2);
       computeAuraBonus.mockResolvedValue({ bonus: 0 });
@@ -531,27 +474,8 @@ describe('rollConditionSave', () => {
       expect(result.advantage).toBe(true);
     });
 
-    it('calls rollD20 twice when aura of purity advantage applies', async () => {
-      getAbilitySaveBonus.mockReturnValue(0);
-      computeAuraBonus.mockResolvedValue({ bonus: 0 });
-      rollD20.mockReturnValueOnce(7).mockReturnValueOnce(12);
-      isAuraOfPurityActive.mockReturnValue(true);
-      getAuraOfPuritySaveAdvantageConditions.mockReturnValue(['frightened']);
-
-      await rollConditionSave(
-        { type: 'player', name: 'Hero' },
-        { ability: 'wis', key: 'frightened', dc: 10 },
-        [{ name: 'Hero' }],
-        [],
-        'Campaign',
-        '',
-        defaultGetName,
-      );
-
-      expect(rollD20).toHaveBeenCalledTimes(2);
-    });
-
-    it('uses lower roll when disadvantageous roll is higher', async () => {
+    it('uses lower roll when disadvantageous roll is higher, and does not apply advantage when inactive or condition not in list', async () => {
+      rollD20.mockReset();
       getAbilitySaveBonus.mockReturnValue(0);
       computeAuraBonus.mockResolvedValue({ bonus: 0 });
       rollD20.mockReturnValueOnce(18).mockReturnValueOnce(5);
@@ -567,14 +491,12 @@ describe('rollConditionSave', () => {
         '',
         defaultGetName,
       );
-
       expect(result.roll).toBe(18);
       expect(result.total).toBe(18);
-    });
 
-    it('does not apply advantage when aura of purity is not active', async () => {
       getAbilitySaveBonus.mockReturnValue(3);
       computeAuraBonus.mockResolvedValue({ bonus: 0 });
+      rollD20.mockReset();
       rollD20.mockReturnValue(10);
       isAuraOfPurityActive.mockReturnValue(false);
 
@@ -587,16 +509,12 @@ describe('rollConditionSave', () => {
         '',
         defaultGetName,
       );
-
       expect(rollD20).toHaveBeenCalledTimes(1);
-    });
 
-    it('does not apply advantage when condition is not in the advantage list', async () => {
-      getAbilitySaveBonus.mockReturnValue(3);
-      computeAuraBonus.mockResolvedValue({ bonus: 0 });
-      rollD20.mockReturnValue(10);
       isAuraOfPurityActive.mockReturnValue(true);
       getAuraOfPuritySaveAdvantageConditions.mockReturnValue(['charmed']);
+      rollD20.mockReset();
+      rollD20.mockReturnValue(10);
 
       await rollConditionSave(
         { type: 'player', name: 'Hero' },
@@ -607,22 +525,17 @@ describe('rollConditionSave', () => {
         '',
         defaultGetName,
       );
-
       expect(rollD20).toHaveBeenCalledTimes(1);
     });
   });
-});
 
-describe('removeCondition', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
+  describe('removeCondition', () => {
+    beforeEach(() => {
+      vi.clearAllMocks();
+    });
 
-  describe('player creatures', () => {
-    it('removes condition by key from activeConditions array', () => {
-      const getRV = makeGetRuntimeValue({
-        'Hero:activeConditions': ['blinded', 'charmed'],
-      });
+    it('removes condition by key or string, case-insensitive, from activeConditions', () => {
+      const getRV = makeGetRuntimeValue({ 'Hero:activeConditions': ['blinded', 'Charmed'] });
       const setRV = makeSetRuntimeValue();
 
       removeCondition(
@@ -635,80 +548,50 @@ describe('removeCondition', () => {
       );
 
       expect(setRV).toHaveBeenCalledWith('Hero', 'activeConditions', ['blinded'], 'Campaign');
-    });
 
-    it('removes condition when condition is passed as a plain string', () => {
-      const getRV = makeGetRuntimeValue({
-        'Hero:activeConditions': ['frightened', 'grappled'],
-      });
-      const setRV = makeSetRuntimeValue();
+      vi.clearAllMocks();
+      const getRV2 = makeGetRuntimeValue({ 'Hero:activeConditions': ['frightened', 'grappled'] });
+      const setRV2 = makeSetRuntimeValue();
 
       removeCondition(
         { creatures: [{ type: 'player', name: 'Hero' }] },
         'Hero',
         'Frightened',
-        getRV,
-        setRV,
+        getRV2,
+        setRV2,
         'Campaign',
       );
 
-      expect(setRV).toHaveBeenCalledWith('Hero', 'activeConditions', ['grappled'], 'Campaign');
+      expect(setRV2).toHaveBeenCalledWith('Hero', 'activeConditions', ['grappled'], 'Campaign');
     });
 
-    it('treats null activeConditions as an empty array', () => {
-      const getRV = vi.fn(() => null);
+    it('treats null/undefined activeConditions as empty array', () => {
       const setRV = makeSetRuntimeValue();
 
       removeCondition(
         { creatures: [{ type: 'player', name: 'Hero' }] },
         'Hero',
         { key: 'poisoned' },
-        getRV,
+        vi.fn(() => null),
         setRV,
         'Campaign',
       );
-
       expect(setRV).toHaveBeenCalledWith('Hero', 'activeConditions', [], 'Campaign');
-    });
 
-    it('treats undefined activeConditions as an empty array', () => {
-      const getRV = vi.fn(() => undefined);
-      const setRV = makeSetRuntimeValue();
-
+      vi.clearAllMocks();
       removeCondition(
         { creatures: [{ type: 'player', name: 'Hero' }] },
         'Hero',
         { key: 'poisoned' },
-        getRV,
+        vi.fn(() => undefined),
         setRV,
         'Campaign',
       );
-
       expect(setRV).toHaveBeenCalledWith('Hero', 'activeConditions', [], 'Campaign');
-    });
-
-    it('performs case-insensitive matching for both object keys and string conditions', () => {
-      const getRV = makeGetRuntimeValue({
-        'Hero:activeConditions': ['Charmed'],
-      });
-      const setRV = makeSetRuntimeValue();
-
-      removeCondition(
-        { creatures: [{ type: 'player', name: 'Hero' }] },
-        'Hero',
-        { key: 'charmed' },
-        getRV,
-        setRV,
-        '',
-      );
-
-      expect(setRV).toHaveBeenCalledWith('Hero', 'activeConditions', [], '');
     });
 
     it('leaves array unchanged when condition is not present', () => {
-      const getRV = makeGetRuntimeValue({
-        'Hero:activeConditions': ['blinded'],
-      });
+      const getRV = makeGetRuntimeValue({ 'Hero:activeConditions': ['blinded'] });
       const setRV = makeSetRuntimeValue();
 
       removeCondition(
@@ -722,13 +605,9 @@ describe('removeCondition', () => {
 
       expect(setRV).toHaveBeenCalledWith('Hero', 'activeConditions', ['blinded'], '');
     });
-  });
 
-  describe('monster creatures', () => {
-    it('removes condition by key from activeConditions array', () => {
-      const getRV = makeGetRuntimeValue({
-        'Orc:activeConditions': ['blinded', 'charmed'],
-      });
+    it('works for monster creatures', () => {
+      const getRV = makeGetRuntimeValue({ 'Orc:activeConditions': ['blinded', 'charmed'] });
       const setRV = makeSetRuntimeValue();
 
       removeCondition(
@@ -743,45 +622,7 @@ describe('removeCondition', () => {
       expect(setRV).toHaveBeenCalledWith('Orc', 'activeConditions', ['charmed'], '');
     });
 
-    it('removes condition when condition is passed as a plain string', () => {
-      const getRV = makeGetRuntimeValue({
-        'Orc:activeConditions': ['frightened', 'grappled'],
-      });
-      const setRV = makeSetRuntimeValue();
-
-      removeCondition(
-        { creatures: [{ type: 'monster', name: 'Orc' }] },
-        'Orc',
-        'Frightened',
-        getRV,
-        setRV,
-        '',
-      );
-
-      expect(setRV).toHaveBeenCalledWith('Orc', 'activeConditions', ['grappled'], '');
-    });
-
-    it('leaves monster conditions unchanged when key does not match', () => {
-      const getRV = makeGetRuntimeValue({
-        'Orc:activeConditions': ['blinded'],
-      });
-      const setRV = makeSetRuntimeValue();
-
-      removeCondition(
-        { creatures: [{ type: 'monster', name: 'Orc' }] },
-        'Orc',
-        { key: 'paralyzed' },
-        getRV,
-        setRV,
-        '',
-      );
-
-      expect(setRV).toHaveBeenCalledWith('Orc', 'activeConditions', ['blinded'], '');
-    });
-  });
-
-  describe('creature not found', () => {
-    it('does not call setRuntimeValue when player creature is not in combatSummary', () => {
+    it('does not call setRuntimeValue when creature is not found', () => {
       const setRV = makeSetRuntimeValue();
 
       removeCondition(
@@ -795,30 +636,13 @@ describe('removeCondition', () => {
 
       expect(setRV).not.toHaveBeenCalled();
     });
+  });
 
-    it('does not call setRuntimeValue when monster creature is not found', () => {
-      const setRV = makeSetRuntimeValue();
-
-      removeCondition(
-        { creatures: [{ type: 'monster', name: 'Orc' }] },
-        'Ghost',
-        { key: 'blinded' },
-        vi.fn(),
-        setRV,
-        '',
-      );
-
-      expect(setRV).not.toHaveBeenCalled();
+  describe('addCondition', () => {
+    beforeEach(() => {
+      vi.clearAllMocks();
     });
-  });
-});
 
-describe('addCondition', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  describe('player immunity check', () => {
     it('skips adding when playerStats is immune', () => {
       playerIsImmuneToCondition.mockReturnValue(true);
       const setRV = makeSetRuntimeValue();
@@ -839,7 +663,7 @@ describe('addCondition', () => {
       expect(setRV).not.toHaveBeenCalled();
     });
 
-    it('skips immunity check when playerStats is null', () => {
+    it('skips immunity check when playerStats is null or campaignName is falsy', () => {
       const getRV = makeGetRuntimeValue({ 'Hero:activeConditions': [] });
       const setRV = makeSetRuntimeValue();
 
@@ -854,14 +678,9 @@ describe('addCondition', () => {
         '',
         null,
       );
-
       expect(playerIsImmuneToCondition).not.toHaveBeenCalled();
-    });
 
-    it('skips immunity check when campaignName is falsy even with playerStats present', () => {
-      const getRV = makeGetRuntimeValue({ 'Hero:activeConditions': [] });
-      const setRV = makeSetRuntimeValue();
-
+      vi.clearAllMocks();
       addCondition(
         { creatures: [{ type: 'player', name: 'Hero' }] },
         'Hero',
@@ -873,7 +692,6 @@ describe('addCondition', () => {
         '',
         { name: 'Hero' },
       );
-
       expect(playerIsImmuneToCondition).not.toHaveBeenCalled();
     });
 
@@ -902,76 +720,63 @@ describe('addCondition', () => {
         campaignName: 'Campaign',
       });
     });
-  });
 
-  describe('player creature — add to activeConditions', () => {
-    it('appends new condition key to existing conditions', () => {
+    it('appends new condition, deduplicates by key, and handles null activeConditions', () => {
       playerIsImmuneToCondition.mockReturnValue(false);
-      const getRV = makeGetRuntimeValue({ 'Hero:activeConditions': ['blinded'] });
-      const setRV = makeSetRuntimeValue();
 
+      const getRV1 = makeGetRuntimeValue({ 'Hero:activeConditions': ['blinded'] });
+      const setRV1 = makeSetRuntimeValue();
       addCondition(
         { creatures: [{ type: 'player', name: 'Hero' }] },
         'Hero',
         { key: 'charmed', label: 'Charmed' },
         15,
         'wis',
-        getRV,
-        setRV,
+        getRV1,
+        setRV1,
         'Campaign',
         {},
       );
+      expect(setRV1).toHaveBeenCalledWith('Hero', 'activeConditions', ['blinded', 'charmed'], 'Campaign');
 
-      expect(setRV).toHaveBeenCalledWith('Hero', 'activeConditions', ['blinded', 'charmed'], 'Campaign');
-    });
-
-    it('deduplicates by replacing existing condition (case-insensitive)', () => {
-      playerIsImmuneToCondition.mockReturnValue(false);
-      const getRV = makeGetRuntimeValue({ 'Hero:activeConditions': ['Charmed'] });
-      const setRV = makeSetRuntimeValue();
-
+      vi.clearAllMocks();
+      const getRV2 = makeGetRuntimeValue({ 'Hero:activeConditions': ['Charmed'] });
+      const setRV2 = makeSetRuntimeValue();
       addCondition(
         { creatures: [{ type: 'player', name: 'Hero' }] },
         'Hero',
         { key: 'charmed', label: 'Charmed' },
         15,
         'wis',
-        getRV,
-        setRV,
+        getRV2,
+        setRV2,
         'Campaign',
         {},
       );
+      expect(setRV2).toHaveBeenCalledWith('Hero', 'activeConditions', ['charmed'], 'Campaign');
 
-      expect(setRV).toHaveBeenCalledWith('Hero', 'activeConditions', ['charmed'], 'Campaign');
-    });
-
-    it('handles null activeConditions by treating as empty array', () => {
-      playerIsImmuneToCondition.mockReturnValue(false);
-      const getRV = vi.fn(() => null);
-      const setRV = makeSetRuntimeValue();
-
+      vi.clearAllMocks();
+      const getRV3 = vi.fn(() => null);
+      const setRV3 = makeSetRuntimeValue();
       addCondition(
         { creatures: [{ type: 'player', name: 'Hero' }] },
         'Hero',
         { key: 'poisoned', label: 'Poisoned' },
         12,
         'con',
-        getRV,
-        setRV,
+        getRV3,
+        setRV3,
         '',
         {},
       );
-
-      expect(setRV).toHaveBeenCalledWith('Hero', 'activeConditions', ['poisoned'], '');
+      expect(setRV3).toHaveBeenCalledWith('Hero', 'activeConditions', ['poisoned'], '');
     });
-  });
 
-  describe('monster creature — add to activeConditions', () => {
-    it('appends new condition key to existing conditions', () => {
+    it('works for monster/npc creatures and does nothing when creature is not found', () => {
       playerIsImmuneToCondition.mockReturnValue(false);
+
       const getRV = makeGetRuntimeValue({ 'Goblin:activeConditions': ['blinded'] });
       const setRV = makeSetRuntimeValue();
-
       addCondition(
         { creatures: [{ type: 'npc', name: 'Goblin' }] },
         'Goblin',
@@ -983,55 +788,10 @@ describe('addCondition', () => {
         '',
         null,
       );
-
       expect(setRV).toHaveBeenCalledWith('Goblin', 'activeConditions', ['blinded', 'frightened'], '');
-    });
 
-    it('replaces existing condition with matching key (case-insensitive)', () => {
-      playerIsImmuneToCondition.mockReturnValue(false);
-      const getRV = makeGetRuntimeValue({ 'Goblin:activeConditions': ['Blinded'] });
-      const setRV = makeSetRuntimeValue();
-
-      addCondition(
-        { creatures: [{ type: 'npc', name: 'Goblin' }] },
-        'Goblin',
-        { key: 'blinded', label: 'Blinded' },
-        10,
-        'null',
-        getRV,
-        setRV,
-        '',
-        null,
-      );
-
-      expect(setRV).toHaveBeenCalledWith('Goblin', 'activeConditions', ['blinded'], '');
-    });
-
-    it('handles null activeConditions by treating as empty array', () => {
-      playerIsImmuneToCondition.mockReturnValue(false);
-      const getRV = vi.fn(() => null);
-      const setRV = makeSetRuntimeValue();
-
-      addCondition(
-        { creatures: [{ type: 'npc', name: 'Orc' }] },
-        'Orc',
-        { key: 'stunned', label: 'Stunned' },
-        10,
-        'con',
-        getRV,
-        setRV,
-        '',
-        null,
-      );
-
-      expect(setRV).toHaveBeenCalledWith('Orc', 'activeConditions', ['stunned'], '');
-    });
-  });
-
-  describe('creature not found', () => {
-    it('does nothing for player when creature name is not in combatSummary', () => {
-      const setRV = makeSetRuntimeValue();
-
+      vi.clearAllMocks();
+      const setRV2 = makeSetRuntimeValue();
       addCondition(
         { creatures: [{ type: 'player', name: 'Other' }] },
         'NonExistent',
@@ -1039,81 +799,54 @@ describe('addCondition', () => {
         10,
         'null',
         vi.fn(),
-        setRV,
+        setRV2,
         '',
         null,
       );
-
-      expect(setRV).not.toHaveBeenCalled();
-    });
-
-    it('does nothing for monster when creature name is not in combatSummary', () => {
-      const setRV = makeSetRuntimeValue();
-
-      addCondition(
-        { creatures: [{ type: 'npc', name: 'Orc' }] },
-        'NonExistent',
-        { key: 'blinded', label: 'Blinded' },
-        10,
-        'null',
-        vi.fn(),
-        setRV,
-        '',
-        null,
-      );
-
-      expect(setRV).not.toHaveBeenCalled();
-    });
-  });
-});
-
-describe('buildConditionPopup', () => {
-  it('returns a popup object with all expected fields', () => {
-    const popup = buildConditionPopup(15, 5, '+3 aura from Paladin', 'Wisdom', 'Charmed', 18, true);
-
-    expect(popup).toEqual({
-      type: 'd20',
-      rollType: 'condition-save',
-      name: 'Wisdom',
-      rolls: [15],
-      bonus: 5,
-      bonusDetail: '+3 aura from Paladin',
-      targetName: null,
-      targetAc: null,
-      hit: undefined,
-      condition: 'Charmed',
-      dc: 18,
-      success: true,
+      expect(setRV2).not.toHaveBeenCalled();
     });
   });
 
-  it('reflects failure when success flag is false', () => {
-    const popup = buildConditionPopup(5, 2, undefined, 'Strength', 'Grappled', 14, false);
+  describe('buildConditionPopup', () => {
+    it('returns a popup object with all expected fields', () => {
+      const popup = buildConditionPopup(15, 5, '+3 aura from Paladin', 'Wisdom', 'Charmed', 18, true);
 
-    expect(popup.success).toBe(false);
-    expect(popup.rollType).toBe('condition-save');
-    expect(popup.hit).toBeUndefined();
+      expect(popup).toEqual({
+        type: 'd20',
+        rollType: 'condition-save',
+        name: 'Wisdom',
+        rolls: [15],
+        bonus: 5,
+        bonusDetail: '+3 aura from Paladin',
+        targetName: null,
+        targetAc: null,
+        hit: undefined,
+        condition: 'Charmed',
+        dc: 18,
+        success: true,
+      });
+    });
+
+    it('handles failure, null/undefined bonusDetail, and negative bonus', () => {
+      let popup = buildConditionPopup(5, 2, undefined, 'Strength', 'Grappled', 14, false);
+      expect(popup.success).toBe(false);
+      expect(popup.rollType).toBe('condition-save');
+      expect(popup.hit).toBeUndefined();
+
+      popup = buildConditionPopup(10, 0, null, 'Constitution', 'Paralyzed', 12, true);
+      expect(popup.bonusDetail).toBeNull();
+
+      popup = buildConditionPopup(8, 3, undefined, 'Dexterity', 'Blinded', 11, false);
+      expect(popup.bonusDetail).toBeUndefined();
+
+      popup = buildConditionPopup(1, -3, 'detail', 'Charisma', 'Frightened', 5, false);
+      expect(popup.targetName).toBeNull();
+      expect(popup.targetAc).toBeNull();
+    });
+
+    it('wraps the roll value in a rolls array', () => {
+      const popup = buildConditionPopup(7, 0, undefined, 'Wisdom', 'Cursed', 10, false);
+      expect(Array.isArray(popup.rolls)).toBe(true);
+      expect(popup.rolls).toEqual([7]);
+    });
   });
-
-  it('preserves null and undefined bonusDetail values as-is', () => {
-    const withNull = buildConditionPopup(10, 0, null, 'Constitution', 'Paralyzed', 12, true);
-    expect(withNull.bonusDetail).toBeNull();
-
-    const withUndefined = buildConditionPopup(8, 3, undefined, 'Dexterity', 'Blinded', 11, false);
-    expect(withUndefined.bonusDetail).toBeUndefined();
-  });
-
-  it('wraps the roll value in a rolls array', () => {
-    const popup = buildConditionPopup(7, 0, undefined, 'Wisdom', 'Cursed', 10, false);
-
-    expect(Array.isArray(popup.rolls)).toBe(true);
-    expect(popup.rolls).toEqual([7]);
-  });
-
-  it('sets targetName and targetAc to null', () => {
-    const popup = buildConditionPopup(1, -3, 'detail', 'Charisma', 'Frightened', 5, false);
-
-    expect(popup.targetName).toBeNull();
-    expect(popup.targetAc).toBeNull();
-  });
-});

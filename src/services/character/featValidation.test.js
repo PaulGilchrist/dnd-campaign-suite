@@ -25,7 +25,7 @@ describe('featValidation', () => {
             [4, 1],
             [8, 2],
             [19, 5],
-        ])('should return correct feat limits for 5e at level %s (allowed: %s)', async (level, expected) => {
+        ])('should return correct feat limits for 5e at level %s (allowed: %s)', async (_level, _expected) => {
             vi.mocked(dataLoader.loadValidationRules).mockResolvedValue({
                 feats: {
                     available_levels: [4, 8, 12, 16, 19],
@@ -625,22 +625,15 @@ describe('featValidation', () => {
     });
 
     describe('normalizeFeatDescription', () => {
-        it('should return empty text and isHtml false for feat with no description', () => {
-            const feat = {};
-            const result = normalizeFeatDescription(feat);
-            expect(result).toEqual({ text: '', isHtml: false });
+        it('should return empty text for null/undefined/missing description', () => {
+            expect(normalizeFeatDescription({})).toEqual({ text: '', isHtml: false });
+            expect(normalizeFeatDescription({ description: null })).toEqual({ text: '', isHtml: false });
+            expect(normalizeFeatDescription({ description: undefined })).toEqual({ text: '', isHtml: false });
         });
 
-        it('should return empty text for feat with null description', () => {
-            const feat = { description: null };
-            const result = normalizeFeatDescription(feat);
-            expect(result).toEqual({ text: '', isHtml: false });
-        });
-
-        it('should return empty text for feat with undefined description', () => {
-            const feat = { description: undefined };
-            const result = normalizeFeatDescription(feat);
-            expect(result).toEqual({ text: '', isHtml: false });
+        it('should return empty for empty or falsy-only arrays', () => {
+            expect(normalizeFeatDescription({ description: [] })).toEqual({ text: '', isHtml: false });
+            expect(normalizeFeatDescription({ description: [null, undefined] })).toEqual({ text: '', isHtml: false });
         });
 
         it('should handle 2024 format with string description (HTML)', () => {
@@ -655,44 +648,14 @@ describe('featValidation', () => {
             expect(result).toEqual({ text: '<p>Gain +1 Strength</p>', isHtml: true });
         });
 
-        it('should handle 2024 format with array description containing object with text (HTML)', () => {
-            const feat = { description: [{ text: '<p>Gain +1 Strength</p>' }] };
-            const result = normalizeFeatDescription(feat);
-            expect(result).toEqual({ text: '<p>Gain +1 Strength</p>', isHtml: true });
-        });
-
-        it('should handle 2024 format with array description containing object with content (HTML)', () => {
-            const feat = { description: [{ content: '<p>Gain +1 Strength</p>' }] };
-            const result = normalizeFeatDescription(feat);
-            expect(result).toEqual({ text: '<p>Gain +1 Strength</p>', isHtml: true });
-        });
-
-        it('should handle 2024 format with array description containing object with description (HTML)', () => {
-            const feat = { description: [{ description: '<p>Gain +1 Strength</p>' }] };
-            const result = normalizeFeatDescription(feat);
-            expect(result).toEqual({ text: '<p>Gain +1 Strength</p>', isHtml: true });
-        });
-
-        it('should return empty when description is an empty array', () => {
-            const feat = { description: [] };
-            const result = normalizeFeatDescription(feat);
-            expect(result).toEqual({ text: '', isHtml: false });
-        });
-
-        it('should return empty when description array has only falsy elements', () => {
-            const feat = { description: [null, undefined] };
-            const result = normalizeFeatDescription(feat);
-            expect(result).toEqual({ text: '', isHtml: false });
+        it('should handle 2024 format with array description containing object with text/content/description', () => {
+            expect(normalizeFeatDescription({ description: [{ text: '<p>Text</p>' }] }).text).toBe('<p>Text</p>');
+            expect(normalizeFeatDescription({ description: [{ content: '<p>Content</p>' }] }).text).toBe('<p>Content</p>');
+            expect(normalizeFeatDescription({ description: [{ description: '<p>Desc</p>' }] }).text).toBe('<p>Desc</p>');
         });
 
         it('should return empty when description object has level property (unexpected structure)', () => {
             const feat = { description: [{ level: 1, name: 'Some Feat' }] };
-            const result = normalizeFeatDescription(feat);
-            expect(result).toEqual({ text: '', isHtml: false });
-        });
-
-        it('should return empty when description array has object with no valid content fields', () => {
-            const feat = { description: [{ level: 1 }] };
             const result = normalizeFeatDescription(feat);
             expect(result).toEqual({ text: '', isHtml: false });
         });

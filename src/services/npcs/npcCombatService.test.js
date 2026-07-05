@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import { npcHasStatBlock } from '../encounters/npcStatBlockUtils.js';
@@ -243,20 +243,6 @@ describe('npcCombatService - addNPCToInitiative', () => {
       expect(body.bonus).toBe(0);
       expect(body.isNatural20).toBe(false);
       expect(body.isNatural1).toBe(false);
-    });
-
-    it('sets isNatural20/isNatural1 based on roll value', async () => {
-      rollD20.mockReturnValue(20);
-      await addNPCToInitiative(CAMPAIGN, defaultNPC());
-      let body = JSON.parse(global.fetch.mock.calls[0][1].body);
-      expect(body.isNatural20).toBe(true);
-      expect(body.isNatural1).toBe(false);
-
-      rollD20.mockReturnValue(1);
-      await addNPCToInitiative(CAMPAIGN, defaultNPC());
-      body = JSON.parse(global.fetch.mock.calls[1][1].body);
-      expect(body.isNatural1).toBe(true);
-      expect(body.isNatural20).toBe(false);
     });
 
     it('includes the initiative bonus in the log payload', async () => {

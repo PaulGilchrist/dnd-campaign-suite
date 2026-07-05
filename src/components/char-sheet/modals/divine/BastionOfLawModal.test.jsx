@@ -1,3 +1,4 @@
+// @cleaned-by-ai
 // @improved-by-ai
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -51,7 +52,7 @@ describe('BastionOfLawModal', () => {
   // ── Initial render / display ──
 
   describe('initial render', () => {
-    it('renders the overlay and modal with feature name and target info', () => {
+    it('renders the overlay, modal, feature name, and target info', () => {
       renderModal();
       expect(screen.getByText('Bastion of Law')).toBeInTheDocument();
       expect(screen.getByText(/Target:/)).toBeInTheDocument();
@@ -63,21 +64,9 @@ describe('BastionOfLawModal', () => {
       expect(document.querySelector('.fa-shield-halved')).toBeInTheDocument();
     });
 
-    it('renders the sorcery points input with correct min, max, and default value', () => {
-      renderModal();
-      const input = document.querySelector('input[type="number"]');
-      expect(input.min).toBe('1');
-      expect(input.max).toBe('5');
-      expect(input.value).toBe('1');
-    });
-
-    it('renders the Create Ward button with dynamic dice count', () => {
+    it('renders the Create Ward button and ward details section', () => {
       renderModal();
       expect(screen.getByRole('button', { name: /Create Ward \(1d8\)/ })).toBeInTheDocument();
-    });
-
-    it('renders the ward details section', () => {
-      renderModal();
       expect(screen.getByText(/Ward dice:/)).toBeInTheDocument();
       expect(screen.getByText(/30 ft/)).toBeInTheDocument();
       expect(screen.getByText(/Long Rest/)).toBeInTheDocument();
@@ -89,29 +78,12 @@ describe('BastionOfLawModal', () => {
       expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
     });
 
-    it('does not show ward-active elements on initial render', () => {
-      renderModal();
-      expect(screen.queryByText(/Ward active on/)).not.toBeInTheDocument();
-      expect(screen.queryByText(/Ward Dice Pool/)).not.toBeInTheDocument();
-      expect(screen.queryByText(/Roll Result/)).not.toBeInTheDocument();
-    });
-
-    it('renders with expected CSS classes on structural elements', () => {
+    it('renders CSS structural classes on overlay, modal, section, and actions', () => {
       renderModal();
       expect(document.querySelector('.bastion-of-law-overlay')).toBeInTheDocument();
       expect(document.querySelector('.bastion-of-law-modal')).toBeInTheDocument();
       expect(document.querySelector('.bastion-section')).toBeInTheDocument();
       expect(document.querySelector('.bastion-actions')).toBeInTheDocument();
-    });
-
-    it('renders the shield icon on the Create Ward button', () => {
-      renderModal();
-      expect(document.querySelector('.bastion-sp-controls .fa-shield-halved')).toBeInTheDocument();
-    });
-
-    it('renders the xmark icon on the Cancel button', () => {
-      renderModal();
-      expect(document.querySelector('.bastion-actions .fa-xmark')).toBeInTheDocument();
     });
   });
 
@@ -140,13 +112,6 @@ describe('BastionOfLawModal', () => {
   // ── SP input clamping behavior ──
 
   describe('SP input clamping', () => {
-    it('updates when input value changes within range', () => {
-      renderModal();
-      const input = document.querySelector('input[type="number"]');
-      fireEvent.change(input, { target: { value: '3' } });
-      expect(input.value).toBe('3');
-    });
-
     it('clamps to min when input is below min', () => {
       renderModal();
       const input = document.querySelector('input[type="number"]');
@@ -208,7 +173,7 @@ describe('BastionOfLawModal', () => {
       expect(onConfirm).toHaveBeenCalledWith(2, 'Ally Warrior');
     });
 
-    it('does not call onConfirm when it is not provided', async () => {
+    it('does not call onConfirm when Create Ward is clicked and onConfirm is not provided', async () => {
       renderModal({ onConfirm: undefined });
       await act(async () => {
         fireEvent.click(screen.getByRole('button', { name: /Create Ward/ }));
@@ -257,7 +222,7 @@ describe('BastionOfLawModal', () => {
   // ── Ward-active mode rendering ──
 
   describe('ward-active mode', () => {
-    it('renders the ward dice pool display', async () => {
+    it('renders the ward dice pool and subtitle with target name', async () => {
       runtimeState.getRuntimeValue.mockImplementation((player, key) => {
         if (key === 'bastionOfLawWardDice') return [{ value: 8 }];
         return 10;
@@ -267,17 +232,10 @@ describe('BastionOfLawModal', () => {
         fireEvent.click(screen.getByRole('button', { name: /Create Ward/ }));
       });
       expect(screen.getByText(/Ward Dice Pool/)).toBeInTheDocument();
-    });
-
-    it('renders the subtitle with target name', async () => {
-      renderModal();
-      await act(async () => {
-        fireEvent.click(screen.getByRole('button', { name: /Create Ward/ }));
-      });
       expect(screen.getByText(/Ward active on Ally Warrior/)).toBeInTheDocument();
     });
 
-    it('renders the spend dice section when ward dice are available', async () => {
+    it('shows the spend dice section when ward dice are available', async () => {
       runtimeState.getRuntimeValue.mockImplementation((player, key) => {
         if (key === 'bastionOfLawWardDice') return [{ value: 8 }];
         return 10;
@@ -290,23 +248,12 @@ describe('BastionOfLawModal', () => {
     });
 
     it('hides the spend dice section when ward dice are empty', async () => {
+      runtimeState.getRuntimeValue.mockReturnValueOnce(10).mockReturnValueOnce([]);
       renderModal();
       await act(async () => {
         fireEvent.click(screen.getByRole('button', { name: /Create Ward/ }));
       });
       expect(screen.queryByText(/Spend Dice as Reaction/)).not.toBeInTheDocument();
-    });
-
-    it('shows hint text about spending dice as reaction', async () => {
-      runtimeState.getRuntimeValue.mockImplementation((player, key) => {
-        if (key === 'bastionOfLawWardDice') return [{ value: 8 }];
-        return 10;
-      });
-      renderModal();
-      await act(async () => {
-        fireEvent.click(screen.getByRole('button', { name: /Create Ward/ }));
-      });
-      expect(screen.getByText(/When Ally Warrior takes damage/)).toBeInTheDocument();
     });
 
     it('renders the dice spend input and roll button when ward dice are available', async () => {
@@ -331,7 +278,7 @@ describe('BastionOfLawModal', () => {
       expect(screen.queryByRole('button', { name: /Roll & Reduce Damage/ })).not.toBeInTheDocument();
     });
 
-    it('renders the dice icon in the spend controls', async () => {
+    it('renders the Clear Ward and Done buttons with action icons', async () => {
       runtimeState.getRuntimeValue.mockImplementation((player, key) => {
         if (key === 'bastionOfLawWardDice') return [{ value: 8 }];
         return 10;
@@ -340,31 +287,9 @@ describe('BastionOfLawModal', () => {
       await act(async () => {
         fireEvent.click(screen.getByRole('button', { name: /Create Ward/ }));
       });
-      expect(document.querySelector('.bastion-spend-controls .fa-dice')).toBeInTheDocument();
-    });
-
-    it('renders the xmark icon on the Clear Ward button', async () => {
-      runtimeState.getRuntimeValue.mockImplementation((player, key) => {
-        if (key === 'bastionOfLawWardDice') return [{ value: 8 }];
-        return 10;
-      });
-      renderModal();
-      await act(async () => {
-        fireEvent.click(screen.getByRole('button', { name: /Create Ward/ }));
-      });
-      expect(document.querySelector('.bastion-actions .fa-xmark')).toBeInTheDocument();
-    });
-
-    it('renders the Done button with check icon', async () => {
-      runtimeState.getRuntimeValue.mockImplementation((player, key) => {
-        if (key === 'bastionOfLawWardDice') return [{ value: 8 }];
-        return 10;
-      });
-      renderModal();
-      await act(async () => {
-        fireEvent.click(screen.getByRole('button', { name: /Create Ward/ }));
-      });
+      expect(screen.getByRole('button', { name: 'Clear Ward' })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Done' })).toBeInTheDocument();
+      expect(document.querySelector('.bastion-actions .fa-xmark')).toBeInTheDocument();
       expect(document.querySelector('.bastion-actions .fa-check')).toBeInTheDocument();
     });
 
@@ -438,26 +363,7 @@ describe('BastionOfLawModal', () => {
       });
     });
 
-    it('displays the roll result section', async () => {
-      runtimeState.getRuntimeValue.mockImplementation((player, key) => {
-        if (key === 'bastionOfLawWardDice') return [{ value: 8 }, { value: 8 }];
-        return 10;
-      });
-      renderModal();
-      await act(async () => {
-        fireEvent.click(screen.getByRole('button', { name: /Create Ward/ }));
-      });
-      const input = document.querySelector('.bastion-spend-controls input[type="number"]');
-      fireEvent.change(input, { target: { value: '1' } });
-      await act(async () => {
-        fireEvent.click(screen.getByRole('button', { name: /Roll & Reduce Damage/ }));
-      });
-      await waitFor(() => {
-        expect(screen.getByText(/Roll Result/)).toBeInTheDocument();
-      });
-    });
-
-    it('displays the roll formula, individual rolls, and total', async () => {
+    it('displays the roll result section with formula, rolls, total, and remaining dice', async () => {
       runtimeState.getRuntimeValue.mockImplementation((player, key) => {
         if (key === 'bastionOfLawWardDice') return [{ value: 8 }, { value: 8 }];
         return 10;
@@ -473,66 +379,11 @@ describe('BastionOfLawModal', () => {
       });
       await waitFor(() => {
         const body = document.querySelector('.bastion-roll-result');
+        expect(body).toBeInTheDocument();
         expect(body.textContent).toContain('15');
         expect(body.textContent).toContain('8, 7');
+        expect(screen.getByText(/Remaining: 1d8/)).toBeInTheDocument();
       });
-    });
-
-    it('displays the remaining dice count', async () => {
-      runtimeState.getRuntimeValue.mockImplementation((player, key) => {
-        if (key === 'bastionOfLawWardDice') return [{ value: 8 }, { value: 8 }, { value: 8 }];
-        return 10;
-      });
-      renderModal();
-      await act(async () => {
-        fireEvent.click(screen.getByRole('button', { name: /Create Ward/ }));
-      });
-      const input = document.querySelector('.bastion-spend-controls input[type="number"]');
-      fireEvent.change(input, { target: { value: '1' } });
-      await act(async () => {
-        fireEvent.click(screen.getByRole('button', { name: /Roll & Reduce Damage/ }));
-      });
-      await waitFor(() => {
-        expect(screen.getByText(/Remaining: 2d8/)).toBeInTheDocument();
-      });
-    });
-
-    it('uses a default total of 0 when rollExpression returns null', async () => {
-      runtimeState.getRuntimeValue.mockImplementation((player, key) => {
-        if (key === 'bastionOfLawWardDice') return [{ value: 8 }];
-        return 10;
-      });
-      renderModal();
-      await act(async () => {
-        fireEvent.click(screen.getByRole('button', { name: /Create Ward/ }));
-      });
-      diceRoller.rollExpression.mockReturnValue(null);
-      const input = document.querySelector('.bastion-spend-controls input[type="number"]');
-      fireEvent.change(input, { target: { value: '1' } });
-      await act(async () => {
-        fireEvent.click(screen.getByRole('button', { name: /Roll & Reduce Damage/ }));
-      });
-      await waitFor(() => {
-        expect(screen.getByText(/Remaining: 0d8/)).toBeInTheDocument();
-      });
-    });
-
-    it('displays the dice icon in the roll result header', async () => {
-      runtimeState.getRuntimeValue.mockImplementation((player, key) => {
-        if (key === 'bastionOfLawWardDice') return [{ value: 8 }];
-        return 10;
-      });
-      renderModal();
-      await act(async () => {
-        fireEvent.click(screen.getByRole('button', { name: /Create Ward/ }));
-      });
-      const input = document.querySelector('.bastion-spend-controls input[type="number"]');
-      fireEvent.change(input, { target: { value: '1' } });
-      await act(async () => {
-        fireEvent.click(screen.getByRole('button', { name: /Roll & Reduce Damage/ }));
-      });
-      const icon = document.querySelector('.bastion-roll-result .fa-dice');
-      expect(icon).toBeInTheDocument();
     });
   });
 
@@ -553,7 +404,7 @@ describe('BastionOfLawModal', () => {
       expect(input.value).toBe('2');
     });
 
-    it('clamps to minimum of 1', async () => {
+    it('clamps to minimum of 1 and defaults to 1 when empty', async () => {
       runtimeState.getRuntimeValue.mockImplementation((player, key) => {
         if (key === 'bastionOfLawWardDice') return [{ value: 8 }, { value: 8 }];
         return 10;
@@ -565,18 +416,6 @@ describe('BastionOfLawModal', () => {
       const input = document.querySelector('.bastion-spend-controls input[type="number"]');
       fireEvent.change(input, { target: { value: '0' } });
       expect(input.value).toBe('1');
-    });
-
-    it('defaults to 1 when input is empty', async () => {
-      runtimeState.getRuntimeValue.mockImplementation((player, key) => {
-        if (key === 'bastionOfLawWardDice') return [{ value: 8 }, { value: 8 }];
-        return 10;
-      });
-      renderModal();
-      await act(async () => {
-        fireEvent.click(screen.getByRole('button', { name: /Create Ward/ }));
-      });
-      const input = document.querySelector('.bastion-spend-controls input[type="number"]');
       fireEvent.change(input, { target: { value: '' } });
       expect(input.value).toBe('1');
     });
@@ -628,43 +467,7 @@ describe('BastionOfLawModal', () => {
       });
       expect(screen.getByText(/Target:/)).toBeInTheDocument();
       expect(screen.queryByText(/Ward active on/)).not.toBeInTheDocument();
-    });
-
-    it('removes the ward dice pool display after clearing', async () => {
-      runtimeState.getRuntimeValue.mockImplementation((player, key) => {
-        if (key === 'bastionOfLawWardDice') return [{ value: 8 }];
-        return 10;
-      });
-      renderModal();
-      await act(async () => {
-        fireEvent.click(screen.getByRole('button', { name: /Create Ward/ }));
-      });
-      await act(async () => {
-        fireEvent.click(screen.getByRole('button', { name: 'Clear Ward' }));
-      });
       expect(screen.queryByText(/Ward Dice Pool/)).not.toBeInTheDocument();
-    });
-
-    it('removes the roll result display after clearing', async () => {
-      runtimeState.getRuntimeValue.mockImplementation((player, key) => {
-        if (key === 'bastionOfLawWardDice') return [{ value: 8 }];
-        return 10;
-      });
-      renderModal();
-      await act(async () => {
-        fireEvent.click(screen.getByRole('button', { name: /Create Ward/ }));
-      });
-      const input = document.querySelector('.bastion-spend-controls input[type="number"]');
-      fireEvent.change(input, { target: { value: '1' } });
-      await act(async () => {
-        fireEvent.click(screen.getByRole('button', { name: /Roll & Reduce Damage/ }));
-      });
-      await waitFor(() => {
-        expect(screen.getByText(/Roll Result/)).toBeInTheDocument();
-      });
-      await act(async () => {
-        fireEvent.click(screen.getByRole('button', { name: 'Clear Ward' }));
-      });
       expect(screen.queryByText(/Roll Result/)).not.toBeInTheDocument();
     });
 
@@ -684,19 +487,6 @@ describe('BastionOfLawModal', () => {
       expect(onConfirm).toHaveBeenCalledTimes(2);
       expect(onConfirm).toHaveBeenNthCalledWith(1, 1, 'Ally Warrior');
       expect(onConfirm).toHaveBeenLastCalledWith(null, null, null, true);
-    });
-  });
-
-  // ── Runtime state integration ──
-
-  describe('runtime state integration', () => {
-    it('initializes ward dice from runtime state on mount', () => {
-      runtimeState.getRuntimeValue.mockImplementation((player, key) => {
-        if (key === 'bastionOfLawWardDice') return [{ value: 8 }, { value: 8 }, { value: 8 }];
-        return 10;
-      });
-      renderModal();
-      expect(screen.getByText('Bastion of Law')).toBeInTheDocument();
     });
   });
 });

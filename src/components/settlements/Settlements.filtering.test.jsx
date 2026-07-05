@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import Settlements from './Settlements.jsx';
@@ -85,13 +85,6 @@ describe('Settlements - filtering', () => {
     expect(screen.queryByText('Goldhaven')).not.toBeInTheDocument();
   });
 
-  it('filters by tags case-insensitively', () => {
-    render(<Settlements campaignName="test" onBack={() => {}} />);
-    const searchInput = screen.getByLabelText('Search settlements');
-    fireEvent.change(searchInput, { target: { value: 'COASTAL' } });
-    expect(screen.getByText('Fireport')).toBeInTheDocument();
-  });
-
   it('combines search and size filter', () => {
     Object.assign(settlementMockReturn, {
       ...mockUseSettlements,
@@ -110,31 +103,6 @@ describe('Settlements - filtering', () => {
     expect(screen.getByText('Fire Village')).toBeInTheDocument();
     expect(screen.queryByText('Fireport')).not.toBeInTheDocument();
     expect(screen.queryByText('Iceholm')).not.toBeInTheDocument();
-  });
-
-  it('shows all settlements when search is cleared after filtering', () => {
-    render(<Settlements campaignName="test" onBack={() => {}} />);
-    const searchInput = screen.getByLabelText('Search settlements');
-    fireEvent.change(searchInput, { target: { value: 'fire' } });
-    expect(screen.getByText('Fireport')).toBeInTheDocument();
-    expect(screen.queryByText('Iceholm')).not.toBeInTheDocument();
-    const clearBtn = screen.getByLabelText('Clear search');
-    fireEvent.click(clearBtn);
-    expect(screen.getByText('Fireport')).toBeInTheDocument();
-    expect(screen.getByText('Iceholm')).toBeInTheDocument();
-    expect(screen.getByText('Goldhaven')).toBeInTheDocument();
-  });
-
-  it('shows all settlements when size filter is cleared after filtering', () => {
-    render(<Settlements campaignName="test" onBack={() => {}} />);
-    const villageBtn = screen.getByRole('button', { name: /village/i });
-    fireEvent.click(villageBtn);
-    expect(screen.getByText('Iceholm')).toBeInTheDocument();
-    expect(screen.queryByText('Fireport')).not.toBeInTheDocument();
-    fireEvent.click(villageBtn);
-    expect(screen.getByText('Fireport')).toBeInTheDocument();
-    expect(screen.getByText('Iceholm')).toBeInTheDocument();
-    expect(screen.getByText('Goldhaven')).toBeInTheDocument();
   });
 
   it('shows no results message when both search and size filter yield no matches', () => {

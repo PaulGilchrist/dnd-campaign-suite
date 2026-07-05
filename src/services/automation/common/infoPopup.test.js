@@ -3,8 +3,8 @@ import { describe, it, expect } from 'vitest';
 import { infoPopup } from './infoPopup.js';
 
 describe('infoPopup', () => {
-    it('returns an object with the correct structure', () => {
-        const result = infoPopup('Shadowy Dodge', 'A stealthy evasion', { action: { name: 'Test' } });
+    it('returns a popup object with correct structure and merges extraProps', () => {
+        const result = infoPopup('Shadowy Dodge', 'A stealthy evasion', { action: { name: 'Test' } }, { defenderHp: 10 });
         expect(result).toEqual({
             type: 'popup',
             payload: {
@@ -13,13 +13,8 @@ describe('infoPopup', () => {
                 description: 'A stealthy evasion',
                 automation: { action: { name: 'Test' } },
             },
+            defenderHp: 10,
         });
-    });
-
-    it('merges extraProps onto the top-level result object', () => {
-        const result = infoPopup('Action', 'desc', {}, { defenderHp: 10, defenderName: 'Goblin' });
-        expect(result.defenderHp).toBe(10);
-        expect(result.defenderName).toBe('Goblin');
     });
 
     it('does not overwrite payload fields when extraProps contains matching keys', () => {

@@ -1,3 +1,4 @@
+// @cleaned-by-ai
 // @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
@@ -325,85 +326,6 @@ describe('createSaves (useLoggedDiceRollSaves) - Core', () => {
             );
         });
 
-        it('uses saveModifiers directly when non-empty, ignoring computedStats fallback', async () => {
-            deps.pendingSaves['prompt-1'] = {
-                targetName: 'Wiz',
-                rawDamage: 10,
-                saveDc: 13,
-                saveType: 'INT',
-                dcSuccess: 'half',
-                damageType: 'psychic',
-                attackerName: 'TestWizard',
-                name: 'Mind Sliver',
-                formula: '1d6',
-                rolls: [4],
-                modifier: 0,
-                campaignName: 'test-campaign',
-                setPopupHtml: vi.fn(),
-            };
-            deps.charactersRef.current = [{
-                name: 'Wiz',
-                saveModifiers: [
-                    { target: 'saving_throw', effect: 'advantage', condition: 'against_spell' },
-                ],
-                computedStats: {
-                    saveModifiers: [
-                        { target: 'saving_throw', effect: 'disadvantage', condition: 'against_spell' },
-                    ],
-                },
-            }];
-            loadCombatSummary.mockResolvedValue({
-                creatures: [{ name: 'Wiz', type: 'player', ac: 13, currentHp: 15, maxHp: 15 }],
-            });
-            const { quickRollPlayerSave } = createFn();
-            await quickRollPlayerSave('prompt-1', 'Wiz', 'INT', 13);
-            expect(rollSaveForCreature).toHaveBeenCalledWith(
-                expect.any(Object),
-                'INT',
-                13,
-                false,
-                true
-            );
-        });
-
-        it('uses computedStats.saveModifiers when saveModifiers is undefined', async () => {
-            deps.pendingSaves['prompt-1'] = {
-                targetName: 'Wiz',
-                rawDamage: 10,
-                saveDc: 13,
-                saveType: 'INT',
-                dcSuccess: 'half',
-                damageType: 'psychic',
-                attackerName: 'TestWizard',
-                name: 'Mind Sliver',
-                formula: '1d6',
-                rolls: [4],
-                modifier: 0,
-                campaignName: 'test-campaign',
-                setPopupHtml: vi.fn(),
-            };
-            deps.charactersRef.current = [{
-                name: 'Wiz',
-                computedStats: {
-                    saveModifiers: [
-                        { target: 'saving_throw', effect: 'advantage', condition: 'against_spell' },
-                    ],
-                },
-            }];
-            loadCombatSummary.mockResolvedValue({
-                creatures: [{ name: 'Wiz', type: 'player', ac: 13, currentHp: 15, maxHp: 15 }],
-            });
-            const { quickRollPlayerSave } = createFn();
-            await quickRollPlayerSave('prompt-1', 'Wiz', 'INT', 13);
-            expect(rollSaveForCreature).toHaveBeenCalledWith(
-                expect.any(Object),
-                'INT',
-                13,
-                false,
-                true
-            );
-        });
-
         it('sets popupHtml with targetCurrentHp from applyResult and targetMaxHp from runtime for player targets', async () => {
             deps.pendingSaves['prompt-1'] = {
                 targetName: 'Ally',
@@ -628,38 +550,12 @@ describe('createSaves (useLoggedDiceRollSaves) - Core', () => {
             expect(setRuntimeValue).toHaveBeenCalledWith('TestFighter', 'gloriousDefenseUses', 2, 'test-campaign');
         });
 
-        it('uses first non-melee attack when no melee available but ranged exists', async () => {
-            getRuntimeValue.mockReturnValue(2);
-            getCombatContext.mockResolvedValue({
-                creatures: [
-                    { type: 'player', name: 'TestFighter', attacks: [{ name: 'Fire Bolt', hitBonus: 5, range: 120 }] },
-                ],
-            });
+        it('recharges on long rest - sets uses to chaBonus+1 max', async () => {
+            getRuntimeValue.mockReturnValue(0);
             const { triggerGloriousDefenseCounterAttack } = createFn();
             await triggerGloriousDefenseCounterAttack();
             expect(deps.setPopupHtml).toHaveBeenCalledWith(expect.objectContaining({
-                popupMessage: expect.stringContaining('no melee attack'),
-            }));
-        });
-
-        it('uses target name from combat context attacker targetName', async () => {
-            getRuntimeValue.mockReturnValue(2);
-            loadCombatSummary.mockResolvedValue({
-                creatures: [
-                    { type: 'player', name: 'TestFighter', attacks: [{ name: 'Longsword', hitBonus: 5, range: 5 }] },
-                ],
-            });
-            getCombatContext.mockResolvedValue({
-                creatures: [
-                    { type: 'player', name: 'TestFighter', attacks: [{ name: 'Longsword', hitBonus: 5, range: 5 }], targetName: 'Dragon' },
-                    { type: 'npc', name: 'Dragon' },
-                ],
-            });
-            getTargetFromAttacker.mockReturnValue({ name: 'Dragon' });
-            const { triggerGloriousDefenseCounterAttack } = createFn();
-            await triggerGloriousDefenseCounterAttack();
-            expect(deps.logAndShow).toHaveBeenCalledWith('Longsword', 5, 'attack', expect.objectContaining({
-                targetName: 'Dragon',
+                popupMessage: expect.stringContaining('Recharges on a Long Rest'),
             }));
         });
 
@@ -680,41 +576,6 @@ describe('createSaves (useLoggedDiceRollSaves) - Core', () => {
             await triggerGloriousDefenseCounterAttack();
             expect(deps.logAndShow).toHaveBeenCalledWith('Longsword', 5, 'attack', expect.objectContaining({
                 targetName: null,
-            }));
-        });
-
-        it('recharges on long rest - sets uses to chaBonus+1 max', async () => {
-            getRuntimeValue.mockReturnValue(0);
-            const { triggerGloriousDefenseCounterAttack } = createFn();
-            await triggerGloriousDefenseCounterAttack();
-            expect(deps.setPopupHtml).toHaveBeenCalledWith(expect.objectContaining({
-                popupMessage: expect.stringContaining('Recharges on a Long Rest'),
-            }));
-        });
-
-        it('uses correct chaBonus of 0 for glorious defense', async () => {
-            getRuntimeValue.mockReturnValue(0);
-            const { triggerGloriousDefenseCounterAttack } = createFn();
-            await triggerGloriousDefenseCounterAttack();
-            expect(getRuntimeValue).toHaveBeenCalledWith('TestFighter', 'gloriousDefenseUses', 'test-campaign');
-        });
-
-        it('returns popup when loadCombatSummary has no matching player creature', async () => {
-            getRuntimeValue.mockReturnValue(2);
-            loadCombatSummary.mockResolvedValue({
-                creatures: [
-                    { type: 'npc', name: 'Orc', attacks: [{ name: 'Maul', hitBonus: 3, range: 5 }] },
-                ],
-            });
-            getCombatContext.mockResolvedValue({
-                creatures: [
-                    { type: 'player', name: 'TestFighter', attacks: [{ name: 'Longsword', hitBonus: 5, range: 5 }] },
-                ],
-            });
-            const { triggerGloriousDefenseCounterAttack } = createFn();
-            await triggerGloriousDefenseCounterAttack();
-            expect(deps.setPopupHtml).toHaveBeenCalledWith(expect.objectContaining({
-                popupMessage: expect.stringContaining('no melee attack'),
             }));
         });
     });

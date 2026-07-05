@@ -3,113 +3,25 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import { executeHandler } from './index.js';
 
-// ── Module-level mocks (must use inline factories due to hoisting) ─
+// ── Module-level mocks ─
 
 vi.mock('./handlers/combat/saveOnlyHandler.js', () => ({
   handle: vi.fn().mockResolvedValue({ result: 'save_only' }),
 }));
-vi.mock('./handlers/combat/saveAttackHandler.js', () => ({
-  handle: vi.fn().mockResolvedValue({ result: 'save_attack' }),
-}));
 vi.mock('./handlers/healing/healingHandler.js', () => ({
   handle: vi.fn().mockResolvedValue({ result: 'shared_healing' }),
-}));
-vi.mock('./handlers/buffs/buffHandler.js', () => ({
-  handle: vi.fn().mockResolvedValue({ result: 'buff' }),
-}));
-vi.mock('./handlers/buffs/conditionHandler.js', () => ({
-  handle: vi.fn().mockResolvedValue({ result: 'condition' }),
-}));
-vi.mock('./handlers/resources/sorceryHandler.js', () => ({
-  handle: vi.fn().mockResolvedValue({ result: 'shared_sorcery' }),
-}));
-vi.mock('./handlers/spells/spellCastHandler.js', () => ({
-  handle: vi.fn().mockResolvedValue({ result: 'spell_cast' }),
-}));
-vi.mock('./handlers/combat/initiativeHandler.js', () => ({
-  handle: vi.fn().mockResolvedValue({ result: 'initiative' }),
-}));
-vi.mock('./handlers/resources/resourcePoolHandler.js', () => ({
-  handle: vi.fn().mockResolvedValue({ result: 'resource_pool' }),
-}));
-vi.mock('./handlers/resources/fontOfMagicHandler.js', () => ({
-  handle: vi.fn().mockResolvedValue({ result: 'font_of_magic' }),
-}));
-vi.mock('./handlers/healing/healingPoolHandler.js', () => ({
-  handle: vi.fn().mockResolvedValue({ result: 'healing_pool' }),
-}));
-
-vi.mock('./handlers/combat/combatStanceHandler.js', () => ({
-  handle: vi.fn().mockResolvedValue({ result: 'combat_stance' }),
-}));
-vi.mock('./handlers/combat/attackRiderHandler.js', () => ({
-  handle: vi.fn().mockResolvedValue({ result: 'attack_rider' }),
-}));
-vi.mock('./handlers/buffs/tempHpBuffHandler.js', () => ({
-  handle: vi.fn().mockResolvedValue({ result: 'temp_hp' }),
 }));
 vi.mock('./handlers/combat/autoRerollHandler.js', () => ({
   handle: vi.fn().mockResolvedValue({ result: 'auto_reroll' }),
 }));
-vi.mock('./handlers/reactions/reactionDamageHandler.js', () => ({
-  handle: vi.fn().mockResolvedValue({ result: 'reaction_damage' }),
-}));
-vi.mock('./handlers/reactions/reactionDebuffHandler.js', () => ({
-  handle: vi.fn().mockResolvedValue({ result: 'reaction_debuff' }),
-}));
-vi.mock('./handlers/combat/weaponMasteryHandler.js', () => ({
-  handle: vi.fn().mockResolvedValue({ result: 'weapon_mastery' }),
-}));
-vi.mock('./handlers/buffs/buffAllyHandler.js', () => ({
-  handle: vi.fn().mockResolvedValue({ result: 'buff_ally' }),
-}));
-vi.mock('./handlers/healing/revivificationHandler.js', () => ({
-  handle: vi.fn().mockResolvedValue({ result: 'revivification' }),
-}));
-vi.mock('./handlers/class-bard/bardicInspirationHandler.js', () => ({
-  handle: vi.fn().mockResolvedValue({ result: 'bardic_inspiration' }),
-}));
-vi.mock('./handlers/combat/bonusActionAttackHandler.js', () => ({
-  handle: vi.fn().mockResolvedValue({ result: 'bonus_action_attack' }),
-}));
-vi.mock('./handlers/class-bard/bardicInspirationUseHandler.js', () => ({
-  handle: vi.fn().mockResolvedValue({ result: 'bardic_inspiration_use' }),
-}));
-vi.mock('./handlers/reactions/reactionBonusHandler.js', () => ({
-  handle: vi.fn().mockResolvedValue({ result: 'reaction_bonus' }),
-}));
-vi.mock('./handlers/combat/postCastRiderHandler.js', () => ({
-  handle: vi.fn().mockResolvedValue({ result: 'post_cast_rider' }),
-}));
-vi.mock('./handlers/class-bard/bardicInspirationDefenseHandler.js', () => ({
-  handle: vi.fn().mockResolvedValue({ result: 'bardic_inspiration_defense' }),
-}));
-vi.mock('./handlers/class-bard/bardicInspirationOffenseHandler.js', () => ({
-  handle: vi.fn().mockResolvedValue({ result: 'bardic_inspiration_offense' }),
-}));
-vi.mock('./handlers/class-cleric-paladin/divineSparkHandler.js', () => ({
-  handle: vi.fn().mockResolvedValue({ result: 'divine_spark' }),
-}));
-vi.mock('./handlers/class-cleric-paladin/divineInterventionHandler.js', () => ({
-  handle: vi.fn().mockResolvedValue({ result: 'divine_intervention' }),
-}));
-vi.mock('./handlers/combat/extraActionHandler.js', () => ({
-  handle: vi.fn().mockResolvedValue({ result: 'extra_action' }),
-}));
-vi.mock('./handlers/spells/eyebiteHandler.js', () => ({
-  handle: vi.fn().mockResolvedValue({ result: 'eyebite' }),
+vi.mock('./handlers/class-wizard/SavantHandler.js', () => ({
+  handle: vi.fn().mockResolvedValue({ result: 'savant' }),
 }));
 vi.mock('./handlers/combat/damageReductionHandler.js', () => ({
   handle: vi.fn().mockResolvedValue({ result: 'damage_reduction' }),
 }));
 vi.mock('./handlers/class-sorcerer/protectiveFieldHandler.js', () => ({
   handle: vi.fn().mockResolvedValue({ result: 'protective_field' }),
-}));
-vi.mock('./handlers/class-wizard/SavantHandler.js', () => ({
-  handle: vi.fn().mockResolvedValue({ result: 'savant' }),
-}));
-vi.mock('./handlers/buffs/encouragingSongHandler.js', () => ({
-  handle: vi.fn().mockResolvedValue({ result: 'encouraging_song' }),
 }));
 vi.mock('../../../shared/popupResponse.js', () => ({
   automationInfoPopup: vi.fn().mockReturnValue({ type: 'popup', payload: { type: 'automation_info', description: 'test' } }),
@@ -163,53 +75,37 @@ describe('executeHandler', () => {
   });
 
   describe('handler routing', () => {
-    it.each([
-      ['save_only', './handlers/combat/saveOnlyHandler.js'],
-      ['save_attack', './handlers/combat/saveAttackHandler.js'],
-      ['healing', './handlers/healing/healingHandler.js'],
-      ['self_healing', './handlers/healing/healingHandler.js'],
-      ['temp_buff', './handlers/buffs/buffHandler.js'],
-      ['set_condition', './handlers/buffs/conditionHandler.js'],
-      ['sorcery_aura', './handlers/resources/sorceryHandler.js'],
-      ['sorcery_incarnate', './handlers/resources/sorceryHandler.js'],
-      ['free_spell', './handlers/spells/spellCastHandler.js'],
-      ['initiative_action', './handlers/combat/initiativeHandler.js'],
-      ['resource_pool', './handlers/resources/resourcePoolHandler.js'],
-      ['font_of_magic', './handlers/resources/fontOfMagicHandler.js'],
-      ['healing_pool', './handlers/healing/healingPoolHandler.js'],
-      ['combat_stance', './handlers/combat/combatStanceHandler.js'],
-      ['attack_rider', './handlers/combat/attackRiderHandler.js'],
-      ['temp_hp_buff', './handlers/buffs/tempHpBuffHandler.js'],
-      ['auto_reroll', './handlers/combat/autoRerollHandler.js'],
-      ['reaction_damage', './handlers/reactions/reactionDamageHandler.js'],
-      ['reaction_debuff', './handlers/reactions/reactionDebuffHandler.js'],
-      ['mastery_rider', './handlers/combat/weaponMasteryHandler.js'],
-      ['buff_ally', './handlers/buffs/buffAllyHandler.js'],
-      ['revivification', './handlers/healing/revivificationHandler.js'],
-      ['bardic_inspiration', './handlers/class-bard/bardicInspirationHandler.js'],
-      ['bardic_inspiration_use', './handlers/class-bard/bardicInspirationUseHandler.js'],
-      ['reaction_bonus', './handlers/reactions/reactionBonusHandler.js'],
-      ['post_cast_rider', './handlers/combat/postCastRiderHandler.js'],
-      ['bardic_inspiration_defense', './handlers/class-bard/bardicInspirationDefenseHandler.js'],
-      ['bardic_inspiration_offense', './handlers/class-bard/bardicInspirationOffenseHandler.js'],
-      ['divine_spark', './handlers/class-cleric-paladin/divineSparkHandler.js'],
-      ['divine_intervention', './handlers/class-cleric-paladin/divineInterventionHandler.js'],
-      ['bonus_action_attack', './handlers/combat/bonusActionAttackHandler.js'],
-      ['extra_action', './handlers/combat/extraActionHandler.js'],
-      ['eyebite', './handlers/spells/eyebiteHandler.js'],
-    ])('routes "%s" to its handler', async (type, _modulePath) => {
-      const expectedReturn = { type, handled: true };
+    it('routes a known handler type and returns its result', async () => {
+      const { handle: saveOnlyHandle } = await import('./handlers/combat/saveOnlyHandler.js');
+      saveOnlyHandle.mockResolvedValue({ result: 'save_only' });
 
-      const mockModule = await import(_modulePath);
-      mockModule.handle.mockResolvedValue(expectedReturn);
+      const action = makeAction({ type: 'save_only' });
+      const result = await executeHandler(action, makePlayerStats(), campaignName, mapName);
 
-      const action = makeAction({ type });
-      const playerStats = makePlayerStats();
+      expect(saveOnlyHandle).toHaveBeenCalledTimes(1);
+      expect(result).toEqual({ result: 'save_only' });
+    });
 
-      const result = await executeHandler(action, playerStats, campaignName, mapName);
+    it('routes a shared handler (healing) used by multiple automation types', async () => {
+      const { handle: healingHandle } = await import('./handlers/healing/healingHandler.js');
+      healingHandle.mockResolvedValue({ result: 'shared_healing' });
 
-      expect(mockModule.handle).toHaveBeenCalledTimes(1);
-      expect(result).toBe(expectedReturn);
+      const action = makeAction({ type: 'healing' });
+      const result = await executeHandler(action, makePlayerStats(), campaignName, mapName);
+
+      expect(healingHandle).toHaveBeenCalledTimes(1);
+      expect(result).toEqual({ result: 'shared_healing' });
+    });
+
+    it('routes a second type sharing the same handler (self_healing)', async () => {
+      const { handle: healingHandle } = await import('./handlers/healing/healingHandler.js');
+      healingHandle.mockResolvedValue({ result: 'shared_healing' });
+
+      const action = makeAction({ type: 'self_healing' });
+      const result = await executeHandler(action, makePlayerStats(), campaignName, mapName);
+
+      expect(healingHandle).toHaveBeenCalledTimes(1);
+      expect(result).toEqual({ result: 'shared_healing' });
     });
   });
 

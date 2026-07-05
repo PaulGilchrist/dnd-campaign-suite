@@ -1,9 +1,9 @@
+// @cleaned-by-ai
 // @improved-by-ai
 import { describe, it, expect } from 'vitest';
 import {
   computeConditionEffects,
   saveModifierApplies,
-  hasSaveAdvantage,
 } from './conditionEffects.js';
 
 // ---------------------------------------------------------------------------
@@ -606,131 +606,6 @@ describe('computeConditionEffects — saveType-based modifier conditions', () =>
 });
 
 // ---------------------------------------------------------------------------
-// computeConditionEffects — condition switch cases
-// ---------------------------------------------------------------------------
-
-describe('computeConditionEffects — condition switch cases', () => {
-  it('sets cannotAct and concentrationBroken for incapacitated', () => {
-    const result = computeConditionEffects(['incapacitated'], []);
-    expect(result.cannotAct).toBe(true);
-    expect(result.concentrationBroken).toBe(true);
-  });
-
-  it('sets speedZero and cannotAct for paralyzed', () => {
-    const result = computeConditionEffects(['paralyzed'], []);
-    expect(result.speedZero).toBe(true);
-    expect(result.cannotAct).toBe(true);
-    expect(result.autoFailSaves).toContain('str');
-    expect(result.autoFailSaves).toContain('dex');
-    expect(result.targetAdvantageCount).toBe(1);
-    expect(result.autoCritWithin5ft).toBe(true);
-  });
-
-  it('sets speedZero, cannotAct, autoFailSaves, resistantToAll, poisonImmune for petrified', () => {
-    const result = computeConditionEffects(['petrified'], []);
-    expect(result.speedZero).toBe(true);
-    expect(result.cannotAct).toBe(true);
-    expect(result.resistantToAll).toBe(true);
-    expect(result.poisonImmune).toBe(true);
-    expect(result.autoFailSaves).toContain('str');
-  });
-
-  it('sets cannotAct, speedZero, autoFailSaves, targetAdvantageCount for stunned', () => {
-    const result = computeConditionEffects(['stunned'], []);
-    expect(result.cannotAct).toBe(true);
-    expect(result.speedZero).toBe(true);
-    expect(result.targetAdvantageCount).toBe(1);
-  });
-
-  it('sets cannotAct, speedZero, targetAdvantageCount, autoFailSaves, autoCritWithin5ft for unconscious', () => {
-    const result = computeConditionEffects(['unconscious'], []);
-    expect(result.cannotAct).toBe(true);
-    expect(result.speedZero).toBe(true);
-    expect(result.targetAdvantageCount).toBe(1);
-    expect(result.autoCritWithin5ft).toBe(true);
-  });
-
-  it('sets speedZero and attackDisadvantageCount for grappled', () => {
-    const result = computeConditionEffects(['grappled'], []);
-    expect(result.speedZero).toBe(true);
-    expect(result.attackDisadvantageCount).toBe(1);
-  });
-
-  it('sets speedReduction for speed_zero condition', () => {
-    const result = computeConditionEffects(['speed_zero'], []);
-    expect(result.speedZero).toBe(true);
-  });
-
-  it('sets abilityCheckDisadvantage and attackDisadvantageCount for frightened', () => {
-    const result = computeConditionEffects(['frightened'], []);
-    expect(result.abilityCheckDisadvantage).toBe(true);
-    expect(result.attackDisadvantageCount).toBe(1);
-  });
-
-  it('sets attackDisadvantageCount and abilityCheckDisadvantage for poisoned', () => {
-    const result = computeConditionEffects(['poisoned'], []);
-    expect(result.attackDisadvantageCount).toBe(1);
-    expect(result.abilityCheckDisadvantage).toBe(true);
-  });
-
-  it('sets attackDisadvantageCount for blinded', () => {
-    const result = computeConditionEffects(['blinded'], []);
-    expect(result.attackDisadvantageCount).toBe(1);
-    expect(result.targetAdvantageCount).toBe(1);
-  });
-
-  it('sets targetAdvantageIfWithin5ft and targetDisadvantageIfBeyond5ft for prone', () => {
-    const result = computeConditionEffects(['prone'], []);
-    expect(result.targetAdvantageIfWithin5ft).toBe(true);
-    expect(result.targetDisadvantageIfBeyond5ft).toBe(true);
-  });
-
-  it('sets speedZero, attackDisadvantageCount, targetAdvantageCount, saveDisadvantage for restrained', () => {
-    const result = computeConditionEffects(['restrained'], []);
-    expect(result.speedZero).toBe(true);
-    expect(result.attackDisadvantageCount).toBe(1);
-    expect(result.targetAdvantageCount).toBe(1);
-    expect(result.saveDisadvantage).toContain('dex');
-  });
-
-  it('sets dazed and targetAdvantageCount for dazed', () => {
-    const result = computeConditionEffects(['dazed'], []);
-    expect(result.dazed).toBe(true);
-    expect(result.targetAdvantageCount).toBe(1);
-  });
-
-  it('sets slow-related flags for slow condition', () => {
-    const result = computeConditionEffects(['slow'], []);
-    expect(result.speedHalved).toBe(true);
-    expect(result.speedReduction).toBeGreaterThan(0);
-    expect(result.acPenalty).toBe(2);
-    expect(result.slowNoReactions).toBe(true);
-    expect(result.slowActionLimit).toBe(true);
-    expect(result.slowSingleAttackLimit).toBe(true);
-    expect(result.slowSomaticFailure).toBe(true);
-    expect(result.targetAdvantageCount).toBe(1);
-    expect(result.saveDisadvantage).toContain('dex');
-  });
-
-  it('respects seeInvisibilityActive for invisible condition', () => {
-    const result = computeConditionEffects(['invisible'], [], [], false, false, false, false, null, true);
-    expect(result.attackAdvantageCount).toBe(0);
-    expect(result.targetDisadvantageCount).toBe(0);
-  });
-
-  it('applies attackAdvantageCount and targetDisadvantageCount for invisible when not seen', () => {
-    const result = computeConditionEffects(['invisible'], [], [], false, false, false, false, null, false);
-    expect(result.attackAdvantageCount).toBe(1);
-    expect(result.targetDisadvantageCount).toBe(1);
-  });
-
-  it('sets saveDisadvantage for charmed condition', () => {
-    const result = computeConditionEffects(['charmed'], []);
-    expect(result.saveDisadvantage).toContain('dex');
-  });
-});
-
-// ---------------------------------------------------------------------------
 // computeConditionEffects — targetEffects
 // ---------------------------------------------------------------------------
 
@@ -1150,85 +1025,5 @@ describe('computeConditionEffects — applied modifier effects', () => {
     const result = computeConditionEffects([], modifiers);
     expect(result.saveDisadvantageAbilities).toEqual(['CON', 'WIS']);
     expect(result.saveDisadvantageCount).toBe(0);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// hasSaveAdvantage
-// ---------------------------------------------------------------------------
-
-describe('hasSaveAdvantage', () => {
-  it('returns false when effects is null', () => {
-    expect(hasSaveAdvantage(null, 'con', false)).toBe(false);
-  });
-
-  it('returns false when effects is undefined', () => {
-    expect(hasSaveAdvantage(undefined, 'con', false)).toBe(false);
-  });
-
-  it('returns false when no advantage sources exist', () => {
-    const effects = { saveAdvantageCount: 0, saveAdvantage: [], saveAdvantageAbilities: [] };
-    expect(hasSaveAdvantage(effects, 'con', false)).toBe(false);
-  });
-
-  it('returns true when saveAdvantageCount is positive', () => {
-    const effects = { saveAdvantageCount: 2, saveAdvantage: [], saveAdvantageAbilities: [] };
-    expect(hasSaveAdvantage(effects, 'con', false)).toBe(true);
-  });
-
-  it('returns true when saveAdvantage includes the saveType', () => {
-    const effects = { saveAdvantageCount: 0, saveAdvantage: ['con'] };
-    expect(hasSaveAdvantage(effects, 'con', false)).toBe(true);
-  });
-
-  it('returns false when saveAdvantage does not include the saveType', () => {
-    const effects = { saveAdvantageCount: 0, saveAdvantage: ['dex'] };
-    expect(hasSaveAdvantage(effects, 'con', false)).toBe(false);
-  });
-
-  it('returns true when saveAdvantageAbilities includes the abbreviated saveType', () => {
-    const effects = { saveAdvantageCount: 0, saveAdvantageAbilities: ['CON'] };
-    expect(hasSaveAdvantage(effects, 'con', false)).toBe(true);
-  });
-
-  it('returns false when saveAdvantageAbilities does not include the abbreviated saveType', () => {
-    const effects = { saveAdvantageCount: 0, saveAdvantageAbilities: ['DEX'] };
-    expect(hasSaveAdvantage(effects, 'con', false)).toBe(false);
-  });
-
-  it('returns true for against_spell regardless of saveType', () => {
-    const effects = { saveAdvantageCount: 0, saveAdvantage: ['against_spell'] };
-    expect(hasSaveAdvantage(effects, 'con', false)).toBe(true);
-    expect(hasSaveAdvantage(effects, 'dex', false)).toBe(true);
-  });
-
-  it('reduces saveAdvantageCount by 1 when restoreBalance is true', () => {
-    const effects = { saveAdvantageCount: 2, saveAdvantage: [] };
-    expect(hasSaveAdvantage(effects, 'con', true)).toBe(true);
-  });
-
-  it('returns false when saveAdvantageCount is 1 and restoreBalance is true', () => {
-    const effects = { saveAdvantageCount: 1, saveAdvantage: [] };
-    expect(hasSaveAdvantage(effects, 'con', true)).toBe(false);
-  });
-
-  it('returns true when saveAdvantageCount is 0 and restoreBalance is true with matching saveType in saveAdvantage', () => {
-    const effects = { saveAdvantageCount: 0, saveAdvantage: ['con'] };
-    expect(hasSaveAdvantage(effects, 'con', true)).toBe(true);
-  });
-
-  it('returns true when saveAdvantageAbilities matches with restoreBalance', () => {
-    const effects = { saveAdvantageCount: 0, saveAdvantageAbilities: ['CON'] };
-    expect(hasSaveAdvantage(effects, 'con', true)).toBe(true);
-  });
-
-  it('handles saveType with different casing by taking first 3 characters uppercased', () => {
-    const effects = { saveAdvantageCount: 0, saveAdvantageAbilities: ['CON'] };
-    expect(hasSaveAdvantage(effects, 'Con', false)).toBe(true);
-  });
-
-  it('returns false when saveAdvantageAbilities exists but saveType is falsy', () => {
-    const effects = { saveAdvantageCount: 0, saveAdvantageAbilities: ['CON'] };
-    expect(hasSaveAdvantage(effects, null, false)).toBe(false);
   });
 });

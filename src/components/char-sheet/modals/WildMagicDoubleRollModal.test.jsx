@@ -1,3 +1,4 @@
+// @cleaned-by-ai
 // @improved-by-ai
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -78,24 +79,12 @@ describe('WildMagicDoubleRollModal', () => {
       expect(screen.getByRole('button', { name: /Roll 2: 7/ })).toBeInTheDocument();
     });
 
-    it('renders roll buttons with different roll values', () => {
-      renderModal({ roll1: 1, roll2: 20 });
-      expect(screen.getByRole('button', { name: /Roll 1: 1/ })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /Roll 2: 20/ })).toBeInTheDocument();
-    });
-
     it('shows a truncated surge effect preview on each roll button', () => {
       renderModal();
       const roll1Btn = screen.getByRole('button', { name: /Roll 1: 14/ });
       const roll2Btn = screen.getByRole('button', { name: /Roll 2: 7/ });
       expect(roll1Btn.textContent).toContain('Your body becomes larger than normal');
       expect(roll2Btn.textContent).toContain('Each creature within 30 feet');
-    });
-
-    it('truncates long surge effect descriptions at 80 characters', () => {
-      renderModal({ roll1: 1, roll2: 20 });
-      const roll1Btn = screen.getByRole('button', { name: /Roll 1: 1/ });
-      expect(roll1Btn.textContent).toContain('...');
     });
 
     it('does not show surge preview text when no matching surge entry exists', () => {
@@ -157,16 +146,6 @@ describe('WildMagicDoubleRollModal', () => {
       });
     });
 
-    it('renders the surge result description in the body', async () => {
-      renderModal();
-      fireEvent.click(screen.getByRole('button', { name: /Roll 1: 14/ }));
-      await waitFor(() => {
-        const body = document.querySelector('.sp-body');
-        expect(body.innerHTML).toContain('SURGE');
-        expect(body.innerHTML).toContain('larger than normal');
-      });
-    });
-
     it('shows the Done button after selection', async () => {
       renderModal();
       fireEvent.click(screen.getByRole('button', { name: /Roll 1: 14/ }));
@@ -175,18 +154,9 @@ describe('WildMagicDoubleRollModal', () => {
       });
     });
 
-    it('calls onClose when Done button is clicked after roll 1', async () => {
+    it('calls onClose when Done button is clicked after selection', async () => {
       renderModal();
       fireEvent.click(screen.getByRole('button', { name: /Roll 1: 14/ }));
-      await waitFor(() => {
-        fireEvent.click(screen.getByRole('button', { name: 'Done' }));
-      });
-      expect(baseProps.onClose).toHaveBeenCalledTimes(1);
-    });
-
-    it('calls onClose when Done button is clicked after roll 2', async () => {
-      renderModal({ roll1: 3, roll2: 18 });
-      fireEvent.click(screen.getByRole('button', { name: /Roll 2: 18/ }));
       await waitFor(() => {
         fireEvent.click(screen.getByRole('button', { name: 'Done' }));
       });

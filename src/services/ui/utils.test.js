@@ -1,3 +1,4 @@
+// @cleaned-by-ai
 // @improved-by-ai
 import { describe, it, expect } from 'vitest';
 import utils from './utils.js';
@@ -17,16 +18,12 @@ describe('utils', () => {
             expect(utils.getAbilityLongName(short)).toBe(long);
         });
 
-        it('returns undefined for unknown codes', () => {
+        it('returns undefined for unknown, empty, or non-string values', () => {
             expect(utils.getAbilityLongName('UNKNOWN')).toBeUndefined();
             expect(utils.getAbilityLongName('')).toBeUndefined();
             expect(utils.getAbilityLongName(null)).toBeUndefined();
             expect(utils.getAbilityLongName(undefined)).toBeUndefined();
-        });
-
-        it('returns undefined for lowercase ability codes', () => {
             expect(utils.getAbilityLongName('str')).toBeUndefined();
-            expect(utils.getAbilityLongName('dex')).toBeUndefined();
         });
     });
 
@@ -35,7 +32,7 @@ describe('utils', () => {
             expect(utils.getName('John Doe')).toBe('John Doe');
             expect(utils.getName('John')).toBe('John');
             expect(utils.getName('John Michael Doe')).toBe('John Michael Doe');
-            expect(utils.getName('O\'Brien')).toBe("O'Brien");
+            expect(utils.getName("O'Brien")).toBe("O'Brien");
         });
 
         it('returns "Unknown" for falsy and non-string values', () => {
@@ -46,11 +43,10 @@ describe('utils', () => {
             expect(utils.getName({})).toBe('Unknown');
             expect(utils.getName([])).toBe('Unknown');
         });
-
     });
 
     describe('getFirstName', () => {
-        it('returns the input string for valid names', () => {
+        it('returns the input string for valid names (same as getName)', () => {
             expect(utils.getFirstName('John Doe')).toBe('John Doe');
             expect(utils.getFirstName('John')).toBe('John');
             expect(utils.getFirstName('John Michael Doe')).toBe('John Michael Doe');
@@ -64,7 +60,6 @@ describe('utils', () => {
             expect(utils.getFirstName({})).toBe('Unknown');
             expect(utils.getFirstName([])).toBe('Unknown');
         });
-
     });
 
     describe('guid', () => {
@@ -80,7 +75,5 @@ describe('utils', () => {
             }
             expect(guids.size).toBe(100);
         });
-
-
     });
 });

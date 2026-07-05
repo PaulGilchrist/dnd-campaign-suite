@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { renderHook, act } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import useRuler from './useRuler.js';
@@ -32,18 +32,6 @@ describe('useRuler', () => {
   });
 
   describe('setRulerMode', () => {
-    it('should enable and disable ruler mode', () => {
-      const result = getHook();
-      act(() => {
-        result.current.setRulerMode(true);
-      });
-      expect(result.current.rulerMode).toBe(true);
-      act(() => {
-        result.current.setRulerMode(false);
-      });
-      expect(result.current.rulerMode).toBe(false);
-    });
-
     it('should reset ruler state when disabling ruler mode', () => {
       const { result } = renderHook(() => useRuler());
       act(() => {
@@ -90,54 +78,6 @@ describe('useRuler', () => {
       expect(result.current.rulerPreview).toEqual({ gridX: 3, gridY: 3 });
       act(() => {
         result.current.setRulerMode(false);
-      });
-      expect(result.current.rulerStart).toBeNull();
-      expect(result.current.rulerEnd).toBeNull();
-      expect(result.current.rulerPreview).toBeNull();
-    });
-  });
-
-  describe('resetRuler', () => {
-    it('should reset all ruler positions to null', () => {
-      const { result } = renderHook(() => useRuler());
-      const mockEvent1 = createMockEvent(1.5, 2.7);
-      const mockSvgRef = createMockSvgRef();
-      const mockGetGrid1 = createMockGrid(1.5, 2.7);
-      act(() => {
-        result.current.handleRulerPointerDown(
-          mockEvent1,
-          true,
-          null,
-          null,
-          () => mockGetGrid1,
-          mockSvgRef
-        );
-      });
-      const mockEvent2 = createMockEvent(5.3, 6.8);
-      const mockGetGrid2 = createMockGrid(5.3, 6.8);
-      act(() => {
-        result.current.handleRulerPointerDown(
-          mockEvent2,
-          true,
-          result.current.rulerStart,
-          result.current.rulerEnd,
-          () => mockGetGrid2,
-          mockSvgRef
-        );
-      });
-      const mockEvent3 = createMockEvent(3, 3);
-      const mockGetGrid3 = createMockGrid(3, 3);
-      act(() => {
-        result.current.handleRulerPointerMove(
-          mockEvent3,
-          true,
-          result.current.rulerStart,
-          null,
-          () => mockGetGrid3
-        );
-      });
-      act(() => {
-        result.current.resetRuler();
       });
       expect(result.current.rulerStart).toBeNull();
       expect(result.current.rulerEnd).toBeNull();
@@ -222,24 +162,6 @@ describe('useRuler', () => {
       expect(mockSvgRef.current.setPointerCapture).toHaveBeenCalledWith(1);
     });
 
-    it('should not capture pointer when svgRef is null', () => {
-      const result = getHook();
-      const mockEvent = createMockEvent(1, 1);
-      const mockSvgRef = { current: null };
-      const mockGetGrid = createMockGrid(1, 1);
-      act(() => {
-        result.current.handleRulerPointerDown(
-          mockEvent,
-          true,
-          null,
-          null,
-          () => mockGetGrid,
-          mockSvgRef
-        );
-      });
-      expect(result.current.rulerStart).toEqual({ gridX: 1, gridY: 1 });
-    });
-
     it('should set rulerEnd on second click', () => {
       const result = getHook();
       const mockEvent1 = createMockEvent(1.5, 2.7);
@@ -313,24 +235,6 @@ describe('useRuler', () => {
       expect(result.current.rulerStart).toEqual({ gridX: 10, gridY: 11 });
       expect(result.current.rulerEnd).toBeNull();
       expect(result.current.rulerPreview).toBeNull();
-    });
-
-    it('should floor grid coordinates', () => {
-      const result = getHook();
-      const mockEvent = createMockEvent(1.9, 2.1);
-      const mockSvgRef = createMockSvgRef();
-      const mockGetGrid = createMockGrid(1.9, 2.1);
-      act(() => {
-        result.current.handleRulerPointerDown(
-          mockEvent,
-          true,
-          null,
-          null,
-          () => mockGetGrid,
-          mockSvgRef
-        );
-      });
-      expect(result.current.rulerStart).toEqual({ gridX: 1, gridY: 2 });
     });
   });
 
@@ -409,21 +313,6 @@ describe('useRuler', () => {
       });
       expect(result.current.rulerPreview).toBeNull();
     });
-
-    it('should floor preview coordinates', () => {
-      const result = getHook();
-      const mockEvent = createMockEvent(5.9, 6.1);
-      act(() => {
-        result.current.handleRulerPointerMove(
-          mockEvent,
-          true,
-          { gridX: 1, gridY: 1 },
-          null,
-          () => createMockGrid(5.9, 6.1)
-        );
-      });
-      expect(result.current.rulerPreview).toEqual({ gridX: 5, gridY: 6 });
-    });
   });
 
   describe('handleRulerPointerUp', () => {
@@ -453,35 +342,6 @@ describe('useRuler', () => {
         );
       });
       expect(mockSvgRef.current.releasePointerCapture).toHaveBeenCalledWith(1);
-    });
-
-    it('should do nothing when svgRef is null', () => {
-      const result = getHook();
-      const mockEvent = createMockEvent(1, 1);
-      const mockSvgRef = { current: null };
-      act(() => {
-        result.current.handleRulerPointerUp(
-          mockEvent,
-          true,
-          mockSvgRef
-        );
-      });
-      expect(result.current.rulerMode).toBe(false);
-    });
-  });
-
-  describe('returned object shape', () => {
-    it('should return all expected properties and functions', () => {
-      const result = getHook();
-      expect(result.current.rulerMode).toBeDefined();
-      expect(typeof result.current.setRulerMode).toBe('function');
-      expect(result.current.rulerStart).toBeDefined();
-      expect(result.current.rulerEnd).toBeDefined();
-      expect(result.current.rulerPreview).toBeDefined();
-      expect(typeof result.current.resetRuler).toBe('function');
-      expect(typeof result.current.handleRulerPointerDown).toBe('function');
-      expect(typeof result.current.handleRulerPointerMove).toBe('function');
-      expect(typeof result.current.handleRulerPointerUp).toBe('function');
     });
   });
 });

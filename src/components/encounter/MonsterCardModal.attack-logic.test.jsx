@@ -1,4 +1,4 @@
-/* @improved-by-ai */
+/* @cleaned-by-ai */
 import { render, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import MonsterCardModal from './MonsterCardModal.jsx';
@@ -235,6 +235,7 @@ describe('MonsterCardModal - handleAttack: Improved Duplicity advantage', () => 
       targetName: 'Player A',
     });
     useRuntimeState.__setInvokeDuplicityAdvantageTargets(['Goblin']);
+    useRuntimeState.__setActiveBuffs([{ effect: 'create_illusion', isImprovedDuplicity: true }]);
 
     const clericCharacter = {
       name: 'Cleric',
@@ -246,12 +247,6 @@ describe('MonsterCardModal - handleAttack: Improved Duplicity advantage', () => 
         },
       },
     };
-
-    useRuntimeState.getRuntimeValue.mockImplementation((_characterKey, propertyName) => {
-      if (propertyName === 'activeBuffs') return [{ effect: 'create_illusion', isImprovedDuplicity: true }];
-      if (propertyName === 'invokeDuplicityAdvantageTargets') return ['Goblin'];
-      return null;
-    });
 
     const m = makeMonster({
       actions: [{ name: 'Club', attack_bonus: 4, description: 'Melee Attack.' }],
@@ -283,12 +278,6 @@ describe('MonsterCardModal - handleAttack: Improved Duplicity advantage', () => 
         },
       },
     };
-
-    useRuntimeState.getRuntimeValue.mockImplementation((_characterKey, propertyName) => {
-      if (propertyName === 'activeBuffs') return [];
-      if (propertyName === 'invokeDuplicityAdvantageTargets') return ['Goblin'];
-      return null;
-    });
 
     const m = makeMonster({
       actions: [{ name: 'Club', attack_bonus: 4, description: 'Melee Attack.' }],
@@ -345,8 +334,7 @@ describe('MonsterCardModal - handleAttack: Graze mechanic', () => {
     expect(callArgs.grazeAbilityName).toBe('STR');
   });
 
-  it('does not set grazeDamage when mastery is not Graze, attack is ranged, or monsterCharacter lacks computedStats', () => {
-    // Non-Graze mastery
+  it('does not set grazeDamage when mastery is not Graze', () => {
     damageUtils.__setFindCreatureReturn({
       name: 'Goblin',
       conditions: [],

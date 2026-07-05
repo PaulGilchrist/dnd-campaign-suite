@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 // ── Mocks ───────────────────────────────────────────────────────
@@ -42,13 +42,8 @@ describe('getLionDisadvantageAgainst', () => {
   })
 
   describe('early returns when mapData is invalid', () => {
-    it('returns { disadvantage: false } when mapData is undefined', () => {
-      expect(getLionDisadvantageAgainst({ attackerName: 'A', mapData: undefined, skipRangeCheck: false }))
-        .toEqual({ disadvantage: false })
-    })
-
-    it('returns { disadvantage: false } when mapData is null', () => {
-      expect(getLionDisadvantageAgainst({ attackerName: 'A', mapData: null, skipRangeCheck: false }))
+    it.each([undefined, null])('returns { disadvantage: false } when mapData is %s', (mapData) => {
+      expect(getLionDisadvantageAgainst({ attackerName: 'A', mapData, skipRangeCheck: false }))
         .toEqual({ disadvantage: false })
     })
 
@@ -198,11 +193,11 @@ describe('getLionDisadvantageAgainst', () => {
       expect(result).toEqual({ disadvantage: false })
     })
 
-    it('returns disadvantage when Lion buff is within range at boundary', () => {
+    it('returns disadvantage when Lion buff is within range at or under boundary', () => {
       getRuntimeValue.mockImplementation(() => [makeLionBuff()])
+
       getDistanceFeet.mockReturnValue(5)
-
-      const result = getLionDisadvantageAgainst({
+      const result1 = getLionDisadvantageAgainst({
         attackerName: 'Attacker',
         mapData: makeMapData([
           makePlayer('Attacker', 0, 0),
@@ -210,15 +205,10 @@ describe('getLionDisadvantageAgainst', () => {
         ]),
         skipRangeCheck: false,
       })
+      expect(result1).toEqual({ disadvantage: true, source: 'Barbarian' })
 
-      expect(result).toEqual({ disadvantage: true, source: 'Barbarian' })
-    })
-
-    it('returns disadvantage when Lion buff is within range under boundary', () => {
-      getRuntimeValue.mockImplementation(() => [makeLionBuff()])
       getDistanceFeet.mockReturnValue(3)
-
-      const result = getLionDisadvantageAgainst({
+      const result2 = getLionDisadvantageAgainst({
         attackerName: 'Attacker',
         mapData: makeMapData([
           makePlayer('Attacker', 0, 0),
@@ -226,15 +216,14 @@ describe('getLionDisadvantageAgainst', () => {
         ]),
         skipRangeCheck: false,
       })
-
-      expect(result).toEqual({ disadvantage: true, source: 'Barbarian' })
+      expect(result2).toEqual({ disadvantage: true, source: 'Barbarian' })
     })
 
-    it('returns false when Lion buff is out of range', () => {
+    it('returns false when Lion buff is out of range or just over the range boundary', () => {
       getRuntimeValue.mockImplementation(() => [makeLionBuff()])
-      getDistanceFeet.mockReturnValue(10)
 
-      const result = getLionDisadvantageAgainst({
+      getDistanceFeet.mockReturnValue(10)
+      const result1 = getLionDisadvantageAgainst({
         attackerName: 'Attacker',
         mapData: makeMapData([
           makePlayer('Attacker', 0, 0),
@@ -242,15 +231,10 @@ describe('getLionDisadvantageAgainst', () => {
         ]),
         skipRangeCheck: false,
       })
+      expect(result1).toEqual({ disadvantage: false })
 
-      expect(result).toEqual({ disadvantage: false })
-    })
-
-    it('returns false when Lion buff is just over the range boundary', () => {
-      getRuntimeValue.mockImplementation(() => [makeLionBuff('10 ft')])
       getDistanceFeet.mockReturnValue(10.5)
-
-      const result = getLionDisadvantageAgainst({
+      const result2 = getLionDisadvantageAgainst({
         attackerName: 'Attacker',
         mapData: makeMapData([
           makePlayer('Attacker', 0, 0),
@@ -258,15 +242,14 @@ describe('getLionDisadvantageAgainst', () => {
         ]),
         skipRangeCheck: false,
       })
-
-      expect(result).toEqual({ disadvantage: false })
+      expect(result2).toEqual({ disadvantage: false })
     })
 
-    it('uses custom range from lionBuff.range string', () => {
+    it('uses custom range from lionBuff.range (string, numeric, or NaN fallback)', () => {
+      // String range
       getRuntimeValue.mockImplementation(() => [makeLionBuff('10 ft')])
       getDistanceFeet.mockReturnValue(8)
-
-      const result = getLionDisadvantageAgainst({
+      const result1 = getLionDisadvantageAgainst({
         attackerName: 'Attacker',
         mapData: makeMapData([
           makePlayer('Attacker', 0, 0),
@@ -274,15 +257,12 @@ describe('getLionDisadvantageAgainst', () => {
         ]),
         skipRangeCheck: false,
       })
+      expect(result1).toEqual({ disadvantage: true, source: 'Barbarian' })
 
-      expect(result).toEqual({ disadvantage: true, source: 'Barbarian' })
-    })
-
-    it('uses numeric range value directly via parseInt', () => {
+      // Numeric range
       getRuntimeValue.mockImplementation(() => [{ optionName: 'Lion', range: 15 }])
       getDistanceFeet.mockReturnValue(12)
-
-      const result = getLionDisadvantageAgainst({
+      const result2 = getLionDisadvantageAgainst({
         attackerName: 'Attacker',
         mapData: makeMapData([
           makePlayer('Attacker', 0, 0),
@@ -290,15 +270,12 @@ describe('getLionDisadvantageAgainst', () => {
         ]),
         skipRangeCheck: false,
       })
+      expect(result2).toEqual({ disadvantage: true, source: 'Barbarian' })
 
-      expect(result).toEqual({ disadvantage: true, source: 'Barbarian' })
-    })
-
-    it('falls back to 5ft when range parsing yields NaN', () => {
+      // NaN falls back to 5ft
       getRuntimeValue.mockImplementation(() => [makeLionBuff('unreachable')])
       getDistanceFeet.mockReturnValue(5)
-
-      const result = getLionDisadvantageAgainst({
+      const result3 = getLionDisadvantageAgainst({
         attackerName: 'Attacker',
         mapData: makeMapData([
           makePlayer('Attacker', 0, 0),
@@ -306,15 +283,11 @@ describe('getLionDisadvantageAgainst', () => {
         ]),
         skipRangeCheck: false,
       })
+      expect(result3).toEqual({ disadvantage: true, source: 'Barbarian' })
 
-      expect(result).toEqual({ disadvantage: true, source: 'Barbarian' })
-    })
-
-    it('uses 5ft fallback when NaN range and distance exceeds 5', () => {
-      getRuntimeValue.mockImplementation(() => [makeLionBuff('unreachable')])
+      // NaN fallback with distance exceeding 5
       getDistanceFeet.mockReturnValue(10)
-
-      const result = getLionDisadvantageAgainst({
+      const result4 = getLionDisadvantageAgainst({
         attackerName: 'Attacker',
         mapData: makeMapData([
           makePlayer('Attacker', 0, 0),
@@ -322,8 +295,7 @@ describe('getLionDisadvantageAgainst', () => {
         ]),
         skipRangeCheck: false,
       })
-
-      expect(result).toEqual({ disadvantage: false })
+      expect(result4).toEqual({ disadvantage: false })
     })
 
     it('returns false when getDistanceFeet returns null', () => {

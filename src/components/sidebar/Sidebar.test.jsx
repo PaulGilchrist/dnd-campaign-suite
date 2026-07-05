@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { render, screen, fireEvent, cleanup } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import Sidebar from './Sidebar.jsx';
@@ -74,29 +74,50 @@ describe('Sidebar', () => {
   });
 
   describe('event handlers', () => {
-    it('should call handlers when sidebar buttons are clicked', () => {
+    it('should call onBackToCampaigns when Campaigns button is clicked', () => {
       render(<Sidebar {...defaultProps} />);
       fireEvent.click(screen.getByText(/Campaigns/));
       expect(defaultProps.onBackToCampaigns).toHaveBeenCalledTimes(1);
+    });
 
+    it('should call onAddCharacter when Add Character button is clicked', () => {
+      render(<Sidebar {...defaultProps} />);
       fireEvent.click(screen.getByText(/Add Character/));
       expect(defaultProps.onAddCharacter).toHaveBeenCalledTimes(1);
+    });
 
+    it('should call onInitiativeClick when Initiative button is clicked', () => {
+      render(<Sidebar {...defaultProps} />);
       fireEvent.click(screen.getByText(/Initiative/));
       expect(defaultProps.onInitiativeClick).toHaveBeenCalledTimes(1);
+    });
 
+    it('should call onNotesClick when Notes button is clicked', () => {
+      render(<Sidebar {...defaultProps} />);
       fireEvent.click(screen.getByText(/Notes/));
       expect(defaultProps.onNotesClick).toHaveBeenCalledTimes(1);
+    });
 
+    it('should call onMapsClick when Map button is clicked', () => {
+      render(<Sidebar {...defaultProps} />);
       fireEvent.click(screen.getByText(/Map/));
       expect(defaultProps.onMapsClick).toHaveBeenCalledTimes(1);
+    });
 
+    it('should call toggleTheme when theme toggle is clicked', () => {
+      render(<Sidebar {...defaultProps} />);
       fireEvent.click(screen.getByTitle(/Switch to/));
       expect(defaultProps.toggleTheme).toHaveBeenCalledTimes(1);
+    });
 
+    it('should call onRenameCampaign when rename button is clicked', () => {
+      render(<Sidebar {...defaultProps} />);
       fireEvent.click(screen.getByTitle('Rename Campaign'));
       expect(defaultProps.onRenameCampaign).toHaveBeenCalledTimes(1);
+    });
 
+    it('should call onDeleteCampaign when delete button is clicked', () => {
+      render(<Sidebar {...defaultProps} />);
       fireEvent.click(screen.getByTitle('Delete Campaign'));
       expect(defaultProps.onDeleteCampaign).toHaveBeenCalledTimes(1);
     });
@@ -114,13 +135,6 @@ describe('Sidebar', () => {
 
       fireEvent.click(screen.getByText(/Quests/));
       expect(defaultProps.onQuestsClick).toHaveBeenCalledTimes(1);
-    });
-
-    it('should call onCharacterClick with character object', () => {
-      const props = { ...defaultProps, characters: [{ name: 'Aragorn' }] };
-      render(<Sidebar {...props} />);
-      fireEvent.click(screen.getByText('Aragorn'));
-      expect(defaultProps.onCharacterClick).toHaveBeenCalledWith({ name: 'Aragorn' });
     });
 
     it('should open rules URL in new tab when Rules clicked', () => {

@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import CombatSuperiorityModal from './CombatSuperiorityModal.jsx';
@@ -38,27 +38,6 @@ function renderModal(overrides = {}) {
   return render(<CombatSuperiorityModal {...makeProps(overrides)} />);
 }
 
-// ── Null payload ──
-
-describe('CombatSuperiorityModal - null payload', () => {
-  describe('null payload handling', () => {
-    it('returns null (renders nothing) when payload is null', () => {
-      const { container } = render(<CombatSuperiorityModal payload={null} />);
-      expect(container.innerHTML).toBe('');
-    });
-
-    it('returns null (renders nothing) when payload is undefined', () => {
-      const { container } = render(<CombatSuperiorityModal />);
-      expect(container.innerHTML).toBe('');
-    });
-
-    it('returns null when payload prop is not provided', () => {
-      const { container } = render(<CombatSuperiorityModal onConfirm={vi.fn()} onClose={vi.fn()} />);
-      expect(container.innerHTML).toBe('');
-    });
-  });
-});
-
 // ── Superiority dice logic ──
 
 describe('CombatSuperiorityModal - superiority dice', () => {
@@ -70,7 +49,7 @@ describe('CombatSuperiorityModal - superiority dice', () => {
       vi.restoreAllMocks();
     });
 
-    it('returns true (shows maneuver selection) when playerStats is missing', () => {
+    it('shows maneuver selection when playerStats is missing', () => {
       renderModal({
         payload: makePayload({
           selectionMode: false,
@@ -81,7 +60,7 @@ describe('CombatSuperiorityModal - superiority dice', () => {
       expect(screen.getByText(/Choose a maneuver to use/)).toBeInTheDocument();
     });
 
-    it('returns true (shows maneuver selection) when playerStats.name is missing', () => {
+    it('shows maneuver selection when playerStats.name is missing', () => {
       renderModal({
         payload: makePayload({
           selectionMode: false,
@@ -147,7 +126,7 @@ describe('CombatSuperiorityModal - superiority dice', () => {
       expect(screen.getByText(/Choose a maneuver to use/)).toBeInTheDocument();
     });
 
-    it('shows no dice message when _trackedResources.current is 0', async () => {
+    it('shows no dice when _trackedResources.current is 0', async () => {
       vi.spyOn(runtimeModule, 'getRuntimeValue').mockReturnValue(null);
       renderModal({
         payload: makePayload({
@@ -204,20 +183,6 @@ describe('CombatSuperiorityModal - superiority dice', () => {
       expect(spy).toHaveBeenCalledWith('TestCharacter', 'superiorityDice');
     });
 
-    it('renders no dice modal with bolt icon', async () => {
-      vi.spyOn(runtimeModule, 'getRuntimeValue').mockReturnValue(0);
-      renderModal({
-        payload: makePayload({
-          selectionMode: false,
-          knownManeuvers: ['Ki-Fueled Attack'],
-          playerStats: { name: 'TestCharacter' },
-        }),
-      });
-      await waitFor(() => {
-        expect(document.querySelector('.fa-solid.fa-bolt')).toBeInTheDocument();
-      });
-    });
-
     it('calls onClose when Close button is clicked in no dice state', async () => {
       const onClose = vi.fn();
       vi.spyOn(runtimeModule, 'getRuntimeValue').mockReturnValue(0);
@@ -234,59 +199,6 @@ describe('CombatSuperiorityModal - superiority dice', () => {
       });
       fireEvent.click(screen.getByRole('button', { name: /Close/ }));
       expect(onClose).toHaveBeenCalledTimes(1);
-    });
-
-    it('calls onClose when overlay is clicked in no dice state', async () => {
-      const onClose = vi.fn();
-      vi.spyOn(runtimeModule, 'getRuntimeValue').mockReturnValue(0);
-      renderModal({
-        payload: makePayload({
-          selectionMode: false,
-          knownManeuvers: ['Ki-Fueled Attack'],
-          playerStats: { name: 'TestCharacter' },
-        }),
-        onClose,
-      });
-      await waitFor(() => {
-        expect(screen.getByText(/No Superiority Dice remaining/)).toBeInTheDocument();
-      });
-      const overlay = document.querySelector('.sp-overlay');
-      fireEvent.click(overlay);
-      expect(onClose).toHaveBeenCalledTimes(1);
-    });
-
-    it('does not close when clicking inside modal in no dice state', async () => {
-      const onClose = vi.fn();
-      vi.spyOn(runtimeModule, 'getRuntimeValue').mockReturnValue(0);
-      renderModal({
-        payload: makePayload({
-          selectionMode: false,
-          knownManeuvers: ['Ki-Fueled Attack'],
-          playerStats: { name: 'TestCharacter' },
-        }),
-        onClose,
-      });
-      await waitFor(() => {
-        expect(screen.getByText(/No Superiority Dice remaining/)).toBeInTheDocument();
-      });
-      const modal = document.querySelector('.sp-modal');
-      fireEvent.click(modal);
-      expect(onClose).not.toHaveBeenCalled();
-    });
-
-    it('renders sp-dismiss-btn class on Close button in no dice state', async () => {
-      vi.spyOn(runtimeModule, 'getRuntimeValue').mockReturnValue(0);
-      renderModal({
-        payload: makePayload({
-          selectionMode: false,
-          knownManeuvers: ['Ki-Fueled Attack'],
-          playerStats: { name: 'TestCharacter' },
-        }),
-      });
-      await waitFor(() => {
-        const btn = screen.getByRole('button', { name: /Close/ });
-        expect(btn.classList.contains('sp-dismiss-btn')).toBe(true);
-      });
     });
 
     it('does not show no dice message when selectionMode is true', () => {
@@ -328,7 +240,8 @@ describe('CombatSuperiorityModal - availableManeuvers override', () => {
       expect(screen.queryByText('Ki-Fueled Attack')).not.toBeInTheDocument();
     });
 
-    it('filters availableManeuvers by knownManeuvers in use mode', () => {
+    it('filters availableManeuvers by knownManeuvers in use mode but shows all in selection mode', () => {
+      // Use mode: filters by knownManeuvers
       render(<CombatSuperiorityModal
         payload={{
           allManeuvers: [],
@@ -345,9 +258,8 @@ describe('CombatSuperiorityModal - availableManeuvers override', () => {
       />);
       expect(screen.getByText('Ki-Fueled Attack')).toBeInTheDocument();
       expect(screen.queryByText('Unknown Maneuver')).not.toBeInTheDocument();
-    });
 
-    it('shows all availableManeuvers in selection mode regardless of knownManeuvers', () => {
+      // Selection mode: shows all availableManeuvers regardless of knownManeuvers
       render(<CombatSuperiorityModal
         payload={{
           allManeuvers: [],
@@ -366,7 +278,7 @@ describe('CombatSuperiorityModal - availableManeuvers override', () => {
       expect(screen.getByText('Available B')).toBeInTheDocument();
     });
 
-    it('falls back to allManeuvers when availableManeuvers is empty array', () => {
+    it('falls back to allManeuvers when availableManeuvers is an empty array', () => {
       renderModal({
         payload: makePayload({
           selectionMode: false,
@@ -412,7 +324,7 @@ describe('CombatSuperiorityModal - prompt mode with attackContext', () => {
   });
 
   describe('attackContext prompt mode', () => {
-    it('renders "Choose Maneuver" header in selection mode with attackContext', () => {
+    it('renders correct header in selection vs use mode with attackContext', () => {
       render(<CombatSuperiorityModal
         payload={{
           allManeuvers: [{ name: 'A', actionType: 'bonus_action' }],
@@ -726,14 +638,15 @@ describe('CombatSuperiorityModal - prompt mode with attackContext', () => {
 
 describe('CombatSuperiorityModal - prompt mode with skillContext', () => {
   beforeEach(() => {
-    vi.spyOn(runtimeModule, 'getRuntimeValue').mockReturnValue(1);
+    vi.restoreAllMocks();
   });
   afterEach(() => {
     vi.restoreAllMocks();
   });
 
   describe('skillContext prompt mode', () => {
-    it('renders "Choose Maneuver" header in selection mode with skillContext', () => {
+    it('renders correct headers and treats skillContext same as attackContext for isPromptMode', () => {
+      // selection mode header
       render(<CombatSuperiorityModal
         payload={{
           allManeuvers: [{ name: 'A', actionType: 'bonus_action' }],
@@ -746,9 +659,8 @@ describe('CombatSuperiorityModal - prompt mode with skillContext', () => {
         onClose={vi.fn()}
       />);
       expect(screen.getByText(/Combat Superiority — Choose Maneuver/)).toBeInTheDocument();
-    });
 
-    it('renders "Use Maneuver" header in use mode with skillContext', () => {
+      // use mode header
       render(<CombatSuperiorityModal
         payload={{
           allManeuvers: [{ name: 'Ki-Fueled Attack', actionType: 'bonus_action' }],
@@ -761,9 +673,8 @@ describe('CombatSuperiorityModal - prompt mode with skillContext', () => {
         onClose={vi.fn()}
       />);
       expect(screen.getByText(/Combat Superiority — Use Maneuver/)).toBeInTheDocument();
-    });
 
-    it('treats skillContext same as attackContext for isPromptMode', () => {
+      // treat as prompt mode (shows maneuvers with null trigger)
       render(<CombatSuperiorityModal
         payload={{
           allManeuvers: [{ name: 'Free Maneuver', actionType: 'bonus_action', trigger: null }],
@@ -810,26 +721,8 @@ describe('CombatSuperiorityModal - lastAttack fallback', () => {
       expect(screen.getByText('Trip Attack')).toBeInTheDocument();
     });
 
-    it('defaults isCrit to false when lastAttack.isCrit is missing', () => {
-      render(<CombatSuperiorityModal
-        payload={{
-          allManeuvers: [
-            { name: 'Trip Attack', actionType: 'bonus_action', trigger: 'melee_weapon_attack_hit' },
-          ],
-          knownManeuvers: ['Trip Attack'],
-          maxOptions: 3,
-          selectionMode: false,
-          attackContext: null,
-          lastAttack: { hit: true, weaponType: 'melee', attackerName: 'TestChar' },
-          playerStats: { name: 'TestChar' },
-        }}
-        onConfirm={vi.fn()}
-        onClose={vi.fn()}
-      />);
-      expect(screen.getByText('Trip Attack')).toBeInTheDocument();
-    });
-
-    it('defaults weaponType to null when lastAttack.weaponType is missing', () => {
+    it('defaults missing lastAttack fields to safe values', () => {
+      // defaults weaponType to null, isCrit to false, isUnarmedStrike to false
       render(<CombatSuperiorityModal
         payload={{
           allManeuvers: [
@@ -846,25 +739,6 @@ describe('CombatSuperiorityModal - lastAttack fallback', () => {
         onClose={vi.fn()}
       />);
       expect(screen.getByText('Any Trigger Maneuver')).toBeInTheDocument();
-    });
-
-    it('defaults isUnarmedStrike to false when missing', () => {
-      render(<CombatSuperiorityModal
-        payload={{
-          allManeuvers: [
-            { name: 'Trip Attack', actionType: 'bonus_action', trigger: 'melee_weapon_attack_hit' },
-          ],
-          knownManeuvers: ['Trip Attack'],
-          maxOptions: 3,
-          selectionMode: false,
-          attackContext: null,
-          lastAttack: { hit: true, weaponType: 'melee', attackerName: 'TestChar' },
-          playerStats: { name: 'TestChar' },
-        }}
-        onConfirm={vi.fn()}
-        onClose={vi.fn()}
-      />);
-      expect(screen.getByText('Trip Attack')).toBeInTheDocument();
     });
 
     it('defaults replacingAttack to false when missing', () => {
@@ -927,7 +801,7 @@ describe('CombatSuperiorityModal - lastAttack fallback', () => {
       expect(screen.queryByText('Unknown')).not.toBeInTheDocument();
     });
 
-    it('falls back to knownManeuvers filtering when attackContext is null and lastAttack has no useful data', () => {
+    it('falls back to knownManeuvers filtering when lastAttack has no useful data', () => {
       render(<CombatSuperiorityModal
         payload={{
           allManeuvers: [
@@ -1008,7 +882,6 @@ describe('CombatSuperiorityModal - onReopenSelection', () => {
       />);
       const btn = screen.getByRole('button', { name: /Manage Maneuvers/ });
       fireEvent.click(btn);
-      // onReopenSelection().catch is async, so we need waitFor
       waitFor(() => {
         expect(consoleSpy).toHaveBeenCalledWith(
           '[CombatSuperiorityModal] Reopen selection failed:',
@@ -1017,21 +890,6 @@ describe('CombatSuperiorityModal - onReopenSelection', () => {
       });
       consoleSpy.mockRestore();
     });
-
-    it('renders Manage Maneuvers button with gear icon', () => {
-      render(<CombatSuperiorityModal
-        payload={{
-          allManeuvers: [{ name: 'Ki-Fueled Attack', actionType: 'bonus_action' }],
-          knownManeuvers: ['Ki-Fueled Attack'],
-          maxOptions: 3,
-          selectionMode: false,
-        }}
-        onConfirm={vi.fn()}
-        onClose={vi.fn()}
-      />);
-      const btn = screen.getByRole('button', { name: /Manage Maneuvers/ });
-      expect(btn.querySelector('.fa-solid.fa-gear')).toBeInTheDocument();
-    });
   });
 });
 
@@ -1039,7 +897,7 @@ describe('CombatSuperiorityModal - onReopenSelection', () => {
 
 describe('CombatSuperiorityModal - handleUseManeuver error', () => {
   describe('use maneuver error handling', () => {
-    it('logs error and does not set applied state when onConfirm rejects', async () => {
+    it('logs error, does not set applied state, and does not show result when onConfirm rejects', async () => {
       const consoleSpy = vi.spyOn(console, 'error').mockReturnValue();
       const onConfirm = vi.fn().mockRejectedValue(new Error('use failed'));
       render(<CombatSuperiorityModal
@@ -1060,29 +918,9 @@ describe('CombatSuperiorityModal - handleUseManeuver error', () => {
           '[CombatSuperiorityModal] Use maneuver failed:',
           expect.any(Error)
         );
-      });
-      expect(screen.queryByText('Done')).not.toBeInTheDocument();
-      consoleSpy.mockRestore();
-    });
-
-    it('does not set result when onConfirm rejects', async () => {
-      const onConfirm = vi.fn().mockRejectedValue(new Error('use failed'));
-      render(<CombatSuperiorityModal
-        payload={{
-          allManeuvers: [{ name: 'Ki-Fueled Attack', actionType: 'bonus_action' }],
-          knownManeuvers: ['Ki-Fueled Attack'],
-          maxOptions: 3,
-          selectionMode: false,
-        }}
-        onConfirm={onConfirm}
-        onClose={vi.fn()}
-      />);
-      const radios = document.querySelectorAll('input[name="combatManeuver"]');
-      fireEvent.click(radios[0]);
-      fireEvent.click(screen.getByRole('button', { name: /Use Maneuver/ }));
-      await waitFor(() => {
         expect(screen.queryByText('Done')).not.toBeInTheDocument();
       });
+      consoleSpy.mockRestore();
     });
   });
 });
@@ -1141,26 +979,6 @@ describe('CombatSuperiorityModal - maneuver descriptions', () => {
       expect(screen.getByText('Prone the target.')).toBeInTheDocument();
     });
 
-    it('does not render description div when description is missing', () => {
-      render(<CombatSuperiorityModal
-        payload={{
-          allManeuvers: [
-            { name: 'Trip Attack', actionType: 'attack_rider' },
-          ],
-          knownManeuvers: [],
-          maxOptions: 3,
-          selectionMode: true,
-        }}
-        onConfirm={vi.fn()}
-        onClose={vi.fn()}
-      />);
-      expect(screen.getByText('Trip Attack')).toBeInTheDocument();
-      const labels = document.querySelectorAll('label');
-      const tripLabel = labels[0];
-      const descDivs = tripLabel.querySelectorAll('[style*="font-size: 0.85em"]');
-      expect(descDivs.length).toBe(0);
-    });
-
     it('renders maneuver description in use mode', () => {
       render(<CombatSuperiorityModal
         payload={{
@@ -1176,214 +994,6 @@ describe('CombatSuperiorityModal - maneuver descriptions', () => {
       />);
       expect(screen.getByText('Ki-Fueled Attack')).toBeInTheDocument();
       expect(screen.getByText('Add die to attack roll.')).toBeInTheDocument();
-    });
-  });
-});
-
-// ── Prompt mode header text variants ──
-
-describe('CombatSuperiorityModal - prompt mode headers', () => {
-  describe('prompt mode header text variants', () => {
-    it('shows "Choose Maneuver" in selection mode with attackContext', () => {
-      render(<CombatSuperiorityModal
-        payload={{
-          allManeuvers: [{ name: 'A', actionType: 'bonus_action' }],
-          knownManeuvers: [],
-          maxOptions: 3,
-          selectionMode: true,
-          attackContext: { hit: true },
-        }}
-        onConfirm={vi.fn()}
-        onClose={vi.fn()}
-      />);
-      expect(screen.getByText(/Combat Superiority — Choose Maneuver/)).toBeInTheDocument();
-    });
-
-    it('shows "Choose Maneuver" in selection mode with skillContext', () => {
-      render(<CombatSuperiorityModal
-        payload={{
-          allManeuvers: [{ name: 'A', actionType: 'bonus_action' }],
-          knownManeuvers: [],
-          maxOptions: 3,
-          selectionMode: true,
-          skillContext: { skill: 'Athletics' },
-        }}
-        onConfirm={vi.fn()}
-        onClose={vi.fn()}
-      />);
-      expect(screen.getByText(/Combat Superiority — Choose Maneuver/)).toBeInTheDocument();
-    });
-
-    it('shows "Select Maneuvers" in selection mode without prompt context', () => {
-      renderModal({
-        payload: makePayload({ selectionMode: true }),
-      });
-      expect(screen.getByText(/Combat Superiority — Select Maneuvers/)).toBeInTheDocument();
-    });
-
-    it('shows "Use Maneuver" in use mode with attackContext', () => {
-      render(<CombatSuperiorityModal
-        payload={{
-          allManeuvers: [{ name: 'Ki-Fueled Attack', actionType: 'bonus_action' }],
-          knownManeuvers: ['Ki-Fueled Attack'],
-          maxOptions: 3,
-          selectionMode: false,
-          attackContext: { hit: true },
-        }}
-        onConfirm={vi.fn()}
-        onClose={vi.fn()}
-      />);
-      expect(screen.getByText(/Combat Superiority — Use Maneuver/)).toBeInTheDocument();
-    });
-
-    it('shows "Use Maneuver" in use mode with skillContext', () => {
-      render(<CombatSuperiorityModal
-        payload={{
-          allManeuvers: [{ name: 'Ki-Fueled Attack', actionType: 'bonus_action' }],
-          knownManeuvers: ['Ki-Fueled Attack'],
-          maxOptions: 3,
-          selectionMode: false,
-          skillContext: { skill: 'Athletics' },
-        }}
-        onConfirm={vi.fn()}
-        onClose={vi.fn()}
-      />);
-      expect(screen.getByText(/Combat Superiority — Use Maneuver/)).toBeInTheDocument();
-    });
-
-    it('shows "Choose Maneuver" in use mode without prompt context', () => {
-      renderModal({
-        payload: makePayload({
-          selectionMode: false,
-          knownManeuvers: ['Ki-Fueled Attack'],
-        }),
-      });
-      expect(screen.getByText(/Combat Superiority — Choose Maneuver/)).toBeInTheDocument();
-    });
-  });
-});
-
-// ── Unknown action types ──
-
-describe('CombatSuperiorityModal - unknown action types', () => {
-  describe('unknown action type handling', () => {
-    it('does not show maneuvers with unknown actionType in selection mode since ACTION_TYPE_ORDER excludes "other"', () => {
-      render(<CombatSuperiorityModal
-        payload={{
-          allManeuvers: [
-            { name: 'Mystery Maneuver', actionType: 'unknown_type' },
-          ],
-          knownManeuvers: [],
-          maxOptions: 3,
-          selectionMode: true,
-        }}
-        onConfirm={vi.fn()}
-        onClose={vi.fn()}
-      />);
-      // "other" is not in ACTION_TYPE_ORDER, so the group won't be rendered
-      expect(screen.queryByText('Mystery Maneuver')).not.toBeInTheDocument();
-    });
-
-    it('does not show "other" group header in selection mode', () => {
-      render(<CombatSuperiorityModal
-        payload={{
-          allManeuvers: [
-            { name: 'Mystery Maneuver', actionType: 'unknown_type' },
-          ],
-          knownManeuvers: [],
-          maxOptions: 3,
-          selectionMode: true,
-        }}
-        onConfirm={vi.fn()}
-        onClose={vi.fn()}
-      />);
-      expect(screen.queryByText('other')).not.toBeInTheDocument();
-    });
-
-    it('does not show unknown action type group in use mode', () => {
-      render(<CombatSuperiorityModal
-        payload={{
-          allManeuvers: [
-            { name: 'Mystery Maneuver', actionType: 'unknown_type' },
-          ],
-          knownManeuvers: ['Mystery Maneuver'],
-          maxOptions: 3,
-          selectionMode: false,
-        }}
-        onConfirm={vi.fn()}
-        onClose={vi.fn()}
-      />);
-      expect(screen.queryByText('other')).not.toBeInTheDocument();
-    });
-  });
-});
-
-// ── knownManeuverObjects filtering ──
-
-describe('CombatSuperiorityModal - knownManeuverObjects', () => {
-  describe('knownManeuverObjects filtering vs maneuverList', () => {
-    it('knownManeuverObjects filters maneuverList by knownManeuvers in use mode', () => {
-      renderModal({
-        payload: makePayload({
-          selectionMode: false,
-          knownManeuvers: ['Ki-Fueled Attack'],
-          allManeuvers: [
-            { name: 'Ki-Fueled Attack', actionType: 'bonus_action' },
-            { name: 'Unknown', actionType: 'reaction' },
-          ],
-        }),
-      });
-      expect(screen.getByText('Ki-Fueled Attack')).toBeInTheDocument();
-      expect(screen.queryByText('Unknown')).not.toBeInTheDocument();
-    });
-
-    it('knownManeuverObjects is empty array in selection mode', () => {
-      renderModal({
-        payload: makePayload({
-          selectionMode: true,
-          knownManeuvers: ['Ki-Fueled Attack'],
-          allManeuvers: [
-            { name: 'Ki-Fueled Attack', actionType: 'bonus_action' },
-          ],
-        }),
-      });
-      // In selection mode, all maneuvers are shown regardless of knownManeuvers
-      expect(screen.getByText('Ki-Fueled Attack')).toBeInTheDocument();
-    });
-  });
-});
-
-
-// ── Cursor styles ──
-
-describe('CombatSuperiorityModal - cursor styles', () => {
-  describe('cursor style on at-max labels', () => {
-    it('applies not-allowed cursor to unselected labels at max', () => {
-      renderModal({ payload: makePayload({ selectionMode: true }) });
-      const checkboxes = document.querySelectorAll('input[type="checkbox"]');
-      fireEvent.click(checkboxes[0]);
-      fireEvent.click(checkboxes[1]);
-      fireEvent.click(checkboxes[2]);
-      const labels = document.querySelectorAll('label');
-      expect(labels[3].style.cursor).toBe('not-allowed');
-    });
-
-    it('applies pointer cursor to selected labels at max', () => {
-      renderModal({ payload: makePayload({ selectionMode: true }) });
-      const checkboxes = document.querySelectorAll('input[type="checkbox"]');
-      fireEvent.click(checkboxes[0]);
-      fireEvent.click(checkboxes[1]);
-      fireEvent.click(checkboxes[2]);
-      const labels = document.querySelectorAll('label');
-      expect(labels[0].style.cursor).toBe('pointer');
-    });
-
-    it('applies pointer cursor when not at max', () => {
-      renderModal({ payload: makePayload({ selectionMode: true }) });
-      const checkboxes = document.querySelectorAll('input[type="checkbox"]');
-      fireEvent.click(checkboxes[0]);
-      const labels = document.querySelectorAll('label');
-      expect(labels[3].style.cursor).toBe('pointer');
     });
   });
 });

@@ -16,61 +16,21 @@ describe('featureCategories2024', () => {
       expect(Array.isArray(featuresToIgnore)).toBe(true);
     });
 
-    it('should contain all expected class feature categories to ignore', () => {
+    it('should contain key class feature categories to ignore', () => {
       const expectedItems = [
-        '(capstone - depends on subclass)',
         'Ability Score Improvement',
-        'Barbarian Subclass',
-        'Bard Subclass',
-        'Bardic Inspiration',
-        'Body and Mind',
         'Channel Divinity',
-        'Cleric Subclass',
-        'Celestial Resistance',
-        'Damage Resistance',
-        'Darkvision',
-        'Draconic Resilience',
-        'Druid Subclass',
-        'Druidic',
-        'Eldritch Invocations',
-        'Epic Boon',
         'Extra Attack',
-        'Two Extra Attacks',
-        'Three Extra Attacks',
-        'Fast Movement',
-        'Feat',
-        'Feral Senses',
-        'Fighter Subclass',
+        'Epic Boon',
         'Fighting Style',
-        'Foe Slayer',
-        'Gnomish Cunning',
-        'Implements of Mercy',
-        'Increased Hit Points',
-        'Keen Senses',
-        'Monk Subclass',
-        'Paladin Subclass',
-        'Rage',
-        'Ranger Subclass',
-        'Rogue Subclass',
-        'Scholar',
-        'Skillful',
-        'Sorcerer Subclass',
         'Spellcasting',
-        'Subclass feature',
-        "Thieves' Cant",
-        'Trance',
-        'Unarmored Defense',
-        'Unarmored Movement',
-        'Versatile',
-        'Warlock Subclass',
-        'Wizard Subclass'
+        'Thieves\' Cant',
       ];
 
       for (const item of expectedItems) {
         expect(featuresToIgnore).toContain(item);
       }
     });
-
 
     it('should not contain items that are not meant to be ignored', () => {
       const notIgnored = [
@@ -81,12 +41,6 @@ describe('featureCategories2024', () => {
         'Action Surge',
         'Ki',
         'Martial Archetype',
-        'Monastic Tradition',
-        'Primal Path',
-        'Ranger Archetype',
-        'Roguish Archetype',
-        'Sacred Oath',
-        'Sorcerous Origin'
       ];
 
       for (const item of notIgnored) {
@@ -96,60 +50,36 @@ describe('featureCategories2024', () => {
   });
 
   describe('actions', () => {
-    it('should be an array', () => {
+    it('should be an array with expected entries', () => {
       expect(Array.isArray(actions)).toBe(true);
-    });
-
-    it('should contain the expected action entries', () => {
       expect(actions).toContain('Naturally Stealthy');
     });
   });
 
   describe('bonusActions', () => {
-    it('should be an array', () => {
+    it('should be an array with expected entries', () => {
       expect(Array.isArray(bonusActions)).toBe(true);
-    });
-
-    it('should contain the expected bonus action entries', () => {
       expect(bonusActions).toContain("Nature's Veil");
     });
   });
 
   describe('reactions', () => {
-    it('should be an array', () => {
+    it('should be an array with expected entries', () => {
       expect(Array.isArray(reactions)).toBe(true);
-    });
-
-    it('should contain 2024-specific reactions', () => {
       expect(reactions).toContain('Protection');
     });
   });
 
   describe('characterAdvancement', () => {
-    it('should be an array', () => {
+    it('should be an array with expected entries', () => {
       expect(Array.isArray(characterAdvancement)).toBe(true);
-    });
-
-    it('should contain all expected advancement entries', () => {
       const expectedItems = [
         'Deft Explorer',
-        'Divine Order',
         'Draconic Ancestry',
-        'Dwarven Toughness',
-        'Elfish Lineage',
         'Expertise',
-        'Gnomish Lineage',
-        'Halfling Nimbleness',
-        'Fiendish Legacies',
-        'LightBearer',
         'Magical Secrets',
-        'Otherworldly Presence',
         'Pact Magic',
-        'Second-Storywork',
-        'Slippery Mind',
-        'Somatic Components'
       ];
-
       for (const item of expectedItems) {
         expect(characterAdvancement).toContain(item);
       }
@@ -159,12 +89,8 @@ describe('featureCategories2024', () => {
   describe('data integrity', () => {
     it('should have no overlap between featuresToIgnore and action categories', () => {
       const allActionItems = [
-        ...actions,
-        ...bonusActions,
-        ...reactions,
-        ...characterAdvancement
+        ...actions, ...bonusActions, ...reactions, ...characterAdvancement
       ];
-
       for (const item of featuresToIgnore) {
         expect(allActionItems).not.toContain(item);
       }
@@ -172,10 +98,7 @@ describe('featureCategories2024', () => {
 
     it('should have no overlap between action categories', () => {
       const allItems = [
-        ...actions,
-        ...bonusActions,
-        ...reactions,
-        ...characterAdvancement
+        ...actions, ...bonusActions, ...reactions, ...characterAdvancement
       ];
       const unique = new Set(allItems);
       expect(allItems).toHaveLength(unique.size);

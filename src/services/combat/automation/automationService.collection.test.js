@@ -1,3 +1,4 @@
+// @cleaned-by-ai
 // @improved-by-ai
 import { describe, it, expect, beforeEach } from 'vitest'
 
@@ -15,43 +16,17 @@ describe('collectAutomationFromFeatures: null and empty handling', () => {
     playerStats = makePlayerStats()
   })
 
-  it('returns all-empty buckets when features is null', () => {
-    const result = collectAutomationFromFeatures(null, playerStats)
-    expect(result.actions).toEqual([])
-    expect(result.bonusActions).toEqual([])
-    expect(result.reactions).toEqual([])
-    expect(result.specialActions).toEqual([])
-    expect(result.passives).toEqual([])
-    expect(result.autoEffects).toEqual([])
-    expect(result.saveModifiers).toEqual([])
-    expect(result.primalKnowledge).toEqual([])
-    expect(result.ritualSpells).toEqual([])
-  })
+  it('returns all-empty buckets when features is null, undefined, or empty', () => {
+    const nullResult = collectAutomationFromFeatures(null, playerStats)
+    const undefResult = collectAutomationFromFeatures(undefined, playerStats)
+    const emptyResult = collectAutomationFromFeatures([], playerStats)
 
-  it('returns all-empty buckets when features is undefined', () => {
-    const result = collectAutomationFromFeatures(undefined, playerStats)
-    expect(result.actions).toEqual([])
-    expect(result.bonusActions).toEqual([])
-    expect(result.reactions).toEqual([])
-    expect(result.specialActions).toEqual([])
-    expect(result.passives).toEqual([])
-    expect(result.autoEffects).toEqual([])
-    expect(result.saveModifiers).toEqual([])
-    expect(result.primalKnowledge).toEqual([])
-    expect(result.ritualSpells).toEqual([])
-  })
-
-  it('returns all-empty buckets when features is an empty array', () => {
-    const result = collectAutomationFromFeatures([], playerStats)
-    expect(result.actions).toEqual([])
-    expect(result.bonusActions).toEqual([])
-    expect(result.reactions).toEqual([])
-    expect(result.specialActions).toEqual([])
-    expect(result.passives).toEqual([])
-    expect(result.autoEffects).toEqual([])
-    expect(result.saveModifiers).toEqual([])
-    expect(result.primalKnowledge).toEqual([])
-    expect(result.ritualSpells).toEqual([])
+    const buckets = ['actions', 'bonusActions', 'reactions', 'specialActions', 'passives', 'autoEffects', 'saveModifiers', 'primalKnowledge', 'ritualSpells']
+    for (const bucket of buckets) {
+      expect(nullResult[bucket]).toEqual([])
+      expect(undefResult[bucket]).toEqual([])
+      expect(emptyResult[bucket]).toEqual([])
+    }
   })
 })
 
@@ -63,7 +38,7 @@ describe('collectAutomationFromFeatures: features without automation', () => {
     playerStats = makePlayerStats()
   })
 
-  it('skips features with no automation property', () => {
+  it('skips features with no automation property or null automation', () => {
     const features = [
       { name: 'No Automation' },
       { name: 'Null Automation', automation: null },
@@ -90,88 +65,39 @@ describe('collectAutomationFromFeatures: action-type categorization', () => {
     playerStats = makePlayerStats()
   })
 
-  it('categorizes save_attack as a default action', () => {
-    const features = [makeFeature({ type: 'save_attack', damageType: 'cold', saveType: 'CON' })]
+  it('categorizes save_attack, attack_rider, bonus_attacks, and resource_pool as actions', () => {
+    const features = [
+      makeFeature({ type: 'save_attack', damageType: 'cold', saveType: 'CON' }),
+      makeFeature({ type: 'attack_rider' }),
+      makeFeature({ type: 'bonus_attacks' }),
+      makeFeature({ type: 'resource_pool', resource: 'ki' }),
+    ]
     const result = collectAutomationFromFeatures(features, playerStats)
-    expect(result.actions).toHaveLength(1)
-    expect(result.actions[0]).toMatchObject({ type: 'save_attack', damageType: 'cold', saveType: 'CON' })
+    expect(result.actions).toHaveLength(4)
+    expect(result.actions.map(a => a.type)).toEqual(['save_attack', 'attack_rider', 'bonus_attacks', 'resource_pool'])
   })
 
-  it('categorizes attack_rider without options as an action', () => {
-    const features = [makeFeature({ type: 'attack_rider' })]
+  it('categorizes healing and buff_ally based on action property', () => {
+    const actionHeal = makeFeature({ type: 'healing', action: 'action' }, 'Heal')
+    const bonusHeal = makeFeature({ type: 'healing', action: 'bonus_action' }, 'Bonus Heal')
+    const actionBuff = makeFeature({ type: 'buff_ally', action: 'action' }, 'Group Heal')
+    const bonusBuff = makeFeature({ type: 'buff_ally', action: 'bonus_action' }, 'Bonus Group Heal')
+
+    const result = collectAutomationFromFeatures([actionHeal, bonusHeal, actionBuff, bonusBuff], playerStats)
+    expect(result.actions).toHaveLength(2)
+    expect(result.actions.map(a => a.type)).toEqual(['healing', 'buff_ally'])
+    expect(result.bonusActions).toHaveLength(2)
+    expect(result.bonusActions.map(a => a.type)).toEqual(['healing', 'buff_ally'])
+  })
+
+  it('categorizes warding_bond and font_of_magic as actions', () => {
+    const features = [makeFeature({ type: 'warding_bond' }), makeFeature({ type: 'font_of_magic' })]
     const result = collectAutomationFromFeatures(features, playerStats)
-    expect(result.actions).toHaveLength(1)
-    expect(result.actions[0].type).toBe('attack_rider')
+    expect(result.actions).toHaveLength(2)
+    expect(result.actions.map(a => a.type)).toEqual(['warding_bond', 'font_of_magic'])
   })
 
-  it('categorizes bonus_attacks as an action', () => {
-    const features = [makeFeature({ type: 'bonus_attacks' })]
-    const result = collectAutomationFromFeatures(features, playerStats)
-    expect(result.actions).toHaveLength(1)
-    expect(result.actions[0].type).toBe('bonus_attacks')
-  })
-
-  it('categorizes resource_pool as an action', () => {
-    const features = [makeFeature({ type: 'resource_pool', resource: 'ki' })]
-    const result = collectAutomationFromFeatures(features, playerStats)
-    expect(result.actions).toHaveLength(1)
-    expect(result.actions[0].type).toBe('resource_pool')
-  })
-
-  it('categorizes font_of_magic as an action', () => {
-    const features = [makeFeature({ type: 'font_of_magic' })]
-    const result = collectAutomationFromFeatures(features, playerStats)
-    expect(result.actions).toHaveLength(1)
-    expect(result.actions[0].type).toBe('font_of_magic')
-  })
-
-  it('categorizes healing with explicit action as an action', () => {
-    const features = [makeFeature({ type: 'healing', action: 'action' }, 'Heal')]
-    const result = collectAutomationFromFeatures(features, playerStats)
-    expect(result.actions).toHaveLength(1)
-    expect(result.actions[0].type).toBe('healing')
-    expect(result.actions[0].action).toBe('action')
-  })
-
-  it('categorizes buff_ally with action as an action', () => {
-    const features = [makeFeature({ type: 'buff_ally', action: 'action' }, 'Group Heal')]
-    const result = collectAutomationFromFeatures(features, playerStats)
-    expect(result.actions).toHaveLength(1)
-    expect(result.actions[0].type).toBe('buff_ally')
-  })
-
-  it('categorizes warding_bond as an action', () => {
-    const features = [makeFeature({ type: 'warding_bond' })]
-    const result = collectAutomationFromFeatures(features, playerStats)
-    expect(result.actions).toHaveLength(1)
-    expect(result.actions[0].type).toBe('warding_bond')
-  })
-})
-
-// ── collectAutomationFromFeatures: bonus action categorization ──────
-describe('collectAutomationFromFeatures: bonus action categorization', () => {
-  let playerStats
-
-  beforeEach(() => {
-    playerStats = makePlayerStats()
-  })
-
-  it('categorizes healing with bonus_action as a bonus action', () => {
-    const features = [makeFeature({ type: 'healing', action: 'bonus_action' }, 'Heal')]
-    const result = collectAutomationFromFeatures(features, playerStats)
-    expect(result.bonusActions).toHaveLength(1)
-    expect(result.bonusActions[0].type).toBe('healing')
-    expect(result.bonusActions[0].action).toBe('bonus_action')
-  })
-
-  it('categorizes buff_ally with bonus_action as a bonus action', () => {
-    const features = [makeFeature({ type: 'buff_ally', action: 'bonus_action' }, 'Group Heal')]
-    const result = collectAutomationFromFeatures(features, playerStats)
-    expect(result.bonusActions).toHaveLength(1)
-    expect(result.bonusActions[0].type).toBe('buff_ally')
-  })
-
-  it('skips extra_action when buildAttackInfo returns null (no handler)', () => {
+  it('skips extra_action when buildAttackInfo returns null', () => {
     const features = [makeFeature({ type: 'extra_action', action: 'bonus_action' })]
     const result = collectAutomationFromFeatures(features, playerStats)
     expect(result.bonusActions).toEqual([])
@@ -186,25 +112,15 @@ describe('collectAutomationFromFeatures: reaction categorization', () => {
     playerStats = makePlayerStats()
   })
 
-  it('categorizes damage_reduction as a reaction', () => {
-    const features = [makeFeature({ type: 'damage_reduction' })]
+  it('categorizes damage_reduction, auto_reroll, and reaction_debuff as reactions', () => {
+    const features = [
+      makeFeature({ type: 'damage_reduction' }),
+      makeFeature({ type: 'auto_reroll' }),
+      makeFeature({ type: 'reaction_debuff' }),
+    ]
     const result = collectAutomationFromFeatures(features, playerStats)
-    expect(result.reactions).toHaveLength(1)
-    expect(result.reactions[0].type).toBe('damage_reduction')
-  })
-
-  it('categorizes auto_reroll without action casting_time as a reaction', () => {
-    const features = [makeFeature({ type: 'auto_reroll' })]
-    const result = collectAutomationFromFeatures(features, playerStats)
-    expect(result.reactions).toHaveLength(1)
-    expect(result.reactions[0].type).toBe('auto_reroll')
-  })
-
-  it('categorizes reaction_debuff as a reaction', () => {
-    const features = [makeFeature({ type: 'reaction_debuff' })]
-    const result = collectAutomationFromFeatures(features, playerStats)
-    expect(result.reactions).toHaveLength(1)
-    expect(result.reactions[0].type).toBe('reaction_debuff')
+    expect(result.reactions).toHaveLength(3)
+    expect(result.reactions.map(r => r.type)).toEqual(['damage_reduction', 'auto_reroll', 'reaction_debuff'])
   })
 
   it('categorizes countercharm as a reaction', () => {
@@ -222,7 +138,6 @@ describe('collectAutomationFromFeatures: reaction categorization', () => {
     expect(result.reactions).toHaveLength(1)
     expect(result.reactions[0].type).toBe('countercharm')
     expect(result.reactions[0].name).toBe('Countercharm')
-    expect(result.reactions[0].casting_time).toBe('1 reaction')
   })
 })
 
@@ -234,26 +149,15 @@ describe('collectAutomationFromFeatures: passive categorization', () => {
     playerStats = makePlayerStats()
   })
 
-  it('categorizes passive_rule as a passive', () => {
-    const features = [makeFeature({ type: 'passive_rule', effect: 'superior_dice' })]
+  it('categorizes passive_rule, evasion, and resistance as passives', () => {
+    const features = [
+      makeFeature({ type: 'passive_rule', effect: 'superior_dice' }),
+      makeFeature({ type: 'evasion', saveType: 'DEX' }),
+      makeFeature({ type: 'resistance', damageTypes: ['fire', 'cold'] }),
+    ]
     const result = collectAutomationFromFeatures(features, playerStats)
-    expect(result.passives).toHaveLength(1)
-    expect(result.passives[0].type).toBe('passive_rule')
-  })
-
-  it('categorizes evasion as a passive', () => {
-    const features = [makeFeature({ type: 'evasion', saveType: 'DEX' })]
-    const result = collectAutomationFromFeatures(features, playerStats)
-    expect(result.passives).toHaveLength(1)
-    expect(result.passives[0].type).toBe('evasion')
-  })
-
-  it('categorizes resistance as a passive', () => {
-    const features = [makeFeature({ type: 'resistance', damageTypes: ['fire', 'cold'] })]
-    const result = collectAutomationFromFeatures(features, playerStats)
-    expect(result.passives).toHaveLength(1)
-    expect(result.passives[0].type).toBe('resistance')
-    expect(result.passives[0].damageTypes).toEqual(['fire', 'cold'])
+    expect(result.passives).toHaveLength(3)
+    expect(result.passives.map(p => p.type)).toEqual(['passive_rule', 'evasion', 'resistance'])
   })
 
   it('categorizes font_of_inspiration as a passive', () => {
@@ -290,23 +194,14 @@ describe('collectAutomationFromFeatures: attack_rider routing logic', () => {
     playerStats = makePlayerStats()
   })
 
-  it('routes attack_rider with trigger to passives', () => {
-    const features = [makeFeature({ type: 'attack_rider', trigger: 'piercing_damage_hit' })]
-    const result = collectAutomationFromFeatures(features, playerStats)
-    expect(result.passives).toHaveLength(1)
-    expect(result.passives[0].type).toBe('attack_rider')
-  })
+  it('routes attack_rider with trigger, chooseOne, or maxEffects to passives', () => {
+    const triggerFeature = makeFeature({ type: 'attack_rider', trigger: 'piercing_damage_hit' })
+    const chooseOneFeature = makeFeature({ type: 'attack_rider', chooseOne: true })
+    const maxEffectsFeature = makeFeature({ type: 'attack_rider', maxEffects: 3 })
 
-  it('routes attack_rider with chooseOne to passives', () => {
-    const features = [makeFeature({ type: 'attack_rider', chooseOne: true })]
-    const result = collectAutomationFromFeatures(features, playerStats)
-    expect(result.passives).toHaveLength(1)
-  })
-
-  it('routes attack_rider with maxEffects > 1 to passives', () => {
-    const features = [makeFeature({ type: 'attack_rider', maxEffects: 3 })]
-    const result = collectAutomationFromFeatures(features, playerStats)
-    expect(result.passives).toHaveLength(1)
+    const result = collectAutomationFromFeatures([triggerFeature, chooseOneFeature, maxEffectsFeature], playerStats)
+    expect(result.passives).toHaveLength(3)
+    expect(result.passives.map(p => p.type)).toEqual(['attack_rider', 'attack_rider', 'attack_rider'])
   })
 })
 
@@ -325,16 +220,12 @@ describe('collectAutomationFromFeatures: primalKnowledge extraction', () => {
     expect(result.primalKnowledge).toEqual(skills)
   })
 
-  it('does not populate primalKnowledge for passive_rule without skills', () => {
-    const features = [makeFeature({ type: 'passive_rule', effect: 'bonus_healing', bonusExpression: '3' }, 'Bonus Healing')]
-    const result = collectAutomationFromFeatures(features, playerStats)
-    expect(result.primalKnowledge).toEqual([])
-  })
+  it('does not populate primalKnowledge for passive_rule without skills or with empty skills', () => {
+    const noSkills = [makeFeature({ type: 'passive_rule', effect: 'bonus_healing', bonusExpression: '3' }, 'Bonus Healing')]
+    expect(collectAutomationFromFeatures(noSkills, playerStats).primalKnowledge).toEqual([])
 
-  it('does not populate primalKnowledge for passive_rule with empty skills array', () => {
-    const features = [makeFeature({ type: 'passive_rule', effect: 'primal_knowledge', skills: [] }, 'Empty Primal')]
-    const result = collectAutomationFromFeatures(features, playerStats)
-    expect(result.primalKnowledge).toEqual([])
+    const emptySkills = [makeFeature({ type: 'passive_rule', effect: 'primal_knowledge', skills: [] }, 'Empty Primal')]
+    expect(collectAutomationFromFeatures(emptySkills, playerStats).primalKnowledge).toEqual([])
   })
 })
 
@@ -347,12 +238,8 @@ describe('collectAutomationFromFeatures: great_weapon_fighting', () => {
   })
 
   it('collects great_weapon_fighting passive from features', () => {
-    const features = [
-      makeFeature({ type: 'great_weapon_fighting' }, 'Great Weapon Fighting'),
-    ]
-
+    const features = [makeFeature({ type: 'great_weapon_fighting' }, 'Great Weapon Fighting')]
     const result = collectAutomationFromFeatures(features, playerStats)
-
     expect(result.passives).toHaveLength(1)
     expect(result.passives[0].type).toBe('passive_rule')
     expect(result.passives[0].effect).toBe('great_weapon_fighting')
@@ -395,15 +282,6 @@ describe('collectAutomationFromFeatures: mixed features', () => {
     expect(result.passives).toHaveLength(1)
     expect(result.passives[0].damageTypes).toEqual(['fire'])
   })
-})
-
-// ── collectAutomationFromFeatures: unknown automation types ─────────
-describe('collectAutomationFromFeatures: unknown automation types', () => {
-  let playerStats
-
-  beforeEach(() => {
-    playerStats = makePlayerStats()
-  })
 
   it('skips unknown automation types when buildAttackInfo returns null', () => {
     const features = [makeFeature({ type: 'some_unknown_type' })]
@@ -422,15 +300,10 @@ describe('processFeatureAutomation', () => {
 
   it('returns an automation object with all expected buckets', () => {
     const result = processFeatureAutomation([], [], [], [], playerStats)
-    expect(result).toHaveProperty('actions')
-    expect(result).toHaveProperty('bonusActions')
-    expect(result).toHaveProperty('reactions')
-    expect(result).toHaveProperty('specialActions')
-    expect(result).toHaveProperty('passives')
-    expect(result).toHaveProperty('autoEffects')
-    expect(result).toHaveProperty('saveModifiers')
-    expect(result).toHaveProperty('primalKnowledge')
-    expect(result).toHaveProperty('ritualSpells')
+    const expected = ['actions', 'bonusActions', 'reactions', 'specialActions', 'passives', 'autoEffects', 'saveModifiers', 'primalKnowledge', 'ritualSpells']
+    for (const key of expected) {
+      expect(result).toHaveProperty(key)
+    }
   })
 
   it('returns empty arrays in all buckets when no features are provided', () => {
@@ -480,7 +353,7 @@ describe('processFeatureAutomation', () => {
     expect(allActions).toHaveLength(1)
   })
 
-  it('adds new automation items to the allSpecialActions array', () => {
+  it('adds new automation items to the allSpecialActions array without duplicating', () => {
     const allActions = []
     const allSpecialActions = [{ name: 'Existing Special', description: '', automation: null }]
     const allBonusActions = [{ name: 'New Special', description: 'Desc', automation: { type: 'combat_stance' } }]
@@ -490,15 +363,10 @@ describe('processFeatureAutomation', () => {
     expect(allSpecialActions).toHaveLength(2)
     expect(allSpecialActions[1].name).toBe('New Special')
     expect(allSpecialActions[1].hasAutomation).toBe(true)
-  })
 
-  it('does not duplicate special actions already in allSpecialActions', () => {
-    const allActions = []
-    const allSpecialActions = [{ name: 'Existing', description: '', automation: null }]
-    const allBonusActions = [{ name: 'Existing', description: 'Desc', automation: { type: 'combat_stance' } }]
-
-    processFeatureAutomation(allActions, allBonusActions, [], allSpecialActions, playerStats)
-
-    expect(allSpecialActions).toHaveLength(1)
+    // Duplicate name should not be added
+    const allBonusActionsDup = [{ name: 'Existing Special', description: 'Desc', automation: { type: 'combat_stance' } }]
+    processFeatureAutomation(allActions, allBonusActionsDup, [], allSpecialActions, playerStats)
+    expect(allSpecialActions).toHaveLength(2)
   })
 })

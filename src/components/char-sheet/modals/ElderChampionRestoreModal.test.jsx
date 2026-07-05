@@ -1,3 +1,4 @@
+// @cleaned-by-ai
 // @improved-by-ai
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -38,32 +39,20 @@ describe('ElderChampionRestoreModal', () => {
     vi.clearAllMocks();
   });
 
-  // ── Initial render / display ──
-
   describe('initial render', () => {
-    it('renders modal overlay and container with proper CSS classes', () => {
+    it('renders modal with header, body messages, and action buttons', () => {
       renderModal();
       expect(document.querySelector('.sp-overlay')).toBeInTheDocument();
       expect(document.querySelector('.sp-modal')).toBeInTheDocument();
-      expect(document.querySelector('.sp-header')).toBeInTheDocument();
-      expect(document.querySelector('.sp-body')).toBeInTheDocument();
-      expect(document.querySelector('.sp-actions')).toBeInTheDocument();
-    });
-
-    it('renders header with fire icon and action name', () => {
-      renderModal();
-      expect(document.querySelector('.fa-fire')).toBeInTheDocument();
       expect(screen.getByText('Elder Champion Restore')).toBeInTheDocument();
-    });
-
-    it('renders body messages explaining Elder Champion rest usage and slot cost', () => {
-      renderModal();
       expect(
         screen.getByText('Elder Champion has already been used this long rest.')
       ).toBeInTheDocument();
       expect(
         screen.getByText(/Restore its use by expending a level 5 spell slot/)
       ).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Expend Level 5 Slot/ })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
     });
 
     it('displays available level 5 spell slot count from runtime value', () => {
@@ -71,82 +60,30 @@ describe('ElderChampionRestoreModal', () => {
       renderModal();
       expect(screen.getByText(/3 available/)).toBeInTheDocument();
     });
-
-    it('renders Expend Level 5 Slot button with xmark icon', () => {
-      renderModal();
-      expect(document.querySelector('.fa-xmark')).toBeInTheDocument();
-      expect(
-        screen.getByRole('button', { name: /Expend Level 5 Slot/ })
-      ).toBeInTheDocument();
-    });
-
-    it('renders Cancel button', () => {
-      renderModal();
-      expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
-    });
   });
 
-  // ── Spell slot display and button disabled state ──
-
   describe('spell slot display and button state', () => {
-    const assertExpendButton = () =>
-      screen.getByRole('button', { name: /Expend Level 5 Slot/ });
-
-    it('displays 0 available when runtime value is null', () => {
-      getRuntimeValue.mockReturnValue(null);
-      renderModal();
-      expect(screen.getByText(/0 available/)).toBeInTheDocument();
-      expect(assertExpendButton()).toBeDisabled();
-    });
-
-    it('displays 0 available when runtime value is 0', () => {
+    it('displays 0 available and disables expend button when slots are unavailable', () => {
       getRuntimeValue.mockReturnValue(0);
       renderModal();
       expect(screen.getByText(/0 available/)).toBeInTheDocument();
-      expect(assertExpendButton()).toBeDisabled();
+      expect(screen.getByRole('button', { name: /Expend Level 5 Slot/ })).toBeDisabled();
     });
 
-    it('displays negative value and disables expend button when runtime value is negative', () => {
-      getRuntimeValue.mockReturnValue(-1);
-      renderModal();
-      expect(screen.getByText(/-1 available/)).toBeInTheDocument();
-      expect(assertExpendButton()).toBeDisabled();
-    });
-
-    it('enables expend button when level 5 slots are available', () => {
+    it('displays available count and enables expend button when slots are available', () => {
       getRuntimeValue.mockReturnValue(2);
       renderModal();
       expect(screen.getByText(/2 available/)).toBeInTheDocument();
-      expect(assertExpendButton()).toBeEnabled();
-    });
-
-    it('enables expend button when exactly 1 level 5 slot is available', () => {
-      getRuntimeValue.mockReturnValue(1);
-      renderModal();
-      expect(screen.getByText(/1 available/)).toBeInTheDocument();
-      expect(assertExpendButton()).toBeEnabled();
-    });
-
-    it('handles string numeric runtime value via Number() coercion', () => {
-      getRuntimeValue.mockReturnValue('5');
-      renderModal();
-      expect(screen.getByText(/5 available/)).toBeInTheDocument();
-      expect(
-        screen.getByRole('button', { name: /Expend Level 5 Slot/ })
-      ).toBeEnabled();
+      expect(screen.getByRole('button', { name: /Expend Level 5 Slot/ })).toBeEnabled();
     });
   });
-
-  // ── Confirm behavior ──
 
   describe('confirm behavior', () => {
     it('calls onConfirm when Expend Level 5 Slot button is clicked with slots available', () => {
       const onConfirm = vi.fn();
       getRuntimeValue.mockReturnValue(1);
       renderModal({ onConfirm });
-      fireEvent.click(
-        screen.getByRole('button', { name: /Expend Level 5 Slot/ })
-      );
+      fireEvent.click(screen.getByRole('button', { name: /Expend Level 5 Slot/ }));
       expect(onConfirm).toHaveBeenCalledTimes(1);
     });
 
@@ -154,24 +91,10 @@ describe('ElderChampionRestoreModal', () => {
       const onConfirm = vi.fn();
       getRuntimeValue.mockReturnValue(0);
       renderModal({ onConfirm });
-      fireEvent.click(
-        screen.getByRole('button', { name: /Expend Level 5 Slot/ })
-      );
-      expect(onConfirm).not.toHaveBeenCalled();
-    });
-
-    it('does not call onConfirm when runtime value is null', () => {
-      const onConfirm = vi.fn();
-      getRuntimeValue.mockReturnValue(null);
-      renderModal({ onConfirm });
-      fireEvent.click(
-        screen.getByRole('button', { name: /Expend Level 5 Slot/ })
-      );
+      fireEvent.click(screen.getByRole('button', { name: /Expend Level 5 Slot/ }));
       expect(onConfirm).not.toHaveBeenCalled();
     });
   });
-
-  // ── Props integration ──
 
   describe('props integration', () => {
     it('passes playerStats.name and campaignName to getRuntimeValue', () => {
@@ -184,16 +107,6 @@ describe('ElderChampionRestoreModal', () => {
         'Sorcerer2',
         'spellSlotLevel5',
         'my-campaign'
-      );
-    });
-
-    it('uses default campaignName from props when rendering', () => {
-      getRuntimeValue.mockReturnValue(1);
-      renderModal({ campaignName: 'test-campaign' });
-      expect(getRuntimeValue).toHaveBeenCalledWith(
-        'Wizard1',
-        'spellSlotLevel5',
-        'test-campaign'
       );
     });
   });

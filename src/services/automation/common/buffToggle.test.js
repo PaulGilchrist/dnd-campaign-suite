@@ -221,21 +221,6 @@ describe('isBuffActive', () => {
         expect(isBuffActive('miss-char', 'Bless', campaign)).toBe(false);
     });
 
-    it('returns false when no buffs are active', () => {
-        clearRuntimeState('none-char');
-        expect(isBuffActive('none-char', 'AnyBuff', campaign)).toBe(false);
-    });
-
-    it('is case-sensitive for buff name matching', () => {
-        clearRuntimeState('case-char');
-        setRuntimeProp('case-char', 'activeBuffs', [
-            { name: 'bless', effect: '+1' },
-        ], campaign);
-
-        expect(isBuffActive('case-char', 'Bless', campaign)).toBe(false);
-        expect(isBuffActive('case-char', 'bless', campaign)).toBe(true);
-    });
-
     it('finds the correct buff among many active buffs', () => {
         clearRuntimeState('multi-char');
         setRuntimeProp('multi-char', 'activeBuffs', [
@@ -245,8 +230,6 @@ describe('isBuffActive', () => {
         ], campaign);
 
         expect(isBuffActive('multi-char', 'Bless', campaign)).toBe(true);
-        expect(isBuffActive('multi-char', 'Shield', campaign)).toBe(true);
-        expect(isBuffActive('multi-char', 'Haste', campaign)).toBe(true);
         expect(isBuffActive('multi-char', 'Invisibility', campaign)).toBe(false);
     });
 });

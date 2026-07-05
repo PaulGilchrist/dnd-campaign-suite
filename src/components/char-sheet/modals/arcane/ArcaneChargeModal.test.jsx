@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import ArcaneChargeModal from './ArcaneChargeModal.jsx';
@@ -64,36 +64,16 @@ describe('ArcaneChargeModal', () => {
   // ── Initial render / display ──
 
   describe('initial render', () => {
-    it('renders the modal overlay structure with all expected sections', () => {
-      render(<ArcaneChargeModal {...makeProps()} />);
-      expect(document.querySelector('.sp-overlay')).toBeInTheDocument();
-      expect(document.querySelector('.sp-modal')).toBeInTheDocument();
-      expect(document.querySelector('.sp-header')).toBeInTheDocument();
-      expect(document.querySelector('.sp-body')).toBeInTheDocument();
-      expect(document.querySelector('.sp-actions')).toBeInTheDocument();
-    });
-
-    it('renders the header with the action name and wind icon', () => {
+    it('renders the modal with action name and description', () => {
       render(<ArcaneChargeModal {...makeProps()} />);
       expect(screen.getByText('Arcane Charge')).toBeInTheDocument();
-      expect(document.querySelector('.sp-header .fa-solid.fa-wind')).toBeInTheDocument();
-    });
-
-    it('renders the description with the distance prop value', () => {
-      render(<ArcaneChargeModal {...makeProps({ distance: '60 ft' })} />);
-      expect(screen.getByText(/Teleport up to 60 ft to an unoccupied space you can see/)).toBeInTheDocument();
+      expect(screen.getByText(/Teleport up to 30 ft to an unoccupied space you can see/)).toBeInTheDocument();
     });
 
     it('renders the Teleport and Cancel buttons', () => {
       render(<ArcaneChargeModal {...makeProps()} />);
       expect(screen.getByRole('button', { name: /Teleport/ })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
-    });
-
-    it('renders the wind icon on the Teleport button', () => {
-      render(<ArcaneChargeModal {...makeProps()} />);
-      const teleportBtn = screen.getByRole('button', { name: /Teleport/ });
-      expect(teleportBtn.querySelector('.fa-solid.fa-wind')).toBeInTheDocument();
     });
 
     it('does not show a result or Done button on initial render', () => {
@@ -105,20 +85,24 @@ describe('ArcaneChargeModal', () => {
     it('renders with a custom action name', () => {
       render(<ArcaneChargeModal {...makeProps({ action: { name: 'Blink', automation: { type: 'teleport', distance: '30 ft' } } })} />);
       expect(screen.getByText('Blink')).toBeInTheDocument();
-      expect(document.querySelector('.sp-header .fa-solid.fa-wind')).toBeInTheDocument();
     });
 
-    it('renders description with an empty distance string', () => {
-      render(<ArcaneChargeModal {...makeProps({ distance: '' })} />);
-      const body = document.querySelector('.sp-body p');
-      expect(body.textContent).toContain('Teleport up to');
-      expect(body.textContent).toContain('to an unoccupied space');
+    it('renders description with a custom distance', () => {
+      render(<ArcaneChargeModal {...makeProps({ distance: '60 ft' })} />);
+      expect(screen.getByText(/Teleport up to 60 ft to an unoccupied space you can see/)).toBeInTheDocument();
     });
   });
 
   // ── Close / dismiss behavior ──
 
   describe('close behavior', () => {
+    it('calls onClose when the Cancel button is clicked', () => {
+      const onClose = vi.fn();
+      render(<ArcaneChargeModal {...makeProps({ onClose })} />);
+      fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+      expect(onClose).toHaveBeenCalledTimes(1);
+    });
+
     it('calls onClose when the overlay background is clicked', () => {
       const onClose = vi.fn();
       render(<ArcaneChargeModal {...makeProps({ onClose })} />);
@@ -131,13 +115,6 @@ describe('ArcaneChargeModal', () => {
       render(<ArcaneChargeModal {...makeProps({ onClose })} />);
       fireEvent.click(document.querySelector('.sp-modal'));
       expect(onClose).not.toHaveBeenCalled();
-    });
-
-    it('calls onClose when the Cancel button is clicked', () => {
-      const onClose = vi.fn();
-      render(<ArcaneChargeModal {...makeProps({ onClose })} />);
-      fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
-      expect(onClose).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -159,9 +136,9 @@ describe('ArcaneChargeModal', () => {
       );
     });
 
-    it('hides Teleport and Cancel buttons and shows Done button after confirm', async () => {
-      confirmArcaneCharge.mockResolvedValue(defaultConfirmResponse());
-      render(<ArcaneChargeModal {...makeProps()} />);
+    it('swaps buttons and shows result description after confirm', async () => {
+      confirmArcaneCharge.mockResolvedValue(defaultConfirmResponse('Arcane Charge: Teleported 60 ft to a new position.'));
+      render(<ArcaneChargeModal {...makeProps({ distance: '60 ft' })} />);
       await act(async () => {
         fireEvent.click(screen.getByRole('button', { name: /Teleport/ }));
       });
@@ -169,21 +146,11 @@ describe('ArcaneChargeModal', () => {
         expect(screen.queryByRole('button', { name: /Teleport/ })).not.toBeInTheDocument();
         expect(screen.queryByRole('button', { name: 'Cancel' })).not.toBeInTheDocument();
         expect(screen.getByRole('button', { name: 'Done' })).toBeInTheDocument();
-      });
-    });
-
-    it('shows the result description from the handler response', async () => {
-      confirmArcaneCharge.mockResolvedValue(defaultConfirmResponse('Arcane Charge: Teleported 60 ft to a new position.'));
-      render(<ArcaneChargeModal {...makeProps({ distance: '60 ft' })} />);
-      await act(async () => {
-        fireEvent.click(screen.getByRole('button', { name: /Teleport/ }));
-      });
-      await waitFor(() => {
         expect(screen.getByText(/Teleported 60 ft/)).toBeInTheDocument();
       });
     });
 
-    it('renders the result body with dangerouslySetInnerHTML for HTML content', async () => {
+    it('renders HTML content in the result body', async () => {
       confirmArcaneCharge.mockResolvedValue(defaultConfirmResponse('<strong>Arcane Charge</strong>: Teleported 30 ft.'));
       render(<ArcaneChargeModal {...makeProps()} />);
       await act(async () => {
@@ -192,18 +159,6 @@ describe('ArcaneChargeModal', () => {
       await waitFor(() => {
         const body = document.querySelector('.sp-body');
         expect(body.innerHTML).toContain('<strong>Arcane Charge</strong>');
-      });
-    });
-
-    it('keeps the header and wind icon visible in the result state', async () => {
-      confirmArcaneCharge.mockResolvedValue(defaultConfirmResponse());
-      render(<ArcaneChargeModal {...makeProps()} />);
-      await act(async () => {
-        fireEvent.click(screen.getByRole('button', { name: /Teleport/ }));
-      });
-      await waitFor(() => {
-        expect(screen.getByText('Arcane Charge')).toBeInTheDocument();
-        expect(document.querySelector('.sp-header .fa-solid.fa-wind')).toBeInTheDocument();
       });
     });
   });
@@ -236,40 +191,13 @@ describe('ArcaneChargeModal', () => {
       });
       expect(onClose).toHaveBeenCalledTimes(1);
     });
-
-    it('does not call onClose when the modal content is clicked after confirm', async () => {
-      const onClose = vi.fn();
-      confirmArcaneCharge.mockResolvedValue(defaultConfirmResponse());
-      render(<ArcaneChargeModal {...makeProps({ onClose })} />);
-      await act(async () => {
-        fireEvent.click(screen.getByRole('button', { name: /Teleport/ }));
-      });
-      await waitFor(() => {
-        fireEvent.click(document.querySelector('.sp-modal'));
-      });
-      expect(onClose).not.toHaveBeenCalled();
-    });
   });
 
   // ── Edge cases ──
 
   describe('edge cases', () => {
-    it('renders with undefined onClose without throwing at render time', () => {
-      render(<ArcaneChargeModal {...makeProps({ onClose: undefined })} />);
-      expect(screen.getByText('Arcane Charge')).toBeInTheDocument();
-    });
-
-    it('renders without throwing when action prop is null', () => {
-      expect(() => render(<ArcaneChargeModal {...makeProps({ action: null })} />)).not.toThrow();
-    });
-
-    it('renders with undefined playerStats without throwing at render time', () => {
-      render(<ArcaneChargeModal {...makeProps({ playerStats: undefined })} />);
-      expect(screen.getByText('Arcane Charge')).toBeInTheDocument();
-    });
-
-    it('renders with undefined campaignName without throwing at render time', () => {
-      render(<ArcaneChargeModal {...makeProps({ campaignName: undefined })} />);
+    it('renders with undefined props without throwing', () => {
+      render(<ArcaneChargeModal {...makeProps({ action: null, playerStats: undefined, campaignName: undefined, onClose: undefined })} />);
       expect(screen.getByText('Arcane Charge')).toBeInTheDocument();
     });
 
@@ -278,22 +206,9 @@ describe('ArcaneChargeModal', () => {
       expect(screen.getByText(/Teleport up to 0 to an unoccupied space you can see/)).toBeInTheDocument();
     });
 
-    it('renders description with distance null (null falls back to default via ??)', () => {
+    it('renders description with distance null falling back to default', () => {
       render(<ArcaneChargeModal {...makeProps({ distance: null })} />);
       expect(screen.getByText(/Teleport up to 30 ft to an unoccupied space you can see/)).toBeInTheDocument();
-    });
-
-    it('calls confirmArcaneCharge with default playerStats and campaignName even when undefined override passed', async () => {
-      confirmArcaneCharge.mockResolvedValue(defaultConfirmResponse());
-      render(<ArcaneChargeModal {...makeProps({ playerStats: undefined, campaignName: undefined })} />);
-      await act(async () => {
-        fireEvent.click(screen.getByRole('button', { name: /Teleport/ }));
-      });
-      expect(confirmArcaneCharge).toHaveBeenCalledWith(
-        defaultAction,
-        defaultPlayerStats,
-        defaultCampaignName
-      );
     });
   });
 

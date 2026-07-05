@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { renderHook, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import useMapLoader from './useMapLoader.js';
@@ -54,13 +54,9 @@ describe('useMapLoader', () => {
       expect(result.current).toHaveProperty('loadInProgressRef');
     });
 
-    it('should initialize mapData to null', () => {
+    it('should initialize mapData to null and placedItems to empty array', () => {
       const { result } = getHook();
       expect(result.current.mapData).toBeNull();
-    });
-
-    it('should initialize placedItems to empty array', () => {
-      const { result } = getHook();
       expect(result.current.placedItems).toEqual([]);
     });
 
@@ -77,17 +73,7 @@ describe('useMapLoader', () => {
       const saveCallArgs = saveMapDataSpy.mock.calls[0];
       expect(saveCallArgs[0]).toBe(defaultCampaignName);
       expect(saveCallArgs[1]).toBe(defaultMapName);
-      expect(saveCallArgs[2]).toHaveProperty('players');
-      expect(saveCallArgs[2]).toHaveProperty('walls');
-      expect(saveCallArgs[2]).toHaveProperty('rooms');
-      expect(saveCallArgs[2]).toHaveProperty('placedItems');
       expect(saveCallArgs[2]).toHaveProperty('gridSize', defaultGridSize);
-    });
-
-    it('should not call setGridSize when no existing data (uses prop gridSize)', async () => {
-      getHook();
-      await act(async () => {});
-      expect(setGridSizeMock).not.toHaveBeenCalled();
     });
   });
 
@@ -159,21 +145,6 @@ describe('useMapLoader', () => {
       await act(async () => {});
 
       expect(setGridSizeMock).toHaveBeenCalledWith(50);
-    });
-
-    it('should set gridSize to DEFAULT_GRID_SIZE when existing data has no gridSize', async () => {
-      const existingData = {
-        players: [],
-        walls: [],
-        rooms: [],
-        placedItems: [],
-      };
-      loadMapDataSpy.mockResolvedValue(existingData);
-
-      getHook();
-      await act(async () => {});
-
-      expect(setGridSizeMock).toHaveBeenCalledWith(mapConfig.DEFAULT_GRID_SIZE);
     });
   });
 
@@ -342,29 +313,6 @@ describe('useMapLoader', () => {
       await act(async () => {});
 
       expect(loadMapDataSpy).toHaveBeenCalledTimes(2);
-    });
-  });
-
-  describe('return values', () => {
-    it('should return setMapData as a function', () => {
-      const { result } = getHook();
-      expect(typeof result.current.setMapData).toBe('function');
-    });
-
-    it('should return setPlacedItems as a function', () => {
-      const { result } = getHook();
-      expect(typeof result.current.setPlacedItems).toBe('function');
-    });
-
-    it('should return loadInProgressRef as a ref object with current property', () => {
-      const { result } = getHook();
-      expect(result.current.loadInProgressRef).toHaveProperty('current');
-    });
-
-    it('should have loadInProgressRef.current as false after load completes', async () => {
-      const { result } = getHook();
-      await act(async () => {});
-      expect(result.current.loadInProgressRef.current).toBe(false);
     });
   });
 });

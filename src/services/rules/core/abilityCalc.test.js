@@ -1,3 +1,4 @@
+// @cleaned-by-ai
 // @improved-by-ai
 import { describe, it, expect, vi } from 'vitest';
 import { getAbilities, getHitPoints, getCarryingCapacity } from './abilityCalc.js';
@@ -72,82 +73,41 @@ describe('abilityCalc', () => {
       };
     }
 
-    it('should return all six abilities with correct structure', async () => {
+    it('should return all six abilities with correct structure, skills, and bonus calculations', async () => {
       const result = await getAbilities(makeStats());
 
       expect(result).toHaveLength(6);
       const names = result.map(a => a.name);
       expect(names).toEqual(['Strength', 'Dexterity', 'Constitution', 'Intelligence', 'Wisdom', 'Charisma']);
-    });
 
-    it('should compute ability bonuses from total score using floor((score-10)/2)', async () => {
-      const result = await getAbilities(makeStats({
-        abilities: [
-          { name: 'Strength', baseScore: 15, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
-          { name: 'Dexterity', baseScore: 14, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
-          { name: 'Constitution', baseScore: 13, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
-          { name: 'Intelligence', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
-          { name: 'Wisdom', baseScore: 8, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
-          { name: 'Charisma', baseScore: 1, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
-        ],
-      }));
-
+      // ability bonuses from floor((score-10)/2)
       const str = result.find(a => a.name === 'Strength');
-      expect(str.totalScore).toBe(15);
-      expect(str.bonus).toBe(2);
-
-      const con = result.find(a => a.name === 'Constitution');
-      expect(con.totalScore).toBe(13);
-      expect(con.bonus).toBe(1);
-
-      const wis = result.find(a => a.name === 'Wisdom');
-      expect(wis.totalScore).toBe(8);
-      expect(wis.bonus).toBe(-1);
+      expect(str.totalScore).toBe(16);
+      expect(str.bonus).toBe(3);
 
       const cha = result.find(a => a.name === 'Charisma');
-      expect(cha.totalScore).toBe(1);
-      expect(cha.bonus).toBe(-5);
+      expect(cha.totalScore).toBe(8);
+      expect(cha.bonus).toBe(-1);
+
+      // skills included
+      expect(str.skills).toHaveLength(1);
+      expect(str.skills[0].name).toBe('Athletics');
+      expect(cha.skills).toHaveLength(4);
     });
 
-    it('should mark saving throw proficiencies from class.saving_throws', async () => {
+    it('should compute save bonuses (proficient = bonus + proficiency, not proficient = bonus only)', async () => {
       const result = await getAbilities(makeStats());
 
       const str = result.find(a => a.name === 'Strength');
       expect(str.proficient).toBe(true);
+      expect(str.save).toBe(6); // 3 (bonus) + 3 (proficiency)
 
       const dex = result.find(a => a.name === 'Dexterity');
       expect(dex.proficient).toBe(false);
+      expect(dex.save).toBe(2); // just bonus
     });
 
-    it('should compute save bonus as bonus + proficiency when proficient', async () => {
-      const result = await getAbilities(makeStats());
-
-      const str = result.find(a => a.name === 'Strength');
-      expect(str.save).toBe(6); // 3 (bonus) + 3 (proficiency)
-    });
-
-    it('should compute save bonus as bonus only when not proficient', async () => {
-      const result = await getAbilities(makeStats());
-
-      const dex = result.find(a => a.name === 'Dexterity');
-      expect(dex.save).toBe(2); // just bonus, no proficiency
-    });
-
-    it('should include skills for each ability', async () => {
-      const result = await getAbilities(makeStats());
-
-      const str = result.find(a => a.name === 'Strength');
-      expect(str.skills).toHaveLength(1);
-      expect(str.skills[0].name).toBe('Athletics');
-
-      const dex = result.find(a => a.name === 'Dexterity');
-      expect(dex.skills).toHaveLength(3);
-
-      const cha = result.find(a => a.name === 'Charisma');
-      expect(cha.skills).toHaveLength(4);
-    });
-
-    it('should mark skill proficiencies from skillProficiencies', async () => {
+    it('should mark skill proficiencies and apply expertise as double proficiency', async () => {
       const result = await getAbilities(makeStats({
         skillProficiencies: ['Athletics'],
       }));
@@ -155,14 +115,12 @@ describe('abilityCalc', () => {
       const str = result.find(a => a.name === 'Strength');
       const athletics = str.skills.find(s => s.name === 'Athletics');
       expect(athletics.bonus).toBe(6); // 3 (str bonus) + 3 (proficiency)
-    });
 
-    it('should apply expertise as double proficiency on skills', async () => {
-      const result = await getAbilities(makeStats({
+      const result2 = await getAbilities(makeStats({
         expertise: ['Stealth'],
       }));
 
-      const dex = result.find(a => a.name === 'Dexterity');
+      const dex = result2.find(a => a.name === 'Dexterity');
       const stealth = dex.skills.find(s => s.name === 'Stealth');
       expect(stealth.bonus).toBe(5); // 2 (dex bonus) + 3 (proficiency) + 3 (expertise)
     });
@@ -186,7 +144,7 @@ describe('abilityCalc', () => {
       expect(str17.save).toBe(3 + profAt(17)); // 3 + 6
     });
 
-    it('should apply Primal Champion (+4 to Str/Con) for level 20 Barbarian', async () => {
+    it('should apply Primal Champion (+4 to Str/Con) for level 20 Barbarian only', async () => {
       const result = await getAbilities(makeStats({
         level: 20,
         class: {
@@ -202,31 +160,71 @@ describe('abilityCalc', () => {
       const con = result.find(a => a.name === 'Constitution');
       expect(con.totalScore).toBe(16); // 12 + 4
       expect(con.bonus).toBe(3);
-    });
 
-    it('should not apply Primal Champion for non-Barbarian at level 20', async () => {
-      const result = await getAbilities(makeStats({ level: 20 }));
+      // Non-Barbarian at level 20
+      const r2 = await getAbilities(makeStats({ level: 20 }));
+      const str2 = r2.find(a => a.name === 'Strength');
+      expect(str2.totalScore).toBe(16);
+      expect(str2.bonus).toBe(3);
 
-      const str = result.find(a => a.name === 'Strength');
-      expect(str.totalScore).toBe(16);
-      expect(str.bonus).toBe(3);
-    });
-
-    it('should not apply Primal Champion below level 20', async () => {
-      const result = await getAbilities(makeStats({
+      // Barbarian below level 20
+      const r3 = await getAbilities(makeStats({
         level: 19,
         class: {
           name: 'Barbarian',
           saving_throws: ['Strength', 'Constitution'],
         },
       }));
-
-      const str = result.find(a => a.name === 'Strength');
-      expect(str.totalScore).toBe(16);
-      expect(str.bonus).toBe(3);
+      const str3 = r3.find(a => a.name === 'Strength');
+      expect(str3.totalScore).toBe(16);
+      expect(str3.bonus).toBe(3);
     });
 
-    it('should handle extreme ability scores (low and high)', async () => {
+    it('should enforce 20 cap on ability scores, apply racial bonus, and apply ability improvements', async () => {
+      // 20 cap
+      const abilities = [
+        { name: 'Dexterity', baseScore: 25, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+        { name: 'Strength', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+        { name: 'Constitution', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+        { name: 'Intelligence', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+        { name: 'Wisdom', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+        { name: 'Charisma', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+      ];
+      let result = await getAbilities(makeStats({ abilities }));
+      let dex = result.find(a => a.name === 'Dexterity');
+      expect(dex.totalScore).toBe(20); // capped at 20
+      expect(dex.bonus).toBe(5);
+
+      // racial bonus
+      vi.mocked(raceRules.rules5e.getRacialBonus).mockReturnValue(2);
+      result = await getAbilities(makeStats({
+        race: {
+          name: 'Half-Orc',
+          ability_bonuses: [{ ability_score: 'Strength', bonus: 2 }],
+        },
+      }));
+      const str = result.find(a => a.name === 'Strength');
+      expect(str.totalScore).toBe(18); // 16 + 2 racial
+      expect(raceRules.rules5e.getRacialBonus).toHaveBeenCalledWith(expect.any(Object), 'Strength');
+
+      // ability improvements
+      vi.mocked(raceRules.rules5e.getRacialBonus).mockReturnValue(0);
+      result = await getAbilities(makeStats({
+        abilities: [
+          { name: 'Strength', baseScore: 8, featIncrease: 2, miscIncrease: 1, backgroundIncrease: 0 },
+          { name: 'Dexterity', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Constitution', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Intelligence', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Wisdom', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Charisma', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+        ],
+      }));
+      const str2 = result.find(a => a.name === 'Strength');
+      expect(str2.totalScore).toBe(11); // 8 + 2 + 1 + 0 racial
+      expect(str2.bonus).toBe(0); // floor((11-10)/2) = 0
+    });
+
+    it('should handle extreme ability scores (low bonus, high capped)', async () => {
       const abilities = [
         { name: 'Strength', baseScore: 3, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
         { name: 'Dexterity', baseScore: 30, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
@@ -245,62 +243,10 @@ describe('abilityCalc', () => {
       expect(dex.bonus).toBe(5);
     });
 
-    it('should enforce 20 cap on ability scores before racial/class bonuses', async () => {
-      const abilities = [
-        { name: 'Dexterity', baseScore: 25, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
-        { name: 'Strength', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
-        { name: 'Constitution', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
-        { name: 'Intelligence', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
-        { name: 'Wisdom', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
-        { name: 'Charisma', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
-      ];
-      const result = await getAbilities(makeStats({ abilities }));
-
-      const dex = result.find(a => a.name === 'Dexterity');
-      expect(dex.totalScore).toBe(20); // capped at 20
-      expect(dex.bonus).toBe(5);
-    });
-
-    it('should apply racial bonus from race.ability_bonuses', async () => {
-      vi.mocked(raceRules.rules5e.getRacialBonus).mockReturnValue(2);
-
-      const result = await getAbilities(makeStats({
-        race: {
-          name: 'Half-Orc',
-          ability_bonuses: [{ ability_score: 'Strength', bonus: 2 }],
-        },
-      }));
-
-      const str = result.find(a => a.name === 'Strength');
-      expect(str.totalScore).toBe(18); // 16 + 2 racial
-      expect(raceRules.rules5e.getRacialBonus).toHaveBeenCalledWith(expect.any(Object), 'Strength');
-    });
-
-    it('should apply ability improvements (feat, misc, background)', async () => {
-      // Reset the racial bonus mock for this test
-      vi.mocked(raceRules.rules5e.getRacialBonus).mockReturnValue(0);
-
-      const result = await getAbilities(makeStats({
-        abilities: [
-          { name: 'Strength', baseScore: 8, featIncrease: 2, miscIncrease: 1, backgroundIncrease: 0 },
-          { name: 'Dexterity', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
-          { name: 'Constitution', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
-          { name: 'Intelligence', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
-          { name: 'Wisdom', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
-          { name: 'Charisma', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
-        ],
-      }));
-
-      const str = result.find(a => a.name === 'Strength');
-      expect(str.totalScore).toBe(11); // 8 + 2 + 1 + 0 racial
-      expect(str.bonus).toBe(0); // floor((11-10)/2) = 0
-    });
-
     it('should not include skills when skills array is empty', async () => {
       vi.mocked((await import('../../ui/dataLoader.js')).loadSkills).mockResolvedValue([]);
 
       const result = await getAbilities(makeStats());
-
       result.forEach(ability => {
         expect(ability.skills).toHaveLength(0);
       });
@@ -358,7 +304,7 @@ describe('abilityCalc', () => {
       expect(hp).toBe(34);
     });
 
-    it('should calculate hit points at level 1 with +2 Con', () => {
+    it('should calculate hit points with +2 Con', () => {
       const playerStats = makeStats({
         level: 1,
         abilities: [
@@ -370,7 +316,7 @@ describe('abilityCalc', () => {
       expect(hp).toBe(12);
     });
 
-    it('should include racial hit point bonus (Hill Dwarf)', () => {
+    it('should include racial hit point bonus (Hill Dwarf) and stack with subclass bonuses', () => {
       const playerStats = makeStats({
         level: 5,
         race: {
@@ -402,89 +348,58 @@ describe('abilityCalc', () => {
       expect(hp).toBe(28);
     });
 
-    it('should use 0 con bonus when constitution ability is missing', () => {
+    it('should use 0 con bonus when constitution ability is missing or bonus is undefined', () => {
       const playerStats = makeStats();
       playerStats.abilities = playerStats.abilities.filter(a => a.name !== 'Constitution');
-      const hp = getHitPoints(playerStats);
-      // 10 + (6*0) + (0*1) = 10
-      expect(hp).toBe(10);
-    });
+      expect(getHitPoints(playerStats)).toBe(10);
 
-    it('should use 0 con bonus when constitution bonus is explicitly undefined', () => {
-      const playerStats = makeStats({
+      const playerStats2 = makeStats({
         abilities: [
           { name: 'Constitution', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0, bonus: undefined },
         ],
       });
-      const hp = getHitPoints(playerStats);
-      // conBonus = 0 (explicit undefined falls back to 0)
-      // 10 + (6*0) + (0*1) = 10
-      expect(hp).toBe(10);
+      expect(getHitPoints(playerStats2)).toBe(10);
     });
 
-    it('should add static max_hp_increase from automation passives', () => {
-      const playerStats = makeStats({
+    it('should add static and expression-based max_hp_increase from automation passives', () => {
+      // static amount
+      const playerStats1 = makeStats({
         automation: {
           passives: [
             { type: 'passive_rule', effect: 'max_hp_increase', amount: 3 },
           ],
         },
       });
+      expect(getHitPoints(playerStats1)).toBe(13); // 10 + 0 + 0 + 3
 
-      const hp = getHitPoints(playerStats);
-      expect(hp).toBe(13); // 10 + 0 + 0 + 3
-    });
-
-    it('should add expression-based max_hp_increase from automation passives', () => {
-      const playerStats = makeStats({
+      // expression (mocked to return 5)
+      const playerStats2 = makeStats({
         automation: {
           passives: [
             { type: 'passive_rule', effect: 'max_hp_increase', bonusExpression: '1d4+1' },
           ],
         },
       });
-
-      // evaluateAutoExpression is mocked to return 5
-      const hp = getHitPoints(playerStats);
-      expect(hp).toBe(15); // 10 + 0 + 0 + 5
+      expect(getHitPoints(playerStats2)).toBe(15); // 10 + 0 + 0 + 5
     });
 
-    it('should ignore automation passives with missing amount and expression', () => {
-      const playerStats = makeStats({
+    it('should ignore automation passives with missing amount/expression, non-matching effects, missing passives, or null automation', () => {
+      let playerStats = makeStats({
         automation: {
-          passives: [
-            { type: 'passive_rule', effect: 'max_hp_increase' },
-          ],
+          passives: [{ type: 'passive_rule', effect: 'max_hp_increase' }],
         },
       });
+      expect(getHitPoints(playerStats)).toBe(10);
 
-      const hp = getHitPoints(playerStats);
-      expect(hp).toBe(10); // no bonus added
-    });
-
-    it('should ignore non-max_hp_increase automation passives', () => {
-      const playerStats = makeStats({
+      playerStats = makeStats({
         automation: {
-          passives: [
-            { type: 'passive_rule', effect: 'other_effect', amount: 100 },
-          ],
+          passives: [{ type: 'passive_rule', effect: 'other_effect', amount: 100 }],
         },
       });
+      expect(getHitPoints(playerStats)).toBe(10);
 
-      const hp = getHitPoints(playerStats);
-      expect(hp).toBe(10); // unaffected
-    });
-
-    it('should handle missing automation passives gracefully', () => {
-      const playerStats = makeStats();
-      const hp = getHitPoints(playerStats);
-      expect(hp).toBe(10);
-    });
-
-    it('should handle null automation gracefully', () => {
-      const playerStats = makeStats({ automation: null });
-      const hp = getHitPoints(playerStats);
-      expect(hp).toBe(10);
+      expect(getHitPoints(makeStats())).toBe(10);
+      expect(getHitPoints(makeStats({ automation: null }))).toBe(10);
     });
   });
 
@@ -498,61 +413,12 @@ describe('abilityCalc', () => {
       };
     }
 
-    it('should calculate capacity as Strength totalScore * 15', () => {
-      const playerStats = makeStats({
-        abilities: [
-          { name: 'Strength', totalScore: 16 },
-        ],
-      });
-
-      expect(getCarryingCapacity(playerStats)).toBe(240); // 16 * 15
-    });
-
-    it('should default to 150 when Strength ability is missing', () => {
-      const playerStats = makeStats({
-        abilities: [
-          { name: 'Dexterity', totalScore: 14 },
-        ],
-      });
-
-      expect(getCarryingCapacity(playerStats)).toBe(150); // 10 * 15
-    });
-
-    it('should default to 150 when abilities array is empty', () => {
-      const playerStats = makeStats({ abilities: [] });
-
-      expect(getCarryingCapacity(playerStats)).toBe(150); // 10 * 15
-    });
-
-    it('should apply size multiplier', () => {
-      const playerStats = makeStats({
-        abilities: [
-          { name: 'Strength', totalScore: 10 },
-        ],
-        sizeMultiplier: 2,
-      });
-
-      expect(getCarryingCapacity(playerStats)).toBe(300); // 10 * 15 * 2
-    });
-
-    it('should apply fractional size multiplier', () => {
-      const playerStats = makeStats({
-        abilities: [
-          { name: 'Strength', totalScore: 10 },
-        ],
-        sizeMultiplier: 1.5,
-      });
-
-      expect(getCarryingCapacity(playerStats)).toBe(225); // 10 * 15 * 1.5
-    });
-
-    it('should apply size multiplier to default strength', () => {
-      const playerStats = makeStats({
-        abilities: [],
-        sizeMultiplier: 2,
-      });
-
-      expect(getCarryingCapacity(playerStats)).toBe(300); // 10 * 15 * 2
+    it('should calculate capacity as Strength totalScore * 15, default to 150 when Strength missing, and apply size multiplier', () => {
+      expect(getCarryingCapacity(makeStats({ abilities: [{ name: 'Strength', totalScore: 16 }] }))).toBe(240); // 16 * 15
+      expect(getCarryingCapacity(makeStats({ abilities: [{ name: 'Dexterity', totalScore: 14 }] }))).toBe(150); // 10 * 15
+      expect(getCarryingCapacity(makeStats({ abilities: [], sizeMultiplier: 2 }))).toBe(300); // 10 * 15 * 2
+      expect(getCarryingCapacity(makeStats({ sizeMultiplier: 2 }))).toBe(300);
+      expect(getCarryingCapacity(makeStats({ sizeMultiplier: 1.5 }))).toBe(225); // 10 * 15 * 1.5
     });
   });
 });

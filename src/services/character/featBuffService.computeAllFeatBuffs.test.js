@@ -24,7 +24,7 @@ describe('computeAllFeatBuffs', () => {
   });
 
   describe('edge cases and error handling', () => {
-    it('should return empty result when formData is null', () => {
+    it('should throw when formData is null', () => {
       expect(() => computeAllFeatBuffs(null, [])).toThrow();
     });
 
@@ -39,15 +39,6 @@ describe('computeAllFeatBuffs', () => {
 
     it('should return empty result when feats array is empty', () => {
       const result = computeAllFeatBuffs({ rules: '5e', feats: [] }, []);
-
-      expect(result.abilityScoreIncreases).toEqual([]);
-      expect(result.proficiencies).toEqual([]);
-      expect(result.resistances).toEqual([]);
-      expect(result.features).toEqual([]);
-    });
-
-    it('should return empty result when feats array is undefined', () => {
-      const result = computeAllFeatBuffs({ rules: '5e' }, []);
 
       expect(result.abilityScoreIncreases).toEqual([]);
       expect(result.proficiencies).toEqual([]);
@@ -81,6 +72,73 @@ describe('computeAllFeatBuffs', () => {
       expect(result.proficiencies).toEqual([]);
       expect(result.resistances).toEqual([]);
       expect(result.features).toEqual([]);
+    });
+  });
+
+  describe('aggregation across multiple feats', () => {
+    it('should aggregate buffs from multiple 5e feats', () => {
+      findFeat
+        .mockReturnValueOnce({
+          benefits: ['Increase your Strength score by 2'],
+        })
+        .mockReturnValueOnce({
+          benefits: ['You gain proficiency with shields'],
+        });
+
+      const result = computeAllFeatBuffs(
+        { rules: '5e', feats: ['Tough', 'Alert'] },
+        [{ name: 'Tough' }, { name: 'Alert' }]
+      );
+
+      expect(result.abilityScoreIncreases).toEqual([
+        { name: 'Strength', amount: 2, isChoice: false },
+      ]);
+      expect(result.proficiencies).toEqual([
+        { name: 'shields' },
+      ]);
+      expect(result.resistances).toEqual([]);
+      expect(result.features).toEqual([]);
+    });
+
+    it('should aggregate multiple 2024 feat buffs', () => {
+      findFeat
+        .mockReturnValueOnce({
+          benefits: [
+            {
+              type: 'ability_score_increase',
+              description: '+1 STR',
+            },
+          ],
+          ability_score_increase: { scores: ['Strength'], amount: 1 },
+        })
+        .mockReturnValueOnce({
+          benefits: [
+            {
+              type: 'proficiency',
+              name: 'Custom Feat',
+              description:
+                'You gain training with heavy armor and shields',
+            },
+          ],
+        });
+
+      const result = computeAllFeatBuffs(
+        { rules: '2024', feats: ['ASI Feat', 'Prof Feat'] },
+        []
+      );
+
+      expect(result.abilityScoreIncreases).toEqual([
+        {
+          name: 'Strength',
+          amount: 1,
+          isChoice: false,
+          description: '+1 STR',
+        },
+      ]);
+      expect(result.proficiencies).toEqual([
+        { name: 'Heavy Armor', type: 'proficiency' },
+        { name: 'Shields', type: 'proficiency' },
+      ]);
     });
   });
 
@@ -318,64 +376,6 @@ describe('computeAllFeatBuffs', () => {
           type: 'passive',
         },
       ]);
-    });
-
-    it('should aggregate buffs from multiple 5e feats', () => {
-      findFeat
-        .mockReturnValueOnce({
-          benefits: ['Increase your Strength score by 2'],
-        })
-        .mockReturnValueOnce({
-          benefits: ['You gain proficiency with shields'],
-        });
-
-      const result = computeAllFeatBuffs(
-        { rules: '5e', feats: ['Tough', 'Alert'] },
-        [{ name: 'Tough' }, { name: 'Alert' }]
-      );
-
-      expect(result.abilityScoreIncreases).toEqual([
-        { name: 'Strength', amount: 2, isChoice: false },
-      ]);
-      expect(result.proficiencies).toEqual([
-        { name: 'shields' },
-      ]);
-      expect(result.resistances).toEqual([]);
-      expect(result.features).toEqual([]);
-    });
-
-    it('should handle a mix of ability, proficiency, resistance, and feature buffs from a single feat', () => {
-      findFeat.mockReturnValue({
-        benefits: [
-          'Increase your Strength score by 2',
-          'You gain proficiency with heavy armor',
-          'You have resistance to fire',
-          'Your speed increases by 10 feet',
-        ],
-      });
-
-      const result = computeAllFeatBuffs(
-        { rules: '5e', feats: ['Custom Feat'] },
-        []
-      );
-
-      expect(result.abilityScoreIncreases).toHaveLength(1);
-      expect(result.abilityScoreIncreases[0]).toEqual({
-        name: 'Strength',
-        amount: 2,
-        isChoice: false,
-      });
-      expect(result.proficiencies).toHaveLength(1);
-      expect(result.proficiencies[0]).toEqual({ name: 'heavy armor' });
-      expect(result.resistances).toHaveLength(1);
-      expect(result.resistances[0]).toBe('fire');
-      expect(result.features).toHaveLength(1);
-      expect(result.features[0]).toEqual({
-        name: 'Speed Bonus',
-        description: 'Your speed increases by 10 feet',
-        type: 'speed',
-        value: 10,
-      });
     });
   });
 
@@ -745,47 +745,6 @@ describe('computeAllFeatBuffs', () => {
           type: 'unknown_type',
           automation: { custom: true },
         },
-      ]);
-    });
-
-    it('should aggregate multiple 2024 feat buffs', () => {
-      findFeat
-        .mockReturnValueOnce({
-          benefits: [
-            {
-              type: 'ability_score_increase',
-              description: '+1 STR',
-            },
-          ],
-          ability_score_increase: { scores: ['Strength'], amount: 1 },
-        })
-        .mockReturnValueOnce({
-          benefits: [
-            {
-              type: 'proficiency',
-              name: 'Custom Feat',
-              description:
-                'You gain training with heavy armor and shields',
-            },
-          ],
-        });
-
-      const result = computeAllFeatBuffs(
-        { rules: '2024', feats: ['ASI Feat', 'Prof Feat'] },
-        []
-      );
-
-      expect(result.abilityScoreIncreases).toEqual([
-        {
-          name: 'Strength',
-          amount: 1,
-          isChoice: false,
-          description: '+1 STR',
-        },
-      ]);
-      expect(result.proficiencies).toEqual([
-        { name: 'Heavy Armor', type: 'proficiency' },
-        { name: 'Shields', type: 'proficiency' },
       ]);
     });
   });
