@@ -167,12 +167,26 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
     }
 
     if (!formula) {
-        if (spell.name.toLowerCase() === 'power word heal' && metaCtx?.multiTarget) {
+        if (spell.name.toLowerCase() === 'power word heal') {
             const target = await getTargetInfo();
             if (target?.name) {
                 await applyPowerWordHealToTarget(target.name, playerStats, campaignName);
-                await applyPowerWordHealToTarget(metaCtx.multiTarget, playerStats, campaignName);
+                if (metaCtx?.multiTarget) {
+                    await applyPowerWordHealToTarget(metaCtx.multiTarget, playerStats, campaignName);
+                }
             }
+            return;
+        }
+
+        if (spell.name.toLowerCase() === 'power word kill') {
+            const target = await getTargetInfo();
+            if (target?.name) {
+                await applyPowerWordKillToTarget(target.name, playerStats, campaignName);
+                if (metaCtx?.multiTarget) {
+                    await applyPowerWordKillToTarget(metaCtx.multiTarget, playerStats, campaignName);
+                }
+            }
+            return;
         }
 
         // Power Word Fortify — multi-target temp HP (up to 6 creatures within range)
@@ -878,23 +892,40 @@ async function applyPowerWordHealToTarget(targetName, playerStats, campaignName)
     const creature = combatSummary.creatures.find(c => c.name === targetName);
     if (!creature) return;
 
-    const maxHp = creature.maxHp || playerStats.hitPoints || 0;
-    const currentHp = creature.currentHp ?? getRuntimeValue(targetName, 'currentHitPoints', campaignName) ?? maxHp;
-    const healAmount = maxHp - currentHp;
+    const isPlayer = creature.type === 'player';
+    const maxHp = isPlayer
+        ? (getRuntimeValue(targetName, 'hitPoints') ?? creature.maxHp ?? 0)
+        : (creature.maxHp ?? 0);
+    const currentHp = isPlayer
+        ? (getRuntimeValue(targetName, 'currentHitPoints') ?? maxHp)
+        : (creature.currentHp ?? maxHp);
+    const healAmount = Math.max(0, maxHp - currentHp);
 
     if (healAmount > 0) {
-        applyHealingToTarget(combatSummary, targetName, healAmount, campaignName);
+        const result = applyHealingToTarget(combatSummary, targetName, healAmount, campaignName);
+        const actualHeal = result?.actualHeal ?? healAmount;
+        const newHp = Math.min(maxHp, currentHp + actualHeal);
         postLogEntry(campaignName, {
             type: 'hp_change',
             targetName,
-            delta: healAmount,
-            currentHp: Math.min(maxHp, currentHp + healAmount),
+            delta: actualHeal,
+            currentHp: newHp,
             maxHp,
             isHealing: true,
             sourceName: playerStats.name,
             note: 'Power Word Heal',
             timestamp: Date.now(),
         });
+        window.dispatchEvent(new CustomEvent('healing-popup', {
+            detail: {
+                targetName,
+                sourceName: playerStats.name,
+                healingName: 'Power Word Heal',
+                rollInfo: '',
+                maximizeHealingDice: false,
+                popupText: `Power Word Heal on ${targetName}: Regained ${actualHeal} HP`,
+            },
+        }));
     }
 
     const conditionsToRemove = ['charmed', 'frightened', 'paralyzed', 'poisoned', 'stunned'];
@@ -928,17 +959,49 @@ async function applyPowerWordHealToTarget(targetName, playerStats, campaignName)
             setRuntimeValue(targetName, 'powerWordHealStandPermission', true, campaignName);
         }
     }
+}
 
-    postLogEntry(campaignName, {
-        type: 'hp_change',
-        targetName,
-        delta: healAmount,
-        currentHp: Math.min(maxHp, currentHp + healAmount),
-        maxHp,
-        isHealing: true,
-        sourceName: playerStats.name,
-        note: 'Power Word Heal',
-    });
+async function applyPowerWordKillToTarget(targetName, playerStats, campaignName) {
+    const combatSummary = await getCombatContext(campaignName);
+    if (!combatSummary) return;
+
+    const creature = combatSummary.creatures.find(c => c.name === targetName);
+    if (!creature) return;
+
+    const currentHp = creature.currentHp ?? getRuntimeValue(targetName, 'currentHitPoints', campaignName) ?? creature.maxHp;
+
+    if (currentHp <= 100) {
+        postLogEntry(campaignName, {
+            type: 'creature_death',
+            characterName: targetName,
+            cause: 'Power Word Kill',
+            casterName: playerStats.name,
+            timestamp: Date.now(),
+        });
+
+        postLogEntry(campaignName, {
+            type: 'hp_change',
+            targetName,
+            delta: -currentHp,
+            currentHp: 0,
+            maxHp: creature.maxHp,
+            isHealing: false,
+            sourceName: playerStats.name,
+            note: 'Power Word Kill',
+            timestamp: Date.now(),
+        });
+    } else {
+        postLogEntry(campaignName, {
+            type: 'hp_change',
+            targetName,
+            delta: 0,
+            currentHp,
+            maxHp: creature.maxHp,
+            isHealing: false,
+            sourceName: playerStats.name,
+            note: 'Power Word Kill (target too healthy)',
+        });
+    }
 }
 
 async function triggerHeal(spell, metaCtx, playerStats, campaignName, _mapName) {

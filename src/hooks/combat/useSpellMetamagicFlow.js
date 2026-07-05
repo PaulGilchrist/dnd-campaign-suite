@@ -17,15 +17,15 @@ import {
 import { useConfirmableFlow } from './useConfirmableFlow.js'
 import { confirmGreaterRestoration } from '../../services/rules/features/greaterRestorationService.js'
 
-function getCreatureTargets(excludeName, campaignName) {
+function getCreatureTargets(excludeName, campaignName, characters = []) {
   const cs = getCombatSummary(campaignName);
-  if (!cs?.creatures) return [];
-  return cs.creatures
-    .filter(c => c.name !== excludeName)
-    .map(c => c.name);
+  if (cs?.creatures) {
+    return cs.creatures.map(c => c.name);
+  }
+  return characters.map(c => c.name);
 }
 
-export function useSpellMetamagicFlow(playerStats, campaignName, onExecute) {
+export function useSpellMetamagicFlow(playerStats, campaignName, onExecute, setSecondaryTargetModal, characters = []) {
   const isSorcerer = playerStats?.class?.name === 'Sorcerer';
   const { setPending: cfSetPending, getPending, createConfirmHandler, createSkipHandler, clearPending: cfClearPending } = useConfirmableFlow(playerStats, campaignName);
 
@@ -219,11 +219,53 @@ export function useSpellMetamagicFlow(playerStats, campaignName, onExecute) {
       }
     }
 
-    const multiTargetSpread = getMultiTargetSpreadForSpell(playerStats, spell.name);
+    const isPowerWordSpell = spell.name && (spell.name.toLowerCase() === 'power word heal' || spell.name.toLowerCase() === 'power word kill');
+    const multiTargetSpread = isPowerWordSpell ? { range: '10 ft' } : getMultiTargetSpreadForSpell(playerStats, spell.name);
 
     if (multiTargetSpread) {
-      const creatureTargets = getCreatureTargets(playerStats?.name, campaignName);
+      const creatureTargets = getCreatureTargets(playerStats?.name, campaignName, characters);
       if (creatureTargets.length > 0) {
+        if (isPowerWordSpell && setSecondaryTargetModal) {
+          const modalConfig = {
+            title: 'Words of Creation — Choose Second Target',
+            targets: creatureTargets.map(name => ({ name, type: 'creature' })),
+            confirmLabel: 'Cast Spell',
+            confirmIcon: 'fa-solid fa-sparkles',
+            featureDescription: `When you cast ${spell.name}, you can target a second creature within ${multiTargetSpread.range || '10 ft'} of the first target.`,
+            description: 'Select a second creature to also be affected by the spell.',
+            onTargetSelected: async (secondTargetName) => {
+              addEntry(campaignName, {
+                type: 'spell',
+                characterName: playerStats.name,
+                spellName: spell.name,
+                spellLevel: spell.level || 0,
+                castingTime: spell.casting_time,
+                metamagic: ['Words of Creation'],
+                spCost: 0,
+                timestamp: Date.now(),
+              });
+              const metaCtx = { multiTarget: secondTargetName };
+              onExecute(spell, metaCtx);
+              setSecondaryTargetModal(null);
+            },
+            onSkip: () => {
+              addEntry(campaignName, {
+                type: 'spell',
+                characterName: playerStats.name,
+                spellName: spell.name,
+                spellLevel: spell.level || 0,
+                castingTime: spell.casting_time,
+                metamagic: [],
+                spCost: 0,
+                timestamp: Date.now(),
+              });
+              onExecute(spell, {});
+              setSecondaryTargetModal(null);
+            },
+          };
+          setSecondaryTargetModal(modalConfig);
+          return;
+        }
         cfSetPending('multiTarget', {
           spell,
           spellName: spell.name,
@@ -266,7 +308,7 @@ export function useSpellMetamagicFlow(playerStats, campaignName, onExecute) {
       psionicCost: isPsionic && hasPsionic ? spellLevel : 0,
       _metaCtx: metaCtx,
     });
-    }, [isSorcerer, playerStats, campaignName, onExecute, cfSetPending]);
+    }, [isSorcerer, playerStats, campaignName, onExecute, cfSetPending, setSecondaryTargetModal, characters]);
 
   const handleConfirm = React.useCallback((result) => {
     const pending = pendingMetamagic;

@@ -176,7 +176,7 @@ function CharReactions({ playerStats, campaignName, cannotAct, mapName, characte
 
     const { castAction: reactionCastAction } = useSpellCastExecutor(rollAttack, rollDamage, playerStats, getTargetInfo, campaignName, mapName, characters, setPopupHtml, {}, cachedReactionCastPosRef);
 
-    const { pendingMetamagic, gateMetamagic, handleConfirm, handleSkip } = useSpellMetamagicFlow(playerStats, campaignName, reactionCastAction);
+    const { pendingMetamagic, gateMetamagic, handleConfirm, handleSkip } = useSpellMetamagicFlow(playerStats, campaignName, reactionCastAction, null, characters);
     const { buildUpcastLevels } = useSpellUpcastFlow(playerStats, campaignName);
 
     const handleReactionSpellCast = React.useCallback(async (spell, metaCtx) => {

@@ -633,9 +633,17 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                 handleChoice(e.detail.chosenType);
             });
             window.addEventListener('damage-type-skip', handleSkip);
+            const handleHealingPopup = (e) => {
+                const { targetName, healingName, rollInfo, maximizeHealingDice, popupText } = e.detail || {};
+                const diceRoll = rollInfo ? ` [${rollInfo}]` : '';
+                const maximizeNote = maximizeHealingDice ? ' (maximized)' : '';
+                setPopupHtml(`<b>${healingName}</b> on ${targetName}${diceRoll}${maximizeNote}<br/><br/>${popupText}`);
+            };
+            window.addEventListener('healing-popup', handleHealingPopup);
             return () => {
                 window.removeEventListener('damage-type-choice', handleChoice);
                 window.removeEventListener('damage-type-skip', handleSkip);
+                window.removeEventListener('healing-popup', handleHealingPopup);
             };
         }
     }, [popupHtml, playerStats.name, campaignName, rollDamage, setPopupHtml]);
@@ -1511,7 +1519,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
 
     const { castAction: actionCastAction } = useSpellCastExecutor(rollAttack, rollDamage, playerStats, getTargetInfo, campaignName, mapName, characters, setPopupHtml, { featEffects: featRangeEffects }, cachedActionCastPosRef);
 
-    const { pendingMetamagic: actionPendingMetamagic, gateMetamagic: actionGateMetamagic, handleConfirm: actionHandleConfirm, handleSkip: actionHandleSkip, pendingAid: actionPendingAid, handleAidConfirm: actionHandleAidConfirm, handleAidSkip: actionHandleAidSkip, pendingGreaterRestoration: actionPendingGreaterRestoration, handleGreaterRestorationConfirm: actionHandleGreaterRestorationConfirm, handleGreaterRestorationSkip: actionHandleGreaterRestorationSkip, pendingRemoveCurse: actionPendingRemoveCurse, handleRemoveCurseConfirm: actionHandleRemoveCurseConfirm, handleRemoveCurseSkip: actionHandleRemoveCurseSkip, pendingMagicMissile: actionPendingMagicMissile, handleMagicMissileConfirm: actionHandleMagicMissileConfirm, handleMagicMissileSkip: actionHandleMagicMissileSkip } = useSpellMetamagicFlow(playerStats, campaignName, actionCastAction);
+    const { pendingMetamagic: actionPendingMetamagic, gateMetamagic: actionGateMetamagic, handleConfirm: actionHandleConfirm, handleSkip: actionHandleSkip, pendingAid: actionPendingAid, handleAidConfirm: actionHandleAidConfirm, handleAidSkip: actionHandleAidSkip, pendingGreaterRestoration: actionPendingGreaterRestoration, handleGreaterRestorationConfirm: actionHandleGreaterRestorationConfirm, handleGreaterRestorationSkip: actionHandleGreaterRestorationSkip, pendingRemoveCurse: actionPendingRemoveCurse, handleRemoveCurseConfirm: actionHandleRemoveCurseConfirm, handleRemoveCurseSkip: actionHandleRemoveCurseSkip, pendingMagicMissile: actionPendingMagicMissile, handleMagicMissileConfirm: actionHandleMagicMissileConfirm, handleMagicMissileSkip: actionHandleMagicMissileSkip } = useSpellMetamagicFlow(playerStats, campaignName, actionCastAction, setSecondaryTargetModal, characters);
 
     const handleActionSpellCast = React.useCallback(async (spell, metaCtx) => {
         setSelectedActionSpell(null);

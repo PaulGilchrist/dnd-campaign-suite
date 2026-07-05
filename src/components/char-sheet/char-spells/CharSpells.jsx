@@ -9,6 +9,7 @@ import MetamagicPopup from '../popups/MetamagicPopup.jsx'
 import SpellDetailPopup from './SpellDetailPopup.jsx'
 import CharSpellSlots from './CharSpellSlots.jsx'
 import MultiTargetPopup from '../popups/MultiTargetPopup.jsx'
+import SecondaryTargetModal from '../modals/shared/SecondaryTargetModal.jsx'
 import MultiTargetCountPopup from '../popups/MultiTargetCountPopup.jsx'
 import TargetWithCheckboxesPopup from '../popups/TargetWithCheckboxesPopup.jsx'
 import SingleTargetPopup from '../popups/SingleTargetPopup.jsx'
@@ -38,6 +39,7 @@ const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells
     const innateSorceryActive = isInnateSorceryActive(playerStats.name, campaignName);
     useActionPopup('spell');
     const { setPopupHtml } = useDiceRollPopup();
+    const [wordsOfCreationTarget, setWordsOfCreationTarget] = React.useState(null);
     const { rollAttack, rollDamage } = useLoggedDiceRoll(playerStats.name, campaignName, {
         characters,
         autoDamageSource: 'char-spells',
@@ -176,7 +178,7 @@ const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells
 
     const { castAction } = useSpellCastExecutor(rollAttack, rollDamage, playerStats, getTargetInfo, campaignName, mapName, characters, setPopupHtml, {}, cachedCastPosRef);
 
-    const { pendingMetamagic, pendingMultiTarget, gateMetamagic, handleConfirm, handleSkip, handleMultiTargetConfirm, handleMultiTargetSkip, pendingAid, handleAidConfirm, handleAidSkip, pendingHeroesFeast, handleHeroesFeastConfirm, handleHeroesFeastSkip, pendingGreaterRestoration, handleGreaterRestorationConfirm, handleGreaterRestorationSkip, pendingLesserRestoration, handleLesserRestorationConfirm, handleLesserRestorationSkip, pendingMageArmor, handleMageArmorConfirm, handleMageArmorSkip, pendingProtectionFromEnergy, handleProtectionFromEnergyConfirm, handleProtectionFromEnergySkip, pendingResistance, handleResistanceConfirm, handleResistanceSkip, pendingRemoveCurse, handleRemoveCurseConfirm, handleRemoveCurseSkip, pendingMagicMissile, handleMagicMissileConfirm, handleMagicMissileSkip } = useSpellMetamagicFlow(playerStats, campaignName, castAction);
+    const { pendingMetamagic, pendingMultiTarget, gateMetamagic, handleConfirm, handleSkip, handleMultiTargetConfirm, handleMultiTargetSkip, pendingAid, handleAidConfirm, handleAidSkip, pendingHeroesFeast, handleHeroesFeastConfirm, handleHeroesFeastSkip, pendingGreaterRestoration, handleGreaterRestorationConfirm, handleGreaterRestorationSkip, pendingLesserRestoration, handleLesserRestorationConfirm, handleLesserRestorationSkip, pendingMageArmor, handleMageArmorConfirm, handleMageArmorSkip, pendingProtectionFromEnergy, handleProtectionFromEnergyConfirm, handleProtectionFromEnergySkip, pendingResistance, handleResistanceConfirm, handleResistanceSkip, pendingRemoveCurse, handleRemoveCurseConfirm, handleRemoveCurseSkip, pendingMagicMissile, handleMagicMissileConfirm, handleMagicMissileSkip } = useSpellMetamagicFlow(playerStats, campaignName, castAction, setWordsOfCreationTarget, characters);
     const { pendingUpcast, buildUpcastLevels, gateUpcast, handleUpcastConfirm, handleUpcastCancel, getCantripAutoLevel } = useSpellUpcastFlow(playerStats, campaignName);
 
     const handleSpellCast = React.useCallback(async (spell, metaCtx) => {
@@ -355,6 +357,18 @@ return (
                         creatureTargets={pendingMultiTarget.creatureTargets}
                         onConfirm={handleMultiTargetConfirm}
                         onSkip={handleMultiTargetSkip}
+                      />
+                    )}
+                    {wordsOfCreationTarget && (
+                      <SecondaryTargetModal
+                        title={wordsOfCreationTarget.title}
+                        targets={wordsOfCreationTarget.targets}
+                        onTargetSelected={wordsOfCreationTarget.onTargetSelected}
+                        onSkip={wordsOfCreationTarget.onSkip}
+                        featureDescription={wordsOfCreationTarget.featureDescription}
+                        description={wordsOfCreationTarget.description}
+                        confirmLabel={wordsOfCreationTarget.confirmLabel}
+                        confirmIcon={wordsOfCreationTarget.confirmIcon}
                       />
                     )}
                     {pendingAid && (

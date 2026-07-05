@@ -510,7 +510,7 @@ describe('useSpellMetamagicFlow — spell-specific gate paths', () => {
       expect(result.current.pendingMetamagic.spell).toBe(spell);
     });
 
-    it('filters out self from creature targets in multi-target spread', () => {
+    it('includes all creatures in multi-target spread', () => {
       postCastRiderModule.getMultiTargetSpreadForSpell.mockReturnValueOnce({
         range: '20 ft',
       });
@@ -530,6 +530,7 @@ describe('useSpellMetamagicFlow — spell-specific gate paths', () => {
       });
 
       expect(result.current.pendingMultiTarget.creatureTargets).toEqual([
+        'TestSorcerer',
         'Orc A',
       ]);
     });
