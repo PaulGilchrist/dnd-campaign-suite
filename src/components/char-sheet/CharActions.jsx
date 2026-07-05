@@ -612,6 +612,26 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
 
     // Handle damage type choice popup (e.g. Blessed Strikes: Necrotic or Radiant)
     useEffect(() => {
+        const handleHealingPopup = (e) => {
+            const { targetName, healingName, rollInfo, maximizeHealingDice, popupText } = e.detail || {};
+            const diceRoll = rollInfo ? ` [${rollInfo}]` : '';
+            const maximizeNote = maximizeHealingDice ? ' (maximized)' : '';
+            setPopupHtml(`<b>${healingName}</b> on ${targetName}${diceRoll}${maximizeNote}<br/><br/>${popupText}`);
+        };
+        const handleDamagePopup = (e) => {
+            const { targetName, spellName, popupText, rollInfo } = e.detail || {};
+            const diceRoll = rollInfo ? ` [${rollInfo}]` : '';
+            setPopupHtml(`<b>${spellName}</b> on ${targetName}${diceRoll}<br/><br/>${popupText}`);
+        };
+        window.addEventListener('healing-popup', handleHealingPopup);
+        window.addEventListener('damage-popup', handleDamagePopup);
+        return () => {
+            window.removeEventListener('healing-popup', handleHealingPopup);
+            window.removeEventListener('damage-popup', handleDamagePopup);
+        };
+    }, [setPopupHtml]);
+
+    useEffect(() => {
         if (popupHtml?.type === 'damage_type_choice') {
             const handleChoice = (chosenType) => {
                 const { bonusFormula, bonusRolls, bonusTotal, usedKey, currentRound, targetName, attackerName, name } = popupHtml;
@@ -633,18 +653,6 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                 handleChoice(e.detail.chosenType);
             });
             window.addEventListener('damage-type-skip', handleSkip);
-            const handleHealingPopup = (e) => {
-                const { targetName, healingName, rollInfo, maximizeHealingDice, popupText } = e.detail || {};
-                const diceRoll = rollInfo ? ` [${rollInfo}]` : '';
-                const maximizeNote = maximizeHealingDice ? ' (maximized)' : '';
-                setPopupHtml(`<b>${healingName}</b> on ${targetName}${diceRoll}${maximizeNote}<br/><br/>${popupText}`);
-            };
-            window.addEventListener('healing-popup', handleHealingPopup);
-            return () => {
-                window.removeEventListener('damage-type-choice', handleChoice);
-                window.removeEventListener('damage-type-skip', handleSkip);
-                window.removeEventListener('healing-popup', handleHealingPopup);
-            };
         }
     }, [popupHtml, playerStats.name, campaignName, rollDamage, setPopupHtml]);
 

@@ -166,28 +166,29 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
         spellCastingMod = playerStats.spellAbilities.modifier || 0;
     }
 
-    if (!formula) {
-        if (spell.name.toLowerCase() === 'power word heal') {
-            const target = await getTargetInfo();
-            if (target?.name) {
-                await applyPowerWordHealToTarget(target.name, playerStats, campaignName);
-                if (metaCtx?.multiTarget) {
-                    await applyPowerWordHealToTarget(metaCtx.multiTarget, playerStats, campaignName);
-                }
+    if (spell.name.toLowerCase() === 'power word heal') {
+        const target = await getTargetInfo();
+        if (target?.name) {
+            await applyPowerWordHealToTarget(target.name, playerStats, campaignName);
+            if (metaCtx?.multiTarget) {
+                await applyPowerWordHealToTarget(metaCtx.multiTarget, playerStats, campaignName);
             }
-            return;
         }
+        return;
+    }
 
-        if (spell.name.toLowerCase() === 'power word kill') {
-            const target = await getTargetInfo();
-            if (target?.name) {
-                await applyPowerWordKillToTarget(target.name, playerStats, campaignName);
-                if (metaCtx?.multiTarget) {
-                    await applyPowerWordKillToTarget(metaCtx.multiTarget, playerStats, campaignName);
-                }
+    if (spell.name && spell.name.toLowerCase() === 'power word kill') {
+        const target = await getTargetInfo();
+        if (target?.name) {
+            await applyPowerWordKillToTarget(target.name, playerStats, campaignName);
+            if (metaCtx?.multiTarget) {
+                await applyPowerWordKillToTarget(metaCtx.multiTarget, playerStats, campaignName);
             }
-            return;
         }
+        return;
+    }
+
+    if (!formula) {
 
         // Power Word Fortify — multi-target temp HP (up to 6 creatures within range)
         if (spell.name && spell.name.toLowerCase() === 'power word fortify') {
@@ -897,7 +898,7 @@ async function applyPowerWordHealToTarget(targetName, playerStats, campaignName)
         ? (getRuntimeValue(targetName, 'hitPoints') ?? creature.maxHp ?? 0)
         : (creature.maxHp ?? 0);
     const currentHp = isPlayer
-        ? (getRuntimeValue(targetName, 'currentHitPoints') ?? maxHp)
+        ? (getRuntimeValue(targetName, 'currentHitPoints') ?? creature.currentHp ?? maxHp)
         : (creature.currentHp ?? maxHp);
     const healAmount = Math.max(0, maxHp - currentHp);
 
@@ -968,7 +969,10 @@ async function applyPowerWordKillToTarget(targetName, playerStats, campaignName)
     const creature = combatSummary.creatures.find(c => c.name === targetName);
     if (!creature) return;
 
-    const currentHp = creature.currentHp ?? getRuntimeValue(targetName, 'currentHitPoints', campaignName) ?? creature.maxHp;
+    const isPlayer = creature.type === 'player';
+    const currentHp = isPlayer
+        ? (getRuntimeValue(targetName, 'currentHitPoints') ?? creature.currentHp ?? creature.maxHp)
+        : (creature.currentHp ?? creature.maxHp);
 
     if (currentHp <= 100) {
         postLogEntry(campaignName, {
@@ -979,28 +983,34 @@ async function applyPowerWordKillToTarget(targetName, playerStats, campaignName)
             timestamp: Date.now(),
         });
 
-        postLogEntry(campaignName, {
-            type: 'hp_change',
-            targetName,
-            delta: -currentHp,
-            currentHp: 0,
-            maxHp: creature.maxHp,
-            isHealing: false,
-            sourceName: playerStats.name,
-            note: 'Power Word Kill',
-            timestamp: Date.now(),
-        });
+        applyDamageToTarget(combatSummary, targetName, currentHp, ['Psychic'], campaignName, [], false, playerStats.name);
+
+        window.dispatchEvent(new CustomEvent('damage-popup', {
+            detail: {
+                targetName,
+                sourceName: playerStats.name,
+                spellName: 'Power Word Kill',
+                popupText: `${targetName} was slain by Power Word Kill`,
+                damageType: 'Psychic',
+            },
+        }));
     } else {
-        postLogEntry(campaignName, {
-            type: 'hp_change',
-            targetName,
-            delta: 0,
-            currentHp,
-            maxHp: creature.maxHp,
-            isHealing: false,
-            sourceName: playerStats.name,
-            note: 'Power Word Kill (target too healthy)',
-        });
+        const damageFormula = '12d12';
+        const damageResult = rollExpression(damageFormula);
+        const totalDamage = damageResult?.total ?? 0;
+        applyDamageToTarget(combatSummary, targetName, totalDamage, ['Psychic'], campaignName, [], false, playerStats.name);
+
+        window.dispatchEvent(new CustomEvent('damage-popup', {
+            detail: {
+                targetName,
+                sourceName: playerStats.name,
+                spellName: 'Power Word Kill',
+                popupText: `${targetName} took ${totalDamage} Psychic damage (too healthy to kill)`,
+                damageType: 'Psychic',
+                rolls: damageResult?.rolls || [],
+                formula: damageFormula,
+            },
+        }));
     }
 }
 
