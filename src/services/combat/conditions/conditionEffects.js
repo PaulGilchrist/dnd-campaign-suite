@@ -167,6 +167,9 @@ function applySaveModifiers(effects, modifiers, saveType, abilityName, isRaging 
       if (mod.effect === 'stroke_of_luck') {
         effects.strokeOfLuck = true;
       }
+      if (mod.effect === 'bardic_inspiration') {
+        effects.bardicInspiration = true;
+      }
     } else if (mod.target === 'attack_roll' || mod.target === 'attack_rolls' || mod.target === 'attack_rolls_vs_unmounted_near_mount') {
       if (mod.effect === 'advantage') {
         effects.attackAdvantageCount = (effects.attackAdvantageCount || 0) + 1;
@@ -315,6 +318,7 @@ function computeConditionEffects(conditions = [], saveModifiers = [], targetEffe
     tacticalMind: false,
     tacticalMindBonus: null,
     strokeOfLuck: false,
+    bardicInspiration: false,
     luckyAdvantage: false,
     luckyDisadvantage: false,
     modifyD20Roll: false,

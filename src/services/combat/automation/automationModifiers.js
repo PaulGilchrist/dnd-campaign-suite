@@ -127,6 +127,14 @@ export function collectSaveModifiers(features) {
                     effect: 'stroke_of_luck',
                 })
             }
+            if (auto.type === 'bardic_inspiration_use') {
+                modifiers.push({
+                    source: feature.name,
+                    target: auto.target || 'd20',
+                    condition: '',
+                    effect: 'bardic_inspiration',
+                })
+            }
             if (auto.type === 'modify_d20_roll') {
                 modifiers.push({
                     source: feature.name,

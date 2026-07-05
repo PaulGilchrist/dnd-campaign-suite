@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import './diceRollResult.css';
 
-function DiceRollResult({ name, type, rolls, rollType, bonus = 0, bonusDetail, formula = '', modifier = 0, total = 0, targetName, targetAc, hit, resistanceNotice, hunterLoreNotice, forcedMode, isAutoMiss, rangeReason, coverReason, isAutoCrit, isCrit, isNatural1, dc, success, dcType, dcSuccess, waitingForPlayerSave, saveDc, saveType, saveResult, finalDamage, damageApplied, targetCurrentHp, damageReduced, damageType, onQuickRoll, autoDamage, coverLevel, coverAcBonus, autoReroll, autoRerollBonus, strSaveReplace, strCheckReplace, strScore, wisCheckReplace, wisCheckMinBonus, reliableTalent, onReroll, tacticalMind, tacticalMindBonus, gloriousDefenseBonus, onCounterAttack, strokeOfLuck, onStrokeOfLuck, defensiveDuelistBonus, baitAndSwitchBonus, isPotentCantrip, luckyAdvantage, luckyDisadvantage, onLuckyAdvantage, onLuckyDisadvantage, secondaryFormula, secondaryRolls, secondaryTotal, secondaryModifier, secondaryDamageType, secondaryFinalDamage, secondarySaveResult, availableSuperiorityManeuvers, onSuperiorityManeuver, onTacticalMind, gwfApplied, gwfOriginalRolls, gwfDisplayRolls, types, baseFormula, baseTotal, baseRolls, bonusFormula, bonusTotal, bonusRolls, finalHeal, healReduced, bonusHeal, bonusHealDetail, psiBolsteredKnack, onPsiBolsteredKnack, psiBolsteredKnackDieSize }) {
+function DiceRollResult({ name, type, rolls, rollType, bonus = 0, bonusDetail, formula = '', modifier = 0, total = 0, targetName, targetAc, hit, resistanceNotice, hunterLoreNotice, forcedMode, isAutoMiss, rangeReason, coverReason, isAutoCrit, isCrit, isNatural1, dc, success, dcType, dcSuccess, waitingForPlayerSave, saveDc, saveType, saveResult, finalDamage, damageApplied, targetCurrentHp, damageReduced, damageType, onQuickRoll, autoDamage, coverLevel, coverAcBonus, autoReroll, autoRerollBonus, strSaveReplace, strCheckReplace, strScore, wisCheckReplace, wisCheckMinBonus, reliableTalent, onReroll, tacticalMind, tacticalMindBonus, gloriousDefenseBonus, onCounterAttack, strokeOfLuck, onStrokeOfLuck, defensiveDuelistBonus, baitAndSwitchBonus, isPotentCantrip, luckyAdvantage, luckyDisadvantage, onLuckyAdvantage, onLuckyDisadvantage, secondaryFormula, secondaryRolls, secondaryTotal, secondaryModifier, secondaryDamageType, secondaryFinalDamage, secondarySaveResult, availableSuperiorityManeuvers, onSuperiorityManeuver, onTacticalMind, gwfApplied, gwfOriginalRolls, gwfDisplayRolls, types, baseFormula, baseTotal, baseRolls, bonusFormula, bonusTotal, bonusRolls, finalHeal, healReduced, bonusHeal, bonusHealDetail, psiBolsteredKnack, onPsiBolsteredKnack, psiBolsteredKnackDieSize, bardicInspiration, bardicInspirationDie, onBardicInspiration }) {
     const [mode, setMode] = useState(forcedMode || 'normal');
     const [rerollUsed, setRerollUsed] = useState(false);
     const [rerollResult, setRerollResult] = useState(null);
@@ -11,6 +11,8 @@ function DiceRollResult({ name, type, rolls, rollType, bonus = 0, bonusDetail, f
     const [strokeResult, setStrokeResult] = useState(null);
     const [luckyAdvantageUsed, setLuckyAdvantageUsed] = useState(false);
     const [luckyDisadvantageUsed, setLuckyDisadvantageUsed] = useState(false);
+    const [bardicInspirationUsed, setBardicInspirationUsed] = useState(false);
+    const [bardicInspirationResult, setBardicInspirationResult] = useState(null);
     const [superiorityUsed, setSuperiorityUsed] = useState(false);
     const [superiorityResult, setSuperiorityResult] = useState(null);
     const [psiKnackClicked, setPsiKnackClicked] = useState(false);
@@ -44,8 +46,8 @@ function DiceRollResult({ name, type, rolls, rollType, bonus = 0, bonusDetail, f
     const isCritDamage = isDamageType && (isCrit || isAutoCrit);
 
     const originalTotal = (isDamageType || isHealType) ? total : (finalRoll + bonus + modifier);
-    const displayRoll = strokeResult !== null ? 20 : (rerollResult !== null ? rerollResult.roll : finalRoll);
-    const displayTotal = strokeResult !== null ? 20 + bonus + modifier : (rerollResult !== null ? rerollResult.total : originalTotal);
+    const displayRoll = strokeResult !== null ? 20 : (rerollResult !== null ? rerollResult.roll : (bardicInspirationResult !== null ? bardicInspirationResult.d20Roll : finalRoll));
+    const displayTotal = strokeResult !== null ? 20 + bonus + modifier : (rerollResult !== null ? rerollResult.total : (bardicInspirationResult !== null ? bardicInspirationResult.total : originalTotal));
     const appliesReplace = (strSaveReplace && rollType === 'save') || (strCheckReplace && (rollType === 'check' || rollType === 'skill'));
     const finalDisplayTotal = appliesReplace && displayTotal < (strScore || 10) ? strScore : displayTotal;
     const wisBonus = wisCheckReplace ? (wisCheckMinBonus || 1) : bonus;
@@ -63,6 +65,15 @@ function DiceRollResult({ name, type, rolls, rollType, bonus = 0, bonusDetail, f
         setTacticalResult({ bonus: dieResult, total: newTotal });
         setTacticalUsed(true);
         if (onTacticalMind) await onTacticalMind(dieResult);
+    };
+
+    const handleBardicInspiration = async () => {
+        const dieSize = parseInt(bardicInspirationDie, 10) || 6;
+        const dieValue = Math.floor(Math.random() * dieSize) + 1;
+        const newTotal = finalRoll + bonus + modifier + dieValue;
+        setBardicInspirationResult({ d20Roll: finalRoll, dieValue, dieSize, total: newTotal });
+        setBardicInspirationUsed(true);
+        if (onBardicInspiration) await onBardicInspiration(dieValue, dieSize);
     };
 
     const handleSuperiorityManeuver = async (maneuver) => {
@@ -116,6 +127,10 @@ function DiceRollResult({ name, type, rolls, rollType, bonus = 0, bonusDetail, f
                       <span className="dice-rolled">
                         {rerollResult.roll} (reroll)
                       </span>
+                    ) : bardicInspirationResult !== null ? (
+                      <span className="dice-rolled">
+                        {bardicInspirationResult.d20Roll}
+                      </span>
                     ) : isD20 && mode !== 'normal' && safeRolls.length === 2 ? (
                       <span className="dice-rolled">
                         {safeRolls[0]}, {safeRolls[1]} → {finalRoll}
@@ -132,6 +147,8 @@ function DiceRollResult({ name, type, rolls, rollType, bonus = 0, bonusDetail, f
                       ` +${20 + bonus + modifier - 20}`
                     ) : rerollResult !== null ? (
                       ` +${rerollResult.total - rerollResult.roll}`
+                    ) : bardicInspirationResult !== null ? (
+                      ` +${bardicInspirationResult.total - bardicInspirationResult.d20Roll}`
                     ) : isCritDamage ? ` +${modifier}${bonusDetail && bonus > 0 ? ' ' + bonusDetail : ''}` : (bonus + modifier) >= 0 && (bonus + modifier) !== 0 ? ` +${(bonus + modifier)}${bonusDetail ? ' ' + bonusDetail : ''}` :
                      (bonus + modifier) < 0 ? ` ${(bonus + modifier)}${bonusDetail ? ' ' + bonusDetail : ''}` : ''}
                 </div>
@@ -293,6 +310,14 @@ function DiceRollResult({ name, type, rolls, rollType, bonus = 0, bonusDetail, f
               </div>
             )}
 
+            {bardicInspiration && !bardicInspirationUsed && isD20 && (rollType === 'check' || rollType === 'skill' || rollType === 'save') && (
+              <div className="dice-roll-reroll">
+                <button className="dice-roll-reroll-btn" onClick={handleBardicInspiration} type="button">
+                  <i className="fa-solid fa-music"></i> Bardic Inspiration (d{bardicInspirationDie})
+                </button>
+              </div>
+            )}
+
             {luckyAdvantage && !luckyAdvantageUsed && isD20 && (
               <div className="dice-roll-reroll">
                 <button className="dice-roll-reroll-btn" onClick={() => { setMode('advantage'); setLuckyAdvantageUsed(true); if (onLuckyAdvantage) onLuckyAdvantage(); }} type="button">
@@ -376,6 +401,12 @@ function DiceRollResult({ name, type, rolls, rollType, bonus = 0, bonusDetail, f
             {strokeUsed && strokeResult !== null && (
               <div className="dice-roll-reroll-result">
                 <i className="fa-solid fa-star"></i> Stroke of Luck: d20 → 20 + {strokeResult.total - 20} = <strong>{strokeResult.total}</strong>
+              </div>
+            )}
+
+            {bardicInspirationUsed && bardicInspirationResult !== null && (
+              <div className="dice-roll-reroll-result">
+                <i className="fa-solid fa-music"></i> Bardic Inspiration: 1d{bardicInspirationResult.dieSize} → {bardicInspirationResult.dieValue} + <strong>{bardicInspirationResult.total}</strong>
               </div>
             )}
 

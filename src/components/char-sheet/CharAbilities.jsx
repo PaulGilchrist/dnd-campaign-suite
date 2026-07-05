@@ -117,6 +117,13 @@ function CharAbilities({ allAbilityScores, playerStats, campaignName, exhaustion
                 if (conditionEffects?.strokeOfLuck) {
                   ctx.strokeOfLuck = true
                 }
+                if (conditionEffects?.bardicInspiration) {
+                  const biDie = getRuntimeValue(playerStats.name, 'bardicInspirationDie', campaignName);
+                  if (biDie) {
+                    ctx.bardicInspiration = true;
+                    ctx.bardicInspirationDie = biDie;
+                  }
+                }
                 if (conditionEffects?.luckyAdvantage) {
                   ctx.luckyAdvantage = true; ctx.luckyAdvantageType = 'advantage'
                 }
@@ -134,7 +141,7 @@ function CharAbilities({ allAbilityScores, playerStats, campaignName, exhaustion
                   ctx.psiBolsteredKnackDieSize = classLevel?.energy?.energy_die_type || 6;
                 }
                 return Object.keys(ctx).length > 0 ? ctx : undefined
-          }, [conditionEffects, playerStats]);
+          }, [conditionEffects, playerStats, campaignName]);
 
        const makeSaveContext = (abilityName) => {
           const abbr = abilityName.substring(0, 3).toLowerCase()
@@ -152,12 +159,18 @@ function CharAbilities({ allAbilityScores, playerStats, campaignName, exhaustion
            if (conditionEffects?.autoReroll) {
              return { forcedMode, autoFail: autoFail || undefined, autoReroll: true, autoRerollCondition: conditionEffects.autoRerollCondition, autoRerollBonus: conditionEffects.autoRerollBonus || null }
            }
-            if (conditionEffects?.strokeOfLuck) {
-              return { forcedMode, autoFail: autoFail || undefined, strokeOfLuck: true }
-            }
-            if (conditionEffects?.luckyAdvantage) {
-              return { forcedMode, autoFail: autoFail || undefined, luckyAdvantage: true }
-            }
+             if (conditionEffects?.strokeOfLuck) {
+               return { forcedMode, autoFail: autoFail || undefined, strokeOfLuck: true }
+             }
+             if (conditionEffects?.bardicInspiration) {
+               const biDie = getRuntimeValue(playerStats.name, 'bardicInspirationDie', campaignName);
+               if (biDie) {
+                 return { forcedMode, autoFail: autoFail || undefined, bardicInspiration: true, bardicInspirationDie: biDie }
+               }
+             }
+             if (conditionEffects?.luckyAdvantage) {
+               return { forcedMode, autoFail: autoFail || undefined, luckyAdvantage: true }
+             }
             if (conditionEffects?.luckyDisadvantage) {
               return { forcedMode, autoFail: autoFail || undefined, luckyDisadvantage: true }
             }

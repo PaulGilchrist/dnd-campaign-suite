@@ -41,7 +41,10 @@ vi.mock('./CharReactions.jsx', () => ({
 
 vi.mock('./CharSpecialActions.jsx', () => ({
   default: vi.fn(({ playerStats }) => (
-    <div data-testid="char-special-actions"><span>{playerStats?.name || 'none'}</span></div>
+    <div data-testid="char-special-actions">
+      <span>{playerStats?.name || 'none'}</span>
+      <span data-testid="special-actions-count">{playerStats?.specialActions?.length || 0}</span>
+    </div>
   )),
 }));
 
@@ -148,7 +151,7 @@ describe('bardic inspiration feature injection', () => {
     { die: 'd6', combatOptions: ['defense_add_to_ac'], expectedCount: 2, label: 'die + defense' },
     { die: 'd6', combatOptions: ['offense_add_to_damage'], expectedCount: 2, label: 'die + offense' },
     { die: 'd6', combatOptions: ['defense_add_to_ac', 'offense_add_to_damage'], expectedCount: 3, label: 'die + both' },
-  ])('advancement count is $expectedCount when $label', async ({ die, combatOptions, expectedCount }) => {
+  ])('special actions count is $expectedCount when $label', async ({ die, combatOptions, expectedCount }) => {
     mockStore.set('Test Bard:bardicInspirationDie', die);
     mockStore.set('Test Bard:bardicInspirationCombatOptions', JSON.stringify(combatOptions));
 
@@ -158,12 +161,12 @@ describe('bardic inspiration feature injection', () => {
       expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
     });
 
-    expect(screen.getByTestId('advancement-count')).toHaveTextContent(String(expectedCount));
+    expect(screen.getByTestId('special-actions-count')).toHaveTextContent(String(expectedCount));
   });
 
-  it('does not duplicate "Use Bardic Inspiration" if already in characterAdvancement', async () => {
+  it('does not duplicate "Use Bardic Inspiration" if already in specialActions', async () => {
     vi.mocked(rulesFactory.getPlayerStats).mockImplementation(() => Promise.resolve(createMockPlayerStats({
-      characterAdvancement: [{ name: 'Use Bardic Inspiration', description: 'existing' }],
+      specialActions: [{ name: 'Use Bardic Inspiration', description: 'existing' }],
     })));
     mockStore.set('Test Bard:bardicInspirationDie', 'd6');
 
@@ -173,6 +176,6 @@ describe('bardic inspiration feature injection', () => {
       expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
     });
 
-    expect(screen.getByTestId('advancement-count')).toHaveTextContent('1');
+    expect(screen.getByTestId('special-actions-count')).toHaveTextContent('1');
   });
 });

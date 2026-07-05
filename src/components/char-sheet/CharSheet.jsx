@@ -169,11 +169,11 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
             // Inject synthetic "Use Bardic Inspiration" feature if this character has an active BI die
             const biDie = getRuntimeValue(playerSummary.name, 'bardicInspirationDie', campaignName);
             if (biDie) {
-                if (!stats.characterAdvancement) stats.characterAdvancement = [];
+                if (!stats.specialActions) stats.specialActions = [];
                 const grantedBy = getRuntimeValue(playerSummary.name, 'bardicInspirationGrantedBy', campaignName) || 'unknown';
 
-                if (!stats.characterAdvancement.some(f => f.name === 'Use Bardic Inspiration')) {
-                    stats.characterAdvancement.unshift({
+                if (!stats.specialActions.some(f => f.name === 'Use Bardic Inspiration')) {
+                    stats.specialActions.unshift({
                         name: 'Use Bardic Inspiration',
                         description: `Roll your Bardic Inspiration die (1d${biDie}) and add the result to an ability check. Die granted by ${grantedBy}.`,
                         automation: {
@@ -190,8 +190,8 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
                 try { combatOpts = JSON.parse(combatOptRaw) || []; } catch (_e) { /* combatOpts is not valid JSON, ignore */ }
 
                 if (combatOpts.includes('defense_add_to_ac') &&
-                    !stats.characterAdvancement.some(f => f.name === 'Bardic Inspiration: Defense')) {
-                    stats.characterAdvancement.unshift({
+                    !stats.specialActions.some(f => f.name === 'Bardic Inspiration: Defense')) {
+                    stats.specialActions.unshift({
                         name: 'Bardic Inspiration: Defense',
                         description: `Use your Reaction when hit by an attack roll to roll your Bardic Inspiration die (1d${biDie}) and add the number rolled to your AC. Die granted by ${grantedBy}.`,
                         automation: {
@@ -201,8 +201,8 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
                 }
 
                 if (combatOpts.includes('offense_add_to_damage') &&
-                    !stats.characterAdvancement.some(f => f.name === 'Bardic Inspiration: Offense')) {
-                    stats.characterAdvancement.unshift({
+                    !stats.specialActions.some(f => f.name === 'Bardic Inspiration: Offense')) {
+                    stats.specialActions.unshift({
                         name: 'Bardic Inspiration: Offense',
                         description: `Immediately after hitting a target with an attack roll, roll your Bardic Inspiration die (1d${biDie}) and add the number rolled to the attack's damage. Die granted by ${grantedBy}.`,
                         automation: {
@@ -481,6 +481,31 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
         }
     }, [playerStats, campaignName]);
 
+    const handleBardicInspiration = React.useCallback(async (dieValue, dieSize) => {
+        if (!playerStats) return;
+        const playerName = playerStats.name;
+        const biDie = getRuntimeValue(playerName, 'bardicInspirationDie', campaignName);
+        if (!biDie) return;
+        const grantedBy = getRuntimeValue(playerName, 'bardicInspirationGrantedBy', campaignName) || 'unknown';
+        const checkName = popupHtml?.name || 'Ability Check';
+        const d20 = popupHtml?.rolls?.[0] || 0;
+        const bonus = popupHtml?.bonus || 0;
+        const modifier = popupHtml?.modifier || 0;
+        const originalTotal = d20 + bonus + modifier;
+        const modifiedTotal = originalTotal + dieValue;
+        await addEntry(campaignName, {
+            type: 'ability_use',
+            characterName: playerName,
+            abilityName: 'Bardic Inspiration',
+            description: `${playerName} used Bardic Inspiration (1d${dieSize}): +${dieValue} to ${checkName} (d20 ${d20} + ${bonus + modifier} = ${originalTotal} → ${modifiedTotal}). Inspiration granted by ${grantedBy}.`,
+            dieValue,
+            dieSize,
+            timestamp: Date.now(),
+        });
+        setRuntimeValue(playerName, 'bardicInspirationDie', null, campaignName);
+        setRuntimeValue(playerName, 'bardicInspirationGrantedBy', null, campaignName);
+    }, [playerStats, campaignName, popupHtml]);
+
     const handleTacticalMind = React.useCallback(async (dieResult) => {
         if (!playerStats) return;
         const playerName = playerStats.name;
@@ -704,7 +729,7 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
                                 ) : null}
                                 <div className="dice-roll-hint">click to dismiss</div>
                             </div> :
-                            <DiceRollResult {...popupHtml} onSuperiorityManeuver={popupHtml?.availableSuperiorityManeuvers ? handleSuperiorityManeuver : undefined} onTacticalMind={popupHtml?.tacticalMind ? handleTacticalMind : undefined} onPsiBolsteredKnack={popupHtml?.psiBolsteredKnack ? handlePsiBolsteredKnack : undefined} />
+                            <DiceRollResult {...popupHtml} onSuperiorityManeuver={popupHtml?.availableSuperiorityManeuvers ? handleSuperiorityManeuver : undefined} onTacticalMind={popupHtml?.tacticalMind ? handleTacticalMind : undefined} onPsiBolsteredKnack={popupHtml?.psiBolsteredKnack ? handlePsiBolsteredKnack : undefined} onBardicInspiration={popupHtml?.bardicInspiration ? handleBardicInspiration : undefined} />
                 }
             </Popup>
         )}

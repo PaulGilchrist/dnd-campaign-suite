@@ -436,6 +436,8 @@ export function createLogAndShow(deps) {
                 strokeOfLuck: context?.strokeOfLuck,
                 psiBolsteredKnack: context?.psiBolsteredKnack,
                 psiBolsteredKnackDieSize: context?.psiBolsteredKnackDieSize,
+                bardicInspiration: context?.bardicInspiration,
+                bardicInspirationDie: context?.bardicInspirationDie,
                 characterName,
                 campaignName,
                 availableSuperiorityManeuvers,
@@ -1114,6 +1116,8 @@ export function createLogAndShow(deps) {
                 availableSuperiorityManeuvers,
                 forcedMode: context?.forcedMode,
                 strokeOfLuck: context?.strokeOfLuck,
+                bardicInspiration: context?.bardicInspiration,
+                bardicInspirationDie: context?.bardicInspirationDie,
             });
             window.dispatchEvent(new CustomEvent('initiative-rolled', { detail: { characterName: firstName, roll: r1 + totalBonus } }));
         }
