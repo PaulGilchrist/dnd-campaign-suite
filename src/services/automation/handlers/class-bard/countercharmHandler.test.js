@@ -3,19 +3,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import { handle } from './countercharmHandler.js';
-import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../ui/logService.js';
 import { findLastAttack } from '../../common/damageRollback.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
-import { rangeToFeet, getDistanceFeet } from '../../../rules/combat/rangeValidation.js';
-import { resolveMapPositions } from '../../common/targetResolver.js';
+import { rangeToFeet, getDistanceFeet, getNearestPlacedItem } from '../../../rules/combat/rangeValidation.js';
+import * as mapsService from '../../../maps/mapsService.js';
 
 // ── Mocks ──────────────────────────────────────────────────────
-
-vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
-  getRuntimeValue: vi.fn(),
-  setRuntimeValue: vi.fn(),
-}));
 
 vi.mock('../../../ui/logService.js', () => ({
   addEntry: vi.fn(() => Promise.resolve()),
@@ -29,13 +23,18 @@ vi.mock('../../../rules/combat/damageUtils.js', () => ({
   getCombatContext: vi.fn(),
 }));
 
+vi.mock('../../../combat/conditions/conditionSaveService.js', () => ({
+  removeCondition: vi.fn(),
+}));
+
 vi.mock('../../../rules/combat/rangeValidation.js', () => ({
   rangeToFeet: vi.fn(),
   getDistanceFeet: vi.fn(),
+  getNearestPlacedItem: vi.fn(),
 }));
 
-vi.mock('../../common/targetResolver.js', () => ({
-  resolveMapPositions: vi.fn(),
+vi.mock('../../../maps/mapsService.js', () => ({
+  loadMapData: vi.fn(),
 }));
 
 // ── Helpers ────────────────────────────────────────────────────
@@ -57,7 +56,6 @@ function makeAction(automation = {}) {
     name: 'Countercharm',
     automation: {
       range: '30 ft',
-      uses: 1,
       ...automation,
     },
   };
@@ -78,6 +76,7 @@ function makeAttackResult(overrides = {}) {
 
 function makeAttackEvent(overrides = {}) {
   return {
+    rollType: 'attack',
     d20: 8,
     bonus: 2,
     targetAc: 13,
@@ -87,345 +86,304 @@ function makeAttackEvent(overrides = {}) {
   };
 }
 
+function makeSaveEvent(overrides = {}) {
+  return {
+    rollType: 'save',
+    d20: 8,
+    bonus: 2,
+    saveDc: 13,
+    saveResult: 'failure',
+    saveType: 'Wisdom',
+    actionName: 'Charm Person',
+    timestamp: Date.now(),
+    ...overrides,
+  };
+}
+
+function makeCheckEvent(overrides = {}) {
+  return {
+    rollType: 'check',
+    d20: 8,
+    bonus: 2,
+    checkName: 'Persuasion',
+    timestamp: Date.now(),
+    ...overrides,
+  };
+}
+
+function makeMapData(overrides = {}) {
+  return {
+    players: [
+      { name: 'TestHero', gridX: 1, gridY: 1 },
+      { name: 'Ally1', gridX: 4, gridY: 1 },
+    ],
+    placedItems: [
+      { name: 'Goblin', gridX: 6, gridY: 1 },
+    ],
+    ...overrides,
+  };
+}
+
 // ── Tests ──────────────────────────────────────────────────────
 
 describe('countercharmHandler.handle', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    getRuntimeValue.mockReturnValue(undefined);
     findLastAttack.mockResolvedValue(makeAttackResult());
     rangeToFeet.mockReturnValue(30);
-    getCombatContext.mockResolvedValue(null);
-    resolveMapPositions.mockResolvedValue(null);
+    getCombatContext.mockResolvedValue({
+      creatures: [
+        { name: 'TestHero', type: 'player' },
+        { name: 'Ally1', type: 'player' },
+        { name: 'Goblin', type: 'npc' },
+      ],
+    });
+    mapsService.loadMapData.mockResolvedValue(null);
     getDistanceFeet.mockReturnValue(0);
+    getNearestPlacedItem.mockReturnValue(null);
   });
 
-  describe('charge handling', () => {
-    it('should return popup when uses are exhausted', async () => {
+  describe('no recent roll', () => {
+    it('should return popup when no lastAttack exists', async () => {
       const ps = makePlayerStats();
       const action = makeAction();
-      getRuntimeValue.mockReturnValue(0);
 
       const result = await handle(action, ps, campaignName, null);
 
       expect(result.type).toBe('popup');
-      expect(result.payload.type).toBe('automation_info');
-      expect(result.payload.name).toBe('Countercharm');
-      expect(result.payload.description).toContain('no uses remaining');
-      expect(result.payload.description).toContain('Recharges on a Long Rest');
-      expect(result.payload.automation).toEqual({ range: '30 ft', uses: 1 });
+      expect(result.payload.description).toContain('No recent D20 test found');
     });
 
-    it('should skip use check when usesMax is 0 (infinite uses)', async () => {
+    it('should return popup when target is out of range on map', async () => {
       const ps = makePlayerStats();
-      const action = makeAction({ uses: 0 });
+      const action = makeAction();
       findLastAttack.mockResolvedValue(makeAttackResult({
-        attackEvent: makeAttackEvent({ d20: 8, targetAc: 13, hit: false }),
+        attackEvent: makeSaveEvent(),
         targetName: 'TestHero',
       }));
+      mapsService.loadMapData.mockResolvedValue(makeMapData());
+      getDistanceFeet.mockReturnValue(50);
 
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.name).toBe('Countercharm');
-      expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', 'countercharmUses', 0, campaignName);
-    });
-  });
-
-  describe('target resolution', () => {
-    it('should return popup when no recent save is found for player or allies', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-      findLastAttack.mockResolvedValue(makeAttackResult());
-      rangeToFeet.mockReturnValue(30);
-
-      const result = await handle(action, ps, campaignName, null);
+      const result = await handle(action, ps, campaignName, mapName);
 
       expect(result.type).toBe('popup');
-      expect(result.payload.description).toContain('No recent save');
-      expect(result.payload.description).toContain('30 ft');
+      expect(result.payload.description).toContain('No recent D20 test found');
     });
 
-    it('should find player\'s own failed save', async () => {
+    it('should skip range check when no active map', async () => {
       const ps = makePlayerStats();
       const action = makeAction();
       findLastAttack.mockResolvedValue(makeAttackResult({
-        attackEvent: makeAttackEvent({ d20: 8, targetAc: 13, hit: false }),
+        attackEvent: makeSaveEvent(),
         targetName: 'TestHero',
       }));
 
       const result = await handle(action, ps, campaignName, null);
 
       expect(result.payload.description).toContain('Target: TestHero');
-      expect(result.payload.description).toContain('Original save');
+      expect(mapsService.loadMapData).not.toHaveBeenCalled();
     });
-  });
 
-  describe('ally target resolution', () => {
-    it('should search allies when player has no recent save and range is valid', async () => {
+    it('should skip range check when map data is missing', async () => {
       const ps = makePlayerStats();
       const action = makeAction();
-      let callCount = 0;
-      findLastAttack.mockImplementation(async () => {
-        callCount++;
-        if (callCount === 1) {
-          return makeAttackResult();
-        }
-        return makeAttackResult({
-          attackEvent: makeAttackEvent(),
-          attackerName: 'Ally1',
-          targetName: 'Ally1',
-        });
-      });
-      getCombatContext.mockResolvedValue({
-        creatures: [{ name: 'TestHero' }, { name: 'Ally1' }],
-      });
+      findLastAttack.mockResolvedValue(makeAttackResult({
+        attackEvent: makeSaveEvent(),
+        targetName: 'TestHero',
+      }));
+      mapsService.loadMapData.mockResolvedValue(null);
 
-      const result = await handle(action, ps, campaignName, null);
+      const result = await handle(action, ps, campaignName, mapName);
 
-      expect(result.payload.description).toContain('Target: Ally1');
+      expect(result.payload.description).toContain('Target: TestHero');
     });
 
-    it('should skip ally search when range is falsy or combat context is empty', async () => {
+    it('should skip range check when source not found on map', async () => {
       const ps = makePlayerStats();
-      const action = makeAction({ range: null });
-      findLastAttack.mockResolvedValue(makeAttackResult());
-      rangeToFeet.mockReturnValue(null);
+      const action = makeAction();
+      findLastAttack.mockResolvedValue(makeAttackResult({
+        attackEvent: makeSaveEvent(),
+        targetName: 'TestHero',
+      }));
+      mapsService.loadMapData.mockResolvedValue(makeMapData({
+        players: [{ name: 'OtherPlayer', gridX: 1, gridY: 1 }],
+      }));
 
-      const result = await handle(action, ps, campaignName, null);
+      const result = await handle(action, ps, campaignName, mapName);
 
-      expect(result.type).toBe('popup');
-      expect(result.payload.description).toContain('No recent save');
+      expect(result.payload.description).toContain('Target: TestHero');
+    });
 
-      vi.clearAllMocks();
-      getRuntimeValue.mockReturnValue(undefined);
-      findLastAttack.mockResolvedValue(makeAttackResult());
-      getCombatContext.mockResolvedValue(null);
+    it('should skip range check when target not found on map', async () => {
+      const ps = makePlayerStats();
+      const action = makeAction();
+      findLastAttack.mockResolvedValue(makeAttackResult({
+        attackEvent: makeSaveEvent(),
+        targetName: 'UnknownCreature',
+      }));
+      mapsService.loadMapData.mockResolvedValue(makeMapData());
+      getNearestPlacedItem.mockReturnValue(null);
 
-      const result2 = await handle(action, ps, campaignName, null);
+      const result = await handle(action, ps, campaignName, mapName);
 
-      expect(result2.type).toBe('popup');
-      expect(result2.payload.description).toContain('No recent save');
+      expect(result.payload.description).toContain('Target: UnknownCreature');
     });
   });
 
-  describe('range filtering for allies', () => {
-    it('should include ally within range', async () => {
+  describe('save roll type', () => {
+    it('should find player who failed their own save', async () => {
       const ps = makePlayerStats();
-      const action = makeAction({ range: '30 ft' });
-      let callCount = 0;
-      findLastAttack.mockImplementation(async () => {
-        callCount++;
-        if (callCount === 1) {
-          return makeAttackResult();
-        }
-        return makeAttackResult({
-          attackEvent: makeAttackEvent(),
-          attackerName: 'Ally1',
-          targetName: 'Ally1',
-        });
-      });
-      resolveMapPositions.mockResolvedValue({
-        attackerPos: { gridX: 1, gridY: 1 },
-        targetPos: { gridX: 4, gridY: 1 },
-      });
+      const action = makeAction();
+      findLastAttack.mockResolvedValue(makeAttackResult({
+        attackEvent: makeSaveEvent({ d20: 8, saveDc: 13, saveResult: 'failure' }),
+        targetName: 'TestHero',
+      }));
+
+      const result = await handle(action, ps, campaignName, null);
+
+      expect(result.payload.description).toContain('Target: TestHero');
+      expect(result.payload.description).toContain('Original Wisdom save');
+      expect(result.payload.description).toContain('Reroll with Advantage');
+    });
+
+    it('should find ally who failed their save', async () => {
+      const ps = makePlayerStats();
+      const action = makeAction();
+      findLastAttack.mockResolvedValue(makeAttackResult({
+        attackEvent: makeSaveEvent({ d20: 5, saveDc: 14, saveResult: 'failure' }),
+        targetName: 'Ally1',
+      }));
+      mapsService.loadMapData.mockResolvedValue(makeMapData());
       getDistanceFeet.mockReturnValue(15);
-      getCombatContext.mockResolvedValue({
-        creatures: [{ name: 'TestHero' }, { name: 'Ally1' }],
-      });
 
       const result = await handle(action, ps, campaignName, mapName);
 
       expect(result.payload.description).toContain('Target: Ally1');
+      expect(result.payload.description).toContain('Original Wisdom save');
     });
 
-    it('should skip ally outside range and find next eligible ally', async () => {
+    it('should find NPC who failed their save', async () => {
       const ps = makePlayerStats();
-      const action = makeAction({ range: '30 ft' });
-      let callCount = 0;
-      findLastAttack.mockImplementation(async () => {
-        callCount++;
-        if (callCount === 1) {
-          return makeAttackResult();
-        }
-        if (callCount === 2) {
-          return makeAttackResult({
-            attackEvent: makeAttackEvent(),
-            attackerName: 'Ally1',
-            targetName: 'Ally1',
-          });
-        }
-        return makeAttackResult({
-          attackEvent: makeAttackEvent({ d20: 10, targetAc: 15 }),
-          attackerName: 'Ally2',
-          targetName: 'Ally2',
-        });
-      });
-      let resolveCallCount = 0;
-      resolveMapPositions.mockImplementation(async () => {
-        resolveCallCount++;
-        if (resolveCallCount === 1) {
-          return {
-            attackerPos: { gridX: 1, gridY: 1 },
-            targetPos: { gridX: 9, gridY: 1 },
-          };
-        }
-        return {
-          attackerPos: { gridX: 1, gridY: 1 },
-          targetPos: { gridX: 4, gridY: 1 },
-        };
-      });
-      getDistanceFeet.mockImplementation((pos1, pos2) => {
-        const dx = Math.abs(pos2.gridX - pos1.gridX) * 5;
-        const dy = Math.abs(pos2.gridY - pos1.gridY) * 5;
-        return Math.sqrt(dx * dx + dy * dy);
-      });
-      getCombatContext.mockResolvedValue({
-        creatures: [{ name: 'TestHero' }, { name: 'Ally1' }, { name: 'Ally2' }],
-      });
+      const action = makeAction();
+      findLastAttack.mockResolvedValue(makeAttackResult({
+        attackEvent: makeSaveEvent({ d20: 5, saveDc: 14, saveResult: 'failure' }),
+        targetName: 'Goblin',
+      }));
+      mapsService.loadMapData.mockResolvedValue(makeMapData());
+      getNearestPlacedItem.mockReturnValue({ gridX: 6, gridY: 1 });
+      getDistanceFeet.mockReturnValue(25);
 
       const result = await handle(action, ps, campaignName, mapName);
 
-      expect(result.payload.description).toContain('Target: Ally2');
+      expect(result.payload.description).toContain('Target: Goblin');
     });
 
-    it('should skip ally if map positions are missing or distance is null', async () => {
+    it('should display turned failure into success', async () => {
       const ps = makePlayerStats();
-      const action = makeAction({ range: '30 ft' });
-      let callCount = 0;
-      findLastAttack.mockImplementation(async () => {
-        callCount++;
-        if (callCount === 1) {
-          return makeAttackResult();
-        }
-        if (callCount === 2) {
-          return makeAttackResult({
-            attackEvent: makeAttackEvent(),
-            attackerName: 'Ally1',
-            targetName: 'Ally1',
-          });
-        }
-        return makeAttackResult({
-          attackEvent: makeAttackEvent(),
-          attackerName: 'Ally2',
-          targetName: 'Ally2',
-        });
-      });
-      resolveMapPositions.mockResolvedValue(null);
-      getCombatContext.mockResolvedValue({
-        creatures: [{ name: 'TestHero' }, { name: 'Ally1' }, { name: 'Ally2' }],
-      });
+      const action = makeAction();
+      findLastAttack.mockResolvedValue(makeAttackResult({
+        attackEvent: makeSaveEvent({ d20: 8, saveDc: 13, saveResult: 'failure' }),
+        targetName: 'TestHero',
+      }));
 
-      const result = await handle(action, ps, campaignName, mapName);
+      const result = await handle(action, ps, campaignName, null);
 
-      expect(result.payload.description).toContain('Target: Ally1');
+      expect(result.payload.description).toContain('Failed');
+      expect(result.payload.description).toContain('Reroll with Advantage');
+    });
 
-      vi.clearAllMocks();
-      getRuntimeValue.mockReturnValue(undefined);
-      findLastAttack.mockResolvedValue(makeAttackResult());
-      getCombatContext.mockResolvedValue(null);
+    it('should display no effect when save already succeeded', async () => {
+      const ps = makePlayerStats();
+      const action = makeAction();
+      findLastAttack.mockResolvedValue(makeAttackResult({
+        attackEvent: makeSaveEvent({ d20: 15, saveDc: 13, saveResult: 'success' }),
+        targetName: 'TestHero',
+      }));
 
-      const result2 = await handle(action, ps, campaignName, null);
+      const result = await handle(action, ps, campaignName, null);
 
-      expect(result2.type).toBe('popup');
-      expect(result2.payload.description).toContain('No recent save');
+      expect(result.payload.description).toContain('Succeeded');
+      expect(result.payload.description).toContain('already succeeded');
     });
   });
 
-  describe('attack roll reroll display', () => {
-    it('should display original miss and reroll result with advantage', async () => {
+  describe('attack roll type', () => {
+    it('should find attacker who made the roll', async () => {
       const ps = makePlayerStats();
       const action = makeAction();
       findLastAttack.mockResolvedValue(makeAttackResult({
         attackEvent: makeAttackEvent({ d20: 8, targetAc: 13, hit: false }),
-        targetName: 'TestHero',
+        attackerName: 'TestHero',
       }));
-      rangeToFeet.mockReturnValue(30);
 
       const result = await handle(action, ps, campaignName, null);
 
       expect(result.payload.description).toContain('Target: TestHero');
-      expect(result.payload.description).toContain('Original save: d20(8)');
+      expect(result.payload.description).toContain('Original roll');
+      expect(result.payload.description).toContain('Reroll with Advantage');
+    });
+
+    it('should display turned miss into hit', async () => {
+      const ps = makePlayerStats();
+      const action = makeAction();
+      findLastAttack.mockResolvedValue(makeAttackResult({
+        attackEvent: makeAttackEvent({ d20: 8, targetAc: 13, hit: false }),
+        attackerName: 'TestHero',
+      }));
+
+      const result = await handle(action, ps, campaignName, null);
+
+      expect(result.payload.description).toContain('MISS');
+      expect(result.payload.description).toContain('Reroll with Advantage');
+    });
+
+    it('should display no effect when attack already hit', async () => {
+      const ps = makePlayerStats();
+      const action = makeAction();
+      findLastAttack.mockResolvedValue(makeAttackResult({
+        attackEvent: makeAttackEvent({ d20: 15, targetAc: 13, hit: true }),
+        attackerName: 'TestHero',
+      }));
+
+      const result = await handle(action, ps, campaignName, null);
+
+      expect(result.payload.description).toContain('already succeeded');
+    });
+  });
+
+  describe('ability check roll type', () => {
+    it('should find character who made the check', async () => {
+      const ps = makePlayerStats();
+      const action = makeAction();
+      findLastAttack.mockResolvedValue(makeAttackResult({
+        attackEvent: makeCheckEvent({ d20: 8 }),
+        attackerName: 'TestHero',
+      }));
+
+      const result = await handle(action, ps, campaignName, null);
+
+      expect(result.payload.description).toContain('Target: TestHero');
+      expect(result.payload.description).toContain('Persuasion');
       expect(result.payload.description).toContain('Reroll with Advantage');
     });
   });
 
-  describe('uses decrement', () => {
-    it('should decrement uses from stored value, falling back to usesMax when no stored value', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction({ uses: 3 });
-      findLastAttack.mockResolvedValue(makeAttackResult({
-        attackEvent: makeAttackEvent({ hit: false }),
-        targetName: 'TestHero',
-      }));
-      rangeToFeet.mockReturnValue(30);
-      getRuntimeValue.mockReturnValue(3);
-
-      await handle(action, ps, campaignName, null);
-
-      expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', 'countercharmUses', 2, campaignName);
-    });
-
-    it('should decrement from stored value when lower than usesMax', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction({ uses: 5 });
-      findLastAttack.mockResolvedValue(makeAttackResult({
-        attackEvent: makeAttackEvent({ hit: false }),
-        targetName: 'TestHero',
-      }));
-      getRuntimeValue.mockReturnValue(2);
-
-      await handle(action, ps, campaignName, null);
-
-      expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', 'countercharmUses', 1, campaignName);
-    });
-
-    it('should use usesMax as fallback when no stored value exists', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction({ uses: 4 });
-      findLastAttack.mockResolvedValue(makeAttackResult({
-        attackEvent: makeAttackEvent({ hit: false }),
-        targetName: 'TestHero',
-      }));
-      getRuntimeValue.mockReturnValue(undefined);
-
-      await handle(action, ps, campaignName, null);
-
-      expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', 'countercharmUses', 3, campaignName);
-    });
-  });
-
   describe('custom feature name', () => {
-    it('should use custom name in popup, description, and runtime key', async () => {
+    it('should use custom name in popup and description', async () => {
       const ps = makePlayerStats();
       const action = {
         name: 'Bardic Countercharm',
-        automation: { range: '30 ft', uses: 1 },
+        automation: { range: '30 ft' },
       };
       findLastAttack.mockResolvedValue(makeAttackResult({
-        attackEvent: makeAttackEvent({ hit: false }),
+        attackEvent: makeSaveEvent({ saveResult: 'failure' }),
         targetName: 'TestHero',
       }));
-      getRuntimeValue.mockReturnValue(1);
 
       const result = await handle(action, ps, campaignName, null);
 
       expect(result.payload.name).toBe('Bardic Countercharm');
       expect(result.payload.description).toContain('<b>Bardic Countercharm</b>');
-      expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', 'bardiccountercharmUses', 0, campaignName);
-    });
-
-    it('should use custom name in no-uses message', async () => {
-      const ps = makePlayerStats();
-      const action = {
-        name: 'MyCountercharm',
-        automation: { range: '30 ft', uses: 1 },
-      };
-      getRuntimeValue.mockReturnValue(0);
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.payload.description).toContain('MyCountercharm has no uses remaining');
     });
   });
 
@@ -434,7 +392,7 @@ describe('countercharmHandler.handle', () => {
       const ps = makePlayerStats();
       const action = makeAction();
       findLastAttack.mockResolvedValue(makeAttackResult({
-        attackEvent: makeAttackEvent({ hit: false }),
+        attackEvent: makeSaveEvent({ saveResult: 'failure' }),
         targetName: 'TestHero',
       }));
 
@@ -444,7 +402,7 @@ describe('countercharmHandler.handle', () => {
         type: 'ability_use',
         characterName: 'TestHero',
         abilityName: 'Countercharm',
-        description: 'TestHero used Countercharm on TestHero.',
+        description: expect.stringContaining('TestHero used Countercharm on TestHero'),
         targetName: 'TestHero',
         timestamp: expect.any(Number),
       });
@@ -453,32 +411,43 @@ describe('countercharmHandler.handle', () => {
     it('should log ability use with ally target name', async () => {
       const ps = makePlayerStats();
       const action = makeAction();
-      let callCount = 0;
-      findLastAttack.mockImplementation(async () => {
-        callCount++;
-        if (callCount === 1) {
-          return makeAttackResult();
-        }
-        return makeAttackResult({
-          attackEvent: makeAttackEvent(),
-          attackerName: 'Ally1',
-          targetName: 'Ally1',
-        });
-      });
-      getCombatContext.mockResolvedValue({
-        creatures: [{ name: 'TestHero' }, { name: 'Ally1' }],
-      });
+      findLastAttack.mockResolvedValue(makeAttackResult({
+        attackEvent: makeSaveEvent({ saveResult: 'failure' }),
+        targetName: 'Ally1',
+      }));
+      mapsService.loadMapData.mockResolvedValue(makeMapData());
+      getDistanceFeet.mockReturnValue(15);
 
-      await handle(action, ps, campaignName, null);
+      await handle(action, ps, campaignName, mapName);
 
       expect(addEntry).toHaveBeenCalledWith(campaignName, {
         type: 'ability_use',
         characterName: 'TestHero',
         abilityName: 'Countercharm',
-        description: 'TestHero used Countercharm on Ally1.',
+        description: expect.stringContaining('TestHero used Countercharm on Ally1'),
         targetName: 'Ally1',
         timestamp: expect.any(Number),
       });
+    });
+
+    it('should log outcome and effect details', async () => {
+      const ps = makePlayerStats();
+      const action = makeAction();
+      findLastAttack.mockResolvedValue(makeAttackResult({
+        attackEvent: makeSaveEvent({ saveResult: 'failure' }),
+        targetName: 'TestHero',
+      }));
+      getCombatContext.mockResolvedValue({
+        creatures: [
+          { name: 'TestHero', type: 'player' },
+        ],
+      });
+
+      await handle(action, ps, campaignName, null);
+
+      const logCall = addEntry.mock.calls[0][1];
+      expect(logCall.description).toContain('save');
+      expect(logCall.description).toContain('Outcome:');
     });
   });
 });

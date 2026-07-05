@@ -7,6 +7,7 @@ import { addExpiration } from '../../../rules/effects/expirations.js';
 import { rollSaveForCreature } from '../../../rules/combat/applyDamage.js';
 import { rollD20 } from '../../../dice/diceRoller.js';
 import { sendSaveResult } from '../../../combat/conditions/savePromptService.js';
+import storage from '../../../ui/storage.js';
 
 function dispatchSaveResult(campaignName, promptId, targetName, saveType, saveDc, saveResult) {
     sendSaveResult(campaignName, targetName, {
@@ -87,6 +88,27 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     }
 
     const saveResult = await promise;
+
+    // Set combatSummary.lastAttack so Countercharm can find this save
+    if (saveResult) {
+        const lastAttackData = {
+            attackerName: casterName,
+            targetName,
+            d20: saveResult.roll,
+            d20Rolls: [saveResult.roll, ...(saveResult.rawRolls || [])],
+            bonus: saveResult.saveBonus,
+            total: saveResult.total,
+            saveType: 'WIS',
+            saveDc: dc,
+            saveResult: saveResult.success ? 'success' : 'failure',
+            isNatural20: saveResult.roll === 20,
+            isNatural1: saveResult.roll === 1,
+            actionName: 'Charm Person',
+            rollType: 'save',
+            timestamp: Date.now(),
+        };
+        await storage.setProperty('combatSummary', 'lastAttack', lastAttackData, campaignName);
+    }
 
     if (saveResult.success) {
         addEntry(campaignName, {
