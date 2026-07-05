@@ -309,7 +309,21 @@ describe('restRules', () => {
       expect(getBatchUpdates().bardicInspirationUses).toBe(2)
     })
 
+    it('restores Bardic Inspiration when untracked (null) with Font of Inspiration', async () => {
+      const stats = makeStats({
+        class: { name: 'Bard' },
+        automation: { passives: [{ type: 'font_of_inspiration' }] },
+      })
+      await applyShortRest(stats, CAMPAIGN)
+
+      expect(getBatchUpdates().bardicInspirationUses).toBe(2)
+    })
+
     it('does not override Bardic Inspiration when already at max', async () => {
+      vi.mocked(getRuntimeValue).mockImplementation((_name, key) => {
+        if (key === 'bardicInspirationUses') return 2
+        return undefined
+      })
       const stats = makeStats({
         class: { name: 'Bard' },
         automation: { passives: [{ type: 'font_of_inspiration' }] },

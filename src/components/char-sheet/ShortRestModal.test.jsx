@@ -229,15 +229,13 @@ describe('ShortRestModal', () => {
                 expect(screen.getByText('Font of Inspiration')).toBeInTheDocument();
             });
 
-            it('shows applied state after using Font of Inspiration when uses are below max', () => {
+            it('shows Font of Inspiration applied when uses are below max', () => {
                 setupGetRuntimeValue({ bardicInspirationUses: 0 });
                 renderModal({
                     class: { name: 'Bard', major: { name: 'Bard' } },
                     automation: { passives: [{ type: 'font_of_inspiration' }] },
                 });
-                const button = screen.getByRole('button', { name: /Regain.*Bardic Inspiration Uses/ });
-                fireEvent.click(button);
-                expect(screen.getByText('Font of Inspiration applied')).toBeInTheDocument();
+                expect(screen.getByText('Font of Inspiration applied on short rest')).toBeInTheDocument();
             });
         });
 
@@ -405,7 +403,7 @@ describe('ShortRestModal', () => {
             expect(srCalls[0][2]).toBe(0);
         });
 
-        it('sets bardic inspiration to max on short rest completion when Font of Inspiration was used', () => {
+        it('sets bardic inspiration to max on short rest completion when Font of Inspiration exists and uses are below max', () => {
             setupGetRuntimeValue({ bardicInspirationUses: 1 });
             const playerStats = createPlayerStats({
                 class: { name: 'Bard', major: { name: 'Bard' } },
@@ -419,7 +417,6 @@ describe('ShortRestModal', () => {
                     onComplete={vi.fn()}
                 />
             );
-            fireEvent.click(screen.getByRole('button', { name: /Regain.*Bardic Inspiration Uses/ }));
             fireEvent.click(screen.getByText('Complete Short Rest'));
             const biCalls = setRuntimeValueMock.mock.calls.filter(
                 (call) => call[1] === 'bardicInspirationUses'

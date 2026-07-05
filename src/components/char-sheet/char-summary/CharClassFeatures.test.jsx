@@ -165,14 +165,6 @@ describe('CharClassFeatures', () => {
             ...overrides,
         });
 
-        it('renders Font of Inspiration button when passive exists', () => {
-            const stats = bardStats({
-                automation: { passives: [{ type: 'font_of_inspiration' }] },
-            });
-            renderComponent(stats);
-            expect(screen.getByTitle('Font of Inspiration: Expend a spell slot to regain 1 Bardic Inspiration use')).toBeInTheDocument();
-        });
-
         it('renders magical secrets tracked resource when bardFeatures.magicalSecrets is not null', () => {
             const stats = bardStats({
                 class: { ...basePlayerStats.class, name: 'Bard', expertise: ['Perception'] },

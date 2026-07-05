@@ -120,8 +120,14 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct, characters }
             } else if (result.modalName === 'weaponMasteryChoice') {
                 setWeaponMasteryChoiceModal(result.payload);
             }
+        } else if (result.type === 'popup') {
+            const payload = result.payload;
+            const name = payload?.name || action?.name || 'Automation';
+            const description = payload?.description || '';
+            const html = `<b>${name}</b><br/>${description}<br/><span class="dice-roll-hint">click to dismiss</span>`;
+            setPopupHtml(html);
         }
-    }, [playerStats, campaignName, cannotAct, setCombatSuperiorityModal]);
+    }, [playerStats, campaignName, cannotAct, setCombatSuperiorityModal, setPopupHtml]);
 
     const handleSignatureSpellsConfirm = useCallback(async (spell1, spell2) => {
         if (!signatureSpellsModal) return;

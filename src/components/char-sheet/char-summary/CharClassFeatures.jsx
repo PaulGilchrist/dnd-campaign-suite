@@ -76,60 +76,18 @@ const BarbarianFeatures = function BarbarianFeatures({ playerStats, campaignName
 const BardFeatures = function BardFeatures({ playerStats, campaignName }) {
     const bardFeatures = getClassFeatures(playerStats);
     const multiMinuteBadges = useActiveBuffs(playerStats, campaignName);
-    const hasFontOfInspiration = (playerStats.automation?.passives ?? []).some(p => p.type === 'font_of_inspiration');
-    const biMax = (() => { const charisma = playerStats.abilities?.find(a => a.name === 'Charisma'); return charisma?.bonus || 0; })();
-    const biCurrent = getRuntimeValue(playerStats.name, 'bardicInspirationUses', campaignName);
-    const biStored = biCurrent != null ? Number(biCurrent) : biMax;
-    const fontOfInspirationAvailable = hasFontOfInspiration && biStored < biMax;
-
-    const handleFontOfInspirationConversion = async () => {
-        if (!fontOfInspirationAvailable) return;
-        const levels = [1, 2, 3, 4, 5, 6, 7, 8, 9];
-        let spellSlotKey = null;
-        let slotMax = 0;
-        for (const level of levels) {
-            const key = `spell_slots_level_${level}`;
-            const current = getRuntimeValue(playerStats.name, key, campaignName);
-            const max = playerStats.spellAbilities?.[key] ?? 0;
-            const stored = current != null ? Number(current) : max;
-            if (stored > 0) {
-                spellSlotKey = key;
-                slotMax = max;
-                break;
-            }
-        }
-        if (!spellSlotKey) return;
-        const currentSlot = getRuntimeValue(playerStats.name, spellSlotKey, campaignName);
-        const slotStored = currentSlot != null ? Number(currentSlot) : slotMax;
-        if (slotStored <= 0) return;
-        await setRuntimeValue(playerStats.name, spellSlotKey, slotStored - 1, campaignName);
-        await setRuntimeValue(playerStats.name, 'bardicInspirationUses', biStored + 1, campaignName);
-    };
 
     return (
            <div data-testid="char-class-bard">
-               {multiMinuteBadges.map((b, i) => <span key={i} className="automation-badge">{b.name}</span>)}
-               <div><b>Bardic Inspiration Die: </b>d{bardFeatures?.bardicDie ?? 0}</div>
-               <TrackedResourceInput label="Bardic Inspiration Uses" resourceKey="bardicInspirationUses" playerName={playerStats.name} getMax={() => { const charisma = playerStats.abilities?.find((a) => a.name === 'Charisma'); return charisma?.bonus || 0; }} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
-                {playerStats.level > 2 && playerStats.expertise && playerStats.expertise.length > 0 && <div><b>Expertise: </b>{playerStats.expertise.join(', ')}</div>}
-               {playerStats.level > 5 && (bardFeatures?.magicalSecrets ?? false) && <div><b>Extra Attacks: </b>1</div>}
-               {hasFontOfInspiration && (
-                   <div className="automation-actions">
-                       <button
-                           className={'automation-btn' + (!fontOfInspirationAvailable ? ' automation-btn--disabled' : '')}
-                           onClick={handleFontOfInspirationConversion}
-                           disabled={!fontOfInspirationAvailable}
-                           title="Font of Inspiration: Expend a spell slot to regain 1 Bardic Inspiration use"
-                       >
-                           <i className="fas fa-wand-magic-sparkles"></i> Font of Inspiration
-                       </button>
-                       {!fontOfInspirationAvailable && <span className="automation-badge">Max BI</span>}
-                   </div>
-               )}
-               {bardFeatures?.magicalSecrets !== null && <TrackedResourceInput label="Magical Secrets" resourceKey="magicalSecrets" playerName={playerStats.name} getMax={() => bardFeatures.magicalSecrets + bardFeatures.subclassMagicalSecrets} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />}
-               {bardFeatures?.songOfRestDie && <div><b>Song of Rest Die: </b>d{bardFeatures.songOfRestDie}</div>}
-           </div>
-        );
+                {multiMinuteBadges.map((b, i) => <span key={i} className="automation-badge">{b.name}</span>)}
+                <div><b>Bardic Inspiration Die: </b>d{bardFeatures?.bardicDie ?? 0}</div>
+                <TrackedResourceInput label="Bardic Inspiration Uses" resourceKey="bardicInspirationUses" playerName={playerStats.name} getMax={() => { const charisma = playerStats.abilities?.find((a) => a.name === 'Charisma'); return charisma?.bonus || 0; }} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
+                 {playerStats.level > 2 && playerStats.expertise && playerStats.expertise.length > 0 && <div><b>Expertise: </b>{playerStats.expertise.join(', ')}</div>}
+                {playerStats.level > 5 && (bardFeatures?.magicalSecrets ?? false) && <div><b>Extra Attacks: </b>1</div>}
+                {bardFeatures?.magicalSecrets !== null && <TrackedResourceInput label="Magical Secrets" resourceKey="magicalSecrets" playerName={playerStats.name} getMax={() => bardFeatures.magicalSecrets + bardFeatures.subclassMagicalSecrets} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />}
+                {bardFeatures?.songOfRestDie && <div><b>Song of Rest Die: </b>d{bardFeatures.songOfRestDie}</div>}
+            </div>
+         );
 
     };
 

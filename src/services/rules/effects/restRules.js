@@ -153,8 +153,9 @@ export async function applyShortRest(playerStats, campaignName) {
   if (hasFontOfInspiration) {
     const charisma = playerStats.abilities?.find(a => a.name === 'Charisma')
     const maxBI = charisma?.bonus || 0
-    const currentBI = Number(getRuntimeValue(name, 'bardicInspirationUses', campaignName) ?? maxBI)
-    if (currentBI < maxBI) {
+    const storedBI = getRuntimeValue(name, 'bardicInspirationUses', campaignName)
+    const currentBI = storedBI != null ? Number(storedBI) : maxBI
+    if (storedBI == null || currentBI < maxBI) {
       updates.bardicInspirationUses = maxBI
     }
   }

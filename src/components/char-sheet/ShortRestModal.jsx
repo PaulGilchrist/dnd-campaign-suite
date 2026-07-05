@@ -19,7 +19,7 @@ function ShortRestModal({ playerStats, campaignName, onClose, onComplete }) {
     const [rollLog, setRollLog] = React.useState([]);
     const [songOfRestApplied, setSongOfRestApplied] = React.useState(false);
     const [restorationRequested, setRestorationRequested] = React.useState(false);
-    const [fontOfInspirationRequested, setFontOfInspirationRequested] = React.useState(false);
+
 
     const isSorcerer = playerStats?.class?.name === 'Sorcerer';
     const sorcRestoration = isSorcerer && (playerStats.automation?.passives ?? []).find(
@@ -137,11 +137,6 @@ function ShortRestModal({ playerStats, campaignName, onClose, onComplete }) {
         setRestorationRequested(true);
        };
 
-    const handleApplyFontOfInspiration = () => {
-        if (!hasFontOfInspiration || !fontOfInspirationAvailable || fontOfInspirationRequested) return;
-        setFontOfInspirationRequested(true);
-       };
-
     const handleCraftBolsteringTreats = () => {
         if (!hasBolsteringTreats || bolsteringTreatsCrafted) return;
         const treatCount = playerStats.proficiency || 0;
@@ -180,7 +175,7 @@ function ShortRestModal({ playerStats, campaignName, onClose, onComplete }) {
             setRuntimeValue(playerStats.name, 'sorcerousRestorationUses', 0, campaignName);
             }
 
-        if (hasFontOfInspiration && fontOfInspirationAvailable && fontOfInspirationRequested) {
+        if (hasFontOfInspiration && fontOfInspirationAvailable) {
             setRuntimeValue(playerStats.name, 'bardicInspirationUses', bardicInspirationMax, campaignName);
             }
 
@@ -293,21 +288,15 @@ function ShortRestModal({ playerStats, campaignName, onClose, onComplete }) {
                         </div>
                     )}
 
-                     {hasFontOfInspiration && (fontOfInspirationAvailable || fontOfInspirationRequested) && (
-                         <div className="short-rest-section">
-                             <h4>Font of Inspiration</h4>
-                             <p>Regain {bardicInspirationMax} expended Bardic Inspiration uses.</p>
-                             <div className="short-rest-dice-row">
-                                 {fontOfInspirationRequested ? (
-                                     <span className="short-rest-applied"><i className="fa-solid fa-check"></i> Font of Inspiration applied</span>
-                                   ) : (
-                                     <button className="char-btn" onClick={handleApplyFontOfInspiration} disabled={!fontOfInspirationAvailable}>
-                                         <i className="fas fa-wand-magic-sparkles"></i> Regain {bardicInspirationMax} Bardic Inspiration Uses
-                                     </button>
-                                   )}
-                             </div>
-                         </div>
-                     )}
+                      {hasFontOfInspiration && fontOfInspirationAvailable && (
+                          <div className="short-rest-section">
+                              <h4>Font of Inspiration</h4>
+                              <p>Regain {bardicInspirationMax} expended Bardic Inspiration uses.</p>
+                              <div className="short-rest-dice-row">
+                                  <span className="short-rest-applied"><i className="fa-solid fa-check"></i> Font of Inspiration applied on short rest</span>
+                              </div>
+                          </div>
+                      )}
 
                      {hasBolsteringTreats && (
                          <div className="short-rest-section">
