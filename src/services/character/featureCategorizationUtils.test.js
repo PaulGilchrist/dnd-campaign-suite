@@ -22,38 +22,19 @@ const makeFeature = (name, overrides = {}) => ({
 
 describe('featureCategorizationUtils', () => {
   describe('categorizeFeatures', () => {
-    it('should return empty arrays when items is null', () => {
-      const result = categorizeFeatures(null, mockCategories);
-      expect(result).toEqual({
-        actions: [],
-        bonusActions: [],
-        reactions: [],
-        specialActions: [],
-        characterAdvancement: []
-      });
+    it('should return empty arrays when items is null, undefined, or not an array', () => {
+      expect(categorizeFeatures(null, mockCategories)).toEqual(emptyResult);
+      expect(categorizeFeatures(undefined, mockCategories)).toEqual(emptyResult);
+      expect(categorizeFeatures('not an array', mockCategories)).toEqual(emptyResult);
     });
 
-    it('should return empty arrays when items is undefined', () => {
-      const result = categorizeFeatures(undefined, mockCategories);
-      expect(result).toEqual({
-        actions: [],
-        bonusActions: [],
-        reactions: [],
-        specialActions: [],
-        characterAdvancement: []
-      });
-    });
-
-    it('should return empty arrays when items is not an array', () => {
-      const result = categorizeFeatures('not an array', mockCategories);
-      expect(result).toEqual({
-        actions: [],
-        bonusActions: [],
-        reactions: [],
-        specialActions: [],
-        characterAdvancement: []
-      });
-    });
+    const emptyResult = {
+      actions: [],
+      bonusActions: [],
+      reactions: [],
+      specialActions: [],
+      characterAdvancement: []
+    };
 
     it('should return empty arrays for empty input array', () => {
       const result = categorizeFeatures([], mockCategories);

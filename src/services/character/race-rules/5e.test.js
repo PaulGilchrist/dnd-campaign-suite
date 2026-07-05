@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { describe, it, expect, vi } from 'vitest';
 import raceRules from './5e.js';
 import utils from '../../ui/utils.js';

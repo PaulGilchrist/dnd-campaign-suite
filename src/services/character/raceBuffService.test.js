@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { describe, it, expect } from 'vitest';
 import { computeRaceBuffs, applyRaceBuffsToPlayerData } from './raceBuffService.js';
 

@@ -142,7 +142,8 @@ describe('Factions', () => {
       render(<Factions {...defaultProps} />);
       await waitFor(() => expect(screen.getByText('ToDelete')).toBeInTheDocument());
       fireEvent.click(screen.getByText('ToDelete'));
-      fireEvent.click(screen.getByRole('button', { name: /Delete/ }));
+      const deleteButtons = screen.getAllByRole('button', { name: /Delete/ });
+      fireEvent.click(deleteButtons[deleteButtons.length - 1]);
       await waitFor(() => expect(factionsState.deleteFactionAction).toHaveBeenCalledWith('f1'));
     });
 
@@ -152,7 +153,8 @@ describe('Factions', () => {
       render(<Factions {...defaultProps} />);
       await waitFor(() => expect(screen.getByText('Keep')).toBeInTheDocument());
       fireEvent.click(screen.getByText('Keep'));
-      fireEvent.click(screen.getByRole('button', { name: /Delete/ }));
+      const deleteButtons = screen.getAllByRole('button', { name: /Delete/ });
+      fireEvent.click(deleteButtons[deleteButtons.length - 1]);
       expect(factionsState.deleteFactionAction).not.toHaveBeenCalled();
     });
 

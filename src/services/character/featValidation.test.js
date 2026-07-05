@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import * as dataLoader from '../ui/dataLoader.js';
 
@@ -21,7 +21,11 @@ describe('featValidation', () => {
     });
 
     describe('getFeatLimits', () => {
-        it('should return correct feat limits for 5e at level 4', async () => {
+        it.each([
+            [4, 1],
+            [8, 2],
+            [19, 5],
+        ])('should return correct feat limits for 5e at level %s (allowed: %s)', async (level, expected) => {
             vi.mocked(dataLoader.loadValidationRules).mockResolvedValue({
                 feats: {
                     available_levels: [4, 8, 12, 16, 19],
