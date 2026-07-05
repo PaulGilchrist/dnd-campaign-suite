@@ -206,40 +206,18 @@ describe('CharSpells - Table Rendering', () => {
   describe('table structure', () => {
     it('renders the spell table', () => {
       renderWithProps({});
-      const table = screen.getByRole('table');
-      expect(table).toBeInTheDocument();
+      expect(screen.getByRole('table')).toBeInTheDocument();
     });
 
-    it('renders 8 header columns for 5e rules (including Prepared)', () => {
-      renderWithProps({});
+    it.each`
+      ruleset                | playerStats              | expectedHeaders
+      ${'5e'}                | ${basePlayerStats}       | ${['Spell', 'Level', 'Prepared', 'Time', 'Range', 'Effect', 'Duration', 'Notes']}
+      ${'2024'}              | ${helpers.mockPlayerStats2024} | ${['Spell', 'Level', 'Time', 'Range', 'Effect', 'Duration', 'Notes']}
+    `('renders correct headers for $ruleset rules', ({ playerStats, expectedHeaders }) => {
+      renderWithProps({ playerStats });
       const table = screen.getByRole('table');
-      const headers = table.querySelectorAll('thead th');
-      expect(headers).toHaveLength(8);
-    });
-
-    it('renders 7 header columns for 2024 rules (excluding Prepared)', () => {
-      renderWithProps({ playerStats: helpers.mockPlayerStats2024 });
-      const table = screen.getByRole('table');
-      const headers = table.querySelectorAll('thead th');
-      expect(headers).toHaveLength(7);
-    });
-
-    it('renders correct header labels for 5e rules', () => {
-      renderWithProps({});
-      const table = screen.getByRole('table');
-      const headerTexts = Array.from(table.querySelectorAll('th')).map(h => h.textContent.trim());
-      expect(headerTexts).toEqual([
-        'Spell', 'Level', 'Prepared', 'Time', 'Range', 'Effect', 'Duration', 'Notes',
-      ]);
-    });
-
-    it('renders correct header labels for 2024 rules without Prepared', () => {
-      renderWithProps({ playerStats: helpers.mockPlayerStats2024 });
-      const table = screen.getByRole('table');
-      const headerTexts = Array.from(table.querySelectorAll('th')).map(h => h.textContent.trim());
-      expect(headerTexts).toEqual([
-        'Spell', 'Level', 'Time', 'Range', 'Effect', 'Duration', 'Notes',
-      ]);
+      const headers = Array.from(table.querySelectorAll('th')).map(h => h.textContent.trim());
+      expect(headers).toEqual(expectedHeaders);
     });
 
     it('renders a row for each spell in the list', () => {
@@ -250,37 +228,15 @@ describe('CharSpells - Table Rendering', () => {
     });
   });
 
-  describe('spell names and levels', () => {
-    it('renders all spell names in the table', () => {
+  describe('spell content rendering', () => {
+    it('renders spell names, levels, ranges, and notes from the data', () => {
       renderWithProps({});
       expect(screen.getByText('Light')).toBeInTheDocument();
       expect(screen.getByText('Detect Magic')).toBeInTheDocument();
-    });
-
-    it('renders Cantrip for 0-level spells and numeric levels for higher spells', () => {
-      renderWithProps({});
       expect(screen.getByText('Cantrip')).toBeInTheDocument();
       expect(screen.getByText('1')).toBeInTheDocument();
-    });
-
-    it('renders level column content for 2024 rules', () => {
-      renderWithProps({ playerStats: helpers.mockPlayerStats2024 });
-      expect(screen.getByText('Cantrip')).toBeInTheDocument();
-      expect(screen.getByText('1')).toBeInTheDocument();
-    });
-  });
-
-  describe('spell ranges', () => {
-    it('renders spell ranges from the data', () => {
-      renderWithProps({});
       expect(screen.getByText('Touch')).toBeInTheDocument();
       expect(screen.getByText('Self')).toBeInTheDocument();
-    });
-  });
-
-  describe('notes column formatting', () => {
-    it('renders components joined with slashes in notes', () => {
-      renderWithProps({});
       const table = screen.getByRole('table');
       const notesCells = Array.from(table.querySelectorAll('td:last-child')).map(td => td.textContent.trim());
       expect(notesCells).toContain('V/M');
@@ -396,13 +352,6 @@ describe('CharSpells - Table Rendering', () => {
       renderWithProps({});
       const levelHeader = screen.getByText('Level');
       fireEvent.click(levelHeader);
-      expect(screen.getByText('Light')).toBeInTheDocument();
-    });
-
-    it('toggles prepared filter when Prepared header is clicked', () => {
-      renderWithProps({});
-      const preparedHeader = screen.getByText('Prepared');
-      fireEvent.click(preparedHeader);
       expect(screen.getByText('Light')).toBeInTheDocument();
     });
   });

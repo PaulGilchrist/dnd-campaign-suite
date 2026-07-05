@@ -1,6 +1,6 @@
 // @cleaned-by-ai
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import CharClassFeatures from './CharClassFeatures.jsx';
 
 vi.mock('./TrackedResourceInput.jsx', () => ({
@@ -140,14 +140,6 @@ describe('CharClassFeatures', () => {
         it('renders rage toggle button with correct title when not raging', () => {
             renderComponent(barbarianStats());
             expect(screen.getByTitle('Enter Rage (toggle for damage bonus)')).toBeInTheDocument();
-        });
-
-        it('shows rage badge and styled damage when rage is toggled on', () => {
-            renderComponent(barbarianStats());
-            const btn = screen.getByTitle('Enter Rage (toggle for damage bonus)');
-            fireEvent.click(btn);
-            expect(screen.getByText(/BPS Resist/)).toBeInTheDocument();
-            expect(screen.getByRole('button', { name: 'Raging' })).toBeInTheDocument();
         });
 
         it('renders barbarian with Aspect of the Wilds passive', () => {

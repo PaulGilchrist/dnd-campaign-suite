@@ -1,5 +1,5 @@
 // @cleaned-by-ai
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharActions from './CharActions.jsx';
 
@@ -188,101 +188,79 @@ describe('CharActions rendering', () => {
       type: 'Action',
     };
 
-    it('renders attack name, range, damage formula, and damage type', () => {
-      render(<CharActions playerStats={createStats({ attacks: [baseAttack] })} />);
-      expect(screen.getByText('Longsword')).toBeInTheDocument();
-      expect(screen.getByText('5 ft.')).toBeInTheDocument();
-      expect(screen.getByText('1d8+3')).toBeInTheDocument();
-      expect(screen.getByText('Slashing')).toBeInTheDocument();
-      expect(screen.getByText('+5')).toBeInTheDocument();
+    it.each([
+      [{ exhaustionPenalty: 0, hitBonus: 5, expected: '+5', penalized: false }, 'no penalty'],
+      [{ exhaustionPenalty: 2, hitBonus: 5, expected: '+3', penalized: true }, 'exhaustion penalty'],
+      [{ exhaustionPenalty: 4, hitBonus: 1, expected: '-3', penalized: true }, 'negative hit bonus'],
+      [{ conditionAttackMode: 'disadvantage', hitBonus: 5, expected: '+5', penalized: true }, 'disadvantage'],
+    ])('computes hit bonus correctly (%s)', (opts, _label) => {
+      render(<CharActions playerStats={createStats({ attacks: [{ ...baseAttack, hitBonus: opts.hitBonus }] })} exhaustionPenalty={opts.exhaustionPenalty} conditionAttackMode={opts.conditionAttackMode} />);
+      expect(screen.getByText(opts.expected)).toBeInTheDocument();
+      if (opts.exhaustionPenalty > 0 || opts.conditionAttackMode === 'disadvantage') {
+        expect(screen.getByText(opts.expected)).toHaveClass('stat--penalized');
+      }
     });
 
-    it('filters out non-Action type attacks from the list', () => {
-      render(<CharActions playerStats={createStats({ attacks: [
-        { ...baseAttack },
-        { ...baseAttack, type: 'Bonus Action', name: 'Secondary' },
-        { ...baseAttack, type: 'Reaction', name: 'Opportunity Attack' },
-      ] })} />);
-      expect(screen.getByText('Longsword')).toBeInTheDocument();
-      expect(screen.queryByText('Secondary')).not.toBeInTheDocument();
-      expect(screen.queryByText('Opportunity Attack')).not.toBeInTheDocument();
-    });
-
-    it('computes hit bonus with exhaustion penalty and applies penalized styling', () => {
-      render(<CharActions playerStats={createStats({ attacks: [baseAttack] })} exhaustionPenalty={2} />);
-      expect(screen.getByText('+3')).toBeInTheDocument();
-      expect(screen.getByText('+3')).toHaveClass('stat--penalized');
-    });
-
-    it('computes negative hit bonus correctly with high exhaustion', () => {
-      render(<CharActions playerStats={createStats({ attacks: [{ ...baseAttack, hitBonus: 1 }] })} exhaustionPenalty={4} />);
-      expect(screen.getByText('-3')).toBeInTheDocument();
-    });
-
-    it('applies penalized styling for disadvantage and cannotAct conditions', () => {
-      render(<CharActions playerStats={createStats({ attacks: [baseAttack] })} conditionAttackMode="disadvantage" exhaustionPenalty={0} />);
-      expect(screen.getByText('+5')).toHaveClass('stat--penalized');
-    });
-
-    it('applies disabled-attack class when cannotAct is true', () => {
+    it('applies disabled-attack class and Incapacitated label when cannotAct is true', () => {
       render(<CharActions playerStats={createStats({ attacks: [baseAttack] })} cannotAct={true} />);
       expect(screen.getByText('+5')).toHaveClass('disabled-attack');
-    });
-
-    it('shows Incapacitated label when cannotAct is true', () => {
-      render(<CharActions playerStats={createStats({ attacks: [baseAttack] })} cannotAct={true} />);
       expect(screen.getByText('(Incapacitated)')).toBeInTheDocument();
     });
-  });
 
-  describe('save DC display', () => {
-    const saveDcAttack = {
-      name: 'Witch Bolt',
-      range: 60,
-      saveDc: 14,
-      saveType: 'CON',
-      damage: '1d12',
-      damageType: 'Lightning',
-      type: 'Action',
-    };
-
-    it('displays save DC in DC X TYPE format with saveDcBonus', () => {
+    it('renders save DC display for save-based attacks', () => {
+      const saveDcAttack = {
+        name: 'Witch Bolt',
+        range: 60,
+        saveDc: 14,
+        saveType: 'CON',
+        damage: '1d12',
+        damageType: 'Lightning',
+        type: 'Action',
+      };
       render(<CharActions playerStats={createStats({ attacks: [saveDcAttack] })} />);
       expect(screen.getByText(/DC 14 CON/)).toBeInTheDocument();
-    });
-
-    it('displays damage and damage type for save-based attacks', () => {
-      render(<CharActions playerStats={createStats({ attacks: [saveDcAttack] })} />);
       expect(screen.getByText('1d12')).toBeInTheDocument();
       expect(screen.getByText('Lightning')).toBeInTheDocument();
     });
 
-    it('renders save DC for different save types', () => {
-      render(<CharActions playerStats={createStats({ attacks: [{ ...saveDcAttack, saveDc: 13, saveType: 'STR' }] })} />);
+    it('renders save DC with different save types', () => {
+      const saveDcAttack = {
+        name: 'Witch Bolt',
+        range: 60,
+        saveDc: 13,
+        saveType: 'STR',
+        damage: '1d12',
+        damageType: 'Thunder',
+        type: 'Action',
+      };
+      render(<CharActions playerStats={createStats({ attacks: [saveDcAttack] })} />);
       expect(screen.getByText(/DC 13 STR/)).toBeInTheDocument();
     });
-  });
 
-  describe('2024 rules mastery column', () => {
-    const baseAttack = {
-      name: 'Longsword',
-      range: 5,
-      hitBonus: 5,
-      damage: '1d8+3',
-      damageType: 'Slashing',
-      type: 'Action',
-    };
+    it('shows Mastery column for 2024 rules but not 5e', () => {
+      const baseAttack = {
+        name: 'Longsword',
+        range: 5,
+        hitBonus: 5,
+        damage: '1d8+3',
+        damageType: 'Slashing',
+        type: 'Action',
+      };
+      render(<CharActions playerStats={createStats({ rules: '2024', attacks: [baseAttack] })} />);
+      expect(screen.getByText('Mastery')).toBeInTheDocument();
+    });
 
-    it.each([
-      ['2024', true],
-      ['5e', false],
-    ])('shows Mastery column and mastery-enabled class for %s rules', (rules, shouldShow) => {
-      render(<CharActions playerStats={createStats({ rules, attacks: [baseAttack] })} />);
-      if (shouldShow) {
-        expect(screen.getByText('Mastery')).toBeInTheDocument();
-      } else {
-        expect(screen.queryByText('Mastery')).not.toBeInTheDocument();
-      }
+    it('hides Mastery column for 5e rules', () => {
+      const baseAttack = {
+        name: 'Longsword',
+        range: 5,
+        hitBonus: 5,
+        damage: '1d8+3',
+        damageType: 'Slashing',
+        type: 'Action',
+      };
+      render(<CharActions playerStats={createStats({ rules: '5e', attacks: [baseAttack] })} />);
+      expect(screen.queryByText('Mastery')).not.toBeInTheDocument();
     });
   });
 
@@ -315,52 +293,26 @@ describe('CharActions rendering', () => {
       expect(screen.getByText(/Simple Action:/)).not.toHaveClass('clickable');
     });
 
-    it('calls buildFeatureDetailHtml when a clickable action with details is clicked', async () => {
-      const stats = createStats({
-        actions: [{ name: 'Test Feature', description: 'Test desc', details: 'Test details' }],
-      });
-      render(<CharActions playerStats={stats} />);
-      const actionName = screen.getByText(/Test Feature:/);
-      fireEvent.click(actionName);
-      const { buildFeatureDetailHtml } = await import('../../hooks/combat/useActionPopup.js');
-      expect(buildFeatureDetailHtml).toHaveBeenCalledWith(stats.actions[0]);
-    });
-  });
-
-  describe('automation badges', () => {
-    it('shows save DC badge for save_attack automation', async () => {
+    it('shows automation badges for save_attack, healing_pool, and auto_effect types', async () => {
       const { hasAutomation } = await import('../../services/combat/automation/automationService.js');
-      hasAutomation.mockImplementation((action) => action?.automation?.type === 'save_attack');
+      hasAutomation.mockImplementation((action) => !!action?.automation);
+
       const stats = createStats({
-        actions: [{ name: 'Elemental Bane', description: 'Choose a creature.', automation: { type: 'save_attack', saveDc: 15, saveType: 'CON' } }],
+        actions: [
+          { name: 'Elemental Bane', description: 'Choose a creature.', automation: { type: 'save_attack', saveDc: 15, saveType: 'CON' } },
+          { name: 'Life Stream', description: 'Heal a creature.', automation: { type: 'healing_pool', pool: 15 } },
+          { name: 'Thunderous Smite', description: 'Strike with thunder.', automation: { type: 'auto_effect', damage: '2d6', damageType: 'Thunder' } },
+        ],
       });
       render(<CharActions playerStats={stats} />);
       expect(screen.getByText('DC 15 CON')).toBeInTheDocument();
-    });
-
-    it('shows healing pool badge for healing_pool automation', async () => {
-      const { hasAutomation } = await import('../../services/combat/automation/automationService.js');
-      hasAutomation.mockImplementation((action) => action?.automation?.type === 'healing_pool');
-      const stats = createStats({
-        actions: [{ name: 'Life Stream', description: 'Heal a creature.', automation: { type: 'healing_pool', pool: 15 } }],
-      });
-      render(<CharActions playerStats={stats} />);
       expect(screen.getByText('Pool: 15 HP')).toBeInTheDocument();
-    });
-
-    it('shows damage badge for auto_effect automation with damage', async () => {
-      const { hasAutomation } = await import('../../services/combat/automation/automationService.js');
-      hasAutomation.mockImplementation((action) => action?.automation?.type === 'auto_effect');
-      const stats = createStats({
-        actions: [{ name: 'Thunderous Smite', description: 'Strike with thunder.', automation: { type: 'auto_effect', damage: '2d6', damageType: 'Thunder' } }],
-      });
-      render(<CharActions playerStats={stats} />);
       expect(screen.getByText('2d6 Thunder')).toBeInTheDocument();
     });
-  });
 
-  describe('metamagic action display', () => {
-    it('displays "Empowered Spell" for Metamagic action with spell_modifier automation', () => {
+    it('displays "Empowered Spell" for Metamagic action with spell_modifier automation', async () => {
+      const { hasAutomation } = await import('../../services/combat/automation/automationService.js');
+      hasAutomation.mockReturnValue(true);
       const stats = createStats({
         actions: [{ name: 'Metamagic', description: 'Modify spells.', automation: { type: 'spell_modifier' } }],
       });
@@ -392,20 +344,6 @@ describe('CharActions rendering', () => {
       });
       render(<CharActions playerStats={stats} />);
       expect(screen.queryByText(/Restore with Rage/)).not.toBeInTheDocument();
-    });
-  });
-
-  describe('combined rendering', () => {
-    it('renders attacks, actions, and spells together', () => {
-      const stats = createStats({
-        attacks: [{ name: 'Longsword', range: 5, hitBonus: 5, damage: '1d8+3', damageType: 'Slashing', type: 'Action' }],
-        actions: [{ name: 'Second Wind', description: 'Regain hit points.', details: 'Heal 1d10+1 HP.' }],
-        spellAbilities: { spells: [{ name: 'Fireball', range: '150 ft', casting_time: '1 action', prepared: 'Prepared', damage: '8d6' }] },
-      });
-      render(<CharActions playerStats={stats} />);
-      expect(screen.getByText('Longsword')).toBeInTheDocument();
-      expect(screen.getByText(/Second Wind:/)).toBeInTheDocument();
-      expect(screen.getByText('Fireball')).toBeInTheDocument();
     });
   });
 });

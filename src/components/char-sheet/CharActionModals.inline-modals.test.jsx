@@ -2,6 +2,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import CharActionModals from './CharActionModals.jsx';
+import { createBaseProps } from './CharActionModals.test-utils.jsx';
 
 // ── Mocked modal modules ──
 // Minimal mocks needed for CharActionModals to render.  Modal rendering is
@@ -83,6 +84,12 @@ vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
 }));
 vi.mock('../../services/automation/common/healingRoll.js', () => ({
   logHealingToSSE: vi.fn(),
+}));
+vi.mock('../../services/rules/combat/damageUtils.js', () => ({
+  getCombatContext: vi.fn().mockResolvedValue(null),
+}));
+vi.mock('../../services/ui/logService.js', () => ({
+  addEntry: vi.fn().mockResolvedValue(undefined),
 }));
 vi.mock('./modals/shared/SaveAttackHealModal.jsx', () => ({
   default: function TestModal() { return <div data-testid="save-attack-heal-modal">SaveAttackHealModal</div>; },
@@ -205,85 +212,6 @@ vi.mock('../../services/automation/handlers/class-cleric-paladin/bastionOfLawHan
   handleSpendDice: vi.fn().mockResolvedValue(undefined),
   handleApply: vi.fn().mockResolvedValue(undefined),
 }));
-
-// ── Test fixtures ──
-
-function createBaseProps(overrides) {
-  return {
-    playerStats: { name: 'Test Character' },
-    campaignName: 'test-campaign',
-    characters: [],
-    setHealingPoolModal: vi.fn(),
-    setHandOfHealingModal: vi.fn(),
-    setFontOfMagicModal: vi.fn(),
-    setResourcePoolModal: vi.fn(),
-    setWildCompanionModal: vi.fn(),
-    setSetConditionModal: vi.fn(),
-    setAttackRiderModal: vi.fn(),
-    setOpenHandTechniqueModal: vi.fn(),
-    setWeaponMasteryChoiceModal: vi.fn(),
-    setCombatStanceModal: vi.fn(),
-    setTeleportModal: vi.fn(),
-    setHealingIllusionModal: vi.fn(),
-    setSaveAttackHealModal: vi.fn(),
-    setDivineSparkModal: vi.fn(),
-    setDivineInterventionModal: vi.fn(),
-    setDivineInterventionAction: vi.fn(),
-    setMoonlightStepResourceModal: vi.fn(),
-    setStarryFormConstellationModal: vi.fn(),
-    setTwinklingConstellationModal: vi.fn(),
-    setArcaneChargeModal: vi.fn(),
-    setWarMagicCantripModal: vi.fn(),
-    setWarMagicSpellModal: vi.fn(),
-    setSacredWeaponModal: vi.fn(),
-    setElderChampionRestoreModal: vi.fn(),
-    setPrimalCompanionBonusActionModal: vi.fn(),
-    setMistyWandererModal: vi.fn(),
-    setBonusActionChoiceModal: vi.fn(),
-    setRevelationInFleshModal: vi.fn(),
-    setBastionOfLawModal: vi.fn(),
-    setElementalAffinityModal: vi.fn(),
-    setFiendishResilienceModal: vi.fn(),
-    setBoonOfEnergyResistanceModal: vi.fn(),
-    setDragonCompanionModal: vi.fn(),
-    setWildMagicDoubleRollModal: vi.fn(),
-    setWildMagicTamedModal: vi.fn(),
-    setDivinationSavantModal: vi.fn(),
-    setIllusionSavantModal: vi.fn(),
-    setThirdEyeModal: vi.fn(),
-    setSoulstitchSpellsModal: vi.fn(),
-    setIllusoryRealityModal: vi.fn(),
-    setCelestialRevelationModal: vi.fn(),
-    setElfisLineageModal: vi.fn(),
-    setGnomishLineageModal: vi.fn(),
-    setFiendishLegacyModal: vi.fn(),
-    setGiantAncestryModal: vi.fn(),
-    setBreathWeaponShapeModal: vi.fn(),
-    setHypnoticPatternShakeModal: vi.fn(),
-    setEyebiteEffectModal: vi.fn(),
-    handleMasteryClose: vi.fn(),
-    handleWeaponMasteryChoice: vi.fn(),
-    handleDivineFuryDamageType: vi.fn(),
-    handleDivineFurySkip: vi.fn(),
-    handleGenericDamageTypeChoice: vi.fn(),
-    handleGenericDamageTypeSkip: vi.fn(),
-    handleDamageTypeModifierChoice: vi.fn(),
-    handleDamageTypeModifierSkip: vi.fn(),
-    handleEnhancedUnarmedChoice: vi.fn(),
-    handleEnhancedUnarmedSkip: vi.fn(),
-    handleFeatureChoiceConfirm: vi.fn(),
-    handleFeatureChoiceSkip: vi.fn(),
-    handleConstellationSelect: vi.fn(),
-    handleElderChampionRestore: vi.fn(),
-    handleDivineInterventionCast: vi.fn(),
-    handleDivinationSavantConfirm: vi.fn(),
-    handleIllusionSavantConfirm: vi.fn(),
-    setRallyChoiceModal: vi.fn(),
-    handleRallyChoiceConfirm: vi.fn(),
-    pendingDamageRef: { current: null },
-    ...overrides,
-  };
-}
 
 // ── Tests ──
 

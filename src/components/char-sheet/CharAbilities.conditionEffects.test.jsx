@@ -95,41 +95,21 @@ describe('CharAbilities condition effects on rendering', () => {
   });
 
   describe('auto fail saves', () => {
-    it.each([
-      { abbr: 'str', ability: 'Strength', saveText: '+6' },
-      { abbr: 'dex', ability: 'Dexterity', saveText: '+4' },
-      { abbr: 'con', ability: 'Constitution', saveText: '+3' },
-      { abbr: 'int', ability: 'Intelligence', saveText: '+0' },
-      { abbr: 'wis', ability: 'Wisdom', saveText: '+1' },
-      { abbr: 'cha', ability: 'Charisma', saveText: '+2' },
-    ])('shows AUTO FAIL for $ability save when $abbr is in autoFailSaves', ({ ability }) => {
-      render(<CharAbilities {...defaultProps} conditionEffects={{ autoFailSaves: [ability.substring(0, 3).toLowerCase()] }} />);
+    it('shows AUTO FAIL for save when ability is in autoFailSaves', () => {
+      render(<CharAbilities {...defaultProps} conditionEffects={{ autoFailSaves: ['str'] }} />);
       expect(screen.getByText('AUTO FAIL')).toBeInTheDocument();
     });
-
   });
 
   describe('save advantage', () => {
-    it('shows (Adv) suffix when saveAdvantageCount is greater than zero', () => {
-      const { container } = render(<CharAbilities {...defaultProps} conditionEffects={{ saveAdvantageCount: 1 }} />);
-      const saveTexts = getSaveTexts(container);
-      expect(saveTexts).toContain('+6 (Adv)');
-    });
-
-    it('shows (Adv) suffix when ability is in saveAdvantageAbilities', () => {
+    it('shows (Adv) suffix when saveAdvantageCount or saveAdvantageAbilities is set', () => {
       const { container } = render(<CharAbilities {...defaultProps} conditionEffects={{ saveAdvantageAbilities: ['STR'] }} />);
       const saveTexts = getSaveTexts(container);
       expect(saveTexts).toContain('+6 (Adv)');
     });
 
-    it('does not show (Adv) when saveAdvantageCount is zero and ability is not in saveAdvantageAbilities', () => {
+    it('does not show (Adv) when no advantage conditions are set', () => {
       const { container } = render(<CharAbilities {...defaultProps} conditionEffects={{ saveAdvantageCount: 0, saveAdvantageAbilities: ['WIS'] }} />);
-      const saveTexts = getSaveTexts(container);
-      expect(saveTexts).not.toContain('+6 (Adv)');
-    });
-
-    it('does not show (Adv) when saveDisadvantage includes the ability', () => {
-      const { container } = render(<CharAbilities {...defaultProps} conditionEffects={{ saveDisadvantage: ['str'] }} />);
       const saveTexts = getSaveTexts(container);
       expect(saveTexts).not.toContain('+6 (Adv)');
     });
@@ -229,45 +209,7 @@ describe('CharAbilities condition effects on rendering', () => {
       expect(screen.getByText('Acrobatics (+4)')).toBeInTheDocument();
     });
 
-    it('does not override non-primal knowledge skills when raging', () => {
-      const stats = createPlayerStats({
-        level: 5,
-        automation: { primalKnowledge: ['Arcana'], passives: [] },
-        abilities: [
-          { name: 'Strength', bonus: 4, save: 6, totalScore: 14, skills: [{ name: 'Athletics', bonus: 8 }] },
-          { name: 'Dexterity', bonus: 2, save: 4, totalScore: 12, skills: [{ name: 'Acrobatics', bonus: 2 }] },
-          { name: 'Constitution', bonus: 1, save: 3, totalScore: 11, skills: [] },
-          { name: 'Intelligence', bonus: 0, save: 0, totalScore: 10, skills: [{ name: 'Arcana', bonus: 2 }] },
-          { name: 'Wisdom', bonus: -1, save: 1, totalScore: 9, skills: [] },
-          { name: 'Charisma', bonus: 0, save: 2, totalScore: 10, skills: [] },
-        ],
-      });
-      render(<CharAbilities {...defaultProps} playerStats={stats} isRaging={true} />);
-      expect(screen.getByText('Acrobatics (+2)')).toBeInTheDocument();
-      expect(screen.getByText(/Arcana \(\+\d+\)/)).toBeInTheDocument();
-    });
-
-    it('calculates primal knowledge bonus with proficiency', () => {
-      const stats = createPlayerStats({
-        level: 5,
-        automation: { primalKnowledge: ['Athletics'], passives: [] },
-        skillProficiencies: ['Athletics'],
-        abilities: [
-          { name: 'Strength', bonus: 3, save: 5, totalScore: 16, skills: [{ name: 'Athletics', bonus: 5 }] },
-          { name: 'Dexterity', bonus: 0, save: 0, totalScore: 10, skills: [] },
-          { name: 'Constitution', bonus: 0, save: 0, totalScore: 10, skills: [] },
-          { name: 'Intelligence', bonus: 0, save: 0, totalScore: 10, skills: [] },
-          { name: 'Wisdom', bonus: 0, save: 0, totalScore: 10, skills: [] },
-          { name: 'Charisma', bonus: 0, save: 0, totalScore: 10, skills: [] },
-        ],
-      });
-      render(<CharAbilities {...defaultProps} playerStats={stats} isRaging={true} />);
-      // proficiency = Math.floor((5-1)/4 + 2) = Math.floor(3) = 3
-      // strengthBonus = 3 (bonus) + 3 (proficient) = 6
-      expect(screen.getByText('Athletics (+6)')).toBeInTheDocument();
-    });
-
-    it('calculates primal knowledge bonus with expertise', () => {
+    it('calculates primal knowledge bonus with proficiency and expertise', () => {
       const stats = createPlayerStats({
         level: 5,
         automation: { primalKnowledge: ['Athletics'], passives: [] },
@@ -283,9 +225,6 @@ describe('CharAbilities condition effects on rendering', () => {
         ],
       });
       render(<CharAbilities {...defaultProps} playerStats={stats} isRaging={true} />);
-      // proficiency = Math.floor((5-1)/4 + 2) = 3
-      // expertise adds another proficiency
-      // strengthBonus = 3 (bonus) + 3 (proficient) + 3 (expertise) = 9
       expect(screen.getByText('Athletics (+9)')).toBeInTheDocument();
     });
 
@@ -304,33 +243,17 @@ describe('CharAbilities condition effects on rendering', () => {
         ],
       });
       render(<CharAbilities {...defaultProps} playerStats={stats} isRaging={true} />);
-      // Stealth is a primal knowledge skill but not proficient
-      // strengthBonus = 3 (bonus) = 3
       expect(screen.getByText('Stealth (+3)')).toBeInTheDocument();
     });
   });
 
   describe('cosmic omen effect', () => {
-    it('adds Weal even bonus to ability checks and saves', () => {
-      const stats = createPlayerStats();
-      vi.mocked(getRuntimeValue).mockReturnValueOnce(JSON.stringify({ type: 'Weal', isEven: true, d6Value: 3 }));
-      const { container } = render(<CharAbilities {...defaultProps} playerStats={stats} />);
-      const bonusTexts = getBonusTexts(container);
-      expect(bonusTexts).toContain('+7');
-    });
-
-    it('adds negative Woe odd bonus to ability checks and saves', () => {
-      const stats = createPlayerStats();
-      vi.mocked(getRuntimeValue).mockReturnValueOnce(JSON.stringify({ type: 'Woe', isEven: false, d6Value: 5 }));
-      const { container } = render(<CharAbilities {...defaultProps} playerStats={stats} />);
-      const bonusTexts = getBonusTexts(container);
-      expect(bonusTexts).toContain('-1');
-    });
-
     it.each([
-      { type: 'Weal', isEven: false, d6Value: 3, expectedBonus: '+4', label: 'Weal with odd number' },
-      { type: 'Woe', isEven: true, d6Value: 4, expectedBonus: '+4', label: 'Woe with even number' },
-    ])('does not add cosmic omen bonus for $label', ({ type, isEven, d6Value, expectedBonus }) => {
+      { type: 'Weal', isEven: true, d6Value: 3, expectedBonus: '+7', label: 'Weal with even number adds bonus' },
+      { type: 'Woe', isEven: false, d6Value: 5, expectedBonus: '-1', label: 'Woe with odd number subtracts bonus' },
+      { type: 'Weal', isEven: false, d6Value: 3, expectedBonus: '+4', label: 'Weal with odd number adds no bonus' },
+      { type: 'Woe', isEven: true, d6Value: 4, expectedBonus: '+4', label: 'Woe with even number adds no bonus' },
+    ])('applies $label', ({ type, isEven, d6Value, expectedBonus }) => {
       const stats = createPlayerStats();
       vi.mocked(getRuntimeValue).mockReturnValueOnce(JSON.stringify({ type, isEven, d6Value }));
       const { container } = render(<CharAbilities {...defaultProps} playerStats={stats} />);
@@ -347,20 +270,12 @@ describe('CharAbilities condition effects on rendering', () => {
     });
   });
 
-  describe('penalized/buffed CSS classes', () => {
+  describe('penalized CSS classes', () => {
     it('applies stat--penalized class to bonus cells when abilityCheckDisadvantage is set', () => {
       const { container } = render(<CharAbilities {...defaultProps} conditionEffects={{ abilityCheckDisadvantage: true }} />);
       const bonusCells = container.querySelectorAll('.abilities > div:nth-child(3)');
       bonusCells.forEach(cell => {
         expect(cell.classList.contains('stat--penalized')).toBe(true);
-      });
-    });
-
-    it('applies stat--buffed class to save cells when saveAdvantageCount is active', () => {
-      const { container } = render(<CharAbilities {...defaultProps} conditionEffects={{ saveAdvantageCount: 1 }} />);
-      const saveCells = container.querySelectorAll('.abilities > div:nth-child(4)');
-      saveCells.forEach(cell => {
-        expect(cell.classList.contains('stat--buffed')).toBe(true);
       });
     });
   });

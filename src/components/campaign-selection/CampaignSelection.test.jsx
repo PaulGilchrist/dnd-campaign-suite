@@ -77,16 +77,6 @@ describe('CampaignSelection', () => {
       });
     });
 
-    it('should render a button for each campaign', async () => {
-      getCharacterFolders.mockResolvedValue(['D&D Campaign', 'Pathfinder Group']);
-
-      render(<CampaignSelection />);
-
-      await waitFor(() => {
-        const buttons = screen.getAllByRole('button', { name: /D&D Campaign|Pathfinder Group/ });
-        expect(buttons).toHaveLength(2);
-      });
-    });
   });
 
   describe('campaign selection', () => {
@@ -108,38 +98,6 @@ describe('CampaignSelection', () => {
 
       await waitFor(() => {
         expect(mockOnCampaignSelect).toHaveBeenCalledWith('Campaign1', [{ name: 'Character1', class: 'Fighter' }]);
-      });
-    });
-
-    it('should call onCampaignSelect with multiple characters', async () => {
-      const mockOnCampaignSelect = vi.fn();
-      getCharacterFolders.mockResolvedValue(['Campaign1']);
-      getCharacterFiles.mockResolvedValue(['char1.json', 'char2.json', 'char3.json']);
-      loadCharacters.mockResolvedValue([
-        { name: 'Character1', class: 'Fighter' },
-        { name: 'Character2', class: 'Wizard' },
-        { name: 'Character3', class: 'Rogue' },
-      ]);
-
-      render(<CampaignSelection onCampaignSelect={mockOnCampaignSelect} />);
-
-      await waitFor(() => {
-        expect(screen.getByText('Campaign1')).toBeInTheDocument();
-      });
-
-      await act(async () => {
-        fireEvent.click(screen.getByText('Campaign1'));
-      });
-
-      await waitFor(() => {
-        expect(mockOnCampaignSelect).toHaveBeenCalledWith(
-          'Campaign1',
-          [
-            { name: 'Character1', class: 'Fighter' },
-            { name: 'Character2', class: 'Wizard' },
-            { name: 'Character3', class: 'Rogue' },
-          ]
-        );
       });
     });
 

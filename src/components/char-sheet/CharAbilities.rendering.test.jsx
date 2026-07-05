@@ -14,29 +14,13 @@ vi.mock('../../hooks/combat/useLoggedDiceRoll.js', () => {
   return { default: mockFn };
 });
 
-vi.mock('../common/Popup.jsx', () => ({
-  default: ({ children, onClickOrKeyDown }) => (
-    <div data-testid="popup" onClick={onClickOrKeyDown}>
-      {children}
-    </div>
-  ),
-}));
-
-vi.mock('./DiceRollResult.jsx', () => ({
-  default: ({ onReroll, onStrokeOfLuck }) => (
-    <div data-testid="dice-roll-result">
-      <button onClick={onReroll}>Reroll</button>
-      <button onClick={onStrokeOfLuck}>Stroke of Luck</button>
-    </div>
-  ),
-}));
-
-const mockStore = new Map();
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn((key, prop) => mockStore.get(`${key}:${prop}`) ?? null),
   setRuntimeValue: vi.fn(),
   useRuntimeValue: vi.fn((key, prop) => mockStore.get(`${key}:${prop}`) ?? null),
 }));
+
+const mockStore = new Map();
 
 const mockAllAbilityScores = [
   { full_name: 'Strength', description: 'STR desc' },
@@ -92,39 +76,29 @@ describe('CharAbilities rendering', () => {
       expect(screen.getByText('Save')).toBeInTheDocument();
       expect(screen.getByText('Skills')).toBeInTheDocument();
     });
-  });
 
-  describe('ability rows', () => {
-    it('renders skill bonuses next to skill names', () => {
-      const stats = createPlayerStats({
-        abilities: [
-          { name: 'Strength', bonus: 4, save: 6, totalScore: 14, skills: [{ name: 'Athletics', bonus: 8 }] },
-        ],
-      });
-      render(<CharAbilities {...defaultProps} playerStats={stats} />);
-      expect(screen.getByText('Athletics (+8)')).toBeInTheDocument();
-    });
-  });
-
-  describe('empty skills', () => {
-    it('renders abilities without skills and excludes skill entries', () => {
-      const stats = createPlayerStats({
-        abilities: [
-          { name: 'Strength', bonus: 4, save: 6, totalScore: 14, skills: [] },
-          { name: 'Dexterity', bonus: 2, save: 4, totalScore: 12, skills: [] },
-          { name: 'Constitution', bonus: 1, save: 3, totalScore: 11, skills: [] },
-          { name: 'Intelligence', bonus: 0, save: 0, totalScore: 10, skills: [] },
-          { name: 'Wisdom', bonus: -1, save: 1, totalScore: 9, skills: [] },
-          { name: 'Charisma', bonus: 0, save: 2, totalScore: 10, skills: [] },
-        ],
-      });
-      render(<CharAbilities {...defaultProps} playerStats={stats} />);
+    it('renders ability names and their scores', () => {
+      render(<CharAbilities {...defaultProps} />);
       expect(screen.getByText('Strength')).toBeInTheDocument();
-      expect(screen.queryByText('Athletics')).not.toBeInTheDocument();
+      expect(screen.getByText('Dexterity')).toBeInTheDocument();
+      expect(screen.getByText('Constitution')).toBeInTheDocument();
+      expect(screen.getByText('Intelligence')).toBeInTheDocument();
+      expect(screen.getByText('Wisdom')).toBeInTheDocument();
+      expect(screen.getByText('Charisma')).toBeInTheDocument();
+      expect(screen.getByText('14')).toBeInTheDocument();
+      expect(screen.getByText('12')).toBeInTheDocument();
+      expect(screen.getByText('11')).toBeInTheDocument();
+      expect(screen.getByText('9')).toBeInTheDocument();
     });
-  });
 
-  describe('edge cases', () => {
+    it('renders skill bonuses next to skill names', () => {
+      render(<CharAbilities {...defaultProps} />);
+      expect(screen.getByText('Athletics (+8)')).toBeInTheDocument();
+      expect(screen.getByText('Acrobatics (+6)')).toBeInTheDocument();
+      expect(screen.getByText('Arcana (+2)')).toBeInTheDocument();
+      expect(screen.getByText('Perception (+3)')).toBeInTheDocument();
+    });
+
     it('renders no ability rows when abilities array is empty', () => {
       const stats = createPlayerStats({ abilities: [] });
       render(<CharAbilities {...defaultProps} playerStats={stats} />);

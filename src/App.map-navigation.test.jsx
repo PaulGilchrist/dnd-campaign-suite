@@ -199,60 +199,28 @@ describe('App - Map Navigation & View Management', () => {
   });
 
   describe('GM view transitions', () => {
-    it('renders GM view and hides char-sheet (settlements)', async () => {
+    it('renders GM view and hides char-sheet', async () => {
       mockState.characters = [{ name: 'Aragorn', level: 1 }];
       render(<App />);
       await selectCampaign();
       await waitFor(() => {
         expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
       });
-      fireEvent.click(screen.getByTestId('settlements-btn'));
-      await waitFor(() => {
-        expect(screen.getByTestId('settlements-view')).toBeInTheDocument();
-        expect(screen.queryByTestId('char-sheet')).not.toBeInTheDocument();
-      });
-    });
 
-    it('renders GM view and hides char-sheet (NPCs)', async () => {
-      mockState.characters = [{ name: 'Aragorn', level: 1 }];
-      render(<App />);
-      await selectCampaign();
-      await waitFor(() => {
-        expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
-      });
-      fireEvent.click(screen.getByTestId('npcs-btn'));
-      await waitFor(() => {
-        expect(screen.getByTestId('npcs-view')).toBeInTheDocument();
-        expect(screen.queryByTestId('char-sheet')).not.toBeInTheDocument();
-      });
-    });
+      const views = [
+        { btn: 'settlements-btn', view: 'settlements-view' },
+        { btn: 'npcs-btn', view: 'npcs-view' },
+        { btn: 'factions-btn', view: 'factions-view' },
+        { btn: 'log-btn', view: 'campaign-log-view' },
+      ];
 
-    it('renders GM view and hides char-sheet (factions)', async () => {
-      mockState.characters = [{ name: 'Aragorn', level: 1 }];
-      render(<App />);
-      await selectCampaign();
-      await waitFor(() => {
-        expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
-      });
-      fireEvent.click(screen.getByTestId('factions-btn'));
-      await waitFor(() => {
-        expect(screen.getByTestId('factions-view')).toBeInTheDocument();
-        expect(screen.queryByTestId('char-sheet')).not.toBeInTheDocument();
-      });
-    });
-
-    it('renders GM view and hides char-sheet (campaign log)', async () => {
-      mockState.characters = [{ name: 'Aragorn', level: 1 }];
-      render(<App />);
-      await selectCampaign();
-      await waitFor(() => {
-        expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
-      });
-      fireEvent.click(screen.getByTestId('log-btn'));
-      await waitFor(() => {
-        expect(screen.getByTestId('campaign-log-view')).toBeInTheDocument();
-        expect(screen.queryByTestId('char-sheet')).not.toBeInTheDocument();
-      });
+      for (const { btn, view } of views) {
+        fireEvent.click(screen.getByTestId(btn));
+        await waitFor(() => {
+          expect(screen.getByTestId(view)).toBeInTheDocument();
+          expect(screen.queryByTestId('char-sheet')).not.toBeInTheDocument();
+        });
+      }
     });
 
     it('hides GM view when onBack is triggered', async () => {
@@ -293,32 +261,26 @@ describe('App - Map Navigation & View Management', () => {
   });
 
   describe('View mutual exclusivity', () => {
-    it('replaces char-sheet with initiative', async () => {
+    it('replaces char-sheet with a view', async () => {
       mockState.characters = [{ name: 'Aragorn', level: 1 }];
       render(<App />);
       await selectCampaign();
       await waitFor(() => {
         expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
       });
-      fireEvent.click(screen.getByTestId('initiative-btn'));
-      await waitFor(() => {
-        expect(screen.getByTestId('initiative')).toBeInTheDocument();
-        expect(screen.queryByTestId('char-sheet')).not.toBeInTheDocument();
-      });
-    });
 
-    it('replaces char-sheet with encounter', async () => {
-      mockState.characters = [{ name: 'Aragorn', level: 1 }];
-      render(<App />);
-      await selectCampaign();
-      await waitFor(() => {
-        expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
-      });
-      fireEvent.click(screen.getByTestId('encounter-btn'));
-      await waitFor(() => {
-        expect(screen.getByTestId('encounter-builder')).toBeInTheDocument();
-        expect(screen.queryByTestId('char-sheet')).not.toBeInTheDocument();
-      });
+      const views = [
+        { btn: 'initiative-btn', view: 'initiative' },
+        { btn: 'encounter-btn', view: 'encounter-builder' },
+      ];
+
+      for (const { btn, view } of views) {
+        fireEvent.click(screen.getByTestId(btn));
+        await waitFor(() => {
+          expect(screen.getByTestId(view)).toBeInTheDocument();
+          expect(screen.queryByTestId('char-sheet')).not.toBeInTheDocument();
+        });
+      }
     });
   });
 });

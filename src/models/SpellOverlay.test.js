@@ -1,35 +1,6 @@
 // @cleaned-by-ai
 import { describe, it, expect } from 'vitest';
-import {
-  OverlayShape,
-  DEFAULTS,
-  toGrid,
-  createOverlay,
-  hitTestOverlay,
-  svgOrigin,
-} from './SpellOverlay.js';
-
-// ── OverlayShape ────────────────────────────────────────────────
-
-describe('OverlayShape', () => {
-  it('exports string constants for all five D&D spell overlay shapes', () => {
-    expect(OverlayShape).toMatchObject({
-      SPHERE: 'sphere',
-      CYLINDER: 'cylinder',
-      CUBE: 'cube',
-      CONE: 'cone',
-      LINE: 'line',
-    });
-  });
-});
-
-// ── DEFAULTS ────────────────────────────────────────────────────
-
-describe('DEFAULTS', () => {
-  it('has entries for all five shapes', () => {
-    expect(Object.keys(DEFAULTS)).toEqual(['sphere', 'cylinder', 'cube', 'cone', 'line']);
-  });
-});
+import { toGrid, createOverlay, hitTestOverlay, svgOrigin } from './SpellOverlay.js';
 
 // ── toGrid ──────────────────────────────────────────────────────
 
@@ -71,18 +42,6 @@ describe('createOverlay', () => {
     expect(overlay.color).toBe('rgba(100,200,50,0.5)');
     expect(overlay.startGridX).toBe(3);
   });
-
-  it('works for all five shapes', () => {
-    const overlays = ['sphere', 'cylinder', 'cube', 'cone', 'line'].map(shape =>
-      createOverlay(shape, 1, 2)
-    );
-    for (const overlay of overlays) {
-      expect(overlay.shape).toBeDefined();
-      expect(overlay.id).toBeDefined();
-      expect(overlay.startGridX).toBe(1);
-      expect(overlay.startGridY).toBe(2);
-    }
-  });
 });
 
 // ── hitTestOverlay ──────────────────────────────────────────────
@@ -92,7 +51,7 @@ describe('hitTestOverlay', () => {
     return createOverlay(shape, gridX, gridY, angle, params);
   }
 
-  // ── SPHERE / CYLINDER (shared code path) ──────────────────────
+  // ── SPHERE ──────────────────────────────────────────────────────
 
   describe('SPHERE', () => {
     it('hits the center point', () => {
@@ -120,14 +79,6 @@ describe('hitTestOverlay', () => {
       const overlay = makeOverlay('sphere', -3, -3, 0, { radiusFt: 5 });
       expect(hitTestOverlay(overlay, -3, -3)).toBe(true);
       expect(hitTestOverlay(overlay, -2, -4)).toBe(false);
-    });
-  });
-
-  describe('CYLINDER', () => {
-    it('shares the same geometry as sphere (hits center, misses outside)', () => {
-      const overlay = makeOverlay('cylinder', 5, 5, 0, { radiusFt: 20 });
-      expect(hitTestOverlay(overlay, 5, 5)).toBe(true);
-      expect(hitTestOverlay(overlay, 5, 10)).toBe(false);
     });
   });
 

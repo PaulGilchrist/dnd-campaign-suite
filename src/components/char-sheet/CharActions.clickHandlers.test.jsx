@@ -274,20 +274,7 @@ describe('CharActions click handlers', () => {
   });
 
   describe('automation handling', () => {
-    it('calls executeHandler when action with automation is clicked', async () => {
-      hasAutomation.mockReturnValue(true);
-
-      const stats = createStats({
-        actions: [{ name: 'War Priest', description: 'Make a weapon attack.', automation: { type: 'bonus_action_attack' } }],
-      });
-
-      await renderWithFetch(<CharActions playerStats={stats} />);
-      const actionName = screen.getByText(/War Priest:/);
-      await act(async () => { fireEvent.click(actionName); });
-      expect(executeHandler).toHaveBeenCalled();
-    });
-
-    it('calls setPopupHtml when automation returns popup result', async () => {
+    it('calls executeHandler when action with automation is clicked and shows popup on result', async () => {
       hasAutomation.mockReturnValue(true);
       const mockSetPopupHtml = vi.fn();
       useLoggedDiceRoll.mockReturnValue({

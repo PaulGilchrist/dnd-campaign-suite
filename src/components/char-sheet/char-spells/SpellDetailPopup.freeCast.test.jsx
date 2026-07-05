@@ -1,4 +1,4 @@
-/* @cleaned-by-ai */
+// @cleaned-by-ai
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import SpellDetailPopup from './SpellDetailPopup.jsx';
@@ -119,63 +119,49 @@ describe('SpellDetailPopup - Free Cast Authorization', () => {
     });
   });
 
-  describe('Signature Spells free cast', () => {
+  describe('Selection-based free cast (Signature Spells, Divination Savant)', () => {
     it.each([
-      { used: false, shouldAuthorize: true, name: 'not yet used' },
-      { used: true, shouldAuthorize: false, name: 'already used' },
-    ])('authorizes when spell is in selection and is $name', ({ used, shouldAuthorize }) => {
+      { selectionKey: 'SignatureSpells_selection', usedKey: 'SignatureSpells_Fireball_used', spellName: 'Fireball', level: 3, dmg: { '3': '8d6' }, selection: ['Fireball'], name: 'Signature Spells' },
+      { selectionKey: '_Divination_Savant_selection', usedKey: '_Divination_Savant_Warding_Bond_used', spellName: 'Warding Bond', level: 2, dmg: { '2': '2d6' }, selection: ['Warding Bond'], name: 'Divination Savant' },
+    ])('authorizes when spell is in $name selection and not yet used', ({ selectionKey, usedKey, spellName, level, dmg }) => {
       vi.mocked(getRuntimeValue).mockImplementation((_name, key, _campaign) => {
-        if (key === 'SignatureSpells_selection') return ['Fireball'];
-        if (key === 'SignatureSpells_Fireball_used') return used;
+        if (key === selectionKey) return ['Fireball', 'Warding Bond'].find(s => s === spellName) ? [spellName] : [];
+        if (key === usedKey) return false;
         return null;
       });
 
       const spell = {
         ...baseMockSpell,
-        name: 'Fireball',
-        level: 3,
-        damage: { damage_at_slot_level: { '3': '8d6' } },
+        name: spellName,
+        level,
+        damage: { damage_at_slot_level: dmg },
       };
       renderPopup(spell);
-      if (shouldAuthorize) {
-        expect(
-          screen.getByText('Free Cast — no spell slot consumed')
-        ).toBeInTheDocument();
-      } else {
-        expect(
-          screen.queryByText('Free Cast — no spell slot consumed')
-        ).not.toBeInTheDocument();
-      }
+      expect(
+        screen.getByText('Free Cast — no spell slot consumed')
+      ).toBeInTheDocument();
     });
-  });
 
-  describe('Divination Savant free cast', () => {
     it.each([
-      { used: false, shouldAuthorize: true, name: 'not yet used' },
-      { used: true, shouldAuthorize: false, name: 'already used' },
-    ])('authorizes when spell is in selection and is $name', ({ used, shouldAuthorize }) => {
+      { selectionKey: 'SignatureSpells_selection', usedKey: 'SignatureSpells_Fireball_used', spellName: 'Fireball', level: 3, dmg: { '3': '8d6' }, name: 'Signature Spells' },
+      { selectionKey: '_Divination_Savant_selection', usedKey: '_Divination_Savant_Warding_Bond_used', spellName: 'Warding Bond', level: 2, dmg: { '2': '2d6' }, name: 'Divination Savant' },
+    ])('does not authorize when spell in $name selection has already been used', ({ selectionKey, usedKey, spellName, level, dmg }) => {
       vi.mocked(getRuntimeValue).mockImplementation((_name, key, _campaign) => {
-        if (key === '_Divination_Savant_selection') return ['Warding Bond'];
-        if (key === '_Divination_Savant_Warding_Bond_used') return used;
+        if (key === selectionKey) return [spellName];
+        if (key === usedKey) return true;
         return null;
       });
 
       const spell = {
         ...baseMockSpell,
-        name: 'Warding Bond',
-        level: 2,
-        damage: { damage_at_slot_level: { '2': '2d6' } },
+        name: spellName,
+        level,
+        damage: { damage_at_slot_level: dmg },
       };
       renderPopup(spell);
-      if (shouldAuthorize) {
-        expect(
-          screen.getByText('Free Cast — no spell slot consumed')
-        ).toBeInTheDocument();
-      } else {
-        expect(
-          screen.queryByText('Free Cast — no spell slot consumed')
-        ).not.toBeInTheDocument();
-      }
+      expect(
+        screen.queryByText('Free Cast — no spell slot consumed')
+      ).not.toBeInTheDocument();
     });
   });
 

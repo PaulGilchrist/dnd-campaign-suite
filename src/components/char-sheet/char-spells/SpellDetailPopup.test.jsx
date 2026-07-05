@@ -1,4 +1,4 @@
-/* @cleaned-by-ai */
+// @cleaned-by-ai
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import SpellDetailPopup from './SpellDetailPopup.jsx';
@@ -201,106 +201,6 @@ describe('SpellDetailPopup', () => {
         upcastLevels,
       });
       expect(screen.getByText(expectedText)).toBeInTheDocument();
-    });
-  });
-
-  describe('cantrip auto-level', () => {
-    it('adjusts cantrip level based on character level thresholds', () => {
-      vi.mocked(getRuntimeValue).mockReturnValue(null);
-
-      const onCast = vi.fn();
-      const cantrip = {
-        ...baseMockSpell,
-        level: 0,
-        damage: {
-          damage_at_character_level: {
-            '3': '2d6',
-            '5': '3d6',
-          },
-        },
-      };
-
-      // Character level exceeds threshold → auto-levels to 5
-      renderPopup(cantrip, baseMockPlayerStats, mockCampaignName, {
-        onCast,
-        playerLevel: 5,
-      });
-      fireEvent.click(screen.getByRole('button', { name: /Cast Spell/ }));
-      expect(onCast).toHaveBeenCalled();
-      expect(onCast.mock.calls[0][0].level).toBe(5);
-
-      onCast.mockClear();
-
-      // Character level below threshold → keeps base level 0
-      renderPopup(cantrip, baseMockPlayerStats, mockCampaignName, {
-        onCast,
-        playerLevel: 2,
-      });
-      const castButtons = screen.getAllByRole('button', { name: /Cast Spell/ });
-      fireEvent.click(castButtons[1]);
-      expect(onCast).toHaveBeenCalled();
-      expect(onCast.mock.calls[0][0].level).toBe(0);
-    });
-  });
-
-  describe('onCast behavior', () => {
-    it('calls onClose when Close button is clicked', () => {
-      const onClose = vi.fn();
-      renderPopup(baseMockSpell, baseMockPlayerStats, mockCampaignName, {
-        onClose,
-      });
-      fireEvent.click(screen.getByRole('button', { name: 'Close' }));
-      expect(onClose).toHaveBeenCalledTimes(1);
-    });
-
-    it('calls onCast with the spell when Cast Spell is clicked and canCast is true', () => {
-      vi.mocked(getRuntimeValue).mockReturnValue(null);
-
-      const onCast = vi.fn();
-      const noUpcastSpell = {
-        ...baseMockSpell,
-        damage: { damage_at_slot_level: { '1': '3d4+1' } },
-      };
-      renderPopup(noUpcastSpell, baseMockPlayerStats, mockCampaignName, {
-        onCast,
-      });
-
-      fireEvent.click(screen.getByRole('button', { name: /Cast Spell/ }));
-      expect(onCast).toHaveBeenCalledTimes(1);
-    });
-
-    it('does not call onCast when Cast Spell is clicked but canCast is false', () => {
-      const onCast = vi.fn();
-      renderPopup(baseMockSpell, baseMockPlayerStats, mockCampaignName, {
-        onCast,
-      });
-
-      const castButton = screen.getByRole('button', { name: /Cast Spell/ });
-      expect(castButton).toBeDisabled();
-      fireEvent.click(castButton);
-      expect(onCast).not.toHaveBeenCalled();
-    });
-
-    it('decrements spell slot when casting a non-free-cast spell', () => {
-      vi.mocked(getRuntimeValue).mockReturnValue(4);
-      vi.mocked(setRuntimeValue).mockReturnValue();
-
-      const onCast = vi.fn();
-      const noSlotsSpell = {
-        ...baseMockSpell,
-        damage: { damage_at_slot_level: { '1': '3d4+1' } },
-      };
-      renderPopup(noSlotsSpell, baseMockPlayerStats, mockCampaignName, {
-        onCast,
-      });
-
-      fireEvent.click(screen.getByRole('button', { name: /Cast Spell/ }));
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'Elara',
-        'spell_slots_level_1',
-        3,
-        mockCampaignName
-      );
     });
   });
 

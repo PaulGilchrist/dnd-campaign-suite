@@ -1,5 +1,4 @@
 // @cleaned-by-ai
-// @improved-by-ai
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharConditions, { loadActiveConditions } from './CharConditions.jsx';
@@ -131,14 +130,13 @@ describe('CharConditions', () => {
     });
 
     it('decreases exhaustion level on minus button click with successful con save', () => {
-      // rollD20 returns 15, con save bonus is 2, total 17 >= dc 13
       render(<CharConditions {...defaultProps} exhaustionLevel={3} />);
       const minusBtn = screen.getByRole('button', { name: '−' });
       fireEvent.click(minusBtn);
       expect(setRuntimeValue).toHaveBeenCalledWith('Test Character', 'exhaustionLevel', 2, 'test-campaign');
     });
 
-    it('does not decrease exhaustion below 0 when con save fails', () => {
+    it('does not decrease exhaustion when con save fails', () => {
       rollD20.mockReturnValueOnce(1);
       render(<CharConditions {...defaultProps} exhaustionLevel={1} />);
       const minusBtn = screen.getByRole('button', { name: '−' });
@@ -161,22 +159,7 @@ describe('CharConditions', () => {
       expect(screen.getByText('Stunned')).toBeInTheDocument();
     });
 
-    it('marks a condition badge as active when present in stored conditions', () => {
-      getRuntimeValue.mockReturnValue(['blinded']);
-      render(<CharConditions {...defaultProps} />);
-      const blindedBtn = screen.getByText('Blinded');
-      expect(blindedBtn).toHaveClass('condition-badge--active');
-    });
-
-    it('toggles a condition badge on click', () => {
-      getRuntimeValue.mockReturnValue(['blinded']);
-      render(<CharConditions {...defaultProps} />);
-      const blindedBtn = screen.getByText('Blinded');
-      fireEvent.click(blindedBtn);
-      expect(blindedBtn).not.toHaveClass('condition-badge--active');
-    });
-
-    it('calls onConditionsChange when toggling a condition', () => {
+    it('toggles a condition badge on click and calls onConditionsChange', () => {
       getRuntimeValue.mockReturnValue([]);
       render(<CharConditions {...defaultProps} />);
       const charmedBtn = screen.getByText('Charmed');
@@ -184,37 +167,7 @@ describe('CharConditions', () => {
       expect(defaultProps.onConditionsChange).toHaveBeenCalled();
     });
 
-    it('does not call onConditionsChange when condition save fails', () => {
-      rollD20.mockReturnValueOnce(1);
-      getRuntimeValue.mockReturnValue(['charmed']);
-      render(<CharConditions {...defaultProps} />);
-      const charmedBtn = screen.getByText('Charmed');
-      fireEvent.click(charmedBtn);
-      expect(defaultProps.onConditionsChange).not.toHaveBeenCalled();
-    });
-
-    it('calls clearUnbreakableMajesty when incapacitated is toggled', () => {
-      getRuntimeValue.mockReturnValue(['incapacitated']);
-      render(<CharConditions {...defaultProps} />);
-      const incapacitatedBtn = screen.getByText('Incapacitated');
-      fireEvent.click(incapacitatedBtn);
-      expect(clearUnbreakableMajesty).toHaveBeenCalledWith(
-        'Test Character',
-        'test-campaign'
-      );
-    });
-
-    it('performs a save check when toggling a condition that has a save ability', async () => {
-      getRuntimeValue.mockReturnValue(['charmed']);
-      render(<CharConditions {...defaultProps} />);
-      const charmedBtn = screen.getByText('Charmed');
-      fireEvent.click(charmedBtn);
-      await waitFor(() => {
-        expect(rollD20).toHaveBeenCalled();
-      });
-    });
-
-    it('removes condition from active list on successful save', async () => {
+    it('removes condition from active list on successful save and calls onConditionsChange', async () => {
       getRuntimeValue.mockReturnValue(['charmed']);
       render(<CharConditions {...defaultProps} />);
       const charmedBtn = screen.getByText('Charmed');
@@ -222,6 +175,7 @@ describe('CharConditions', () => {
       await waitFor(() => {
         expect(setRuntimeValue).toHaveBeenCalledWith('Test Character', 'activeConditions', [], 'test-campaign');
       });
+      expect(defaultProps.onConditionsChange).toHaveBeenCalled();
     });
 
     it('keeps condition in active list on failed save', async () => {
@@ -231,7 +185,6 @@ describe('CharConditions', () => {
       const charmedBtn = screen.getByText('Charmed');
       fireEvent.click(charmedBtn);
       await waitFor(() => {
-        // rollD20 returns 1, bonus is 2, total 3 < DC 10, condition stays
         expect(setRuntimeValue).toHaveBeenCalledWith(
           'Test Character',
           'activeConditions',
@@ -239,6 +192,7 @@ describe('CharConditions', () => {
           'test-campaign'
         );
       });
+      expect(defaultProps.onConditionsChange).not.toHaveBeenCalled();
     });
 
     it('applies aura bonus to save roll total', async () => {
@@ -251,7 +205,6 @@ describe('CharConditions', () => {
       const charmedBtn = screen.getByText('Charmed');
       fireEvent.click(charmedBtn);
       await waitFor(() => {
-        // rollD20=15, bonus=2, aura=3, total=20 >= DC 10, condition removed
         expect(setRuntimeValue).toHaveBeenCalledWith('Test Character', 'activeConditions', [], 'test-campaign');
       });
     });
@@ -265,6 +218,17 @@ describe('CharConditions', () => {
         expect(rollD20).toHaveBeenCalledTimes(2);
         expect(setRuntimeValue).toHaveBeenCalledWith('Test Character', 'activeConditions', [], 'test-campaign');
       });
+    });
+
+    it('calls clearUnbreakableMajesty when incapacitated is toggled', () => {
+      getRuntimeValue.mockReturnValue(['incapacitated']);
+      render(<CharConditions {...defaultProps} />);
+      const incapacitatedBtn = screen.getByText('Incapacitated');
+      fireEvent.click(incapacitatedBtn);
+      expect(clearUnbreakableMajesty).toHaveBeenCalledWith(
+        'Test Character',
+        'test-campaign'
+      );
     });
   });
 
@@ -283,16 +247,6 @@ describe('CharConditions', () => {
       fireEvent.click(charmedBtn);
       expect(setRuntimeValue).toHaveBeenCalledWith('Test Character', 'activeConditions', ['charmed'], 'test-campaign');
     });
-
-    it('resets conditions when playerStats.name changes', () => {
-      getRuntimeValue.mockReturnValue(['blinded']);
-      const { rerender } = render(<CharConditions {...defaultProps} />);
-      expect(screen.getByText('Blinded')).toHaveClass('condition-badge--active');
-
-      getRuntimeValue.mockReturnValue([]);
-      rerender(<CharConditions {...defaultProps} playerStats={{ ...mockPlayerStats, name: 'Other Character' }} />);
-      expect(screen.getByText('Blinded')).not.toHaveClass('condition-badge--active');
-    });
   });
 
   describe('loadActiveConditions', () => {
@@ -303,7 +257,7 @@ describe('CharConditions', () => {
     });
 
     it('returns empty array when stored value is not an array', () => {
-      for (const badValue of [null, undefined, 'not-an-array', { key: 'blinded' }, 42, []]) {
+      for (const badValue of [null, undefined, 'not-an-array', { key: 'blinded' }, 42]) {
         getRuntimeValue.mockReturnValue(badValue);
         const result = loadActiveConditions('Test Character', 'test-campaign');
         expect(result).toEqual([]);

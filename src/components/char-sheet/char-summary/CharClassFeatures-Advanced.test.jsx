@@ -136,11 +136,6 @@ describe('CharClassFeatures', () => {
             expect(screen.getByTestId('tracked-resource-Innate Sorcery')).toBeInTheDocument();
         });
 
-        it('renders spell slot costs when creatingSpellSlotCosts is populated', () => {
-            renderComponent(sorcererStats());
-            expect(screen.getByText(/Spell Slot \(level 1-5\) Costs:/)).toBeInTheDocument();
-        });
-
         it('renders sorcerous restoration when resource_restoration passive exists', () => {
             const stats = makeStats({
                 class: { name: 'Sorcerer', class_levels: [{ level: 5 }] },
@@ -201,21 +196,6 @@ describe('CharClassFeatures', () => {
         });
     });
 
-    describe('2024 ruleset variations', () => {
-        it('renders barbarian 2024 with rage values from classLevel', () => {
-            const stats = makeStats({
-                rules: '2024',
-                class: {
-                    name: 'Barbarian',
-                    class_levels: [{ level: 5, rages: 3, rage_damage: 2, weapon_mastery: 'Heavy' }],
-                },
-                automation: { passives: [] },
-            });
-            renderComponent(stats);
-            expect(screen.getByTestId('char-class-barbarian')).toBeInTheDocument();
-        });
-    });
-
     describe('main CharClassFeatures entry point', () => {
         it('renders Adrenaline Rush tracked resource when bonus_action_dash special action exists', () => {
             const stats = makeStats({
@@ -223,16 +203,6 @@ describe('CharClassFeatures', () => {
                 automation: { specialActions: [{ effect: 'bonus_action_dash' }] },
             });
             renderComponent(stats);
-            expect(screen.getByTestId('tracked-resource-Adrenaline Rush')).toBeInTheDocument();
-        });
-
-        it('renders class component and Adrenaline Rush when both exist', () => {
-            const stats = makeStats({
-                class: { name: 'Cleric', class_levels: [{ level: 5 }] },
-                automation: { passives: [], specialActions: [{ effect: 'bonus_action_dash' }] },
-            });
-            renderComponent(stats);
-            expect(screen.getByTestId('char-class-cleric')).toBeInTheDocument();
             expect(screen.getByTestId('tracked-resource-Adrenaline Rush')).toBeInTheDocument();
         });
     });

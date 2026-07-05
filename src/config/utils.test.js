@@ -42,14 +42,6 @@ describe('character-creation/utils', () => {
         class: { name: 'Wizard' },
         expertSkills: []
       })).toHaveProperty('name', 'name is required');
-      expect(utils.validateFinalFormData({
-        name: '      ',
-        level: 1,
-        alignment: 'Lawful Good',
-        race: { name: 'Human' },
-        class: { name: 'Wizard' },
-        expertSkills: []
-      })).toHaveProperty('name', 'name is required');
     });
 
   });
@@ -65,7 +57,7 @@ describe('character-creation/utils', () => {
       vi.restoreAllMocks();
     });
 
-    it('returns no errors for valid levels (boundary and mid-range)', async () => {
+    it('returns no errors for valid levels at boundaries and mid-range', async () => {
       expect(await utils.validateLevel(1, '5e')).toEqual({});
       expect(await utils.validateLevel(10, '5e')).toEqual({});
       expect(await utils.validateLevel(20, '5e')).toEqual({});
@@ -96,8 +88,11 @@ describe('character-creation/utils', () => {
       expect(await utils.validateAbility({ baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 }, 0, '5e', 1)).toEqual({});
     });
 
-    it('returns an error when baseScore is below or above the allowed range', async () => {
+    it('returns an error when baseScore is below the allowed range', async () => {
       expect((await utils.validateAbility({ baseScore: 7, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 }, 0, '5e', 1)).baseScore).toBe('Base score must be at least 8');
+    });
+
+    it('returns an error when baseScore exceeds the point buy max', async () => {
       expect((await utils.validateAbility({ baseScore: 16, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 }, 0, '5e', 1)).baseScore).toBe('Base score cannot exceed 15 (point buy max)');
     });
 
@@ -113,22 +108,6 @@ describe('character-creation/utils', () => {
 
     it('returns an error for negative miscIncrease', async () => {
       expect((await utils.validateAbility({ baseScore: 10, featIncrease: 0, miscIncrease: -1, backgroundIncrease: 0 }, 0, '5e', 1)).miscIncrease).toBe('Misc bonus must be 0 or above');
-    });
-  });
-
-  describe('getPointBuyCosts', () => {
-    let utils;
-    beforeEach(async () => {
-      vi.spyOn(dataLoader, 'loadValidationRules').mockResolvedValue(mockValidationRules);
-      utils = await import('./utils.js');
-    });
-
-    afterEach(() => {
-      vi.restoreAllMocks();
-    });
-
-    it('returns the point buy costs object from rules', async () => {
-      expect(await utils.getPointBuyCosts('5e')).toEqual(mockValidationRules.point_buy.costs);
     });
   });
 

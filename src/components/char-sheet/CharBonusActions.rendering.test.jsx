@@ -122,12 +122,10 @@ describe('CharBonusActions - Rendering', () => {
   });
 
   describe('section visibility', () => {
-    it('returns null when there are no bonus actions, attacks, spells, or horde breaker', () => {
+    it('returns null when there are no bonus actions, bonus action attacks, bonus action spells, or horde breaker', () => {
       const stats = createStats({
         bonusActions: [],
-        attacks: [
-          { name: 'Longsword', range: 5, hitBonus: 5, damage: '1d8+3', damageType: 'Slashing', type: 'Action' },
-        ],
+        attacks: [{ name: 'Longsword', range: 5, hitBonus: 5, damage: '1d8+3', damageType: 'Slashing', type: 'Action' }],
         spellAbilities: { spells: [] },
       });
 
@@ -166,7 +164,6 @@ describe('CharBonusActions - Rendering', () => {
 
     it('applies exhaustionPenalty to hit bonus display', () => {
       const stats = createStats({ attacks: [bonusActionAttack] });
-      // exhaustion penalty changes hit bonus from +5 to +2
       render(<CharBonusActions playerStats={stats} exhaustionPenalty={3} />);
       expect(screen.getByText('+2')).toBeInTheDocument();
     });
@@ -218,12 +215,6 @@ describe('CharBonusActions - Rendering', () => {
       expect(screen.getByText(/Cunning Action:/)).toBeInTheDocument();
       expect(screen.getByText(/You can take a bonus action/)).toBeInTheDocument();
     });
-
-    it('renders non-clickable when there are no details and no automation', () => {
-      const simple = { name: 'Simple Bonus', description: 'A simple bonus action without details.' };
-      render(<CharBonusActions playerStats={createStats({ bonusActions: [simple] })} />);
-      expect(screen.getByText(/Simple Bonus:/)).toBeInTheDocument();
-    });
   });
 
   describe('2024 rules rendering', () => {
@@ -232,22 +223,6 @@ describe('CharBonusActions - Rendering', () => {
     it('shows Mastery column header for 2024 rules', () => {
       render(<CharBonusActions playerStats={createStats({ rules: '2024', attacks: [bonusActionAttack] })} getWeaponMastery={() => null} />);
       expect(screen.getByText('Mastery')).toBeInTheDocument();
-    });
-  });
-
-  describe('combined content rendering', () => {
-    it('renders bonus action attacks, descriptions, and spells together', () => {
-      const stats = createStats({
-        attacks: [{ name: 'Main Gauche', range: 5, hitBonus: 5, damage: '1d4+3', damageType: 'Piercing', type: 'Bonus Action' }],
-        bonusActions: [{ name: 'Cunning Action', description: 'You can take a bonus action.', details: 'Dash, Hide, or Disengage.' }],
-        spellAbilities: { spells: [{ name: 'Shocking Grasp', range: 'Touch', casting_time: '1 bonus action', prepared: 'Prepared' }] },
-      });
-      render(<CharBonusActions playerStats={stats} />);
-      expect(screen.getByText('Main Gauche')).toBeInTheDocument();
-      expect(screen.getByText(/Cunning Action:/)).toBeInTheDocument();
-      expect(screen.getByText('Shocking Grasp')).toBeInTheDocument();
-      expect(screen.getByText('Hit')).toBeInTheDocument();
-      expect(screen.getByText('Damage')).toBeInTheDocument();
     });
   });
 

@@ -1,5 +1,4 @@
 // @cleaned-by-ai
-// @improved-by-ai
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import UpcastPopup from './UpcastPopup.jsx';
@@ -34,23 +33,15 @@ describe('UpcastPopup', () => {
   });
 
   describe('rendering', () => {
-    it('renders spell name in heading', () => {
+    it('renders spell name, level options, formulas, and action buttons', () => {
       renderUpcastPopup();
       expect(screen.getByText(/Fireball/)).toBeInTheDocument();
-    });
-
-    it('renders all level options with their labels and formulas', () => {
-      renderUpcastPopup();
       expect(screen.getByText('Level 3')).toBeInTheDocument();
       expect(screen.getByText('Level 4')).toBeInTheDocument();
       expect(screen.getByText('Level 5')).toBeInTheDocument();
       expect(screen.getByText('+1d6')).toBeInTheDocument();
       expect(screen.getByText('+2d6')).toBeInTheDocument();
       expect(screen.getByText('+3d6')).toBeInTheDocument();
-    });
-
-    it('renders the cancel and cast buttons', () => {
-      renderUpcastPopup();
       expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: /Cast at Level 3/ })).toBeInTheDocument();
     });
@@ -61,16 +52,24 @@ describe('UpcastPopup', () => {
       ['first level with available slots', mockLevels, 0],
       ['skips zero-slot levels', [{ level: 3, formula: '+1d6', availableSlots: 0 }, { level: 4, formula: '+2d6', availableSlots: 2 }], 1],
       ['falls back to spell base level when all levels have zero slots', [{ level: 3, formula: '+1d6', availableSlots: 0 }], 0],
+      ['disables cast button when levels array is empty', [], 0],
     ])('selects %s', (_, levels, expectedIndex) => {
       renderUpcastPopup({ levels });
-      const radios = screen.getAllByRole('radio');
-      expect(radios[expectedIndex]).toBeChecked();
-    });
-
-    it('disables cast button when levels array is empty', () => {
-      renderUpcastPopup({ levels: [] });
-      const castButton = screen.getByRole('button', { name: /Cast at Level 3/ });
-      expect(castButton).toBeDisabled();
+      const castButton = screen.getByRole('button', { name: /Cast at Level/ });
+      const radios = screen.queryAllByRole('radio');
+      if (radios.length) {
+        expect(radios[expectedIndex]).toBeChecked();
+        const hasSlots = levels.some(l => l.availableSlots > 0);
+        if (hasSlots) {
+          expect(castButton).not.toBeDisabled();
+        }
+        else {
+          expect(castButton).toBeDisabled();
+        }
+      }
+      else {
+        expect(castButton).toBeDisabled();
+      }
     });
   });
 
@@ -91,16 +90,14 @@ describe('UpcastPopup', () => {
     });
 
     it('disables cast button when no slots available at selected level', () => {
-      const levels = [
-        { level: 3, formula: '+1d6', availableSlots: 0 },
-      ];
+      const levels = [{ level: 3, formula: '+1d6', availableSlots: 0 }];
       renderUpcastPopup({ levels });
       const castButton = screen.getByRole('button', { name: /Cast at Level/ });
       expect(castButton).toBeDisabled();
     });
   });
 
-  describe('cast button behavior', () => {
+  describe('cast behavior', () => {
     it('calls onConfirm with the newly selected level', () => {
       const onConfirm = vi.fn();
       renderUpcastPopup({ onConfirm });
@@ -123,22 +120,6 @@ describe('UpcastPopup', () => {
       renderUpcastPopup({ onCancel });
       fireEvent.keyDown(document, { key: 'Escape' });
       expect(onCancel).toHaveBeenCalledTimes(1);
-    });
-
-    it('calls onCancel when clicking the overlay background', () => {
-      const onCancel = vi.fn();
-      renderUpcastPopup({ onCancel });
-      const overlay = document.querySelector('.popup-overlay');
-      fireEvent.click(overlay);
-      expect(onCancel).toHaveBeenCalledTimes(1);
-    });
-
-    it('does not call onCancel when clicking inside the modal', () => {
-      const onCancel = vi.fn();
-      renderUpcastPopup({ onCancel });
-      const modal = document.querySelector('.popup-modal');
-      fireEvent.click(modal);
-      expect(onCancel).not.toHaveBeenCalled();
     });
   });
 });

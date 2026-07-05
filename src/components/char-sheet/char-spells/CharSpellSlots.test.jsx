@@ -47,28 +47,24 @@ describe('CharSpellSlots', () => {
   });
 
   describe('rendering', () => {
-    it('renders the spell slots header', () => {
-      rules.getSpellMaxLevel.mockReturnValue(3);
-
-      render(<CharSpellSlots playerStats={createPlayerStats()} />);
-
-      expect(screen.getByText('Spell Slots')).toBeInTheDocument();
-    });
-
-    it('renders no slot levels when spellMaxLevel is falsy', () => {
-      rules.getSpellMaxLevel.mockReturnValue(0);
-
-      render(<CharSpellSlots playerStats={createPlayerStats()} />);
-
-      expect(screen.queryByTestId('spell-slot-level-1')).not.toBeInTheDocument();
-    });
-
-    it('does not render when spellAbilities is absent', () => {
+    it('renders nothing when spellAbilities is absent', () => {
       rules.getSpellMaxLevel.mockReturnValue(null);
 
       render(<CharSpellSlots playerStats={{ name: 'No Spells' }} />);
 
       expect(screen.queryByText('Spell Slots')).not.toBeInTheDocument();
+    });
+
+    it('renders the spell slots header and level components', () => {
+      rules.getSpellMaxLevel.mockReturnValue(3);
+
+      render(<CharSpellSlots playerStats={createPlayerStats()} />);
+
+      expect(screen.getByText('Spell Slots')).toBeInTheDocument();
+      expect(screen.getByTestId('spell-slot-level-1')).toBeInTheDocument();
+      expect(screen.getByTestId('spell-slot-level-2')).toBeInTheDocument();
+      expect(screen.getByTestId('spell-slot-level-3')).toBeInTheDocument();
+      expect(screen.queryByTestId('spell-slot-level-4')).not.toBeInTheDocument();
     });
 
     it('renders levels up to maxLevel', () => {
@@ -82,14 +78,15 @@ describe('CharSpellSlots', () => {
       expect(screen.queryByTestId('spell-slot-level-6')).not.toBeInTheDocument();
     });
 
-    it('passes correct totalSlots to each level component', () => {
+    it('passes totalSlots and campaignName to each level component', () => {
       rules.getSpellMaxLevel.mockReturnValue(3);
 
-      render(<CharSpellSlots playerStats={createPlayerStats()} />);
+      render(<CharSpellSlots playerStats={createPlayerStats()} campaignName='test-campaign' />);
 
       expect(screen.getByTestId('spell-slot-level-1')).toHaveAttribute('data-total-slots', '4');
       expect(screen.getByTestId('spell-slot-level-2')).toHaveAttribute('data-total-slots', '3');
       expect(screen.getByTestId('spell-slot-level-3')).toHaveAttribute('data-total-slots', '3');
+      expect(screen.getByTestId('spell-slot-level-1')).toHaveAttribute('data-campaign-name', 'test-campaign');
     });
 
     it('passes undefined when a slot level property is missing from spellAbilities', () => {

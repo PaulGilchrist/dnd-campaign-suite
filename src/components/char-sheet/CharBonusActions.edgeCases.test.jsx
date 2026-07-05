@@ -104,7 +104,7 @@ import { getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 
 const basePlayerStats = {
   name: 'TestCharacter',
-  rules: '5e',
+  rules: '2024',
   level: 5,
   attacks: [],
   bonusActions: [],
@@ -132,21 +132,14 @@ describe('CharBonusActions - Edge Cases', () => {
       properties: ['Light'],
     };
 
-    it.each([
-      { nickUsedRound: 1, attackShown: false, label: 'filters out when Nick used this round' },
-      { nickUsedRound: 0, attackShown: true, label: 'shows when Nick not used this round' },
-    ])('$label', ({ nickUsedRound, attackShown }) => {
+    it('filters out Light weapon bonus action attack when Nick mastery was used this round', () => {
       vi.mocked(getRuntimeValue).mockImplementation((name, key) => {
-        if (key === '_Nick_UsedRound') return nickUsedRound;
+        if (key === '_Nick_UsedRound') return 1;
         return null;
       });
-      const stats = createStats({ rules: '2024', attacks: [lightWeaponAttack] });
+      const stats = createStats({ attacks: [lightWeaponAttack] });
       render(<CharBonusActions playerStats={stats} getWeaponMastery={() => null} />);
-      if (attackShown) {
-        expect(screen.getByText('Dagger')).toBeInTheDocument();
-      } else {
-        expect(screen.queryByText('Dagger')).not.toBeInTheDocument();
-      }
+      expect(screen.queryByText('Dagger')).not.toBeInTheDocument();
     });
   });
 

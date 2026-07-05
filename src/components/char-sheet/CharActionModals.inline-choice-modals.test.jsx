@@ -2,24 +2,28 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import CharActionModals from './CharActionModals.jsx';
+import { createBaseProps } from './CharActionModals.test-utils.jsx';
 
-// ── Test fixtures ──
+// ── Mocked modal modules ──
+// These mocks are needed so CharActionModals can render without unmocked
+// dependencies.  Modal rendering is covered by
+// CharActionModals.rendering.test.jsx; handler callbacks are covered by
+// CharActionModals.handlers.test.jsx.  These mocks exist only so the
+// component can mount without side effects (e.g. getCombatContext fetch).
 
-function baseProps(overrides) {
-  return {
-    playerStats: { name: 'Test Character' },
-    campaignName: 'test-campaign',
-    characters: [],
-    setSweepingAttackTargetModal: vi.fn(),
-    setBaitAndSwitchChoiceModal: vi.fn(),
-    setCommanderStrikeChoiceModal: vi.fn(),
-    handleSweepingAttackConfirm: vi.fn(),
-    handleBaitAndSwitchChoiceConfirm: vi.fn(),
-    handleCommanderStrikeChoiceConfirm: vi.fn(),
-    pendingDamageRef: { current: null },
-    ...overrides,
-  };
-}
+vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
+  getRuntimeValue: vi.fn(() => null),
+  setRuntimeValue: vi.fn(),
+}));
+vi.mock('../../services/automation/common/healingRoll.js', () => ({
+  logHealingToSSE: vi.fn(),
+}));
+vi.mock('../../services/rules/combat/damageUtils.js', () => ({
+  getCombatContext: vi.fn().mockResolvedValue(null),
+}));
+vi.mock('../../services/ui/logService.js', () => ({
+  addEntry: vi.fn().mockResolvedValue(undefined),
+}));
 
 // ── Tests ──
 
@@ -69,7 +73,7 @@ describe('CharActionModals inline choice modals', () => {
     it(`${name}: calls handler with selected value and modal data on selection`, () => {
       const handler = vi.fn();
       render(<CharActionModals
-        {...baseProps({ [handlerProp]: handler })}
+        {...createBaseProps({ [handlerProp]: handler })}
         {...{ [modalProp]: modalData }}
       />);
       fireEvent.click(screen.getByText(optionText));

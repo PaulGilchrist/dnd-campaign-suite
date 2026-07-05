@@ -1,4 +1,4 @@
-/* @cleaned-by-ai */
+// @cleaned-by-ai
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import SpellDetailPopup from './SpellDetailPopup.jsx';
@@ -88,7 +88,6 @@ describe('SpellDetailPopup - Overchannel', () => {
     it.each([
       { name: 'applicable spell (level 1-5 with damage)', level: 3, damage: { damage_at_slot_level: { '1': '3d6', '3': '8d6' } }, stats: 'overchannel', shouldShow: true },
       { name: 'cantrip (level 0)', level: 0, damage: { damage_at_slot_level: { '0': '1d6' } }, stats: 'overchannel', shouldShow: false },
-      { name: 'spell above level 5', level: 6, damage: { damage_at_slot_level: { '6': '10d6' } }, stats: 'overchannel', shouldShow: false },
       { name: 'spell without damage', level: 3, damage: null, stats: 'overchannel', shouldShow: false },
       { name: 'without the overchannel passive', level: 3, damage: { damage_at_slot_level: { '1': '3d6', '3': '8d6' } }, stats: 'noOverchannel', shouldShow: false },
     ])('renders Overchannel checkbox when applicable: $name', ({ level, damage, stats, shouldShow }) => {

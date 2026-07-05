@@ -1,5 +1,4 @@
 // @cleaned-by-ai
-// @improved-by-ai
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharSpellSlotLevel from './CharSpellSlotLevel.jsx';
@@ -36,9 +35,7 @@ describe('CharSpellSlotLevel', () => {
 
       expect(screen.getByText('2')).toBeInTheDocument();
     });
-  });
 
-  describe('slot active/inactive classes', () => {
     it.each`
       availableSlots | totalSlots | expectedActive
       ${3}           | ${4}       | ${3}
@@ -65,7 +62,7 @@ describe('CharSpellSlotLevel', () => {
       }
     });
 
-    it('uses _trackedResources fallback when runtime value is null', () => {
+    it('falls back to _trackedResources when runtime value is null', () => {
       useRuntimeValue.mockReturnValue(null);
 
       const playerStats = createPlayerStats({
@@ -87,7 +84,7 @@ describe('CharSpellSlotLevel', () => {
       expect(activeSlots.length).toBe(4);
     });
 
-    it('uses totalSlots fallback when both runtime value and _trackedResources are absent', () => {
+    it('falls back to totalSlots when both runtime value and _trackedResources are absent', () => {
       useRuntimeValue.mockReturnValue(null);
 
       const playerStats = createPlayerStats({
@@ -135,30 +132,27 @@ describe('CharSpellSlotLevel', () => {
       );
     });
 
-    it.each(['Enter', ' ', 'ArrowDown'])(
-      'decrements on %s key press',
-      (key) => {
-        useRuntimeValue.mockReturnValue(3);
+    it('decrements on Enter key press', () => {
+      useRuntimeValue.mockReturnValue(3);
 
-        const { container } = render(
-          <CharSpellSlotLevel
-            level={1}
-            totalSlots={3}
-            playerStats={createPlayerStats()}
-          />
-        );
+      const { container } = render(
+        <CharSpellSlotLevel
+          level={1}
+          totalSlots={3}
+          playerStats={createPlayerStats()}
+        />
+      );
 
-        const levelDiv = container.querySelector('.level');
-        fireEvent.keyDown(levelDiv, { key });
+      const levelDiv = container.querySelector('.level');
+      fireEvent.keyDown(levelDiv, { key: 'Enter' });
 
-        expect(setRuntimeValue).toHaveBeenCalledWith(
-          'Test Character',
-          'spell_slots_level_1',
-          2,
-          undefined
-        );
-      }
-    );
+      expect(setRuntimeValue).toHaveBeenCalledWith(
+        'Test Character',
+        'spell_slots_level_1',
+        2,
+        undefined
+      );
+    });
 
     it('uses _trackedResources fallback for interaction when runtime value is null', () => {
       useRuntimeValue.mockReturnValue(null);

@@ -185,17 +185,22 @@ describe('CharActions haste extra action', () => {
       });
     });
 
-    it('marks haste as used and shows popup for non-Attack action click', async () => {
+    it.each([
+      ['Dash', 'Haste extra action: Dash.'],
+      ['Disengage', 'Haste extra action: Disengage.'],
+      ['Hide', 'Haste extra action: Hide.'],
+      ['Use an Object', 'Haste extra action: Use an Object.'],
+    ])('marks haste as used and shows popup for %s click', async (actionName, expectedDescription) => {
       const { mockSetPopupHtml } = renderWithDiceRollContext(createStats());
 
-      const btn = screen.getByText('Dash');
+      const btn = screen.getByText(actionName);
       await act(async () => { fireEvent.click(btn); });
 
       expect(setRuntimeValue).toHaveBeenCalledWith('TestCharacter', 'hasteExtraActionUsed', true, undefined);
       expect(mockSetPopupHtml).toHaveBeenCalledWith({
         type: 'automation_info',
         name: 'Haste',
-        description: 'Haste extra action: Dash.',
+        description: expectedDescription,
       });
     });
 

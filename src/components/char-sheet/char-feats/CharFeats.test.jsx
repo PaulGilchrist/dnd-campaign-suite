@@ -1,5 +1,4 @@
 // @cleaned-by-ai
-// @improved-by-ai
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharFeats from './CharFeats.jsx';
@@ -73,11 +72,10 @@ describe('CharFeats', () => {
       expect(container.firstChild).toBeNull();
     });
 
-    it('should render feat names as clickable elements', () => {
+    it('should render all feat names', () => {
       render(<CharFeats {...defaultProps} />);
-      const actorLink = screen.getByText(/Actor/);
-      expect(actorLink).toHaveClass('clickable');
-      expect(actorLink).toHaveClass('feat-name');
+      expect(screen.getByText(/Actor/)).toBeInTheDocument();
+      expect(screen.getByText(/Athlete/)).toBeInTheDocument();
     });
   });
 

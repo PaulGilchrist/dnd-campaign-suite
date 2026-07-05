@@ -65,24 +65,8 @@ vi.mock('../../services/automation/handlers/combat/saveAttackHandler.js', () => 
   isExhausted: vi.fn(() => false),
 }));
 
-vi.mock('../../services/automation/handlers/class-cleric-paladin/divineInterventionHandler.js', () => ({
-  onSpellSelected: vi.fn(),
-}));
-
-vi.mock('../../services/automation/handlers/class-wizard/divinationSavantHandler.js', () => ({
-  onDivinationSavantSelected: vi.fn(() => Promise.resolve(null)),
-}));
-
-vi.mock('../../services/automation/handlers/class-wizard/illusionSavantHandler.js', () => ({
-  onIllusionSavantSelected: vi.fn(() => Promise.resolve(null)),
-}));
-
 vi.mock('../../services/combat/buffs/buffService.js', () => ({
   getInnateSorceryBonus: vi.fn(() => ({ saveDcBonus: 0 })),
-}));
-
-vi.mock('../../services/maps/mapsService.js', () => ({
-  loadMapData: vi.fn(() => Promise.resolve({})),
 }));
 
 vi.mock('../../services/rules/combat/damageUtils.js', () => ({
@@ -90,40 +74,8 @@ vi.mock('../../services/rules/combat/damageUtils.js', () => ({
   getCombatContext: vi.fn(() => Promise.resolve(null)),
 }));
 
-vi.mock('../../services/rules/combat/rangeValidation.js', () => ({
-  getNearestPlacedItem: vi.fn(() => null),
-}));
-
 vi.mock('../../services/ui/sanitize.js', () => ({
   sanitizeHtml: vi.fn((html) => html),
-}));
-
-vi.mock('./DiceRollResult.jsx', () => ({
-  default: vi.fn(() => <div data-testid="dice-roll-result">DiceRollResult</div>),
-}));
-
-vi.mock('./popups/MetamagicPopup.jsx', () => ({
-  default: vi.fn(() => <div data-testid="metamagic-popup">MetamagicPopup</div>),
-}));
-
-vi.mock('./char-spells/SpellDetailPopup.jsx', () => ({
-  default: vi.fn(() => <div data-testid="spell-detail-popup">SpellDetailPopup</div>),
-}));
-
-vi.mock('./popups/EmpoweredSpellPopup.jsx', () => ({
-  default: vi.fn(() => <div data-testid="empowered-spell-popup">EmpoweredSpellPopup</div>),
-}));
-
-vi.mock('./CharBonusActions.jsx', () => ({
-  default: vi.fn(() => <div data-testid="char-bonus-actions">CharBonusActions</div>),
-}));
-
-vi.mock('./CharActionModals.jsx', () => ({
-  default: vi.fn(() => <div data-testid="char-action-modals">CharActionModals</div>),
-}));
-
-vi.mock('./CharActionSpellPopups.jsx', () => ({
-  default: vi.fn(() => <div data-testid="char-action-spell-popups">CharActionSpellPopups</div>),
 }));
 
 vi.mock('../../services/encounters/combatData.js', () => ({
@@ -156,12 +108,25 @@ vi.mock('./useInitiativeEffects.js', () => ({
   default: vi.fn(),
 }));
 
+vi.mock('./CharBonusActions.jsx', () => ({
+  default: vi.fn(() => <div data-testid="char-bonus-actions">CharBonusActions</div>),
+}));
+
+vi.mock('./CharActionModals.jsx', () => ({
+  default: vi.fn(() => <div data-testid="char-action-modals">CharActionModals</div>),
+}));
+
+vi.mock('./CharActionSpellPopups.jsx', () => ({
+  default: vi.fn(() => <div data-testid="char-action-spell-popups">CharActionSpellPopups</div>),
+}));
+
 const BASE_PLAYER_STATS = {
   name: 'TestCharacter',
   rules: '5e',
   level: 5,
   attacks: [],
   actions: [],
+  bonusActions: [],
   spellAbilities: { spells: [] },
   equipment: [],
 };
@@ -222,68 +187,43 @@ describe('CharActions monk ki', () => {
   });
 
   describe('monk ki: no FP remaining', () => {
-    it('shows no-FP message when focus points are 0 (5e)', async () => {
-      hasAutomation.mockReturnValue(true);
-      getRuntimeValue.mockImplementation((_name, key) => {
-        if (key === 'focusPoints') return 0;
-        return null;
-      });
-      const mockSetPopupHtml = vi.fn();
-      useLoggedDiceRoll.mockReturnValue({
-        popupHtml: null, setPopupHtml: mockSetPopupHtml, rollAttack: vi.fn(), rollDamage: vi.fn(), quickRollPlayerSave: vi.fn(),
-      });
+    const testCases = [
+      { rules: '5e', expectedMessage: '<b>Flurry of Blows</b><br/>No ki points remaining.', label: '5e' },
+      { rules: '2024', expectedMessage: '<b>Flurry of Blows</b><br/>No Focus Points remaining.', label: '2024' },
+    ];
 
-      const wrapper = ({ children }) => (
-        <DiceRollContext.Provider value={{ popupHtml: null, setPopupHtml: mockSetPopupHtml }}>
-          {children}
-        </DiceRollContext.Provider>
-      );
+    for (const tc of testCases) {
+      it(`shows no-FP message when focus points are 0 (${tc.label})`, async () => {
+        hasAutomation.mockReturnValue(true);
+        getRuntimeValue.mockImplementation((_name, key) => {
+          if (key === 'focusPoints') return 0;
+          return null;
+        });
+        const mockSetPopupHtml = vi.fn();
+        useLoggedDiceRoll.mockReturnValue({
+          popupHtml: null, setPopupHtml: mockSetPopupHtml, rollAttack: vi.fn(), rollDamage: vi.fn(), quickRollPlayerSave: vi.fn(),
+        });
 
-      await act(async () => {
-        render(<CharActions playerStats={createStats({
-          class: { class_levels: [{ level: 5, focus_points: 2 }] },
-          level: 5,
-          rules: '5e',
-          actions: [{ name: 'Flurry of Blows', description: 'No FP.', automation: { type: 'auto_effect' } }],
-        })} />, { wrapper });
-      });
-      const actionName = screen.getByText(/Flurry of Blows:/);
-      await act(async () => { fireEvent.click(actionName); });
-      await waitFor(() => {
-        expect(mockSetPopupHtml).toHaveBeenCalledWith('<b>Flurry of Blows</b><br/>No ki points remaining.');
-      });
-    });
+        const wrapper = ({ children }) => (
+          <DiceRollContext.Provider value={{ popupHtml: null, setPopupHtml: mockSetPopupHtml }}>
+            {children}
+          </DiceRollContext.Provider>
+        );
 
-    it('shows no-FP message when focus points are 0 (2024)', async () => {
-      hasAutomation.mockReturnValue(true);
-      getRuntimeValue.mockImplementation((_name, key) => {
-        if (key === 'focusPoints') return 0;
-        return null;
+        await act(async () => {
+          render(<CharActions playerStats={createStats({
+            class: { class_levels: [{ level: 5, focus_points: 2 }] },
+            level: 5,
+            rules: tc.rules,
+            actions: [{ name: 'Flurry of Blows', description: 'No FP.', automation: { type: 'auto_effect' } }],
+          })} />, { wrapper });
+        });
+        const actionName = screen.getByText(/Flurry of Blows:/);
+        await act(async () => { fireEvent.click(actionName); });
+        await waitFor(() => {
+          expect(mockSetPopupHtml).toHaveBeenCalledWith(tc.expectedMessage);
+        });
       });
-      const mockSetPopupHtml = vi.fn();
-      useLoggedDiceRoll.mockReturnValue({
-        popupHtml: null, setPopupHtml: mockSetPopupHtml, rollAttack: vi.fn(), rollDamage: vi.fn(), quickRollPlayerSave: vi.fn(),
-      });
-
-      const wrapper = ({ children }) => (
-        <DiceRollContext.Provider value={{ popupHtml: null, setPopupHtml: mockSetPopupHtml }}>
-          {children}
-        </DiceRollContext.Provider>
-      );
-
-      await act(async () => {
-        render(<CharActions playerStats={createStats({
-          class: { class_levels: [{ level: 5, focus_points: 2 }] },
-          level: 5,
-          rules: '2024',
-          actions: [{ name: 'Flurry of Blows', description: 'No FP.', automation: { type: 'auto_effect' } }],
-        })} />, { wrapper });
-      });
-      const actionName = screen.getByText(/Flurry of Blows:/);
-      await act(async () => { fireEvent.click(actionName); });
-      await waitFor(() => {
-        expect(mockSetPopupHtml).toHaveBeenCalledWith('<b>Flurry of Blows</b><br/>No Focus Points remaining.');
-      });
-    });
+    }
   });
 });

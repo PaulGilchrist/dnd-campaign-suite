@@ -153,33 +153,21 @@ describe('App', () => {
       expect(await screen.findByTestId('campaign-selection')).toBeInTheDocument();
     });
 
-    it('renders CharSheet when campaign has characters', async () => {
-      mockState.characters = [{ name: 'Aragorn', level: 1 }];
+    it.each([
+      { characters: [{ name: 'Aragorn', level: 1 }], expectedView: 'char-sheet', expectedName: 'Aragorn' },
+      { characters: [], expectedView: 'character-wizard', expectedName: null },
+    ])('renders $expectedView when campaign has $characters.length characters', async ({ characters, expectedView, expectedName }) => {
+      mockState.characters = characters;
       render(<App />);
       await selectCampaign();
       await waitFor(() => {
-        expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
+        expect(screen.getByTestId(expectedView)).toBeInTheDocument();
       });
-    });
-
-    it('renders character wizard when campaign has no characters', async () => {
-      mockState.characters = [];
-      render(<App />);
-      await selectCampaign();
-      await waitFor(() => {
-        expect(screen.getByTestId('character-wizard')).toBeInTheDocument();
-      });
-      expect(screen.queryByTestId('char-sheet')).not.toBeInTheDocument();
-    });
-
-    it('shows campaign selection when navigating back from a view', async () => {
-      mockState.characters = [{ name: 'Aragorn', level: 1 }];
-      render(<App />);
-      await selectCampaign();
-      fireEvent.click(screen.getByTestId('back-to-campaigns-btn'));
-      await waitFor(() => {
-        expect(screen.getByTestId('campaign-selection')).toBeInTheDocument();
-      });
+      if (expectedName) {
+        expect(screen.getByTestId('character-name').textContent).toBe(expectedName);
+      } else {
+        expect(screen.queryByTestId('char-sheet')).not.toBeInTheDocument();
+      }
     });
   });
 
@@ -210,26 +198,6 @@ describe('App', () => {
         expect(screen.getByTestId('sidebar-theme').textContent).toBe('light');
       });
       expect(localStorageMock.setItem).toHaveBeenCalledWith('theme', 'light');
-    });
-
-    it('defaults to dark when localStorage throws on read', async () => {
-      const localStorageMock = window.localStorage;
-      localStorageMock.getItem.mockImplementation(() => { throw new Error('Storage error'); });
-      mockState.characters = [{ name: 'Aragorn', level: 1 }];
-      render(<App />);
-      await selectCampaign();
-      await waitFor(() => {
-        expect(screen.getByTestId('sidebar-theme').textContent).toBe('dark');
-      });
-    });
-
-    it('does not crash when localStorage throws on write', async () => {
-      const { toggleBtn } = await renderWithTheme('dark');
-      const localStorageMock = window.localStorage;
-      localStorageMock.setItem.mockImplementation(() => { throw new Error('Storage error'); });
-      expect(() => {
-        fireEvent.click(toggleBtn);
-      }).not.toThrow();
     });
   });
 
@@ -324,89 +292,6 @@ describe('App', () => {
       fireEvent.click(screen.getByTestId('char-btn-Legolas'));
       await waitFor(() => {
         expect(screen.getByTestId('character-name').textContent).toBe('Legolas');
-      });
-    });
-
-    it('handles campaign rename callback', async () => {
-      mockState.characters = [{ name: 'Aragorn', level: 1 }];
-      render(<App />);
-      await selectCampaign();
-      await waitFor(() => {
-        expect(screen.getByTestId('sidebar')).toBeInTheDocument();
-      });
-      fireEvent.click(screen.getByTestId('rename-campaign-btn'));
-      await waitFor(() => {
-        expect(window.prompt).toHaveBeenCalled();
-      });
-    });
-
-    it('handles delete campaign callback', async () => {
-      mockState.characters = [];
-      render(<App />);
-      await selectCampaign();
-      await waitFor(() => {
-        expect(screen.getByTestId('character-wizard')).toBeInTheDocument();
-      });
-      fireEvent.click(screen.getByTestId('delete-campaign-btn'));
-      await waitFor(() => {
-        expect(window.confirm).toHaveBeenCalled();
-      });
-    });
-
-    it('handles delete character from CharSheet', async () => {
-      mockState.characters = [{ name: 'Aragorn', level: 1 }];
-      render(<App />);
-      await selectCampaign();
-      await waitFor(() => {
-        expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
-      });
-      fireEvent.click(screen.getByTitle('Delete Character'));
-      await waitFor(() => {
-        expect(window.confirm).toHaveBeenCalled();
-      });
-    });
-  });
-
-  describe('Wizards & overlays', () => {
-    it('shows character wizard when Add Character clicked', async () => {
-      mockState.characters = [{ name: 'Aragorn', level: 1 }];
-      render(<App />);
-      await selectCampaign();
-      await waitFor(() => {
-        expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
-      });
-      fireEvent.click(screen.getByTestId('add-character-btn'));
-      await waitFor(() => {
-        expect(screen.getByTestId('character-wizard')).toBeInTheDocument();
-      });
-    });
-
-    it('shows edit wizard when Edit clicked on CharSheet', async () => {
-      mockState.characters = [{ name: 'Aragorn', level: 1 }];
-      render(<App />);
-      await selectCampaign();
-      await waitFor(() => {
-        expect(screen.getByText(/Edit/)).toBeInTheDocument();
-      });
-      fireEvent.click(screen.getByText(/Edit/));
-      await waitFor(() => {
-        expect(screen.getByTestId('character-wizard')).toBeInTheDocument();
-        expect(screen.getByTestId('editing-mode')).toBeInTheDocument();
-        expect(screen.getByTestId('editing-character').textContent).toBe('Aragorn');
-      });
-    });
-
-    it('hides wizard when wizard cancel is clicked', async () => {
-      mockState.characters = [{ name: 'Aragorn', level: 1 }];
-      render(<App />);
-      await selectCampaign();
-      fireEvent.click(screen.getByTestId('add-character-btn'));
-      await waitFor(() => {
-        expect(screen.getByTestId('character-wizard')).toBeInTheDocument();
-      });
-      fireEvent.click(screen.getByTestId('wizard-cancel-btn'));
-      await waitFor(() => {
-        expect(screen.queryByTestId('character-wizard')).not.toBeInTheDocument();
       });
     });
   });

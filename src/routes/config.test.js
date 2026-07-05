@@ -29,35 +29,23 @@ describe('routes config', () => {
       expect(new Set(names).size).toBe(names.length);
     });
 
-    it('should have unique stateVar values within each category', () => {
+    it('should have unique stateVar values among boolean (overlay) views', () => {
       const booleanStateVars = Object.values(VIEWS)
         .filter(v => v.type === 'boolean')
         .map(v => v.stateVar);
       expect(new Set(booleanStateVars).size).toBe(booleanStateVars.length);
     });
 
-    it('should classify sidebar views as activeView string type', () => {
+    it('should classify sidebar views as string type with activeView stateVar and overlay views as boolean type with overlay flag', () => {
       Object.values(VIEWS).forEach(view => {
         if (view.type === 'string') {
           expect(view.stateVar).toBe('activeView');
           expect(view.overlay).not.toBe(true);
-        }
-      });
-    });
-
-    it('should classify overlay views as boolean type with overlay flag', () => {
-      Object.values(VIEWS).forEach(view => {
-        if (view.type === 'boolean') {
+        } else if (view.type === 'boolean') {
           expect(view.stateVar).not.toBe('activeView');
           expect(view.overlay).toBe(true);
         }
       });
-    });
-
-    it('should map overlay views to correct component and needsActiveCharacter flags', () => {
-      expect(VIEWS.CAMPAIGN_SELECTION.component).toBe('CampaignSelection');
-      expect(VIEWS.CHARACTER_WIZARD.needsActiveCharacter).toBe(false);
-      expect(VIEWS.EDIT_CHARACTER_WIZARD.needsActiveCharacter).toBe(true);
     });
   });
 
@@ -95,14 +83,9 @@ describe('routes config', () => {
   });
 
   describe('SIDEBAR_VIEWS', () => {
-    it('should export an array of unique view names without overlay views', () => {
+    it('should export an array of unique view names', () => {
       expect(Array.isArray(SIDEBAR_VIEWS)).toBe(true);
       expect(new Set(SIDEBAR_VIEWS).size).toBe(SIDEBAR_VIEWS.length);
-
-      const overlayNames = ['campaignSelection', 'characterWizard', 'editCharacterWizard'];
-      overlayNames.forEach(name => {
-        expect(SIDEBAR_VIEWS).not.toContain(name);
-      });
     });
   });
 

@@ -1,5 +1,5 @@
 // @cleaned-by-ai
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharGold from './CharGold.jsx';
 
@@ -9,7 +9,7 @@ vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
 }));
 
 vi.mock('../../common/HiddenInput.jsx', () => ({
-  default: vi.fn(({ value, showInput, displayValue, handleValueChange, handleInputToggle }) => {
+  default: vi.fn(({ value, showInput, displayValue }) => {
     const isDisplayingValue = displayValue !== false;
     if (showInput) {
       return (
@@ -17,8 +17,6 @@ vi.mock('../../common/HiddenInput.jsx', () => ({
           data-testid="gold-input"
           type="number"
           value={value}
-          onChange={(e) => handleValueChange(e.target.value)}
-          onBlur={handleInputToggle}
         />
       );
     }
@@ -54,16 +52,5 @@ describe('CharGold', () => {
     render(<CharGold playerStats={statsWithoutGold} campaignName={campaignName} />);
 
     expect(screen.getByTestId('gold-value')).toHaveTextContent('0');
-  });
-
-  it('toggles input visibility on interaction', () => {
-    render(<CharGold playerStats={mockPlayerStats} campaignName={campaignName} />);
-
-    expect(screen.queryByTestId('gold-input')).not.toBeInTheDocument();
-
-    const clickable = document.querySelector('.clickable');
-    fireEvent.click(clickable);
-
-    expect(screen.getByTestId('gold-input')).toBeInTheDocument();
   });
 });

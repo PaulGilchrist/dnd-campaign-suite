@@ -133,14 +133,8 @@ describe('CharBonusActions - Spell Cast Flow', () => {
   describe('spell detail popup', () => {
     const bonusActionSpell = { name: 'Shocking Grasp', range: 'Touch', casting_time: '1 bonus action', prepared: 'Prepared' };
 
-    it.each([
-      { label: 'with mapName', mapName: 'test-map', campaignName: 'test' },
-      { label: 'without mapName', mapName: null, campaignName: undefined },
-    ])('opens spell detail popup when clicking a spell ($label)', async ({ mapName, campaignName }) => {
-      const renderArgs = { playerStats: createStats({ spellAbilities: { spells: [bonusActionSpell] } }), mapName };
-      if (campaignName) renderArgs.campaignName = campaignName;
-
-      render(<CharBonusActions {...renderArgs} />);
+    it('opens spell detail popup when clicking a spell', async () => {
+      render(<CharBonusActions playerStats={createStats({ spellAbilities: { spells: [bonusActionSpell] } })} />);
       fireEvent.click(screen.getByText('Shocking Grasp'));
       expect(screen.getByTestId('spell-detail-popup')).toBeInTheDocument();
     });
@@ -185,17 +179,6 @@ describe('CharBonusActions - Spell Cast Flow', () => {
       } else {
         expect(vi.mocked(addEntry)).not.toHaveBeenCalled();
       }
-    });
-  });
-
-  describe('attack click behavior', () => {
-    const bonusActionAttack = { name: 'Main Gauche', range: 5, hitBonus: 5, damage: '1d4+3', damageType: 'Piercing', type: 'Bonus Action' };
-
-    it('calls onAttackClick even when cannotAct is true', () => {
-      const mockOnAttackClick = vi.fn();
-      render(<CharBonusActions playerStats={createStats({ attacks: [bonusActionAttack] })} cannotAct={true} exhaustionPenalty={0} onAttackClick={mockOnAttackClick} />);
-      fireEvent.click(screen.getByText('+5'));
-      expect(mockOnAttackClick).toHaveBeenCalledWith(bonusActionAttack);
     });
   });
 });

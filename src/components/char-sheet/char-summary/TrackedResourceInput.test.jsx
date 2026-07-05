@@ -3,11 +3,6 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import TrackedResourceInput from './TrackedResourceInput.jsx';
 
-vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
-  useRuntimeValue: vi.fn(),
-  setRuntimeValue: vi.fn(),
-}));
-
 vi.mock('../../../hooks/runtime/useTrackedResource.js', () => ({
   default: vi.fn(),
 }));
@@ -40,18 +35,15 @@ describe('TrackedResourceInput', () => {
     useTrackedResource.mockReturnValue(createTrackedResource());
   });
 
-  it('renders the label with current and max values', () => {
+  it('renders the label with current and max values and toggles input on click', () => {
     render(<TrackedResourceInput {...defaultProps} />);
     expect(screen.getByText('Sorcery Points:')).toBeInTheDocument();
-    const clickable = document.querySelector('.clickable');
-    expect(clickable.textContent).toContain('5/10');
-  });
+    expect(document.querySelector('.clickable').textContent).toContain('5/10');
 
-  it('toggles the input visible on click', () => {
-    render(<TrackedResourceInput {...defaultProps} />);
     const clickable = document.querySelector('.clickable');
     fireEvent.click(clickable);
     expect(document.querySelector('input')).toBeInTheDocument();
+
     fireEvent.click(clickable);
     expect(document.querySelector('input')).not.toBeInTheDocument();
   });

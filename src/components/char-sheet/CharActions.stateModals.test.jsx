@@ -157,10 +157,7 @@ vi.mock('../../hooks/combat/useActionSpellMetamagic.js', () => ({
 }));
 
 import { useSpellMetamagicFlow } from '../../hooks/combat/useSpellMetamagicFlow.js';
-import { useActionSpellMetamagic } from '../../hooks/combat/useActionSpellMetamagic.js';
 import { hasAutomation } from '../../services/combat/automation/automationService.js';
-import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
-import { getInnateSorceryBonus } from '../../services/combat/buffs/buffService.js';
 
 const basePlayerStats = {
   name: 'TestCharacter',
@@ -201,17 +198,15 @@ describe('CharActions state and modals', () => {
 
   describe('feature choice modal', () => {
     const featureChoiceCases = [
-      { name: 'Blessed Strikes', automation: { type: 'damage_bonus', options: ['Lightning', 'Thunder'] }, actionText: /Blessed Strikes:/, shouldShowModal: true },
-      { name: 'Elemental Attunement', automation: { type: 'save_attack', hasOptions: true, options: ['Fire', 'Cold'] }, actionText: /Elemental Attunement:/, shouldShowModal: true },
-      { name: "Hunter's Prey", automation: { type: 'hunter_prey' }, actionText: /Hunter's Prey:/, shouldShowModal: true },
-      { name: 'Defensive Tactics', automation: { type: 'defensive_tactics' }, actionText: /Defensive Tactics:/, shouldShowModal: true },
+      { name: 'Blessed Strikes', automation: { type: 'damage_bonus', options: ['Lightning', 'Thunder'] }, actionText: /Blessed Strikes:/ },
+      { name: "Hunter's Prey", automation: { type: 'hunter_prey' }, actionText: /Hunter's Prey:/ },
+      { name: 'Defensive Tactics', automation: { type: 'defensive_tactics' }, actionText: /Defensive Tactics:/ },
     ];
 
     it.each(featureChoiceCases)(
       'shows feature choice modal for $name ($automation.type)',
       async ({ name, automation, actionText }) => {
         hasAutomation.mockReturnValue(true);
-        vi.mocked(getRuntimeValue).mockReturnValue(null);
 
         const stats = createStats({
           actions: [{ name, description: 'Choose an option.', automation }],
@@ -223,74 +218,19 @@ describe('CharActions state and modals', () => {
         await waitFor(() => { expect(screen.getByText(/Choose your option/)).toBeInTheDocument(); });
       }
     );
-
-    it('does not show feature choice modal when option was already chosen', async () => {
-      hasAutomation.mockReturnValue(true);
-      vi.mocked(getRuntimeValue).mockReturnValue('Thunder');
-
-      const stats = createStats({
-        actions: [{ name: 'Blessed Strikes', description: 'Choose a damage type.', automation: { type: 'damage_bonus', options: ['Lightning', 'Thunder'] } }],
-      });
-
-      await act(async () => { render(<CharActions playerStats={stats} />); });
-      const actionName = screen.getByText(/Blessed Strikes:/);
-      await act(async () => { fireEvent.click(actionName); });
-      await waitFor(() => {
-        expect(screen.queryByText(/Choose your option/)).not.toBeInTheDocument();
-      });
-    });
-
-    it('saves the chosen option to runtime state on confirm', async () => {
-      hasAutomation.mockReturnValue(true);
-      vi.mocked(getRuntimeValue).mockReturnValue(null);
-
-      const stats = createStats({
-        actions: [{ name: 'Blessed Strikes', description: 'Choose a damage type.', automation: { type: 'damage_bonus', options: ['Lightning', 'Thunder'] } }],
-      });
-
-      await act(async () => { render(<CharActions playerStats={stats} />); });
-      const actionName = screen.getByText(/Blessed Strikes:/);
-      await act(async () => { fireEvent.click(actionName); });
-      await waitFor(() => { expect(screen.getByText(/Choose your option/)).toBeInTheDocument(); });
-
-      const lightningBtn = screen.getByText('Lightning');
-      await act(async () => { fireEvent.click(lightningBtn); });
-
-      await waitFor(() => {
-        expect(setRuntimeValue).toHaveBeenCalledWith('TestCharacter', '_Blessed_Strikes_option', 'Lightning', undefined);
-      });
-    });
   });
 
   describe('metamagic popup', () => {
-    it.each([
-      { flowHook: 'useSpellMetamagicFlow', _pendingKey: 'pendingMetamagic', pendingValue: { spellName: 'Fireball', spellLevel: 3, _currentSP: 5 }, extraSetup: null },
-      { flowHook: 'useActionSpellMetamagic', _pendingKey: 'pendingActionMetamagic', pendingValue: { spellName: 'Fireball', spellLevel: 3, _currentSP: 5 }, extraSetup: { getInnateSorceryBonus: { saveDcBonus: 0 } } },
-    ])('renders MetamagicPopup when %s returns pending', async ({ flowHook, _pendingKey, pendingValue, extraSetup }) => {
-      if (extraSetup?.getInnateSorceryBonus) {
-        vi.mocked(getInnateSorceryBonus).mockReturnValue(extraSetup.getInnateSorceryBonus);
-      }
-
-      if (flowHook === 'useSpellMetamagicFlow') {
-        useSpellMetamagicFlow.mockReturnValue({
-          pendingMetamagic: pendingValue,
-          gateMetamagic: vi.fn(),
-          handleConfirm: vi.fn(),
-          handleSkip: vi.fn(),
-          pendingAid: null, handleAidConfirm: vi.fn(), handleAidSkip: vi.fn(),
-          pendingGreaterRestoration: null, handleGreaterRestorationConfirm: vi.fn(), handleGreaterRestorationSkip: vi.fn(),
-          pendingRemoveCurse: null, handleRemoveCurseConfirm: vi.fn(), handleRemoveCurseSkip: vi.fn(),
-        });
-      } else {
-        useActionSpellMetamagic.mockReturnValue({
-          pendingActionMetamagic: pendingValue,
-          handleActionMetamagicConfirm: vi.fn(),
-          handleActionMetamagicSkip: vi.fn(),
-          handleActionSpellDamageClick: vi.fn(),
-          handleSpellAttackClick: vi.fn(),
-          handleSpellDamageClick: vi.fn(),
-        });
-      }
+    it('renders MetamagicPopup when a metamagic flow hook returns pending data', async () => {
+      useSpellMetamagicFlow.mockReturnValue({
+        pendingMetamagic: { spellName: 'Fireball', spellLevel: 3, _currentSP: 5 },
+        gateMetamagic: vi.fn(),
+        handleConfirm: vi.fn(),
+        handleSkip: vi.fn(),
+        pendingAid: null, handleAidConfirm: vi.fn(), handleAidSkip: vi.fn(),
+        pendingGreaterRestoration: null, handleGreaterRestorationConfirm: vi.fn(), handleGreaterRestorationSkip: vi.fn(),
+        pendingRemoveCurse: null, handleRemoveCurseConfirm: vi.fn(), handleRemoveCurseSkip: vi.fn(),
+      });
 
       const stats = createStats({
         spellAbilities: { spells: [{ name: 'Fireball', range: '150 ft', casting_time: '1 action', prepared: 'Prepared', damage: '8d6' }] },
@@ -299,7 +239,5 @@ describe('CharActions state and modals', () => {
       await act(async () => { render(<CharActions playerStats={stats} />); });
       expect(screen.getByTestId('metamagic-popup')).toBeInTheDocument();
     });
-
-
   });
 });

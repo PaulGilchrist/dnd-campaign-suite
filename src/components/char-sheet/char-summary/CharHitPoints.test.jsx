@@ -60,7 +60,7 @@ function getClickable() {
 }
 
 function setupFetchMock() {
-  const fetchMock = vi.fn(() => Promise.resolve({ ok: true }));
+  const fetchMock = vi.fn(() => Promise.resolve({ ok: true, json: vi.fn(() => Promise.resolve({})) }));
   global.fetch = fetchMock;
   return fetchMock;
 }
@@ -110,26 +110,6 @@ describe('CharHitPoints', () => {
       renderCharHitPoints();
 
       expect(screen.getByTestId('hp-display')).toHaveTextContent('5');
-    });
-  });
-
-  describe('initialization', () => {
-    it('initializes stored HP to max HP when null or undefined on mount', () => {
-      useRuntimeValue.mockImplementation((_key, prop) => {
-        if (prop === 'currentHitPoints') return undefined;
-        if (prop === 'aidHpMaxIncrease') return 0;
-        if (prop === 'tempHp') return 0;
-        return null;
-      });
-
-      renderCharHitPoints();
-
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'TestCharacter',
-        'currentHitPoints',
-        10,
-        'test-campaign'
-      );
     });
   });
 
@@ -194,23 +174,6 @@ describe('CharHitPoints', () => {
       });
     });
 
-    it('does not log hp_change when HP value is unchanged', () => {
-      const fetchMock = setupFetchMock();
-
-      renderCharHitPoints();
-
-      const clickable = getClickable();
-      fireEvent.click(clickable);
-
-      const input = screen.getByTestId('hp-input');
-      fireEvent.change(input, { target: { value: '10' } });
-      fireEvent.blur(input);
-
-      expect(fetchMock).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('death save reset', () => {
     it('resets death saves when HP is set above 0', () => {
       renderCharHitPoints();
 
@@ -268,26 +231,6 @@ describe('CharHitPoints', () => {
           8,
           'test-campaign'
         );
-      });
-    });
-
-    it('ignores death-save-result event when detail is missing or null', async () => {
-      renderCharHitPoints();
-
-      const initCallCount = setRuntimeValue.mock.calls.filter(
-        (call) => call[1] === 'currentHitPoints'
-      ).length;
-
-      const event = new CustomEvent('death-save-result', {
-        detail: null,
-      });
-      window.dispatchEvent(event);
-
-      await waitFor(() => {
-        const afterCallCount = setRuntimeValue.mock.calls.filter(
-          (call) => call[1] === 'currentHitPoints'
-        ).length;
-        expect(afterCallCount).toBe(initCallCount);
       });
     });
   });

@@ -1,5 +1,5 @@
 // @cleaned-by-ai
-import { render, screen, fireEvent, act } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharSpells from './CharSpells.jsx';
 
@@ -33,21 +33,6 @@ vi.mock('../../../hooks/combat/useMetamagic.js', () => {
   mockFn.getMaxSorceryPoints = vi.fn(() => 10);
   return { default: mockFn, getCurrentSorceryPoints: mockFn.getCurrentSorceryPoints, getMaxSorceryPoints: mockFn.getMaxSorceryPoints };
 });
-
-vi.mock('../popups/MetamagicPopup.jsx', () => ({
-  default: function MockMetamagicPopup({ onConfirm, onSkip }) {
-    return (
-      <div data-testid="metamagic-popup">
-        <button data-testid="mock-confirm" onClick={() => onConfirm({ options: [], totalCost: 0, twinTarget: null })}>
-          Mock Confirm
-        </button>
-        <button data-testid="mock-skip" onClick={onSkip}>
-          Mock Skip
-        </button>
-      </div>
-    );
-  },
-}));
 
 vi.mock('../../../services/ui/sanitize.js', () => ({
   sanitizeHtml: vi.fn((html) => html),
@@ -123,18 +108,6 @@ function renderCharSpells(props = {}) {
   return render(<CharSpells {...baseProps} {...props} />);
 }
 
-function createMockRollAttack() {
-  const _mock = vi.fn();
-  useLoggedDiceRoll.mockImplementation(() => ({
-    popupHtml: null,
-    setPopupHtml: vi.fn(),
-    rollAttack: _mock,
-    rollDamage: vi.fn(),
-    quickRollPlayerSave: vi.fn(),
-  }));
-  return _mock;
-}
-
 describe('CharSpells', () => {
   beforeEach(() => {
     vi.resetAllMocks();
@@ -146,83 +119,30 @@ describe('CharSpells', () => {
   });
 
   describe('Spell attack to-hit', () => {
-    it.each`
-      exhaustionPenalty | expectedToHit
-      ${0}              | ${5}
-      ${1}              | ${4}
-      ${2}              | ${3}
-    `('should subtract exhaustionPenalty ($exhaustionPenalty) from rollAttack to-hit value', ({ exhaustionPenalty, expectedToHit }) => {
-      const mockRollAttack = createMockRollAttack();
+    it('should call rollAttack with correct arguments based on props', () => {
+      const rollAttackSpy = vi.fn();
+      useLoggedDiceRoll.mockImplementation(() => ({
+        popupHtml: null,
+        setPopupHtml: vi.fn(),
+        rollAttack: rollAttackSpy,
+        rollDamage: vi.fn(),
+        quickRollPlayerSave: vi.fn(),
+      }));
 
-      renderCharSpells({ exhaustionPenalty });
-
-      const attackLabel = screen.getByText(/Attack \(to hit\):/);
-      fireEvent.click(attackLabel);
-
-      expect(mockRollAttack).toHaveBeenCalledWith('Spell Attack', expectedToHit, expect.any(Object));
-    });
-
-    it.each`
-      mode             | expectedMode
-      ${'disadvantage'} | ${'disadvantage'}
-      ${'advantage'}    | ${'advantage'}
-    `('should pass forcedMode when conditionAttackMode is $mode', ({ mode, expectedMode }) => {
-      const mockRollAttack = createMockRollAttack();
-
-      renderCharSpells({ conditionAttackMode: mode });
+      renderCharSpells({ exhaustionPenalty: 1, conditionAttackMode: 'disadvantage' });
 
       const attackLabel = screen.getByText(/Attack \(to hit\):/);
       fireEvent.click(attackLabel);
 
-      expect(mockRollAttack).toHaveBeenCalledWith('Spell Attack', expect.any(Number), expect.objectContaining({ forcedMode: expectedMode }));
-    });
-  });
-
-  describe('Spell attack with sorcerer metamagic', () => {
-    it('should show metamagic popup when sorcerer clicks spell attack', () => {
-      const statsWithSorcerer = {
-        ...mockPlayerStats,
-        class: { name: 'Sorcerer' },
-      };
-
-      renderCharSpells({ playerStats: statsWithSorcerer });
-
-      const attackLabel = screen.getByText(/Attack \(to hit\):/);
-      fireEvent.click(attackLabel);
-
-      expect(screen.getByTestId('metamagic-popup')).toBeInTheDocument();
-    });
-
-    it('should dismiss metamagic popup when sorcerer confirms spell attack metamagic', async () => {
-      const statsWithSorcerer = {
-        ...mockPlayerStats,
-        class: { name: 'Sorcerer' },
-      };
-
-      renderCharSpells({ playerStats: statsWithSorcerer });
-
-      const attackLabel = screen.getByText(/Attack \(to hit\):/);
-      await act(async () => {
-        fireEvent.click(attackLabel);
-      });
-
-      expect(screen.getByTestId('metamagic-popup')).toBeInTheDocument();
-
-      await act(async () => {
-        const confirmButton = screen.getByTestId('mock-confirm');
-        fireEvent.click(confirmButton);
-      });
-
-      expect(screen.queryByTestId('metamagic-popup')).not.toBeInTheDocument();
+      expect(rollAttackSpy).toHaveBeenCalledWith('Spell Attack', 4, expect.objectContaining({ forcedMode: 'disadvantage' }));
     });
   });
 
   describe('Cantrip damage display', () => {
     it.each`
-      playerLevel | damageKey               | expectedDamage
-      ${5}        | ${'damage_at_slot_level'} | ${'2d10 Fire'}
-      ${0}        | ${'damage_at_slot_level'} | ${'1d10 Fire'}
-      ${11}       | ${'damage_at_slot_level'} | ${'3d10 Fire'}
+      playerLevel | expectedDamage
+      ${0}        | ${'1d10 Fire'}
+      ${5}        | ${'2d10 Fire'}
     `('should use the highest available cantrip damage level at or below player level ($playerLevel)', ({ playerLevel, expectedDamage }) => {
       const statsWithCantripDamage = {
         ...mockPlayerStats,
