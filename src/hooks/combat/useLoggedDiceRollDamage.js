@@ -3,9 +3,11 @@ import { postLogEntry } from '../../services/shared/logPoster.js';
 import utils from '../../services/ui/utils.js';
 import {
     computeDamageAfterSave,
+    computeDamageAfterEvasion,
     rollSaveForCreature,
     applyDamageToTarget,
     clearReTriggeredSequence,
+    normalizeSaveType,
 } from '../../services/rules/combat/applyDamage.js';
 import { sendSavePrompt } from '../../services/combat/conditions/savePromptService.js';
 import { getAffectedCreatures, processAoeNpcs, sendAoePlayerSaves } from '../../services/rules/combat/aoeService.js';
@@ -304,7 +306,19 @@ export function createLogDamageAndShow(deps) {
         const targetSaveModifiers = targetCharacter?.saveModifiers || targetCharacter?.computedStats?.saveModifiers || [];
         const advantage = targetSaveModifiers.some(mod => mod.target === 'saving_throw' && mod.effect === 'advantage' && mod.condition === 'against_spell');
         const saveResult = rollSaveForCreature(target, saveType, saveDc, disadvantage, advantage);
-        let finalDamage = isSoulstitchProtected ? 0 : computeDamageAfterSave(adjustedTotal, saveResult.success, dcSuccess);
+        const normalizedSaveType = normalizeSaveType(saveType);
+        const targetConditions = getRuntimeValue(target.name, 'activeConditions', campaignName) || [];
+        const isIncapacitated = targetConditions.some(c => String(c).toLowerCase() === 'incapacitated');
+        const ownEvasion = targetCharacter?.computedStats?.evasionEffects;
+        const hasOwnEvasion = !isIncapacitated && dcSuccess === 'half' && ownEvasion?.some(ef => ef.saveType === normalizedSaveType);
+        const hasSharedEvasion = !hasOwnEvasion && !isIncapacitated && dcSuccess === 'half' &&
+            (characters || []).some(c => {
+                if (c.name === target.name) return false;
+                const ev = c?.computedStats?.evasionEffects;
+                return ev?.some(ef => ef.saveType === normalizedSaveType && ef.shareable && ef.shareRange >= 5);
+            });
+        const hasEvasion = hasOwnEvasion || hasSharedEvasion;
+        let finalDamage = isSoulstitchProtected ? 0 : computeDamageAfterEvasion(adjustedTotal, saveResult.success, dcSuccess, hasEvasion);
         const isCantripFlag = context?.isCantrip || false;
         const hasPotentFlag = hasPotentCantrip(context?.playerStats);
         const hasBlessedStrikesOptions = context?.playerStats?.automation?.actions?.some(
@@ -891,6 +905,15 @@ export function createLogDamageAndShow(deps) {
             autoDamageSecondaryName: context?.autoDamageSecondaryName || null,
             autoDamageSecondaryDamageType: context?.autoDamageSecondaryDamageType || null,
         };
+
+        console.log('[handlePlayerSaveDamage] created pending save promptId:', promptId,
+            'characterName:', characterName,
+            'attackerName from context:', attackerName,
+            'computed attackerName:', attackerName || characterName,
+            'name:', name,
+            'target:', target.name,
+            'saveType:', saveType,
+            'saveDc:', saveDc);
 
         sendSavePrompt(campaignName, {
             promptId,

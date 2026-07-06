@@ -4,6 +4,8 @@ import storage from '../../services/ui/storage.js';
 import { getTargetFromAttacker, findCreatureByName, getCombatContext } from '../../services/rules/combat/damageUtils.js';
 import {
     applyDamageToTarget,
+    computeDamageAfterEvasion,
+    normalizeSaveType,
 } from '../../services/rules/combat/applyDamage.js';
 import { getRuntimeValue, setRuntimeValue } from '../runtime/useRuntimeState.js';
 import { clearAllExpirationEffects } from '../../services/rules/effects/expirations.js';
@@ -995,20 +997,39 @@ export function createLogAndShow(deps) {
                 const saveConditions = context?.saveConditions || [];
                 const damageResult = rollExpression(damageFormula);
                 if (damageResult) {
-                    let finalDamage;
-                    if (saveSuccess) {
-                        if (context?.dcSuccess === 'half') {
-                            finalDamage = Math.floor(damageResult.total / 2);
-                        } else {
-                            finalDamage = 0;
-                        }
-                    } else {
-                        finalDamage = damageResult.total;
+                    const applyTarget = targetName || characterName;
+                    const normalizedSaveType = normalizeSaveType(saveType);
+                    const targetChar = (characters || []).find(c => c.name === applyTarget);
+                    const targetConditions = getRuntimeValue(applyTarget, 'activeConditions', campaignName) || [];
+                    const isIncapacitated = targetConditions.some(c => String(c).toLowerCase() === 'incapacitated');
+                    const ownEvasion = targetChar?.computedStats?.evasionEffects;
+                    const hasOwnEvasion = !isIncapacitated && context?.dcSuccess === 'half' && ownEvasion?.some(ef => ef.saveType === normalizedSaveType);
+                    const hasSharedEvasion = !hasOwnEvasion && !isIncapacitated && context?.dcSuccess === 'half' &&
+                        (characters || []).some(c => {
+                            if (c.name === applyTarget) return false;
+                            const ev = c?.computedStats?.evasionEffects;
+                            return ev?.some(ef => ef.saveType === normalizedSaveType && ef.shareable && ef.shareRange >= 5);
+                        });
+                    const hasEvasion = hasOwnEvasion || hasSharedEvasion;
+                    if (hasEvasion) {
+                        logEntry({
+                            type: 'roll',
+                            characterName: applyTarget,
+                            rollType: 'evasion',
+                            name: hasOwnEvasion ? 'Evasion' : 'Leading Evasion',
+                            targetName: applyTarget,
+                            saveType,
+                            saveDc,
+                            saveResult: saveSuccess ? 'success' : 'failure',
+                            dcSuccess: context?.dcSuccess,
+                            timestamp: Date.now(),
+                            id: utils.guid(),
+                        });
                     }
+                    let finalDamage = computeDamageAfterEvasion(damageResult.total, saveSuccess, context?.dcSuccess, hasEvasion);
 
                     const attackerChar = (characters || []).find(c => c.name === attackerName);
                     const ignoreResistance = (attackerChar?.computedStats && hasIgnoreResistance(attackerChar.computedStats, damageType)) || false;
-                    const applyTarget = targetName || characterName;
                     const combatSummaryForSave = await loadCombatSummary(campaignName);
                     const applyResult = applyDamageToTarget(combatSummaryForSave, applyTarget, finalDamage, [damageType], campaignName, characters, ignoreResistance, attackerName);
 

@@ -12,6 +12,11 @@ vi.mock('../../services/rules/combat/applyDamage.js', () => ({
         return success ? Math.floor(raw / 2) : raw;
     }),
     applyDamageToTarget: vi.fn(), clearReTriggeredSequence: vi.fn(),
+    normalizeSaveType: (saveType) => {
+        if (!saveType) return '';
+        const map = { 'STRENGTH': 'STR', 'DEXTERITY': 'DEX', 'CONSTITUTION': 'CON', 'INTELLIGENCE': 'INT', 'WISDOM': 'WIS', 'CHARISMA': 'CHA' };
+        return map[saveType.toUpperCase()] || saveType.toUpperCase();
+    },
 }));
 vi.mock('../../services/combat/automation/automationService.js', () => ({ hasIgnoreResistance: vi.fn(), playerIsImmuneToCondition: vi.fn() }));
 vi.mock('../../services/rules/features/invisibilityService.js', () => ({ endInvisibilityOnHostileAction: vi.fn() }));
@@ -143,10 +148,13 @@ describe('setupEventListeners (useLoggedDiceRollEventHandlers)', () => {
                 if (evasion && !success) return Math.floor(raw / 2);
                 return success ? Math.floor(raw / 2) : raw;
             });
-            deps.charactersRef.current = [{ name: 'Ally', computedStats: { evasionEffects: [{ saveType: 'DEX', shareable: true, shareRange: 3 }] } }];
+            deps.charactersRef.current = [
+                { name: 'Bard', computedStats: { evasionEffects: [{ saveType: 'DEX', shareable: true, shareRange: 3 }] } },
+                { name: 'Ally', computedStats: {} },
+            ];
             const pid = 'p7';
             window.__pendingSaves = { [pid]: createSavePrompt(pid, { targetName: 'Ally' }) };
-            window.dispatchEvent(new CustomEvent('save-result', { detail: { promptId: pid, targetName: 'Ally', success: false, roll: 5, total: 8, saveBonus: 3, rawDamage: 15, dcSuccess: 'half' } }));
+            window.dispatchEvent(new CustomEvent('save-result', { detail: { promptId: pid, targetName: 'Ally', success: false, roll: 5, total: 8, saveBonus: 3, rawDamage: 15, dcSuccess: 'half', saveType: 'DEX' } }));
             expect(computeDamageAfterEvasion).toHaveBeenCalledWith(15, expect.anything(), 'half', false);
         });
 
@@ -157,11 +165,14 @@ describe('setupEventListeners (useLoggedDiceRollEventHandlers)', () => {
                 if (evasion && !success) return Math.floor(raw / 2);
                 return success ? Math.floor(raw / 2) : raw;
             });
-            getRuntimeValue.mockImplementation((charName, prop, camp) => { if (prop === 'activeConditions' && !camp) return ['incapacitated']; return null; });
-            deps.charactersRef.current = [{ name: 'Ally', computedStats: { evasionEffects: [{ saveType: 'DEX' }] } }];
+            getRuntimeValue.mockImplementation((charName, prop, _) => { if (prop === 'activeConditions') return ['incapacitated']; return null; });
+            deps.charactersRef.current = [
+                { name: 'Bard', computedStats: { evasionEffects: [{ saveType: 'DEX', shareable: true, shareRange: 5 }] } },
+                { name: 'Ally', computedStats: {} },
+            ];
             const pid = 'p8';
             window.__pendingSaves = { [pid]: createSavePrompt(pid, { targetName: 'Ally' }) };
-            window.dispatchEvent(new CustomEvent('save-result', { detail: { promptId: pid, targetName: 'Ally', success: false, roll: 5, total: 8, saveBonus: 3, rawDamage: 15, dcSuccess: 'half' } }));
+            window.dispatchEvent(new CustomEvent('save-result', { detail: { promptId: pid, targetName: 'Ally', success: false, roll: 5, total: 8, saveBonus: 3, rawDamage: 15, dcSuccess: 'half', saveType: 'DEX' } }));
             expect(computeDamageAfterEvasion).toHaveBeenCalledWith(15, expect.anything(), 'half', false);
         });
 

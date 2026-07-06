@@ -3,6 +3,7 @@ import {
     computeDamageAfterEvasion,
     rollSaveForCreature,
     applyDamageToTarget,
+    normalizeSaveType,
 } from '../../services/rules/combat/applyDamage.js';
 import { sendSaveResult } from '../../services/combat/conditions/savePromptService.js';
 import { getTargetFromAttacker, getCombatContext } from '../../services/rules/combat/damageUtils.js';
@@ -85,10 +86,18 @@ export function createSaves(deps) {
 
         logAndShow(attack.name, attack.hitBonus, 'attack', { targetName, forcedMode: undefined });
     }
-
-    async function quickRollPlayerSave(promptId, targetName, saveType, saveDc) {
+    async function quickRollPlayerSave(promptId, targetName, saveType, saveDc, selectedAllies) {
         const pending = pendingSaves[promptId];
-        if (!pending) return;
+        if (!pending) {
+            console.log('[quickRollPlayerSave] NO pending for promptId', promptId);
+            return;
+        }
+        console.log('[quickRollPlayerSave] called for promptId', promptId,
+            'target:', targetName,
+            'saveType:', saveType,
+            'saveDc:', saveDc,
+            'pending.attackerName:', pending.attackerName,
+            'pending.name:', pending.name);
 
         const combatSummary = await loadCombatSummary(campaignName);
         const target = combatSummary?.creatures?.find(c => c.name === pending.targetName);
@@ -106,19 +115,21 @@ export function createSaves(deps) {
         const targetSaveModifiers = targetChar?.saveModifiers || targetChar?.computedStats?.saveModifiers || [];
         const advantage = targetSaveModifiers.some(mod => mod.target === 'saving_throw' && mod.effect === 'advantage' && mod.condition === 'against_spell');
         const saveResult = rollSaveForCreature(target, saveType, saveDc, disadvantage, advantage);
-        const saveTypeUpper = (saveType || '').toUpperCase();
+
+        const normalizedSaveType = normalizeSaveType(saveType);
         const targetConditions = getRuntimeValue(pending.targetName, 'activeConditions', campaignName) || [];
         const isIncapacitated = targetConditions.some(c => String(c).toLowerCase() === 'incapacitated');
 
         const ownEvasion = targetChar?.computedStats?.evasionEffects;
-        const hasOwnEvasion = !isIncapacitated && pending.dcSuccess === 'half' && ownEvasion?.some(ef => ef.saveType === saveTypeUpper);
-        const hasSharedEvasion = !hasOwnEvasion && !isIncapacitated && pending.dcSuccess === 'half' &&
+        const hasOwnEvasion = !isIncapacitated && pending.dcSuccess === 'half' && ownEvasion?.some(ef => ef.saveType === normalizedSaveType);
+        const hasSelectedEvasion = selectedAllies?.has?.(pending.targetName) || false;
+        const hasSharedEvasion = !hasOwnEvasion && !hasSelectedEvasion && !isIncapacitated && pending.dcSuccess === 'half' &&
             (charactersRef.current || []).some(c => {
                 if (c.name === pending.targetName) return false;
                 const ev = c?.computedStats?.evasionEffects;
-                return ev?.some(ef => ef.saveType === saveTypeUpper && ef.shareable && ef.shareRange >= 5);
+                return ev?.some(ef => ef.saveType === normalizedSaveType && ef.shareable && ef.shareRange >= 5);
             });
-        const hasEvasion = hasOwnEvasion || hasSharedEvasion;
+        const hasEvasion = hasOwnEvasion || hasSelectedEvasion || hasSharedEvasion;
         let finalDamage = computeDamageAfterEvasion(pending.rawDamage, saveResult.success, pending.dcSuccess, hasEvasion);
 
         const targetActiveBuffs = getRuntimeValue(pending.targetName, 'activeBuffs', campaignName) || [];

@@ -22,6 +22,9 @@ export function buildSaveDc(auto, playerStats) {
 export function createSaveListener(campaignName, config) {
     const promptId = utils.guid();
 
+    if (!window.__createSaveListenerPrompts) window.__createSaveListenerPrompts = new Set();
+    window.__createSaveListenerPrompts.add(promptId);
+
     sendSavePrompt(campaignName, {
         promptId,
         targetName: config.targetName,
@@ -36,10 +39,19 @@ export function createSaveListener(campaignName, config) {
         const handler = (event) => {
             if (event.detail.promptId !== promptId) return;
             window.removeEventListener('save-result', handler);
+            if (window.__createSaveListenerPrompts) {
+                window.__createSaveListenerPrompts.delete(promptId);
+            }
             resolve(event.detail);
          };
         window.addEventListener('save-result', handler);
      });
+
+    promise.finally(() => {
+        if (window.__createSaveListenerPrompts) {
+            window.__createSaveListenerPrompts.delete(promptId);
+        }
+    });
 
     return { promptId, promise };
 }

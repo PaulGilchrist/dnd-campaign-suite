@@ -63,10 +63,25 @@ export function computeDamageAfterSave(rawDamage, saveSuccess, dcSuccess) {
   return 0;
 }
 
+const SAVE_TYPE_ABBREVIATIONS = {
+  'STRENGTH': 'STR',
+  'DEXTERITY': 'DEX',
+  'CONSTITUTION': 'CON',
+  'INTELLIGENCE': 'INT',
+  'WISDOM': 'WIS',
+  'CHARISMA': 'CHA',
+};
+
+export function normalizeSaveType(saveType) {
+  if (!saveType) return '';
+  const upper = saveType.toUpperCase();
+  return SAVE_TYPE_ABBREVIATIONS[upper] || upper;
+}
+
 export function hasEvasionForSave(evasionEffects, saveType) {
   if (!evasionEffects || evasionEffects.length === 0) return false;
-  const upper = (saveType || '').toUpperCase();
-  return evasionEffects.some(e => e.saveType === upper);
+  const normalized = normalizeSaveType(saveType);
+  return evasionEffects.some(e => e.saveType === normalized);
 }
 
 export function computeDamageAfterEvasion(rawDamage, saveSuccess, dcSuccess, evasionActive) {
@@ -91,6 +106,7 @@ export function applyDamageToTarget(combatSummary, targetName, rawDamage, damage
   if (!combatSummary) return null;
   const creature = combatSummary.creatures.find(c => c.name === targetName);
   if (!creature) return null;
+  if (isNaN(rawDamage) || rawDamage === null || rawDamage === undefined) return null;
 
   // Save unified last attack to combat summary — accessible by any creature for reactions
   // This overwrites the attack roll info with damage results after applyDamageToTarget runs

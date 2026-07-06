@@ -23,6 +23,7 @@ function getRollIconType(rollType) {
 
 function RollEntry({ entry }) {
   const isDamage = entry.rollType === 'damage';
+  const isSave = entry.rollType === 'save';
   const isSaveDamage = entry.rollType === 'save-damage';
   const isAoeDamage = entry.rollType === 'aoe-damage';
   const isOverchannelDamage = entry.rollType === 'overchannel-damage';
@@ -77,7 +78,7 @@ function RollEntry({ entry }) {
         {entry.damageType && (isDamage || isSaveDamage || isAoeDamage || isOverchannelDamage || isGrazeDamage) && (
           <span className="log-damage-type">{entry.damageType}</span>
         )}
-        {(isSaveDamage || isAoeDamage) && entry.saveType && entry.saveDc && (
+        {(isSave || isSaveDamage || isAoeDamage) && entry.saveType && entry.saveDc && (
           <span className="log-save-info">
             {entry.saveType.toUpperCase()} save DC {entry.saveDc}&nbsp;
             {entry.mode === 'disadvantage' && (
@@ -85,11 +86,19 @@ function RollEntry({ entry }) {
             )}
           </span>
         )}
-        {isSaveDamage && entry.saveResult && (
+        {(isSave || isSaveDamage) && entry.saveResult && (
           <span className={`log-save-result ${entry.saveResult === 'success' ? 'log-condition-success' : 'log-condition-failure'}`}>
             {entry.saveResult === 'success' ? 'SAVE SUCCESS' : 'SAVE FAILURE'}
             {entry.saveRoll != null && ` (d20 ${entry.saveRoll}${entry.saveBonus != null ? `+${entry.saveBonus}` : ''})`}
           </span>
+        )}
+        {isSaveDamage && !entry.saveResult && entry.saveSuccess != null && (
+          <span className={`log-save-result ${entry.saveSuccess ? 'log-condition-success' : 'log-condition-failure'}`}>
+            {entry.saveSuccess ? 'SAVE SUCCESS' : 'SAVE FAILURE'}
+          </span>
+        )}
+        {isSave && entry.targetName && entry.attackerName && (
+          <span className="log-target">{entry.targetName} vs {entry.attackerName}</span>
         )}
         {isSaveDamage && entry.targetName && (
           <span className="log-target">vs {entry.targetName}</span>

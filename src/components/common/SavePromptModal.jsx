@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import utils from '../../services/ui/utils.js';
 import { rollD20 } from '../../services/dice/diceRoller.js';
 import { sendSaveResult, clearSavePrompt } from '../../services/combat/conditions/savePromptService.js';
@@ -6,13 +6,35 @@ import Subscriber from './Subscriber.jsx';
 import { computeAuraBonus } from '../../services/combat/auras/auraOfProtection.js';
 import { getAbilitySaveBonus } from '../../services/combat/conditions/conditionUtils.js';
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
+import { normalizeSaveType } from '../../services/rules/combat/applyDamage.js';
 import './savePromptModal.css';
 
 function SavePromptModal({ campaignName, characters, activeMapName }) {
   const [prompts, setPrompts] = useState([]);
+  const [evasionSelection, setEvasionSelection] = useState(null);
   const forceRollTo20Ref = useRef(false);
+  const selectedAlliesRef = useRef(new Set());
 
   const current = prompts.length > 0 ? prompts[0] : null;
+
+  const hasShareableEvasion = !current ? false : (() => {
+    const normalizedSaveType = normalizeSaveType(current.saveType);
+    if (current.dcSuccess !== 'half') return false;
+    return (characters || []).some(c => {
+      if (utils.getName(c.name) === utils.getName(current.targetName)) return false;
+      const ev = c?.computedStats?.evasionEffects;
+      return ev?.some(ef => ef.saveType === normalizedSaveType && ef.shareable && ef.shareRange >= 5);
+    });
+  })();
+
+  const evasionTriggeredIdsRef = useRef(new Set());
+
+  useEffect(() => {
+    if (current && hasShareableEvasion && !evasionTriggeredIdsRef.current.has(current.promptId)) {
+      evasionTriggeredIdsRef.current.add(current.promptId);
+      setEvasionSelection({ selectedAllies: [] });
+    }
+  }, [current, hasShareableEvasion]);
 
   const advance = useCallback(() => {
     setPrompts(prev => prev.slice(1));
@@ -27,7 +49,20 @@ function SavePromptModal({ campaignName, characters, activeMapName }) {
 
     setPrompts(prev => {
       if (prev.some(p => p.promptId === event.data.promptId)) return prev;
-      return [...prev, { targetName, ...event.data }];
+      const { sourceAttackerName, ...restData } = event.data;
+      const newPrompt = { targetName, attackerName: sourceAttackerName, ...restData };
+      if (!window.__pendingSaves) window.__pendingSaves = {};
+      const oldEntry = window.__pendingSaves[newPrompt.promptId];
+      console.log('[SavePromptModal handleEvent] overwriting pendingSaves for promptId', newPrompt.promptId,
+        'old attackerName:', oldEntry?.attackerName,
+        'new attackerName:', newPrompt.attackerName,
+        'sourceAttackerName from SSE:', sourceAttackerName,
+        'event.data keys:', Object.keys(event.data));
+      const fullPrompt = { ...newPrompt, campaignName };
+      if (!window.__pendingSaves[newPrompt.promptId]) {
+        window.__pendingSaves[newPrompt.promptId] = fullPrompt;
+      }
+      return [...prev, newPrompt];
      });
    }, [campaignName]);
 
@@ -36,6 +71,7 @@ function SavePromptModal({ campaignName, characters, activeMapName }) {
     const prefix = `change-${campaignName}-savePromptCleared-`;
     if (!event.key.startsWith(prefix)) return;
     if (!event.data?.promptId) return;
+    if (window.__pendingSaves) delete window.__pendingSaves[event.data.promptId];
     setPrompts(prev => prev.filter(p => p.promptId !== event.data.promptId));
   }, [campaignName]);
 
@@ -67,6 +103,15 @@ function SavePromptModal({ campaignName, characters, activeMapName }) {
 
     const aura = await computeAuraBonus({ targetName: current.targetName, characters, campaignName, activeMapName });
     const auraBonus = aura.bonus;
+
+    const targetConditions = getRuntimeValue(current.targetName, 'activeConditions', campaignName) || [];
+    const isIncapacitated = targetConditions.some(c => String(c).toLowerCase() === 'incapacitated');
+    const targetCharForEvasion = (characters || []).find(c => utils.getName(c.name) === utils.getName(current.targetName));
+    const ownEvasion = targetCharForEvasion?.computedStats?.evasionEffects;
+    const normalizedSaveType = normalizeSaveType(current.saveType);
+    const hasOwnEvasion = !isIncapacitated && ownEvasion?.some(ef => ef.saveType === normalizedSaveType);
+    const hasSelectedEvasion = !hasOwnEvasion && !isIncapacitated && selectedAlliesRef.current.has(current.targetName);
+    const hasEvasion = hasOwnEvasion || hasSelectedEvasion;
 
     let hasAdvantage = false;
     if (current.advantage) {
@@ -106,6 +151,13 @@ function SavePromptModal({ campaignName, characters, activeMapName }) {
       mode: rollMode,
     });
 
+    console.log('[SavePromptModal handleRollSave] dispatching save-result promptId:', current.promptId,
+      'targetName:', current.targetName,
+      'success:', success,
+      'current.attackerName:', current.attackerName,
+      'current.sourceName:', current.sourceName,
+      'current keys:', Object.keys(current).join(','));
+
     window.dispatchEvent(new CustomEvent('save-result', {
       detail: {
         promptId: current.promptId,
@@ -121,6 +173,7 @@ function SavePromptModal({ campaignName, characters, activeMapName }) {
         dcSuccess: current.dcSuccess,
         rawRolls: [roll1, roll2],
         mode: rollMode,
+        evasionActive: hasEvasion,
       },
     }));
 
@@ -132,7 +185,17 @@ function SavePromptModal({ campaignName, characters, activeMapName }) {
 
     forceRollTo20Ref.current = false;
     clearSavePrompt(campaignName, current.targetName);
-  }, [campaignName, current, characters, activeMapName]);
+  }, [campaignName, current, characters, activeMapName, selectedAlliesRef]);
+
+  const handleEvasionConfirm = useCallback((selectedNames) => {
+    selectedAlliesRef.current = new Set(selectedNames);
+    setEvasionSelection(null);
+  }, []);
+
+  const handleEvasionSkip = useCallback(() => {
+    selectedAlliesRef.current = new Set();
+    setEvasionSelection(null);
+  }, []);
 
   const handleNext = useCallback(() => {
     advance();
@@ -172,7 +235,7 @@ function SavePromptModal({ campaignName, characters, activeMapName }) {
         />
       )}
       {current && (
-        <div className="sp-overlay" onClick={handleDismiss}>
+        <div className={`sp-overlay${evasionSelection !== null ? ' sp-overlay--dimmed' : ''}`} onClick={handleDismiss}>
           <div className="sp-modal" onClick={e => e.stopPropagation()}>
             <div className="sp-header">
               <i className="fa-solid fa-shield-halved"></i> Saving Throw Required
@@ -184,17 +247,17 @@ function SavePromptModal({ campaignName, characters, activeMapName }) {
               <p><strong>{current.targetName}</strong> must make a <strong>{abilityLabel}</strong> saving throw.</p>
               <p className="sp-dc">DC {current.saveDc}</p>
               {current.dcSuccess === 'half' && (() => {
-                const saveTypeUpper = (current.saveType || '').toUpperCase();
+                const normalizedSaveType = normalizeSaveType(current.saveType);
                 const targetChar = (characters || []).find(c => utils.getName(c.name) === utils.getName(current.targetName));
                 const targetConditions = getRuntimeValue(current.targetName, 'activeConditions', campaignName) || [];
                 const isIncapacitated = targetConditions.some(c => String(c).toLowerCase() === 'incapacitated');
                 const ownEvasion = targetChar?.computedStats?.evasionEffects;
-                const hasOwnEvasion = !isIncapacitated && ownEvasion?.some(ef => ef.saveType === saveTypeUpper);
+                const hasOwnEvasion = !isIncapacitated && ownEvasion?.some(ef => ef.saveType === normalizedSaveType);
                 const hasSharedEvasion = !hasOwnEvasion && !isIncapacitated &&
                   (characters || []).some(c => {
                     if (utils.getName(c.name) === utils.getName(current.targetName)) return false;
                     const ev = c?.computedStats?.evasionEffects;
-                    return ev?.some(ef => ef.saveType === saveTypeUpper && ef.shareable && ef.shareRange >= 5);
+                    return ev?.some(ef => ef.saveType === normalizedSaveType && ef.shareable && ef.shareRange >= 5);
                   });
                 const hasEvasion = hasOwnEvasion || hasSharedEvasion;
                 return hasEvasion
@@ -231,6 +294,66 @@ function SavePromptModal({ campaignName, characters, activeMapName }) {
                   {queueCount > 1 ? 'Next Save' : 'Done'}
                 </button>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+      {evasionSelection !== null && (
+        <div className="sp-overlay sp-overlay--evasion" onClick={() => handleEvasionSkip()}>
+          <div className="sp-modal" onClick={e => e.stopPropagation()}>
+            <div className="sp-header">
+              <i className="fa-solid fa-shield-halved"></i> Leading Evasion — Choose Allies
+            </div>
+            <div className="sp-body">
+              <p>Which of the following creatures making this save should benefit from <strong>Leading Evasion</strong>?</p>
+              <p className="sp-note">Select all allies within 5 feet of the Bard. On a successful save, selected allies take no damage. On a failure, they take half damage.</p>
+              <div className="secondary-target-list">
+                {prompts.map((prompt, i) => (
+                  <label
+                    key={i}
+                    className={`secondary-target-row ${evasionSelection?.selectedAllies?.includes(prompt.targetName) ? 'secondary-target-selected' : ''}`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const currentSelection = evasionSelection?.selectedAllies || [];
+                      const isSelected = currentSelection.includes(prompt.targetName);
+                      setEvasionSelection({
+                        selectedAllies: isSelected
+                          ? currentSelection.filter(n => n !== prompt.targetName)
+                          : [...currentSelection, prompt.targetName],
+                      });
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={(evasionSelection?.selectedAllies || []).includes(prompt.targetName)}
+                      onChange={(e) => e.stopPropagation()}
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                    <span className="secondary-target-name">
+                      <strong>{prompt.targetName}</strong>
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </div>
+            <div className="sp-actions">
+              <button
+                className="sp-roll-btn"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleEvasionConfirm(evasionSelection?.selectedAllies || []);
+                }}
+                disabled={(evasionSelection?.selectedAllies || []).length === 0}
+                type="button"
+              >
+                <i className="fa-solid fa-shield-halved"></i> Apply Evasion ({(evasionSelection?.selectedAllies || []).length})
+              </button>
+              <button className="sp-dismiss-btn" onClick={(e) => {
+                e.stopPropagation();
+                handleEvasionSkip();
+              }} type="button">
+                Skip
+              </button>
             </div>
           </div>
         </div>

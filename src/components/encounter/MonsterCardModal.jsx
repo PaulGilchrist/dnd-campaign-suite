@@ -2,6 +2,7 @@ import { useMemo, useCallback, useEffect, useRef, useState } from 'react';
 import { sanitizeHtml } from '../../services/ui/sanitize.js';
 import { rollExpression, rollExpressionDoubled } from '../../services/dice/diceRoller.js';
 import useLoggedDiceRoll from '../../hooks/combat/useLoggedDiceRoll.js';
+import { normalizeSaveType } from '../../services/rules/combat/applyDamage.js';
 import Popup from '../common/popup.jsx';
 import DiceRollResult from '../char-sheet/DiceRollResult.jsx';
 import { extractDamageTypes, formatDamageTypes, getTargetFromAttacker, getResistanceNotice } from '../../services/rules/combat/damageUtils.js';
@@ -47,6 +48,8 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
   const monsterName = creatureName || monster?.name || 'Monster';
   const fallbackCsRef = useRef(null);
   const [mapData, setMapData] = useState(null);
+  const [evasionSelection, setEvasionSelection] = useState(null);
+  const pendingSaveRef = useRef(null);
 
   useEffect(() => {
     if (creatures) return;
@@ -395,6 +398,43 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
     return (creature.conditions || []).some(c => CONDITIONS_THAT_CANNOT_ACT.has(c.key));
   }, [getAttackerCreature]);
 
+  const hasShareableEvasionForSave = useCallback((saveType) => {
+    if (!saveType || !characters) return false;
+    const normalizedSaveType = normalizeSaveType(saveType);
+    return characters.some(c => {
+      const ev = c?.computedStats?.evasionEffects;
+      return ev?.some(ef => ef.saveType === normalizedSaveType && ef.shareable && ef.shareRange >= 5);
+    });
+  }, [characters]);
+
+  const handleQuickRollWithEvasion = useCallback((promptId, targetName, saveType, saveDc) => {
+    const pendingSave = { promptId, targetName, saveType, saveDc };
+    const hasEvasion = hasShareableEvasionForSave(saveType);
+    if (hasEvasion) {
+      pendingSaveRef.current = pendingSave;
+      setEvasionSelection([]);
+    } else {
+      quickRollPlayerSave(promptId, targetName, saveType, saveDc);
+    }
+  }, [hasShareableEvasionForSave, quickRollPlayerSave]);
+
+  const handleEvasionConfirm = useCallback((selectedNames) => {
+    if (!pendingSaveRef.current) return;
+    const { promptId, targetName, saveType, saveDc } = pendingSaveRef.current;
+    const selectedAllies = new Set(selectedNames);
+    quickRollPlayerSave(promptId, targetName, saveType, saveDc, selectedAllies);
+    setEvasionSelection(null);
+    pendingSaveRef.current = null;
+  }, [quickRollPlayerSave]);
+
+  const handleEvasionSkip = useCallback(() => {
+    if (!pendingSaveRef.current) return;
+    const { promptId, targetName, saveType, saveDc } = pendingSaveRef.current;
+    quickRollPlayerSave(promptId, targetName, saveType, saveDc);
+    setEvasionSelection(null);
+    pendingSaveRef.current = null;
+  }, [quickRollPlayerSave]);
+
   const content = useMemo(() => {
     if (!monster) return null;
 
@@ -690,18 +730,75 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
   if (!monster) return null;
 
   return (
-    <div className="mc-overlay" onClick={onClose}>
+    <>
+    <div className={`mc-overlay${evasionSelection !== null ? ' mc-overlay--dimmed' : ''}`} onClick={onClose}>
       {content}
       {popupHtml && (
         <div onClick={(e) => e.stopPropagation()}>
           <Popup onClickOrKeyDown={() => setPopupHtml(null)}>
             {typeof popupHtml === 'string'
               ? <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(popupHtml) }} />
-              : <DiceRollResult {...popupHtml} onQuickRoll={popupHtml.waitingForPlayerSave ? () => quickRollPlayerSave(popupHtml.promptId, popupHtml.targetName, popupHtml.saveType, popupHtml.saveDc) : undefined} />}
+              : <DiceRollResult {...popupHtml} onQuickRoll={popupHtml.waitingForPlayerSave ? () => handleQuickRollWithEvasion(popupHtml.promptId, popupHtml.targetName, popupHtml.saveType, popupHtml.saveDc) : undefined} />}
           </Popup>
         </div>
       )}
     </div>
+    {evasionSelection !== null && pendingSaveRef.current && (
+        <div className="mc-overlay mc-overlay--evasion" onClick={handleEvasionSkip}>
+          <div className="sp-modal" onClick={e => e.stopPropagation()}>
+            <div className="sp-header">
+              <i className="fa-solid fa-shield-halved"></i> Leading Evasion — Choose Allies
+            </div>
+            <div className="sp-body">
+              <p>Which creatures should benefit from <strong>Leading Evasion</strong>?</p>
+              <p className="sp-note">Select all allies within 5 feet of the Bard. On a successful save, selected allies take no damage. On a failure, they take half damage.</p>
+              <div className="secondary-target-list">
+                {(creatures || []).filter(c => c.name !== monsterName).map((creature, i) => {
+                  const isSelected = evasionSelection.includes(creature.name);
+                  return (
+                    <label
+                      key={i}
+                      className={`secondary-target-row ${isSelected ? 'secondary-target-selected' : ''}`}
+                      onClick={() => {
+                        const currentSelection = evasionSelection;
+                        const isSelected = currentSelection.includes(creature.name);
+                        setEvasionSelection(
+                          isSelected
+                            ? currentSelection.filter(n => n !== creature.name)
+                            : [...currentSelection, creature.name]
+                        );
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={evasionSelection.includes(creature.name)}
+                        onChange={() => {}}
+                      />
+                      <span className="secondary-target-name">
+                        <strong>{creature.name}</strong>
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+            <div className="sp-actions">
+              <button
+                className="sp-roll-btn"
+                onClick={() => handleEvasionConfirm(evasionSelection)}
+                disabled={evasionSelection.length === 0}
+                type="button"
+              >
+                <i className="fa-solid fa-shield-halved"></i> Apply Evasion ({evasionSelection.length})
+              </button>
+              <button className="sp-dismiss-btn" onClick={handleEvasionSkip} type="button">
+                Skip
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 

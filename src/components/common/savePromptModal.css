@@ -8,6 +8,18 @@
   z-index: 2000;
 }
 
+.sp-overlay--dimmed {
+  pointer-events: none;
+  opacity: 0.3;
+}
+
+.sp-overlay--evasion {
+  z-index: 2100;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
 .sp-modal {
   position: absolute;
   top: 50%;
@@ -21,6 +33,13 @@
   min-width: 320px;
   max-width: 480px;
   text-align: center;
+}
+
+.sp-overlay--evasion .sp-modal {
+  position: relative;
+  top: auto;
+  left: auto;
+  transform: none;
 }
 
 .sp-modal--wide {

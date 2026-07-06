@@ -19,6 +19,11 @@ vi.mock('../../services/rules/combat/applyDamage.js', () => ({
     rollSaveForCreature: vi.fn(),
     applyDamageToTarget: vi.fn(),
     clearReTriggeredSequence: vi.fn(),
+    normalizeSaveType: (saveType) => {
+        if (!saveType) return '';
+        const map = { 'STRENGTH': 'STR', 'DEXTERITY': 'DEX', 'CONSTITUTION': 'CON', 'INTELLIGENCE': 'INT', 'WISDOM': 'WIS', 'CHARISMA': 'CHA' };
+        return map[saveType.toUpperCase()] || saveType.toUpperCase();
+    },
 }));
 
 vi.mock('../../services/combat/conditions/savePromptService.js', () => ({

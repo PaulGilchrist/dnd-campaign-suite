@@ -58,9 +58,11 @@ vi.mock('../../services/shared/logPoster.js', () => ({
 
 vi.mock('../../services/rules/combat/applyDamage.js', () => ({
     computeDamageAfterSave: vi.fn((total, success, _dcSuccess) => success ? Math.floor(total / 2) : total),
+    computeDamageAfterEvasion: vi.fn((total, success, _dcSuccess, evasion) => (evasion && success ? 0 : (success ? Math.floor(total / 2) : total))),
     rollSaveForCreature: vi.fn(),
     applyDamageToTarget: vi.fn(),
     clearReTriggeredSequence: vi.fn(),
+    normalizeSaveType: (type) => type,
 }));
 
 import { getRuntimeValue, setRuntimeValue } from '../runtime/useRuntimeState.js';
