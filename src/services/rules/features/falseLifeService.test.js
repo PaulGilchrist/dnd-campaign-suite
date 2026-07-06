@@ -39,32 +39,36 @@ describe('falseLifeService', () => {
             expect(result).toEqual({ type: 'popup' });
         });
 
-        it.each([
-            ['metaCtx slotLevel', { slotLevel: 5 }, 5],
-            ['spell.level', {}, 1],
-            ['default level 1', {}, 1],
-        ])('uses %s for spellSlotLevel', async (_label, metaCtx, expectedLevel) => {
+        it('uses slotLevel from metaCtx, falls back to spell.level, defaults to 1', async () => {
             executeHandler.mockResolvedValue({ type: 'popup' });
-            await triggerFalseLife({ name: 'False Life', level: 1 }, metaCtx, playerStats, campaignName, mapName);
+
+            await triggerFalseLife({ name: 'False Life', level: 1 }, { slotLevel: 5 }, playerStats, campaignName, mapName);
             expect(executeHandler).toHaveBeenCalledWith(
-                expect.objectContaining({ spellSlotLevel: expectedLevel }),
+                expect.objectContaining({ spellSlotLevel: 5 }),
+                playerStats, campaignName, mapName,
+            );
+            vi.clearAllMocks();
+
+            await triggerFalseLife({ name: 'False Life', level: 1 }, {}, playerStats, campaignName, mapName);
+            expect(executeHandler).toHaveBeenCalledWith(
+                expect.objectContaining({ spellSlotLevel: 1 }),
                 playerStats, campaignName, mapName,
             );
         });
 
-        it('returns handler result on success', async () => {
-            const expectedResult = { type: 'popup', payload: { type: 'automation_info', description: 'Gained temp HP' } };
-            executeHandler.mockResolvedValue(expectedResult);
-            const result = await triggerFalseLife({ name: 'False Life', level: 1 }, {}, playerStats, campaignName, mapName);
-            expect(result).toBe(expectedResult);
-        });
-
-        it('catches handler errors, logs them, and returns null', async () => {
+        it('returns handler result on success, logs error and returns null on failure', async () => {
             const consoleSpy = vi.spyOn(console, 'error');
+            const expectedResult = { type: 'popup', payload: { type: 'automation_info', description: 'Gained temp HP' } };
+
+            executeHandler.mockResolvedValue(expectedResult);
+            let result = await triggerFalseLife({ name: 'False Life', level: 1 }, {}, playerStats, campaignName, mapName);
+            expect(result).toBe(expectedResult);
+
             executeHandler.mockRejectedValue(new Error('Handler failed'));
-            const result = await triggerFalseLife({ name: 'False Life', level: 1 }, {}, playerStats, campaignName, mapName);
+            result = await triggerFalseLife({ name: 'False Life', level: 1 }, {}, playerStats, campaignName, mapName);
             expect(result).toBeNull();
             expect(consoleSpy).toHaveBeenCalledWith('[falseLife] Failed to execute False Life handler:', expect.any(Error));
+
             consoleSpy.mockRestore();
         });
     });

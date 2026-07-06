@@ -14,9 +14,7 @@ describe('feignDeathService', () => {
 
     const campaignName = 'TestCampaign';
     const mapName = 'testMap';
-    const playerStats = {
-        name: 'Wizard',
-    };
+    const playerStats = { name: 'Wizard' };
 
     describe('triggerFeignDeath', () => {
         it.each([
@@ -25,184 +23,94 @@ describe('feignDeathService', () => {
             { name: undefined },
             {},
         ])('returns null for non-Feign Death spell: $name', async (spell) => {
-            const result = await triggerFeignDeath(
-                spell,
-                {},
-                playerStats,
-                campaignName,
-                mapName,
-            );
+            const result = await triggerFeignDeath(spell, {}, playerStats, campaignName, mapName);
             expect(result).toBeNull();
             expect(executeHandler).not.toHaveBeenCalled();
         });
 
-        it('matches spell name case-insensitively', async () => {
+        it.each(['fEiGn dEaTh', 'feign death', 'FEIGN DEATH'])('matches "%s" case-insensitively', async (name) => {
             executeHandler.mockResolvedValue({ type: 'popup' });
-
-            const result = await triggerFeignDeath(
-                { name: 'fEiGn dEaTh', duration: '1 hour' },
-                {},
-                playerStats,
-                campaignName,
-                mapName,
-            );
-
+            const result = await triggerFeignDeath({ name, duration: '1 hour' }, {}, playerStats, campaignName, mapName);
             expect(executeHandler).toHaveBeenCalled();
             expect(result).toEqual({ type: 'popup' });
         });
 
-        it('uses metaCtx.targetName when provided', async () => {
+        it('uses metaCtx.targetName when provided, falls back to playerStats.name', async () => {
             executeHandler.mockResolvedValue({ type: 'popup' });
 
-            await triggerFeignDeath(
-                { name: 'Feign Death', duration: '1 hour' },
-                { targetName: 'Fighter' },
-                playerStats,
-                campaignName,
-                mapName,
-            );
-
+            await triggerFeignDeath({ name: 'Feign Death', duration: '1 hour' }, { targetName: 'Fighter' }, playerStats, campaignName, mapName);
             expect(executeHandler).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    automation: expect.objectContaining({ targetName: 'Fighter' }),
-                }),
-                playerStats,
-                campaignName,
-                mapName,
+                expect.objectContaining({ automation: expect.objectContaining({ targetName: 'Fighter' }) }),
+                playerStats, campaignName, mapName,
+            );
+            vi.clearAllMocks();
+
+            await triggerFeignDeath({ name: 'Feign Death', duration: '1 hour' }, {}, playerStats, campaignName, mapName);
+            expect(executeHandler).toHaveBeenCalledWith(
+                expect.objectContaining({ automation: expect.objectContaining({ targetName: 'Wizard' }) }),
+                playerStats, campaignName, mapName,
             );
         });
 
         it.each([
-            {},
-            { targetName: undefined },
-            null,
-            undefined,
-        ])('falls back to playerStats.name when metaCtx is %s', async (metaCtx) => {
+            { metaCtx: {}, label: 'empty object' },
+            { metaCtx: { targetName: undefined }, label: 'targetName undefined' },
+            { metaCtx: null, label: 'null' },
+            { metaCtx: undefined, label: 'undefined' },
+        ])('falls back to playerStats.name when metaCtx is $label', async ({ metaCtx }) => {
             executeHandler.mockResolvedValue({ type: 'popup' });
-
-            await triggerFeignDeath(
-                { name: 'Feign Death', duration: '1 hour' },
-                metaCtx,
-                playerStats,
-                campaignName,
-                mapName,
-            );
-
+            await triggerFeignDeath({ name: 'Feign Death', duration: '1 hour' }, metaCtx, playerStats, campaignName, mapName);
             expect(executeHandler).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    automation: expect.objectContaining({ targetName: 'Wizard' }),
-                }),
-                playerStats,
-                campaignName,
-                mapName,
+                expect.objectContaining({ automation: expect.objectContaining({ targetName: 'Wizard' }) }),
+                playerStats, campaignName, mapName,
             );
         });
 
-        it('uses spell.duration in the automation', async () => {
+        it.each([
+            { spell: { name: 'Feign Death', duration: '8 hours' }, expected: '8 hours' },
+            { spell: { name: 'Feign Death' }, expected: '1 hour' },
+        ])('uses spell.duration "%s" or defaults to "1 hour"', async ({ spell, expected }) => {
             executeHandler.mockResolvedValue({ type: 'popup' });
-
-            await triggerFeignDeath(
-                { name: 'Feign Death', duration: '8 hours' },
-                {},
-                playerStats,
-                campaignName,
-                mapName,
-            );
-
+            await triggerFeignDeath(spell, {}, playerStats, campaignName, mapName);
             expect(executeHandler).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    automation: expect.objectContaining({ duration: '8 hours' }),
-                }),
-                playerStats,
-                campaignName,
-                mapName,
+                expect.objectContaining({ automation: expect.objectContaining({ duration: expected }) }),
+                playerStats, campaignName, mapName,
             );
         });
 
-        it('defaults duration to "1 hour" when spell.duration is missing', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
-
-            await triggerFeignDeath(
-                { name: 'Feign Death' },
-                {},
-                playerStats,
-                campaignName,
-                mapName,
-            );
-
-            expect(executeHandler).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    automation: expect.objectContaining({ duration: '1 hour' }),
-                }),
-                playerStats,
-                campaignName,
-                mapName,
-            );
-        });
-
-        it('returns result from executeHandler on success', async () => {
+        it('returns handler result on success, null when handler returns null or throws', async () => {
             const expectedResult = {
                 type: 'popup',
                 payload: { type: 'automation_info', name: 'Feign Death', description: 'The target appears dead.' },
             };
+            const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
             executeHandler.mockResolvedValue(expectedResult);
-
-            const result = await triggerFeignDeath(
-                { name: 'Feign Death', duration: '1 hour' },
-                {},
-                playerStats,
-                campaignName,
-                mapName,
-            );
-
+            let result = await triggerFeignDeath({ name: 'Feign Death', duration: '1 hour' }, {}, playerStats, campaignName, mapName);
             expect(result).toBe(expectedResult);
-        });
 
-        it('returns null when executeHandler returns null', async () => {
             executeHandler.mockResolvedValue(null);
-
-            const result = await triggerFeignDeath(
-                { name: 'Feign Death', duration: '1 hour' },
-                {},
-                playerStats,
-                campaignName,
-                mapName,
-            );
-
+            result = await triggerFeignDeath({ name: 'Feign Death', duration: '1 hour' }, {}, playerStats, campaignName, mapName);
             expect(result).toBeNull();
-        });
 
-        it('returns null and logs error when executeHandler throws', async () => {
-            const spy = vi.spyOn(console, 'error').mockReturnValue();
             executeHandler.mockRejectedValue(new Error('Handler failed'));
-
-            const result = await triggerFeignDeath(
-                { name: 'Feign Death', duration: '1 hour' },
-                {},
-                playerStats,
-                campaignName,
-                mapName,
-            );
-
+            result = await triggerFeignDeath({ name: 'Feign Death', duration: '1 hour' }, {}, playerStats, campaignName, mapName);
             expect(result).toBeNull();
-            expect(console.error).toHaveBeenCalledWith(
+            expect(consoleSpy).toHaveBeenCalledWith(
                 '[feignDeath] Failed to execute Feign Death handler:',
                 expect.any(Error),
             );
-            spy.mockRestore();
+
+            consoleSpy.mockRestore();
         });
 
         it('passes the spell object into the action', async () => {
             executeHandler.mockResolvedValue({ type: 'popup' });
             const spell = { name: 'Feign Death', duration: '1 hour', level: 3, school: 'Necromancy' };
-
             await triggerFeignDeath(spell, {}, playerStats, campaignName, mapName);
-
             expect(executeHandler).toHaveBeenCalledWith(
                 expect.objectContaining({ spell }),
-                playerStats,
-                campaignName,
-                mapName,
+                playerStats, campaignName, mapName,
             );
         });
     });

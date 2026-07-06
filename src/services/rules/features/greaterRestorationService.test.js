@@ -61,19 +61,19 @@ describe('greaterRestorationService', () => {
             );
         });
 
-        it('returns handler result on success', async () => {
-            const expectedResult = { type: 'popup', payload: { type: 'automation_info', name: 'Greater Restoration', description: 'Ends one effect...' } };
-            executeHandler.mockResolvedValue(expectedResult);
-            const result = await triggerGreaterRestoration({ name: 'Greater Restoration', level: 5 }, {}, playerStats, campaignName, mapName);
-            expect(result).toBe(expectedResult);
-        });
-
-        it('catches handler errors, logs them, and returns null', async () => {
+        it('returns handler result on success, logs error and returns null on failure', async () => {
             const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+            const expectedResult = { type: 'popup', payload: { type: 'automation_info', name: 'Greater Restoration', description: 'Ends one effect...' } };
+
+            executeHandler.mockResolvedValue(expectedResult);
+            let result = await triggerGreaterRestoration({ name: 'Greater Restoration', level: 5 }, {}, playerStats, campaignName, mapName);
+            expect(result).toBe(expectedResult);
+
             executeHandler.mockRejectedValue(new Error('Connection refused'));
-            const result = await triggerGreaterRestoration({ name: 'Greater Restoration', level: 5 }, {}, playerStats, campaignName, mapName);
+            result = await triggerGreaterRestoration({ name: 'Greater Restoration', level: 5 }, {}, playerStats, campaignName, mapName);
             expect(result).toBeNull();
             expect(consoleSpy).toHaveBeenCalledWith('[greaterRestoration] Failed to execute Greater Restoration handler:', expect.any(Error));
+
             consoleSpy.mockRestore();
         });
     });
@@ -89,7 +89,7 @@ describe('greaterRestorationService', () => {
             expect(result).toBe(expectedResult);
         });
 
-        it('catches effect errors, logs them, and returns null', async () => {
+        it('logs error and returns null when effect throws', async () => {
             const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
             applyGreaterRestorationEffect.mockRejectedValue(new Error('Database error'));
             const result = await confirmGreaterRestoration(action, playerStats, campaignName, mapName, confirmationResult);

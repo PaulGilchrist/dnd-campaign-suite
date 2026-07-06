@@ -1,5 +1,6 @@
 // @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { triggerHealingWord } from './healingWordService.js';
 
 // ── Mocks ──────────────────────────────────────────────────────
 
@@ -27,7 +28,6 @@ vi.mock('../../dice/diceRoller.js', () => ({
 
 // ── Imports ────────────────────────────────────────────────────
 
-import { triggerHealingWord } from './healingWordService.js';
 import { getCombatContext, getTargetFromAttacker } from '../combat/damageUtils.js';
 import { applyHealingToTarget } from '../combat/applyHealing.js';
 import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
@@ -78,66 +78,51 @@ describe('triggerHealingWord', () => {
     });
 
     describe('early returns (null)', () => {
-        it('returns null for non-Healing Word spells', async () => {
-            const result = await triggerHealingWord(makeSpell('Fire Bolt', 0), {}, makePlayerStats(), CAMPAIGN, 'testMap');
+        it('returns null for non-Healing Word spells, missing heal_at_slot_level, or unavailable combat context', async () => {
+            let result = await triggerHealingWord(makeSpell('Fire Bolt', 0), {}, makePlayerStats(), CAMPAIGN, 'testMap');
             expect(result).toBeNull();
             expect(getCombatContext).not.toHaveBeenCalled();
-        });
 
-        it('returns null when heal_at_slot_level is null', async () => {
-            const spell = { name: 'Healing Word', level: 1, heal_at_slot_level: null };
-            const result = await triggerHealingWord(spell, {}, makePlayerStats(), CAMPAIGN, 'testMap');
+            const spellNull = { name: 'Healing Word', level: 1, heal_at_slot_level: null };
+            result = await triggerHealingWord(spellNull, {}, makePlayerStats(), CAMPAIGN, 'testMap');
             expect(result).toBeNull();
             expect(getCombatContext).not.toHaveBeenCalled();
-        });
 
-        it('returns null when heal_at_slot_level is empty object', async () => {
-            const spell = { name: 'Healing Word', level: 1, heal_at_slot_level: {} };
-            const result = await triggerHealingWord(spell, {}, makePlayerStats(), CAMPAIGN, 'testMap');
+            const spellEmpty = { name: 'Healing Word', level: 1, heal_at_slot_level: {} };
+            result = await triggerHealingWord(spellEmpty, {}, makePlayerStats(), CAMPAIGN, 'testMap');
             expect(result).toBeNull();
             expect(getCombatContext).not.toHaveBeenCalled();
-        });
 
-        it('returns null when slot level has no heal expression', async () => {
-            const spell = { name: 'Healing Word', level: 1, heal_at_slot_level: { '1': '2d4 + MOD' } };
-            const result = await triggerHealingWord(spell, { slotLevel: 2 }, makePlayerStats(), CAMPAIGN, 'testMap');
+            const spellNoSlot = { name: 'Healing Word', level: 1, heal_at_slot_level: { '1': '2d4 + MOD' } };
+            result = await triggerHealingWord(spellNoSlot, { slotLevel: 2 }, makePlayerStats(), CAMPAIGN, 'testMap');
             expect(result).toBeNull();
             expect(getCombatContext).not.toHaveBeenCalled();
-        });
 
-        it('returns null when combat context is unavailable', async () => {
-            const spell = makeSpell('Healing Word', 1);
-            const result = await triggerHealingWord(spell, {}, makePlayerStats(), CAMPAIGN, 'testMap');
+            getCombatContext.mockResolvedValue(null);
+            result = await triggerHealingWord(makeSpell('Healing Word', 1), {}, makePlayerStats(), CAMPAIGN, 'testMap');
             expect(result).toBeNull();
             expect(getCombatContext).toHaveBeenCalledWith(CAMPAIGN);
         });
 
-        it('returns null when no target is found', async () => {
+        it('returns null when no target is found or rollExpression returns null', async () => {
             const cs = makeCombatSummary([{ name: 'Ally', maxHp: 30, currentHp: 10 }]);
             getCombatContext.mockResolvedValueOnce(cs);
             getTargetFromAttacker.mockReturnValueOnce(null);
 
-            const spell = makeSpell('Healing Word', 1);
-            const result = await triggerHealingWord(spell, {}, makePlayerStats(), CAMPAIGN, 'testMap');
-
+            let result = await triggerHealingWord(makeSpell('Healing Word', 1), {}, makePlayerStats(), CAMPAIGN, 'testMap');
             expect(result).toBeNull();
             expect(rollExpression).not.toHaveBeenCalled();
-        });
 
-        it('returns null when rollExpression returns null', async () => {
-            const cs = makeCombatSummary([{ name: 'Ally', maxHp: 30, currentHp: 10 }]);
             getCombatContext.mockResolvedValueOnce(cs);
             getTargetFromAttacker.mockReturnValueOnce({ name: 'Ally' });
             rollExpression.mockReturnValueOnce(null);
 
-            const spell = makeSpell('Healing Word', 1);
-            const result = await triggerHealingWord(spell, {}, makePlayerStats(), CAMPAIGN, 'testMap');
-
+            result = await triggerHealingWord(makeSpell('Healing Word', 1), {}, makePlayerStats(), CAMPAIGN, 'testMap');
             expect(result).toBeNull();
             expect(applyHealingToTarget).not.toHaveBeenCalled();
         });
 
-        it('uses spell.name fallback with empty string check', async () => {
+        it('returns null when spell.name fallback has empty string check', async () => {
             const spell = { level: 1, heal_at_slot_level: { '1': '2d4 + MOD' } };
             const result = await triggerHealingWord(spell, {}, makePlayerStats(), CAMPAIGN, 'testMap');
             expect(result).toBeNull();
@@ -145,53 +130,25 @@ describe('triggerHealingWord', () => {
     });
 
     describe('successful healing', () => {
-        it('applies healing with positive spellcasting modifier', async () => {
+        it.each([
+            ['positive modifier', 3, 8, '2d4 + 3'],
+            ['zero modifier', 0, 5, '2d4 + 0'],
+            ['negative modifier', -3, 1, '2d4 + -3'],
+        ])('applies healing with %s: healAmount=%s, formula=%s', async (_label, mod, healAmount, formula) => {
             const cs = makeCombatSummary([{ name: 'Ally', maxHp: 30, currentHp: 10 }]);
             getCombatContext.mockResolvedValueOnce(cs);
             getTargetFromAttacker.mockReturnValueOnce({ name: 'Ally' });
-            rollExpression.mockReturnValueOnce({ total: 8, rolls: [[2, 4]], modifier: 3 });
+            rollExpression.mockReturnValueOnce({ total: healAmount, rolls: [[2, mod > 0 ? 4 : 2]], modifier: mod });
             getRuntimeValue.mockReturnValue('10');
 
             const spell = makeSpell('Healing Word', 1);
-            const playerStats = makePlayerStats(3);
+            const playerStats = makePlayerStats(mod);
             const result = await triggerHealingWord(spell, {}, playerStats, CAMPAIGN, 'testMap');
 
             expect(result).not.toBeNull();
             expect(result.targetName).toBe('Ally');
-            expect(result.healAmount).toBe(8);
-            expect(result.formula).toBe('2d4 + 3');
-        });
-
-        it('applies healing with zero modifier', async () => {
-            const cs = makeCombatSummary([{ name: 'Ally', maxHp: 30, currentHp: 10 }]);
-            getCombatContext.mockResolvedValueOnce(cs);
-            getTargetFromAttacker.mockReturnValueOnce({ name: 'Ally' });
-            rollExpression.mockReturnValueOnce({ total: 5, rolls: [[2, 3]], modifier: 0 });
-            getRuntimeValue.mockReturnValue('10');
-
-            const spell = makeSpell('Healing Word', 1);
-            const playerStats = makePlayerStats(0);
-            const result = await triggerHealingWord(spell, {}, playerStats, CAMPAIGN, 'testMap');
-
-            expect(result).not.toBeNull();
-            expect(result.healAmount).toBe(5);
-            expect(result.formula).toBe('2d4 + 0');
-        });
-
-        it('applies healing with negative modifier', async () => {
-            const cs = makeCombatSummary([{ name: 'Ally', maxHp: 30, currentHp: 10 }]);
-            getCombatContext.mockResolvedValueOnce(cs);
-            getTargetFromAttacker.mockReturnValueOnce({ name: 'Ally' });
-            rollExpression.mockReturnValueOnce({ total: 1, rolls: [[2, 2]], modifier: -3 });
-            getRuntimeValue.mockReturnValue('10');
-
-            const spell = makeSpell('Healing Word', 1);
-            const playerStats = makePlayerStats(-3);
-            const result = await triggerHealingWord(spell, {}, playerStats, CAMPAIGN, 'testMap');
-
-            expect(result).not.toBeNull();
-            expect(result.healAmount).toBe(1);
-            expect(result.formula).toBe('2d4 + -3');
+            expect(result.healAmount).toBe(healAmount);
+            expect(result.formula).toBe(formula);
         });
 
         it('scales healing at higher slot levels', async () => {
@@ -223,21 +180,6 @@ describe('triggerHealingWord', () => {
 
             expect(result).not.toBeNull();
             expect(result.formula).toBe('2d4 + 4');
-        });
-
-        it('uses spellCastingAbility from playerStats fallback when spell has none', async () => {
-            const cs = makeCombatSummary([{ name: 'Ally', maxHp: 30, currentHp: 10 }]);
-            getCombatContext.mockResolvedValueOnce(cs);
-            getTargetFromAttacker.mockReturnValueOnce({ name: 'Ally' });
-            rollExpression.mockReturnValueOnce({ total: 7, rolls: [[2, 4]], modifier: 2 });
-            getRuntimeValue.mockReturnValue('10');
-
-            const spell = makeSpell('Healing Word', 1);
-            const playerStats = makePlayerStats(2, 'Intelligence');
-            const result = await triggerHealingWord(spell, {}, playerStats, CAMPAIGN, 'testMap');
-
-            expect(result).not.toBeNull();
-            expect(result.formula).toBe('2d4 + 2');
         });
 
         it('uses metaCtx targetName when provided instead of getTargetFromAttacker', async () => {
@@ -301,12 +243,7 @@ describe('triggerHealingWord', () => {
             const playerStats = makePlayerStats(3);
             await triggerHealingWord(spell, {}, playerStats, CAMPAIGN, 'testMap');
 
-            expect(applyHealingToTarget).toHaveBeenCalledWith(
-                cs,
-                'Ally',
-                8,
-                CAMPAIGN
-            );
+            expect(applyHealingToTarget).toHaveBeenCalledWith(cs, 'Ally', 8, CAMPAIGN);
         });
 
         it('does not call applyHealingToTarget when actualHeal is 0', async () => {

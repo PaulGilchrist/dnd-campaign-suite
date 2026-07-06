@@ -57,8 +57,8 @@
     },
     {
       "name": "The Inner Sanctum",
-      "description": "Thorgar Ironfist awaits in the inner sanctum of the ancient tomb, flanked by four wights and two wraiths. The sanctum is a chamber of molten metal pools and crumbling pillars — environmental hazards that add danger to every round. The Clan Heart glows at the chamber's center, powering Thorgar's undeath. Destroying it requires a DC 15 Strength check or a spell like disintegrate. During the battle, Thorgar recognizes the Mountain Dwarf Ranger's clan bloodline and offers them a choice that could change the course of the fight.",
       "savedAt": "2026-05-21T00:00:00Z",
+      "description": "Thorgar Ironfist awaits in the inner sanctum of the ancient tomb, flanked by four wights and two wraiths. The sanctum is a chamber of molten metal pools and crumbling pillars — environmental hazards that add danger to every round. The Clan Heart glows at the chamber's center, powering Thorgar's undeath. Destroying it requires a DC 15 Strength check or a spell like disintegrate. During the battle, Thorgar recognizes the Mountain Dwarf Ranger's clan bloodline and offers them a choice that could change the course of the fight.",
       "rulesVersion": "5e",
       "difficulty": 3,
       "playerLevels": [
@@ -83,7 +83,8 @@
           "name": "Wraith",
           "qty": 2
         }
-      ]
+      ],
+      "effectiveXP": 48800
     },
     {
       "name": "Charm",
