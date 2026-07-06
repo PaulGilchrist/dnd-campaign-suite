@@ -195,6 +195,7 @@ import { handle as handlePassWithoutTrace } from './handlers/buffs/passWithoutTr
 import { handle as handleProtectionFromEvilAndGood, isProtectionFromEvilAndGoodActive, isCreatureWarded } from './handlers/buffs/protectionFromEvilAndGoodHandler.js';
 import { handle as handleResistance, applyResistance as applyResistanceEffect, getResistanceDamageType, isResistanceUsedThisTurn } from './handlers/buffs/resistanceHandler.js';
 import { handle as handleRayOfEnfeeblement, isRayOfEnfeeblementActive } from './handlers/spells/rayOfEnfeeblementHandler.js';
+import { handle as handleViciousMockery } from './handlers/spells/viciousMockeryHandler.js';
 import { handle as handleSentinelGuardian } from './handlers/combat/sentinelGuardianHandler.js';
 import { handle as handleSentinelHalt } from './handlers/combat/sentinelHaltHandler.js';
 import { handle as handleWebAreaSave } from './handlers/spells/webAreaSaveHandler.js';
@@ -453,6 +454,7 @@ const HANDLER_MAP = {
         boon_of_energy_resistance: handleBoonOfEnergyResistance,
         modify_d20_roll: handleBoonOfFate,
         ray_of_enfeeblement: handleRayOfEnfeeblement,
+        vicious_mockery: handleViciousMockery,
         silence: handleSilence,
         slow: handleSlow,
         survive_and_heal: handleBoonOfRecovery,

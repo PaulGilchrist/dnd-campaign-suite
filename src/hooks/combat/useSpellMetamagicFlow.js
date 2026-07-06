@@ -279,29 +279,58 @@ export function useSpellMetamagicFlow(playerStats, campaignName, onExecute, setS
     }
 
     if (!isSorcerer) {
+      let castSpell = spell;
+      if (spell.level === 0 && spell.damage) {
+        const charDmg = spell.damage?.damage_at_character_level;
+        const slotDmg = spell.damage?.damage_at_slot_level;
+        const dmgObj = (charDmg && Object.keys(charDmg).length) ? charDmg : (slotDmg && Object.keys(slotDmg).length ? slotDmg : null);
+        if (dmgObj) {
+          const levels = Object.keys(dmgObj).map(Number).sort((a, b) => a - b);
+          const applicable = levels.filter(l => l <= playerStats.level);
+          if (applicable.length > 0) {
+            const autoLevel = Math.max(...applicable);
+            castSpell = { ...spell, level: autoLevel, baseLevel: 0 };
+          }
+        }
+      }
       addEntry(campaignName, {
         type: 'spell',
         characterName: playerStats.name,
         spellName: spell.name,
-        spellLevel: spell.level || 0,
+        spellLevel: castSpell.level || 0,
         castingTime: spell.casting_time,
         metamagic: [],
         spCost: 0,
         timestamp: Date.now(),
       });
-      onExecute(spell, metaCtx);
+      onExecute(castSpell, metaCtx);
       return;
     }
 
-    const spellLevel = spell.level || 0;
+    let sorcerySpell = spell;
+    if (spell.level === 0 && spell.damage) {
+      const charDmg = spell.damage?.damage_at_character_level;
+      const slotDmg = spell.damage?.damage_at_slot_level;
+      const dmgObj = (charDmg && Object.keys(charDmg).length) ? charDmg : (slotDmg && Object.keys(slotDmg).length ? slotDmg : null);
+      if (dmgObj) {
+        const levels = Object.keys(dmgObj).map(Number).sort((a, b) => a - b);
+        const applicable = levels.filter(l => l <= playerStats.level);
+        if (applicable.length > 0) {
+          const autoLevel = Math.max(...applicable);
+          sorcerySpell = { ...spell, level: autoLevel, baseLevel: 0 };
+        }
+      }
+    }
+
+    const spellLevel = sorcerySpell.level || 0;
     const currentSP = getCurrentSorceryPoints(playerStats.name, getMaxSorceryPoints(playerStats));
     const isPsionic = isPsionicSpell(playerStats, spell.name);
     const hasPsionic = hasPsionicSorcery(playerStats);
 
     cfSetPending('metamagic', {
-      spell,
+      spell: sorcerySpell,
       spellName: spell.name,
-      spellLevel: spell.level || 0,
+      spellLevel: sorcerySpell.level || 0,
       castingTime: spell.casting_time,
       _currentSP: currentSP,
       isPsionic: isPsionic && hasPsionic,

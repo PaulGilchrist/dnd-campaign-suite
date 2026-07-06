@@ -35,6 +35,7 @@ import { triggerOttoDance } from '../features/ottoDanceService.js';
 import { triggerFriends, endFriendsOnHostileAction } from '../features/friendsService.js';
 import { triggerCharmPerson } from '../features/charmPersonService.js';
 import { triggerRayOfEnfeeblement } from '../features/rayOfEnfeeblementService.js';
+import { triggerViciousMockeryForGeneric } from '../features/viciousMockeryService.js';
 import { endInvisibilityOnHostileAction } from '../features/invisibilityService.js';
 import { triggerGlobeOfInvulnerability } from '../features/globeOfInvulnerabilityService.js';
 import { triggerHeroism } from '../features/heroismService.js';
@@ -721,6 +722,14 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
         }
         if (overchannelResult) {
             rollDamage(spell.name, finalFormula, overchannelResult.total, overchannelResult.rolls, overchannelResult.modifier, context);
+        }
+
+        // Vicious Mockery — trigger disadvantage effect after save+damage roll
+        if (spell.name && spell.name.toLowerCase() === 'vicious mockery') {
+            const mockeryTarget = await getTargetInfo();
+            triggerViciousMockeryForGeneric(spell, { ...metaCtx, spellSaveDc, targetName: mockeryTarget?.name }, playerStats, campaignName, mapName).catch(e => {
+                console.error('[spellCast] Vicious Mockery trigger failed:', e);
+            });
         }
     } else {
         if (isMagicMissile(spell)) {
