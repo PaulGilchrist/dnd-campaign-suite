@@ -406,6 +406,8 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
                 if (creature.type === 'player') {
                     setRuntimeValue(creature.name, 'activeBuffs', [], campaignName)
                     setRuntimeValue(creature.name, 'invokeDuplicityAdvantageTargets', [], campaignName)
+                    setRuntimeValue(creature.name, 'unbreakableMajestyActive', null, campaignName)
+                    setRuntimeValue(creature.name, 'unbreakableMajestySaveDc', null, campaignName)
                 }
             }
         }

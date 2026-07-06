@@ -623,6 +623,8 @@ async function applyGrappleDamageTurnStart(activeName, playerStats, effect, camp
       setRuntimeValue(characterName, 'activeBuffs', [], campaignName);
       setRuntimeValue(characterName, 'mantleOfMajestyActive', null, campaignName);
       setRuntimeValue(characterName, 'innerRadianceActive', null, campaignName);
+      setRuntimeValue(characterName, 'unbreakableMajestyActive', null, campaignName);
+      setRuntimeValue(characterName, 'unbreakableMajestySaveDc', null, campaignName);
 
       // Clear Bait and Switch (Evasive Footwork) AC bonus
       const wasActive = getRuntimeValue(characterName, 'baitAndSwitchActive');
