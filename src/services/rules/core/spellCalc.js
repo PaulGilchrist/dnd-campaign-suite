@@ -220,7 +220,7 @@ export function getSpellAbilities(allSpells, playerStats) {
                     return { ...spellDetail, prepared: spellDetail.level === 0 ? 'Always' : spell.prepared };
                  }
                 return { ...spell };
-             });
+              });
              // Sort by level (ascending) and then by name
             spellAbilities.spells.sort((a, b) => {
                 if (a.level !== b.level) {
