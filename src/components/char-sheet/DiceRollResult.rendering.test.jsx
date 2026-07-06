@@ -74,15 +74,23 @@ describe('DiceRollResult', () => {
 
     describe('critical hit', () => {
         it.each`
-            rolls        | isAutoCrit | expected
-            ${[20, 5]}   | ${false}   | ${true}
-            ${[5, 3]}    | ${true}    | ${true}
-        `('shows "Critical Hit!" when roll is 20 or isAutoCrit is true', ({ rolls, isAutoCrit }) => {
+            rolls        | isAutoCrit | rollType   | isCrit
+            ${[20, 5]}   | ${false}   | ${'attack'}| ${true}
+            ${[5, 3]}    | ${true}    | ${'attack'}| ${false}
+        `('shows "Critical Hit!" when isCrit or isAutoCrit is true for attack rolls', ({ rolls, isAutoCrit, isCrit }) => {
             render(
-                <DiceRollResult name="Attack" type="d20" rolls={rolls} bonus={3} isAutoCrit={isAutoCrit} />
+                <DiceRollResult name="Attack" type="d20" rolls={rolls} bonus={3} isAutoCrit={isAutoCrit} isCrit={isCrit} rollType="attack" />
             );
             expect(screen.getByText(/Critical Hit!/)).toBeInTheDocument();
             expect(screen.getByText(/damage dice doubled/)).toBeInTheDocument();
+        });
+
+        it('shows "Natural 20!" for non-attack d20 rolls with natural 20', () => {
+            render(
+                <DiceRollResult name="Athletics" type="d20" rolls={[20]} bonus={5} rollType="check" />
+            );
+            expect(screen.getByText('Natural 20!')).toBeInTheDocument();
+            expect(screen.queryByText(/Critical Hit!/)).not.toBeInTheDocument();
         });
 
         it.each`

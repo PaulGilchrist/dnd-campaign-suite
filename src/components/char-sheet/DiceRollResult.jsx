@@ -198,7 +198,9 @@ function DiceRollResult({ name, type, rolls, rollType, bonus = 0, bonusDetail, f
                   </div>
               )}
 
-            {(isCritDamage || isCrit || isAutoCrit || (isD20 && displayRoll === 20) || (strokeResult !== null && isD20)) && <div className="dice-roll-crit">Critical Hit! — damage dice doubled</div>}
+            {(isCritDamage || isCrit || isAutoCrit) && <div className="dice-roll-crit">Critical Hit! — damage dice doubled</div>}
+            {(isD20 && !isCrit && !isAutoCrit && displayRoll === 20) && <div className="dice-roll-crit">Natural 20!</div>}
+            {strokeResult !== null && isD20 && !isCrit && !isAutoCrit && <div className="dice-roll-crit">Natural 20!</div>}
             {showFumble && <div className="dice-roll-crit dice-roll-crit-miss">Critical Miss!</div>}
               {targetName && hit !== undefined && !isSaveDamageType && rollType === 'attack' && (
                   <div className={`dice-roll-hit-miss ${hit ? 'hit' : 'miss'}`}>
