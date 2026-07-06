@@ -452,8 +452,9 @@ export function applyDamageToTarget(combatSummary, targetName, rawDamage, damage
    const wasAlive = oldHp > 0;
    const isNowUnconscious = newHp <= 0;
 
-   if (creature.concentration && finalDamage > 0) {
-     creature.concentration.dc = Math.max(10, Math.floor(finalDamage / 2));
+   if (!options?.skipConcentration && creature.concentration && (finalDamage > 0 || options?.concentrationTotalDamage > 0)) {
+     const dcDamage = options?.concentrationTotalDamage ?? finalDamage;
+     creature.concentration.dc = Math.max(10, Math.floor(dcDamage / 2));
    }
 
     if (!isPlayer && wasAlive && isNowUnconscious && finalDamage > 0) {
@@ -521,7 +522,7 @@ export function applyDamageToTarget(combatSummary, targetName, rawDamage, damage
       });
     }
 
-    if (creature.concentration && finalDamage > 0) {
+    if (!options?.skipConcentration && creature.concentration && (finalDamage > 0 || options?.concentrationTotalDamage > 0)) {
       const promptId = utils.guid();
       sendConcentrationPrompt(campaignName, {
         promptId,
@@ -533,7 +534,7 @@ export function applyDamageToTarget(combatSummary, targetName, rawDamage, damage
     }
   } else {
     combatSummaryChanged = true;
-    if (creature.concentration && finalDamage > 0) {
+    if (!options?.skipConcentration && creature.concentration && (finalDamage > 0 || options?.concentrationTotalDamage > 0)) {
       const saveBonus = creature?.saveBonuses?.['con'] ?? 0;
       const dragonConstellationActive = (() => {
         const rawActiveBuffs = getRuntimeValue(creature.name, 'activeBuffs');

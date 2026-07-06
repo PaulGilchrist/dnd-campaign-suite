@@ -66,16 +66,10 @@ export function setupEventListeners(deps) {
             }
             const ignoreResistance = (pending.playerStats && hasIgnoreResistance(pending.playerStats, pending.damageType)) || false;
             const attacker = pending.attackerName || pending.sourceAttackerName || characterName;
-            const applyResult = applyDamageToTarget(
-                combatSummary, pendingTargetName, finalDamage, [pending.damageType], pending.campaignName, charactersRef.current, ignoreResistance, attacker, true
-            );
 
-            if (applyResult && applyResult.finalDamage > 0) {
-                endInvisibilityOnHostileAction(attacker, pending.campaignName);
-            }
-
-            let secondaryResult = null;
-            let secondaryFinalDamage = 0;
+            // Compute secondary damage info first (dice rolls only, no damage application)
+            // so we can use the combined total for the concentration DC
+            let secondaryData = null;
             if (pending.autoDamageSecondaryFormula) {
                 const secondaryFormula = pending.autoDamageSecondaryFormula;
                 const secondaryName = pending.autoDamageSecondaryName || pending.name;
@@ -84,23 +78,46 @@ export function setupEventListeners(deps) {
                 const secondaryRollResult = isAutoCrit ? rollExpressionDoubled(secondaryFormula) : rollExpression(secondaryFormula);
                 if (secondaryRollResult) {
                     const secondaryTotal = secondaryRollResult.total;
-                    let secondaryRawDamage = secondaryTotal;
                     const secondaryIgnoreResistance = (pending.playerStats && hasIgnoreResistance(pending.playerStats, secondaryDamageType)) || false;
-                    const secondaryApplyResult = applyDamageToTarget(combatSummary, pendingTargetName, secondaryRawDamage, [secondaryDamageType], pending.campaignName, charactersRef.current, secondaryIgnoreResistance, attacker, true);
-                    secondaryFinalDamage = secondaryApplyResult?.finalDamage ?? secondaryRawDamage;
-                    if (secondaryApplyResult && secondaryApplyResult.finalDamage > 0) {
-                        endInvisibilityOnHostileAction(attacker, pending.campaignName);
-                    }
-                    secondaryResult = {
-                        name: secondaryName,
+                    secondaryData = {
                         formula: secondaryFormula,
-                        rolls: secondaryRollResult.rolls,
+                        name: secondaryName,
+                        damageType: secondaryDamageType,
                         total: secondaryTotal,
                         modifier: secondaryRollResult.modifier,
-                        damageType: secondaryDamageType,
-                        finalDamage: secondaryFinalDamage,
+                        rolls: secondaryRollResult.rolls,
+                        ignoreResistance: secondaryIgnoreResistance,
                     };
                 }
+            }
+
+            // Apply primary damage with combined concentration total (if secondary exists)
+            const applyResult = secondaryData
+                ? applyDamageToTarget(combatSummary, pendingTargetName, finalDamage, [pending.damageType], pending.campaignName, charactersRef.current, ignoreResistance, attacker, true, { concentrationTotalDamage: finalDamage + secondaryData.total })
+                : applyDamageToTarget(combatSummary, pendingTargetName, finalDamage, [pending.damageType], pending.campaignName, charactersRef.current, ignoreResistance, attacker, true);
+
+            if (applyResult && applyResult.finalDamage > 0) {
+                endInvisibilityOnHostileAction(attacker, pending.campaignName);
+            }
+
+            // Apply secondary damage (skip concentration — handled by primary call with combined total)
+            let secondaryResult = null;
+            let secondaryFinalDamage = 0;
+            if (secondaryData) {
+                const secondaryApplyResult = applyDamageToTarget(combatSummary, pendingTargetName, secondaryData.total, [secondaryData.damageType], pending.campaignName, charactersRef.current, secondaryData.ignoreResistance, attacker, true, { skipConcentration: true });
+                secondaryFinalDamage = secondaryApplyResult?.finalDamage ?? secondaryData.total;
+                if (secondaryApplyResult && secondaryApplyResult.finalDamage > 0) {
+                    endInvisibilityOnHostileAction(attacker, pending.campaignName);
+                }
+                secondaryResult = {
+                    name: secondaryData.name,
+                    formula: secondaryData.formula,
+                    rolls: secondaryData.rolls,
+                    total: secondaryData.total,
+                    modifier: secondaryData.modifier,
+                    damageType: secondaryData.damageType,
+                    finalDamage: secondaryFinalDamage,
+                };
             }
 
             const totalDamageDealt = (applyResult?.finalDamage ?? 0) + secondaryFinalDamage;

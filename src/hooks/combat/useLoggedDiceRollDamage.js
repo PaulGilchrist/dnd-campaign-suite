@@ -409,7 +409,7 @@ export function createLogDamageAndShow(deps) {
                     secondaryRawDamage = Math.floor(secondaryTotal / 2);
                 }
                 const secondaryIgnoreResistance = (context?.playerStats && hasIgnoreResistance(context.playerStats, secondaryDamageType)) || false;
-                const secondaryApplyResult = applyDamageToTarget(combatSummary, target.name, secondaryRawDamage, [secondaryDamageType], campaignName, characters, secondaryIgnoreResistance, characterName, true);
+                const secondaryApplyResult = applyDamageToTarget(combatSummary, target.name, secondaryRawDamage, [secondaryDamageType], campaignName, characters, secondaryIgnoreResistance, characterName, true, { skipConcentration: true });
                 secondaryFinalDamage = secondaryApplyResult?.finalDamage ?? secondaryRawDamage;
                 if (secondaryApplyResult && secondaryApplyResult.finalDamage > 0) {
                     endInvisibilityOnHostileAction(characterName, campaignName);
@@ -431,7 +431,9 @@ export function createLogDamageAndShow(deps) {
             }
         }
 
-        const primaryApplyResult = applyDamageToTarget(combatSummary, target.name, finalDamage, [damageType], campaignName, characters, ignoreResistance, characterName, true);
+        const primaryApplyResult = secondaryFinalDamage > 0
+          ? applyDamageToTarget(combatSummary, target.name, finalDamage, [damageType], campaignName, characters, ignoreResistance, characterName, true, { concentrationTotalDamage: finalDamage + secondaryFinalDamage })
+          : applyDamageToTarget(combatSummary, target.name, finalDamage, [damageType], campaignName, characters, ignoreResistance, characterName, true);
 
         if (primaryApplyResult && primaryApplyResult.finalDamage > 0) {
             endInvisibilityOnHostileAction(characterName, campaignName);
@@ -1029,7 +1031,7 @@ export function createLogDamageAndShow(deps) {
                     const secondaryIgnoreResistance = (context?.playerStats && hasIgnoreResistance(context.playerStats, secondaryDamageType)) || false;
                     const damageSequenceId = `seq_${Date.now()}_${Math.random()}`;
                     const multiAttackOptions = { damageSequenceId };
-                    const secondaryApplyResult = applyDamageToTarget(combatSummary, target.name, secondaryRawDamage, [secondaryDamageType], campaignName, characters, secondaryIgnoreResistance, characterName, true, multiAttackOptions);
+                    const secondaryApplyResult = applyDamageToTarget(combatSummary, target.name, secondaryRawDamage, [secondaryDamageType], campaignName, characters, secondaryIgnoreResistance, characterName, true, { ...multiAttackOptions, skipConcentration: true });
                     secondaryFinalDamage = secondaryApplyResult?.finalDamage ?? secondaryRawDamage;
                     if (secondaryApplyResult && secondaryApplyResult.finalDamage > 0) {
                         endInvisibilityOnHostileAction(characterName, campaignName);
@@ -1044,7 +1046,8 @@ export function createLogDamageAndShow(deps) {
                         finalDamage: secondaryFinalDamage,
                     };
 
-                    const primaryApplyResult = applyDamageToTarget(combatSummary, target.name, reducedTotal, [damageType], campaignName, characters, ignoreResistance, characterName, true, multiAttackOptions);
+                    const totalConcentrationDamage = reducedTotal + secondaryRawDamage;
+                    const primaryApplyResult = applyDamageToTarget(combatSummary, target.name, reducedTotal, [damageType], campaignName, characters, ignoreResistance, characterName, true, { ...multiAttackOptions, concentrationTotalDamage: totalConcentrationDamage });
                     applyResult = rayReduction > 0 ? { ...primaryApplyResult, rayOfEnfeebleReduction: rayReduction } : primaryApplyResult;
                     clearReTriggeredSequence(damageSequenceId);
                 }
