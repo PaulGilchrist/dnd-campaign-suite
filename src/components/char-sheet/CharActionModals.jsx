@@ -50,6 +50,7 @@ import CreatureSelectionModal from './modals/shared/CreatureSelectionModal.jsx'
 import BulwarkOfForceModal from './modals/BulwarkOfForceModal.jsx'
 import CoronaEnemySelectionModal from './modals/CoronaEnemySelectionModal.jsx'
 import RadianceOfDawnModal from './modals/RadianceOfDawnModal.jsx'
+import MantleOfInspirationModal from './modals/MantleOfInspirationModal.jsx'
 import { handleClearWard, handleSpendDice, handleApply } from '../../services/automation/handlers/class-cleric-paladin/bastionOfLawHandler.js'
 import { getCombatContext } from '../../services/rules/combat/damageUtils.js'
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js'
@@ -226,6 +227,8 @@ export default function CharActionModals({
     handleCoronaEnemySelectionConfirm,
     radianceOfDawnModal, setRadianceOfDawnModal,
     handleRadianceOfDawnConfirm,
+    mantleOfInspirationModal, setMantleOfInspirationModal,
+    handleMantleOfInspirationConfirm,
     tricksterBlessingModal,
     handleTricksterBlessingConfirm,
     bardicInspirationTargetModal,
@@ -874,6 +877,17 @@ export default function CharActionModals({
                     rangeFeet={radianceOfDawnModal.rangeFeet}
                     onConfirm={handleRadianceOfDawnConfirm}
                     onSkip={() => setRadianceOfDawnModal(null)}
+                />
+            )}
+            {mantleOfInspirationModal && (
+                <MantleOfInspirationModal
+                    creatureTargets={mantleOfInspirationModal.creatureTargets}
+                    tempHp={mantleOfInspirationModal.tempHp}
+                    dieRoll={mantleOfInspirationModal.dieRoll}
+                    bardicDieSize={mantleOfInspirationModal.bardicDieSize}
+                    maxTargets={mantleOfInspirationModal.maxTargets}
+                    onConfirm={handleMantleOfInspirationConfirm}
+                    onSkip={() => setMantleOfInspirationModal(null)}
                 />
             )}
             {tricksterBlessingModal && (

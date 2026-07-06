@@ -47,7 +47,7 @@ export default function CreatureSelectionModal({
                         {targets.map((target, i) => {
                             const name = target.name || target;
                             const isSelected = selected.includes(name);
-                            const atMax = maxTargets && selected.length >= maxTargets && !isSelected;
+                            const atMax = maxTargets && typeof maxTargets === 'number' && selected.length >= maxTargets && !isSelected;
                             const isPlayer = target.type === 'player';
                             const hpDisplay = (!isPlayer && target.currentHp != null && target.maxHp != null)
                                 ? `${Math.round((target.currentHp / target.maxHp) * 100)}%`

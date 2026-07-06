@@ -74,6 +74,7 @@ export default function useCharActionModals({
     const [secondaryTargetModal, setSecondaryTargetModal] = useState(null);
     const [invokeDuplicityModal, setInvokeDuplicityModal] = useState(null);
     const [stealthAttackModal, setStealthAttackModal] = useState(null);
+    const [mantleOfInspirationTarget, setMantleOfInspirationTarget] = useState(null);
 
     const pendingDamageRef = useRef(null);
 
@@ -195,6 +196,7 @@ export default function useCharActionModals({
         secondaryTargetModal, setSecondaryTargetModal,
         invokeDuplicityModal, setInvokeDuplicityModal,
         stealthAttackModal, setStealthAttackModal,
+        mantleOfInspirationTarget, setMantleOfInspirationTarget,
         resolveAttackDamage,
         handleMasteryClose,
         handleWeaponMasteryChoice,

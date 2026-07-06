@@ -37,6 +37,7 @@ import { activateCoronaOfLight } from '../../services/automation/handlers/class-
 import { confirmRadianceOfDawn } from '../../services/automation/handlers/class-cleric-paladin/radianceOfDawnHandler.js';
 import { applyBardicInspiration } from '../../services/automation/handlers/class-bard/bardicInspirationHandler.js';
 import { applyInspiringMovement } from '../../services/automation/handlers/reactions/reactionBonusHandler.js';
+import { confirmMantleOfInspiration } from '../../services/automation/handlers/buffs/tempHpBuffHandler.js';
 import { endFriendsOnHostileAction } from '../../services/rules/features/friendsService.js';
 import { endInvisibilityOnHostileAction } from '../../services/rules/features/invisibilityService.js';
 import { applyDamageToTarget } from '../../services/rules/combat/applyDamage.js';
@@ -758,6 +759,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         bulwarkOfForceModal, setBulwarkOfForceModal,
         coronaEnemySelectionModal, setCoronaEnemySelectionModal,
         radianceOfDawnModal, setRadianceOfDawnModal,
+        mantleOfInspirationTarget, setMantleOfInspirationTarget,
         tricksterBlessingModal, setTricksterBlessingModal,
         bardicInspirationTargetModal, setBardicInspirationTargetModal,
         inspiringMovementAllyModal, setInspiringMovementAllyModal,
@@ -1138,6 +1140,23 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         setRadianceOfDawnModal(null);
     }, [setPopupHtml, radianceOfDawnModal, setRadianceOfDawnModal]);
 
+    const handleMantleOfInspirationConfirm = React.useCallback(async (selectedTargets) => {
+        if (!selectedTargets || !mantleOfInspirationTarget) return;
+        const result = await confirmMantleOfInspiration(
+            mantleOfInspirationTarget.action,
+            mantleOfInspirationTarget.playerStats,
+            mantleOfInspirationTarget.campaignName,
+            selectedTargets,
+            mantleOfInspirationTarget.dieRoll,
+            mantleOfInspirationTarget.bardicDieSize,
+            mantleOfInspirationTarget.tempHp
+        );
+        if (result?.payload) {
+            setPopupHtml(result.payload);
+        }
+        setMantleOfInspirationTarget(null);
+    }, [setPopupHtml, mantleOfInspirationTarget, setMantleOfInspirationTarget]);
+
     const handleTricksterBlessingConfirm = React.useCallback(async (targetName) => {
         if (!tricksterBlessingModal) return;
         const { action, playerStats, campaignName: evtCampaignName } = tricksterBlessingModal;
@@ -1413,6 +1432,9 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                         break;
                     case 'radianceOfDawn':
                         setRadianceOfDawnModal(result.payload);
+                        break;
+                    case 'mantleOfInspirationTarget':
+                        setMantleOfInspirationTarget(result.payload);
                         break;
                     case 'tricksterBlessing':
                         setTricksterBlessingModal(result.payload);
@@ -1757,6 +1779,8 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     handleCoronaEnemySelectionConfirm={handleCoronaEnemySelectionConfirm}
                     radianceOfDawnModal={radianceOfDawnModal} setRadianceOfDawnModal={setRadianceOfDawnModal}
                     handleRadianceOfDawnConfirm={handleRadianceOfDawnConfirm}
+                    mantleOfInspirationModal={mantleOfInspirationTarget} setMantleOfInspirationModal={setMantleOfInspirationTarget}
+                    handleMantleOfInspirationConfirm={handleMantleOfInspirationConfirm}
                     tricksterBlessingModal={tricksterBlessingModal} setTricksterBlessingModal={setTricksterBlessingModal}
                     handleTricksterBlessingConfirm={handleTricksterBlessingConfirm}
                     bardicInspirationTargetModal={bardicInspirationTargetModal}

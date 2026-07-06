@@ -36,35 +36,13 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 
     // Get combat summary for target selection
     const combatSummary = await loadCombatSummary(campaignName);
-    if (!combatSummary || !combatSummary.creatures) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: action.name,
-                description: 'No active combat found.',
-                automation: auto,
-            },
-        };
-    }
+    const creatures = combatSummary?.creatures || [];
 
     // Calculate range
     const rangeFeet = auto.shape?.includes('emanation_30ft') ? 30 : 10;
 
     // Build creature targets list (exclude self)
-    const creatureTargets = combatSummary.creatures.filter(c => c.name !== playerName);
-
-    if (creatureTargets.length === 0) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: action.name,
-                description: 'No creatures in range.',
-                automation: auto,
-            },
-        };
-    }
+    const creatureTargets = creatures.filter(c => c.name !== playerName);
 
     // Return modal request
     return {

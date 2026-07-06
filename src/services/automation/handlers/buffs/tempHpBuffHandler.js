@@ -4,6 +4,7 @@ import { loadMapData } from '../../../maps/mapsService.js';
 import { addExpiration } from '../../../rules/effects/expirations.js';
 import { getDistanceFeet, rangeToFeet } from '../../../rules/combat/rangeValidation.js';
 import { addEntry } from '../../../ui/logService.js';
+import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 
 function getBardicDieSize(playerStats) {
     const classLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level);
@@ -13,7 +14,9 @@ function getBardicDieSize(playerStats) {
 function getAbilityModifier(playerStats, abilityName) {
     const abil = playerStats.abilities?.find(a => a.name === abilityName);
     if (!abil) return 0;
-    return Math.floor((abil.score - 10) / 2);
+    const score = abil.score ?? abil.totalScore;
+    if (score == null) return 0;
+    return Math.floor((score - 10) / 2);
 }
 
 function rollDie(sides) {
@@ -164,7 +167,7 @@ async function handleMultiTargetAllyTempHp(action, playerStats, campaignName, ma
     };
 }
 
-async function handleMantleOfInspiration(action, playerStats, campaignName, mapName) {
+export async function handleMantleOfInspiration(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
     const playerName = playerStats.name;
 
@@ -174,6 +177,7 @@ async function handleMantleOfInspiration(action, playerStats, campaignName, mapN
 
     if (usesMax > 0) {
         const currentUses = Number(getRuntimeValue(playerName, 'bardicInspirationUses', campaignName) ?? usesMax);
+        console.log('[handleMantleOfInspiration] usesMax:', usesMax, 'currentUses:', currentUses);
         if (currentUses <= 0) {
             return {
                 type: 'popup',
@@ -186,6 +190,7 @@ async function handleMantleOfInspiration(action, playerStats, campaignName, mapN
             };
         }
         await setRuntimeValue(playerName, 'bardicInspirationUses', currentUses - 1, campaignName);
+        console.log('[handleMantleOfInspiration] decremented to:', currentUses - 1);
     }
 
     const dieRoll = rollDie(bardicDieSize);
@@ -194,54 +199,62 @@ async function handleMantleOfInspiration(action, playerStats, campaignName, mapN
     const chaMod = getAbilityModifier(playerStats, 'Charisma');
     const maxTargets = Math.max(1, chaMod);
 
-    const rangeFt = rangeToFeet(auto.range || '60 ft');
-    const targets = [];
+    const combatSummary = await getCombatContext(campaignName);
+    const creatureTargets = combatSummary?.creatures
+        ? combatSummary.creatures
+            .map(c => ({ name: c.name }))
+        : [];
 
-    if (mapName && rangeFt != null) {
-        const attackerPlayer = await loadMapData(campaignName, mapName).then(md => md?.players?.find(p => p.name === playerName));
-        if (attackerPlayer) {
-            const attackerPos = { gridX: attackerPlayer.gridX, gridY: attackerPlayer.gridY };
-            const mapPlayers = (await loadMapData(campaignName, mapName))?.players || [];
-            for (const p of mapPlayers) {
-                if (p.name === playerName) continue;
-                if (targets.length >= maxTargets) break;
-                const pos = { gridX: p.gridX, gridY: p.gridY };
-                const dist = getDistanceFeet(attackerPos, pos);
-                if (dist != null && dist <= rangeFt) {
-                    targets.push(p.name);
-                }
-            }
-        }
-    }
+    return {
+        type: 'modal',
+        modalName: 'mantleOfInspirationTarget',
+        payload: {
+            action,
+            playerStats,
+            campaignName,
+            creatureTargets,
+            tempHp,
+            dieRoll,
+            bardicDieSize,
+            maxTargets,
+        },
+    };
+}
 
-    for (const targetName of targets) {
-        setRuntimeValue(targetName, 'tempHp', tempHp, campaignName);
+export async function confirmMantleOfInspiration(action, playerStats, campaignName, selectedTargets, dieRoll, bardicDieSize, tempHp) {
+    const auto = action.automation;
+    const playerName = playerStats.name;
+    const finalTargets = (selectedTargets || []).slice(0, Math.max(1, getAbilityModifier(playerStats, 'Charisma')));
+
+    for (const targetName of finalTargets) {
+        const existingTempHp = Number(getRuntimeValue(targetName, 'tempHp', campaignName) || 0);
+        const newTotal = Math.max(existingTempHp, tempHp);
+        setRuntimeValue(targetName, 'tempHp', newTotal, campaignName);
         setRuntimeValue(targetName, 'inspiringMovementNoOA', true, campaignName);
         addExpiration(playerName, targetName, [
             { type: 'inspiring_movement_no_oa' }
         ], campaignName, 1);
     }
 
-    const targetList = targets.length > 0 ? targets.join(', ') : 'no targets in range';
-    const description = `${action.name}: Rolled ${dieRoll} (1d${bardicDieSize}), granting ${tempHp} temporary hit points to ${targetList}.` +
-        (targets.length > 0 ? ' Each target can use their Reaction to move up to their Speed without provoking Opportunity Attacks.' : '');
+    const targetList = finalTargets.length > 0 ? finalTargets.join(', ') : 'no targets selected';
+    const targetDetail = finalTargets.length > 0 ? ` Each target can use their Reaction to move up to their Speed without provoking Opportunity Attacks.` : '';
+    const description = `${action.name}: Rolled ${dieRoll} (1d${bardicDieSize}), granting ${tempHp} temporary hit points to ${targetList}.${targetDetail}`;
 
-    addEntry(campaignName, {
+    await addEntry(campaignName, {
         type: 'ability_use',
         characterName: playerName,
         abilityName: action.name,
-        description: `${playerName} used ${action.name} (rolled ${dieRoll} on 1d${bardicDieSize} = ${tempHp} temp HP). Targets: ${targetList}`,
+        description: `${playerName} used ${action.name} (rolled ${dieRoll} on 1d${bardicDieSize} = ${tempHp} temp HP). Targets: ${targetList}.${targetDetail}`,
     }).catch(() => {});
 
     return {
-        type: 'roll',
+        type: 'popup',
         payload: {
-            roll: `1d${bardicDieSize}`,
-            result: dieRoll,
+            type: 'automation_info',
             name: action.name,
-            tempHp,
-            targets,
+            automationType: auto.type,
             description,
+            automation: auto,
         },
     };
 }

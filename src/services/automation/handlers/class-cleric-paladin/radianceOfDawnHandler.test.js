@@ -165,25 +165,24 @@ describe('radianceOfDawnHandler.handle', () => {
   });
 
   describe('combat summary check', () => {
-    it('returns popup when no combat is active', async () => {
+    it('returns modal with empty targets when no combat is active', async () => {
       useRuntimeState.getRuntimeValue.mockReturnValue(2);
       combatData.loadCombatSummary.mockResolvedValue(null);
 
       const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-      expect(result.type).toBe('popup');
-      expect(result.payload.type).toBe('automation_info');
-      expect(result.payload.description).toBe('No active combat found.');
+      expect(result.type).toBe('modal');
+      expect(result.payload.creatureTargets).toEqual([]);
     });
 
-    it('returns popup when combatSummary has no creatures', async () => {
+    it('returns modal with empty targets when combatSummary has no creatures', async () => {
       useRuntimeState.getRuntimeValue.mockReturnValue(2);
       combatData.loadCombatSummary.mockResolvedValue({ creatures: [] });
 
       const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-      expect(result.type).toBe('popup');
-      expect(result.payload.description).toBe('No creatures in range.');
+      expect(result.type).toBe('modal');
+      expect(result.payload.creatureTargets).toEqual([]);
     });
   });
 
@@ -200,15 +199,15 @@ describe('radianceOfDawnHandler.handle', () => {
       expect(result.payload.creatureTargets).toEqual([expect.objectContaining({ name: 'Goblin' })]);
     });
 
-    it('returns no-creatures popup when only the player is in combat', async () => {
+    it('returns modal with empty targets when only the player is in combat', async () => {
       useRuntimeState.getRuntimeValue.mockReturnValue(2);
       const cs = { creatures: [makeCreature('TestCleric')] };
       combatData.loadCombatSummary.mockResolvedValue(cs);
 
       const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-      expect(result.type).toBe('popup');
-      expect(result.payload.description).toBe('No creatures in range.');
+      expect(result.type).toBe('modal');
+      expect(result.payload.creatureTargets).toEqual([]);
     });
   });
 
