@@ -3,6 +3,7 @@ import Popup from '../common/popup.jsx'
 import SpellDetailPopup from './char-spells/SpellDetailPopup.jsx'
 import MetamagicPopup from './popups/MetamagicPopup.jsx'
 import ArcaneWardRestoreModal from './modals/arcane/ArcaneWardRestoreModal.jsx'
+import SecondaryTargetModal from './modals/shared/SecondaryTargetModal.jsx'
 import { getReactionSpellNames } from '../../services/ui/spellSectionUtils.js'
 import { getCategories } from '../../services/character/featureCategories.js'
 import { sanitizeHtml } from '../../services/ui/sanitize.js';
@@ -15,11 +16,12 @@ import { getCombatContext, getTargetFromAttacker } from '../../services/rules/co
 import { useRuntimeValue, getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js'
 import { executeHandler } from '../../services/automation/index.js'
 import { applyWarCasterReaction } from '../../services/automation/handlers/reactions/reactionSpellHandler.js'
+import { applyInspiringMovement } from '../../services/automation/handlers/reactions/reactionBonusHandler.js'
 import { useSpellMetamagicFlow } from '../../hooks/combat/useSpellMetamagicFlow.js'
 import { useSpellUpcastFlow } from '../../hooks/combat/useSpellUpcastFlow.js'
 import { useSpellPositionResolver } from '../../hooks/combat/useSpellPositionResolver.js';
 import { useSpellCastExecutor } from '../../hooks/combat/useSpellCastExecutor.js';
-import { resolveSpellDamageAtLevel, isAutoHitSpell } from '../../services/rules/core/spellDamageUtils.js';
+import { resolveSpellDamageAtLevel, isAutoHitSpell } from '../../services/rules/core/spellDamageUtils.js'
 import { signFormatter } from '../../services/ui/formatUtils.js';
 import './CharActions.css'
 
@@ -31,6 +33,7 @@ function CharReactions({ playerStats, campaignName, cannotAct, mapName, characte
     const [reactiveSpellWarnings, setReactiveSpellWarnings] = React.useState(false);
     const [isReactiveSpellFlow, setIsReactiveSpellFlow] = React.useState(false);
     const [arcaneWardRestoreModal, setArcaneWardRestoreModal] = React.useState(null);
+    const [inspiringMovementAllyModal, setInspiringMovementAllyModal] = React.useState(null);
 
     const activeBuffs = useRuntimeValue(playerStats?.name, 'activeBuffs', campaignName) ?? [];
 
@@ -155,6 +158,8 @@ function CharReactions({ playerStats, campaignName, cannotAct, mapName, characte
         if (result.type === 'modal') {
             if (result.modalName === 'arcaneWardRestore') {
                 setArcaneWardRestoreModal(result.payload);
+            } else if (result.modalName === 'inspiringMovementAlly') {
+                setInspiringMovementAllyModal(result.payload);
             } else {
                 const html = buildFeatureDetailHtml(reaction);
                 if (html) setPopupHtml(html);
@@ -197,6 +202,18 @@ function CharReactions({ playerStats, campaignName, cannotAct, mapName, characte
         await resolveReactionSpellPositions();
         gateMetamagic(spell, metaCtx);
     }, [gateMetamagic, resolveReactionSpellPositions, campaignName, playerStats]);
+
+    const handleInspiringMovementConfirm = React.useCallback(async (allyName) => {
+        if (!inspiringMovementAllyModal) return;
+        const { action, playerStats: imPlayerStats, campaignName: imCampaignName, halfSpeed, noOAs } = inspiringMovementAllyModal;
+        setInspiringMovementAllyModal(null);
+        if (!allyName) return;
+        const result = await applyInspiringMovement(action, imPlayerStats, imCampaignName, allyName, halfSpeed, noOAs);
+        if (!result) return;
+        if (result.type === 'popup') {
+            setPopupHtml(result.payload);
+        }
+    }, [inspiringMovementAllyModal, setPopupHtml]);
 
     return (
         <div className='char-actions'>
@@ -296,6 +313,17 @@ function CharReactions({ playerStats, campaignName, cannotAct, mapName, characte
                     playerStats={playerStats}
                     campaignName={campaignName}
                     onClose={() => setArcaneWardRestoreModal(null)}
+                />
+            )}
+            {inspiringMovementAllyModal && (
+                <SecondaryTargetModal
+                    title="Inspiring Movement — Choose Ally"
+                    targets={inspiringMovementAllyModal.creatureTargets}
+                    confirmLabel="Move"
+                    confirmIcon="fa-person-walking"
+                    featureDescription="Both you and the chosen ally move up to half your Speeds without provoking Opportunity Attacks."
+                    onTargetSelected={handleInspiringMovementConfirm}
+                    onSkip={() => handleInspiringMovementConfirm(null)}
                 />
             )}
             {reactions.filter(r => !getCategories(playerStats.rules || '5e').featuresToIgnore.includes(r.name)).map((reaction) => {

@@ -230,6 +230,8 @@ export default function CharActionModals({
     handleTricksterBlessingConfirm,
     bardicInspirationTargetModal,
     handleBardicInspirationConfirm,
+    inspiringMovementAllyModal,
+    handleInspiringMovementConfirm,
     handleDivineInterventionCast,
     pendingDamageRef,
     buildCtx,
@@ -895,6 +897,17 @@ export default function CharActionModals({
                     showHp={false}
                     onTargetSelected={handleBardicInspirationConfirm}
                     onSkip={() => handleBardicInspirationConfirm(null)}
+                />
+            )}
+            {inspiringMovementAllyModal && (
+                <SecondaryTargetModal
+                    title="Inspiring Movement — Choose Ally"
+                    targets={inspiringMovementAllyModal.creatureTargets}
+                    confirmLabel="Move"
+                    confirmIcon="fa-person-walking"
+                    featureDescription="Both you and the chosen ally move up to half your Speeds without provoking Opportunity Attacks."
+                    onTargetSelected={handleInspiringMovementConfirm}
+                    onSkip={() => handleInspiringMovementConfirm(null)}
                 />
             )}
         </>

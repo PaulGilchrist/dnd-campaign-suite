@@ -2,7 +2,7 @@ import { resolveTarget, resolveMapPositions } from '../../common/targetResolver.
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addExpiration } from '../../../rules/effects/expirations.js';
 import { addEntry } from '../../../ui/logService.js';
-import { getDistanceFeet, rangeToFeet } from '../../../rules/combat/rangeValidation.js';
+import { getDistanceFeet } from '../../../rules/combat/rangeValidation.js';
 import { rollExpression } from '../../../dice/diceRoller.js';
 import { spendSorceryPoints, getCurrentSorceryPoints } from '../../../../hooks/combat/useMetamagic.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
@@ -403,7 +403,7 @@ async function handleVeer(action, playerStats, campaignName) {
     };
 }
 
-async function handleInspiringMovement(action, playerStats, campaignName, mapName) {
+async function handleInspiringMovement(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
 
     const usesMax = auto.uses_expression
@@ -424,36 +424,66 @@ async function handleInspiringMovement(action, playerStats, campaignName, mapNam
                 },
             };
         }
+    }
+
+    const selfSpeed = playerStats.speed || 30;
+    const halfSpeed = Math.floor(selfSpeed / 2);
+
+    const combatSummary = await getCombatContext(campaignName);
+    const creatureTargets = combatSummary?.creatures
+        ?.filter(c => c.name !== playerStats.name)
+        .map(c => ({ name: c.name, currentHp: c.currentHp, maxHp: c.maxHp, size: c.size, type: c.type })) || [];
+
+    if (creatureTargets.length === 0) {
+        const noOAs = !!auto.noOAs;
+        let description = `${action.name}: You may move up to ${halfSpeed} ft (half your Speed) as a Reaction.`;
+        if (noOAs) {
+            description += ` This movement does not provoke Opportunity Attacks.`;
+        }
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: action.name,
+                description,
+                automation: auto,
+            },
+        };
+    }
+
+    return {
+        type: 'modal',
+        modalName: 'inspiringMovementAlly',
+        payload: {
+            action,
+            playerStats,
+            campaignName,
+            creatureTargets,
+            halfSpeed,
+            noOAs: !!auto.noOAs,
+            allyRange: auto.allyRange || '30 ft',
+            usesMax,
+            usesKey: auto.resourceKey || 'bardicInspirationUses',
+        },
+    };
+}
+
+export async function applyInspiringMovement(action, playerStats, campaignName, allyName, halfSpeed, noOAs) {
+    const auto = action.automation;
+    const usesMax = auto.uses_expression
+        ? evaluateUses(auto.uses_expression, playerStats)
+        : (auto.usesMax ?? auto.uses ?? 0);
+
+    if (usesMax > 0) {
+        const usesKey = auto.resourceKey || 'bardicInspirationUses';
+        const currentUses = Number(getRuntimeValue(playerStats.name, usesKey, campaignName) ?? usesMax);
         await setRuntimeValue(playerStats.name, usesKey, currentUses - 1, campaignName);
     }
 
-    const allyRangeFt = rangeToFeet(auto.allyRange || '30 ft');
-    let allyName = null;
-
-    if (allyRangeFt != null && mapName) {
-        const positions = await resolveMapPositions(campaignName, mapName, playerStats.name);
-        if (positions?.attackerPos) {
-            const targetInfo = await resolveTarget(campaignName, playerStats.name);
-            if (targetInfo?.target) {
-                const targetName = targetInfo.target.name;
-                const targetPlayer = positions.targetPos;
-                if (targetPlayer) {
-                    const dist = getDistanceFeet(positions.attackerPos, targetPlayer);
-                    if (dist != null && dist <= allyRangeFt) {
-                        allyName = targetName;
-                    }
-                }
-            }
-        }
-    }
-
-    const noOAs = !!auto.noOAs;
-    if (noOAs) {
-        setRuntimeValue(playerStats.name, 'inspiringMovementNoOA', true, campaignName);
-        addExpiration(playerStats.name, playerStats.name, [
-            { type: 'inspiring_movement_no_oa' }
-        ], campaignName, 1);
-    }
+    setRuntimeValue(playerStats.name, 'inspiringMovementNoOA', true, campaignName);
+    addExpiration(playerStats.name, playerStats.name, [
+        { type: 'inspiring_movement_no_oa' }
+    ], campaignName, 1);
 
     if (allyName) {
         setRuntimeValue(allyName, 'inspiringMovementGranted', true, campaignName);
@@ -468,24 +498,20 @@ async function handleInspiringMovement(action, playerStats, campaignName, mapNam
         ], campaignName, 1);
     }
 
-    const selfSpeed = playerStats.speed || 30;
-    const halfSpeed = Math.floor(selfSpeed / 2);
-
-    let description = `${action.name}: You move up to ${halfSpeed} ft (half your Speed).`;
+    let description = `${playerStats.name} used ${action.name} (Dance). `;
+    description += `You move up to ${halfSpeed} ft (half your Speed) as a Reaction. `;
     if (allyName) {
-        description += ` ${allyName} can also move up to half their Speed using their Reaction.`;
-    } else if (allyRangeFt != null) {
-        description += ` Select an ally within ${auto.allyRange || '30 ft'} to also move up to half their Speed.`;
+        description += `${allyName} can also move up to half their Speed using their Reaction. `;
     }
     if (noOAs) {
-        description += ` This movement does not provoke Opportunity Attacks.`;
+        description += `This movement does not provoke Opportunity Attacks.`;
     }
 
     addEntry(campaignName, {
         type: 'ability_use',
         characterName: playerStats.name,
         abilityName: action.name,
-        description: `${playerStats.name} used ${action.name}.` + (allyName ? ` Ally: ${allyName}.` : ''),
+        description: `${playerStats.name} used ${action.name}.` + (allyName ? ` Ally: ${allyName}. Movement does not provoke Opportunity Attacks.` : ' Movement does not provoke Opportunity Attacks.'),
     }).catch(() => {});
 
     return {

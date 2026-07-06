@@ -344,6 +344,7 @@ describe('reactionBonusHandler', () => {
 
     describe('handleInspiringMovement', () => {
         it('should route to handleInspiringMovement for unknown effects', async () => {
+            getCombatContext.mockReturnValue(makeCombatSummary([]));
             const action = makeAction({ automation: { effect: 'inspiring_movement', allyRange: '30_ft' } });
             const result = await handle(action, makePlayerStats(), CAMPAIGN, MAP);
 
@@ -352,6 +353,7 @@ describe('reactionBonusHandler', () => {
         });
 
         it('should use half speed based on player speed', async () => {
+            getCombatContext.mockReturnValue(makeCombatSummary([]));
             getRuntimeValue.mockReturnValue(1);
             const stats = makePlayerStats({ speed: 25 });
             const action = makeAction({ automation: { effect: 'inspiring_movement' } });
@@ -359,5 +361,20 @@ describe('reactionBonusHandler', () => {
 
             expect(result.payload.description).toContain('12 ft');
         });
+
+        it('should return a modal when creatures exist in combat', async () => {
+            getCombatContext.mockReturnValue(makeCombatSummary([
+                { name: 'Goblin', currentHp: 7, maxHp: 7, size: 'Small', type: 'humanoid' },
+            ]));
+            const action = makeAction({ automation: { effect: 'inspiring_movement' } });
+            const result = await handle(action, makePlayerStats(), CAMPAIGN, MAP);
+
+            expect(result.type).toBe('modal');
+            expect(result.modalName).toBe('inspiringMovementAlly');
+        });
     });
 });
+
+function makeCombatSummary(creatures) {
+    return { creatures };
+}
