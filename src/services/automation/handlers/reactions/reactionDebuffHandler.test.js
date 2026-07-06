@@ -87,15 +87,19 @@ function makePlayerStats(overrides = {}) {
     class: {
       name: 'Bard',
       class_levels: [
-        { level: 1, bardic_die: 6, bardic_inspiration_uses: 2 },
-        { level: 2, bardic_die: 6, bardic_inspiration_uses: 3 },
-        { level: 3, bardic_die: 8, bardic_inspiration_uses: 4 },
+        { level: 1, bardic_die: 6 },
+        { level: 2, bardic_die: 6 },
+        { level: 3, bardic_die: 8 },
       ],
     },
     abilities: [
       { name: 'Wisdom', bonus: 2 },
+      { name: 'Charisma', bonus: 4 },
     ],
     characterAdvancement: [],
+    _trackedResources: {
+      bardicInspirationUses: { current: 4, max: 4 },
+    },
     ...overrides,
   };
 }
@@ -884,7 +888,7 @@ describe('reactionDebuffHandler.handle', () => {
       );
     });
 
-    it('increments uses count with bardic inspiration fallback', async () => {
+    it('decrements bardicInspirationUses with bardic inspiration fallback', async () => {
       const ps = makePlayerStats({});
       const action = makeAction({});
 
@@ -905,7 +909,7 @@ describe('reactionDebuffHandler.handle', () => {
 
       expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
         'Bard',
-        'cuttingwordsUses',
+        'bardicInspirationUses',
         1,
         campaignName
       );
@@ -960,7 +964,7 @@ describe('reactionDebuffHandler.handle', () => {
       return { ps, action };
     }
 
-    it('adds log entry after successful handling', async () => {
+    it('adds log entry with combat details after successful handling', async () => {
       const { ps, action } = setupLogPath();
 
       await handle(action, ps, campaignName, mapName);
@@ -972,7 +976,7 @@ describe('reactionDebuffHandler.handle', () => {
           characterName: 'Bard',
           abilityName: 'Cutting Words',
           targetName: 'Goblin',
-          description: 'Bard used Cutting Words on Goblin.',
+          description: expect.stringContaining('d20(5) + 3 = 8 vs AC 14'),
           timestamp: expect.any(Number),
         })
       );

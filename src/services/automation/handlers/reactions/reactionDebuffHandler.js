@@ -216,14 +216,15 @@ export async function handle(action, playerStats, campaignName, mapName) {
         : 0;
 
     const bardicUsesMax = !auto.uses_expression
-        ? (playerStats?.class?.class_levels?.[(playerStats.level || 1) - 1]?.bardic_inspiration_uses
+        ? (playerStats?._trackedResources?.bardicInspirationUses?.max
             ?? 0)
         : 0;
 
     const effectiveUsesMax = usesMax || bardicUsesMax;
 
     if (effectiveUsesMax > 0) {
-        const currentUses = Number(getRuntimeValue(playerName, usesKey, campaignName) ?? effectiveUsesMax);
+        const effectiveUsesKey = bardicUsesMax > 0 ? 'bardicInspirationUses' : usesKey;
+        const currentUses = Number(getRuntimeValue(playerName, effectiveUsesKey, campaignName) ?? effectiveUsesMax);
         if (currentUses <= 0) {
             return {
                 type: 'popup',
@@ -385,8 +386,9 @@ export async function handle(action, playerStats, campaignName, mapName) {
     }
 
     if (effectiveUsesMax > 0) {
-        const currentUses = Number(getRuntimeValue(playerName, usesKey, campaignName) ?? effectiveUsesMax);
-        await setRuntimeValue(playerName, usesKey, currentUses - 1, campaignName);
+        const effectiveUsesKey = bardicUsesMax > 0 ? 'bardicInspirationUses' : usesKey;
+        const currentUses = Number(getRuntimeValue(playerName, effectiveUsesKey, campaignName) ?? effectiveUsesMax);
+        await setRuntimeValue(playerName, effectiveUsesKey, currentUses - 1, campaignName);
     }
 
     if (effect === 'disadvantage_on_attacks_vs_ally') {
@@ -395,7 +397,7 @@ export async function handle(action, playerStats, campaignName, mapName) {
             type: 'ability_use',
             characterName: playerName,
             abilityName: featureName,
-            description: `${playerName} used ${featureName} to impose Disadvantage on attacks against ${defenderName}.`,
+            description: result.payload.description,
             targetName: defenderName,
             timestamp: Date.now(),
         }).catch((e) => { console.error("[reactionDebuff] Error:", e); });
@@ -412,16 +414,11 @@ export async function handle(action, playerStats, campaignName, mapName) {
         }
 
         const logDefenderName = defenderName || 'the target';
-        const healedAmt = result?.healedAmount ?? 0;
-        const logDescription = healedAmt > 0
-            ? `${playerName} used ${featureName} — the attack misses and ${logDefenderName} is healed for ${healedAmt} HP.`
-            : `${playerName} used ${featureName} on ${logDefenderName}.`;
-
         addEntry(campaignName, {
             type: 'ability_use',
             characterName: playerName,
             abilityName: featureName,
-            description: logDescription,
+            description: result.payload.description,
             targetName: logDefenderName,
             timestamp: Date.now(),
         }).catch((e) => { console.error("[reactionDebuff] Error:", e); });
@@ -433,7 +430,7 @@ export async function handle(action, playerStats, campaignName, mapName) {
         type: 'ability_use',
         characterName: playerName,
         abilityName: featureName,
-        description: `${playerName} used ${featureName} on ${attackerName}.`,
+        description: result.payload.description,
         targetName: attackerName,
         timestamp: Date.now(),
     }).catch((e) => { console.error("[reactionDebuff] Error:", e); });
