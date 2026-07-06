@@ -52,12 +52,6 @@ function SavePromptModal({ campaignName, characters, activeMapName }) {
       const { sourceAttackerName, ...restData } = event.data;
       const newPrompt = { targetName, attackerName: sourceAttackerName, ...restData };
       if (!window.__pendingSaves) window.__pendingSaves = {};
-      const oldEntry = window.__pendingSaves[newPrompt.promptId];
-      console.log('[SavePromptModal handleEvent] overwriting pendingSaves for promptId', newPrompt.promptId,
-        'old attackerName:', oldEntry?.attackerName,
-        'new attackerName:', newPrompt.attackerName,
-        'sourceAttackerName from SSE:', sourceAttackerName,
-        'event.data keys:', Object.keys(event.data));
       const fullPrompt = { ...newPrompt, campaignName };
       if (!window.__pendingSaves[newPrompt.promptId]) {
         window.__pendingSaves[newPrompt.promptId] = fullPrompt;
@@ -150,13 +144,6 @@ function SavePromptModal({ campaignName, characters, activeMapName }) {
       rawRolls: [roll1, roll2],
       mode: rollMode,
     });
-
-    console.log('[SavePromptModal handleRollSave] dispatching save-result promptId:', current.promptId,
-      'targetName:', current.targetName,
-      'success:', success,
-      'current.attackerName:', current.attackerName,
-      'current.sourceName:', current.sourceName,
-      'current keys:', Object.keys(current).join(','));
 
     window.dispatchEvent(new CustomEvent('save-result', {
       detail: {

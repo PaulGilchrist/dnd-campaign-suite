@@ -906,15 +906,6 @@ export function createLogDamageAndShow(deps) {
             autoDamageSecondaryDamageType: context?.autoDamageSecondaryDamageType || null,
         };
 
-        console.log('[handlePlayerSaveDamage] created pending save promptId:', promptId,
-            'characterName:', characterName,
-            'attackerName from context:', attackerName,
-            'computed attackerName:', attackerName || characterName,
-            'name:', name,
-            'target:', target.name,
-            'saveType:', saveType,
-            'saveDc:', saveDc);
-
         sendSavePrompt(campaignName, {
             promptId,
             targetName: target.name,

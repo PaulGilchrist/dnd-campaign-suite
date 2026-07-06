@@ -35,12 +35,6 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
   useEffect(() => {
     if (activePopupHtml?.hit === true && activePopupHtml?.autoDamage && autoDamageRollRef.current) {
       if (activePopupHtml.autoDamage.source !== autoDamageSourceRef.current) return;
-      console.log('[autoDamage useEffect] FIRING for character:', characterName,
-        'source:', activePopupHtml.autoDamage.source,
-        'targetName:', activePopupHtml.autoDamage.targetName,
-        'attackerName:', activePopupHtml.autoDamage.attackerName,
-        'name:', activePopupHtml.autoDamage.name,
-        'hasSave:', !!activePopupHtml.autoDamage.saveDc);
       const autoDamage = activePopupHtml.autoDamage;
       const isCrit = activePopupHtml.isCrit;
       const timer = setTimeout(() => {

@@ -88,16 +88,7 @@ export function createSaves(deps) {
     }
     async function quickRollPlayerSave(promptId, targetName, saveType, saveDc, selectedAllies) {
         const pending = pendingSaves[promptId];
-        if (!pending) {
-            console.log('[quickRollPlayerSave] NO pending for promptId', promptId);
-            return;
-        }
-        console.log('[quickRollPlayerSave] called for promptId', promptId,
-            'target:', targetName,
-            'saveType:', saveType,
-            'saveDc:', saveDc,
-            'pending.attackerName:', pending.attackerName,
-            'pending.name:', pending.name);
+        if (!pending) return;
 
         const combatSummary = await loadCombatSummary(campaignName);
         const target = combatSummary?.creatures?.find(c => c.name === pending.targetName);

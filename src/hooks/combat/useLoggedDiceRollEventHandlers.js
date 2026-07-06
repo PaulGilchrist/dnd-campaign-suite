@@ -22,26 +22,9 @@ export function setupEventListeners(deps) {
 
         window.addEventListener('save-result', (e) => {
             const pending = window.__pendingSaves[e.detail.promptId];
-            if (!pending) {
-                console.log('[save-result handler] NO pending for promptId', e.detail.promptId, 'available promptIds:', Object.keys(window.__pendingSaves));
-                return;
-            }
+            if (!pending) return;
 
-            if (window.__createSaveListenerPrompts?.has(e.detail.promptId)) {
-                console.log('[save-result handler] SKIPPING createSaveListener-managed promptId', e.detail.promptId);
-                return;
-            }
-
-            console.log('[save-result handler] processing promptId', e.detail.promptId,
-                'pending.attackerName:', pending.attackerName,
-                'pending.sourceAttackerName:', pending.sourceAttackerName,
-                'pending.name:', pending.name,
-                'pending.sourceName:', pending.sourceName,
-                'closure characterName:', characterName,
-                'targetName:', e.detail.targetName,
-                'saveType:', e.detail.saveType,
-                'saveDc:', e.detail.saveDc,
-                'success:', e.detail.success);
+            if (window.__createSaveListenerPrompts?.has(e.detail.promptId)) return;
 
             const combatSummary = getCombatSummary(campaignName);
             const normalizedSaveType = normalizeSaveType(e.detail.saveType || pending.saveType);
@@ -64,9 +47,6 @@ export function setupEventListeners(deps) {
             return ev?.some(ef => ef.saveType === normalizedSaveType && ef.shareable && ef.shareRange >= 5);
         });
     const hasEvasion = e.detail.evasionActive ?? (hasOwnEvasion || hasSharedEvasion);
-    if (hasEvasion) {
-        console.log('[save-result handler] Evasion ACTIVE for', e.detail.targetName, 'hasOwnEvasion:', hasOwnEvasion, 'hasSharedEvasion:', hasSharedEvasion, 'e.detail.evasionActive:', e.detail.evasionActive);
-    }
             let finalDamage = isSoulstitchProtected || (isShieldActive && isMagicMissile) ? 0 : computeDamageAfterEvasion(
                 e.detail.rawDamage ?? pending.rawDamage, e.detail.success, e.detail.dcSuccess, hasEvasion
             );
