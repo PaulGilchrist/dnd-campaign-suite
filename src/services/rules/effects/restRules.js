@@ -350,6 +350,16 @@ export async function applyLongRest(playerStats, campaignName) {
       charData[key] = null
        })
 
+   // Clear post-cast rider uses on long rest (e.g. Beguiling Magic)
+   const passives = playerStats.automation?.passives ?? []
+   for (const p of passives) {
+     if ((p.type === 'post_cast_rider' || (p.type === 'passive_rule' && p.riderSave)) && p.riderSave?.recharge === 'long_rest') {
+       const riderName = p.name
+       const usesKey = `postCastRider_${riderName.replace(/\s+/g, '_')}`
+       charData[usesKey] = null
+     }
+   }
+
    // Clear active buffs and conditions as part of the atomic batch so SSE echo carries correct final state
    charData.activeBuffs = [];
    charData.activeConditions = [];

@@ -160,7 +160,7 @@ describe('postCastRiderHandler.handle', () => {
         }));
     });
 
-    it('handles failed save: applies first mapped condition and expiration', async () => {
+    it('handles failed save: shows condition choice modal and applies chosen condition', async () => {
         getRuntimeValue.mockImplementation((_char, key) => {
             if (key === usesKeyFor(action.name)) return 1;
             if (key === 'activeConditions' && _char === 'Enemy') return ['blinded'];
@@ -169,7 +169,22 @@ describe('postCastRiderHandler.handle', () => {
 
         await handle(action, playerStats, campaignName);
 
+        const choiceShowPromise = new Promise(resolve => {
+            window.addEventListener('condition-choice-show', resolve, { once: true });
+        });
+
         dispatchSaveResult('test-prompt-id', false);
+
+        const choiceEvent = await choiceShowPromise;
+        const choiceDetail = choiceEvent.detail;
+        expect(choiceDetail.targetName).toBe('Enemy');
+        expect(choiceDetail.conditions).toEqual(['charmed', 'frightened']);
+
+        window.dispatchEvent(new CustomEvent('condition-choice-selected', {
+            detail: { promptId: choiceDetail.promptId, condition: 'frightened' },
+        }));
+
+        await new Promise(resolve => setTimeout(resolve, 0));
 
         const usesKey = usesKeyFor(action.name);
         expect(setRuntimeValue).toHaveBeenCalledWith(
@@ -182,14 +197,14 @@ describe('postCastRiderHandler.handle', () => {
         expect(setRuntimeValue).toHaveBeenCalledWith(
             'Enemy',
             'activeConditions',
-            ['blinded', 'charmed'],
+            ['blinded', 'frightened'],
             campaignName,
         );
 
         expect(addExpiration).toHaveBeenCalledWith(
             playerStats.name,
             'Enemy',
-            [{ type: 'condition', condition: 'charmed' }],
+            [{ type: 'condition', condition: 'frightened' }],
             campaignName,
             10,
         );
@@ -198,15 +213,22 @@ describe('postCastRiderHandler.handle', () => {
             type: 'save_result',
             success: false,
             targetName: 'Enemy',
+            description: expect.stringContaining('Frightened'),
         }));
     });
 
-    it('handles failed save with unmapped condition by lowercasing it', async () => {
+    it('handles failed save with single condition by auto-applying without choice modal', async () => {
         action.automation.condition = 'Prone';
+
+        const choiceShowSpy = vi.fn();
+        window.addEventListener('condition-choice-show', choiceShowSpy);
 
         await handle(action, playerStats, campaignName);
 
         dispatchSaveResult('test-prompt-id', false);
+
+        expect(choiceShowSpy).not.toHaveBeenCalled();
+        window.removeEventListener('condition-choice-show', choiceShowSpy);
 
         expect(setRuntimeValue).toHaveBeenCalledWith(
             'Enemy',
@@ -258,7 +280,18 @@ describe('postCastRiderHandler.handle', () => {
 
         await handle(action, playerStats, campaignName);
 
+        const choiceShowPromise = new Promise(resolve => {
+            window.addEventListener('condition-choice-show', resolve, { once: true });
+        });
+
         dispatchSaveResult('test-prompt-id', false);
+
+        const choiceEvent = await choiceShowPromise;
+        window.dispatchEvent(new CustomEvent('condition-choice-selected', {
+            detail: { promptId: choiceEvent.detail.promptId, condition: 'charmed' },
+        }));
+
+        await new Promise(resolve => setTimeout(resolve, 0));
 
         expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
             success: false,

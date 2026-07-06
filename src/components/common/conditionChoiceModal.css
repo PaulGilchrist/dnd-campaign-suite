@@ -1,0 +1,89 @@
+.cc-overlay {
+  position: fixed;
+  top: 0;
+  left: 180px;
+  width: calc(100vw - 180px);
+  height: 100vh;
+  background-color: rgba(0, 0, 0, 0.85);
+  z-index: 2100;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.cc-modal {
+  background-color: var(--background-color-header-inner);
+  border: 2px solid var(--color-header);
+  border-radius: 10px;
+  color: var(--color-header-inner);
+  padding: 24px;
+  min-width: 320px;
+  max-width: 480px;
+  text-align: center;
+}
+
+.cc-header {
+  font-size: 1.15em;
+  font-weight: bold;
+  margin-bottom: 16px;
+  color: var(--color-link);
+}
+
+.cc-header i {
+  margin-right: 8px;
+}
+
+.cc-body {
+  margin-bottom: 20px;
+  line-height: 1.6;
+}
+
+.cc-body p {
+  margin: 8px 0;
+}
+
+.cc-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+
+.cc-choice-btn {
+  background-color: var(--color-link);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 12px 24px;
+  font-size: 1em;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 120px;
+  justify-content: center;
+}
+
+.cc-choice-btn:hover {
+  opacity: 0.9;
+}
+
+.cc-skip-btn {
+  background-color: transparent;
+  color: var(--color-text-muted, #999);
+  border: 1px solid var(--color-text-muted, #555);
+  border-radius: 6px;
+  padding: 12px 24px;
+  font-size: 1em;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 120px;
+  justify-content: center;
+}
+
+.cc-skip-btn:hover {
+  opacity: 0.8;
+  color: #fff;
+  border-color: #fff;
+}
