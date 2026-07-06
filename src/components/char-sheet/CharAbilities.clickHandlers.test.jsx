@@ -134,6 +134,7 @@ describe('CharAbilities click handlers', () => {
       { name: 'd20Floor10', effect: { d20Floor10: true }, expected: { d20Floor10: true } },
       { name: 'reliableTalent', effect: { reliableTalent: true }, expected: { reliableTalent: true } },
       { name: 'tacticalMind', effect: { tacticalMind: true, tacticalMindBonus: 5 }, expected: { tacticalMind: true, tacticalMindBonus: 5 } },
+      { name: 'autoReroll', effect: { autoReroll: true, autoRerollCondition: 'roll_equals_1', autoRerollBonus: null }, expected: { autoReroll: true, autoRerollCondition: 'roll_equals_1', autoRerollBonus: null } },
     ];
 
     for (const { name, effect, expected } of checkEffectTests) {

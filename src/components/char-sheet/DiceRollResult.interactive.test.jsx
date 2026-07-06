@@ -286,4 +286,62 @@ describe('DiceRollResult', () => {
             expect(screen.getByText(/Precision Attack:/)).toBeInTheDocument();
         });
     });
+
+    describe('lucky reroll (Halfling trait)', () => {
+        it('hides reroll button when autoRerollCondition is roll_equals_1', () => {
+            render(
+                <DiceRollResult
+                    name="Attack"
+                    type="d20"
+                    rolls={[12]}
+                    bonus={3}
+                    autoReroll={true}
+                    autoRerollCondition="roll_equals_1"
+                />
+            );
+            expect(screen.queryByText(/Reroll/)).not.toBeInTheDocument();
+        });
+
+        it('shows reroll button when autoRerollCondition is not roll_equals_1', () => {
+            render(
+                <DiceRollResult
+                    name="Attack"
+                    type="d20"
+                    rolls={[12]}
+                    bonus={3}
+                    autoReroll={true}
+                    autoRerollCondition="frightened"
+                />
+            );
+            expect(screen.getByText(/Reroll/)).toBeInTheDocument();
+        });
+
+        it('shows lucky reroll message when luckyRerolled is true', () => {
+            render(
+                <DiceRollResult
+                    name="DEX Save"
+                    type="d20"
+                    rolls={[1, 19]}
+                    bonus={2}
+                    luckyRerolled={true}
+                    luckyRerollValue={14}
+                />
+            );
+            expect(screen.getByText(/Lucky \(Halfling\): rerolled natural 1 → 14/)).toBeInTheDocument();
+            expect(screen.getByText(/14 \(Lucky reroll\)/)).toBeInTheDocument();
+        });
+
+        it('does not show lucky reroll message when luckyRerolled is false', () => {
+            render(
+                <DiceRollResult
+                    name="Attack"
+                    type="d20"
+                    rolls={[12]}
+                    bonus={3}
+                    luckyRerolled={false}
+                />
+            );
+            expect(screen.queryByText(/Lucky \(Halfling\)/)).not.toBeInTheDocument();
+        });
+    });
 });

@@ -63,6 +63,16 @@ export function createLogAndShow(deps) {
             effectiveD20Roll = effectiveD20;
         }
 
+        // Halfling Lucky: automatic reroll on natural 1
+        let luckyRerolled = false;
+        let luckyRerollValue = null;
+        const isLuckyReroll = context?.autoReroll && context?.autoRerollCondition === 'roll_equals_1' && effectiveD20Roll === 1;
+        if (isLuckyReroll) {
+            luckyRerollValue = rollD20();
+            effectiveD20Roll = luckyRerollValue;
+            luckyRerolled = true;
+        }
+
         const combatSummary = await loadCombatSummary(campaignName);
 
         // Pre-load maneuver cache for skill check / initiative superiority buttons
@@ -372,6 +382,17 @@ export function createLogAndShow(deps) {
             }
         }
 
+        // Log Lucky reroll to campaign log
+        if (luckyRerolled) {
+            addEntry(campaignName, {
+                type: 'ability_use',
+                characterName,
+                abilityName: 'Lucky (Halfling)',
+                description: `${characterName} used Lucky (Halfling trait): rerolled natural 1 on ${name} ${rollType} → ${luckyRerollValue}`,
+                timestamp: Date.now(),
+            }).catch((e) => { console.error('[Lucky] Log error:', e); });
+        }
+
         logEntry({
             type: 'roll',
             characterName,
@@ -403,7 +424,7 @@ export function createLogAndShow(deps) {
                 type: 'd20',
                 rollType,
                 name,
-                rolls: [r1, r2],
+                rolls: luckyRerolled ? [luckyRerollValue] : [r1, r2],
                 bonus,
                 targetName,
                 targetAc,
@@ -423,6 +444,7 @@ export function createLogAndShow(deps) {
                 autoDamage,
                 autoReroll: context?.autoReroll,
                 autoRerollBonus: context?.autoRerollBonus,
+                autoRerollCondition: context?.autoRerollCondition,
                 strSaveReplace: context?.strSaveReplace,
                 strScore: context?.strScore,
                 strCheckReplace: context?.strCheckReplace,
@@ -440,6 +462,8 @@ export function createLogAndShow(deps) {
                 psiBolsteredKnackDieSize: context?.psiBolsteredKnackDieSize,
                 bardicInspiration: context?.bardicInspiration,
                 bardicInspirationDie: context?.bardicInspirationDie,
+                luckyRerolled,
+                luckyRerollValue,
                 characterName,
                 campaignName,
                 availableSuperiorityManeuvers,

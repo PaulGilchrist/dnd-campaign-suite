@@ -126,6 +126,11 @@ function CharAbilities({ allAbilityScores, playerStats, campaignName, exhaustion
                if (conditionEffects?.d20Floor10) {
                   ctx.d20Floor10 = true
                 }
+               if (conditionEffects?.autoReroll) {
+                  ctx.autoReroll = true;
+                  ctx.autoRerollCondition = conditionEffects.autoRerollCondition;
+                  ctx.autoRerollBonus = conditionEffects.autoRerollBonus || null;
+                }
                 const isSoulknife = playerStats?.class?.name === 'Rogue' && playerStats?.class?.major?.name === 'Soulknife';
                 const hasPsiBolsteredKnack = isSoulknife && (playerStats?.level || 0) >= 3;
                 if (hasPsiBolsteredKnack) {
