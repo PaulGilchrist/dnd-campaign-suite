@@ -141,9 +141,9 @@ function CharConditions({ playerStats, campaignName, activeMapName, characters, 
      if (key === 'incapacitated') {
          clearUnbreakableMajesty(playerStats.name, campaignName)
      }
-   }
+    }
 
-  const adjustExhaustion = (delta) => {
+   const adjustExhaustion = (delta) => {
     if (delta < 0 && exhaustionLevel > 0) {
       const conSaveBonus = getAbilitySaveBonus(playerStats, 'con')
       const dc = getExhaustionSaveDC(exhaustionLevel)

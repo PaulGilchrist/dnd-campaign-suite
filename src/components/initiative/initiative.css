@@ -775,3 +775,61 @@
     font-size: 0.85em;
 }
 
+/* Unbreakable Majesty badge */
+.initiative .majesty-badge-wrapper {
+    position: relative;
+    width: 100%;
+    display: flex;
+    justify-content: center;
+}
+
+.initiative .initiative-majesty-badge {
+    padding: 2px 6px;
+    border: 1px solid rgba(168, 85, 247, 0.5);
+    border-radius: 4px;
+    background-color: rgba(168, 85, 247, 0.2);
+    color: inherit;
+    font-size: 0.7em;
+    cursor: pointer;
+    opacity: 1;
+    transition: opacity 0.15s ease, background-color 0.15s ease;
+    white-space: nowrap;
+}
+
+.initiative .initiative-majesty-badge:hover {
+    background-color: rgba(168, 85, 247, 0.35);
+}
+
+.initiative .initiative-majesty-badge:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.initiative .initiative-majesty-badge .fa-shield-halved {
+    margin-right: 3px;
+    font-size: 0.85em;
+}
+
+.initiative .majesty-break-btn {
+    position: absolute;
+    top: -6px;
+    right: -6px;
+    width: 16px;
+    height: 16px;
+    padding: 0;
+    border: 1px solid rgba(168, 85, 247, 0.7);
+    border-radius: 50%;
+    background-color: var(--background-color, #1a1a2e);
+    color: #a855f7;
+    font-size: 0.6em;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+}
+
+.initiative .majesty-break-btn:hover {
+    background-color: rgba(168, 85, 247, 0.3);
+}
+

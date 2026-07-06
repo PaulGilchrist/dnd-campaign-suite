@@ -64,6 +64,8 @@ vi.mock('../../../services/combat/auras/auraOfProtection.js', () => ({
 
 vi.mock('../../../services/combat/auras/unbreakableMajesty.js', () => ({
   clearUnbreakableMajesty: vi.fn(),
+  isUnbreakableMajestyActive: vi.fn(() => false),
+  getUnbreakableMajestySaveDc: vi.fn(() => 0),
 }));
 
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';

@@ -47,6 +47,12 @@ vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
     }),
 }));
 
+vi.mock('../../services/combat/auras/unbreakableMajesty.js', () => ({
+    isUnbreakableMajestyActive: vi.fn(() => false),
+    getUnbreakableMajestySaveDc: vi.fn(() => 0),
+    clearUnbreakableMajesty: vi.fn(),
+}));
+
 describe('CreatureCard', () => {
     let props;
 

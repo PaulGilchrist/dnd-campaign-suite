@@ -8,6 +8,7 @@ import { applyPortentChoice } from '../../../services/automation/handlers/class-
 import Popup from '../../common/popup.jsx';
 import WeaponKindMasteryModal from '../modals/WeaponKindMasteryModal.jsx';
 import { loadFightingStyles } from '../../../services/ui/dataLoader.js';
+import { isUnbreakableMajestyActive, getUnbreakableMajestySaveDc, clearUnbreakableMajesty } from '../../../services/combat/auras/unbreakableMajesty.js';
 /* ─── Barbarian ─── */
 const BarbarianFeatures = function BarbarianFeatures({ playerStats, campaignName, onWeaponMasteryClick }) {
     const classLevel = playerStats.class?.class_levels?.[playerStats.level - 1];
@@ -76,10 +77,32 @@ const BarbarianFeatures = function BarbarianFeatures({ playerStats, campaignName
 const BardFeatures = function BardFeatures({ playerStats, campaignName }) {
     const bardFeatures = getClassFeatures(playerStats);
     const multiMinuteBadges = useActiveBuffs(playerStats, campaignName);
+    const majestyActive = isUnbreakableMajestyActive(playerStats.name, campaignName);
+    const majestyDc = getUnbreakableMajestySaveDc(playerStats.name, campaignName);
+
+    function toggleMajesty() {
+        if (majestyActive) {
+            clearUnbreakableMajesty(playerStats.name, campaignName);
+        } else {
+            const chaBonus = playerStats.abilities?.find(a => a.name === 'Charisma')?.bonus || 0;
+            const prof = playerStats.proficiency || 0;
+            setRuntimeValue(playerStats.name, 'unbreakableMajestyActive', true, campaignName);
+            setRuntimeValue(playerStats.name, 'unbreakableMajestySaveDc', 8 + chaBonus + prof, campaignName);
+        }
+    }
 
     return (
            <div data-testid="char-class-bard">
                 {multiMinuteBadges.map((b, i) => <span key={i} className="automation-badge">{b.name}</span>)}
+                {majestyActive && (
+                    <button
+                        className="automation-btn majesty-badge majesty-badge--active"
+                        onClick={() => toggleMajesty()}
+                        title={`Unbreakable Majesty (DC ${majestyDc})\n\nFirst attack per turn that hits forces attacker to make a CHA save or the attack misses.\nClick to deactivate.`}
+                    >
+                        <i className="fa-solid fa-shield-halved"></i> Unbreakable Majesty DC {majestyDc}
+                    </button>
+                )}
                 <div><b>Bardic Inspiration Die: </b>d{bardFeatures?.bardicDie ?? 0}</div>
                 <TrackedResourceInput label="Bardic Inspiration Uses" resourceKey="bardicInspirationUses" playerName={playerStats.name} getMax={() => { const charisma = playerStats.abilities?.find((a) => a.name === 'Charisma'); return charisma?.bonus || 0; }} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
                  {playerStats.level > 2 && playerStats.expertise && playerStats.expertise.length > 0 && <div><b>Expertise: </b>{playerStats.expertise.join(', ')}</div>}

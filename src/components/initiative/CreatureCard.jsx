@@ -8,6 +8,7 @@ import { getAbilityLabel } from '../../services/combat/conditions/conditionUtils
 import { useRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import ConditionEffectBadges from './ConditionEffectBadges.jsx'
 import { CONDITION_DESCRIPTIONS } from '../../services/combat/conditions/effectDescriptions.js'
+import { isUnbreakableMajestyActive, getUnbreakableMajestySaveDc, clearUnbreakableMajesty } from '../../services/combat/auras/unbreakableMajesty.js'
 
 const SHAPE_LABELS = {
     sphere: 'Sphere',
@@ -46,6 +47,8 @@ function CreatureCard({
     const isUnconscious = creature.currentHp <= 0
     const allTargetEffects = useRuntimeValue(campaignName, 'targetEffects') ?? [];
     const myTargetEffects = allTargetEffects.filter(te => te.target === creature.name);
+    const isMajestyActive = creature.type === 'player' && isUnbreakableMajestyActive(creature.name, campaignName);
+    const majestyDc = isMajestyActive ? getUnbreakableMajestySaveDc(creature.name, campaignName) : 0;
 
     return (
         <div className={`creature-card ${creature.type} ${isActive ? 'active' : ''} ${isUnconscious ? 'creature-unconscious' : ''}`}>
@@ -191,6 +194,29 @@ function CreatureCard({
                         <i className='fa-solid fa-spinner'></i>
                     </button>
                 ) : null}
+                {isMajestyActive && (
+                    <div className='majesty-badge-wrapper'>
+                        <button
+                            className='initiative-majesty-badge'
+                            onClick={() => isLocalhost && clearUnbreakableMajesty(creature.name, campaignName)}
+                            disabled={!isLocalhost}
+                            type='button'
+                            title={`Unbreakable Majesty (DC ${majestyDc})\n\nFirst attack per turn that hits forces attacker to make a CHA save or the attack misses.\nClick to deactivate.`}
+                        >
+                            <i className='fa-solid fa-shield-halved'></i> Majesty DC {majestyDc}
+                        </button>
+                        {isLocalhost && (
+                            <button
+                                className='majesty-break-btn'
+                                onClick={() => clearUnbreakableMajesty(creature.name, campaignName)}
+                                type='button'
+                                title='Deactivate Unbreakable Majesty'
+                            >
+                                <i className='fa-solid fa-xmark'></i>
+                            </button>
+                        )}
+                    </div>
+                )}
             </div>
         </div>
     )
