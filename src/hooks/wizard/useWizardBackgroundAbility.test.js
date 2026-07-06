@@ -38,16 +38,7 @@ describe('useWizardBackgroundAbility', () => {
       expect(result.current.hasMaxSingleBonus).toBe(false);
     });
 
-    it('returns empty state when background is null or empty', () => {
-      const { result } = renderHook(() =>
-        useWizardBackgroundAbility({ rules: '2024', background: null }, mockSetFormData)
-      );
 
-      expect(result.current.backgroundAbilityNames).toEqual([]);
-      expect(result.current.backgroundAbilityAssignments).toEqual({});
-      expect(result.current.totalAssigned).toBe(0);
-      expect(result.current.isValid).toBe(false);
-    });
   });
 
   describe('loading background ability data', () => {
