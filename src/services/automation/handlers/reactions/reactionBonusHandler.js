@@ -7,6 +7,7 @@ import { rollExpression } from '../../../dice/diceRoller.js';
 import { spendSorceryPoints, getCurrentSorceryPoints } from '../../../../hooks/combat/useMetamagic.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { getClassFeatures } from '../../../../services/character/classFeatures.js';
+import { executeHandler } from '../../index.js';
 
 export async function handle(action, playerStats, campaignName, mapName) {
     const auto = action.automation;
@@ -513,6 +514,26 @@ export async function applyInspiringMovement(action, playerStats, campaignName, 
         abilityName: action.name,
         description: `${playerStats.name} used ${action.name}.` + (allyName ? ` Ally: ${allyName}. Movement does not provoke Opportunity Attacks.` : ' Movement does not provoke Opportunity Attacks.'),
     }).catch(() => {});
+
+    const hasAgileStrikes = (playerStats.automation?.passives || []).some(
+        p => p.type === 'passive_rule' && p.effect === 'agile_strike'
+    );
+
+    if (hasAgileStrikes) {
+        const classLevel = (playerStats.class?.class_levels ?? []).find(cl => cl.level === playerStats.level);
+        const bardicDie = classLevel?.bardic_die || 6;
+        const agileStrikeAction = {
+            name: 'Agile Strikes',
+            automation: {
+                type: 'agile_strike',
+                bardicDie: bardicDie,
+            },
+        };
+        const strikeResult = await executeHandler(agileStrikeAction, playerStats, campaignName, null);
+        if (strikeResult && strikeResult.type === 'popup') {
+            return strikeResult;
+        }
+    }
 
     return {
         type: 'popup',

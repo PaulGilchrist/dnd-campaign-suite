@@ -1500,13 +1500,20 @@
                         "name": "Dazzling Footwork",
                         "description": "While you aren't wearing armor or wielding a shield, you gain the following benefits.<ul><li><b>Dance Virtuoso.</b> You have Advantage on any Charisma (Performance) check you make that involves you dancing.</li><li><b>Unarmored Defense.</b> Your base Armor Class equals 10 plus your Dexterity and Charisma modifiers.</li><li><b>Agile Strikes.</b> When you expend a use of your Bardic Inspiration as part of an action, a Bonus Action, or a Reaction, you can make one Unarmed Strike as part of that action.</li><li><b>Bardic Damage.</b> You can use Dexterity instead of Strength for the attack rolls of your Unarmed Strikes. When you deal damage with an Unarmed Strike, you can deal Bludgeoning damage equal to a roll of your Bardic Inspiration die plus your Dexterity modifier, instead of the strike's normal damage.</li></ul>",
                         "level": 3,
-                        "automation": {
-                            "type": "conditional_advantage",
-                            "target": "performance_checks",
-                            "condition": "dancing",
-                            "effect": "advantage",
-                            "casting_time": "passive"
-                        }
+                        "automation": [
+                            {
+                                "type": "conditional_advantage",
+                                "target": "performance_checks",
+                                "condition": "dancing",
+                                "effect": "advantage",
+                                "casting_time": "passive"
+                            },
+                            {
+                                "type": "passive_rule",
+                                "effect": "agile_strike",
+                                "casting_time": "passive"
+                            }
+                        ]
                     },
                     {
                         "name": "Inspiring Movement",

@@ -3,6 +3,7 @@ import { addExpiration } from '../../../rules/effects/expirations.js';
 import { evaluateAutoExpression } from '../../../combat/automation/automationService.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { postLogEntry } from '../../../shared/logPoster.js';
+import { executeHandler } from '../../index.js';
 
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
@@ -111,6 +112,24 @@ export async function applyBardicInspiration(action, playerStats, campaignName, 
         abilityName: action.name,
         description: `${playerStats.name} granted Bardic Inspiration (d${dieSize}) to ${targetName}.`,
     }).catch((e) => { console.error("[bardicInspirationHandler] Error:", e); });
+
+    const hasAgileStrikes = (playerStats.automation?.passives || []).some(
+        p => p.type === 'passive_rule' && p.effect === 'agile_strike'
+    );
+
+    if (hasAgileStrikes) {
+        const agileStrikeAction = {
+            name: 'Agile Strikes',
+            automation: {
+                type: 'agile_strike',
+                bardicDie: dieSize,
+            },
+        };
+        const strikeResult = await executeHandler(agileStrikeAction, playerStats, campaignName, null);
+        if (strikeResult && strikeResult.type === 'popup') {
+            return strikeResult;
+        }
+    }
 
     return {
         type: 'popup',

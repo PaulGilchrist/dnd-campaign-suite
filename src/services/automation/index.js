@@ -46,6 +46,7 @@ import { handle as handleOpenHandTechnique } from './handlers/class-fighter-rogu
 import { handle as handleReactionSaveHeal } from './handlers/reactions/reactionSaveHealHandler.js';
 import { handle as handleCountercharm } from './handlers/class-bard/countercharmHandler.js';
 import { handle as handleFontOfInspiration } from './handlers/class-bard/fontOfInspirationHandler.js';
+import { handle as handleAgileStrike } from './handlers/class-bard/agileStrikeHandler.js';
 import { handle as handleMultiTarget } from './handlers/combat/multiTargetHandler.js';
 import { handle as handleDivineOrder } from './handlers/class-cleric-paladin/divineOrderHandler.js';
 import { handle as handleNaturesSanctuary, handleMove as handleNaturesSanctuaryMove } from './handlers/class-ranger/naturesSanctuaryHandler.js';
@@ -273,6 +274,7 @@ const HANDLER_MAP = {
       bardic_inspiration_offense: handleBardicInspirationOffense,
         countercharm: handleCountercharm,
         font_of_inspiration: handleFontOfInspiration,
+        agile_strike: handleAgileStrike,
         multi_target_spread: handleMultiTarget,
         divine_order: handleDivineOrder,
         nature_sanctuary: handleNaturesSanctuary,
