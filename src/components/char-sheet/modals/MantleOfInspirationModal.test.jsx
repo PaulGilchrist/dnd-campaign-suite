@@ -88,7 +88,7 @@ describe('MantleOfInspirationModal', () => {
       />
     );
 
-    expect(screen.getByTestId('modal-description')).toHaveTextContent('Choose allies to grant temporary hit points');
+    expect(screen.getByTestId('modal-description')).toHaveTextContent('Choose up to 3 allies to grant temporary hit points');
   });
 
   it('passes note with die roll and temp HP info to CreatureSelectionModal', () => {

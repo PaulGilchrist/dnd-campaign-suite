@@ -142,6 +142,7 @@ describe('modal payload', () => {
     expect(result.payload.playerStats).toBe(ps);
     expect(result.payload.campaignName).toBe(campaignName);
     expect(result.payload.creatureTargets).toEqual([
+      { name: 'Bard1' },
       { name: 'Ally1' },
       { name: 'Ally2' },
     ]);
@@ -172,7 +173,9 @@ describe('modal payload', () => {
 
     const result = await handle(action, ps, campaignName);
 
-    expect(result.payload.creatureTargets).toEqual([]);
+    expect(result.payload.creatureTargets).toEqual([
+      { name: 'Bard1' },
+    ]);
   });
 
   it('returns empty creature targets when no combat context', async () => {
