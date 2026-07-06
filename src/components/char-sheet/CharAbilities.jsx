@@ -79,7 +79,7 @@ function CharAbilities({ allAbilityScores, playerStats, campaignName, exhaustion
                      'CON': 'CON', 'Constitution': 'CON',
                      'ARC': 'INT', 'INT': 'INT', 'His': 'INT', 'Inv': 'INT', 'Nat': 'INT', 'Rel': 'INT',
                      'Animal Handling': 'WIS', 'Ins': 'WIS', 'WIS': 'WIS', 'Med': 'WIS', 'Per': 'WIS', 'Sur': 'WIS',
-                     'Dec': 'CHA', 'Int': 'CHA', 'Perf': 'CHA', 'Pers': 'CHA', 'CHA': 'CHA', 'Charisma': 'CHA',
+                      'Dec': 'CHA', 'Int': 'CHA', 'Perf': 'CHA', 'PER': 'CHA', 'Pers': 'CHA', 'CHA': 'CHA', 'Charisma': 'CHA',
                    };
                    const abbr = checkName.substring(0, 3).toUpperCase();
                    const abilityForCheck = skillToAbility[checkName] || skillToAbility[abbr];

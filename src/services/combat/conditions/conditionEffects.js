@@ -63,7 +63,7 @@ function saveModifierApplies(modifier, saveType, abilityName, isRaging = false, 
     if (!within5ft) return false;
     return true;
   }
-  if (modifier.target !== 'saving_throw' && modifier.target !== 'save' && modifier.target !== 'attack_roll' && modifier.target !== 'attack_rolls' && modifier.target !== 'attack_rolls_vs_unmounted_near_mount' && modifier.target !== 'concentration_saving_throws' && modifier.target !== 'death_saving_throws' && modifier.target !== 'ability_check' && modifier.target !== 'check' && modifier.target !== 'd20') return false;
+  if (modifier.target !== 'saving_throw' && modifier.target !== 'save' && modifier.target !== 'attack_roll' && modifier.target !== 'attack_rolls' && modifier.target !== 'attack_rolls_vs_unmounted_near_mount' && modifier.target !== 'concentration_saving_throws' && modifier.target !== 'death_saving_throws' && modifier.target !== 'ability_check' && modifier.target !== 'check' && modifier.target !== 'd20' && modifier.target !== 'performance_checks' && modifier.target !== 'deception_performance_checks') return false;
   if (modifier.condition === 'raging') return isRaging;
   if (modifier.condition === 'shape_shift') return shapeShiftActive;
   if (modifier.condition === 'peerless_athlete') return isPeerlessAthlete;
@@ -126,7 +126,7 @@ function applySaveModifiers(effects, modifiers, saveType, abilityName, isRaging 
   if (!modifiers || modifiers.length === 0) return;
   for (const mod of modifiers) {
     if (!saveModifierApplies(mod, saveType, abilityName, isRaging, shapeShiftActive, isPeerlessAthlete, isLargeFormActive, combatContext, conditions, attackerName)) continue;
-    if (mod.target === 'ability_check' || mod.target === 'check') {
+    if (mod.target === 'ability_check' || mod.target === 'check' || mod.target === 'performance_checks' || mod.target === 'deception_performance_checks') {
       if (mod.effect === 'advantage') {
         if (mod.abilities && mod.abilities.length > 0) {
           // Per-ability check advantage (e.g., Remarkable Athlete for STR)
@@ -143,6 +143,16 @@ function applySaveModifiers(effects, modifiers, saveType, abilityName, isRaging 
               effects.abilityCheckAdvantage = true;
             }
           }
+        } else if (mod.target === 'performance_checks') {
+          // Performance checks specific: limit to Performance skill
+          effects.abilityCheckAdvantage = true;
+          effects.abilityCheckAdvantageSkill = 'Performance';
+        } else if (mod.target === 'deception_performance_checks') {
+          // Deception/Performance checks: use CHA ability filter
+          effects.abilityCheckAdvantageAbilities = [...new Set([
+            ...(effects.abilityCheckAdvantageAbilities || []),
+            'CHA'
+          ])];
         } else {
           effects.abilityCheckAdvantage = true;
         }
