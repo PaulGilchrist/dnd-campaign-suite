@@ -32,7 +32,6 @@ function showConditionChoice(targetName, conditions) {
 }
 
 export async function handle(action, playerStats, campaignName, _mapName) {
-    console.log('[postCastRiderHandler] handle called for', action.name, 'automation:', JSON.stringify(action.automation));
     const auto = action.automation;
 
     const usesKey = `postCastRider_${action.name.replace(/\s+/g, '_')}`;
@@ -50,18 +49,14 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     }
 
     const saveDc = buildSaveDc(auto, playerStats);
-    console.log('[postCastRiderHandler] saveDc:', saveDc);
     const targetInfo = await resolveTarget(campaignName, playerStats.name);
     const targetName = targetInfo?.target?.name || 'Unknown';
-    console.log('[postCastRiderHandler] targetName:', targetName, 'targetInfo:', targetInfo ? 'found' : 'null');
 
     const { promptId } = createSaveListener(campaignName, {
         targetName,
         saveType: auto.saveType || 'WIS',
         saveDc,
     });
-
-    console.log('[postCastRiderHandler] createSaveListener called with promptId:', promptId, 'targetName:', targetName, 'saveType:', auto.saveType || 'WIS', 'saveDc:', saveDc);
 
     addEntry(campaignName, {
         type: 'ability_use',
@@ -71,12 +66,8 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         promptId,
     }).catch((e) => { console.error("[postCastRider] Error:", e); });
 
-    console.log('[postCastRiderHandler] Returning popup for', action.name);
-
     const handleSaveResult = async (event) => {
         if (event.detail.promptId !== promptId) return;
-
-        console.log('[postCastRiderHandler] handleSaveResult called, success:', event.detail.success, 'targetName:', event.detail.targetName);
 
         const isSuccessful = event.detail.success;
 
@@ -95,19 +86,15 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             }).catch((e) => { console.error("[postCastRider] Error:", e); });
         } else {
             const conditionChoices = RIDER_CONDITIONS[auto.condition] || [auto.condition.toLowerCase()];
-            console.log('[postCastRiderHandler] Condition choices:', conditionChoices, 'from auto.condition:', auto.condition);
             const appliedCondition = conditionChoices.length > 1
                 ? await showConditionChoice(targetName, conditionChoices)
                 : conditionChoices[0];
-            console.log('[postCastRiderHandler] Applied condition:', appliedCondition);
 
             if (appliedCondition === null) {
-                console.log('[postCastRiderHandler] User skipped condition — not consuming use');
                 window.removeEventListener('save-result', handleSaveResult);
                 return;
             }
 
-            console.log('[postCastRiderHandler] Setting uses to', uses - 1, 'for', usesKey);
             setRuntimeValue(playerStats.name, usesKey, uses - 1, campaignName);
 
             const storedConditions = getRuntimeValue(targetName, 'activeConditions', campaignName) || [];
@@ -124,19 +111,14 @@ export async function handle(action, playerStats, campaignName, _mapName) {
                 saveType: auto.saveType || 'WIS',
                 success: false,
                 description: `${targetName} failed ${auto.saveType || 'WIS'} save. ${appliedCondition.charAt(0).toUpperCase() + appliedCondition.slice(1)} for 1 minute.`,
-            }).then(() => console.log('[postCastRiderHandler] addEntry succeeded'))
+            })
             .catch((e) => { console.error("[postCastRider] addEntry Error:", e); });
 
-            console.log('[postCastRiderHandler] Adding expiration for', targetName, 'condition:', appliedCondition);
             addExpiration(playerStats.name, targetName, [
                 { type: 'condition', condition: appliedCondition }
             ], campaignName, 10);
 
-            // Log applied condition so user can verify
-            console.log('[postCastRiderHandler] Condition applied:', appliedCondition, 'to', targetName, 'activeConditions:', getRuntimeValue(targetName, 'activeConditions', campaignName));
         }
-
-        console.log('[postCastRiderHandler] Removing save-result listener');
         window.removeEventListener('save-result', handleSaveResult);
     };
 

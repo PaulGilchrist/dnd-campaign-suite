@@ -507,16 +507,12 @@ export async function executeHandler(action, playerStats, campaignName, mapName,
         handler = HANDLER_MAP[auto.type];
     }
 
-    console.log('[executeHandler] Looked up handler for type:', auto.type, 'handler:', !!handler, 'handlerName:', handler?.name);
     if (!handler) {
-        console.log('[executeHandler] No handler for', auto.type, '— returning null');
         return null;
     }
 
-    console.log('[executeHandler] Calling handler for', action.name, 'type:', auto.type, 'handler:', handler?.name);
     try {
         const result = await handler(action, playerStats, campaignName, mapName, characters);
-        console.log('[executeHandler] Handler returned:', result?.type, result?.payload?.type);
         return result;
       } catch (e) {
           console.error(`[automation] Handler ${auto.type}/${auto.effect} failed:`, e);

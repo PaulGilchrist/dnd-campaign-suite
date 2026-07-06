@@ -60,41 +60,28 @@ export function getMultiTargetSpreadForSpell(playerStats, spellName) {
 }
 
 export async function triggerPostCastRiderSaves(spell, metaCtx, playerStats, campaignName, mapName) {
-    console.log('[postCastRider] Spell cast:', spell.name, 'school:', spell.school, 'level:', spell.level, 'slotLevel:', metaCtx?.slotLevel);
-
     if (!isEnchantmentOrIllusion(spell)) {
-        console.log('[postCastRider] Not enchantment/illusion, skipping');
         return null;
     }
 
     if (!usesSpellSlot(spell, metaCtx)) {
-        console.log('[postCastRider] No spell slot used (cantrip), skipping');
         return null;
     }
 
     const riderSaves = getPostCastRiderSaves(playerStats);
-    console.log('[postCastRider] Passives found:', playerStats.automation?.passives?.length, 'Rider saves found:', riderSaves.length);
-    if (riderSaves.length > 0) {
-        riderSaves.forEach(r => console.log('[postCastRider] Rider:', r.name, 'type:', r.type, 'has riderSave:', !!r.riderSave, 'riderSave data:', JSON.stringify(r.riderSave)));
-    }
     if (riderSaves.length === 0) {
         return null;
     }
 
     const results = [];
-    console.log('[postCastRider] Entering loop with', riderSaves.length, 'riders');
     for (const rider of riderSaves) {
         const riderName = rider.riderSave ? rider.name : rider.name;
         const usesKey = `postCastRider_${riderName.replace(/\s+/g, '_')}`;
         const uses = getRuntimeValue(playerStats.name, usesKey, campaignName) ?? 1;
-        console.log('[postCastRider] usesKey:', usesKey, 'uses:', uses);
 
         if (uses <= 0) {
-            console.log('[postCastRider] uses <= 0, skipping');
             continue;
         }
-
-        console.log('[postCastRider] Building riderConfig for', riderName);
         let riderConfig;
         if (rider.riderSave) {
             riderConfig = {
@@ -127,10 +114,8 @@ export async function triggerPostCastRiderSaves(spell, metaCtx, playerStats, cam
             },
         };
 
-        console.log('[postCastRider] About to call executeHandler for', riderName, 'action:', JSON.stringify(action));
         try {
             const result = await executeHandler(action, playerStats, campaignName, mapName);
-            console.log('[postCastRider] executeHandler returned for', riderName, 'result:', result);
             if (result) {
                 results.push(result);
             }
