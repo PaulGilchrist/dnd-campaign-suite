@@ -53,7 +53,6 @@ vi.mock('../../../../services/character/classFeatures.js', () => ({
 
 import { resolveTarget, resolveMapPositions } from '../../common/targetResolver.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
-import { addExpiration } from '../../../rules/effects/expirations.js';
 import { rollExpression } from '../../../dice/diceRoller.js';
 import { getCurrentSorceryPoints } from '../../../../hooks/combat/useMetamagic.js';
 import { spendSorceryPoints } from '../../../../hooks/combat/useMetamagic.js';
@@ -151,9 +150,10 @@ describe('reactionBonusHandler', () => {
     });
 
     // ── handleUnbreakableMajesty ─────────────────────────────
+    // NOTE: Full coverage lives in reactionBonusHandler.unbreakableMajesty.test.js
 
     describe('handleUnbreakableMajesty', () => {
-        it('should activate and set runtime state', async () => {
+        it('should route to handleUnbreakableMajesty for miss_on_failed_save effect', async () => {
             const action = makeAction({ automation: { effect: 'miss_on_failed_save', duration: '1_minute' } });
             const result = await handle(action, makePlayerStats(), CAMPAIGN, MAP);
 
@@ -161,28 +161,6 @@ describe('reactionBonusHandler', () => {
             expect(result.payload.description).toContain('activated');
             expect(result.payload.description).toContain('CHA save');
             expect(result.payload.description).toContain('DC 13');
-            expect(setRuntimeValue).toHaveBeenCalledWith(HERO_NAME, 'unbreakableMajestyActive', true, CAMPAIGN);
-            expect(setRuntimeValue).toHaveBeenCalledWith(HERO_NAME, 'unbreakableMajestySaveDc', 13, CAMPAIGN);
-            expect(addExpiration).toHaveBeenCalledWith(HERO_NAME, HERO_NAME, [{ type: 'unbreakable_majesty' }], CAMPAIGN, 10);
-        });
-
-        it('should toggle off when already active', async () => {
-            getRuntimeValue.mockImplementation((playerName, key) => {
-                if (key === 'unbreakableMajestyActive') return true;
-                return null;
-            });
-            const action = makeAction({ automation: { effect: 'miss_on_failed_save', duration: '1_minute' } });
-            const result = await handle(action, makePlayerStats(), CAMPAIGN, MAP);
-
-            expect(result.payload.description).toContain('ended');
-            expect(setRuntimeValue).toHaveBeenCalledWith(HERO_NAME, 'unbreakableMajestyActive', null, CAMPAIGN);
-        });
-
-        it('should use custom duration in rounds', async () => {
-            const action = makeAction({ automation: { effect: 'miss_on_failed_save', duration: '3_rounds' } });
-            await handle(action, makePlayerStats(), CAMPAIGN, MAP);
-
-            expect(addExpiration).toHaveBeenCalledWith(HERO_NAME, HERO_NAME, [{ type: 'unbreakable_majesty' }], CAMPAIGN, 3);
         });
     });
 
@@ -271,41 +249,21 @@ describe('reactionBonusHandler', () => {
     });
 
     // ── handleAcBonus ────────────────────────────────────────
+    // NOTE: Toggle and duration coverage lives in reactionBonusHandler.unbreakableMajesty.test.js
 
     describe('handleAcBonus', () => {
-        it('should activate defensive duelist and set runtime state', async () => {
+        it('should route to handleAcBonus for ac_bonus effect', async () => {
             const action = makeAction({ automation: { effect: 'ac_bonus' } });
             const result = await handle(action, makePlayerStats(), CAMPAIGN, MAP);
 
+            expect(result.type).toBe('popup');
             expect(result.payload.description).toContain('activated');
             expect(result.payload.description).toContain('Proficiency Bonus');
-            expect(result.payload.description).toContain('Add 3');
-            expect(setRuntimeValue).toHaveBeenCalledWith(HERO_NAME, 'defensiveDuelistActive', true, CAMPAIGN);
-            expect(setRuntimeValue).toHaveBeenCalledWith(HERO_NAME, 'defensiveDuelistBonus', 3, CAMPAIGN);
-            expect(addExpiration).toHaveBeenCalledWith(HERO_NAME, HERO_NAME, [{ type: 'defensive_duelist' }], CAMPAIGN, 1);
-        });
-
-        it('should toggle off when already active', async () => {
-            getRuntimeValue.mockImplementation((playerName, key) => {
-                if (key === 'defensiveDuelistActive') return true;
-                return null;
-            });
-            const action = makeAction({ automation: { effect: 'ac_bonus' } });
-            const result = await handle(action, makePlayerStats(), CAMPAIGN, MAP);
-
-            expect(result.payload.description).toContain('ended');
-            expect(setRuntimeValue).toHaveBeenCalledWith(HERO_NAME, 'defensiveDuelistActive', null, CAMPAIGN);
-        });
-
-        it('should use custom duration in rounds', async () => {
-            const action = makeAction({ automation: { effect: 'ac_bonus', duration: '2_rounds' } });
-            await handle(action, makePlayerStats(), CAMPAIGN, MAP);
-
-            expect(addExpiration).toHaveBeenCalledWith(HERO_NAME, HERO_NAME, [{ type: 'defensive_duelist' }], CAMPAIGN, 2);
         });
     });
 
-    // ── handleLeapAside ──────────────────────────────────────
+    // ── handleLeapAside / handleVeer ─────────────────────────
+    // Both share identical mount + incapacitated validation logic
 
     describe('handleLeapAside', () => {
         it('should reject when no mount', async () => {
@@ -319,22 +277,19 @@ describe('reactionBonusHandler', () => {
             expect(result.payload.description).toContain('requires you to be mounted');
         });
 
-        it('should reject when player or mount is incapacitated', async () => {
-            // Player incapacitated (object format)
+        it('should reject when player or mount is incapacitated (object and string formats)', async () => {
             getRuntimeValue.mockReturnValue('Warhorse');
             let stats = makePlayerStats({ conditions: [{ key: 'incapacitated' }] });
             let action = makeAction({ automation: { effect: 'zero_on_success_half_on_fail_for_mount' } });
             let result = await handle(action, stats, CAMPAIGN, MAP);
             expect(result.payload.description).toContain('not be Incapacitated');
 
-            vi.clearAllMocks();
             getRuntimeValue.mockReturnValue('Warhorse');
             stats = makePlayerStats({ conditions: ['incapacitated'] });
             action = makeAction({ automation: { effect: 'zero_on_success_half_on_fail_for_mount' } });
             result = await handle(action, stats, CAMPAIGN, MAP);
             expect(result.payload.description).toContain('not be Incapacitated');
 
-            vi.clearAllMocks();
             getRuntimeValue.mockImplementation((playerName, key) => {
                 if (key === 'mountName') return 'Warhorse';
                 if (key === 'conditions' && playerName === 'Warhorse') return [{ key: 'incapacitated' }];
@@ -360,8 +315,6 @@ describe('reactionBonusHandler', () => {
         });
     });
 
-    // ── handleVeer ───────────────────────────────────────────
-
     describe('handleVeer', () => {
         it('should reject when no mount', async () => {
             getRuntimeValue.mockImplementation((playerName, key) => {
@@ -372,21 +325,6 @@ describe('reactionBonusHandler', () => {
             const result = await handle(action, makePlayerStats(), CAMPAIGN, MAP);
 
             expect(result.payload.description).toContain('requires you to be mounted');
-        });
-
-        it('should reject when player is incapacitated', async () => {
-            getRuntimeValue.mockReturnValue('Warhorse');
-            let stats = makePlayerStats({ conditions: [{ key: 'incapacitated' }] });
-            let action = makeAction({ automation: { effect: 'redirect_attack_to_self' } });
-            let result = await handle(action, stats, CAMPAIGN, MAP);
-            expect(result.payload.description).toContain('not be Incapacitated');
-
-            vi.clearAllMocks();
-            getRuntimeValue.mockReturnValue('Warhorse');
-            stats = makePlayerStats({ conditions: ['incapacitated'] });
-            action = makeAction({ automation: { effect: 'redirect_attack_to_self' } });
-            result = await handle(action, stats, CAMPAIGN, MAP);
-            expect(result.payload.description).toContain('not be Incapacitated');
         });
 
         it('should activate successfully', async () => {
@@ -401,93 +339,16 @@ describe('reactionBonusHandler', () => {
     });
 
     // ── handleInspiringMovement ──────────────────────────────
+    // NOTE: Full coverage (no map, no-OA, ally resolution, uses tracking, log entry)
+    // lives in reactionBonusHandler.inspiringMovement.test.js
 
     describe('handleInspiringMovement', () => {
-        it('should return popup with movement description', async () => {
+        it('should route to handleInspiringMovement for unknown effects', async () => {
             const action = makeAction({ automation: { effect: 'inspiring_movement', allyRange: '30_ft' } });
             const result = await handle(action, makePlayerStats(), CAMPAIGN, MAP);
 
             expect(result.type).toBe('popup');
             expect(result.payload.description).toContain('move up to 15 ft');
-        });
-
-        it('should reject when no uses remaining', async () => {
-            getRuntimeValue.mockImplementation((playerName, key) => {
-                if (key === 'bardicInspirationUses') return 0;
-                return null;
-            });
-            const action = makeAction({ automation: { effect: 'inspiring_movement', usesMax: 3 } });
-            const result = await handle(action, makePlayerStats(), CAMPAIGN, MAP);
-
-            expect(result.payload.description).toContain('no uses remaining');
-        });
-
-        it('should consume a use', async () => {
-            getRuntimeValue.mockImplementation((playerName, key) => {
-                if (key === 'bardicInspirationUses') return 1;
-                return null;
-            });
-            const action = makeAction({ automation: { effect: 'inspiring_movement', usesMax: 3 } });
-            await handle(action, makePlayerStats(), CAMPAIGN, MAP);
-
-            expect(setRuntimeValue).toHaveBeenCalledWith(HERO_NAME, 'bardicInspirationUses', 0, CAMPAIGN);
-        });
-
-        it('should use custom resource key and consume a use', async () => {
-            getRuntimeValue.mockImplementation((playerName, key) => {
-                if (key === 'customUses') return 2;
-                return null;
-            });
-            const action = makeAction({ automation: { effect: 'inspiring_movement', usesMax: 3, resourceKey: 'customUses' } });
-            await handle(action, makePlayerStats(), CAMPAIGN, MAP);
-
-            expect(setRuntimeValue).toHaveBeenCalledWith(HERO_NAME, 'customUses', 1, CAMPAIGN);
-        });
-
-        it('should skip uses check when usesMax is 0', async () => {
-            getRuntimeValue.mockReturnValue(0);
-            const action = makeAction({ automation: { effect: 'inspiring_movement', usesMax: 0 } });
-            const result = await handle(action, makePlayerStats(), CAMPAIGN, MAP);
-
-            expect(result.payload.description).toContain('half your Speed');
-            expect(setRuntimeValue).not.toHaveBeenCalledWith(HERO_NAME, 'bardicInspirationUses', 0, CAMPAIGN);
-        });
-
-        it('should handle noOAs flag for self', async () => {
-            getRuntimeValue.mockReturnValue(2);
-
-            const action = makeAction({ automation: { effect: 'inspiring_movement', noOAs: true, usesMax: 3 } });
-            const result = await handle(action, makePlayerStats(), CAMPAIGN, MAP);
-
-            expect(result.payload.description).toContain('does not provoke Opportunity Attacks');
-            expect(setRuntimeValue).toHaveBeenCalledWith(HERO_NAME, 'bardicInspirationUses', 1, CAMPAIGN);
-            expect(setRuntimeValue).toHaveBeenCalledWith(HERO_NAME, 'inspiringMovementNoOA', true, CAMPAIGN);
-            expect(addExpiration).toHaveBeenCalledWith(HERO_NAME, HERO_NAME, [{ type: 'inspiring_movement_no_oa' }], CAMPAIGN, 1);
-        });
-
-        it('should find ally within range on map', async () => {
-            getRuntimeValue.mockReturnValue(2);
-            resolveTarget.mockResolvedValue({ target: { name: 'Ally' } });
-            getDistanceFeet.mockReturnValue(10);
-
-            const action = makeAction({ automation: { effect: 'inspiring_movement', allyRange: '30_ft', usesMax: 3 } });
-            const result = await handle(action, makePlayerStats(), CAMPAIGN, MAP);
-
-            expect(result.payload.description).toContain('Ally');
-            expect(result.payload.description).toContain('can also move');
-            expect(setRuntimeValue).toHaveBeenCalledWith('Ally', 'inspiringMovementGranted', true, CAMPAIGN);
-        });
-
-        it('should not find ally when distance exceeds range', async () => {
-            getRuntimeValue.mockReturnValue(2);
-            resolveTarget.mockResolvedValue({ target: { name: 'Ally' } });
-            getDistanceFeet.mockReturnValue(60);
-
-            const action = makeAction({ automation: { effect: 'inspiring_movement', allyRange: '30_ft', usesMax: 3 } });
-            const result = await handle(action, makePlayerStats(), CAMPAIGN, MAP);
-
-            expect(result.payload.description).not.toContain('can also move');
-            expect(result.payload.description).toContain('Select an ally');
         });
 
         it('should use half speed based on player speed', async () => {

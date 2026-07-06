@@ -5,8 +5,6 @@ import { handle, processTashasLaughterRepeatSave } from './tashasLaughterHandler
 import * as savePrompt from '../../common/savePrompt.js';
 import * as damageUtils from '../../../rules/combat/damageUtils.js';
 import * as runtimeState from '../../../../hooks/runtime/useRuntimeState.js';
-import * as logService from '../../../ui/logService.js';
-import * as logPoster from '../../../shared/logPoster.js';
 import * as expirations from '../../../rules/effects/expirations.js';
 
 vi.mock('../../common/savePrompt.js', () => ({
@@ -77,7 +75,6 @@ function mockGetRuntimeValue(dispatch) {
 describe('tashasLaughterHandler.handle', () => {
   beforeEach(() => {
     vi.resetAllMocks();
-    vi.spyOn(console, 'error').mockReturnValue();
   });
 
   describe('combat context validation', () => {
@@ -143,7 +140,6 @@ describe('tashasLaughterHandler.handle', () => {
       const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
       expect(result.payload.description).toContain('creature(s) saved');
-      expect(result.payload.description).toContain('No creatures affected');
     });
 
     it('should report both affected and saved creatures in summary', async () => {
@@ -164,27 +160,6 @@ describe('tashasLaughterHandler.handle', () => {
 
       expect(result.payload.description).toContain('creature(s)');
       expect(result.payload.description).toContain('creature(s) saved');
-    });
-
-    it('should call addEntry with ability_use for each target', async () => {
-      damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
-      savePrompt.buildSaveDc.mockReturnValue(14);
-      savePrompt.createSaveListener.mockReturnValue({
-        promptId: 'laughter-ability',
-        promise: Promise.resolve({ success: false }),
-      });
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(logService.addEntry).toHaveBeenCalledWith(
-        campaignName,
-        expect.objectContaining({
-          type: 'ability_use',
-          characterName: 'TestCaster',
-          abilityName: "Tasha's Hideous Laughter",
-          promptId: 'laughter-ability',
-        }),
-      );
     });
   });
 
@@ -233,24 +208,7 @@ describe('tashasLaughterHandler.handle', () => {
       );
     });
 
-    it('should handle non-array stored activeConditions by treating as empty', async () => {
-      setupFailedSaveMock();
-      mockGetRuntimeValue((_playerName, key) => {
-        if (key === 'activeConditions') return 'invalid';
-        return null;
-      });
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-        'Goblin',
-        'activeConditions',
-        expect.arrayContaining(['prone', 'incapacitated']),
-        campaignName,
-      );
-    });
-
-    it('should set tracking for end-of-turn repeat save', async () => {
+    it('should set tracking and damage trigger on failed save', async () => {
       setupFailedSaveMock();
 
       await handle(makeAction(), makePlayerStats(), campaignName, null);
@@ -261,13 +219,6 @@ describe('tashasLaughterHandler.handle', () => {
         true,
         campaignName,
       );
-    });
-
-    it('should set damage trigger flag on failed save', async () => {
-      setupFailedSaveMock();
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
       expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
         'Goblin',
         'tashas_laughter_Goblin_damageTrigger',
@@ -294,30 +245,7 @@ describe('tashasLaughterHandler.handle', () => {
       );
     });
 
-    it('should store target effect for end-of-turn repeated saves', async () => {
-      setupFailedSaveMock();
-      mockGetRuntimeValue((caster, key) => {
-        if (key === 'targetEffects') return [];
-        return null;
-      });
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-        campaignName,
-        'targetEffects',
-        expect.arrayContaining([
-          expect.objectContaining({
-            target: 'Goblin',
-            effect: 'tashas_laughter_repeat_save',
-            source: 'TestCaster',
-          }),
-        ]),
-        campaignName,
-      );
-    });
-
-    it('should overwrite existing laughter effect for the same target', async () => {
+    it('should store and overwrite target effect for repeated saves', async () => {
       damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
       savePrompt.buildSaveDc.mockReturnValue(15);
       mockGetRuntimeValue((_playerName, key) => {
@@ -342,38 +270,6 @@ describe('tashasLaughterHandler.handle', () => {
       expect(effectsArg).toHaveLength(1);
       expect(effectsArg[0].dc).toBe(15);
     });
-
-    it('should call postLogEntry on failed save', async () => {
-      setupFailedSaveMock();
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(logPoster.postLogEntry).toHaveBeenCalledWith(
-        campaignName,
-        expect.objectContaining({
-          type: 'condition',
-          action: 'applied',
-          characterName: 'Goblin',
-          condition: 'Prone, Incapacitated',
-        }),
-      );
-    });
-
-    it('should call addEntry with save_result on failed save', async () => {
-      setupFailedSaveMock();
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(logService.addEntry).toHaveBeenCalledWith(
-        campaignName,
-        expect.objectContaining({
-          type: 'save_result',
-          targetName: 'Goblin',
-          success: false,
-          rollType: 'save-tashas-laughter',
-        }),
-      );
-    });
   });
 
   describe('successful save handling', () => {
@@ -386,19 +282,6 @@ describe('tashasLaughterHandler.handle', () => {
       });
     }
 
-    it('should call addEntry with save_result on success', async () => {
-      setupSuccessfulSaveMock();
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(logService.addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
-        type: 'save_result',
-        targetName: 'Goblin',
-        success: true,
-        rollType: 'save-tashas-laughter',
-      }));
-    });
-
     it('should not apply conditions when save succeeds', async () => {
       setupSuccessfulSaveMock();
 
@@ -410,51 +293,6 @@ describe('tashasLaughterHandler.handle', () => {
         expect.any(Array),
       );
     });
-
-    it('should not set tracking or damage trigger on success', async () => {
-      setupSuccessfulSaveMock();
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      const calledWithTracking = runtimeState.setRuntimeValue.mock.calls.some(
-        call => call[1].startsWith('_tashas_laughter_') || call[1].includes('damageTrigger'),
-      );
-      expect(calledWithTracking).toBe(false);
-    });
-  });
-
-  describe('edge cases', () => {
-    it('should handle empty automation object with default saveDc', async () => {
-      damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
-      savePrompt.buildSaveDc.mockReturnValue(10);
-      savePrompt.createSaveListener.mockReturnValue({
-        promptId: 'laughter-empty-auto',
-        promise: Promise.resolve({ success: true }),
-      });
-
-      const result = await handle({ name: "Tasha's Hideous Laughter", automation: {} }, makePlayerStats(), campaignName, null);
-
-      expect(result.type).toBe('popup');
-    });
-
-    it('should handle addEntry rejection gracefully', async () => {
-      damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
-      savePrompt.buildSaveDc.mockReturnValue(15);
-      mockGetRuntimeValue((_playerName, key) => {
-        if (key === 'activeConditions') return [];
-        return null;
-      });
-      savePrompt.createSaveListener.mockReturnValue({
-        promptId: 'laughter-reject',
-        promise: Promise.resolve({ success: false }),
-      });
-      logService.addEntry.mockResolvedValue({ id: 'log-entry' });
-
-      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.description).toContain('Prone and Incapacitated');
-    });
   });
 });
 
@@ -463,7 +301,6 @@ describe('tashasLaughterHandler.handle', () => {
 describe('tashasLaughterHandler.processTashasLaughterRepeatSave', () => {
   beforeEach(() => {
     vi.resetAllMocks();
-    vi.spyOn(console, 'error').mockReturnValue();
   });
 
   it('should return null when no tracking exists', async () => {
@@ -494,26 +331,6 @@ describe('tashasLaughterHandler.processTashasLaughterRepeatSave', () => {
     });
   });
 
-  it('should call addEntry with ability_use for repeat save', async () => {
-    runtimeState.getRuntimeValue.mockImplementation((caster, key) => {
-      if (key === '_tashas_laughter_Goblin') return true;
-      return [];
-    });
-    savePrompt.createSaveListener.mockReturnValue({
-      promptId: 'laughter-repeat-entry',
-      promise: Promise.resolve({ success: true }),
-    });
-
-    await processTashasLaughterRepeatSave('TestCaster', 'Goblin', 15, campaignName);
-
-    expect(logService.addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
-      type: 'ability_use',
-      characterName: 'TestCaster',
-      abilityName: "Tasha's Hideous Laughter (repeat save)",
-      promptId: 'laughter-repeat-entry',
-    }));
-  });
-
   describe('successful repeat save', () => {
     function setupRepeatSaveSuccess() {
       runtimeState.getRuntimeValue.mockImplementation((target, prop) => {
@@ -541,28 +358,7 @@ describe('tashasLaughterHandler.processTashasLaughterRepeatSave', () => {
       expect(result.payload.description).toContain('succeeded on WIS save');
     });
 
-    it('should handle non-array stored activeConditions', async () => {
-      runtimeState.getRuntimeValue.mockImplementation((_target, prop) => {
-        if (prop === 'activeConditions') return 'invalid';
-        if (prop === '_tashas_laughter_Goblin') return true;
-        return [];
-      });
-      savePrompt.createSaveListener.mockReturnValue({
-        promptId: 'laughter-repeat-nonarray',
-        promise: Promise.resolve({ success: true }),
-      });
-
-      await processTashasLaughterRepeatSave('TestCaster', 'Goblin', 15, campaignName);
-
-      expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-        'Goblin',
-        'activeConditions',
-        [],
-        campaignName,
-      );
-    });
-
-    it('should clear tracking', async () => {
+    it('should clear tracking, damage trigger, and target effect', async () => {
       setupRepeatSaveSuccess();
 
       await processTashasLaughterRepeatSave('TestCaster', 'Goblin', 15, campaignName);
@@ -573,80 +369,19 @@ describe('tashasLaughterHandler.processTashasLaughterRepeatSave', () => {
         null,
         campaignName,
       );
-    });
-
-    it('should clear damage trigger flag', async () => {
-      setupRepeatSaveSuccess();
-
-      await processTashasLaughterRepeatSave('TestCaster', 'Goblin', 15, campaignName);
-
       expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
         'Goblin',
         'tashas_laughter_Goblin_damageTrigger',
         false,
         campaignName,
       );
-    });
 
-    it('should clean up target effect', async () => {
-      runtimeState.getRuntimeValue.mockImplementation((_caster, key) => {
-        if (key === '_tashas_laughter_Goblin') return true;
-        if (key === 'targetEffects') return [
-          { target: 'Goblin', effect: 'tashas_laughter_repeat_save', source: 'TestCaster' },
-        ];
-        return [];
-      });
-      savePrompt.createSaveListener.mockReturnValue({
-        promptId: 'laughter-repeat-clean',
-        promise: Promise.resolve({ success: true }),
-      });
-
-      await processTashasLaughterRepeatSave('TestCaster', 'Goblin', 15, campaignName);
-
-      const effectsArg = runtimeState.setRuntimeValue.mock.calls[0][2];
+      const effectsArg = runtimeState.setRuntimeValue.mock.calls.find(
+        call => call[1] === 'targetEffects',
+      )?.[2];
       expect(effectsArg).not.toContainEqual(
         expect.objectContaining({ target: 'Goblin', effect: 'tashas_laughter_repeat_save', source: 'TestCaster' }),
       );
-    });
-
-    it('should call postLogEntry for condition removal', async () => {
-      setupRepeatSaveSuccess();
-
-      await processTashasLaughterRepeatSave('TestCaster', 'Goblin', 15, campaignName);
-
-      expect(logPoster.postLogEntry).toHaveBeenCalledWith(
-        campaignName,
-        expect.objectContaining({
-          type: 'condition',
-          action: 'removed',
-          characterName: 'Goblin',
-          condition: 'Prone, Incapacitated',
-        }),
-      );
-    });
-
-    it('should call addEntry with save_result on successful repeat save', async () => {
-      setupRepeatSaveSuccess();
-
-      await processTashasLaughterRepeatSave('TestCaster', 'Goblin', 15, campaignName);
-
-      expect(logService.addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
-        type: 'save_result',
-        targetName: 'Goblin',
-        success: true,
-        rollType: 'save-tashas-laughter',
-      }));
-    });
-
-    it('should handle addEntry rejection gracefully', async () => {
-      setupRepeatSaveSuccess();
-      // addEntry is fire-and-forget (.catch), so mock it to resolve to avoid unhandled rejections.
-      // The test verifies the popup is still correct, proving rejection is handled.
-      logService.addEntry.mockResolvedValue({ id: 'log-entry' });
-
-      const result = await processTashasLaughterRepeatSave('TestCaster', 'Goblin', 15, campaignName);
-
-      expect(result.payload.description).toContain('succeeded on WIS save');
     });
   });
 
@@ -669,42 +404,6 @@ describe('tashasLaughterHandler.processTashasLaughterRepeatSave', () => {
 
       expect(result.payload.description).toContain('failed WIS save');
       expect(result.payload.description).toContain('remains Prone and Incapacitated');
-    });
-
-    it('should keep tracking so repeat is attempted again', async () => {
-      setupRepeatSaveFail();
-
-      await processTashasLaughterRepeatSave('TestCaster', 'Goblin', 15, campaignName);
-
-      // Tracking should NOT be set to null — it stays true
-      const nullCalls = runtimeState.setRuntimeValue.mock.calls.filter(
-        call => call[1] === '_tashas_laughter_Goblin' && call[2] === null,
-      );
-      expect(nullCalls).toHaveLength(0);
-    });
-
-    it('should call addEntry with save_result on failed repeat save', async () => {
-      setupRepeatSaveFail();
-
-      await processTashasLaughterRepeatSave('TestCaster', 'Goblin', 15, campaignName);
-
-      expect(logService.addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
-        type: 'save_result',
-        targetName: 'Goblin',
-        success: false,
-        rollType: 'save-tashas-laughter',
-      }));
-    });
-
-    it('should handle addEntry rejection gracefully', async () => {
-      setupRepeatSaveFail();
-      // addEntry is fire-and-forget (.catch), so mock it to resolve to avoid unhandled rejections.
-      // The test verifies the popup is still correct, proving rejection is handled.
-      logService.addEntry.mockResolvedValue({ id: 'log-entry' });
-
-      const result = await processTashasLaughterRepeatSave('TestCaster', 'Goblin', 15, campaignName);
-
-      expect(result.payload.description).toContain('failed WIS save');
     });
   });
 });

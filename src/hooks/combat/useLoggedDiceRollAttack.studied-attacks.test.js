@@ -247,7 +247,7 @@ describe('createLogAndShow - auto_effect miss trigger (Studied Attacks)', () => 
             expect(targetEffectsCalls.length).toBe(0);
         });
 
-        it('does not apply effect for non-miss triggers', async () => {
+        it('does not apply effect for passives that do not match trigger and effect', async () => {
             const fn = createFn();
             await fn('Longsword', 0, 'attack', {
                 ...baseContext,
@@ -257,30 +257,13 @@ describe('createLogAndShow - auto_effect miss trigger (Studied Attacks)', () => 
                         passives: [
                             {
                                 type: 'auto_effect',
-                                name: 'Some Other Effect',
+                                name: 'Hit Effect',
                                 trigger: 'hit',
                                 effect: 'knock_prone',
                             },
-                        ],
-                    },
-                },
-            });
-
-            const targetEffectsCalls = setRuntimeValue.mock.calls.filter(isTargetEffectsCall);
-            expect(targetEffectsCalls.length).toBe(0);
-        });
-
-        it('does not apply effect for non-next_attack_advantage effects on miss', async () => {
-            const fn = createFn();
-            await fn('Longsword', 0, 'attack', {
-                ...baseContext,
-                playerStats: {
-                    ...baseContext.playerStats,
-                    automation: {
-                        passives: [
                             {
                                 type: 'auto_effect',
-                                name: 'Some Other Effect',
+                                name: 'Wrong Effect',
                                 trigger: 'miss',
                                 effect: 'knock_prone',
                             },

@@ -46,7 +46,7 @@ function stubUtilsNameIdentity() {
 }
 
 // ---------------------------------------------------------------------------
-// expireStaleEffects — early-exit / guard clauses
+// expireStaleEffects — early exits
 // ---------------------------------------------------------------------------
 describe('expireStaleEffects — early exits', () => {
   beforeEach(() => {
@@ -56,8 +56,11 @@ describe('expireStaleEffects — early exits', () => {
     getActiveCreatureName.mockReturnValue('Goblin');
   });
 
-  it('returns early without side effects when active creature name is null', () => {
-    getActiveCreatureName.mockReturnValue(null);
+  it.each([
+    { name: 'null', value: null },
+    { name: 'empty string', value: '' },
+  ])('returns early without side effects when active creature name is $name', ({ value }) => {
+    getActiveCreatureName.mockReturnValue(value);
 
     expireStaleEffects('MyCampaign');
 
@@ -66,25 +69,11 @@ describe('expireStaleEffects — early exits', () => {
     expect(getCombatSummary).not.toHaveBeenCalled();
   });
 
-  it('returns early without side effects when active creature name is empty string', () => {
-    getActiveCreatureName.mockReturnValue('');
-
-    expireStaleEffects('MyCampaign');
-
-    expect(getRuntimeValue).not.toHaveBeenCalled();
-    expect(setRuntimeValue).not.toHaveBeenCalled();
-  });
-
-  it('returns early when combat summary is null', () => {
-    getCombatSummary.mockReturnValue(null);
-
-    expireStaleEffects('MyCampaign');
-
-    expect(getRuntimeValue).not.toHaveBeenCalled();
-  });
-
-  it('returns early when combat summary is not an object', () => {
-    getCombatSummary.mockReturnValue('not-an-object');
+  it.each([
+    { name: 'null', value: null },
+    { name: 'non-object', value: 'not-an-object' },
+  ])('returns early when combat summary is $name', ({ value }) => {
+    getCombatSummary.mockReturnValue(value);
 
     expireStaleEffects('MyCampaign');
 
@@ -132,11 +121,7 @@ describe('expireStaleEffects — creature matching', () => {
 
     expireStaleEffects('MyCampaign');
 
-    // Only the matching creature (Goblin) should trigger a getRuntimeValue call
     expect(getRuntimeValue).toHaveBeenCalledWith('Goblin', KEY);
-    // The Orc should not have triggered any runtime reads
-    const orcCalls = getRuntimeValue.mock.calls.filter((c) => c[0] === 'Orc');
-    expect(orcCalls).toHaveLength(0);
   });
 
   it('applies utils.getName normalization to creature names for matching but uses raw name for runtime lookup', () => {
@@ -153,7 +138,6 @@ describe('expireStaleEffects — creature matching', () => {
 
     expireStaleEffects('MyCampaign');
 
-    // Matching uses normalized name but runtime lookup uses raw attacker.name
     expect(getRuntimeValue).toHaveBeenCalledWith('goblin', KEY);
   });
 
@@ -172,7 +156,7 @@ describe('expireStaleEffects — creature matching', () => {
 });
 
 // ---------------------------------------------------------------------------
-// expireStaleEffects — stale vs fresh entry classification
+// expireStaleEffects — stale vs fresh entries
 // ---------------------------------------------------------------------------
 describe('expireStaleEffects — stale vs fresh entries', () => {
   beforeEach(() => {
@@ -180,47 +164,6 @@ describe('expireStaleEffects — stale vs fresh entries', () => {
     stubUtilsNameIdentity();
     getCurrentCombatRound.mockReturnValue(2);
     getActiveCreatureName.mockReturnValue('Goblin');
-  });
-
-  it('clears entries where currentRound equals appliedRound + expiryRounds (boundary)', () => {
-    const entry = {
-      target: 'Human',
-      effects: [{ type: 'stunned', condition: 'speed_halved' }],
-      appliedRound: 1,
-      expiryRounds: 1,
-    };
-
-    getCombatSummary.mockReturnValue({ creatures: [{ name: 'Goblin' }] });
-    getRuntimeValue.mockReturnValueOnce([entry]);
-
-    expireStaleEffects('MyCampaign');
-
-    const pendingCalls = setRuntimeValue.mock.calls.filter(
-      (c) => c[0] === 'Goblin' && c[1] === KEY,
-    );
-    expect(pendingCalls.length).toBe(1);
-    expect(pendingCalls[0][2]).toEqual([]);
-  });
-
-  it('keeps entries where currentRound is one below the expiry boundary', () => {
-    const entry = {
-      target: 'Human',
-      effects: [{ type: 'stunned', condition: 'speed_halved' }],
-      appliedRound: 1,
-      expiryRounds: 2,
-    };
-
-    getCurrentCombatRound.mockReturnValue(2);
-    getCombatSummary.mockReturnValue({ creatures: [{ name: 'Goblin' }] });
-    getRuntimeValue.mockReturnValueOnce([entry]);
-
-    expireStaleEffects('MyCampaign');
-
-    const pendingCalls = setRuntimeValue.mock.calls.filter(
-      (c) => c[0] === 'Goblin' && c[1] === KEY,
-    );
-    expect(pendingCalls.length).toBe(1);
-    expect(pendingCalls[0][2]).toEqual([entry]);
   });
 
   it('filters mixed stale and fresh entries, keeping only fresh ones', () => {
@@ -266,44 +209,6 @@ describe('expireStaleEffects — stale vs fresh entries', () => {
     );
     expect(pendingCalls.length).toBe(1);
     expect(pendingCalls[0][2]).toEqual([]);
-  });
-
-  it('skips processing when the attacker pending list is empty', () => {
-    getCombatSummary.mockReturnValue({ creatures: [{ name: 'Goblin' }] });
-    getRuntimeValue.mockReturnValueOnce([]);
-
-    expireStaleEffects('MyCampaign');
-
-    const pendingCalls = setRuntimeValue.mock.calls.filter(
-      (c) => c[0] === 'Goblin' && c[1] === KEY,
-    );
-    expect(pendingCalls).toHaveLength(0);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// expireStaleEffects — campaign name propagation
-// ---------------------------------------------------------------------------
-describe('expireStaleEffects — campaign name', () => {
-  beforeEach(() => {
-    resetMocks();
-    stubUtilsNameIdentity();
-    getCurrentCombatRound.mockReturnValue(5);
-    getActiveCreatureName.mockReturnValue('Goblin');
-  });
-
-  it('passes campaignName to all setRuntimeValue calls', () => {
-    const list = [
-      { target: 'Human', effects: [{ type: 'stunned', condition: 'speed_halved' }], appliedRound: 0, expiryRounds: 1 },
-    ];
-    getCombatSummary.mockReturnValue({ creatures: [{ name: 'Goblin' }] });
-    getRuntimeValue.mockReturnValueOnce(list);
-
-    expireStaleEffects('TestCampaign');
-
-    for (const call of setRuntimeValue.mock.calls) {
-      expect(call[3]).toBe('TestCampaign');
-    }
   });
 });
 

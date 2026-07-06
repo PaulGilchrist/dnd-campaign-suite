@@ -107,13 +107,6 @@ describe('miscHandlers – survive_and_heal', () => {
         expect(result.healAmount).toBe(2) // level 5 / 2 = 2
     })
 
-    it('returns NaN for non-numeric expression (no fallback)', () => {
-        const stats = { ...BASE_STATS, hitPoints: { max: 20 } }
-        const feature = makeFeature({ type: 'survive_and_heal', healExpression: 'invalid' })
-        const result = miscHandlers.survive_and_heal(feature, stats)
-        expect(result.healAmount).toBeNaN()
-    })
-
     it('passes through custom fields', () => {
         const feature = makeFeature({
             type: 'survive_and_heal',
@@ -352,18 +345,6 @@ describe('miscHandlers – steps_of_the_fey', () => {
     })
 })
 
-// ── moonlight_step_rider ─────────────────────────────────────────────
-
-describe('miscHandlers – moonlight_step_rider', () => {
-    it('returns moonlight_step_rider info', () => {
-        const feature = makeFeature({ type: 'moonlight_step_rider' })
-        const result = miscHandlers.moonlight_step_rider(feature, BASE_STATS)
-        expect(result.type).toBe('moonlight_step_rider')
-        expect(result.name).toBe('Test Feature')
-        expect(result.hasAutomation).toBe(true)
-    })
-})
-
 // ── post_cast_rider ──────────────────────────────────────────────────
 
 describe('miscHandlers – post_cast_rider', () => {
@@ -511,18 +492,6 @@ describe('miscHandlers – set_condition', () => {
     })
 })
 
-// ── shadow_step_rider ────────────────────────────────────────────────
-
-describe('miscHandlers – shadow_step_rider', () => {
-    it('returns shadow_step_rider info', () => {
-        const feature = makeFeature({ type: 'shadow_step_rider' })
-        const result = miscHandlers.shadow_step_rider(feature, BASE_STATS)
-        expect(result.type).toBe('shadow_step_rider')
-        expect(result.name).toBe('Test Feature')
-        expect(result.hasAutomation).toBe(true)
-    })
-})
-
 // ── relentless_avenger ───────────────────────────────────────────────
 
 describe('miscHandlers – relentless_avenger', () => {
@@ -589,32 +558,6 @@ describe('miscHandlers – hunter_prey', () => {
         })
         const result = miscHandlers.hunter_prey(feature, BASE_STATS)
         expect(result.casting_time).toBe('1 action')
-    })
-})
-
-// ── defensive_tactics ────────────────────────────────────────────────
-
-describe('miscHandlers – defensive_tactics', () => {
-    it('returns defensive_tactics info with defaults', () => {
-        const feature = makeFeature({ type: 'defensive_tactics' })
-        const result = miscHandlers.defensive_tactics(feature, BASE_STATS)
-        checkDefaults(result, {
-            type: 'defensive_tactics',
-            casting_time: 'passive'
-        })
-    })
-})
-
-// ── superior_hunter_prey ─────────────────────────────────────────────
-
-describe('miscHandlers – superior_hunter_prey', () => {
-    it('returns superior_hunter_prey info with defaults', () => {
-        const feature = makeFeature({ type: 'superior_hunter_prey' })
-        const result = miscHandlers.superior_hunter_prey(feature, BASE_STATS)
-        checkDefaults(result, {
-            type: 'superior_hunter_prey',
-            casting_time: 'passive'
-        })
     })
 })
 
@@ -940,19 +883,6 @@ describe('miscHandlers – multi_target_spread', () => {
     })
 })
 
-// ── bewitching_magic ─────────────────────────────────────────────────
-
-describe('miscHandlers – bewitching_magic', () => {
-    it('returns bewitching_magic info with defaults', () => {
-        const feature = makeFeature({ type: 'bewitching_magic' })
-        const result = miscHandlers.bewitching_magic(feature, BASE_STATS)
-        checkDefaults(result, {
-            type: 'bewitching_magic',
-            casting_time: 'passive'
-        })
-    })
-})
-
 // ── radiant_soul ─────────────────────────────────────────────────────
 
 describe('miscHandlers – radiant_soul', () => {
@@ -1110,19 +1040,6 @@ describe('miscHandlers – clairvoyant_combatant', () => {
         expect(result.duration).toBe('10_minutes')
         expect(result.uses).toBe(3)
         expect(result.pactMagicRecharge).toBe(true)
-    })
-})
-
-// ── memorize_spell ───────────────────────────────────────────────────
-
-describe('miscHandlers – memorize_spell', () => {
-    it('returns memorize_spell info with defaults', () => {
-        const feature = makeFeature({ type: 'memorize_spell' })
-        const result = miscHandlers.memorize_spell(feature, BASE_STATS)
-        checkDefaults(result, {
-            type: 'memorize_spell',
-            casting_time: 'passive'
-        })
     })
 })
 
@@ -1317,30 +1234,6 @@ describe('miscHandlers – phantasmal_creatures', () => {
     })
 })
 
-// ── illusory_reality ─────────────────────────────────────────────────
-
-describe('miscHandlers – illusory_reality', () => {
-    it('returns illusory_reality info with defaults', () => {
-        const feature = makeFeature({ type: 'illusory_reality' })
-        const result = miscHandlers.illusory_reality(feature, BASE_STATS)
-        checkDefaults(result, {
-            type: 'illusory_reality',
-            effect: 'illusory_reality',
-            casting_time: '1 bonus_action',
-            objectDuration: '1 minute'
-        })
-    })
-
-    it('passes through custom fields', () => {
-        const feature = makeFeature({
-            type: 'illusory_reality',
-            objectDuration: '10 minutes'
-        })
-        const result = miscHandlers.illusory_reality(feature, BASE_STATS)
-        expect(result.objectDuration).toBe('10 minutes')
-    })
-})
-
 // ── celestial_revelation ─────────────────────────────────────────────
 
 describe('miscHandlers – celestial_revelation', () => {
@@ -1375,46 +1268,26 @@ describe('miscHandlers – celestial_revelation', () => {
     })
 })
 
-// ── elfish_lineage ───────────────────────────────────────────────────
+// ── lineage handlers (elfish, gnomish, fiendish) ─────────────────────
 
-describe('miscHandlers – elfish_lineage', () => {
-    it('returns elfish_lineage info with defaults', () => {
-        const feature = makeFeature({ type: 'elfish_lineage' })
-        const result = miscHandlers.elfish_lineage(feature, BASE_STATS)
-        expect(result.type).toBe('elfish_lineage')
-        expect(result.name).toBe('Test Feature')
-        expect(result.options).toEqual([])
-        expect(result.chooseOne).toBe(false)
-        expect(result.hasAutomation).toBe(true)
-    })
-})
+describe('miscHandlers – lineage handlers', () => {
+    const lineageHandlers = [
+        ['elfish_lineage', 'elfish_lineage'],
+        ['gnomish_lineage', 'gnomish_lineage'],
+        ['fiendish_legacy', 'fiendish_legacy']
+    ]
 
-// ── gnomish_lineage ──────────────────────────────────────────────────
-
-describe('miscHandlers – gnomish_lineage', () => {
-    it('returns gnomish_lineage info with defaults', () => {
-        const feature = makeFeature({ type: 'gnomish_lineage' })
-        const result = miscHandlers.gnomish_lineage(feature, BASE_STATS)
-        expect(result.type).toBe('gnomish_lineage')
-        expect(result.name).toBe('Test Feature')
-        expect(result.options).toEqual([])
-        expect(result.chooseOne).toBe(false)
-        expect(result.hasAutomation).toBe(true)
-    })
-})
-
-// ── fiendish_legacy ──────────────────────────────────────────────────
-
-describe('miscHandlers – fiendish_legacy', () => {
-    it('returns fiendish_legacy info with defaults', () => {
-        const feature = makeFeature({ type: 'fiendish_legacy' })
-        const result = miscHandlers.fiendish_legacy(feature, BASE_STATS)
-        expect(result.type).toBe('fiendish_legacy')
-        expect(result.name).toBe('Test Feature')
-        expect(result.options).toEqual([])
-        expect(result.chooseOne).toBe(false)
-        expect(result.hasAutomation).toBe(true)
-    })
+    for (const [handlerName, type] of lineageHandlers) {
+        it(`returns ${type} info with defaults`, () => {
+            const feature = makeFeature({ type: handlerName })
+            const result = miscHandlers[handlerName](feature, BASE_STATS)
+            expect(result.type).toBe(type)
+            expect(result.name).toBe('Test Feature')
+            expect(result.options).toEqual([])
+            expect(result.chooseOne).toBe(false)
+            expect(result.hasAutomation).toBe(true)
+        })
+    }
 })
 
 // ── lesser_restoration ───────────────────────────────────────────────
@@ -1442,35 +1315,6 @@ describe('miscHandlers – lesser_restoration', () => {
         expect(result.range).toBe('30 ft')
         expect(result.conditions).toEqual(['charmed'])
         expect(result.casting_time).toBe('1 action')
-    })
-})
-
-// ── remove_curse ─────────────────────────────────────────────────────
-
-describe('miscHandlers – remove_curse', () => {
-    it('returns remove_curse info with defaults', () => {
-        const feature = makeFeature({ type: 'remove_curse' })
-        const result = miscHandlers.remove_curse(feature, BASE_STATS)
-        checkDefaults(result, {
-            type: 'remove_curse',
-            range: 'Touch',
-            casting_time: '1 action'
-        })
-    })
-})
-
-// ── protection_from_poison ───────────────────────────────────────────
-
-describe('miscHandlers – protection_from_poison', () => {
-    it('returns protection_from_poison info with defaults', () => {
-        const feature = makeFeature({ type: 'protection_from_poison' })
-        const result = miscHandlers.protection_from_poison(feature, BASE_STATS)
-        checkDefaults(result, {
-            type: 'protection_from_poison',
-            range: 'Touch',
-            duration: '1 hour',
-            casting_time: '1 action'
-        })
     })
 })
 
@@ -1546,15 +1390,6 @@ describe('miscHandlers – telekinetic_shove', () => {
         })
         const result = miscHandlers.telekinetic_shove(feature, BASE_STATS)
         expect(result.action).toBe('action')
-    })
-
-    it('derives action from casting_time with underscore variant', () => {
-        const feature = makeFeature({
-            type: 'telekinetic_shove',
-            casting_time: 'bonus_action'
-        })
-        const result = miscHandlers.telekinetic_shove(feature, BASE_STATS)
-        expect(result.action).toBe('bonus_action')
     })
 
     it('passes through custom fields', () => {

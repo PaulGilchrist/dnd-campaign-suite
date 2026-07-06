@@ -332,64 +332,51 @@ describe('Thought Shield — Psychic damage reflection', () => {
   });
 
   describe('concentration check on attacker', () => {
-    it('updates attacker concentration DC when reflected damage is dealt', () => {
-      const goblin = createNpcCreature('Goblin', 10, 10, {
+    it('updates attacker concentration DC when reflected damage is dealt (with/without resistance, large damage)', () => {
+      // With resistance (halved)
+      const goblin1 = createNpcCreature('Goblin', 10, 10, {
         concentration: { spell: 'Burning Hands', dc: 10 },
       });
-      const warlockCreature = createPlayerCreature('Warlock');
-      const cs = makeCombatSummary([goblin, warlockCreature]);
-      const warlock = createWarlockCharacter(20);
-
+      const warlockCreature1 = createPlayerCreature('Warlock');
+      const cs1 = makeCombatSummary([goblin1, warlockCreature1]);
+      const warlock1 = createWarlockCharacter(20);
       stubPlayerRuntime(20);
+      applyDamageToTarget(cs1, 'Warlock', 10, ['Psychic'], 'TestCampaign', [warlock1], false, 'Goblin');
+      expect(goblin1.concentration.dc).toBe(10);
 
-      applyDamageToTarget(cs, 'Warlock', 10, ['Psychic'], 'TestCampaign', [warlock], false, 'Goblin');
-
-      // reflectedDamage = 5 (halved by resistance), dc = Math.max(10, Math.floor(5/2)) = 10
-      expect(goblin.concentration.dc).toBe(10);
-    });
-
-    it('sets concentration DC from reflected damage without resistance', () => {
-      const goblin = createNpcCreature('Goblin', 10, 10, {
+      // Without resistance — DC = max(10, floor(10/2)) = 10
+      const goblin2 = createNpcCreature('Goblin2', 10, 10, {
         concentration: { spell: 'Haste', dc: 5 },
       });
-      const warlockCreature = createPlayerCreature('Warlock');
-      const cs = makeCombatSummary([goblin, warlockCreature]);
-      const warlock = {
-        ...createWarlockCharacter(20),
+      const warlockCreature2 = createPlayerCreature('Warlock');
+      const cs2 = makeCombatSummary([goblin2, warlockCreature2]);
+      const warlock2 = {
+        name: 'Warlock',
         computedStats: {
           ...createWarlockCharacter(20).computedStats,
           resistances: [],
         },
       };
-
       stubPlayerRuntime(20);
+      applyDamageToTarget(cs2, 'Warlock', 10, ['Psychic'], 'TestCampaign', [warlock2], false, 'Goblin2');
+      expect(goblin2.concentration.dc).toBe(10);
 
-      applyDamageToTarget(cs, 'Warlock', 10, ['Psychic'], 'TestCampaign', [warlock], false, 'Goblin');
-
-      // No resistance → 10 reflected, dc = Math.max(10, Math.floor(10/2)) = Math.max(10, 5) = 10
-      expect(goblin.concentration.dc).toBe(10);
-    });
-
-    it('sets concentration DC above 10 for large reflected damage', () => {
-      const goblin = createNpcCreature('Goblin', 50, 50, {
+      // Large damage
+      const goblin3 = createNpcCreature('Goblin3', 50, 50, {
         concentration: { spell: 'Haste', dc: 5 },
       });
-      const warlockCreature = createPlayerCreature('Warlock');
-      const cs = makeCombatSummary([goblin, warlockCreature]);
-      const warlock = {
-        ...createWarlockCharacter(20),
+      const warlockCreature3 = createPlayerCreature('Warlock');
+      const cs3 = makeCombatSummary([goblin3, warlockCreature3]);
+      const warlock3 = {
+        name: 'Warlock',
         computedStats: {
           ...createWarlockCharacter(20).computedStats,
           resistances: [],
         },
       };
-
       stubPlayerRuntime(20);
-
-      applyDamageToTarget(cs, 'Warlock', 30, ['Psychic'], 'TestCampaign', [warlock], false, 'Goblin');
-
-      // 30 reflected, dc = Math.max(10, Math.floor(30/2)) = Math.max(10, 15) = 15
-      expect(goblin.concentration.dc).toBe(15);
+      applyDamageToTarget(cs3, 'Warlock', 30, ['Psychic'], 'TestCampaign', [warlock3], false, 'Goblin3');
+      expect(goblin3.concentration.dc).toBe(15);
     });
 
     it('does not set concentration DC when attacker has no concentration', () => {
@@ -397,11 +384,8 @@ describe('Thought Shield — Psychic damage reflection', () => {
       const warlockCreature = createPlayerCreature('Warlock');
       const cs = makeCombatSummary([goblin, warlockCreature]);
       const warlock = createWarlockCharacter(20);
-
       stubPlayerRuntime(20);
-
       applyDamageToTarget(cs, 'Warlock', 10, ['Psychic'], 'TestCampaign', [warlock], false, 'Goblin');
-
       expect(goblin.concentration).toBeNull();
     });
   });

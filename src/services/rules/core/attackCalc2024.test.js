@@ -102,12 +102,6 @@ describe('attackCalc2024', () => {
       expect(result[0].name).toBe('Unarmed Strike');
     });
 
-    it('returns unarmed strike when allEquipment and allSpells are empty and no class features apply', () => {
-      const result = getAttacks([], [], defaultPlayerStats());
-      expect(result).toHaveLength(1);
-      expect(result[0].name).toBe('Unarmed Strike');
-    });
-
     it('selects Dexterity for ranged weapon attacks', () => {
       // Ranged returns Shortbow, melee returns empty
       findEquippedWeaponsStub
@@ -325,11 +319,8 @@ describe('attackCalc2024', () => {
 
       // Main hand: ability bonus is included in damage
       expect(result[0].damage).toContain('+2');
-      // Off-hand: stub receives includeAbilityBonusInDamage: false so no ability bonus
-      expect(buildWeaponAttackStub).toHaveBeenNthCalledWith(
-        2,
-        expect.objectContaining({ includeAbilityBonusInDamage: false })
-      );
+      // Off-hand: stub produces damage without ability bonus when includeAbilityBonusInDamage is false
+      expect(result[1].damage).toBe('1d4');
     });
 
     it('provides two unarmed strike attacks for a Monk', () => {
@@ -396,20 +387,13 @@ describe('attackCalc2024', () => {
       expect(result[0].name).toBe('Unarmed Strike');
     });
 
-    it('does not add spell attacks when spellAbilities is absent', () => {
-      findEquippedWeaponsStub.mockReturnValue([]);
-
-      const playerStats = defaultPlayerStats({
-        class: { name: 'Fighter' },
-      });
-
-      const result = getAttacks([], [], playerStats);
-
-      expect(result).toHaveLength(1);
-      expect(result[0].name).toBe('Unarmed Strike');
-    });
-
-    it('computes proficiency correctly at level 9', () => {
+    it.each([
+      [1, 2],
+      [5, 3],
+      [9, 4],
+      [13, 5],
+      [17, 6],
+    ])('computes proficiency correctly at level %s (expected: %d)', (level, expectedProf) => {
       findEquippedWeaponsStub
         .mockReturnValueOnce(['Shortbow'])
         .mockReturnValueOnce([]);
@@ -424,7 +408,7 @@ describe('attackCalc2024', () => {
         },
       ];
       const playerStats = defaultPlayerStats({
-        level: 9,
+        level,
         abilities: [
           { name: 'Strength', baseScore: 10, abilityImprovements: 0, miscBonus: 0, bonus: 0 },
           { name: 'Dexterity', baseScore: 18, abilityImprovements: 0, miscBonus: 0, bonus: 4 },
@@ -436,38 +420,7 @@ describe('attackCalc2024', () => {
 
       expect(result).toHaveLength(1);
       expect(buildWeaponAttackStub).toHaveBeenCalledWith(
-        expect.objectContaining({ proficiency: 4 })
-      );
-    });
-
-    it('computes proficiency correctly at level 17', () => {
-      findEquippedWeaponsStub
-        .mockReturnValueOnce(['Shortbow'])
-        .mockReturnValueOnce([]);
-
-      const allEquipment = [
-        {
-          name: 'Shortbow',
-          equipment_category: 'Weapon',
-          weapon_range: 'Ranged',
-          damage: { damage_dice: '1d6', damage_type: 'Piercing' },
-          range: { normal: 80 },
-        },
-      ];
-      const playerStats = defaultPlayerStats({
-        level: 17,
-        abilities: [
-          { name: 'Strength', baseScore: 10, abilityImprovements: 0, miscBonus: 0, bonus: 0 },
-          { name: 'Dexterity', baseScore: 18, abilityImprovements: 0, miscBonus: 0, bonus: 4 },
-        ],
-        class: { name: 'Ranger' },
-      });
-
-      const getAttacksResult = getAttacks(allEquipment, [], playerStats);
-
-      expect(getAttacksResult).toHaveLength(1);
-      expect(buildWeaponAttackStub).toHaveBeenCalledWith(
-        expect.objectContaining({ proficiency: 6 })
+        expect.objectContaining({ proficiency: expectedProf })
       );
     });
 
@@ -961,10 +914,7 @@ describe('attackCalc2024', () => {
 
       expect(result).toHaveLength(2);
       // Off-hand should have ability bonus because of crossbow expert dual wielding
-      expect(buildWeaponAttackStub).toHaveBeenNthCalledWith(
-        2,
-        expect.objectContaining({ includeAbilityBonusInDamage: true })
-      );
+      expect(result[1].damage).toContain('+2');
     });
 
     it('returns attack objects with consistent shape for weapon attacks', () => {

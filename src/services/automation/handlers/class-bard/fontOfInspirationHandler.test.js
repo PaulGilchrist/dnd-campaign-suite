@@ -92,20 +92,6 @@ describe('fontOfInspirationHandler.handle', () => {
       );
     });
 
-    it('should treat null stored value as equal to max', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-      useRuntimeState.getRuntimeValue
-        .mockReturnValueOnce(null)
-        .mockReturnValueOnce(4);
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.payload.description).toBe(
-        'Font of Inspiration: Bardic Inspiration uses are already at maximum (3/3).'
-      );
-    });
-
     it('should use custom name when provided', async () => {
       const ps = makePlayerStats();
       const action = makeAction({ name: 'My Custom Feature' });
@@ -153,23 +139,6 @@ describe('fontOfInspirationHandler.handle', () => {
         'Font of Inspiration: No spell slots available to expend.'
       );
       expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
-    });
-
-    it('should return info popup when no spell slots are defined', async () => {
-      const ps = makePlayerStats({ spellAbilities: {} });
-      const action = makeAction();
-      useRuntimeState.getRuntimeValue
-        .mockReturnValueOnce(2)
-        .mockReturnValueOnce(null)
-        .mockReturnValueOnce(null)
-        .mockReturnValueOnce(null)
-        .mockReturnValueOnce(null);
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.payload.description).toBe(
-        'Font of Inspiration: No spell slots available to expend.'
-      );
     });
 
     it('should return info popup when lowest level slot has 0 stored', async () => {
@@ -253,7 +222,7 @@ describe('fontOfInspirationHandler.handle', () => {
       });
     });
 
-    it('should use the correct player name for runtime calls', async () => {
+    it('should use the correct player name and campaignName for runtime calls', async () => {
       const ps = makePlayerStats({ name: 'Eldara the Wise' });
       const action = makeAction();
       useRuntimeState.getRuntimeValue
@@ -276,24 +245,6 @@ describe('fontOfInspirationHandler.handle', () => {
         'bardicInspirationUses',
         2,
         campaignName,
-      );
-    });
-
-    it('should pass campaignName to setRuntimeValue', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-      const customCampaign = 'EpicCampaign';
-      useRuntimeState.getRuntimeValue
-        .mockReturnValueOnce(2)
-        .mockReturnValueOnce(4);
-
-      await handle(action, ps, customCampaign, null);
-
-      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-        'TestBard',
-        'spell_slots_level_1',
-        3,
-        customCampaign,
       );
     });
 

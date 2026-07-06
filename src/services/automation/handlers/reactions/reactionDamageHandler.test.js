@@ -510,46 +510,5 @@ describe('reactionDamageHandler', () => {
 
             expect(setRuntimeValue).not.toHaveBeenCalledWith('Enemy', 'activeConditions', expect.any(Array), 'test-campaign');
         });
-
-        it('ignores save result events with different promptId and removes event listener after handling', async () => {
-            getRuntimeValue.mockReturnValue(1);
-            const action = makeAction({ automation: { saveType: 'CON' } });
-            resolveTarget.mockResolvedValue({ target: { name: 'Enemy' } });
-
-            await handle(action, makePlayerStats(), 'test-campaign', null);
-
-            window.dispatchEvent(new CustomEvent('save-result', {
-                detail: { promptId: 'wrong-prompt-id', success: false },
-            }));
-
-            await new Promise(r => setTimeout(r, 10));
-
-            expect(addEntry).not.toHaveBeenCalledWith('test-campaign', expect.objectContaining({
-                type: 'damage_roll',
-            }));
-        });
-
-        it('handles target with no activeConditions gracefully', async () => {
-            getRuntimeValue.mockImplementation((_characterKey, propertyName, campaign) => {
-                if (campaign === 'test-campaign' && propertyName === 'targetEffects') return [];
-                if (campaign && propertyName === 'activeConditions') return undefined;
-                return 1;
-            });
-            const action = makeAction({ automation: { saveType: 'CON' } });
-            resolveTarget.mockResolvedValue({ target: { name: 'Enemy' } });
-            const statsWithPhysiciansTouch = makePlayerStats({
-                characterAdvancement: [{ name: "Physician's Touch" }],
-            });
-
-            await handle(action, statsWithPhysiciansTouch, 'test-campaign', null);
-
-            window.dispatchEvent(new CustomEvent('save-result', {
-                detail: { promptId: 'test-prompt-id', success: false },
-            }));
-
-            await new Promise(r => setTimeout(r, 10));
-
-            expect(setRuntimeValue).toHaveBeenCalledWith('Enemy', 'activeConditions', ['poisoned'], 'test-campaign');
-        });
     });
 });

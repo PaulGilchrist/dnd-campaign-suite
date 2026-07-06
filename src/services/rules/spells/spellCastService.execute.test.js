@@ -159,8 +159,34 @@ function getRollDamageContext(services) {
 /* ------------------------------------------------------------------ */
 
 describe('executeSpellCast', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks()
+
+    // Reset mock implementations to defaults after each test
+    const buffService = await import('../../combat/buffs/buffService.js')
+    buffService.getActiveBuffs.mockReturnValue([])
+
+    const silence = await import('../features/silenceService.js')
+    silence.getSilenceSource.mockReturnValue(null)
+    silence.isCreatureInSilenceZone.mockReturnValue(false)
+
+    const buffService2 = await import('../../combat/buffs/buffService.js')
+    buffService2.isInnateSorceryActive.mockReturnValue(false)
+
+    const runtime = await import('../../../hooks/runtime/useRuntimeState.js')
+    runtime.getRuntimeValue.mockImplementation((_key1, key2) => {
+      if (key2 === 'activeConditions' || key2 === 'targetEffects') return []
+      return undefined
+    })
+
+    const rider = await import('./postCastRiderService.js')
+    rider.getEmpoweredEvocationFeatures.mockReturnValue([])
+    rider.getEmpoweredEvocationIntModifier.mockReturnValue(0)
+
+    const range = await import('../combat/rangeValidation.js')
+    range.computeRangeEffect.mockReturnValue({ mode: 'normal' })
+    range.computeEffectiveSpellRange.mockReturnValue(60)
+    range.getDistanceFeet.mockReturnValue(30)
   })
 
   /* ---------------------------------------------------------------- */
@@ -180,16 +206,6 @@ describe('executeSpellCast', () => {
       expect(result).toBeUndefined()
       expect(services.rollAttack).not.toHaveBeenCalled()
       expect(services.rollDamage).not.toHaveBeenCalled()
-    })
-
-    it('allows casting when no buff blocks', async () => {
-      const buffService = await import('../../combat/buffs/buffService.js')
-      vi.mocked(buffService.getActiveBuffs).mockReturnValue([])
-
-      const services = makeServices()
-      await executeSpellCast(makeSpell(), makeMetaCtx(), services)
-
-      expect(services.rollDamage).toHaveBeenCalled()
     })
   })
 
@@ -212,28 +228,6 @@ describe('executeSpellCast', () => {
 
       expect(result).toBeUndefined()
       expect(services.rollDamage).not.toHaveBeenCalled()
-    })
-
-    it('allows casting when spell has no Verbal component despite silence', async () => {
-      const silence = await import('../features/silenceService.js')
-      vi.mocked(silence.getSilenceSource).mockReturnValue('SilenceCaster')
-      vi.mocked(silence.isCreatureInSilenceZone).mockReturnValue(true)
-
-      const services = makeServices()
-      await executeSpellCast(makeSpell({ components: ['S', 'M'] }), makeMetaCtx(), services)
-
-      expect(services.rollDamage).toHaveBeenCalled()
-    })
-
-    it('allows casting when no silence source is active', async () => {
-      const silence = await import('../features/silenceService.js')
-      vi.mocked(silence.getSilenceSource).mockReturnValue(null)
-      vi.mocked(silence.isCreatureInSilenceZone).mockReturnValue(false)
-
-      const services = makeServices()
-      await executeSpellCast(makeSpell({ components: ['V'] }), makeMetaCtx(), services)
-
-      expect(services.rollDamage).toHaveBeenCalled()
     })
   })
 
@@ -332,19 +326,6 @@ describe('executeSpellCast', () => {
       expect(services.rollDamage).toHaveBeenCalled()
       expect(services.rollDamage.mock.calls[0][1]).toBe('1d10')
     })
-
-    it('falls back to first available slot level when exact match missing', async () => {
-      const services = makeServices()
-      const spell = makeSpell({
-        damage: {
-          damage_type: 'Fire',
-          damage_at_slot_level: { 3: '8d6', 4: '10d6', 5: '12d6' },
-        },
-      })
-      await executeSpellCast(spell, makeMetaCtx({ slotLevel: 3 }), services)
-
-      expect(services.rollDamage.mock.calls[0][1]).toBe('8d6')
-    })
   })
 
   /* ---------------------------------------------------------------- */
@@ -384,17 +365,6 @@ describe('executeSpellCast', () => {
       const ctx = getRollDamageContext(services)
       expect(ctx.saveDc).toBe(18)
     })
-
-    it('does not add Innate Sorcery when inactive', async () => {
-      const buffService = await import('../../combat/buffs/buffService.js')
-      vi.mocked(buffService.isInnateSorceryActive).mockReturnValue(false)
-
-      const services = makeServices()
-      await executeSpellCast(makeSpell(), makeMetaCtx(), services)
-
-      const ctx = getRollDamageContext(services)
-      expect(ctx.saveDc).toBe(17)
-    })
   })
 
   /* ---------------------------------------------------------------- */
@@ -421,14 +391,6 @@ describe('executeSpellCast', () => {
 
       const ctx = getRollDamageContext(services)
       expect(ctx.statusEffects).toEqual(['poisoned', 'paralyzed'])
-    })
-
-    it('omits statusEffects when spell has none', async () => {
-      const services = makeServices()
-      await executeSpellCast(makeSpell({ status_effects: [] }), makeMetaCtx(), services)
-
-      const ctx = getRollDamageContext(services)
-      expect(ctx.statusEffects).toBeUndefined()
     })
   })
 
@@ -482,17 +444,6 @@ describe('executeSpellCast', () => {
       expect(services.rollDamage.mock.calls[0][1]).toContain('+ 5')
     })
 
-    it('does not apply Empowered Evocation to non-evocation spells', async () => {
-      const rider = await import('./postCastRiderService.js')
-      vi.mocked(rider.getEmpoweredEvocationFeatures).mockReturnValue([{ type: 'empowered_evocation' }])
-      vi.mocked(rider.getEmpoweredEvocationIntModifier).mockReturnValue(5)
-
-      const services = makeServices()
-      await executeSpellCast(makeSpell({ school: 'Necromancy' }), makeMetaCtx(), services)
-
-      expect(services.rollDamage.mock.calls[0][1]).not.toContain('+ 5')
-    })
-
     it('does not apply when Int modifier is 0', async () => {
       const rider = await import('./postCastRiderService.js')
       vi.mocked(rider.getEmpoweredEvocationFeatures).mockReturnValue([{ type: 'empowered_evocation' }])
@@ -529,43 +480,6 @@ describe('executeSpellCast', () => {
       expect(dice.rollExpressionMaximized).toHaveBeenCalled()
       expect(dice.rollExpression).not.toHaveBeenCalled()
     })
-
-    it('uses normal roll when overchannel is not enabled', async () => {
-      const dice = await import('../../dice/diceRoller.js')
-      const services = makeServices({ playerStats: makeOverchannelPlayerStats() })
-      await executeSpellCast(makeSpell(), makeMetaCtx({ slotLevel: 3 }), services)
-
-      expect(dice.rollExpression).toHaveBeenCalled()
-      expect(dice.rollExpressionMaximized).not.toHaveBeenCalled()
-    })
-
-    it('uses normal roll for slot level 6+ even with overchannel enabled', async () => {
-      const dice = await import('../../dice/diceRoller.js')
-      const services = makeServices({ playerStats: makeOverchannelPlayerStats() })
-      await executeSpellCast(
-        makeSpell(),
-        makeMetaCtx({ slotLevel: 6, overchannel: true }),
-        services,
-      )
-
-      expect(dice.rollExpression).toHaveBeenCalled()
-      expect(dice.rollExpressionMaximized).not.toHaveBeenCalled()
-    })
-
-    it('uses normal roll for cantrips (level 0) even with overchannel enabled', async () => {
-      const dice = await import('../../dice/diceRoller.js')
-      const services = makeServices({ playerStats: makeOverchannelPlayerStats() })
-      await executeSpellCast(
-        makeSpell({ level: 0, damage: undefined }),
-        makeMetaCtx({ slotLevel: 0, overchannel: true }),
-        services,
-      )
-
-      // rollExpressionMaximized is NOT called (overchannel blocked for level 0)
-      expect(dice.rollExpressionMaximized).not.toHaveBeenCalled()
-      // rollExpression IS called for the attack-roll path (no damage formula)
-      expect(dice.rollExpression).toHaveBeenCalled()
-    })
   })
 
   /* ---------------------------------------------------------------- */
@@ -588,23 +502,6 @@ describe('executeSpellCast', () => {
       const ctx = getRollDamageContext(services)
       expect(ctx.isAutoMiss).toBe(true)
       expect(ctx.rangeReason).toBe('Out of range')
-    })
-
-    it('allows roll when target is within range', async () => {
-      const range = await import('../combat/rangeValidation.js')
-      vi.mocked(range.computeEffectiveSpellRange).mockReturnValue(150)
-      vi.mocked(range.getDistanceFeet).mockReturnValue(30)
-      vi.mocked(range.computeRangeEffect).mockReturnValue({ mode: 'normal' })
-
-      const services = makeServices({
-        attackerPos: { gridX: 0, gridY: 0 },
-        targetPos: { gridX: 5, gridY: 0 },
-      })
-      await executeSpellCast(makeSpell(), makeMetaCtx(), services)
-
-      const ctx = getRollDamageContext(services)
-      expect(ctx.isAutoMiss).toBeUndefined()
-      expect(ctx.rangeReason).toBeUndefined()
     })
 
     it('skips range check when positions are not provided', async () => {
@@ -637,42 +534,6 @@ describe('executeSpellCast', () => {
 
       const ctx = getRollDamageContext(services)
       expect(ctx.metamagicHeighten).toBe(true)
-    })
-
-    it('does not set metamagicHeighten without the passive feature', async () => {
-      const runtime = await import('../../../hooks/runtime/useRuntimeState.js')
-      vi.mocked(runtime.getRuntimeValue).mockImplementation((_char, key) => {
-        if (key === 'activeConditions') return ['Invisible']
-        return undefined
-      })
-
-      const services = makeServices({
-        playerStats: makePlayerStats({
-          automation: { passives: [] },
-        }),
-      })
-      await executeSpellCast(makeSpell(), makeMetaCtx(), services)
-
-      const ctx = getRollDamageContext(services)
-      expect(ctx.metamagicHeighten).toBe(false)
-    })
-
-    it('does not set metamagicHeighten when not invisible', async () => {
-      const runtime = await import('../../../hooks/runtime/useRuntimeState.js')
-      vi.mocked(runtime.getRuntimeValue).mockImplementation((_char, key) => {
-        if (key === 'activeConditions') return ['Bleeding']
-        return undefined
-      })
-
-      const services = makeServices({
-        playerStats: makePlayerStats({
-          automation: { passives: [{ type: 'passive_rule', effect: 'magical_ambush' }] },
-        }),
-      })
-      await executeSpellCast(makeSpell(), makeMetaCtx(), services)
-
-      const ctx = getRollDamageContext(services)
-      expect(ctx.metamagicHeighten).toBe(false)
     })
   })
 

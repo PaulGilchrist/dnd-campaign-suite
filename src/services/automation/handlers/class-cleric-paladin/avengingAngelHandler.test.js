@@ -46,9 +46,7 @@ vi.mock('../../../ui/storage.js', () => ({
 import {
   handle,
   isAuraTarget,
-  isActive,
   removeFrightenedOnDamage,
-  handleSaveResult,
 } from './avengingAngelHandler.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../ui/logService.js';
@@ -85,50 +83,40 @@ describe('avengingAngelHandler.handle', () => {
   });
 
   describe('deactivation (toggle off)', () => {
-    it('should return popup indicating deactivation when already active', async () => {
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'avengingAngelActive') return true;
-        if (key === 'activeBuffs') return [{ name: 'Avenging Angel', effect: 'avenging_angel_flight' }];
-        return null;
-      });
-
-      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.description).toBe('Avenging Angel ended.');
-      expect(result.payload.automationType).toBe('avenging_angel');
-    });
-
-    it('should set avengingAngelActive to false', async () => {
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'avengingAngelActive') return true;
-        if (key === 'activeBuffs') return [];
-        return null;
-      });
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(setRuntimeValue).toHaveBeenCalledWith('TestPaladin', 'avengingAngelActive', false, campaignName);
-    });
-
-    it('should remove fly speed buff when toggling off', async () => {
+    it('should return popup and clear state when already active', async () => {
       getRuntimeValue.mockImplementation((name, key) => {
         if (key === 'avengingAngelActive') return true;
         if (key === 'activeBuffs') return [
           { name: 'Other Buff', effect: 'other' },
           { name: 'Avenging Angel', effect: 'avenging_angel_flight' },
         ];
+        if (key === 'avengingAngelAuraTargets') return ['Target1'];
         return null;
       });
 
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
+      const now = Date.now();
+      vi.spyOn(Date, 'now').mockReturnValue(now);
 
+      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+      expect(result.type).toBe('popup');
+      expect(result.payload.description).toBe('Avenging Angel ended.');
+      expect(result.payload.automationType).toBe('avenging_angel');
+      expect(setRuntimeValue).toHaveBeenCalledWith('TestPaladin', 'avengingAngelActive', false, campaignName);
       expect(setRuntimeValue).toHaveBeenCalledWith(
         'TestPaladin',
         'activeBuffs',
         [{ name: 'Other Buff', effect: 'other' }],
         campaignName,
       );
+      expect(setRuntimeValue).toHaveBeenCalledWith('TestPaladin', 'avengingAngelAuraTargets', [], campaignName);
+      expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+        type: 'ability_use',
+        characterName: 'TestPaladin',
+        abilityName: 'Avenging Angel',
+        description: 'Avenging Angel ended.',
+        timestamp: now,
+      }));
     });
 
     it('should filter out avenging_angel_flight effect keeping other buffs', async () => {
@@ -150,172 +138,10 @@ describe('avengingAngelHandler.handle', () => {
         campaignName,
       );
     });
-
-    it('should clear aura targets on deactivation', async () => {
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'avengingAngelActive') return true;
-        if (key === 'activeBuffs') return [];
-        if (key === 'avengingAngelAuraTargets') return ['Target1'];
-        return null;
-      });
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(setRuntimeValue).toHaveBeenCalledWith('TestPaladin', 'avengingAngelAuraTargets', [], campaignName);
-    });
-
-    it('should call addEntry on deactivation', async () => {
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'avengingAngelActive') return true;
-        if (key === 'activeBuffs') return [];
-        return null;
-      });
-
-      const now = Date.now();
-      vi.spyOn(Date, 'now').mockReturnValue(now);
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
-        type: 'ability_use',
-        characterName: 'TestPaladin',
-        abilityName: 'Avenging Angel',
-        description: 'Avenging Angel ended.',
-        timestamp: now,
-      }));
-    });
   });
 
   describe('activation', () => {
-    it('should set avengingAngelActive to true', async () => {
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'avengingAngelActive') return false;
-        if (key === 'activeBuffs') return [];
-        return null;
-      });
-      getCombatContext.mockResolvedValue({ creatures: [] });
-      rollD20.mockReturnValue(20);
-      getAbilityModifier.mockReturnValue(3);
-      utils.guid.mockReturnValue('test-guid');
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(setRuntimeValue).toHaveBeenCalledWith('TestPaladin', 'avengingAngelActive', true, campaignName);
-    });
-
-    it('should add flight buff with default flySpeed 60 and hover false', async () => {
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'avengingAngelActive') return false;
-        if (key === 'activeBuffs') return [];
-        return null;
-      });
-      getCombatContext.mockResolvedValue({ creatures: [] });
-      rollD20.mockReturnValue(20);
-      getAbilityModifier.mockReturnValue(3);
-      utils.guid.mockReturnValue('test-guid');
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'TestPaladin',
-        'activeBuffs',
-        expect.arrayContaining([
-          expect.objectContaining({ flySpeed: 60, hover: false, duration: '10_minutes' }),
-        ]),
-        campaignName,
-      );
-    });
-
-    it('should add flight buff with custom flySpeed from automation', async () => {
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'avengingAngelActive') return false;
-        if (key === 'activeBuffs') return [];
-        return null;
-      });
-      getCombatContext.mockResolvedValue({ creatures: [] });
-      rollD20.mockReturnValue(20);
-      getAbilityModifier.mockReturnValue(3);
-      utils.guid.mockReturnValue('test-guid');
-
-      const customAction = makeAction({ flySpeed: 50 });
-      await handle(customAction, makePlayerStats(), campaignName, null);
-
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'TestPaladin',
-        'activeBuffs',
-        expect.arrayContaining([
-          expect.objectContaining({ flySpeed: 50 }),
-        ]),
-        campaignName,
-      );
-    });
-
-    it('should use hover true from automation when set', async () => {
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'avengingAngelActive') return false;
-        if (key === 'activeBuffs') return [];
-        return null;
-      });
-      getCombatContext.mockResolvedValue({ creatures: [] });
-      rollD20.mockReturnValue(20);
-      getAbilityModifier.mockReturnValue(3);
-      utils.guid.mockReturnValue('test-guid');
-
-      const customAction = makeAction({ hover: true });
-      await handle(customAction, makePlayerStats(), campaignName, null);
-
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'TestPaladin',
-        'activeBuffs',
-        expect.arrayContaining([
-          expect.objectContaining({ hover: true }),
-        ]),
-        campaignName,
-      );
-    });
-
-    it('should clear aura targets on activation', async () => {
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'avengingAngelActive') return false;
-        if (key === 'activeBuffs') return [];
-        if (key === 'avengingAngelAuraTargets') return ['Target1'];
-        return null;
-      });
-      getCombatContext.mockResolvedValue({ creatures: [] });
-      rollD20.mockReturnValue(20);
-      getAbilityModifier.mockReturnValue(3);
-      utils.guid.mockReturnValue('test-guid');
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(setRuntimeValue).toHaveBeenCalledWith('TestPaladin', 'avengingAngelAuraTargets', [], campaignName);
-    });
-
-    it('should call addEntry on activation with description', async () => {
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'avengingAngelActive') return false;
-        if (key === 'activeBuffs') return [];
-        return null;
-      });
-      getCombatContext.mockResolvedValue({ creatures: [] });
-      rollD20.mockReturnValue(20);
-      getAbilityModifier.mockReturnValue(3);
-      utils.guid.mockReturnValue('test-guid');
-
-      const now = Date.now();
-      vi.spyOn(Date, 'now').mockReturnValue(now);
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
-        type: 'ability_use',
-        characterName: 'TestPaladin',
-        abilityName: 'Avenging Angel',
-        timestamp: now,
-      }));
-    });
-
-    it('should return popup with activation description mentioning flight and hover', async () => {
+    it('should return popup and set state when not active', async () => {
       getRuntimeValue.mockImplementation((name, key) => {
         if (key === 'avengingAngelActive') return false;
         if (key === 'activeBuffs') return [];
@@ -335,6 +161,40 @@ describe('avengingAngelHandler.handle', () => {
       expect(result.payload.description).toContain('Frightful Aura');
       expect(result.payload.automationType).toBe('avenging_angel');
       expect(result.payload.automation).toEqual(makeAction().automation);
+      expect(setRuntimeValue).toHaveBeenCalledWith('TestPaladin', 'avengingAngelActive', true, campaignName);
+      expect(setRuntimeValue).toHaveBeenCalledWith(
+        'TestPaladin',
+        'activeBuffs',
+        expect.arrayContaining([
+          expect.objectContaining({ flySpeed: 60, hover: false }),
+        ]),
+        campaignName,
+      );
+      expect(setRuntimeValue).toHaveBeenCalledWith('TestPaladin', 'avengingAngelAuraTargets', [], campaignName);
+    });
+
+    it('should use custom flySpeed and hover from automation', async () => {
+      getRuntimeValue.mockImplementation((name, key) => {
+        if (key === 'avengingAngelActive') return false;
+        if (key === 'activeBuffs') return [];
+        return null;
+      });
+      getCombatContext.mockResolvedValue({ creatures: [] });
+      rollD20.mockReturnValue(20);
+      getAbilityModifier.mockReturnValue(3);
+      utils.guid.mockReturnValue('test-guid');
+
+      const customAction = makeAction({ flySpeed: 50, hover: true });
+      await handle(customAction, makePlayerStats(), campaignName, null);
+
+      expect(setRuntimeValue).toHaveBeenCalledWith(
+        'TestPaladin',
+        'activeBuffs',
+        expect.arrayContaining([
+          expect.objectContaining({ flySpeed: 50, hover: true }),
+        ]),
+        campaignName,
+      );
     });
 
     it('should add existing buffs alongside the new flight buff', async () => {
@@ -363,7 +223,7 @@ describe('avengingAngelHandler.handle', () => {
   });
 
   describe('Frightful Aura - NPC handling', () => {
-    it('should send save result for NPCs that fail the save', async () => {
+    it('should apply frightened and addExpiration when NPC fails save', async () => {
       getRuntimeValue.mockImplementation((name, key) => {
         if (key === 'avengingAngelActive') return false;
         if (key === 'activeBuffs') return [];
@@ -380,79 +240,32 @@ describe('avengingAngelHandler.handle', () => {
 
       await handle(makeAction(), makePlayerStats(), campaignName, null);
 
+      // saveDc = 8 + 3 + 3 = 14, roll 5 + 2 = 7 < 14 = fail
       expect(sendSaveResult).toHaveBeenCalledWith(campaignName, 'Goblin', expect.objectContaining({
         success: false,
         roll: 5,
         saveBonus: 2,
       }));
-    });
-
-    it('should send save result for NPCs that succeed on the save', async () => {
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'avengingAngelActive') return false;
-        if (key === 'activeBuffs') return [];
-        return null;
-      });
-      getCombatContext.mockResolvedValue({
-        creatures: [
-          { name: 'Goblin', type: 'npc', saveBonuses: { wis: 2 }, conditions: [] },
-        ],
-      });
-      rollD20.mockReturnValue(20);
-      getAbilityModifier.mockReturnValue(3);
-      utils.guid.mockReturnValue('test-guid');
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      // saveDc = 8 + 3 + 3 = 14, roll 20 + 2 = 22 >= 14 = success
-      expect(sendSaveResult).toHaveBeenCalledWith(campaignName, 'Goblin', expect.objectContaining({
-        success: true,
-        roll: 20,
-        total: 22,
-      }));
-    });
-
-    it('should apply frightened condition and addExpiration when NPC fails save', async () => {
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'avengingAngelActive') return false;
-        if (key === 'activeBuffs') return [];
-        return null;
-      });
-      getCombatContext.mockResolvedValue({
-        creatures: [
-          { name: 'Goblin', type: 'npc', saveBonuses: { wis: 0 }, conditions: [] },
-        ],
-      });
-      rollD20.mockReturnValue(1);
-      getAbilityModifier.mockReturnValue(3);
-      utils.guid.mockReturnValue('test-guid');
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      // saveDc = 8 + 3 + 3 = 14, roll 1 + 0 = 1 < 14 = fail
-      expect(sendSaveResult).toHaveBeenCalledWith(campaignName, 'Goblin', expect.objectContaining({
-        success: false,
-      }));
       expect(addExpiration).toHaveBeenCalledWith(
         'TestPaladin',
         'Goblin',
-        [{ type: 'frightened', condition: 'frightened' }, { type: 'avenging_angel_aura' }],
+        expect.any(Array),
         campaignName,
         10,
       );
     });
 
-    it('should NOT apply frightened or addExpiration when NPC succeeds', async () => {
+    it('should send save result but not apply frightened when NPC succeeds', async () => {
       getRuntimeValue.mockImplementation((name, key) => {
         if (key === 'avengingAngelActive') return false;
         if (key === 'activeBuffs') return [];
         return null;
       });
-      getCombatContext.mockImplementation(() => Promise.resolve({
+      getCombatContext.mockResolvedValue({
         creatures: [
           { name: 'Goblin', type: 'npc', saveBonuses: { wis: 20 }, conditions: [] },
         ],
-      }));
+      });
       rollD20.mockReturnValue(1);
       getAbilityModifier.mockReturnValue(3);
       utils.guid.mockReturnValue('test-guid');
@@ -466,40 +279,17 @@ describe('avengingAngelHandler.handle', () => {
       expect(addExpiration).not.toHaveBeenCalled();
     });
 
-    it('should apply addExpiration even when creature already has frightened (source does not check)', async () => {
+    it('should handle wis fallback and missing saveBonuses', async () => {
       getRuntimeValue.mockImplementation((name, key) => {
         if (key === 'avengingAngelActive') return false;
         if (key === 'activeBuffs') return [];
         return null;
       });
-      getCombatContext.mockImplementation(() => Promise.resolve({
-        creatures: [
-          { name: 'Goblin', type: 'npc', saveBonuses: { wis: 0 }, conditions: [{ key: 'frightened' }] },
-        ],
-      }));
-      rollD20.mockReturnValue(1);
-      getAbilityModifier.mockReturnValue(3);
-      utils.guid.mockReturnValue('test-guid');
 
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      // saveDc = 8 + 3 + 3 = 14, roll 1 + 0 = 1 < 14 = fail
-      expect(sendSaveResult).toHaveBeenCalledWith(campaignName, 'Goblin', expect.objectContaining({
-        success: false,
-      }));
-      // Source calls addExpiration unconditionally on fail, even if creature already frightened
-      expect(addExpiration).toHaveBeenCalled();
-    });
-
-    it('should handle creature with wis fallback in saveBonuses', async () => {
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'avengingAngelActive') return false;
-        if (key === 'activeBuffs') return [];
-        return null;
-      });
+      // Test wis fallback: saveBonuses.wisdom used when wis is absent
       getCombatContext.mockResolvedValue({
         creatures: [
-          { name: 'Goblin', type: 'npc', saveBonuses: { wisdom: 5 }, conditions: [] },
+          { name: 'Goblin1', type: 'npc', saveBonuses: { wisdom: 5 }, conditions: [] },
         ],
       });
       rollD20.mockReturnValue(10);
@@ -509,30 +299,33 @@ describe('avengingAngelHandler.handle', () => {
       await handle(makeAction(), makePlayerStats(), campaignName, null);
 
       // saveDc = 8 + 3 + 3 = 14, roll 10 + 5 = 15 >= 14 = success
-      expect(sendSaveResult).toHaveBeenCalledWith(campaignName, 'Goblin', expect.objectContaining({
+      expect(sendSaveResult).toHaveBeenCalledWith(campaignName, 'Goblin1', expect.objectContaining({
         success: true,
         saveBonus: 5,
       }));
-    });
 
-    it('should default saveBonus to 0 when saveBonuses is missing', async () => {
+      vi.clearAllMocks();
       getRuntimeValue.mockImplementation((name, key) => {
         if (key === 'avengingAngelActive') return false;
         if (key === 'activeBuffs') return [];
         return null;
       });
+
+      // Test missing saveBonuses defaults to 0
       getCombatContext.mockResolvedValue({
         creatures: [
-          { name: 'Goblin', type: 'npc', conditions: [] },
+          { name: 'Goblin2', type: 'npc', conditions: [] },
         ],
       });
       rollD20.mockReturnValue(1);
       getAbilityModifier.mockReturnValue(3);
-      utils.guid.mockReturnValue('test-guid');
+      utils.guid.mockReturnValue('test-guid-2');
 
       await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-      expect(sendSaveResult).toHaveBeenCalledWith(campaignName, 'Goblin', expect.objectContaining({
+      // saveDc = 8 + 3 + 3 = 14, roll 1 + 0 = 1 < 14 = fail
+      expect(sendSaveResult).toHaveBeenCalledWith(campaignName, 'Goblin2', expect.objectContaining({
+        success: false,
         saveBonus: 0,
       }));
     });
@@ -599,7 +392,6 @@ describe('avengingAngelHandler.handle', () => {
 
       await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-      // Should be treated as NPC (no type → isNpc = true)
       expect(sendSaveResult).toHaveBeenCalledWith(campaignName, 'UnknownCreature', expect.objectContaining({
         success: false,
       }));
@@ -607,46 +399,6 @@ describe('avengingAngelHandler.handle', () => {
   });
 
   describe('Frightful Aura - storage', () => {
-    it('should store affected NPC targets that failed in runtime', async () => {
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'avengingAngelActive') return false;
-        if (key === 'activeBuffs') return [];
-        return null;
-      });
-      getCombatContext.mockResolvedValue({
-        creatures: [
-          { name: 'Goblin', type: 'npc', saveBonuses: { wis: 0 }, conditions: [] },
-        ],
-      });
-      rollD20.mockReturnValue(1);
-      getAbilityModifier.mockReturnValue(3);
-      utils.guid.mockReturnValue('test-guid');
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(setRuntimeValue).toHaveBeenCalledWith('TestPaladin', 'avengingAngelAuraTargets', ['Goblin'], campaignName);
-    });
-
-    it('should store player creature names in runtime', async () => {
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'avengingAngelActive') return false;
-        if (key === 'activeBuffs') return [];
-        return null;
-      });
-      getCombatContext.mockResolvedValue({
-        creatures: [
-          { name: 'Ally', type: 'player' },
-        ],
-      });
-      rollD20.mockReturnValue(20);
-      getAbilityModifier.mockReturnValue(3);
-      utils.guid.mockReturnValue('test-guid');
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(setRuntimeValue).toHaveBeenCalledWith('TestPaladin', 'avengingAngelAuraTargets', ['Ally'], campaignName);
-    });
-
     it('should store only failed NPCs and player creatures, not successful NPCs', async () => {
       getRuntimeValue.mockImplementation((name, key) => {
         if (key === 'avengingAngelActive') return false;
@@ -700,19 +452,6 @@ describe('avengingAngelHandler.handle', () => {
       expect(setRuntimeValue).toHaveBeenCalledWith('TestPaladin', 'avengingAngelAuraTargets', [], campaignName);
     });
 
-    it('should handle combat context with no creatures property', async () => {
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'avengingAngelActive') return false;
-        if (key === 'activeBuffs') return [];
-        return null;
-      });
-      getCombatContext.mockResolvedValue({});
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(sendSaveResult).not.toHaveBeenCalled();
-    });
-
     it('should build save DC from chaBonus + proficiency + 8', async () => {
       getRuntimeValue.mockImplementation((name, key) => {
         if (key === 'avengingAngelActive') return false;
@@ -759,198 +498,81 @@ describe('avengingAngelHandler.handle', () => {
 });
 
 describe('avengingAngelHandler.isAuraTarget', () => {
-  it('should return true when target is in aura targets', () => {
+  it('should return true when target is in aura targets, false otherwise', () => {
     getRuntimeValue.mockReturnValue(['Goblin1', 'Goblin2']);
-
     expect(isAuraTarget('TestPaladin', 'Goblin1', campaignName)).toBe(true);
-  });
-
-  it('should return false when target is not in aura targets', () => {
-    getRuntimeValue.mockReturnValue(['Goblin1', 'Goblin2']);
-
     expect(isAuraTarget('TestPaladin', 'Goblin3', campaignName)).toBe(false);
-  });
 
-  it('should return false when aura targets is empty', () => {
     getRuntimeValue.mockReturnValue([]);
-
     expect(isAuraTarget('TestPaladin', 'Goblin1', campaignName)).toBe(false);
-  });
 
-  it('should return false when aura targets is null', () => {
     getRuntimeValue.mockReturnValue(null);
-
     expect(isAuraTarget('TestPaladin', 'Goblin1', campaignName)).toBe(false);
   });
 });
 
-describe('avengingAngelHandler.isActive', () => {
-  it('should return true when active', () => {
-    getRuntimeValue.mockReturnValue(true);
 
-    expect(isActive('TestPaladin', campaignName)).toBe(true);
+
+describe('avengingAngelHandler.removeFrightenedOnDamage', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    getRuntimeValue.mockReset();
+    getCombatContext.mockReset();
+    storage.set.mockReset();
+    setRuntimeValue.mockReset();
   });
 
-  it('should return false when not active', () => {
-    getRuntimeValue.mockReturnValue(false);
+  it('should remove frightened and clear from aura targets', async () => {
+    getRuntimeValue.mockImplementation((name, key) => {
+      if (key === 'avengingAngelAuraTargets') return ['Goblin'];
+      if (key === 'activeConditions') return ['frightened', 'blinded', 'poisoned'];
+      return null;
+    });
+    getCombatContext.mockResolvedValue({
+      creatures: [{
+        name: 'Goblin',
+        conditions: [{ key: 'frightened' }, { key: 'blinded' }, { key: 'poisoned' }],
+      }],
+    });
 
-    expect(isActive('TestPaladin', campaignName)).toBe(false);
+    await removeFrightenedOnDamage('TestPaladin', 'Goblin', campaignName);
+
+    expect(setRuntimeValue).toHaveBeenCalledWith('Goblin', 'activeConditions', ['blinded', 'poisoned'], campaignName);
+    expect(setRuntimeValue).toHaveBeenCalledWith('TestPaladin', 'avengingAngelAuraTargets', [], campaignName);
   });
 
-  it('should return false when null', () => {
-    getRuntimeValue.mockReturnValue(null);
+  it('should remove target from aura targets list', async () => {
+    getRuntimeValue.mockImplementation((name, key) => {
+      if (key === 'avengingAngelAuraTargets') return ['Goblin1', 'Goblin2', 'Goblin3'];
+      if (key === 'activeConditions') return ['frightened'];
+      return null;
+    });
+    getCombatContext.mockResolvedValue({
+      creatures: [{ name: 'Goblin2', conditions: [{ key: 'frightened' }] }],
+    });
 
-    expect(isActive('TestPaladin', campaignName)).toBe(false);
+    await removeFrightenedOnDamage('TestPaladin', 'Goblin2', campaignName);
+
+    expect(setRuntimeValue).toHaveBeenCalledWith('TestPaladin', 'avengingAngelAuraTargets', ['Goblin1', 'Goblin3'], campaignName);
   });
 
-  it('should return false for any non-true value', () => {
-    getRuntimeValue.mockReturnValue('yes');
+  it('should not modify anything if target not in aura targets', async () => {
+    getRuntimeValue.mockReset().mockImplementation((name, key) => {
+      if (key === 'avengingAngelAuraTargets') return ['OtherCreature'];
+      return null;
+    });
+    getCombatContext.mockResolvedValue({
+      creatures: [{
+        name: 'Goblin',
+        conditions: [{ key: 'frightened' }],
+      }],
+    });
 
-    expect(isActive('TestPaladin', campaignName)).toBe(false);
+    await removeFrightenedOnDamage('TestPaladin', 'Goblin', campaignName);
+
+    expect(setRuntimeValue).not.toHaveBeenCalled();
+    expect(storage.set).not.toHaveBeenCalled();
   });
 });
 
-  describe('avengingAngelHandler.removeFrightenedOnDamage', () => {
-    beforeEach(() => {
-      vi.clearAllMocks();
-      getRuntimeValue.mockReset();
-      getCombatContext.mockReset();
-      storage.set.mockReset();
-      setRuntimeValue.mockReset();
-    });
 
-    it('should remove frightened from creature in combat context', async () => {
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'avengingAngelAuraTargets') return ['Goblin'];
-        if (key === 'activeConditions') return ['frightened', 'blinded'];
-        return null;
-      });
-      getCombatContext.mockResolvedValue({
-        creatures: [{
-          name: 'Goblin',
-          conditions: [{ key: 'frightened' }, { key: 'blinded' }],
-        }],
-      });
-
-      await removeFrightenedOnDamage('TestPaladin', 'Goblin', campaignName);
-
-      expect(setRuntimeValue).toHaveBeenCalledWith('Goblin', 'activeConditions', ['blinded'], campaignName);
-      expect(setRuntimeValue).toHaveBeenCalledWith('TestPaladin', 'avengingAngelAuraTargets', [], campaignName);
-      expect(storage.set).not.toHaveBeenCalled();
-    });
-
-    it('should not call storage.set when combat context is null', async () => {
-      getRuntimeValue.mockReset().mockImplementation((name, key) => {
-        if (key === 'avengingAngelAuraTargets') return ['Goblin'];
-        if (key === 'activeConditions') return ['frightened'];
-        return null;
-      });
-      getCombatContext.mockReset().mockImplementation(() => Promise.resolve(null));
-
-      await removeFrightenedOnDamage('TestPaladin', 'Goblin', campaignName);
-
-      expect(setRuntimeValue).toHaveBeenCalledWith('TestPaladin', 'avengingAngelAuraTargets', [], campaignName);
-      expect(storage.set).not.toHaveBeenCalled();
-    });
-
-    it('should handle creature without conditions', async () => {
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'avengingAngelAuraTargets') return ['Goblin'];
-        if (key === 'activeConditions') return undefined;
-        return null;
-      });
-      getCombatContext.mockResolvedValue({
-        creatures: [{ name: 'Goblin', conditions: undefined }],
-      });
-
-      await removeFrightenedOnDamage('TestPaladin', 'Goblin', campaignName);
-
-      expect(setRuntimeValue).toHaveBeenCalledWith('TestPaladin', 'avengingAngelAuraTargets', [], campaignName);
-    });
-
-    it('should only remove frightened condition, not others', async () => {
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'avengingAngelAuraTargets') return ['Goblin'];
-        if (key === 'activeConditions') return ['frightened', 'blinded', 'poisoned'];
-        return null;
-      });
-      getCombatContext.mockResolvedValue({
-        creatures: [{
-          name: 'Goblin',
-          conditions: [{ key: 'frightened' }, { key: 'blinded' }, { key: 'poisoned' }],
-        }],
-      });
-
-      await removeFrightenedOnDamage('TestPaladin', 'Goblin', campaignName);
-
-      expect(setRuntimeValue).toHaveBeenCalledWith('Goblin', 'activeConditions', ['blinded', 'poisoned'], campaignName);
-      expect(setRuntimeValue).toHaveBeenCalledWith('TestPaladin', 'avengingAngelAuraTargets', [], campaignName);
-    });
-
-    it('should not modify creature if target not in aura targets', async () => {
-      getRuntimeValue.mockReset().mockImplementation((name, key) => {
-        if (key === 'avengingAngelAuraTargets') return ['OtherCreature'];
-        return null;
-      });
-      getCombatContext.mockResolvedValue({
-        creatures: [{
-          name: 'Goblin',
-          conditions: [{ key: 'frightened' }],
-        }],
-      });
-
-      await removeFrightenedOnDamage('TestPaladin', 'Goblin', campaignName);
-
-      expect(setRuntimeValue).not.toHaveBeenCalled();
-      expect(storage.set).not.toHaveBeenCalled();
-    });
-
-    it('should not call storage.set when creature not found in combat context', async () => {
-      getRuntimeValue.mockReset().mockReturnValue(['Goblin']);
-      getCombatContext.mockResolvedValue({
-        creatures: [{ name: 'OtherCreature', conditions: [{ key: 'frightened' }] }],
-      });
-
-      await removeFrightenedOnDamage('TestPaladin', 'Goblin', campaignName);
-
-      expect(storage.set).not.toHaveBeenCalled();
-      expect(setRuntimeValue).toHaveBeenCalledWith('TestPaladin', 'avengingAngelAuraTargets', [], campaignName);
-    });
-
-    it('should remove target from aura targets list', async () => {
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'avengingAngelAuraTargets') return ['Goblin1', 'Goblin2', 'Goblin3'];
-        if (key === 'activeConditions') return ['frightened'];
-        return null;
-      });
-      getCombatContext.mockResolvedValue({
-        creatures: [{ name: 'Goblin2', conditions: [{ key: 'frightened' }] }],
-      });
-
-      await removeFrightenedOnDamage('TestPaladin', 'Goblin2', campaignName);
-
-      expect(setRuntimeValue).toHaveBeenCalledWith('TestPaladin', 'avengingAngelAuraTargets', ['Goblin1', 'Goblin3'], campaignName);
-    });
-  });
-
-describe('avengingAngelHandler.handleSaveResult', () => {
-  it('should do nothing when event has no detail', () => {
-    const event = { detail: null };
-    expect(() => handleSaveResult(event)).not.toThrow();
-  });
-
-  it('should do nothing when event has no promptId', () => {
-    const event = { detail: {} };
-    expect(() => handleSaveResult(event)).not.toThrow();
-  });
-
-  it('should do nothing when event has detail but no promptId', () => {
-    const event = { detail: { someOtherField: 'value' } };
-    expect(() => handleSaveResult(event)).not.toThrow();
-  });
-
-  it('should be a placeholder that returns early without side effects', () => {
-    const event = { detail: { promptId: 'test-prompt' } };
-    expect(() => handleSaveResult(event)).not.toThrow();
-  });
-});

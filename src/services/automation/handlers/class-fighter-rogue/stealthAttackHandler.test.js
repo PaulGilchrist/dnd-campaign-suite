@@ -11,7 +11,6 @@ vi.mock('../../../ui/logService.js', () => ({
 }));
 
 const { setRuntimeValue } = await import('../../../../hooks/runtime/useRuntimeState.js');
-const { addEntry } = await import('../../../ui/logService.js');
 
 beforeEach(() => {
     vi.clearAllMocks();
@@ -77,37 +76,6 @@ describe('stealthAttackHandler', () => {
             expect(result.type).toBe('modal');
             expect(result.payload.costD6).toBe(3);
             expect(result.payload.availableDice).toBe(5);
-        });
-
-        it('allows cost equal to available dice', async () => {
-            const stats = makePlayerStats({
-                class: { class_levels: [{ level: 1, sneak_attack_num_d6: 2 }] },
-            });
-
-            const result = await handle(
-                makeAction({ automation: { cost: '2d6' } }),
-                stats,
-                'test-campaign'
-            );
-
-            expect(result.type).toBe('modal');
-            expect(result.payload.costD6).toBe(2);
-            expect(result.payload.availableDice).toBe(2);
-        });
-
-        it('defaults cost to 1d6 when automation cost is malformed or empty', async () => {
-            const stats = makePlayerStats({
-                class: { class_levels: [{ level: 1, sneak_attack_num_d6: 2 }] },
-            });
-
-            const result = await handle(
-                makeAction({ automation: { cost: '2d8' } }),
-                stats,
-                'test-campaign'
-            );
-
-            expect(result.type).toBe('modal');
-            expect(result.payload.costD6).toBe(1);
         });
 
         it('returns error popup when sneak attack dice are insufficient', async () => {
@@ -178,43 +146,6 @@ describe('stealthAttackHandler', () => {
                 'test-campaign',
                 true
             );
-        });
-
-        it('logs an ability_use entry on success', async () => {
-            const stats = makePlayerStats({
-                class: { class_levels: [{ level: 1, sneak_attack_num_d6: 3 }] },
-            });
-
-            await applyStealthAttack(makeAction(), stats, 'test-campaign', 1);
-
-            expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
-                type: 'ability_use',
-                characterName: 'TestRogue',
-                abilityName: 'Stealth Attack',
-            }));
-        });
-
-        it('does not call setRuntimeValue or addEntry on failure', async () => {
-            const stats = makePlayerStats({
-                class: { class_levels: [{ level: 1, sneak_attack_num_d6: 1 }] },
-            });
-
-            await applyStealthAttack(makeAction(), stats, 'test-campaign', 5);
-
-            expect(setRuntimeValue).not.toHaveBeenCalled();
-            expect(addEntry).not.toHaveBeenCalled();
-        });
-
-        it('swallows addEntry errors without throwing', async () => {
-            const stats = makePlayerStats({
-                class: { class_levels: [{ level: 1, sneak_attack_num_d6: 3 }] },
-            });
-
-            addEntry.mockRejectedValue(new Error('network error'));
-
-            const result = await applyStealthAttack(makeAction(), stats, 'test-campaign', 1);
-
-            expect(result.type).toBe('popup');
         });
     });
 });

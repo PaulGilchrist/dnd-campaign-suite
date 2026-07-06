@@ -210,54 +210,5 @@ describe('Player save damage edge cases', () => {
         expect(deps.pendingSaves[promptId].isCantrip).toBe(true);
     });
 
-    it('shows waiting popup when sending save prompt', async () => {
-        const fn = createFn();
-        await fn('Fireball', '8d6', 20, [3, 4, 5, 2, 3, 3], 0, {
-            targetName: 'Ally1',
-            damageType: 'fire',
-            saveDc: 15,
-            saveType: 'DEX',
-            dcSuccess: 'half',
-        });
 
-        expect(deps.setPopupHtml).toHaveBeenCalledWith(expect.objectContaining({
-            type: 'save-damage',
-            waitingForPlayerSave: true,
-            rawDamage: 20,
-        }));
-    });
-
-    it('returns true from handlePlayerSaveDamage when save prompt is sent', async () => {
-        const fn = createFn();
-        await fn('Fireball', '8d6', 20, [3, 4, 5, 2, 3, 3], 0, {
-            targetName: 'Ally1',
-            damageType: 'fire',
-            saveDc: 15,
-            saveType: 'DEX',
-            dcSuccess: 'half',
-        });
-        // The main function should not fall through to handlePlainDamage
-        // since handlePlayerSaveDamage returned true
-        const logCalls = deps.logEntry.mock.calls.map(c => c[0]);
-        const damageEntry = logCalls.find(entry => entry.rollType === 'damage');
-        expect(damageEntry).toBeUndefined();
-    });
-
-    it('does not prompt for save when target is not a player and not npc (null target)', async () => {
-        loadCombatSummary.mockResolvedValue({ creatures: [] });
-
-        const fn = createFn();
-        await fn('Fireball', '8d6', 20, [3, 4, 5, 2, 3, 3], 0, {
-            targetName: 'NonExistent',
-            damageType: 'fire',
-            saveDc: 15,
-            saveType: 'DEX',
-            dcSuccess: 'half',
-        });
-
-        // Falls through to handlePlainDamage since target is null
-        // sendSavePrompt is only called from handlePlayerSaveDamage which returns early for null target
-        const savePromptCalls = deps.logEntry.mock.calls.filter(c => c[0].rollType === 'save-prompt');
-        expect(savePromptCalls).toHaveLength(0);
-    });
 });

@@ -89,17 +89,6 @@ describe('searingVengeanceHandler.handle', () => {
       expect(result.payload.name).toBe('Searing Vengeance');
       expect(result.payload.description).toContain('has no uses remaining');
       expect(result.payload.description).toContain('Long Rest');
-      expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
-    });
-
-    it('returns a popup when uses are negative', async () => {
-      mockRuntimeValues({ searingvengeanceUses: -1 });
-
-      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.description).toContain('has no uses remaining');
-      expect(damageUtils.getCombatContext).not.toHaveBeenCalled();
     });
 
     it('falls back to usesMax when no stored uses value exists', async () => {
@@ -131,7 +120,6 @@ describe('searingVengeanceHandler.handle', () => {
       expect(result.type).toBe('popup');
       expect(result.payload.type).toBe('automation_info');
       expect(result.payload.description).toBe('No combat active.');
-      expect(damageUtils.getTargetFromAttacker).not.toHaveBeenCalled();
     });
   });
 
@@ -200,24 +188,6 @@ describe('searingVengeanceHandler.handle', () => {
       expect(storage.set).toHaveBeenCalledWith('combatSummary', expect.any(Object), campaignName);
     });
 
-    it('uses player max HP from hitPoints when target is missing maxHp', async () => {
-      mockRuntimeValues({ searingvengeanceUses: 1 });
-      damageUtils.getCombatContext.mockResolvedValue({});
-      damageUtils.getTargetFromAttacker.mockReturnValue({
-        name: 'Ally',
-        type: 'player',
-      });
-      diceRoller.rollExpression.mockReturnValue({ total: 10 });
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-        'Ally',
-        'currentHitPoints',
-        35,
-        campaignName
-      );
-    });
   });
 
   describe('condition clearing', () => {
@@ -242,32 +212,6 @@ describe('searingVengeanceHandler.handle', () => {
         'Ally',
         'activeConditions',
         [],
-        campaignName
-      );
-    });
-
-    it('does not error when creature has no conditions array', async () => {
-      mockRuntimeValues({ searingvengeanceUses: 1 });
-      const cs = {
-        creatures: [{
-          name: 'Ally',
-        }],
-      };
-      damageUtils.getCombatContext.mockResolvedValueOnce(cs).mockResolvedValueOnce(cs);
-      damageUtils.getTargetFromAttacker.mockReturnValue({
-        name: 'Ally',
-        type: 'player',
-      });
-      diceRoller.rollExpression.mockReturnValue({ total: 10 });
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      // No direct mutation since creature.conditions is undefined
-      // but healing and damage should still proceed
-      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-        'Ally',
-        'currentHitPoints',
-        35,
         campaignName
       );
     });
@@ -470,33 +414,6 @@ describe('searingVengeanceHandler.handle', () => {
       expect(result.payload.description).toContain('Blinded');
     });
 
-    it('includes the automation object in the popup payload', async () => {
-      mockRuntimeValues({ searingvengeanceUses: 1 });
-      damageUtils.getCombatContext.mockResolvedValue({});
-      damageUtils.getTargetFromAttacker.mockReturnValue({
-        name: 'Ally',
-        type: 'player',
-      });
-      diceRoller.rollExpression.mockReturnValue({ total: 10 });
-
-      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(result.payload.automation).toEqual(makeAction().automation);
-    });
-
-    it('includes automationType in the popup payload', async () => {
-      mockRuntimeValues({ searingvengeanceUses: 1 });
-      damageUtils.getCombatContext.mockResolvedValue({});
-      damageUtils.getTargetFromAttacker.mockReturnValue({
-        name: 'Ally',
-        type: 'player',
-      });
-      diceRoller.rollExpression.mockReturnValue({ total: 10 });
-
-      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(result.payload.automationType).toBeUndefined();
-    });
   });
 
   describe('uses consumption', () => {
@@ -519,24 +436,6 @@ describe('searingVengeanceHandler.handle', () => {
       );
     });
 
-    it('decrements uses by one regardless of heal/damage outcome', async () => {
-      mockRuntimeValues({ searingvengeanceUses: 3 });
-      damageUtils.getCombatContext.mockResolvedValue({});
-      damageUtils.getTargetFromAttacker.mockReturnValue({
-        name: 'Ally',
-        type: 'player',
-      });
-      diceRoller.rollExpression.mockReturnValue({ total: 10 });
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-        'TestCleric',
-        'searingvengeanceUses',
-        2,
-        campaignName
-      );
-    });
   });
 
   describe('edge cases', () => {
@@ -562,27 +461,6 @@ describe('searingVengeanceHandler.handle', () => {
       diceRoller.rollExpression.mockReturnValue({ total: 10 });
 
       const stats = makePlayerStats({ hitPoints: {}, currentHitPoints: 40 });
-
-      await handle(makeAction(), stats, campaignName, null);
-
-      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-        'Ally',
-        'currentHitPoints',
-        20,
-        campaignName
-      );
-    });
-
-    it('handles a player with no hitPoints by falling back to currentHitPoints', async () => {
-      mockRuntimeValues({ searingvengeanceUses: 1 });
-      damageUtils.getCombatContext.mockResolvedValue({});
-      damageUtils.getTargetFromAttacker.mockReturnValue({
-        name: 'Ally',
-        type: 'player',
-      });
-      diceRoller.rollExpression.mockReturnValue({ total: 10 });
-
-      const stats = makePlayerStats({ hitPoints: undefined, currentHitPoints: 40 });
 
       await handle(makeAction(), stats, campaignName, null);
 

@@ -7,7 +7,6 @@ import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useR
 import { addEntry } from '../../../ui/logService.js';
 import { addExpiration } from '../../../rules/effects/expirations.js';
 import { postLogEntry } from '../../../shared/logPoster.js';
-import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import storage from '../../../ui/storage.js';
 
 vi.mock('../../common/savePrompt.js', () => ({
@@ -30,10 +29,6 @@ vi.mock('../../../rules/effects/expirations.js', () => ({
 
 vi.mock('../../../shared/logPoster.js', () => ({
     postLogEntry: vi.fn(),
-}));
-
-vi.mock('../../../rules/combat/damageUtils.js', () => ({
-    getCombatContext: vi.fn(),
 }));
 
 vi.mock('../../../ui/storage.js', () => ({
@@ -59,7 +54,7 @@ function defaultSaveListener(success = true) {
     });
 }
 
-// ─── Success path (save succeeds) ───
+// ─── Success path ───
 
 describe('friendsHandler.handle', () => {
     beforeEach(() => {
@@ -69,9 +64,6 @@ describe('friendsHandler.handle', () => {
     describe('save succeeds', () => {
         it('returns a popup indicating the save succeeded', async () => {
             defaultSaveListener(true);
-            getCombatContext.mockResolvedValue({
-                creatures: [{ name: 'Goblin', type: 'npc' }],
-            });
 
             const result = await handle(makeAction(), defaultPlayerStats, campaignName, null);
 
@@ -87,9 +79,6 @@ describe('friendsHandler.handle', () => {
 
         it('logs the ability use and save result entries', async () => {
             defaultSaveListener(true);
-            getCombatContext.mockResolvedValue({
-                creatures: [{ name: 'Goblin', type: 'npc' }],
-            });
 
             await handle(makeAction(), defaultPlayerStats, campaignName, null);
 
@@ -117,7 +106,6 @@ describe('friendsHandler.handle', () => {
 
         it('clears active Friends tracking after a successful save', async () => {
             defaultSaveListener(true);
-            getCombatContext.mockResolvedValue(null);
 
             await handle(makeAction(), defaultPlayerStats, campaignName, null);
 
@@ -128,60 +116,28 @@ describe('friendsHandler.handle', () => {
                 campaignName,
             );
         });
-
-        it('posts a log entry when the save succeeds', async () => {
-            defaultSaveListener(true);
-            getCombatContext.mockResolvedValue(null);
-
-            await handle(makeAction(), defaultPlayerStats, campaignName, null);
-
-            expect(postLogEntry).not.toHaveBeenCalled();
-        });
-
-        it('does not apply conditions when the save succeeds', async () => {
-            defaultSaveListener(true);
-            getCombatContext.mockResolvedValue({
-                creatures: [{ name: 'Ally1', type: 'player' }],
-            });
-
-            await handle(makeAction({ targetName: 'Ally1' }), defaultPlayerStats, campaignName, null);
-
-            expect(setRuntimeValue).not.toHaveBeenCalledWith(
-                'Ally1',
-                'activeConditions',
-                expect.anything(),
-                campaignName,
-            );
-            expect(addExpiration).not.toHaveBeenCalled();
-        });
     });
 
-    // ─── Save fails: player target ───
+    // ─── Save fails ───
 
-    describe('save fails — player target', () => {
-        it('applies charmed condition to the player via runtime state', async () => {
+    describe('save fails', () => {
+        it('applies charmed condition to the target', async () => {
             defaultSaveListener(false);
             getRuntimeValue.mockReturnValue([]);
-            getCombatContext.mockResolvedValue({
-                creatures: [{ name: 'Ally1', type: 'player' }],
-            });
 
-            await handle(makeAction({ targetName: 'Ally1' }), defaultPlayerStats, campaignName, null);
+            await handle(makeAction({ targetName: 'Goblin' }), defaultPlayerStats, campaignName, null);
 
             expect(setRuntimeValue).toHaveBeenCalledWith(
-                'Ally1',
+                'Goblin',
                 'activeConditions',
                 expect.arrayContaining(['charmed']),
                 campaignName,
             );
         });
 
-        it('removes existing charmed condition before re-adding for player target', async () => {
+        it('removes existing charmed condition before re-adding', async () => {
             defaultSaveListener(false);
             getRuntimeValue.mockReturnValue(['charmed', 'frightened']);
-            getCombatContext.mockResolvedValue({
-                creatures: [{ name: 'Ally1', type: 'player' }],
-            });
 
             await handle(makeAction({ targetName: 'Ally1' }), defaultPlayerStats, campaignName, null);
 
@@ -193,12 +149,9 @@ describe('friendsHandler.handle', () => {
             expect(newConditions).toEqual(['frightened', 'charmed']);
         });
 
-        it('calls addExpiration and postLogEntry for player targets (unconditional on failure)', async () => {
+        it('calls addExpiration and postLogEntry for the target', async () => {
             defaultSaveListener(false);
             getRuntimeValue.mockReturnValue([]);
-            getCombatContext.mockResolvedValue({
-                creatures: [{ name: 'Ally1', type: 'player' }],
-            });
 
             await handle(makeAction({ targetName: 'Ally1' }), defaultPlayerStats, campaignName, null);
 
@@ -215,85 +168,9 @@ describe('friendsHandler.handle', () => {
             );
         });
 
-        it('does not call storage.set for player targets', async () => {
+        it('posts a condition log entry with correct details', async () => {
             defaultSaveListener(false);
             getRuntimeValue.mockReturnValue([]);
-            getCombatContext.mockResolvedValue({
-                creatures: [{ name: 'Ally1', type: 'player' }],
-            });
-
-            await handle(makeAction({ targetName: 'Ally1' }), defaultPlayerStats, campaignName, null);
-
-            expect(storage.set).not.toHaveBeenCalled();
-        });
-    });
-
-    // ─── Save fails: NPC creature ───
-
-    describe('save fails — NPC creature', () => {
-        it('adds charmed condition to the creature conditions array', async () => {
-            defaultSaveListener(false);
-            const creature = { name: 'Goblin', type: 'npc', conditions: [] };
-            getCombatContext.mockResolvedValue({ creatures: [creature] });
-
-            await handle(makeAction({ targetName: 'Goblin' }), defaultPlayerStats, campaignName, null);
-
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'Goblin',
-                'activeConditions',
-                expect.arrayContaining(['charmed']),
-                campaignName,
-            );
-        });
-
-        it('replaces an existing charmed condition with a new one for NPCs', async () => {
-            defaultSaveListener(false);
-            getRuntimeValue.mockReturnValue(['charmed', 'blinded']);
-            const creature = { name: 'Goblin', type: 'npc', conditions: [] };
-            getCombatContext.mockResolvedValue({ creatures: [creature] });
-
-            await handle(makeAction({ targetName: 'Goblin' }), defaultPlayerStats, campaignName, null);
-
-            const calls = setRuntimeValue.mock.calls.filter(
-                (c) => c[1] === 'activeConditions',
-            );
-            expect(calls).toHaveLength(1);
-            const newConditions = calls[0][2];
-            expect(newConditions).toEqual(['blinded', 'charmed']);
-        });
-
-        it('does not call storage.set for NPC targets', async () => {
-            defaultSaveListener(false);
-            const creature = { name: 'Goblin', type: 'npc', conditions: [] };
-            getCombatContext.mockResolvedValue({ creatures: [creature] });
-
-            await handle(makeAction({ targetName: 'Goblin' }), defaultPlayerStats, campaignName, null);
-
-            expect(storage.set).not.toHaveBeenCalled();
-        });
-
-        it('calls addExpiration with correct parameters for NPC', async () => {
-            defaultSaveListener(false);
-            const creature = { name: 'Goblin', type: 'npc', conditions: [] };
-            getCombatContext.mockResolvedValue({ creatures: [creature] });
-
-            await handle(makeAction({ targetName: 'Goblin' }), defaultPlayerStats, campaignName, null);
-
-            expect(addExpiration).toHaveBeenCalledWith(
-                'Bard1',
-                'Goblin',
-                expect.arrayContaining([
-                    expect.objectContaining({ type: 'condition', condition: 'charmed' }),
-                ]),
-                campaignName,
-                2,
-            );
-        });
-
-        it('posts a condition log entry for NPC', async () => {
-            defaultSaveListener(false);
-            const creature = { name: 'Goblin', type: 'npc', conditions: [] };
-            getCombatContext.mockResolvedValue({ creatures: [creature] });
 
             await handle(makeAction({ targetName: 'Goblin' }), defaultPlayerStats, campaignName, null);
 
@@ -309,10 +186,9 @@ describe('friendsHandler.handle', () => {
             );
         });
 
-        it('returns a popup with the failure description for NPC', async () => {
+        it('returns a popup with the failure description', async () => {
             defaultSaveListener(false);
-            const creature = { name: 'Goblin', type: 'npc', conditions: [] };
-            getCombatContext.mockResolvedValue({ creatures: [creature] });
+            getRuntimeValue.mockReturnValue([]);
 
             const result = await handle(makeAction({ targetName: 'Goblin' }), defaultPlayerStats, campaignName, null);
 
@@ -322,15 +198,23 @@ describe('friendsHandler.handle', () => {
             expect(result.payload.description).toContain('Concentration');
             expect(result.payload.targetName).toBe('Goblin');
         });
+
+        it('does not call storage.set', async () => {
+            defaultSaveListener(false);
+            getRuntimeValue.mockReturnValue([]);
+
+            await handle(makeAction({ targetName: 'Goblin' }), defaultPlayerStats, campaignName, null);
+
+            expect(storage.set).not.toHaveBeenCalled();
+        });
     });
 
-    // ─── Save fails: target not found in combat ───
+    // ─── Target not in combat ───
 
-    describe('save fails — target not in combat', () => {
+    describe('target not in combat', () => {
         it('still applies expiration and log entry when targetCreature is undefined', async () => {
             defaultSaveListener(false);
             getRuntimeValue.mockReturnValue([]);
-            getCombatContext.mockResolvedValue({ creatures: [] });
 
             await handle(makeAction({ targetName: 'MissingTarget' }), defaultPlayerStats, campaignName, null);
 
@@ -347,20 +231,9 @@ describe('friendsHandler.handle', () => {
             );
         });
 
-        it('does not call storage.set when targetCreature is undefined', async () => {
-            defaultSaveListener(false);
-            getRuntimeValue.mockReturnValue([]);
-            getCombatContext.mockResolvedValue({ creatures: [] });
-
-            await handle(makeAction({ targetName: 'MissingTarget' }), defaultPlayerStats, campaignName, null);
-
-            expect(storage.set).not.toHaveBeenCalled();
-        });
-
         it('applies charmed condition via setRuntimeValue even when targetCreature is undefined', async () => {
             defaultSaveListener(false);
             getRuntimeValue.mockReturnValue([]);
-            getCombatContext.mockResolvedValue({ creatures: [] });
 
             await handle(makeAction({ targetName: 'MissingTarget' }), defaultPlayerStats, campaignName, null);
 
@@ -378,7 +251,6 @@ describe('friendsHandler.handle', () => {
     describe('no combat context', () => {
         it('handles null combat context gracefully on success', async () => {
             defaultSaveListener(true);
-            getCombatContext.mockResolvedValue(null);
 
             const result = await handle(makeAction(), defaultPlayerStats, campaignName, null);
 
@@ -386,28 +258,13 @@ describe('friendsHandler.handle', () => {
             expect(result.payload.description).toContain('Unknown');
         });
 
-        it('handles null combat context on failure with no creatures', async () => {
+        it('handles null combat context on failure', async () => {
             defaultSaveListener(false);
-            getCombatContext.mockResolvedValue(null);
 
             const result = await handle(makeAction(), defaultPlayerStats, campaignName, null);
 
             expect(result.type).toBe('popup');
             expect(result.payload.targetName).toBe('Unknown');
-        });
-
-        it('clears active tracking key on campaign even with null combat context', async () => {
-            defaultSaveListener(true);
-            getCombatContext.mockResolvedValue(null);
-
-            await handle(makeAction(), defaultPlayerStats, campaignName, null);
-
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                campaignName,
-                '_activeFriends_Bard1',
-                null,
-                campaignName,
-            );
         });
     });
 
@@ -416,8 +273,7 @@ describe('friendsHandler.handle', () => {
     describe('custom targetName', () => {
         it('uses the automation targetName in all outputs', async () => {
             defaultSaveListener(false);
-            const creature = { name: 'CustomTarget', type: 'npc', conditions: [] };
-            getCombatContext.mockResolvedValue({ creatures: [creature] });
+            getRuntimeValue.mockReturnValue([]);
 
             await handle(makeAction({ targetName: 'CustomTarget' }), defaultPlayerStats, campaignName, null);
 
@@ -447,8 +303,7 @@ describe('friendsHandler.handle', () => {
         it('passes saveDc to the save listener when save fails', async () => {
             const customDc = 13;
             defaultSaveListener(false);
-            const creature = { name: 'Goblin', type: 'npc', conditions: [] };
-            getCombatContext.mockResolvedValue({ creatures: [creature] });
+            getRuntimeValue.mockReturnValue([]);
 
             await handle(makeAction({ targetName: 'Goblin', saveDc: customDc }), defaultPlayerStats, campaignName, null);
 
@@ -464,7 +319,6 @@ describe('friendsHandler.handle', () => {
     describe('createSaveListener invocation', () => {
         it('calls createSaveListener with correct parameters', async () => {
             defaultSaveListener(true);
-            getCombatContext.mockResolvedValue(null);
 
             await handle(makeAction({ targetName: 'Goblin' }), defaultPlayerStats, campaignName, null);
 

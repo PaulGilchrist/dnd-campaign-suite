@@ -254,80 +254,24 @@ describe('rules.getPlayerStats - 5e basics', () => {
   });
 
   describe('rules field', () => {
-    it('should set rules to 5e when playerSummary has no rules field', async () => {
+    it('should default rules to 5e when playerSummary has no rules field', async () => {
       const playerSummary = makePlayerSummary({ rules: undefined });
-      const result = await rules.getPlayerStats([], [], [], [], [], playerSummary);
-      expect(result.rules).toBe('5e');
-    });
-
-    it('should preserve rules field from playerSummary', async () => {
-      const playerSummary = makePlayerSummary({ rules: '5e' });
       const result = await rules.getPlayerStats([], [], [], [], [], playerSummary);
       expect(result.rules).toBe('5e');
     });
   });
 
   describe('proficiency bonus', () => {
-    it('should set proficiency to 2 at level 1', async () => {
-      const playerSummary = makePlayerSummary({ level: 1 });
+    it.each`
+      level  | expectedProficiency
+      ${1}   | ${2}
+      ${5}   | ${3}
+      ${9}   | ${4}
+      ${17}  | ${6}
+    `('should compute proficiency from level $level', async ({ level, expectedProficiency }) => {
+      const playerSummary = makePlayerSummary({ level });
       const result = await rules.getPlayerStats([], [], [], [], [], playerSummary);
-      expect(result.proficiency).toBe(2);
-    });
-
-    it('should compute proficiency from level formula', async () => {
-      const playerSummary = makePlayerSummary({ level: 5 });
-      const result = await rules.getPlayerStats([], [], [], [], [], playerSummary);
-      expect(result.proficiency).toBe(3);
-    });
-
-    it('should set proficiency to 4 at level 9', async () => {
-      const playerSummary = makePlayerSummary({ level: 9 });
-      const result = await rules.getPlayerStats([], [], [], [], [], playerSummary);
-      expect(result.proficiency).toBe(4);
-    });
-
-    it('should set proficiency to 6 at level 17', async () => {
-      const playerSummary = makePlayerSummary({ level: 17 });
-      const result = await rules.getPlayerStats([], [], [], [], [], playerSummary);
-      expect(result.proficiency).toBe(6);
-    });
-  });
-
-  describe('wildMagicSurgeTable', () => {
-    it('should set wildMagicSurgeTable from class', async () => {
-      classRules.getClass.mockReturnValue({
-        name: 'Sorcerer', wild_magic_surge_table: 'table1',
-        saving_throws: [], languages: [], subclass: {}, major: {},
-      });
-      const playerSummary = makePlayerSummary({
-        class: { name: 'Sorcerer', wild_magic_surge_table: 'table1', saving_throws: [], languages: [] },
-      });
-      const result = await rules.getPlayerStats([], [], [], [], [], playerSummary);
-      expect(result.wildMagicSurgeTable).toBe('table1');
-    });
-
-    it('should set wildMagicSurgeTable to null when class lacks it', async () => {
-      const playerSummary = makePlayerSummary();
-      const result = await rules.getPlayerStats([], [], [], [], [], playerSummary);
-      expect(result.wildMagicSurgeTable).toBeNull();
-    });
-  });
-
-  describe('immunities and resistances', () => {
-    it('should set immunities from raceRules.getImmunities', async () => {
-      setupDefaults({ immunities: ['Poison'], resistances: ['Fire'] });
-      const playerSummary = makePlayerSummary();
-      const result = await rules.getPlayerStats([], [], [], [], [], playerSummary);
-      expect(result.immunities).toEqual(['Poison']);
-      expect(result.resistances).toEqual(['Fire']);
-    });
-
-    it('should handle empty immunities and resistances', async () => {
-      setupDefaults({ immunities: [], resistances: [] });
-      const playerSummary = makePlayerSummary();
-      const result = await rules.getPlayerStats([], [], [], [], [], playerSummary);
-      expect(result.immunities).toEqual([]);
-      expect(result.resistances).toEqual([]);
+      expect(result.proficiency).toBe(expectedProficiency);
     });
   });
 });

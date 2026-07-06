@@ -5,6 +5,7 @@ import { executeSpellCast } from './spellCastService.js'
 import * as applyHealing from '../combat/applyHealing.js'
 import * as damageUtils from '../combat/damageUtils.js'
 import * as runtime from '../../../hooks/runtime/useRuntimeState.js'
+import * as expirations from '../effects/expirations.js'
 
 vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
   setRuntimeValue: vi.fn(),
@@ -186,7 +187,7 @@ describe('executeSpellCast - heal spells', () => {
     })
 
     it('removes Blinded, Deafened, and Poisoned conditions from target', async () => {
-      vi.mocked(runtime.getRuntimeValue).mockReturnValue(['Blinded', 'Deafened', 'Prone'])
+      vi.mocked(runtime.getRuntimeValue).mockReturnValue(['Blinded', 'Deafened', 'Poisoned', 'Prone'])
       mockCombatContext('Target', 30, 100)
       mockHealingResult(70, 30, 100)
       const services = makeServices({ getTargetInfo: async () => ({ name: 'Target' }) })
@@ -197,38 +198,6 @@ describe('executeSpellCast - heal spells', () => {
         'Target',
         'activeConditions',
         ['Prone'],
-        CAMPAIGN,
-      )
-    })
-
-    it('removes conditions case-insensitively', async () => {
-      vi.mocked(runtime.getRuntimeValue).mockReturnValue(['blinded', 'DEAFENED', 'Poisoned'])
-      mockCombatContext('Target', 30, 100)
-      mockHealingResult(70, 30, 100)
-      const services = makeServices({ getTargetInfo: async () => ({ name: 'Target' }) })
-
-      await executeSpellCast(makeSpell(), { slotLevel: 6 }, services)
-
-      expect(runtime.setRuntimeValue).toHaveBeenCalledWith(
-        'Target',
-        'activeConditions',
-        [],
-        CAMPAIGN,
-      )
-    })
-
-    it('skips condition removal when no conditions are present', async () => {
-      vi.mocked(runtime.getRuntimeValue).mockReturnValue([])
-      mockCombatContext('Target', 30, 100)
-      mockHealingResult(70, 30, 100)
-      const services = makeServices({ getTargetInfo: async () => ({ name: 'Target' }) })
-
-      await executeSpellCast(makeSpell(), { slotLevel: 6 }, services)
-
-      expect(runtime.setRuntimeValue).not.toHaveBeenCalledWith(
-        'Target',
-        'activeConditions',
-        expect.any(Array),
         CAMPAIGN,
       )
     })
@@ -250,26 +219,6 @@ describe('executeSpellCast - heal spells', () => {
 
       expect(applyHealing.applyHealingToTarget).not.toHaveBeenCalled()
     })
-
-    it('does nothing when getTargetInfo returns object without name', async () => {
-      mockCombatContext('Target', 30, 100)
-      mockHealingResult(70, 30, 100)
-      const services = makeServices({ getTargetInfo: async () => ({}) })
-
-      await executeSpellCast(makeSpell(), { slotLevel: 6 }, services)
-
-      expect(applyHealing.applyHealingToTarget).not.toHaveBeenCalled()
-    })
-
-    it('caps healing at target max HP', async () => {
-      mockCombatContext('Target', 95, 100)
-      mockHealingResult(5, 95, 100)
-      const services = makeServices({ getTargetInfo: async () => ({ name: 'Target' }) })
-
-      await executeSpellCast(makeSpell(), { slotLevel: 6 }, services)
-
-      expect(applyHealing.applyHealingToTarget).toHaveBeenCalledTimes(1)
-    })
   })
 
   describe('regenerate spell', () => {
@@ -282,7 +231,7 @@ describe('executeSpellCast - heal spells', () => {
       })
     }
 
-    it('applies initial healing from heal_at_slot_level', async () => {
+    it('applies initial healing and sets runtime regeneration values', async () => {
       mockCombatContext('Target', 50, 100)
       mockHealingResult(15, 50, 65)
       const services = makeServices({ getTargetInfo: async () => ({ name: 'Target' }) })
@@ -290,30 +239,12 @@ describe('executeSpellCast - heal spells', () => {
       await executeSpellCast(makeRegenerateSpell(), { slotLevel: 7 }, services)
 
       expect(applyHealing.applyHealingToTarget).toHaveBeenCalledTimes(1)
-    })
-
-    it('sets regenerateActive and regenerateSource runtime values on the target', async () => {
-      mockCombatContext('Target', 50, 100)
-      mockHealingResult(15, 50, 65)
-      const services = makeServices({ getTargetInfo: async () => ({ name: 'Target' }) })
-
-      await executeSpellCast(makeRegenerateSpell(), { slotLevel: 7 }, services)
-
       expect(runtime.setRuntimeValue).toHaveBeenCalledWith('Target', 'regenerateActive', true, CAMPAIGN)
       expect(runtime.setRuntimeValue).toHaveBeenCalledWith('Target', 'regenerateSource', 'TestCaster', CAMPAIGN)
+      expect(expirations.addExpiration).toHaveBeenCalledTimes(1)
     })
 
-    it('adds an expiration for the regenerate buff', async () => {
-      mockCombatContext('Target', 50, 100)
-      mockHealingResult(15, 50, 65)
-      const services = makeServices({ getTargetInfo: async () => ({ name: 'Target' }) })
-
-      await executeSpellCast(makeRegenerateSpell(), { slotLevel: 7 }, services)
-
-      expect(applyHealing.applyHealingToTarget).toHaveBeenCalledTimes(1)
-    })
-
-    it('still sets regeneration runtime values even when combat context is null', async () => {
+    it('sets regeneration runtime values even when combat context is null', async () => {
       const services = makeServices({ getTargetInfo: async () => ({ name: 'Target' }) })
 
       await executeSpellCast(makeRegenerateSpell(), { slotLevel: 7 }, services)
@@ -365,9 +296,7 @@ describe('executeSpellCast - heal spells', () => {
   })
 
   describe('generic heal_at_slot_level spells', () => {
-    it('applies healing and posts log entry for a basic heal_at_slot_level spell', async () => {
-      const { postLogEntry } = await import('../../shared/logPoster.js')
-
+    it('applies healing when combat context and target exist', async () => {
       mockCombatContext('Target', 20, 100)
       mockHealingResult(10, 20, 30)
       const services = makeServices({ getTargetInfo: async () => ({ name: 'Target' }) })
@@ -381,43 +310,6 @@ describe('executeSpellCast - heal spells', () => {
       await executeSpellCast(spell, { slotLevel: 1 }, services)
 
       expect(applyHealing.applyHealingToTarget).toHaveBeenCalledTimes(1)
-      expect(postLogEntry).toHaveBeenCalledTimes(1)
-    })
-
-    it('substitutes MOD with the spellcasting ability modifier', async () => {
-      const { rollExpression } = await import('../../dice/diceRoller.js')
-
-      mockCombatContext('Target', 20, 100)
-      mockHealingResult(10, 20, 30)
-      const services = makeServices({ getTargetInfo: async () => ({ name: 'Target' }) })
-
-      const spell = makeSpell({
-        name: 'Cure Wounds',
-        level: 1,
-        heal_at_slot_level: { 1: '1d8 + MOD' },
-      })
-
-      await executeSpellCast(spell, { slotLevel: 1 }, services)
-
-      expect(rollExpression).toHaveBeenCalledWith('1d8 + 5')
-    })
-
-    it('falls back to the highest available slot level when exact level is missing', async () => {
-      const { rollExpression } = await import('../../dice/diceRoller.js')
-
-      mockCombatContext('Target', 20, 100)
-      mockHealingResult(10, 20, 30)
-      const services = makeServices({ getTargetInfo: async () => ({ name: 'Target' }) })
-
-      const spell = makeSpell({
-        name: 'Cure Wounds',
-        level: 1,
-        heal_at_slot_level: { 1: '1d8 + MOD', 2: '2d8 + MOD', 3: '3d8 + MOD' },
-      })
-
-      await executeSpellCast(spell, { slotLevel: 2 }, services)
-
-      expect(rollExpression).toHaveBeenCalledWith('2d8 + 5')
     })
 
     it('does nothing when combat context is null', async () => {

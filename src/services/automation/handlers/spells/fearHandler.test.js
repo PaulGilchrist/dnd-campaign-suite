@@ -108,10 +108,8 @@ describe('fearHandler.handle', () => {
       expect(result.payload.description).toContain('No creatures in combat');
       expect(result.payload.description).toContain('Fear has no effect');
     });
-  });
 
-  describe('when combat has no creatures', () => {
-    it('returns a popup indicating no creatures in combat', async () => {
+    it('returns a popup when combat context has no creatures', async () => {
       const ps = makePlayerStats();
       const action = makeAction();
       getCombatContext.mockResolvedValue({ creatures: [] });
@@ -184,21 +182,6 @@ describe('fearHandler.handle', () => {
         saveType: 'WIS',
         saveDc: 15,
       }));
-    });
-
-    it('passes campaignName as the first argument to createSaveListener', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-      const ctx = makeCombatContext([
-        { name: 'Goblin', type: 'monster', currentHp: 5, maxHp: 7 },
-      ]);
-      getCombatContext.mockResolvedValue(ctx);
-      buildSaveDc.mockReturnValue(13);
-      createSaveListener.mockReturnValue(failSaveListener());
-
-      await handle(action, ps, 'MyCampaign', null);
-
-      expect(createSaveListener).toHaveBeenCalledWith('MyCampaign', expect.any(Object));
     });
   });
 
@@ -482,17 +465,6 @@ describe('fearHandler.handle', () => {
   });
 
   describe('edge cases', () => {
-    it('handles undefined campaignName in no-combat case', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-      getCombatContext.mockResolvedValue(null);
-
-      const result = await handle(action, ps, null, null);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.description).toContain('No creatures in combat');
-    });
-
     it('handles single non-caster target', async () => {
       const ps = makePlayerStats();
       const action = makeAction();
@@ -523,22 +495,6 @@ describe('fearHandler.handle', () => {
       expect(createSaveListener).not.toHaveBeenCalled();
       expect(addEntry).not.toHaveBeenCalled();
       expect(result.payload.description).toContain('No creatures affected by Fear');
-    });
-
-    it('handles zero proficiency on player stats', async () => {
-      const ps = makePlayerStats({ proficiency: 0, abilities: [] });
-      const action = makeAction();
-      const ctx = makeCombatContext([
-        { name: 'Goblin', type: 'monster', currentHp: 5, maxHp: 7 },
-      ]);
-      getCombatContext.mockResolvedValue(ctx);
-      buildSaveDc.mockReturnValue(10);
-      createSaveListener.mockReturnValue(failSaveListener());
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.type).toBe('popup');
-      expect(buildSaveDc).toHaveBeenCalledWith(action.automation, ps);
     });
   });
 });

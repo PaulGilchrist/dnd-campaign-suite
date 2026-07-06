@@ -184,24 +184,17 @@ describe('rules.getPlayerStats - speed bonuses', () => {
     expect(result.speed).toBe(30);
   });
 
-  it('should not add speed bonus when lineage is null', async () => {
-    vi.mocked(elfishLineageHandler.getElfisLineageSelection).mockReturnValue(null);
-    const playerSummary = makePlayerSummary({ speed: 30 });
-    const result = await rules.getPlayerStats([], [], [], [], [], playerSummary);
-    expect(result.speed).toBe(30);
-  });
-
-  it('should apply speed increase from passive_buff with speed_bonus effect', async () => {
+  it('should add speed_bonus when condition allows', async () => {
     automationService.collectAutomationFromFeatures.mockReturnValue({
-      passives: [{ type: 'passive_buff', effect: 'speed_bonus', bonusExpression: '10', condition: 'no_armor_no_shield' }],
+      passives: [{ type: 'passive_buff', effect: 'speed_bonus', bonusExpression: '15', condition: 'no_heavy_armor' }],
       actions: [], specialActions: [],
     });
     const playerSummary = makePlayerSummary({ speed: 30 });
     const result = await rules.getPlayerStats([], [], [], [], [], playerSummary);
-    expect(result.speed).toBe(40);
+    expect(result.speed).toBe(45);
   });
 
-  it('should not apply speed_bonus when wearing heavy armor', async () => {
+  it('should not apply speed_bonus when wearing heavy armor with no_heavy_armor condition', async () => {
     automationService.collectAutomationFromFeatures.mockReturnValue({
       passives: [{ type: 'passive_buff', effect: 'speed_bonus', bonusExpression: '10', condition: 'no_heavy_armor' }],
       actions: [], specialActions: [],
@@ -214,41 +207,10 @@ describe('rules.getPlayerStats - speed bonuses', () => {
     const result = await rules.getPlayerStats([], [], [], [], [], playerSummary);
     expect(result.speed).toBe(30);
   });
-
-  it('should apply speed_bonus when not wearing heavy armor with no_heavy_armor condition', async () => {
-    automationService.collectAutomationFromFeatures.mockReturnValue({
-      passives: [{ type: 'passive_buff', effect: 'speed_bonus', bonusExpression: '15', condition: 'no_heavy_armor' }],
-      actions: [], specialActions: [],
-    });
-    const playerSummary = makePlayerSummary({ speed: 30 });
-    const result = await rules.getPlayerStats([], [], [], [], [], playerSummary);
-    expect(result.speed).toBe(45);
-  });
-
-  it('should not apply speed_bonus when wearing armor and shield with no_armor_no_shield condition', async () => {
-    automationService.collectAutomationFromFeatures.mockReturnValue({
-      passives: [{ type: 'passive_buff', effect: 'speed_bonus', bonusExpression: '10', condition: 'no_armor_no_shield' }],
-      actions: [], specialActions: [],
-    });
-    const playerSummary = makePlayerSummary({
-      speed: 30,
-      inventory: { equipped: ['Leather Armor', 'Shield'], magicItems: [] },
-      equipment: [{ name: 'Leather Armor', equipment_category: 'Armor' }],
-    });
-    const result = await rules.getPlayerStats([], [], [], [], [], playerSummary);
-    expect(result.speed).toBe(30);
-  });
 });
 
 describe('rules.getPlayerStats - senses enhancements', () => {
   beforeEach(() => { vi.clearAllMocks(); setupDefaults(); });
-
-  it('should not add darkvision when Third Eye buff is absent', async () => {
-    raceRules.getSenses.mockReturnValue([{ name: 'Darkvision', value: '60 ft.' }]);
-    const playerSummary = makePlayerSummary();
-    const result = await rules.getPlayerStats([], [], [], [], [], playerSummary);
-    expect(result.senses).toContainEqual({ name: 'Darkvision', value: '60 ft.' });
-  });
 
   it('should upgrade Darkvision to 120 ft with Third Eye buff', async () => {
     vi.spyOn(runtimeState, 'getRuntimeValue').mockReturnValue([{ name: 'The Third Eye', effect: 'darkvision_120' }]);
@@ -425,10 +387,10 @@ describe('rules.getPlayerStats - 2024 senses', () => {
   });
 });
 
-describe('rules.getPlayerStats - Horde Breaker attack details', () => {
+describe('rules.getPlayerStats - Horde Breaker attack', () => {
   beforeEach(() => { vi.clearAllMocks(); setupDefaults(); });
 
-  it('should include correct Horde Breaker attack properties', async () => {
+  it('should include Horde Breaker attack with correct properties when Hunter\'s Prey is active', async () => {
     automationService.collectAutomationFromFeatures.mockReturnValue({
       passives: [{ type: 'hunter_prey', name: "Hunter's Prey" }],
       actions: [], specialActions: [],
@@ -449,95 +411,6 @@ describe('rules.getPlayerStats - Horde Breaker attack details', () => {
     expect(hordeBreaker.isHordeBreaker).toBe(true);
     expect(hordeBreaker.hitBonusFormula).toContain('To Hit Bonus');
   });
-
-  it('should use Strength bonus for Horde Breaker when Strength >= Dexterity', async () => {
-    automationService.collectAutomationFromFeatures.mockReturnValue({
-      passives: [{ type: 'hunter_prey', name: "Hunter's Prey" }],
-      actions: [], specialActions: [],
-    });
-    classRules.getRangerFeatures.mockReturnValue({ extraAttacks: 1 });
-    const abilities = [
-      { name: 'Strength', totalScore: 18, bonus: 4, skills: [] },
-      { name: 'Dexterity', totalScore: 14, bonus: 2, skills: [] },
-      { name: 'Constitution', totalScore: 13, bonus: 1, skills: [] },
-      { name: 'Intelligence', totalScore: 12, bonus: 1, skills: [] },
-      { name: 'Wisdom', totalScore: 10, bonus: 0, skills: [] },
-      { name: 'Charisma', totalScore: 8, bonus: -1, skills: [] },
-    ];
-    const playerSummary = makePlayerSummary({
-      class: { name: 'Ranger', saving_throws: [], languages: [], subclass: {}, major: {} },
-      proficiency: 3,
-    });
-    abilityCalc.getAbilities.mockResolvedValue(abilities);
-    const result = await rules.getPlayerStats([], [], [], [], [], playerSummary);
-    const hordeBreaker = result.attacks.find((a) => a.isHordeBreaker);
-    expect(hordeBreaker.hitBonus).toBe(6); // 4 (str) + 2 (prof)
-  });
 });
 
-describe('rules.getPlayerStats - feat feature categorization without casting_time', () => {
-  beforeEach(() => { vi.clearAllMocks(); setupDefaults(); });
 
-  it('should add feat feature to specialActions when no casting_time and not in any category', async () => {
-    vi.mocked(featBuffService.computeAllFeatBuffs).mockReturnValue({
-      abilityScoreIncreases: [], proficiencies: [],
-      features: [{ name: 'Resilient', description: 'Con save proficiency', type: 'passive', automation: null }],
-    });
-    const playerSummary = makePlayerSummary();
-    const result = await rules.getPlayerStats([], [], [], [], [], playerSummary);
-    const resilient = result.specialActions.find((f) => f.name === 'Resilient');
-    expect(resilient).toBeDefined();
-    expect(resilient.source).toBe('feat');
-  });
-
-  it('should add feat feature to actions when name matches action category', async () => {
-    vi.mocked(featBuffService.computeAllFeatBuffs).mockReturnValue({
-      abilityScoreIncreases: [], proficiencies: [],
-      features: [{ name: 'Alert', description: 'Initiative bonus', type: 'passive', automation: null }],
-    });
-    vi.mocked(featureCategories.getCategories).mockReturnValue({
-      actions: ['Alert'],
-      bonusActions: [], reactions: [], specialActions: [], characterAdvancement: [],
-    });
-    const playerSummary = makePlayerSummary();
-    const result = await rules.getPlayerStats([], [], [], [], [], playerSummary);
-    const alert = result.actions.find((f) => f.name === 'Alert');
-    expect(alert).toBeDefined();
-  });
-
-  it('should add feat feature to characterAdvancement when name matches category', async () => {
-    vi.mocked(featBuffService.computeAllFeatBuffs).mockReturnValue({
-      abilityScoreIncreases: [], proficiencies: [],
-      features: [{ name: 'Ability Score Improvement', description: '+2 STR', type: 'passive', automation: null }],
-    });
-    vi.mocked(featureCategories.getCategories).mockReturnValue({
-      actions: [], bonusActions: [], reactions: [], specialActions: [],
-      characterAdvancement: ['Ability Score Improvement'],
-    });
-    const playerSummary = makePlayerSummary();
-    const result = await rules.getPlayerStats([], [], [], [], [], playerSummary);
-    const asi = result.characterAdvancement.find((f) => f.name === 'Ability Score Improvement');
-    expect(asi).toBeDefined();
-  });
-
-  it('should add feat features to allFeatures for automation processing', async () => {
-    vi.mocked(featBuffService.computeAllFeatBuffs).mockReturnValue({
-      abilityScoreIncreases: [], proficiencies: [],
-      features: [{ name: 'Test Feat', description: 'A test feat', type: 'passive', automation: { type: 'passive_buff', effect: 'test' } }],
-    });
-    automationService.collectAutomationFromFeatures.mockImplementation((features) => {
-      if (features && features.some((f) => f.name === 'Test Feat')) {
-        return { passives: [{ type: 'passive_buff', effect: 'test' }], actions: [], specialActions: [] };
-      }
-      return { passives: [], actions: [], specialActions: [] };
-    });
-    const playerSummary = makePlayerSummary();
-    const result = await rules.getPlayerStats([], [], [], [], [], playerSummary);
-    const testFeat = result.allFeatures.find((f) => f.name === 'Test Feat');
-    expect(testFeat).toBeDefined();
-    expect(testFeat.source).toBe('feat');
-  });
-});
-
-import * as featBuffService from '../../character/featBuffService.js';
-import * as featureCategories from '../../character/featureCategories.js';

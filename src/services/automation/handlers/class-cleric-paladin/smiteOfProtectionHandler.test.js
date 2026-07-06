@@ -41,7 +41,7 @@ describe('smiteOfProtectionHandler.handle', () => {
     });
 
     describe('deactivation (already active)', () => {
-        it('returns info popup when smite cover is already active', async () => {
+        it('returns info popup without side effects when smite cover is already active', async () => {
             getRuntimeValue.mockImplementation((_name, key) => {
                 if (key === 'smiteOfProtectionActive') return true;
                 return null;
@@ -53,48 +53,25 @@ describe('smiteOfProtectionHandler.handle', () => {
             expect(result.payload.type).toBe('automation_info');
             expect(result.payload.description).toBe('Smite of Protection is already active.');
             expect(result.payload.name).toBe('Smite of Protection');
-        });
-
-        it('does not activate or set expiration when already active', async () => {
-            getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === 'smiteOfProtectionActive') return true;
-                return null;
-            });
-
-            await handle(makeAction(), makePlayerStats(), campaignName, null);
-
             expect(setRuntimeValue).not.toHaveBeenCalled();
             expect(addExpiration).not.toHaveBeenCalled();
-        });
-
-        it('does not log ability use when already active', async () => {
-            getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === 'smiteOfProtectionActive') return true;
-                return null;
-            });
-
-            await handle(makeAction(), makePlayerStats(), campaignName, null);
-
             expect(addEntry).not.toHaveBeenCalled();
         });
     });
 
     describe('activation', () => {
-        it('sets smiteOfProtectionActive to true', async () => {
+        it('activates smite cover, sets expiration, logs the ability, and returns success popup', async () => {
+            const now = Date.now();
+            vi.spyOn(Date, 'now').mockReturnValue(now);
+
             const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-            expect(result.type).toBe('popup');
             expect(setRuntimeValue).toHaveBeenCalledWith(
                 playerName,
                 'smiteOfProtectionActive',
                 true,
                 campaignName,
             );
-        });
-
-        it('sets an expiration to remove smite of protection on next turn', async () => {
-            await handle(makeAction(), makePlayerStats(), campaignName, null);
-
             expect(addExpiration).toHaveBeenCalledWith(
                 playerName,
                 playerName,
@@ -102,14 +79,6 @@ describe('smiteOfProtectionHandler.handle', () => {
                 campaignName,
                 1,
             );
-        });
-
-        it('logs the ability use', async () => {
-            const now = Date.now();
-            vi.spyOn(Date, 'now').mockReturnValue(now);
-
-            await handle(makeAction(), makePlayerStats(), campaignName, null);
-
             expect(addEntry).toHaveBeenCalledWith(campaignName, {
                 type: 'ability_use',
                 characterName: playerName,
@@ -117,22 +86,17 @@ describe('smiteOfProtectionHandler.handle', () => {
                 description: `${playerName} activated Smite of Protection. You and allies in Aura of Protection have Half Cover until start of your next turn.`,
                 timestamp: now,
             });
-        });
-
-        it('returns success popup with activation description', async () => {
-            const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
             expect(result.type).toBe('popup');
             expect(result.payload.type).toBe('automation_info');
             expect(result.payload.name).toBe('Smite of Protection');
+            expect(result.payload.automationType).toBe('post_cast_smite_cover');
             expect(result.payload.description).toBe(
                 'Smite of Protection activated! You and allies within your Aura of Protection have Half Cover until the start of your next turn.',
             );
-            expect(result.payload.automationType).toBe('post_cast_smite_cover');
             expect(result.payload.automation).toEqual(makeAction().automation);
         });
 
-        it('ignores the mapName parameter', async () => {
+        it('activates smite cover even when a mapName is provided', async () => {
             await handle(makeAction(), makePlayerStats(), campaignName, 'test-map');
 
             expect(setRuntimeValue).toHaveBeenCalledWith(
@@ -152,41 +116,13 @@ describe('smiteOfProtectionHandler.handle', () => {
     });
 
     describe('runtime state guard', () => {
-        it('treats falsy runtime values as not active', async () => {
-            getRuntimeValue.mockReturnValue(false);
+        it.each([false, '', 0])('treats %p as not active and proceeds with activation', async (falsyValue) => {
+            getRuntimeValue.mockReturnValue(falsyValue);
 
             const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
             expect(result.type).toBe('popup');
             expect(result.payload.type).toBe('automation_info');
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                playerName,
-                'smiteOfProtectionActive',
-                true,
-                campaignName,
-            );
-        });
-
-        it('treats empty string as not active', async () => {
-            getRuntimeValue.mockReturnValue('');
-
-            const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-            expect(result.type).toBe('popup');
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                playerName,
-                'smiteOfProtectionActive',
-                true,
-                campaignName,
-            );
-        });
-
-        it('treats zero as not active', async () => {
-            getRuntimeValue.mockReturnValue(0);
-
-            const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-            expect(result.type).toBe('popup');
             expect(setRuntimeValue).toHaveBeenCalledWith(
                 playerName,
                 'smiteOfProtectionActive',

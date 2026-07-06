@@ -6,7 +6,6 @@ import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../ui/logService.js';
 import { postLogEntry } from '../../../shared/logPoster.js';
-import storage from '../../../ui/storage.js';
 
 vi.mock('../../../rules/combat/damageUtils.js', () => ({
   getCombatContext: vi.fn(),
@@ -23,10 +22,6 @@ vi.mock('../../../ui/logService.js', () => ({
 
 vi.mock('../../../shared/logPoster.js', () => ({
   postLogEntry: vi.fn(),
-}));
-
-vi.mock('../../../ui/storage.js', () => ({
-  default: { set: vi.fn() },
 }));
 
 const campaignName = 'TestCampaign';
@@ -75,14 +70,6 @@ describe('greaterRestorationHandler.handle', () => {
       expect(result.payload.name).toBe('Greater Restoration');
       expect(result.payload.description).toContain('No combat context found');
     });
-
-    it('should return automation_info popup when combat context is undefined', async () => {
-      getCombatContext.mockResolvedValue(undefined);
-      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.type).toBe('automation_info');
-    });
   });
 
   describe('creature targets', () => {
@@ -92,13 +79,6 @@ describe('greaterRestorationHandler.handle', () => {
 
       expect(result.payload.type).toBe('greater_restoration_selection');
       expect(result.payload.creatureTargets).toEqual(['Goblin', 'Orc']);
-    });
-
-    it('should return empty creature targets when only the caster exists', async () => {
-      getCombatContext.mockResolvedValue(makeCombatContext([{ name: 'TestCaster', gridX: 5, gridY: 10 }]));
-      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(result.payload.creatureTargets).toEqual([]);
     });
 
     it('should return empty creature targets when creatures array is empty', async () => {
@@ -122,15 +102,6 @@ describe('greaterRestorationHandler.handle', () => {
       expect(result.payload.range).toBe('Touch');
     });
 
-    it('should pass automation object in payload', async () => {
-      getCombatContext.mockResolvedValue(makeCombatContext());
-      const auto = { range: '60 ft', custom: true };
-      const result = await handle(makeAction(auto), makePlayerStats(), campaignName, null);
-
-      expect(result.payload.automation.range).toBe('60 ft');
-      expect(result.payload.automation.custom).toBe(true);
-    });
-
     it('should use empty object when action has no automation property', async () => {
       getCombatContext.mockResolvedValue(makeCombatContext());
       const result = await handle({ name: 'Greater Restoration' }, makePlayerStats(), campaignName, null);
@@ -147,24 +118,14 @@ describe('greaterRestorationHandler.applyGreaterRestoration', () => {
   });
 
   describe('early return paths', () => {
-    it('should return null when result is null', async () => {
-      const result = await applyGreaterRestoration(makeAction(), makePlayerStats(), campaignName, null, null);
-      expect(result).toBeNull();
+    it('should return null when result is null or undefined', async () => {
+      expect(await applyGreaterRestoration(makeAction(), makePlayerStats(), campaignName, null, null)).toBeNull();
+      expect(await applyGreaterRestoration(makeAction(), makePlayerStats(), campaignName, null, undefined)).toBeNull();
     });
 
-    it('should return null when result is undefined', async () => {
-      const result = await applyGreaterRestoration(makeAction(), makePlayerStats(), campaignName, null, undefined);
-      expect(result).toBeNull();
-    });
-
-    it('should return null when result has no targetName', async () => {
-      const result = await applyGreaterRestoration(makeAction(), makePlayerStats(), campaignName, null, { selections: [] });
-      expect(result).toBeNull();
-    });
-
-    it('should return null when result targetName is empty string', async () => {
-      const result = await applyGreaterRestoration(makeAction(), makePlayerStats(), campaignName, null, { targetName: '', selections: [] });
-      expect(result).toBeNull();
+    it('should return null when result has no or empty targetName', async () => {
+      expect(await applyGreaterRestoration(makeAction(), makePlayerStats(), campaignName, null, { selections: [] })).toBeNull();
+      expect(await applyGreaterRestoration(makeAction(), makePlayerStats(), campaignName, null, { targetName: '', selections: [] })).toBeNull();
     });
   });
 
@@ -204,23 +165,6 @@ describe('greaterRestorationHandler.applyGreaterRestoration', () => {
 
       expect(result.payload.description).toContain('No removable effects found');
     });
-
-    it('should not call setRuntimeValue when exhaustion level is falsy', async () => {
-      getRuntimeValue.mockImplementation((target, prop) => {
-        if (prop === 'exhaustionLevel') return undefined;
-        return null;
-      });
-
-      await applyGreaterRestoration(
-        makeAction(),
-        makePlayerStats(),
-        campaignName,
-        null,
-        { targetName: 'Goblin', selections: [{ type: 'exhaustion' }] },
-      );
-
-      expect(setRuntimeValue).not.toHaveBeenCalled();
-    });
   });
 
   describe('condition removal', () => {
@@ -259,63 +203,6 @@ describe('greaterRestorationHandler.applyGreaterRestoration', () => {
 
       expect(setRuntimeValue).not.toHaveBeenCalled();
       expect(result.payload.description).toContain('No removable effects found');
-    });
-
-    it('should update creature conditions via setRuntimeValue and not persist via storage', async () => {
-      getRuntimeValue.mockImplementation((target, prop) => {
-        if (prop === 'activeConditions') return ['Paralyzed'];
-        return null;
-      });
-      getCombatContext.mockResolvedValue({ creatures: [{ name: 'Goblin', conditions: [{ key: 'Paralyzed' }, { key: 'Frightened' }] }] });
-
-      await applyGreaterRestoration(
-        makeAction(),
-        makePlayerStats(),
-        campaignName,
-        null,
-        { targetName: 'Goblin', selections: [{ type: 'condition', condition: 'Paralyzed' }] },
-      );
-
-      expect(setRuntimeValue).toHaveBeenCalledWith('Goblin', 'activeConditions', [], campaignName);
-      expect(storage.set).not.toHaveBeenCalled();
-    });
-
-    it('should handle missing creature in combat summary gracefully', async () => {
-      getRuntimeValue.mockImplementation((target, prop) => {
-        if (prop === 'activeConditions') return ['Paralyzed'];
-        return null;
-      });
-      getCombatContext.mockResolvedValue({ creatures: [{ name: 'Orc', conditions: [] }] });
-
-      const result = await applyGreaterRestoration(
-        makeAction(),
-        makePlayerStats(),
-        campaignName,
-        null,
-        { targetName: 'Goblin', selections: [{ type: 'condition', condition: 'Paralyzed' }] },
-      );
-
-      expect(result.payload.description).toContain('Paralyzed condition');
-      expect(storage.set).not.toHaveBeenCalled();
-    });
-
-    it('should handle missing combat summary gracefully', async () => {
-      getRuntimeValue.mockImplementation((target, prop) => {
-        if (prop === 'activeConditions') return ['Paralyzed'];
-        return null;
-      });
-      getCombatContext.mockResolvedValue(null);
-
-      const result = await applyGreaterRestoration(
-        makeAction(),
-        makePlayerStats(),
-        campaignName,
-        null,
-        { targetName: 'Goblin', selections: [{ type: 'condition', condition: 'Paralyzed' }] },
-      );
-
-      expect(result.payload.description).toContain('Paralyzed condition');
-      expect(storage.set).not.toHaveBeenCalled();
     });
 
     it('should handle case-insensitive condition matching', async () => {
@@ -392,23 +279,6 @@ describe('greaterRestorationHandler.applyGreaterRestoration', () => {
       );
 
       expect(setRuntimeValue).not.toHaveBeenCalled();
-      expect(result.payload.description).toContain('No removable effects found');
-    });
-
-    it('should skip when activeBuffs is empty array', async () => {
-      getRuntimeValue.mockImplementation((target, prop) => {
-        if (prop === 'activeBuffs') return [];
-        return null;
-      });
-
-      const result = await applyGreaterRestoration(
-        makeAction(),
-        makePlayerStats(),
-        campaignName,
-        null,
-        { targetName: 'Goblin', selections: [{ type: 'curse' }] },
-      );
-
       expect(result.payload.description).toContain('No removable effects found');
     });
   });

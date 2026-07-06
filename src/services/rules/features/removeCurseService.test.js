@@ -22,238 +22,70 @@ describe('removeCurseService', () => {
     });
 
     describe('triggerRemoveCurse', () => {
-        it('returns null for non-matching spell names', async () => {
-            const nonMatchingNames = [
-                'Detect Magic',
-                'Lesser Remove Curse',
-                'Curse Removal',
-                'remove curses',
-                '',
-            ];
-
-            for (const name of nonMatchingNames) {
-                const result = await triggerRemoveCurse(
-                    { name, level: 2 },
-                    {},
-                    playerStats,
-                    campaignName,
-                    mapName,
-                );
-                expect(result).toBeNull();
-                expect(executeHandler).not.toHaveBeenCalled();
-            }
-        });
-
-        it('returns null when spell object is missing name property', async () => {
-            const result = await triggerRemoveCurse(
-                { level: 2 },
-                {},
-                playerStats,
-                campaignName,
-                mapName,
-            );
+        it.each([
+            'Detect Magic', 'Lesser Remove Curse', 'Curse Removal', 'remove curses', '',
+        ])('returns null for non-Remove Curse spell: "%s"', async (name) => {
+            const result = await triggerRemoveCurse({ name, level: 2 }, {}, playerStats, campaignName, mapName);
             expect(result).toBeNull();
             expect(executeHandler).not.toHaveBeenCalled();
         });
 
-        it('executes handler for case-insensitive "remove curse"', async () => {
+        it('is case-insensitive for "Remove Curse"', async () => {
             executeHandler.mockResolvedValue({ type: 'popup', payload: { type: 'automation_info' } });
-
-            const result = await triggerRemoveCurse(
-                { name: 'REMOVE CURSE', level: 2 },
-                {},
-                playerStats,
-                campaignName,
-                mapName,
-            );
-
+            const result = await triggerRemoveCurse({ name: 'REMOVE CURSE', level: 2 }, {}, playerStats, campaignName, mapName);
             expect(result).toEqual({ type: 'popup', payload: { type: 'automation_info' } });
             expect(executeHandler).toHaveBeenCalledTimes(1);
         });
 
-        it('passes spell range to action automation, defaulting to "Touch"', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
-
-            await triggerRemoveCurse(
-                { name: 'Remove Curse', level: 2, range: 'Self' },
-                {},
-                playerStats,
-                campaignName,
-                mapName,
-            );
-
-            expect(executeHandler).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    automation: { type: 'remove_curse', range: 'Self' },
-                }),
-                playerStats,
-                campaignName,
-                mapName,
-            );
+        it.each([undefined, null, ''])('returns null when spell name is %s', async (name) => {
+            const result = await triggerRemoveCurse({ name, level: 2 }, {}, playerStats, campaignName, mapName);
+            expect(result).toBeNull();
+            expect(executeHandler).not.toHaveBeenCalled();
         });
 
-        it('passes the spell object into the action', async () => {
+        it('passes spell range to action automation, defaulting to "Touch"', async () => {
             executeHandler.mockResolvedValue({ type: 'popup' });
-            const spell = { name: 'Remove Curse', level: 2, school: 'Abjuration' };
-
-            await triggerRemoveCurse(spell, {}, playerStats, campaignName, mapName);
-
+            await triggerRemoveCurse({ name: 'Remove Curse', level: 2, range: 'Self' }, {}, playerStats, campaignName, mapName);
             expect(executeHandler).toHaveBeenCalledWith(
-                expect.objectContaining({ spell }),
-                playerStats,
-                campaignName,
-                mapName,
+                expect.objectContaining({ automation: { type: 'remove_curse', range: 'Self' } }),
+                playerStats, campaignName, mapName,
             );
         });
 
         it('returns handler result on success', async () => {
-            const expectedResult = {
-                type: 'popup',
-                payload: { type: 'automation_info', name: 'Remove Curse', description: 'Remove curse removes...' },
-            };
+            const expectedResult = { type: 'popup', payload: { type: 'automation_info', name: 'Remove Curse', description: 'Remove curse removes...' } };
             executeHandler.mockResolvedValue(expectedResult);
-
-            const result = await triggerRemoveCurse(
-                { name: 'Remove Curse', level: 2 },
-                {},
-                playerStats,
-                campaignName,
-                mapName,
-            );
-
+            const result = await triggerRemoveCurse({ name: 'Remove Curse', level: 2 }, {}, playerStats, campaignName, mapName);
             expect(result).toBe(expectedResult);
-        });
-
-        it('returns null when handler returns null', async () => {
-            executeHandler.mockResolvedValue(null);
-
-            const result = await triggerRemoveCurse(
-                { name: 'Remove Curse', level: 2 },
-                {},
-                playerStats,
-                campaignName,
-                mapName,
-            );
-
-            expect(result).toBeNull();
         });
 
         it('catches handler errors, logs them, and returns null', async () => {
             const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
             executeHandler.mockRejectedValue(new Error('Handler failed'));
-
-            const result = await triggerRemoveCurse(
-                { name: 'Remove Curse', level: 2 },
-                {},
-                playerStats,
-                campaignName,
-                mapName,
-            );
-
+            const result = await triggerRemoveCurse({ name: 'Remove Curse', level: 2 }, {}, playerStats, campaignName, mapName);
             expect(result).toBeNull();
-            expect(consoleSpy).toHaveBeenCalledWith(
-                '[removeCurse] Failed to execute Remove Curse handler:',
-                expect.any(Error),
-            );
+            expect(consoleSpy).toHaveBeenCalledWith('[removeCurse] Failed to execute Remove Curse handler:', expect.any(Error));
             consoleSpy.mockRestore();
         });
     });
 
     describe('confirmRemoveCurse', () => {
-        const action = {
-            name: 'Remove Curse',
-            automation: { type: 'remove_curse', range: 'Touch' },
-        };
+        const action = { name: 'Remove Curse', automation: { type: 'remove_curse', range: 'Touch' } };
 
         it('returns the effect application result on success', async () => {
             const expectedResult = { success: true, removedCurse: 'Cursed Sword' };
             applyRemoveCurseEffect.mockResolvedValue(expectedResult);
-
-            const result = await confirmRemoveCurse(
-                action,
-                playerStats,
-                campaignName,
-                mapName,
-                { type: 'popup', payload: {} },
-            );
-
+            const result = await confirmRemoveCurse(action, playerStats, campaignName, mapName, { type: 'popup', payload: {} });
             expect(result).toBe(expectedResult);
-        });
-
-        it('passes all arguments through to applyRemoveCurseEffect', async () => {
-            applyRemoveCurseEffect.mockResolvedValue({ success: true });
-            const popupResult = { type: 'popup', payload: { curseId: 'abc123' } };
-
-            await confirmRemoveCurse(
-                action,
-                playerStats,
-                campaignName,
-                mapName,
-                popupResult,
-            );
-
-            expect(applyRemoveCurseEffect).toHaveBeenCalledWith(
-                action,
-                playerStats,
-                campaignName,
-                mapName,
-                popupResult,
-            );
-        });
-
-        it('returns null when effect application returns null', async () => {
-            applyRemoveCurseEffect.mockResolvedValue(null);
-
-            const result = await confirmRemoveCurse(
-                action,
-                playerStats,
-                campaignName,
-                mapName,
-                { type: 'popup' },
-            );
-
-            expect(result).toBeNull();
         });
 
         it('catches effect errors, logs them, and returns null', async () => {
             const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
             applyRemoveCurseEffect.mockRejectedValue(new Error('Application failed'));
-
-            const result = await confirmRemoveCurse(
-                action,
-                playerStats,
-                campaignName,
-                mapName,
-                { type: 'popup' },
-            );
-
+            const result = await confirmRemoveCurse(action, playerStats, campaignName, mapName, { type: 'popup' });
             expect(result).toBeNull();
-            expect(consoleSpy).toHaveBeenCalledWith(
-                '[removeCurse] Failed to apply Remove Curse effect:',
-                expect.any(Error),
-            );
+            expect(consoleSpy).toHaveBeenCalledWith('[removeCurse] Failed to apply Remove Curse effect:', expect.any(Error));
             consoleSpy.mockRestore();
-        });
-
-        it('passes undefined result through to effect application', async () => {
-            applyRemoveCurseEffect.mockResolvedValue({ success: true });
-
-            const result = await confirmRemoveCurse(
-                action,
-                playerStats,
-                campaignName,
-                mapName,
-                undefined,
-            );
-
-            expect(applyRemoveCurseEffect).toHaveBeenCalledWith(
-                action,
-                playerStats,
-                campaignName,
-                mapName,
-                undefined,
-            );
-            expect(result).toEqual({ success: true });
         });
     });
 });

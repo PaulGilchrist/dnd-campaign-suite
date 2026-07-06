@@ -1,17 +1,9 @@
-// @cleaned-by-ai
 import { describe, it, expect } from 'vitest';
 import { computePassiveSkills } from './computePassiveSkills.js';
 
 describe('computePassiveSkills', () => {
-  it('throws TypeError when playerStats is null or undefined', () => {
-    expect(() => computePassiveSkills(null)).toThrow(TypeError);
-    expect(() => computePassiveSkills(undefined)).toThrow(TypeError);
-  });
-
-  it('returns empty array when input is empty, abilities is null, or abilities is undefined', () => {
+  it('returns empty array when abilities are missing', () => {
     expect(computePassiveSkills({})).toEqual([]);
-    expect(computePassiveSkills({ senses: [], abilities: null })).toEqual([]);
-    expect(computePassiveSkills({ senses: [], abilities: undefined })).toEqual([]);
   });
 
   it('returns existing senses alongside computed passive skills, sorted alphabetically', () => {

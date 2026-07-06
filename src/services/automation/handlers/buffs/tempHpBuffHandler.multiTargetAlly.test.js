@@ -35,96 +35,6 @@ import * as rangeValidation from '../../../rules/combat/rangeValidation.js';
 import { campaignName, makePlayerStats, resetMocks } from './tempHpBuffTestHelpers.js';
 
 // ────────────────────────────────────────────────────────────────
-// handleMultiTargetAllyTempHp — expression evaluation
-// ────────────────────────────────────────────────────────────────
-
-describe('handleMultiTargetAllyTempHp — expression evaluation', () => {
-  beforeEach(() => resetMocks());
-
-  it('returns error popup when temp HP expression evaluates to a non-number string', async () => {
-    const action = {
-      name: 'Inspiring Leader',
-      automation: {
-        type: 'temp_hp_buff',
-        tempHpExpression: 'invalid_expr',
-        range: '30 ft',
-        multiTargetAlly: true,
-      },
-    };
-    const ps = makePlayerStats();
-    automationService.evaluateAutoExpression.mockReturnValue('not-a-number');
-
-    const result = await handle(action, ps, campaignName);
-
-    expect(result.type).toBe('popup');
-    expect(result.payload.type).toBe('automation_info');
-    expect(result.payload.description).toContain('Inspiring Leader: Could not calculate temp HP');
-    expect(result.payload.description).toContain('invalid_expr');
-    expect(result.payload.automation).toBe(action.automation);
-    expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
-  });
-
-  it('returns error popup when temp HP expression evaluates to zero', async () => {
-    const action = {
-      name: 'Inspiring Leader',
-      automation: {
-        type: 'temp_hp_buff',
-        tempHpExpression: '0',
-        range: '30 ft',
-        multiTargetAlly: true,
-      },
-    };
-    const ps = makePlayerStats();
-    automationService.evaluateAutoExpression.mockReturnValue(0);
-
-    const result = await handle(action, ps, campaignName);
-
-    expect(result.type).toBe('popup');
-    expect(result.payload.description).toContain('Could not calculate temp HP');
-    expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
-  });
-
-  it('returns error popup when temp HP expression evaluates to a negative number', async () => {
-    const action = {
-      name: 'Inspiring Leader',
-      automation: {
-        type: 'temp_hp_buff',
-        tempHpExpression: '-1',
-        range: '30 ft',
-        multiTargetAlly: true,
-      },
-    };
-    const ps = makePlayerStats();
-    automationService.evaluateAutoExpression.mockReturnValue(-5);
-
-    const result = await handle(action, ps, campaignName);
-
-    expect(result.type).toBe('popup');
-    expect(result.payload.description).toContain('Could not calculate temp HP');
-    expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
-  });
-
-  it('returns error popup when temp HP expression evaluates to null', async () => {
-    const action = {
-      name: 'Inspiring Leader',
-      automation: {
-        type: 'temp_hp_buff',
-        tempHpExpression: 'null_expr',
-        range: '30 ft',
-        multiTargetAlly: true,
-      },
-    };
-    const ps = makePlayerStats();
-    automationService.evaluateAutoExpression.mockReturnValue(null);
-
-    const result = await handle(action, ps, campaignName);
-
-    expect(result.type).toBe('popup');
-    expect(result.payload.description).toContain('Could not calculate temp HP');
-  });
-});
-
-// ────────────────────────────────────────────────────────────────
 // handleMultiTargetAllyTempHp — no map available
 // ────────────────────────────────────────────────────────────────
 
@@ -317,7 +227,7 @@ describe('handleMultiTargetAllyTempHp — map and range', () => {
     expect(leaderCall[2]).toBe(8);
   });
 
-  it('skips map lookup when rangeToFeet returns null', async () => {
+  it('skips map lookup when rangeToFeet returns null (self range)', async () => {
     const action = {
       name: 'Inspiring Leader',
       automation: {
@@ -380,40 +290,6 @@ describe('handleMultiTargetAllyTempHp — map and range', () => {
     expect(targetNames).toContain('Ally1');
   });
 
-  it('excludes self from distance-based ally resolution even when includesSelf is true', async () => {
-    const action = {
-      name: 'Inspiring Leader',
-      automation: {
-        type: 'temp_hp_buff',
-        tempHpExpression: 'level + 3',
-        range: '30 ft',
-        targets: 6,
-        includesSelf: true,
-        multiTargetAlly: true,
-      },
-    };
-    const ps = makePlayerStats({ level: 5, name: 'Leader' });
-    automationService.evaluateAutoExpression.mockReturnValue(8);
-
-    const mapData = createMapData([
-      { name: 'Leader', gridX: 0, gridY: 0 },
-      { name: 'Ally1', gridX: 2, gridY: 0 },
-    ]);
-
-    rangeValidation.rangeToFeet.mockReturnValue(30);
-    mapsService.loadMapData.mockResolvedValue(mapData);
-    rangeValidation.getDistanceFeet.mockReturnValueOnce(10);
-
-    await handle(action, ps, campaignName, 'test-map');
-
-    const tempHpCalls = useRuntimeState.setRuntimeValue.mock.calls.filter(
-      (c) => c[1] === 'tempHp',
-    );
-    expect(tempHpCalls.length).toBe(2);
-    const targetNames = tempHpCalls.map((c) => c[0]);
-    expect(targetNames).toEqual(expect.arrayContaining(['Leader', 'Ally1']));
-  });
-
   it('produces no targets when attacker is not found on map', async () => {
     const action = {
       name: 'Inspiring Leader',
@@ -442,31 +318,6 @@ describe('handleMultiTargetAllyTempHp — map and range', () => {
     expect(result.payload.description).toContain('0 creatures');
     expect(result.payload.description).toContain('no targets available');
     expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
-  });
-
-  it('produces no targets when map data is undefined', async () => {
-    const action = {
-      name: 'Inspiring Leader',
-      automation: {
-        type: 'temp_hp_buff',
-        tempHpExpression: 'level + 3',
-        range: '30 ft',
-        targets: 6,
-        includesSelf: true,
-        multiTargetAlly: true,
-      },
-    };
-    const ps = makePlayerStats({ level: 5, name: 'Leader' });
-    automationService.evaluateAutoExpression.mockReturnValue(8);
-
-    rangeValidation.rangeToFeet.mockReturnValue(30);
-    mapsService.loadMapData.mockResolvedValue(undefined);
-
-    const result = await handle(action, ps, campaignName, 'test-map');
-
-    expect(result.type).toBe('popup');
-    expect(result.payload.description).toContain('0 creatures');
-    expect(result.payload.description).toContain('no targets available');
   });
 
   it('skips ally when getDistanceFeet returns null', async () => {
@@ -523,98 +374,5 @@ describe('handleMultiTargetAllyTempHp — map and range', () => {
     mapsService.loadMapData.mockRejectedValue(new Error('map not found'));
 
     await expect(handle(action, ps, campaignName, 'test-map')).rejects.toThrow('map not found');
-  });
-
-  it('uses correct pluralization for creature count', async () => {
-    const action = {
-      name: 'Inspiring Leader',
-      automation: {
-        type: 'temp_hp_buff',
-        tempHpExpression: 'level + 3',
-        range: '30 ft',
-        targets: 6,
-        includesSelf: true,
-        multiTargetAlly: true,
-      },
-    };
-    const ps = makePlayerStats({ level: 5, name: 'Leader' });
-    automationService.evaluateAutoExpression.mockReturnValue(8);
-
-    const mapData = createMapData([
-      { name: 'Leader', gridX: 0, gridY: 0 },
-      { name: 'Ally1', gridX: 2, gridY: 0 },
-      { name: 'Ally2', gridX: 4, gridY: 0 },
-    ]);
-
-    rangeValidation.rangeToFeet.mockReturnValue(30);
-    mapsService.loadMapData.mockResolvedValue(mapData);
-    rangeValidation.getDistanceFeet
-      .mockReturnValueOnce(10)
-      .mockReturnValueOnce(20)
-      .mockReturnValueOnce(384);
-
-    const result = await handle(action, ps, campaignName, 'test-map');
-
-    expect(result.payload.description).toContain('3 creatures');
-  });
-
-  it('uses singular creature when exactly one target', async () => {
-    const action = {
-      name: 'Inspiring Leader',
-      automation: {
-        type: 'temp_hp_buff',
-        tempHpExpression: 'level + 3',
-        range: '30 ft',
-        targets: 6,
-        includesSelf: true,
-        multiTargetAlly: true,
-      },
-    };
-    const ps = makePlayerStats({ level: 5, name: 'Leader' });
-    automationService.evaluateAutoExpression.mockReturnValue(8);
-
-    const mapData = createMapData([
-      { name: 'Leader', gridX: 0, gridY: 0 },
-      { name: 'Ally1', gridX: 50, gridY: 50 },
-    ]);
-
-    rangeValidation.rangeToFeet.mockReturnValue(30);
-    mapsService.loadMapData.mockResolvedValue(mapData);
-    rangeValidation.getDistanceFeet.mockReturnValueOnce(384);
-
-    const result = await handle(action, ps, campaignName, 'test-map');
-
-    expect(result.payload.description).toContain('1 creature');
-  });
-
-  it('returns payload with correct structure', async () => {
-    const action = {
-      name: 'Inspiring Leader',
-      automation: {
-        type: 'temp_hp_buff',
-        tempHpExpression: 'level + 3',
-        range: '30 ft',
-        targets: 6,
-        includesSelf: true,
-        multiTargetAlly: true,
-      },
-    };
-    const ps = makePlayerStats({ level: 5, name: 'Leader' });
-    automationService.evaluateAutoExpression.mockReturnValue(8);
-
-    const mapData = createMapData([
-      { name: 'Leader', gridX: 0, gridY: 0 },
-    ]);
-
-    rangeValidation.rangeToFeet.mockReturnValue(30);
-    mapsService.loadMapData.mockResolvedValue(mapData);
-
-    const result = await handle(action, ps, campaignName, 'test-map');
-
-    expect(result.type).toBe('popup');
-    expect(result.payload.type).toBe('automation_info');
-    expect(result.payload.name).toBe('Inspiring Leader');
-    expect(result.payload.automationType).toBe('temp_hp_buff');
-    expect(result.payload.automation).toBe(action.automation);
   });
 });

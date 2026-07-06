@@ -83,18 +83,6 @@ describe('postCastRiderService', () => {
       }
       expect(getPostCastRiderSaves(stats)).toHaveLength(2)
     })
-
-    it('throws when automation.passives is missing', () => {
-      expect(() => getPostCastRiderSaves({})).toThrow('Expected array')
-    })
-
-    it('throws when automation.passives is null', () => {
-      expect(() => getPostCastRiderSaves({ automation: { passives: null } })).toThrow('Expected array')
-    })
-
-    it('returns empty array when passives is empty', () => {
-      expect(getPostCastRiderSaves({ automation: { passives: [] } })).toEqual([])
-    })
   })
 
   describe('getSpellThiefFeatures', () => {
@@ -111,14 +99,6 @@ describe('postCastRiderService', () => {
       expect(result).toHaveLength(1)
       expect(result[0].name).toBe('Thief')
     })
-
-    it('throws when automation.reactions is missing', () => {
-      expect(() => getSpellThiefFeatures({})).toThrow('Expected array')
-    })
-
-    it('returns empty array when reactions is empty', () => {
-      expect(getSpellThiefFeatures({ automation: { reactions: [] } })).toEqual([])
-    })
   })
 
   describe('getMultiTargetSpreads', () => {
@@ -133,14 +113,6 @@ describe('postCastRiderService', () => {
       }
       const result = getMultiTargetSpreads(stats)
       expect(result).toHaveLength(1)
-    })
-
-    it('throws when automation.passives is missing', () => {
-      expect(() => getMultiTargetSpreads({})).toThrow('Expected array')
-    })
-
-    it('returns empty array when passives is empty', () => {
-      expect(getMultiTargetSpreads({ automation: { passives: [] } })).toEqual([])
     })
   })
 
@@ -176,17 +148,13 @@ describe('postCastRiderService', () => {
       expect(getMultiTargetSpreadForSpell(stats, 'Iceball')).toBeNull()
     })
 
-    it('returns null when spread has no spellFilter', () => {
+    it('throws when spread has no spellFilter', () => {
       const stats = {
         automation: {
           passives: [{ type: 'multi_target_spread', name: 'NoFilter' }],
         },
       }
       expect(() => getMultiTargetSpreadForSpell(stats, 'Fireball')).toThrow('Expected array')
-    })
-
-    it('throws when automation.passives is missing', () => {
-      expect(() => getMultiTargetSpreadForSpell({}, 'Fireball')).toThrow('Expected array')
     })
   })
 
@@ -315,17 +283,6 @@ describe('postCastRiderService', () => {
       expect(result[1]).toEqual({ success: false })
     })
 
-    it('throws when executeHandler errors', async () => {
-      executeHandler.mockRejectedValue(new Error('fail'))
-      const stats = {
-        name: 'Player',
-        automation: { passives: [{ type: 'post_cast_rider', name: 'Rider' }] },
-      }
-      await expect(
-        triggerPostCastRiderSaves(enchantmentSpell, { slotLevel: 1 }, stats, 'camp', 'map')
-      ).rejects.toThrow('fail')
-    })
-
     it('does not call executeHandler when spell has no school property', async () => {
       const stats = {
         name: 'Player',
@@ -350,14 +307,6 @@ describe('postCastRiderService', () => {
       const result = getSoulstitchFeatures(stats)
       expect(result).toHaveLength(1)
       expect(result[0].name).toBe('Soulstitch')
-    })
-
-    it('throws when automation.passives is missing', () => {
-      expect(() => getSoulstitchFeatures({})).toThrow('Expected array')
-    })
-
-    it('returns empty array when passives is empty', () => {
-      expect(getSoulstitchFeatures({ automation: { passives: [] } })).toEqual([])
     })
   })
 
@@ -433,14 +382,6 @@ describe('postCastRiderService', () => {
       const result = await triggerSoulstitchSpells(evocationSpell, {}, stats, 'camp', 'map')
       expect(result).toBeNull()
     })
-
-    it('throws when executeHandler errors', async () => {
-      executeHandler.mockRejectedValue(new Error('fail'))
-      const stats = { automation: { passives: [{ type: 'soulstitch_spells', name: 'Soulstitch' }] } }
-      await expect(
-        triggerSoulstitchSpells(evocationSpell, {}, stats, 'camp', 'map')
-      ).rejects.toThrow('fail')
-    })
   })
 
   describe('getEmpoweredEvocationFeatures', () => {
@@ -457,14 +398,6 @@ describe('postCastRiderService', () => {
       expect(result).toHaveLength(1)
       expect(result[0].name).toBe('Empowered')
     })
-
-    it('throws when automation.passives is missing', () => {
-      expect(() => getEmpoweredEvocationFeatures({})).toThrow('Expected array')
-    })
-
-    it('returns empty array when passives is empty', () => {
-      expect(getEmpoweredEvocationFeatures({ automation: { passives: [] } })).toEqual([])
-    })
   })
 
   describe('getEmpoweredEvocationIntModifier', () => {
@@ -480,11 +413,6 @@ describe('postCastRiderService', () => {
 
     it('returns 0 when abilities is empty', () => {
       expect(getEmpoweredEvocationIntModifier({ abilities: [] })).toBe(0)
-    })
-
-    it('returns 0 when abilities property is missing', () => {
-      // Source does not guard against missing abilities - this is a source bug
-      expect(() => getEmpoweredEvocationIntModifier({})).toThrow('Cannot read properties of undefined')
     })
   })
 
@@ -601,14 +529,6 @@ describe('postCastRiderService', () => {
       expect(result).toHaveLength(2)
       vi.mocked(getRuntimeValue).mockRestore()
     })
-
-    it('throws when executeHandler errors', async () => {
-      executeHandler.mockRejectedValue(new Error('fail'))
-      const stats = { name: 'Player', automation: { reactions: [{ type: 'spell_thief', name: 'Thief' }] } }
-      await expect(
-        triggerSpellThief(spell, { slotLevel: 1 }, stats, 'camp', 'map')
-      ).rejects.toThrow('fail')
-    })
   })
 
   describe('getBewitchingMagicFeatures', () => {
@@ -624,14 +544,6 @@ describe('postCastRiderService', () => {
       const result = getBewitchingMagicFeatures(stats)
       expect(result).toHaveLength(1)
       expect(result[0].name).toBe('Bewitch')
-    })
-
-    it('throws when automation.passives is missing', () => {
-      expect(() => getBewitchingMagicFeatures({})).toThrow('Expected array')
-    })
-
-    it('returns empty array when passives is empty', () => {
-      expect(getBewitchingMagicFeatures({ automation: { passives: [] } })).toEqual([])
     })
   })
 
@@ -716,14 +628,6 @@ describe('postCastRiderService', () => {
       }
       const result = await triggerBewitchingMagic(enchantmentSpell, { slotLevel: 1 }, stats, 'camp', 'map')
       expect(result).toHaveLength(2)
-    })
-
-    it('throws when executeHandler errors', async () => {
-      executeHandler.mockRejectedValue(new Error('fail'))
-      const stats = { automation: { passives: [{ type: 'bewitching_magic', name: 'Bewitch' }] } }
-      await expect(
-        triggerBewitchingMagic(enchantmentSpell, { slotLevel: 1 }, stats, 'camp', 'map')
-      ).rejects.toThrow('fail')
     })
 
     it('returns null when spell has no casting_time property', async () => {

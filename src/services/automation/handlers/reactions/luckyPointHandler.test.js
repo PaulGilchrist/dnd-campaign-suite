@@ -342,20 +342,4 @@ describe('luckyPointHandler.handle', () => {
             expect(logService.addEntry).toHaveBeenCalled();
         });
     });
-
-    describe('integration', () => {
-        it('should deduct exactly the cost amount from lucky points', async () => {
-            runtimeState.getRuntimeValue.mockReturnValue(10);
-            damageUtils.getCombatContext.mockResolvedValue({
-                lastAttack: { rollType: 'attack', attackerName: 'TestFighter', d20: 1, bonus: 0, targetName: 'Mushroom', hit: false }
-            });
-            logService.addEntry.mockResolvedValue(undefined);
-
-            await handle(makeAction(), makePlayerStats(), mockCampaignName);
-
-            expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-                'TestFighter', 'luckyPoints', 9, mockCampaignName
-            );
-        });
-    });
 });

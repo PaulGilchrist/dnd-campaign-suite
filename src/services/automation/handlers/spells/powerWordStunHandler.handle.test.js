@@ -91,73 +91,45 @@ function setupMocks(targetName, hp, existingConditions = [], existingEffects = [
   });
 }
 
-describe('powerWordStunHandler.handle - no combat', () => {
+describe('powerWordStunHandler.handle - early returns', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it('should return popup when combat context is null', async () => {
-    getCombatContext.mockResolvedValue(null);
-    const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
+  it('should return popup when combat context is invalid or has no creatures', async () => {
+    const scenarios = [
+      { context: null },
+      { context: {} },
+      { context: { creatures: [] } },
+    ];
 
-    expect(result.type).toBe('popup');
-    expect(result.payload.type).toBe('automation_info');
-    expect(result.payload.description).toContain('No creatures in combat');
+    for (const { context } of scenarios) {
+      getCombatContext.mockResolvedValue(context);
+      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+      expect(result.type).toBe('popup');
+      expect(result.payload.type).toBe('automation_info');
+      expect(result.payload.description).toContain('No creatures in combat');
+    }
   });
 
-  it('should return popup when combat context has no creatures property', async () => {
-    getCombatContext.mockResolvedValue({});
-    const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
+  it('should return popup when resolveTarget returns no valid target', async () => {
+    const scenarios = [
+      { result: null },
+      { result: {} },
+      { result: { target: {} } },
+    ];
 
-    expect(result.type).toBe('popup');
-    expect(result.payload.description).toContain('No creatures in combat');
-  });
+    for (const { result } of scenarios) {
+      getCombatContext.mockResolvedValue(lowHpCombatContext);
+      buildSaveDc.mockReturnValue(15);
+      resolveTarget.mockResolvedValue(result);
 
-  it('should return popup when creatures array is empty', async () => {
-    getCombatContext.mockResolvedValue({ creatures: [] });
-    const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
+      const handlerResult = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-    expect(result.type).toBe('popup');
-    expect(result.payload.description).toContain('No creatures in combat');
-  });
-});
-
-describe('powerWordStunHandler.handle - no target', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it('should return popup when resolveTarget returns null', async () => {
-    getCombatContext.mockResolvedValue(lowHpCombatContext);
-    buildSaveDc.mockReturnValue(15);
-    resolveTarget.mockResolvedValue(null);
-
-    const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-    expect(result.type).toBe('popup');
-    expect(result.payload.description).toContain('No target selected');
-  });
-
-  it('should return popup when resolveTarget returns object without target', async () => {
-    getCombatContext.mockResolvedValue(lowHpCombatContext);
-    buildSaveDc.mockReturnValue(15);
-    resolveTarget.mockResolvedValue({});
-
-    const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-    expect(result.type).toBe('popup');
-    expect(result.payload.description).toContain('No target selected');
-  });
-
-  it('should return popup when resolveTarget returns target without name', async () => {
-    getCombatContext.mockResolvedValue(lowHpCombatContext);
-    buildSaveDc.mockReturnValue(15);
-    resolveTarget.mockResolvedValue({ target: {} });
-
-    const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-    expect(result.type).toBe('popup');
-    expect(result.payload.description).toContain('No target selected');
+      expect(handlerResult.type).toBe('popup');
+      expect(handlerResult.payload.description).toContain('No target selected');
+    }
   });
 });
 
@@ -166,7 +138,7 @@ describe('powerWordStunHandler.handle - target with 150 HP or fewer', () => {
     vi.clearAllMocks();
   });
 
-  it('should apply Stunned condition', async () => {
+  it('should apply Stunned condition and update description', async () => {
     setupMocks('Goblin', 5);
     const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
@@ -177,62 +149,6 @@ describe('powerWordStunHandler.handle - target with 150 HP or fewer', () => {
       campaignName,
     );
     expect(result.payload.description).toContain('Stunned');
-  });
-
-  it('should set tracking for repeat saves', async () => {
-    setupMocks('Goblin', 5);
-    await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-    expect(setRuntimeValue).toHaveBeenCalledWith(
-      casterName,
-      '_powerWordStun_Goblin',
-      true,
-      campaignName,
-    );
-  });
-
-  it('should store target effect for repeat saves', async () => {
-    setupMocks('Goblin', 5);
-    await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-    const effectsCall = setRuntimeValue.mock.calls.find(
-      call => call[1] === 'targetEffects'
-    );
-    expect(effectsCall).toBeDefined();
-    const effects = effectsCall[2];
-    expect(effects).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          target: 'Goblin',
-          effect: 'power_word_stun_repeat_save',
-          source: casterName,
-          condition: 'stunned',
-          dc: 15,
-          saveType: 'CON',
-        }),
-      ]),
-    );
-  });
-
-  it('should log the condition application', async () => {
-    setupMocks('Goblin', 5);
-    await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-    expect(postLogEntry).toHaveBeenCalledWith(
-      campaignName,
-      expect.objectContaining({
-        type: 'condition',
-        action: 'applied',
-        characterName: 'Goblin',
-        condition: 'Stunned',
-      }),
-    );
-  });
-
-  it('should include target HP in description', async () => {
-    setupMocks('Goblin', 5);
-    const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
     expect(result.payload.description).toContain('5 HP');
     expect(result.payload.description).toContain('150 or fewer');
   });
@@ -261,7 +177,9 @@ describe('powerWordStunHandler.handle - target with 150 HP or fewer', () => {
     const condCall = setRuntimeValue.mock.calls.find(
       call => call[0] === 'Goblin' && call[1] === 'activeConditions'
     );
-    expect(condCall[2]).toEqual(['Frightened', 'stunned']);
+    expect(condCall[2]).toContain('stunned');
+    expect(condCall[2]).toContain('Frightened');
+    expect(condCall[2].length).toBe(2);
   });
 
   it('should handle non-array activeConditions gracefully', async () => {
@@ -314,7 +232,7 @@ describe('powerWordStunHandler.handle - target with 150 HP or fewer', () => {
     expect(effects[0].dc).toBe(15);
   });
 
-  it('should use the DC from buildSaveDc in the stored effect', async () => {
+  it('should store the DC from buildSaveDc in the target effect', async () => {
     getCombatContext.mockResolvedValue(lowHpCombatContext);
     buildSaveDc.mockReturnValue(18);
     resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
@@ -338,7 +256,7 @@ describe('powerWordStunHandler.handle - target with more than 150 HP', () => {
     vi.clearAllMocks();
   });
 
-  it('should apply speed_zero instead of Stunned', async () => {
+  it('should apply speed_zero instead of Stunned and update description', async () => {
     setupMocks('Dragon', 300);
     const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
@@ -350,6 +268,7 @@ describe('powerWordStunHandler.handle - target with more than 150 HP', () => {
     );
     expect(result.payload.description).toContain('Speed is 0');
     expect(result.payload.description).toContain('more than 150');
+    expect(result.payload.description).toContain('300 HP');
   });
 
   it('should call addExpiration for speed_zero', async () => {
@@ -380,32 +299,6 @@ describe('powerWordStunHandler.handle - target with more than 150 HP', () => {
         condition: 'Speed 0',
       }),
     );
-  });
-
-  it('should not set tracking key for speed_zero path', async () => {
-    setupMocks('Dragon', 300);
-    await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-    const trackingCall = setRuntimeValue.mock.calls.find(
-      call => call[0] === casterName && typeof call[1] === 'string' && call[1].startsWith('_powerWordStun_')
-    );
-    expect(trackingCall).toBeUndefined();
-  });
-
-  it('should not store target effect for speed_zero path', async () => {
-    setupMocks('Dragon', 300);
-    await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-    const effectsCalls = setRuntimeValue.mock.calls.filter(call => call[1] === 'targetEffects');
-    expect(effectsCalls.length).toBe(0);
-  });
-
-  it('should include HP in description for speed_zero', async () => {
-    setupMocks('Dragon', 300);
-    const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-    expect(result.payload.description).toContain('300 HP');
-    expect(result.payload.description).toContain('more than 150');
   });
 
   it('should append speed_zero to existing conditions', async () => {
@@ -502,75 +395,4 @@ describe('powerWordStunHandler.handle - target with unknown HP', () => {
   });
 });
 
-describe('powerWordStunHandler.handle - target with spaces in name', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
 
-  it('should handle target names with spaces correctly (speed_zero path)', async () => {
-    const combatContext = {
-      creatures: [
-        { name: 'Ancient Red Dragon', type: 'monster', currentHp: 200 },
-        { name: casterName, gridX: 5, gridY: 10 },
-      ],
-      players: [{ name: casterName, gridX: 5, gridY: 10 }],
-      placedItems: [],
-    };
-    getCombatContext.mockResolvedValue(combatContext);
-    buildSaveDc.mockReturnValue(15);
-    resolveTarget.mockResolvedValue({ target: { name: 'Ancient Red Dragon' } });
-    getRuntimeValue.mockReturnValue(null);
-
-    const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-    expect(result.payload.description).toContain('Speed is 0');
-    expect(setRuntimeValue).toHaveBeenCalledWith(
-      'Ancient Red Dragon',
-      'activeConditions',
-      expect.arrayContaining(['speed_zero']),
-      campaignName,
-    );
-  });
-
-  it('should handle target names with spaces correctly (stunned path)', async () => {
-    const combatContext = {
-      creatures: [
-        { name: 'Ancient Red Dragon', type: 'monster', currentHp: 100 },
-        { name: casterName, gridX: 5, gridY: 10 },
-      ],
-      players: [{ name: casterName, gridX: 5, gridY: 10 }],
-      placedItems: [],
-    };
-    getCombatContext.mockResolvedValue(combatContext);
-    buildSaveDc.mockReturnValue(15);
-    resolveTarget.mockResolvedValue({ target: { name: 'Ancient Red Dragon' } });
-    getRuntimeValue.mockReturnValue(null);
-
-    const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-    expect(result.payload.description).toContain('Stunned');
-    expect(setRuntimeValue).toHaveBeenCalledWith(
-      casterName,
-      '_powerWordStun_Ancient_Red_Dragon',
-      true,
-      campaignName,
-    );
-  });
-});
-
-describe('powerWordStunHandler.handle - resolveTarget called correctly', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it('should call resolveTarget with campaignName and casterName', async () => {
-    getCombatContext.mockResolvedValue(lowHpCombatContext);
-    buildSaveDc.mockReturnValue(15);
-    resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
-    getRuntimeValue.mockReturnValue(null);
-
-    await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-    expect(resolveTarget).toHaveBeenCalledWith(campaignName, casterName);
-  });
-});

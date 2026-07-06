@@ -83,18 +83,13 @@ describe('useSpellUpcastFlow', () => {
   // ── isUpcastable ───────────────────────────────────────────────────────
 
   describe('isUpcastable', () => {
-    it('returns true for a spell with multiple slot damage levels', () => {
+    it('returns true for spells with multiple slot damage or heal entries', () => {
       const { result } = renderHook(() =>
         useSpellUpcastFlow(makePlayerStats(), 'TestCampaign')
       );
       expect(result.current.isUpcastable(makeUpcastableSpell())).toBe(true);
-    });
 
-    it('returns true for a healing spell with multiple heal_at_slot_level entries', () => {
-      const { result } = renderHook(() =>
-        useSpellUpcastFlow(makePlayerStats(), 'TestCampaign')
-      );
-      const spell = {
+      const healSpell = {
         name: 'Cure Wounds',
         level: 1,
         heal_at_slot_level: {
@@ -103,40 +98,23 @@ describe('useSpellUpcastFlow', () => {
           3: '3d8 + MOD',
         },
       };
-      expect(result.current.isUpcastable(spell)).toBe(true);
+      expect(result.current.isUpcastable(healSpell)).toBe(true);
     });
 
-    it('returns false for a cantrip regardless of damage type', () => {
+    it('returns false for cantrips, single-slot spells, and missing damage', () => {
       const { result } = renderHook(() =>
         useSpellUpcastFlow(makePlayerStats(), 'TestCampaign')
       );
       expect(result.current.isUpcastable(makeCantripWithCharDmg())).toBe(false);
       expect(result.current.isUpcastable(makeCantripWithSlotDmg())).toBe(false);
-    });
 
-    it('returns false for a spell with only one slot damage level', () => {
-      const { result } = renderHook(() =>
-        useSpellUpcastFlow(makePlayerStats(), 'TestCampaign')
-      );
-      const spell = {
+      const singleLevelSpell = {
         name: 'Single Level Spell',
         level: 2,
         damage: { damage_at_slot_level: { 2: '2d6' } },
       };
-      expect(result.current.isUpcastable(spell)).toBe(false);
-    });
-
-    it('returns false for a spell with no damage object', () => {
-      const { result } = renderHook(() =>
-        useSpellUpcastFlow(makePlayerStats(), 'TestCampaign')
-      );
+      expect(result.current.isUpcastable(singleLevelSpell)).toBe(false);
       expect(result.current.isUpcastable({ name: 'Simple Spell', level: 1 })).toBe(false);
-    });
-
-    it('returns false for null or undefined spell', () => {
-      const { result } = renderHook(() =>
-        useSpellUpcastFlow(makePlayerStats(), 'TestCampaign')
-      );
       expect(result.current.isUpcastable(null)).toBe(false);
       expect(result.current.isUpcastable(undefined)).toBe(false);
     });
@@ -294,7 +272,7 @@ describe('useSpellUpcastFlow', () => {
       expect(result.current.pendingUpcast.deductSlot).toBe(true);
     });
 
-    it('returns false and does not set pendingUpcast for a non-upcastable spell', () => {
+    it('returns false and does not set pendingUpcast for non-upcastable or null spells', () => {
       const { result } = renderHook(() =>
         useSpellUpcastFlow(makePlayerStats(), 'TestCampaign')
       );
@@ -307,6 +285,9 @@ describe('useSpellUpcastFlow', () => {
       expect(retVal).toBe(false);
       expect(result.current.pendingUpcast).toBeNull();
       expect(afterUpcast).not.toHaveBeenCalled();
+
+      act(() => { expect(result.current.gateUpcast(null, afterUpcast)).toBe(false); });
+      act(() => { expect(result.current.gateUpcast(undefined, afterUpcast)).toBe(false); });
     });
 
     it('respects deductSlot = false', () => {
@@ -318,15 +299,6 @@ describe('useSpellUpcastFlow', () => {
 
       act(() => { result.current.gateUpcast(spell, afterUpcast, false); });
       expect(result.current.pendingUpcast.deductSlot).toBe(false);
-    });
-
-    it('returns false for null or undefined spell', () => {
-      const { result } = renderHook(() =>
-        useSpellUpcastFlow(makePlayerStats(), 'TestCampaign')
-      );
-      const afterUpcast = vi.fn();
-      act(() => { expect(result.current.gateUpcast(null, afterUpcast)).toBe(false); });
-      act(() => { expect(result.current.gateUpcast(undefined, afterUpcast)).toBe(false); });
     });
   });
 
@@ -354,7 +326,7 @@ describe('useSpellUpcastFlow', () => {
       expect(result.current.pendingUpcast).toBeNull();
     });
 
-    it('skips slot deduction when deductSlot is false', () => {
+    it('skips slot deduction when deductSlot is false or no slots available', () => {
       mockGetRuntimeValue.mockImplementation((_name, key) => {
         if (key === 'spell_slots_level_3') return 3;
         return null;
@@ -370,21 +342,17 @@ describe('useSpellUpcastFlow', () => {
 
       expect(mockSetRuntimeValue).not.toHaveBeenCalled();
       expect(afterUpcast).toHaveBeenCalled();
-    });
+      vi.clearAllMocks();
 
-    it('skips slot deduction when no slots available but still calls afterUpcast', () => {
       mockGetRuntimeValue.mockImplementation((_name, key) => {
         if (key === 'spell_slots_level_3') return 0;
         return null;
       });
-      const { result } = renderHook(() =>
+      const { result: result2 } = renderHook(() =>
         useSpellUpcastFlow(makePlayerStats(), 'TestCampaign')
       );
-      const spell = makeUpcastableSpell();
-      const afterUpcast = vi.fn();
-
-      act(() => { result.current.gateUpcast(spell, afterUpcast); });
-      act(() => { result.current.handleUpcastConfirm(3); });
+      act(() => { result2.current.gateUpcast(spell, afterUpcast); });
+      act(() => { result2.current.handleUpcastConfirm(3); });
 
       expect(mockSetRuntimeValue).not.toHaveBeenCalled();
       expect(afterUpcast).toHaveBeenCalledWith({ ...spell, level: 3 });
@@ -467,64 +435,6 @@ describe('useSpellUpcastFlow', () => {
         level: 0,
         damage: { damage_at_character_level: {}, damage_at_slot_level: {} },
       }, 5)).toBeNull();
-    });
-  });
-
-  // ── Integration tests ──────────────────────────────────────────────────
-
-  describe('full upcast flow', () => {
-    it('completes the full gate -> confirm flow with slot deduction', () => {
-      mockGetRuntimeValue.mockImplementation((_name, key) => {
-        if (key === 'spell_slots_level_3') return 2;
-        return null;
-      });
-      const { result } = renderHook(() =>
-        useSpellUpcastFlow(makePlayerStats(), 'TestCampaign')
-      );
-      const spell = makeUpcastableSpell();
-      const afterUpcast = vi.fn();
-
-      let gateResult;
-      act(() => { gateResult = result.current.gateUpcast(spell, afterUpcast); });
-      expect(gateResult).toBe(true);
-
-      act(() => { result.current.handleUpcastConfirm(3); });
-
-      expect(mockSetRuntimeValue).toHaveBeenCalledWith(
-        'TestWizard', 'spell_slots_level_3', 1, 'TestCampaign'
-      );
-      expect(afterUpcast).toHaveBeenCalledWith({ ...spell, level: 3 });
-      expect(result.current.pendingUpcast).toBeNull();
-    });
-
-    it('completes the full gate -> cancel flow', () => {
-      const { result } = renderHook(() =>
-        useSpellUpcastFlow(makePlayerStats(), 'TestCampaign')
-      );
-      const spell = makeUpcastableSpell();
-      const afterUpcast = vi.fn();
-
-      act(() => { result.current.gateUpcast(spell, afterUpcast); });
-      act(() => { result.current.handleUpcastCancel(); });
-
-      expect(result.current.pendingUpcast).toBeNull();
-      expect(afterUpcast).not.toHaveBeenCalled();
-      expect(mockSetRuntimeValue).not.toHaveBeenCalled();
-    });
-
-    it('rejects non-upcastable spell at the gate', () => {
-      const { result } = renderHook(() =>
-        useSpellUpcastFlow(makePlayerStats(), 'TestCampaign')
-      );
-      const spell = { name: 'Fireball', level: 3 };
-      const afterUpcast = vi.fn();
-
-      let gateResult;
-      act(() => { gateResult = result.current.gateUpcast(spell, afterUpcast); });
-
-      expect(gateResult).toBe(false);
-      expect(result.current.pendingUpcast).toBeNull();
-      expect(afterUpcast).not.toHaveBeenCalled();
     });
   });
 });

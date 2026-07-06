@@ -102,10 +102,10 @@ describe('buffAllyHandler.handle', () => {
       expect(expirations.addExpiration).not.toHaveBeenCalled();
     });
 
-    it('passes buffExpression as effect when both are provided', async () => {
+    it('passes buffExpression as effect when both are provided, falling back to effect when buffExpression is absent', async () => {
       const ps = makePlayerStats();
       const action = makeAction({
-        effect: 'effect_value',
+        effect: 'my_effect',
         buffExpression: 'custom_expression',
       });
       buffToggle.toggleBuff.mockReturnValue({ wasActive: false });
@@ -118,14 +118,10 @@ describe('buffAllyHandler.handle', () => {
         expect.objectContaining({ effect: 'custom_expression' }),
         campaignName,
       );
-    });
 
-    it('falls back to effect when buffExpression is absent', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction({ effect: 'my_effect' });
+      resetMocks();
       buffToggle.toggleBuff.mockReturnValue({ wasActive: false });
-
-      await handle(action, ps, campaignName, null);
+      await handle({ ...action, automation: { ...action.automation, buffExpression: undefined } }, ps, campaignName, null);
 
       expect(buffToggle.toggleBuff).toHaveBeenCalledWith(
         'Fighter',
@@ -176,7 +172,7 @@ describe('buffAllyHandler.handle', () => {
       expect(buffToggle.toggleBuff).not.toHaveBeenCalled();
     });
 
-    it('includes Rage recharge hint for long_rest_or_expend_rage', async () => {
+    it('includes Rage recharge hint for long_rest_or_expend_rage, omits it for other recharge values', async () => {
       const ps = makePlayerStats();
       const action = makeAction({ usesMax: 1, recharge: 'long_rest_or_expend_rage' });
       useRuntimeState.getRuntimeValue.mockReturnValue(0);
@@ -184,16 +180,12 @@ describe('buffAllyHandler.handle', () => {
       const result = await handle(action, ps, campaignName, null);
 
       expect(result.payload.description).toContain('expend one use of Rage');
-    });
 
-    it('omits Rage hint for other recharge values', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction({ usesMax: 1, recharge: 'short_rest' });
+      resetMocks();
       useRuntimeState.getRuntimeValue.mockReturnValue(0);
+      const result2 = await handle(makeAction({ usesMax: 1, recharge: 'short_rest' }), ps, campaignName, null);
 
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.payload.description).not.toContain('Rage');
+      expect(result2.payload.description).not.toContain('Rage');
     });
   });
 

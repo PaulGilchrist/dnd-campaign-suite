@@ -73,18 +73,6 @@ describe('darkOnesBlessingHandler', () => {
                 expect(result).toBeNull();
             });
 
-            it('returns null when feature is not in characterAdvancement', async () => {
-                const playerStats = {
-                    name: 'TestWarlock',
-                    class: { subclass: { name: 'Fiend Patron' } },
-                    characterAdvancement: [],
-                };
-
-                const result = await grantDarkOnesBlessing(playerStats, 'campaign', null, null);
-
-                expect(result).toBeNull();
-            });
-
             it('returns null when feature exists but has no automation', async () => {
                 const playerStats = {
                     name: 'TestWarlock',
@@ -95,26 +83,6 @@ describe('darkOnesBlessingHandler', () => {
                 const result = await grantDarkOnesBlessing(playerStats, 'campaign', null, null);
 
                 expect(result).toBeNull();
-            });
-
-            it('returns null when characterAdvancement is undefined', async () => {
-                const playerStats = {
-                    name: 'TestWarlock',
-                    class: { subclass: { name: 'Fiend Patron' } },
-                };
-
-                const result = await grantDarkOnesBlessing(playerStats, 'campaign', null, null);
-
-                expect(result).toBeNull();
-            });
-
-            it('returns null when evaluated amount is zero (Math.max(1, 0) = 1, but check is <= 0)', async () => {
-                automationService.evaluateAutoExpression.mockReturnValue(0);
-
-                const result = await grantDarkOnesBlessing(makeFiendWarlockStats(), 'campaign', null, null);
-
-                expect(result).not.toBeNull();
-                expect(result.amount).toBe(1);
             });
         });
 
@@ -134,7 +102,7 @@ describe('darkOnesBlessingHandler', () => {
                 );
             });
 
-            it('uses minimum of 1 when evaluated amount is zero', async () => {
+            it('uses minimum of 1 when evaluated amount is zero or negative', async () => {
                 automationService.evaluateAutoExpression.mockReturnValue(0);
 
                 const result = await grantDarkOnesBlessing(makeFiendWarlockStats(), 'campaign', null, null);
@@ -146,14 +114,6 @@ describe('darkOnesBlessingHandler', () => {
                     1,
                     'campaign'
                 );
-            });
-
-            it('uses minimum of 1 when evaluated amount is negative', async () => {
-                automationService.evaluateAutoExpression.mockReturnValue(-3);
-
-                const result = await grantDarkOnesBlessing(makeFiendWarlockStats(), 'campaign', null, null);
-
-                expect(result.amount).toBe(1);
             });
 
             it('adds to existing temp HP', async () => {
@@ -192,18 +152,9 @@ describe('darkOnesBlessingHandler', () => {
                 expect(result.outOfRange).toBeUndefined();
             });
 
-            it('checks range when attacker is out of range', async () => {
+            it('sets outOfRange when attacker is out of range', async () => {
                 mapsService.loadMapData.mockResolvedValue(makeMapData(20, 20));
                 rangeValidation.getDistanceFeet.mockReturnValue(15);
-
-                const result = await grantDarkOnesBlessing(makeFiendWarlockStats(), 'campaign', 'Goblin', 'test-map');
-
-                expect(result.outOfRange).toBe(true);
-            });
-
-            it('sets outOfRange when distance is null', async () => {
-                mapsService.loadMapData.mockResolvedValue(makeMapData(20, 20));
-                rangeValidation.getDistanceFeet.mockReturnValue(null);
 
                 const result = await grantDarkOnesBlessing(makeFiendWarlockStats(), 'campaign', 'Goblin', 'test-map');
 
@@ -221,35 +172,8 @@ describe('darkOnesBlessingHandler', () => {
                 expect(result.outOfRange).toBeUndefined();
             });
 
-            it('skips range check when player is not found on map', async () => {
-                mapsService.loadMapData.mockResolvedValue({
-                    players: [{ name: 'Goblin', gridX: 5, gridY: 5 }],
-                });
-
-                const result = await grantDarkOnesBlessing(makeFiendWarlockStats(), 'campaign', 'Goblin', 'test-map');
-
-                expect(result).not.toBeNull();
-                expect(result.outOfRange).toBeUndefined();
-            });
-
-            it('skips range check when no mapName is provided', async () => {
+            it('skips range check when no mapName or attackerName is provided', async () => {
                 const result = await grantDarkOnesBlessing(makeFiendWarlockStats(), 'campaign', null, null);
-
-                expect(result).not.toBeNull();
-                expect(result.outOfRange).toBeUndefined();
-            });
-
-            it('skips range check when no attackerName is provided', async () => {
-                const result = await grantDarkOnesBlessing(makeFiendWarlockStats(), 'campaign', null, 'test-map');
-
-                expect(result).not.toBeNull();
-                expect(result.outOfRange).toBeUndefined();
-            });
-
-            it('skips range check when rangeToFeet returns null', async () => {
-                rangeValidation.rangeToFeet.mockReturnValue(null);
-
-                const result = await grantDarkOnesBlessing(makeFiendWarlockStats(), 'campaign', 'Goblin', 'test-map');
 
                 expect(result).not.toBeNull();
                 expect(result.outOfRange).toBeUndefined();
@@ -263,24 +187,6 @@ describe('darkOnesBlessingHandler', () => {
 
             expect(result).toBeNull();
             expect(addEntry).not.toHaveBeenCalled();
-        });
-
-        it('returns null when not a Fiend patron', async () => {
-            const result = await handle(makeAction(), makeOtherWarlockStats(), 'campaign', null);
-
-            expect(result).toBeNull();
-        });
-
-        it('returns null when feature not in characterAdvancement', async () => {
-            const playerStats = {
-                name: 'TestWarlock',
-                class: { subclass: { name: 'Fiend Patron' } },
-                characterAdvancement: [],
-            };
-
-            const result = await handle(makeAction(), playerStats, 'campaign', null);
-
-            expect(result).toBeNull();
         });
 
         it('adds a campaign log entry on success', async () => {

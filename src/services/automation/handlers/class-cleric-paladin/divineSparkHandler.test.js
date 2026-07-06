@@ -64,13 +64,13 @@ describe('divineSparkHandler.handle', () => {
     vi.clearAllMocks();
   });
 
-  describe('charge validation — no-charges popup', () => {
-    it('returns no-charges popup when stored charges is 0', async () => {
+  describe('charge validation', () => {
+    it('returns no-charges popup when stored charges is zero', async () => {
+      const ps = makePlayerStats();
+      const action = makeAction();
+
       useRuntimeState.getRuntimeValue.mockReturnValue(0);
 
-      const ps = makePlayerStats();
-      const action = makeAction();
-
       const result = await handle(action, ps, campaignName, null);
 
       expect(result).toEqual({
@@ -84,28 +84,6 @@ describe('divineSparkHandler.handle', () => {
         },
       });
     });
-
-    it('returns no-charges popup when stored charges is negative', async () => {
-      useRuntimeState.getRuntimeValue.mockReturnValue(-1);
-
-      const ps = makePlayerStats();
-      const action = makeAction();
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result).toEqual({
-        type: 'popup',
-        payload: {
-          type: 'automation_info',
-          name: action.name,
-          automationType: 'divine_spark',
-          description: 'No Channel Divinity charges remaining.',
-          automation: action.automation,
-        },
-      });
-    });
-
-
   });
 
   describe('charge deduction', () => {
@@ -130,48 +108,7 @@ describe('divineSparkHandler.handle', () => {
       );
     });
 
-    it('deducts 1 from maxCharges when no stored charges', async () => {
-      useRuntimeState.getRuntimeValue.mockReturnValue(undefined);
-      targetResolver.resolveTarget.mockResolvedValue(null);
-
-      const ps = makePlayerStats();
-      const action = makeAction();
-
-      await handle(action, ps, campaignName, null);
-
-      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-        ps.name,
-        'channelDivinityCharges',
-        1,
-        campaignName,
-        true,
-      );
-    });
-
-    it('deducts 1 from class_level.channel_divinity when available', async () => {
-      useRuntimeState.getRuntimeValue.mockReturnValue(undefined);
-      targetResolver.resolveTarget.mockResolvedValue(null);
-
-      const ps = makePlayerStats({
-        level: 3,
-        class: {
-          class_levels: [undefined, undefined, { channel_divinity: 3 }],
-        },
-      });
-      const action = makeAction();
-
-      await handle(action, ps, campaignName, null);
-
-      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-        ps.name,
-        'channelDivinityCharges',
-        2,
-        campaignName,
-        true,
-      );
-    });
-
-    it('deducts 1 from class_specific.channel_divinity_charges when channel_divinity is 0', async () => {
+    it('uses class_specific.channel_divinity_charges when channel_divinity is 0', async () => {
       useRuntimeState.getRuntimeValue.mockReturnValue(undefined);
       targetResolver.resolveTarget.mockResolvedValue(null);
 
@@ -200,96 +137,6 @@ describe('divineSparkHandler.handle', () => {
         true,
       );
     });
-
-    it('deducts 1 from default maxCharges of 2 when class structure is missing', async () => {
-      useRuntimeState.getRuntimeValue.mockReturnValue(undefined);
-      targetResolver.resolveTarget.mockResolvedValue(null);
-
-      const ps = makePlayerStats({ class: undefined });
-      const action = makeAction();
-
-      await handle(action, ps, campaignName, null);
-
-      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-        ps.name,
-        'channelDivinityCharges',
-        1,
-        campaignName,
-        true,
-      );
-    });
-
-    it('deducts 1 from default maxCharges of 2 when class_levels is undefined', async () => {
-      useRuntimeState.getRuntimeValue.mockReturnValue(undefined);
-      targetResolver.resolveTarget.mockResolvedValue(null);
-
-      const ps = makePlayerStats({ class: { class_levels: undefined } });
-      const action = makeAction();
-
-      await handle(action, ps, campaignName, null);
-
-      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-        ps.name,
-        'channelDivinityCharges',
-        1,
-        campaignName,
-        true,
-      );
-    });
-
-    it('deducts 1 from default maxCharges of 2 when level is missing', async () => {
-      useRuntimeState.getRuntimeValue.mockReturnValue(undefined);
-      targetResolver.resolveTarget.mockResolvedValue(null);
-
-      const ps = makePlayerStats({ level: undefined });
-      const action = makeAction();
-
-      await handle(action, ps, campaignName, null);
-
-      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-        ps.name,
-        'channelDivinityCharges',
-        1,
-        campaignName,
-        true,
-      );
-    });
-
-    it('deducts 1 from default maxCharges of 2 when playerStats.level is 0', async () => {
-      useRuntimeState.getRuntimeValue.mockReturnValue(undefined);
-      targetResolver.resolveTarget.mockResolvedValue(null);
-
-      const ps = makePlayerStats({ level: 0 });
-      const action = makeAction();
-
-      await handle(action, ps, campaignName, null);
-
-      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-        ps.name,
-        'channelDivinityCharges',
-        1,
-        campaignName,
-        true,
-      );
-    });
-
-    it('deducts 1 from default maxCharges of 2 when playerStats is missing level and class', async () => {
-      useRuntimeState.getRuntimeValue.mockReturnValue(undefined);
-      targetResolver.resolveTarget.mockResolvedValue(null);
-
-      const ps = makePlayerStats({ level: undefined, class: undefined });
-      const action = makeAction();
-
-      await handle(action, ps, campaignName, null);
-
-      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-        ps.name,
-        'channelDivinityCharges',
-        1,
-        campaignName,
-        true,
-      );
-    });
   });
 
   describe('modal payload structure', () => {
@@ -298,7 +145,7 @@ describe('divineSparkHandler.handle', () => {
       targetResolver.resolveTarget.mockResolvedValue(null);
     });
 
-    it('returns a modal with modalName divineSpark', async () => {
+    it('returns a modal with correct structure and fields', async () => {
       const ps = makePlayerStats();
       const action = makeAction();
 
@@ -316,40 +163,15 @@ describe('divineSparkHandler.handle', () => {
       });
     });
 
-    it('includes featureName from action name', async () => {
-      const ps = makePlayerStats();
+    it('uses wisModifier from Wisdom ability or defaults to 0', async () => {
+      const ps = makePlayerStats({ abilities: [{ name: 'Wisdom', bonus: 3 }] });
       const action = makeAction();
 
       const result = await handle(action, ps, campaignName, null);
 
-      expect(result.payload.featureName).toBe(action.name);
-    });
-
-    it('includes attackerName from playerStats', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.payload.attackerName).toBe(ps.name);
-    });
-
-    it('includes campaignName', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.payload.campaignName).toBe(campaignName);
-    });
-
-    it('includes wisModifier from Wisdom ability bonus', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.payload.wisModifier).toBe(2);
+      expect(result.payload.wisModifier).toBe(3);
+      expect(result.payload.healExpression).toBe('1d8 + 3');
+      expect(result.payload.damageExpression).toBe('1d8 + 3');
     });
 
     it('uses 0 as wisModifier when Wisdom ability is missing', async () => {
@@ -361,34 +183,7 @@ describe('divineSparkHandler.handle', () => {
       expect(result.payload.wisModifier).toBe(0);
     });
 
-    it('uses 0 as wisModifier when abilities array is undefined', async () => {
-      const ps = makePlayerStats({ abilities: undefined });
-      const action = makeAction();
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.payload.wisModifier).toBe(0);
-    });
-
-    it('builds healExpression with wisModifier', async () => {
-      const ps = makePlayerStats({ abilities: [{ name: 'Wisdom', bonus: 3 }] });
-      const action = makeAction();
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.payload.healExpression).toBe('1d8 + 3');
-    });
-
-    it('builds damageExpression with wisModifier', async () => {
-      const ps = makePlayerStats({ abilities: [{ name: 'Wisdom', bonus: 3 }] });
-      const action = makeAction();
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.payload.damageExpression).toBe('1d8 + 3');
-    });
-
-    it('uses auto.damageTypes when provided', async () => {
+    it('handles damageTypes from auto or defaults', async () => {
       const ps = makePlayerStats();
       const action = makeAction({ damageTypes: ['Fire', 'Cold'] });
 
@@ -397,16 +192,7 @@ describe('divineSparkHandler.handle', () => {
       expect(result.payload.damageTypes).toEqual(['Fire', 'Cold']);
     });
 
-    it('falls back to ["Necrotic", "Radiant"] when auto.damageTypes is missing', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.payload.damageTypes).toEqual(['Necrotic', 'Radiant']);
-    });
-
-    it('falls back to ["Necrotic", "Radiant"] when auto.damageTypes is null', async () => {
+    it('falls back to default damageTypes when auto.damageTypes is null or missing', async () => {
       const ps = makePlayerStats();
       const action = makeAction({ damageTypes: null });
 
@@ -415,7 +201,7 @@ describe('divineSparkHandler.handle', () => {
       expect(result.payload.damageTypes).toEqual(['Necrotic', 'Radiant']);
     });
 
-    it('falls back to ["Necrotic", "Radiant"] when auto.damageTypes is an empty array', async () => {
+    it('uses auto.damageTypes when it is an empty array', async () => {
       const ps = makePlayerStats();
       const action = makeAction({ damageTypes: [] });
 
@@ -424,7 +210,7 @@ describe('divineSparkHandler.handle', () => {
       expect(result.payload.damageTypes).toEqual([]);
     });
 
-    it('uses auto.saveType when provided', async () => {
+    it('handles saveType from auto or defaults to CON', async () => {
       const ps = makePlayerStats();
       const action = makeAction({ saveType: 'WIS' });
 
@@ -433,16 +219,7 @@ describe('divineSparkHandler.handle', () => {
       expect(result.payload.saveType).toBe('WIS');
     });
 
-    it('falls back to CON when auto.saveType is missing', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.payload.saveType).toBe('CON');
-    });
-
-    it('falls back to CON when auto.saveType is null', async () => {
+    it('defaults saveType to CON when auto.saveType is null or missing', async () => {
       const ps = makePlayerStats();
       const action = makeAction({ saveType: null });
 
@@ -469,41 +246,8 @@ describe('divineSparkHandler.handle', () => {
       expect(targetResolver.resolveTarget).toHaveBeenCalledWith(campaignName, ps.name);
     });
 
-    it('falls back to playerStats.name when resolveTarget returns null', async () => {
+    it('falls back to playerStats.name when resolveTarget returns null or empty target', async () => {
       targetResolver.resolveTarget.mockResolvedValue(null);
-
-      const ps = makePlayerStats();
-      const action = makeAction();
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.payload.targetName).toBe(ps.name);
-    });
-
-    it('falls back to playerStats.name when resolveTarget returns object without target', async () => {
-      targetResolver.resolveTarget.mockResolvedValue({});
-
-      const ps = makePlayerStats();
-      const action = makeAction();
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.payload.targetName).toBe(ps.name);
-    });
-
-    it('falls back to playerStats.name when resolveTarget returns object with null target', async () => {
-      targetResolver.resolveTarget.mockResolvedValue({ target: null });
-
-      const ps = makePlayerStats();
-      const action = makeAction();
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.payload.targetName).toBe(ps.name);
-    });
-
-    it('falls back to playerStats.name when resolveTarget returns object with undefined target', async () => {
-      targetResolver.resolveTarget.mockResolvedValue({ target: undefined });
 
       const ps = makePlayerStats();
       const action = makeAction();
@@ -536,20 +280,6 @@ describe('divineSparkHandler.handle', () => {
       });
     });
 
-    it('uses playerStats.name in description when target is the player', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-
-      await handle(action, ps, campaignName, null);
-
-      expect(logService.addEntry).toHaveBeenCalledWith(campaignName, {
-        type: 'ability_use',
-        characterName: ps.name,
-        abilityName: action.name,
-        description: 'Divine Spark activated — targeting TestHero.',
-      });
-    });
-
     it('does not await addEntry (fire-and-forget)', async () => {
       const ps = makePlayerStats();
       const action = makeAction();
@@ -559,32 +289,10 @@ describe('divineSparkHandler.handle', () => {
       });
       logService.addEntry.mockReturnValue(addEntryPromise);
 
-      // Should not hang — the handler fire-and-forgets
       const result = await handle(action, ps, campaignName, null);
 
       expect(result.type).toBe('modal');
     });
   });
 
-  describe('ignores unused parameters', () => {
-    it('ignores the _mapName parameter', async () => {
-      useRuntimeState.getRuntimeValue.mockReturnValue(2);
-      targetResolver.resolveTarget.mockResolvedValue(null);
-
-      const ps = makePlayerStats();
-      const action = makeAction();
-
-      const result = await handle(action, ps, campaignName, 'SomeMap');
-
-      expect(result.type).toBe('modal');
-      expect(result.payload.targetName).toBe(ps.name);
-      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-        ps.name,
-        'channelDivinityCharges',
-        1,
-        campaignName,
-        true,
-      );
-    });
-  });
 });

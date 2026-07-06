@@ -149,9 +149,55 @@ describe('findNPCByName', () => {
 // ===================================================================
 describe('npcToMonsterFormat', () => {
   // --- Null / undefined input ---
-  it('returns null when npc is null or undefined', () => {
+  it('returns null for null or undefined npc', () => {
     expect(npcToMonsterFormat(null)).toBeNull();
     expect(npcToMonsterFormat(undefined)).toBeNull();
+  });
+
+  // --- Saving throws & skills (shared filter+convert+default logic) ---
+  it('includes saving throws with defined numeric bonuses', () => {
+    const npc = makeNPC({ savingThrowBonuses: { str: 3, con: 1 } });
+    const monster = npcToMonsterFormat(npc);
+    expect(monster.saving_throws.str).toEqual({ modifier: 3 });
+    expect(monster.saving_throws.con).toEqual({ modifier: 1 });
+    expect(monster.saving_throws.dex).toBeUndefined();
+  });
+
+  it('excludes saving throws with undefined, null, or empty string bonuses', () => {
+    const npc = makeNPC({ savingThrowBonuses: { str: undefined, dex: null, con: '' } });
+    expect(Object.keys(npcToMonsterFormat(npc).saving_throws)).toEqual([]);
+  });
+
+  it('converts saving throw bonus string values to numbers', () => {
+    const npc = makeNPC({ savingThrowBonuses: { int: '2' } });
+    expect(npcToMonsterFormat(npc).saving_throws.int.modifier).toBe(2);
+  });
+
+  it('omits saving_throws key when no bonuses provided', () => {
+    const monster = npcToMonsterFormat({ armorClass: 10 });
+    expect(monster.saving_throws).toEqual({});
+  });
+
+  it('includes skills with defined numeric bonuses', () => {
+    const npc = makeNPC({ skillBonuses: { Stealth: 4, Perception: 2 } });
+    const monster = npcToMonsterFormat(npc);
+    expect(monster.skills.Stealth).toEqual({ modifier: 4 });
+    expect(monster.skills.Perception).toEqual({ modifier: 2 });
+  });
+
+  it('excludes skills with undefined, null, or empty string bonuses', () => {
+    const npc = makeNPC({ skillBonuses: { Acrobatics: undefined, Athletics: null, History: '' } });
+    expect(Object.keys(npcToMonsterFormat(npc).skills)).toEqual([]);
+  });
+
+  it('converts skill bonus string values to numbers', () => {
+    const npc = makeNPC({ skillBonuses: { Insight: '-1' } });
+    expect(npcToMonsterFormat(npc).skills.Insight.modifier).toBe(-1);
+  });
+
+  it('omits skills key when no bonuses provided', () => {
+    const monster = npcToMonsterFormat({ armorClass: 10 });
+    expect(monster.skills).toEqual({});
   });
 
   // --- Identity defaults ---
@@ -199,53 +245,6 @@ describe('npcToMonsterFormat', () => {
     expect(monster.ability_score_modifiers).toEqual({ str: 0, dex: 0, con: 0, int: 0, wis: 0, cha: 0 });
   });
 
-  // --- Saving throws ---
-  it('includes saving throws with defined numeric bonuses', () => {
-    const npc = makeNPC({ savingThrowBonuses: { str: 3, con: 1 } });
-    const monster = npcToMonsterFormat(npc);
-    expect(monster.saving_throws.str).toEqual({ modifier: 3 });
-    expect(monster.saving_throws.con).toEqual({ modifier: 1 });
-    expect(monster.saving_throws.dex).toBeUndefined();
-  });
-
-  it('excludes saving throws with undefined, null, or empty string bonuses', () => {
-    const npc = makeNPC({ savingThrowBonuses: { str: undefined, dex: null, con: '' } });
-    expect(Object.keys(npcToMonsterFormat(npc).saving_throws)).toEqual([]);
-  });
-
-  it('converts saving throw bonus string values to numbers', () => {
-    const npc = makeNPC({ savingThrowBonuses: { int: '2' } });
-    expect(npcToMonsterFormat(npc).saving_throws.int.modifier).toBe(2);
-  });
-
-  it('omits saving_throws key when no bonuses provided', () => {
-    const monster = npcToMonsterFormat({ armorClass: 10 });
-    expect(monster.saving_throws).toEqual({});
-  });
-
-  // --- Skills ---
-  it('includes skills with defined numeric bonuses', () => {
-    const npc = makeNPC({ skillBonuses: { Stealth: 4, Perception: 2 } });
-    const monster = npcToMonsterFormat(npc);
-    expect(monster.skills.Stealth).toEqual({ modifier: 4 });
-    expect(monster.skills.Perception).toEqual({ modifier: 2 });
-  });
-
-  it('excludes skills with undefined, null, or empty string bonuses', () => {
-    const npc = makeNPC({ skillBonuses: { Acrobatics: undefined, Athletics: null, History: '' } });
-    expect(Object.keys(npcToMonsterFormat(npc).skills)).toEqual([]);
-  });
-
-  it('converts skill bonus string values to numbers', () => {
-    const npc = makeNPC({ skillBonuses: { Insight: '-1' } });
-    expect(npcToMonsterFormat(npc).skills.Insight.modifier).toBe(-1);
-  });
-
-  it('omits skills key when no bonuses provided', () => {
-    const monster = npcToMonsterFormat({ armorClass: 10 });
-    expect(monster.skills).toEqual({});
-  });
-
   // --- Initiative ---
   it('formats initiative_details for positive, zero, and negative bonuses', () => {
     expect(npcToMonsterFormat(makeNPC({ initiativeBonus: 5 })).initiative_details).toBe('+5');
@@ -254,9 +253,12 @@ describe('npcToMonsterFormat', () => {
   });
 
   it('omits initiative_details for undefined, null, or empty string bonuses', () => {
-    expect(npcToMonsterFormat(makeNPC({ initiativeBonus: undefined })).initiative_details).toBeNull();
-    expect(npcToMonsterFormat(makeNPC({ initiativeBonus: null })).initiative_details).toBeNull();
-    expect(npcToMonsterFormat(makeNPC({ initiativeBonus: '' })).initiative_details).toBeNull();
+    const { initiative_details } = npcToMonsterFormat(makeNPC({ initiativeBonus: undefined }));
+    expect(initiative_details).toBeNull();
+    const { initiative_details: initNull } = npcToMonsterFormat(makeNPC({ initiativeBonus: null }));
+    expect(initNull).toBeNull();
+    const { initiative_details: initEmpty } = npcToMonsterFormat(makeNPC({ initiativeBonus: '' }));
+    expect(initEmpty).toBeNull();
   });
 
   // --- Armor class ---

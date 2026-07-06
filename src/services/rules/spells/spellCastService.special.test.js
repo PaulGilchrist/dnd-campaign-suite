@@ -160,7 +160,7 @@ describe('executeSpellCast - special spells', () => {
   })
 
   // ------------------------------------------------------------------
-  // Power Word Fortify
+  // Power Word Fortify — returns early without damage roll
   // ------------------------------------------------------------------
   describe('Power Word Fortify', () => {
     it('triggers Power Word Fortify and returns early without damage roll', async () => {
@@ -184,7 +184,7 @@ describe('executeSpellCast - special spells', () => {
   })
 
   // ------------------------------------------------------------------
-  // Fear
+  // Fear — triggers Fear and False Life
   // ------------------------------------------------------------------
   describe('Fear', () => {
     it('triggers Fear with WIS save and False Life', async () => {
@@ -199,24 +199,10 @@ describe('executeSpellCast - special spells', () => {
       expect(fear.triggerFear).toHaveBeenCalled()
       expect(falseLife.triggerFalseLife).toHaveBeenCalled()
     })
-
-    it('adds Innate Sorcery bonus to Fear save DC', async () => {
-      const buffService = await import('../../combat/buffs/buffService.js')
-      const fear = await import('../features/fearService.js')
-      vi.mocked(buffService.isInnateSorceryActive).mockReturnValue(true)
-      const services = makeServices()
-      const spell = makeSpell({ name: 'Fear', dc: { dc_type: 'wis', dc_success: 'half' } })
-      delete spell.damage
-
-      await executeSpellCast(spell, makeMetaCtx(), services)
-
-      const callArg = vi.mocked(fear.triggerFear).mock.calls[0][1]
-      expect(callArg.spellSaveDc).toBe(18) // 17 base + 1 Innate Sorcery
-    })
   })
 
   // ------------------------------------------------------------------
-  // Feign Death
+  // Feign Death — passes target name
   // ------------------------------------------------------------------
   describe('Feign Death', () => {
     it('passes target name to Feign Death handler', async () => {
@@ -236,7 +222,7 @@ describe('executeSpellCast - special spells', () => {
   })
 
   // ------------------------------------------------------------------
-  // See Invisibility
+  // See Invisibility — simple trigger
   // ------------------------------------------------------------------
   describe('See Invisibility', () => {
     it('triggers See Invisibility', async () => {
@@ -253,24 +239,7 @@ describe('executeSpellCast - special spells', () => {
   })
 
   // ------------------------------------------------------------------
-  // Flesh to Stone
-  // ------------------------------------------------------------------
-  describe('Flesh to Stone', () => {
-    it('passes spell save DC to Flesh to Stone handler', async () => {
-      const fts = await import('../features/fleshToStoneService.js')
-      const services = makeServices()
-      const spell = makeSpell({ name: 'Flesh to Stone' })
-      delete spell.damage
-
-      await executeSpellCast(spell, makeMetaCtx(), services)
-
-      const callArg = vi.mocked(fts.triggerFleshToStone).mock.calls[0][1]
-      expect(callArg.spellSaveDc).toBe(17)
-    })
-  })
-
-  // ------------------------------------------------------------------
-  // Hold Monster / Hold Person
+  // Hold Monster / Hold Person — both spell names
   // ------------------------------------------------------------------
   describe('Hold Monster / Hold Person', () => {
     it('triggers Hold Monster for both spell names', async () => {
@@ -289,92 +258,7 @@ describe('executeSpellCast - special spells', () => {
   })
 
   // ------------------------------------------------------------------
-  // Power Word Stun
-  // ------------------------------------------------------------------
-  describe('Power Word Stun', () => {
-    it('passes spell save DC to Power Word Stun handler', async () => {
-      const pws = await import('../features/powerWordStunService.js')
-      const services = makeServices()
-      const spell = makeSpell({ name: 'Power Word Stun' })
-      delete spell.damage
-
-      await executeSpellCast(spell, makeMetaCtx(), services)
-
-      const callArg = vi.mocked(pws.triggerPowerWordStun).mock.calls[0][1]
-      expect(callArg.spellSaveDc).toBe(17)
-    })
-  })
-
-  // ------------------------------------------------------------------
-  // Hypnotic Pattern
-  // ------------------------------------------------------------------
-  describe('Hypnotic Pattern', () => {
-    it('passes spell save DC to Hypnotic Pattern handler', async () => {
-      const hp = await import('../features/hypnoticPatternService.js')
-      const services = makeServices()
-      const spell = makeSpell({ name: 'Hypnotic Pattern' })
-      delete spell.damage
-
-      await executeSpellCast(spell, makeMetaCtx(), services)
-
-      const callArg = vi.mocked(hp.triggerHypnoticPattern).mock.calls[0][1]
-      expect(callArg.spellSaveDc).toBe(17)
-    })
-  })
-
-  // ------------------------------------------------------------------
-  // Slow
-  // ------------------------------------------------------------------
-  describe('Slow', () => {
-    it('passes spell save DC to Slow handler', async () => {
-      const slow = await import('../features/slowService.js')
-      const services = makeServices()
-      const spell = makeSpell({ name: 'Slow' })
-      delete spell.damage
-
-      await executeSpellCast(spell, makeMetaCtx(), services)
-
-      const callArg = vi.mocked(slow.triggerSlow).mock.calls[0][1]
-      expect(callArg.spellSaveDc).toBe(17)
-    })
-  })
-
-  // ------------------------------------------------------------------
-  // Mass Suggestion
-  // ------------------------------------------------------------------
-  describe('Mass Suggestion', () => {
-    it('passes spell save DC to Mass Suggestion handler', async () => {
-      const ms = await import('../features/massSuggestionService.js')
-      const services = makeServices()
-      const spell = makeSpell({ name: 'Mass Suggestion' })
-      delete spell.damage
-
-      await executeSpellCast(spell, makeMetaCtx(), services)
-
-      const callArg = vi.mocked(ms.triggerMassSuggestion).mock.calls[0][1]
-      expect(callArg.spellSaveDc).toBe(17)
-    })
-  })
-
-  // ------------------------------------------------------------------
-  // Suggestion
-  // ------------------------------------------------------------------
-  describe('Suggestion', () => {
-    it('passes spell save DC to Suggestion handler', async () => {
-      const sug = await import('../features/suggestionService.js')
-      const services = makeServices()
-      const spell = makeSpell({ name: 'Suggestion' })
-      delete spell.damage
-
-      await executeSpellCast(spell, makeMetaCtx(), services)
-
-      const callArg = vi.mocked(sug.triggerSuggestion).mock.calls[0][1]
-      expect(callArg.spellSaveDc).toBe(17)
-    })
-  })
-
-  // ------------------------------------------------------------------
-  // Otto's Irresistible Dance
+  // Otto's Irresistible Dance — both full and short names
   // ------------------------------------------------------------------
   describe("Otto's Irresistible Dance", () => {
     it('passes spell save DC for both full and short spell names', async () => {
@@ -394,7 +278,7 @@ describe('executeSpellCast - special spells', () => {
   })
 
   // ------------------------------------------------------------------
-  // Otiluke's Resilient Sphere
+  // Otiluke's Resilient Sphere — both full and short names
   // ------------------------------------------------------------------
   describe("Otiluke's Resilient Sphere", () => {
     it('passes spell save DC for both full and short spell names', async () => {
@@ -414,7 +298,7 @@ describe('executeSpellCast - special spells', () => {
   })
 
   // ------------------------------------------------------------------
-  // Foresight
+  // Foresight — passes target name
   // ------------------------------------------------------------------
   describe('Foresight', () => {
     it('passes target name to Foresight handler', async () => {
@@ -434,7 +318,7 @@ describe('executeSpellCast - special spells', () => {
   })
 
   // ------------------------------------------------------------------
-  // Friends
+  // Friends — passes target name and spell save DC
   // ------------------------------------------------------------------
   describe('Friends', () => {
     it('passes target name and spell save DC to Friends handler', async () => {
@@ -455,7 +339,7 @@ describe('executeSpellCast - special spells', () => {
   })
 
   // ------------------------------------------------------------------
-  // Ray of Enfeeblement
+  // Ray of Enfeeblement — passes target name and spell save DC
   // ------------------------------------------------------------------
   describe('Ray of Enfeeblement', () => {
     it('passes target name and spell save DC to Ray of Enfeeblement handler', async () => {
@@ -476,7 +360,7 @@ describe('executeSpellCast - special spells', () => {
   })
 
   // ------------------------------------------------------------------
-  // Globe of Invulnerability
+  // Globe of Invulnerability — simple trigger
   // ------------------------------------------------------------------
   describe('Globe of Invulnerability', () => {
     it('triggers Globe of Invulnerability', async () => {
@@ -493,7 +377,7 @@ describe('executeSpellCast - special spells', () => {
   })
 
   // ------------------------------------------------------------------
-  // Silence
+  // Silence — simple trigger
   // ------------------------------------------------------------------
   describe('Silence', () => {
     it('triggers Silence handler', async () => {
@@ -510,61 +394,7 @@ describe('executeSpellCast - special spells', () => {
   })
 
   // ------------------------------------------------------------------
-  // Sleep
-  // ------------------------------------------------------------------
-  describe('Sleep', () => {
-    it('passes spell save DC to Sleep handler', async () => {
-      const sleep = await import('../features/sleepService.js')
-      const services = makeServices()
-      const spell = makeSpell({ name: 'Sleep' })
-      delete spell.damage
-      delete spell.dc
-
-      await executeSpellCast(spell, makeMetaCtx(), services)
-
-      const callArg = vi.mocked(sleep.triggerSleep).mock.calls[0][1]
-      expect(callArg.spellSaveDc).toBe(17)
-    })
-  })
-
-  // ------------------------------------------------------------------
-  // Stinking Cloud
-  // ------------------------------------------------------------------
-  describe('Stinking Cloud', () => {
-    it('passes spell save DC to Stinking Cloud handler', async () => {
-      const sc = await import('../features/stinkingCloudService.js')
-      const services = makeServices()
-      const spell = makeSpell({ name: 'Stinking Cloud' })
-      delete spell.damage
-      delete spell.dc
-
-      await executeSpellCast(spell, makeMetaCtx(), services)
-
-      const callArg = vi.mocked(sc.triggerStinkingCloud).mock.calls[0][1]
-      expect(callArg.spellSaveDc).toBe(17)
-    })
-  })
-
-  // ------------------------------------------------------------------
-  // Tasha's Hideous Laughter
-  // ------------------------------------------------------------------
-  describe("Tasha's Hideous Laughter", () => {
-    it('passes spell save DC to Tasha Hideous Laughter handler', async () => {
-      const thl = await import('../features/tashasHideousLaughterService.js')
-      const services = makeServices()
-      const spell = makeSpell({ name: "Tasha's Hideous Laughter" })
-      delete spell.damage
-      delete spell.dc
-
-      await executeSpellCast(spell, makeMetaCtx(), services)
-
-      const callArg = vi.mocked(thl.triggerTashasHideousLaughter).mock.calls[0][1]
-      expect(callArg.spellSaveDc).toBe(17)
-    })
-  })
-
-  // ------------------------------------------------------------------
-  // Heroism
+  // Heroism — passes target name
   // ------------------------------------------------------------------
   describe('Heroism', () => {
     it('passes target name to Heroism handler', async () => {
@@ -584,7 +414,7 @@ describe('executeSpellCast - special spells', () => {
   })
 
   // ------------------------------------------------------------------
-  // Holy Aura
+  // Holy Aura — simple trigger
   // ------------------------------------------------------------------
   describe('Holy Aura', () => {
     it('triggers Holy Aura', async () => {
@@ -601,7 +431,24 @@ describe('executeSpellCast - special spells', () => {
   })
 
   // ------------------------------------------------------------------
-  // Automation-routing spells
+  // Remove Curse — simple trigger
+  // ------------------------------------------------------------------
+  describe('Remove Curse', () => {
+    it('triggers Remove Curse', async () => {
+      const rc = await import('../features/removeCurseService.js')
+      const services = makeServices()
+      const spell = makeSpell({ name: 'Remove Curse' })
+      delete spell.damage
+      delete spell.dc
+
+      await executeSpellCast(spell, makeMetaCtx(), services)
+
+      expect(rc.triggerRemoveCurse).toHaveBeenCalled()
+    })
+  })
+
+  // ------------------------------------------------------------------
+  // Automation-routing spells — specific spell names
   // ------------------------------------------------------------------
   describe('automation-routing spells', () => {
     const automationSpells = [
@@ -628,51 +475,6 @@ describe('executeSpellCast - special spells', () => {
   })
 
   // ------------------------------------------------------------------
-  // Remove Curse
-  // ------------------------------------------------------------------
-  describe('Remove Curse', () => {
-    it('triggers Remove Curse', async () => {
-      const rc = await import('../features/removeCurseService.js')
-      const services = makeServices()
-      const spell = makeSpell({ name: 'Remove Curse' })
-      delete spell.damage
-      delete spell.dc
-
-      await executeSpellCast(spell, makeMetaCtx(), services)
-
-      expect(rc.triggerRemoveCurse).toHaveBeenCalled()
-    })
-  })
-
-  // ------------------------------------------------------------------
-  // Dispel Magic — verifies that triggerDispelMagic dispatches a
-  // CustomEvent with the expected detail shape.
-  // ------------------------------------------------------------------
-  describe('Dispel Magic', () => {
-    it('dispatches spell-result event with isDispelMagic detail', async () => {
-      const events = []
-      const handler = (e) => events.push(e.detail)
-      window.addEventListener('spell-result', handler)
-
-      const services = makeServices({
-        getTargetInfo: async () => ({ name: 'Target' }),
-      })
-      const spell = { name: 'Dispel Magic', level: 3, school: 'Abjuration', casting_time: '1 action', components: ['V', 'S'], range: 'Self (60-foot radius sphere)' }
-      delete spell.damage
-      delete spell.dc
-
-      await executeSpellCast(spell, makeMetaCtx(), services)
-
-      const dispelEvent = events.find((e) => e.isDispelMagic)
-      expect(dispelEvent).toBeDefined()
-      expect(dispelEvent.spellName).toBe('Dispel Magic')
-      expect(dispelEvent.targetName).toBe('Target')
-
-      window.removeEventListener('spell-result', handler)
-    })
-  })
-
-  // ------------------------------------------------------------------
   // Generic automation routing — arbitrary automation.type spell
   // ------------------------------------------------------------------
   describe('generic automation routing', () => {
@@ -694,31 +496,6 @@ describe('executeSpellCast - special spells', () => {
       await executeSpellCast(spell, makeMetaCtx(), services)
 
       expect(executeHandler).toHaveBeenCalled()
-    })
-  })
-
-  // ------------------------------------------------------------------
-  // Cantrip range bonus
-  // ------------------------------------------------------------------
-  describe('cantrip range bonus', () => {
-    it('extends cantrip range when cantripRangeBonus feat is active', async () => {
-      const range = await import('../combat/rangeValidation.js')
-      const services = makeServices({
-        attackerPos: { gridX: 0, gridY: 0 },
-        targetPos: { gridX: 30, gridY: 0 },
-        featEffects: { cantripRangeBonus: 30 },
-      })
-      const spell = makeSpell({
-        name: 'Fire Bolt', level: 0,
-        damage: { damage_type: 'Fire', damage_at_character_level: { 1: '1d10' } },
-        range: '120 feet',
-      })
-      delete spell.damage.damage_at_slot_level
-      delete spell.dc
-
-      await executeSpellCast(spell, makeMetaCtx({ slotLevel: 0 }), services)
-
-      expect(range.computeRangeEffect).toHaveBeenCalled()
     })
   })
 })

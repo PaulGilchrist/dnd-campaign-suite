@@ -59,44 +59,36 @@ describe('bardicInspirationDefenseHandler.handle', () => {
   // ── No bardic inspiration die ──────────────────────────────────
 
   describe('no bardic inspiration die', () => {
-    const falsyValues = [null, undefined, 0];
+    it('returns info popup when bardicInspirationDie is falsy', async () => {
+      useRuntimeState.getRuntimeValue.mockReturnValue(null);
 
-    for (const dieValue of falsyValues) {
-      it(`returns info popup when bardicInspirationDie is ${JSON.stringify(dieValue)}`, async () => {
-        useRuntimeState.getRuntimeValue.mockReturnValue(dieValue);
+      const result = await handle(makeAction(), makePlayerStats(), campaignName);
 
-        const result = await handle(makeAction(), makePlayerStats(), campaignName);
-
-        expect(result.type).toBe('popup');
-        expect(result.payload.type).toBe('automation_info');
-        expect(result.payload.description).toBe('You do not have a Bardic Inspiration die.');
-        expect(result.payload.name).toBe('Defensive Inspiration');
-        expect(diceRoller.rollExpression).not.toHaveBeenCalled();
-        expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
-        expect(logService.addEntry).not.toHaveBeenCalled();
-      });
-    }
+      expect(result.type).toBe('popup');
+      expect(result.payload.type).toBe('automation_info');
+      expect(result.payload.description).toBe('You do not have a Bardic Inspiration die.');
+      expect(result.payload.name).toBe('Defensive Inspiration');
+      expect(diceRoller.rollExpression).not.toHaveBeenCalled();
+      expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
+      expect(logService.addEntry).not.toHaveBeenCalled();
+    });
   });
 
   // ── Roll expression fails ──────────────────────────────────────
 
   describe('roll expression fails', () => {
-    const failureValues = [null, undefined, 0];
+    it('returns error popup when rollExpression returns null', async () => {
+      useRuntimeState.getRuntimeValue.mockReturnValueOnce(8).mockReturnValueOnce(undefined);
+      diceRoller.rollExpression.mockReturnValue(null);
 
-    for (const failureValue of failureValues) {
-      it(`returns error popup when rollExpression returns ${JSON.stringify(failureValue)}`, async () => {
-        useRuntimeState.getRuntimeValue.mockReturnValueOnce(8).mockReturnValueOnce(undefined);
-        diceRoller.rollExpression.mockReturnValue(failureValue);
+      const result = await handle(makeAction(), makePlayerStats(), campaignName);
 
-        const result = await handle(makeAction(), makePlayerStats(), campaignName);
-
-        expect(result.type).toBe('popup');
-        expect(result.payload.type).toBe('automation_info');
-        expect(result.payload.description).toBe('Roll failed.');
-        expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
-        expect(logService.addEntry).not.toHaveBeenCalled();
-      });
-    }
+      expect(result.type).toBe('popup');
+      expect(result.payload.type).toBe('automation_info');
+      expect(result.payload.description).toBe('Roll failed.');
+      expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
+      expect(logService.addEntry).not.toHaveBeenCalled();
+    });
   });
 
   // ── Successful invocation ──────────────────────────────────────

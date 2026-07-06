@@ -21,17 +21,12 @@ vi.mock('../../../shared/logPoster.js', () => ({
     postLogEntry: vi.fn(() => Promise.resolve()),
 }));
 
-vi.mock('../../../rules/features/silenceService.js', () => ({
-    isSilenceActive: vi.fn(),
-}));
-
-import { handle, isSilenceActive } from './silenceHandler.js';
+import { handle } from './silenceHandler.js';
 import { toggleBuff } from '../../common/buffToggle.js';
 import { addExpiration } from '../../../rules/effects/expirations.js';
 import { setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { postLogEntry } from '../../../shared/logPoster.js';
-import { isSilenceActive as isSilenceActiveService } from '../../../rules/features/silenceService.js';
 
 const campaignName = 'test-campaign';
 const casterName = 'ClericBoy';
@@ -122,7 +117,7 @@ describe('silenceHandler', () => {
                 );
             });
 
-            it('sets silence center based on combat context', async () => {
+            it('sets silence center based on combat context or null when unavailable', async () => {
                 getCombatContext.mockResolvedValue({
                     players: [{ name: casterName, gridX: 5, gridY: 10 }],
                 });
@@ -135,25 +130,14 @@ describe('silenceHandler', () => {
                     '{"gridX":5,"gridY":10}',
                     campaignName,
                 );
-            });
 
-            it('sets silence center to null when caster position is unavailable', async () => {
-                const scenarios = [
-                    { ctx: null },
-                    { ctx: { players: [{ name: 'OtherCleric', gridX: 3, gridY: 7 }] } },
-                    { ctx: { players: [{ name: casterName, gridX: 5, gridY: null }] } },
-                ];
-
-                for (const { ctx } of scenarios) {
-                    getCombatContext.mockResolvedValue(ctx);
-                    await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-                    expect(setRuntimeValue).toHaveBeenCalledWith(
-                        casterName, 'silenceCenter', null, campaignName,
-                    );
-                    vi.clearAllMocks();
-                    toggleBuff.mockReturnValue({ wasActive: false });
-                }
+                vi.clearAllMocks();
+                toggleBuff.mockReturnValue({ wasActive: false });
+                getCombatContext.mockResolvedValue({ players: [{ name: 'OtherCleric', gridX: 3, gridY: 7 }] });
+                await handle(makeAction(), makePlayerStats(), campaignName, null);
+                expect(setRuntimeValue).toHaveBeenCalledWith(
+                    casterName, 'silenceCenter', null, campaignName,
+                );
             });
 
             it('adds expiration to remove the buff', async () => {
@@ -217,15 +201,5 @@ describe('silenceHandler', () => {
         });
     });
 
-    describe('isSilenceActive', () => {
-        it('delegates to silenceService and returns its result', () => {
-            isSilenceActiveService.mockReturnValue(true);
-
-            const result = isSilenceActive(casterName, campaignName);
-
-            expect(result).toBe(true);
-            expect(isSilenceActiveService).toHaveBeenCalledWith(casterName, campaignName);
-        });
-    });
 });
 // @cleaned-by-ai

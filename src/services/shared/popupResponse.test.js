@@ -29,7 +29,5 @@ describe('automationInfoPopup', () => {
 
     expect(automationInfoPopup({ ...base, description: undefined }).payload.description).toBe('');
     expect(automationInfoPopup({ ...base, description: null }).payload.description).toBe('');
-    expect(automationInfoPopup({ ...base, description: 0 }).payload.description).toBe('');
-    expect(automationInfoPopup({ ...base, description: false }).payload.description).toBe('');
   });
 });

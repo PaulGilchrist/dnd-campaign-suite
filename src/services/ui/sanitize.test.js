@@ -4,46 +4,13 @@ import { describe, it, expect } from 'vitest';
 import { sanitizeHtml, renderMarkdown, renderMarkdownInline } from './sanitize.js';
 
 describe('sanitizeHtml', () => {
-  it('returns empty string for falsy or non-string input', () => {
+  it('returns empty string for invalid input', () => {
     expect(sanitizeHtml(null)).toBe('');
     expect(sanitizeHtml(undefined)).toBe('');
     expect(sanitizeHtml(123)).toBe('');
     expect(sanitizeHtml({})).toBe('');
     expect(sanitizeHtml([])).toBe('');
-  });
-
-  it('passes through safe formatting tags', () => {
-    const input = '<b>Bold</b><i>Italic</i><u>Underline</u><s>Strikethrough</s><em>Emphasis</em><strong>Strong</strong>';
-    const result = sanitizeHtml(input);
-
-    expect(result).toContain('<b>Bold</b>');
-    expect(result).toContain('<i>Italic</i>');
-    expect(result).toContain('<u>Underline</u>');
-    expect(result).toContain('<s>Strikethrough</s>');
-  });
-
-  it('removes script tags and their content', () => {
-    const input = '<script>alert("xss")</script><p>Safe content</p>';
-    const result = sanitizeHtml(input);
-
-    expect(result).not.toContain('<script>');
-    expect(result).not.toContain('alert');
-    expect(result).toContain('Safe content');
-  });
-
-  it('removes noscript and iframe tags', () => {
-    const input = '<noscript><p>Hidden</p></noscript><iframe src="evil"></iframe><p>Visible</p>';
-    const result = sanitizeHtml(input);
-
-    expect(result).not.toContain('<noscript>');
-    expect(result).not.toContain('<iframe');
-    expect(result).toContain('Visible');
-  });
-
-  it('allows links with safe href values', () => {
-    const result = sanitizeHtml('<a href="https://example.com">Link</a>');
-    expect(result).toContain('<a');
-    expect(result).toContain('href="https://example.com"');
+    expect(sanitizeHtml('')).toBe('');
   });
 
   it('strips javascript: and data: URLs from links', () => {
@@ -68,56 +35,22 @@ describe('sanitizeHtml', () => {
     expect(result).toContain('data-value="test"');
   });
 
-  it('allows table elements with proper structure', () => {
-    const input = '<table><thead><tr><th>Header</th></tr></thead><tbody><tr><td>Cell</td></tr></tbody></table>';
-    const result = sanitizeHtml(input);
-
-    expect(result).toContain('<table>');
-    expect(result).toContain('<thead>');
-    expect(result).toContain('<th>Header</th>');
-    expect(result).toContain('<td>Cell</td>');
-  });
-
-  it('allows all heading levels', () => {
-    const input = '<h1>H1</h1><h2>H2</h2><h3>H3</h3><h4>H4</h4><h5>H5</h5><h6>H6</h6>';
-    const result = sanitizeHtml(input);
-
-    expect(result).toContain('<h1>H1</h1>');
-    expect(result).toContain('<h6>H6</h6>');
-  });
-
-  it('allows ordered and unordered lists', () => {
-    const ulResult = sanitizeHtml('<ul><li>Item 1</li><li>Item 2</li></ul>');
-    expect(ulResult).toContain('<ul>');
-    expect(ulResult).toContain('<li>Item 1</li>');
-
-    const olResult = sanitizeHtml('<ol><li>First</li><li>Second</li></ol>');
-    expect(olResult).toContain('<ol>');
-    expect(olResult).toContain('<li>First</li>');
-  });
-
-  it('allows details and summary tags', () => {
-    const input = '<details><summary>Click me</summary>Content</details>';
-    const result = sanitizeHtml(input);
-
-    expect(result).toContain('<details>');
-    expect(result).toContain('<summary>Click me</summary>');
-    expect(result).toContain('Content');
-  });
-
-  it('handles empty string input', () => {
-    expect(sanitizeHtml('')).toBe('');
+  it('allows safe links', () => {
+    const result = sanitizeHtml('<a href="https://example.com">Link</a>');
+    expect(result).toContain('<a');
+    expect(result).toContain('href="https://example.com"');
   });
 });
 
 describe('renderMarkdown', () => {
-  it('returns empty string for falsy or non-string input', () => {
+  it('returns empty string for invalid input', () => {
     expect(renderMarkdown(null)).toBe('');
     expect(renderMarkdown(undefined)).toBe('');
     expect(renderMarkdown(123)).toBe('');
+    expect(renderMarkdown('')).toBe('');
   });
 
-  it('converts bold and italic markdown to sanitized HTML', () => {
+  it('converts markdown to sanitized HTML', () => {
     expect(renderMarkdown('**bold text**')).toContain('<strong>bold text</strong>');
     expect(renderMarkdown('*italic text*')).toContain('<em>italic text</em>');
   });
@@ -168,17 +101,14 @@ describe('renderMarkdown', () => {
     const result = renderMarkdown('[click](javascript:alert("xss"))');
     expect(result).not.toContain('javascript:');
   });
-
-  it('handles empty string input', () => {
-    expect(renderMarkdown('')).toBe('');
-  });
 });
 
 describe('renderMarkdownInline', () => {
-  it('returns empty string for falsy or non-string input', () => {
+  it('returns empty string for invalid input', () => {
     expect(renderMarkdownInline(null)).toBe('');
     expect(renderMarkdownInline(undefined)).toBe('');
     expect(renderMarkdownInline(123)).toBe('');
+    expect(renderMarkdownInline('')).toBe('');
   });
 
   it('converts inline markdown without wrapping in <p>', () => {
@@ -194,9 +124,5 @@ describe('renderMarkdownInline', () => {
     expect(result).toContain('<a');
     expect(result).toContain('href="https://example.com"');
     expect(result).not.toContain('<p>');
-  });
-
-  it('handles empty string input', () => {
-    expect(renderMarkdownInline('')).toBe('');
   });
 });

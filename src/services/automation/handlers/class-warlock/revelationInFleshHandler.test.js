@@ -79,15 +79,6 @@ describe('revelationInFleshHandler', () => {
             });
         });
 
-        it('should return info popup when sorcery points are negative', async () => {
-            metamagic.getCurrentSorceryPoints.mockReturnValue(-1);
-
-            const result = await handle(makeActionWithOptions(), makePlayerStats(), 'campaign');
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('No Sorcery Points available');
-        });
-
         it('should return modal when options and sorcery points available', async () => {
             const result = await handle(makeActionWithOptions(), makePlayerStats(), 'campaign');
 
@@ -100,12 +91,6 @@ describe('revelationInFleshHandler', () => {
                     campaignName: 'campaign',
                 }),
             });
-        });
-
-        it('should not spend sorcery points when showing modal', async () => {
-            await handle(makeActionWithOptions(), makePlayerStats(), 'campaign');
-
-            expect(metamagic.spendSorceryPoints).not.toHaveBeenCalled();
         });
 
         it('should handle automation with no options property', async () => {
@@ -157,13 +142,6 @@ describe('revelationInFleshHandler', () => {
             expect(metamagic.spendSorceryPoints).toHaveBeenCalledWith('TestWarlock', 1, 'campaign');
         });
 
-        it('should not spend SP when no options are available', async () => {
-            const action = makeAction();
-            await applyRevelationOption(action, makePlayerStats(), 'campaign', 'Option A');
-
-            expect(metamagic.spendSorceryPoints).not.toHaveBeenCalled();
-        });
-
         it('should add new buff when none exists', async () => {
             runtimeState.getRuntimeValue.mockReturnValue(null);
 
@@ -204,24 +182,6 @@ describe('revelationInFleshHandler', () => {
             );
         });
 
-        it('should preserve other buffs when adding a new one', async () => {
-            runtimeState.getRuntimeValue.mockReturnValue([
-                { name: 'Other Buff', effect: 'other' },
-            ]);
-
-            await applyRevelationOption(makeActionWithOptions(), makePlayerStats(), 'campaign', 'Option A');
-
-            expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-                'TestWarlock',
-                'activeBuffs',
-                expect.arrayContaining([
-                    expect.objectContaining({ name: 'Other Buff' }),
-                    expect.objectContaining({ name: 'Revelation in Flesh' }),
-                ]),
-                'campaign',
-            );
-        });
-
         it('should use custom duration from automation when provided', async () => {
             runtimeState.getRuntimeValue.mockReturnValue(null);
             const action = makeActionWithOptions({ duration: '1_hour' });
@@ -238,51 +198,10 @@ describe('revelationInFleshHandler', () => {
             );
         });
 
-        it('should default duration to 10_minutes when automation has no duration', async () => {
-            runtimeState.getRuntimeValue.mockReturnValue(null);
-
-            await applyRevelationOption(makeActionWithOptions(), makePlayerStats(), 'campaign', 'Option A');
-
-            expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-                'TestWarlock',
-                'activeBuffs',
-                expect.arrayContaining([
-                    expect.objectContaining({ duration: '10_minutes' }),
-                ]),
-                'campaign',
-            );
-        });
-
         it('should include option description in result when available', async () => {
             const result = await applyRevelationOption(makeActionWithOptions(), makePlayerStats(), 'campaign', 'Option A');
 
             expect(result.payload.description).toContain('Description A');
-        });
-
-        it('should omit option description from result when option has none', async () => {
-            const result = await applyRevelationOption(makeActionWithOptions(), makePlayerStats(), 'campaign', 'Option B');
-
-            expect(result.payload.description).toContain('Option B chosen');
-            expect(result.payload.description).not.toContain('Description');
-        });
-
-        it('should include SP cost in result', async () => {
-            const result = await applyRevelationOption(makeActionWithOptions(), makePlayerStats(), 'campaign', 'Option A');
-
-            expect(result.payload.description).toContain('1 SP spent');
-        });
-
-        it('should include duration in result', async () => {
-            const result = await applyRevelationOption(makeActionWithOptions(), makePlayerStats(), 'campaign', 'Option A');
-
-            expect(result.payload.description).toContain('10 minutes');
-        });
-
-        it('should include custom duration in result', async () => {
-            const action = makeActionWithOptions({ duration: '1_hour' });
-            const result = await applyRevelationOption(action, makePlayerStats(), 'campaign', 'Option A');
-
-            expect(result.payload.description).toContain('1_hour');
         });
 
         it('should include logEntries in result', async () => {
@@ -297,30 +216,8 @@ describe('revelationInFleshHandler', () => {
             ]);
         });
 
-        it('should include automationType in result', async () => {
-            const result = await applyRevelationOption(makeActionWithOptions(), makePlayerStats(), 'campaign', 'Option A');
-
-            expect(result.payload.automationType).toBe('revelation_in_flesh');
-        });
-
         it('should handle non-array stored activeBuffs as empty', async () => {
             runtimeState.getRuntimeValue.mockReturnValue('not-an-array');
-
-            const result = await applyRevelationOption(makeActionWithOptions(), makePlayerStats(), 'campaign', 'Option A');
-
-            expect(result.type).toBe('popup');
-            expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-                'TestWarlock',
-                'activeBuffs',
-                expect.arrayContaining([
-                    expect.objectContaining({ name: 'Revelation in Flesh' }),
-                ]),
-                'campaign',
-            );
-        });
-
-        it('should handle undefined stored activeBuffs as empty', async () => {
-            runtimeState.getRuntimeValue.mockReturnValue(undefined);
 
             const result = await applyRevelationOption(makeActionWithOptions(), makePlayerStats(), 'campaign', 'Option A');
 

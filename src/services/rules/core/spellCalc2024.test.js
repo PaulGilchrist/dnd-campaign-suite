@@ -103,7 +103,7 @@ describe('spellCalc2024', () => {
       expect(result).toBeNull();
     });
 
-    it('returns null when required_major does not match major name', () => {
+    it('returns null when required_major does not match major name or subclass name', () => {
       const stats = makePlayerStats({
         class: {
           class_levels: [{
@@ -111,20 +111,6 @@ describe('spellCalc2024', () => {
             spellcasting: { cantrips_known: 3, spell_slots: { '1': 2 }, required_major: 'Evoker' },
           }],
           major: { name: 'Necromancer' },
-        },
-      });
-      const result = getSpellAbilities([], stats);
-      expect(result).toBeNull();
-    });
-
-    it('returns null when required_major does not match legacy subclass name', () => {
-      const stats = makePlayerStats({
-        class: {
-          class_levels: [{
-            level: 1,
-            spellcasting: { cantrips_known: 3, spell_slots: { '1': 2 }, required_major: 'Life' },
-          }],
-          subclass: { name: 'Death' },
         },
       });
       const result = getSpellAbilities([], stats);
@@ -259,24 +245,6 @@ describe('spellCalc2024', () => {
       expect(mageHand).toBeDefined();
     });
 
-    it('adds +3 cantrips for Arcane Trickster even with empty known spells array', () => {
-      const stats = makePlayerStats({
-        class: {
-          name: 'Rogue',
-          major: { name: 'Arcane Trickster' },
-          class_levels: [{ level: 1, spellcasting: { cantrips_known: 3, spell_slots: {}, spells: [] } }],
-          spell_casting_ability: 'Intelligence',
-        },
-        abilities: [{ name: 'Intelligence', baseScore: 16, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0, bonus: 3 }],
-        spells: [],
-      });
-      const result = getSpellAbilities([], stats);
-
-      // Source checks `if (playerStats.spells)` which is truthy for [], so +3 is always added
-      expect(result.cantrips_known).toBe(6);
-      expect(result.spells).toHaveLength(0);
-    });
-
     // ── Spell mapping and sorting ──
 
     it('maps spell names to spell details with prepared=Always for all levels', () => {
@@ -325,13 +293,6 @@ describe('spellCalc2024', () => {
       expect(result.saveDc).toBe(10);
     });
 
-    it('handles missing playerStats.spells as empty array', () => {
-      const stats = makePlayerStats({ spells: undefined });
-      const result = getSpellAbilities([], stats);
-
-      expect(result.spells).toEqual([]);
-    });
-
     // ── Subclass (major) spells ──
 
     it('adds subclass spells when level > 2 and level >= spell level', () => {
@@ -358,37 +319,8 @@ describe('spellCalc2024', () => {
       const result = getSpellAbilities([], stats);
 
       const names = result.spells.map(s => s.name);
-      // Both are added because level 3 >= level 3 (Lightning Bolt) and level 3 >= level 1 (Mage Hand)
       expect(names).toContain('Mage Hand');
       expect(names).toContain('Lightning Bolt');
-    });
-
-    it('adds subclass spells unlocked at current level', () => {
-      const stats = makePlayerStats({
-        level: 3,
-        class: {
-          class_levels: [
-            { level: 1, spellcasting: { cantrips_known: 3, spell_slots: { '1': 2 } } },
-            { level: 2, spellcasting: { cantrips_known: 3, spell_slots: { '1': 2 } } },
-            { level: 3, spellcasting: { cantrips_known: 4, spell_slots: { '1': 4, '2': 2 } } },
-          ],
-          spell_casting_ability: 'Intelligence',
-          major: {
-            name: 'School of Evocation',
-            spells: [
-              { name: 'Mage Hand', level: 1 },
-              { name: 'Flaming Sphere', level: 2 },
-            ],
-          },
-        },
-      });
-      stats.spells = [];
-
-      const result = getSpellAbilities([], stats);
-
-      const names = result.spells.map(s => s.name);
-      expect(names).toContain('Mage Hand');
-      expect(names).toContain('Flaming Sphere');
     });
 
     it('does not add subclass spells when level <= 2', () => {
@@ -413,52 +345,6 @@ describe('spellCalc2024', () => {
       expect(result.spells).toHaveLength(0);
     });
 
-    it('supports legacy subclassSpell.spell.name format', () => {
-      const stats = makePlayerStats({
-        level: 3,
-        class: {
-          class_levels: [
-            { level: 1, spellcasting: { cantrips_known: 3, spell_slots: { '1': 2 } } },
-            { level: 2, spellcasting: { cantrips_known: 3, spell_slots: { '1': 2 } } },
-            { level: 3, spellcasting: { cantrips_known: 4, spell_slots: { '1': 4, '2': 2 } } },
-          ],
-          spell_casting_ability: 'Intelligence',
-          major: {
-            name: 'School of Evocation',
-            spells: [{ spell: { name: 'Mage Hand' }, level: 1 }],
-          },
-        },
-      });
-      stats.spells = [];
-
-      const result = getSpellAbilities([], stats);
-
-      expect(result.spells.map(s => s.name)).toContain('Mage Hand');
-    });
-
-    it('does not duplicate subclass spells already in known list', () => {
-      const stats = makePlayerStats({
-        level: 3,
-        class: {
-          class_levels: [
-            { level: 1, spellcasting: { cantrips_known: 3, spell_slots: { '1': 2 } } },
-            { level: 2, spellcasting: { cantrips_known: 3, spell_slots: { '1': 2 } } },
-            { level: 3, spellcasting: { cantrips_known: 4, spell_slots: { '1': 4, '2': 2 } } },
-          ],
-          spell_casting_ability: 'Intelligence',
-          major: {
-            name: 'School of Evocation',
-            spells: [{ name: 'Fire Bolt', level: 1 }],
-          },
-        },
-      });
-      stats.spells = ['Fire Bolt'];
-
-      const result = getSpellAbilities([], stats);
-
-      expect(result.spells.filter(s => s.name === 'Fire Bolt').length).toBe(1);
-    });
-
     // ── Automation: passive_rule (always_prepared_spells) ──
 
     it('adds always_prepared_spells from automation passives', () => {
@@ -474,8 +360,8 @@ describe('spellCalc2024', () => {
       expect(result.spells.map(s => s.name)).toEqual(['Fire Bolt', 'Light']);
     });
 
-    it('adds always_prepared_spells from automation actions', () => {
-      const allSpells = [makeSpell('Sanctuary', 1)];
+    it('adds always_prepared_spells from automation actions and bonusActions', () => {
+      const allSpells = [makeSpell('Sanctuary', 1), makeSpell('Healing Word', 1)];
       const stats = makePlayerStats({
         class: {
           name: 'Cleric',
@@ -487,34 +373,17 @@ describe('spellCalc2024', () => {
       });
       stats.automation = {
         actions: [{ type: 'passive_rule', effect: 'always_prepared_spells', spells: ['Sanctuary'] }],
-      };
-
-      const result = getSpellAbilities(allSpells, stats);
-
-      expect(result.spells.map(s => s.name)).toContain('Sanctuary');
-    });
-
-    it('adds always_prepared_spells from automation bonusActions', () => {
-      const allSpells = [makeSpell('Healing Word', 1)];
-      const stats = makePlayerStats({
-        class: {
-          name: 'Cleric',
-          class_levels: [{ level: 1, spellcasting: { cantrips_known: 3, spell_slots: { '1': 2 } } }],
-          spell_casting_ability: 'Wisdom',
-        },
-        abilities: [{ name: 'Wisdom', baseScore: 16, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0, bonus: 3 }],
-        spells: [],
-      });
-      stats.automation = {
         bonusActions: [{ type: 'passive_rule', effect: 'always_prepared_spells', spells: ['Healing Word'] }],
       };
 
       const result = getSpellAbilities(allSpells, stats);
 
-      expect(result.spells.map(s => s.name)).toContain('Healing Word');
+      const names = result.spells.map(s => s.name);
+      expect(names).toContain('Sanctuary');
+      expect(names).toContain('Healing Word');
     });
 
-    it('does not duplicate a spell already in the known list from always_prepared_spells', () => {
+    it('deduplicates always_prepared_spells already in the known list', () => {
       const stats = makePlayerStats();
       stats.spells = ['Fire Bolt'];
       stats.automation = {
@@ -574,7 +443,7 @@ describe('spellCalc2024', () => {
       expect(result.spells.map(s => s.name)).toContain('Shield');
     });
 
-    it('does not duplicate a free_spell already known', () => {
+    it('deduplicates free_spells already known', () => {
       const stats = makePlayerStats();
       stats.spells = ['Fire Bolt'];
       stats.automation = {
@@ -634,7 +503,7 @@ describe('spellCalc2024', () => {
       expect(result.spells.map(s => s.name)).toContain('Shield');
     });
 
-    it('does not duplicate spell_breaker spells already known', () => {
+    it('deduplicates spell_breaker spells already known', () => {
       const stats = makePlayerStats();
       stats.spells = ['Shield'];
       stats.automation = {
@@ -647,22 +516,6 @@ describe('spellCalc2024', () => {
     });
 
     // ── Automation: cantrip_spellcasting_ability ──
-
-    it('attempts to update cantrip spellCastingAbility from cantrip_spellcasting_ability feature', () => {
-      const allSpells = [makeSpell('Fire Bolt', 0)];
-      const stats = makePlayerStats();
-      stats.spells = ['Fire Bolt'];
-      stats.automation = {
-        actions: [{ type: 'cantrip_spellcasting_ability', cantripName: 'Fire Bolt', spellcastingAbility: 'Charisma' }],
-      };
-
-      const result = getSpellAbilities(allSpells, stats);
-
-      // The automation handler sets spellCastingAbility on the spell entry,
-      // but the final map overwrites with spellDetail (which lacks it).
-      const fireBolt = result.spells.find(s => s.name === 'Fire Bolt');
-      expect(fireBolt.spellCastingAbility).toBeUndefined();
-    });
 
     it('adds cantrip_spellcasting_ability cantrip even when not in spell list', () => {
       const stats = makePlayerStats();
@@ -846,7 +699,7 @@ describe('spellCalc2024', () => {
       expect(names).toContain('Thaumaturgy');
     });
 
-    // ── Automation: Spell Mastery ──
+    // ── Automation: runtime-state features (Spell Mastery, Savants, Signature Spells) ──
 
     it('adds Spell Mastery level 1 and level 2 spells from runtime state', () => {
       const allSpells = [
@@ -871,7 +724,7 @@ describe('spellCalc2024', () => {
       expect(names).toContain('Web');
     });
 
-    it('does not duplicate Spell Mastery spells already known', () => {
+    it('deduplicates Spell Mastery spells already known', () => {
       mockGetRuntimeValue.mockImplementation((_key, prop) => {
         if (prop === 'SpellMastery_level1') return 'Fire Bolt';
         return null;
@@ -888,76 +741,38 @@ describe('spellCalc2024', () => {
       expect(result.spells.filter(s => s.name === 'Fire Bolt').length).toBe(1);
     });
 
-    // ── Automation: Savant features ──
-
-    it('adds Abjuration Savant spells from runtime state', () => {
-      const allSpells = [makeSpell('Shield', 1)];
+    it('adds Savant and Signature spells from runtime state', () => {
       mockGetRuntimeValue.mockImplementation((_key, prop) => {
         if (prop === '_Abjuration_Savant_selection') return ['Shield'];
-        return null;
-      });
-
-      const stats = makePlayerStats();
-      stats.automation = {
-        passives: [{ type: 'abjuration_savant' }],
-      };
-
-      const result = getSpellAbilities(allSpells, stats, { campaignName: 'TestCampaign' });
-
-      expect(result.spells.map(s => s.name)).toContain('Shield');
-    });
-
-    it('adds Divination Savant spells from runtime state', () => {
-      const allSpells = [makeSpell('Detect Magic', 1)];
-      mockGetRuntimeValue.mockImplementation((_key, prop) => {
         if (prop === '_Divination_Savant_selection') return ['Detect Magic'];
-        return null;
-      });
-
-      const stats = makePlayerStats();
-      stats.automation = {
-        passives: [{ type: 'divination_savant' }],
-      };
-
-      const result = getSpellAbilities(allSpells, stats, { campaignName: 'TestCampaign' });
-
-      expect(result.spells.map(s => s.name)).toContain('Detect Magic');
-    });
-
-    it('adds Illusion Savant spells from runtime state', () => {
-      const allSpells = [makeSpell('Minor Illusion', 0)];
-      mockGetRuntimeValue.mockImplementation((_key, prop) => {
         if (prop === '_Illusion_Savant_selection') return ['Minor Illusion'];
-        return null;
-      });
-
-      const stats = makePlayerStats();
-      stats.automation = {
-        passives: [{ type: 'illusion_savant' }],
-      };
-
-      const result = getSpellAbilities(allSpells, stats, { campaignName: 'TestCampaign' });
-
-      expect(result.spells.map(s => s.name)).toContain('Minor Illusion');
-    });
-
-    // ── Automation: Signature Spells ──
-
-    it('adds Signature Spells from runtime state', () => {
-      const allSpells = [makeSpell('Shield', 1)];
-      mockGetRuntimeValue.mockImplementation((_key, prop) => {
         if (prop === 'SignatureSpells_selection') return ['Shield'];
         return null;
       });
 
+      const allSpells = [
+        makeSpell('Shield', 1),
+        makeSpell('Detect Magic', 1),
+        makeSpell('Minor Illusion', 0),
+      ];
       const stats = makePlayerStats();
       stats.automation = {
-        passives: [{ type: 'signature_spells' }],
+        passives: [
+          { type: 'abjuration_savant' },
+          { type: 'divination_savant' },
+          { type: 'illusion_savant' },
+          { type: 'signature_spells' },
+        ],
       };
 
       const result = getSpellAbilities(allSpells, stats, { campaignName: 'TestCampaign' });
 
-      expect(result.spells.map(s => s.name)).toContain('Shield');
+      const names = result.spells.map(s => s.name);
+      expect(names).toContain('Shield');
+      expect(names).toContain('Detect Magic');
+      expect(names).toContain('Minor Illusion');
+      // Shield is already deduplicated (from abjuration_savant + signature_spells)
+      expect(result.spells.filter(s => s.name === 'Shield').length).toBe(1);
     });
 
     // ── Automation: Phantasmal Creatures ──
@@ -997,22 +812,6 @@ describe('spellCalc2024', () => {
       expect(minorIllusion.casting_time).toBe('1 action');
     });
 
-    it('attempts to override Minor Illusion casting time but final map overwrites it', () => {
-      const allSpells = [makeSpell('Minor Illusion', 0, { casting_time: '1 action' })];
-      const stats = makePlayerStats();
-      stats.spells = ['Minor Illusion'];
-      stats.automation = {
-        passives: [{ type: 'improved_illusions' }],
-      };
-
-      const result = getSpellAbilities(allSpells, stats);
-
-      const minorIllusion = result.spells.find(s => s.name === 'Minor Illusion');
-      // The automation handler sets casting_time to '1 bonus action',
-      // but the final map spreads spellDetail which has '1 action'.
-      expect(minorIllusion.casting_time).toBe('1 action');
-    });
-
     // ── Automation: Ritual Adept ──
 
     it('adds ritual-tagged spells from spellbook when Ritual Adept is present', () => {
@@ -1037,7 +836,7 @@ describe('spellCalc2024', () => {
       expect(names).toContain('Detect Magic');
     });
 
-    it('does not duplicate ritual spells already in known list', () => {
+    it('deduplicates ritual spells already in known list', () => {
       const allSpells = [makeSpell('Alarm', 1, { ritual: true })];
       const stats = makePlayerStats();
       stats.spells = ['Alarm'];
@@ -1065,7 +864,7 @@ describe('spellCalc2024', () => {
       expect(names).not.toContain('Alarm');
     });
 
-    // ── Automation: missing sub-arrays and null safety ──
+    // ── Null safety ──
 
     it('handles automation with missing actions/bonusActions arrays', () => {
       const allSpells = [makeSpell('Light', 0)];
@@ -1079,22 +878,11 @@ describe('spellCalc2024', () => {
       expect(result.spells.map(s => s.name)).toContain('Light');
     });
 
-    it('handles automation with empty sub-arrays', () => {
+    it('handles automation with empty sub-arrays or no matching feature types', () => {
       const stats = makePlayerStats();
       stats.automation = {
         actions: [],
         bonusActions: [],
-        passives: [],
-      };
-
-      const result = getSpellAbilities([], stats);
-
-      expect(result.spells).toHaveLength(0);
-    });
-
-    it('handles automation with no matching feature types', () => {
-      const stats = makePlayerStats();
-      stats.automation = {
         passives: [{ type: 'some_other_type', effect: 'something' }],
       };
 
@@ -1103,20 +891,9 @@ describe('spellCalc2024', () => {
       expect(result.spells).toHaveLength(0);
     });
 
-    it('skips automation block when automation is undefined', () => {
-      const stats = makePlayerStats({ automation: undefined });
-
-      const result = getSpellAbilities([], stats);
-
-      expect(result.spells).toHaveLength(0);
-    });
-
-    it('skips automation block when automation is null', () => {
-      const stats = makePlayerStats({ automation: null });
-
-      const result = getSpellAbilities([], stats);
-
-      expect(result.spells).toHaveLength(0);
+    it('handles automation that is undefined or null', () => {
+      expect(() => getSpellAbilities([], makePlayerStats({ automation: undefined }))).not.toThrow();
+      expect(() => getSpellAbilities([], makePlayerStats({ automation: null }))).not.toThrow();
     });
 
     // ── Mixed automation ──

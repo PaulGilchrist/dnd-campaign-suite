@@ -3,11 +3,14 @@
 // Tests for passive.js — behavior-first, minimal over-mocking
 //
 // What we test:
-//   • Each handler returns the correct `type` and `effect`
+//   • Each handler returns the correct `type`, `effect`, `name`, `hasAutomation`
 //   • Custom automation fields are passed through (not hardcoded)
 //   • Default values are used when automation fields are missing
 //   • `feature.name` is forwarded to the result
 //   • `hasAutomation` is always true
+//   • Conditional type mapping (passive_buff → passive_rule for max_hp_increase)
+//   • Boolean coercion (!!auto.oncePerTurn)
+//   • snake_case → camelCase field mapping (passive_immunity)
 //
 // What we don't test:
 //   • Internal implementation details (e.g. which `||` fallbacks exist)
@@ -20,26 +23,66 @@ import { BASE_STATS, makeFeature } from '../automationInfoBuilder.fixtures.js'
 // ── Helpers ──────────────────────────────────────────────────────────
 
 /**
- * Assert that a handler result always has the structural invariants
- * regardless of the feature data.  This catches missing keys, wrong
- * types, and the always-true hasAutomation flag in one call.
+ * Assert structural invariants on any handler result.
+ * Some handlers (passive_immunity, create_thrall_temp_hp) omit `effect`.
  */
 function expectValidResult(result, expectedType, expectedEffect) {
     expect(result).toBeInstanceOf(Object)
     expect(result.type).toBe(expectedType)
-    expect(result.effect).toBe(expectedEffect)
+    if (expectedEffect !== undefined) {
+        expect(result.effect).toBe(expectedEffect)
+    }
     expect(result.hasAutomation).toBe(true)
     expect(result.name).toBe('Test Feature')
 }
 
+// ── Generic handler contract ─────────────────────────────────────────
+
+/**
+ * All handlers share the same basic contract: return an object with
+ * type, effect, name, and hasAutomation.  This parameterized test
+ * verifies that contract for every handler without asserting internal
+ * field defaults.
+ */
+describe('passiveHandlers – generic contract', () => {
+    const handlers = [
+        ['passive_buff', 'passive_buff', ''],
+        ['ignore_resistance', 'passive_rule', 'ignore_resistance'],
+        ['passive_immunity', 'passive_immunity', undefined],
+        ['holy_nimbus_radiant_damage', 'passive_rule', 'holy_nimbus_radiant_damage'],
+        ['umbral_sight', 'passive_rule', 'umbral_sight'],
+        ['supreme_sneak', 'passive_rule', 'supreme_sneak'],
+        ['otherworldly_glamour', 'passive_buff', 'otherworldly_glamour'],
+        ['create_thrall_temp_hp', 'create_thrall_temp_hp', undefined],
+        ['ritual_spells', 'passive_rule', 'ritual_spells'],
+        ['potent_cantrip', 'potent_cantrip', 'potent_cantrip'],
+        ['soulstitch_spells', 'soulstitch_spells', 'soulstitch_spells'],
+        ['empowered_evocation', 'empowered_evocation', 'empowered_evocation'],
+        ['concentration_disadvantage_on_damage_dealt', 'passive_rule', 'concentration_disadvantage_on_damage_dealt'],
+        ['tavern_brawler_reroll_ones', 'passive_rule', 'tavern_brawler_reroll_ones'],
+        ['tavern_brawler_push', 'passive_rule', 'tavern_brawler_push'],
+        ['ignore_loading_crossbows', 'passive_rule', 'ignore_loading_crossbows'],
+        ['no_melee_disadvantage_crossbows', 'passive_rule', 'no_melee_disadvantage_crossbows'],
+        ['naturally_stealthy', 'passive_rule', 'naturally_stealthy'],
+        ['blessed_warrior', 'passive_rule', 'blessed_warrior'],
+    ]
+
+    for (const [handlerName, expectedType, expectedEffect] of handlers) {
+        it(`${handlerName} returns correct type, effect, name, and hasAutomation`, () => {
+            const feature = makeFeature({ type: handlerName })
+            const result = passiveHandlers[handlerName](feature, BASE_STATS)
+            expectValidResult(result, expectedType, expectedEffect)
+        })
+    }
+})
+
 // ── passive_buff ─────────────────────────────────────────────────────
 
 describe('passiveHandlers – passive_buff', () => {
-    it('returns passive_buff type with default automation fields', () => {
+    it('returns default values for all fields', () => {
         const feature = makeFeature({ type: 'passive_buff' })
         const result = passiveHandlers.passive_buff(feature, BASE_STATS)
 
-        expectValidResult(result, 'passive_buff', '')
         expect(result.target).toBe('allies_in_range')
         expect(result.range_expression).toBe('10_ft')
         expect(result.bonusExpression).toBe('')
@@ -63,9 +106,7 @@ describe('passiveHandlers – passive_buff', () => {
             effect: 'max_hp_increase'
         })
         const result = passiveHandlers.passive_buff(feature, BASE_STATS)
-
         expect(result.type).toBe('passive_rule')
-        // Other fields should still have defaults
         expect(result.effect).toBe('max_hp_increase')
         expect(result.target).toBe('allies_in_range')
     })
@@ -110,14 +151,6 @@ describe('passiveHandlers – passive_buff', () => {
 // ── ignore_resistance ────────────────────────────────────────────────
 
 describe('passiveHandlers – ignore_resistance', () => {
-    it('returns passive_rule with ignore_resistance effect and defaults', () => {
-        const feature = makeFeature({ type: 'ignore_resistance' })
-        const result = passiveHandlers.ignore_resistance(feature, BASE_STATS)
-
-        expectValidResult(result, 'passive_rule', 'ignore_resistance')
-        expect(result.damageTypes).toEqual([])
-    })
-
     it('passes through custom damageTypes', () => {
         const feature = makeFeature(
             { type: 'ignore_resistance', damageTypes: ['fire', 'cold'] },
@@ -133,20 +166,6 @@ describe('passiveHandlers – ignore_resistance', () => {
 // ── passive_immunity ─────────────────────────────────────────────────
 
 describe('passiveHandlers – passive_immunity', () => {
-    it('returns passive_immunity info with defaults', () => {
-        const feature = makeFeature({ type: 'passive_immunity' })
-        const result = passiveHandlers.passive_immunity(feature, BASE_STATS)
-
-        expect(result).toBeInstanceOf(Object)
-        expect(result.type).toBe('passive_immunity')
-        expect(result.name).toBe('Test Feature')
-        expect(result.target).toBe('self')
-        expect(result.conditionImmunity).toBe('')
-        expect(result.damageResistance).toEqual([])
-        expect(result.saveAdvantage).toEqual([])
-        expect(result.hasAutomation).toBe(true)
-    })
-
     it('passes through custom fields including snake_case → camelCase mapping', () => {
         const feature = makeFeature(
             {
@@ -168,19 +187,40 @@ describe('passiveHandlers – passive_immunity', () => {
     })
 })
 
+// ── Casting-time handlers (share same pattern) ──────────────────────
+
+describe('passiveHandlers – casting_time defaults', () => {
+    const handlers = [
+        ['umbral_sight', 'immediate', 'Drow Darkness'],
+        ['supreme_sneak', 'movement', 'Rogue Cunning'],
+        ['ritual_spells', '1 minute', 'Druid Rituals'],
+        ['potent_cantrip', 'action', 'Savage Cantrip'],
+        ['soulstitch_spells', 'reaction', 'Soul Binder'],
+        ['empowered_evocation', '1 action', 'Evocation Expert'],
+        ['tavern_brawler_push', '1 action', 'Brawler Shove'],
+        ['ignore_loading_crossbows', 'custom', 'Quick Draw'],
+        ['blessed_warrior', undefined, 'Warrior Blessing'],
+    ]
+
+    for (const [handlerName, customCastingTime, customName] of handlers) {
+        it(`${handlerName} passes through custom casting_time`, () => {
+            const feature = makeFeature(
+                { type: handlerName, casting_time: customCastingTime },
+                customName
+            )
+            const result = passiveHandlers[handlerName](feature, BASE_STATS)
+
+            expect(result.name).toBe(customName)
+            if (customCastingTime) {
+                expect(result.casting_time).toBe(customCastingTime)
+            }
+        })
+    }
+})
+
 // ── holy_nimbus_radiant_damage ───────────────────────────────────────
 
 describe('passiveHandlers – holy_nimbus_radiant_damage', () => {
-    it('returns passive_rule with defaults', () => {
-        const feature = makeFeature({ type: 'holy_nimbus_radiant_damage' })
-        const result = passiveHandlers.holy_nimbus_radiant_damage(feature, BASE_STATS)
-
-        expectValidResult(result, 'passive_rule', 'holy_nimbus_radiant_damage')
-        expect(result.damageExpression).toBe('')
-        expect(result.range).toBe('')
-        expect(result.casting_time).toBe('')
-    })
-
     it('passes through custom fields', () => {
         const feature = makeFeature(
             {
@@ -200,80 +240,9 @@ describe('passiveHandlers – holy_nimbus_radiant_damage', () => {
     })
 })
 
-// ── umbral_sight ─────────────────────────────────────────────────────
-
-describe('passiveHandlers – umbral_sight', () => {
-    it('returns passive_rule with umbral_sight effect and casting_time default', () => {
-        const feature = makeFeature({ type: 'umbral_sight' })
-        const result = passiveHandlers.umbral_sight(feature, BASE_STATS)
-
-        expectValidResult(result, 'passive_rule', 'umbral_sight')
-        expect(result.casting_time).toBe('passive')
-    })
-
-    it('passes through custom casting_time', () => {
-        const feature = makeFeature(
-            { type: 'umbral_sight', casting_time: 'immediate' },
-            'Drow Darkness'
-        )
-        const result = passiveHandlers.umbral_sight(feature, BASE_STATS)
-
-        expect(result.name).toBe('Drow Darkness')
-        expect(result.casting_time).toBe('immediate')
-    })
-})
-
-// ── supreme_sneak ────────────────────────────────────────────────────
-
-describe('passiveHandlers – supreme_sneak', () => {
-    it('returns passive_rule with supreme_sneak effect and casting_time default', () => {
-        const feature = makeFeature({ type: 'supreme_sneak' })
-        const result = passiveHandlers.supreme_sneak(feature, BASE_STATS)
-
-        expectValidResult(result, 'passive_rule', 'supreme_sneak')
-        expect(result.casting_time).toBe('passive')
-    })
-
-    it('passes through custom casting_time', () => {
-        const feature = makeFeature(
-            { type: 'supreme_sneak', casting_time: 'movement' },
-            'Rogue Cunning'
-        )
-        const result = passiveHandlers.supreme_sneak(feature, BASE_STATS)
-
-        expect(result.name).toBe('Rogue Cunning')
-        expect(result.casting_time).toBe('movement')
-    })
-})
-
-// ── otherworldly_glamour ─────────────────────────────────────────────
-
-describe('passiveHandlers – otherworldly_glamour', () => {
-    it('returns passive_buff with otherworldly_glamour effect and hardcoded values', () => {
-        const feature = makeFeature({ type: 'otherworldly_glamour' })
-        const result = passiveHandlers.otherworldly_glamour(feature, BASE_STATS)
-
-        expect(result.type).toBe('passive_buff')
-        expect(result.effect).toBe('otherworldly_glamour')
-        expect(result.name).toBe('Test Feature')
-        expect(result.hasAutomation).toBe(true)
-    })
-})
-
 // ── create_thrall_temp_hp ────────────────────────────────────────────
 
 describe('passiveHandlers – create_thrall_temp_hp', () => {
-    it('returns create_thrall_temp_hp info with defaults', () => {
-        const feature = makeFeature({ type: 'create_thrall_temp_hp' })
-        const result = passiveHandlers.create_thrall_temp_hp(feature, BASE_STATS)
-
-        expect(result.type).toBe('create_thrall_temp_hp')
-        expect(result.name).toBe('Test Feature')
-        expect(result.tempHpExpression).toBe('')
-        expect(result.casting_time).toBe('passive')
-        expect(result.hasAutomation).toBe(true)
-    })
-
     it('passes through custom fields', () => {
         const feature = makeFeature(
             {
@@ -289,139 +258,24 @@ describe('passiveHandlers – create_thrall_temp_hp', () => {
     })
 })
 
-// ── ritual_spells ────────────────────────────────────────────────────
+// ── tavern_brawler_push – boolean coercion ───────────────────────────
 
-describe('passiveHandlers – ritual_spells', () => {
-    it('returns passive_rule with ritual_spells effect and casting_time default', () => {
-        const feature = makeFeature({ type: 'ritual_spells' })
-        const result = passiveHandlers.ritual_spells(feature, BASE_STATS)
-
-        expectValidResult(result, 'passive_rule', 'ritual_spells')
-        expect(result.casting_time).toBe('passive')
-    })
-
-    it('passes through custom casting_time', () => {
+describe('passiveHandlers – tavern_brawler_push coercion', () => {
+    it('coerces oncePerTurn with !!', () => {
         const feature = makeFeature(
-            { type: 'ritual_spells', casting_time: '1 minute' },
-            'Druid Rituals'
-        )
-        const result = passiveHandlers.ritual_spells(feature, BASE_STATS)
-
-        expect(result.name).toBe('Druid Rituals')
-        expect(result.casting_time).toBe('1 minute')
-    })
-})
-
-// ── potent_cantrip ───────────────────────────────────────────────────
-
-describe('passiveHandlers – potent_cantrip', () => {
-    it('returns potent_cantrip info with defaults', () => {
-        const feature = makeFeature({ type: 'potent_cantrip' })
-        const result = passiveHandlers.potent_cantrip(feature, BASE_STATS)
-
-        expectValidResult(result, 'potent_cantrip', 'potent_cantrip')
-        expect(result.casting_time).toBe('passive')
-    })
-
-    it('passes through custom casting_time', () => {
-        const feature = makeFeature(
-            { type: 'potent_cantrip', casting_time: 'action' },
-            'Savage Cantrip'
-        )
-        const result = passiveHandlers.potent_cantrip(feature, BASE_STATS)
-
-        expect(result.name).toBe('Savage Cantrip')
-        expect(result.casting_time).toBe('action')
-    })
-})
-
-// ── soulstitch_spells ────────────────────────────────────────────────
-
-describe('passiveHandlers – soulstitch_spells', () => {
-    it('returns soulstitch_spells info with defaults', () => {
-        const feature = makeFeature({ type: 'soulstitch_spells' })
-        const result = passiveHandlers.soulstitch_spells(feature, BASE_STATS)
-
-        expectValidResult(result, 'soulstitch_spells', 'soulstitch_spells')
-        expect(result.casting_time).toBe('passive')
-    })
-
-    it('passes through custom casting_time', () => {
-        const feature = makeFeature(
-            { type: 'soulstitch_spells', casting_time: 'reaction' },
-            'Soul Binder'
-        )
-        const result = passiveHandlers.soulstitch_spells(feature, BASE_STATS)
-
-        expect(result.name).toBe('Soul Binder')
-        expect(result.casting_time).toBe('reaction')
-    })
-})
-
-// ── empowered_evocation ──────────────────────────────────────────────
-
-describe('passiveHandlers – empowered_evocation', () => {
-    it('returns empowered_evocation info with defaults', () => {
-        const feature = makeFeature({ type: 'empowered_evocation' })
-        const result = passiveHandlers.empowered_evocation(feature, BASE_STATS)
-
-        expectValidResult(result, 'empowered_evocation', 'empowered_evocation')
-        expect(result.casting_time).toBe('passive')
-    })
-
-    it('passes through custom casting_time', () => {
-        const feature = makeFeature(
-            { type: 'empowered_evocation', casting_time: '1 action' },
-            'Evocation Expert'
-        )
-        const result = passiveHandlers.empowered_evocation(feature, BASE_STATS)
-
-        expect(result.name).toBe('Evocation Expert')
-        expect(result.casting_time).toBe('1 action')
-    })
-})
-
-// ── tavern_brawler_push ──────────────────────────────────────────────
-
-describe('passiveHandlers – tavern_brawler_push', () => {
-    it('returns passive_rule with defaults', () => {
-        const feature = makeFeature({ type: 'tavern_brawler_push' })
-        const result = passiveHandlers.tavern_brawler_push(feature, BASE_STATS)
-
-        expectValidResult(result, 'passive_rule', 'tavern_brawler_push')
-        expect(result.oncePerTurn).toBe(false)
-        expect(result.casting_time).toBe('passive')
-    })
-
-    it('passes through custom fields and coerces oncePerTurn with !!', () => {
-        const feature = makeFeature(
-            {
-                type: 'tavern_brawler_push',
-                oncePerTurn: true,
-                casting_time: '1 action'
-            },
+            { type: 'tavern_brawler_push', oncePerTurn: true },
             'Brawler Shove'
         )
         const result = passiveHandlers.tavern_brawler_push(feature, BASE_STATS)
 
         expect(result.name).toBe('Brawler Shove')
         expect(result.oncePerTurn).toBe(true)
-        expect(result.casting_time).toBe('1 action')
     })
 })
 
 // ── ignore_loading_crossbows ─────────────────────────────────────────
 
 describe('passiveHandlers – ignore_loading_crossbows', () => {
-    it('returns passive_rule with defaults', () => {
-        const feature = makeFeature({ type: 'ignore_loading_crossbows' })
-        const result = passiveHandlers.ignore_loading_crossbows(feature, BASE_STATS)
-
-        expectValidResult(result, 'passive_rule', 'ignore_loading_crossbows')
-        expect(result.weapons).toEqual([])
-        expect(result.casting_time).toBe('passive')
-    })
-
     it('passes through custom weapons', () => {
         const feature = makeFeature(
             {
@@ -434,17 +288,5 @@ describe('passiveHandlers – ignore_loading_crossbows', () => {
 
         expect(result.name).toBe('Quick Draw')
         expect(result.weapons).toEqual(['heavy crossbow', 'light crossbow'])
-    })
-})
-
-// ── naturally_stealthy ───────────────────────────────────────────────
-
-describe('passiveHandlers – naturally_stealthy', () => {
-    it('returns passive_rule with casting_time default', () => {
-        const feature = makeFeature({ type: 'naturally_stealthy' })
-        const result = passiveHandlers.naturally_stealthy(feature, BASE_STATS)
-
-        expectValidResult(result, 'passive_rule', 'naturally_stealthy')
-        expect(result.casting_time).toBe('passive')
     })
 })

@@ -127,57 +127,36 @@ describe('Silence zone — Thunder immunity for players', () => {
     expect(silenceService.isCreatureInSilenceZone).toHaveBeenCalledWith('Wizard', 'Bard', 'TestCampaign');
   });
 
-  it('does not add Thunder immunity when player is not in silence zone', () => {
+  it('does not add Thunder immunity when not in silence zone, no silence buff, or silence buff lacks sourceCharacter', () => {
+    // Not in silence zone
     silenceService.isCreatureInSilenceZone.mockImplementation(() => false);
     global.fetch.mockReset();
-
-    const player = createPlayerCreature('Wizard');
-    const cs = makeCombatSummary([player]);
-
+    const player1 = createPlayerCreature('Wizard');
+    const cs1 = makeCombatSummary([player1]);
     stubPlayerRuntime(20, [], [{ effect: 'silence', sourceCharacter: 'Bard' }]);
-
-    const result = applyDamageToTarget(cs, 'Wizard', 10, ['Thunder'], 'TestCampaign', [
-      createMinimalCharacter('Wizard'),
-    ]);
-
+    let result = applyDamageToTarget(cs1, 'Wizard', 10, ['Thunder'], 'TestCampaign', [createMinimalCharacter('Wizard')]);
     expect(result.finalDamage).toBe(10);
     expect(silenceService.isCreatureInSilenceZone).toHaveBeenCalledWith('Wizard', 'Bard', 'TestCampaign');
-  });
 
-  it('does not add Thunder immunity when no silence buff is present', () => {
+    // No silence buff
     silenceService.isCreatureInSilenceZone.mockClear();
     silenceService.isCreatureInSilenceZone.mockImplementation(() => false);
     global.fetch.mockReset();
-
-    const player = createPlayerCreature('Wizard');
-    const cs = makeCombatSummary([player]);
-
-    // No silence buff — getRuntimeValue returns empty array for activeBuffs
+    const player2 = createPlayerCreature('Wizard2');
+    const cs2 = makeCombatSummary([player2]);
     stubPlayerRuntime(20, [], []);
-
-    const result = applyDamageToTarget(cs, 'Wizard', 10, ['Thunder'], 'TestCampaign', [
-      createMinimalCharacter('Wizard'),
-    ]);
-
+    result = applyDamageToTarget(cs2, 'Wizard2', 10, ['Thunder'], 'TestCampaign', [createMinimalCharacter('Wizard2')]);
     expect(result.finalDamage).toBe(10);
     expect(silenceService.isCreatureInSilenceZone).not.toHaveBeenCalled();
-  });
 
-  it('does not add Thunder immunity when silence buff has no sourceCharacter', () => {
+    // Silence buff without sourceCharacter
     silenceService.isCreatureInSilenceZone.mockClear();
     silenceService.isCreatureInSilenceZone.mockImplementation(() => false);
     global.fetch.mockReset();
-
-    const player = createPlayerCreature('Wizard');
-    const cs = makeCombatSummary([player]);
-
-    // Silence buff without sourceCharacter — the code checks `buff.sourceCharacter`
+    const player3 = createPlayerCreature('Wizard3');
+    const cs3 = makeCombatSummary([player3]);
     stubPlayerRuntime(20, [], [{ effect: 'silence' }]);
-
-    const result = applyDamageToTarget(cs, 'Wizard', 10, ['Thunder'], 'TestCampaign', [
-      createMinimalCharacter('Wizard'),
-    ]);
-
+    result = applyDamageToTarget(cs3, 'Wizard3', 10, ['Thunder'], 'TestCampaign', [createMinimalCharacter('Wizard3')]);
     expect(result.finalDamage).toBe(10);
     expect(silenceService.isCreatureInSilenceZone).not.toHaveBeenCalled();
   });

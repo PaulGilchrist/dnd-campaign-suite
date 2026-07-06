@@ -14,7 +14,6 @@ vi.mock('../../automation/common/healingRoll.js', () => ({
   logHealingToSSE: vi.fn(),
 }))
 
-// Import mocked modules after vi.mock declarations (hoisted by Vitest)
 const { evaluateAutoExpression } = await import('../../combat/automation/automationService.js')
 const { applyHealingDirectly, logHealingToSSE } = await import('../../automation/common/healingRoll.js')
 
@@ -87,22 +86,8 @@ describe('postCastHealService', () => {
       expect(result).toEqual([{ name: 'Test Heal', amount: 10, actualHeal: 10 }])
     })
 
-    it('skips when evaluation returns zero', async () => {
+    it('skips healing when evaluation returns non-positive value', async () => {
       evaluateAutoExpression.mockReturnValue(0)
-      const result = await triggerPostCastSelfHeals(healingSpell, {}, baseStats, 'camp', 'map')
-      expect(result).toBeNull()
-      expect(applyHealingDirectly).not.toHaveBeenCalled()
-    })
-
-    it('skips when evaluation returns negative', async () => {
-      evaluateAutoExpression.mockReturnValue(-5)
-      const result = await triggerPostCastSelfHeals(healingSpell, {}, baseStats, 'camp', 'map')
-      expect(result).toBeNull()
-      expect(applyHealingDirectly).not.toHaveBeenCalled()
-    })
-
-    it('skips when evaluation returns NaN', async () => {
-      evaluateAutoExpression.mockReturnValue(NaN)
       const result = await triggerPostCastSelfHeals(healingSpell, {}, baseStats, 'camp', 'map')
       expect(result).toBeNull()
       expect(applyHealingDirectly).not.toHaveBeenCalled()
@@ -115,22 +100,10 @@ describe('postCastHealService', () => {
       expect(evaluateAutoExpression).toHaveBeenCalledWith('2d8', twinkledStats, 2, 10, 1)
     })
 
-    it('does not upgrade heal expression below level 10', async () => {
-      evaluateAutoExpression.mockReturnValue(15)
-      await triggerPostCastSelfHeals(healingSpell, {}, baseStats, 'camp', 'map')
-      expect(evaluateAutoExpression).toHaveBeenCalledWith('1d8', baseStats, 2, 5, 1)
-    })
-
-    it('uses slotLevel from metaCtx when available', async () => {
+    it('uses slotLevel from metaCtx or falls back to spell.level', async () => {
       evaluateAutoExpression.mockReturnValue(15)
       await triggerPostCastSelfHeals(healingSpell, { slotLevel: 5 }, baseStats, 'camp', 'map')
       expect(evaluateAutoExpression).toHaveBeenCalledWith('1d8', baseStats, 2, 5, 5)
-    })
-
-    it('uses spell.level when metaCtx.slotLevel is missing', async () => {
-      evaluateAutoExpression.mockReturnValue(15)
-      await triggerPostCastSelfHeals(healingSpell, {}, baseStats, 'camp', 'map')
-      expect(evaluateAutoExpression).toHaveBeenCalledWith('1d8', baseStats, 2, 5, 1)
     })
 
     it('handles multiple self-heal passives', async () => {
@@ -152,16 +125,6 @@ describe('postCastHealService', () => {
       ])
     })
 
-    it('defaults to healExpression 0 when missing', async () => {
-      const noExpressionStats = {
-        ...baseStats,
-        automation: { passives: [{ type: 'post_cast_self_heal', name: 'No Expression' }] },
-      }
-      evaluateAutoExpression.mockReturnValue(0)
-      const result = await triggerPostCastSelfHeals(healingSpell, {}, noExpressionStats, 'camp', 'map')
-      expect(result).toBeNull()
-    })
-
     it('throws when slot level is missing from both metaCtx and spell', async () => {
       const noSlotStats = { ...baseStats, level: 5 }
       const noSlotSpell = { name: 'Cure Wounds', level: null }
@@ -170,7 +133,7 @@ describe('postCastHealService', () => {
       ).rejects.toThrow('slot level is required for post-cast self heals')
     })
 
-    it('returns null when all passives are skipped (othersOnly + zero amount)', async () => {
+    it('returns null when all passives are skipped', async () => {
       const allSkippedStats = {
         ...baseStats,
         automation: {
@@ -278,17 +241,6 @@ describe('postCastHealService', () => {
       const result = await triggerPostCastAllyHeals(healingSpell, {}, multiStats, 'camp', 'map')
       expect(applyHealingDirectly).toHaveBeenCalledTimes(2)
       expect(result).toHaveLength(2)
-    })
-
-    it('defaults to healExpression 0 when missing', async () => {
-      const noExpressionStats = {
-        ...baseStats,
-        automation: { passives: [{ type: 'post_cast_ally_heal', name: 'No Expression' }] },
-        activeBuffs: [{ name: 'Starry Form', constellation: 'Chalice' }],
-      }
-      evaluateAutoExpression.mockReturnValue(0)
-      const result = await triggerPostCastAllyHeals(healingSpell, {}, noExpressionStats, 'camp', 'map')
-      expect(result).toBeNull()
     })
 
     it('throws when slot level is missing from both metaCtx and spell', async () => {

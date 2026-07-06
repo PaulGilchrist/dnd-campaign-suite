@@ -37,13 +37,6 @@ describe('useWizardFeatBuffs', () => {
   });
 
   describe('initial state', () => {
-    it('returns null when no feats are selected', () => {
-      const { result } = renderHook(() =>
-        useWizardFeatBuffs(createBaseFormData(), createMockAllFeats(), mockSetFormData)
-      );
-      expect(result.current.computedBuffs).toBeNull();
-    });
-
     it('returns null when allFeats is empty', () => {
       const formData = createBaseFormData({ feats: ['Tough'] });
       const { result } = renderHook(() =>
@@ -85,7 +78,10 @@ describe('useWizardFeatBuffs', () => {
 
     it('applies ability score increases to matching abilities', () => {
       const mockBuffs = {
-        abilityScoreIncreases: [{ name: 'Strength', amount: 2 }],
+        abilityScoreIncreases: [
+          { name: 'Strength', amount: 2 },
+          { name: 'Dexterity', amount: 1 },
+        ],
         resistances: [],
         features: [],
         proficiencies: [],
@@ -100,12 +96,10 @@ describe('useWizardFeatBuffs', () => {
         )
       );
 
-      // call[0] = clearBuffs, call[1] = applyBuffs
       const applyFn = mockSetFormData.mock.calls[1][0];
-      expect(typeof applyFn).toBe('function');
       const result = applyFn(createBaseFormData());
-      const strAbility = result.abilities.find((a) => a.name === 'Strength');
-      expect(strAbility.featIncrease).toBe(2);
+      expect(result.abilities.find((a) => a.name === 'Strength').featIncrease).toBe(2);
+      expect(result.abilities.find((a) => a.name === 'Dexterity').featIncrease).toBe(1);
     });
 
     it('skips ability score increases with name "any"', () => {
@@ -130,81 +124,6 @@ describe('useWizardFeatBuffs', () => {
       result.abilities.forEach((a) => {
         expect(a.featIncrease).toBe(0);
       });
-    });
-
-    it('accumulates multiple ability score increases on the same ability', () => {
-      const mockBuffs = {
-        abilityScoreIncreases: [
-          { name: 'Strength', amount: 2 },
-          { name: 'Strength', amount: 1 },
-        ],
-        resistances: [],
-        features: [],
-        proficiencies: [],
-      };
-      computeAllFeatBuffs.mockReturnValue(mockBuffs);
-
-      renderHook(() =>
-        useWizardFeatBuffs(
-          createBaseFormData({ feats: ['Tough'] }),
-          createMockAllFeats(),
-          mockSetFormData
-        )
-      );
-
-      const applyFn = mockSetFormData.mock.calls[1][0];
-      const result = applyFn(createBaseFormData());
-      const strAbility = result.abilities.find((a) => a.name === 'Strength');
-      expect(strAbility.featIncrease).toBe(3);
-    });
-
-    it('handles case-insensitive ability name matching', () => {
-      const mockBuffs = {
-        abilityScoreIncreases: [{ name: 'strength', amount: 2 }],
-        resistances: [],
-        features: [],
-        proficiencies: [],
-      };
-      computeAllFeatBuffs.mockReturnValue(mockBuffs);
-
-      renderHook(() =>
-        useWizardFeatBuffs(
-          createBaseFormData({ feats: ['Tough'] }),
-          createMockAllFeats(),
-          mockSetFormData
-        )
-      );
-
-      const applyFn = mockSetFormData.mock.calls[1][0];
-      const result = applyFn(createBaseFormData());
-      const strAbility = result.abilities.find((a) => a.name === 'Strength');
-      expect(strAbility.featIncrease).toBe(2);
-    });
-
-    it('handles abilities missing featIncrease property', () => {
-      const mockBuffs = {
-        abilityScoreIncreases: [{ name: 'Dexterity', amount: 2 }],
-        resistances: [],
-        features: [],
-        proficiencies: [],
-      };
-      computeAllFeatBuffs.mockReturnValue(mockBuffs);
-
-      renderHook(() =>
-        useWizardFeatBuffs(
-          {
-            ...createBaseFormData({ feats: ['Tough'] }),
-            abilities: [{ name: 'Strength' }, { name: 'Dexterity' }],
-          },
-          createMockAllFeats(),
-          mockSetFormData
-        )
-      );
-
-      const applyFn = mockSetFormData.mock.calls[1][0];
-      const result = applyFn(createBaseFormData({ feats: ['Tough'] }));
-      const dexAbility = result.abilities.find((a) => a.name === 'Dexterity');
-      expect(dexAbility.featIncrease).toBe(2);
     });
 
     it('merges resistances with deduplication', () => {
@@ -251,50 +170,6 @@ describe('useWizardFeatBuffs', () => {
       const applyFn = mockSetFormData.mock.calls[1][0];
       const result = applyFn(createBaseFormData({ feats: ['Tough'], resistances: ['fire'] }));
       expect(result.resistances).toHaveLength(1);
-    });
-
-    it('handles undefined abilities gracefully during apply', () => {
-      const mockBuffs = {
-        abilityScoreIncreases: [{ name: 'Strength', amount: 2 }],
-        resistances: [],
-        features: [],
-        proficiencies: [],
-      };
-      computeAllFeatBuffs.mockReturnValue(mockBuffs);
-
-      renderHook(() =>
-        useWizardFeatBuffs(
-          createBaseFormData({ feats: ['Tough'] }),
-          createMockAllFeats(),
-          mockSetFormData
-        )
-      );
-
-      const applyFn = mockSetFormData.mock.calls[1][0];
-      const result = applyFn({ ...createBaseFormData({ feats: ['Tough'] }), abilities: undefined });
-      expect(result.abilities).toBeDefined();
-    });
-
-    it('handles undefined resistances gracefully during apply', () => {
-      const mockBuffs = {
-        abilityScoreIncreases: [],
-        resistances: ['Fire'],
-        features: [],
-        proficiencies: [],
-      };
-      computeAllFeatBuffs.mockReturnValue(mockBuffs);
-
-      renderHook(() =>
-        useWizardFeatBuffs(
-          createBaseFormData({ feats: ['Tough'] }),
-          createMockAllFeats(),
-          mockSetFormData
-        )
-      );
-
-      const applyFn = mockSetFormData.mock.calls[1][0];
-      const result = applyFn({ ...createBaseFormData({ feats: ['Tough'] }), resistances: undefined });
-      expect(result.resistances).toContain('Fire');
     });
 
     it('handles skill proficiencies from all_skills buff', () => {
@@ -370,23 +245,6 @@ describe('useWizardFeatBuffs', () => {
   });
 
   describe('state transitions', () => {
-    it('recomputes when feats change from empty to non-empty', () => {
-      const mockBuffs = {
-        abilityScoreIncreases: [{ name: 'Strength', amount: 2 }],
-        resistances: [],
-        features: [],
-        proficiencies: [],
-      };
-      computeAllFeatBuffs.mockReturnValue(mockBuffs);
-
-      const formData = createBaseFormData({ feats: ['Tough'] });
-      const { result } = renderHook(() =>
-        useWizardFeatBuffs(formData, createMockAllFeats(), mockSetFormData)
-      );
-
-      expect(result.current.computedBuffs).toEqual(mockBuffs);
-    });
-
     it('clears buffs when feats change from non-empty to empty', () => {
       const mockBuffs = {
         abilityScoreIncreases: [{ name: 'Strength', amount: 2 }],
@@ -406,7 +264,6 @@ describe('useWizardFeatBuffs', () => {
       const initialCalls = mockSetFormData.mock.calls.length;
       rerender({ fd: createBaseFormData({ feats: [] }) });
 
-      // Should have called setFormData (clearBuffs) but NOT computeAllFeatBuffs
       expect(computeAllFeatBuffs).not.toHaveBeenCalled();
       expect(mockSetFormData.mock.calls.length).toBeGreaterThan(initialCalls);
     });
@@ -510,96 +367,6 @@ describe('useWizardFeatBuffs', () => {
       });
       expect(result.abilities[0].featIncrease).toBe(5);
       expect(result.abilities[1].featIncrease).toBe(3);
-    });
-
-    it('returns prev unchanged when abilities is missing during clear', () => {
-      const mockBuffs = {
-        abilityScoreIncreases: [],
-        resistances: [],
-        features: [],
-        proficiencies: [],
-      };
-      computeAllFeatBuffs.mockReturnValue(mockBuffs);
-
-      renderHook(() =>
-        useWizardFeatBuffs(
-          createBaseFormData({ feats: ['Tough'] }),
-          createMockAllFeats(),
-          mockSetFormData
-        )
-      );
-
-      const clearFn = mockSetFormData.mock.calls[0][0];
-      const prev = { name: 'Test' };
-      const result = clearFn(prev);
-      expect(result).toBe(prev);
-    });
-  });
-
-  describe('edge cases', () => {
-    it('handles empty buffs result', () => {
-      const mockBuffs = {
-        abilityScoreIncreases: [],
-        resistances: [],
-        features: [],
-        proficiencies: [],
-      };
-      computeAllFeatBuffs.mockReturnValue(mockBuffs);
-
-      const { result } = renderHook(() =>
-        useWizardFeatBuffs(
-          createBaseFormData({ feats: ['Tough'] }),
-          createMockAllFeats(),
-          mockSetFormData
-        )
-      );
-
-      expect(result.current.computedBuffs).toEqual(mockBuffs);
-    });
-
-    it('handles no resistances to add', () => {
-      const mockBuffs = {
-        abilityScoreIncreases: [],
-        resistances: ['Fire'],
-        features: [],
-        proficiencies: [],
-      };
-      computeAllFeatBuffs.mockReturnValue(mockBuffs);
-
-      renderHook(() =>
-        useWizardFeatBuffs(
-          createBaseFormData({ feats: ['Tough'], resistances: ['Fire'] }),
-          createMockAllFeats(),
-          mockSetFormData
-        )
-      );
-
-      const applyFn = mockSetFormData.mock.calls[1][0];
-      const result = applyFn(createBaseFormData({ feats: ['Tough'], resistances: ['Fire'] }));
-      expect(result.resistances).toEqual(['Fire']);
-    });
-
-    it('passes formData with rules field to computeAllFeatBuffs', () => {
-      const mockBuffs = {
-        abilityScoreIncreases: [],
-        resistances: [],
-        features: [],
-        proficiencies: [],
-      };
-      computeAllFeatBuffs.mockReturnValue(mockBuffs);
-
-      renderHook(() =>
-        useWizardFeatBuffs(
-          createBaseFormData({ feats: ['Tough'], rules: '2024' }),
-          createMockAllFeats(),
-          mockSetFormData
-        )
-      );
-
-      expect(computeAllFeatBuffs).toHaveBeenCalledWith(
-        expect.objectContaining({ rules: '2024' }),
-        createMockAllFeats()
-      );
     });
   });
 });

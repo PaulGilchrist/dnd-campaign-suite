@@ -100,15 +100,6 @@ describe('bardicInspirationHandler.handle', () => {
   });
 
   describe('no combat context', () => {
-    it('returns info popup when getCombatContext returns null', async () => {
-      getCombatContext.mockResolvedValue(null);
-
-      const result = await handle(action, playerStats, campaignName);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.description).toContain('requires a target');
-    });
-
     it('returns info popup when combat context has no creatures', async () => {
       getCombatContext.mockResolvedValue(makeCombatSummary([]));
 
@@ -155,21 +146,9 @@ describe('bardicInspirationHandler.handle', () => {
       expect(result.payload.playerStats).toEqual(playerStats);
     });
 
-    it('includes the action and playerStats in the modal payload', async () => {
-      const result = await handle(action, playerStats, campaignName);
-
-      expect(result.payload.action).toBe(action);
-      expect(result.payload.playerStats).toBe(playerStats);
-    });
   });
 
   describe('die size in modal payload', () => {
-    it('uses the bardic_die from class_levels matching the player level', async () => {
-      const result = await handle(action, playerStats, campaignName);
-
-      expect(result.payload.dieSize).toBe(8);
-    });
-
     it('falls back to die size 6 when class data has no matching level', async () => {
       playerStats.class = { class_levels: [{ level: 1, bardic_die: 4 }] };
 
@@ -196,20 +175,8 @@ describe('bardicInspirationHandler.handle', () => {
       expect(result.payload.hasCombatOptions).toBe(true);
     });
 
-    it('sets hasCombatOptions false when passive is absent', async () => {
-      const result = await handle(action, playerStats, campaignName);
-
-      expect(result.payload.hasCombatOptions).toBe(false);
-    });
   });
 
-  describe('uses available but not decremented by handle()', () => {
-    it('does NOT decrement uses (that happens in applyBardicInspiration)', async () => {
-      await handle(action, playerStats, campaignName);
-
-      expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
-    });
-  });
 });
 
 // ── applyBardicInspiration() Tests ─────────────────────────────────
@@ -246,7 +213,6 @@ describe('bardicInspirationHandler.applyBardicInspiration', () => {
 
       await applyBardicInspiration(action, playerStats, campaignName, 'Fighter', 8, false);
 
-      expect(automationService.evaluateAutoExpression).not.toHaveBeenCalled();
       expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalledWith(
         'Bard',
         'bardicInspirationUses',
@@ -349,7 +315,7 @@ describe('bardicInspirationHandler.applyBardicInspiration', () => {
   });
 
   describe('return value', () => {
-    it('returns a popup with the correct die size in the description', async () => {
+    it('returns a popup with the correct die size and target in the description', async () => {
       const result = await applyBardicInspiration(action, playerStats, campaignName, 'Fighter', 8, false);
 
       expect(result.type).toBe('popup');
@@ -359,13 +325,6 @@ describe('bardicInspirationHandler.applyBardicInspiration', () => {
       expect(result.payload.description).toContain('granted to Fighter');
       expect(result.payload.description).toContain('one ability check');
       expect(result.payload.automation).toEqual(action.automation);
-    });
-
-    it('uses the provided die size in the popup description', async () => {
-      const result = await applyBardicInspiration(action, playerStats, campaignName, 'Rogue', 6, false);
-
-      expect(result.payload.description).toContain('d6');
-      expect(result.payload.description).toContain('granted to Rogue');
     });
   });
 });

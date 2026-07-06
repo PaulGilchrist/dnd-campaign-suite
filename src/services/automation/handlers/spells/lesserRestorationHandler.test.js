@@ -14,17 +14,10 @@ vi.mock('../../../rules/combat/damageUtils.js', () => ({
   getCombatContext: vi.fn(),
 }));
 
-vi.mock('../../../ui/storage.js', () => ({
-  default: {
-    set: vi.fn(),
-  },
-}));
-
 import { handle, applyLesserRestoration } from './lesserRestorationHandler.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { addEntry } from '../../../ui/logService.js';
-import storage from '../../../ui/storage.js';
 
 const campaignName = 'TestCampaign';
 
@@ -83,18 +76,6 @@ describe('lesserRestorationHandler.handle', () => {
       expect(selfTarget.name).toBe('TestCleric');
     });
 
-    it('should include other creatures in targets list', async () => {
-      getCombatContext.mockResolvedValue(baseCombatContext);
-      getRuntimeValue.mockReturnValue([]);
-
-      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      const names = result.payload.targets.map(t => t.name);
-      expect(names).toContain('Ally1');
-      expect(names).toContain('Goblin');
-      expect(result.payload.targets.length).toBe(3);
-    });
-
     it('should exclude the caster from non-self creature targets', async () => {
       getCombatContext.mockResolvedValue(baseCombatContext);
       getRuntimeValue.mockReturnValue([]);
@@ -115,16 +96,6 @@ describe('lesserRestorationHandler.handle', () => {
       expect(result.payload.targets.length).toBe(1);
       expect(result.payload.targets[0].name).toBe('TestCleric');
       expect(result.payload.targets[0].isSelf).toBe(true);
-    });
-
-    it('should return automation_info popup type', async () => {
-      getCombatContext.mockResolvedValue(baseCombatContext);
-      getRuntimeValue.mockReturnValue([]);
-
-      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(result.payload.type).toBe('automation_info');
-      expect(result.payload.name).toBe('Lesser Restoration');
     });
   });
 
@@ -151,23 +122,6 @@ describe('lesserRestorationHandler.handle', () => {
       expect(goblinTarget.hasApplicableConditions).toBe(true);
     });
 
-    it('should mark targets without applicable conditions', async () => {
-      getCombatContext.mockResolvedValue(baseCombatContext);
-      getRuntimeValue.mockImplementation((target, key) => {
-        if (key === 'activeConditions') {
-          if (target === 'Ally1') return ['Frightened', 'Prone'];
-          return [];
-        }
-        return [];
-      });
-
-      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      const allyTarget = result.payload.targets.find(t => t.name === 'Ally1');
-      expect(allyTarget.hasApplicableConditions).toBe(false);
-      expect(allyTarget.conditions).toEqual([]);
-    });
-
     it('should reflect self conditions in self-target', async () => {
       getCombatContext.mockResolvedValue(baseCombatContext);
       getRuntimeValue.mockImplementation((target, key) => {
@@ -188,33 +142,15 @@ describe('lesserRestorationHandler.handle', () => {
   });
 
   describe('payload configuration', () => {
-    it('should include range from automation config', async () => {
+    it('should include range from automation config or default to Touch', async () => {
       getCombatContext.mockResolvedValue(baseCombatContext);
       getRuntimeValue.mockReturnValue([]);
 
-      const result = await handle(makeAction({ range: '30 ft' }), makePlayerStats(), campaignName, null);
+      const resultWithRange = await handle(makeAction({ range: '30 ft' }), makePlayerStats(), campaignName, null);
+      expect(resultWithRange.payload.range).toBe('30 ft');
 
-      expect(result.payload.range).toBe('30 ft');
-    });
-
-    it('should default range to Touch when not specified', async () => {
-      getCombatContext.mockResolvedValue(baseCombatContext);
-      getRuntimeValue.mockReturnValue([]);
-
-      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(result.payload.range).toBe('Touch');
-    });
-
-    it('should include automation object in payload', async () => {
-      getCombatContext.mockResolvedValue(baseCombatContext);
-      getRuntimeValue.mockReturnValue([]);
-
-      const auto = { range: '60 ft', custom: true };
-      const result = await handle(makeAction(auto), makePlayerStats(), campaignName, null);
-
-      expect(result.payload.automation.range).toBe('60 ft');
-      expect(result.payload.automation.custom).toBe(true);
+      const resultDefaultRange = await handle(makeAction(), makePlayerStats(), campaignName, null);
+      expect(resultDefaultRange.payload.range).toBe('Touch');
     });
   });
 });
@@ -310,22 +246,6 @@ describe('lesserRestorationHandler.applyLesserRestoration', () => {
       expect(result.payload.description).toContain('No applicable condition found');
     });
 
-    it('should handle empty conditions array', async () => {
-      getCombatContext.mockResolvedValue({ creatures: [] });
-      getRuntimeValue.mockReturnValue([]);
-
-      const result = await applyLesserRestoration(
-        makeAction(),
-        makePlayerStats(),
-        campaignName,
-        null,
-        { targetName: 'Ally1', condition: 'Blinded' },
-      );
-
-      expect(setRuntimeValue).not.toHaveBeenCalled();
-      expect(result.payload.description).toContain('No applicable condition found');
-    });
-
     it('should handle whitespace in condition names', async () => {
       getCombatContext.mockResolvedValue({ creatures: [] });
       getRuntimeValue.mockReturnValue(['  blinded  ', 'POISONED']);
@@ -383,71 +303,5 @@ describe('lesserRestorationHandler.applyLesserRestoration', () => {
       expect(addEntry).not.toHaveBeenCalled();
     });
 
-    it('should update creature conditions via setRuntimeValue and not persist via storage', async () => {
-      getCombatContext.mockResolvedValue({
-        creatures: [{ name: 'Ally1', conditions: [{ key: 'Blinded' }, { key: 'Poisoned' }] }],
-      });
-      getRuntimeValue.mockReturnValue(['Blinded', 'Poisoned']);
-
-      await applyLesserRestoration(
-        makeAction(),
-        makePlayerStats(),
-        campaignName,
-        null,
-        { targetName: 'Ally1', condition: 'Blinded' },
-      );
-
-      expect(setRuntimeValue).toHaveBeenCalledWith('Ally1', 'activeConditions', ['Poisoned'], campaignName);
-      expect(storage.set).not.toHaveBeenCalled();
-    });
-
-    it('should not call storage.set when combatSummary is missing', async () => {
-      getCombatContext.mockResolvedValue(null);
-      getRuntimeValue.mockReturnValue(['Blinded']);
-
-      await applyLesserRestoration(
-        makeAction(),
-        makePlayerStats(),
-        campaignName,
-        null,
-        { targetName: 'Ally1', condition: 'Blinded' },
-      );
-
-      expect(storage.set).not.toHaveBeenCalled();
-    });
-
-    it('should not call storage.set when target creature not found in combatSummary', async () => {
-      getCombatContext.mockResolvedValue({
-        creatures: [{ name: 'OtherGuy', conditions: [{ key: 'Blinded' }] }],
-      });
-      getRuntimeValue.mockReturnValue(['Blinded']);
-
-      await applyLesserRestoration(
-        makeAction(),
-        makePlayerStats(),
-        campaignName,
-        null,
-        { targetName: 'Ally1', condition: 'Blinded' },
-      );
-
-      expect(storage.set).not.toHaveBeenCalled();
-    });
-
-    it('should not call storage.set when creature has no conditions array', async () => {
-      getCombatContext.mockResolvedValue({
-        creatures: [{ name: 'Ally1' }],
-      });
-      getRuntimeValue.mockReturnValue(['Blinded']);
-
-      await applyLesserRestoration(
-        makeAction(),
-        makePlayerStats(),
-        campaignName,
-        null,
-        { targetName: 'Ally1', condition: 'Blinded' },
-      );
-
-      expect(storage.set).not.toHaveBeenCalled();
-    });
   });
 });

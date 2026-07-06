@@ -468,7 +468,7 @@ describe('slowHandler.handle', () => {
       );
     });
 
-    it('stores all slow debuff target effects', async () => {
+    it('stores all slow debuff target effects with dc and saveType', async () => {
       setupFailedSave();
 
       await handle(makeAction(), makePlayerStats(), campaignName, null);
@@ -483,17 +483,6 @@ describe('slowHandler.handle', () => {
       expect(effectTypes).toContain('no_reactions');
       expect(effectTypes).toContain('ac_penalty');
       expect(effectTypes).toContain('slow_repeat_save');
-    });
-
-    it('includes dc and saveType in slow_repeat_save effect', async () => {
-      setupFailedSave();
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      const targetEffectsCall = setRuntimeValue.mock.calls.find(
-        (c) => c[1] === 'targetEffects',
-      );
-      const effects = targetEffectsCall[2];
       const repeatSaveEffect = effects.find((e) => e.effect === 'slow_repeat_save');
       expect(repeatSaveEffect.dc).toBe(saveDc);
       expect(repeatSaveEffect.saveType).toBe('WIS');

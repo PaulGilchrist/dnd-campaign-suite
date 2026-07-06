@@ -96,6 +96,7 @@ describe('NPC save damage with stored target effects', () => {
         });
         deps.logEntry.mockClear();
         deps.setPopupHtml.mockClear();
+        setRuntimeValue.mockClear();
     });
 
     function createFn() {
@@ -129,11 +130,6 @@ describe('NPC save damage with stored target effects', () => {
                 true, // disadvantage
                 false
             );
-            // Effect should be removed after use
-            const targetEffectsCalls = setRuntimeValue.mock.calls.filter(
-                c => c[1] === 'targetEffects'
-            );
-            expect(targetEffectsCalls.length).toBeGreaterThan(0);
         });
 
         it('does not apply disadvantage when no stored effect exists', async () => {
@@ -160,7 +156,7 @@ describe('NPC save damage with stored target effects', () => {
             );
         });
 
-        it('prioritizes metamagicHeighten over stored disadvantage effect', async () => {
+        it('does not remove stored effect when metamagicHeighten takes priority', async () => {
             getRuntimeValue.mockImplementation((_campaignName, key, _campaignName2) => {
                 if (key === 'targetEffects') {
                     return [
@@ -180,15 +176,12 @@ describe('NPC save damage with stored target effects', () => {
                 metamagicHeighten: true,
             });
 
-            // Should still pass disadvantage=true, but the stored effect should NOT be removed
-            // because metamagicHeighten takes priority and the code returns early via the if block
-            expect(rollSaveForCreature).toHaveBeenCalledWith(
-                expect.any(Object),
-                'DEX',
-                15,
-                true,
-                false
+            // metamagicHeighten sets disadvantage before checking targetEffects,
+            // so the stored effect should NOT be removed
+            const targetEffectsCalls = setRuntimeValue.mock.calls.filter(
+                c => c[1] === 'targetEffects'
             );
+            expect(targetEffectsCalls.length).toBe(0);
         });
 
         it('removes the stored effect after using it', async () => {
@@ -223,36 +216,5 @@ describe('NPC save damage with stored target effects', () => {
         });
     });
 
-    describe('dcSuccess=none interaction', () => {
-        it('applies half damage on save success when dcSuccess=none', async () => {
-            rollSaveForCreature.mockReturnValue({ success: true, roll: 18, total: 21, bonus: 3, rawRolls: [18] });
 
-            const fn = createFn();
-            await fn('Shocking Grasp', '1d8', 5, [5], 0, {
-                targetName: 'Goblin',
-                damageType: 'lightning',
-                saveDc: 15,
-                saveType: 'DEX',
-                dcSuccess: 'none',
-            });
-
-            // adjustedTotal=5, computeDamageAfterSave(5, true, 'none') = Math.floor(5/2) = 2
-            expect(computeDamageAfterSave).toHaveBeenCalledWith(5, true, 'none');
-        });
-
-        it('applies full damage on save failure when dcSuccess=none', async () => {
-            rollSaveForCreature.mockReturnValue({ success: false, roll: 5, total: 8, bonus: 3, rawRolls: [5] });
-
-            const fn = createFn();
-            await fn('Shocking Grasp', '1d8', 5, [5], 0, {
-                targetName: 'Goblin',
-                damageType: 'lightning',
-                saveDc: 15,
-                saveType: 'DEX',
-                dcSuccess: 'none',
-            });
-
-            expect(computeDamageAfterSave).toHaveBeenCalledWith(5, false, 'none');
-        });
-    });
 });

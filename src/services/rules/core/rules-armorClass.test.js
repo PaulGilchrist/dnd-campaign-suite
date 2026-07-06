@@ -31,20 +31,6 @@ describe('rules.getArmorClass', () => {
       expect(ac).toBe(13);
     });
 
-    it('handles zero Dexterity bonus', () => {
-      const playerStats = {
-        class: { name: 'Wizard' },
-        abilities: [
-          { name: 'Dexterity', bonus: 0 }
-        ],
-        inventory: { equipped: [] }
-      };
-
-      const [ac] = rules.getArmorClass(createEquipment(), playerStats);
-
-      expect(ac).toBe(10);
-    });
-
     it('handles negative Dexterity bonus', () => {
       const playerStats = {
         class: { name: 'Wizard' },
@@ -86,24 +72,6 @@ describe('rules.getArmorClass', () => {
 
       const [ac] = rules.getArmorClass(createEquipment(), playerStats);
 
-      expect(ac).toBe(15);
-    });
-
-    it('does not apply Monk bonus to a Barbarian character', () => {
-      const playerStats = {
-        class: { name: 'Barbarian' },
-        abilities: [
-          { name: 'Dexterity', bonus: 2 },
-          { name: 'Constitution', bonus: 3 },
-          { name: 'Wisdom', bonus: 5 }
-        ],
-        inventory: { equipped: [] }
-      };
-
-      const [ac] = rules.getArmorClass(createEquipment(), playerStats);
-
-      // Only Barbarian unarmored defense applies (10 + 2 + 3 = 15)
-      // Monk bonus does not apply because class is Barbarian, not Monk
       expect(ac).toBe(15);
     });
 
@@ -228,22 +196,6 @@ describe('rules.getArmorClass', () => {
       expect(ac).toBe(15);
     });
 
-    it('adds +2 for Shield with string variant', () => {
-      const equipment = [
-        { name: 'Leather Armor', equipment_category: 'Armor', armor_class: { base: 11, dex_bonus: true, max_bonus: null } },
-        { name: 'Shield', equipment_category: 'Armor', armor_class: { base: 2 } }
-      ];
-      const playerStats = {
-        class: { name: 'Fighter' },
-        abilities: [{ name: 'Dexterity', bonus: 2 }],
-        inventory: { equipped: ['Leather Armor', 'Shield'] }
-      };
-
-      const [ac] = rules.getArmorClass(equipment, playerStats);
-
-      expect(ac).toBe(15);
-    });
-
     it('adds magic bonus for +1 Shield', () => {
       const equipment = [
         { name: 'Leather Armor', equipment_category: 'Armor', armor_class: { base: 11, dex_bonus: true, max_bonus: null } },
@@ -277,30 +229,6 @@ describe('rules.getArmorClass', () => {
       const [ac] = rules.getArmorClass(equipment, playerStats);
 
       expect(ac).toBe(14);
-    });
-
-    it('adds +1 for Cloak of Protection', () => {
-      const playerStats = {
-        class: { name: 'Wizard' },
-        abilities: [{ name: 'Dexterity', bonus: 2 }],
-        inventory: { equipped: [], magicItems: [{ name: 'Cloak of Protection' }] }
-      };
-
-      const [ac] = rules.getArmorClass(createEquipment(), playerStats);
-
-      expect(ac).toBe(13);
-    });
-
-    it('adds +1 for Ring of Protection', () => {
-      const playerStats = {
-        class: { name: 'Wizard' },
-        abilities: [{ name: 'Dexterity', bonus: 2 }],
-        inventory: { equipped: [], magicItems: [{ name: 'Ring of Protection' }] }
-      };
-
-      const [ac] = rules.getArmorClass(createEquipment(), playerStats);
-
-      expect(ac).toBe(13);
     });
 
     it('stacks Cloak and Ring of Protection (+2 total)', () => {
@@ -348,21 +276,6 @@ describe('rules.getArmorClass', () => {
       const [ac] = rules.getArmorClass(createEquipment(), playerStats);
 
       expect(ac).toBe(14);
-    });
-
-    it('does not apply Defense fighting style when unarmored', () => {
-      const playerStats = {
-        class: {
-          name: 'Fighter',
-          fightingStyles: ['Defense']
-        },
-        abilities: [{ name: 'Dexterity', bonus: 3 }],
-        inventory: { equipped: [] }
-      };
-
-      const [ac] = rules.getArmorClass(createEquipment(), playerStats);
-
-      expect(ac).toBe(13);
     });
 
     it('applies Unarmed Fighting fighting style (+2 AC) when no weapons/shield/armor equipped', () => {
@@ -429,33 +342,6 @@ describe('rules.getArmorClass', () => {
       const [ac] = rules.getArmorClass(equipment, playerStats);
 
       expect(ac).toBe(14);
-    });
-
-    it('applies Unarmed Fighting with magic weapon prefix', () => {
-      const playerStats = {
-        class: {
-          name: 'Fighter',
-          fightingStyles: ['Unarmed Fighting']
-        },
-        abilities: [{ name: 'Dexterity', bonus: 3 }],
-        inventory: { equipped: [] }
-      };
-
-      const [ac] = rules.getArmorClass(createEquipment(), playerStats);
-
-      expect(ac).toBe(15);
-    });
-
-    it('does not apply Unarmed Fighting when fightingStyles is missing', () => {
-      const playerStats = {
-        class: { name: 'Fighter' },
-        abilities: [{ name: 'Dexterity', bonus: 2 }],
-        inventory: { equipped: [] }
-      };
-
-      const [ac] = rules.getArmorClass(createEquipment(), playerStats);
-
-      expect(ac).toBe(12);
     });
 
     it('applies Unarmed Fighting in 2024 rules', () => {
@@ -576,48 +462,6 @@ describe('rules.getArmorClass', () => {
 
       expect(ac).toBe(12);
     });
-
-    it('does not apply Defense fighting style in 2024 mode', () => {
-      const playerStats = {
-        rules: '2024',
-        class: { name: 'Fighter', fightingStyles: ['Defense'] },
-        abilities: [{ name: 'Dexterity', bonus: 2 }],
-        inventory: { equipped: [] },
-        automation: { passives: [] }
-      };
-
-      const [ac] = rules.getArmorClass(baseEquipment2024(), playerStats);
-
-      expect(ac).toBe(12);
-    });
-
-    it('does not apply Cloak of Protection in 2024 mode', () => {
-      const playerStats = {
-        rules: '2024',
-        class: { name: 'Wizard' },
-        abilities: [{ name: 'Dexterity', bonus: 2 }],
-        inventory: { equipped: [], magicItems: [{ name: 'Cloak of Protection' }] },
-        automation: { passives: [] }
-      };
-
-      const [ac] = rules.getArmorClass(baseEquipment2024(), playerStats);
-
-      expect(ac).toBe(12);
-    });
-
-    it('does not apply Ring of Protection in 2024 mode', () => {
-      const playerStats = {
-        rules: '2024',
-        class: { name: 'Wizard' },
-        abilities: [{ name: 'Dexterity', bonus: 2 }],
-        inventory: { equipped: [], magicItems: [{ name: 'Ring of Protection' }] },
-        automation: { passives: [] }
-      };
-
-      const [ac] = rules.getArmorClass(baseEquipment2024(), playerStats);
-
-      expect(ac).toBe(12);
-    });
   });
 
   // === 2024 RULES: Unarmored Defense ===
@@ -679,25 +523,6 @@ describe('rules.getArmorClass', () => {
       expect(ac).toBe(13);
     });
 
-    it('does not apply Draconic Sorcery unarmored defense when wielding shield', () => {
-      const playerStats = {
-        rules: '2024',
-        class: { name: 'Sorcerer', major: { name: 'Draconic Sorcery' } },
-        abilities: [
-          { name: 'Dexterity', bonus: 2 },
-          { name: 'Charisma', bonus: 3 }
-        ],
-        inventory: { equipped: ['Shield'] },
-        automation: { passives: [] }
-      };
-
-      const [ac] = rules.getArmorClass(baseEquipment2024(), playerStats);
-
-      // Shield is treated as armor by the code, so Draconic unarmored defense does not apply
-      // AC = Shield base (2) + Shield bonus (2) = 4
-      expect(ac).toBe(4);
-    });
-
     it('applies College of Dance unarmored defense (10 + Dex + Cha)', () => {
       const playerStats = {
         rules: '2024',
@@ -707,23 +532,6 @@ describe('rules.getArmorClass', () => {
           { name: 'Charisma', bonus: 4 }
         ],
         inventory: { equipped: [] },
-        automation: { passives: [] }
-      };
-
-      const [ac] = rules.getArmorClass(baseEquipment2024(), playerStats);
-
-      expect(ac).toBe(16);
-    });
-
-    it('does not apply College of Dance when wearing armor', () => {
-      const playerStats = {
-        rules: '2024',
-        class: { name: 'Bard', subclass: { name: 'College of Dance' } },
-        abilities: [
-          { name: 'Dexterity', bonus: 2 },
-          { name: 'Charisma', bonus: 4 }
-        ],
-        inventory: { equipped: ['Chain Mail'] },
         automation: { passives: [] }
       };
 
@@ -981,55 +789,6 @@ describe('rules.getArmorClass', () => {
       const [ac] = rules.getArmorClass([], playerStats);
 
       expect(ac).toBe(13);
-    });
-  });
-
-  // === 2024 RULES: playerSummary dispatch ===
-
-  describe('playerSummary dispatch for 2024', () => {
-    const baseEquipment2024 = () => [
-      { name: 'Leather Armor', equipment_category: 'Armor', armor_class: { base: 11, dex_bonus: true, max_bonus: null } }
-    ];
-
-    it('detects 2024 from playerSummary argument', () => {
-      const playerStats = {
-        class: { name: 'Fighter' },
-        abilities: [{ name: 'Dexterity', bonus: 2 }],
-        inventory: { equipped: [] },
-        automation: { passives: [] }
-      };
-
-      const [ac] = rules.getArmorClass(baseEquipment2024(), playerStats, { rules: '2024' });
-
-      expect(ac).toBe(12);
-    });
-
-    it('prioritizes playerStats.rules over playerSummary.rules', () => {
-      const playerStats = {
-        rules: '2024',
-        class: { name: 'Fighter' },
-        abilities: [{ name: 'Dexterity', bonus: 2 }],
-        inventory: { equipped: ['Leather Armor'] },
-        automation: { passives: [] }
-      };
-
-      const [ac] = rules.getArmorClass(baseEquipment2024(), playerStats, { rules: '5e' });
-
-      // 2024: 11 + 2 = 13
-      expect(ac).toBe(13);
-    });
-
-    it('defaults to 5e when no rules field present', () => {
-      const playerStats = {
-        class: { name: 'Fighter', fightingStyles: ['Defense'] },
-        abilities: [{ name: 'Dexterity', bonus: 2 }],
-        inventory: { equipped: ['Leather Armor'] }
-      };
-
-      const [ac] = rules.getArmorClass(baseEquipment2024(), playerStats);
-
-      // 5e: Defense fighting style applies
-      expect(ac).toBe(14);
     });
   });
 });

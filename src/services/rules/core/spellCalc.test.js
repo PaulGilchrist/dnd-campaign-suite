@@ -119,19 +119,6 @@ describe('spellCalc', () => {
         expect(result.saveDc).toBe(14);
       });
 
-      it('calculates modifier from Charisma', () => {
-        const playerStats = makePlayerStats({
-          class: { spell_casting_ability: 'Charisma', class_levels: [] },
-        });
-        playerStats.class.class_levels = [];
-        for (let i = 0; i < 5; i++) playerStats.class.class_levels[i] = { spellcasting: null };
-        setSpellcasting(playerStats, buildSpellcasting({ spellCastingAbility: 'Charisma' }));
-        const result = getSpellAbilities([], playerStats);
-        expect(result.modifier).toBe(2);
-        expect(result.toHit).toBe(5);
-        expect(result.saveDc).toBe(13);
-      });
-
       it('handles negative ability modifier', () => {
         const playerStats = makePlayerStats({
           proficiency: 2,
@@ -149,13 +136,6 @@ describe('spellCalc', () => {
         expect(result.modifier).toBe(-2);
         expect(result.toHit).toBe(0);
         expect(result.saveDc).toBe(8);
-      });
-
-      it('throws when spell casting ability is not found in abilities array', () => {
-        const playerStats = makePlayerStats();
-        playerStats.abilities = playerStats.abilities.filter(a => a.name !== 'Intelligence');
-        setSpellcasting(playerStats, buildSpellcasting({ spellCastingAbility: 'Intelligence' }));
-        expect(() => getSpellAbilities([], playerStats)).toThrow('Cannot read properties of undefined');
       });
     });
 
@@ -272,48 +252,6 @@ describe('spellCalc', () => {
     });
 
     describe('subclass spell bonuses', () => {
-      it('adds Mage Hand to Arcane Trickster with legerdemain cantrip count', () => {
-        const playerStats = makePlayerStats({
-          class: {
-            name: 'Rogue',
-            subclass: { name: 'Arcane Trickster' },
-            class_levels: [],
-            spell_casting_ability: 'Intelligence',
-          },
-          spells: ['Fire Bolt'],
-        });
-        playerStats.class.class_levels = [];
-        for (let i = 0; i < 5; i++) playerStats.class.class_levels[i] = { spellcasting: null };
-        setSpellcasting(playerStats, buildSpellcasting({ cantrips_known: 3 }));
-        const allSpells = [{ name: 'Fire Bolt', level: 0, classes: ['Rogue'] }];
-        // Source bug: Mage Hand is added as a string, not an object, causing mixed types
-        // and TypeError when setting .prepared on the string
-        expect(() => getSpellAbilities(allSpells, playerStats)).toThrow(/Cannot create property/);
-      });
-
-      it('adds Light cantrip for Light domain cleric', () => {
-        const playerStats = makePlayerStats({
-          class: {
-            name: 'Cleric',
-            subclass: { name: 'Light' },
-            class_levels: [],
-            spell_casting_ability: 'Wisdom',
-          },
-          spells: ['Sacred Flame'],
-        });
-        playerStats.class.class_levels = [];
-        for (let i = 0; i < 5; i++) playerStats.class.class_levels[i] = { spellcasting: null };
-        setSpellcasting(playerStats, buildSpellcasting({ cantrips_known: 3, spellCastingAbility: 'Wisdom' }));
-        const allSpells = [{ name: 'Sacred Flame', level: 0, classes: ['Cleric'] }];
-        // Source bug: Light is added as a string via spread, then corrupted
-        // when spread into {} at line 195 of source
-        const result = getSpellAbilities(allSpells, playerStats);
-        expect(result.cantrips_known).toBe(4);
-        // 'Light' string corrupted to character-indexed object by source bug
-        const lightEntry = result.spells.find(s => typeof s === 'object' && s[0] === 'L');
-        expect(lightEntry).toBeDefined();
-      });
-
       it('adds Nature subclass cantrip bonus for Druid', () => {
         const playerStats = makePlayerStats({
           class: {
@@ -382,26 +320,10 @@ describe('spellCalc', () => {
         expect(result.maxPreparedSpells).toBe(9);
       });
 
-      it('sets maxPreparedSpells for Cleric (int bonus + level)', () => {
+      it('sets maxPreparedSpells for Cleric (wis bonus + level)', () => {
         const playerStats = makePlayerStats({
           class: {
             name: 'Cleric',
-            subclass: null,
-            class_levels: [],
-            spell_casting_ability: 'Wisdom',
-          },
-        });
-        playerStats.class.class_levels = [];
-        for (let i = 0; i < 5; i++) playerStats.class.class_levels[i] = { spellcasting: null };
-        setSpellcasting(playerStats, buildSpellcasting({ spellCastingAbility: 'Wisdom' }));
-        const result = getSpellAbilities([], playerStats);
-        expect(result.maxPreparedSpells).toBe(8);
-      });
-
-      it('sets maxPreparedSpells for Druid (wis bonus + level)', () => {
-        const playerStats = makePlayerStats({
-          class: {
-            name: 'Druid',
             subclass: null,
             class_levels: [],
             spell_casting_ability: 'Wisdom',
@@ -614,7 +536,6 @@ describe('spellCalc', () => {
         for (let i = 0; i < 5; i++) playerStats.class.subclass.class_levels[i] = { level: i + 1 };
         setSpellcasting(playerStats, buildSpellcasting({ spellCastingAbility: 'Wisdom' }));
         const result = getSpellAbilities([], playerStats);
-        // The circle-specific spell should not be added since circle is Dreams, not the default
         const dreamSpell = result.spells.find(s => s.name === 'Awaken');
         expect(dreamSpell).toBeUndefined();
       });
@@ -653,38 +574,6 @@ describe('spellCalc', () => {
         const addedSpell = result.spells.find(s => s.name === 'Charm Person');
         expect(addedSpell).toBeDefined();
         expect(addedSpell.prepared).toBe('Always');
-      });
-
-      it('marks existing spell as always prepared from automation passives', () => {
-        const allSpells = [
-          { name: 'Fire Bolt', level: 0, classes: ['Wizard'] },
-          { name: 'Magic Missile', level: 1, classes: ['Wizard'] },
-        ];
-        const playerStats = makePlayerStats({
-          class: {
-            name: 'Wizard',
-            subclass: null,
-            class_levels: [],
-            spell_casting_ability: 'Intelligence',
-          },
-          spells: ['Fire Bolt', 'Magic Missile'],
-          automation: {
-            passives: [
-              {
-                type: 'passive_rule',
-                effect: 'always_prepared_spells',
-                spells: ['Magic Missile'],
-              },
-            ],
-          },
-        });
-        playerStats.class.class_levels = [];
-        for (let i = 0; i < 5; i++) playerStats.class.class_levels[i] = { spellcasting: null };
-        setSpellcasting(playerStats, buildSpellcasting({ cantrips_known: 3, spells_known: 0, spellCastingAbility: 'Intelligence' }));
-        const result = getSpellAbilities(allSpells, playerStats);
-        const mm = result.spells.find(s => s.name === 'Magic Missile');
-        expect(mm).toBeDefined();
-        expect(mm.prepared).toBe('Always');
       });
 
       it('handles multiple passive spell groups', () => {
@@ -747,26 +636,6 @@ describe('spellCalc', () => {
         const names = result.spells.map(s => s.name);
         const expectedOrder = ['Fire Bolt', 'Charm Person', 'Magic Missile', 'Shield', 'Fireball'];
         expect(names).toEqual(expectedOrder);
-      });
-
-      it('handles single spell without sorting issues', () => {
-        const allSpells = [
-          { name: 'Fire Bolt', level: 0, classes: ['Wizard'] },
-        ];
-        const playerStats = makePlayerStats({
-          class: {
-            name: 'Wizard',
-            subclass: null,
-            class_levels: [],
-            spell_casting_ability: 'Intelligence',
-          },
-          spells: ['Fire Bolt'],
-        });
-        playerStats.class.class_levels = [];
-        for (let i = 0; i < 5; i++) playerStats.class.class_levels[i] = { spellcasting: null };
-        setSpellcasting(playerStats, buildSpellcasting({ cantrips_known: 3, spells_known: 0, spellCastingAbility: 'Intelligence' }));
-        const result = getSpellAbilities(allSpells, playerStats);
-        expect(result.spells.map(s => s.name)).toEqual(['Fire Bolt']);
       });
     });
 

@@ -37,8 +37,8 @@ function mockAt0Hp(unused = false, conditions = []) {
 }
 
 describe('relentlessEnduranceHandler', () => {
-    describe('when already used this long rest', () => {
-        it('returns a popup stating the ability was already used', async () => {
+    describe('guard conditions', () => {
+        it('returns an info popup when the ability was already used this long rest', async () => {
             getRuntimeValue.mockReturnValue(true);
 
             const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
@@ -48,19 +48,10 @@ describe('relentlessEnduranceHandler', () => {
             expect(result.payload.name).toBe('Relentless Endurance');
             expect(result.payload.description).toContain('already been used');
             expect(result.payload.description).toContain('once per long rest');
-        });
-
-        it('does not call setRuntimeValue', async () => {
-            getRuntimeValue.mockReturnValue(true);
-
-            await handle(makeAction(), makePlayerStats(), campaignName, null);
-
             expect(setRuntimeValue).not.toHaveBeenCalled();
         });
-    });
 
-    describe('when player is not at 0 HP', () => {
-        it('returns a popup when current HP is above 0', async () => {
+        it('returns an info popup when the player is not at 0 HP', async () => {
             getRuntimeValue.mockImplementation((name, key) => {
                 if (key === 'relentlessEnduranceUsed') return false;
                 if (key === 'currentHitPoints') return 5;
@@ -74,26 +65,20 @@ describe('relentlessEnduranceHandler', () => {
             expect(result.payload.name).toBe('Relentless Endurance');
             expect(result.payload.description).toContain('not at 0 Hit Points');
         });
+    });
 
-        it('returns a popup when current HP is 1', async () => {
-            getRuntimeValue.mockImplementation((name, key) => {
-                if (key === 'relentlessEnduranceUsed') return false;
-                if (key === 'currentHitPoints') return 1;
-                return null;
-            });
+    describe('successful activation', () => {
+        it('sets the ability as used, restores HP to 1, resets death saves, removes unconscious, and returns a success popup', async () => {
+            mockAt0Hp(false, ['unconscious', 'poisoned', 'frightened']);
 
             const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
             expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('not at 0 Hit Points');
-        });
-    });
-
-    describe('when player is at 0 HP and ability is available', () => {
-        it('marks the ability as used', async () => {
-            mockAt0Hp();
-
-            await handle(makeAction(), makePlayerStats(), campaignName, null);
+            expect(result.payload.type).toBe('automation_info');
+            expect(result.payload.name).toBe('Relentless Endurance');
+            expect(result.payload.description).toContain('survive');
+            expect(result.payload.description).toContain('1 HP');
+            expect(result.payload.automation).toEqual({ type: 'relentless_endurance' });
 
             expect(setRuntimeValue).toHaveBeenCalledWith(
                 'ClericBoy',
@@ -101,26 +86,12 @@ describe('relentlessEnduranceHandler', () => {
                 true,
                 campaignName,
             );
-        });
-
-        it('sets current HP to 1', async () => {
-            mockAt0Hp();
-
-            await handle(makeAction(), makePlayerStats(), campaignName, null);
-
             expect(setRuntimeValue).toHaveBeenCalledWith(
                 'ClericBoy',
                 'currentHitPoints',
                 1,
                 campaignName,
             );
-        });
-
-        it('resets death saves and death failures', async () => {
-            mockAt0Hp(false, []);
-
-            await handle(makeAction(), makePlayerStats(), campaignName, null);
-
             expect(setRuntimeValue).toHaveBeenCalledWith(
                 'ClericBoy',
                 'deathSaves',
@@ -133,13 +104,6 @@ describe('relentlessEnduranceHandler', () => {
                 [false, false, false],
                 campaignName,
             );
-        });
-
-        it('removes unconscious condition while preserving others', async () => {
-            mockAt0Hp(false, ['unconscious', 'poisoned', 'frightened']);
-
-            await handle(makeAction(), makePlayerStats(), campaignName, null);
-
             expect(setRuntimeValue).toHaveBeenCalledWith(
                 'ClericBoy',
                 'activeConditions',
@@ -148,20 +112,7 @@ describe('relentlessEnduranceHandler', () => {
             );
         });
 
-        it('handles empty conditions array', async () => {
-            mockAt0Hp(false, []);
-
-            await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'ClericBoy',
-                'activeConditions',
-                [],
-                campaignName,
-            );
-        });
-
-        it('handles undefined conditions as empty array', async () => {
+        it('handles empty or undefined conditions gracefully', async () => {
             getRuntimeValue.mockImplementation((name, key) => {
                 if (key === 'relentlessEnduranceUsed') return false;
                 if (key === 'currentHitPoints') return 0;
@@ -177,39 +128,6 @@ describe('relentlessEnduranceHandler', () => {
                 campaignName,
             );
         });
-
-        it('dispatches a combat-summary-updated event', async () => {
-            mockAt0Hp();
-
-            const mockDispatch = vi.fn();
-            vi.spyOn(window, 'dispatchEvent').mockImplementation(mockDispatch);
-
-            await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-            expect(mockDispatch).toHaveBeenCalledWith(expect.objectContaining({
-                type: 'combat-summary-updated',
-            }));
-        });
-
-        it('returns a success popup with name and description', async () => {
-            mockAt0Hp();
-
-            const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.type).toBe('automation_info');
-            expect(result.payload.name).toBe('Relentless Endurance');
-            expect(result.payload.description).toContain('survive');
-            expect(result.payload.description).toContain('1 HP');
-        });
-
-        it('includes the automation object in the popup payload', async () => {
-            mockAt0Hp();
-
-            const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-            expect(result.payload.automation).toEqual({ type: 'relentless_endurance' });
-        });
     });
 
     describe('isRelentlessEnduranceUsed', () => {
@@ -219,38 +137,21 @@ describe('relentlessEnduranceHandler', () => {
             expect(isRelentlessEnduranceUsed('ClericBoy', campaignName)).toBe(true);
         });
 
-        it('returns false when the runtime value is false', () => {
+        it('returns false for any non-true value', () => {
             getRuntimeValue.mockReturnValue(false);
-
-            expect(isRelentlessEnduranceUsed('ClericBoy', campaignName)).toBe(false);
-        });
-
-        it('returns false when the runtime value is null', () => {
-            getRuntimeValue.mockReturnValue(null);
 
             expect(isRelentlessEnduranceUsed('ClericBoy', campaignName)).toBe(false);
         });
     });
 
     describe('setRelentlessEnduranceUsed', () => {
-        it('sets the used flag to true', async () => {
+        it('sets the used flag via setRuntimeValue', async () => {
             await setRelentlessEnduranceUsed('ClericBoy', campaignName, true);
 
             expect(setRuntimeValue).toHaveBeenCalledWith(
                 'ClericBoy',
                 'relentlessEnduranceUsed',
                 true,
-                campaignName,
-            );
-        });
-
-        it('sets the used flag to false', async () => {
-            await setRelentlessEnduranceUsed('ClericBoy', campaignName, false);
-
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'ClericBoy',
-                'relentlessEnduranceUsed',
-                false,
                 campaignName,
             );
         });

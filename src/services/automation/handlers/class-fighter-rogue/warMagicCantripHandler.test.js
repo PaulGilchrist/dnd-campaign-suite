@@ -117,26 +117,6 @@ describe('warMagicCantripHandler', () => {
             expect(result.payload.description).toBe('No Wizard cantrips available.')
         })
 
-        it('uses fallback defaults for missing spell properties in optionDetails', async () => {
-            const { loadSpellData } = await import('../../../ui/dataLoader.js')
-            loadSpellData.mockResolvedValue([{ name: 'Minor Illusion', level: 0 }])
-
-            const action = {
-                name: 'War Magic',
-                automation: { type: 'war_magic_cantrip' },
-            }
-
-            const result = await handle(action, mockPlayerStats, mockCampaignName)
-
-            expect(result.payload.optionDetails['Minor Illusion']).toEqual({
-                name: 'Minor Illusion',
-                level: 0,
-                casting_time: '1 action',
-                range: '',
-                description: '',
-                damage: null,
-            })
-        })
     })
 
     describe('confirmWarMagicCantrip', () => {

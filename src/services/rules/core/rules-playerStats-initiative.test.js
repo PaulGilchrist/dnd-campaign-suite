@@ -261,30 +261,17 @@ describe('rules.getPlayerStats - initiative', () => {
     expect(result.initiative).toBe(4);
   });
 
-  it('should set initiativeAdvantage when passive_rule exists', async () => {
+  it.each`
+    effect                                | flag                     | passiveType
+    ${'initiative_advantage'}             | ${'initiativeAdvantage'} | ${'passive_rule'}
+    ${'no_surprise'}                      | ${'noSurprise'}          | ${'passive_buff'}
+    ${'unseen_attacker_advantage_negate'} | ${'unseenAttackerAdvantageNegate'} | ${'passive_buff'}
+  `('should set $flag when $passiveType with effect $effect exists', async ({ effect, flag, passiveType }) => {
     setupDefaults({
-      automation: { passives: [{ type: 'passive_rule', effect: 'initiative_advantage' }] },
+      automation: { passives: [{ type: passiveType, effect }] },
     });
     const playerSummary = makePlayerSummary();
     const result = await rules.getPlayerStats([], [], [], [], [], playerSummary);
-    expect(result.initiativeAdvantage).toBe(true);
-  });
-
-  it('should set noSurprise when Alert passive exists', async () => {
-    setupDefaults({
-      automation: { passives: [{ type: 'passive_buff', effect: 'no_surprise' }] },
-    });
-    const playerSummary = makePlayerSummary();
-    const result = await rules.getPlayerStats([], [], [], [], [], playerSummary);
-    expect(result.noSurprise).toBe(true);
-  });
-
-  it('should set unseenAttackerAdvantageNegate when Alert passive exists', async () => {
-    setupDefaults({
-      automation: { passives: [{ type: 'passive_buff', effect: 'unseen_attacker_advantage_negate' }] },
-    });
-    const playerSummary = makePlayerSummary();
-    const result = await rules.getPlayerStats([], [], [], [], [], playerSummary);
-    expect(result.unseenAttackerAdvantageNegate).toBe(true);
+    expect(result[flag]).toBe(true);
   });
 });

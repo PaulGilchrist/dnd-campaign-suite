@@ -231,8 +231,8 @@ describe('processAoeNpcs', () => {
     expect(result[0].newHp).toBe(14);
   });
 
-  it('applies half damage on successful save when dcSuccess is half', () => {
-    const npc = createNpcCreature('Goblin');
+  it('applies half damage on success with dcSuccess "half", no damage with "none"', () => {
+    let npc = createNpcCreature('Goblin');
     rollSaveForCreature.mockReturnValue({ success: true, roll: 15, bonus: 2 });
     computeDamageAfterSave.mockReturnValue(4);
     applyDamageToTarget.mockReturnValue({ finalDamage: 4, newHp: 16 });
@@ -241,12 +241,9 @@ describe('processAoeNpcs', () => {
       makeCombatSummary([npc]), [{ creature: npc }],
       8, 'Fire', 15, 'dexterity', 'half', 'TestCampaign'
     );
-
     expect(computeDamageAfterSave).toHaveBeenCalledWith(8, true, 'half');
-  });
 
-  it('applies no damage on successful save when dcSuccess is none', () => {
-    const npc = createNpcCreature('Goblin');
+    npc = createNpcCreature('Goblin2');
     rollSaveForCreature.mockReturnValue({ success: true, roll: 20, bonus: 5 });
     computeDamageAfterSave.mockReturnValue(0);
     applyDamageToTarget.mockReturnValue({ finalDamage: 0, newHp: 20 });
@@ -255,7 +252,6 @@ describe('processAoeNpcs', () => {
       makeCombatSummary([npc]), [{ creature: npc }],
       10, 'Fire', 15, 'dexterity', 'none', 'TestCampaign'
     );
-
     expect(computeDamageAfterSave).toHaveBeenCalledWith(10, true, 'none');
   });
 
@@ -447,26 +443,24 @@ describe('sendAoePlayerSaves', () => {
     });
   });
 
-  it('returns pending list for all player creatures', () => {
+  it('returns pending list for all player creatures, calls sendSavePrompt once per player, generates unique prompt IDs', () => {
     const hero = createPlayerCreature('Hero');
     const ranger = createPlayerCreature('Ranger');
     utils.guid
       .mockReturnValueOnce('guid-1')
       .mockReturnValueOnce('guid-2');
 
-    const results = sendAoePlayerSaves(
+    let results = sendAoePlayerSaves(
       [{ creature: hero }, { creature: ranger }], 5, 'Fire', 15, 'dexterity', 'half',
       'TestCampaign', 'Fireball', 'Wizard', [], '4d6'
     );
-
     expect(results).toHaveLength(2);
     expect(results[0].targetName).toBe('Hero');
     expect(results[0].creature).toBe(hero);
     expect(results[1].targetName).toBe('Ranger');
     expect(results[1].creature).toBe(ranger);
-  });
 
-  it('calls sendSavePrompt once per player creature', () => {
+    sendSavePrompt.mockClear();
     sendAoePlayerSaves(
       [
         { creature: createPlayerCreature('Hero') },
@@ -475,23 +469,20 @@ describe('sendAoePlayerSaves', () => {
       ], 10, 'Thunder', 15, 'strength', 'none',
       'MyCampaign', 'Thunderstorm', 'Druid', [], '8d6'
     );
-
     expect(sendSavePrompt).toHaveBeenCalledTimes(3);
-  });
 
-  it('generates a unique prompt ID per player via utils.guid', () => {
+    utils.guid.mockClear();
     utils.guid
       .mockReturnValueOnce('id-a')
       .mockReturnValueOnce('id-b');
 
-    const results = sendAoePlayerSaves(
+    results = sendAoePlayerSaves(
       [
         { creature: createPlayerCreature('Player1') },
         { creature: createPlayerCreature('Player2') },
       ], 5, 'Fire', 10, 'dexterity', 'half',
       'TestCampaign', 'Burning Hands', 'Wizard', [], '4d6'
     );
-
     expect(results[0].promptId).toBe('id-a');
     expect(results[1].promptId).toBe('id-b');
     expect(utils.guid).toHaveBeenCalledTimes(2);

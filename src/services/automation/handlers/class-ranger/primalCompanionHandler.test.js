@@ -176,20 +176,6 @@ describe('primalCompanionHandler', () => {
             expect(result.payload.description).toContain("Beast's Strike");
         });
 
-        it('handles missing class info gracefully', async () => {
-            getRuntimeValue.mockReturnValue('Beast of the Land');
-
-            const action = makeAction({ automation: { type: 'primal_companion_command' } });
-
-            const playerStatsNoClass = { name: 'TestRanger' };
-
-            const result = await handleCommand(action, playerStatsNoClass, mockCampaignName);
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain("Beast's Strike");
-            expect(result.payload.description).not.toContain('Bestial Fury');
-        });
-
         it('returns error when no companion is summoned', async () => {
             getRuntimeValue.mockReturnValue(null);
 

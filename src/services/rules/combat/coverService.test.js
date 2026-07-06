@@ -236,28 +236,24 @@ describe('computeCover', () => {
 
   describe('two-cell items', () => {
     it('registers both cells for horizontal and vertical two-cell items', () => {
-      // horizontal table
       expect(computeCover(
         { gridX: 0, gridY: 0 }, { gridX: 4, gridY: 0 }, new Set(), [
           { type: 'table', gridX: 2, gridY: 0, rotation: 0 },
         ]
       )).toEqual({ level: COVER.THREE_QUARTER, acBonus: 5 })
 
-      // vertical bed
       expect(computeCover(
         { gridX: 0, gridY: 0 }, { gridX: 0, gridY: 4 }, new Set(), [
           { type: 'bed', gridX: 0, gridY: 2, rotation: 90 },
         ]
       )).toEqual({ level: COVER.THREE_QUARTER, acBonus: 5 })
 
-      // vertical altar
       expect(computeCover(
         { gridX: 0, gridY: 0 }, { gridX: 0, gridY: 4 }, new Set(), [
           { type: 'altar', gridX: 0, gridY: 2, rotation: 90 },
         ]
       )).toEqual({ level: COVER.THREE_QUARTER, acBonus: 5 })
 
-      // vertical bookshelf
       expect(computeCover(
         { gridX: 0, gridY: 0 }, { gridX: 0, gridY: 4 }, new Set(), [
           { type: 'bookshelf', gridX: 0, gridY: 2, rotation: 90 },
@@ -265,15 +261,13 @@ describe('computeCover', () => {
       )).toEqual({ level: COVER.THREE_QUARTER, acBonus: 5 })
     })
 
-    it('returns 3/4 cover when both primary and secondary cells of a two-cell item are on the line', () => {
+    it('returns 3/4 cover when both primary and secondary cells are on the line, or only primary', () => {
       expect(computeCover(
         { gridX: 0, gridY: 0 }, { gridX: 5, gridY: 0 }, new Set(), [
           { type: 'table', gridX: 3, gridY: 0, rotation: 0 },
         ]
       )).toEqual({ level: COVER.THREE_QUARTER, acBonus: 5 })
-    })
 
-    it('returns 3/4 cover when only the primary cell of a two-cell item is on the line', () => {
       expect(computeCover(
         { gridX: 0, gridY: 0 }, { gridX: 4, gridY: 0 }, new Set(), [
           { type: 'table', gridX: 1, gridY: 0, rotation: 0 },

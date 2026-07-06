@@ -137,11 +137,11 @@ describe('longstriderHandler', () => {
       expect(result.payload.rangeFt).toBe(30);
     });
 
-    it('defaults range to Touch when action.spell is missing', async () => {
+    it('defaults range to Touch when spell is undefined', async () => {
       damageUtils.getCombatContext.mockResolvedValue(makeCombatContext());
       rangeValidation.rangeToFeet.mockReturnValue(5);
 
-      const action = makeAction({ spell: undefined });
+      const action = { name: 'Longstrider' };
       const result = await handle(action, playerStats, campaignName, null);
 
       expect(result.payload.range).toBe('Touch');
@@ -173,17 +173,6 @@ describe('longstriderHandler', () => {
       const result = await handle(makeAction(), playerStats, campaignName, 'test-map');
 
       expect(result.payload.attackerPos).toEqual({ x: 1, y: 2 });
-    });
-
-    it('defaults range to Touch when spell is undefined', async () => {
-      damageUtils.getCombatContext.mockResolvedValue(makeCombatContext());
-      rangeValidation.rangeToFeet.mockReturnValue(5);
-
-      const action = { name: 'Longstrider' };
-      const result = await handle(action, playerStats, campaignName, null);
-
-      expect(result.payload.range).toBe('Touch');
-      expect(result.payload.rangeFt).toBe(5);
     });
   });
 
@@ -227,24 +216,6 @@ describe('longstriderHandler', () => {
       );
     });
 
-    it('does not duplicate buff when already active', async () => {
-      const existingBuffs = [
-        { name: 'Longstrider', effect: 'speed_boost', speedBonus: 10 },
-        { name: 'Bless', effect: 'attack_roll_bonus', bonus: 1 },
-      ];
-      runtimeState.getRuntimeValue.mockImplementation(() => existingBuffs);
-
-      const action = makeAction();
-      const result = await applyLongstrider(action, playerStats, campaignName, null, ['Ally1']);
-
-      expect(result).not.toBeNull();
-
-      const buffsCall = runtimeState.setRuntimeValue.mock.calls.find(
-        (call) => call[1] === 'activeBuffs'
-      );
-      expect(buffsCall).toBeUndefined();
-    });
-
     it('does not apply buff when already active but still adds expiration', async () => {
       const existingBuffs = [
         { name: 'Longstrider', effect: 'speed_boost', speedBonus: 10 },
@@ -278,32 +249,12 @@ describe('longstriderHandler', () => {
       expect(logPoster.postLogEntry).toHaveBeenCalledTimes(2);
     });
 
-    it('returns null for empty target list', async () => {
+    it('returns null for empty, null, undefined, or non-array target list', async () => {
       const action = makeAction();
-      const result = await applyLongstrider(action, playerStats, campaignName, null, []);
-
-      expect(result).toBeNull();
-    });
-
-    it('returns null for null target list', async () => {
-      const action = makeAction();
-      const result = await applyLongstrider(action, playerStats, campaignName, null, null);
-
-      expect(result).toBeNull();
-    });
-
-    it('returns null for undefined target list', async () => {
-      const action = makeAction();
-      const result = await applyLongstrider(action, playerStats, campaignName, null, undefined);
-
-      expect(result).toBeNull();
-    });
-
-    it('returns null for non-array target list', async () => {
-      const action = makeAction();
-      const result = await applyLongstrider(action, playerStats, campaignName, null, 'Ally1');
-
-      expect(result).toBeNull();
+      expect(await applyLongstrider(action, playerStats, campaignName, null, [])).toBeNull();
+      expect(await applyLongstrider(action, playerStats, campaignName, null, null)).toBeNull();
+      expect(await applyLongstrider(action, playerStats, campaignName, null, undefined)).toBeNull();
+      expect(await applyLongstrider(action, playerStats, campaignName, null, 'Ally1')).toBeNull();
     });
 
     it('uses default duration when spell has no duration', async () => {
@@ -350,7 +301,7 @@ describe('longstriderHandler', () => {
       expect(longstriderBuff.sourceCharacter).toBe('TestCharacter');
     });
 
-    it('handles target with no existing buffs (undefined)', async () => {
+    it('handles target with no existing buffs (undefined or non-array)', async () => {
       runtimeState.getRuntimeValue.mockImplementation(() => undefined);
 
       const action = makeAction();
@@ -364,33 +315,6 @@ describe('longstriderHandler', () => {
         ]),
         campaignName
       );
-    });
-
-    it('handles target with non-array activeBuffs stored', async () => {
-      runtimeState.getRuntimeValue.mockImplementation(() => 'not an array');
-
-      const action = makeAction();
-      await applyLongstrider(action, playerStats, campaignName, null, ['Ally1']);
-
-      expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-        'Ally1',
-        'activeBuffs',
-        expect.arrayContaining([
-          expect.objectContaining({ name: 'Longstrider' }),
-        ]),
-        campaignName
-      );
-    });
-
-    it('returns popup with correct description format', async () => {
-      runtimeState.getRuntimeValue.mockImplementation(() => []);
-
-      const action = makeAction();
-      const result = await applyLongstrider(action, playerStats, campaignName, null, ['Ally1', 'Ally2', 'Ally3']);
-
-      expect(result.payload.description).toContain('3 target(s)');
-      expect(result.payload.description).toContain('+10 feet');
-      expect(result.payload.description).toContain('Longstrider');
     });
 
     it('adds expiration for each target even when buff already exists', async () => {

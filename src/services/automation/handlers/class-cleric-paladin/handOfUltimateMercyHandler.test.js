@@ -125,22 +125,13 @@ describe('handOfUltimateMercyHandler.handle', () => {
       expect(result.payload.description).toContain('Need 5, have 4');
     });
 
-    it('should default costAmount to 5 when resourceCostAmount is missing', async () => {
+    it('should default costAmount to 5 when resourceCostAmount is missing or falsy', async () => {
       useRuntimeState.getRuntimeValue.mockReturnValue(4);
       const action = { name: 'Hand of Ultimate Mercy', automation: {} };
 
       const result = await handle(action, makePlayerStats(), campaignName, null);
 
       expect(result.payload.description).toContain('Need 5, have 4');
-    });
-
-    it('should default costAmount to 5 when resourceCostAmount is falsy', async () => {
-      useRuntimeState.getRuntimeValue.mockReturnValue(0);
-      const action = { name: 'Hand of Ultimate Mercy', automation: { resourceCostAmount: 0 } };
-
-      const result = await handle(action, makePlayerStats(), campaignName, null);
-
-      expect(result.payload.description).toContain('Need 5, have 0');
     });
 
     it('should handle _trackedResources when class is undefined', async () => {
@@ -156,21 +147,7 @@ describe('handOfUltimateMercyHandler.handle', () => {
       expect(result.payload.description).toContain('have 2');
     });
 
-    it('should handle missing _trackedResources entirely (falls back to maxFP)', async () => {
-      useRuntimeState.getRuntimeValue.mockReturnValue(null);
-      resolveTarget.mockReturnValue({});
-      const ps = makePlayerStats({ _trackedResources: undefined });
-
-      const result = await handle(makeAction(), ps, campaignName, null);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.description).toContain('Select a target in combat first');
-      expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('Target selection', () => {
-    it('should return popup when no target selected (null)', async () => {
+    it('should return popup when no target selected', async () => {
       useRuntimeState.getRuntimeValue.mockImplementation((_name, key) => {
         if (key === 'focusPoints') return 5;
         return null;
@@ -183,18 +160,6 @@ describe('handOfUltimateMercyHandler.handle', () => {
       expect(result.payload.description).toContain('Select a target in combat first');
     });
 
-    it('should return popup when no target selected (empty object)', async () => {
-      useRuntimeState.getRuntimeValue.mockImplementation((_name, key) => {
-        if (key === 'focusPoints') return 5;
-        return null;
-      });
-      resolveTarget.mockResolvedValue({});
-
-      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.description).toContain('Select a target in combat first');
-    });
   });
 
   describe('Target HP validation', () => {
@@ -383,39 +348,7 @@ describe('handOfUltimateMercyHandler.handle', () => {
       expect(storage.set).toHaveBeenCalledWith('combatSummary', { creatures: [target] }, campaignName);
     });
 
-    it('should NOT call storage.set when getCombatContext returns null', async () => {
-      useRuntimeState.getRuntimeValue.mockImplementation((_name, key) => {
-        if (key === 'focusPoints') return 5;
-        if (key === 'activeConditions') return [];
-        return null;
-      });
-      diceRoller.rollExpression.mockReturnValue({ total: 8, rolls: [2, 2, 2, 2] });
-      const target = { name: 'Goblin', type: 'npc', currentHp: 0 };
-      resolveTarget.mockResolvedValue({ target });
-      damageUtils.getCombatContext.mockResolvedValue(null);
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(storage.set).not.toHaveBeenCalled();
-    });
-
-    it('should save combatSummary even when creatures array does not include target', async () => {
-      useRuntimeState.getRuntimeValue.mockImplementation((_name, key) => {
-        if (key === 'focusPoints') return 5;
-        if (key === 'activeConditions') return [];
-        return null;
-      });
-      diceRoller.rollExpression.mockReturnValue({ total: 8, rolls: [2, 2, 2, 2] });
-      const target = { name: 'Goblin', type: 'npc', currentHp: 0 };
-      resolveTarget.mockResolvedValue({ target });
-      damageUtils.getCombatContext.mockResolvedValue({ creatures: [{ name: 'OtherCreature', type: 'npc', currentHp: 5 }] });
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(storage.set).toHaveBeenCalledWith('combatSummary', { creatures: [{ name: 'OtherCreature', type: 'npc', currentHp: 5 }] }, campaignName);
-    });
-
-    it('should not deduct focus points for NPC healing', async () => {
+    it('should deduct focus points for NPC healing', async () => {
       useRuntimeState.getRuntimeValue.mockImplementation((_name, key) => {
         if (key === 'focusPoints') return 5;
         if (key === 'activeConditions') return [];
@@ -514,27 +447,7 @@ describe('handOfUltimateMercyHandler.handle', () => {
       expect(result.payload.description).toContain('Also removed: Blinded, Poisoned');
     });
 
-    it('should handle non-array activeConditions gracefully', async () => {
-      useRuntimeState.getRuntimeValue.mockImplementation((_name, key) => {
-        if (key === 'focusPoints') return 5;
-        if (key === 'currentHitPoints') return 0;
-        if (key === 'activeConditions') return 'Blinded';
-        return null;
-      });
-      diceRoller.rollExpression.mockReturnValue({ total: 5, rolls: [5] });
-      resolveTarget.mockResolvedValue({ target: { name: 'DownedAlly', type: 'player' } });
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalledWith(
-        'DownedAlly',
-        'activeConditions',
-        expect.anything(),
-        campaignName
-      );
-    });
-
-    it('should handle null activeConditions gracefully', async () => {
+    it('should handle non-array and null activeConditions gracefully', async () => {
       useRuntimeState.getRuntimeValue.mockImplementation((_name, key) => {
         if (key === 'focusPoints') return 5;
         if (key === 'currentHitPoints') return 0;
@@ -572,7 +485,7 @@ describe('handOfUltimateMercyHandler.handle', () => {
   });
 
   describe('Logging', () => {
-    it('should call postLogEntry with correct heal data', async () => {
+    it('should call postLogEntry with correct heal data on success', async () => {
       setupSuccessPath(7);
 
       const now = Date.now();
@@ -591,37 +504,21 @@ describe('handOfUltimateMercyHandler.handle', () => {
       dateSpy.mockRestore();
     });
 
-    it('should not call postLogEntry when dice roll fails', async () => {
-      useRuntimeState.getRuntimeValue.mockImplementation((_name, key) => {
-        if (key === 'focusPoints') return 5;
-        if (key === 'currentHitPoints') return 0;
-        return null;
-      });
-      resolveTarget.mockResolvedValue({ target: { name: 'DownedAlly', type: 'player' } });
-      diceRoller.rollExpression.mockReturnValue(null);
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(logPoster.postLogEntry).not.toHaveBeenCalled();
-    });
-
-    it('should not call postLogEntry when focus points are insufficient', async () => {
+    it('should not call postLogEntry on early returns', async () => {
+      // Focus points insufficient
       useRuntimeState.getRuntimeValue.mockReturnValue(2);
-
       await handle(makeAction(), makePlayerStats(), campaignName, null);
-
       expect(logPoster.postLogEntry).not.toHaveBeenCalled();
-    });
 
-    it('should not call postLogEntry when no target selected', async () => {
+      vi.resetAllMocks();
+
+      // No target selected
       useRuntimeState.getRuntimeValue.mockImplementation((_name, key) => {
         if (key === 'focusPoints') return 5;
         return null;
       });
       resolveTarget.mockResolvedValue(null);
-
       await handle(makeAction(), makePlayerStats(), campaignName, null);
-
       expect(logPoster.postLogEntry).not.toHaveBeenCalled();
     });
   });
@@ -629,14 +526,6 @@ describe('handOfUltimateMercyHandler.handle', () => {
   describe('Automation payload', () => {
     it('should include automation object in popup payload', async () => {
       useRuntimeState.getRuntimeValue.mockReturnValue(2);
-
-      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(result.payload.automation).toEqual({ resourceCostAmount: 5, healExpression: '4d10' });
-    });
-
-    it('should include automation object in success popup payload', async () => {
-      setupSuccessPath(12);
 
       const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 

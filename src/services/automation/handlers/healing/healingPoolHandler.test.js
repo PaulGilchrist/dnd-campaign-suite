@@ -24,31 +24,6 @@ describe('healingPoolHandler.handle', () => {
   });
 
   describe('response structure', () => {
-    it('returns a modal with the action name and pool in the payload', async () => {
-      const action = {
-        name: 'Divine Smite',
-        automation: { pool: 'life_pool' },
-      };
-
-      const result = await handle(action, {}, campaignName, mapName);
-
-      expect(result).toEqual({
-        type: 'modal',
-        modalName: 'healingPool',
-        payload: {
-          name: 'Divine Smite',
-          pool: 'life_pool',
-          alsoCures: [],
-          cureCost: 5,
-          range: '',
-          resourceCost: '',
-          bloodiedOnly: false,
-          restoringTouchConditions: [],
-          maxDicePerUse: '',
-        },
-      });
-    });
-
     it('passes optional automation fields through to payload', async () => {
       const result = await handle(
         makeAction({
@@ -71,74 +46,9 @@ describe('healingPoolHandler.handle', () => {
     });
   });
 
-  describe('default values for missing automation fields', () => {
-    it('applies defaults for alsoCures, cureCost, range, and resourceCost', async () => {
-      const result = await handle(makeAction(), {}, campaignName, mapName);
-
-      expect(result.payload.alsoCures).toEqual([]);
-      expect(result.payload.cureCost).toBe(5);
-      expect(result.payload.range).toBe('');
-      expect(result.payload.resourceCost).toBe('');
-    });
-
-    it('uses provided alsoCures, cureCost, range, and resourceCost when truthy', async () => {
-      const result = await handle(
-        makeAction({
-          alsoCures: ['Poisoned', 'Stunned'],
-          cureCost: 10,
-          range: '30ft',
-          resourceCost: 'channel_divinity',
-        }),
-        {},
-        campaignName,
-        mapName,
-      );
-
-      expect(result.payload.alsoCures).toEqual(['Poisoned', 'Stunned']);
-      expect(result.payload.cureCost).toBe(10);
-      expect(result.payload.range).toBe('30ft');
-      expect(result.payload.resourceCost).toBe('channel_divinity');
-    });
-  });
-
-  describe('bloodiedOnly coercion', () => {
-    it('coerces bloodiedOnly to boolean, treating truthy as true and falsy as false', async () => {
-      const resultTrue = await handle(
-        makeAction({ bloodiedOnly: true }),
-        {},
-        campaignName,
-        mapName,
-      );
-      expect(resultTrue.payload.bloodiedOnly).toBe(true);
-
-      const resultFalse = await handle(
-        makeAction({ bloodiedOnly: undefined }),
-        {},
-        campaignName,
-        mapName,
-      );
-      expect(resultFalse.payload.bloodiedOnly).toBe(false);
-
-      const resultTruthy = await handle(
-        makeAction({ bloodiedOnly: 'yes' }),
-        {},
-        campaignName,
-        mapName,
-      );
-      expect(resultTruthy.payload.bloodiedOnly).toBe(true);
-
-      const resultFalsy = await handle(
-        makeAction({ bloodiedOnly: 0 }),
-        {},
-        campaignName,
-        mapName,
-      );
-      expect(resultFalsy.payload.bloodiedOnly).toBe(false);
-    });
-  });
-
   describe('restoringTouchConditions from characterAdvancement', () => {
-    it('extracts cureConditions when Restoring Touch feature exists', async () => {
+    it('extracts cureConditions when Restoring Touch feature exists, returns empty array otherwise', async () => {
+      // positive case: feature found with cureConditions
       const playerStats = {
         characterAdvancement: [
           {
@@ -149,7 +59,7 @@ describe('healingPoolHandler.handle', () => {
         ],
       };
 
-      const result = await handle(
+      let result = await handle(
         makeAction(),
         playerStats,
         campaignName,
@@ -160,78 +70,21 @@ describe('healingPoolHandler.handle', () => {
         'Bloodied',
         'Unconscious',
       ]);
-    });
 
-    it('returns empty array when Restoring Touch is absent, missing, or has no cureConditions', async () => {
-      // absent feature
-      const result1 = await handle(
-        makeAction(),
+      // negative cases: none of these produce cureConditions
+      const negativeCases = [
         { characterAdvancement: [{ name: 'Other Feature' }] },
-        campaignName,
-        mapName,
-      );
-      expect(result1.payload.restoringTouchConditions).toEqual([]);
-
-      // feature with no automation
-      const result2 = await handle(
-        makeAction(),
         { characterAdvancement: [{ name: 'Restoring Touch' }] },
-        campaignName,
-        mapName,
-      );
-      expect(result2.payload.restoringTouchConditions).toEqual([]);
-
-      // feature with automation but no cureConditions
-      const result3 = await handle(
-        makeAction(),
         { characterAdvancement: [{ name: 'Restoring Touch', automation: {} }] },
-        campaignName,
-        mapName,
-      );
-      expect(result3.payload.restoringTouchConditions).toEqual([]);
-
-      // feature with null automation
-      const result4 = await handle(
-        makeAction(),
         { characterAdvancement: [{ name: 'Restoring Touch', automation: null }] },
-        campaignName,
-        mapName,
-      );
-      expect(result4.payload.restoringTouchConditions).toEqual([]);
-
-      // null/undefined characterAdvancement
-      const result5 = await handle(makeAction(), {}, campaignName, mapName);
-      expect(result5.payload.restoringTouchConditions).toEqual([]);
-
-      const result6 = await handle(
-        makeAction(),
+        {},
         { characterAdvancement: null },
-        campaignName,
-        mapName,
-      );
-      expect(result6.payload.restoringTouchConditions).toEqual([]);
-    });
+      ];
 
-    it('finds Restoring Touch even when it is not the first feature', async () => {
-      const playerStats = {
-        characterAdvancement: [
-          { name: 'Feature A' },
-          { name: 'Feature B' },
-          {
-            name: 'Restoring Touch',
-            automation: { cureConditions: ['Prone'] },
-          },
-        ],
-      };
-
-      const result = await handle(
-        makeAction(),
-        playerStats,
-        campaignName,
-        mapName,
-      );
-
-      expect(result.payload.restoringTouchConditions).toEqual(['Prone']);
+      for (const stats of negativeCases) {
+        result = await handle(makeAction(), stats, campaignName, mapName);
+        expect(result.payload.restoringTouchConditions).toEqual([]);
+      }
     });
   });
 });

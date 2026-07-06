@@ -118,12 +118,9 @@ describe('getResistanceNotice', () => {
     expect(getResistanceNotice([], [], [], 'Orc')).toBeNull();
   });
 
-  it('reports immunity or resistance correctly', () => {
+  it('reports immunity or resistance correctly, prioritizes immunity over resistance', () => {
     expect(getResistanceNotice(['Fire'], [], ['fire'], 'Dragon')).toBe('Dragon is IMMUNE to Fire');
     expect(getResistanceNotice(['Cold'], ['Cold'], [], 'Ice Golem')).toBe('Ice Golem resists Cold');
-  });
-
-  it('prioritizes immunity over resistance when both match', () => {
     expect(getResistanceNotice(['Fire'], ['fire'], ['fire'], 'Dragon')).toBe('Dragon is IMMUNE to Fire');
   });
 

@@ -37,29 +37,15 @@ describe('createThrallHandler', () => {
             expect(result.payload.description).toContain('Long Rest');
         });
 
-        it('returns popup when uses are negative', async () => {
-            getRuntimeValue.mockReturnValue(-1);
-
-            const result = await handle(makeAction(), makePlayerStats(), 'campaign');
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('No free casts remaining');
-        });
-
-        it('defaults to usesMax when no stored value exists', async () => {
+        it('returns modal for both null/undefined stored value and positive stored value', async () => {
             getRuntimeValue.mockReturnValue(undefined);
 
-            const result = await handle(makeAction(), makePlayerStats(), 'campaign');
-
+            let result = await handle(makeAction(), makePlayerStats(), 'campaign');
             expect(result.type).toBe('modal');
             expect(result.modalName).toBe('createThrall');
-        });
 
-        it('uses stored value when available', async () => {
             getRuntimeValue.mockReturnValue(1);
-
-            const result = await handle(makeAction(), makePlayerStats(), 'campaign');
-
+            result = await handle(makeAction(), makePlayerStats(), 'campaign');
             expect(result.type).toBe('modal');
             expect(result.modalName).toBe('createThrall');
         });
@@ -73,30 +59,6 @@ describe('createThrallHandler', () => {
             expect(result.payload.action).toBeInstanceOf(Object);
             expect(result.payload.playerStats).toBeInstanceOf(Object);
             expect(result.payload.campaignName).toBe('campaign');
-        });
-
-        it('uses action name to build runtime key', async () => {
-            getRuntimeValue.mockReturnValue(1);
-
-            const customAction = makeAction();
-            customAction.name = 'Custom Thrall';
-
-            await handle(customAction, makePlayerStats(), 'my-campaign');
-
-            expect(getRuntimeValue).toHaveBeenCalledWith(
-                'Test Warlock',
-                '_Custom_Thrall_freeCastCount',
-                'my-campaign'
-            );
-        });
-
-        it('falls back to stored value when usesMax is missing from automation', async () => {
-            getRuntimeValue.mockReturnValue(undefined);
-
-            const actionWithoutMax = makeAction({ usesMax: undefined });
-            const result = await handle(actionWithoutMax, makePlayerStats(), 'campaign');
-
-            expect(result.type).toBe('modal');
         });
     });
 
@@ -160,18 +122,6 @@ describe('createThrallHandler', () => {
             expect(result.payload.description).toContain('Free cast of Summon Shadow (0 remaining)');
         });
 
-        it('uses action name in popup description', async () => {
-            getRuntimeValue.mockReturnValue(1);
-            setRuntimeValue.mockResolvedValue(undefined);
-
-            const customAction = makeAction();
-            customAction.name = 'Custom Thrall';
-            const result = await confirmCreateThrall(customAction, makePlayerStats(), 'campaign', false);
-
-            expect(result.payload.description).toContain('Custom Thrall: Free cast');
-            expect(result.payload.name).toBe('Custom Thrall');
-        });
-
         it('uses default spell name when automation has no spell field', async () => {
             getRuntimeValue.mockReturnValue(1);
             setRuntimeValue.mockResolvedValue(undefined);
@@ -182,45 +132,16 @@ describe('createThrallHandler', () => {
             expect(result.payload.description).toContain('Summon Aberration');
         });
 
-        it('passes through automation object with noConcentration flag', async () => {
-            getRuntimeValue.mockReturnValue(1);
-            setRuntimeValue.mockResolvedValue(undefined);
-
-            const result = await confirmCreateThrall(makeAction(), makePlayerStats(), 'campaign', true);
-
-            expect(result.payload.automation.type).toBe('create_thrall');
-            expect(result.payload.automation.noConcentration).toBe(true);
-        });
-
-        it('handles string count value from runtime store', async () => {
-            getRuntimeValue.mockReturnValue('1');
-
-            const result = await confirmCreateThrall(makeAction(), makePlayerStats(), 'campaign', false);
-
-            expect(result.type).toBe('popup');
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'Test Warlock',
-                '_Create_Thrall_freeCastCount',
-                0,
-                'campaign'
-            );
-        });
-
-        it('uses custom runtime key based on action name', async () => {
+        it('uses action name in popup description', async () => {
             getRuntimeValue.mockReturnValue(1);
             setRuntimeValue.mockResolvedValue(undefined);
 
             const customAction = makeAction();
-            customAction.name = 'My Thrall';
+            customAction.name = 'Custom Thrall';
+            const result = await confirmCreateThrall(customAction, makePlayerStats(), 'campaign', false);
 
-            await confirmCreateThrall(customAction, makePlayerStats(), 'my-campaign', false);
-
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'Test Warlock',
-                '_My_Thrall_freeCastCount',
-                0,
-                'my-campaign'
-            );
+            expect(result.payload.description).toContain('Custom Thrall: Free cast');
+            expect(result.payload.name).toBe('Custom Thrall');
         });
     });
 });

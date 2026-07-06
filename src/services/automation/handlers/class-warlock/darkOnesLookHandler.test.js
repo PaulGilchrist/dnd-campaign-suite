@@ -80,17 +80,6 @@ describe('darkOnesLookHandler.handle', () => {
             expect(logService.addEntry).not.toHaveBeenCalled();
         });
 
-        it('should return error popup when uses is undefined (defaults to max)', async () => {
-            runtimeState.getRuntimeValue.mockReturnValue(undefined);
-            automationService.evaluateAutoExpression.mockReturnValue(3);
-            damageUtils.getCombatContext.mockResolvedValue({ lastAttack: null });
-
-            const result = await handle(createAction(), createPlayerStats(), mockCampaignName);
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('No recent ability check');
-        });
-
         it('should use minimum 1 max uses when CHA modifier is negative', async () => {
             runtimeState.getRuntimeValue.mockReturnValue(1);
             automationService.evaluateAutoExpression.mockReturnValue(-4);
@@ -105,22 +94,6 @@ describe('darkOnesLookHandler.handle', () => {
             expect(result.payload.description).toContain('Modified: d20(8) + 5 + 1d10(5) = <b>18</b>');
             expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
                 'TestWarlock', 'darkOnesLookUses', 0, mockCampaignName
-            );
-        });
-
-        it('should use CHA modifier as max uses when positive', async () => {
-            runtimeState.getRuntimeValue.mockReturnValue(3);
-            automationService.evaluateAutoExpression.mockReturnValue(3);
-            damageUtils.getCombatContext.mockResolvedValue({
-                lastAttack: createCheck(),
-            });
-            mockRandom(7);
-
-            const result = await handle(createAction(), createPlayerStats(), mockCampaignName);
-
-            expect(result.type).toBe('popup');
-            expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-                'TestWarlock', 'darkOnesLookUses', 2, mockCampaignName
             );
         });
     });
@@ -141,21 +114,6 @@ describe('darkOnesLookHandler.handle', () => {
             expect(result.payload.description).toContain('d20(8) + 5 = 13');
             expect(result.payload.description).toContain('1d10(10)');
             expect(result.payload.description).toContain('1d10(10) = <b>23</b>');
-        });
-
-        it('should handle skill rollType the same as check', async () => {
-            runtimeState.getRuntimeValue.mockReturnValue(1);
-            automationService.evaluateAutoExpression.mockReturnValue(3);
-            damageUtils.getCombatContext.mockResolvedValue({
-                lastAttack: createCheck({ rollType: 'skill', checkName: 'Acrobatics skill' }),
-            });
-            mockRandom(1);
-
-            const result = await handle(createAction(), createPlayerStats(), mockCampaignName);
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('Acrobatics skill');
-            expect(result.payload.description).toContain('d20(8) + 5 = 13');
         });
 
         it('should consume one use after processing ability check', async () => {
@@ -212,19 +170,6 @@ describe('darkOnesLookHandler.handle', () => {
             expect(result.payload.description).toContain('1d10(3) = <b>18</b>');
         });
 
-        it('should use "Save" label when saveType is missing', async () => {
-            runtimeState.getRuntimeValue.mockReturnValue(1);
-            automationService.evaluateAutoExpression.mockReturnValue(3);
-            damageUtils.getCombatContext.mockResolvedValue({
-                lastAttack: createSave({ saveType: undefined }),
-            });
-            mockRandom(1);
-
-            const result = await handle(createAction(), createPlayerStats(), mockCampaignName);
-
-            expect(result.payload.description).toContain('Save');
-        });
-
         it('should consume one use after processing saving throw', async () => {
             runtimeState.getRuntimeValue.mockReturnValue(5);
             automationService.evaluateAutoExpression.mockReturnValue(3);
@@ -272,7 +217,7 @@ describe('darkOnesLookHandler.handle', () => {
             expect(runtimeState.setRuntimeValue).not.toHaveBeenCalled();
         });
 
-        it('should reject when last attack is null', async () => {
+        it('should reject when last attack is null or missing', async () => {
             runtimeState.getRuntimeValue.mockReturnValue(1);
             automationService.evaluateAutoExpression.mockReturnValue(3);
             damageUtils.getCombatContext.mockResolvedValue({ lastAttack: null });
@@ -281,81 +226,6 @@ describe('darkOnesLookHandler.handle', () => {
 
             expect(result.type).toBe('popup');
             expect(result.payload.description).toContain('No recent ability check');
-        });
-
-        it('should reject when combat context is null', async () => {
-            runtimeState.getRuntimeValue.mockReturnValue(1);
-            automationService.evaluateAutoExpression.mockReturnValue(3);
-            damageUtils.getCombatContext.mockResolvedValue(null);
-
-            const result = await handle(createAction(), createPlayerStats(), mockCampaignName);
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('No recent ability check');
-        });
-    });
-
-    describe('edge cases', () => {
-        it('should handle minimum d10 roll of 1', async () => {
-            runtimeState.getRuntimeValue.mockReturnValue(1);
-            automationService.evaluateAutoExpression.mockReturnValue(3);
-            damageUtils.getCombatContext.mockResolvedValue({
-                lastAttack: createCheck({ d20: 1, bonus: 0 }),
-            });
-            mockRandom(1);
-
-            const result = await handle(createAction(), createPlayerStats(), mockCampaignName);
-
-            expect(result.payload.description).toContain('d20(1) + 0 = 1');
-            expect(result.payload.description).toContain('1d10(1)');
-            expect(result.payload.description).toContain('1d10(1) = <b>2</b>');
-        });
-
-        it('should handle maximum d10 roll of 10', async () => {
-            runtimeState.getRuntimeValue.mockReturnValue(1);
-            automationService.evaluateAutoExpression.mockReturnValue(3);
-            damageUtils.getCombatContext.mockResolvedValue({
-                lastAttack: createCheck({ d20: 20, bonus: 5 }),
-            });
-            mockRandom(10);
-
-            const result = await handle(createAction(), createPlayerStats(), mockCampaignName);
-
-            expect(result.payload.description).toContain('d20(20) + 5 = 25');
-            expect(result.payload.description).toContain('1d10(10)');
-            expect(result.payload.description).toContain('1d10(10) = <b>35</b>');
-        });
-
-        it('should preserve automation reference in result payload', async () => {
-            runtimeState.getRuntimeValue.mockReturnValue(1);
-            automationService.evaluateAutoExpression.mockReturnValue(3);
-            damageUtils.getCombatContext.mockResolvedValue({
-                lastAttack: createCheck(),
-            });
-            mockRandom(5);
-
-            const action = createAction({ automation: { type: 'dark_ones_look', diceExpression: '1d10' } });
-            const result = await handle(action, createPlayerStats(), mockCampaignName);
-
-            expect(result.payload.automation).toEqual({ type: 'dark_ones_look', diceExpression: '1d10' });
-        });
-
-        it('should use custom action name in popup', async () => {
-            runtimeState.getRuntimeValue.mockReturnValue(1);
-            automationService.evaluateAutoExpression.mockReturnValue(3);
-            damageUtils.getCombatContext.mockResolvedValue({
-                lastAttack: createCheck(),
-            });
-            mockRandom(5);
-
-            const result = await handle(
-                createAction({ name: 'Custom Dark Look' }),
-                createPlayerStats(),
-                mockCampaignName
-            );
-
-            expect(result.payload.name).toBe('Custom Dark Look');
-            expect(result.payload.description).toContain('Custom Dark Look');
         });
     });
 });

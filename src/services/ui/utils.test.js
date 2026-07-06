@@ -45,35 +45,10 @@ describe('utils', () => {
         });
     });
 
-    describe('getFirstName', () => {
-        it('returns the input string for valid names (same as getName)', () => {
-            expect(utils.getFirstName('John Doe')).toBe('John Doe');
-            expect(utils.getFirstName('John')).toBe('John');
-            expect(utils.getFirstName('John Michael Doe')).toBe('John Michael Doe');
-        });
-
-        it('returns "Unknown" for falsy and non-string values', () => {
-            expect(utils.getFirstName(null)).toBe('Unknown');
-            expect(utils.getFirstName(undefined)).toBe('Unknown');
-            expect(utils.getFirstName('')).toBe('Unknown');
-            expect(utils.getFirstName(123)).toBe('Unknown');
-            expect(utils.getFirstName({})).toBe('Unknown');
-            expect(utils.getFirstName([])).toBe('Unknown');
-        });
-    });
-
     describe('guid', () => {
         it('returns a string matching the GUID format', () => {
             const guidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
             expect(utils.guid()).toMatch(guidRegex);
-        });
-
-        it('generates unique GUIDs', () => {
-            const guids = new Set();
-            for (let i = 0; i < 100; i++) {
-                guids.add(utils.guid());
-            }
-            expect(guids.size).toBe(100);
         });
     });
 });

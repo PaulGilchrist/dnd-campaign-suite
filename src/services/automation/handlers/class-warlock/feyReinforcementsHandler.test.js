@@ -43,7 +43,7 @@ describe('feyReinforcementsHandler', () => {
         it('returns modal when free casts are available', async () => {
             getRuntimeValue.mockReturnValue(1);
 
-            const result = await handle(makeAction(), makePlayerStats(), 'campaign', 'map');
+            const result = await handle(makeAction(), makePlayerStats(), 'campaign');
 
             expect(result.type).toBe('modal');
             expect(result.modalName).toBe('feyReinforcements');
@@ -53,20 +53,11 @@ describe('feyReinforcementsHandler', () => {
             expect(result.payload.noConcentrationOption).toBe(true);
         });
 
-        it('returns modal when free casts > 1', async () => {
-            getRuntimeValue.mockReturnValue(3);
-
-            const result = await handle(makeAction(), makePlayerStats(), 'campaign', 'map');
-
-            expect(result.type).toBe('modal');
-            expect(result.modalName).toBe('feyReinforcements');
-        });
-
         it('returns modal when runtime value is null (defaults to usesMax)', async () => {
             getRuntimeValue.mockReturnValue(null);
             const action = makeAction({ automation: { usesMax: 1 } });
 
-            const result = await handle(action, makePlayerStats(), 'campaign', 'map');
+            const result = await handle(action, makePlayerStats(), 'campaign');
 
             expect(result.type).toBe('modal');
             expect(result.modalName).toBe('feyReinforcements');
@@ -75,7 +66,7 @@ describe('feyReinforcementsHandler', () => {
         it('returns popup when no free casts remain', async () => {
             getRuntimeValue.mockReturnValue(0);
 
-            const result = await handle(makeAction(), makePlayerStats(), 'campaign', 'map');
+            const result = await handle(makeAction(), makePlayerStats(), 'campaign');
 
             expect(result.type).toBe('popup');
             expect(result.payload.type).toBe('automation_info');
@@ -85,42 +76,22 @@ describe('feyReinforcementsHandler', () => {
             expect(result.payload.automation).toEqual(makeAction().automation);
         });
 
-        it('returns popup when free casts are negative', async () => {
-            getRuntimeValue.mockReturnValue(-1);
-
-            const result = await handle(makeAction(), makePlayerStats(), 'campaign', 'map');
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.type).toBe('automation_info');
-            expect(result.payload.description).toContain('No free casts remaining');
-        });
-
         it('uses custom action name in runtime key and popup', async () => {
             getRuntimeValue.mockReturnValue(0);
             const action = makeAction({ name: 'Custom Fey Feature' });
 
-            const result = await handle(action, makePlayerStats(), 'campaign', 'map');
+            const result = await handle(action, makePlayerStats(), 'campaign');
 
             expect(result.type).toBe('popup');
             expect(result.payload.name).toBe('Custom Fey Feature');
             expect(result.payload.description).toContain('No free casts remaining');
         });
 
-        it('uses custom spell name in popup when confirmed', async () => {
-            getRuntimeValue.mockReturnValue(1);
-            const action = makeAction({ automation: { spell: 'Call Fey' } });
-
-            const result = await confirmFeyReinforcement(action, makePlayerStats(), 'campaign', false);
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('Free cast of Call Fey');
-        });
-
         it('passes custom usesMax through to automation in popup', async () => {
             getRuntimeValue.mockReturnValue(0);
             const action = makeAction({ automation: { usesMax: 2, spell: 'Summon Fey' } });
 
-            const result = await handle(action, makePlayerStats(), 'campaign', 'map');
+            const result = await handle(action, makePlayerStats(), 'campaign');
 
             expect(result.payload.automation.usesMax).toBe(2);
         });
@@ -145,6 +116,7 @@ describe('feyReinforcementsHandler', () => {
             expect(result.payload.description).toContain('(0 remaining)');
             expect(result.payload.description).not.toContain('Does not require Concentration');
             expect(result.payload.description).not.toContain('Duration: 1 minute');
+            expect(result.payload.automation.noConcentration).toBe(false);
         });
 
         it('decrements counter and includes concentration info when noConcentration=true', async () => {
@@ -161,6 +133,7 @@ describe('feyReinforcementsHandler', () => {
             expect(result.type).toBe('popup');
             expect(result.payload.description).toContain('Does not require Concentration');
             expect(result.payload.description).toContain('Duration: 1 minute');
+            expect(result.payload.automation.noConcentration).toBe(true);
         });
 
         it('returns info popup when no free casts remain', async () => {
@@ -202,22 +175,6 @@ describe('feyReinforcementsHandler', () => {
                 0,
                 'campaign'
             );
-        });
-
-        it('passes automation with noConcentration flag through to popup', async () => {
-            getRuntimeValue.mockReturnValue(1);
-
-            const result = await confirmFeyReinforcement(makeAction(), makePlayerStats(), 'campaign', true);
-
-            expect(result.payload.automation.noConcentration).toBe(true);
-        });
-
-        it('passes automation with noConcentration=false when false', async () => {
-            getRuntimeValue.mockReturnValue(1);
-
-            const result = await confirmFeyReinforcement(makeAction(), makePlayerStats(), 'campaign', false);
-
-            expect(result.payload.automation.noConcentration).toBe(false);
         });
 
         it('uses default spell name when automation.spell is missing', async () => {

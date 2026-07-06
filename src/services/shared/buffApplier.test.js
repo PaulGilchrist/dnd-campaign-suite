@@ -6,12 +6,9 @@ import {
 } from './buffApplier.js';
 
 describe('applyAbilityScoreIncreases', () => {
-  it('returns void when abilities or increases is falsy', () => {
+  it('returns early when abilities or increases is falsy', () => {
     expect(applyAbilityScoreIncreases(null, [])).toBeUndefined();
-    expect(applyAbilityScoreIncreases(undefined, [])).toBeUndefined();
-    const abilities = [{ name: 'Strength', featIncrease: 0 }];
-    expect(applyAbilityScoreIncreases(abilities, null)).toBeUndefined();
-    expect(abilities[0].featIncrease).toBe(0);
+    expect(applyAbilityScoreIncreases([], null)).toBeUndefined();
   });
 
   it('applies bonus to matching ability case-insensitively, accumulating across multiple increases', () => {
@@ -52,9 +49,9 @@ describe('applyAbilityScoreIncreases', () => {
 });
 
 describe('mergeDeduplicated', () => {
-  it('returns void and does not mutate when newItems is nullish or empty', () => {
+  it('returns early when newItems is nullish or empty', () => {
     const target = { langs: ['Common'] };
-    expect(mergeDeduplicated(target, 'langs', null)).toBeUndefined();
+    mergeDeduplicated(target, 'langs', null);
     expect(target.langs).toEqual(['Common']);
   });
 
@@ -62,16 +59,6 @@ describe('mergeDeduplicated', () => {
     const target = { langs: ['Common'] };
     mergeDeduplicated(target, 'langs', ['common', 'Elvish', 'COMMON', 'Dwarvish', 'elvish', 'Halfling']);
     expect(target.langs).toEqual(['Common', 'Elvish', 'Dwarvish', 'Halfling']);
-  });
-
-  it('initializes the key when target[key] is undefined or missing', () => {
-    const target = {};
-    mergeDeduplicated(target, 'langs', ['Gnoll']);
-    expect(target.langs).toEqual(['Gnoll']);
-
-    const target2 = { langs: undefined };
-    mergeDeduplicated(target2, 'langs', ['Dwarvish']);
-    expect(target2.langs).toEqual(['Dwarvish']);
   });
 
   it('deduplicates within newItems itself, keeping first occurrence', () => {

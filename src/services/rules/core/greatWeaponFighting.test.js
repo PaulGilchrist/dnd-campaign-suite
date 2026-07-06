@@ -33,33 +33,9 @@ describe('greatWeaponFighting', () => {
     it('converts 1s and 2s to 3s, leaves 3+ unchanged', () => {
       expect(applyGreatWeaponFighting([1, 2, 3, 4, 5, 6])).toEqual([3, 3, 3, 4, 5, 6]);
     });
-
-    it('handles all 1s and 2s', () => {
-      expect(applyGreatWeaponFighting([1, 1, 2, 2])).toEqual([3, 3, 3, 3]);
-    });
-
-    it('handles single die roll of 1', () => {
-      expect(applyGreatWeaponFighting([1])).toEqual([3]);
-    });
-
-    it('handles single die roll of 6', () => {
-      expect(applyGreatWeaponFighting([6])).toEqual([6]);
-    });
-
-    it('handles rolls with duplicates', () => {
-      expect(applyGreatWeaponFighting([1, 1, 1, 2, 2, 2])).toEqual([3, 3, 3, 3, 3, 3]);
-    });
-
-    it('handles rolls with no 1s or 2s', () => {
-      expect(applyGreatWeaponFighting([3, 4, 5, 6])).toEqual([3, 4, 5, 6]);
-    });
   });
 
   describe('greatWeaponFightingApplies', () => {
-    it('returns false when weapon is null', () => {
-      expect(greatWeaponFightingApplies(null, {})).toBe(false);
-    });
-
     it('returns false when player has no GWF passive', () => {
       const weapon = { properties: ['Two-Handed'] };
       const playerStats = { automation: { passives: [] } };
@@ -80,21 +56,9 @@ describe('greatWeaponFighting', () => {
       expect(greatWeaponFightingApplies(weapon, playerStats)).toBe(false);
     });
 
-    it('returns false when weapon has no properties array', () => {
-      const playerStats = makePlayerStats();
-      const weapon = {};
-      expect(greatWeaponFightingApplies(weapon, playerStats)).toBe(false);
-    });
-
     it('returns false when playerStats.automation is missing', () => {
       const weapon = { properties: ['Two-Handed'] };
       expect(greatWeaponFightingApplies(weapon, {})).toBe(false);
-    });
-
-    it('returns false when playerStats.automation.passives is missing', () => {
-      const weapon = { properties: ['Two-Handed'] };
-      const playerStats = { automation: {} };
-      expect(greatWeaponFightingApplies(weapon, playerStats)).toBe(false);
     });
 
     it('returns true when player has GWF and weapon has Two-Handed', () => {

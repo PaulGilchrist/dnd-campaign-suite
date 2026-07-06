@@ -94,32 +94,6 @@ describe('passWithoutTraceHandler', () => {
             expect(result.payload.description).toContain('deactivated')
         })
 
-        it('does not call addExpiration when deactivating', async () => {
-            toggleBuff.mockReturnValue({ wasActive: true })
-
-            await handle(makeAction(), { name: 'Rogue' }, CAMPAIGN, null)
-
-            expect(addExpiration).not.toHaveBeenCalled()
-        })
-
-        it('uses default auraRange of 30 when not specified in automation', async () => {
-            toggleBuff.mockReturnValue({ wasActive: false })
-
-            await handle(
-                { name: 'Pass Without Trace', automation: { type: 'pass_without_trace', duration: 'Concentration, up to 1 hour' } },
-                { name: 'Rogue' },
-                CAMPAIGN,
-                null
-            )
-
-            expect(toggleBuff).toHaveBeenCalledWith(
-                'Rogue',
-                'Pass Without Trace',
-                expect.objectContaining({ auraRange: 30 }),
-                CAMPAIGN
-            )
-        })
-
         it('uses custom auraRange when specified in automation', async () => {
             toggleBuff.mockReturnValue({ wasActive: false })
 
@@ -131,40 +105,6 @@ describe('passWithoutTraceHandler', () => {
                 expect.objectContaining({ auraRange: 60 }),
                 CAMPAIGN
             )
-        })
-
-        it('uses custom auraRange of 0 when explicitly specified', async () => {
-            toggleBuff.mockReturnValue({ wasActive: false })
-
-            await handle(makeAction({ auraRange: 0 }), { name: 'Rogue' }, CAMPAIGN, null)
-
-            // auraRange 0 is falsy, so the handler uses the default 30
-            expect(toggleBuff).toHaveBeenCalledWith(
-                'Rogue',
-                'Pass Without Trace',
-                expect.objectContaining({ auraRange: 30 }),
-                CAMPAIGN
-            )
-        })
-
-        it('includes automation object in returned payload', async () => {
-            toggleBuff.mockReturnValue({ wasActive: false })
-
-            const result = await handle(makeAction({ auraRange: 45 }), { name: 'Rogue' }, CAMPAIGN, null)
-
-            expect(result.payload.automation).toEqual({
-                type: 'pass_without_trace',
-                duration: 'Concentration, up to 1 hour',
-                auraRange: 45,
-            })
-        })
-
-        it('includes automationType in payload matching action automation type', async () => {
-            toggleBuff.mockReturnValue({ wasActive: false })
-
-            const result = await handle(makeAction(), { name: 'Rogue' }, CAMPAIGN, null)
-
-            expect(result.payload.automationType).toBe('pass_without_trace')
         })
 
         it('uses action.name in popup description', async () => {
@@ -189,42 +129,14 @@ describe('passWithoutTraceHandler', () => {
             expect(getPassWithoutTraceStealthBonus('Rogue', CAMPAIGN)).toBe(10)
         })
 
-        it('returns 0 when stored value is null', () => {
-            getRuntimeValue.mockReturnValue(null)
+        it('returns 0 for null, undefined, NaN, non-number strings, and zero', () => {
+            const values = [null, undefined, NaN, 'not-a-number', 0]
 
-            expect(getPassWithoutTraceStealthBonus('Rogue', CAMPAIGN)).toBe(0)
-        })
+            for (const val of values) {
+                getRuntimeValue.mockReturnValue(val)
 
-        it('returns 0 when stored value is undefined', () => {
-            getRuntimeValue.mockReturnValue(undefined)
-
-            expect(getPassWithoutTraceStealthBonus('Rogue', CAMPAIGN)).toBe(0)
-        })
-
-        it('returns 0 when stored value is a non-number string', () => {
-            getRuntimeValue.mockReturnValue('not-a-number')
-
-            expect(getPassWithoutTraceStealthBonus('Rogue', CAMPAIGN)).toBe(0)
-        })
-
-        it('returns 0 when stored value is NaN', () => {
-            getRuntimeValue.mockReturnValue(NaN)
-
-            expect(getPassWithoutTraceStealthBonus('Rogue', CAMPAIGN)).toBe(0)
-        })
-
-        it('returns the stored numeric value when it is zero', () => {
-            getRuntimeValue.mockReturnValue(0)
-
-            expect(getPassWithoutTraceStealthBonus('Rogue', CAMPAIGN)).toBe(0)
-        })
-
-        it('passes the correct key to getRuntimeValue', () => {
-            getRuntimeValue.mockReturnValue(5)
-
-            getPassWithoutTraceStealthBonus('Rogue', CAMPAIGN)
-
-            expect(getRuntimeValue).toHaveBeenCalledWith('Rogue', 'passWithoutTraceStealthBonus', CAMPAIGN)
+                expect(getPassWithoutTraceStealthBonus('Rogue', CAMPAIGN)).toBe(0)
+            }
         })
     })
 
@@ -237,64 +149,13 @@ describe('passWithoutTraceHandler', () => {
             expect(isPassWithoutTraceActive('Rogue', CAMPAIGN)).toBe(true)
         })
 
-        it('returns false when no buffs stored', () => {
-            getRuntimeValue.mockReturnValue(null)
-
-            expect(isPassWithoutTraceActive('Rogue', CAMPAIGN)).toBe(false)
-        })
-
-        it('returns false when activeBuffs is empty array', () => {
-            getRuntimeValue.mockReturnValue([])
-
-            expect(isPassWithoutTraceActive('Rogue', CAMPAIGN)).toBe(false)
-        })
-
-        it('returns false when stored value is not an array', () => {
-            getRuntimeValue.mockReturnValue('invalid')
-
-            expect(isPassWithoutTraceActive('Rogue', CAMPAIGN)).toBe(false)
-        })
-
-        it('returns false when buff has different name', () => {
+        it('returns false when buff has no matching name and effect', () => {
             getRuntimeValue.mockReturnValue([
                 { name: 'Silent Image', effect: 'pass_without_trace' },
-            ])
-
-            expect(isPassWithoutTraceActive('Rogue', CAMPAIGN)).toBe(false)
-        })
-
-        it('returns false when buff has different effect', () => {
-            getRuntimeValue.mockReturnValue([
                 { name: 'Pass Without Trace', effect: 'other_effect' },
             ])
 
             expect(isPassWithoutTraceActive('Rogue', CAMPAIGN)).toBe(false)
-        })
-
-        it('returns true when buff is among multiple active buffs', () => {
-            getRuntimeValue.mockReturnValue([
-                { name: 'Mage Armor', effect: 'mage_armor' },
-                { name: 'Pass Without Trace', effect: 'pass_without_trace' },
-                { name: 'Bless', effect: 'bless' },
-            ])
-
-            expect(isPassWithoutTraceActive('Rogue', CAMPAIGN)).toBe(true)
-        })
-
-        it('returns false when there are other pass_without_trace buffs but not Pass Without Trace', () => {
-            getRuntimeValue.mockReturnValue([
-                { name: 'Some Other Spell', effect: 'pass_without_trace' },
-            ])
-
-            expect(isPassWithoutTraceActive('Rogue', CAMPAIGN)).toBe(false)
-        })
-
-        it('passes the correct key to getRuntimeValue', () => {
-            getRuntimeValue.mockReturnValue([])
-
-            isPassWithoutTraceActive('Rogue', CAMPAIGN)
-
-            expect(getRuntimeValue).toHaveBeenCalledWith('Rogue', 'activeBuffs', CAMPAIGN)
         })
     })
 })

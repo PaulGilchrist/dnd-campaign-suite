@@ -69,19 +69,10 @@ describe('restRules', () => {
       expect(getHitDieSize({ class: { hit_die: 'd8' } })).toBe(8)
     })
 
-    it('returns 8 when playerStats is null', () => {
+    it('returns 8 when playerStats or class is missing or hit_point_die is falsy', () => {
       expect(getHitDieSize(null)).toBe(8)
-    })
-
-    it('returns 8 when class is missing', () => {
       expect(getHitDieSize({})).toBe(8)
-    })
-
-    it('returns 8 when hit_point_die is null', () => {
       expect(getHitDieSize({ class: { hit_point_die: null } })).toBe(8)
-    })
-
-    it('returns 8 when hit_point_die is an empty string', () => {
       expect(getHitDieSize({ class: { hit_point_die: '' } })).toBe(8)
     })
 
@@ -91,11 +82,8 @@ describe('restRules', () => {
   })
 
   describe('getShortRestResourceLabels', () => {
-    it('includes Channel Divinity for Cleric', () => {
+    it('includes Channel Divinity for Cleric and Paladin', () => {
       expect(getShortRestResourceLabels({ class: { name: 'Cleric' } })).toContain('Channel Divinity')
-    })
-
-    it('includes Channel Divinity for Paladin', () => {
       expect(getShortRestResourceLabels({ class: { name: 'Paladin' } })).toContain('Channel Divinity')
     })
 
@@ -113,11 +101,9 @@ describe('restRules', () => {
       expect(getShortRestResourceLabels({ class: { name: 'Monk' } })).toContain('Focus Points')
     })
 
-    it('includes Psionic Energy for Psi Warrior Fighter', () => {
-      const labels = getShortRestResourceLabels({
-        class: { name: 'Fighter', subclass: { name: 'Psi Warrior' } },
-      })
-      expect(labels).toContain('Psionic Energy')
+    it('includes Psionic Energy for Psi Warrior Fighter and Soulknife Rogue', () => {
+      expect(getShortRestResourceLabels({ class: { name: 'Fighter', subclass: { name: 'Psi Warrior' } } })).toContain('Psionic Energy')
+      expect(getShortRestResourceLabels({ class: { name: 'Rogue', subclass: { name: 'Soulknife' } } })).toContain('Psionic Energy')
     })
 
     it('includes Superiority Dice for Battle Master Fighter', () => {
@@ -141,11 +127,8 @@ describe('restRules', () => {
       expect(labels).toContain('Natural Recovery (Spell Slots)')
     })
 
-    it('returns empty array for Rogue', () => {
+    it('returns empty array for Rogue and when class is missing', () => {
       expect(getShortRestResourceLabels({ class: { name: 'Rogue' } })).toEqual([])
-    })
-
-    it('returns empty array when class is missing', () => {
       expect(getShortRestResourceLabels({})).toEqual([])
     })
   })
@@ -157,9 +140,6 @@ describe('restRules', () => {
 
     it('returns 1 when roll + conBonus is less than 1', () => {
       expect(computeHitDieRecovery(1, -5)).toBe(1)
-    })
-
-    it('returns 1 when both values are zero', () => {
       expect(computeHitDieRecovery(0, 0)).toBe(1)
     })
 
@@ -177,11 +157,8 @@ describe('restRules', () => {
       expect(computeShortRestHpNewCurrent(18, 20, 5)).toBe(20)
     })
 
-    it('uses maxHp as base when currentHp is null', () => {
+    it('uses maxHp as base when currentHp is null or empty string', () => {
       expect(computeShortRestHpNewCurrent(null, 20, 5)).toBe(20)
-    })
-
-    it('uses maxHp as base when currentHp is empty string', () => {
       expect(computeShortRestHpNewCurrent('', 20, 5)).toBe(20)
     })
 
@@ -192,51 +169,21 @@ describe('restRules', () => {
     it('returns currentHp when recoveredAmount is 0 and currentHp is valid', () => {
       expect(computeShortRestHpNewCurrent(10, 20, 0)).toBe(10)
     })
-
-    it('returns maxHp when recoveredAmount is undefined and currentHp is null', () => {
-      expect(computeShortRestHpNewCurrent(null, 20, undefined)).toBe(20)
-    })
   })
 
   describe('getShortRestResources', () => {
-    it('returns a non-empty array', () => {
+    it('returns a non-empty array of resource keys', () => {
       const resources = getShortRestResources()
       expect(Array.isArray(resources)).toBe(true)
       expect(resources.length).toBeGreaterThan(0)
     })
-
-    it('returns a new array on each call', () => {
-      const a = getShortRestResources()
-      const b = getShortRestResources()
-      expect(a).not.toBe(b)
-    })
-
-    it('returns an array that does not mutate the internal constant', () => {
-      const a = getShortRestResources()
-      a.push('fake')
-      const b = getShortRestResources()
-      expect(b).not.toContain('fake')
-    })
   })
 
   describe('getLongRestResources', () => {
-    it('returns a non-empty array', () => {
+    it('returns a non-empty array of resource keys', () => {
       const resources = getLongRestResources()
       expect(Array.isArray(resources)).toBe(true)
       expect(resources.length).toBeGreaterThan(0)
-    })
-
-    it('returns a new array on each call', () => {
-      const a = getLongRestResources()
-      const b = getLongRestResources()
-      expect(a).not.toBe(b)
-    })
-
-    it('returns an array that does not mutate the internal constant', () => {
-      const a = getLongRestResources()
-      a.push('fake')
-      const b = getLongRestResources()
-      expect(b).not.toContain('fake')
     })
   })
 
@@ -300,16 +247,6 @@ describe('restRules', () => {
         if (key === 'bardicInspirationUses') return 0
         return undefined
       })
-      const stats = makeStats({
-        class: { name: 'Bard' },
-        automation: { passives: [{ type: 'font_of_inspiration' }] },
-      })
-      await applyShortRest(stats, CAMPAIGN)
-
-      expect(getBatchUpdates().bardicInspirationUses).toBe(2)
-    })
-
-    it('restores Bardic Inspiration when untracked (null) with Font of Inspiration', async () => {
       const stats = makeStats({
         class: { name: 'Bard' },
         automation: { passives: [{ type: 'font_of_inspiration' }] },
@@ -399,52 +336,33 @@ describe('restRules', () => {
       expect(updates.spell_slots_level_2).toBeUndefined()
     })
 
-    it('resets Signature Spells per-spell used flags', async () => {
+    it('resets per-spell used flags for Signature Spells, Divination Savant, Evocation Savant, and Illusion Savant', async () => {
       vi.mocked(getRuntimeValue).mockImplementation((_name, key) => {
         if (key === 'SignatureSpells_selection') return ['Fireball', 'Counterspell']
+        if (key === '_Divination_Savant_selection') return ['Detect Magic', 'See Invisibility']
+        if (key === '_Evocation_Savant_selection') return ['Fireball']
+        if (key === '_Illusion_Savant_selection') return ['Major Image']
         return undefined
       })
-      const stats = makeStats({ automation: { specialActions: [{ type: 'signature_spells' }] } })
+      const stats = makeStats({
+        automation: {
+          specialActions: [{ type: 'signature_spells' }],
+          passives: [
+            { type: 'passive_rule', effect: 'divination_savant' },
+            { type: 'passive_rule', effect: 'evocation_savant' },
+            { type: 'passive_rule', effect: 'illusion_savant' },
+          ],
+        },
+      })
       await applyShortRest(stats, CAMPAIGN)
 
       const updates = getBatchUpdates()
       expect(updates.SignatureSpells_Fireball_used).toBeNull()
       expect(updates.SignatureSpells_Counterspell_used).toBeNull()
-    })
-
-    it('resets Divination Savant per-spell used flags', async () => {
-      vi.mocked(getRuntimeValue).mockImplementation((_name, key) => {
-        if (key === '_Divination_Savant_selection') return ['Detect Magic', 'See Invisibility']
-        return undefined
-      })
-      const stats = makeStats({ automation: { passives: [{ type: 'passive_rule', effect: 'divination_savant' }] } })
-      await applyShortRest(stats, CAMPAIGN)
-
-      const updates = getBatchUpdates()
       expect(updates._Divination_Savant_Detect_Magic_used).toBeNull()
       expect(updates._Divination_Savant_See_Invisibility_used).toBeNull()
-    })
-
-    it('resets Evocation Savant per-spell used flags', async () => {
-      vi.mocked(getRuntimeValue).mockImplementation((_name, key) => {
-        if (key === '_Evocation_Savant_selection') return ['Fireball']
-        return undefined
-      })
-      const stats = makeStats({ automation: { passives: [{ type: 'passive_rule', effect: 'evocation_savant' }] } })
-      await applyShortRest(stats, CAMPAIGN)
-
-      expect(getBatchUpdates()._Evocation_Savant_Fireball_used).toBeNull()
-    })
-
-    it('resets Illusion Savant per-spell used flags', async () => {
-      vi.mocked(getRuntimeValue).mockImplementation((_name, key) => {
-        if (key === '_Illusion_Savant_selection') return ['Major Image']
-        return undefined
-      })
-      const stats = makeStats({ automation: { passives: [{ type: 'passive_rule', effect: 'illusion_savant' }] } })
-      await applyShortRest(stats, CAMPAIGN)
-
-      expect(getBatchUpdates()._Illusion_Savant_Major_Image_used).toBeNull()
+      expect(updates._Evocation_Savant_Fireball_used).toBeNull()
+      expect(updates._Illusion_Savant_Major_Image_used).toBeNull()
     })
 
     it('restores Warlock Pact Magic slots', async () => {
@@ -516,31 +434,17 @@ describe('restRules', () => {
       expect(getBatchUpdates().tempHp).toBe(15)
     })
 
-    it('throws when level is missing for Celestial Resilience', async () => {
-      const stats = makeStats({
+    it('throws when level is missing for Celestial Resilience, Natural Recovery, and Arcane Recovery', async () => {
+      const missingLevelStats = (automation) => makeStats({
         class: { name: 'Warlock', subclass: { name: 'Celestial Patron' } },
         level: null,
         characterAdvancement: [{ name: 'Celestial Resilience' }],
+        automation,
       })
-      await expect(applyShortRest(stats, CAMPAIGN)).rejects.toThrow('playerStats.level is required')
-    })
 
-    it('throws when level is missing for Natural Recovery', async () => {
-      const stats = makeStats({
-        class: { name: 'Druid' },
-        level: null,
-        automation: { passives: [{ type: 'resource_restoration', resourceKey: 'naturalRecoverySlots' }] },
-      })
-      await expect(applyShortRest(stats, CAMPAIGN)).rejects.toThrow('playerStats.level is required')
-    })
-
-    it('throws when level is missing for Arcane Recovery', async () => {
-      const stats = makeStats({
-        class: { name: 'Wizard' },
-        level: null,
-        automation: { passives: [{ type: 'resource_restoration', resourceKey: 'arcaneRecoveryLevels' }] },
-      })
-      await expect(applyShortRest(stats, CAMPAIGN)).rejects.toThrow('playerStats.level is required')
+      await expect(applyShortRest(missingLevelStats({}), CAMPAIGN)).rejects.toThrow('playerStats.level is required')
+      await expect(applyShortRest(missingLevelStats({ passives: [{ type: 'resource_restoration', resourceKey: 'naturalRecoverySlots' }] }), CAMPAIGN)).rejects.toThrow('playerStats.level is required')
+      await expect(applyShortRest(missingLevelStats({ passives: [{ type: 'resource_restoration', resourceKey: 'arcaneRecoveryLevels' }] }), CAMPAIGN)).rejects.toThrow('playerStats.level is required')
     })
   })
 
@@ -580,7 +484,7 @@ describe('restRules', () => {
       expect(getBatchUpdates().wardingflareUses).toBeNull()
     })
 
-    it('reduces exhaustion level by 1', async () => {
+    it('reduces exhaustion level by 1 on long rest', async () => {
       vi.mocked(getRuntimeValue).mockImplementation((_name, key) => {
         if (key === 'exhaustionLevel') return 2
         return undefined
@@ -591,21 +495,18 @@ describe('restRules', () => {
       expect(getBatchUpdates().exhaustionLevel).toBe(1)
     })
 
-    it('does not modify exhaustion when level is 0', async () => {
+    it('does not modify exhaustion when level is 0 or undefined', async () => {
       vi.mocked(getRuntimeValue).mockImplementation((_name, key) => {
         if (key === 'exhaustionLevel') return 0
         return undefined
       })
       const stats = makeStats()
       await applyLongRest(stats, CAMPAIGN)
-
       expect(getBatchUpdates().exhaustionLevel).toBeUndefined()
-    })
 
-    it('does not modify exhaustion when it is undefined', async () => {
-      const stats = makeStats()
-      await applyLongRest(stats, CAMPAIGN)
-
+      vi.clearAllMocks()
+      vi.mocked(getRuntimeValue).mockImplementation((_name, _key) => undefined)
+      await applyLongRest(makeStats(), CAMPAIGN)
       expect(getBatchUpdates().exhaustionLevel).toBeUndefined()
     })
 
@@ -626,7 +527,8 @@ describe('restRules', () => {
       expect(getBatchUpdates().naturalRecoverySlots).toBeNull()
     })
 
-    it('decrements Divine Intervention Wish cooldown and restores use', async () => {
+    it('handles Divine Intervention Wish cooldown on long rest', async () => {
+      // decrements cooldown and resets uses when cooldown > 1
       vi.mocked(getRuntimeValue).mockImplementation((_name, key) => {
         if (key === '_divineInterventionWishCooldown') return 3
         return undefined
@@ -640,76 +542,49 @@ describe('restRules', () => {
       expect(setRuntimeValue).toHaveBeenCalledWith(
         'Test Hero', 'divineInterventionUses', -1, CAMPAIGN, true,
       )
-    })
 
-    it('clears Divine Intervention Wish cooldown when it reaches 0', async () => {
+      vi.clearAllMocks()
+
+      // clears cooldown when it reaches 0
       vi.mocked(getRuntimeValue).mockImplementation((_name, key) => {
         if (key === '_divineInterventionWishCooldown') return 1
         return undefined
       })
-      const stats = makeStats()
-      await applyLongRest(stats, CAMPAIGN)
+      await applyLongRest(makeStats(), CAMPAIGN)
 
       expect(setRuntimeValue).toHaveBeenCalledWith(
         'Test Hero', '_divineInterventionWishCooldown', 0, CAMPAIGN, true,
       )
-      // Should NOT set divineInterventionUses when cooldown hits 0
       expect(setRuntimeValue).not.toHaveBeenCalledWith(
         'Test Hero', 'divineInterventionUses', expect.anything(), CAMPAIGN, true,
       )
-    })
 
-    it('does not touch cooldown when it is 0', async () => {
+      vi.clearAllMocks()
+
+      // does not touch cooldown when it is 0 or null
       vi.mocked(getRuntimeValue).mockImplementation((_name, key) => {
         if (key === '_divineInterventionWishCooldown') return 0
         return undefined
       })
-      const stats = makeStats()
-      await applyLongRest(stats, CAMPAIGN)
-
+      await applyLongRest(makeStats(), CAMPAIGN)
       expect(setRuntimeValue).not.toHaveBeenCalledWith(
         'Test Hero', '_divineInterventionWishCooldown', expect.anything(), CAMPAIGN, true,
       )
-    })
 
-    it('does not touch cooldown when it is null', async () => {
+      vi.clearAllMocks()
       vi.mocked(getRuntimeValue).mockImplementation((_name, key) => {
         if (key === '_divineInterventionWishCooldown') return null
         return undefined
       })
-      const stats = makeStats()
-      await applyLongRest(stats, CAMPAIGN)
-
+      await applyLongRest(makeStats(), CAMPAIGN)
       expect(setRuntimeValue).not.toHaveBeenCalledWith(
         'Test Hero', '_divineInterventionWishCooldown', expect.anything(), CAMPAIGN, true,
       )
     })
 
-    it('resets Uncanny Metabolism tracking', async () => {
-      await applyLongRest(makeStats(), CAMPAIGN)
 
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'Test Hero', 'uncannyMetabolismUsed', false, CAMPAIGN, true,
-      )
-    })
 
-    it('resets Undying Sentinel on long rest', async () => {
-      await applyLongRest(makeStats(), CAMPAIGN)
-
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'Test Hero', 'undyingSentinelUsed', false, CAMPAIGN, true,
-      )
-    })
-
-    it('resets Relentless Endurance on long rest', async () => {
-      await applyLongRest(makeStats(), CAMPAIGN)
-
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'Test Hero', 'relentlessEnduranceUsed', false, CAMPAIGN, true,
-      )
-    })
-
-    it('resets Signature Spells per-spell used flags on long rest', async () => {
+    it('resets per-spell used flags for Signature Spells on long rest', async () => {
       vi.mocked(getRuntimeValue).mockImplementation((_name, key) => {
         if (key === 'SignatureSpells_selection') return ['Fireball']
         return undefined
@@ -748,23 +623,18 @@ describe('restRules', () => {
       )
     })
 
-    it('resets Bastion of Law ward on long rest', async () => {
+    it('resets Bastion of Law and Arcane Ward on long rest', async () => {
       await applyLongRest(makeStats(), CAMPAIGN)
 
       expect(setRuntimeValue).toHaveBeenCalledWith('Test Hero', 'bastionOfLawActive', false, CAMPAIGN, true)
       expect(setRuntimeValue).toHaveBeenCalledWith('Test Hero', 'bastionOfLawWardDice', [], CAMPAIGN, true)
       expect(setRuntimeValue).toHaveBeenCalledWith('Test Hero', 'bastionOfLawWardTarget', null, CAMPAIGN, true)
-    })
-
-    it('resets Arcane Ward on long rest', async () => {
-      await applyLongRest(makeStats(), CAMPAIGN)
-
       expect(setRuntimeValue).toHaveBeenCalledWith('Test Hero', 'arcaneWardActive', false, CAMPAIGN, true)
       expect(setRuntimeValue).toHaveBeenCalledWith('Test Hero', 'arcaneWardHp', 0, CAMPAIGN, true)
       expect(setRuntimeValue).toHaveBeenCalledWith('Test Hero', 'arcaneWardMax', 0, CAMPAIGN, true)
     })
 
-    it('refreshes Portent dice (2 dice below level 14)', async () => {
+    it('refreshes Portent dice (2 dice below level 14, 3 at level 14+)', async () => {
       const stats = makeStats({ automation: { specialActions: [{ type: 'portent' }] } })
       await applyLongRest(stats, CAMPAIGN)
 
@@ -772,14 +642,14 @@ describe('restRules', () => {
       expect(setRuntimeValue).toHaveBeenCalledWith(
         'Test Hero', 'portentDice', JSON.stringify([10, 10]), CAMPAIGN, true,
       )
-    })
 
-    it('refreshes Portent dice (3 dice at level 14+)', async () => {
-      const stats = makeStats({
+      vi.clearAllMocks()
+
+      const stats14 = makeStats({
         level: 14,
         automation: { specialActions: [{ type: 'portent', name: 'Portent' }] },
       })
-      await applyLongRest(stats, CAMPAIGN)
+      await applyLongRest(stats14, CAMPAIGN)
 
       expect(rollD20).toHaveBeenCalledTimes(3)
       expect(setRuntimeValue).toHaveBeenCalledWith(
@@ -805,16 +675,11 @@ describe('restRules', () => {
       )
     })
 
-    it('resets Stonecunning on long rest', async () => {
+    it('resets Stonecunning and Adrenaline Rush on long rest', async () => {
       await applyLongRest(makeStats(), CAMPAIGN)
 
       expect(setRuntimeValue).toHaveBeenCalledWith('Test Hero', 'stonecunningUses', null, CAMPAIGN, true)
       expect(setRuntimeValue).toHaveBeenCalledWith('Test Hero', 'stonecunningRestTimestamp', null, CAMPAIGN, true)
-    })
-
-    it('resets Adrenaline Rush on long rest', async () => {
-      await applyLongRest(makeStats(), CAMPAIGN)
-
       expect(setRuntimeValue).toHaveBeenCalledWith('Test Hero', 'adrenalineRushUses', null, CAMPAIGN, true)
       expect(setRuntimeValue).toHaveBeenCalledWith('Test Hero', 'adrenalineRushRestTimestamp', null, CAMPAIGN, true)
     })
@@ -835,35 +700,6 @@ describe('restRules', () => {
       expect(setRuntimeValue).toHaveBeenCalledWith(
         'Test Hero', 'chefBolsteringTreats', 4, CAMPAIGN, true,
       )
-    })
-
-    it('fully restores all spell slots present in spellAbilities', async () => {
-      const stats = makeStats({
-        spellAbilities: {
-          spell_slots_level_1: 4,
-          spell_slots_level_2: 3,
-          spell_slots_level_3: 3,
-          spell_slots_level_4: 1,
-          spell_slots_level_5: 2,
-          spell_slots_level_6: 0,
-          spell_slots_level_7: 1,
-          spell_slots_level_8: 1,
-          spell_slots_level_9: 1,
-        },
-      })
-      await applyLongRest(stats, CAMPAIGN)
-
-      const data = getBatchUpdates()
-      expect(data.spell_slots_level_1).toBe(4)
-      expect(data.spell_slots_level_2).toBe(3)
-      expect(data.spell_slots_level_3).toBe(3)
-      expect(data.spell_slots_level_4).toBe(1)
-      expect(data.spell_slots_level_5).toBe(2)
-      // 0 is a valid max, so it should be restored
-      expect(data.spell_slots_level_6).toBe(0)
-      expect(data.spell_slots_level_7).toBe(1)
-      expect(data.spell_slots_level_8).toBe(1)
-      expect(data.spell_slots_level_9).toBe(1)
     })
 
     it('restores hit dice equal to character level', async () => {

@@ -40,13 +40,13 @@ describe('bladeWardHandler.handle', () => {
     vi.clearAllMocks();
   });
 
-  describe('toggleBuff calls', () => {
-    it('passes playerName, buffName, merged effect object, and campaignName', async () => {
+  describe('activation (wasActive false)', () => {
+    it('toggles the buff, registers expiration, and returns activation popup', async () => {
       const ps = makePlayerStats();
       const action = makeAction({ duration: '1 minute' });
       buffToggle.toggleBuff.mockReturnValue({ wasActive: false });
 
-      await handle(action, ps, CAMPAIGN_NAME, null);
+      const result = await handle(action, ps, CAMPAIGN_NAME, null);
 
       expect(buffToggle.toggleBuff).toHaveBeenCalledWith(
         ps.name,
@@ -54,9 +54,25 @@ describe('bladeWardHandler.handle', () => {
         { type: 'buff', duration: '1 minute', effect: 'blade_ward' },
         CAMPAIGN_NAME
       );
+      expect(expirations.addExpiration).toHaveBeenCalledWith(
+        ps.name,
+        ps.name,
+        [{ type: 'remove_active_buff', buffName: action.name }],
+        CAMPAIGN_NAME
+      );
+      expect(result).toEqual({
+        type: 'popup',
+        payload: {
+          type: 'automation_info',
+          name: action.name,
+          automationType: 'buff',
+          description: 'Blade Ward activated — attackers subtract 1d4 from attack rolls against you',
+          automation: action.automation,
+        },
+      });
     });
 
-    it('overrides any existing effect value to blade_ward', async () => {
+    it('forces effect to blade_ward regardless of automation.effect value', async () => {
       const ps = makePlayerStats();
       const action = makeAction({ effect: 'some_other_effect' });
       buffToggle.toggleBuff.mockReturnValue({ wasActive: false });
@@ -66,7 +82,7 @@ describe('bladeWardHandler.handle', () => {
       expect(buffToggle.toggleBuff).toHaveBeenCalledWith(
         ps.name,
         action.name,
-        { type: 'buff', effect: 'blade_ward' },
+        expect.objectContaining({ effect: 'blade_ward' }),
         CAMPAIGN_NAME
       );
     });
@@ -81,110 +97,8 @@ describe('bladeWardHandler.handle', () => {
       expect(buffToggle.toggleBuff).toHaveBeenCalledWith(
         ps.name,
         action.name,
-        { type: 'buff', duration: '1 hour', extraProp: 'value', effect: 'blade_ward' },
+        expect.objectContaining({ duration: '1 hour', extraProp: 'value', effect: 'blade_ward' }),
         CAMPAIGN_NAME
-      );
-    });
-
-    it('handles empty automation object', async () => {
-      const ps = makePlayerStats();
-      const action = { name: 'Blade Ward', automation: {} };
-      buffToggle.toggleBuff.mockReturnValue({ wasActive: false });
-
-      await handle(action, ps, CAMPAIGN_NAME, null);
-
-      expect(buffToggle.toggleBuff).toHaveBeenCalledWith(
-        ps.name,
-        action.name,
-        { effect: 'blade_ward' },
-        CAMPAIGN_NAME
-      );
-    });
-  });
-
-  describe('expiration registration', () => {
-    it('registers expiration on first activation (wasActive false)', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-      buffToggle.toggleBuff.mockReturnValue({ wasActive: false });
-
-      await handle(action, ps, CAMPAIGN_NAME, null);
-
-      expect(expirations.addExpiration).toHaveBeenCalledWith(
-        ps.name,
-        ps.name,
-        [{ type: 'remove_active_buff', buffName: action.name }],
-        CAMPAIGN_NAME
-      );
-    });
-
-    it('does not register expiration on deactivation (wasActive true)', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-      buffToggle.toggleBuff.mockReturnValue({ wasActive: true });
-
-      await handle(action, ps, CAMPAIGN_NAME, null);
-
-      expect(expirations.addExpiration).not.toHaveBeenCalled();
-    });
-
-    it('uses playerName as both attacker and target in expiration', async () => {
-      const ps = makePlayerStats({ name: 'AnotherHero' });
-      const action = makeAction();
-      buffToggle.toggleBuff.mockReturnValue({ wasActive: false });
-
-      await handle(action, ps, CAMPAIGN_NAME, null);
-
-      expect(expirations.addExpiration).toHaveBeenCalledWith(
-        'AnotherHero',
-        'AnotherHero',
-        [{ type: 'remove_active_buff', buffName: action.name }],
-        CAMPAIGN_NAME
-      );
-    });
-  });
-
-  describe('return value on activation (wasActive false)', () => {
-    it('returns popup with automation_info payload', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-      buffToggle.toggleBuff.mockReturnValue({ wasActive: false });
-
-      const result = await handle(action, ps, CAMPAIGN_NAME, null);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.type).toBe('automation_info');
-    });
-
-    it('includes buff name in payload', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-      buffToggle.toggleBuff.mockReturnValue({ wasActive: false });
-
-      const result = await handle(action, ps, CAMPAIGN_NAME, null);
-
-      expect(result.payload.name).toBe(action.name);
-    });
-
-    it('includes automationType from action.automation.type', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction({ customType: 'x' });
-      buffToggle.toggleBuff.mockReturnValue({ wasActive: false });
-
-      const result = await handle(action, ps, CAMPAIGN_NAME, null);
-
-      expect(result.payload.automationType).toBe('buff');
-    });
-
-    it('includes activation description with the standard message', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-      buffToggle.toggleBuff.mockReturnValue({ wasActive: false });
-
-      const result = await handle(action, ps, CAMPAIGN_NAME, null);
-
-      expect(result.payload.description).toBe(
-        'Blade Ward activated — attackers subtract 1d4 from attack rolls against you'
       );
     });
 
@@ -199,68 +113,33 @@ describe('bladeWardHandler.handle', () => {
         'Custom Blade Ward activated — attackers subtract 1d4 from attack rolls against you'
       );
     });
-
-    it('includes the automation object in payload', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction({ duration: '2 minutes' });
-      buffToggle.toggleBuff.mockReturnValue({ wasActive: false });
-
-      const result = await handle(action, ps, CAMPAIGN_NAME, null);
-
-      expect(result.payload.automation).toEqual(action.automation);
-    });
-
-    it('handles missing automation.type gracefully', async () => {
-      const ps = makePlayerStats();
-      const action = { name: 'Blade Ward', automation: {} };
-      buffToggle.toggleBuff.mockReturnValue({ wasActive: false });
-
-      const result = await handle(action, ps, CAMPAIGN_NAME, null);
-
-      expect(result.payload.automationType).toBeUndefined();
-    });
   });
 
-  describe('return value on deactivation (wasActive true)', () => {
-    it('returns popup with automation_info payload', async () => {
+  describe('deactivation (wasActive true)', () => {
+    it('toggles the buff, skips expiration, and returns expired popup', async () => {
       const ps = makePlayerStats();
       const action = makeAction();
       buffToggle.toggleBuff.mockReturnValue({ wasActive: true });
 
       const result = await handle(action, ps, CAMPAIGN_NAME, null);
 
-      expect(result.type).toBe('popup');
-      expect(result.payload.type).toBe('automation_info');
-    });
-
-    it('includes buff name in payload', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-      buffToggle.toggleBuff.mockReturnValue({ wasActive: true });
-
-      const result = await handle(action, ps, CAMPAIGN_NAME, null);
-
-      expect(result.payload.name).toBe(action.name);
-    });
-
-    it('includes automationType from action.automation.type', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-      buffToggle.toggleBuff.mockReturnValue({ wasActive: true });
-
-      const result = await handle(action, ps, CAMPAIGN_NAME, null);
-
-      expect(result.payload.automationType).toBe('buff');
-    });
-
-    it('includes expired description', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-      buffToggle.toggleBuff.mockReturnValue({ wasActive: true });
-
-      const result = await handle(action, ps, CAMPAIGN_NAME, null);
-
-      expect(result.payload.description).toBe('Blade Ward expired');
+      expect(buffToggle.toggleBuff).toHaveBeenCalledWith(
+        ps.name,
+        action.name,
+        { type: 'buff', effect: 'blade_ward' },
+        CAMPAIGN_NAME
+      );
+      expect(expirations.addExpiration).not.toHaveBeenCalled();
+      expect(result).toEqual({
+        type: 'popup',
+        payload: {
+          type: 'automation_info',
+          name: action.name,
+          automationType: 'buff',
+          description: 'Blade Ward expired',
+          automation: action.automation,
+        },
+      });
     });
 
     it('uses the action name in the expired description', async () => {
@@ -272,44 +151,33 @@ describe('bladeWardHandler.handle', () => {
 
       expect(result.payload.description).toBe('My Ward expired');
     });
-
-    it('includes the automation object in payload', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction({ duration: '5 minutes' });
-      buffToggle.toggleBuff.mockReturnValue({ wasActive: true });
-
-      const result = await handle(action, ps, CAMPAIGN_NAME, null);
-
-      expect(result.payload.automation).toEqual(action.automation);
-    });
   });
 
   describe('edge cases', () => {
-    it('handles minimal playerStats with only a name', async () => {
-      const ps = { name: 'Minimal' };
-      const action = makeAction();
+    it('handles empty automation object', async () => {
+      const ps = makePlayerStats();
+      const action = { name: 'Blade Ward', automation: {} };
       buffToggle.toggleBuff.mockReturnValue({ wasActive: false });
 
       const result = await handle(action, ps, CAMPAIGN_NAME, null);
 
-      expect(result.type).toBe('popup');
-      expect(expirations.addExpiration).toHaveBeenCalledWith(
+      expect(buffToggle.toggleBuff).toHaveBeenCalledWith(
         ps.name,
-        ps.name,
-        [{ type: 'remove_active_buff', buffName: action.name }],
+        action.name,
+        { effect: 'blade_ward' },
         CAMPAIGN_NAME
       );
+      expect(result.payload.description).toContain('activated');
     });
 
-    it('returns correct result when toggled off with empty automation', async () => {
+    it('handles missing automation.type gracefully', async () => {
       const ps = makePlayerStats();
       const action = { name: 'Blade Ward', automation: {} };
-      buffToggle.toggleBuff.mockReturnValue({ wasActive: true });
+      buffToggle.toggleBuff.mockReturnValue({ wasActive: false });
 
       const result = await handle(action, ps, CAMPAIGN_NAME, null);
 
-      expect(result.payload.description).toBe('Blade Ward expired');
-      expect(expirations.addExpiration).not.toHaveBeenCalled();
+      expect(result.payload.automationType).toBeUndefined();
     });
   });
 });

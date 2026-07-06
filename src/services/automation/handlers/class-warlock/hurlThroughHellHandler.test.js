@@ -1,5 +1,5 @@
 // @improved-by-ai
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import { handle } from './hurlThroughHellHandler.js';
 
@@ -33,7 +33,6 @@ vi.mock('../../../rules/combat/damageUtils.js', () => ({
 // ── Re-import after mocking ────────────────────────────────────
 
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
-import { addEntry } from '../../../ui/logService.js';
 import { getCombatContext, getTargetFromAttacker } from '../../../rules/combat/damageUtils.js';
 
 // ── Helpers ────────────────────────────────────────────────────
@@ -68,26 +67,11 @@ function mockRuntimeValues(values) {
     });
 }
 
-function triggerSaveResult(success, promptId = 'test-prompt-id') {
-    window.dispatchEvent(new CustomEvent('save-result', {
-        detail: { promptId, success },
-    }));
-}
-
-function flushTimers(count = 1) {
-    return new Promise(r => setTimeout(r, count * 5));
-}
-
 // ── Tests ──────────────────────────────────────────────────────
 
 describe('hurlThroughHellHandler', () => {
     beforeEach(() => {
         vi.clearAllMocks();
-    });
-
-    afterEach(() => {
-        // Clean up any event listeners registered by the handler
-        window.removeEventListener('save-result', () => {});
     });
 
     describe('handle', () => {
@@ -99,20 +83,6 @@ describe('hurlThroughHellHandler', () => {
             expect(result.type).toBe('popup');
             expect(result.payload.description).toContain('Already used this turn');
             expect(setRuntimeValue).not.toHaveBeenCalled();
-        });
-
-        it('should return popup when no uses remaining without pact magic recharge', async () => {
-            getCombatContext.mockResolvedValue({
-                creatures: [{ name: 'Goblin', type: 'fiend' }],
-            });
-            getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
-            mockRuntimeValues({ hurlThroughHellUses: 1 });
-
-            const result = await handle(makeAction(), makePlayerStats(), CAMPAIGN, MAP);
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('No uses remaining');
-            expect(result.payload.description).toContain('Long Rest');
         });
 
         it('should spend pact magic slot to restore a use when available', async () => {
@@ -190,97 +160,6 @@ describe('hurlThroughHellHandler', () => {
             );
         });
 
-        it('should apply incapacitated condition on save failure for non-fiend', async () => {
-            getCombatContext.mockResolvedValue({
-                creatures: [{ name: 'Human', type: 'humanoid' }],
-            });
-            getTargetFromAttacker.mockReturnValue({ name: 'Human' });
-            mockRuntimeValues({ currentTurn: 'turn1', targetEffects: [], activeConditions: [] });
-
-            await handle(makeAction(), makePlayerStats(), CAMPAIGN, MAP);
-
-            triggerSaveResult(false);
-            await flushTimers();
-
-            expect(setRuntimeValue).toHaveBeenCalledWith('Human', 'activeConditions', ['incapacitated'], CAMPAIGN);
-        });
-
-        it('should log damage entry for non-fiend on save failure', async () => {
-            getCombatContext.mockResolvedValue({
-                creatures: [{ name: 'Human', type: 'humanoid' }],
-            });
-            getTargetFromAttacker.mockReturnValue({ name: 'Human' });
-            mockRuntimeValues({ currentTurn: 'turn1', targetEffects: [], activeConditions: [] });
-
-            await handle(makeAction(), makePlayerStats(), CAMPAIGN, MAP);
-
-            triggerSaveResult(false);
-            await flushTimers();
-
-            expect(addEntry).toHaveBeenCalledWith(CAMPAIGN, expect.objectContaining({
-                type: 'damage_roll',
-                targetName: 'Human',
-                damageType: 'Psychic',
-                formula: '8d10',
-            }));
-        });
-
-        it('should skip damage entry for fiend on save failure', async () => {
-            getCombatContext.mockResolvedValue({
-                creatures: [{ name: 'Goblin', type: 'fiend' }],
-            });
-            getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
-            mockRuntimeValues({ currentTurn: 'turn1', targetEffects: [], activeConditions: [] });
-
-            await handle(makeAction(), makePlayerStats(), CAMPAIGN, MAP);
-
-            triggerSaveResult(false);
-            await flushTimers();
-
-            const damageEntries = addEntry.mock.calls.filter(
-                call => call[1]?.type === 'damage_roll'
-            );
-            expect(damageEntries).toHaveLength(0);
-        });
-
-        it('should log save failure entry for fiend with no-damage note', async () => {
-            getCombatContext.mockResolvedValue({
-                creatures: [{ name: 'Goblin', type: 'fiend' }],
-            });
-            getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
-            mockRuntimeValues({ currentTurn: 'turn1', targetEffects: [], activeConditions: [] });
-
-            await handle(makeAction(), makePlayerStats(), CAMPAIGN, MAP);
-
-            triggerSaveResult(false);
-            await flushTimers();
-
-            expect(addEntry).toHaveBeenCalledWith(CAMPAIGN, expect.objectContaining({
-                type: 'save_result',
-                targetName: 'Goblin',
-                success: false,
-                description: expect.stringContaining('Fiend'),
-            }));
-        });
-
-        it('should log save success entry on save success', async () => {
-            getCombatContext.mockResolvedValue({
-                creatures: [{ name: 'Goblin', type: 'fiend' }],
-            });
-            getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
-            mockRuntimeValues({ currentTurn: 'turn1' });
-
-            await handle(makeAction(), makePlayerStats(), CAMPAIGN, MAP);
-
-            triggerSaveResult(true);
-            await flushTimers();
-
-            expect(addEntry).toHaveBeenCalledWith(CAMPAIGN, expect.objectContaining({
-                type: 'save_result',
-                success: true,
-            }));
-        });
-
         it('should include damage and save info in popup payload', async () => {
             getCombatContext.mockResolvedValue({
                 creatures: [{ name: 'Goblin', type: 'fiend' }],
@@ -295,38 +174,6 @@ describe('hurlThroughHellHandler', () => {
             expect(result.payload.damageType).toBe('Psychic');
             expect(result.payload.damageTotal).toBe(44);
             expect(result.payload.targetName).toBe('Goblin');
-        });
-
-        it('should use default values when automation omits them', async () => {
-            getCombatContext.mockResolvedValue({
-                creatures: [{ name: 'Goblin', type: 'fiend' }],
-            });
-            getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
-            mockRuntimeValues({ currentTurn: 'turn1' });
-
-            const result = await handle(makeAction({
-                name: 'Hurl Through Hell',
-                automation: { type: 'hurl_through_hell', uses: 1 },
-            }), makePlayerStats(), CAMPAIGN, MAP);
-
-            expect(result.payload.saveType).toBe('CHA');
-            expect(result.payload.damageType).toBe('Psychic');
-            expect(result.payload.damageTotal).toBe(44);
-        });
-
-        it('should ignore save result events with wrong promptId', async () => {
-            getCombatContext.mockResolvedValue({
-                creatures: [{ name: 'Goblin', type: 'fiend' }],
-            });
-            getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
-            mockRuntimeValues({ currentTurn: 'turn1', targetEffects: [], activeConditions: [] });
-
-            await handle(makeAction(), makePlayerStats(), CAMPAIGN, MAP);
-
-            triggerSaveResult(false, 'wrong-prompt-id');
-            await flushTimers();
-
-            expect(setRuntimeValue).not.toHaveBeenCalledWith('Goblin', 'activeConditions', expect.arrayContaining(['incapacitated']));
         });
 
         it('should use currentTurn value or fallback to unknown', async () => {

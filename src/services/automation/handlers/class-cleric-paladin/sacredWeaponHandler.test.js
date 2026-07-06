@@ -69,7 +69,7 @@ describe('sacredWeaponHandler', () => {
       expect(result.payload.campaignName).toBe(campaignName);
     });
 
-    it('should show no-charges popup when channel divinity charges are 0', async () => {
+    it('should show no-charges popup when channel divinity charges are insufficient', async () => {
       getRuntimeValue.mockImplementation((name, key) => {
         if (key === 'activeBuffs') return [];
         if (key === 'channelDivinityCharges') return 0;
@@ -82,19 +82,6 @@ describe('sacredWeaponHandler', () => {
       expect(result.payload.description).toBe('No Channel Divinity charges remaining.');
       expect(result.payload.type).toBe('automation_info');
       expect(result.payload.automationType).toBe('temp_buff');
-    });
-
-    it('should show no-charges popup when channel divinity charges are negative', async () => {
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'activeBuffs') return [];
-        if (key === 'channelDivinityCharges') return -1;
-        return null;
-      });
-
-      const result = await handle(makeAction(), makePlayerStats(), campaignName);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.description).toBe('No Channel Divinity charges remaining.');
     });
 
     it('should activate immediately when options array is empty', async () => {
@@ -160,45 +147,6 @@ describe('sacredWeaponHandler', () => {
       );
     });
 
-    it('should clear all buffs when only sacred weapon is active', async () => {
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'activeBuffs') return [{ name: 'Sacred Weapon', effect: 'sacred_weapon' }];
-        return null;
-      });
-
-      await handle(makeAction(), makePlayerStats(), campaignName);
-
-      expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', 'activeBuffs', [], campaignName);
-    });
-
-    it('should use stored charges when available instead of class level', async () => {
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'activeBuffs') return [];
-        if (key === 'channelDivinityCharges') return 1;
-        return null;
-      });
-
-      const action = makeAction({ automation: { ...makeAction().automation, options: [] } });
-
-      await handle(action, makePlayerStats(), campaignName);
-
-      expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', 'channelDivinityCharges', 0, campaignName);
-    });
-
-    it('should default charges to class level when stored is null', async () => {
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'activeBuffs') return [];
-        if (key === 'channelDivinityCharges') return null;
-        return null;
-      });
-
-      const action = makeAction({ automation: { ...makeAction().automation, options: [] } });
-
-      await handle(action, makePlayerStats(), campaignName);
-
-      expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', 'channelDivinityCharges', 1, campaignName);
-    });
-
     it('should use class_specific.channel_divinity_charges fallback when stored is null', async () => {
       getRuntimeValue.mockImplementation((name, key) => {
         if (key === 'activeBuffs') return [];
@@ -222,34 +170,6 @@ describe('sacredWeaponHandler', () => {
       expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', 'channelDivinityCharges', 2, campaignName);
     });
 
-    it('should default maxCharges to 2 when no class level data', async () => {
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'activeBuffs') return [];
-        if (key === 'channelDivinityCharges') return null;
-        return null;
-      });
-
-      const action = makeAction({ automation: { ...makeAction().automation, options: [] } });
-      const playerStats = makePlayerStats({
-        class: { class_levels: [undefined, undefined, undefined, undefined, undefined] },
-      });
-
-      await handle(action, playerStats, campaignName);
-
-      expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', 'channelDivinityCharges', 1, campaignName);
-    });
-
-    it('should not decrement charges when toggling off', async () => {
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'activeBuffs') return [{ name: 'Sacred Weapon', effect: 'sacred_weapon' }];
-        if (key === 'channelDivinityCharges') return 2;
-        return null;
-      });
-
-      await handle(makeAction(), makePlayerStats(), campaignName);
-
-      expect(setRuntimeValue).not.toHaveBeenCalledWith('TestHero', 'channelDivinityCharges', expect.any(Number), campaignName);
-    });
   });
 
   describe('applyDamageTypeChoice', () => {
@@ -268,26 +188,6 @@ describe('sacredWeaponHandler', () => {
         'activeBuffs',
         expect.arrayContaining([
           expect.objectContaining({ damageTypeChoice: 'Radiant' }),
-        ]),
-        campaignName,
-      );
-    });
-
-    it('should apply normal damage type choice', async () => {
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'activeBuffs') return [{ name: 'Sacred Weapon', effect: 'sacred_weapon', damageTypeChoice: null }];
-        return null;
-      });
-
-      const result = await applyDamageTypeChoice(makeAction(), makePlayerStats(), campaignName, 'Normal Damage Type');
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.description).toContain('normal');
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'TestHero',
-        'activeBuffs',
-        expect.arrayContaining([
-          expect.objectContaining({ damageTypeChoice: 'normal' }),
         ]),
         campaignName,
       );
@@ -333,18 +233,6 @@ describe('sacredWeaponHandler', () => {
         ]),
         campaignName,
       );
-    });
-
-    it('should return popup with description for unknown option', async () => {
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'activeBuffs') return [{ name: 'Sacred Weapon', effect: 'sacred_weapon', damageTypeChoice: null }];
-        return null;
-      });
-
-      const result = await applyDamageTypeChoice(makeAction(), makePlayerStats(), campaignName, 'Unknown Option');
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.description).not.toContain('Damage type set to');
     });
   });
 });

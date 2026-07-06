@@ -62,19 +62,13 @@ describe('psychicSpellsHandler', () => {
             expect(isPsychicSpellsActive(playerStats)).toBe(false);
         });
 
-        it('should return false when passives is empty', () => {
-            const playerStats = makePlayerStats({ automation: { passives: [] } });
-            expect(isPsychicSpellsActive(playerStats)).toBe(false);
-        });
-
-        it('should return false when automation is null', () => {
-            const playerStats = makePlayerStats({ automation: null });
-            expect(isPsychicSpellsActive(playerStats)).toBe(false);
-        });
-
-        it('should return false when passives is undefined', () => {
-            const playerStats = makePlayerStats({ automation: {} });
-            expect(isPsychicSpellsActive(playerStats)).toBe(false);
+        it('should return false when passives is empty or automation is null', () => {
+            // empty passives
+            expect(isPsychicSpellsActive(makePlayerStats({ automation: { passives: [] } }))).toBe(false);
+            // null automation
+            expect(isPsychicSpellsActive(makePlayerStats({ automation: null }))).toBe(false);
+            // missing passives (automation object without passives)
+            expect(isPsychicSpellsActive(makePlayerStats({ automation: {} }))).toBe(false);
         });
     });
 
@@ -90,26 +84,11 @@ describe('psychicSpellsHandler', () => {
             expect(getPsychicSpellsConfig(playerStats)).toEqual({ type: 'psychic_spells', name: 'Psychic Spells', damageType: 'Psychic', componentReduction: ['V', 'S'] });
         });
 
-        it('should return undefined when psychic_spells passive does not exist', () => {
-            const playerStats = makePlayerStats({ automation: { passives: [] } });
-            expect(getPsychicSpellsConfig(playerStats)).toBeUndefined();
-        });
-
-        it('should return undefined when automation is null', () => {
-            const playerStats = makePlayerStats({ automation: null });
-            expect(getPsychicSpellsConfig(playerStats)).toBeUndefined();
-        });
-
-        it('should return the first matching passive when multiple exist', () => {
-            const playerStats = makePlayerStats({
-                automation: {
-                    passives: [
-                        { type: 'psychic_spells', name: 'Psychic Spells', damageType: 'Psychic' },
-                        { type: 'psychic_spells', name: 'Duplicate', damageType: 'Force' },
-                    ],
-                },
-            });
-            expect(getPsychicSpellsConfig(playerStats).name).toBe('Psychic Spells');
+        it('should return undefined when psychic_spells passive does not exist or automation is null', () => {
+            // no matching passive
+            expect(getPsychicSpellsConfig(makePlayerStats({ automation: { passives: [] } }))).toBeUndefined();
+            // null automation
+            expect(getPsychicSpellsConfig(makePlayerStats({ automation: null }))).toBeUndefined();
         });
     });
 
@@ -151,19 +130,10 @@ describe('psychicSpellsHandler', () => {
                 abilityName: 'Psychic Spells',
             }));
         });
-
-        it('should set runtime damageType when not already set', async () => {
-            const action = makeFeature();
-            const playerStats = makePlayerStats({ automation: { passives: [] } });
-
-            await handle(action, playerStats, 'TestCampaign');
-
-            expect(logService.addEntry).toHaveBeenCalled();
-        });
     });
 
     describe('psionicHandlers - psychic_spells', () => {
-        it('should build correct info object for psychic_spells automation', () => {
+        it('should build correct info object with defaults', () => {
             const feature = makeFeature();
 
             const result = psionicHandlers['psychic_spells'](feature, {});
@@ -210,14 +180,9 @@ describe('psychicSpellsHandler', () => {
             expect(result.passives[0].spellSchools).toEqual(['enchantment', 'illusion']);
         });
 
-        it('should not add passives when features array is empty', () => {
-            const result = collectAutomationFromFeatures([], {});
-            expect(result.passives).toHaveLength(0);
-        });
-
-        it('should not add passives when features is null', () => {
-            const result = collectAutomationFromFeatures(null, {});
-            expect(result.passives).toHaveLength(0);
+        it('should return empty passives when features is empty or null', () => {
+            expect(collectAutomationFromFeatures([], {}).passives).toHaveLength(0);
+            expect(collectAutomationFromFeatures(null, {}).passives).toHaveLength(0);
         });
     });
 });

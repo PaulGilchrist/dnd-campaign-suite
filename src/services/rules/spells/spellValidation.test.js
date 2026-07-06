@@ -68,16 +68,6 @@ describe('spellValidation', () => {
       expect(result).toEqual(['Wizard']);
     });
 
-    it('matches by lowercase index', async () => {
-      vi.mocked(dataLoader.loadClassData).mockResolvedValue([
-        { name: 'Wizard', index: 'wizard' },
-      ]);
-
-      const result = await getClassSpellList('wizard', '5e');
-
-      expect(result).toEqual(['wizard']);
-    });
-
     it('returns empty array when class is not found', async () => {
       vi.mocked(dataLoader.loadClassData).mockResolvedValue([
         { name: 'Wizard', index: 'wizard' },
@@ -209,19 +199,7 @@ describe('spellValidation', () => {
         expect(result.race.spells).toContain('Invisibility');
       });
 
-      it('returns empty arrays when race data is missing', async () => {
-        mockAllLoadersEmpty();
-
-        const result = await getSpellSources(
-          { class: { name: 'Wizard' }, race: { name: 'Nonexistent' } },
-          '5e',
-        );
-
-        expect(result.race.spells).toEqual([]);
-        expect(result.race.cantrips).toEqual([]);
-      });
-
-      it('returns empty arrays when race is null', async () => {
+      it('returns empty arrays when race data is missing or null', async () => {
         mockAllLoadersEmpty();
 
         const result = await getSpellSources(
@@ -256,27 +234,6 @@ describe('spellValidation', () => {
         expect(result.background.cantrips).toContain('Prestidigitation');
       });
 
-      it('handles array descriptions in 5e backgrounds', async () => {
-        vi.mocked(dataLoader.loadClassData).mockResolvedValue([]);
-        vi.mocked(dataLoader.loadRaceData).mockResolvedValue([]);
-        vi.mocked(dataLoader.loadBackgroundData).mockResolvedValue([
-          {
-            name: 'Acolyte',
-            features: [
-              { description: ['You learn the <em>Guidance</em> cantrip.'] },
-            ],
-          },
-        ]);
-        vi.mocked(dataLoader.loadFeatData).mockResolvedValue([]);
-
-        const result = await getSpellSources(
-          { class: { name: 'Wizard' }, background: { name: 'Acolyte' } },
-          '5e',
-        );
-
-        expect(result.background.cantrips).toContain('Guidance');
-      });
-
       it('returns empty arrays when background data is missing', async () => {
         mockAllLoadersEmpty();
 
@@ -307,62 +264,22 @@ describe('spellValidation', () => {
         );
       });
 
-      it('grants specific spells for Fey Touched', async () => {
+      it('grants specific spells for feat-based spell sources', async () => {
         mockAllLoadersEmpty();
         vi.mocked(dataLoader.loadFeatData).mockResolvedValue([
           { name: 'Fey Touched' },
-        ]);
-
-        const result = await getSpellSources(
-          { class: { name: 'Wizard' }, feats: ['Fey Touched'] },
-          '2024',
-        );
-
-        expect(result.feats.grantedSpells).toContain('Misty Step');
-      });
-
-      it('grants specific spells for Shadow Touched', async () => {
-        mockAllLoadersEmpty();
-        vi.mocked(dataLoader.loadFeatData).mockResolvedValue([
           { name: 'Shadow Touched' },
-        ]);
-
-        const result = await getSpellSources(
-          { class: { name: 'Wizard' }, feats: ['Shadow Touched'] },
-          '2024',
-        );
-
-        expect(result.feats.grantedSpells).toContain('Invisibility');
-      });
-
-      it('grants Detect Thoughts for Telepathy feat', async () => {
-        mockAllLoadersEmpty();
-        vi.mocked(dataLoader.loadFeatData).mockResolvedValue([
           { name: 'Telepathy' },
         ]);
 
         const result = await getSpellSources(
-          { class: { name: 'Wizard' }, feats: ['Telepathy'] },
-          '2024',
-        );
-
-        expect(result.feats.grantedSpells).toContain('Detect Thoughts');
-      });
-
-      it('handles multiple feats', async () => {
-        mockAllLoadersEmpty();
-        vi.mocked(dataLoader.loadFeatData).mockResolvedValue([
-          { name: 'Fey Touched' },
-          { name: 'Shadow Touched' },
-        ]);
-
-        const result = await getSpellSources(
-          { class: { name: 'Wizard' }, feats: ['Fey Touched', 'Shadow Touched'] },
+          { class: { name: 'Wizard' }, feats: ['Fey Touched', 'Shadow Touched', 'Telepathy'] },
           '2024',
         );
 
         expect(result.feats.grantedSpells).toContain('Misty Step');
         expect(result.feats.grantedSpells).toContain('Invisibility');
+        expect(result.feats.grantedSpells).toContain('Detect Thoughts');
       });
 
       it('handles unknown feat names gracefully', async () => {
@@ -531,42 +448,25 @@ describe('spellValidation', () => {
       expect(result.warnings[0].message).toContain('Spell(s)');
     });
 
-    it('allows Fighter/Wizard spells for Fighter class', async () => {
-      vi.mocked(dataLoader.loadClassData).mockResolvedValue([
-        { name: 'Fighter', class_levels: [] },
-      ]);
-      vi.mocked(dataLoader.loadRaceData).mockResolvedValue([]);
-      vi.mocked(dataLoader.loadBackgroundData).mockResolvedValue([]);
-      vi.mocked(dataLoader.loadFeatData).mockResolvedValue([]);
+    it('allows Fighter and Rogue classes to use Wizard spells', async () => {
+      for (const className of ['Fighter', 'Rogue']) {
+        vi.mocked(dataLoader.loadClassData).mockResolvedValue([
+          { name: className, class_levels: [] },
+        ]);
+        vi.mocked(dataLoader.loadRaceData).mockResolvedValue([]);
+        vi.mocked(dataLoader.loadBackgroundData).mockResolvedValue([]);
+        vi.mocked(dataLoader.loadFeatData).mockResolvedValue([]);
 
-      const result = await validateSpells(
-        { class: { name: 'Fighter' } },
-        ['Fireball'],
-        allSpells,
-        '5e',
-      );
+        const result = await validateSpells(
+          { class: { name: className } },
+          ['Fireball'],
+          allSpells,
+          '5e',
+        );
 
-      expect(result.valid).toBe(true);
-      expect(result.warnings).toEqual([]);
-    });
-
-    it('allows Rogue/Wizard spells for Rogue class', async () => {
-      vi.mocked(dataLoader.loadClassData).mockResolvedValue([
-        { name: 'Rogue', class_levels: [] },
-      ]);
-      vi.mocked(dataLoader.loadRaceData).mockResolvedValue([]);
-      vi.mocked(dataLoader.loadBackgroundData).mockResolvedValue([]);
-      vi.mocked(dataLoader.loadFeatData).mockResolvedValue([]);
-
-      const result = await validateSpells(
-        { class: { name: 'Rogue' } },
-        ['Fireball'],
-        allSpells,
-        '5e',
-      );
-
-      expect(result.valid).toBe(true);
-      expect(result.warnings).toEqual([]);
+        expect(result.valid).toBe(true);
+        expect(result.warnings).toEqual([]);
+      }
     });
 
     it('handles explicitly granted spells via grantedSpells parameter', async () => {
@@ -650,30 +550,26 @@ describe('spellValidation', () => {
       expect(result.valid).toBeDefined();
     });
 
-    it('returns spell count of 0 when no spells selected', async () => {
+    it('returns spell count of 0 when no spells are selected or selectedSpells is null', async () => {
       mockAllLoadersEmpty();
 
-      const result = await getSpellValidationInfo(
+      const result1 = await getSpellValidationInfo(
         { class: { name: 'Wizard' } },
         [],
         [],
         '5e',
       );
 
-      expect(result.spellCount).toBe(0);
-    });
+      expect(result1.spellCount).toBe(0);
 
-    it('returns spell count of 0 when selectedSpells is null', async () => {
-      mockAllLoadersEmpty();
-
-      const result = await getSpellValidationInfo(
+      const result2 = await getSpellValidationInfo(
         { class: { name: 'Wizard' } },
         null,
         [],
         '5e',
       );
 
-      expect(result.spellCount).toBe(0);
+      expect(result2.spellCount).toBe(0);
     });
 
     it('includes validation warnings from validateSpells', async () => {

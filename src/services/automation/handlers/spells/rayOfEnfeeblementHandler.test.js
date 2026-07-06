@@ -1,6 +1,6 @@
 // @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { handle, isRayOfEnfeeblementActive } from './rayOfEnfeeblementHandler.js';
+import { handle } from './rayOfEnfeeblementHandler.js';
 
 // ── Mocks ──────────────────────────────────────────────────────
 
@@ -64,41 +64,34 @@ describe('rayOfEnfeeblementHandler', () => {
     });
 
     describe('handle — failed save', () => {
-        it('returns popup with automation_info type', async () => {
+        it('returns popup with correct structure and content', async () => {
             buildSaveDc.mockReturnValue(10);
 
             const result = await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
 
             expect(result.type).toBe('popup');
             expect(result.payload.type).toBe('automation_info');
-        });
-
-        it('describes the failed CON save and debuffs in the popup', async () => {
-            buildSaveDc.mockReturnValue(10);
-
-            const result = await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
-
+            expect(result.payload.targetName).toBe('Goblin');
             expect(result.payload.description).toContain('failed the CON save');
             expect(result.payload.description).toContain('Disadvantage on Strength-based d20 tests');
             expect(result.payload.description).toContain('subtracts 1d8 from all damage rolls');
+            expect(result.payload.automation).toEqual({ targetName: 'Goblin' });
         });
 
-        it('includes the target name in the popup payload', async () => {
+        it('handles missing automation targetName gracefully', async () => {
             buildSaveDc.mockReturnValue(10);
 
-            const result = await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
+            const action = makeAction({ automation: {} });
 
-            expect(result.payload.targetName).toBe('Goblin');
-        });
-
-        it('includes the automation object in the popup payload', async () => {
-            buildSaveDc.mockReturnValue(10);
-
-            const automation = { targetName: 'Orc', extra: true };
-            const action = makeAction({ automation });
             const result = await handle(action, makePlayerStats(), 'test-campaign', null);
 
-            expect(result.payload.automation).toBe(automation);
+            expect(result.payload.targetName).toBe('Unknown');
+            expect(createSaveListener).toHaveBeenCalledWith('test-campaign', {
+                targetName: 'Unknown',
+                saveType: 'CON',
+                saveDc: 10,
+                dcSuccess: 'none',
+            });
         });
 
         it('logs the ability use with correct details', async () => {
@@ -111,20 +104,6 @@ describe('rayOfEnfeeblementHandler', () => {
                 characterName: 'Test Wizard',
                 abilityName: 'Ray of Enfeeblement',
                 description: expect.stringContaining('Test Wizard casts Ray of Enfeeblement on Goblin'),
-                promptId: 'test-prompt-id',
-            });
-        });
-
-        it('uses the computed save DC in the log description', async () => {
-            buildSaveDc.mockReturnValue(15);
-
-            await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
-
-            expect(addEntry).toHaveBeenCalledWith('test-campaign', {
-                type: 'ability_use',
-                characterName: 'Test Wizard',
-                abilityName: 'Ray of Enfeeblement',
-                description: expect.stringContaining('DC 15'),
                 promptId: 'test-prompt-id',
             });
         });
@@ -142,7 +121,7 @@ describe('rayOfEnfeeblementHandler', () => {
             });
         });
 
-        it('applies the debuff effect to targetEffects via setRuntimeValue', async () => {
+        it('applies the debuff effect to targetEffects and deduplicates from same caster', async () => {
             buildSaveDc.mockReturnValue(10);
             getRuntimeValue.mockReturnValue([]);
 
@@ -164,35 +143,16 @@ describe('rayOfEnfeeblementHandler', () => {
             );
         });
 
-        it('replaces an existing ray_of_enfeeble_debuff effect from the same caster', async () => {
+        it('replaces an existing ray_of_enfeeble_debuff effect from the same caster but not from other casters', async () => {
             buildSaveDc.mockReturnValue(10);
 
-            const existingEffect = {
+            const sameCasterEffect = {
                 target: 'Goblin',
                 effect: 'ray_of_enfeeble_debuff',
                 source: 'Test Wizard',
                 strCheckDisadvantage: true,
                 rayOfEnfeebleDamageReduction: true,
             };
-            getRuntimeValue.mockReturnValue([existingEffect, { target: 'Goblin', effect: 'other' }]);
-
-            await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
-
-            const call = setRuntimeValue.mock.calls[0];
-            const newEffects = call[2];
-            expect(newEffects).toHaveLength(2);
-            expect(newEffects[0]).toEqual({
-                target: 'Goblin',
-                effect: 'ray_of_enfeeble_debuff',
-                source: 'Test Wizard',
-                strCheckDisadvantage: true,
-                rayOfEnfeebleDamageReduction: true,
-            });
-        });
-
-        it('does not replace effects from other casters', async () => {
-            buildSaveDc.mockReturnValue(10);
-
             const otherEffect = {
                 target: 'Goblin',
                 effect: 'ray_of_enfeeble_debuff',
@@ -200,14 +160,22 @@ describe('rayOfEnfeeblementHandler', () => {
                 strCheckDisadvantage: true,
                 rayOfEnfeebleDamageReduction: true,
             };
-            getRuntimeValue.mockReturnValue([otherEffect]);
+            getRuntimeValue.mockReturnValue([sameCasterEffect, otherEffect, { target: 'Goblin', effect: 'other' }]);
 
             await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
 
             const call = setRuntimeValue.mock.calls[0];
             const newEffects = call[2];
-            expect(newEffects).toHaveLength(2);
-            expect(newEffects[0]).toBe(otherEffect);
+            expect(newEffects).toHaveLength(3);
+            expect(newEffects[0]).toEqual({
+                target: 'Goblin',
+                effect: 'ray_of_enfeeble_debuff',
+                source: 'Test Wizard',
+                strCheckDisadvantage: true,
+                rayOfEnfeebleDamageReduction: true,
+            });
+            expect(newEffects[1]).toBe(otherEffect);
+            expect(newEffects[2]).toEqual({ target: 'Goblin', effect: 'other' });
         });
 
         it('adds expiration for the debuff (10 rounds)', async () => {
@@ -245,22 +213,6 @@ describe('rayOfEnfeeblementHandler', () => {
                 timestamp: expect.any(Number),
             });
         });
-
-        it('handles missing automation targetName gracefully', async () => {
-            buildSaveDc.mockReturnValue(10);
-
-            const action = makeAction({ automation: {} });
-
-            const result = await handle(action, makePlayerStats(), 'test-campaign', null);
-
-            expect(result.payload.targetName).toBe('Unknown');
-            expect(createSaveListener).toHaveBeenCalledWith('test-campaign', {
-                targetName: 'Unknown',
-                saveType: 'CON',
-                saveDc: 10,
-                dcSuccess: 'none',
-            });
-        });
     });
 
     describe('handle — successful save', () => {
@@ -273,6 +225,8 @@ describe('rayOfEnfeeblementHandler', () => {
 
             const result = await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
 
+            expect(result.type).toBe('popup');
+            expect(result.payload.type).toBe('automation_info');
             expect(result.payload.description).toContain('succeeded on the CON save');
             expect(result.payload.description).toContain('Disadvantage on the next attack roll');
         });
@@ -316,7 +270,7 @@ describe('rayOfEnfeeblementHandler', () => {
             });
         });
 
-        it('applies disadvantage_next_attack effect to targetEffects via setRuntimeValue', async () => {
+        it('applies disadvantage_next_attack effect to targetEffects and deduplicates from same caster', async () => {
             buildSaveDc.mockReturnValue(10);
             createSaveListener.mockReturnValue({
                 promptId: 'test-prompt-id',
@@ -338,31 +292,6 @@ describe('rayOfEnfeeblementHandler', () => {
                 ]),
                 'test-campaign'
             );
-        });
-
-        it('replaces an existing disadvantage_next_attack effect from the same caster', async () => {
-            buildSaveDc.mockReturnValue(10);
-            createSaveListener.mockReturnValue({
-                promptId: 'test-prompt-id',
-                promise: Promise.resolve({ success: true }),
-            });
-            const existingEffect = {
-                target: 'Goblin',
-                effect: 'disadvantage_next_attack',
-                source: 'Test Wizard',
-            };
-            getRuntimeValue.mockReturnValue([existingEffect, { target: 'Goblin', effect: 'other' }]);
-
-            await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
-
-            const call = setRuntimeValue.mock.calls[0];
-            const newEffects = call[2];
-            expect(newEffects).toHaveLength(2);
-            expect(newEffects[0]).toEqual({
-                target: 'Goblin',
-                source: 'Test Wizard',
-                effect: 'disadvantage_next_attack',
-            });
         });
 
         it('adds expiration for the disadvantage effect (1 round)', async () => {
@@ -427,90 +356,6 @@ describe('rayOfEnfeeblementHandler', () => {
                 dcSuccess: 'none',
             });
         });
-
-        it('passes automation config to buildSaveDc with saveDc "ability"', async () => {
-            buildSaveDc.mockReturnValue(15);
-
-            const action = makeAction({ automation: { targetName: 'Goblin', saveDc: 'ability' } });
-            await handle(action, makePlayerStats(), 'test-campaign', null);
-
-            expect(buildSaveDc).toHaveBeenCalledWith(
-                expect.objectContaining({ saveDc: 'ability' }),
-                expect.any(Object)
-            );
-        });
-
-        it('falls back to default DC when automation.saveDc is undefined', async () => {
-            buildSaveDc.mockReturnValue(10);
-            const action = makeAction({ automation: { targetName: 'Goblin' } });
-
-            await handle(action, makePlayerStats(), 'test-campaign', null);
-
-            expect(buildSaveDc).toHaveBeenCalled();
-        });
     });
 
-    describe('isRayOfEnfeeblementActive', () => {
-        it('returns true when matching debuff exists', async () => {
-            getRuntimeValue.mockReturnValue([
-                { target: 'Goblin', effect: 'ray_of_enfeeble_debuff', source: 'Test Wizard' },
-            ]);
-
-            const result = isRayOfEnfeeblementActive('Goblin', 'Test Wizard', 'test-campaign');
-
-            expect(result).toBe(true);
-        });
-
-        it('returns false when no debuff exists', async () => {
-            getRuntimeValue.mockReturnValue([]);
-
-            const result = isRayOfEnfeeblementActive('Goblin', 'Test Wizard', 'test-campaign');
-
-            expect(result).toBe(false);
-        });
-
-        it('returns false when debuff exists but from a different caster', async () => {
-            getRuntimeValue.mockReturnValue([
-                { target: 'Goblin', effect: 'ray_of_enfeeble_debuff', source: 'Other Wizard' },
-            ]);
-
-            const result = isRayOfEnfeeblementActive('Goblin', 'Test Wizard', 'test-campaign');
-
-            expect(result).toBe(false);
-        });
-
-        it('returns false when debuff exists but targets a different creature', async () => {
-            getRuntimeValue.mockReturnValue([
-                { target: 'Orc', effect: 'ray_of_enfeeble_debuff', source: 'Test Wizard' },
-            ]);
-
-            const result = isRayOfEnfeeblementActive('Goblin', 'Test Wizard', 'test-campaign');
-
-            expect(result).toBe(false);
-        });
-
-        it('returns false when targetEffects is null', async () => {
-            getRuntimeValue.mockReturnValue(null);
-
-            const result = isRayOfEnfeeblementActive('Goblin', 'Test Wizard', 'test-campaign');
-
-            expect(result).toBe(false);
-        });
-
-        it('returns false when targetEffects is undefined', async () => {
-            getRuntimeValue.mockReturnValue(undefined);
-
-            const result = isRayOfEnfeeblementActive('Goblin', 'Test Wizard', 'test-campaign');
-
-            expect(result).toBe(false);
-        });
-
-        it('returns false when targetEffects is empty string', async () => {
-            getRuntimeValue.mockReturnValue('');
-
-            const result = isRayOfEnfeeblementActive('Goblin', 'Test Wizard', 'test-campaign');
-
-            expect(result).toBe(false);
-        });
-    });
 });

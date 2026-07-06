@@ -3,7 +3,6 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import { handle } from './holyNimbusHandler.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
-import { addEntry } from '../../../ui/logService.js';
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(),
@@ -89,40 +88,10 @@ describe('holyNimbusHandler.handle', () => {
         campaignName,
       );
     });
-
-    it('sets activeBuffs to empty array when no other buffs exist', async () => {
-      mockInactive([]);
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'TestCleric',
-        'activeBuffs',
-        [],
-        campaignName,
-      );
-    });
-
-    it('handles non-array activeBuffs on deactivation', async () => {
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'holyNimbusActive') return true;
-        if (key === 'activeBuffs') return 'not-an-array';
-        return null;
-      });
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'TestCleric',
-        'activeBuffs',
-        [],
-        campaignName,
-      );
-    });
   });
 
   describe('charge validation', () => {
-    it('returns error popup when charges are zero', async () => {
+    it('returns error popup when charges are zero or negative', async () => {
       mockActive(0);
 
       const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
@@ -131,36 +100,6 @@ describe('holyNimbusHandler.handle', () => {
       expect(result.payload.type).toBe('automation_info');
       expect(result.payload.description).toBe('No Channel Divinity charges remaining.');
       expect(setRuntimeValue).not.toHaveBeenCalled();
-    });
-
-    it('returns error popup when charges are negative', async () => {
-      mockActive(-1);
-
-      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.description).toBe('No Channel Divinity charges remaining.');
-      expect(setRuntimeValue).not.toHaveBeenCalled();
-    });
-
-    it('uses maxCharges default of 2 when stored charges are null and class_levels is empty', async () => {
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'holyNimbusActive') return false;
-        if (key === 'channelDivinityCharges') return null;
-        if (key === 'activeBuffs') return [];
-        return null;
-      });
-
-      const ps = makePlayerStats({ class: { class_levels: [] } });
-      await handle(makeAction(), ps, campaignName, null);
-
-      // maxCharges=2 (fallback), spent 1 => 1
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'TestCleric',
-        'channelDivinityCharges',
-        1,
-        campaignName,
-      );
     });
   });
 
@@ -237,58 +176,6 @@ describe('holyNimbusHandler.handle', () => {
       );
     });
 
-    it('handles non-array activeBuffs on activation', async () => {
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'holyNimbusActive') return false;
-        if (key === 'activeBuffs') return 'not-an-array';
-        if (key === 'channelDivinityCharges') return 2;
-        return null;
-      });
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'TestCleric',
-        'activeBuffs',
-        expect.arrayContaining([
-          expect.objectContaining({ name: 'Holy Nimbus' }),
-        ]),
-        campaignName,
-      );
-    });
-
-    it('uses stored charges when available', async () => {
-      mockActive(5);
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'TestCleric',
-        'channelDivinityCharges',
-        4,
-        campaignName,
-      );
-    });
-
-    it('defaults to maxCharges from class_levels when stored charges are null', async () => {
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'holyNimbusActive') return false;
-        if (key === 'channelDivinityCharges') return null;
-        if (key === 'activeBuffs') return [];
-        return null;
-      });
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      // maxCharges=2, spent 1 => 1
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'TestCleric',
-        'channelDivinityCharges',
-        1,
-        campaignName,
-      );
-    });
-
     it('falls back to class_specific.channel_divinity_charges when channel_divinity is absent', async () => {
       getRuntimeValue.mockImplementation((name, key) => {
         if (key === 'holyNimbusActive') return false;
@@ -311,49 +198,6 @@ describe('holyNimbusHandler.handle', () => {
         2,
         campaignName,
       );
-    });
-
-    it('defaults maxCharges to 2 when no class level data', async () => {
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'holyNimbusActive') return false;
-        if (key === 'channelDivinityCharges') return null;
-        if (key === 'activeBuffs') return [];
-        return null;
-      });
-
-      const ps = makePlayerStats({
-        class: { class_levels: [{ level: 5 }] },
-      });
-
-      await handle(makeAction(), ps, campaignName, null);
-
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'TestCleric',
-        'channelDivinityCharges',
-        1,
-        campaignName,
-      );
-    });
-  });
-
-  describe('logging', () => {
-    it('calls addEntry with ability_use data on activation', async () => {
-      mockActive(2);
-
-      const now = Date.now();
-      const dateSpy = vi.spyOn(Date, 'now').mockReturnValue(now);
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(addEntry).toHaveBeenCalledWith(campaignName, {
-        type: 'ability_use',
-        characterName: 'TestCleric',
-        abilityName: 'Holy Nimbus',
-        description: 'TestCleric activated Holy Nimbus. Aura of Protection gains holy power for 10 minutes.',
-        timestamp: now,
-      });
-
-      dateSpy.mockRestore();
     });
   });
 

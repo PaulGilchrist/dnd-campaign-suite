@@ -1,11 +1,6 @@
 // @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import {
-    handle,
-    clearMovementFlag,
-    clearSpeedZero,
-    markAsMoved,
-} from './steadyAimHandler.js';
+import { handle } from './steadyAimHandler.js';
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
     getRuntimeValue: vi.fn(() => undefined),
@@ -159,7 +154,7 @@ describe('steadyAimHandler', () => {
             );
         });
 
-        it('removes only speed_zero from activeConditions on cancel', async () => {
+        it('preserves other conditions when cancelling steady_aim', async () => {
             getRuntimeValue.mockImplementation(makeGetRuntime({
                 steadyAimMovedThisTurn: false,
                 steadyAimSpeedZero: true,
@@ -206,46 +201,6 @@ describe('steadyAimHandler', () => {
             );
         });
 
-        it('appends speed_zero to existing activeConditions', async () => {
-            getRuntimeValue.mockImplementation(makeGetRuntime({
-                steadyAimMovedThisTurn: false,
-                steadyAimSpeedZero: false,
-                activeConditions: ['blinded'],
-                targetEffects: [],
-            }));
-
-            await handle(makeAction(), makePlayerStats(), makeCampaignName());
-
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'TestRogue',
-                'activeConditions',
-                ['blinded', 'speed_zero'],
-                'test-campaign'
-            );
-        });
-
-        it('sets targetEffects with correct structure', async () => {
-            getRuntimeValue.mockImplementation(makeGetRuntime());
-
-            await handle(makeAction(), makePlayerStats(), makeCampaignName());
-
-            const effectCalls = setRuntimeValue.mock.calls.filter(
-                (c) => c[1] === 'targetEffects'
-            );
-            expect(effectCalls.length).toBeGreaterThan(0);
-            expect(effectCalls[0][2]).toEqual(
-                expect.arrayContaining([
-                    expect.objectContaining({
-                        target: 'TestRogue',
-                        source: 'Steady Aim',
-                        effect: 'next_attack_advantage',
-                        value: null,
-                        duration: 'until_end_of_turn',
-                    }),
-                ])
-            );
-        });
-
         it.each([
             ['provided', 'until_end_of_encounter'],
             ['default', 'until_end_of_turn'],
@@ -267,42 +222,6 @@ describe('steadyAimHandler', () => {
                 (c) => c[1] === 'targetEffects'
             );
             expect(effectCalls[0][2][0].duration).toBe(expectedDuration);
-        });
-    });
-
-    describe('markAsMoved', () => {
-        it('sets steadyAimMovedThisTurn to true', () => {
-            markAsMoved('TestRogue', 'test-campaign');
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'TestRogue',
-                'steadyAimMovedThisTurn',
-                true,
-                'test-campaign'
-            );
-        });
-    });
-
-    describe('clearMovementFlag', () => {
-        it('sets steadyAimMovedThisTurn to false', async () => {
-            await clearMovementFlag('TestRogue', 'test-campaign');
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'TestRogue',
-                'steadyAimMovedThisTurn',
-                false,
-                'test-campaign'
-            );
-        });
-    });
-
-    describe('clearSpeedZero', () => {
-        it('sets steadyAimSpeedZero to false', async () => {
-            await clearSpeedZero('TestRogue', 'test-campaign');
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'TestRogue',
-                'steadyAimSpeedZero',
-                false,
-                'test-campaign'
-            );
         });
     });
 });

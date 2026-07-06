@@ -64,7 +64,7 @@ describe('sleepService', () => {
             );
         });
 
-        it('uses spellSaveDc from metaCtx when provided', async () => {
+        it('uses spellSaveDc from metaCtx when provided, falls back to playerStats, computes from proficiency', async () => {
             executeHandler.mockResolvedValue({ type: 'popup' });
 
             await triggerSleep(
@@ -74,20 +74,12 @@ describe('sleepService', () => {
                 campaignName,
                 mapName,
             );
-
             expect(executeHandler).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    automation: expect.objectContaining({ saveDc: 18 }),
-                    spellSlotLevel: 3,
-                }),
+                expect.objectContaining({ automation: expect.objectContaining({ saveDc: 18 }), spellSlotLevel: 3 }),
                 playerStats,
                 campaignName,
                 mapName,
             );
-        });
-
-        it('falls back to playerStats.spellAbilities.saveDc when metaCtx lacks it', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
 
             await triggerSleep(
                 { name: 'Sleep', level: 1 },
@@ -96,21 +88,14 @@ describe('sleepService', () => {
                 campaignName,
                 mapName,
             );
-
             expect(executeHandler).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    automation: expect.objectContaining({ saveDc: 15 }),
-                }),
+                expect.objectContaining({ automation: expect.objectContaining({ saveDc: 15 }) }),
                 playerStats,
                 campaignName,
                 mapName,
             );
-        });
 
-        it('computes saveDc from proficiency when no spellAbilities.saveDc', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
             const stats = { name: 'Wizard', proficiency: 3 };
-
             await triggerSleep(
                 { name: 'Sleep', level: 1 },
                 {},
@@ -118,247 +103,82 @@ describe('sleepService', () => {
                 campaignName,
                 mapName,
             );
-
             expect(executeHandler).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    automation: expect.objectContaining({ saveDc: 11 }),
-                }),
+                expect.objectContaining({ automation: expect.objectContaining({ saveDc: 11 }) }),
                 stats,
                 campaignName,
                 mapName,
             );
         });
 
-        it('throws when proficiency is not available', async () => {
-            const stats = { name: 'Wizard' };
-
+        it.each([
+            { stats: { name: 'Wizard' }, label: 'proficiency is missing' },
+            { stats: { name: 'Wizard', proficiency: null }, label: 'proficiency is null' },
+            { stats: { name: 'Wizard', proficiency: undefined }, label: 'proficiency is undefined' },
+            { stats: { name: 'Wizard', spellAbilities: { saveDc: null, modifier: 4 } }, label: 'saveDc is null and proficiency is missing' },
+            { stats: { name: 'Wizard', spellAbilities: undefined }, label: 'spellAbilities is undefined and proficiency is missing' },
+        ])('throws when %s', async ({ stats }) => {
             await expect(
-                triggerSleep(
-                    { name: 'Sleep', level: 1 },
-                    {},
-                    stats,
-                    campaignName,
-                    mapName,
-                )
+                triggerSleep({ name: 'Sleep', level: 1 }, {}, stats, campaignName, mapName)
             ).rejects.toThrow('playerStats.proficiency is required for sleep spell');
         });
 
-        it('throws when proficiency is explicitly null', async () => {
-            const stats = { name: 'Wizard', proficiency: null };
-
-            await expect(
-                triggerSleep(
-                    { name: 'Sleep', level: 1 },
-                    {},
-                    stats,
-                    campaignName,
-                    mapName,
-                )
-            ).rejects.toThrow('playerStats.proficiency is required for sleep spell');
-        });
-
-        it('throws when proficiency is undefined', async () => {
-            const stats = { name: 'Wizard', proficiency: undefined };
-
-            await expect(
-                triggerSleep(
-                    { name: 'Sleep', level: 1 },
-                    {},
-                    stats,
-                    campaignName,
-                    mapName,
-                )
-            ).rejects.toThrow('playerStats.proficiency is required for sleep spell');
-        });
-
-        it('throws when spellAbilities.saveDc is null and proficiency is missing', async () => {
-            const stats = {
-                name: 'Wizard',
-                spellAbilities: { saveDc: null, modifier: 4 },
-            };
-
-            await expect(
-                triggerSleep(
-                    { name: 'Sleep', level: 1 },
-                    {},
-                    stats,
-                    campaignName,
-                    mapName,
-                )
-            ).rejects.toThrow('playerStats.proficiency is required for sleep spell');
-        });
-
-        it('throws when spellAbilities is undefined and proficiency is missing', async () => {
-            const stats = { name: 'Wizard' };
-
-            await expect(
-                triggerSleep(
-                    { name: 'Sleep', level: 1 },
-                    {},
-                    stats,
-                    campaignName,
-                    mapName,
-                )
-            ).rejects.toThrow('playerStats.proficiency is required for sleep spell');
-        });
-
-        it('uses spell.level as fallback when metaCtx has no slotLevel', async () => {
+        it.each([
+            ['metaCtx slotLevel', { spellSaveDc: 17, slotLevel: 4 }, 4],
+            ['spell.level', { spellSaveDc: 17 }, 3],
+        ])('uses %s for spellSlotLevel', async (_label, metaCtx, expectedLevel) => {
             executeHandler.mockResolvedValue({ type: 'popup' });
-
             await triggerSleep(
                 { name: 'Sleep', level: 3 },
-                { spellSaveDc: 17 },
+                metaCtx,
                 playerStats,
                 campaignName,
                 mapName,
             );
-
             expect(executeHandler).toHaveBeenCalledWith(
-                expect.objectContaining({ spellSlotLevel: 3 }),
+                expect.objectContaining({ spellSlotLevel: expectedLevel }),
                 playerStats,
                 campaignName,
                 mapName,
             );
         });
 
-        it('prefers metaCtx slotLevel over spell.level', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
+        it.each([
+            { spell: { name: 'Sleep' }, metaCtx: {}, label: 'no level and no slotLevel' },
+            { spell: { name: 'Sleep', level: null }, metaCtx: { spellSaveDc: 15 }, label: 'spell.level is null' },
+            { spell: { name: 'Sleep', level: undefined }, metaCtx: {}, label: 'spell.level is undefined' },
+            { spell: {}, metaCtx: {}, label: 'empty spell object' },
+        ])('throws when %s', async ({ spell, metaCtx }) => {
+            await expect(
+                triggerSleep(spell, metaCtx, playerStats, campaignName, mapName)
+            ).rejects.toThrow('slot level is required for sleep spell');
+        });
 
+        it.each([undefined, null])('handles metaCtx %s gracefully', async (metaCtx) => {
+            executeHandler.mockResolvedValue({ type: 'popup' });
             await triggerSleep(
                 { name: 'Sleep', level: 1 },
-                { spellSaveDc: 17, slotLevel: 4 },
+                metaCtx,
                 playerStats,
                 campaignName,
                 mapName,
             );
-
-            expect(executeHandler).toHaveBeenCalledWith(
-                expect.objectContaining({ spellSlotLevel: 4 }),
-                playerStats,
-                campaignName,
-                mapName,
-            );
-        });
-
-        it('throws when slot level is not available from either source', async () => {
-            await expect(
-                triggerSleep(
-                    { name: 'Sleep' },
-                    {},
-                    playerStats,
-                    campaignName,
-                    mapName,
-                )
-            ).rejects.toThrow('slot level is required for sleep spell');
-        });
-
-        it('throws when spell has no level and metaCtx has no slotLevel', async () => {
-            await expect(
-                triggerSleep(
-                    { name: 'Sleep', level: null },
-                    { spellSaveDc: 15 },
-                    playerStats,
-                    campaignName,
-                    mapName,
-                )
-            ).rejects.toThrow('slot level is required for sleep spell');
-        });
-
-        it('throws when spell has no level and metaCtx has no slotLevel (undefined)', async () => {
-            await expect(
-                triggerSleep(
-                    { name: 'Sleep', level: undefined },
-                    {},
-                    playerStats,
-                    campaignName,
-                    mapName,
-                )
-            ).rejects.toThrow('slot level is required for sleep spell');
-        });
-
-        it('throws when spell object is empty', async () => {
-            await expect(
-                triggerSleep(
-                    {},
-                    {},
-                    playerStats,
-                    campaignName,
-                    mapName,
-                )
-            ).rejects.toThrow('slot level is required for sleep spell');
-        });
-
-        it('handles metaCtx as undefined', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
-
-            await triggerSleep(
-                { name: 'Sleep', level: 1 },
-                undefined,
-                playerStats,
-                campaignName,
-                mapName,
-            );
-
             expect(executeHandler).toHaveBeenCalled();
         });
 
-        it('handles metaCtx as null', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
-
-            await triggerSleep(
-                { name: 'Sleep', level: 1 },
-                null,
-                playerStats,
-                campaignName,
-                mapName,
-            );
-
-            expect(executeHandler).toHaveBeenCalled();
-        });
-
-        it('returns result from executeHandler on success', async () => {
-            const expectedResult = {
-                type: 'popup',
-                payload: { type: 'automation_info', name: 'Sleep', description: 'Sleep affects...' },
-            };
+        it('returns result from executeHandler on success, null when handler returns null or throws', async () => {
+            const expectedResult = { type: 'popup', payload: { type: 'automation_info', name: 'Sleep', description: 'Sleep affects...' } };
             executeHandler.mockResolvedValue(expectedResult);
 
-            const result = await triggerSleep(
-                { name: 'Sleep', level: 1 },
-                {},
-                playerStats,
-                campaignName,
-                mapName,
-            );
-
+            let result = await triggerSleep({ name: 'Sleep', level: 1 }, {}, playerStats, campaignName, mapName);
             expect(result).toBe(expectedResult);
-        });
 
-        it('returns null when executeHandler returns null', async () => {
             executeHandler.mockResolvedValue(null);
-
-            const result = await triggerSleep(
-                { name: 'Sleep', level: 1 },
-                {},
-                playerStats,
-                campaignName,
-                mapName,
-            );
-
+            result = await triggerSleep({ name: 'Sleep', level: 1 }, {}, playerStats, campaignName, mapName);
             expect(result).toBeNull();
-        });
 
-        it('returns null when executeHandler throws an error', async () => {
             executeHandler.mockRejectedValue(new Error('Handler failed'));
-
-            const result = await triggerSleep(
-                { name: 'Sleep', level: 1 },
-                {},
-                playerStats,
-                campaignName,
-                mapName,
-            );
-
+            result = await triggerSleep({ name: 'Sleep', level: 1 }, {}, playerStats, campaignName, mapName);
             expect(result).toBeNull();
         });
 
@@ -375,10 +195,7 @@ describe('sleepService', () => {
 
             expect(executeHandler).toHaveBeenCalledWith(
                 expect.objectContaining({
-                    automation: expect.objectContaining({
-                        type: 'sleep',
-                        saveType: 'WIS',
-                    }),
+                    automation: expect.objectContaining({ type: 'sleep', saveType: 'WIS' }),
                 }),
                 playerStats,
                 campaignName,
@@ -405,27 +222,9 @@ describe('sleepService', () => {
             );
         });
 
-        it('throws when playerStats is undefined', async () => {
+        it.each([undefined, null])('throws when playerStats is %s', async (playerStatsVal) => {
             await expect(
-                triggerSleep(
-                    { name: 'Sleep', level: 1 },
-                    {},
-                    undefined,
-                    campaignName,
-                    mapName,
-                )
-            ).rejects.toThrow();
-        });
-
-        it('throws when playerStats is null', async () => {
-            await expect(
-                triggerSleep(
-                    { name: 'Sleep', level: 1 },
-                    {},
-                    null,
-                    campaignName,
-                    mapName,
-                )
+                triggerSleep({ name: 'Sleep', level: 1 }, {}, playerStatsVal, campaignName, mapName)
             ).rejects.toThrow();
         });
     });

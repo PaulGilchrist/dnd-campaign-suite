@@ -121,7 +121,7 @@ describe('Overchannel self-damage', () => {
         }));
     });
 
-    it('calculates correct dice count based on useCount and spellLevel', async () => {
+    it('calculates dice count based on different useCount and spellLevel combinations', async () => {
         const fn = createFn();
         await fn('Fireball', '8d6', 20, [3, 4, 5, 2, 3, 3], 0, {
             targetName: 'Goblin',
@@ -134,39 +134,18 @@ describe('Overchannel self-damage', () => {
         expect(rollExpression).toHaveBeenCalledWith('9d12');
     });
 
-    it('does not trigger self-damage when overchannelUseCount is 1', async () => {
+    it('does not trigger self-damage when overchannel is inactive, useCount is 1, or context is missing', async () => {
         const fn = createFn();
-        await fn('Fireball', '8d6', 20, [3, 4, 5, 2, 3, 3], 0, {
-            targetName: 'Goblin',
-            damageType: 'fire',
-            overchannelActive: true,
-            overchannelUseCount: 1,
-            overchannelSpellLevel: 3,
-        });
-        const d12Calls = deps.logEntry.mock.calls.filter(c => c[0].formula && c[0].formula.includes('d12'));
-        expect(d12Calls).toHaveLength(0);
-    });
+        const testCases = [
+            { name: 'overchannelActive false', context: { targetName: 'Goblin', damageType: 'fire', overchannelActive: false, overchannelUseCount: 3, overchannelSpellLevel: 2 } },
+            { name: 'overchannelUseCount is 1', context: { targetName: 'Goblin', damageType: 'fire', overchannelActive: true, overchannelUseCount: 1, overchannelSpellLevel: 3 } },
+            { name: 'overchannelActive undefined', context: { targetName: 'Goblin', damageType: 'fire' } },
+        ];
 
-    it('does not trigger self-damage when overchannelActive is false', async () => {
-        const fn = createFn();
-        await fn('Fireball', '8d6', 20, [3, 4, 5, 2, 3, 3], 0, {
-            targetName: 'Goblin',
-            damageType: 'fire',
-            overchannelActive: false,
-            overchannelUseCount: 3,
-            overchannelSpellLevel: 2,
-        });
-        const d12Calls = deps.logEntry.mock.calls.filter(c => c[0].formula && c[0].formula.includes('d12'));
-        expect(d12Calls).toHaveLength(0);
-    });
-
-    it('does not trigger self-damage when overchannelActive is undefined', async () => {
-        const fn = createFn();
-        await fn('Fireball', '8d6', 20, [3, 4, 5, 2, 3, 3], 0, {
-            targetName: 'Goblin',
-            damageType: 'fire',
-        });
-        const d12Calls = deps.logEntry.mock.calls.filter(c => c[0].formula && c[0].formula.includes('d12'));
-        expect(d12Calls).toHaveLength(0);
+        for (const { context } of testCases) {
+            await fn('Fireball', '8d6', 20, [3, 4, 5, 2, 3, 3], 0, context);
+            const d12Calls = deps.logEntry.mock.calls.filter(c => c[0].formula && c[0].formula.includes('d12'));
+            expect(d12Calls).toHaveLength(0);
+        }
     });
 });

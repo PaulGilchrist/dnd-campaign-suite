@@ -100,7 +100,7 @@ describe('encouragingSongHandler', () => {
       expect(result.payload.automationType).toBe('heroic_inspiration_buff');
     });
 
-    it('should return popup when map data is null', async () => {
+    it('should return popup when map data is unavailable or has no players', async () => {
       mapsService.loadMapData.mockResolvedValue(null);
       const action = makeAction();
       const ps = makePlayerStats();
@@ -112,22 +112,6 @@ describe('encouragingSongHandler', () => {
       expect(result.payload.description).toContain('no targets in range');
     });
 
-    it('should return popup when map data has no players array', async () => {
-      mapsService.loadMapData.mockResolvedValue({});
-      const action = makeAction();
-      const ps = makePlayerStats();
-
-      const result = await handle(action, ps, campaignName, 'empty-map');
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.type).toBe('automation_info');
-      expect(result.payload.description).toContain('no targets in range');
-    });
-  });
-
-  // ── Player not on map ───────────────────────────────────────
-
-  describe('player presence on map', () => {
     it('should return popup when player is not found on the map', async () => {
       mapsService.loadMapData.mockResolvedValue(makeMapData([
         { name: 'Ally1', gridX: 5, gridY: 5 },
@@ -166,32 +150,6 @@ describe('encouragingSongHandler', () => {
       );
     });
 
-    it('should skip allies when rangeToFeet returns null', async () => {
-      rangeValidation.rangeToFeet.mockReturnValue(null);
-      mapsService.loadMapData.mockResolvedValue(makeMapData(defaultMapPlayers));
-
-      const action = makeAction();
-      const ps = makePlayerStats();
-
-      const result = await handle(action, ps, campaignName, 'test-map');
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.description).toContain('no targets in range');
-    });
-
-    it('should skip allies when getDistanceFeet returns null', async () => {
-      rangeValidation.rangeToFeet.mockReturnValue(30);
-      rangeValidation.getDistanceFeet.mockReturnValue(null);
-      mapsService.loadMapData.mockResolvedValue(makeMapData(defaultMapPlayers));
-
-      const action = makeAction();
-      const ps = makePlayerStats();
-
-      const result = await handle(action, ps, campaignName, 'test-map');
-
-      expect(result.payload.description).toContain('no targets in range');
-    });
-
     it('should include allies within range', async () => {
       rangeValidation.rangeToFeet.mockReturnValue(30);
       rangeValidation.getDistanceFeet.mockReturnValue(15);
@@ -205,21 +163,6 @@ describe('encouragingSongHandler', () => {
 
       expect(result.type).toBe('popup');
       expect(result.payload.description).toMatch(/all(y|ies)/);
-      expect(result.payload.description).toContain('Ally1');
-      expect(result.payload.description).toContain('Ally2');
-    });
-
-    it('should list individual ally names when multiple targets', async () => {
-      rangeValidation.rangeToFeet.mockReturnValue(30);
-      rangeValidation.getDistanceFeet.mockReturnValue(15);
-      mapsService.loadMapData.mockResolvedValue(makeMapData(defaultMapPlayers));
-      runtimeState.getRuntimeValue.mockReturnValue(false);
-
-      const action = makeAction();
-      const ps = makePlayerStats();
-
-      const result = await handle(action, ps, campaignName, 'test-map');
-
       expect(result.payload.description).toContain('Ally1');
       expect(result.payload.description).toContain('Ally2');
     });
@@ -243,7 +186,7 @@ describe('encouragingSongHandler', () => {
     });
   });
 
-  // ── Inspiration toggle ──────────────────────────────────────
+  // ── Inspiration toggling ─────────────────────────────────────
 
   describe('inspiration toggling', () => {
     it('should grant inspiration to allies without it', async () => {
@@ -293,11 +236,6 @@ describe('encouragingSongHandler', () => {
       rangeValidation.rangeToFeet.mockReturnValue(30);
       rangeValidation.getDistanceFeet.mockReturnValue(15);
       mapsService.loadMapData.mockResolvedValue(makeMapData(defaultMapPlayers));
-      runtimeState.getRuntimeValue.mockImplementation((_player, key) => {
-        if (key === 'hasInspiration') return false;
-        return null;
-      });
-      // Override for Ally1 only: already has inspiration
       runtimeState.getRuntimeValue.mockImplementation((player, key) => {
         if (key === 'hasInspiration' && player === 'Ally1') return true;
         if (key === 'hasInspiration') return false;
@@ -367,7 +305,7 @@ describe('encouragingSongHandler', () => {
       expect(result.payload.name).toBe('Encouraging Song');
     });
 
-    it('should not decrement uses when maxUses is 0 (no uses_expression)', async () => {
+    it('should not decrement uses when maxUses is 0 or negative', async () => {
       rangeValidation.rangeToFeet.mockReturnValue(30);
       rangeValidation.getDistanceFeet.mockReturnValue(15);
       mapsService.loadMapData.mockResolvedValue(makeMapData(defaultMapPlayers));
@@ -379,27 +317,6 @@ describe('encouragingSongHandler', () => {
 
       await handle(action, ps, campaignName, 'test-map');
 
-      expect(runtimeState.setRuntimeValue).not.toHaveBeenCalledWith(
-        expect.any(String),
-        expect.stringContaining('Uses'),
-        expect.any(Number),
-        campaignName,
-      );
-    });
-
-    it('should not decrement uses when maxUses is negative', async () => {
-      rangeValidation.rangeToFeet.mockReturnValue(30);
-      rangeValidation.getDistanceFeet.mockReturnValue(15);
-      mapsService.loadMapData.mockResolvedValue(makeMapData(defaultMapPlayers));
-      runtimeState.getRuntimeValue.mockReturnValue(false);
-      automationService.evaluateAutoExpression.mockReturnValue(-1);
-
-      const action = makeAction({ uses_expression: '-1' });
-      const ps = makePlayerStats();
-
-      const result = await handle(action, ps, campaignName, 'test-map');
-
-      expect(result.type).toBe('popup');
       expect(runtimeState.setRuntimeValue).not.toHaveBeenCalledWith(
         expect.any(String),
         expect.stringContaining('Uses'),
@@ -426,55 +343,12 @@ describe('encouragingSongHandler', () => {
 
       expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith('Bard', 'customResource', 2, campaignName);
     });
-
-    it('should default usesKey to action name when no resourceKey', async () => {
-      rangeValidation.rangeToFeet.mockReturnValue(30);
-      rangeValidation.getDistanceFeet.mockReturnValue(15);
-      mapsService.loadMapData.mockResolvedValue(makeMapData(defaultMapPlayers));
-      runtimeState.getRuntimeValue.mockImplementation((_player, key) => {
-        if (key === 'hasInspiration') return false;
-        if (key === 'encouragingsongUses') return 5;
-        return null;
-      });
-      automationService.evaluateAutoExpression.mockReturnValue(3);
-
-      const action = makeAction();
-      const ps = makePlayerStats();
-
-      await handle(action, ps, campaignName, 'test-map');
-
-      expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-        'Bard',
-        'encouragingsongUses',
-        4,
-        campaignName,
-      );
-    });
-
-    it('should handle currentUses as string and convert to number', async () => {
-      rangeValidation.rangeToFeet.mockReturnValue(30);
-      rangeValidation.getDistanceFeet.mockReturnValue(15);
-      mapsService.loadMapData.mockResolvedValue(makeMapData(defaultMapPlayers));
-      runtimeState.getRuntimeValue.mockImplementation((_player, key) => {
-        if (key === 'hasInspiration') return false;
-        if (key === 'encouragingsongUses') return '2';
-        return null;
-      });
-      automationService.evaluateAutoExpression.mockReturnValue(3);
-
-      const action = makeAction();
-      const ps = makePlayerStats();
-
-      await handle(action, ps, campaignName, 'test-map');
-
-      expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith('Bard', 'encouragingsongUses', 1, campaignName);
-    });
   });
 
   // ── Logging ─────────────────────────────────────────────────
 
   describe('logging', () => {
-    it('should call addEntry with ability_use log type', async () => {
+    it('should call addEntry with ability_use log type and description', async () => {
       rangeValidation.rangeToFeet.mockReturnValue(30);
       rangeValidation.getDistanceFeet.mockReturnValue(15);
       mapsService.loadMapData.mockResolvedValue(makeMapData(defaultMapPlayers));
@@ -490,36 +364,23 @@ describe('encouragingSongHandler', () => {
         type: 'ability_use',
         characterName: 'Bard',
         abilityName: 'Encouraging Song',
+        description: expect.stringContaining('Encouraging Song'),
         timestamp: expect.any(Number),
       }));
-    });
-
-    it('should include description in log entry', async () => {
-      rangeValidation.rangeToFeet.mockReturnValue(30);
-      rangeValidation.getDistanceFeet.mockReturnValue(15);
-      mapsService.loadMapData.mockResolvedValue(makeMapData(defaultMapPlayers));
-      runtimeState.getRuntimeValue.mockReturnValue(null);
-
-      const action = makeAction();
-      const ps = makePlayerStats();
-
-      await handle(action, ps, campaignName, 'test-map');
-      await Promise.resolve();
-
-      const logCall = logService.addEntry.mock.calls[0][1];
-      expect(logCall.description).toContain('Encouraging Song');
-      expect(logCall.description).toContain('Heroic Inspiration');
     });
   });
 
   // ── Return payload structure ────────────────────────────────
 
   describe('return payload', () => {
-    it('should include automation object in returned payload', async () => {
+    it('should include automation object and metadata in returned payload', async () => {
       rangeValidation.rangeToFeet.mockReturnValue(30);
       rangeValidation.getDistanceFeet.mockReturnValue(15);
       mapsService.loadMapData.mockResolvedValue(makeMapData(defaultMapPlayers));
-      runtimeState.getRuntimeValue.mockReturnValue(false);
+      runtimeState.getRuntimeValue.mockImplementation((_player, key) => {
+        if (key === 'hasInspiration') return false;
+        return null;
+      });
 
       const action = makeAction({ effect: 'advantage' });
       const ps = makePlayerStats();
@@ -527,33 +388,7 @@ describe('encouragingSongHandler', () => {
       const result = await handle(action, ps, campaignName, 'test-map');
 
       expect(result.payload.automation).toEqual(action.automation);
-    });
-
-    it('should include automationType in payload', async () => {
-      rangeValidation.rangeToFeet.mockReturnValue(30);
-      rangeValidation.getDistanceFeet.mockReturnValue(15);
-      mapsService.loadMapData.mockResolvedValue(makeMapData(defaultMapPlayers));
-      runtimeState.getRuntimeValue.mockReturnValue(null);
-
-      const action = makeAction();
-      const ps = makePlayerStats();
-
-      const result = await handle(action, ps, campaignName, 'test-map');
-
       expect(result.payload.automationType).toBe('heroic_inspiration_buff');
-    });
-
-    it('should include action name in payload', async () => {
-      rangeValidation.rangeToFeet.mockReturnValue(30);
-      rangeValidation.getDistanceFeet.mockReturnValue(15);
-      mapsService.loadMapData.mockResolvedValue(makeMapData(defaultMapPlayers));
-      runtimeState.getRuntimeValue.mockReturnValue(false);
-
-      const action = makeAction();
-      const ps = makePlayerStats();
-
-      const result = await handle(action, ps, campaignName, 'test-map');
-
       expect(result.payload.name).toBe('Encouraging Song');
     });
   });

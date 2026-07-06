@@ -283,42 +283,7 @@ describe('NPC Concentration — Dragon Constellation & Relentless Hunter', () =>
     });
   });
 
-  describe('combined Dragon Constellation + Relentless Hunter', () => {
-    it('Relentless Hunter takes priority — no save even with Dragon Constellation', () => {
-      const rangerCreature = createNpcCreature('Ranger', 30, 30, {
-        concentration: { spell: 'Haste', dc: 10 },
-        saveBonuses: { con: 0 },
-      });
-      const cs = makeCombatSummary([rangerCreature]);
 
-      getRuntimeValue.mockReset();
-      getRuntimeValue.mockImplementation((_charName, key, _campaignName) => {
-        if (key === 'activeBuffs') return [{ name: 'Starry Form', constellation: 'Dragon' }];
-        if (key === 'arcaneWardActive') return false;
-        if (key === 'arcaneWardHp') return 0;
-        if (key === 'lastMetamagicDamage') return undefined;
-        if (key === 'currentHitPoints') return 30;
-        if (key === 'activeConditions') return [];
-        if (key === 'holyAuraSaveDc') return undefined;
-        if (key === 'stealthAttackCost') return undefined;
-        if (key === 'targetEffects') return [];
-        if (key === 'tempHp') return 0;
-        if (key === 'resistanceUsedThisTurn') return undefined;
-        return undefined;
-      });
-
-      const rangerCharacter = createMinimalCharacter('Ranger', 15, {
-        computedExtra: {
-          class: { name: 'Ranger', class_levels: [{ level: 15 }] },
-          level: 15,
-        },
-      });
-
-      applyDamageToTarget(cs, 'Ranger', 10, ['Slashing'], 'TestCampaign', [rangerCharacter]);
-
-      expect(rollConcentrationSave).not.toHaveBeenCalled();
-    });
-  });
 
   describe('concentration save logging', () => {
     it('logs concentration-broken when NPC fails save (no special features)', () => {

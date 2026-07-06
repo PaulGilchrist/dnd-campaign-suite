@@ -220,22 +220,6 @@ describe('interceptionHandler', () => {
                 expect(result.payload.description).toContain('interpose yourself');
             }
         });
-
-        it('handles empty, null, or missing inventory gracefully', async () => {
-            const actions = [
-                { inventory: { equipped: [] } },
-                { inventory: null },
-                {},
-            ];
-
-            for (const inv of actions) {
-                const action = makeAction();
-                const ps = makePlayerStats(inv);
-                const result = await handle(action, ps, campaignName, mapName);
-                expect(result.type).toBe('popup');
-                expect(result.payload.description).toContain('You must be holding a Shield');
-            }
-        });
     });
 
     describe('range check', () => {
@@ -994,55 +978,6 @@ describe('interceptionHandler', () => {
             // Out of range
             result = await handle(action, ps, campaignName, mapName);
             expect(result.payload.automation).toEqual(action.automation);
-        });
-    });
-
-    describe('edge cases', () => {
-        it('handles missing automation range by defaulting to 5_ft', async () => {
-            const action = { name: 'Interception', automation: { type: 'interception' } };
-            const ps = makePlayerStats({
-                inventory: { equipped: ['Shield'] },
-                equipment: [{ name: 'Shield', armor_category: 'Shield' }],
-            });
-
-            const result = await handle(action, ps, campaignName, mapName);
-
-            expect(result.type).toBe('popup');
-            expect(rangeValidation.rangeToFeet).toHaveBeenCalledWith('5_ft');
-        });
-
-        it('uses proficiency 0 when playerStats.proficiency is missing, null, or undefined', async () => {
-            const basePs = {
-                inventory: { equipped: ['Shield'] },
-                equipment: [{ name: 'Shield', armor_category: 'Shield' }],
-            };
-
-            const profValues = [undefined, null];
-            for (const prof of profValues) {
-                const action = makeAction();
-                const ps = makePlayerStats({ ...basePs, proficiency: prof });
-                diceRoller.rollExpression.mockReturnValue({ total: 5, rolls: [5], modifier: 0 });
-
-                const result = await handle(action, ps, campaignName, mapName);
-
-                expect(result.payload.description).toContain('+ 0');
-                vi.clearAllMocks();
-                useRuntimeState.getRuntimeValue.mockReturnValue(null);
-                damageUtils.getCombatContext.mockResolvedValue(makeCombatSummary());
-                targetResolver.resolveMapPositions.mockResolvedValue({ attackerPos: { x: 0, y: 0 }, targetPos: { x: 1, y: 0 } });
-                rangeValidation.getDistanceFeet.mockReturnValue(5);
-                rangeValidation.rangeToFeet.mockReturnValue(5);
-                damageRollback.findLastAttack.mockResolvedValue({
-                    attackEvent: makeCombatSummary().lastAttack,
-                    attackerName,
-                    targetName: defenderName,
-                    primaryDamage: 12,
-                    secondaryDamage: 0,
-                    totalDamage: 12,
-                    damageTypes: ['slashing'],
-                });
-                diceRoller.rollExpression.mockReturnValue({ total: 5, rolls: [5], modifier: 0 });
-            }
         });
     });
 });

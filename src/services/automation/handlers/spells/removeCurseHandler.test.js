@@ -61,7 +61,7 @@ describe('removeCurseHandler.handle', () => {
   });
 
   describe('combat context validation', () => {
-    it('should return automation_info popup when no combat context exists', async () => {
+    it('should return automation_info popup when combat context is absent', async () => {
       getCombatContext.mockResolvedValue(null);
       const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
@@ -69,14 +69,6 @@ describe('removeCurseHandler.handle', () => {
       expect(result.payload.type).toBe('automation_info');
       expect(result.payload.name).toBe('Remove Curse');
       expect(result.payload.description).toContain('No combat context found');
-    });
-
-    it('should return automation_info popup when combat context is undefined', async () => {
-      getCombatContext.mockResolvedValue(undefined);
-      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.type).toBe('automation_info');
     });
   });
 
@@ -199,7 +191,7 @@ describe('removeCurseHandler.handle', () => {
       getCombatContext.mockResolvedValue(makeCombatContext());
       getRuntimeValue.mockImplementation(() => []);
 
-      const result = await handle(makeAction({}), makePlayerStats(), campaignName, null);
+      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
       expect(result.payload.range).toBe('Touch');
     });
@@ -219,29 +211,10 @@ describe('removeCurseHandler.handle', () => {
 
       const result = await handle({ name: 'Remove Curse' }, makePlayerStats(), campaignName, null);
 
-      expect(result.payload.range).toBe('Touch');
       expect(result.payload.automation).toEqual({});
     });
 
-    it('should return empty targets when only caster exists in combat', async () => {
-      getCombatContext.mockResolvedValue({
-        creatures: [{ name: 'TestCaster', gridX: 5, gridY: 10 }],
-        players: [{ name: 'TestCaster', gridX: 5, gridY: 10 }],
-        placedItems: [],
-      });
-      getRuntimeValue.mockImplementation((name, prop) => {
-        if (prop === 'activeBuffs' && name === 'TestCaster') return [];
-        if (prop === 'attunement' && name === 'TestCaster') return [];
-        return [];
-      });
-
-      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(result.payload.targets).toHaveLength(1);
-      expect(result.payload.targets[0].isSelf).toBe(true);
-    });
-
-    it('should return only self target when creatures array is empty', async () => {
+    it('should return only self target when no other creatures exist', async () => {
       getCombatContext.mockResolvedValue({
         creatures: [],
         players: [{ name: 'TestCaster', gridX: 5, gridY: 10 }],
@@ -256,6 +229,7 @@ describe('removeCurseHandler.handle', () => {
       const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
       expect(result.payload.targets).toHaveLength(1);
+      expect(result.payload.targets[0].isSelf).toBe(true);
       expect(result.payload.targets[0].name).toBe('TestCaster');
     });
   });
@@ -267,29 +241,14 @@ describe('removeCurseHandler.applyRemoveCurse', () => {
   });
 
   describe('early return paths', () => {
-    it('should return null when result is null', async () => {
-      const result = await applyRemoveCurse(makeAction(), makePlayerStats(), campaignName, null, null);
-      expect(result).toBeNull();
+    it('should return null when result is null or undefined', async () => {
+      expect(await applyRemoveCurse(makeAction(), makePlayerStats(), campaignName, null, null)).toBeNull();
+      expect(await applyRemoveCurse(makeAction(), makePlayerStats(), campaignName, null, undefined)).toBeNull();
     });
 
-    it('should return null when result is undefined', async () => {
-      const result = await applyRemoveCurse(makeAction(), makePlayerStats(), campaignName, null, undefined);
-      expect(result).toBeNull();
-    });
-
-    it('should return null when result is an empty object', async () => {
-      const result = await applyRemoveCurse(makeAction(), makePlayerStats(), campaignName, null, {});
-      expect(result).toBeNull();
-    });
-
-    it('should return null when result has no targetName', async () => {
-      const result = await applyRemoveCurse(makeAction(), makePlayerStats(), campaignName, null, { selections: [] });
-      expect(result).toBeNull();
-    });
-
-    it('should return null when result targetName is empty string', async () => {
-      const result = await applyRemoveCurse(makeAction(), makePlayerStats(), campaignName, null, { targetName: '', selections: [] });
-      expect(result).toBeNull();
+    it('should return null when result has no targetName or empty targetName', async () => {
+      expect(await applyRemoveCurse(makeAction(), makePlayerStats(), campaignName, null, { selections: [] })).toBeNull();
+      expect(await applyRemoveCurse(makeAction(), makePlayerStats(), campaignName, null, { targetName: '', selections: [] })).toBeNull();
     });
   });
 

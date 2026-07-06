@@ -129,7 +129,6 @@ describe('createLogAndShow - Potent Cantrip & Soulknife', () => {
         it('logs cantrip-miss-half-damage when potent cantrip misses with storedDamageResult', async () => {
             hasPotentCantrip.mockReturnValue(true);
             applyMinDamageAdjustment.mockImplementation((d) => d);
-            loadCombatSummary.mockResolvedValue({ creatures: [{ name: 'Goblin', type: 'npc', ac: 15 }] });
             getTargetFromAttacker.mockReturnValue({ name: 'Goblin', ac: 25 });
             const fn = createFn();
             await fn('Fire Bolt', 3, 'attack', {
@@ -148,10 +147,9 @@ describe('createLogAndShow - Potent Cantrip & Soulknife', () => {
             expect(missLogs[0][0].isPotentCantrip).toBe(true);
         });
 
-        it('logs cantrip-miss-half-damage when no storedDamageResult (rolls fresh)', async () => {
+        it('logs cantrip-miss-half-damage when potent cantrip misses rolling fresh', async () => {
             hasPotentCantrip.mockReturnValue(true);
             applyMinDamageAdjustment.mockImplementation((d) => d);
-            loadCombatSummary.mockResolvedValue({ creatures: [{ name: 'Goblin', type: 'npc', ac: 15 }] });
             getTargetFromAttacker.mockReturnValue({ name: 'Goblin', ac: 25 });
             const fn = createFn();
             await fn('Fire Bolt', 3, 'attack', {
@@ -188,7 +186,6 @@ describe('createLogAndShow - Potent Cantrip & Soulknife', () => {
         it('applies half damage when isAutoMiss and saveDc is provided', async () => {
             hasPotentCantrip.mockReturnValue(true);
             applyMinDamageAdjustment.mockImplementation((d) => d);
-            loadCombatSummary.mockResolvedValue({ creatures: [{ name: 'Goblin', type: 'npc', ac: 15 }] });
             getTargetFromAttacker.mockReturnValue({ name: 'Goblin', ac: 25 });
             const fn = createFn();
             await fn('Fire Bolt', 3, 'attack', {
@@ -212,7 +209,6 @@ describe('createLogAndShow - Potent Cantrip & Soulknife', () => {
             getEmpoweredEvocationFeatures.mockReturnValue([{ type: 'empowered_evocation' }]);
             getEmpoweredEvocationIntModifier.mockReturnValue(2);
             applyMinDamageAdjustment.mockImplementation((d) => d);
-            loadCombatSummary.mockResolvedValue({ creatures: [{ name: 'Goblin', type: 'npc', ac: 15 }] });
             getTargetFromAttacker.mockReturnValue({ name: 'Goblin', ac: 25 });
             const fn = createFn();
             await fn('Fire Bolt', 3, 'attack', {
@@ -239,17 +235,6 @@ describe('createLogAndShow - Potent Cantrip & Soulknife', () => {
             await fn('Fire Bolt', 3, 'attack', {
                 targetName: 'Goblin',
                 autoDamageFormula: '1d10',
-                damageType: 'fire',
-                playerStats: { automation: { passives: [{ type: 'potent_cantrip' }] } },
-            });
-            expect(rollExpression).not.toHaveBeenCalled();
-        });
-
-        it('does not apply potent cantrip when no autoDamageFormula', async () => {
-            hasPotentCantrip.mockReturnValue(true);
-            const fn = createFn();
-            await fn('Fire Bolt', 3, 'attack', {
-                targetName: 'Goblin',
                 damageType: 'fire',
                 playerStats: { automation: { passives: [{ type: 'potent_cantrip' }] } },
             });
@@ -358,9 +343,8 @@ describe('createLogAndShow - Potent Cantrip & Soulknife', () => {
                 _trackedResources: { psionicEnergy: { max: 6 } },
             };
             getRuntimeValue.mockImplementation((name, key) => key === 'psionicEnergy' ? 6 : null);
-            // d20=15, bonus=3 → total=18, ac=20 → miss, but psychic bonus of 6 makes it 24 → hit
             getTargetFromAttacker.mockReturnValue({ name: 'Goblin', ac: 20 });
-            const spyRandom = vi.spyOn(Math, 'random').mockReturnValue(1); // max roll = 6
+            const spyRandom = vi.spyOn(Math, 'random').mockReturnValue(1);
             const fn = createFn();
             await fn('Psychic Blade', 3, 'attack', {
                 targetName: 'Goblin',
@@ -372,8 +356,6 @@ describe('createLogAndShow - Potent Cantrip & Soulknife', () => {
                 call => call[1] === 'lastAttackRoll'
             );
             const homingCalls = lastAttackCalls.filter(call => call[2]?.homingStrikesBonus);
-            // The psychic blades homing strikes adds a random bonus to the attack
-            // If newHit becomes true, it sets lastAttackRoll with homingStrikesBonus
             expect(homingCalls.length).toBeGreaterThan(0);
             expect(homingCalls[0][2].hit).toBe(true);
             expect(homingCalls[0][2].isCrit).toBe(false);

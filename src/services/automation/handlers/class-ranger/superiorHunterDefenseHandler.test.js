@@ -129,40 +129,11 @@ describe('superiorHunterDefenseHandler', () => {
             }));
         });
 
-        it('preserves existing buffs when adding the resistance buff', async () => {
+        it('manages existing buffs correctly when adding the resistance buff', async () => {
+            // Preserve existing buffs and replace existing Superior Hunter Defense
             const existingBuffs = [
                 { name: 'Shield', effect: 'ac_bonus', resistanceTypes: [] },
-                { name: 'Other Feature', effect: 'damage_resistance', resistanceTypes: ['cold'] },
-            ];
-            getRuntimeValue.mockReturnValue(existingBuffs);
-            damageRollback.findLastAttack.mockResolvedValue({
-                attackEvent: { damageType: 'lightning', primaryDamage: 12, targetName: 'Test Ranger' },
-                attackerName: 'Dragon',
-                targetName: 'Test Ranger',
-                primaryDamage: 12,
-                secondaryDamage: 0,
-                totalDamage: 12,
-                damageTypes: ['lightning'],
-            });
-
-            await handle(makeAction(), makePlayerStats(), 'test-campaign');
-
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'Test Ranger',
-                'activeBuffs',
-                expect.arrayContaining([
-                    expect.objectContaining({ name: 'Shield' }),
-                    expect.objectContaining({ name: 'Other Feature' }),
-                    expect.objectContaining({ name: "Superior Hunter's Defense", resistanceTypes: ['lightning'] }),
-                ]),
-                'test-campaign'
-            );
-        });
-
-        it('replaces existing Superior Hunter Defense buff when reactivated', async () => {
-            const existingBuffs = [
                 { name: "Superior Hunter's Defense", effect: 'damage_resistance', resistanceTypes: ['cold'] },
-                { name: 'Shield', effect: 'ac_bonus', resistanceTypes: [] },
             ];
             getRuntimeValue.mockReturnValue(existingBuffs);
             damageRollback.findLastAttack.mockResolvedValue({
@@ -178,11 +149,16 @@ describe('superiorHunterDefenseHandler', () => {
             await handle(makeAction(), makePlayerStats(), 'test-campaign');
 
             const buffsArg = setRuntimeValue.mock.calls[0][2];
+
+            // Shield preserved
+            expect(buffsArg).toEqual(expect.arrayContaining([
+                expect.objectContaining({ name: 'Shield' }),
+            ]));
+
+            // Only one Superior Hunter Defense buff (replaced, not duplicated)
             const shdBuffs = buffsArg.filter(b => b.name === "Superior Hunter's Defense");
             expect(shdBuffs).toHaveLength(1);
             expect(shdBuffs[0].resistanceTypes).toEqual(['acid']);
-
-            expect(buffsArg).toHaveLength(2);
         });
 
         it('defaults to untyped when attackEvent has no damageType', async () => {
@@ -210,30 +186,6 @@ describe('superiorHunterDefenseHandler', () => {
             );
         });
 
-        it('uses damageTypes array from lastAttack when available', async () => {
-            getRuntimeValue.mockReturnValue([]);
-            damageRollback.findLastAttack.mockResolvedValue({
-                attackEvent: { damageType: 'cold', primaryDamage: 8, targetName: 'Test Ranger' },
-                attackerName: 'Orc',
-                targetName: 'Test Ranger',
-                primaryDamage: 8,
-                secondaryDamage: 0,
-                totalDamage: 8,
-                damageTypes: ['cold'],
-            });
-
-            await handle(makeAction(), makePlayerStats(), 'test-campaign');
-
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'Test Ranger',
-                'activeBuffs',
-                expect.arrayContaining([
-                    expect.objectContaining({ resistanceTypes: ['cold'] }),
-                ]),
-                'test-campaign'
-            );
-        });
-
         it('uses totalDamage in the popup description', async () => {
             getRuntimeValue.mockReturnValue([]);
             damageRollback.findLastAttack.mockResolvedValue({
@@ -251,7 +203,7 @@ describe('superiorHunterDefenseHandler', () => {
             expect(result.payload.description).toContain('15 lightning');
         });
 
-        it('handles empty stored activeBuffs by treating as empty array', async () => {
+        it('handles null stored activeBuffs by treating as empty array', async () => {
             getRuntimeValue.mockReturnValue(null);
             damageRollback.findLastAttack.mockResolvedValue({
                 attackEvent: { damageType: 'fire', primaryDamage: 7, targetName: 'Test Ranger' },

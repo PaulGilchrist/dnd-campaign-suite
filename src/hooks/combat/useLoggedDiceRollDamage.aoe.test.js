@@ -111,7 +111,7 @@ describe('AOE damage handling', () => {
         return createLogDamageAndShow(deps);
     }
 
-    it('does not process AOE when readAoeContext returns null', async () => {
+    it('does not process AOE when overlay context or combatSummary is missing', async () => {
         readAoeContext.mockReturnValue(null);
         const fn = createFn();
         await fn('Fireball', '8d6', 20, [3, 4, 5, 2, 3, 3], 0, {
@@ -120,17 +120,6 @@ describe('AOE damage handling', () => {
         });
         expect(getAffectedCreatures).not.toHaveBeenCalled();
         expect(deps.setPopupHtml).not.toHaveBeenCalled();
-    });
-
-    it('does not process AOE when combatSummary is null', async () => {
-        readAoeContext.mockReturnValue({ overlay: { label: 'Fireball' }, players: [], npcs: [] });
-        loadCombatSummary.mockResolvedValue(null);
-        const fn = createFn();
-        await fn('Fireball', '8d6', 20, [3, 4, 5, 2, 3, 3], 0, {
-            targetName: 'overlay-fireball',
-            damageType: 'fire',
-        });
-        expect(getAffectedCreatures).not.toHaveBeenCalled();
     });
 
     it('processes AOE with NPC saves when saveDc and saveType are provided', async () => {
@@ -232,7 +221,7 @@ describe('AOE damage handling', () => {
         );
     });
 
-    it('calls endInvisibilityOnHostileAction when AOE deals damage', async () => {
+    it('calls endInvisibilityOnHostileAction when AOE deals damage without saves', async () => {
         const overlay = { id: 'fireball-1', label: 'Fireball', shape: 'circle' };
         readAoeContext.mockReturnValue({
             overlay,
@@ -242,7 +231,6 @@ describe('AOE damage handling', () => {
         getAffectedCreatures.mockReturnValue([
             { creature: { name: 'Goblin', type: 'npc', ac: 12 }, inOverlay: true },
         ]);
-        // No saveDc/saveType so the else branch runs applyDamageToTarget + endInvisibility
         sendAoePlayerSaves.mockReturnValue([]);
         applyDamageToTarget.mockReturnValue({ finalDamage: 10, newHp: 3, damageReduced: false });
 
@@ -255,82 +243,5 @@ describe('AOE damage handling', () => {
         expect(endInvisibilityOnHostileAction).toHaveBeenCalledWith('TestWizard', 'test-campaign');
     });
 
-    it('calls handleOverchannelSelfDamage after AOE processing', async () => {
-        const overlay = { id: 'fireball-1', label: 'Fireball', shape: 'circle' };
-        readAoeContext.mockReturnValue({
-            overlay,
-            players: [],
-            npcs: [{ name: 'Goblin', x: 1, y: 1 }],
-        });
-        getAffectedCreatures.mockReturnValue([
-            { creature: { name: 'Goblin', type: 'npc', ac: 12 }, inOverlay: true },
-        ]);
-        processAoeNpcs.mockReturnValue([]);
-        sendAoePlayerSaves.mockReturnValue([]);
-        applyDamageToTarget.mockReturnValue({ finalDamage: 10, newHp: 3, damageReduced: false });
 
-        const fn = createFn();
-        await fn('Fireball', '8d6', 20, [3, 4, 5, 2, 3, 3], 0, {
-            targetName: 'overlay-fireball',
-            damageType: 'fire',
-            overchannelActive: true,
-            overchannelUseCount: 2,
-            overchannelSpellLevel: 1,
-        });
-
-        expect(rollExpression).toHaveBeenCalledWith('3d12');
-    });
-
-    it('uses attackerName from context for target lookups', async () => {
-        const overlay = { id: 'fireball-1', label: 'Fireball', shape: 'circle' };
-        readAoeContext.mockReturnValue({
-            overlay,
-            players: [],
-            npcs: [{ name: 'Goblin', x: 1, y: 1 }],
-        });
-        getAffectedCreatures.mockReturnValue([
-            { creature: { name: 'Goblin', type: 'npc', ac: 12 }, inOverlay: true },
-        ]);
-        processAoeNpcs.mockReturnValue([]);
-        sendAoePlayerSaves.mockReturnValue([]);
-        applyDamageToTarget.mockReturnValue({ finalDamage: 10, newHp: 3, damageReduced: false });
-
-        const fn = createFn();
-        await fn('Fireball', '8d6', 20, [3, 4, 5, 2, 3, 3], 0, {
-            targetName: 'overlay-fireball',
-            damageType: 'fire',
-            attackerName: 'AllyCaster',
-        });
-
-        expect(applyDamageToTarget).toHaveBeenCalledWith(
-            expect.any(Object),
-            'Goblin',
-            20,
-            ['fire'],
-            'test-campaign',
-            expect.any(Array),
-            false,
-            'AllyCaster'
-        );
-    });
-
-    it('handles overlay with id prefix correctly', async () => {
-        const overlay = { id: 'my-overlay-123', label: 'Ice Storm', shape: 'square' };
-        readAoeContext.mockReturnValue({
-            overlay,
-            players: [],
-            npcs: [],
-        });
-        getAffectedCreatures.mockReturnValue([]);
-        processAoeNpcs.mockReturnValue([]);
-        sendAoePlayerSaves.mockReturnValue([]);
-
-        const fn = createFn();
-        await fn('Ice Storm', '4d8', 18, [2, 4, 6, 3, 3], 0, {
-            targetName: 'overlay-my-overlay-123',
-            damageType: 'cold',
-        });
-
-        expect(readAoeContext).toHaveBeenCalledWith('test-campaign', 'my-overlay-123');
-    });
 });

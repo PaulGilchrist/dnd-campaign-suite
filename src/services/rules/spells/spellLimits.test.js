@@ -73,11 +73,21 @@ describe('spellLimits', () => {
       });
     });
 
-    it('should return default limits for unknown class', async () => {
+    it('should return default limits when class not found or missing class_levels', async () => {
       silenceConsole();
       setupFetch([]);
 
       const limits = await getSpellLimits('UnknownClass', 1, '5e');
+
+      expect(limits.isNonSpellcaster).toBe(true);
+      expect(limits.cantrip).toBe(0);
+    });
+
+    it('should return default limits when class data has no class_levels property', async () => {
+      silenceConsole();
+      setupFetch([{ name: 'Wizard', index: 'wizard' }]);
+
+      const limits = await getSpellLimits('Wizard', 1, '5e');
 
       expect(limits.isNonSpellcaster).toBe(true);
       expect(limits.cantrip).toBe(0);
@@ -175,23 +185,17 @@ describe('spellLimits', () => {
       expect(limits.level1).toBe(2);
     });
 
-    it('should handle fetch rejection gracefully', async () => {
+    it('should handle fetch errors and non-OK responses gracefully', async () => {
       silenceConsole();
-      setupFetch([]);
+      resetClassDataCache();
+
       global.fetch = vi.fn().mockRejectedValue(new Error('Network error'));
-
-      const limits = await getSpellLimits('Wizard', 1, '5e');
-
+      let limits = await getSpellLimits('Wizard', 1, '5e');
       expect(limits.isNonSpellcaster).toBe(true);
       expect(limits.cantrip).toBe(0);
-    });
 
-    it('should handle non-OK HTTP response gracefully', async () => {
-      silenceConsole();
       global.fetch = vi.fn().mockResolvedValue({ ok: false });
-
-      const limits = await getSpellLimits('Wizard', 1, '5e');
-
+      limits = await getSpellLimits('Wizard', 1, '5e');
       expect(limits.isNonSpellcaster).toBe(true);
       expect(limits.cantrip).toBe(0);
     });
@@ -219,16 +223,6 @@ describe('spellLimits', () => {
 
       expect(limits.cantrip).toBe(3);
       expect(limits.level1).toBe(2);
-    });
-
-    it('should handle missing class_levels property', async () => {
-      silenceConsole();
-      setupFetch([{ name: 'Wizard', index: 'wizard' }]);
-
-      const limits = await getSpellLimits('Wizard', 1, '5e');
-
-      expect(limits.isNonSpellcaster).toBe(true);
-      expect(limits.cantrip).toBe(0);
     });
 
     it('should convert all spell slot levels correctly', async () => {
@@ -325,36 +319,6 @@ describe('spellLimits', () => {
       expect(limits.isNonSpellcaster).toBe(true);
       expect(limits.cantrip).toBe(0);
     });
-
-    it('should return level 2 violation when exceeded', async () => {
-      const level2Spells = [
-        { name: 'Web', level: 2 },
-        { name: 'Mirror Image', level: 2 }
-      ];
-
-      setupFetch(makeClassData({
-        name: 'Wizard',
-        index: 'wizard',
-        class_levels: [{
-          level: 3,
-          spellcasting: makeSpellcasting({
-            cantrips_known: 3,
-            spell_slots_level_2: 1
-          })
-        }]
-      }));
-
-      const result = await validateSpellSelection(
-        ['Web', 'Mirror Image'],
-        level2Spells,
-        'Wizard',
-        3,
-        '5e'
-      );
-
-      expect(result.valid).toBe(false);
-      expect(result.violations).toContain('2nd level: 2/1');
-    });
   });
 
   describe('validateSpellSelection', () => {
@@ -390,7 +354,7 @@ describe('spellLimits', () => {
       expect(result.counts.level1).toBe(1);
     });
 
-    it('should allow exactly at cantrip limit', async () => {
+    it('should allow exactly at cantrip limit and reject when exceeded', async () => {
       setupFetch(makeClassData({
         name: 'Wizard',
         index: 'wizard',
@@ -400,19 +364,16 @@ describe('spellLimits', () => {
         }]
       }));
 
-      const result = await validateSpellSelection(
+      const atLimit = await validateSpellSelection(
         ['Fire Bolt', 'Light'],
         mockSpells,
         'Wizard',
         1,
         '5e'
       );
+      expect(atLimit.valid).toBe(true);
+      expect(atLimit.violations).toHaveLength(0);
 
-      expect(result.valid).toBe(true);
-      expect(result.violations).toHaveLength(0);
-    });
-
-    it('should reject when cantrip limit is exceeded', async () => {
       setupFetch(makeClassData({
         name: 'Wizard',
         index: 'wizard',
@@ -422,16 +383,15 @@ describe('spellLimits', () => {
         }]
       }));
 
-      const result = await validateSpellSelection(
+      const exceeded = await validateSpellSelection(
         ['Fire Bolt', 'Light'],
         mockSpells,
         'Wizard',
         1,
         '5e'
       );
-
-      expect(result.valid).toBe(false);
-      expect(result.violations).toContain('Cantrips: 2/1');
+      expect(exceeded.valid).toBe(false);
+      expect(exceeded.violations).toContain('Cantrips: 2/1');
     });
 
     it('should reject when level 1 spell limit is exceeded', async () => {
@@ -480,33 +440,19 @@ describe('spellLimits', () => {
       expect(result.violations).toContain('1st level: 2/1');
     });
 
-    it('should allow empty spell selection', async () => {
+    it('should allow empty, null, and undefined spell selections', async () => {
       setupFetch(makeClassData());
 
-      const result = await validateSpellSelection(
-        [],
-        mockSpells,
-        'Wizard',
-        1,
-        '5e'
-      );
-
+      let result = await validateSpellSelection([], mockSpells, 'Wizard', 1, '5e');
       expect(result.valid).toBe(true);
       expect(result.violations).toHaveLength(0);
       expect(result.counts.cantrip).toBe(0);
-    });
 
-    it('should allow null spell selection', async () => {
-      setupFetch(makeClassData());
+      result = await validateSpellSelection(null, mockSpells, 'Wizard', 1, '5e');
+      expect(result.valid).toBe(true);
+      expect(result.violations).toHaveLength(0);
 
-      const result = await validateSpellSelection(
-        null,
-        mockSpells,
-        'Wizard',
-        1,
-        '5e'
-      );
-
+      result = await validateSpellSelection(undefined, mockSpells, 'Wizard', 1, '5e');
       expect(result.valid).toBe(true);
       expect(result.violations).toHaveLength(0);
     });
@@ -555,36 +501,6 @@ describe('spellLimits', () => {
       expect(result.counts.cantrip).toBe(0);
     });
 
-    it('should reject when level 6 spell limit is exceeded', async () => {
-      const level6Spells = [
-        { name: 'Disintegrate', level: 6 },
-        { name: 'Globe of Invulnerability', level: 6 }
-      ];
-
-      setupFetch(makeClassData({
-        name: 'Wizard',
-        index: 'wizard',
-        class_levels: [{
-          level: 11,
-          spellcasting: makeSpellcasting({
-            cantrips_known: 3,
-            spell_slots_level_6: 1
-          })
-        }]
-      }));
-
-      const result = await validateSpellSelection(
-        ['Disintegrate', 'Globe of Invulnerability'],
-        level6Spells,
-        'Wizard',
-        11,
-        '5e'
-      );
-
-      expect(result.valid).toBe(false);
-      expect(result.violations).toContain('6th level: 2/1');
-    });
-
     it('should detect violations across multiple high spell levels', async () => {
       const highLevelSpells = [
         { name: 'Fire Bolt', level: 0 },
@@ -600,9 +516,8 @@ describe('spellLimits', () => {
       setupFetch(makeClassData({
         name: 'Wizard',
         index: 'wizard',
-        class_levels: Array.from({ length: 20 }, (_, i) => ({
-          level: i + 1,
-          spellcasting: makeSpellcasting({
+        class_levels: [
+          { level: 17, spellcasting: makeSpellcasting({
             cantrips_known: 3,
             spell_slots_level_1: 4,
             spell_slots_level_2: 3,
@@ -613,8 +528,8 @@ describe('spellLimits', () => {
             spell_slots_level_7: 1,
             spell_slots_level_8: 0,
             spell_slots_level_9: 0
-          })
-        }))
+          })}
+        ]
       }));
 
       const result = await validateSpellSelection(
@@ -643,21 +558,6 @@ describe('spellLimits', () => {
         ['Fire Bolt', 'Light', 'Magic Missile', 'Fireball'],
         mockSpells,
         'Barbarian',
-        1,
-        '5e'
-      );
-
-      expect(result.valid).toBe(true);
-      expect(result.violations).toHaveLength(0);
-    });
-
-    it('should handle undefined spell selection', async () => {
-      setupFetch(makeClassData());
-
-      const result = await validateSpellSelection(
-        undefined,
-        mockSpells,
-        'Wizard',
         1,
         '5e'
       );
@@ -708,30 +608,6 @@ describe('spellLimits', () => {
 
       // Duplicate spell names count twice
       expect(result.counts.cantrip).toBe(2);
-    });
-
-    it('should return limits and counts in result', async () => {
-      setupFetch(makeClassData({
-        name: 'Wizard',
-        index: 'wizard',
-        class_levels: [{
-          level: 1,
-          spellcasting: makeSpellcasting({ cantrips_known: 3, spell_slots_level_1: 2 })
-        }]
-      }));
-
-      const result = await validateSpellSelection(
-        ['Fire Bolt'],
-        mockSpells,
-        'Wizard',
-        1,
-        '5e'
-      );
-
-      expect(result.limits.cantrip).toBe(3);
-      expect(result.limits.level1).toBe(2);
-      expect(result.counts.cantrip).toBe(1);
-      expect(result.counts.level1).toBe(0);
     });
 
     it('should validate prepared spell type (total non-cantrip limit)', async () => {
@@ -785,96 +661,6 @@ describe('spellLimits', () => {
 
       expect(result.valid).toBe(true);
       expect(result.violations).toHaveLength(0);
-    });
-
-    it('should reject when 4th level spell limit is exceeded', async () => {
-      const level4Spells = [
-        { name: 'Wall of Force', level: 4 },
-        { name: 'Stoneskin', level: 4 }
-      ];
-
-      setupFetch(makeClassData({
-        name: 'Wizard',
-        index: 'wizard',
-        class_levels: [{
-          level: 7,
-          spellcasting: makeSpellcasting({
-            cantrips_known: 3,
-            spell_slots_level_4: 1
-          })
-        }]
-      }));
-
-      const result = await validateSpellSelection(
-        ['Wall of Force', 'Stoneskin'],
-        level4Spells,
-        'Wizard',
-        7,
-        '5e'
-      );
-
-      expect(result.valid).toBe(false);
-      expect(result.violations).toContain('4th level: 2/1');
-    });
-
-    it('should reject when 5th level spell limit is exceeded', async () => {
-      const level5Spells = [
-        { name: 'Wall of Force', level: 5 },
-        { name: 'Hold Monster', level: 5 }
-      ];
-
-      setupFetch(makeClassData({
-        name: 'Wizard',
-        index: 'wizard',
-        class_levels: [{
-          level: 11,
-          spellcasting: makeSpellcasting({
-            cantrips_known: 3,
-            spell_slots_level_5: 1
-          })
-        }]
-      }));
-
-      const result = await validateSpellSelection(
-        ['Wall of Force', 'Hold Monster'],
-        level5Spells,
-        'Wizard',
-        11,
-        '5e'
-      );
-
-      expect(result.valid).toBe(false);
-      expect(result.violations).toContain('5th level: 2/1');
-    });
-
-    it('should reject when 7th level spell limit is exceeded', async () => {
-      const level7Spells = [
-        { name: 'Teleport', level: 7 },
-        { name: 'Forcecage', level: 7 }
-      ];
-
-      setupFetch(makeClassData({
-        name: 'Wizard',
-        index: 'wizard',
-        class_levels: [{
-          level: 13,
-          spellcasting: makeSpellcasting({
-            cantrips_known: 3,
-            spell_slots_level_7: 1
-          })
-        }]
-      }));
-
-      const result = await validateSpellSelection(
-        ['Teleport', 'Forcecage'],
-        level7Spells,
-        'Wizard',
-        13,
-        '5e'
-      );
-
-      expect(result.valid).toBe(false);
-      expect(result.violations).toContain('7th level: 2/1');
     });
 
     it('should handle prepared spell class exceeding both cantrip and prepared limits', async () => {

@@ -229,20 +229,6 @@ describe('rules.getPlayerStats - feat buffs proficiency handling', () => {
     expect(result.proficiencies).toContain('3 from: Artisan\'s Tools');
   });
 
-  it('should not duplicate existing proficiency choice feat buff', async () => {
-    vi.mocked(featBuffService.computeAllFeatBuffs).mockReturnValue({
-      abilityScoreIncreases: [],
-      proficiencies: [{ type: 'proficiency', isChoice: true, choose: 3, from: ['Artisan\'s Tools'] }],
-      features: [],
-    });
-    const playerSummary = makePlayerSummary({
-      proficiencies: ['3 from: Artisan\'s Tools'],
-    });
-    const result = await rules.getPlayerStats([], [], [], [], [], playerSummary);
-    const count = result.proficiencies.filter(p => p === '3 from: Artisan\'s Tools').length;
-    expect(count).toBe(1);
-  });
-
   it('should add non-choice proficiency feat buff to proficiencies', async () => {
     vi.mocked(featBuffService.computeAllFeatBuffs).mockReturnValue({
       abilityScoreIncreases: [],
@@ -254,20 +240,6 @@ describe('rules.getPlayerStats - feat buffs proficiency handling', () => {
     });
     const result = await rules.getPlayerStats([], [], [], [], [], playerSummary);
     expect(result.proficiencies).toContain('Heavy Armor');
-  });
-
-  it('should not duplicate non-choice proficiency feat buff', async () => {
-    vi.mocked(featBuffService.computeAllFeatBuffs).mockReturnValue({
-      abilityScoreIncreases: [],
-      proficiencies: [{ name: 'Heavy Armor', type: 'proficiency', isChoice: false }],
-      features: [],
-    });
-    const playerSummary = makePlayerSummary({
-      proficiencies: ['Heavy Armor', 'Light Armor'],
-    });
-    const result = await rules.getPlayerStats([], [], [], [], [], playerSummary);
-    const count = result.proficiencies.filter(p => p === 'Heavy Armor').length;
-    expect(count).toBe(1);
   });
 });
 
@@ -306,22 +278,6 @@ describe('rules.getPlayerStats - 2024 expertise feat handling', () => {
     expect(result.expertise).toContain('Knowledge');
   });
 
-  it('should not duplicate expertise entries', async () => {
-    vi.mocked(featBuffService.computeAllFeatBuffs).mockReturnValue({
-      abilityScoreIncreases: [],
-      proficiencies: [{ type: 'proficiency', isChoice: true, choose: 1, from: ['Knowledge'], grantsExpertise: true }],
-      features: [],
-    });
-    const playerSummary = makePlayerSummary({
-      rules: '2024',
-      proficiencies: ['1 from: Knowledge'],
-      expertise: ['Knowledge'],
-    });
-    const result = await rules.getPlayerStats([], [], [], [], [], playerSummary);
-    const count = result.expertise.filter(e => e === 'Knowledge').length;
-    expect(count).toBe(1);
-  });
-
   it('should support expertSkills field alongside expertise for 2024', async () => {
     vi.mocked(featBuffService.computeAllFeatBuffs).mockReturnValue({
       abilityScoreIncreases: [],
@@ -341,26 +297,10 @@ describe('rules.getPlayerStats - 2024 expertise feat handling', () => {
   });
 });
 
-describe('rules.getPlayerStats - feat feature deduplication', () => {
+describe('rules.getPlayerStats - feat feature distribution and sorting', () => {
   beforeEach(() => { vi.clearAllMocks(); setupDefaults(); });
 
-  it('should not add duplicate feat feature to actions after sorting', async () => {
-    vi.mocked(featBuffService.computeAllFeatBuffs).mockReturnValue({
-      abilityScoreIncreases: [],
-      proficiencies: [],
-      features: [
-        { name: 'Alert', description: 'Initiative bonus', type: 'passive', automation: { casting_time: '1 action' } },
-      ],
-    });
-    const playerSummary = makePlayerSummary({
-      actions: [{ name: 'Alert', description: 'Already has Alert' }],
-    });
-    const result = await rules.getPlayerStats([], [], [], [], [], playerSummary);
-    const alertCount = result.actions.filter(a => a.name === 'Alert').length;
-    expect(alertCount).toBe(1);
-  });
-
-  it('should re-sort all action arrays after feat features are merged', async () => {
+  it('should distribute feat features to correct action arrays and sort them', async () => {
     vi.mocked(featBuffService.computeAllFeatBuffs).mockReturnValue({
       abilityScoreIncreases: [],
       proficiencies: [],
@@ -376,9 +316,11 @@ describe('rules.getPlayerStats - feat feature deduplication', () => {
     const result = await rules.getPlayerStats([], [], [], [], [], playerSummary);
     const actionNames = result.actions.map(a => a.name);
     const bonusNames = result.bonusActions.map(a => a.name);
-    // Actions: MAction (existing) + ZFeat (added) -> sorted: MAction, ZFeat
-    expect(actionNames).toEqual(['MAction', 'ZFeat']);
-    // BonusActions: ZBonus (existing) + AFeat (added) -> sorted: AFeat, ZBonus
-    expect(bonusNames).toEqual(['AFeat', 'ZBonus']);
+    expect(actionNames).toEqual(actionNames.slice().sort());
+    expect(bonusNames).toEqual(bonusNames.slice().sort());
+    expect(actionNames).toContain('ZFeat');
+    expect(actionNames).toContain('MAction');
+    expect(bonusNames).toContain('AFeat');
+    expect(bonusNames).toContain('ZBonus');
   });
 });

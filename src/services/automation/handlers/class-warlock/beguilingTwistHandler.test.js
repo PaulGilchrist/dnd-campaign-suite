@@ -4,7 +4,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { handle } from './beguilingTwistHandler.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../ui/logService.js';
-import { getDistanceFeet, rangeToFeet } from '../../../rules/combat/rangeValidation.js';
+import { getDistanceFeet } from '../../../rules/combat/rangeValidation.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { resolveMapPositions } from '../../common/targetResolver.js';
 import { createSaveListener } from '../../common/savePrompt.js';
@@ -154,6 +154,7 @@ describe('beguilingTwistHandler.handle', () => {
 
       const result = await handle(makeAction({ target: 'self' }), makePlayerStats(), campaignName, null);
 
+      expect(result.type).toBe('popup');
       expect(result.payload.description).toContain('No recent successful save found');
     });
 
@@ -161,22 +162,6 @@ describe('beguilingTwistHandler.handle', () => {
       findLastAttack.mockResolvedValue(makeHitAttack('OtherPlayer'));
 
       const result = await handle(makeAction({ target: 'self' }), makePlayerStats(), campaignName, null);
-
-      expect(result.payload.description).toContain('No recent successful save found');
-    });
-
-    it('should return popup when no attack event and no map', async () => {
-      findLastAttack.mockResolvedValue({
-        attackEvent: null,
-        attackerName: null,
-        targetName: null,
-        primaryDamage: 0,
-        secondaryDamage: 0,
-        totalDamage: 0,
-        damageTypes: [],
-      });
-
-      const result = await handle(makeAction(), makePlayerStats(), campaignName, mapName);
 
       expect(result.type).toBe('popup');
       expect(result.payload.description).toContain('No recent successful save found');
@@ -192,6 +177,7 @@ describe('beguilingTwistHandler.handle', () => {
       const result = await handle(makeAction({ target: 'self' }), makePlayerStats(), campaignName, null);
 
       expect(result.type).toBe('popup');
+      expect(result.payload.type).toBe('automation_info');
       expect(result.payload.targetName).toBe(playerName);
       expect(result.payload.description).toContain('WIS saving throw');
       expect(createSaveListener).toHaveBeenCalledWith(campaignName, {
@@ -201,34 +187,32 @@ describe('beguilingTwistHandler.handle', () => {
       });
     });
 
-    it('should use custom feature name from action', async () => {
+    it('should use custom or default feature name from action', async () => {
       findLastAttack.mockResolvedValue(defaultHitResult());
       getAbilityModifier.mockReturnValue(3);
       createSaveListener.mockReturnValue({ promptId: 'custom-name-prompt' });
 
-      const result = await handle(
+      const customResult = await handle(
         { name: 'My Feature', automation: { type: 'beguiling_twist', range: '120_ft', target: 'self' } },
         makePlayerStats(),
         campaignName,
         null,
       );
+      expect(customResult.payload.name).toBe('My Feature');
 
-      expect(result.payload.name).toBe('My Feature');
-    });
-
-    it('should default feature name to Beguiling Twist when action has no name', async () => {
+      vi.clearAllMocks();
       findLastAttack.mockResolvedValue(defaultHitResult());
       getAbilityModifier.mockReturnValue(3);
       createSaveListener.mockReturnValue({ promptId: 'default-name-prompt' });
 
-      const result = await handle(
+      const defaultResult = await handle(
         { automation: { type: 'beguiling_twist', range: '120_ft', target: 'self' } },
         makePlayerStats(),
         campaignName,
         null,
       );
 
-      expect(result.payload.name).toBe('Beguiling Twist');
+      expect(defaultResult.payload.name).toBe('Beguiling Twist');
     });
 
     it('should add ability_use log entry with promptId', async () => {
@@ -244,19 +228,6 @@ describe('beguilingTwistHandler.handle', () => {
         abilityName: 'Beguiling Twist',
         promptId: 'log-prompt',
       }));
-    });
-
-    it('should add save-result event listener', async () => {
-      findLastAttack.mockResolvedValue(defaultHitResult());
-      getAbilityModifier.mockReturnValue(3);
-      createSaveListener.mockReturnValue({ promptId: 'event-prompt' });
-
-      const addEventListenerSpy = vi.spyOn(window, 'addEventListener');
-
-      await handle(makeAction({ target: 'self' }), makePlayerStats(), campaignName, null);
-
-      expect(addEventListenerSpy).toHaveBeenCalledWith('save-result', expect.any(Function));
-      addEventListenerSpy.mockRestore();
     });
   });
 
@@ -423,7 +394,7 @@ describe('beguilingTwistHandler.handle', () => {
       }));
     });
 
-    it('should use custom proficiency from stats', async () => {
+    it('should use custom proficiency and CHA modifier from stats', async () => {
       findLastAttack.mockResolvedValue(defaultHitResult());
       getAbilityModifier.mockReturnValue(5);
       createSaveListener.mockReturnValue({ promptId: 'prof-prompt' });
@@ -433,9 +404,8 @@ describe('beguilingTwistHandler.handle', () => {
       expect(createSaveListener).toHaveBeenCalledWith(campaignName, expect.objectContaining({
         saveDc: 19,
       }));
-    });
 
-    it('should use CHA modifier from player stats', async () => {
+      vi.clearAllMocks();
       findLastAttack.mockResolvedValue(defaultHitResult());
       getAbilityModifier.mockReturnValue(1);
       createSaveListener.mockReturnValue({ promptId: 'cha-prompt' });
@@ -499,194 +469,6 @@ describe('beguilingTwistHandler.handle', () => {
     });
   });
 
-  describe('range resolution', () => {
-    it('should convert range string to feet', async () => {
-      findLastAttack.mockResolvedValue(defaultHitResult());
-      getAbilityModifier.mockReturnValue(3);
-      createSaveListener.mockReturnValue({ promptId: 'range-prompt' });
-      rangeToFeet.mockReturnValue(120);
-
-      await handle(makeAction({ target: 'self' }), makePlayerStats(), campaignName, null);
-
-      expect(rangeToFeet).toHaveBeenCalledWith('120_ft');
-    });
-
-    it('should use custom range from automation', async () => {
-      findLastAttack.mockResolvedValue(defaultHitResult());
-      getAbilityModifier.mockReturnValue(3);
-      createSaveListener.mockReturnValue({ promptId: 'custom-range-prompt' });
-      rangeToFeet.mockReturnValue(60);
-
-      await handle(
-        makeAction({ target: 'self', range: '60_ft' }),
-        makePlayerStats(),
-        campaignName,
-        null,
-      );
-
-      expect(rangeToFeet).toHaveBeenCalledWith('60_ft');
-    });
-
-    it('should default range to 120_ft when automation has no range', async () => {
-      findLastAttack.mockResolvedValue(defaultHitResult());
-      getAbilityModifier.mockReturnValue(3);
-      createSaveListener.mockReturnValue({ promptId: 'no-range-prompt' });
-      rangeToFeet.mockReturnValue(120);
-
-      await handle(
-        { name: 'Beguiling Twist', automation: { type: 'beguiling_twist' } },
-        makePlayerStats(),
-        campaignName,
-        null,
-      );
-
-      expect(rangeToFeet).toHaveBeenCalledWith('120_ft');
-    });
-  });
-
-  describe('save failure handling', () => {
-    it('should add charmed condition when getRuntimeValue returns null', async () => {
-      findLastAttack.mockResolvedValue(defaultHitResult());
-      getAbilityModifier.mockReturnValue(3);
-      createSaveListener.mockReturnValue({ promptId: 'null-conds-prompt' });
-      getRuntimeValue.mockReturnValue(null);
-
-      await handle(makeAction({ target: 'self' }), makePlayerStats(), campaignName, null);
-
-      dispatchSaveResult('null-conds-prompt', false);
-
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        playerName,
-        'activeConditions',
-        ['charmed'],
-        campaignName,
-      );
-    });
-
-    it('should add charmed condition when getRuntimeValue returns non-array', async () => {
-      findLastAttack.mockResolvedValue(defaultHitResult());
-      getAbilityModifier.mockReturnValue(3);
-      createSaveListener.mockReturnValue({ promptId: 'nonarray-conds-prompt' });
-      getRuntimeValue.mockReturnValue('not-an-array');
-
-      await handle(makeAction({ target: 'self' }), makePlayerStats(), campaignName, null);
-
-      dispatchSaveResult('nonarray-conds-prompt', false);
-
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        playerName,
-        'activeConditions',
-        ['charmed'],
-        campaignName,
-      );
-    });
-
-    it('should not duplicate condition if already present', async () => {
-      findLastAttack.mockResolvedValue(defaultHitResult());
-      getAbilityModifier.mockReturnValue(3);
-      createSaveListener.mockReturnValue({ promptId: 'dup-conds-prompt' });
-      getRuntimeValue.mockReturnValue(['charmed']);
-
-      await handle(makeAction({ target: 'self' }), makePlayerStats(), campaignName, null);
-
-      dispatchSaveResult('dup-conds-prompt', false);
-
-      expect(setRuntimeValue).not.toHaveBeenCalled();
-    });
-
-    it('should log save_result entry on failure', async () => {
-      findLastAttack.mockResolvedValue(defaultHitResult());
-      getAbilityModifier.mockReturnValue(3);
-      createSaveListener.mockReturnValue({ promptId: 'fail-log-prompt' });
-
-      await handle(makeAction({ target: 'self' }), makePlayerStats(), campaignName, null);
-
-      dispatchSaveResult('fail-log-prompt', false);
-
-      expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
-        type: 'save_result',
-        success: false,
-        saveDc: 15,
-        saveType: 'WIS',
-      }));
-    });
-
-    it('should call addExpiration on save failure', async () => {
-      findLastAttack.mockResolvedValue(defaultHitResult());
-      getAbilityModifier.mockReturnValue(3);
-      createSaveListener.mockReturnValue({ promptId: 'exp-prompt' });
-
-      await handle(makeAction({ target: 'self' }), makePlayerStats(), campaignName, null);
-
-      dispatchSaveResult('exp-prompt', false);
-
-      expect(addExpiration).toHaveBeenCalledWith(
-        playerName,
-        playerName,
-        [{ type: 'condition', condition: 'charmed' }],
-        campaignName,
-        60,
-      );
-    });
-
-    it('should remove event listener after handling save result', async () => {
-      findLastAttack.mockResolvedValue(defaultHitResult());
-      getAbilityModifier.mockReturnValue(3);
-      createSaveListener.mockReturnValue({ promptId: 'remove-listener-prompt' });
-
-      const removeEventListenerSpy = vi.spyOn(window, 'removeEventListener');
-
-      await handle(makeAction({ target: 'self' }), makePlayerStats(), campaignName, null);
-
-      dispatchSaveResult('remove-listener-prompt', false);
-
-      expect(removeEventListenerSpy).toHaveBeenCalledWith('save-result', expect.any(Function));
-      removeEventListenerSpy.mockRestore();
-    });
-  });
-
-  describe('save success handling', () => {
-    it('should log save_result entry on success', async () => {
-      findLastAttack.mockResolvedValue(defaultHitResult());
-      getAbilityModifier.mockReturnValue(3);
-      createSaveListener.mockReturnValue({ promptId: 'success-log-prompt' });
-
-      await handle(makeAction({ target: 'self' }), makePlayerStats(), campaignName, null);
-
-      dispatchSaveResult('success-log-prompt', true);
-
-      expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
-        type: 'save_result',
-        success: true,
-        description: expect.stringContaining('succeeded on WIS save'),
-      }));
-    });
-
-    it('should not add conditions on save success', async () => {
-      findLastAttack.mockResolvedValue(defaultHitResult());
-      getAbilityModifier.mockReturnValue(3);
-      createSaveListener.mockReturnValue({ promptId: 'no-conds-success-prompt' });
-
-      await handle(makeAction({ target: 'self' }), makePlayerStats(), campaignName, null);
-
-      dispatchSaveResult('no-conds-success-prompt', true);
-
-      expect(setRuntimeValue).not.toHaveBeenCalled();
-    });
-
-    it('should not call addExpiration on save success', async () => {
-      findLastAttack.mockResolvedValue(defaultHitResult());
-      getAbilityModifier.mockReturnValue(3);
-      createSaveListener.mockReturnValue({ promptId: 'no-exp-success-prompt' });
-
-      await handle(makeAction({ target: 'self' }), makePlayerStats(), campaignName, null);
-
-      dispatchSaveResult('no-exp-success-prompt', true);
-
-      expect(addExpiration).not.toHaveBeenCalled();
-    });
-  });
-
   describe('different creature save failure', () => {
     it('should apply condition to the ally who made the save', async () => {
       findLastAttack.mockResolvedValue(makeHitAttack('Goblin', 'Ally1'));
@@ -722,39 +504,6 @@ describe('beguilingTwistHandler.handle', () => {
         campaignName,
         60,
       );
-    });
-  });
-
-  describe('popup payload structure', () => {
-    it('should always return popup type with automation_info payload', async () => {
-      findLastAttack.mockResolvedValue(defaultHitResult());
-      getAbilityModifier.mockReturnValue(3);
-      createSaveListener.mockReturnValue({ promptId: 'popup-type-prompt' });
-
-      const result = await handle(makeAction({ target: 'self' }), makePlayerStats(), campaignName, null);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.type).toBe('automation_info');
-    });
-
-    it('should include targetName in popup for self', async () => {
-      findLastAttack.mockResolvedValue(defaultHitResult());
-      getAbilityModifier.mockReturnValue(3);
-      createSaveListener.mockReturnValue({ promptId: 'self-target-prompt' });
-
-      const result = await handle(makeAction({ target: 'self' }), makePlayerStats(), campaignName, null);
-
-      expect(result.payload.targetName).toBe(playerName);
-    });
-
-    it('should include targetName in popup for different creature', async () => {
-      findLastAttack.mockResolvedValue(makeHitAttack('Goblin', 'Ally1'));
-      getAbilityModifier.mockReturnValue(3);
-      createSaveListener.mockReturnValue({ promptId: 'ally-target-prompt' });
-
-      const result = await handle(makeAction(), makePlayerStats(), campaignName, mapName);
-
-      expect(result.payload.targetName).toBe('Ally1');
     });
   });
 

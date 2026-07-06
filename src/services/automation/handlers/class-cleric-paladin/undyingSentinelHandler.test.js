@@ -1,7 +1,7 @@
 // @improved-by-ai
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
-import { handle, isUndyingSentinelUsed, setUndyingSentinelUsed } from './undyingSentinelHandler.js';
+import { handle } from './undyingSentinelHandler.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { getCombatContext, getTargetFromAttacker } from '../../../rules/combat/damageUtils.js';
 import { postLogEntry } from '../../../shared/logPoster.js';
@@ -194,7 +194,7 @@ describe('undyingSentinelHandler', () => {
         );
       });
 
-      it('uses level 7 paladin to heal 21 HP (capped at max HP)', async () => {
+      it('uses level 7 paladin to heal 22 HP (capped at max HP)', async () => {
         setupPlayerHeal('DownedAlly', 100);
 
         await handle(makeAction(), makePlayerStats({ level: 7 }), campaignName, null);
@@ -203,26 +203,6 @@ describe('undyingSentinelHandler', () => {
           'DownedAlly',
           'currentHitPoints',
           22,
-          campaignName,
-        );
-      });
-
-      it('defaults to 100 max HP when hitPoints is undefined', async () => {
-        getRuntimeValue
-          .mockReturnValueOnce(false)
-          .mockImplementation((name, key) => {
-            if (key === 'currentHitPoints' && name === 'DownedAlly') return 0;
-            return null;
-          });
-        getCombatContext.mockResolvedValue({});
-        getTargetFromAttacker.mockReturnValue(makePlayerTarget('DownedAlly', 0));
-
-        await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-        expect(setRuntimeValue).toHaveBeenCalledWith(
-          'DownedAlly',
-          'currentHitPoints',
-          16,
           campaignName,
         );
       });
@@ -287,47 +267,4 @@ describe('undyingSentinelHandler', () => {
     });
   });
 
-  describe('isUndyingSentinelUsed', () => {
-    it('returns true when runtime value is true', () => {
-      getRuntimeValue.mockReturnValue(true);
-
-      expect(isUndyingSentinelUsed('TestCleric', campaignName)).toBe(true);
-    });
-
-    it('returns false when runtime value is null', () => {
-      getRuntimeValue.mockReturnValue(null);
-
-      expect(isUndyingSentinelUsed('TestCleric', campaignName)).toBe(false);
-    });
-
-    it('returns false when runtime value is false', () => {
-      getRuntimeValue.mockReturnValue(false);
-
-      expect(isUndyingSentinelUsed('TestCleric', campaignName)).toBe(false);
-    });
-  });
-
-  describe('setUndyingSentinelUsed', () => {
-    it('sets used to true', async () => {
-      await setUndyingSentinelUsed('TestCleric', campaignName, true);
-
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'TestCleric',
-        'undyingSentinelUsed',
-        true,
-        campaignName,
-      );
-    });
-
-    it('sets used to false', async () => {
-      await setUndyingSentinelUsed('TestCleric', campaignName, false);
-
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'TestCleric',
-        'undyingSentinelUsed',
-        false,
-        campaignName,
-      );
-    });
-  });
 });

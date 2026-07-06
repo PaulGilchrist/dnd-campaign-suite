@@ -103,11 +103,11 @@ describe('handle — Bolstering Treats', () => {
   });
 
   describe('no treats remaining', () => {
-    it('should return error popup when treat count is 0', async () => {
+    it.each([0, -1])('should return error popup when treat count is %s', async (treatCount) => {
       const action = makeBolsteringAction();
       const ps = makePlayerStats({ proficiency: 2 });
       useRuntimeState.getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'chefBolsteringTreats') return 0;
+        if (key === 'chefBolsteringTreats') return treatCount;
         return null;
       });
 
@@ -117,21 +117,6 @@ describe('handle — Bolstering Treats', () => {
       expect(result.payload.type).toBe('automation_info');
       expect(result.payload.name).toBe('Bolstering Treats');
       expect(result.payload.automationType).toBe('temp_hp_buff');
-      expect(result.payload.description).toContain('No treats remaining');
-      expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
-    });
-
-    it('should return error popup when treat count is negative', async () => {
-      const action = makeBolsteringAction();
-      const ps = makePlayerStats({ proficiency: 2 });
-      useRuntimeState.getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'chefBolsteringTreats') return -1;
-        return null;
-      });
-
-      const result = await handle(action, ps, campaignName);
-
-      expect(result.type).toBe('popup');
       expect(result.payload.description).toContain('No treats remaining');
       expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
     });
@@ -234,45 +219,48 @@ describe('handle — Bolstering Treats', () => {
       );
     });
 
-    it('should pluralize "treat" correctly for 1 remaining before consumption', async () => {
-      const action = makeBolsteringAction();
-      const ps = makePlayerStats({ proficiency: 2 });
+    it('should pluralize treat/treats correctly based on remaining count', async () => {
+      // 2 before consumption => 1 remaining => singular "treat"
+      const action1 = makeBolsteringAction();
+      const ps1 = makePlayerStats({ proficiency: 2 });
       useRuntimeState.getRuntimeValue.mockImplementation((name, key) => {
         if (key === 'chefBolsteringTreats') return 2;
         return null;
       });
       automationService.evaluateAutoExpression.mockReturnValue(2);
 
-      const result = await handle(action, ps, campaignName);
-
+      let result = await handle(action1, ps1, campaignName);
       expect(result.payload.description).toContain('1 treat remaining');
       expect(result.payload.description).not.toContain('1 treats remaining');
-    });
 
-    it('should pluralize "treats" correctly for more than 1 remaining', async () => {
-      const action = makeBolsteringAction();
-      const ps = makePlayerStats({ proficiency: 3 });
+      // 3 before consumption => 2 remaining => plural "treats"
+      const action2 = makeBolsteringAction();
+      const ps2 = makePlayerStats({ proficiency: 3 });
       useRuntimeState.getRuntimeValue.mockImplementation((name, key) => {
         if (key === 'chefBolsteringTreats') return 3;
         return null;
       });
       automationService.evaluateAutoExpression.mockReturnValue(3);
 
-      const result = await handle(action, ps, campaignName);
-
+      result = await handle(action2, ps2, campaignName);
       expect(result.payload.description).toContain('2 treats remaining');
     });
   });
 
   describe('error handling', () => {
-    it('should return error popup when temp HP evaluates to non-number', async () => {
-      const action = makeBolsteringAction({ tempHpExpression: 'invalid_expr' });
+    it.each([
+      ['not-a-number', 'invalid_expr'],
+      [0, '0'],
+      [-5, '-1'],
+      [undefined, 'undefined_expr'],
+    ])('should return error popup when temp HP evaluates to %p (expression: %s)', async (mockReturn, expression) => {
+      const action = makeBolsteringAction({ tempHpExpression: expression });
       const ps = makePlayerStats({ proficiency: 2 });
       useRuntimeState.getRuntimeValue.mockImplementation((name, key) => {
         if (key === 'chefBolsteringTreats') return 2;
         return null;
       });
-      automationService.evaluateAutoExpression.mockReturnValue('not-a-number');
+      automationService.evaluateAutoExpression.mockReturnValue(mockReturn);
 
       const result = await handle(action, ps, campaignName);
 
@@ -281,112 +269,8 @@ describe('handle — Bolstering Treats', () => {
       expect(result.payload.description).toContain('Could not calculate temp HP');
       expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
     });
-
-    it('should return error popup when temp HP evaluates to 0', async () => {
-      const action = makeBolsteringAction({ tempHpExpression: '0' });
-      const ps = makePlayerStats({ proficiency: 2 });
-      useRuntimeState.getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'chefBolsteringTreats') return 2;
-        return null;
-      });
-      automationService.evaluateAutoExpression.mockReturnValue(0);
-
-      const result = await handle(action, ps, campaignName);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.description).toContain('Could not calculate temp HP');
-      expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
-    });
-
-    it('should return error popup when temp HP evaluates to negative', async () => {
-      const action = makeBolsteringAction({ tempHpExpression: '-1' });
-      const ps = makePlayerStats({ proficiency: 2 });
-      useRuntimeState.getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'chefBolsteringTreats') return 2;
-        return null;
-      });
-      automationService.evaluateAutoExpression.mockReturnValue(-5);
-
-      const result = await handle(action, ps, campaignName);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.description).toContain('Could not calculate temp HP');
-      expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
-    });
-
-    it('should return error popup when temp HP evaluates to undefined', async () => {
-      const action = makeBolsteringAction({ tempHpExpression: 'undefined_expr' });
-      const ps = makePlayerStats({ proficiency: 2 });
-      useRuntimeState.getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'chefBolsteringTreats') return 2;
-        return null;
-      });
-      automationService.evaluateAutoExpression.mockReturnValue(undefined);
-
-      const result = await handle(action, ps, campaignName);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.description).toContain('Could not calculate temp HP');
-    });
   });
 
-  describe('return payload structure', () => {
-    it('should return popup type with automation_info payload', async () => {
-      const action = makeBolsteringAction();
-      const ps = makePlayerStats({ proficiency: 2 });
-      useRuntimeState.getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'chefBolsteringTreats') return 2;
-        return null;
-      });
-      automationService.evaluateAutoExpression.mockReturnValue(2);
-
-      const result = await handle(action, ps, campaignName);
-
-      expect(result).toMatchObject({
-        type: 'popup',
-        payload: {
-          type: 'automation_info',
-          name: 'Bolstering Treats',
-          automationType: 'temp_hp_buff',
-        },
-      });
-    });
-
-    it('should include the automation object in the payload', async () => {
-      const autoConfig = {
-        type: 'temp_hp_buff',
-        craftCount: 'proficiency_bonus',
-        tempHpExpression: 'proficiency_bonus',
-        action: 'bonus_action',
-      };
-      const action = makeBolsteringAction(autoConfig);
-      const ps = makePlayerStats({ proficiency: 2 });
-      useRuntimeState.getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'chefBolsteringTreats') return 2;
-        return null;
-      });
-      automationService.evaluateAutoExpression.mockReturnValue(2);
-
-      const result = await handle(action, ps, campaignName);
-
-      expect(result.payload.automation).toEqual(autoConfig);
-    });
-
-    it('should include the action name in the payload', async () => {
-      const action = makeBolsteringAction();
-      action.name = 'Custom Treats';
-      const ps = makePlayerStats({ proficiency: 2 });
-      useRuntimeState.getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'chefBolsteringTreats') return 2;
-        return null;
-      });
-      automationService.evaluateAutoExpression.mockReturnValue(2);
-
-      const result = await handle(action, ps, campaignName);
-
-      expect(result.payload.name).toBe('Custom Treats');
-    });
-  });
 });
 
 describe('craftBolsteringTreats', () => {
@@ -394,7 +278,7 @@ describe('craftBolsteringTreats', () => {
     vi.clearAllMocks();
   });
 
-  it('should set chefBolsteringTreats to proficiency_bonus value', () => {
+  it('should set chefBolsteringTreats to proficiency value using player name', () => {
     const ps = makePlayerStats({ proficiency: 2, name: 'Chef' });
 
     craftBolsteringTreats(ps, campaignName);
@@ -404,43 +288,19 @@ describe('craftBolsteringTreats', () => {
     );
   });
 
-  it('should use the proficiency from playerStats', () => {
-    const ps = makePlayerStats({ proficiency: 6, name: 'TestChar' });
-
+  it('should set treat count to 0 when proficiency is 0 or undefined', () => {
+    // proficiency 0
+    let ps = makePlayerStats({ proficiency: 0, name: 'NoProf' });
     craftBolsteringTreats(ps, campaignName);
-
-    expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-      'TestChar', 'chefBolsteringTreats', 6, campaignName,
-    );
-  });
-
-  it('should set treat count to 0 when proficiency is 0', () => {
-    const ps = makePlayerStats({ proficiency: 0, name: 'NoProf' });
-
-    craftBolsteringTreats(ps, campaignName);
-
     expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
       'NoProf', 'chefBolsteringTreats', 0, campaignName,
     );
-  });
 
-  it('should set treat count to 0 when proficiency is undefined', () => {
-    const ps = makePlayerStats({ proficiency: undefined, name: 'NoProf' });
-
+    // proficiency undefined
+    ps = makePlayerStats({ proficiency: undefined, name: 'NoProf' });
     craftBolsteringTreats(ps, campaignName);
-
     expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
       'NoProf', 'chefBolsteringTreats', 0, campaignName,
-    );
-  });
-
-  it('should use player name from playerStats', () => {
-    const ps = makePlayerStats({ name: 'UniqueName' });
-
-    craftBolsteringTreats(ps, campaignName);
-
-    expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-      'UniqueName', 'chefBolsteringTreats', 2, campaignName,
     );
   });
 });

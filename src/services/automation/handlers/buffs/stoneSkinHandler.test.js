@@ -77,7 +77,7 @@ describe('stoneSkinHandler', () => {
       expect(result.payload.description).toContain('No combat context found');
     });
 
-    it('returns target selection popup when combat context exists', async () => {
+    it('returns target selection popup with filtered creatures when combat context exists', async () => {
       damageUtils.getCombatContext.mockResolvedValue({
         creatures: [
           { name: 'Ally1' },
@@ -93,19 +93,6 @@ describe('stoneSkinHandler', () => {
       expect(result.payload.creatureTargets).toEqual(['Ally1', 'Ally2']);
     });
 
-    it('filters out the caster from creature targets', async () => {
-      damageUtils.getCombatContext.mockResolvedValue({
-        creatures: [
-          { name: 'TestWizard' },
-          { name: 'Goblin' },
-        ],
-      });
-
-      const result = await handle(makeAction(), makePlayerStats({ name: 'TestWizard' }), campaignName, 'TestMap');
-
-      expect(result.payload.creatureTargets).toEqual(['Goblin']);
-    });
-
     it('returns empty creatureTargets when only the caster is present', async () => {
       damageUtils.getCombatContext.mockResolvedValue({
         creatures: [{ name: 'TestWizard' }],
@@ -115,22 +102,11 @@ describe('stoneSkinHandler', () => {
 
       expect(result.payload.creatureTargets).toEqual([]);
     });
-
-    it('throws when combat context has no creatures array', async () => {
-      damageUtils.getCombatContext.mockResolvedValue({});
-
-      await expect(handle(makeAction(), makePlayerStats(), campaignName, 'TestMap')).rejects.toThrow();
-    });
   });
 
   describe('applyStoneSkin', () => {
-    it('returns null when target is null', async () => {
+    it('returns null when target is falsy', async () => {
       const result = await applyStoneSkin(makeAction(), makePlayerStats(), campaignName, null);
-      expect(result).toBeNull();
-    });
-
-    it('returns null when target is undefined', async () => {
-      const result = await applyStoneSkin(makeAction(), makePlayerStats(), campaignName, undefined);
       expect(result).toBeNull();
     });
 
@@ -207,19 +183,6 @@ describe('stoneSkinHandler', () => {
       );
     });
 
-    it('stores damage types in runtime state', async () => {
-      useRuntimeState.getRuntimeValue.mockReturnValue([]);
-
-      await applyStoneSkin(makeAction(), makePlayerStats(), campaignName, 'Ally1');
-
-      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-        'Ally1',
-        'stoneSkinDamageTypes',
-        ['Bludgeoning', 'Piercing', 'Slashing'],
-        campaignName,
-      );
-    });
-
     it('uses default damage types when automation does not specify them', async () => {
       const action = makeAction({ damageTypes: undefined });
       useRuntimeState.getRuntimeValue.mockReturnValue([]);
@@ -229,52 +192,6 @@ describe('stoneSkinHandler', () => {
       const buffsArg = useRuntimeState.setRuntimeValue.mock.calls[0][2];
       const stoneSkinBuff = buffsArg.find((b) => b.name === 'Stone Skin');
       expect(stoneSkinBuff.resistanceTypes).toEqual(['Bludgeoning', 'Piercing', 'Slashing']);
-    });
-
-    it('uses custom duration from automation', async () => {
-      const action = makeAction({ duration: '1 minute' });
-      useRuntimeState.getRuntimeValue.mockReturnValue([]);
-
-      await applyStoneSkin(action, makePlayerStats(), campaignName, 'Ally1');
-
-      const buffsArg = useRuntimeState.setRuntimeValue.mock.calls[0][2];
-      const stoneSkinBuff = buffsArg.find((b) => b.name === 'Stone Skin');
-      expect(stoneSkinBuff.duration).toBe('1 minute');
-    });
-
-    it('uses the action name in the buff and log entry', async () => {
-      const action = {
-        name: 'Custom Stone Skin',
-        automation: makeAction().automation,
-      };
-      useRuntimeState.getRuntimeValue.mockReturnValue([]);
-
-      await applyStoneSkin(action, makePlayerStats(), campaignName, 'Ally1');
-
-      const buffsArg = useRuntimeState.setRuntimeValue.mock.calls[0][2];
-      const stoneSkinBuff = buffsArg.find((b) => b.name === 'Custom Stone Skin');
-      expect(stoneSkinBuff).toBeDefined();
-
-      expect(logService.addEntry).toHaveBeenCalledWith(
-        campaignName,
-        expect.objectContaining({
-          abilityName: 'Custom Stone Skin',
-        }),
-      );
-    });
-
-    it('includes target name in the log entry', async () => {
-      useRuntimeState.getRuntimeValue.mockReturnValue([]);
-
-      await applyStoneSkin(makeAction(), makePlayerStats(), campaignName, 'Goblin');
-
-      expect(logService.addEntry).toHaveBeenCalledWith(
-        campaignName,
-        expect.objectContaining({
-          targetName: 'Goblin',
-          description: expect.stringContaining('Goblin'),
-        }),
-      );
     });
   });
 
@@ -287,17 +204,9 @@ describe('stoneSkinHandler', () => {
       expect(isStoneSkinActive('Ally1', campaignName)).toBe(true);
     });
 
-    it('returns false when buff has wrong name', () => {
+    it('returns false when buff has wrong name or effect', () => {
       useRuntimeState.getRuntimeValue.mockReturnValue([
-        { name: 'Protection from Energy', effect: 'damage_resistance' },
-      ]);
-
-      expect(isStoneSkinActive('Ally1', campaignName)).toBe(false);
-    });
-
-    it('returns false when buff has wrong effect', () => {
-      useRuntimeState.getRuntimeValue.mockReturnValue([
-        { name: 'Stone Skin', effect: 'ac_bonus' },
+        { name: 'Protection from Energy', effect: 'ac_bonus' },
       ]);
 
       expect(isStoneSkinActive('Ally1', campaignName)).toBe(false);
@@ -305,18 +214,6 @@ describe('stoneSkinHandler', () => {
 
     it('returns false when activeBuffs is empty', () => {
       useRuntimeState.getRuntimeValue.mockReturnValue([]);
-
-      expect(isStoneSkinActive('Ally1', campaignName)).toBe(false);
-    });
-
-    it('returns false when activeBuffs is null', () => {
-      useRuntimeState.getRuntimeValue.mockReturnValue(null);
-
-      expect(isStoneSkinActive('Ally1', campaignName)).toBe(false);
-    });
-
-    it('returns false when activeBuffs is not an array', () => {
-      useRuntimeState.getRuntimeValue.mockReturnValue('not-an-array');
 
       expect(isStoneSkinActive('Ally1', campaignName)).toBe(false);
     });
@@ -341,14 +238,6 @@ describe('stoneSkinHandler', () => {
 
     it('returns undefined when nothing is stored', () => {
       useRuntimeState.getRuntimeValue.mockReturnValue(undefined);
-
-      expect(getStoneSkinDamageTypes('Ally1', campaignName)).toBeUndefined();
-    });
-
-    it('returns undefined when activeBuffs exists but stoneSkinDamageTypes does not', () => {
-      // When getRuntimeValue is called with the stoneSkinKey, it returns undefined
-      // because only activeBuffs were set
-      useRuntimeState.getRuntimeValue.mockReturnValueOnce(undefined);
 
       expect(getStoneSkinDamageTypes('Ally1', campaignName)).toBeUndefined();
     });

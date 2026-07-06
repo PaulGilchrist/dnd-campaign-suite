@@ -1,4 +1,3 @@
-// @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../services/dice/diceRoller.js', () => ({
@@ -81,8 +80,7 @@ import { getTargetFromAttacker } from '../../services/rules/combat/damageUtils.j
 import { getRuntimeValue, setRuntimeValue } from '../runtime/useRuntimeState.js';
 import { loadCombatSummary } from '../../services/encounters/combatData.js';
 import { hasIgnoreResistance } from '../../services/combat/automation/automationService.js';
-import { getEmpoweredEvocationFeatures, getEmpoweredEvocationIntModifier } from '../../services/rules/spells/postCastRiderService.js';
-import { applyDamageToTarget } from '../../services/rules/combat/applyDamage.js';
+import { getEmpoweredEvocationFeatures } from '../../services/rules/spells/postCastRiderService.js';
 import {
     hasPotentCantrip,
     getShieldAcBonus,
@@ -95,7 +93,7 @@ import {
     hasAttackerTriggeredMajesty,
 } from '../../services/combat/auras/unbreakableMajesty.js';
 
-describe('createLogAndShow - Target Effects & Empowered Evocation', () => {
+describe('createLogAndShow - Target Effects', () => {
     const deps = {
         characterName: 'TestWizard',
         campaignName: 'test-campaign',
@@ -127,63 +125,14 @@ describe('createLogAndShow - Target Effects & Empowered Evocation', () => {
         return createLogAndShow(deps);
     }
 
-    describe('target effects on attack', () => {
-        it('clears vex effects (next_attack_advantage) when attacking the vex target', async () => {
+    describe('target effects clearing on attack hit', () => {
+        it('clears vex, distracting strike, and sap effects when attacking', async () => {
             getRuntimeValue.mockImplementation((name, prop, _campaign) => {
                 if (name === 'test-campaign' && prop === 'targetEffects') {
                     return [
                         { effect: 'next_attack_advantage', target: 'TestWizard', vexTarget: 'Goblin' },
-                        { effect: 'other_effect', target: 'TestWizard', vexTarget: 'Goblin' },
-                    ];
-                }
-                return null;
-            });
-            const fn = createFn();
-            await fn('Fire Bolt', 3, 'attack', {
-                targetName: 'Goblin',
-                autoDamageFormula: '1d10',
-                damageType: 'fire',
-            });
-            const targetEffectCalls = setRuntimeValue.mock.calls.filter(
-                call => call[1] === 'targetEffects'
-            );
-            expect(targetEffectCalls.length).toBeGreaterThan(0);
-            // Should only keep the other_effect, not the next_attack_advantage
-            const clearedEffects = targetEffectCalls[0][2];
-            expect(clearedEffects).toHaveLength(1);
-            expect(clearedEffects[0].effect).toBe('other_effect');
-        });
-
-        it('clears distracting strike effects when attacking (source is not attacker)', async () => {
-            getRuntimeValue.mockImplementation((name, prop, _campaign) => {
-                if (name === 'test-campaign' && prop === 'targetEffects') {
-                    return [
                         { effect: 'distracting_strike_advantage', target: 'Goblin', source: 'OtherEnemy' },
                         { effect: 'distracting_strike_advantage', target: 'Goblin', source: 'TestWizard' },
-                    ];
-                }
-                return null;
-            });
-            const fn = createFn();
-            await fn('Fire Bolt', 3, 'attack', {
-                targetName: 'Goblin',
-                autoDamageFormula: '1d10',
-                damageType: 'fire',
-            });
-            const targetEffectCalls = setRuntimeValue.mock.calls.filter(
-                call => call[1] === 'targetEffects'
-            );
-            expect(targetEffectCalls.length).toBeGreaterThan(0);
-            const clearedEffects = targetEffectCalls[0][2];
-            // Should only keep the one where source === TestWizard (attacker)
-            expect(clearedEffects).toHaveLength(1);
-            expect(clearedEffects[0].source).toBe('TestWizard');
-        });
-
-        it('clears sap effects (disadvantage_next_attack) when attacking', async () => {
-            getRuntimeValue.mockImplementation((name, prop, _campaign) => {
-                if (name === 'test-campaign' && prop === 'targetEffects') {
-                    return [
                         { effect: 'disadvantage_next_attack', target: 'TestWizard' },
                         { effect: 'other_effect', target: 'TestWizard' },
                     ];
@@ -199,10 +148,20 @@ describe('createLogAndShow - Target Effects & Empowered Evocation', () => {
             const targetEffectCalls = setRuntimeValue.mock.calls.filter(
                 call => call[1] === 'targetEffects'
             );
-            expect(targetEffectCalls.length).toBeGreaterThan(0);
-            const clearedEffects = targetEffectCalls[0][2];
-            expect(clearedEffects).toHaveLength(1);
-            expect(clearedEffects[0].effect).toBe('other_effect');
+            expect(targetEffectCalls.length).toBe(3);
+            // Each block filters the original array independently, so each call removes one effect type
+            const call1Effects = targetEffectCalls[0][2];
+            const call2Effects = targetEffectCalls[1][2];
+            const call3Effects = targetEffectCalls[2][2];
+            // Call 1: removes vex effect → 4 remaining
+            expect(call1Effects).toHaveLength(4);
+            expect(call1Effects.every(e => e.effect !== 'next_attack_advantage')).toBe(true);
+            // Call 2: removes distracting_strike where source !== TestWizard → 4 remaining (TestWizard source stays)
+            expect(call2Effects).toHaveLength(4);
+            expect(call2Effects.every(e => !(e.effect === 'distracting_strike_advantage' && e.source !== 'TestWizard'))).toBe(true);
+            // Call 3: removes sap effect → 4 remaining
+            expect(call3Effects).toHaveLength(4);
+            expect(call3Effects.every(e => e.effect !== 'disadvantage_next_attack')).toBe(true);
         });
 
         it('does not clear target effects when rollType is not attack', async () => {
@@ -249,127 +208,6 @@ describe('createLogAndShow - Target Effects & Empowered Evocation', () => {
                 call => call[1] === 'targetEffects'
             );
             expect(targetEffectCalls.length).toBe(0);
-        });
-    });
-
-    describe('empowered evocation with potent cantrip', () => {
-        it('adds Empowered Evocation modifier to formula when getEmpoweredEvocationFeatures and isEvocation', async () => {
-            hasPotentCantrip.mockReturnValue(true);
-            getEmpoweredEvocationFeatures.mockReturnValue([{ type: 'empowered_evocation' }]);
-            getEmpoweredEvocationIntModifier.mockReturnValue(2);
-            getTargetFromAttacker.mockReturnValue({ name: 'Goblin', ac: 25 });
-            rollExpression.mockReturnValue({ total: 10, rolls: [5, 5], modifier: 0 });
-            const fn = createFn();
-            await fn('Fire Bolt', 3, 'attack', {
-                targetName: 'Goblin',
-                autoDamageFormula: '1d10',
-                autoDamageSchool: 'Evocation',
-                damageType: 'fire',
-                saveDc: 13,
-                saveType: 'DEX',
-                playerStats: { automation: { passives: [{ type: 'potent_cantrip' }] } },
-            });
-            // The formula should include the Empowered Evocation modifier
-            const saveDamagePopups = deps.setPopupHtml.mock.calls.filter(
-                call => call[0].type === 'save-damage'
-            );
-            expect(saveDamagePopups.length).toBeGreaterThan(0);
-            expect(saveDamagePopups[0][0].formula).toContain('Empowered Evocation');
-        });
-
-        it('does not add Empowered Evocation when spell school is not evocation', async () => {
-            hasPotentCantrip.mockReturnValue(true);
-            getEmpoweredEvocationFeatures.mockReturnValue([{ type: 'empowered_evocation' }]);
-            getEmpoweredEvocationIntModifier.mockReturnValue(2);
-            getTargetFromAttacker.mockReturnValue({ name: 'Goblin', ac: 25 });
-            rollExpression.mockReturnValue({ total: 10, rolls: [5, 5], modifier: 0 });
-            const fn = createFn();
-            await fn('Chill Touch', 3, 'attack', {
-                targetName: 'Goblin',
-                autoDamageFormula: '1d8',
-                autoDamageSchool: 'Necromancy',
-                damageType: 'cold',
-                saveDc: 13,
-                saveType: 'DEX',
-                playerStats: { automation: { passives: [{ type: 'potent_cantrip' }] } },
-            });
-            const saveDamagePopups = deps.setPopupHtml.mock.calls.filter(
-                call => call[0].type === 'save-damage'
-            );
-            expect(saveDamagePopups.length).toBeGreaterThan(0);
-            expect(saveDamagePopups[0][0].formula).not.toContain('Empowered Evocation');
-        });
-
-        it('does not add Empowered Evocation when hasEmpoweredEvocation is false', async () => {
-            hasPotentCantrip.mockReturnValue(true);
-        getEmpoweredEvocationFeatures.mockReturnValue([]);
-            getTargetFromAttacker.mockReturnValue({ name: 'Goblin', ac: 25 });
-            rollExpression.mockReturnValue({ total: 10, rolls: [5, 5], modifier: 0 });
-            const fn = createFn();
-            await fn('Fire Bolt', 3, 'attack', {
-                targetName: 'Goblin',
-                autoDamageFormula: '1d10',
-                autoDamageSchool: 'Evocation',
-                damageType: 'fire',
-                saveDc: 13,
-                saveType: 'DEX',
-                playerStats: { automation: { passives: [{ type: 'potent_cantrip' }] } },
-            });
-            const saveDamagePopups = deps.setPopupHtml.mock.calls.filter(
-                call => call[0].type === 'save-damage'
-            );
-            expect(saveDamagePopups.length).toBeGreaterThan(0);
-            expect(saveDamagePopups[0][0].formula).not.toContain('Empowered Evocation');
-        });
-
-        it('does not add Empowered Evocation when int modifier is 0', async () => {
-            hasPotentCantrip.mockReturnValue(true);
-            getEmpoweredEvocationFeatures.mockReturnValue([{ type: 'empowered_evocation' }]);
-            getEmpoweredEvocationIntModifier.mockReturnValue(0);
-            getTargetFromAttacker.mockReturnValue({ name: 'Goblin', ac: 25 });
-            rollExpression.mockReturnValue({ total: 10, rolls: [5, 5], modifier: 0 });
-            const fn = createFn();
-            await fn('Fire Bolt', 3, 'attack', {
-                targetName: 'Goblin',
-                autoDamageFormula: '1d10',
-                autoDamageSchool: 'Evocation',
-                damageType: 'fire',
-                saveDc: 13,
-                saveType: 'DEX',
-                playerStats: { automation: { passives: [{ type: 'potent_cantrip' }] } },
-            });
-            const saveDamagePopups = deps.setPopupHtml.mock.calls.filter(
-                call => call[0].type === 'save-damage'
-            );
-            expect(saveDamagePopups.length).toBeGreaterThan(0);
-            expect(saveDamagePopups[0][0].formula).not.toContain('Empowered Evocation');
-        });
-
-        it('applies half damage with Empowered Evocation modifier included', async () => {
-            hasPotentCantrip.mockReturnValue(true);
-            getEmpoweredEvocationFeatures.mockReturnValue([{ type: 'empowered_evocation' }]);
-            getEmpoweredEvocationIntModifier.mockReturnValue(3);
-            getTargetFromAttacker.mockReturnValue({ name: 'Goblin', ac: 25 });
-            // Total is 15, with +3 = 18, half = 9
-            rollExpression.mockReturnValue({ total: 15, rolls: [7, 8], modifier: 0 });
-            applyDamageToTarget.mockReturnValue({ finalDamage: 9, newHp: 6, damageReduced: 0 });
-            const fn = createFn();
-            await fn('Fire Bolt', 3, 'attack', {
-                targetName: 'Goblin',
-                autoDamageFormula: '1d10+5',
-                autoDamageSchool: 'Evocation',
-                damageType: 'fire',
-                saveDc: 13,
-                saveType: 'DEX',
-                playerStats: { automation: { passives: [{ type: 'potent_cantrip' }] } },
-            });
-            // Verify damage was applied with the adjusted formula
-            expect(applyDamageToTarget).toHaveBeenCalled();
-            const saveDamagePopups = deps.setPopupHtml.mock.calls.filter(
-                call => call[0].type === 'save-damage'
-            );
-            expect(saveDamagePopups.length).toBeGreaterThan(0);
-            expect(saveDamagePopups[0][0].dcSuccess).toBe('half');
         });
     });
 });

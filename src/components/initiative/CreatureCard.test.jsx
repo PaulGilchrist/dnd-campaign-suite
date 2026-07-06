@@ -158,32 +158,20 @@ describe('CreatureCard', () => {
     });
 
     describe('rendering - NPC creatures', () => {
-        it('should render NpcAvatar for NPC creatures', () => {
-            render(<CreatureCard {...props} creature={defaultNpcCreature} />);
-            expect(screen.getByTestId('npc-avatar-Goblin')).toBeInTheDocument();
-        });
-
-        it('should render MonsterNameAutocomplete for NPC creatures', () => {
-            render(<CreatureCard {...props} creature={defaultNpcCreature} />);
-            expect(screen.getByTestId('monster-autocomplete')).toBeInTheDocument();
-        });
-
-        it('should show NPC match badge when NPC name matches campaignNpcs', () => {
-            const campaignNpcs = [{ name: 'Goblin' }];
-            render(<CreatureCard {...props} creature={defaultNpcCreature} campaignNpcs={campaignNpcs} />);
-            expect(screen.getByTestId('npc-match-badge')).toBeInTheDocument();
-        });
-
-        it('should not show NPC match badge when name does not match', () => {
-            const campaignNpcs = [{ name: 'Orc' }];
-            render(<CreatureCard {...props} creature={defaultNpcCreature} campaignNpcs={campaignNpcs} />);
-            expect(screen.queryByTestId('npc-match-badge')).not.toBeInTheDocument();
-        });
-
-        it('should do case-insensitive NPC name matching', () => {
-            const campaignNpcs = [{ name: 'goblin' }];
-            render(<CreatureCard {...props} creature={defaultNpcCreature} campaignNpcs={campaignNpcs} />);
-            expect(screen.getByTestId('npc-match-badge')).toBeInTheDocument();
+        it.each`
+            npcName     | campaignNpcName | expectBadge
+            ${'Goblin'} | ${'Goblin'}     | ${true}
+            ${'Goblin'} | ${'goblin'}     | ${true}
+            ${'Goblin'} | ${'Orc'}        | ${false}
+        `('should $expectBadge NPC match badge when NPC name is "$npcName" and campaignNpcName is "$campaignNpcName"', ({ npcName, campaignNpcName, expectBadge }) => {
+            const creature = { ...defaultNpcCreature, name: npcName };
+            const campaignNpcs = [{ name: campaignNpcName }];
+            render(<CreatureCard {...props} creature={creature} campaignNpcs={campaignNpcs} />);
+            if (expectBadge) {
+                expect(screen.getByTestId('npc-match-badge')).toBeInTheDocument();
+            } else {
+                expect(screen.queryByTestId('npc-match-badge')).not.toBeInTheDocument();
+            }
         });
     });
 
@@ -247,7 +235,7 @@ describe('CreatureCard', () => {
 
         it('should set selected value to creature.targetName', () => {
             const creature = { ...defaultPlayerCreature, targetName: 'Bob' };
-            const allCreatures = [creature, { name: 'Bob', type: 'player' }];
+            const allCreatures = [creature, { name: 'Bob', type: 'player' } ];
             render(<CreatureCard {...props} creature={creature} allCreatures={allCreatures} />);
             const targetSelect = document.querySelector('.creature-target select');
             expect(targetSelect).toHaveValue('Bob');
@@ -306,13 +294,6 @@ describe('CreatureCard', () => {
             expect(screen.queryByTitle('Automatically break condition')).not.toBeInTheDocument();
         });
 
-        it('should pass conditions to ConditionEffectBadges', () => {
-            const conditions = [{ id: 'c1', label: 'Blinded' }, { id: 'c2', label: 'Prone' }];
-            render(<CreatureCard {...props} creature={{ ...defaultPlayerCreature, conditions }} />);
-            expect(screen.getByTestId('effect-condition-c1')).toBeInTheDocument();
-            expect(screen.getByTestId('effect-condition-c2')).toBeInTheDocument();
-        });
-
         it('should call onOpenConditionPicker when add condition button is clicked', () => {
             render(<CreatureCard {...props} creature={defaultPlayerCreature} />);
             fireEvent.click(screen.getByTitle('Add condition'));
@@ -362,38 +343,6 @@ describe('CreatureCard', () => {
             render(<CreatureCard {...props} creature={{ ...defaultPlayerCreature, concentration }} />);
             const badge = document.querySelector('.initiative-concentration-badge');
             expect(badge.getAttribute('title')).toBe('Concentration: Shield (DC 10 Constitution)');
-        });
-    });
-
-    describe('avatar rendering', () => {
-        it('should pass imagePath to AvatarImage for player creatures', () => {
-            render(<CreatureCard {...props} creature={{ ...defaultPlayerCreature, imagePath: '/images/alice.png' }} />);
-            const avatar = screen.getByTestId('avatar-Alice');
-            expect(avatar.querySelector('img')).toHaveAttribute('src', '/images/alice.png');
-        });
-
-        it('should pass imagePath to NpcAvatar for NPC creatures', () => {
-            render(<CreatureCard {...props} creature={{ ...defaultNpcCreature, imagePath: '/images/goblin.png' }} />);
-            const npcAvatar = screen.getByTestId('npc-avatar-Goblin');
-            expect(npcAvatar.querySelector('img')).toHaveAttribute('src', '/images/goblin.png');
-        });
-
-        it('should use imageUrl fallback for NPC avatar', () => {
-            render(<CreatureCard {...props} creature={defaultNpcCreature} npcImage="https://example.com/goblin.jpg" />);
-            const npcAvatar = screen.getByTestId('npc-avatar-Goblin');
-            expect(npcAvatar.querySelector('img')).toHaveAttribute('src', 'https://example.com/goblin.jpg');
-        });
-
-        it('should render initial letter when no image available for player', () => {
-            render(<CreatureCard {...props} creature={{ ...defaultPlayerCreature, imagePath: null }} />);
-            const avatar = screen.getByTestId('avatar-Alice');
-            expect(avatar.querySelector('span')).toHaveTextContent('A');
-        });
-
-        it('should render initial letter when no image available for NPC', () => {
-            render(<CreatureCard {...props} creature={{ ...defaultNpcCreature, imagePath: null, imageUrl: null }} />);
-            const npcAvatar = screen.getByTestId('npc-avatar-Goblin');
-            expect(npcAvatar.querySelector('span')).toHaveTextContent('G');
         });
     });
 

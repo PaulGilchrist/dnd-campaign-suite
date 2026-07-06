@@ -99,6 +99,7 @@ import * as abilityCalc from './abilityCalc.js';
 import * as attackCalc from './attackCalc.js';
 import * as automationService from '../../combat/automation/automationService.js';
 import * as dataLoader from '../../ui/dataLoader.js';
+import * as featBuffService from '../../character/featBuffService.js';
 
 const defaultSkills = [
   { name: 'Athletics', ability: 'Strength' },
@@ -165,81 +166,75 @@ const setupDefaults = (overrides = {}) => {
 describe('rules.getPlayerStats - missing array error handling', () => {
   beforeEach(() => { vi.clearAllMocks(); setupDefaults(); });
 
-  it('should throw when race.traits is null for Powerful Build check', async () => {
-    setupDefaults({ race: { name: 'Hill Giant', languages: ['Common'], traits: null } });
-    const playerSummary = makePlayerSummary();
-    await expect(rules.getPlayerStats([], [], [], [], [], playerSummary)).rejects.toThrow('Missing array: race.traits');
-  });
-
-  it('should throw when race.traits is undefined for Powerful Build check', async () => {
-    setupDefaults({ race: { name: 'Human', languages: ['Common'], traits: undefined } });
-    const playerSummary = makePlayerSummary();
-    await expect(rules.getPlayerStats([], [], [], [], [], playerSummary)).rejects.toThrow('Missing array: race.traits');
-  });
-
-  it('should throw when race.traits is null for Halfling Nimbleness check', async () => {
-    setupDefaults({ race: { name: 'Lightfoot Halfling', languages: ['Common'], traits: null } });
-    const playerSummary = makePlayerSummary();
-    await expect(rules.getPlayerStats([], [], [], [], [], playerSummary)).rejects.toThrow('Missing array: race.traits');
-  });
-
-  it('should throw when passives is null for speed increase check', async () => {
-    setupDefaults({ automation: { passives: null } });
-    const playerSummary = makePlayerSummary();
-    await expect(rules.getPlayerStats([], [], [], [], [], playerSummary)).rejects.toThrow('Missing array: passives');
-  });
-
-  it('should throw when actions is null in getActions', () => {
-    const playerSummary = makePlayerSummary({ actions: null });
-    expect(() => rules.getActions(playerSummary)).toThrow('Missing array: actions');
-  });
-
-  it('should throw when bonusActions is null in getActions', () => {
-    const playerSummary = makePlayerSummary({ bonusActions: null });
-    expect(() => rules.getActions(playerSummary)).toThrow('Missing array: bonusActions');
-  });
-
-  it('should throw when reactions is null in getActions', () => {
-    const playerSummary = makePlayerSummary({ reactions: null });
-    expect(() => rules.getActions(playerSummary)).toThrow('Missing array: reactions');
-  });
-
-  it('should throw when specialActions is null in getActions', () => {
-    const playerSummary = makePlayerSummary({ specialActions: null });
-    expect(() => rules.getActions(playerSummary)).toThrow('Missing array: specialActions');
-  });
-
-  it('should throw when race.languages is null in getLanguages', () => {
-    const stats = { race: { languages: null }, class: { languages: [] }, languages: [] };
-    expect(() => rules.getLanguages(stats, {})).toThrow('Missing array: race.languages');
-  });
-
-  it('should throw when subrace.languages is null in getLanguages', () => {
-    const stats = {
-      race: { languages: ['Common'], subrace: { languages: null, language_options: { choose: 0 } } },
-      class: { languages: [] },
-      languages: [],
-    };
-    expect(() => rules.getLanguages(stats, {})).toThrow('Missing array: subrace.languages');
-  });
-
-  it('should throw when class.languages is an object in getLanguages', () => {
-    const stats = { race: { languages: ['Common'] }, class: { languages: {} }, languages: [] };
-    expect(() => rules.getLanguages(stats, {})).toThrow('Missing array: class.languages');
-  });
-
-  it('should throw when inventory.magicItems is null in getMagicItems', () => {
-    expect(() => rules.getMagicItems([], { inventory: { magicItems: null } })).toThrow('Missing array: inventory.magicItems');
-  });
-
-  it('should throw when features is null in getPlayerStats', async () => {
-    vi.mocked(featBuffService.computeAllFeatBuffs).mockReturnValue({
-      abilityScoreIncreases: [], proficiencies: [], features: null,
+  describe('getPlayerStats array validation', () => {
+    it('should throw when race.traits is null', async () => {
+      setupDefaults({ race: { name: 'Hill Giant', languages: ['Common'], traits: null } });
+      const playerSummary = makePlayerSummary();
+      await expect(rules.getPlayerStats([], [], [], [], [], playerSummary)).rejects.toThrow('Missing array: race.traits');
     });
-    setupDefaults({ race: { name: 'Human', languages: ['Common'], traits: [] } });
-    const playerSummary = makePlayerSummary();
-    await expect(rules.getPlayerStats([], [], [], [], [], playerSummary)).rejects.toThrow('Missing array: features');
+
+    it('should throw when race.traits is undefined', async () => {
+      setupDefaults({ race: { name: 'Human', languages: ['Common'], traits: undefined } });
+      const playerSummary = makePlayerSummary();
+      await expect(rules.getPlayerStats([], [], [], [], [], playerSummary)).rejects.toThrow('Missing array: race.traits');
+    });
+
+    it('should throw when passives is null', async () => {
+      setupDefaults({ automation: { passives: null } });
+      const playerSummary = makePlayerSummary();
+      await expect(rules.getPlayerStats([], [], [], [], [], playerSummary)).rejects.toThrow('Missing array: passives');
+    });
+
+    it('should throw when features is null', async () => {
+      vi.mocked(featBuffService.computeAllFeatBuffs).mockReturnValue({
+        abilityScoreIncreases: [], proficiencies: [], features: null,
+      });
+      setupDefaults({ race: { name: 'Human', languages: ['Common'], traits: [] } });
+      const playerSummary = makePlayerSummary();
+      await expect(rules.getPlayerStats([], [], [], [], [], playerSummary)).rejects.toThrow('Missing array: features');
+    });
+  });
+
+  describe('getActions array validation', () => {
+    const actionFields = [
+      { field: 'actions', name: 'actions' },
+      { field: 'bonusActions', name: 'bonusActions' },
+      { field: 'reactions', name: 'reactions' },
+      { field: 'specialActions', name: 'specialActions' },
+    ];
+
+    for (const { field, name } of actionFields) {
+      it(`should throw when ${name} is null`, () => {
+        const playerSummary = makePlayerSummary({ [field]: null });
+        expect(() => rules.getActions(playerSummary)).toThrow(`Missing array: ${name}`);
+      });
+    }
+  });
+
+  describe('getLanguages array validation', () => {
+    it('should throw when race.languages is null', () => {
+      const stats = { race: { languages: null }, class: { languages: [] }, languages: [] };
+      expect(() => rules.getLanguages(stats, {})).toThrow('Missing array: race.languages');
+    });
+
+    it('should throw when subrace.languages is null', () => {
+      const stats = {
+        race: { languages: ['Common'], subrace: { languages: null, language_options: { choose: 0 } } },
+        class: { languages: [] },
+        languages: [],
+      };
+      expect(() => rules.getLanguages(stats, {})).toThrow('Missing array: subrace.languages');
+    });
+
+    it('should throw when class.languages is not an array', () => {
+      const stats = { race: { languages: ['Common'] }, class: { languages: {} }, languages: [] };
+      expect(() => rules.getLanguages(stats, {})).toThrow('Missing array: class.languages');
+    });
+  });
+
+  describe('getMagicItems array validation', () => {
+    it('should throw when inventory.magicItems is null', () => {
+      expect(() => rules.getMagicItems([], { inventory: { magicItems: null } })).toThrow('Missing array: inventory.magicItems');
+    });
   });
 });
-
-import * as featBuffService from '../../character/featBuffService.js';

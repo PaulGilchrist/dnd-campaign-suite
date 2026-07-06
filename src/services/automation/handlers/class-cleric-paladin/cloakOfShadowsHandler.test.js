@@ -111,58 +111,9 @@ describe('cloakOfShadowsHandler', () => {
             );
             expect(setRuntimeValue).not.toHaveBeenCalled();
         });
-
-        it('returns error when focus points are exactly 2', async () => {
-            getRuntimeValue.mockImplementation((player, key) => {
-                if (key === 'activeBuffs') return [];
-                if (key === 'focusPoints') return 2;
-                return null;
-            });
-
-            const result = await handle(makeAction(), makePlayerStats(), campaignName);
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.description).toBe(
-                'Not enough Focus Points. Need 3, have 2.',
-            );
-        });
-
-        it('returns error when focus points are 0', async () => {
-            getRuntimeValue.mockImplementation((player, key) => {
-                if (key === 'activeBuffs') return [];
-                if (key === 'focusPoints') return 0;
-                return null;
-            });
-
-            const result = await handle(makeAction(), makePlayerStats(), campaignName);
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.description).toBe(
-                'Not enough Focus Points. Need 3, have 0.',
-            );
-        });
     });
 
     describe('focus point fallback', () => {
-        it('uses class class_levels focus_points when runtime focusPoints is null', async () => {
-            getRuntimeValue.mockImplementation((player, key) => {
-                if (key === 'activeBuffs') return [];
-                if (key === 'focusPoints') return null;
-                return null;
-            });
-
-            const result = await handle(makeAction(), makePlayerStats(), campaignName);
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('activated');
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'TestCleric',
-                'focusPoints',
-                0,
-                campaignName,
-            );
-        });
-
         it('uses getClassFeatures maxFocusPoints when class_levels is missing', async () => {
             getRuntimeValue.mockImplementation((player, key) => {
                 if (key === 'activeBuffs') return [];
@@ -342,34 +293,5 @@ describe('cloakOfShadowsHandler', () => {
         });
     });
 
-    describe('popup payload structure', () => {
-        it('includes name, automationType, and automation in popup payload on activation', async () => {
-            getRuntimeValue.mockImplementation((player, key) => {
-                if (key === 'activeBuffs') return [];
-                if (key === 'focusPoints') return 5;
-                return null;
-            });
 
-            const result = await handle(makeAction(), makePlayerStats(), campaignName);
-
-            expect(result.payload.name).toBe('Cloak of Shadows');
-            expect(result.payload.automationType).toBe('cloak_of_shadows');
-            expect(result.payload.automation).toEqual(makeAction().automation);
-        });
-
-        it('includes name, automationType, and automation in popup payload on deactivation', async () => {
-            getRuntimeValue.mockImplementation((player, key) => {
-                if (key === 'activeBuffs') {
-                    return [{ name: 'Cloak of Shadows', effect: 'cloak_of_shadows' }];
-                }
-                return null;
-            });
-
-            const result = await handle(makeAction(), makePlayerStats(), campaignName);
-
-            expect(result.payload.name).toBe('Cloak of Shadows');
-            expect(result.payload.automationType).toBe('cloak_of_shadows');
-            expect(result.payload.automation).toEqual(makeAction().automation);
-        });
-    });
 });

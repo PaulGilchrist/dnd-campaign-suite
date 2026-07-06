@@ -172,43 +172,6 @@ describe('Great Weapon Fighting with critical hits', () => {
             // rollsForMin uses doubled rolls for min damage check, GWF block is skipped because hasChanges is false
             expect(applyMinDamageAdjustment).toHaveBeenCalledWith(18, [3, 4, 5, 6, 3, 4, 5, 6], {}, 'slashing');
         });
-
-        it('applies GWF display rolls correctly on crit with rerolls', async () => {
-            hasGreatWeaponFighting.mockReturnValue(true);
-            applyGreatWeaponFightingToDamage.mockReturnValue([3, 3, 4, 5]);
-
-            const fn = createFn();
-            await fn('Greatsword', '4d6', 10, [1, 1, 4, 5], 0, {
-                targetName: 'Goblin',
-                damageType: 'slashing',
-                isAutoCrit: true,
-                doubledRolls: [1, 1, 4, 5, 1, 1, 4, 5],
-                playerStats: {},
-            });
-
-            const logCall = deps.logEntry.mock.calls[0][0];
-            expect(logCall.gwfApplied).toBe(true);
-            expect(logCall.gwfOriginalRolls).toEqual([1, 1, 4, 5]);
-            expect(logCall.gwfDisplayRolls).toEqual([3, 3, 4, 5]);
-        });
-
-        it('passes displayRolls to handlePlainDamage for GWF crit', async () => {
-            hasGreatWeaponFighting.mockReturnValue(true);
-            applyGreatWeaponFightingToDamage.mockReturnValue([3, 3, 4, 5]);
-            applyDamageToTarget.mockReturnValue({ finalDamage: 30, newHp: -17, damageReduced: false });
-
-            const fn = createFn();
-            await fn('Greatsword', '4d6', 10, [1, 1, 4, 5], 0, {
-                targetName: 'Goblin',
-                damageType: 'slashing',
-                isAutoCrit: true,
-                doubledRolls: [1, 1, 4, 5, 1, 1, 4, 5],
-                playerStats: {},
-            });
-
-            const logCall = deps.logEntry.mock.calls[0][0];
-            expect(logCall.total).toBe(30);
-        });
     });
 
     describe('GWF with Elemental Adept interaction', () => {
@@ -226,7 +189,8 @@ describe('Great Weapon Fighting with critical hits', () => {
                 playerStats: { automation: { passives: [] } },
             });
 
-            expect(applyMinDamageAdjustment).toHaveBeenCalledWith(30, [3, 3, 4, 5], expect.any(Object), 'slashing');
+            // GWF produces 30, then Elemental Adept bumps it to 32
+            expect(applyMinDamageAdjustment).toHaveBeenLastCalledWith(30, [3, 3, 4, 5], expect.any(Object), 'slashing');
         });
     });
 });

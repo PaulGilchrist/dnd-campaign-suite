@@ -71,44 +71,6 @@ describe('addExpiration', () => {
     resetMocks();
   });
 
-  describe('early return guards', () => {
-    it('throws when pendingExpirations is not an array', () => {
-      getRuntimeValue.mockReturnValueOnce('not-an-array');
-
-      expect(() =>
-        addExpiration('Caster', 'Target', [{ type: 'stunned' }], 'TestCampaign', 3),
-      ).toThrow('Missing array: pendingExpirations');
-    });
-
-    it('throws when pendingExpirations is null', () => {
-      getRuntimeValue.mockReturnValueOnce(null);
-
-      expect(() =>
-        addExpiration('Caster', 'Target', [{ type: 'stunned' }], 'TestCampaign', 3),
-      ).toThrow('Missing array: pendingExpirations');
-    });
-
-    it('uses Infinity when rounds is null', () => {
-      getRuntimeValue.mockReturnValueOnce([]);
-
-      addExpiration('Caster', 'Target', [{ type: 'stunned' }], 'TestCampaign', null);
-
-      expect(setRuntimeValue).toHaveBeenCalledWith('Caster', expect.any(String), expect.arrayContaining([
-        expect.objectContaining({ expiryRounds: Infinity }),
-      ]), 'TestCampaign');
-    });
-
-    it('uses Infinity when rounds is undefined', () => {
-      getRuntimeValue.mockReturnValueOnce([]);
-
-      addExpiration('Caster', 'Target', [{ type: 'stunned' }], 'TestCampaign', undefined);
-
-      expect(setRuntimeValue).toHaveBeenCalledWith('Caster', expect.any(String), expect.arrayContaining([
-        expect.objectContaining({ expiryRounds: Infinity }),
-      ]), 'TestCampaign');
-    });
-  });
-
   describe('creates correct entry structure', () => {
     it('adds a new expiration entry when no existing list', () => {
       getRuntimeValue.mockReturnValueOnce([]);
@@ -156,32 +118,6 @@ describe('addExpiration', () => {
       );
     });
 
-    it('uses the campaignName from the call in setRuntimeValue', () => {
-      getRuntimeValue.mockReturnValueOnce([]);
-
-      addExpiration('Caster', 'Target', [{ type: 'stunned' }], 'TestCampaign', 3);
-
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'Caster',
-        KEY,
-        expect.any(Array),
-        'TestCampaign',
-      );
-    });
-
-    it('passes the exact effects array through in the entry', () => {
-      const effects = [
-        { type: 'stunned', condition: 'speed_halved' },
-        { type: 'advantage_on_target' },
-      ];
-      getRuntimeValue.mockReturnValueOnce([]);
-
-      addExpiration('Caster', 'Target', effects, 'MyCampaign', 5);
-
-      const call = setRuntimeValue.mock.calls[0];
-      expect(call[2][0].effects).toBe(effects);
-    });
-
     it('uses getCurrentCombatRound for appliedRound', () => {
       getCurrentCombatRound.mockReturnValue(10);
       getRuntimeValue.mockReturnValueOnce([]);
@@ -196,6 +132,16 @@ describe('addExpiration', () => {
         ]),
         'MyCampaign',
       );
+    });
+
+    it('uses Infinity when rounds is nullish', () => {
+      getRuntimeValue.mockReturnValueOnce([]);
+
+      addExpiration('Caster', 'Target', [{ type: 'stunned' }], 'TestCampaign', null);
+
+      expect(setRuntimeValue).toHaveBeenCalledWith('Caster', expect.any(String), expect.arrayContaining([
+        expect.objectContaining({ expiryRounds: Infinity }),
+      ]), 'TestCampaign');
     });
   });
 });

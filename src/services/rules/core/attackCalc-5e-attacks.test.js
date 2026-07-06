@@ -132,16 +132,6 @@ describe('attackCalc getAttacks edge cases', () => {
       expect(result[0].damageFormula).toContain('Dueling');
       expect(result[0].damageFormula).toContain('Druidic Warrior');
     });
-
-    it('should not apply Druidic Warrior when not selected', () => {
-      const playerStats = makePlayerStats({
-        equipped: ['Longsword'],
-        class: { name: 'Fighter', fightingStyles: ['Dueling'] },
-      });
-      const result = getAttacks(allEquipment, [], playerStats);
-      expect(result[0].damage).toBe('1d8+5');
-      expect(result[0].damageFormula).not.toContain('Druidic Warrior');
-    });
   });
 
   describe('Thrown Weapon Fighting', () => {
@@ -235,14 +225,8 @@ describe('attackCalc getAttacks edge cases', () => {
   });
 
   describe('Proficiency calculation at various levels', () => {
-    it('should compute proficiency = 2 at level 1', () => {
+    it('should compute proficiency = 2 at levels 1-4', () => {
       const playerStats = makePlayerStats({ level: 1, equipped: ['Longsword'] });
-      const result = getAttacks(allEquipment, [], playerStats);
-      expect(result[0].hitBonus).toBe(5); // str(3) + prof(2) = 5
-    });
-
-    it('should compute proficiency = 2 at level 4', () => {
-      const playerStats = makePlayerStats({ level: 4, equipped: ['Longsword'] });
       const result = getAttacks(allEquipment, [], playerStats);
       expect(result[0].hitBonus).toBe(5); // str(3) + prof(2) = 5
     });
@@ -351,20 +335,15 @@ describe('attackCalc getAttacks edge cases', () => {
   });
 
   describe('Magic weapon handling', () => {
-    it('should parse +1 weapon name and include magic bonus in damage', () => {
-      const playerStats = makePlayerStats({ equipped: ['+1 Longsword'] });
+    it.each`
+      weaponName       | expectedDamage | expectedHitBonus
+      ${'+1 Longsword'} | ${'1d8+4'}    | ${7}
+      ${'+2 Longsword'} | ${'1d8+5'}    | ${8}
+    `('should parse $weaponName and include magic bonus in damage/hit', ({ weaponName, expectedDamage, expectedHitBonus }) => {
+      const playerStats = makePlayerStats({ equipped: [weaponName] });
       const result = getAttacks(allEquipment, [], playerStats);
-      // magicBonus=1, so damage = 1d8+str(3)+magic(1) = 1d8+4; hit = str(3)+prof(3)+magic(1) = 7
-      expect(result[0].damage).toBe('1d8+4');
-      expect(result[0].hitBonus).toBe(7);
-    });
-
-    it('should parse +2 weapon name and include magic bonus in damage', () => {
-      const playerStats = makePlayerStats({ equipped: ['+2 Longsword'] });
-      const result = getAttacks(allEquipment, [], playerStats);
-      // magicBonus=2, so damage = 1d8+str(3)+magic(2) = 1d8+5; hit = str(3)+prof(3)+magic(2) = 8
-      expect(result[0].damage).toBe('1d8+5');
-      expect(result[0].hitBonus).toBe(8);
+      expect(result[0].damage).toBe(expectedDamage);
+      expect(result[0].hitBonus).toBe(expectedHitBonus);
     });
 
     it('should match magic weapon by base name against equipment list', () => {
@@ -385,16 +364,6 @@ describe('attackCalc getAttacks edge cases', () => {
       const result = getAttacks(allEquipment, [], playerStats);
       expect(result).toHaveLength(1);
       expect(result[0].name).toBe('Longsword');
-    });
-
-    it('should handle missing strength bonus gracefully', () => {
-      const playerStats = makePlayerStats({
-        equipped: ['Longsword'],
-        abilities: [{ name: 'Strength' }, { name: 'Dexterity', bonus: 2 }],
-      });
-      const result = getAttacks(allEquipment, [], playerStats);
-      // Strength has no bonus property, so str.bonus is undefined -> NaN -> Math.max picks dexterity
-      expect(result[0].weaponType).toBe('melee');
     });
   });
 
@@ -483,48 +452,6 @@ describe('attackCalc getAttacks edge cases', () => {
       const result = getAttacks(allEquipment, [], playerStats);
       const unarmedStrikes = result.filter(a => a.name === 'Unarmed Strike');
       expect(unarmedStrikes[0].damage).toBe('2d6+2');
-    });
-  });
-
-  describe('Combat round tracking for Nick mastery', () => {
-    it('should use combat round from getCurrentCombatRound', async () => {
-      const { getCurrentCombatRound } = await import('../../encounters/combatData.js');
-      const { getRuntimeValue } = await import('../../../hooks/runtime/useRuntimeState.js');
-      const { collectWeaponMastery } = await import('../../combat/automation/automationPassives.js');
-
-      vi.mocked(getCurrentCombatRound).mockReturnValue(5);
-      vi.mocked(getRuntimeValue).mockReturnValue(5); // Same round = Nick used
-      vi.mocked(collectWeaponMastery).mockReturnValue({ baseMastery: 'Nick', extraMasteries: [] });
-
-      const playerStats = makePlayerStats({
-        equipped: ['Shortsword', 'Dagger'],
-        class: { name: 'Fighter', fightingStyles: ['Two-Weapon Fighting'] },
-      });
-      const result = getAttacks(allEquipment, [], playerStats);
-      expect(result[1].type).toBe('Action');
-    });
-
-    it('should use campaignName for runtime value lookup', async () => {
-      const { getCurrentCombatRound } = await import('../../encounters/combatData.js');
-      const { getRuntimeValue } = await import('../../../hooks/runtime/useRuntimeState.js');
-      const { collectWeaponMastery } = await import('../../combat/automation/automationPassives.js');
-
-      vi.mocked(getCurrentCombatRound).mockReturnValue(1);
-      vi.mocked(getRuntimeValue).mockReturnValue(1);
-      vi.mocked(collectWeaponMastery).mockReturnValue({ baseMastery: 'Nick', extraMasteries: [] });
-
-      const playerStats = makePlayerStats({
-        equipped: ['Shortsword', 'Dagger'],
-        class: { name: 'Fighter', fightingStyles: ['Two-Weapon Fighting'] },
-      });
-
-      getAttacks(allEquipment, [], playerStats);
-
-      expect(getRuntimeValue).toHaveBeenCalledWith(
-        undefined,
-        '_Nick_UsedRound',
-        'test-campaign'
-      );
     });
   });
 

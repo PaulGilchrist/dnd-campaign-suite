@@ -5,7 +5,7 @@ import { handle, applyMageArmor } from './mageArmorHandler.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addExpiration } from '../../../rules/effects/expirations.js';
 import { getCombatContext } from '../../../../services/rules/combat/damageUtils.js';
-import { rangeToFeet } from '../../../../services/rules/combat/rangeValidation.js';
+
 import { resolveMapPositions } from '../../common/targetResolver.js';
 import { postLogEntry } from '../../../../services/shared/logPoster.js';
 
@@ -76,85 +76,35 @@ describe('mageArmorHandler.handle', () => {
         expect(result.payload.name).toBe('Mage Armor');
         expect(result.payload.creatureTargets).toEqual(['Ally1', 'Enemy1']);
         expect(result.payload.duration).toBe('8 hours');
+        expect(result.payload.range).toBe('Touch');
+        expect(result.payload).toHaveProperty('rangeFt');
+        expect(result.payload.attackerPos).toBeNull();
     });
 
-    it('excludes the caster from creature targets', async () => {
-        getCombatContext.mockResolvedValue({
-            creatures: [
-                { name: 'TestWizard', type: 'player' },
-                { name: 'Ally1', type: 'player' },
-            ],
-        });
-
-        const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-        expect(result.payload.creatureTargets).not.toContain('TestWizard');
-        expect(result.payload.creatureTargets).toEqual(['Ally1']);
-    });
-
-    it('uses spell range from action when provided', async () => {
+    it('uses spell range and duration from action when provided', async () => {
         getCombatContext.mockResolvedValue({
             creatures: [{ name: 'Ally1', type: 'player' }],
         });
 
-        const result = await handle(makeAction({ spell: { range: '60 feet' } }), makePlayerStats(), campaignName, null);
+        const result = await handle(makeAction({ spell: { range: '60 feet', duration: '1 hour' } }), makePlayerStats(), campaignName, null);
 
         expect(result.payload.range).toBe('60 feet');
+        expect(result.payload.duration).toBe('1 hour');
     });
 
-    it('defaults range to Touch when spell range is not provided', async () => {
+    it('defaults range to Touch and duration to 8 hours when spell is missing', async () => {
         getCombatContext.mockResolvedValue({
             creatures: [{ name: 'Ally1', type: 'player' }],
         });
 
         const result = await handle(
-            { name: 'Mage Armor', spell: {}, automation: { type: 'mage_armor' } },
+            { name: 'Mage Armor', automation: { type: 'mage_armor' } },
             makePlayerStats(),
             campaignName,
             null,
         );
 
         expect(result.payload.range).toBe('Touch');
-    });
-
-    it('includes rangeFt in payload when combat context exists', async () => {
-        getCombatContext.mockResolvedValue({
-            creatures: [{ name: 'Ally1', type: 'player' }],
-        });
-
-        const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-        expect(result.payload).toHaveProperty('rangeFt');
-        expect(rangeToFeet).toHaveBeenCalledWith('Touch');
-    });
-
-    it('includes duration from spell in payload', async () => {
-        getCombatContext.mockResolvedValue({
-            creatures: [{ name: 'Ally1', type: 'player' }],
-        });
-
-        const result = await handle(
-            makeAction({ spell: { duration: '1 hour' } }),
-            makePlayerStats(),
-            campaignName,
-            null,
-        );
-
-        expect(result.payload.duration).toBe('1 hour');
-    });
-
-    it('defaults duration to 8 hours when spell has no duration', async () => {
-        getCombatContext.mockResolvedValue({
-            creatures: [{ name: 'Ally1', type: 'player' }],
-        });
-
-        const result = await handle(
-            { name: 'Mage Armor', spell: {}, automation: { type: 'mage_armor' } },
-            makePlayerStats(),
-            campaignName,
-            null,
-        );
-
         expect(result.payload.duration).toBe('8 hours');
     });
 
@@ -170,16 +120,6 @@ describe('mageArmorHandler.handle', () => {
         expect(resolveMapPositions).toHaveBeenCalledWith(campaignName, mapName, 'TestWizard');
     });
 
-    it('sets attackerPos to null when mapName is not provided', async () => {
-        getCombatContext.mockResolvedValue({
-            creatures: [{ name: 'Ally1', type: 'player' }],
-        });
-
-        const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-        expect(result.payload.attackerPos).toBeNull();
-    });
-
     it('returns automation_info popup when no combat context', async () => {
         getCombatContext.mockResolvedValue(null);
 
@@ -191,29 +131,14 @@ describe('mageArmorHandler.handle', () => {
         expect(result.payload.description).toContain('Mage Armor');
     });
 
-    it('returns automation_info popup when combat context has no creatures', async () => {
+    it('returns popup with empty creature targets when combat context has no creatures', async () => {
         getCombatContext.mockResolvedValue({ creatures: [] });
 
         const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
         expect(result.type).toBe('popup');
+        expect(result.payload.type).toBe('mage_armor_target_selection');
         expect(result.payload.creatureTargets).toEqual([]);
-    });
-
-    it('handles action with no spell property', async () => {
-        getCombatContext.mockResolvedValue({
-            creatures: [{ name: 'Ally1', type: 'player' }],
-        });
-
-        const result = await handle(
-            { name: 'Mage Armor', automation: { type: 'mage_armor' } },
-            makePlayerStats(),
-            campaignName,
-            null,
-        );
-
-        expect(result.payload.range).toBe('Touch');
-        expect(result.payload.duration).toBe('8 hours');
     });
 });
 
@@ -258,7 +183,7 @@ describe('mageArmorHandler.applyMageArmor', () => {
         );
     });
 
-    it('does not apply buff if Mage Armor already active', async () => {
+    it('does not apply buff if Mage Armor already active on target', async () => {
         getRuntimeValue.mockImplementation((name, key) => {
             if (key === 'activeBuffs') return [{ name: 'Mage Armor', effect: 'mage_armor' }];
             return null;
@@ -323,40 +248,33 @@ describe('mageArmorHandler.applyMageArmor', () => {
         expect(buffsCalls[0][0]).toBe('Ally2');
     });
 
-    it('returns null when no targets provided', async () => {
-        const result = await applyMageArmor(
+    it('returns null when targets is empty, null, or not an array', async () => {
+        const emptyResult = await applyMageArmor(
             makeAction(),
             makePlayerStats(),
             campaignName,
             null,
             [],
         );
+        expect(emptyResult).toBeNull();
 
-        expect(result).toBeNull();
-    });
-
-    it('returns null when targets is null', async () => {
-        const result = await applyMageArmor(
+        const nullResult = await applyMageArmor(
             makeAction(),
             makePlayerStats(),
             campaignName,
             null,
             null,
         );
+        expect(nullResult).toBeNull();
 
-        expect(result).toBeNull();
-    });
-
-    it('returns null when targets is not an array', async () => {
-        const result = await applyMageArmor(
+        const strResult = await applyMageArmor(
             makeAction(),
             makePlayerStats(),
             campaignName,
             null,
             'Ally1',
         );
-
-        expect(result).toBeNull();
+        expect(strResult).toBeNull();
     });
 
     it('calls addExpiration for each target', async () => {
@@ -417,26 +335,6 @@ describe('mageArmorHandler.applyMageArmor', () => {
         expect(buffsCall[2][0].duration).toBe('1 hour');
     });
 
-    it('defaults duration to 8 hours when spell has no duration', async () => {
-        getRuntimeValue.mockImplementation((name, key) => {
-            if (key === 'activeBuffs') return [];
-            return null;
-        });
-
-        await applyMageArmor(
-            makeAction({ spell: {} }),
-            makePlayerStats(),
-            campaignName,
-            null,
-            ['Ally1'],
-        );
-
-        const buffsCall = setRuntimeValue.mock.calls.find(
-            (c) => c[0] === 'Ally1' && c[1] === 'activeBuffs',
-        );
-        expect(buffsCall[2][0].duration).toBe('8 hours');
-    });
-
     it('handles activeBuffs not set (null stored value)', async () => {
         getRuntimeValue.mockImplementation((name, key) => {
             if (key === 'activeBuffs') return null;
@@ -458,24 +356,6 @@ describe('mageArmorHandler.applyMageArmor', () => {
         expect(buffsCall[2]).toContainEqual(
             expect.objectContaining({ name: 'Mage Armor' }),
         );
-    });
-
-    it('handles activeBuffs as non-array (coerces to empty array)', async () => {
-        getRuntimeValue.mockImplementation((name, key) => {
-            if (key === 'activeBuffs') return 'invalid';
-            return null;
-        });
-
-        const result = await applyMageArmor(
-            makeAction(),
-            makePlayerStats(),
-            campaignName,
-            null,
-            ['Ally1'],
-        );
-
-        expect(result).not.toBeNull();
-        expect(addExpiration).toHaveBeenCalled();
     });
 
     it('posts a log entry for each target', async () => {

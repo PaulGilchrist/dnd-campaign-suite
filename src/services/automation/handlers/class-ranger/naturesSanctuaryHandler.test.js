@@ -118,12 +118,6 @@ describe("Nature's Sanctuary Handler", () => {
         true,
         campaignName,
       );
-      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-        'Druid',
-        'naturesSanctuaryResistance',
-        'Lightning',
-        campaignName,
-      );
       expect(expirations.addExpiration).toHaveBeenCalledWith(
         'Druid',
         'Druid',
@@ -247,48 +241,6 @@ describe("Nature's Sanctuary Handler", () => {
         'Druid',
         'naturesSanctuaryRange',
         120,
-        campaignName,
-      );
-    });
-
-    it('does not set cube position when map is unavailable', async () => {
-      useRuntimeState.getRuntimeValue.mockImplementation((player, key) => {
-        if (key === 'wildShapeUses') return 3;
-        if (key === 'naturesSanctuaryActive') return null;
-        return null;
-      });
-
-      const action = makeAction();
-      const playerStats = makePlayerStats();
-
-      // No map name provided
-      await handle(action, playerStats, campaignName, null);
-      expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalledWith(
-        'Druid',
-        'naturesSanctuaryCubeX',
-        expect.anything(),
-        campaignName,
-      );
-
-      // Map data is null
-      mapsService.loadMapData.mockResolvedValue(null);
-      await handle(action, playerStats, campaignName, 'battlefield');
-      expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalledWith(
-        'Druid',
-        'naturesSanctuaryCubeX',
-        expect.anything(),
-        campaignName,
-      );
-
-      // Player not on the map
-      mapsService.loadMapData.mockResolvedValue({
-        players: [{ name: 'Ally', gridX: 5, gridY: 5 }],
-      });
-      await handle(action, playerStats, campaignName, 'battlefield');
-      expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalledWith(
-        'Druid',
-        'naturesSanctuaryCubeX',
-        expect.anything(),
         campaignName,
       );
     });

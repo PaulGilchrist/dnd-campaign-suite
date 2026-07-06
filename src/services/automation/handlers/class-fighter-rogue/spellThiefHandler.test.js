@@ -1,6 +1,6 @@
 // @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { handle, isBlockedBySpellThief, hasStolenSpell } from './spellThiefHandler.js';
+import { handle } from './spellThiefHandler.js';
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
     getRuntimeValue: vi.fn(),
@@ -385,46 +385,6 @@ describe('spellThiefHandler', () => {
             const result = await handle(action, makePlayerStats(), 'test-campaign', null);
 
             expect(result.payload.name).toBe('Custom Feature');
-        });
-    });
-
-    describe('isBlockedBySpellThief', () => {
-        it('returns true when blocked key is true', () => {
-            getRuntimeValue.mockReturnValue(true);
-
-            expect(isBlockedBySpellThief('FighterRogue', 'Goblin', 'Burning Hands', 'test-campaign')).toBe(true);
-        });
-
-        it('returns false when blocked key is not true', () => {
-            getRuntimeValue.mockReturnValue(false);
-
-            expect(isBlockedBySpellThief('FighterRogue', 'Goblin', 'Burning Hands', 'test-campaign')).toBe(false);
-        });
-
-        it('returns false when blocked key is null or undefined', () => {
-            getRuntimeValue.mockReturnValue(null);
-
-            expect(isBlockedBySpellThief('FighterRogue', 'Goblin', 'Burning Hands', 'test-campaign')).toBe(false);
-        });
-    });
-
-    describe('hasStolenSpell', () => {
-        it('returns true when stolen key is true', () => {
-            getRuntimeValue.mockReturnValue(true);
-
-            expect(hasStolenSpell('FighterRogue', 'Goblin', 'Burning Hands', 'test-campaign')).toBe(true);
-        });
-
-        it('returns false when stolen key is not true', () => {
-            getRuntimeValue.mockReturnValue(false);
-
-            expect(hasStolenSpell('FighterRogue', 'Goblin', 'Burning Hands', 'test-campaign')).toBe(false);
-        });
-
-        it('returns false when stolen key is null or undefined', () => {
-            getRuntimeValue.mockReturnValue(null);
-
-            expect(hasStolenSpell('FighterRogue', 'Goblin', 'Burning Hands', 'test-campaign')).toBe(false);
         });
     });
 });

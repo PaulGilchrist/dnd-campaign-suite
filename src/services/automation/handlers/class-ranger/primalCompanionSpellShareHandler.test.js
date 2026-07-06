@@ -33,8 +33,9 @@ describe('primalCompanionSpellShareHandler', () => {
     });
 
     describe('handle', () => {
-        it('returns modal when companion is summoned and alive', async () => {
-            getRuntimeValue.mockReturnValue('Beast of the Forest');
+        it('returns modal when companion is summoned and alive or alive is undefined', async () => {
+            // Companion summoned and alive (undefined = treated as alive)
+            getRuntimeValue.mockReturnValueOnce('Beast of the Forest').mockReturnValueOnce(undefined);
 
             const result = await handle(makeAction(), makePlayerStats(), 'test-campaign');
 
@@ -44,17 +45,6 @@ describe('primalCompanionSpellShareHandler', () => {
             expect(result.payload.action).toBeDefined();
             expect(result.payload.playerStats).toBeDefined();
             expect(result.payload.campaignName).toBe('test-campaign');
-        });
-
-        it('returns modal when companion exists but alive is undefined', async () => {
-            getRuntimeValue
-                .mockReturnValueOnce('Beast of the Mountain')
-                .mockReturnValueOnce(undefined);
-
-            const result = await handle(makeAction(), makePlayerStats(), 'test-campaign');
-
-            expect(result.type).toBe('modal');
-            expect(result.payload.companionType).toBe('Beast of the Mountain');
         });
 
         it('returns info popup when companion is not alive', async () => {

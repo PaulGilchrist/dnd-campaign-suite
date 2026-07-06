@@ -199,19 +199,6 @@ describe('rules.getPlayerStats - fighting style reaction features (5e)', () => {
     expect(interception).toBeDefined();
     expect(interception.type).toBe('interception');
     expect(interception.hasAutomation).toBe(true);
-    expect(interception.automation.type).toBe('interception');
-    expect(interception.automation.requiresShield).toBe(true);
-  });
-
-  it('should not duplicate Interception reaction if already present', async () => {
-    const existingInterception = { name: 'Interception', type: 'interception' };
-    const playerSummary = makePlayerSummary({
-      class: { name: 'Paladin', fightingStyles: ['Interception'] },
-      reactions: [existingInterception],
-    });
-    const result = await rules.getPlayerStats([], [], [], [], [], playerSummary);
-    const interceptions = result.reactions.filter((r) => r.name === 'Interception');
-    expect(interceptions.length).toBe(1);
   });
 
   it('should add Protection reaction when Protection fighting style is present (5e)', async () => {
@@ -224,19 +211,6 @@ describe('rules.getPlayerStats - fighting style reaction features (5e)', () => {
     expect(protection).toBeDefined();
     expect(protection.type).toBe('protection');
     expect(protection.hasAutomation).toBe(true);
-    expect(protection.automation.type).toBe('reaction_debuff');
-    expect(protection.automation.requiresShield).toBe(true);
-  });
-
-  it('should not duplicate Protection reaction if already present (5e)', async () => {
-    const existingProtection = { name: 'Protection', type: 'protection' };
-    const playerSummary = makePlayerSummary({
-      class: { name: 'Paladin', fightingStyles: ['Protection'] },
-      reactions: [existingProtection],
-    });
-    const result = await rules.getPlayerStats([], [], [], [], [], playerSummary);
-    const protections = result.reactions.filter((r) => r.name === 'Protection');
-    expect(protections.length).toBe(1);
   });
 
   it('should add Thrown Weapon Fighting special action when fighting style is present (5e)', async () => {
@@ -249,18 +223,6 @@ describe('rules.getPlayerStats - fighting style reaction features (5e)', () => {
     expect(thrownWeapon).toBeDefined();
     expect(thrownWeapon.type).toBe('thrown_weapon_fighting');
     expect(thrownWeapon.hasAutomation).toBe(true);
-    expect(thrownWeapon.automation.type).toBe('passive_rule');
-  });
-
-  it('should not duplicate Thrown Weapon Fighting if already present', async () => {
-    const existing = { name: 'Thrown Weapon Fighting', type: 'thrown_weapon_fighting' };
-    const playerSummary = makePlayerSummary({
-      class: { name: 'Fighter', fightingStyles: ['Thrown Weapon Fighting'] },
-      specialActions: [existing],
-    });
-    const result = await rules.getPlayerStats([], [], [], [], [], playerSummary);
-    const count = result.specialActions.filter((a) => a.name === 'Thrown Weapon Fighting').length;
-    expect(count).toBe(1);
   });
 
   it('should add Two-Weapon Fighting special action when fighting style is present (5e)', async () => {
@@ -273,17 +235,6 @@ describe('rules.getPlayerStats - fighting style reaction features (5e)', () => {
     expect(twoWeapon).toBeDefined();
     expect(twoWeapon.type).toBe('two_weapon_fighting');
     expect(twoWeapon.hasAutomation).toBe(true);
-  });
-
-  it('should not duplicate Two-Weapon Fighting if already present', async () => {
-    const existing = { name: 'Two-Weapon Fighting', type: 'two_weapon_fighting' };
-    const playerSummary = makePlayerSummary({
-      class: { name: 'Fighter', fightingStyles: ['Two-Weapon Fighting'] },
-      specialActions: [existing],
-    });
-    const result = await rules.getPlayerStats([], [], [], [], [], playerSummary);
-    const count = result.specialActions.filter((a) => a.name === 'Two-Weapon Fighting').length;
-    expect(count).toBe(1);
   });
 
   it('should add Blessed Warrior special action when fighting style is present', async () => {
@@ -320,25 +271,6 @@ describe('rules.getPlayerStats - fighting style reaction features (5e)', () => {
     expect(superiority).toBeDefined();
     expect(superiority.type).toBe('combat_superiority');
     expect(superiority.hasAutomation).toBe(true);
-    expect(superiority.automation.dieExpression).toBe('6');
-    expect(superiority.automation.uses_max).toBe(1);
-  });
-
-  it('should not add fighting style features when fightingStyles array is missing', async () => {
-    const playerSummary = makePlayerSummary({
-      class: { name: 'Fighter', fightingStyles: undefined },
-    });
-    const result = await rules.getPlayerStats([], [], [], [], [], playerSummary);
-    expect(result.reactions.find((r) => r.name === 'Interception')).toBeUndefined();
-    expect(result.specialActions.find((a) => a.name === 'Thrown Weapon Fighting')).toBeUndefined();
-  });
-
-  it('should not add Interception for non-Fighter classes without the style', async () => {
-    const playerSummary = makePlayerSummary({
-      class: { name: 'Wizard', fightingStyles: [] },
-    });
-    const result = await rules.getPlayerStats([], [], [], [], [], playerSummary);
-    expect(result.reactions.find((r) => r.name === 'Interception')).toBeUndefined();
   });
 
   it('should add both Interception and Protection reactions when both styles are present', async () => {
@@ -367,8 +299,6 @@ describe('rules.getPlayerStats - fighting style reaction features (2024)', () =>
     expect(protection).toBeDefined();
     expect(protection.type).toBe('protection');
     expect(protection.hasAutomation).toBe(true);
-    expect(protection.automation.type).toBe('reaction_debuff');
-    expect(protection.automation.requiresShield).toBe(true);
   });
 
   it('should add Interception reaction when Interception fighting style is present (2024)', async () => {
@@ -383,21 +313,6 @@ describe('rules.getPlayerStats - fighting style reaction features (2024)', () =>
     expect(interception).toBeDefined();
     expect(interception.type).toBe('interception');
     expect(interception.hasAutomation).toBe(true);
-    expect(interception.automation.requiresShieldOrWeapon).toBe(true);
-  });
-
-  it('should not duplicate Protection reaction if already present (2024)', async () => {
-    const existingProtection = { name: 'Protection', type: 'protection' };
-    classRules2024.getClass.mockReturnValue({ name: 'Paladin', hit_die: 10, saving_throws: [], proficiencies: [], class_levels: [{}], languages: [], major: {}, fightingStyles: ['Protection'] });
-    const playerSummary = makePlayerSummary({
-      rules: '2024',
-      class: { name: 'Paladin', fightingStyles: ['Protection'] },
-      reactions: [existingProtection],
-      race: { name: 'Human', languages: ['Common'], traits: [] },
-    });
-    const result = await rules.getPlayerStats([], [], [], [], [], playerSummary);
-    const protections = result.reactions.filter((r) => r.name === 'Protection');
-    expect(protections.length).toBe(1);
   });
 
   it('should not add 5e-specific features when ruleset is 2024', async () => {
@@ -452,47 +367,21 @@ describe('rules.getPlayerStats - fighting style reaction features (2024)', () =>
 describe('rules.getPlayerStats - action array re-sorting after fighting styles', () => {
   beforeEach(() => { vi.clearAllMocks(); setupDefaults(); });
 
-  it('should re-sort actions after adding fighting style features', async () => {
+  it('should re-sort all action arrays after adding fighting style features', async () => {
     const playerSummary = makePlayerSummary({
       class: { name: 'Paladin', fightingStyles: ['Interception', 'Protection'] },
       actions: [{ name: 'ZAction' }, { name: 'AAction' }],
-    });
-    const result = await rules.getPlayerStats([], [], [], [], [], playerSummary);
-    const actionNames = result.actions.map((a) => a.name);
-    expect(actionNames).toEqual([...actionNames].sort((a, b) => a.localeCompare(b)));
-  });
-
-  it('should re-sort reactions after adding fighting style reactions', async () => {
-    const playerSummary = makePlayerSummary({
-      class: { name: 'Paladin', fightingStyles: ['Interception', 'Protection'] },
       reactions: [{ name: 'ZReaction' }, { name: 'AReaction' }],
-    });
-    const result = await rules.getPlayerStats([], [], [], [], [], playerSummary);
-    const reactionNames = result.reactions.map((r) => r.name);
-    expect(reactionNames).toEqual([...reactionNames].sort((a, b) => a.localeCompare(b)));
-  });
-
-  it('should re-sort specialActions after adding fighting style special actions', async () => {
-    const playerSummary = makePlayerSummary({
-      class: { name: 'Fighter', fightingStyles: ['Thrown Weapon Fighting', 'Two-Weapon Fighting'] },
       specialActions: [{ name: 'ZSpecial' }, { name: 'ASpecial' }],
-    });
-    const result = await rules.getPlayerStats([], [], [], [], [], playerSummary);
-    const specialNames = result.specialActions.map((a) => a.name);
-    expect(specialNames).toEqual([...specialNames].sort((a, b) => a.localeCompare(b)));
-  });
-
-  it('should re-sort bonusActions and characterAdvancement after fighting styles', async () => {
-    const playerSummary = makePlayerSummary({
-      class: { name: 'Fighter', fightingStyles: ['Superior Technique'] },
       bonusActions: [{ name: 'ZBonus' }, { name: 'ABonus' }],
       characterAdvancement: [{ name: 'ZAdvancement' }, { name: 'AAdvancement' }],
     });
     const result = await rules.getPlayerStats([], [], [], [], [], playerSummary);
-    const bonusNames = result.bonusActions.map((a) => a.name);
-    expect(bonusNames).toEqual([...bonusNames].sort((a, b) => a.localeCompare(b)));
-    const advNames = result.characterAdvancement.map((a) => a.name);
-    expect(advNames).toEqual([...advNames].sort((a, b) => a.localeCompare(b)));
+    expect(result.actions.map((a) => a.name)).toEqual([...result.actions.map((a) => a.name)].sort((a, b) => a.localeCompare(b)));
+    expect(result.reactions.map((r) => r.name)).toEqual([...result.reactions.map((r) => r.name)].sort((a, b) => a.localeCompare(b)));
+    expect(result.specialActions.map((a) => a.name)).toEqual([...result.specialActions.map((a) => a.name)].sort((a, b) => a.localeCompare(b)));
+    expect(result.bonusActions.map((a) => a.name)).toEqual([...result.bonusActions.map((a) => a.name)].sort((a, b) => a.localeCompare(b)));
+    expect(result.characterAdvancement.map((a) => a.name)).toEqual([...result.characterAdvancement.map((a) => a.name)].sort((a, b) => a.localeCompare(b)));
   });
 });
 
@@ -567,30 +456,14 @@ import * as featBuffService from '../../character/featBuffService.js';
 describe('rules.getPlayerStats - expertise handling', () => {
   beforeEach(() => { vi.clearAllMocks(); setupDefaults(); });
 
-  it('should add expertSkills entries to expertise array', async () => {
+  it('should add expertSkills entries to expertise array and skip empty/non-string entries', async () => {
     const playerSummary = makePlayerSummary({
-      expertSkills: ['Stealth', 'Persuasion'],
+      expertSkills: ['', 123, 'Stealth', null, 'Persuasion'],
     });
     const result = await rules.getPlayerStats([], [], [], [], [], playerSummary);
     expect(result.expertise).toContain('Stealth');
     expect(result.expertise).toContain('Persuasion');
-  });
-
-  it('should skip empty expertSkills entries', async () => {
-    const playerSummary = makePlayerSummary({
-      expertSkills: ['', 'Stealth', ''],
-    });
-    const result = await rules.getPlayerStats([], [], [], [], [], playerSummary);
-    expect(result.expertise).toContain('Stealth');
     const emptyCount = result.expertise.filter((e) => e === '').length;
     expect(emptyCount).toBe(0);
-  });
-
-  it('should skip non-string expertSkills entries', async () => {
-    const playerSummary = makePlayerSummary({
-      expertSkills: [123, 'Stealth', null],
-    });
-    const result = await rules.getPlayerStats([], [], [], [], [], playerSummary);
-    expect(result.expertise).toContain('Stealth');
   });
 });

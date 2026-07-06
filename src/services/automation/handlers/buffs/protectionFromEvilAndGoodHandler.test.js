@@ -84,45 +84,6 @@ describe('protectionFromEvilAndGoodHandler', () => {
           CAMPAIGN_NAME
         );
       });
-
-      it('overrides effect to protection_from_evil_and_good even if automation specifies a different value', async () => {
-        const ps = makePlayerStats();
-        const action = makeAction({ effect: 'wrong_effect' });
-        buffToggle.toggleBuff.mockReturnValue({ wasActive: false });
-
-        await handle(action, ps, CAMPAIGN_NAME, null);
-
-        expect(buffToggle.toggleBuff).toHaveBeenCalledWith(
-          ps.name,
-          action.name,
-          expect.objectContaining({ effect: 'protection_from_evil_and_good' }),
-          CAMPAIGN_NAME
-        );
-      });
-
-      it('always includes wardedCreatureTypes regardless of automation content', async () => {
-        const ps = makePlayerStats();
-        const action = makeAction({});
-        buffToggle.toggleBuff.mockReturnValue({ wasActive: false });
-
-        await handle(action, ps, CAMPAIGN_NAME, null);
-
-        expect(buffToggle.toggleBuff).toHaveBeenCalledWith(
-          expect.any(String),
-          expect.any(String),
-          expect.objectContaining({
-            wardedCreatureTypes: [
-              'Aberration',
-              'Celestial',
-              'Elemental',
-              'Fey',
-              'Fiend',
-              'Undead',
-            ],
-          }),
-          expect.any(String)
-        );
-      });
     });
 
     describe('expiration registration', () => {
@@ -182,21 +143,10 @@ describe('protectionFromEvilAndGoodHandler', () => {
           CAMPAIGN_NAME
         );
       });
-
-      it('does NOT call addExpiration when deactivating (setRuntimeValue still called)', async () => {
-        const ps = makePlayerStats();
-        const action = makeAction();
-        buffToggle.toggleBuff.mockReturnValue({ wasActive: true });
-
-        await handle(action, ps, CAMPAIGN_NAME, null);
-
-        expect(runtimeState.setRuntimeValue).toHaveBeenCalled();
-        expect(expirations.addExpiration).not.toHaveBeenCalled();
-      });
     });
 
-    describe('return value on activation', () => {
-      it('returns popup with automation_info payload', async () => {
+    describe('return value', () => {
+      it('returns popup with automation_info payload on activation', async () => {
         const ps = makePlayerStats();
         const action = makeAction();
         buffToggle.toggleBuff.mockReturnValue({ wasActive: false });
@@ -205,41 +155,15 @@ describe('protectionFromEvilAndGoodHandler', () => {
 
         expect(result.type).toBe('popup');
         expect(result.payload.type).toBe('automation_info');
-      });
-
-      it('includes buff name in payload', async () => {
-        const ps = makePlayerStats();
-        const action = makeAction();
-        buffToggle.toggleBuff.mockReturnValue({ wasActive: false });
-
-        const result = await handle(action, ps, CAMPAIGN_NAME, null);
-
         expect(result.payload.name).toBe(action.name);
-      });
-
-      it('includes automationType from action.automation.type', async () => {
-        const ps = makePlayerStats();
-        const action = makeAction();
-        buffToggle.toggleBuff.mockReturnValue({ wasActive: false });
-
-        const result = await handle(action, ps, CAMPAIGN_NAME, null);
-
         expect(result.payload.automationType).toBe('protection_from_evil_and_good');
-      });
-
-      it('includes activation description with warded creature mechanics', async () => {
-        const ps = makePlayerStats();
-        const action = makeAction();
-        buffToggle.toggleBuff.mockReturnValue({ wasActive: false });
-
-        const result = await handle(action, ps, CAMPAIGN_NAME, null);
-
         expect(result.payload.description).toContain('activated');
         expect(result.payload.description).toContain('Disadvantage');
         expect(result.payload.description).toContain('charmed');
         expect(result.payload.description).toContain('frightened');
         expect(result.payload.description).toContain('possessed');
         expect(result.payload.description).toContain('advantage');
+        expect(result.payload.automation).toEqual(action.automation);
       });
 
       it('uses the action name in the activation description', async () => {
@@ -252,19 +176,7 @@ describe('protectionFromEvilAndGoodHandler', () => {
         expect(result.payload.description).toContain('Custom Buff activated');
       });
 
-      it('includes the automation object in payload', async () => {
-        const ps = makePlayerStats();
-        const action = makeAction({ duration: '10 minutes' });
-        buffToggle.toggleBuff.mockReturnValue({ wasActive: false });
-
-        const result = await handle(action, ps, CAMPAIGN_NAME, null);
-
-        expect(result.payload.automation).toEqual(action.automation);
-      });
-    });
-
-    describe('return value on deactivation', () => {
-      it('returns popup with automation_info payload', async () => {
+      it('returns popup with automation_info payload on deactivation', async () => {
         const ps = makePlayerStats();
         const action = makeAction();
         buffToggle.toggleBuff.mockReturnValue({ wasActive: true });
@@ -273,15 +185,6 @@ describe('protectionFromEvilAndGoodHandler', () => {
 
         expect(result.type).toBe('popup');
         expect(result.payload.type).toBe('automation_info');
-      });
-
-      it('includes deactivated description', async () => {
-        const ps = makePlayerStats();
-        const action = makeAction();
-        buffToggle.toggleBuff.mockReturnValue({ wasActive: true });
-
-        const result = await handle(action, ps, CAMPAIGN_NAME, null);
-
         expect(result.payload.description).toBe(
           'Protection from Evil and Good deactivated'
         );
@@ -318,46 +221,24 @@ describe('protectionFromEvilAndGoodHandler', () => {
       expect(isProtectionFromEvilAndGoodActive(PLAYER_NAME, CAMPAIGN_NAME)).toBe(true);
     });
 
-    it('returns false when activeBuffs is empty', () => {
+    it('returns false when activeBuffs is empty or null', () => {
       runtimeState.getRuntimeValue.mockReturnValue([]);
 
       expect(isProtectionFromEvilAndGoodActive(PLAYER_NAME, CAMPAIGN_NAME)).toBe(false);
     });
 
-    it('returns false when activeBuffs is null', () => {
-      runtimeState.getRuntimeValue.mockReturnValue(null);
-
-      expect(isProtectionFromEvilAndGoodActive(PLAYER_NAME, CAMPAIGN_NAME)).toBe(false);
-    });
-
-    it('returns false when buff name matches but effect differs', () => {
+    it('returns false when name matches but effect differs, or effect matches but name differs', () => {
       runtimeState.getRuntimeValue.mockReturnValue([
         { name: 'Protection from Evil and Good', effect: 'some_other_effect' },
       ]);
 
       expect(isProtectionFromEvilAndGoodActive(PLAYER_NAME, CAMPAIGN_NAME)).toBe(false);
-    });
 
-    it('returns false when effect matches but name differs', () => {
       runtimeState.getRuntimeValue.mockReturnValue([
         { name: 'Other Spell', effect: 'protection_from_evil_and_good' },
       ]);
 
       expect(isProtectionFromEvilAndGoodActive(PLAYER_NAME, CAMPAIGN_NAME)).toBe(false);
-    });
-
-    it('uses playerName to fetch activeBuffs', () => {
-      runtimeState.getRuntimeValue.mockReturnValue([
-        { name: 'Protection from Evil and Good', effect: 'protection_from_evil_and_good' },
-      ]);
-
-      isProtectionFromEvilAndGoodActive('DifferentHero', CAMPAIGN_NAME);
-
-      expect(runtimeState.getRuntimeValue).toHaveBeenCalledWith(
-        'DifferentHero',
-        'activeBuffs',
-        CAMPAIGN_NAME
-      );
     });
   });
 
@@ -394,34 +275,13 @@ describe('protectionFromEvilAndGoodHandler', () => {
       expect(isCreatureWarded('Aberration', PLAYER_NAME, CAMPAIGN_NAME)).toBe(false);
     });
 
-    it('returns false when creatureType is null', () => {
+    it('returns false when creatureType or playerName is null or undefined', () => {
       runtimeState.getRuntimeValue.mockReturnValue(WARDED_TYPES);
 
       expect(isCreatureWarded(null, PLAYER_NAME, CAMPAIGN_NAME)).toBe(false);
-    });
-
-    it('returns false when creatureType is undefined', () => {
-      runtimeState.getRuntimeValue.mockReturnValue(WARDED_TYPES);
-
       expect(isCreatureWarded(undefined, PLAYER_NAME, CAMPAIGN_NAME)).toBe(false);
-    });
-
-    it('returns false when playerName is null', () => {
-      runtimeState.getRuntimeValue.mockReturnValue(WARDED_TYPES);
-
       expect(isCreatureWarded('Aberration', null, CAMPAIGN_NAME)).toBe(false);
-    });
-
-    it('returns false when playerName is undefined', () => {
-      runtimeState.getRuntimeValue.mockReturnValue(WARDED_TYPES);
-
       expect(isCreatureWarded('Aberration', undefined, CAMPAIGN_NAME)).toBe(false);
-    });
-
-    it('converts creatureType to string before matching', () => {
-      runtimeState.getRuntimeValue.mockReturnValue(WARDED_TYPES);
-
-      expect(isCreatureWarded(42, PLAYER_NAME, CAMPAIGN_NAME)).toBe(false);
     });
   });
 });

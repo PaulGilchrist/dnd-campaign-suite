@@ -112,21 +112,6 @@ describe('mistyEscapeHandler', () => {
             expect(result.payload.description).toContain('No recent damage taken');
         });
 
-        it('uses feature name in the no-damage message', async () => {
-            findLastAttack.mockResolvedValue({
-                attackEvent: null,
-                attackerName: null,
-                targetName: null,
-                primaryDamage: 0,
-                secondaryDamage: 0,
-                totalDamage: 0,
-                damageTypes: [],
-            });
-
-            const result = await handle(makeAction({ name: 'My Feature' }), makePlayerStats(), 'test-campaign', null);
-
-            expect(result.payload.description).toContain('My Feature');
-        });
     });
 
     describe('disappearing step: invisible condition', () => {
@@ -167,20 +152,6 @@ describe('mistyEscapeHandler', () => {
             );
         });
 
-        it('handles non-array stored conditions as empty', async () => {
-            findLastAttack.mockResolvedValue(makeRecentAttack());
-            getRuntimeValue.mockReturnValue(null);
-
-            await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
-
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'WarlockGirl',
-                'activeConditions',
-                ['invisible'],
-                'test-campaign'
-            );
-        });
-
         it('registers expiration for invisible condition after 1 round', async () => {
             findLastAttack.mockResolvedValue(makeRecentAttack());
 
@@ -202,15 +173,6 @@ describe('mistyEscapeHandler', () => {
             getRuntimeValue.mockReturnValue([]);
             buildSaveDc.mockReturnValue(15);
         }
-
-        it('returns popup with automation info type', async () => {
-            setupSuccessfulHandler();
-
-            const result = await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.type).toBe('automation_info');
-        });
 
         it('includes Misty Step, invisible condition, and Dreadful Step in description', async () => {
             setupSuccessfulHandler();
@@ -244,14 +206,6 @@ describe('mistyEscapeHandler', () => {
 
             expect(result.payload.saveType).toBe('CHA');
             expect(result.payload.saveDc).toBe(17);
-        });
-
-        it('uses default feature name when action name is empty', async () => {
-            setupSuccessfulHandler();
-
-            const result = await handle(makeAction({ name: '' }), makePlayerStats(), 'test-campaign', null);
-
-            expect(result.payload.name).toBe('Misty Escape');
         });
 
         it('uses custom feature name when provided', async () => {

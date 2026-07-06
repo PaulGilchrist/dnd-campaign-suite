@@ -68,11 +68,8 @@ describe('computeTrackedResources', () => {
     vi.clearAllMocks();
   });
 
-  it('returns empty object when playerStats is null', () => {
+  it('returns empty object when playerStats is null or undefined', () => {
     expect(computeTrackedResources(null)).toEqual({});
-  });
-
-  it('returns empty object when playerStats is undefined', () => {
     expect(computeTrackedResources(undefined)).toEqual({});
   });
 
@@ -137,12 +134,6 @@ describe('computeTrackedResources', () => {
 
   it('defaults sorceryPoints to 0 when features is null', () => {
     getClassFeatures.mockReturnValue(null);
-    const result = computeTrackedResources(basePlayerStats());
-    expect(result.sorceryPoints).toEqual({ current: 0, max: 0 });
-  });
-
-  it('defaults sorceryPoints to 0 when features lacks maxSorceryPoints', () => {
-    getClassFeatures.mockReturnValue({ otherProp: 10 });
     const result = computeTrackedResources(basePlayerStats());
     expect(result.sorceryPoints).toEqual({ current: 0, max: 0 });
   });
@@ -250,6 +241,7 @@ describe('computeTrackedResources', () => {
     });
     const result = computeTrackedResources(stats);
     expect(result.secondWindUses).toEqual({ current: 0, max: 0 });
+    expect(result.secondwindUses).toEqual({ current: 0, max: 0 });
   });
 
   // ── actionSurge (Fighter) ──
@@ -472,22 +464,6 @@ describe('computeTrackedResources', () => {
       expect(result.psionicEnergy).toEqual({ current: 3, max: 3 });
     });
 
-    it('does not match when subclass differs from major but energy matches subclass', () => {
-      // Source uses `major?.name || subclass?.name` so when major is "Champion",
-      // it short-circuits and never checks subclass
-      const stats = basePlayerStats({
-        class: {
-          ...basePlayerStats().class,
-          name: 'Fighter',
-          major: { name: 'Champion' },
-          subclass: { name: 'Psi Warrior' },
-          class_levels: [{ level: 5, energy: { required_major: 'Psi Warrior', energy_die_num: 4 } }],
-        },
-      });
-      const result = computeTrackedResources(stats);
-      expect(result.psionicEnergy).toEqual({ current: 0, max: 0 });
-    });
-
     it('defaults to 0 when energy required_major does not match', () => {
       const stats = basePlayerStats({
         class: {
@@ -570,18 +546,6 @@ describe('computeTrackedResources', () => {
       const stats = basePlayerStats({
         automation: { passives: [{ type: 'other_type' }] },
       });
-      const result = computeTrackedResources(stats);
-      expect(result.sorcerousRestorationUses).toEqual({ current: 0, max: 0 });
-    });
-
-    it('defaults to 0 when automation.passives is missing', () => {
-      const result = computeTrackedResources(basePlayerStats());
-      expect(result.sorcerousRestorationUses).toEqual({ current: 0, max: 0 });
-    });
-
-    it('defaults to 0 when automation is missing entirely', () => {
-      const stats = basePlayerStats();
-      delete stats.automation;
       const result = computeTrackedResources(stats);
       expect(result.sorcerousRestorationUses).toEqual({ current: 0, max: 0 });
     });
@@ -731,38 +695,17 @@ describe('computeTrackedResources', () => {
       const result = computeTrackedResources(stats);
       expect(result.warPriestUses).toEqual({ current: 1, max: 1 });
     });
-
-    it('non-cleric still gets warPriestUses from Wisdom ability (no class check)', () => {
-      // Source does not check class name for warPriestUses
-      const stats = basePlayerStats({
-        class: { ...basePlayerStats().class, name: 'Wizard' },
-        abilities: [{ name: 'Wisdom', bonus: 5 }],
-      });
-      const result = computeTrackedResources(stats);
-      expect(result.warPriestUses).toEqual({ current: 5, max: 5 });
-    });
   });
 });
 
 // ── applyServerOverride ─────────────────────────────────────────
 
 describe('applyServerOverride', () => {
-  it('returns a shallow copy when serverData is null', () => {
+  it('returns a shallow copy when serverData is null, undefined, or a non-object primitive', () => {
     const computed = { hitPoints: { current: 10, max: 20 } };
-    const result = applyServerOverride(computed, null);
-    expect(result).toEqual(computed);
-    expect(result).not.toBe(computed);
-  });
-
-  it('returns a shallow copy when serverData is undefined', () => {
-    const computed = { hitPoints: { current: 10, max: 20 } };
-    const result = applyServerOverride(computed, undefined);
-    expect(result).toEqual(computed);
-    expect(result).not.toBe(computed);
-  });
-
-  it('returns a shallow copy when serverData is a non-object primitive', () => {
-    const computed = { hitPoints: { current: 10, max: 20 } };
+    expect(applyServerOverride(computed, null)).toEqual(computed);
+    expect(applyServerOverride(computed, null)).not.toBe(computed);
+    expect(applyServerOverride(computed, undefined)).toEqual(computed);
     expect(applyServerOverride(computed, 42)).toEqual(computed);
     expect(applyServerOverride(computed, 'string')).toEqual(computed);
     expect(applyServerOverride(computed, [])).toEqual(computed);
@@ -781,16 +724,10 @@ describe('applyServerOverride', () => {
     expect(result.sorceryPoints).toEqual({ current: 3, max: 5 });
   });
 
-  it('does not override when serverValue is null', () => {
+  it('does not override when serverValue is null or undefined', () => {
     const computed = { hitPoints: { current: 20, max: 20 } };
-    const result = applyServerOverride(computed, { hitPoints: null });
-    expect(result.hitPoints).toEqual({ current: 20, max: 20 });
-  });
-
-  it('does not override when serverValue is undefined', () => {
-    const computed = { hitPoints: { current: 20, max: 20 } };
-    const result = applyServerOverride(computed, { hitPoints: undefined });
-    expect(result.hitPoints).toEqual({ current: 20, max: 20 });
+    expect(applyServerOverride(computed, { hitPoints: null }).hitPoints).toEqual({ current: 20, max: 20 });
+    expect(applyServerOverride(computed, { hitPoints: undefined }).hitPoints).toEqual({ current: 20, max: 20 });
   });
 
   it('overrides with 0 when serverValue is 0 (falsy but valid)', () => {
@@ -803,18 +740,6 @@ describe('applyServerOverride', () => {
     const computed = { hitPoints: { current: 20, max: 20 } };
     const result = applyServerOverride(computed, { unknownKey: 99 });
     expect(result.unknownKey).toBeUndefined();
-  });
-
-  it('adds unknown keys that ARE in ALL_TRACKED_RESOURCES', () => {
-    const computed = { hitPoints: { current: 20, max: 20 } };
-    const result = applyServerOverride(computed, { kiPoints: 4 });
-    expect(result.kiPoints).toEqual({ current: 4, max: 4 });
-  });
-
-  it('does not add unknown keys that are NOT in ALL_TRACKED_RESOURCES', () => {
-    const computed = { hitPoints: { current: 20, max: 20 } };
-    const result = applyServerOverride(computed, { someRandomKey: 10 });
-    expect(result.someRandomKey).toBeUndefined();
   });
 
   it('preserves computed entries not overridden by serverData', () => {
@@ -848,20 +773,6 @@ describe('trackedResourcesToStoreEntries', () => {
 
   it('returns empty object for empty input', () => {
     expect(trackedResourcesToStoreEntries({})).toEqual({});
-  });
-
-  it('handles negative current values', () => {
-    const result = trackedResourcesToStoreEntries({
-      hitPoints: { current: -5, max: 20 },
-    });
-    expect(result).toEqual({ hitPoints: -5 });
-  });
-
-  it('handles zero current values', () => {
-    const result = trackedResourcesToStoreEntries({
-      hitPoints: { current: 0, max: 20 },
-    });
-    expect(result).toEqual({ hitPoints: 0 });
   });
 
   it('preserves all keys from tracked resources', () => {

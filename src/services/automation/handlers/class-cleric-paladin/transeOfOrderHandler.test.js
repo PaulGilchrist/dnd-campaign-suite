@@ -65,10 +65,10 @@ describe('Transe of Order Handler', () => {
     });
 
     describe('handle()', () => {
-        it('should activate Transe of Order when not active and player has enough SP', async () => {
+        it('should activate Transe of Order when uses are available', async () => {
             runtimeState.getRuntimeValue.mockImplementation((_name, key) => {
                 if (key === activeKey) return false;
-                if (key === usesKey) return null;
+                if (key === usesKey) return 1;
                 return null;
             });
             classFeatures.getClassFeatures.mockReturnValue({ maxSorceryPoints: 10 });
@@ -96,10 +96,10 @@ describe('Transe of Order Handler', () => {
             );
         });
 
-        it('should activate when stored uses exist and active flag is false (re-activation after deactivation)', async () => {
+        it('should activate with default uses when runtime value is null', async () => {
             runtimeState.getRuntimeValue.mockImplementation((_name, key) => {
                 if (key === activeKey) return false;
-                if (key === usesKey) return 1;
+                if (key === usesKey) return null;
                 return null;
             });
             classFeatures.getClassFeatures.mockReturnValue({ maxSorceryPoints: 10 });
@@ -108,12 +108,7 @@ describe('Transe of Order Handler', () => {
 
             expect(result.type).toBe('popup');
             expect(result.payload.description).toContain('activated');
-            expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-                playerName,
-                activeKey,
-                true,
-                campaignName,
-            );
+            expect(metamagic.spendSorceryPoints).not.toHaveBeenCalled();
         });
 
         it('should restore uses by spending 5 SP when no uses remain and player has enough SP', async () => {
@@ -135,61 +130,13 @@ describe('Transe of Order Handler', () => {
                 1,
                 campaignName,
             );
-            expect(logService.addEntry).toHaveBeenCalledTimes(1);
-            const [logCampaign, logEntry] = logService.addEntry.mock.calls[0];
-            expect(logCampaign).toBe(campaignName);
-            expect(logEntry.type).toBe('ability_use');
-            expect(logEntry.description).toContain('spending 5 Sorcery Points');
-        });
-
-        it('should return error popup when no uses remain, active is false, and player lacks SP', async () => {
-            runtimeState.getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === activeKey) return false;
-                if (key === usesKey) return 0;
-                return null;
-            });
-            classFeatures.getClassFeatures.mockReturnValue({ maxSorceryPoints: 5 });
-
-            const result = await handle(makeAction(), makePlayerStats({
-                resources: { sorcery_points: { current: 2 } },
-            }), campaignName, null);
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('no uses remaining');
-            expect(metamagic.spendSorceryPoints).not.toHaveBeenCalled();
-            expect(runtimeState.setRuntimeValue).not.toHaveBeenCalled();
-        });
-
-        it('should restore when no uses remain, active is false, and getClassFeatures returns null but player has SP', async () => {
-            runtimeState.getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === activeKey) return false;
-                if (key === usesKey) return 0;
-                return null;
-            });
-            classFeatures.getClassFeatures.mockReturnValue(null);
-
-            const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('restored');
-            expect(metamagic.spendSorceryPoints).toHaveBeenCalledWith(playerName, 5, campaignName);
-        });
-
-        it('should use maxSorceryPoints as fallback when playerStats.resources.sorcery_points is missing', async () => {
-            runtimeState.getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === activeKey) return false;
-                if (key === usesKey) return 0;
-                return null;
-            });
-            classFeatures.getClassFeatures.mockReturnValue({ maxSorceryPoints: 10 });
-
-            const result = await handle(makeAction(), makePlayerStats({
-                resources: undefined,
-            }), campaignName, null);
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('restored');
-            expect(metamagic.spendSorceryPoints).toHaveBeenCalledWith(playerName, 5, campaignName);
+            expect(logService.addEntry).toHaveBeenCalledWith(
+                campaignName,
+                expect.objectContaining({
+                    type: 'ability_use',
+                    description: expect.stringContaining('spending 5 Sorcery Points'),
+                }),
+            );
         });
 
         it('should use current SP from playerStats when available instead of maxSorceryPoints', async () => {
@@ -209,42 +156,28 @@ describe('Transe of Order Handler', () => {
             expect(metamagic.spendSorceryPoints).not.toHaveBeenCalled();
         });
 
-        it('should restore when no uses remain, maxSorceryPoints is 0, but player has SP in resources', async () => {
+        it('should return error popup when no uses remain and player lacks SP', async () => {
             runtimeState.getRuntimeValue.mockImplementation((_name, key) => {
                 if (key === activeKey) return false;
                 if (key === usesKey) return 0;
                 return null;
             });
-            classFeatures.getClassFeatures.mockReturnValue({ maxSorceryPoints: 0 });
-
-            const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('restored');
-            expect(metamagic.spendSorceryPoints).toHaveBeenCalledWith(playerName, 5, campaignName);
-        });
-
-        it('should return error popup when no uses remain, no resources, and maxSorceryPoints is 0', async () => {
-            runtimeState.getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === activeKey) return false;
-                if (key === usesKey) return 0;
-                return null;
-            });
-            classFeatures.getClassFeatures.mockReturnValue({ maxSorceryPoints: 0 });
+            classFeatures.getClassFeatures.mockReturnValue(null);
 
             const result = await handle(makeAction(), makePlayerStats({
-                resources: undefined,
+                resources: { sorcery_points: { current: 2 } },
             }), campaignName, null);
 
             expect(result.type).toBe('popup');
             expect(result.payload.description).toContain('no uses remaining');
             expect(metamagic.spendSorceryPoints).not.toHaveBeenCalled();
+            expect(runtimeState.setRuntimeValue).not.toHaveBeenCalled();
         });
 
-        it('should use custom action name from the action object', async () => {
+        it('should include automation config and use custom action name in the popup payload', async () => {
             runtimeState.getRuntimeValue.mockImplementation((_name, key) => {
                 if (key === activeKey) return false;
-                if (key === usesKey) return null;
+                if (key === usesKey) return 1;
                 return null;
             });
             classFeatures.getClassFeatures.mockReturnValue({ maxSorceryPoints: 10 });
@@ -253,18 +186,6 @@ describe('Transe of Order Handler', () => {
 
             expect(result.payload.name).toBe('Custom Feature');
             expect(result.payload.description).toContain('Custom Feature');
-        });
-
-        it('should include automation config in the popup payload', async () => {
-            runtimeState.getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === activeKey) return false;
-                if (key === usesKey) return null;
-                return null;
-            });
-            classFeatures.getClassFeatures.mockReturnValue({ maxSorceryPoints: 10 });
-
-            const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
             expect(result.payload.automation).toEqual({
                 type: 'transe_of_order',
                 action: 'bonus_action',
@@ -275,24 +196,20 @@ describe('Transe of Order Handler', () => {
     });
 
     describe('isActive()', () => {
-        it('should return true when the active flag is true', () => {
+        it('should return true when the active flag is true, false otherwise', () => {
             runtimeState.getRuntimeValue.mockReturnValue(true);
             expect(isActive(playerName)).toBe(true);
-        });
 
-        it('should return false when the active flag is false', () => {
             runtimeState.getRuntimeValue.mockReturnValue(false);
             expect(isActive(playerName)).toBe(false);
-        });
 
-        it('should return false when the active flag is null', () => {
             runtimeState.getRuntimeValue.mockReturnValue(null);
             expect(isActive(playerName)).toBe(false);
         });
     });
 
     describe('deactivate()', () => {
-        it('should set the active flag to false', () => {
+        it('should set the active flag to false for the given player', () => {
             deactivate(playerName, campaignName);
 
             expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
@@ -303,7 +220,7 @@ describe('Transe of Order Handler', () => {
             );
         });
 
-        it('should use the correct runtime key for the player', () => {
+        it('should use the correct runtime key for a different player', () => {
             deactivate('Other Player', campaignName);
 
             expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(

@@ -49,33 +49,23 @@ describe('defensiveTacticsHandler', () => {
             expect(result.payload.campaignName).toBe('test-campaign');
         });
 
-        it('returns info popup for Escape the Horde', async () => {
-            getRuntimeValue.mockReturnValue('Escape the Horde');
+        it.each([
+            ['Escape the Horde', 'Opportunity Attacks have Disadvantage'],
+            ['Multiattack Defense', 'Disadvantage on all other attack rolls'],
+        ])('returns info popup for %s', async (choice, expectedText) => {
+            getRuntimeValue.mockReturnValue(choice);
 
             const result = await handle(makeAction(), makePlayerStats(), 'test-campaign');
 
             expect(result.type).toBe('popup');
             expect(result.payload.type).toBe('automation_info');
             expect(result.payload.name).toBe('Defensive Tactics');
-            expect(result.payload.description).toContain('Escape the Horde');
-            expect(result.payload.description).toContain('Opportunity Attacks have Disadvantage');
+            expect(result.payload.description).toContain(choice);
+            expect(result.payload.description).toContain(expectedText);
             expect(result.payload.automation).toBeDefined();
         });
 
-        it('returns info popup for Multiattack Defense', async () => {
-            getRuntimeValue.mockReturnValue('Multiattack Defense');
-
-            const result = await handle(makeAction(), makePlayerStats(), 'test-campaign');
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.type).toBe('automation_info');
-            expect(result.payload.name).toBe('Defensive Tactics');
-            expect(result.payload.description).toContain('Multiattack Defense');
-            expect(result.payload.description).toContain('Disadvantage on all other attack rolls');
-            expect(result.payload.automation).toBeDefined();
-        });
-
-        it('returns modal for falsy runtime values (empty string, null, undefined)', async () => {
+        it('returns modal for falsy runtime values', async () => {
             for (const falsy of [undefined, '', null]) {
                 getRuntimeValue.mockReturnValue(falsy);
 
@@ -98,60 +88,31 @@ describe('defensiveTacticsHandler', () => {
             }
         });
 
-        it('returns popup for Escape the Horde', async () => {
-            const result = await applyChoice(makePlayerStats(), 'test-campaign', 'Escape the Horde');
+        it.each([
+            ['Escape the Horde', 'Escape the Horde'],
+            ['Multiattack Defense', 'Multiattack Defense'],
+        ])('stores %s and returns confirmation popup', async (choice, expectedText) => {
+            const result = await applyChoice(makePlayerStats(), 'test-campaign', choice);
 
             expect(result.type).toBe('popup');
             expect(result.payload.type).toBe('automation_info');
             expect(result.payload.name).toBe('Defensive Tactics');
-            expect(result.payload.description).toContain('Escape the Horde');
+            expect(result.payload.description).toContain(expectedText);
             expect(result.payload.description).toContain('Short or Long Rest');
             expect(result.payload.automation).toBeUndefined();
-        });
-
-        it('returns popup for Multiattack Defense', async () => {
-            const result = await applyChoice(makePlayerStats(), 'test-campaign', 'Multiattack Defense');
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.type).toBe('automation_info');
-            expect(result.payload.name).toBe('Defensive Tactics');
-            expect(result.payload.description).toContain('Multiattack Defense');
-            expect(result.payload.description).toContain('Short or Long Rest');
-            expect(result.payload.automation).toBeUndefined();
-        });
-
-        it('stores the chosen value and logs to campaign log', async () => {
-            await applyChoice(makePlayerStats(), 'test-campaign', 'Escape the Horde');
 
             expect(setRuntimeValue).toHaveBeenCalledWith(
                 'RangerBoy',
                 '_Defensive_Tactics_choice',
-                'Escape the Horde',
-                'test-campaign'
+                choice,
+                'test-campaign',
             );
+
             expect(addEntry).toHaveBeenCalledWith('test-campaign', {
                 type: 'ability_use',
                 characterName: 'RangerBoy',
                 abilityName: 'Defensive Tactics',
-                description: 'Defensive Tactics choice: Escape the Horde',
-            });
-        });
-
-        it('uses the character name from playerStats for runtime key and log', async () => {
-            const stats = makePlayerStats({ name: 'OtherRanger' });
-            await applyChoice(stats, 'test-campaign', 'Escape the Horde');
-
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'OtherRanger',
-                '_Defensive_Tactics_choice',
-                'Escape the Horde',
-                'test-campaign'
-            );
-            expect(addEntry).toHaveBeenCalledWith('test-campaign', {
-                type: 'ability_use',
-                characterName: 'OtherRanger',
-                abilityName: 'Defensive Tactics',
-                description: 'Defensive Tactics choice: Escape the Horde',
+                description: `Defensive Tactics choice: ${choice}`,
             });
         });
     });

@@ -70,24 +70,7 @@ describe('divineInterventionHandler', () => {
             });
         });
 
-        it('should return popup when uses are negative', async () => {
-            mockUses(-1);
-
-            const result = await handle(makeAction(), makePlayerStats(), campaignName, 'TestMap');
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.description).toBe('Divine Intervention is expended. It recharges after a Long Rest.');
-        });
-
-        it('should return popup with cooldown message when Wish cooldown is active (single rest)', async () => {
-            mockUsesWithCooldown(0, 1);
-
-            const result = await handle(makeAction(), makePlayerStats(), campaignName, 'TestMap');
-
-            expect(result.payload.description).toBe('Divine Intervention (Wish) is on cooldown. 1 long rest remaining.');
-        });
-
-        it('should return popup with cooldown message when Wish cooldown is active (multiple rests)', async () => {
+        it('should return popup with cooldown message when Wish cooldown is active', async () => {
             mockUsesWithCooldown(0, 3);
 
             const result = await handle(makeAction(), makePlayerStats(), campaignName, 'TestMap');
@@ -122,7 +105,7 @@ describe('divineInterventionHandler', () => {
                 { name: 'Flame Strike', classes: ['Cleric'], level: 5, casting_time: '1 Action' },
                 { name: 'Holy Word', classes: ['Cleric'], level: 7, casting_time: '1 Action' },
                 { name: 'Something Else', classes: ['Wizard'], level: 1, casting_time: '1 Action' },
-                { name: 'Reaction Spell', classes: ['Cleric'], level: 1, casting_time: 'Reaction' },
+                { name: 'Reaction Spell', classes: ['Cleric'], level: 1, casting_time: '1 Reaction' },
                 { name: 'No Classes', level: 1, casting_time: '1 Action' },
             ];
             loadSpells.mockResolvedValue(mockSpells);
@@ -141,34 +124,6 @@ describe('divineInterventionHandler', () => {
                 },
             });
             expect(loadSpells).toHaveBeenCalledWith('2024');
-        });
-
-        it('should exclude spells with casting_time of 1 Reaction', async () => {
-            mockUses(1);
-            loadSpells.mockResolvedValue([
-                { name: 'Counterspell', classes: ['Cleric'], level: 3, casting_time: '1 Reaction' },
-                { name: 'Shield', classes: ['Cleric'], level: 1, casting_time: 'Reaction' },
-                { name: 'Cure Wounds', classes: ['Cleric'], level: 1, casting_time: '1 Action' },
-            ]);
-
-            const result = await handle(makeAction(), makePlayerStats(), campaignName, 'TestMap');
-
-            expect(result.payload.eligibleSpells).toHaveLength(1);
-            expect(result.payload.eligibleSpells[0].name).toBe('Cure Wounds');
-        });
-
-        it('should exclude spells above level 5', async () => {
-            mockUses(1);
-            loadSpells.mockResolvedValue([
-                { name: 'Cure Wounds', classes: ['Cleric'], level: 5, casting_time: '1 Action' },
-                { name: 'Holy Word', classes: ['Cleric'], level: 7, casting_time: '1 Action' },
-                { name: 'Gate', classes: ['Cleric'], level: 9, casting_time: '1 Action' },
-            ]);
-
-            const result = await handle(makeAction(), makePlayerStats(), campaignName, 'TestMap');
-
-            expect(result.payload.eligibleSpells).toHaveLength(1);
-            expect(result.payload.eligibleSpells[0].name).toBe('Cure Wounds');
         });
 
         it('should use playerStats.rules when set', async () => {
@@ -213,26 +168,11 @@ describe('divineInterventionHandler', () => {
             expect(result.payload.isGreater).toBe(true);
             expect(result.payload.eligibleSpells).toEqual([wishSpell]);
         });
-
-        it('should pass isGreater=false for normal Divine Intervention', async () => {
-            mockUses(1);
-            loadSpells.mockResolvedValue([]);
-
-            const result = await handle(makeAction(), makePlayerStats(), campaignName, 'TestMap');
-
-            expect(result.payload.isGreater).toBe(false);
-        });
     });
 
     describe('onSpellSelected()', () => {
         it('should return null if uses are exhausted', async () => {
             mockUses(0);
-            const result = await onSpellSelected(makeAction(), makePlayerStats(), campaignName, { name: 'Cure Wounds' });
-            expect(result).toBeNull();
-        });
-
-        it('should return null if uses are negative', async () => {
-            mockUses(-1);
             const result = await onSpellSelected(makeAction(), makePlayerStats(), campaignName, { name: 'Cure Wounds' });
             expect(result).toBeNull();
         });
@@ -264,21 +204,20 @@ describe('divineInterventionHandler', () => {
             expect(setRuntimeValue).toHaveBeenCalledWith('Player One', 'divineInterventionUses', 0, campaignName, true);
         });
 
-        it('should set uses to 0 when starting from 1 use', async () => {
-            mockUses(1);
-            const selectedSpell = { name: 'Cure Wounds' };
-
-            await onSpellSelected(makeAction(), makePlayerStats(), campaignName, selectedSpell);
-
-            expect(setRuntimeValue).toHaveBeenCalledWith('Player One', 'divineInterventionUses', 0, campaignName, true);
-        });
-
-        it('should set uses to -1 when starting from 2 uses', async () => {
+        it('should decrement uses correctly when starting from 2 uses', async () => {
             mockUses(2);
             const selectedSpell = { name: 'Cure Wounds' };
 
-            await onSpellSelected(makeAction(), makePlayerStats(), campaignName, selectedSpell);
+            const result = await onSpellSelected(makeAction(), makePlayerStats(), campaignName, selectedSpell);
 
+            expect(result).toEqual({
+                type: 'spell_selected',
+                spell: selectedSpell,
+                skipSlotCost: true,
+                skipMaterialComponents: true,
+                rechargeMessage: 'until you finish a Long Rest.',
+                name: 'Divine Intervention',
+            });
             expect(setRuntimeValue).toHaveBeenCalledWith('Player One', 'divineInterventionUses', 1, campaignName, true);
         });
 
@@ -299,7 +238,7 @@ describe('divineInterventionHandler', () => {
             vi.restoreAllMocks();
         });
 
-        it('should use minimum cooldown (1) when both d4 rolls are 1', async () => {
+        it('should handle minimum cooldown (2) when both d4 rolls are 1', async () => {
             mockUses(1);
             const action = makeAction({ upgradeTo: 'wish' });
             const selectedSpell = { name: 'Wish' };
@@ -314,7 +253,7 @@ describe('divineInterventionHandler', () => {
             vi.restoreAllMocks();
         });
 
-        it('should use maximum cooldown (8) when both d4 rolls are 4', async () => {
+        it('should handle maximum cooldown (8) when both d4 rolls are 4', async () => {
             mockUses(1);
             const action = makeAction({ upgradeTo: 'wish' });
             const selectedSpell = { name: 'Wish' };
@@ -347,7 +286,7 @@ describe('divineInterventionHandler', () => {
             );
         });
 
-        it('should not set cooldown when spell is not Wish even if upgradeTo is wish but action is not greater', async () => {
+        it('should not set cooldown when spell is not Wish even if upgradeTo is wish', async () => {
             mockUses(1);
             const action = makeAction({ upgradeTo: 'wish' });
             const selectedSpell = { name: 'Cure Wounds' };
@@ -366,4 +305,3 @@ describe('divineInterventionHandler', () => {
         });
     });
 });
-

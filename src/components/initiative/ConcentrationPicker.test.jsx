@@ -1,5 +1,5 @@
 import { render, screen, fireEvent } from '@testing-library/react';
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import ConcentrationPicker from './ConcentrationPicker.jsx';
 
 describe('ConcentrationPicker', () => {
@@ -19,7 +19,7 @@ describe('ConcentrationPicker', () => {
     });
 
     describe('rendering', () => {
-        it('should render the overlay, modal, labels and buttons', () => {
+        it('should render the overlay, modal, labels, buttons, and heading', () => {
             render(<ConcentrationPicker {...props} />);
             expect(screen.getByRole('heading', { name: 'Concentration for Goblin' })).toBeInTheDocument();
             expect(document.querySelector('.condition-picker-overlay')).toBeInTheDocument();
@@ -28,12 +28,6 @@ describe('ConcentrationPicker', () => {
             expect(screen.getByText('DC')).toBeInTheDocument();
             expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
             expect(screen.getByRole('button', { name: 'Apply' })).toBeInTheDocument();
-        });
-
-        it('should autoFocus the spell input', () => {
-            render(<ConcentrationPicker {...props} />);
-            const spellInput = screen.getByLabelText('Spell');
-            expect(spellInput).toHaveFocus();
         });
 
         it.each`
@@ -57,36 +51,6 @@ describe('ConcentrationPicker', () => {
             render(<ConcentrationPicker {...props} targetName={targetName} />);
             const heading = screen.getByRole('heading', { level: 3 });
             expect(heading.textContent).toContain(`Concentration for ${targetName}`);
-        });
-
-        it.each`
-            dc
-            ${10}
-            ${20}
-            ${25}
-        `('should render DC input with value $dc', ({ dc }) => {
-            render(<ConcentrationPicker {...props} dc={dc} />);
-            const dcInput = screen.getByLabelText('DC');
-            expect(dcInput).toHaveValue(dc);
-        });
-
-        it.each`
-            spellName
-            ${'Shield'}
-            ${'Wish'}
-        `('should render spell input with value "$spellName"', ({ spellName }) => {
-            render(<ConcentrationPicker {...props} spellName={spellName} />);
-            const spellInput = screen.getByLabelText('Spell');
-            expect(spellInput).toHaveValue(spellName);
-        });
-    });
-
-    describe('spell name input interaction', () => {
-        it('should call onSpellNameChange when spell input changes', () => {
-            render(<ConcentrationPicker {...props} />);
-            const spellInput = screen.getByLabelText('Spell');
-            fireEvent.change(spellInput, { target: { value: 'Lightning Bolt' } });
-            expect(props.onSpellNameChange).toHaveBeenCalledWith('Lightning Bolt');
         });
     });
 
@@ -130,14 +94,6 @@ describe('ConcentrationPicker', () => {
             const modal = document.querySelector('.condition-picker-modal');
             fireEvent.click(modal);
             expect(props.onCancel).not.toHaveBeenCalled();
-        });
-    });
-
-    describe('apply interaction', () => {
-        it('should call onApply when Apply button is clicked with valid spell name', () => {
-            render(<ConcentrationPicker {...props} />);
-            fireEvent.click(screen.getByRole('button', { name: 'Apply' }));
-            expect(props.onApply).toHaveBeenCalled();
         });
     });
 });

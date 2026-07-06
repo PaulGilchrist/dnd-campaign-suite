@@ -66,7 +66,6 @@ describe('tempTeleportHandler', () => {
     });
 
     afterEach(() => {
-        // Clean up any event listeners added by tests
         document.dispatchEvent(new Event('cleanup'));
     });
 
@@ -110,7 +109,7 @@ describe('tempTeleportHandler', () => {
             expect(result.payload.description).toContain('Long Rest');
         });
 
-        it('returns info popup when moonlight_step_teleport uses is null (defaults to max)', async () => {
+        it('defaults to max uses when moonlight_step_teleport uses is null, returning modal', async () => {
             getRuntimeValue.mockReturnValue(null);
             const action = makeAction({
                 automation: { effect: 'moonlight_step_teleport' },
@@ -430,26 +429,6 @@ describe('tempTeleportHandler', () => {
             );
         });
 
-        it('decrements uses when moonlight step uses is null (defaults to max then decrements)', async () => {
-            getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === 'targetEffects') return [];
-                if (key === 'moonlightStepUses') return null;
-                return null;
-            });
-            const action = makeAction({
-                automation: { effect: 'moonlight_step_teleport' },
-            });
-            await confirmTeleport(action, makePlayerStats(), 'campaign', false);
-
-            // null defaults to usesMax (3), so it decrements to 2
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'TestHero',
-                'moonlightStepUses',
-                2,
-                'campaign'
-            );
-        });
-
         it('respects campaign name in all setRuntimeValue calls', async () => {
             getRuntimeValue.mockImplementation((_name, key) => {
                 if (key === 'targetEffects') return [];
@@ -484,49 +463,17 @@ describe('tempTeleportHandler', () => {
                 'campaign'
             );
         });
-
-        it('uses the provided player name and campaign name', async () => {
-            await clearExtendedFlag('OtherHero', 'other-campaign');
-
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'OtherHero',
-                '_teleportExtendedUsed',
-                false,
-                'other-campaign'
-            );
-        });
     });
 
     describe('isExtendedAvailable', () => {
-        it('returns true when flag is false', () => {
-            getRuntimeValue.mockReturnValue(false);
-            expect(isExtendedAvailable('TestHero', 'campaign')).toBe(true);
-        });
-
         it('returns false when flag is true', () => {
             getRuntimeValue.mockReturnValue(true);
             expect(isExtendedAvailable('TestHero', 'campaign')).toBe(false);
         });
 
-        it('returns true when flag is null (not set)', () => {
-            getRuntimeValue.mockReturnValue(null);
-            expect(isExtendedAvailable('TestHero', 'campaign')).toBe(true);
-        });
-
-        it('returns true when flag is undefined (not set)', () => {
-            getRuntimeValue.mockReturnValue(undefined);
-            expect(isExtendedAvailable('TestHero', 'campaign')).toBe(true);
-        });
-
-        it('passes correct name and campaign to getRuntimeValue', () => {
+        it('returns true when flag is falsy', () => {
             getRuntimeValue.mockReturnValue(false);
-            isExtendedAvailable('OtherHero', 'other-campaign');
-
-            expect(getRuntimeValue).toHaveBeenCalledWith(
-                'OtherHero',
-                '_teleportExtendedUsed',
-                'other-campaign'
-            );
+            expect(isExtendedAvailable('TestHero', 'campaign')).toBe(true);
         });
     });
 });

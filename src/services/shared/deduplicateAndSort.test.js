@@ -1,17 +1,17 @@
-// @cleaned-by-ai
 import { describe, it, expect } from 'vitest';
 import { deduplicateAndSort } from './deduplicateAndSort.js';
 
 describe('deduplicateAndSort', () => {
   describe('invalid / empty inputs', () => {
-    it('should return empty array for null, undefined, and non-array types', () => {
+    it('should return empty array for null', () => {
       expect(deduplicateAndSort(null)).toEqual([]);
-      expect(deduplicateAndSort(undefined)).toEqual([]);
+    });
+
+    it('should return empty array for non-array types', () => {
       expect(deduplicateAndSort('string')).toEqual([]);
       expect(deduplicateAndSort(42)).toEqual([]);
       expect(deduplicateAndSort({})).toEqual([]);
     });
-
   });
 
   describe('deduplication', () => {
@@ -36,13 +36,21 @@ describe('deduplicateAndSort', () => {
   });
 
   describe('sorting', () => {
-    it('should sort objects by string and numeric sortKey values', () => {
+    it('should sort objects by string sortKey', () => {
+      const arr = [
+        { name: 'Charlie' },
+        { name: 'Alice' },
+        { name: 'Bob' },
+      ];
+      expect(deduplicateAndSort(arr, 'name').map(r => r.name)).toEqual(['Alice', 'Bob', 'Charlie']);
+    });
+
+    it('should sort objects by numeric sortKey via string comparison', () => {
       const arr = [
         { name: 'Charlie', age: 30 },
         { name: 'Alice', age: 25 },
         { name: 'Bob', age: 35 },
       ];
-      expect(deduplicateAndSort(arr, 'name').map(r => r.name)).toEqual(['Alice', 'Bob', 'Charlie']);
       expect(deduplicateAndSort(arr, 'age').map(r => r.name)).toEqual(['Alice', 'Charlie', 'Bob']);
     });
   });

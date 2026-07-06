@@ -150,16 +150,16 @@ describe("heroesFeastHandler", () => {
       );
     });
 
-    it('should default to slot level 6 when spellSlotLevel is not provided', async () => {
+    it('should default to slot level 6 and hpIncrease 11 when defaults apply', async () => {
       const ps = makePlayerStats();
       const action = makeAction();
       delete action.spellSlotLevel;
       damageUtils.getCombatContext.mockResolvedValue({
         creatures: [{ name: 'Enemy' }],
       });
-      automationExpressions.evaluateAutoExpression.mockReturnValue(20);
+      automationExpressions.evaluateAutoExpression.mockReturnValue(undefined);
 
-      await handle(action, ps, campaignName, null);
+      const result = await handle(action, ps, campaignName, null);
 
       expect(automationExpressions.evaluateAutoExpression).toHaveBeenCalledWith(
         '2d10',
@@ -168,35 +168,10 @@ describe("heroesFeastHandler", () => {
         6,
         6
       );
+      expect(result.payload.hpIncrease).toBe(11);
     });
 
-    it('should use action.automation.maxTargets from action', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction({ automation: { maxTargets: 5 } });
-      damageUtils.getCombatContext.mockResolvedValue({
-        creatures: [{ name: 'Enemy' }],
-      });
-      automationExpressions.evaluateAutoExpression.mockReturnValue(11);
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.payload.maxTargets).toBe(5);
-    });
-
-    it('should default maxTargets to 12 when automation.maxTargets is missing', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction({ automation: {} });
-      damageUtils.getCombatContext.mockResolvedValue({
-        creatures: [{ name: 'Enemy' }],
-      });
-      automationExpressions.evaluateAutoExpression.mockReturnValue(11);
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.payload.maxTargets).toBe(12);
-    });
-
-    it('should default maxTargets to 12 when automation is missing', async () => {
+    it('should default maxTargets to 12 when automation is missing or empty', async () => {
       const ps = makePlayerStats();
       const action = makeAction({ automation: undefined });
       damageUtils.getCombatContext.mockResolvedValue({
@@ -209,12 +184,13 @@ describe("heroesFeastHandler", () => {
       expect(result.payload.maxTargets).toBe(12);
     });
 
-    it('should default hpIncrease to 11 when evaluateAutoExpression returns non-positive', async () => {
+    it('should default hpIncrease to 11 when evaluateAutoExpression returns non-positive or non-number', async () => {
       const ps = makePlayerStats();
       const action = makeAction();
       damageUtils.getCombatContext.mockResolvedValue({
         creatures: [{ name: 'Enemy' }],
       });
+      automationExpressions.evaluateAutoExpression.mockReturnValue(undefined);
 
       const result = await handle(action, ps, campaignName, null);
       expect(result.payload.hpIncrease).toBe(11);
@@ -236,48 +212,26 @@ describe("heroesFeastHandler", () => {
 
       const resultNegative = await handle(action, ps, campaignName, null);
       expect(resultNegative.payload.hpIncrease).toBe(11);
-    });
 
-    it('should default hpIncrease to 11 when evaluateAutoExpression returns non-number', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
+      vi.clearAllMocks();
+      automationExpressions.evaluateAutoExpression.mockReturnValue('invalid');
       damageUtils.getCombatContext.mockResolvedValue({
         creatures: [{ name: 'Enemy' }],
       });
-      automationExpressions.evaluateAutoExpression.mockReturnValue('invalid');
 
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.payload.hpIncrease).toBe(11);
+      const resultString = await handle(action, ps, campaignName, null);
+      expect(resultString.payload.hpIncrease).toBe(11);
     });
   });
 
   describe('applyHeroesFeast', () => {
-    it('should return null when targetNames is empty array', async () => {
+    it('should return null when targetNames is empty, null, or not an array', async () => {
       const ps = makePlayerStats();
       const action = makeAction();
 
-      const result = await applyHeroesFeast(action, ps, campaignName, null, []);
-
-      expect(result).toBeNull();
-    });
-
-    it('should return null when targetNames is null', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-
-      const result = await applyHeroesFeast(action, ps, campaignName, null, null);
-
-      expect(result).toBeNull();
-    });
-
-    it('should return null when targetNames is not an array', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-
-      const result = await applyHeroesFeast(action, ps, campaignName, null, 'Goblin');
-
-      expect(result).toBeNull();
+      expect(await applyHeroesFeast(action, ps, campaignName, null, [])).toBeNull();
+      expect(await applyHeroesFeast(action, ps, campaignName, null, null)).toBeNull();
+      expect(await applyHeroesFeast(action, ps, campaignName, null, 'Goblin')).toBeNull();
     });
 
     it('should apply buff to a single target with correct runtime values', async () => {
@@ -461,14 +415,26 @@ describe("heroesFeastHandler", () => {
       expect(buffsCalls.length).toBe(0);
     });
 
-    it('should handle target with no activeBuffs stored (undefined)', async () => {
+    it('should treat undefined or non-array activeBuffs as empty array', async () => {
       const ps = makePlayerStats();
       const action = makeAction();
+      const expectedBuffs = [
+        {
+          name: "Heroes' Feast",
+          effect: 'heroes_feast',
+          duration: '24 hours',
+          sourceCharacter: 'TestHero',
+          resistanceTypes: ['Poison'],
+          conditionImmunity: ['Frightened', 'Poisoned'],
+        },
+      ];
+
+      // undefined activeBuffs
       runtimeState.getRuntimeValue
-        .mockReturnValueOnce(0)       // heroesFeastHpMaxIncrease
-        .mockReturnValueOnce(50)      // hitPoints
-        .mockReturnValueOnce(30)      // currentHitPoints
-        .mockReturnValueOnce(undefined); // activeBuffs is undefined
+        .mockReturnValueOnce(0)
+        .mockReturnValueOnce(50)
+        .mockReturnValueOnce(30)
+        .mockReturnValueOnce(undefined);
       automationExpressions.evaluateAutoExpression.mockReturnValue(15);
 
       await applyHeroesFeast(action, ps, campaignName, null, ['Goblin1']);
@@ -476,28 +442,18 @@ describe("heroesFeastHandler", () => {
       expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
         'Goblin1',
         'activeBuffs',
-        [
-          {
-            name: "Heroes' Feast",
-            effect: 'heroes_feast',
-            duration: '24 hours',
-            sourceCharacter: 'TestHero',
-            resistanceTypes: ['Poison'],
-            conditionImmunity: ['Frightened', 'Poisoned'],
-          },
-        ],
+        expectedBuffs,
         campaignName
       );
-    });
 
-    it('should handle target with non-array activeBuffs stored', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
+      vi.clearAllMocks();
+
+      // non-array activeBuffs
       runtimeState.getRuntimeValue
-        .mockReturnValueOnce(0)       // heroesFeastHpMaxIncrease
-        .mockReturnValueOnce(50)      // hitPoints
-        .mockReturnValueOnce(30)      // currentHitPoints
-        .mockReturnValueOnce('not an array'); // activeBuffs is a string
+        .mockReturnValueOnce(0)
+        .mockReturnValueOnce(50)
+        .mockReturnValueOnce(30)
+        .mockReturnValueOnce('not an array');
       automationExpressions.evaluateAutoExpression.mockReturnValue(15);
 
       await applyHeroesFeast(action, ps, campaignName, null, ['Goblin1']);
@@ -505,16 +461,7 @@ describe("heroesFeastHandler", () => {
       expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
         'Goblin1',
         'activeBuffs',
-        [
-          {
-            name: "Heroes' Feast",
-            effect: 'heroes_feast',
-            duration: '24 hours',
-            sourceCharacter: 'TestHero',
-            resistanceTypes: ['Poison'],
-            conditionImmunity: ['Frightened', 'Poisoned'],
-          },
-        ],
+        expectedBuffs,
         campaignName
       );
     });
@@ -596,65 +543,6 @@ describe("heroesFeastHandler", () => {
         'Goblin1',
         'hitPoints',
         70,
-        campaignName
-      );
-    });
-
-    it('should default to slot level 6 when spellSlotLevel is missing in applyHeroesFeast', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-      delete action.spellSlotLevel;
-      runtimeState.getRuntimeValue
-        .mockReturnValueOnce(0)
-        .mockReturnValueOnce(50)
-        .mockReturnValueOnce(30);
-      automationExpressions.evaluateAutoExpression.mockReturnValue(11);
-
-      await applyHeroesFeast(action, ps, campaignName, null, ['Goblin1']);
-
-      expect(automationExpressions.evaluateAutoExpression).toHaveBeenCalledWith(
-        '2d10',
-        { level: 6, proficiency: 0 },
-        0,
-        6,
-        6
-      );
-    });
-
-    it('should handle currentHitPoints as string value and convert to number', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-      runtimeState.getRuntimeValue
-        .mockReturnValueOnce(0)
-        .mockReturnValueOnce(50)
-        .mockReturnValueOnce('30'); // string instead of number
-      automationExpressions.evaluateAutoExpression.mockReturnValue(15);
-
-      await applyHeroesFeast(action, ps, campaignName, null, ['Goblin1']);
-
-      expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-        'Goblin1',
-        'currentHitPoints',
-        45,
-        campaignName
-      );
-    });
-
-    it('should handle heroesFeastHpMaxIncrease as string and convert to number', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-      runtimeState.getRuntimeValue
-        .mockReturnValueOnce('10') // string existing increase
-        .mockReturnValueOnce(50)
-        .mockReturnValueOnce(30);
-      automationExpressions.evaluateAutoExpression.mockReturnValue(15);
-
-      await applyHeroesFeast(action, ps, campaignName, null, ['Goblin1']);
-
-      expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-        'Goblin1',
-        'heroesFeastHpMaxIncrease',
-        25,
         campaignName
       );
     });

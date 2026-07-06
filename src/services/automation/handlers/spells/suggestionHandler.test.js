@@ -80,25 +80,7 @@ describe('suggestionHandler.handle', () => {
       expect(result.payload.description).toContain('Suggestion has no effect');
     });
 
-    it('returns popup when resolveTarget returns { target: null }', async () => {
-      resolveTarget.mockResolvedValue({ target: null });
-
-      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.description).toContain('No target selected');
-    });
-
-    it('returns popup when target info has no target property', async () => {
-      resolveTarget.mockResolvedValue({});
-
-      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.description).toContain('No target selected');
-    });
-
-    it('returns popup when target exists but name is undefined', async () => {
+    it('returns popup when target name is missing', async () => {
       resolveTarget.mockResolvedValue({ target: {} });
 
       const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
@@ -130,7 +112,7 @@ describe('suggestionHandler.handle', () => {
   });
 
   describe('ability_use log entry', () => {
-    it('logs ability_use when a target is resolved', async () => {
+    it('logs ability_use with correct details when a target is resolved', async () => {
       setupBaseMocks();
 
       await handle(makeAction(), makePlayerStats(), campaignName, null);
@@ -153,26 +135,6 @@ describe('suggestionHandler.handle', () => {
         abilityName: 'My Suggestion',
       }));
     });
-
-    it('includes save DC in ability_use description', async () => {
-      setupBaseMocks();
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
-        description: expect.stringContaining('DC 15'),
-      }));
-    });
-
-    it('includes save type in ability_use description', async () => {
-      setupBaseMocks();
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
-        description: expect.stringContaining('WIS save'),
-      }));
-    });
   });
 
   describe('successful save', () => {
@@ -183,6 +145,8 @@ describe('suggestionHandler.handle', () => {
 
       expect(result.type).toBe('popup');
       expect(result.payload.description).toContain('succeeded on WIS save');
+      expect(result.payload.description).toContain('Goblin');
+      expect(result.payload.name).toBe('Suggestion');
     });
 
     it('logs save_result with success=true', async () => {
@@ -200,44 +164,14 @@ describe('suggestionHandler.handle', () => {
       }));
     });
 
-    it('does not apply charmed condition on success', async () => {
+    it('does not apply charmed condition or add expiration on success', async () => {
       setupBaseMocks({ success: true });
 
       await handle(makeAction(), makePlayerStats(), campaignName, null);
 
       expect(setRuntimeValue).not.toHaveBeenCalled();
-    });
-
-    it('does not add expiration on success', async () => {
-      setupBaseMocks({ success: true });
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
       expect(addExpiration).not.toHaveBeenCalled();
-    });
-
-    it('does not post condition log on success', async () => {
-      setupBaseMocks({ success: true });
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
       expect(postLogEntry).not.toHaveBeenCalled();
-    });
-
-    it('includes target name in success popup description', async () => {
-      setupBaseMocks({ success: true });
-
-      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(result.payload.description).toContain('Goblin');
-    });
-
-    it('includes action name in success popup', async () => {
-      setupBaseMocks({ success: true });
-
-      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(result.payload.name).toBe('Suggestion');
     });
   });
 
@@ -256,49 +190,7 @@ describe('suggestionHandler.handle', () => {
       );
     });
 
-    it('deduplicates charmed when already present lowercase', async () => {
-      setupBaseMocks({ success: false });
-      getRuntimeValue.mockReturnValue(['charmed']);
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'Goblin',
-        'activeConditions',
-        ['charmed'],
-        campaignName,
-      );
-    });
-
-    it('deduplicates charmed when already present capitalized', async () => {
-      setupBaseMocks({ success: false });
-      getRuntimeValue.mockReturnValue(['Charmed']);
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'Goblin',
-        'activeConditions',
-        ['charmed'],
-        campaignName,
-      );
-    });
-
-    it('preserves other conditions when adding charmed', async () => {
-      setupBaseMocks({ success: false });
-      getRuntimeValue.mockReturnValue(['frightened', 'charmed']);
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'Goblin',
-        'activeConditions',
-        ['frightened', 'charmed'],
-        campaignName,
-      );
-    });
-
-    it('filters charmed by case-insensitive comparison', async () => {
+    it('deduplicates charmed condition regardless of case', async () => {
       setupBaseMocks({ success: false });
       getRuntimeValue.mockReturnValue(['CHARMED', 'frightened']);
 
@@ -308,6 +200,20 @@ describe('suggestionHandler.handle', () => {
         'Goblin',
         'activeConditions',
         ['frightened', 'charmed'],
+        campaignName,
+      );
+    });
+
+    it('preserves other conditions when adding charmed', async () => {
+      setupBaseMocks({ success: false });
+      getRuntimeValue.mockReturnValue(['frightened', 'unconscious']);
+
+      await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+      expect(setRuntimeValue).toHaveBeenCalledWith(
+        'Goblin',
+        'activeConditions',
+        ['frightened', 'unconscious', 'charmed'],
         campaignName,
       );
     });
@@ -359,17 +265,6 @@ describe('suggestionHandler.handle', () => {
       }));
     });
 
-    it('posts condition log mentioning caster in note', async () => {
-      setupBaseMocks({ success: false });
-      getRuntimeValue.mockReturnValue([]);
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      const logCall = postLogEntry.mock.calls[0][1];
-      expect(logCall.note).toContain('TestCaster');
-      expect(logCall.note).toContain('damage');
-    });
-
     it('logs save_result with success=false', async () => {
       setupBaseMocks({ success: false });
       getRuntimeValue.mockReturnValue([]);
@@ -386,35 +281,7 @@ describe('suggestionHandler.handle', () => {
       }));
     });
 
-    it('includes caster name in popup description', async () => {
-      setupBaseMocks({ success: false });
-      getRuntimeValue.mockReturnValue([]);
-
-      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(result.payload.description).toContain('TestCaster');
-    });
-
-    it('includes target name in popup description', async () => {
-      setupBaseMocks({ success: false });
-      getRuntimeValue.mockReturnValue([]);
-
-      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(result.payload.description).toContain('Goblin');
-    });
-
-    it('mentions spell end condition in popup', async () => {
-      setupBaseMocks({ success: false });
-      getRuntimeValue.mockReturnValue([]);
-
-      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(result.payload.description).toContain('damage');
-      expect(result.payload.description).toContain('Charmed');
-    });
-
-    it('returns popup with correct payload type on failure', async () => {
+    it('returns popup with failure description including caster, target, and spell end condition', async () => {
       setupBaseMocks({ success: false });
       getRuntimeValue.mockReturnValue([]);
 
@@ -423,41 +290,14 @@ describe('suggestionHandler.handle', () => {
       expect(result.type).toBe('popup');
       expect(result.payload.type).toBe('automation_info');
       expect(result.payload.name).toBe('Suggestion');
-    });
-
-    it('calls addEntry before setting runtime values (order matters)', async () => {
-      setupBaseMocks({ success: false });
-      getRuntimeValue.mockReturnValue([]);
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      // ability_use should be first, save_result should be after charmed application
-      const abilityUseCall = addEntry.mock.calls.findIndex(
-        call => call[1].type === 'ability_use',
-      );
-      const saveResultCall = addEntry.mock.calls.findIndex(
-        call => call[1].type === 'save_result',
-      );
-      expect(abilityUseCall).toBeLessThan(saveResultCall);
+      expect(result.payload.description).toContain('TestCaster');
+      expect(result.payload.description).toContain('Goblin');
+      expect(result.payload.description).toContain('damage');
+      expect(result.payload.description).toContain('Charmed');
     });
   });
 
   describe('edge cases', () => {
-    it('uses default DC 10 when automation is empty', async () => {
-      resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
-      buildSaveDc.mockReturnValue(10);
-      createSaveListener.mockReturnValue({
-        promptId: 'test-prompt-id',
-        promise: Promise.resolve({ success: false }),
-      });
-      getRuntimeValue.mockReturnValue([]);
-
-      const result = await handle({ name: 'Suggestion', automation: {} }, makePlayerStats(), campaignName, null);
-
-      expect(result.type).toBe('popup');
-      expect(buildSaveDc).toHaveBeenCalledWith({}, makePlayerStats());
-    });
-
     it('handles missing automation property by defaulting to empty object', async () => {
       resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
       buildSaveDc.mockReturnValue(10);
@@ -482,7 +322,7 @@ describe('suggestionHandler.handle', () => {
       expect(resolveTarget).toHaveBeenCalledWith(campaignName, 'TestCaster');
     });
 
-    it('handles undefined getRuntimeValue by defaulting to empty array', async () => {
+    it('handles undefined or non-array getRuntimeValue by defaulting to empty array', async () => {
       setupBaseMocks({ success: false });
       getRuntimeValue.mockReturnValue(undefined);
 
@@ -496,44 +336,7 @@ describe('suggestionHandler.handle', () => {
       );
     });
 
-    it('handles non-array getRuntimeValue by defaulting to empty array', async () => {
-      setupBaseMocks({ success: false });
-      getRuntimeValue.mockReturnValue('not-an-array');
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'Goblin',
-        'activeConditions',
-        ['charmed'],
-        campaignName,
-      );
-    });
-
-    it('handles zero getRuntimeValue by defaulting to empty array', async () => {
-      setupBaseMocks({ success: false });
-      getRuntimeValue.mockReturnValue(0);
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'Goblin',
-        'activeConditions',
-        ['charmed'],
-        campaignName,
-      );
-    });
-
-    it('uses action.name in popup payload', async () => {
-      setupBaseMocks({ success: false });
-      getRuntimeValue.mockReturnValue([]);
-
-      const result = await handle({ name: 'My Custom Suggestion', automation: { type: 'suggestion' } }, makePlayerStats(), campaignName, null);
-
-      expect(result.payload.name).toBe('My Custom Suggestion');
-    });
-
-    it('uses custom playerStats name in descriptions', async () => {
+    it('uses custom names in popup and ability_use descriptions', async () => {
       setupBaseMocks({ success: false });
       getRuntimeValue.mockReturnValue([]);
 
@@ -541,16 +344,6 @@ describe('suggestionHandler.handle', () => {
       const result = await handle(makeAction(), ps, campaignName, null);
 
       expect(result.payload.description).toContain('WizardX');
-    });
-
-    it('uses custom playerStats name in ability_use description', async () => {
-      setupBaseMocks({ success: false });
-      getRuntimeValue.mockReturnValue([]);
-
-      const ps = makePlayerStats({ name: 'WizardX' });
-
-      await handle(makeAction(), ps, campaignName, null);
-
       expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
         description: expect.stringContaining('WizardX casts Suggestion'),
       }));

@@ -88,14 +88,6 @@ const baseCombatContext = {
   placedItems: [],
 };
 
-function findTrackingCall() {
-  return useRuntimeState.setRuntimeValue.mock.calls.find(
-    (c) => c[1] === '_grease_TestWizard',
-  ) || useRuntimeState.setRuntimeValue.mock.calls.find(
-    (c) => c[1].includes('_grease_'),
-  );
-}
-
 // ── Tests ──────────────────────────────────────────────────────
 
 describe('greaseAreaSaveHandler.handle', () => {
@@ -104,7 +96,7 @@ describe('greaseAreaSaveHandler.handle', () => {
   });
 
   describe('return value', () => {
-    it('returns modal with setCondition modalName', async () => {
+    it('returns modal with setCondition modalName and correct payload', async () => {
       damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
       savePrompt.buildSaveDc.mockReturnValue(13);
       mapsService.loadMapData.mockResolvedValue({
@@ -130,193 +122,100 @@ describe('greaseAreaSaveHandler.handle', () => {
       });
     });
 
-    it('includes attackerPos from map data', async () => {
+    it('includes attackerPos from map data or null when caster not on map', async () => {
       damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
       savePrompt.buildSaveDc.mockReturnValue(13);
+
+      // caster found on map
       mapsService.loadMapData.mockResolvedValue({
         players: [{ name: casterName, gridX: 12, gridY: 20 }],
       });
-
-      const result = await handle(makeAction(), makePlayerStats(), campaignName, mapName);
-
+      let result = await handle(makeAction(), makePlayerStats(), campaignName, mapName);
       expect(result.payload.attackerPos).toEqual({ gridX: 12, gridY: 20 });
-    });
 
-    it('includes null attackerPos when caster not on map', async () => {
-      damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
-      savePrompt.buildSaveDc.mockReturnValue(13);
+      // caster not on map
       mapsService.loadMapData.mockResolvedValue({ players: [] });
-
-      const result = await handle(makeAction(), makePlayerStats(), campaignName, mapName);
-
+      result = await handle(makeAction(), makePlayerStats(), campaignName, mapName);
       expect(result.payload.attackerPos).toBeNull();
     });
 
-    it('includes mapData in payload when mapName provided', async () => {
+    it('includes mapData when mapName provided, null when mapName is null', async () => {
       damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
       savePrompt.buildSaveDc.mockReturnValue(13);
+
       const expectedMap = { players: [{ name: casterName, gridX: 5, gridY: 10 }] };
       mapsService.loadMapData.mockResolvedValue(expectedMap);
-
-      const result = await handle(makeAction(), makePlayerStats(), campaignName, mapName);
-
+      let result = await handle(makeAction(), makePlayerStats(), campaignName, mapName);
       expect(result.payload.mapData).toEqual(expectedMap);
-    });
 
-    it('includes null mapData in payload when mapName is null', async () => {
-      damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
-      savePrompt.buildSaveDc.mockReturnValue(13);
-
-      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
+      mapsService.loadMapData.mockClear();
+      result = await handle(makeAction(), makePlayerStats(), campaignName, null);
       expect(result.payload.mapData).toBeNull();
     });
   });
 
   describe('save type and condition defaults', () => {
-    it('uses custom saveType from automation', async () => {
+    it('uses custom saveType from automation, defaults to DEX', async () => {
       damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
       savePrompt.buildSaveDc.mockReturnValue(14);
 
-      const result = await handle(
-        makeAction({ saveType: 'CON' }),
-        makePlayerStats(),
-        campaignName,
-        null,
-      );
-
+      let result = await handle(makeAction({ saveType: 'CON' }), makePlayerStats(), campaignName, null);
       expect(result.payload.saveType).toBe('CON');
-    });
 
-    it('defaults saveType to DEX when not specified', async () => {
-      damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
-      savePrompt.buildSaveDc.mockReturnValue(10);
-
-      const result = await handle(
-        makeAction({ saveType: undefined }),
-        makePlayerStats(),
-        campaignName,
-        null,
-      );
-
+      result = await handle(makeAction({ saveType: undefined }), makePlayerStats(), campaignName, null);
       expect(result.payload.saveType).toBe('DEX');
     });
 
-    it('uses custom conditionInflicted from automation', async () => {
+    it('uses custom conditionInflicted from automation, defaults to Prone', async () => {
       damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
       savePrompt.buildSaveDc.mockReturnValue(13);
       mapsService.loadMapData.mockResolvedValue({
         players: [{ name: casterName, gridX: 5, gridY: 10 }],
       });
 
-      const result = await handle(
-        makeAction({ conditionInflicted: 'Blinded' }),
-        makePlayerStats(),
-        campaignName,
-        mapName,
-      );
-
+      let result = await handle(makeAction({ conditionInflicted: 'Blinded' }), makePlayerStats(), campaignName, mapName);
       expect(result.payload.conditionName).toBe('Blinded');
-    });
 
-    it('defaults conditionInflicted to Prone', async () => {
-      damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
-      savePrompt.buildSaveDc.mockReturnValue(13);
-      mapsService.loadMapData.mockResolvedValue({
-        players: [{ name: casterName, gridX: 5, gridY: 10 }],
-      });
-
-      const result = await handle(
-        makeAction({ conditionInflicted: undefined }),
-        makePlayerStats(),
-        campaignName,
-        mapName,
-      );
-
+      result = await handle(makeAction({ conditionInflicted: undefined }), makePlayerStats(), campaignName, mapName);
       expect(result.payload.conditionName).toBe('Prone');
     });
   });
 
   describe('area radius parsing', () => {
-    it('parses 10-foot size', async () => {
+    it('parses size values correctly, defaulting to 10', async () => {
       damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
       savePrompt.buildSaveDc.mockReturnValue(13);
       mapsService.loadMapData.mockResolvedValue({
         players: [{ name: casterName, gridX: 5, gridY: 10 }],
       });
 
-      const result = await handle(
-        makeAction({ size: '10-foot' }),
-        makePlayerStats(),
-        campaignName,
-        mapName,
-      );
-
+      let result = await handle(makeAction({ size: '10-foot' }), makePlayerStats(), campaignName, mapName);
       expect(result.payload.rangeFeet).toBe(10);
-    });
 
-    it('parses 15-foot size', async () => {
-      damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
-      savePrompt.buildSaveDc.mockReturnValue(13);
-      mapsService.loadMapData.mockResolvedValue({
-        players: [{ name: casterName, gridX: 5, gridY: 10 }],
-      });
-
-      const result = await handle(
-        makeAction({ size: '15-foot' }),
-        makePlayerStats(),
-        campaignName,
-        mapName,
-      );
-
+      result = await handle(makeAction({ size: '15-foot' }), makePlayerStats(), campaignName, mapName);
       expect(result.payload.rangeFeet).toBe(15);
-    });
 
-    it('defaults to 10 when size pattern does not match', async () => {
-      damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
-      savePrompt.buildSaveDc.mockReturnValue(13);
-      mapsService.loadMapData.mockResolvedValue({
-        players: [{ name: casterName, gridX: 5, gridY: 10 }],
-      });
-
-      const result = await handle(
-        makeAction({ size: 'invalid' }),
-        makePlayerStats(),
-        campaignName,
-        mapName,
-      );
-
+      result = await handle(makeAction({ size: 'invalid' }), makePlayerStats(), campaignName, mapName);
       expect(result.payload.rangeFeet).toBe(10);
-    });
 
-    it('defaults to 10 when size is undefined', async () => {
-      damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
-      savePrompt.buildSaveDc.mockReturnValue(13);
-      mapsService.loadMapData.mockResolvedValue({
-        players: [{ name: casterName, gridX: 5, gridY: 10 }],
-      });
-
-      const result = await handle(
-        makeAction({ size: undefined }),
-        makePlayerStats(),
-        campaignName,
-        mapName,
-      );
-
+      result = await handle(makeAction({ size: undefined }), makePlayerStats(), campaignName, mapName);
       expect(result.payload.rangeFeet).toBe(10);
     });
   });
 
   describe('duration and expiration', () => {
-    it('sets expiration for 1_minute duration (10 rounds)', async () => {
+    function setupDuration() {
       damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
       savePrompt.buildSaveDc.mockReturnValue(13);
       mapsService.loadMapData.mockResolvedValue({
         players: [{ name: casterName, gridX: 5, gridY: 10 }],
       });
+    }
 
-      await handle(makeAction({ duration: '1_minute' }), makePlayerStats(), campaignName, mapName);
-
+    it('sets expiration and payload durationRounds for 1_minute (10 rounds)', async () => {
+      setupDuration();
+      const result = await handle(makeAction({ duration: '1_minute' }), makePlayerStats(), campaignName, mapName);
+      expect(result.payload.durationRounds).toBe(10);
       expect(expirations.addExpiration).toHaveBeenCalledWith(
         casterName,
         casterName,
@@ -326,15 +225,10 @@ describe('greaseAreaSaveHandler.handle', () => {
       );
     });
 
-    it('sets expiration for round-based duration', async () => {
-      damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
-      savePrompt.buildSaveDc.mockReturnValue(13);
-      mapsService.loadMapData.mockResolvedValue({
-        players: [{ name: casterName, gridX: 5, gridY: 10 }],
-      });
-
-      await handle(makeAction({ duration: '3_rounds' }), makePlayerStats(), campaignName, mapName);
-
+    it('sets expiration and payload durationRounds for round-based duration', async () => {
+      setupDuration();
+      let result = await handle(makeAction({ duration: '3_rounds' }), makePlayerStats(), campaignName, mapName);
+      expect(result.payload.durationRounds).toBe(3);
       expect(expirations.addExpiration).toHaveBeenCalledWith(
         casterName,
         casterName,
@@ -342,124 +236,49 @@ describe('greaseAreaSaveHandler.handle', () => {
         campaignName,
         3,
       );
-    });
 
-    it('sets durationRounds=15 for 1_rounds duration', async () => {
-      damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
-      savePrompt.buildSaveDc.mockReturnValue(13);
-      mapsService.loadMapData.mockResolvedValue({
-        players: [{ name: casterName, gridX: 5, gridY: 10 }],
-      });
-
-      const result = await handle(
-        makeAction({ duration: '1_rounds' }),
-        makePlayerStats(),
-        campaignName,
-        mapName,
-      );
-
+      result = await handle(makeAction({ duration: '1_rounds' }), makePlayerStats(), campaignName, mapName);
       expect(result.payload.durationRounds).toBe(1);
-    });
 
-    it('does not set expiration when duration is unrecognized', async () => {
-      damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
-      savePrompt.buildSaveDc.mockReturnValue(13);
-      mapsService.loadMapData.mockResolvedValue({
-        players: [{ name: casterName, gridX: 5, gridY: 10 }],
-      });
-
-      await handle(makeAction({ duration: 'unknown' }), makePlayerStats(), campaignName, mapName);
-
-      expect(expirations.addExpiration).not.toHaveBeenCalled();
-    });
-
-    it('does not set expiration when duration is empty string', async () => {
-      damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
-      savePrompt.buildSaveDc.mockReturnValue(13);
-      mapsService.loadMapData.mockResolvedValue({
-        players: [{ name: casterName, gridX: 5, gridY: 10 }],
-      });
-
-      await handle(makeAction({ duration: '' }), makePlayerStats(), campaignName, mapName);
-
-      expect(expirations.addExpiration).not.toHaveBeenCalled();
-    });
-
-    it('does not set expiration when duration is undefined', async () => {
-      damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
-      savePrompt.buildSaveDc.mockReturnValue(13);
-      mapsService.loadMapData.mockResolvedValue({
-        players: [{ name: casterName, gridX: 5, gridY: 10 }],
-      });
-
-      await handle(makeAction({ duration: undefined }), makePlayerStats(), campaignName, mapName);
-
-      expect(expirations.addExpiration).not.toHaveBeenCalled();
-    });
-
-    it('includes durationRounds in payload for 1_minute', async () => {
-      damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
-      savePrompt.buildSaveDc.mockReturnValue(13);
-      mapsService.loadMapData.mockResolvedValue({
-        players: [{ name: casterName, gridX: 5, gridY: 10 }],
-      });
-
-      const result = await handle(
-        makeAction({ duration: '1_minute' }),
-        makePlayerStats(),
-        campaignName,
-        mapName,
-      );
-
-      expect(result.payload.durationRounds).toBe(10);
-    });
-
-    it('includes durationRounds in payload for round-based duration', async () => {
-      damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
-      savePrompt.buildSaveDc.mockReturnValue(13);
-      mapsService.loadMapData.mockResolvedValue({
-        players: [{ name: casterName, gridX: 5, gridY: 10 }],
-      });
-
-      const result = await handle(
-        makeAction({ duration: '5_rounds' }),
-        makePlayerStats(),
-        campaignName,
-        mapName,
-      );
-
+      result = await handle(makeAction({ duration: '5_rounds' }), makePlayerStats(), campaignName, mapName);
       expect(result.payload.durationRounds).toBe(5);
     });
 
-    it('includes null durationRounds in payload when unrecognized', async () => {
-      damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
-      savePrompt.buildSaveDc.mockReturnValue(13);
-      mapsService.loadMapData.mockResolvedValue({
-        players: [{ name: casterName, gridX: 5, gridY: 10 }],
-      });
-
-      const result = await handle(
-        makeAction({ duration: 'unknown' }),
-        makePlayerStats(),
-        campaignName,
-        mapName,
-      );
-
+    it('does not set expiration or durationRounds for unrecognized duration values', async () => {
+      setupDuration();
+      let result = await handle(makeAction({ duration: 'unknown' }), makePlayerStats(), campaignName, mapName);
+      expect(expirations.addExpiration).not.toHaveBeenCalled();
       expect(result.payload.durationRounds).toBeUndefined();
+
+      expirations.addExpiration.mockClear();
+      result = await handle(makeAction({ duration: '' }), makePlayerStats(), campaignName, mapName);
+      expect(expirations.addExpiration).not.toHaveBeenCalled();
+
+      expirations.addExpiration.mockClear();
+      result = await handle(makeAction({ duration: undefined }), makePlayerStats(), campaignName, mapName);
+      expect(expirations.addExpiration).not.toHaveBeenCalled();
     });
   });
 
   describe('tracking data storage', () => {
-    it('stores grease tracking data with all fields', async () => {
+    function setupTracking() {
       damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
       savePrompt.buildSaveDc.mockReturnValue(13);
+    }
+
+    it('stores grease tracking data with all fields when caster found on map', async () => {
+      setupTracking();
       mapsService.loadMapData.mockResolvedValue({
         players: [{ name: casterName, gridX: 5, gridY: 10 }],
       });
 
       await handle(makeAction(), makePlayerStats(), campaignName, mapName);
 
-      const call = findTrackingCall();
+      const call = useRuntimeState.setRuntimeValue.mock.calls.find(
+        (c) => c[1] === '_grease_TestWizard',
+      ) || useRuntimeState.setRuntimeValue.mock.calls.find(
+        (c) => c[1]?.includes('_grease_'),
+      );
       expect(call).toBeDefined();
       expect(call[0]).toBe(casterName);
       expect(call[1]).toBe('_grease_TestWizard');
@@ -483,117 +302,59 @@ describe('greaseAreaSaveHandler.handle', () => {
       expect(typeof data.timestamp).toBe('number');
     });
 
-    it('stores null center when caster not found on map', async () => {
-      damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
-      savePrompt.buildSaveDc.mockReturnValue(13);
+    it('stores null center and mapName when caster not on map or mapName is null', async () => {
+      setupTracking();
+
+      // caster not found on map
       mapsService.loadMapData.mockResolvedValue({ players: [] });
-
       await handle(makeAction(), makePlayerStats(), campaignName, mapName);
-
-      const call = findTrackingCall();
-      expect(call[2].center).toBeNull();
-    });
-
-    it('stores null center when mapName is null', async () => {
-      damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
-      savePrompt.buildSaveDc.mockReturnValue(13);
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      const call = findTrackingCall();
-      expect(call[2].center).toBeNull();
-      expect(call[2].mapName).toBeNull();
-    });
-
-    it('stores mapName in tracking data when mapName provided', async () => {
-      damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
-      savePrompt.buildSaveDc.mockReturnValue(13);
-      mapsService.loadMapData.mockResolvedValue({
-        players: [{ name: casterName, gridX: 5, gridY: 10 }],
-      });
-
-      await handle(makeAction(), makePlayerStats(), campaignName, mapName);
-
-      const call = findTrackingCall();
-      expect(call[2].mapName).toBe(mapName);
-    });
-
-    it('stores null mapName in tracking data when mapName is null', async () => {
-      damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
-      savePrompt.buildSaveDc.mockReturnValue(13);
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      const call = findTrackingCall();
-      expect(call[2].mapName).toBeNull();
-    });
-
-    it('stores duration from automation in tracking data', async () => {
-      damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
-      savePrompt.buildSaveDc.mockReturnValue(13);
-
-      await handle(
-        makeAction({ duration: '3_rounds' }),
-        makePlayerStats(),
-        campaignName,
-        null,
+      let call = useRuntimeState.setRuntimeValue.mock.calls.find(
+        (c) => c[1]?.includes('_grease_'),
       );
+      expect(call[2].center).toBeNull();
 
-      const call = findTrackingCall();
+      // mapName is null
+      useRuntimeState.setRuntimeValue.mockClear();
+      await handle(makeAction(), makePlayerStats(), campaignName, null);
+      call = useRuntimeState.setRuntimeValue.mock.calls.find(
+        (c) => c[1]?.includes('_grease_'),
+      );
+      expect(call[2].center).toBeNull();
+      expect(call[2].mapName).toBeNull();
+    });
+
+    it('stores custom values from automation in tracking data', async () => {
+      setupTracking();
+
+      await handle(makeAction({ duration: '3_rounds' }), makePlayerStats(), campaignName, null);
+      let call = useRuntimeState.setRuntimeValue.mock.calls.find(
+        (c) => c[1]?.includes('_grease_'),
+      );
       expect(call[2].duration).toBe('3_rounds');
-    });
 
-    it('defaults duration to 1 minute when not specified', async () => {
-      damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
-      savePrompt.buildSaveDc.mockReturnValue(13);
-
-      await handle(makeAction({ duration: undefined }), makePlayerStats(), campaignName, null);
-
-      const call = findTrackingCall();
-      expect(call[2].duration).toBe('1 minute');
-    });
-
-    it('stores radius from automation in tracking data', async () => {
-      damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
-      savePrompt.buildSaveDc.mockReturnValue(13);
-      mapsService.loadMapData.mockResolvedValue({
-        players: [{ name: casterName, gridX: 5, gridY: 10 }],
-      });
-
+      useRuntimeState.setRuntimeValue.mockClear();
       await handle(makeAction({ size: '15-foot' }), makePlayerStats(), campaignName, mapName);
-
-      const call = findTrackingCall();
-      expect(call[2].radius).toBe(15);
-    });
-
-    it('stores condition from automation in tracking data', async () => {
-      damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
-      savePrompt.buildSaveDc.mockReturnValue(13);
       mapsService.loadMapData.mockResolvedValue({
         players: [{ name: casterName, gridX: 5, gridY: 10 }],
       });
-
-      await handle(
-        makeAction({ conditionInflicted: 'Blinded' }),
-        makePlayerStats(),
-        campaignName,
-        mapName,
+      call = useRuntimeState.setRuntimeValue.mock.calls.find(
+        (c) => c[1]?.includes('_grease_'),
       );
+      expect(call[2].radius).toBe(15);
 
-      const call = findTrackingCall();
+      useRuntimeState.setRuntimeValue.mockClear();
+      await handle(makeAction({ conditionInflicted: 'Blinded' }), makePlayerStats(), campaignName, mapName);
+      call = useRuntimeState.setRuntimeValue.mock.calls.find(
+        (c) => c[1]?.includes('_grease_'),
+      );
       expect(call[2].condition).toBe('Blinded');
-    });
 
-    it('stores saveType from automation in tracking data', async () => {
-      damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
+      useRuntimeState.setRuntimeValue.mockClear();
       savePrompt.buildSaveDc.mockReturnValue(14);
-      mapsService.loadMapData.mockResolvedValue({
-        players: [{ name: casterName, gridX: 5, gridY: 10 }],
-      });
-
       await handle(makeAction({ saveType: 'CON' }), makePlayerStats(), campaignName, mapName);
-
-      const call = findTrackingCall();
+      call = useRuntimeState.setRuntimeValue.mock.calls.find(
+        (c) => c[1]?.includes('_grease_'),
+      );
       expect(call[2].saveType).toBe('CON');
     });
   });
@@ -604,7 +365,6 @@ describe('greaseAreaSaveHandler.handle', () => {
       savePrompt.buildSaveDc.mockReturnValue(13);
 
       await handle(makeAction(), makePlayerStats(), campaignName, null);
-
       expect(mapsService.loadMapData).not.toHaveBeenCalled();
     });
 
@@ -620,23 +380,10 @@ describe('greaseAreaSaveHandler.handle', () => {
       expect(result.payload.attackerPos).toBeNull();
       expect(result.payload.mapData).toBeNull();
     });
-
-    it('passes caster position to tracking when found on map', async () => {
-      damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
-      savePrompt.buildSaveDc.mockReturnValue(13);
-      mapsService.loadMapData.mockResolvedValue({
-        players: [{ name: casterName, gridX: 7, gridY: 14 }],
-      });
-
-      await handle(makeAction(), makePlayerStats(), campaignName, mapName);
-
-      const call = findTrackingCall();
-      expect(call[2].center).toEqual({ gridX: 7, gridY: 14 });
-    });
   });
 
   describe('log entries', () => {
-    it('calls addEntry with ability_use type and correct details', async () => {
+    it('calls addEntry with ability_use type and correct details including range', async () => {
       damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
       savePrompt.buildSaveDc.mockReturnValue(13);
       mapsService.loadMapData.mockResolvedValue({
@@ -656,19 +403,14 @@ describe('greaseAreaSaveHandler.handle', () => {
       );
     });
 
-    it('includes range in log description', async () => {
+    it('calls addEntry with range in log description', async () => {
       damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
       savePrompt.buildSaveDc.mockReturnValue(13);
       mapsService.loadMapData.mockResolvedValue({
         players: [{ name: casterName, gridX: 5, gridY: 10 }],
       });
 
-      await handle(
-        makeAction({ size: '15-foot' }),
-        makePlayerStats(),
-        campaignName,
-        mapName,
-      );
+      await handle(makeAction({ size: '15-foot' }), makePlayerStats(), campaignName, mapName);
 
       expect(logService.addEntry).toHaveBeenCalledWith(
         campaignName,
@@ -676,21 +418,6 @@ describe('greaseAreaSaveHandler.handle', () => {
           description: expect.stringContaining('15ft'),
         }),
       );
-    });
-
-    it('catches and swallows addEntry errors without crashing', async () => {
-      damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
-      savePrompt.buildSaveDc.mockReturnValue(13);
-      mapsService.loadMapData.mockResolvedValue({
-        players: [{ name: casterName, gridX: 5, gridY: 10 }],
-      });
-      logService.addEntry.mockImplementation(
-        () => Promise.reject(new Error('network')).catch(() => {}),
-      );
-
-      const result = await handle(makeAction(), makePlayerStats(), campaignName, mapName);
-
-      expect(result.type).toBe('modal');
     });
   });
 });
@@ -701,199 +428,33 @@ describe('greaseAreaSaveHandler.processGreaseAreaSave', () => {
   });
 
   describe('early returns', () => {
-    it('returns null when no tracking data exists', async () => {
-      useRuntimeState.getRuntimeValue.mockReturnValue(null);
+    it('returns null when target is already prone (case-insensitive)', async () => {
+      const setupTracking = () => {
+        useRuntimeState.getRuntimeValue.mockImplementation((name, key) => {
+          if (key.includes('_grease_')) {
+            return {
+              caster: casterName,
+              center: { gridX: 5, gridY: 10 },
+              saveDc: 13,
+              saveType: 'DEX',
+              condition: 'Prone',
+              radius: 10,
+            };
+          }
+          if (key === 'activeConditions') return ['prone'];
+          return null;
+        });
+        mapsService.loadMapData.mockResolvedValue({
+          players: [{ name: casterName, gridX: 5, gridY: 10 }],
+          placedItems: [{ name: 'Goblin', gridX: 6, gridY: 10 }],
+        });
+        rangeValidation.getDistanceFeet.mockReturnValue(5);
+      };
 
-      const result = await processGreaseAreaSave(
-        casterName,
-        'Goblin',
-        campaignName,
-        mapName,
-      );
+      setupTracking();
+      expect(await processGreaseAreaSave(casterName, 'Goblin', campaignName, mapName)).toBeNull();
 
-      expect(result).toBeNull();
-    });
-
-    it('returns null when tracking has no center', async () => {
-      useRuntimeState.getRuntimeValue.mockReturnValue({
-        caster: casterName,
-        center: null,
-        saveDc: 13,
-      });
-
-      const result = await processGreaseAreaSave(
-        casterName,
-        'Goblin',
-        campaignName,
-        mapName,
-      );
-
-      expect(result).toBeNull();
-    });
-
-    it('returns null when tracking has no saveDc', async () => {
-      useRuntimeState.getRuntimeValue.mockReturnValue({
-        caster: casterName,
-        center: { gridX: 5, gridY: 10 },
-      });
-
-      const result = await processGreaseAreaSave(
-        casterName,
-        'Goblin',
-        campaignName,
-        mapName,
-      );
-
-      expect(result).toBeNull();
-    });
-
-    it('returns null when mapName is null', async () => {
-      useRuntimeState.getRuntimeValue.mockReturnValue({
-        caster: casterName,
-        center: { gridX: 5, gridY: 10 },
-        saveDc: 13,
-      });
-
-      const result = await processGreaseAreaSave(
-        casterName,
-        'Goblin',
-        campaignName,
-        null,
-      );
-
-      expect(result).toBeNull();
-    });
-
-    it('returns null when target not found on map players', async () => {
-      useRuntimeState.getRuntimeValue.mockReturnValue({
-        caster: casterName,
-        center: { gridX: 5, gridY: 10 },
-        saveDc: 13,
-      });
-      mapsService.loadMapData.mockResolvedValue({
-        players: [{ name: casterName, gridX: 5, gridY: 10 }],
-        placedItems: [],
-      });
-
-      const result = await processGreaseAreaSave(
-        casterName,
-        'Unknown',
-        campaignName,
-        mapName,
-      );
-
-      expect(result).toBeNull();
-    });
-
-    it('returns null when target not found on map placedItems', async () => {
-      useRuntimeState.getRuntimeValue.mockReturnValue({
-        caster: casterName,
-        center: { gridX: 5, gridY: 10 },
-        saveDc: 13,
-      });
-      mapsService.loadMapData.mockResolvedValue({
-        players: [{ name: casterName, gridX: 5, gridY: 10 }],
-        placedItems: [],
-      });
-
-      const result = await processGreaseAreaSave(
-        casterName,
-        'UnknownItem',
-        campaignName,
-        mapName,
-      );
-
-      expect(result).toBeNull();
-    });
-
-    it('returns null when target is outside the area radius', async () => {
-      useRuntimeState.getRuntimeValue.mockReturnValue({
-        caster: casterName,
-        center: { gridX: 5, gridY: 10 },
-        saveDc: 13,
-        saveType: 'DEX',
-        condition: 'Prone',
-        radius: 10,
-      });
-      mapsService.loadMapData.mockResolvedValue({
-        players: [{ name: casterName, gridX: 5, gridY: 10 }],
-        placedItems: [{ name: 'Goblin', gridX: 50, gridY: 50 }],
-      });
-      rangeValidation.getDistanceFeet.mockReturnValue(200);
-
-      const result = await processGreaseAreaSave(
-        casterName,
-        'Goblin',
-        campaignName,
-        mapName,
-      );
-
-      expect(result).toBeNull();
-    });
-
-    it('returns null when target is already prone (uppercase)', async () => {
-      useRuntimeState.getRuntimeValue.mockImplementation((name, key) => {
-        if (key.includes('_grease_')) {
-          return {
-            caster: casterName,
-            center: { gridX: 5, gridY: 10 },
-            saveDc: 13,
-            saveType: 'DEX',
-            condition: 'Prone',
-            radius: 10,
-          };
-        }
-        if (key === 'activeConditions') return ['Prone'];
-        return null;
-      });
-      mapsService.loadMapData.mockResolvedValue({
-        players: [{ name: casterName, gridX: 5, gridY: 10 }],
-        placedItems: [{ name: 'Goblin', gridX: 6, gridY: 10 }],
-      });
-      rangeValidation.getDistanceFeet.mockReturnValue(5);
-
-      const result = await processGreaseAreaSave(
-        casterName,
-        'Goblin',
-        campaignName,
-        mapName,
-      );
-
-      expect(result).toBeNull();
-    });
-
-    it('returns null when target is already prone (lowercase)', async () => {
-      useRuntimeState.getRuntimeValue.mockImplementation((name, key) => {
-        if (key.includes('_grease_')) {
-          return {
-            caster: casterName,
-            center: { gridX: 5, gridY: 10 },
-            saveDc: 13,
-            saveType: 'DEX',
-            condition: 'Prone',
-            radius: 10,
-          };
-        }
-        if (key === 'activeConditions') return ['prone'];
-        return null;
-      });
-      mapsService.loadMapData.mockResolvedValue({
-        players: [{ name: casterName, gridX: 5, gridY: 10 }],
-        placedItems: [{ name: 'Goblin', gridX: 6, gridY: 10 }],
-      });
-      rangeValidation.getDistanceFeet.mockReturnValue(5);
-
-      const result = await processGreaseAreaSave(
-        casterName,
-        'Goblin',
-        campaignName,
-        mapName,
-      );
-
-      expect(result).toBeNull();
-    });
-
-    it('returns null when target is already prone (mixed case)', async () => {
+      // mixed case
       useRuntimeState.getRuntimeValue.mockImplementation((name, key) => {
         if (key.includes('_grease_')) {
           return {
@@ -908,23 +469,11 @@ describe('greaseAreaSaveHandler.processGreaseAreaSave', () => {
         if (key === 'activeConditions') return ['PrOnE'];
         return null;
       });
-      mapsService.loadMapData.mockResolvedValue({
-        players: [{ name: casterName, gridX: 5, gridY: 10 }],
-        placedItems: [{ name: 'Goblin', gridX: 6, gridY: 10 }],
-      });
-      rangeValidation.getDistanceFeet.mockReturnValue(5);
-
-      const result = await processGreaseAreaSave(
-        casterName,
-        'Goblin',
-        campaignName,
-        mapName,
-      );
-
-      expect(result).toBeNull();
+      expect(await processGreaseAreaSave(casterName, 'Goblin', campaignName, mapName)).toBeNull();
     });
 
-    it('returns null when player is immune to the condition', async () => {
+    it('returns null when player is immune to the condition, skips immunity for non-players', async () => {
+      // immune player
       useRuntimeState.getRuntimeValue.mockImplementation((name, key) => {
         if (key.includes('_grease_')) {
           return {
@@ -953,24 +502,12 @@ describe('greaseAreaSaveHandler.processGreaseAreaSave', () => {
       automationImmunities.playerIsImmuneToCondition.mockReturnValue(true);
       rangeValidation.getDistanceFeet.mockReturnValue(5);
 
-      const result = await processGreaseAreaSave(
-        casterName,
-        'Goblin',
-        campaignName,
-        mapName,
-      );
-
+      const result = await processGreaseAreaSave(casterName, 'Goblin', campaignName, mapName);
       expect(result).toBeNull();
-      expect(automationImmunities.playerIsImmuneToCondition).toHaveBeenCalledWith(
-        expect.objectContaining({
-          conditionKey: 'prone',
-          campaignName,
-        }),
-      );
+      expect(automationImmunities.playerIsImmuneToCondition).toHaveBeenCalled();
       expect(savePrompt.createSaveListener).not.toHaveBeenCalled();
-    });
 
-    it('skips immunity check for non-player targets', async () => {
+      // non-player target — skips immunity check
       useRuntimeState.getRuntimeValue.mockImplementation((name, key) => {
         if (key.includes('_grease_')) {
           return {
@@ -992,21 +529,15 @@ describe('greaseAreaSaveHandler.processGreaseAreaSave', () => {
       damageUtils.getCombatContext.mockResolvedValue({
         creatures: [{ name: 'Goblin', type: 'monster' }],
       });
+      automationImmunities.playerIsImmuneToCondition.mockClear();
       rangeValidation.getDistanceFeet.mockReturnValue(5);
-
       vi.mocked(savePrompt.createSaveListener).mockReturnValue({
         promptId: 'grease-monster',
         promise: Promise.resolve({ success: true }),
       });
 
-      const result = await processGreaseAreaSave(
-        casterName,
-        'Goblin',
-        campaignName,
-        mapName,
-      );
-
-      expect(result.type).toBe('popup');
+      const result2 = await processGreaseAreaSave(casterName, 'Goblin', campaignName, mapName);
+      expect(result2.type).toBe('popup');
       expect(automationImmunities.playerIsImmuneToCondition).not.toHaveBeenCalled();
     });
   });
@@ -1034,86 +565,49 @@ describe('greaseAreaSaveHandler.processGreaseAreaSave', () => {
       rangeValidation.getDistanceFeet.mockReturnValue(5);
     }
 
-    it('triggers save listener with correct parameters on failed save', async () => {
+    it('triggers save listener with correct parameters', async () => {
       setupBaseSave();
       damageUtils.getCombatContext.mockResolvedValue({
         creatures: [{ name: 'Goblin', type: 'monster' }],
       });
+      vi.mocked(savePrompt.createSaveListener).mockReturnValue({
+        promptId: 'grease-test',
+        promise: Promise.resolve({ success: false }),
+      });
+
+      await processGreaseAreaSave(casterName, 'Goblin', campaignName, mapName);
+
+      expect(savePrompt.createSaveListener).toHaveBeenCalledWith(campaignName, {
+        targetName: 'Goblin',
+        saveType: 'DEX',
+        saveDc: 13,
+      });
+    });
+
+    it('returns popup with correct description based on save result', async () => {
+      setupBaseSave();
+      damageUtils.getCombatContext.mockResolvedValue({
+        creatures: [{ name: 'Goblin', type: 'monster' }],
+      });
+
+      // failed save
       vi.mocked(savePrompt.createSaveListener).mockReturnValue({
         promptId: 'grease-fail',
         promise: Promise.resolve({ success: false }),
       });
-
-      await processGreaseAreaSave(casterName, 'Goblin', campaignName, mapName);
-
-      expect(savePrompt.createSaveListener).toHaveBeenCalledWith(campaignName, {
-        targetName: 'Goblin',
-        saveType: 'DEX',
-        saveDc: 13,
-      });
-    });
-
-    it('triggers save listener with correct parameters on successful save', async () => {
-      setupBaseSave();
-      damageUtils.getCombatContext.mockResolvedValue({
-        creatures: [{ name: 'Goblin', type: 'monster' }],
-      });
-      vi.mocked(savePrompt.createSaveListener).mockReturnValue({
-        promptId: 'grease-success',
-        promise: Promise.resolve({ success: true }),
-      });
-
-      await processGreaseAreaSave(casterName, 'Goblin', campaignName, mapName);
-
-      expect(savePrompt.createSaveListener).toHaveBeenCalledWith(campaignName, {
-        targetName: 'Goblin',
-        saveType: 'DEX',
-        saveDc: 13,
-      });
-    });
-
-    it('returns popup with failed description on failed save', async () => {
-      setupBaseSave();
-      damageUtils.getCombatContext.mockResolvedValue({
-        creatures: [{ name: 'Goblin', type: 'monster' }],
-      });
-      vi.mocked(savePrompt.createSaveListener).mockReturnValue({
-        promptId: 'grease-fail-desc',
-        promise: Promise.resolve({ success: false }),
-      });
-
-      const result = await processGreaseAreaSave(
-        casterName,
-        'Goblin',
-        campaignName,
-        mapName,
-      );
-
+      let result = await processGreaseAreaSave(casterName, 'Goblin', campaignName, mapName);
       expect(result.type).toBe('popup');
       expect(result.payload.description).toContain('failed');
       expect(result.payload.description).toContain('DEX');
       expect(result.payload.description).toContain('DC 13');
       expect(result.payload.description).toContain('Becomes Prone');
-    });
 
-    it('returns popup with succeeded description on successful save', async () => {
-      setupBaseSave();
-      damageUtils.getCombatContext.mockResolvedValue({
-        creatures: [{ name: 'Goblin', type: 'monster' }],
-      });
+      // successful save
       vi.mocked(savePrompt.createSaveListener).mockReturnValue({
-        promptId: 'grease-success-desc',
+        promptId: 'grease-success',
         promise: Promise.resolve({ success: true }),
       });
-
-      const result = await processGreaseAreaSave(
-        casterName,
-        'Goblin',
-        campaignName,
-        mapName,
-      );
-
-      expect(result.type).toBe('popup');
+      result = await processGreaseAreaSave(casterName, 'Goblin', campaignName, mapName);
       expect(result.payload.description).toContain('succeeded');
       expect(result.payload.description).toContain('Unaffected');
     });
@@ -1124,31 +618,26 @@ describe('greaseAreaSaveHandler.processGreaseAreaSave', () => {
         creatures: [{ name: 'Goblin', type: 'monster' }],
       });
       vi.mocked(savePrompt.createSaveListener).mockReturnValue({
-        promptId: 'grease-payload-type',
+        promptId: 'grease-payload',
         promise: Promise.resolve({ success: false }),
       });
 
-      const result = await processGreaseAreaSave(
-        casterName,
-        'Goblin',
-        campaignName,
-        mapName,
-      );
+      const result = await processGreaseAreaSave(casterName, 'Goblin', campaignName, mapName);
 
       expect(result.payload.type).toBe('automation_info');
       expect(result.payload.name).toBe('Grease');
     });
 
-    it('applies condition on failed save', async () => {
+    it('applies condition on failed save and does not on success', async () => {
       setupBaseSave();
       damageUtils.getCombatContext.mockResolvedValue({
         creatures: [{ name: 'Goblin', type: 'monster' }],
       });
+
       vi.mocked(savePrompt.createSaveListener).mockReturnValue({
-        promptId: 'grease-apply-cond',
+        promptId: 'grease-apply',
         promise: Promise.resolve({ success: false }),
       });
-
       await processGreaseAreaSave(casterName, 'Goblin', campaignName, mapName);
 
       expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
@@ -1157,18 +646,13 @@ describe('greaseAreaSaveHandler.processGreaseAreaSave', () => {
         expect.arrayContaining(['prone']),
         campaignName,
       );
-    });
 
-    it('does not apply condition on successful save', async () => {
-      setupBaseSave();
-      damageUtils.getCombatContext.mockResolvedValue({
-        creatures: [{ name: 'Goblin', type: 'monster' }],
-      });
+      // successful save — no condition applied
+      useRuntimeState.setRuntimeValue.mockClear();
       vi.mocked(savePrompt.createSaveListener).mockReturnValue({
-        promptId: 'grease-no-cond',
+        promptId: 'grease-no-apply',
         promise: Promise.resolve({ success: true }),
       });
-
       await processGreaseAreaSave(casterName, 'Goblin', campaignName, mapName);
 
       expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalledWith(
@@ -1179,7 +663,7 @@ describe('greaseAreaSaveHandler.processGreaseAreaSave', () => {
       );
     });
 
-    it('removes existing condition of same type before adding on failed save', async () => {
+    it('deduplicates conditions before adding on failed save', async () => {
       useRuntimeState.getRuntimeValue.mockImplementation((name, key) => {
         if (key.includes('_grease_')) {
           return {
@@ -1213,44 +697,6 @@ describe('greaseAreaSaveHandler.processGreaseAreaSave', () => {
         'Goblin',
         'activeConditions',
         ['frightened', 'blinded'],
-        campaignName,
-      );
-    });
-
-    it('uses condition from tracking data for deduplication', async () => {
-      useRuntimeState.getRuntimeValue.mockImplementation((name, key) => {
-        if (key.includes('_grease_')) {
-          return {
-            caster: casterName,
-            center: { gridX: 5, gridY: 10 },
-            saveDc: 13,
-            saveType: 'DEX',
-            condition: 'Blinded',
-            radius: 10,
-          };
-        }
-        if (key === 'activeConditions') return ['blinded'];
-        return null;
-      });
-      mapsService.loadMapData.mockResolvedValue({
-        players: [{ name: casterName, gridX: 5, gridY: 10 }],
-        placedItems: [{ name: 'Goblin', gridX: 6, gridY: 10 }],
-      });
-      damageUtils.getCombatContext.mockResolvedValue({
-        creatures: [{ name: 'Goblin', type: 'monster' }],
-      });
-      rangeValidation.getDistanceFeet.mockReturnValue(5);
-      vi.mocked(savePrompt.createSaveListener).mockReturnValue({
-        promptId: 'grease-custom-cond',
-        promise: Promise.resolve({ success: false }),
-      });
-
-      await processGreaseAreaSave(casterName, 'Goblin', campaignName, mapName);
-
-      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-        'Goblin',
-        'activeConditions',
-        ['blinded'],
         campaignName,
       );
     });
@@ -1302,19 +748,20 @@ describe('greaseAreaSaveHandler.processGreaseAreaSave', () => {
       );
     });
 
-    it('calls addEntry with save_result on failed save', async () => {
+    it('calls addEntry with save_result on failed and successful saves', async () => {
       setupBaseSave();
       damageUtils.getCombatContext.mockResolvedValue({
         creatures: [{ name: 'Goblin', type: 'monster' }],
       });
+
+      // failed save
       vi.mocked(savePrompt.createSaveListener).mockReturnValue({
         promptId: 'grease-result-fail',
         promise: Promise.resolve({ success: false }),
       });
-
       await processGreaseAreaSave(casterName, 'Goblin', campaignName, mapName);
 
-      const saveResultCall = logService.addEntry.mock.calls.find(
+      let saveResultCall = logService.addEntry.mock.calls.find(
         (c) => c[1].type === 'save_result',
       );
       expect(saveResultCall).toBeDefined();
@@ -1328,21 +775,16 @@ describe('greaseAreaSaveHandler.processGreaseAreaSave', () => {
           description: expect.stringContaining('failed'),
         }),
       );
-    });
 
-    it('calls addEntry with save_result on successful save', async () => {
-      setupBaseSave();
-      damageUtils.getCombatContext.mockResolvedValue({
-        creatures: [{ name: 'Goblin', type: 'monster' }],
-      });
+      // successful save
+      logService.addEntry.mockClear();
       vi.mocked(savePrompt.createSaveListener).mockReturnValue({
         promptId: 'grease-result-success',
         promise: Promise.resolve({ success: true }),
       });
-
       await processGreaseAreaSave(casterName, 'Goblin', campaignName, mapName);
 
-      const saveResultCall = logService.addEntry.mock.calls.find(
+      saveResultCall = logService.addEntry.mock.calls.find(
         (c) => c[1].type === 'save_result',
       );
       expect(saveResultCall).toBeDefined();
@@ -1359,109 +801,6 @@ describe('greaseAreaSaveHandler.processGreaseAreaSave', () => {
     });
   });
 
-  describe('distance and map checks', () => {
-    it('proceeds with save when target is within radius', async () => {
-      useRuntimeState.getRuntimeValue.mockImplementation((name, key) => {
-        if (key.includes('_grease_')) {
-          return {
-            caster: casterName,
-            center: { gridX: 5, gridY: 10 },
-            saveDc: 13,
-            saveType: 'DEX',
-            condition: 'Prone',
-            radius: 10,
-          };
-        }
-        if (key === 'activeConditions') return [];
-        return null;
-      });
-      mapsService.loadMapData.mockResolvedValue({
-        players: [{ name: casterName, gridX: 5, gridY: 10 }],
-        placedItems: [{ name: 'Goblin', gridX: 6, gridY: 10 }],
-      });
-      damageUtils.getCombatContext.mockResolvedValue({
-        creatures: [{ name: 'Goblin', type: 'monster' }],
-      });
-      rangeValidation.getDistanceFeet.mockReturnValue(5);
-      vi.mocked(savePrompt.createSaveListener).mockReturnValue({
-        promptId: 'grease-within',
-        promise: Promise.resolve({ success: true }),
-      });
-
-      const result = await processGreaseAreaSave(
-        casterName,
-        'Goblin',
-        campaignName,
-        mapName,
-      );
-
-      expect(result.type).toBe('popup');
-      expect(rangeValidation.getDistanceFeet).toHaveBeenCalled();
-    });
-
-    it('proceeds with save when map load fails (catches and returns popup)', async () => {
-      useRuntimeState.getRuntimeValue.mockReturnValue({
-        caster: casterName,
-        center: { gridX: 5, gridY: 10 },
-        saveDc: 13,
-        saveType: 'DEX',
-        condition: 'Prone',
-        radius: 10,
-      });
-      mapsService.loadMapData.mockRejectedValue(new Error('map not found'));
-
-      const result = await processGreaseAreaSave(
-        casterName,
-        'Goblin',
-        campaignName,
-        mapName,
-      );
-
-      expect(result).toBeNull();
-    });
-
-    it('does not check distance when no center in tracking', async () => {
-      useRuntimeState.getRuntimeValue.mockReturnValue({
-        caster: casterName,
-        center: null,
-        saveDc: 13,
-        saveType: 'DEX',
-      });
-
-      await processGreaseAreaSave(casterName, 'Goblin', campaignName, mapName);
-
-      expect(mapsService.loadMapData).not.toHaveBeenCalled();
-      expect(rangeValidation.getDistanceFeet).not.toHaveBeenCalled();
-    });
-
-    it('does not check distance when no mapName', async () => {
-      useRuntimeState.getRuntimeValue.mockReturnValue({
-        caster: casterName,
-        center: { gridX: 5, gridY: 10 },
-        saveDc: 13,
-        saveType: 'DEX',
-        radius: 10,
-      });
-
-      await processGreaseAreaSave(casterName, 'Goblin', campaignName, null);
-
-      expect(mapsService.loadMapData).not.toHaveBeenCalled();
-      expect(rangeValidation.getDistanceFeet).not.toHaveBeenCalled();
-    });
-
-    it('does not check distance when no saveDc in tracking', async () => {
-      useRuntimeState.getRuntimeValue.mockReturnValue({
-        caster: casterName,
-        center: { gridX: 5, gridY: 10 },
-      });
-
-      await processGreaseAreaSave(casterName, 'Goblin', campaignName, mapName);
-
-      expect(mapsService.loadMapData).not.toHaveBeenCalled();
-      expect(rangeValidation.getDistanceFeet).not.toHaveBeenCalled();
-    });
-  });
-
   describe('error handling', () => {
     it('returns null on unexpected error during processing', async () => {
       useRuntimeState.getRuntimeValue.mockReturnValue({
@@ -1471,12 +810,7 @@ describe('greaseAreaSaveHandler.processGreaseAreaSave', () => {
       });
       mapsService.loadMapData.mockRejectedValue(new Error('map not found'));
 
-      const result = await processGreaseAreaSave(
-        casterName,
-        'Goblin',
-        campaignName,
-        mapName,
-      );
+      const result = await processGreaseAreaSave(casterName, 'Goblin', campaignName, mapName);
 
       expect(result).toBeNull();
     });
@@ -1521,12 +855,7 @@ describe('greaseAreaSaveHandler.processGreaseAreaSave', () => {
         promise: Promise.resolve({ success: true }),
       });
 
-      const result = await processGreaseAreaSave(
-        casterName,
-        'Goblin',
-        campaignName,
-        mapName,
-      );
+      const result = await processGreaseAreaSave(casterName, 'Goblin', campaignName, mapName);
 
       expect(result.type).toBe('popup');
     });
@@ -1560,12 +889,7 @@ describe('greaseAreaSaveHandler.processGreaseAreaSave', () => {
         promise: Promise.resolve({ success: true }),
       });
 
-      const result = await processGreaseAreaSave(
-        casterName,
-        'Goblin',
-        campaignName,
-        mapName,
-      );
+      const result = await processGreaseAreaSave(casterName, 'Goblin', campaignName, mapName);
 
       expect(result.type).toBe('popup');
       expect(rangeValidation.getDistanceFeet).toHaveBeenCalledWith(

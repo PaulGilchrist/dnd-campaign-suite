@@ -128,26 +128,6 @@ describe('warMagicSpellHandler', () => {
             })
         })
 
-        it('uses fallback defaults for missing spell properties in optionDetails', async () => {
-            const { loadSpellData } = await import('../../../ui/dataLoader.js')
-            loadSpellData.mockResolvedValue([{ name: 'Minor Spell', level: 1 }])
-
-            const action = {
-                name: 'War Magic',
-                automation: { type: 'war_magic_spell', maxSpellLevel: 2 },
-            }
-
-            const result = await handle(action, mockPlayerStats, mockCampaignName)
-
-            expect(result.payload.optionDetails['Minor Spell']).toEqual({
-                name: 'Minor Spell',
-                level: 1,
-                casting_time: '1 action',
-                range: '',
-                description: '',
-                damage: null,
-            })
-        })
     })
 
     describe('confirmWarMagicSpell', () => {

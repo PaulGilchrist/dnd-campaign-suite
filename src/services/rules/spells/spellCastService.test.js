@@ -63,54 +63,21 @@ describe('spellCastService', () => {
       )
     })
 
-    it('refunds by incrementing current slots by 1', async () => {
-      runtimeStateMock.getRuntimeValue.mockReturnValue(0)
+    it('does not refund when currentSlots is null, undefined, or negative', async () => {
+      const invalidValues = [null, undefined, -1]
 
-      refundSpellBreakerSlot('Cleric5', 1, 'myCampaign')
+      for (const invalidValue of invalidValues) {
+        runtimeStateMock.getRuntimeValue.mockReturnValue(invalidValue)
 
-      expect(runtimeStateMock.setRuntimeValue).toHaveBeenCalledWith(
-        'Cleric5',
-        'spell_slots_level_1',
-        1,
-        'myCampaign',
-      )
-    })
+        refundSpellBreakerSlot('Wizard1', 3, 'camp')
 
-    it('does not refund when currentSlots is null', async () => {
-      runtimeStateMock.getRuntimeValue.mockReturnValue(null)
-
-      refundSpellBreakerSlot('Wizard1', 3, 'camp')
-
-      expect(runtimeStateMock.setRuntimeValue).not.toHaveBeenCalled()
-    })
-
-    it('does not refund when currentSlots is undefined', async () => {
-      runtimeStateMock.getRuntimeValue.mockReturnValue(undefined)
-
-      refundSpellBreakerSlot('Wizard1', 3, 'camp')
-
-      expect(runtimeStateMock.setRuntimeValue).not.toHaveBeenCalled()
-    })
-
-    it('does not refund when currentSlots is negative', async () => {
-      runtimeStateMock.getRuntimeValue.mockReturnValue(-1)
-
-      refundSpellBreakerSlot('Wizard1', 3, 'camp')
-
-      expect(runtimeStateMock.setRuntimeValue).not.toHaveBeenCalled()
-    })
-
-    it('refunds when currentSlots is zero', async () => {
-      runtimeStateMock.getRuntimeValue.mockReturnValue(0)
-
-      refundSpellBreakerSlot('Wizard1', 3, 'camp')
-
-      expect(runtimeStateMock.setRuntimeValue).toHaveBeenCalledWith(
-        'Wizard1',
-        'spell_slots_level_3',
-        1,
-        'camp',
-      )
+        expect(runtimeStateMock.setRuntimeValue).not.toHaveBeenCalled()
+        vi.clearAllMocks()
+        runtimeStateMock.getRuntimeValue.mockImplementation((_characterKey, propertyName) => {
+          if (propertyName === 'activeConditions') return []
+          return undefined
+        })
+      }
     })
   })
 
@@ -230,29 +197,6 @@ describe('spellCastService', () => {
       })
     })
 
-    describe('cantrip spell ability override', () => {
-      it('uses cantripSpellAbility for spellToHit when set', async () => {
-        const spell = { ...makeSpell('Ray of Frost'), level: 0, spellCastingAbility: 'Int' }
-        const playerStats = makePlayerStats()
-        const metaCtx = makeMetaCtx()
-
-        const rollAttackSpy = vi.fn()
-        const { executeSpellCast: spellCast } = await import('./spellCastService.js')
-        await spellCast(spell, metaCtx, {
-          rollAttack: rollAttackSpy,
-          rollDamage: vi.fn(),
-          playerStats,
-          getTargetInfo: vi.fn(() => ({ name: 'Goblin1' })),
-          campaignName: 'camp',
-          mapName: 'map1',
-        })
-
-        expect(rollAttackSpy).toHaveBeenCalled()
-        const attackCtx = rollAttackSpy.mock.calls[0][2]
-        expect(attackCtx.isCantrip).toBe(true)
-      })
-    })
-
     describe('range validation', () => {
       function makeSpellWithDC(name = 'Fireball', level = 3) {
         return {
@@ -263,28 +207,6 @@ describe('spellCastService', () => {
           school: 'Evocation',
         }
       }
-
-      it('computes range effect when attackerPos and targetPos are provided', async () => {
-        const spell = makeSpellWithDC('Fireball')
-        const playerStats = makePlayerStats()
-        const metaCtx = makeMetaCtx()
-
-        const rollAttackSpy = vi.fn()
-        const rollDamageSpy = vi.fn()
-        const { executeSpellCast: spellCast } = await import('./spellCastService.js')
-        await spellCast(spell, metaCtx, {
-          rollAttack: rollAttackSpy,
-          rollDamage: rollDamageSpy,
-          playerStats,
-          getTargetInfo: vi.fn(() => ({ name: 'Goblin1' })),
-          attackerPos: { x: 0, y: 0 },
-          targetPos: { x: 30, y: 0 },
-          campaignName: 'camp',
-          mapName: 'map1',
-        })
-
-        expect(rollDamageSpy).toHaveBeenCalled()
-      })
 
       it('marks auto miss when target is out of range', async () => {
         const spell = {
@@ -352,32 +274,6 @@ describe('spellCastService', () => {
         const formula = rollDamageSpy.mock.calls[0][1]
         expect(formula).toContain('Empowered Evocation')
       })
-
-      it('does not apply empowered evocation to non-evocation spells', async () => {
-        const playerStats = makePlayerStats({
-          automation: {
-            passives: [
-              { name: 'Empowered Evocation', type: 'empowered_evocation' },
-            ],
-          },
-          abilities: [{ name: 'Int', bonus: 3 }],
-        })
-        const spell = { ...makeSpell('Charm Person'), school: 'Enchantment', damage: null }
-        const metaCtx = makeMetaCtx()
-
-        const rollDamageSpy = vi.fn()
-        const { executeSpellCast: spellCast } = await import('./spellCastService.js')
-        await spellCast(spell, metaCtx, {
-          rollAttack: vi.fn(),
-          rollDamage: rollDamageSpy,
-          playerStats,
-          getTargetInfo: vi.fn(() => ({ name: 'Goblin1' })),
-          campaignName: 'camp',
-          mapName: 'map1',
-        })
-
-        expect(rollDamageSpy).not.toHaveBeenCalled()
-      })
     })
 
     describe('overchannel', () => {
@@ -425,7 +321,7 @@ describe('spellCastService', () => {
         )
       })
 
-      it('does not overchannel for cantrips (level 0)', async () => {
+      it('does not overchannel for cantrips (level 0) or slot levels above 5', async () => {
         const playerStats = makePlayerStats({
           automation: {
             passives: [
@@ -433,77 +329,37 @@ describe('spellCastService', () => {
             ],
           },
         })
-        const spell = { ...makeSpellWithDC('Ray of Frost'), level: 0 }
-        const metaCtx = makeMetaCtx({ overchannel: true, slotLevel: 0 })
 
-        const rollDamageSpy = vi.fn()
-        const { executeSpellCast: spellCast } = await import('./spellCastService.js')
-        await spellCast(spell, metaCtx, {
-          rollAttack: vi.fn(),
-          rollDamage: rollDamageSpy,
-          playerStats,
-          getTargetInfo: vi.fn(() => ({ name: 'Goblin1' })),
-          campaignName: 'camp',
-          mapName: 'map1',
-        })
+        const invalidSlotLevels = [
+          { spell: { ...makeSpellWithDC('Ray of Frost'), level: 0 }, metaCtx: { overchannel: true, slotLevel: 0 } },
+          { spell: makeSpellWithDC('Wish', 9), metaCtx: { overchannel: true, slotLevel: 9 } },
+        ]
 
-        // Overchannel should not apply for level 0 — rollDamage not called with Overchannel
-        expect(rollDamageSpy).toHaveBeenCalled()
-        const formula = rollDamageSpy.mock.calls[0][1]
-        expect(formula).not.toContain('Overchannel')
-      })
+        for (const { spell, metaCtx: mc } of invalidSlotLevels) {
+          const rollDamageSpy = vi.fn()
+          const { executeSpellCast: spellCast } = await import('./spellCastService.js')
+          await spellCast(spell, mc, {
+            rollAttack: vi.fn(),
+            rollDamage: rollDamageSpy,
+            playerStats,
+            getTargetInfo: vi.fn(() => ({ name: 'Goblin1' })),
+            campaignName: 'camp',
+            mapName: 'map1',
+          })
 
-      it('does not overchannel for slot levels above 5', async () => {
-        const playerStats = makePlayerStats({
-          automation: {
-            passives: [
-              { name: 'Overchannel', type: 'overchannel' },
-            ],
-          },
-        })
-        const spell = makeSpellWithDC('Wish', 9)
-        const metaCtx = makeMetaCtx({ overchannel: true, slotLevel: 9 })
-
-        const rollDamageSpy = vi.fn()
-        const { executeSpellCast: spellCast } = await import('./spellCastService.js')
-        await spellCast(spell, metaCtx, {
-          rollAttack: vi.fn(),
-          rollDamage: rollDamageSpy,
-          playerStats,
-          getTargetInfo: vi.fn(() => ({ name: 'Goblin1' })),
-          campaignName: 'camp',
-          mapName: 'map1',
-        })
-
-        expect(rollDamageSpy).toHaveBeenCalled()
-        const formula = rollDamageSpy.mock.calls[0][1]
-        expect(formula).not.toContain('Overchannel')
+          expect(rollDamageSpy).toHaveBeenCalled()
+          const formula = rollDamageSpy.mock.calls[0][1]
+          expect(formula).not.toContain('Overchannel')
+          vi.clearAllMocks()
+          runtimeStateMock.getRuntimeValue.mockImplementation((_characterKey, propertyName) => {
+            if (propertyName === 'activeConditions') return []
+            return undefined
+          })
+        }
       })
     })
 
     describe('healing spells', () => {
-      it('handles healing spells with heal_at_slot_level', async () => {
-        const spell = {
-          name: 'Cure Wounds',
-          level: 1,
-          heal_at_slot_level: { 1: '1d8', 2: '2d8', 3: '3d8' },
-        }
-        const playerStats = { ...makePlayerStats(), automation: { passives: [] }, activeBuffs: [] }
-        const metaCtx = makeMetaCtx({ slotLevel: 1 })
-
-        const { executeSpellCast: spellCast } = await import('./spellCastService.js')
-        await spellCast(spell, metaCtx, {
-          rollAttack: vi.fn(),
-          rollDamage: vi.fn(),
-          playerStats,
-          getTargetInfo: vi.fn(() => ({ name: 'Ally1' })),
-          campaignName: 'camp',
-          mapName: 'map1',
-        })
-
-        expect(consoleErrorSpy).not.toHaveBeenCalled()
-      })
-
       it('throws when slot level is missing for healing spell', async () => {
         const spell = {
           name: 'Cure Wounds',

@@ -83,17 +83,16 @@ function inRangeAlly() {
   rangeValidation.getDistanceFeet.mockReturnValue(15);
 }
 
-// ── No map / no ally ───────────────────────────────────────────
+// ── No map — movement popup ────────────────────────────────────
 
-describe('handleInspiringMovement — no map or ally', () => {
+describe('handleInspiringMovement — no map', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it('returns popup description with movement only when no map', async () => {
+  it('returns popup with movement description when no map', async () => {
     const ps = makePlayerStats();
     const action = makeAction({ effect: 'inspiring_movement' });
-
     useRuntimeState.getRuntimeValue.mockReturnValue(0);
 
     const result = await handle(action, ps, campaignName, null);
@@ -103,22 +102,9 @@ describe('handleInspiringMovement — no map or ally', () => {
     expect(result.payload.description).not.toContain('Select an ally');
   });
 
-  it('returns popup description with custom ally range', async () => {
-    const ps = makePlayerStats({ speed: 30 });
-    const action = makeAction({ effect: 'inspiring_movement', allyRange: '50 ft' });
-    rangeValidation.rangeToFeet.mockReturnValue(50);
-
-    useRuntimeState.getRuntimeValue.mockReturnValue(0);
-
-    const result = await handle(action, ps, campaignName, mapName);
-
-    expect(result.payload.description).toContain('Select an ally within 50 ft');
-  });
-
   it('uses player speed for half-speed calculation', async () => {
     const ps = makePlayerStats({ speed: 40 });
     const action = makeAction({ effect: 'inspiring_movement' });
-
     useRuntimeState.getRuntimeValue.mockReturnValue(0);
 
     const result = await handle(action, ps, campaignName, mapName);
@@ -126,46 +112,61 @@ describe('handleInspiringMovement — no map or ally', () => {
     expect(result.payload.description).toContain('You move up to 20 ft');
   });
 
-  it('defaults speed to 30 when playerStats.speed is missing', async () => {
-    const ps = makePlayerStats({});
-    delete ps.speed;
-    const action = makeAction({ effect: 'inspiring_movement' });
+  it('defaults speed to 30 when playerStats.speed is falsy', async () => {
+    const cases = [
+      { speed: undefined },
+      { speed: 0 },
+    ];
+    for (const overrides of cases) {
+      vi.clearAllMocks();
+      const ps = makePlayerStats(overrides);
+      const action = makeAction({ effect: 'inspiring_movement' });
+      useRuntimeState.getRuntimeValue.mockReturnValue(0);
 
+      const result = await handle(action, ps, campaignName, mapName);
+
+      expect(result.payload.description).toContain('You move up to 15 ft');
+    }
+  });
+
+  it('shows custom ally range in popup', async () => {
+    const ps = makePlayerStats({ speed: 30 });
+    const action = makeAction({ effect: 'inspiring_movement', allyRange: '50 ft' });
+    rangeValidation.rangeToFeet.mockReturnValue(50);
     useRuntimeState.getRuntimeValue.mockReturnValue(0);
 
     const result = await handle(action, ps, campaignName, mapName);
 
-    expect(result.payload.description).toContain('You move up to 15 ft');
+    expect(result.payload.description).toContain('Select an ally within 50 ft');
   });
+});
 
-  it('defaults speed to 30 when playerStats.speed is 0', async () => {
-    const ps = makePlayerStats({ speed: 0 });
-    const action = makeAction({ effect: 'inspiring_movement' });
+// ── Routing ──────────────────────────────────────────────────
+// NOTE: Routing to handleInspiringMovement is tested in reactionBonusHandler.test.js
 
-    useRuntimeState.getRuntimeValue.mockReturnValue(0);
-
-    const result = await handle(action, ps, campaignName, mapName);
-
-    expect(result.payload.description).toContain('You move up to 15 ft');
-  });
-
-  it('skips ally resolution when allyRangeFt is null', async () => {
+describe('handleInspiringMovement — routing', () => {
+  it('returns popup with movement description as default handler', async () => {
     const ps = makePlayerStats();
-    const action = makeAction({ effect: 'inspiring_movement' });
-    rangeValidation.rangeToFeet.mockReturnValue(null);
-
+    const action = makeAction({ effect: 'inspiring_movement', allyRange: '30_ft' });
     useRuntimeState.getRuntimeValue.mockReturnValue(0);
 
     const result = await handle(action, ps, campaignName, mapName);
 
-    expect(targetResolver.resolveMapPositions).not.toHaveBeenCalled();
-    expect(result.payload.description).not.toContain('Select an ally');
+    expect(result.type).toBe('popup');
+    expect(result.payload.description).toContain('move up to 15 ft');
+  });
+});
+
+// ── No-OA flag ─────────────────────────────────────────────────
+
+describe('handleInspiringMovement — no-OA flag', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
   });
 
   it('grants no-OA to self when noOAs is true', async () => {
     const ps = makePlayerStats({ name: 'Bard' });
     const action = makeAction({ effect: 'inspiring_movement', noOAs: true });
-
     useRuntimeState.getRuntimeValue.mockReturnValue(0);
 
     const result = await handle(action, ps, campaignName, mapName);
@@ -179,17 +180,15 @@ describe('handleInspiringMovement — no map or ally', () => {
     );
   });
 
-  it('omits no-OA text when noOAs is false', async () => {
-    const ps = makePlayerStats({ speed: 30 });
-    const action = makeAction({ effect: 'inspiring_movement', noOAs: false });
+  it('grants no-OA to ally when noOAs is true', async () => {
+    const ps = makePlayerStats({ name: 'Bard' });
+    const action = makeAction({ effect: 'inspiring_movement', noOAs: true });
+    inRangeAlly();
 
-    useRuntimeState.getRuntimeValue.mockReturnValue(0);
+    await handle(action, ps, campaignName, mapName);
 
-    const result = await handle(action, ps, campaignName, mapName);
-
-    expect(result.payload.description).not.toContain('Opportunity Attacks');
-    expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalledWith(
-      expect.any(String), 'inspiringMovementNoOA', expect.any(Boolean), expect.any(String)
+    expect(expirations.addExpiration).toHaveBeenCalledWith(
+      'Bard', 'Ally1', [{ type: 'inspiring_movement_no_oa' }], campaignName, 1
     );
   });
 });
@@ -214,34 +213,7 @@ describe('handleInspiringMovement — ally resolution', () => {
     );
   });
 
-  it('grants no-OA to ally when noOAs is true', async () => {
-    const ps = makePlayerStats({ name: 'Bard' });
-    const action = makeAction({ effect: 'inspiring_movement', noOAs: true });
-    inRangeAlly();
-
-    await handle(action, ps, campaignName, mapName);
-
-    expect(expirations.addExpiration).toHaveBeenCalledWith(
-      'Bard', 'Ally1', [{ type: 'inspiring_movement_granted' }], campaignName, 1
-    );
-    expect(expirations.addExpiration).toHaveBeenCalledWith(
-      'Bard', 'Ally1', [{ type: 'inspiring_movement_no_oa' }], campaignName, 1
-    );
-  });
-
-  it('skips no-OA on ally when noOAs is false', async () => {
-    const ps = makePlayerStats({ name: 'Bard' });
-    const action = makeAction({ effect: 'inspiring_movement', noOAs: false });
-    inRangeAlly();
-
-    await handle(action, ps, campaignName, mapName);
-
-    expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalledWith(
-      'Ally1', 'inspiringMovementNoOA', expect.any(Boolean), expect.any(String)
-    );
-  });
-
-  it('skips ally resolution when target is out of range', async () => {
+  it('skips ally movement when target is out of range', async () => {
     const ps = makePlayerStats({ name: 'Bard' });
     const action = makeAction({ effect: 'inspiring_movement', allyRange: '10 ft' });
     rangeValidation.rangeToFeet.mockReturnValue(10);
@@ -258,112 +230,50 @@ describe('handleInspiringMovement — ally resolution', () => {
 
     expect(result.payload.description).not.toContain('Ally1 can also move');
     expect(result.payload.description).toContain('Select an ally within 10 ft');
-    expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalledWith(
-      'Ally1', 'inspiringMovementGranted', expect.any(Boolean), expect.any(String)
-    );
   });
 
-  it('skips ally movement when no target is selected', async () => {
-    const ps = makePlayerStats({ name: 'Bard' });
-    const action = makeAction({ effect: 'inspiring_movement' });
+  it('skips ally movement when any guard condition fails', async () => {
+    const cases = [
+      { resolveLabel: 'no map positions', mock: () => { targetResolver.resolveMapPositions.mockResolvedValue(null); } },
+      { resolveLabel: 'empty map positions', mock: () => { targetResolver.resolveMapPositions.mockResolvedValue({}); } },
+      { resolveLabel: 'no attackerPos', mock: () => { targetResolver.resolveMapPositions.mockResolvedValue({}); } },
+      { resolveLabel: 'no target selected', mock: () => { targetResolver.resolveTarget.mockResolvedValue(null); } },
+      { resolveLabel: 'no target property', mock: () => { targetResolver.resolveTarget.mockResolvedValue({}); } },
+      { resolveLabel: 'target without name', mock: () => { targetResolver.resolveTarget.mockResolvedValue({ target: {} }); } },
+      { resolveLabel: 'no targetPos on map', mock: () => { targetResolver.resolveMapPositions.mockResolvedValue({ attackerPos: { gridX: 0, gridY: 0 } }); } },
+      { resolveLabel: 'getDistanceFeet returns null', mock: () => { rangeValidation.getDistanceFeet.mockReturnValue(null); } },
+    ];
 
+    for (const { mock } of cases) {
+      vi.clearAllMocks();
+      const ps = makePlayerStats({ name: 'Bard' });
+      const action = makeAction({ effect: 'inspiring_movement' });
+      useRuntimeState.getRuntimeValue.mockReturnValue(0);
+      rangeValidation.rangeToFeet.mockReturnValue(30);
+      targetResolver.resolveMapPositions.mockResolvedValue({
+        attackerPos: { gridX: 0, gridY: 0 },
+        targetPos: { gridX: 2, gridY: 0 },
+      });
+      targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Ally1' } });
+
+      mock();
+
+      const result = await handle(action, ps, campaignName, mapName);
+
+      expect(result.payload.description).not.toContain('can also move');
+    }
+  });
+
+  it('skips ally resolution when allyRangeFt is null', async () => {
+    const ps = makePlayerStats();
+    const action = makeAction({ effect: 'inspiring_movement' });
+    rangeValidation.rangeToFeet.mockReturnValue(null);
     useRuntimeState.getRuntimeValue.mockReturnValue(0);
-    rangeValidation.rangeToFeet.mockReturnValue(30);
-    targetResolver.resolveMapPositions.mockResolvedValue({ attackerPos: { gridX: 0, gridY: 0 } });
-    targetResolver.resolveTarget.mockResolvedValue(null);
 
     const result = await handle(action, ps, campaignName, mapName);
 
-    expect(result.payload.description).not.toContain('can also move');
-  });
-
-  it('skips ally movement when targetPos is missing from map', async () => {
-    const ps = makePlayerStats({ name: 'Bard' });
-    const action = makeAction({ effect: 'inspiring_movement' });
-
-    useRuntimeState.getRuntimeValue.mockReturnValue(0);
-    rangeValidation.rangeToFeet.mockReturnValue(30);
-    targetResolver.resolveMapPositions.mockResolvedValue({ attackerPos: { gridX: 0, gridY: 0 } });
-    targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Ally1' } });
-
-    const result = await handle(action, ps, campaignName, mapName);
-
-    expect(result.payload.description).not.toContain('can also move');
-  });
-
-  it('skips ally movement when getDistanceFeet returns null', async () => {
-    const ps = makePlayerStats({ name: 'Bard' });
-    const action = makeAction({ effect: 'inspiring_movement' });
-
-    useRuntimeState.getRuntimeValue.mockReturnValue(0);
-    rangeValidation.rangeToFeet.mockReturnValue(30);
-    targetResolver.resolveMapPositions.mockResolvedValue({
-      attackerPos: { gridX: 0, gridY: 0 },
-      targetPos: { gridX: 2, gridY: 0 },
-    });
-    targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Ally1' } });
-    rangeValidation.getDistanceFeet.mockReturnValue(null);
-
-    const result = await handle(action, ps, campaignName, mapName);
-
-    expect(result.payload.description).not.toContain('Ally1 can also move');
-  });
-
-  it('handles resolveMapPositions returning null', async () => {
-    const ps = makePlayerStats({ name: 'Bard' });
-    const action = makeAction({ effect: 'inspiring_movement' });
-
-    useRuntimeState.getRuntimeValue.mockReturnValue(0);
-    rangeValidation.rangeToFeet.mockReturnValue(30);
-    targetResolver.resolveMapPositions.mockResolvedValue(null);
-
-    const result = await handle(action, ps, campaignName, mapName);
-
-    expect(result.payload.description).not.toContain('can also move');
-  });
-
-  it('handles resolveMapPositions returning empty object', async () => {
-    const ps = makePlayerStats({ name: 'Bard' });
-    const action = makeAction({ effect: 'inspiring_movement' });
-
-    useRuntimeState.getRuntimeValue.mockReturnValue(0);
-    rangeValidation.rangeToFeet.mockReturnValue(30);
-    targetResolver.resolveMapPositions.mockResolvedValue({});
-
-    const result = await handle(action, ps, campaignName, mapName);
-
-    expect(result.payload.description).not.toContain('can also move');
-  });
-
-  it('handles targetInfo without target property', async () => {
-    const ps = makePlayerStats({ name: 'Bard' });
-    const action = makeAction({ effect: 'inspiring_movement' });
-
-    useRuntimeState.getRuntimeValue.mockReturnValue(0);
-    rangeValidation.rangeToFeet.mockReturnValue(30);
-    targetResolver.resolveMapPositions.mockResolvedValue({ attackerPos: { gridX: 0, gridY: 0 } });
-    targetResolver.resolveTarget.mockResolvedValue({});
-
-    const result = await handle(action, ps, campaignName, mapName);
-
-    expect(result.payload.description).not.toContain('can also move');
-  });
-
-  it('handles targetInfo.target without name property', async () => {
-    const ps = makePlayerStats({ name: 'Bard' });
-    const action = makeAction({ effect: 'inspiring_movement' });
-
-    useRuntimeState.getRuntimeValue.mockReturnValue(0);
-    rangeValidation.rangeToFeet.mockReturnValue(30);
-    targetResolver.resolveMapPositions.mockResolvedValue({
-      attackerPos: { gridX: 0, gridY: 0 },
-      targetPos: { gridX: 2, gridY: 0 },
-    });
-    targetResolver.resolveTarget.mockResolvedValue({ target: {} });
-
-    const result = await handle(action, ps, campaignName, mapName);
-
-    expect(result.payload.description).not.toContain('can also move');
+    expect(targetResolver.resolveMapPositions).not.toHaveBeenCalled();
+    expect(result.payload.description).not.toContain('Select an ally');
   });
 });
 
@@ -374,36 +284,21 @@ describe('handleInspiringMovement — uses tracking', () => {
     vi.clearAllMocks();
   });
 
-  it('returns early with "no uses remaining" when all uses exhausted (usesMax)', async () => {
+  it('returns early with "no uses remaining" when uses exhausted', async () => {
     const ps = makePlayerStats({});
     const action = makeAction({ effect: 'inspiring_movement', usesMax: 3 });
-
     useRuntimeState.getRuntimeValue.mockReturnValue(0);
 
     const result = await handle(action, ps, campaignName, mapName);
 
-    expect(result.type).toBe('popup');
     expect(result.payload.description).toContain('no uses remaining');
     expect(result.payload.description).toContain('Long Rest');
     expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
   });
 
-  it('returns early with "no uses remaining" when numeric uses match used count', async () => {
-    const ps = makePlayerStats({});
-    const action = makeAction({ effect: 'inspiring_movement', uses: 2, usesMax: null });
-
-    useRuntimeState.getRuntimeValue.mockReturnValue(0);
-
-    const result = await handle(action, ps, campaignName, mapName);
-
-    expect(result.payload.description).toContain('no uses remaining');
-    expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
-  });
-
-  it('decrements uses when not exhausted (usesMax)', async () => {
+  it('decrements uses when not exhausted', async () => {
     const ps = makePlayerStats({ name: 'Bard' });
     const action = makeAction({ effect: 'inspiring_movement', usesMax: 3, resourceKey: 'customUses' });
-
     useRuntimeState.getRuntimeValue.mockReturnValueOnce(1);
 
     await handle(action, ps, campaignName, mapName);
@@ -416,7 +311,6 @@ describe('handleInspiringMovement — uses tracking', () => {
   it('defaults resourceKey to bardicInspirationUses when not provided', async () => {
     const ps = makePlayerStats({ name: 'Bard' });
     const action = makeAction({ effect: 'inspiring_movement', usesMax: 3, resourceKey: null });
-
     useRuntimeState.getRuntimeValue.mockReturnValueOnce(2);
 
     await handle(action, ps, campaignName, mapName);
@@ -429,7 +323,6 @@ describe('handleInspiringMovement — uses tracking', () => {
   it('treats null getRuntimeValue result as max uses (no decrement)', async () => {
     const ps = makePlayerStats({ name: 'Bard' });
     const action = makeAction({ effect: 'inspiring_movement', usesMax: 3 });
-
     useRuntimeState.getRuntimeValue.mockReturnValueOnce(null);
 
     await handle(action, ps, campaignName, mapName);
@@ -442,7 +335,6 @@ describe('handleInspiringMovement — uses tracking', () => {
   it('skips uses tracking when usesMax is 0', async () => {
     const ps = makePlayerStats({ name: 'Bard' });
     const action = makeAction({ effect: 'inspiring_movement', usesMax: 0 });
-
     useRuntimeState.getRuntimeValue.mockReturnValue(0);
 
     await handle(action, ps, campaignName, mapName);
@@ -455,19 +347,7 @@ describe('handleInspiringMovement — uses tracking', () => {
   it('evaluates string expression for usesMax', async () => {
     const ps = makePlayerStats({ proficiency: 2, level: 3 });
     const action = makeAction({ effect: 'inspiring_movement', uses_expression: 'proficiency_bonus' });
-
     useRuntimeState.getRuntimeValue.mockReturnValueOnce(1);
-
-    await handle(action, ps, campaignName, mapName);
-
-    expect(useRuntimeState.setRuntimeValue).toHaveBeenCalled();
-  });
-
-  it('uses level placeholder in expression', async () => {
-    const ps = makePlayerStats({ proficiency: 4, level: 8 });
-    const action = makeAction({ effect: 'inspiring_movement', uses_expression: 'level / 2' });
-
-    useRuntimeState.getRuntimeValue.mockReturnValueOnce(3);
 
     await handle(action, ps, campaignName, mapName);
 
@@ -477,7 +357,6 @@ describe('handleInspiringMovement — uses tracking', () => {
   it('proceeds normally when expression evaluates to 0 (no tracking)', async () => {
     const ps = makePlayerStats({});
     const action = makeAction({ effect: 'inspiring_movement', uses_expression: 'INVALID_EXPR' });
-
     useRuntimeState.getRuntimeValue.mockReturnValue(0);
 
     const result = await handle(action, ps, campaignName, mapName);
@@ -485,45 +364,18 @@ describe('handleInspiringMovement — uses tracking', () => {
     expect(result.type).toBe('popup');
     expect(result.payload.description).not.toContain('no uses remaining');
   });
-
-  it('handles missing level on playerStats for evaluateUses', async () => {
-    const ps = makePlayerStats({});
-    delete ps.level;
-    const action = makeAction({ effect: 'inspiring_movement', uses_expression: 'level * 2' });
-
-    useRuntimeState.getRuntimeValue.mockReturnValue(0);
-
-    const result = await handle(action, ps, campaignName, mapName);
-
-    expect(result.payload.description).toContain('no uses remaining');
-  });
 });
 
-// ── Log entry and payload structure ────────────────────────────
+// ── Log entry ──────────────────────────────────────────────────
 
-describe('handleInspiringMovement — log and payload', () => {
+describe('handleInspiringMovement — log entry', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-  });
-
-  it('returns popup with correct payload structure', async () => {
-    const ps = makePlayerStats({ speed: 30 });
-    const action = makeAction({ effect: 'inspiring_movement' });
-
-    useRuntimeState.getRuntimeValue.mockReturnValue(0);
-
-    const result = await handle(action, ps, campaignName, mapName);
-
-    expect(result.type).toBe('popup');
-    expect(result.payload.type).toBe('automation_info');
-    expect(result.payload.name).toBe('Test Reaction');
-    expect(result.payload.automation).toBe(action.automation);
   });
 
   it('adds log entry without ally when no ally resolved', async () => {
     const ps = makePlayerStats({ name: 'Bard' });
     const action = makeAction({ effect: 'inspiring_movement' });
-
     useRuntimeState.getRuntimeValue.mockReturnValue(0);
     rangeValidation.rangeToFeet.mockReturnValue(30);
     targetResolver.resolveMapPositions.mockResolvedValue(null);
@@ -555,15 +407,5 @@ describe('handleInspiringMovement — log and payload', () => {
         description: 'Bard used Test Reaction. Ally: Ally1.',
       })
     );
-  });
-
-  it('catches and swallows addEntry errors', async () => {
-    const ps = makePlayerStats();
-    const action = makeAction({ effect: 'inspiring_movement' });
-
-    useRuntimeState.getRuntimeValue.mockReturnValue(0);
-    logService.addEntry.mockRejectedValue(new Error('fail'));
-
-    await expect(handle(action, ps, campaignName, mapName)).resolves.toBeDefined();
   });
 });

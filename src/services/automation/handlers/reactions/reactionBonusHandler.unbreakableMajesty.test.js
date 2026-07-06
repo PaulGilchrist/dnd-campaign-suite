@@ -77,35 +77,6 @@ function resetMocks() {
   logService.addEntry.mockResolvedValue({});
 }
 
-// ── Dispatch routing ───────────────────────────────────────────
-
-describe('handle — dispatch routing', () => {
-  beforeEach(() => resetMocks());
-
-  it('routes to Unbreakable Majesty when effect is miss_on_failed_save', async () => {
-    const ps = makePlayerStats();
-    const action = makeAction({ effect: 'miss_on_failed_save' });
-
-    useRuntimeState.getRuntimeValue.mockReturnValue(false);
-
-    const result = await handle(action, ps, campaignName, 'DungeonMap');
-
-    expect(result.type).toBe('popup');
-    expect(result.payload.description).toContain('activated');
-  });
-
-  it('does NOT route to Unbreakable Majesty for other effect types', async () => {
-    const ps = makePlayerStats();
-    const action = makeAction({ effect: 'ac_bonus' });
-
-    const result = await handle(action, ps, campaignName, 'DungeonMap');
-
-    expect(result.type).toBe('popup');
-    expect(result.payload.description).toContain('Proficiency Bonus');
-    expect(result.payload.description).not.toContain('CHA save');
-  });
-});
-
 // ── Deactivation path ──────────────────────────────────────────
 
 describe('handleUnbreakableMajesty — deactivation', () => {
@@ -122,34 +93,6 @@ describe('handleUnbreakableMajesty — deactivation', () => {
     expect(result.type).toBe('popup');
     expect(result.payload.type).toBe('automation_info');
     expect(result.payload.description).toBe('Test Reaction ended.');
-  });
-
-  it('sets unbreakableMajestyActive to null on deactivation', async () => {
-    const ps = makePlayerStats({ name: 'Tyrion' });
-    const action = makeAction({ effect: 'miss_on_failed_save' });
-
-    useRuntimeState.getRuntimeValue.mockReturnValue(true);
-
-    await handle(action, ps, campaignName, 'DungeonMap');
-
-    expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-      'Tyrion', 'unbreakableMajestyActive', null, campaignName
-    );
-  });
-
-  it('does NOT set duration or DC runtime values on deactivation', async () => {
-    const ps = makePlayerStats();
-    const action = makeAction({ effect: 'miss_on_failed_save' });
-
-    useRuntimeState.getRuntimeValue.mockReturnValue(true);
-
-    await handle(action, ps, campaignName, 'DungeonMap');
-
-    const saveDcCall = useRuntimeState.setRuntimeValue.mock.calls.find(
-      c => c[1] === 'unbreakableMajestySaveDc'
-    );
-    expect(saveDcCall).toBeUndefined();
-    expect(expirations.addExpiration).not.toHaveBeenCalled();
   });
 
   it('adds a log entry on deactivation', async () => {
@@ -169,29 +112,6 @@ describe('handleUnbreakableMajesty — deactivation', () => {
         abilityName: 'Unbreakable Majesty',
       })
     );
-  });
-
-  it('popup payload name matches action.name', async () => {
-    const ps = makePlayerStats();
-    const action = makeAction({ effect: 'miss_on_failed_save' });
-    action.name = 'Divine Shield';
-
-    useRuntimeState.getRuntimeValue.mockReturnValue(true);
-
-    const result = await handle(action, ps, campaignName, 'DungeonMap');
-
-    expect(result.payload.name).toBe('Divine Shield');
-  });
-
-  it('popup payload contains automation object', async () => {
-    const ps = makePlayerStats();
-    const action = makeAction({ effect: 'miss_on_failed_save' });
-
-    useRuntimeState.getRuntimeValue.mockReturnValue(true);
-
-    const result = await handle(action, ps, campaignName, 'DungeonMap');
-
-    expect(result.payload.automation).toBe(action.automation);
   });
 
   it('swallows addEntry errors on deactivation without throwing', async () => {
@@ -252,11 +172,9 @@ describe('handleUnbreakableMajesty — activation', () => {
     );
   });
 
-  it('uses DC containing CHA bonus from abilities', async () => {
-    const ps = makePlayerStats({
-      abilities: [{ name: 'Charisma', bonus: 5 }],
-      proficiency: 3,
-    });
+  it('defaults Cha bonus and proficiency to 0 when missing', async () => {
+    const ps = makePlayerStats({ abilities: [] });
+    delete ps.proficiency;
     const action = makeAction({ effect: 'miss_on_failed_save' });
 
     useRuntimeState.getRuntimeValue.mockReturnValue(false);
@@ -264,33 +182,7 @@ describe('handleUnbreakableMajesty — activation', () => {
     await handle(action, ps, campaignName, 'DungeonMap');
 
     expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-      'Paladin', 'unbreakableMajestySaveDc', 16, campaignName
-    );
-  });
-
-  it('defaults Cha bonus to 0 when ability not found', async () => {
-    const ps = makePlayerStats({ abilities: [{ name: 'Strength', bonus: 3 }] });
-    const action = makeAction({ effect: 'miss_on_failed_save' });
-
-    useRuntimeState.getRuntimeValue.mockReturnValue(false);
-
-    await handle(action, ps, campaignName, 'DungeonMap');
-
-    expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-      'Paladin', 'unbreakableMajestySaveDc', 10, campaignName
-    );
-  });
-
-  it('defaults proficiency to 0 when missing', async () => {
-    const ps = makePlayerStats({ abilities: [{ name: 'Charisma', bonus: 3 }], proficiency: undefined });
-    const action = makeAction({ effect: 'miss_on_failed_save' });
-
-    useRuntimeState.getRuntimeValue.mockReturnValue(false);
-
-    await handle(action, ps, campaignName, 'DungeonMap');
-
-    expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-      'Paladin', 'unbreakableMajestySaveDc', 11, campaignName
+      'Paladin', 'unbreakableMajestySaveDc', 8, campaignName
     );
   });
 
@@ -362,45 +254,7 @@ describe('handleUnbreakableMajesty — activation', () => {
     );
   });
 
-  it('activation log description includes DC', async () => {
-    const ps = makePlayerStats();
-    const action = makeAction({ effect: 'miss_on_failed_save', duration: '1_minute' });
-
-    useRuntimeState.getRuntimeValue.mockReturnValue(false);
-
-    await handle(action, ps, campaignName, 'DungeonMap');
-
-    expect(logService.addEntry).toHaveBeenCalledWith(
-      campaignName,
-      expect.objectContaining({
-        description: expect.stringContaining('DC 13'),
-      })
-    );
-  });
-
-  it('activation popup description mentions duration', async () => {
-    const ps = makePlayerStats();
-    const action = makeAction({ effect: 'miss_on_failed_save', duration: '1_minute' });
-
-    useRuntimeState.getRuntimeValue.mockReturnValue(false);
-
-    const result = await handle(action, ps, campaignName, 'DungeonMap');
-
-    expect(result.payload.description).toContain('For 1_minute');
-  });
-
-  it('uses default duration text "1 minute" when auto.duration missing', async () => {
-    const ps = makePlayerStats();
-    const action = makeAction({ effect: 'miss_on_failed_save' });
-
-    useRuntimeState.getRuntimeValue.mockReturnValue(false);
-
-    const result = await handle(action, ps, campaignName, 'DungeonMap');
-
-    expect(result.payload.description).toContain('For 1 minute');
-  });
-
-  it('activation popup mentions Incapacitated as early end condition', async () => {
+  it('activation popup description mentions Incapacitated as early end condition', async () => {
     const ps = makePlayerStats();
     const action = makeAction({ effect: 'miss_on_failed_save', duration: '1_minute' });
 
@@ -453,20 +307,6 @@ describe('handleUnbreakableMajesty — activation', () => {
 
 describe('Unbreakable Majesty DC calculation', () => {
   beforeEach(() => resetMocks());
-
-  it('DC = 8 + Cha bonus (0) + prof (0) when all missing', async () => {
-    const ps = makePlayerStats({ abilities: [] });
-    delete ps.proficiency;
-    const action = makeAction({ effect: 'miss_on_failed_save' });
-
-    useRuntimeState.getRuntimeValue.mockReturnValue(false);
-
-    await handle(action, ps, campaignName, 'DungeonMap');
-
-    expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-      'Paladin', 'unbreakableMajestySaveDc', 8, campaignName
-    );
-  });
 
   it('Cha bonus from ability with no name field uses 0', async () => {
     const ps = makePlayerStats({ abilities: [{ bonus: 5 }] });
@@ -541,19 +381,6 @@ describe('parseDurationRounds via handleUnbreakableMajesty', () => {
       'Paladin', 'Paladin', [{ type: 'unbreakable_majesty' }], campaignName, 10
     );
   });
-
-  it('parses "1_minute" as 10 rounds (exact match)', async () => {
-    const ps = makePlayerStats();
-    const action = makeAction({ effect: 'miss_on_failed_save', duration: '1_minute' });
-
-    useRuntimeState.getRuntimeValue.mockReturnValue(false);
-
-    await handle(action, ps, campaignName, 'DungeonMap');
-
-    expect(expirations.addExpiration).toHaveBeenCalledWith(
-      'Paladin', 'Paladin', [{ type: 'unbreakable_majesty' }], campaignName, 10
-    );
-  });
 });
 
 // ── Null safety ────────────────────────────────────────────────
@@ -564,19 +391,6 @@ describe('Unbreakable Majesty null safety', () => {
   it('handles missing proficiency on playerStats', async () => {
     const ps = makePlayerStats({});
     delete ps.proficiency;
-    const action = makeAction({ effect: 'miss_on_failed_save' });
-
-    useRuntimeState.getRuntimeValue.mockReturnValue(false);
-
-    const result = await handle(action, ps, campaignName, 'DungeonMap');
-
-    expect(result).toBeDefined();
-    expect(result.type).toBe('popup');
-  });
-
-  it('handles missing name on playerStats for getRuntimeValue calls', async () => {
-    const ps = makePlayerStats({});
-    delete ps.name;
     const action = makeAction({ effect: 'miss_on_failed_save' });
 
     useRuntimeState.getRuntimeValue.mockReturnValue(false);
@@ -598,19 +412,5 @@ describe('Unbreakable Majesty null safety', () => {
     expect(result).toBeDefined();
     expect(result.type).toBe('popup');
     expect(result.payload.description).toContain('activated');
-  });
-
-  it('treats non-boolean truthy return as inactive (not === true)', async () => {
-    const ps = makePlayerStats();
-    const action = makeAction({ effect: 'miss_on_failed_save' });
-
-    useRuntimeState.getRuntimeValue.mockReturnValue('truthy');
-
-    const result = await handle(action, ps, campaignName, 'DungeonMap');
-
-    expect(result.payload.description).toContain('activated');
-    expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-      'Paladin', 'unbreakableMajestyActive', true, campaignName
-    );
   });
 });

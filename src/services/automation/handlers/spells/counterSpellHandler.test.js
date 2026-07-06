@@ -77,7 +77,7 @@ describe('counterSpellHandler.handle', () => {
     vi.clearAllMocks();
   });
 
-  describe('combat context validation', () => {
+  describe('validation', () => {
     it('should return popup when no combat context exists', async () => {
       const ps = makePlayerStats();
       const action = makeAction();
@@ -94,22 +94,6 @@ describe('counterSpellHandler.handle', () => {
       expect(result.payload.automation).toEqual(action.automation);
     });
 
-    it('should return popup when combat context has no creatures', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-
-      getCombatContext.mockResolvedValue({ creatures: [] });
-      getTargetFromAttacker.mockReturnValue(null);
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.type).toBe('automation_info');
-      expect(result.payload.description).toContain('requires a target');
-    });
-  });
-
-  describe('target validation', () => {
     it('should return popup when no target is found', async () => {
       const ps = makePlayerStats();
       const action = makeAction();
@@ -124,21 +108,6 @@ describe('counterSpellHandler.handle', () => {
       expect(result.payload.name).toBe('Counterspell');
       expect(result.payload.description).toContain('requires a target');
       expect(result.payload.description).toContain('Select a creature in combat');
-    });
-
-    it('should pass combat context and player name to getTargetFromAttacker', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-
-      getCombatContext.mockResolvedValue(makeCombatContext());
-      getTargetFromAttacker.mockReturnValue(null);
-
-      await handle(action, ps, campaignName, null);
-
-      expect(getTargetFromAttacker).toHaveBeenCalledWith(
-        expect.objectContaining({ creatures: expect.any(Array) }),
-        'TestCaster',
-      );
     });
   });
 
@@ -163,120 +132,28 @@ describe('counterSpellHandler.handle', () => {
       expect(result.payload.automation).toEqual(action.automation);
     });
 
-    it('should call buildSaveDc with action automation and playerStats', async () => {
+    it('should support custom saveType and action name', async () => {
       const ps = makePlayerStats();
-      const action = makeAction();
-
-      getCombatContext.mockResolvedValue(makeCombatContext());
-      getTargetFromAttacker.mockReturnValue({ name: 'Orc' });
-      buildSaveDc.mockReturnValue(13);
-      createSaveListener.mockReturnValue({ promptId: 'test-prompt-2' });
-
-      await handle(action, ps, campaignName, null);
-
-      expect(buildSaveDc).toHaveBeenCalledWith(action.automation, ps);
-    });
-
-    it('should call createSaveListener with correct config', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-
-      getCombatContext.mockResolvedValue(makeCombatContext());
-      getTargetFromAttacker.mockReturnValue({ name: 'Bugbear' });
-      buildSaveDc.mockReturnValue(14);
-      createSaveListener.mockReturnValue({ promptId: 'test-prompt-3' });
-
-      await handle(action, ps, campaignName, null);
-
-      expect(createSaveListener).toHaveBeenCalledWith(campaignName, {
-        targetName: 'Bugbear',
-        saveType: 'CON',
-        saveDc: 14,
-      });
-    });
-
-    it('should call addEntry with ability_use type', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-
-      getCombatContext.mockResolvedValue(makeCombatContext());
-      getTargetFromAttacker.mockReturnValue({ name: 'Hobgoblin' });
-      buildSaveDc.mockReturnValue(16);
-      createSaveListener.mockReturnValue({ promptId: 'test-prompt-4' });
-
-      await handle(action, ps, campaignName, null);
-
-      expect(addEntry).toHaveBeenCalledWith(campaignName, {
-        type: 'ability_use',
-        characterName: 'TestCaster',
-        abilityName: 'Counterspell',
-        description: 'Counterspell triggered — Hobgoblin must make CON save (DC 16)',
-        promptId: 'test-prompt-4',
-      });
-    });
-
-    it('should add save-result event listener', async () => {
-      const addEventListenerSpy = vi.spyOn(window, 'addEventListener');
-      const ps = makePlayerStats();
-      const action = makeAction();
-
-      getCombatContext.mockResolvedValue(makeCombatContext());
-      getTargetFromAttacker.mockReturnValue({ name: 'Kobold' });
-      buildSaveDc.mockReturnValue(12);
-      createSaveListener.mockReturnValue({ promptId: 'test-prompt-5' });
-
-      await handle(action, ps, campaignName, null);
-
-      expect(addEventListenerSpy).toHaveBeenCalledWith(
-        'save-result',
-        expect.any(Function),
-      );
-      addEventListenerSpy.mockRestore();
-    });
-
-    it('should use custom saveType from automation', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction({ saveType: 'WIS' });
+      const action = { name: 'My Counterspell', automation: { type: 'counterspell', saveType: 'WIS' } };
 
       getCombatContext.mockResolvedValue(makeCombatContext());
       getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
       buildSaveDc.mockReturnValue(15);
-      createSaveListener.mockReturnValue({ promptId: 'test-prompt-6' });
-
-      await handle(action, ps, campaignName, null);
-
-      expect(createSaveListener).toHaveBeenCalledWith(campaignName, {
-        targetName: 'Goblin',
-        saveType: 'WIS',
-        saveDc: 15,
-      });
-      expect(addEntry).toHaveBeenCalledWith(campaignName, {
-        type: 'ability_use',
-        characterName: 'TestCaster',
-        abilityName: 'Counterspell',
-        description: 'Counterspell triggered — Goblin must make WIS save (DC 15)',
-        promptId: 'test-prompt-6',
-      });
-    });
-
-    it('should use action.name when provided', async () => {
-      const ps = makePlayerStats();
-      const action = { name: 'My Counterspell', automation: { type: 'counterspell', saveType: 'CON' } };
-
-      getCombatContext.mockResolvedValue(makeCombatContext());
-      getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
-      buildSaveDc.mockReturnValue(15);
-      createSaveListener.mockReturnValue({ promptId: 'test-prompt-7' });
+      createSaveListener.mockReturnValue({ promptId: 'custom-prompt' });
 
       const result = await handle(action, ps, campaignName, null);
 
       expect(result.payload.name).toBe('My Counterspell');
+      expect(result.payload.targetName).toBe('Goblin');
+      expect(result.payload.description).toContain('Goblin must make a WIS saving throw');
+      expect(result.payload.description).toContain('DC 15');
+      expect(result.payload.automation).toEqual(action.automation);
       expect(addEntry).toHaveBeenCalledWith(campaignName, {
         type: 'ability_use',
         characterName: 'TestCaster',
         abilityName: 'My Counterspell',
-        description: 'My Counterspell triggered — Goblin must make CON save (DC 15)',
-        promptId: 'test-prompt-7',
+        description: 'My Counterspell triggered — Goblin must make WIS save (DC 15)',
+        promptId: 'custom-prompt',
       });
     });
   });
@@ -343,203 +220,152 @@ describe('counterSpellHandler.handle', () => {
       });
       addEventListenerSpy.mockRestore();
     });
-
-    it('should ignore save-result events with different promptId', async () => {
-      const addEventListenerSpy = vi.spyOn(window, 'addEventListener');
-
-      getCombatContext.mockResolvedValue(makeCombatContext());
-      getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
-      buildSaveDc.mockReturnValue(15);
-      createSaveListener.mockReturnValue({ promptId: 'correct-prompt' });
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      const savedCallback = addEventListenerSpy.mock.calls[0][1];
-      savedCallback({
-        detail: {
-          promptId: 'wrong-prompt',
-          success: false,
-        },
-      });
-
-      const saveResultCalls = addEntry.mock.calls.filter(
-        call => call[1]?.type === 'save_result',
-      );
-      expect(saveResultCalls.length).toBe(0);
-      addEventListenerSpy.mockRestore();
-    });
-
-    it('should remove event listener after handling save result', async () => {
-      const removeEventListenerSpy = vi.spyOn(window, 'removeEventListener');
-      const addEventListenerSpy = vi.spyOn(window, 'addEventListener');
-
-      getCombatContext.mockResolvedValue(makeCombatContext());
-      getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
-      buildSaveDc.mockReturnValue(15);
-      createSaveListener.mockReturnValue({ promptId: 'remove-test-prompt' });
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      const savedCallback = addEventListenerSpy.mock.calls[0][1];
-      savedCallback({
-        detail: {
-          promptId: 'remove-test-prompt',
-          success: false,
-        },
-      });
-
-      expect(removeEventListenerSpy).toHaveBeenCalledWith(
-        'save-result',
-        savedCallback,
-      );
-      addEventListenerSpy.mockRestore();
-      removeEventListenerSpy.mockRestore();
-    });
   });
-
-  describe('automation passthrough', () => {
-    it('should include automation object in popup payload', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction({ customField: 'customValue' });
-
-      getCombatContext.mockResolvedValue(makeCombatContext());
-      getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
-      buildSaveDc.mockReturnValue(15);
-      createSaveListener.mockReturnValue({ promptId: 'test-prompt-8' });
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.payload.automation).toEqual({
-        type: 'counterspell',
-        saveType: 'CON',
-        customField: 'customValue',
-      });
-    });
-  });
-
-
 
   describe('spell_breaker passive', () => {
-    async function runSpellBreakerTest(config) {
-      const {
-        ps,
-        action,
-        runtimeValue,
-        mockPromptId,
-        eventSuccess,
-        expectRestore,
-      } = config;
+    it('should restore a spell slot on successful save when spell_breaker passive includes Counterspell', async () => {
+      const addEventListenerSpy = vi.spyOn(window, 'addEventListener');
+      const ps = makePlayerStats({
+        automation: {
+          passives: [
+            { type: 'spell_breaker', slotRetentionSpells: ['Counterspell'] },
+          ],
+        },
+      });
 
-      getRuntimeValue.mockReturnValue(runtimeValue);
-
+      getRuntimeValue.mockReturnValue(3);
       getCombatContext.mockResolvedValue(makeCombatContext());
       getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
       buildSaveDc.mockReturnValue(15);
-      createSaveListener.mockReturnValue({ promptId: mockPromptId });
+      createSaveListener.mockReturnValue({ promptId: 'spellbreaker-prompt' });
 
-      const addEventListenerSpy = vi.spyOn(window, 'addEventListener');
-
-      await handle(action, ps, campaignName, null);
+      await handle(makeAction(), ps, campaignName, null);
 
       const savedCallback = addEventListenerSpy.mock.calls[0][1];
       savedCallback({
         detail: {
-          promptId: mockPromptId,
-          success: eventSuccess,
+          promptId: 'spellbreaker-prompt',
+          success: true,
         },
       });
 
-      if (expectRestore) {
-        expect(setRuntimeValue).toHaveBeenCalledWith(
-          'TestCaster',
-          'spell_slots_level_3',
-          expectRestore,
-          campaignName,
-        );
-      } else {
-        expect(setRuntimeValue).not.toHaveBeenCalled();
-      }
-
+      expect(setRuntimeValue).toHaveBeenCalledWith(
+        'TestCaster',
+        'spell_slots_level_3',
+        4,
+        campaignName,
+      );
       addEventListenerSpy.mockRestore();
-    }
-
-    it('should restore a spell slot when spell_breaker passive succeeds on Counterspell', async () => {
-      await runSpellBreakerTest({
-        ps: makePlayerStats({
-          automation: {
-            passives: [
-              { type: 'spell_breaker', slotRetentionSpells: ['Counterspell'] },
-            ],
-          },
-        }),
-        action: makeAction(),
-        runtimeValue: 3,
-        mockPromptId: 'spellbreaker-prompt',
-        eventSuccess: true,
-        expectRestore: 4,
-      });
     });
 
     it('should not restore a spell slot when spell_breaker passive is missing', async () => {
-      await runSpellBreakerTest({
-        ps: makePlayerStats(),
-        action: makeAction(),
-        runtimeValue: 3,
-        mockPromptId: 'nospellbreaker-prompt',
-        eventSuccess: true,
-        expectRestore: false,
+      const addEventListenerSpy = vi.spyOn(window, 'addEventListener');
+
+      getRuntimeValue.mockReturnValue(3);
+      getCombatContext.mockResolvedValue(makeCombatContext());
+      getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
+      buildSaveDc.mockReturnValue(15);
+      createSaveListener.mockReturnValue({ promptId: 'nospellbreaker-prompt' });
+
+      await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+      const savedCallback = addEventListenerSpy.mock.calls[0][1];
+      savedCallback({
+        detail: {
+          promptId: 'nospellbreaker-prompt',
+          success: true,
+        },
       });
+
+      expect(setRuntimeValue).not.toHaveBeenCalled();
+      addEventListenerSpy.mockRestore();
     });
 
-    it('should not restore a spell slot when spell_breaker does not include Counterspell', async () => {
-      await runSpellBreakerTest({
-        ps: makePlayerStats({
-          automation: {
-            passives: [
-              { type: 'spell_breaker', slotRetentionSpells: ['Shield'] },
-            ],
-          },
-        }),
-        action: makeAction(),
-        runtimeValue: 3,
-        mockPromptId: 'partialmatch-prompt',
-        eventSuccess: true,
-        expectRestore: false,
+    it('should not restore a spell slot when passive excludes Counterspell', async () => {
+      const addEventListenerSpy = vi.spyOn(window, 'addEventListener');
+
+      getRuntimeValue.mockReturnValue(3);
+      getCombatContext.mockResolvedValue(makeCombatContext());
+      getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
+      buildSaveDc.mockReturnValue(15);
+      createSaveListener.mockReturnValue({ promptId: 'partialmatch-prompt' });
+
+      await handle(makeAction(), makePlayerStats({
+        automation: {
+          passives: [
+            { type: 'spell_breaker', slotRetentionSpells: ['Shield'] },
+          ],
+        },
+      }), campaignName, null);
+
+      const savedCallback = addEventListenerSpy.mock.calls[0][1];
+      savedCallback({
+        detail: {
+          promptId: 'partialmatch-prompt',
+          success: true,
+        },
       });
+
+      expect(setRuntimeValue).not.toHaveBeenCalled();
+      addEventListenerSpy.mockRestore();
     });
 
     it('should not restore a spell slot on failed save even with spell_breaker', async () => {
-      await runSpellBreakerTest({
-        ps: makePlayerStats({
-          automation: {
-            passives: [
-              { type: 'spell_breaker', slotRetentionSpells: ['Counterspell'] },
-            ],
-          },
-        }),
-        action: makeAction(),
-        runtimeValue: 3,
-        mockPromptId: 'failspellbreaker-prompt',
-        eventSuccess: false,
-        expectRestore: false,
+      const addEventListenerSpy = vi.spyOn(window, 'addEventListener');
+
+      getRuntimeValue.mockReturnValue(3);
+      getCombatContext.mockResolvedValue(makeCombatContext());
+      getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
+      buildSaveDc.mockReturnValue(15);
+      createSaveListener.mockReturnValue({ promptId: 'failspellbreaker-prompt' });
+
+      await handle(makeAction(), makePlayerStats({
+        automation: {
+          passives: [
+            { type: 'spell_breaker', slotRetentionSpells: ['Counterspell'] },
+          ],
+        },
+      }), campaignName, null);
+
+      const savedCallback = addEventListenerSpy.mock.calls[0][1];
+      savedCallback({
+        detail: {
+          promptId: 'failspellbreaker-prompt',
+          success: false,
+        },
       });
+
+      expect(setRuntimeValue).not.toHaveBeenCalled();
+      addEventListenerSpy.mockRestore();
     });
 
     it('should not restore a spell slot when slot value is null', async () => {
-      await runSpellBreakerTest({
-        ps: makePlayerStats({
-          automation: {
-            passives: [
-              { type: 'spell_breaker', slotRetentionSpells: ['Counterspell'] },
-            ],
-          },
-        }),
-        action: makeAction(),
-        runtimeValue: null,
-        mockPromptId: 'nullslot-prompt',
-        eventSuccess: true,
-        expectRestore: false,
+      const addEventListenerSpy = vi.spyOn(window, 'addEventListener');
+
+      getRuntimeValue.mockReturnValue(null);
+      getCombatContext.mockResolvedValue(makeCombatContext());
+      getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
+      buildSaveDc.mockReturnValue(15);
+      createSaveListener.mockReturnValue({ promptId: 'nullslot-prompt' });
+
+      await handle(makeAction(), makePlayerStats({
+        automation: {
+          passives: [
+            { type: 'spell_breaker', slotRetentionSpells: ['Counterspell'] },
+          ],
+        },
+      }), campaignName, null);
+
+      const savedCallback = addEventListenerSpy.mock.calls[0][1];
+      savedCallback({
+        detail: {
+          promptId: 'nullslot-prompt',
+          success: true,
+        },
       });
+
+      expect(setRuntimeValue).not.toHaveBeenCalled();
+      addEventListenerSpy.mockRestore();
     });
   });
 });

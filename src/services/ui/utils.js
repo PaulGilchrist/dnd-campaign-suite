@@ -15,12 +15,7 @@ const utils = {
         }
         return fullName;
     },
-    getFirstName: (fullName) => {
-        if (!fullName || typeof fullName !== 'string') {
-            return 'Unknown';
-        }
-        return fullName;
-    },
+
     guid: () => {
 		return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
             

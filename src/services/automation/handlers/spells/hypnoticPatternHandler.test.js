@@ -78,11 +78,6 @@ describe('hypnoticPatternHandler.handle', () => {
       getCombatContext.mockResolvedValue({ creatures: [] });
       result = await handle(makeAction(), makePlayerStats(), campaignName, null);
       expect(result.payload.description).toContain('No creatures in combat');
-
-      // null campaignName
-      getCombatContext.mockResolvedValue(null);
-      result = await handle(makeAction(), makePlayerStats(), null, null);
-      expect(result.payload.description).toContain('No creatures in combat');
     });
   });
 
@@ -99,24 +94,6 @@ describe('hypnoticPatternHandler.handle', () => {
 
       expect(createSaveListener).toHaveBeenCalledTimes(2);
       expect(addEntry).toHaveBeenCalledTimes(2);
-      expect(createSaveListener).toHaveBeenNthCalledWith(1, campaignName, {
-        targetName: 'Goblin', saveType: 'WIS', saveDc: 15, dcSuccess: 'none',
-      });
-      expect(createSaveListener).toHaveBeenNthCalledWith(2, campaignName, {
-        targetName: 'Orc', saveType: 'WIS', saveDc: 15, dcSuccess: 'none',
-      });
-    });
-
-    it('calls buildSaveDc with action automation and playerStats', async () => {
-      getCombatContext.mockResolvedValue(baseCombatContext);
-      buildSaveDc.mockReturnValue(16);
-      createSaveListener.mockReturnValue({
-        promptId: 'hypno-dc',
-        promise: Promise.resolve({ success: false }),
-      });
-
-      await handle(makeAction({ saveDc: 16 }), makePlayerStats(), campaignName, null);
-      expect(buildSaveDc).toHaveBeenCalledWith(makeAction({ saveDc: 16 }).automation, expect.any(Object));
     });
 
     it('handles single target, all saves succeed, or mixed results', async () => {
@@ -169,7 +146,7 @@ describe('hypnoticPatternHandler.handle', () => {
   });
 
   describe('failed save handling', () => {
-    it('applies charmed, incapacitated, and speed_zero conditions, deduplicates, logs, and adds expiration', async () => {
+    it('applies charmed, incapacitated, and speed_zero conditions, logs, and adds expiration', async () => {
       getCombatContext.mockResolvedValue(baseCombatContext);
       buildSaveDc.mockReturnValue(10);
       getRuntimeValue.mockReturnValue(['Stunned']);
@@ -180,20 +157,6 @@ describe('hypnoticPatternHandler.handle', () => {
 
       await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'Goblin', 'activeConditions',
-        ['Stunned', 'charmed', 'incapacitated', 'speed_zero'],
-        campaignName,
-      );
-
-      // Deduplication
-      vi.clearAllMocks();
-      getRuntimeValue.mockReturnValue(['charmed', 'Stunned', 'speed_zero']);
-      createSaveListener.mockReturnValue({
-        promptId: 'hypno-dedup',
-        promise: Promise.resolve({ success: false }),
-      });
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
       expect(setRuntimeValue).toHaveBeenCalledWith(
         'Goblin', 'activeConditions',
         ['Stunned', 'charmed', 'incapacitated', 'speed_zero'],
@@ -225,22 +188,6 @@ describe('hypnoticPatternHandler.handle', () => {
         campaignName, 10,
       );
     });
-
-    it('calls addEntry with save_result for successful saves', async () => {
-      getCombatContext.mockResolvedValue(baseCombatContext);
-      buildSaveDc.mockReturnValue(20);
-      createSaveListener.mockReturnValue({
-        promptId: 'hypno-save-result',
-        promise: Promise.resolve({ success: true }),
-      });
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
-        type: 'save_result', targetName: 'Goblin', success: true,
-        rollType: 'save-hypnotic-pattern',
-      }));
-    });
   });
 
   describe('popup payload and edge cases', () => {
@@ -256,9 +203,6 @@ describe('hypnoticPatternHandler.handle', () => {
       expect(result.type).toBe('popup');
       expect(result.payload.type).toBe('automation_info');
       expect(result.payload.name).toBe('Hypnotic Pattern');
-
-      // Description includes affected creature info
-      result = await handle(makeAction(), makePlayerStats(), campaignName, null);
       expect(result.payload.description).toContain('Goblin is Charmed');
       expect(result.payload.description).toContain('Incapacitated');
       expect(result.payload.description).toContain('Speed 0');

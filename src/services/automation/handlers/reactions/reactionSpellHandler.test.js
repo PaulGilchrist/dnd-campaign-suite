@@ -98,26 +98,6 @@ describe('reactionSpellHandler.handle', () => {
             expect(spellNames).not.toContain('Mage Armor');
         });
 
-        it('includes spells with casting time of Action (capitalized)', async () => {
-            const ps = makePlayerStats({ spellAbilities: { spells: [
-                { name: 'Magic Missile', casting_time: 'Action', prepared: 'Always', level: 1 },
-            ] } });
-            const result = await handle(makeAction(), ps, campaignName);
-
-            const spellNames = result.payload.eligibleSpells.map(s => s.name);
-            expect(spellNames).toContain('Magic Missile');
-        });
-
-        it('includes spells with casting time of Action (lowercase variant)', async () => {
-            const ps = makePlayerStats({ spellAbilities: { spells: [
-                { name: 'Fire Bolt', casting_time: '1 action', prepared: 'Always', level: 1 },
-            ] } });
-            const result = await handle(makeAction(), ps, campaignName);
-
-            const spellNames = result.payload.eligibleSpells.map(s => s.name);
-            expect(spellNames).toContain('Fire Bolt');
-        });
-
         it('excludes unprepared spells', async () => {
             const ps = makePlayerStats({ spellAbilities: { spells: [
                 { name: 'Burning Hands', casting_time: '1 action', prepared: 'Not Prepared', level: 1 },

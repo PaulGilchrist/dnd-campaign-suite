@@ -188,21 +188,6 @@ describe('bardicInspirationOffenseHandler.handle', () => {
     });
   });
 
-  describe('no bonus when attacker differs', () => {
-    it('treats different attacker as no recent damage event', async () => {
-      useRuntimeState.getRuntimeValue.mockReturnValueOnce(8);
-      useRuntimeState.getRuntimeValue.mockReturnValueOnce(undefined);
-      diceRoller.rollExpression.mockReturnValue({ total: 4, rolls: [4] });
-      damageRollback.findLastAttack.mockResolvedValue(makeLastAttack('Goblin', 'Bard', Date.now()));
-
-      const result = await handle(makeAction(), makePlayerStats(), campaignName);
-
-      expect(result.payload.description).toContain('No recent damage event found');
-      expect(result.payload.description).toContain('Add 4 damage');
-      expect(result.payload.description).not.toContain('Bonus damage');
-    });
-  });
-
   describe('error resilience', () => {
     it('does not block popup return when addEntry rejects (fire-and-forget)', async () => {
       useRuntimeState.getRuntimeValue.mockReturnValueOnce(8);

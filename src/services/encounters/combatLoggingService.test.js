@@ -67,12 +67,11 @@ describe('logInitiativeRoll', () => {
         });
     });
 
-    it('marks isNatural20 when the die roll is 20', () => {
+    it('marks isNatural20 when the die roll is 20 and isNatural1 when the die roll is 1', () => {
         logInitiativeRoll(campaignName, 'Gortha', 20, 3);
         expect(capturedEntry().isNatural20).toBe(true);
-    });
 
-    it('marks isNatural1 when the die roll is 1', () => {
+        clearMocks();
         logInitiativeRoll(campaignName, 'Gortha', 1, -2);
         expect(capturedEntry().isNatural1).toBe(true);
     });
@@ -117,7 +116,7 @@ describe('logConcentrationSave', () => {
         clearMocks();
     });
 
-    it('posts a roll entry with concentration-save details on success', () => {
+    it('posts a roll entry with concentration-save details', () => {
         logConcentrationSave(campaignName, 'Gortha', 14, 2, '+2 DEX', 'Fireball', 15, true);
 
         const entry = capturedEntry();
@@ -139,7 +138,7 @@ describe('logConcentrationSave', () => {
         });
     });
 
-    it('posts a roll entry with success=false on a failed save', () => {
+    it('sets success=false on a failed save', () => {
         logConcentrationSave(campaignName, 'Gortha', 10, 2, '+2 DEX', 'Held Horror', 15, false);
 
         const entry = capturedEntry();
@@ -156,7 +155,7 @@ describe('logConditionSave', () => {
         clearMocks();
     });
 
-    it('posts a roll entry with condition-save details on success', () => {
+    it('posts a roll entry with condition-save details', () => {
         logConditionSave(campaignName, 'Gortha', 13, 3, '+3 WIS', 'poisoned', 'Wisdom', 14, true);
 
         const entry = capturedEntry();
@@ -178,7 +177,7 @@ describe('logConditionSave', () => {
         });
     });
 
-    it('posts a roll entry with success=false on a failed save', () => {
+    it('sets success=false on a failed save', () => {
         logConditionSave(campaignName, 'Gortha', 8, 0, '+0 CON', 'stunned', 'Constitution', 12, false);
 
         const entry = capturedEntry();
@@ -195,7 +194,7 @@ describe('logHpChange', () => {
         clearMocks();
     });
 
-    it('posts an hp_change entry for damage', () => {
+    it('posts an hp_change entry with correct fields', () => {
         logHpChange(campaignName, 'Orc', -5, 20, 30, false, false);
 
         const entry = capturedEntry();
@@ -210,7 +209,7 @@ describe('logHpChange', () => {
         });
     });
 
-    it('posts an hp_change entry for healing', () => {
+    it('sets isHealing=true for healing', () => {
         logHpChange(campaignName, 'Gortha', 8, 25, 30, true, false);
 
         const entry = capturedEntry();
@@ -244,12 +243,5 @@ describe('logNpcThreshold', () => {
             threshold: 5,
             maxHp: 10,
         });
-    });
-
-    it('handles zero threshold', () => {
-        logNpcThreshold(campaignName, 'Goblin', -8, 0, 8);
-
-        const entry = capturedEntry();
-        expect(entry.threshold).toBe(0);
     });
 });

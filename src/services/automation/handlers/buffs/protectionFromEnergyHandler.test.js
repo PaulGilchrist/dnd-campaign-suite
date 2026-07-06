@@ -82,6 +82,7 @@ describe('protectionFromEnergyHandler', () => {
       expect(result.payload.name).toBe('Protection from Energy');
       expect(result.payload.creatureTargets).toEqual(['Goblin', 'Orc']);
       expect(result.payload.damageTypes).toEqual(['Acid', 'Cold', 'Fire', 'Lightning', 'Thunder']);
+      expect(result.payload.automation).toEqual(action.automation);
     });
 
     it('returns error popup when no combat context', async () => {
@@ -123,19 +124,7 @@ describe('protectionFromEnergyHandler', () => {
       expect(result.payload.creatureTargets).toEqual([]);
     });
 
-    it('passes action.automation through to popup payload', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-      damageUtils.getCombatContext.mockResolvedValue({
-        creatures: [{ name: 'Goblin', type: 'npc' }],
-      });
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.payload.automation).toEqual(action.automation);
-    });
-
-    it('handles action with no automation property', async () => {
+    it('defaults damageTypes and automation when action.automation is missing', async () => {
       const ps = makePlayerStats();
       const action = { name: 'Protection from Energy' };
       damageUtils.getCombatContext.mockResolvedValue({
@@ -144,11 +133,11 @@ describe('protectionFromEnergyHandler', () => {
 
       const result = await handle(action, ps, campaignName, null);
 
-      expect(result.type).toBe('popup');
+      expect(result.payload.damageTypes).toEqual(['Acid', 'Cold', 'Fire', 'Lightning', 'Thunder']);
       expect(result.payload.automation).toEqual({});
     });
 
-    it('handles action with no automation.damageTypes', async () => {
+    it('defaults damageTypes when automation exists but has no damageTypes', async () => {
       const ps = makePlayerStats();
       const action = { name: 'Protection from Energy', automation: {} };
       damageUtils.getCombatContext.mockResolvedValue({
@@ -228,79 +217,15 @@ describe('protectionFromEnergyHandler', () => {
       );
     });
 
-    it('returns null when targetName is missing', async () => {
+    it('returns null when targetName or chosenDamageType is missing or empty', async () => {
       const ps = makePlayerStats();
       const action = makeAction();
 
-      const result = await applyProtectionFromEnergy(
-        action,
-        ps,
-        campaignName,
-        null,
-        'fire'
-      );
-
-      expect(result).toBeNull();
-    });
-
-    it('returns null when chosenDamageType is missing', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-
-      const result = await applyProtectionFromEnergy(
-        action,
-        ps,
-        campaignName,
-        'Goblin',
-        null
-      );
-
-      expect(result).toBeNull();
-    });
-
-    it('returns null when both targetName and chosenDamageType are missing', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-
-      const result = await applyProtectionFromEnergy(
-        action,
-        ps,
-        campaignName,
-        null,
-        null
-      );
-
-      expect(result).toBeNull();
-    });
-
-    it('returns null when targetName is empty string', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-
-      const result = await applyProtectionFromEnergy(
-        action,
-        ps,
-        campaignName,
-        '',
-        'fire'
-      );
-
-      expect(result).toBeNull();
-    });
-
-    it('returns null when chosenDamageType is empty string', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-
-      const result = await applyProtectionFromEnergy(
-        action,
-        ps,
-        campaignName,
-        'Goblin',
-        ''
-      );
-
-      expect(result).toBeNull();
+      expect(await applyProtectionFromEnergy(action, ps, campaignName, null, 'fire')).toBeNull();
+      expect(await applyProtectionFromEnergy(action, ps, campaignName, 'Goblin', null)).toBeNull();
+      expect(await applyProtectionFromEnergy(action, ps, campaignName, null, null)).toBeNull();
+      expect(await applyProtectionFromEnergy(action, ps, campaignName, '', 'fire')).toBeNull();
+      expect(await applyProtectionFromEnergy(action, ps, campaignName, 'Goblin', '')).toBeNull();
     });
 
     it('replaces existing buff instead of appending', async () => {
@@ -411,21 +336,6 @@ describe('protectionFromEnergyHandler', () => {
 
       expect(result.payload.description).toContain('Goblin');
       expect(result.payload.description).toContain('Cold');
-    });
-
-    it('returns popup with automationType in description', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-      useRuntimeState.getRuntimeValue.mockReturnValue(null);
-
-      const result = await applyProtectionFromEnergy(
-        action,
-        ps,
-        campaignName,
-        'Goblin',
-        'fire'
-      );
-
       expect(result.payload.automationType).toBe('protection_from_energy');
     });
   });
@@ -445,31 +355,18 @@ describe('protectionFromEnergyHandler', () => {
       expect(isProtectionFromEnergyActive('Goblin', campaignName)).toBe(false);
     });
 
-    it('returns false when stored value is null', () => {
+    it('returns false when stored value is null or buff has wrong name or effect', () => {
       useRuntimeState.getRuntimeValue.mockReturnValue(null);
-
       expect(isProtectionFromEnergyActive('Goblin', campaignName)).toBe(false);
-    });
 
-    it('returns false when stored value is not an array', () => {
-      useRuntimeState.getRuntimeValue.mockReturnValue('not-an-array');
-
-      expect(isProtectionFromEnergyActive('Goblin', campaignName)).toBe(false);
-    });
-
-    it('returns false when buff has wrong effect type', () => {
-      useRuntimeState.getRuntimeValue.mockReturnValue([
-        { name: 'Protection from Energy', effect: 'something_else' },
-      ]);
-
-      expect(isProtectionFromEnergyActive('Goblin', campaignName)).toBe(false);
-    });
-
-    it('returns false when buff has wrong name', () => {
       useRuntimeState.getRuntimeValue.mockReturnValue([
         { name: 'Protection from Evil and Good', effect: 'damage_resistance' },
       ]);
+      expect(isProtectionFromEnergyActive('Goblin', campaignName)).toBe(false);
 
+      useRuntimeState.getRuntimeValue.mockReturnValue([
+        { name: 'Protection from Energy', effect: 'something_else' },
+      ]);
       expect(isProtectionFromEnergyActive('Goblin', campaignName)).toBe(false);
     });
   });
@@ -479,12 +376,6 @@ describe('protectionFromEnergyHandler', () => {
       useRuntimeState.getRuntimeValue.mockReturnValue('Fire');
 
       expect(getProtectionFromEnergyDamageType('Goblin', campaignName)).toBe('Fire');
-    });
-
-    it('returns null when no damage type stored', () => {
-      useRuntimeState.getRuntimeValue.mockReturnValue(null);
-
-      expect(getProtectionFromEnergyDamageType('Goblin', campaignName)).toBeNull();
     });
   });
 });

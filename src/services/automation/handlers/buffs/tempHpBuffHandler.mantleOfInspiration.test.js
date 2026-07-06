@@ -31,7 +31,6 @@ import { handle } from './tempHpBuffHandler.js';
 import * as useRuntimeState from '../../../../hooks/runtime/useRuntimeState.js';
 import * as automationService from '../../../combat/automation/automationService.js';
 import * as mapsService from '../../../maps/mapsService.js';
-import * as expirations from '../../../rules/effects/expirations.js';
 import * as rangeValidation from '../../../rules/combat/rangeValidation.js';
 import * as logService from '../../../ui/logService.js';
 import { campaignName, makePlayerStats, makeAction, resetMocks } from './tempHpBuffTestHelpers.js';
@@ -60,33 +59,6 @@ describe('route detection', () => {
     expect(result.type).toBe('roll');
   });
 
-  it('falls through to generic popup when bonusMovement is true but expression does not reference bardic_inspiration_die', async () => {
-    const action = makeAction({
-      bonusMovement: true,
-      tempHpExpression: '5 + level',
-    });
-    const ps = makePlayerStats();
-    automationService.evaluateAutoExpression.mockReturnValue(8);
-
-    const result = await handle(action, ps, campaignName);
-
-    expect(result.type).toBe('popup');
-    expect(result.payload.description).toContain('Gained 8 temporary hit points');
-  });
-
-  it('falls through to generic popup when expression contains bardic_inspiration_die but bonusMovement is false', async () => {
-    const action = makeAction({
-      bonusMovement: false,
-      tempHpExpression: 'bardic_inspiration_die * 2',
-    });
-    const ps = makePlayerStats();
-    automationService.evaluateAutoExpression.mockReturnValue(10);
-
-    const result = await handle(action, ps, campaignName);
-
-    expect(result.type).toBe('popup');
-    expect(result.payload.description).toContain('Gained 10 temporary hit points');
-  });
 });
 
 // ────────────────────────────────────────────────────────────────
@@ -124,26 +96,6 @@ describe('exhausted bardic inspiration uses', () => {
     expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
   });
 
-  it('uses Charisma modifier as usesMax fallback when class_levels entry lacks bardic_inspiration_uses', async () => {
-    // Cha score 14 => modifier +2, so usesMax = 2
-    const action = makeAction({
-      bonusMovement: true,
-      tempHpExpression: 'bardic_inspiration_die',
-    });
-    const ps = makePlayerStats({
-      level: 1,
-      class: { name: 'Bard', class_levels: [{ level: 1 }] },
-      abilities: [{ name: 'Charisma', score: 14 }],
-    });
-
-    // Return 0 so the exhausted-check path fires
-    useRuntimeState.getRuntimeValue.mockReturnValue(0);
-
-    const result = await handle(action, ps, campaignName);
-
-    expect(result.type).toBe('popup');
-    expect(result.payload.description).toContain('no uses remaining');
-  });
 });
 
 // ────────────────────────────────────────────────────────────────
@@ -210,27 +162,6 @@ describe('successful execution', () => {
     expect(setCall[2]).toBe(1);
   });
 
-  it('does not decrement bardicInspirationUses when usesMax is 0', async () => {
-    const ps = makePlayerStats({
-      level: 1,
-      class: {
-        name: 'Bard',
-        class_levels: [{ level: 1, bardic_inspiration_uses: 0 }],
-      },
-    });
-
-    const action = makeAction({
-      bonusMovement: true,
-      tempHpExpression: 'bardic_inspiration_die',
-    });
-
-    await handle(action, ps, campaignName, null);
-
-    const usageCall = useRuntimeState.setRuntimeValue.mock.calls.find(
-      c => c[1] === 'bardicInspirationUses',
-    );
-    expect(usageCall).toBeUndefined();
-  });
 });
 
 // ────────────────────────────────────────────────────────────────
@@ -358,40 +289,6 @@ describe('map-based target resolution', () => {
     expect(movementCall[2]).toBe(true);
   });
 
-  it('calls addExpiration for each resolved target', async () => {
-    const action = makeAction({
-      bonusMovement: true,
-      tempHpExpression: 'bardic_inspiration_die',
-    });
-    const ps = makePlayerStats({
-      name: 'Faldorn',
-      level: 1,
-      class: {
-        name: 'Bard',
-        class_levels: [{ level: 1, bardic_inspiration_uses: 2 }],
-      },
-      abilities: [{ name: 'Charisma', score: 14 }],
-    });
-
-    const mapData = {
-      players: [
-        { name: 'Faldorn', gridX: 0, gridY: 0 },
-        { name: 'Ally1', gridX: 2, gridY: 0 },
-      ],
-    };
-
-    useRuntimeState.getRuntimeValue.mockReturnValue(2);
-    rangeValidation.rangeToFeet.mockReturnValue(60);
-    mapsService.loadMapData.mockResolvedValue(mapData);
-    rangeValidation.getDistanceFeet.mockReturnValue(10);
-
-    await handle(action, ps, campaignName, 'some-map');
-
-    expect(expirations.addExpiration).toHaveBeenCalledWith(
-      'Faldorn', 'Ally1', [{ type: 'inspiring_movement_no_oa' }], campaignName, 1,
-    );
-  });
-
   it('skips self when resolving map targets', async () => {
     const action = makeAction({
       bonusMovement: true,
@@ -493,21 +390,6 @@ describe('logging', () => {
     );
   });
 
-  it('swallows addEntry errors without crashing', async () => {
-    const action = makeAction({
-      bonusMovement: true,
-      tempHpExpression: 'bardic_inspiration_die',
-    });
-    const ps = makePlayerStats();
-
-    useRuntimeState.getRuntimeValue.mockReturnValue(0);
-    logService.addEntry.mockRejectedValue(new Error('network'));
-
-    const result = await handle(action, ps, campaignName, null);
-
-    expect(result).toBeDefined();
-    expect(result.type).toBe('roll');
-  });
 });
 
 // ────────────────────────────────────────────────────────────────

@@ -20,19 +20,14 @@ describe('getDistanceFeet', () => {
     expect(getDistanceFeet({ gridX: 0, gridY: 0 }, undefined)).toBeNull()
   })
 
-  it('returns 0 for same position', () => {
+  it('returns 0 for same position, converts grid distance to feet, computes diagonal distance', () => {
     expect(getDistanceFeet({ gridX: 5, gridY: 5 }, { gridX: 5, gridY: 5 })).toBe(0)
-  })
-
-  it('converts grid distance to feet (1 cell = 5 ft)', () => {
     expect(getDistanceFeet({ gridX: 0, gridY: 0 }, { gridX: 2, gridY: 0 })).toBe(10)
     expect(getDistanceFeet({ gridX: 0, gridY: 0 }, { gridX: 0, gridY: 3 })).toBe(15)
-  })
-
-  it('computes diagonal distance using Euclidean formula', () => {
     expect(getDistanceFeet({ gridX: 0, gridY: 0 }, { gridX: 3, gridY: 4 })).toBeCloseTo(25)
     expect(getDistanceFeet({ gridX: 0, gridY: 0 }, { gridX: 1, gridY: 1 })).toBeCloseTo(5 * Math.sqrt(2))
   })
+
 })
 
 describe('rangeToFeet', () => {
@@ -43,7 +38,7 @@ describe('rangeToFeet', () => {
     expect(rangeToFeet(-10)).toBe(-10)
   })
 
-  it('converts special strings: Touch, Self, Sight, Unlimited, Special', () => {
+  it('converts special strings: Touch (8), Self/Special (null), Sight/Unlimited (Infinity)', () => {
     expect(rangeToFeet('Touch')).toBe(8)
     expect(rangeToFeet('touch')).toBe(8)
     expect(rangeToFeet('Self')).toBeNull()
@@ -114,7 +109,6 @@ describe('computeRangeEffect', () => {
     expect(miss.mode).toBe('miss')
     expect(miss.reason).toContain('out of melee range')
 
-    // includes actual distance and effective range in reason
     const miss2 = computeRangeEffect(5, 12)
     expect(miss2.reason).toContain('12 ft')
     expect(miss2.reason).toContain('8 ft')
@@ -128,17 +122,12 @@ describe('computeRangeEffect', () => {
   })
 
   it('handles Touch as melee range and ranged spell range with normal/disadvantage/miss', () => {
-    // Touch adjacent
     expect(computeRangeEffect('Touch', 0)).toEqual({ mode: 'normal' })
     expect(computeRangeEffect('Touch', 8)).toEqual({ mode: 'normal' })
-    // Touch beyond
     expect(computeRangeEffect('Touch', 10).mode).toBe('miss')
 
-    // Ranged: normal within range
     expect(computeRangeEffect('120 feet', 50).mode).toBe('normal')
-    // disadvantage beyond normal
     expect(computeRangeEffect('120 feet', 150).mode).toBe('disadvantage')
-    // miss beyond double
     expect(computeRangeEffect('120 feet', 250).mode).toBe('miss')
   })
 

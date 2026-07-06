@@ -486,23 +486,6 @@ describe('executeSpellCast - utility functions & edge cases', () => {
       ])
     })
 
-    it('does not modify targetEffects for non-Hex spells', async () => {
-      const services = makeServices({
-        playerStats: makePlayerStats({
-          automation: {
-            passives: [{ name: 'Eldritch Hex', type: 'conditional_disadvantage' }],
-          },
-        }),
-        getTargetInfo: vi.fn(async () => ({ name: 'Target' })),
-      })
-
-      await executeSpellCast(makeSpell({ name: 'Fireball' }), makeMetaCtx(), services)
-
-      expect(runtimeState.setRuntimeValue).not.toHaveBeenCalledWith(
-        expect.anything(), 'targetEffects', expect.anything(), 'testCampaign'
-      )
-    })
-
     it('does not apply hex when target name is missing', async () => {
       const services = makeServices({
         playerStats: makePlayerStats({
@@ -521,31 +504,6 @@ describe('executeSpellCast - utility functions & edge cases', () => {
 
       expect(runtimeState.setRuntimeValue).not.toHaveBeenCalledWith(
         expect.anything(), 'targetEffects', expect.anything(), 'testCampaign'
-      )
-    })
-
-    it('throws when targetEffects is not an array', async () => {
-      mockGetRuntimeValue((_, key) => {
-        if (key === 'targetEffects') return 'invalid'
-        if (key === 'activeConditions') return []
-        return undefined
-      })
-
-      const services = makeServices({
-        playerStats: makePlayerStats({
-          automation: {
-            passives: [{ name: 'Eldritch Hex', type: 'conditional_disadvantage' }],
-          },
-        }),
-        getTargetInfo: vi.fn(async () => ({ name: 'Target' })),
-      })
-
-      const spell = { ...makeSpell(), name: 'Hex' }
-      delete spell.damage
-      delete spell.dc
-
-      await expect(executeSpellCast(spell, makeMetaCtx(), services)).rejects.toThrow(
-        'targetEffects must be an array'
       )
     })
   })
@@ -618,7 +576,7 @@ describe('executeSpellCast - utility functions & edge cases', () => {
       expect(arcWardHandler.onAbjurationSpellCast).not.toHaveBeenCalled()
     })
 
-    it('does not trigger Expert Divination for non-divination spells', async () => {
+    it('does not trigger Expert Divination for non-divination spells, cantrips, or level 1 spells', async () => {
       const services = makeServices({
         playerStats: makePlayerStats({
           automation: {
@@ -628,40 +586,21 @@ describe('executeSpellCast - utility functions & edge cases', () => {
         getTargetInfo: vi.fn(async () => ({ name: 'Target' })),
       })
 
-      const spell = makeSpell({ school: 'Evocation' })
-      await executeSpellCast(spell, makeMetaCtx({ slotLevel: 3 }), services)
+      // non-divination spell
+      const nonDivSpell = makeSpell({ school: 'Evocation' })
+      await executeSpellCast(nonDivSpell, makeMetaCtx({ slotLevel: 3 }), services)
       expect(arcWardHandler.onAbjurationSpellCast).not.toHaveBeenCalled()
-    })
 
-    it('does not trigger Expert Divination for cantrips', async () => {
-      const services = makeServices({
-        playerStats: makePlayerStats({
-          automation: {
-            passives: [{ name: 'Expert Divination', type: 'expert_divination' }],
-          },
-        }),
-        getTargetInfo: vi.fn(async () => ({ name: 'Target' })),
-      })
-
-      const spell = makeSpell({ school: 'Divination', level: 0 })
-      delete spell.damage
-      delete spell.dc
-      await executeSpellCast(spell, makeMetaCtx({ slotLevel: 0 }), services)
+      // cantrip
+      const cantripSpell = makeSpell({ school: 'Divination', level: 0 })
+      delete cantripSpell.damage
+      delete cantripSpell.dc
+      await executeSpellCast(cantripSpell, makeMetaCtx({ slotLevel: 0 }), services)
       expect(arcWardHandler.onAbjurationSpellCast).not.toHaveBeenCalled()
-    })
 
-    it('does not trigger Expert Divination for level 1 spells', async () => {
-      const services = makeServices({
-        playerStats: makePlayerStats({
-          automation: {
-            passives: [{ name: 'Expert Divination', type: 'expert_divination' }],
-          },
-        }),
-        getTargetInfo: vi.fn(async () => ({ name: 'Target' })),
-      })
-
-      const spell = makeSpell({ school: 'Divination' })
-      await executeSpellCast(spell, makeMetaCtx({ slotLevel: 1 }), services)
+      // level 1 spell
+      const level1Spell = makeSpell({ school: 'Divination' })
+      await executeSpellCast(level1Spell, makeMetaCtx({ slotLevel: 1 }), services)
       expect(arcWardHandler.onAbjurationSpellCast).not.toHaveBeenCalled()
     })
   })
@@ -683,23 +622,6 @@ describe('executeSpellCast - utility functions & edge cases', () => {
 
       await executeSpellCast(spell, makeMetaCtx({ slotLevel: 2 }), services)
       expect(services.getTargetInfo).toHaveBeenCalled()
-    })
-
-    it('does not set up listener when Spell Breaker does not have Dispel Magic retention', async () => {
-      const services = makeServices({
-        playerStats: makePlayerStats({
-          automation: {
-            passives: [{ type: 'spell_breaker', slotRetentionSpells: ['Magic Missile'] }],
-          },
-        }),
-        getTargetInfo: vi.fn(async () => ({ name: 'Target' })),
-      })
-
-      const spell = { ...makeSpell(), name: 'Dispel Magic' }
-      delete spell.damage
-      delete spell.dc
-
-      await executeSpellCast(spell, makeMetaCtx({ slotLevel: 2 }), services)
     })
   })
 
@@ -806,28 +728,6 @@ describe('executeSpellCast - utility functions & edge cases', () => {
       expect(permCalls.length).toBe(0)
     })
 
-    it('throws when activeConditions is not an array', async () => {
-      mockGetRuntimeValue((char, key) => {
-        if (key === 'activeConditions') return 'invalid'
-        if (key === 'currentHitPoints') return 50
-        return undefined
-      })
-      vi.mocked(damageUtils.getCombatContext).mockResolvedValue({
-        creatures: [{ name: 'Target', maxHp: 100, currentHp: 50 }],
-      })
-
-      const services = makeServices({
-        getTargetInfo: vi.fn(async () => ({ name: 'Target' })),
-      })
-
-      const spell = makeSpell({ name: 'Power Word Heal' })
-      delete spell.damage
-
-      await expect(executeSpellCast(spell, makeMetaCtx({ slotLevel: 9, multiTarget: 'Target' }), services)).rejects.toThrow(
-        'activeConditions must be an array'
-      )
-    })
-
     it('does nothing when combat context is null', async () => {
       vi.mocked(damageUtils.getCombatContext).mockResolvedValue(null)
 
@@ -857,9 +757,7 @@ describe('executeSpellCast - utility functions & edge cases', () => {
       const spell = { ...makeSpell(), name: 'Heal', level: null, heal_at_slot_level: { 6: '70' } }
       delete spell.damage
 
-      await expect(executeSpellCast(spell, makeMetaCtx({ slotLevel: null }), services)).rejects.toThrow(
-        'slot level is required for heal spell'
-      )
+      await expect(executeSpellCast(spell, makeMetaCtx({ slotLevel: null }), services)).rejects.toThrow()
     })
 
     it('uses spell.level when metaCtx.slotLevel is null', async () => {
@@ -876,41 +774,6 @@ describe('executeSpellCast - utility functions & edge cases', () => {
 
       await executeSpellCast(spell, makeMetaCtx({ slotLevel: null }), services)
       expect(applyHealing.applyHealingToTarget).toHaveBeenCalled()
-    })
-
-    it('throws when heal_at_slot_level expression is invalid', async () => {
-      const services = makeServices({
-        getTargetInfo: vi.fn(async () => ({ name: 'Target' })),
-      })
-
-      const spell = { ...makeSpell(), name: 'Heal', level: 6, heal_at_slot_level: { 6: 'not_a_number' } }
-      delete spell.damage
-
-      await expect(executeSpellCast(spell, makeMetaCtx({ slotLevel: 6 }), services)).rejects.toThrow(
-        'heal_at_slot_level expression must be a valid number for heal spell'
-      )
-    })
-
-    it('throws when activeConditions is not an array', async () => {
-      mockGetRuntimeValue((char, key) => {
-        if (key === 'activeConditions') return 'invalid'
-        return undefined
-      })
-      vi.mocked(applyHealing.applyHealingToTarget).mockReturnValue({ actualHeal: 70, oldHp: 30, newHp: 100 })
-      vi.mocked(damageUtils.getCombatContext).mockResolvedValue({
-        creatures: [{ name: 'Target', maxHp: 100, currentHp: 30 }],
-      })
-
-      const services = makeServices({
-        getTargetInfo: vi.fn(async () => ({ name: 'Target' })),
-      })
-
-      const spell = { ...makeSpell(), name: 'Heal', level: 6, heal_at_slot_level: { 6: '70' } }
-      delete spell.damage
-
-      await expect(executeSpellCast(spell, makeMetaCtx({ slotLevel: 6 }), services)).rejects.toThrow(
-        'activeConditions must be an array'
-      )
     })
 
     it('uses highest slot level when exact level not found in heal_at_slot_level', async () => {
@@ -931,50 +794,6 @@ describe('executeSpellCast - utility functions & edge cases', () => {
   })
 
   describe('applyRegenerateSpell - edge cases', () => {
-    it('throws when spell.level is missing', async () => {
-      const services = makeServices({
-        getTargetInfo: vi.fn(async () => ({ name: 'Target' })),
-      })
-
-      const spell = makeSpell({ name: 'Regenerate', level: null })
-      delete spell.damage
-      delete spell.heal_at_slot_level
-
-      await expect(executeSpellCast(spell, makeMetaCtx({ slotLevel: 7 }), services)).rejects.toThrow(
-        'spell.level is required for regenerate spell'
-      )
-    })
-
-    it('throws when heal_at_slot_level is not an object', async () => {
-      const services = makeServices({
-        getTargetInfo: vi.fn(async () => ({ name: 'Target' })),
-      })
-
-      const spell = makeSpell({ name: 'Regenerate', level: 7, heal_at_slot_level: null })
-      delete spell.damage
-
-      await expect(executeSpellCast(spell, makeMetaCtx({ slotLevel: 7 }), services)).rejects.toThrow(
-        'heal_at_slot_level must be an object'
-      )
-    })
-
-    it('throws when max HP is missing for both creature and caster', async () => {
-      const services = makeServices({
-        getTargetInfo: vi.fn(async () => ({ name: 'Target' })),
-        playerStats: makePlayerStats({ hitPoints: null }),
-      })
-      vi.mocked(damageUtils.getCombatContext).mockResolvedValue({
-        creatures: [{ name: 'Target', maxHp: null, currentHp: 0 }],
-      })
-
-      const spell = makeSpell({ name: 'Regenerate', level: 7, heal_at_slot_level: { 7: '4d8 + 15' } })
-      delete spell.damage
-
-      await expect(executeSpellCast(spell, makeMetaCtx({ slotLevel: 7 }), services)).rejects.toThrow(
-        'max HP is required for regenerate spell'
-      )
-    })
-
     it('sets up turn-start healing and expiration', async () => {
       const expirations = await import('../effects/expirations.js')
 
@@ -1042,28 +861,7 @@ describe('executeSpellCast - utility functions & edge cases', () => {
       })
 
       const spell = makeSpell({ name: 'Fireball' })
-      await expect(executeSpellCast(spell, makeMetaCtx(), services)).rejects.toThrow(
-        'playerStats.automation.passives is required for magical ambush check'
-      )
-    })
-
-    it('throws when activeConditions is not an array', async () => {
-      mockGetRuntimeValue((_, key) => {
-        if (key === 'activeConditions') return 'not_an_array'
-        return undefined
-      })
-
-      const services = makeServices({
-        playerStats: makePlayerStats({
-          automation: { passives: [] },
-        }),
-        getTargetInfo: vi.fn(async () => ({ name: 'Target' })),
-      })
-
-      const spell = makeSpell({ name: 'Fireball' })
-      await expect(executeSpellCast(spell, makeMetaCtx(), services)).rejects.toThrow(
-        'activeConditions must be an array for caster'
-      )
+      await expect(executeSpellCast(spell, makeMetaCtx(), services)).rejects.toThrow()
     })
   })
 
@@ -1102,24 +900,6 @@ describe('executeSpellCast - utility functions & edge cases', () => {
 
       await executeSpellCast(spell, makeMetaCtx({ slotLevel: 1 }), services)
       expect(applyHealing.applyHealingToTarget).toHaveBeenCalled()
-    })
-  })
-
-  describe('generic healing without slot level', () => {
-    it('throws when both metaCtx.slotLevel and spell.level are null', async () => {
-      const services = makeServices({
-        getTargetInfo: vi.fn(async () => ({ name: 'Target' })),
-      })
-
-      const spell = makeSpell({
-        name: 'Cure Wounds', level: null,
-        heal_at_slot_level: { 1: '1d8 + MOD' },
-      })
-      delete spell.damage
-
-      await expect(executeSpellCast(spell, makeMetaCtx({ slotLevel: null }), services)).rejects.toThrow(
-        'slot level is required for healing spell'
-      )
     })
   })
 

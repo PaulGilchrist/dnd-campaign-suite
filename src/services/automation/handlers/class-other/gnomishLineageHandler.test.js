@@ -1,13 +1,7 @@
-// @cleaned-by-ai
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
     handle,
     confirmGnomishLineage,
-    getGnomishLineageSelection,
-    getGnomishLineageAbility,
-    getGnomishLineageCantrip,
-    getGnomishLineageLevel3Spell,
-    getGnomishLineageLevel5Spell,
     restoreUses,
 } from './gnomishLineageHandler.js';
 
@@ -22,24 +16,9 @@ beforeEach(() => {
     vi.clearAllMocks();
 });
 
-afterEach(() => {
-    vi.restoreAllMocks();
-});
-
 function makePlayerStats(overrides = {}) {
     return {
         name: 'GnomeBoy',
-        ...overrides,
-    };
-}
-
-function makeAction(overrides = {}) {
-    return {
-        name: 'Gnomish Lineage',
-        automation: {
-            type: 'gnomish_lineage',
-            ...overrides.automation,
-        },
         ...overrides,
     };
 }
@@ -49,19 +28,29 @@ describe('gnomishLineageHandler', () => {
         it('returns popup with stored lineage info when lineage already selected', async () => {
             getRuntimeValue.mockReturnValue('Forest Gnome');
 
-            const result = await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
+            const result = await handle(
+                { name: 'Gnomish Lineage', automation: { type: 'gnomish_lineage' } },
+                makePlayerStats(),
+                'test-campaign',
+                null
+            );
 
             expect(result.type).toBe('popup');
             expect(result.payload.type).toBe('automation_info');
             expect(result.payload.name).toBe('Gnomish Lineage');
             expect(result.payload.description).toBe('Gnomish Lineage: Forest Gnome (already selected).');
-            expect(result.payload.automation).toEqual(makeAction().automation);
+            expect(result.payload.automation).toEqual({ type: 'gnomish_lineage' });
         });
 
         it('returns modal with payload when no lineage selected', async () => {
             getRuntimeValue.mockReturnValue(undefined);
 
-            const result = await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
+            const result = await handle(
+                { name: 'Gnomish Lineage', automation: { type: 'gnomish_lineage' } },
+                makePlayerStats(),
+                'test-campaign',
+                null
+            );
 
             expect(result.type).toBe('modal');
             expect(result.modalName).toBe('gnomishLineage');
@@ -87,17 +76,13 @@ describe('gnomishLineageHandler', () => {
             });
         });
 
-        it('returns success popup with correct description for Deep Gnome', async () => {
+        it('stores all runtime values for a valid lineage', async () => {
             const result = await confirmGnomishLineage(makePlayerStats(), 'Deep Gnome', 'test-campaign');
 
             expect(result.type).toBe('popup');
             expect(result.payload.name).toBe('Gnomish Lineage');
             expect(result.payload.description).toBe('Selected Deep Gnome lineage. Spellcasting ability: Intelligence.');
             expect(result.payload.automation.type).toBe('gnomish_lineage');
-        });
-
-        it('stores all runtime values for a valid lineage', async () => {
-            await confirmGnomishLineage(makePlayerStats(), 'Deep Gnome', 'test-campaign');
 
             const calls = setRuntimeValue.mock.calls;
             expect(calls).toHaveLength(5);
@@ -118,46 +103,6 @@ describe('gnomishLineageHandler', () => {
                 'Deep Gnome',
                 'my-campaign'
             );
-        });
-    });
-
-    describe('getGnomishLineageSelection', () => {
-        it('returns stored lineage value', () => {
-            getRuntimeValue.mockReturnValue('Forest Gnome');
-
-            expect(getGnomishLineageSelection(makePlayerStats(), 'test-campaign')).toBe('Forest Gnome');
-        });
-    });
-
-    describe('getGnomishLineageAbility', () => {
-        it('returns stored ability value', () => {
-            getRuntimeValue.mockReturnValue('Intelligence');
-
-            expect(getGnomishLineageAbility(makePlayerStats(), 'test-campaign')).toBe('Intelligence');
-        });
-    });
-
-    describe('getGnomishLineageCantrip', () => {
-        it('returns stored cantrip value', () => {
-            getRuntimeValue.mockReturnValue('Minor Illusion');
-
-            expect(getGnomishLineageCantrip(makePlayerStats(), 'test-campaign')).toBe('Minor Illusion');
-        });
-    });
-
-    describe('getGnomishLineageLevel3Spell', () => {
-        it('returns stored level 3 spell value', () => {
-            getRuntimeValue.mockReturnValue('Speak with Animals');
-
-            expect(getGnomishLineageLevel3Spell(makePlayerStats(), 'test-campaign')).toBe('Speak with Animals');
-        });
-    });
-
-    describe('getGnomishLineageLevel5Spell', () => {
-        it('returns stored level 5 spell value', () => {
-            getRuntimeValue.mockReturnValue('Call Lightning');
-
-            expect(getGnomishLineageLevel5Spell(makePlayerStats(), 'test-campaign')).toBe('Call Lightning');
         });
     });
 

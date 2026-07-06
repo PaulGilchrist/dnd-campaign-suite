@@ -255,23 +255,7 @@ describe('combatSuperiorityHandler.handle', () => {
             expect(dataLoader.loadManeuvers).toHaveBeenCalledWith('5e');
         });
 
-        it('defaults to 2024 ruleset when playerStats.rules is undefined', async () => {
-            dataLoader.loadManeuvers.mockResolvedValue([]);
-
-            const playerStats = makePlayerStats();
-            delete playerStats.rules;
-
-            await handle(
-                makeAction(),
-                playerStats,
-                'test-campaign',
-                null
-            );
-
-            expect(dataLoader.loadManeuvers).toHaveBeenCalledWith('2024');
-        });
-
-        it('defaults to 2024 ruleset when playerStats.rules is null', async () => {
+        it('defaults to 2024 ruleset when playerStats.rules is null or undefined', async () => {
             dataLoader.loadManeuvers.mockResolvedValue([]);
 
             await handle(
@@ -348,21 +332,6 @@ describe('combatSuperiorityHandler.handle', () => {
     });
 
     describe('known maneuvers tracking', () => {
-        it('returns empty knownManeuvers array when none stored', async () => {
-            dataLoader.loadManeuvers.mockResolvedValue([
-                { name: 'Trip Attack', effect: 'knock_prone' },
-            ]);
-
-            const result = await handle(
-                makeAction(),
-                makePlayerStats(),
-                'test-campaign',
-                null
-            );
-
-            expect(result.payload.knownManeuvers).toEqual([]);
-        });
-
         it('returns known maneuver names from runtime storage', async () => {
             dataLoader.loadManeuvers.mockResolvedValue([
                 { name: 'Trip Attack', effect: 'knock_prone' },

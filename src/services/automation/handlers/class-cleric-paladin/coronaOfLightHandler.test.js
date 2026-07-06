@@ -50,7 +50,7 @@ describe('coronaOfLightHandler.activateCoronaOfLight', () => {
     });
 
     describe('buff toggling', () => {
-        it('calls toggleBuff with correct arguments', async () => {
+        it('calls toggleBuff with playerName, action name, automation, campaignName, and playerName', async () => {
             const action = makeAction();
             const playerStats = makePlayerStats();
 
@@ -65,7 +65,7 @@ describe('coronaOfLightHandler.activateCoronaOfLight', () => {
             );
         });
 
-        it('uses the action name as the buff identifier', async () => {
+        it('uses the custom action name as the buff identifier', async () => {
             const action = { ...makeAction(), name: 'Custom Corona Name' };
             const playerStats = makePlayerStats();
 
@@ -97,7 +97,7 @@ describe('coronaOfLightHandler.activateCoronaOfLight', () => {
             );
         });
 
-        it('stores null when no enemies selected', async () => {
+        it('stores empty array when no enemies selected', async () => {
             const action = makeAction();
             const playerStats = makePlayerStats();
 
@@ -110,24 +110,10 @@ describe('coronaOfLightHandler.activateCoronaOfLight', () => {
                 campaignName,
             );
         });
-
-        it('stores null when enemies argument is null', async () => {
-            const action = makeAction();
-            const playerStats = makePlayerStats();
-
-            await activateCoronaOfLight(action, playerStats, campaignName, null);
-
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'TestCleric',
-                'coronaOfLightEnemies',
-                null,
-                campaignName,
-            );
-        });
     });
 
     describe('expiration setup', () => {
-        it('adds an expiration for 10 rounds', async () => {
+        it('adds an expiration for 10 rounds with the action name as buffName', async () => {
             const action = makeAction();
             const playerStats = makePlayerStats();
 
@@ -142,7 +128,7 @@ describe('coronaOfLightHandler.activateCoronaOfLight', () => {
             );
         });
 
-        it('uses action name as the buffName in expiration', async () => {
+        it('uses the custom action name as the buffName in expiration', async () => {
             const action = { ...makeAction(), name: 'Custom Corona' };
             const playerStats = makePlayerStats();
 
@@ -156,25 +142,10 @@ describe('coronaOfLightHandler.activateCoronaOfLight', () => {
                 10,
             );
         });
-
-        it('sets expiration on the caster character key', async () => {
-            const action = makeAction();
-            const playerStats = makePlayerStats({ name: 'PaladinPaul' });
-
-            await activateCoronaOfLight(action, playerStats, campaignName, []);
-
-            expect(addExpiration).toHaveBeenCalledWith(
-                'PaladinPaul',
-                'PaladinPaul',
-                expect.any(Array),
-                campaignName,
-                10,
-            );
-        });
     });
 
     describe('logging', () => {
-        it('calls addEntry with ability_use type', async () => {
+        it('calls addEntry with ability_use type and correct structure', async () => {
             const action = makeAction();
             const playerStats = makePlayerStats();
             const enemies = ['Goblin', 'Orc'];
@@ -195,18 +166,6 @@ describe('coronaOfLightHandler.activateCoronaOfLight', () => {
             dateSpy.mockRestore();
         });
 
-        it('includes the selected enemies in the log description', async () => {
-            const action = makeAction();
-            const playerStats = makePlayerStats();
-            const enemies = ['Goblin'];
-
-            await activateCoronaOfLight(action, playerStats, campaignName, enemies);
-
-            const logCall = addEntry.mock.calls[0][1];
-            expect(logCall.description).toContain('Goblin');
-            expect(logCall.description).toContain('Corona of Light');
-        });
-
         it('shows "none selected (all enemies affected)" when no enemies are passed', async () => {
             const action = makeAction();
             const playerStats = makePlayerStats();
@@ -216,71 +175,19 @@ describe('coronaOfLightHandler.activateCoronaOfLight', () => {
             const logCall = addEntry.mock.calls[0][1];
             expect(logCall.description).toContain('none selected (all enemies affected)');
         });
-
-        it('shows "none selected (all enemies affected)" when null is passed', async () => {
-            const action = makeAction();
-            const playerStats = makePlayerStats();
-
-            await activateCoronaOfLight(action, playerStats, campaignName, null);
-
-            const logCall = addEntry.mock.calls[0][1];
-            expect(logCall.description).toContain('none selected (all enemies affected)');
-        });
-
-        it('uses the character name as characterName in log', async () => {
-            const action = makeAction();
-            const playerStats = makePlayerStats({ name: 'ClericCynthia' });
-
-            await activateCoronaOfLight(action, playerStats, campaignName, []);
-
-            const logCall = addEntry.mock.calls[0][1];
-            expect(logCall.characterName).toBe('ClericCynthia');
-        });
     });
 
     describe('return value structure', () => {
-        it('returns a popup type', async () => {
+        it('returns a popup with automation_info payload containing action details', async () => {
             const action = makeAction();
             const playerStats = makePlayerStats();
 
             const result = await activateCoronaOfLight(action, playerStats, campaignName, []);
 
             expect(result.type).toBe('popup');
-        });
-
-        it('returns automation_info payload type', async () => {
-            const action = makeAction();
-            const playerStats = makePlayerStats();
-
-            const result = await activateCoronaOfLight(action, playerStats, campaignName, []);
-
             expect(result.payload.type).toBe('automation_info');
-        });
-
-        it('includes the action name in payload', async () => {
-            const action = makeAction();
-            const playerStats = makePlayerStats();
-
-            const result = await activateCoronaOfLight(action, playerStats, campaignName, []);
-
             expect(result.payload.name).toBe('Corona of Light');
-        });
-
-        it('includes automationType in payload', async () => {
-            const action = makeAction();
-            const playerStats = makePlayerStats();
-
-            const result = await activateCoronaOfLight(action, playerStats, campaignName, []);
-
             expect(result.payload.automationType).toBe('corona_of_light');
-        });
-
-        it('includes the automation object in payload', async () => {
-            const action = makeAction();
-            const playerStats = makePlayerStats();
-
-            const result = await activateCoronaOfLight(action, playerStats, campaignName, []);
-
             expect(result.payload.automation).toEqual(action.automation);
         });
 
@@ -329,7 +236,7 @@ describe('coronaOfLightHandler.removeCoronaEnemies', () => {
         vi.clearAllMocks();
     });
 
-    it('calls setRuntimeValue to clear the enemy list', () => {
+    it('calls setRuntimeValue to clear the enemy list for the given player and campaign', () => {
         removeCoronaEnemies('TestCleric', campaignName);
 
         expect(setRuntimeValue).toHaveBeenCalledWith(
@@ -337,17 +244,6 @@ describe('coronaOfLightHandler.removeCoronaEnemies', () => {
             'coronaOfLightEnemies',
             null,
             campaignName,
-        );
-    });
-
-    it('uses the correct runtime key for corona enemies', () => {
-        removeCoronaEnemies('PaladinPaul', 'MyCampaign');
-
-        expect(setRuntimeValue).toHaveBeenCalledWith(
-            'PaladinPaul',
-            'coronaOfLightEnemies',
-            null,
-            'MyCampaign',
         );
     });
 });

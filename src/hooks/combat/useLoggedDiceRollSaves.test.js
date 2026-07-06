@@ -90,53 +90,42 @@ describe('createSaves (useLoggedDiceRollSaves) - Core', () => {
     }
 
     describe('quickRollPlayerSave', () => {
-        it('returns early when pending does not exist', async () => {
+        const basePending = {
+            targetName: 'Goblin',
+            rawDamage: 15,
+            saveDc: 15,
+            saveType: 'DEX',
+            dcSuccess: 'half',
+            damageType: 'fire',
+            attackerName: 'TestWizard',
+            name: 'Fireball',
+            formula: '8d6',
+            rolls: [3, 4, 5, 2, 3, 3],
+            modifier: 0,
+            campaignName: 'test-campaign',
+            setPopupHtml: vi.fn(),
+        };
+
+        function setupCreature(type, hp) {
+            loadCombatSummary.mockResolvedValue({
+                creatures: [{ name: 'Goblin', type, ac: 12, currentHp: hp, maxHp: hp }],
+            });
+        }
+
+        it('returns early when pending does not exist or target not found', async () => {
             const { quickRollPlayerSave } = createFn();
             await quickRollPlayerSave('nonexistent', 'Goblin', 'DEX', 15);
             expect(loadCombatSummary).not.toHaveBeenCalled();
-        });
 
-        it('returns early when target not found in combat summary', async () => {
-            deps.pendingSaves['prompt-1'] = {
-                targetName: 'Goblin',
-                rawDamage: 15,
-                saveDc: 15,
-                saveType: 'DEX',
-                dcSuccess: 'half',
-                damageType: 'fire',
-                attackerName: 'TestWizard',
-                name: 'Fireball',
-                formula: '8d6',
-                rolls: [3, 4, 5, 2, 3, 3],
-                modifier: 0,
-                campaignName: 'test-campaign',
-                setPopupHtml: vi.fn(),
-            };
+            deps.pendingSaves['prompt-1'] = { ...basePending };
             loadCombatSummary.mockResolvedValue({ creatures: [] });
-            const { quickRollPlayerSave } = createFn();
             await quickRollPlayerSave('prompt-1', 'Goblin', 'DEX', 15);
             expect(rollSaveForCreature).not.toHaveBeenCalled();
         });
 
-        it('rolls save and applies damage for target', async () => {
-            deps.pendingSaves['prompt-1'] = {
-                targetName: 'Goblin',
-                rawDamage: 15,
-                saveDc: 15,
-                saveType: 'DEX',
-                dcSuccess: 'half',
-                damageType: 'fire',
-                attackerName: 'TestWizard',
-                name: 'Fireball',
-                formula: '8d6',
-                rolls: [3, 4, 5, 2, 3, 3],
-                modifier: 0,
-                campaignName: 'test-campaign',
-                setPopupHtml: vi.fn(),
-            };
-            loadCombatSummary.mockResolvedValue({
-                creatures: [{ name: 'Goblin', type: 'npc', ac: 12, currentHp: 13, maxHp: 13 }],
-            });
+        it('rolls save, applies damage, sends result, and removes pending', async () => {
+            deps.pendingSaves['prompt-1'] = { ...basePending };
+            setupCreature('npc', 13);
             rollSaveForCreature.mockReturnValue({ success: false, roll: 8, total: 11, bonus: 3 });
             const { quickRollPlayerSave } = createFn();
             await quickRollPlayerSave('prompt-1', 'Goblin', 'DEX', 15);
@@ -146,25 +135,9 @@ describe('createSaves (useLoggedDiceRollSaves) - Core', () => {
             expect(deps.pendingSaves['prompt-1']).toBeUndefined();
         });
 
-        it('sends save result with correct data', async () => {
-            deps.pendingSaves['prompt-1'] = {
-                targetName: 'Goblin',
-                rawDamage: 15,
-                saveDc: 15,
-                saveType: 'DEX',
-                dcSuccess: 'half',
-                damageType: 'fire',
-                attackerName: 'TestWizard',
-                name: 'Fireball',
-                formula: '8d6',
-                rolls: [3, 4, 5, 2, 3, 3],
-                modifier: 0,
-                campaignName: 'test-campaign',
-                setPopupHtml: vi.fn(),
-            };
-            loadCombatSummary.mockResolvedValue({
-                creatures: [{ name: 'Goblin', type: 'npc', ac: 12, currentHp: 13, maxHp: 13 }],
-            });
+        it('sends save result with correct data and sets popupHtml with save-damage type', async () => {
+            deps.pendingSaves['prompt-1'] = { ...basePending };
+            setupCreature('npc', 13);
             const { quickRollPlayerSave } = createFn();
             await quickRollPlayerSave('prompt-1', 'Goblin', 'DEX', 15);
             expect(sendSaveResult).toHaveBeenCalledWith('test-campaign', 'Goblin', expect.objectContaining({
@@ -172,29 +145,6 @@ describe('createSaves (useLoggedDiceRollSaves) - Core', () => {
                 success: true,
                 roll: 15,
             }));
-        });
-
-        it('sets popupHtml with save result data', async () => {
-            deps.pendingSaves['prompt-1'] = {
-                targetName: 'Goblin',
-                rawDamage: 15,
-                saveDc: 15,
-                saveType: 'DEX',
-                dcSuccess: 'half',
-                damageType: 'fire',
-                attackerName: 'TestWizard',
-                name: 'Fireball',
-                formula: '8d6',
-                rolls: [3, 4, 5, 2, 3, 3],
-                modifier: 0,
-                campaignName: 'test-campaign',
-                setPopupHtml: vi.fn(),
-            };
-            loadCombatSummary.mockResolvedValue({
-                creatures: [{ name: 'Goblin', type: 'npc', ac: 12, currentHp: 13, maxHp: 13 }],
-            });
-            const { quickRollPlayerSave } = createFn();
-            await quickRollPlayerSave('prompt-1', 'Goblin', 'DEX', 15);
             expect(deps.setPopupHtml).toHaveBeenCalledWith(expect.objectContaining({
                 type: 'save-damage',
                 name: 'Fireball',
@@ -203,76 +153,23 @@ describe('createSaves (useLoggedDiceRollSaves) - Core', () => {
             }));
         });
 
-        it('handles save failure with full damage', async () => {
-            deps.pendingSaves['prompt-1'] = {
-                targetName: 'Goblin',
-                rawDamage: 20,
-                saveDc: 15,
-                saveType: 'DEX',
-                dcSuccess: 'half',
-                damageType: 'fire',
-                attackerName: 'TestWizard',
-                name: 'Fireball',
-                formula: '8d6',
-                rolls: [3, 4, 5, 2, 3, 3],
-                modifier: 0,
-                campaignName: 'test-campaign',
-                setPopupHtml: vi.fn(),
-            };
-            loadCombatSummary.mockResolvedValue({
-                creatures: [{ name: 'Goblin', type: 'npc', ac: 12, currentHp: 13, maxHp: 13 }],
-            });
+        it('handles save failure with full damage, success with dcSuccess none reduces to 0', async () => {
+            deps.pendingSaves['prompt-1'] = { ...basePending, rawDamage: 20 };
+            setupCreature('npc', 13);
             rollSaveForCreature.mockReturnValue({ success: false, roll: 5, total: 8, bonus: 3 });
             const { quickRollPlayerSave } = createFn();
             await quickRollPlayerSave('prompt-1', 'Goblin', 'DEX', 15);
             expect(computeDamageAfterEvasion).toHaveBeenCalledWith(20, false, 'half', false);
-        });
 
-        it('handles save success with dcSuccess none - full damage reduced to 0', async () => {
-            deps.pendingSaves['prompt-1'] = {
-                targetName: 'Goblin',
-                rawDamage: 20,
-                saveDc: 15,
-                saveType: 'DEX',
-                dcSuccess: 'none',
-                damageType: 'fire',
-                attackerName: 'TestWizard',
-                name: 'Fireball',
-                formula: '8d6',
-                rolls: [3, 4, 5, 2, 3, 3],
-                modifier: 0,
-                campaignName: 'test-campaign',
-                setPopupHtml: vi.fn(),
-            };
-            loadCombatSummary.mockResolvedValue({
-                creatures: [{ name: 'Goblin', type: 'npc', ac: 12, currentHp: 13, maxHp: 13 }],
-            });
+            deps.pendingSaves['prompt-2'] = { ...basePending, rawDamage: 20, dcSuccess: 'none' };
             rollSaveForCreature.mockReturnValue({ success: true, roll: 18, total: 21, bonus: 3 });
-            const { quickRollPlayerSave } = createFn();
-            await quickRollPlayerSave('prompt-1', 'Goblin', 'DEX', 15);
+            await quickRollPlayerSave('prompt-2', 'Goblin', 'DEX', 15);
             expect(computeDamageAfterEvasion).toHaveBeenCalledWith(20, true, 'none', false);
         });
 
         it('passes ignoreResistance flag to applyDamageToTarget', async () => {
-            deps.pendingSaves['prompt-1'] = {
-                targetName: 'Goblin',
-                rawDamage: 20,
-                saveDc: 15,
-                saveType: 'DEX',
-                dcSuccess: 'half',
-                damageType: 'fire',
-                attackerName: 'TestWizard',
-                name: 'Fireball',
-                formula: '8d6',
-                rolls: [3, 4, 5, 2, 3, 3],
-                modifier: 0,
-                campaignName: 'test-campaign',
-                setPopupHtml: vi.fn(),
-                playerStats: {},
-            };
-            loadCombatSummary.mockResolvedValue({
-                creatures: [{ name: 'Goblin', type: 'npc', ac: 12, currentHp: 13, maxHp: 13 }],
-            });
+            deps.pendingSaves['prompt-1'] = { ...basePending, playerStats: {} };
+            setupCreature('npc', 13);
             hasIgnoreResistance.mockReturnValue(true);
             const { quickRollPlayerSave } = createFn();
             await quickRollPlayerSave('prompt-1', 'Goblin', 'DEX', 15);
@@ -291,19 +188,16 @@ describe('createSaves (useLoggedDiceRollSaves) - Core', () => {
 
         it('uses target saveModifiers from charactersRef when available', async () => {
             deps.pendingSaves['prompt-1'] = {
+                ...basePending,
                 targetName: 'Wiz',
                 rawDamage: 10,
                 saveDc: 13,
                 saveType: 'INT',
-                dcSuccess: 'half',
                 damageType: 'psychic',
                 attackerName: 'TestWizard',
                 name: 'Mind Sliver',
                 formula: '1d6',
                 rolls: [4],
-                modifier: 0,
-                campaignName: 'test-campaign',
-                setPopupHtml: vi.fn(),
             };
             deps.charactersRef.current = [{
                 name: 'Wiz',
@@ -326,21 +220,11 @@ describe('createSaves (useLoggedDiceRollSaves) - Core', () => {
             );
         });
 
-        it('sets popupHtml with targetCurrentHp from applyResult and targetMaxHp from runtime for player targets', async () => {
+        it('sets popupHtml with correct HP values for player vs npc targets', async () => {
             deps.pendingSaves['prompt-1'] = {
+                ...basePending,
                 targetName: 'Ally',
                 rawDamage: 10,
-                saveDc: 15,
-                saveType: 'DEX',
-                dcSuccess: 'half',
-                damageType: 'fire',
-                attackerName: 'TestWizard',
-                name: 'Fireball',
-                formula: '8d6',
-                rolls: [3, 4, 5, 2, 3, 3],
-                modifier: 0,
-                campaignName: 'test-campaign',
-                setPopupHtml: vi.fn(),
             };
             loadCombatSummary.mockResolvedValue({
                 creatures: [{ name: 'Ally', type: 'player', ac: 16, currentHp: 20, maxHp: 20 }],
@@ -357,53 +241,20 @@ describe('createSaves (useLoggedDiceRollSaves) - Core', () => {
                 targetCurrentHp: 15,
                 targetMaxHp: 20,
             }));
-        });
 
-        it('sets popupHtml with targetMaxHp from creature for npc targets', async () => {
-            deps.pendingSaves['prompt-1'] = {
-                targetName: 'Goblin',
-                rawDamage: 10,
-                saveDc: 15,
-                saveType: 'DEX',
-                dcSuccess: 'half',
-                damageType: 'fire',
-                attackerName: 'TestWizard',
-                name: 'Fireball',
-                formula: '8d6',
-                rolls: [3, 4, 5, 2, 3, 3],
-                modifier: 0,
-                campaignName: 'test-campaign',
-                setPopupHtml: vi.fn(),
-            };
+            deps.pendingSaves['prompt-2'] = { ...basePending, targetName: 'Goblin', rawDamage: 10 };
             loadCombatSummary.mockResolvedValue({
                 creatures: [{ name: 'Goblin', type: 'npc', ac: 12, currentHp: 13, maxHp: 13 }],
             });
-            const { quickRollPlayerSave } = createFn();
-            await quickRollPlayerSave('prompt-1', 'Goblin', 'DEX', 15);
+            await quickRollPlayerSave('prompt-2', 'Goblin', 'DEX', 15);
             expect(deps.setPopupHtml).toHaveBeenCalledWith(expect.objectContaining({
                 targetMaxHp: 13,
             }));
         });
 
         it('handles popupHtml with finalDamage and damageApplied fields', async () => {
-            deps.pendingSaves['prompt-1'] = {
-                targetName: 'Goblin',
-                rawDamage: 15,
-                saveDc: 15,
-                saveType: 'DEX',
-                dcSuccess: 'half',
-                damageType: 'fire',
-                attackerName: 'TestWizard',
-                name: 'Fireball',
-                formula: '8d6',
-                rolls: [3, 4, 5, 2, 3, 3],
-                modifier: 0,
-                campaignName: 'test-campaign',
-                setPopupHtml: vi.fn(),
-            };
-            loadCombatSummary.mockResolvedValue({
-                creatures: [{ name: 'Goblin', type: 'npc', ac: 12, currentHp: 13, maxHp: 13 }],
-            });
+            deps.pendingSaves['prompt-1'] = { ...basePending };
+            setupCreature('npc', 13);
             applyDamageToTarget.mockReturnValue({ finalDamage: 7, newHp: 6, damageReduced: true });
             const { quickRollPlayerSave } = createFn();
             await quickRollPlayerSave('prompt-1', 'Goblin', 'DEX', 15);
@@ -415,28 +266,12 @@ describe('createSaves (useLoggedDiceRollSaves) - Core', () => {
         });
 
         it('handles save with no advantage or disadvantage by default', async () => {
-            deps.pendingSaves['prompt-1'] = {
-                targetName: 'Goblin',
-                rawDamage: 15,
-                saveDc: 15,
-                saveType: 'DEX',
-                dcSuccess: 'half',
-                damageType: 'fire',
-                attackerName: 'TestWizard',
-                name: 'Fireball',
-                formula: '8d6',
-                rolls: [3, 4, 5, 2, 3, 3],
-                modifier: 0,
-                campaignName: 'test-campaign',
-                setPopupHtml: vi.fn(),
-            };
+            deps.pendingSaves['prompt-1'] = { ...basePending };
             deps.charactersRef.current = [{
                 name: 'Goblin',
                 computedStats: { saveModifiers: [] },
             }];
-            loadCombatSummary.mockResolvedValue({
-                creatures: [{ name: 'Goblin', type: 'npc', ac: 12, currentHp: 13, maxHp: 13 }],
-            });
+            setupCreature('npc', 13);
             const { quickRollPlayerSave } = createFn();
             await quickRollPlayerSave('prompt-1', 'Goblin', 'DEX', 15);
             expect(rollSaveForCreature).toHaveBeenCalledWith(

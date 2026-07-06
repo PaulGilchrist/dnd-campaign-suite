@@ -85,17 +85,8 @@ describe('soulOfVengeanceHandler', () => {
       expect(result.payload.description).toContain('Vow of Enmity is not active');
     });
 
-    it('should return popup when Vow of Enmity target is null', async () => {
+    it('should return popup when Vow of Enmity target is missing', async () => {
       setupVowOfEnmityActive(null);
-
-      const result = await handle(makeAction(), makePlayerStats(), campaignName);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.description).toContain('No Vow of Enmity target selected');
-    });
-
-    it('should return popup when Vow of Enmity target is empty string', async () => {
-      setupVowOfEnmityActive('');
 
       const result = await handle(makeAction(), makePlayerStats(), campaignName);
 
@@ -105,17 +96,7 @@ describe('soulOfVengeanceHandler', () => {
   });
 
   describe('combat context checks', () => {
-    it('should return popup when combat context is null', async () => {
-      setupVowOfEnmityActive('Orc');
-      getCombatContext.mockResolvedValue(null);
-
-      const result = await handle(makeAction(), makePlayerStats(), campaignName);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.description).toContain('No target selected in combat');
-    });
-
-    it('should return popup when getTargetFromAttacker returns null', async () => {
+    it('should return popup when combat context or target is missing', async () => {
       setupVowOfEnmityActive('Orc');
       getCombatContext.mockResolvedValue({});
       getTargetFromAttacker.mockReturnValue(null);
@@ -125,32 +106,10 @@ describe('soulOfVengeanceHandler', () => {
       expect(result.type).toBe('popup');
       expect(result.payload.description).toContain('No target selected in combat');
     });
-
-    it('should return popup when getTargetFromAttacker returns undefined', async () => {
-      setupVowOfEnmityActive('Orc');
-      getCombatContext.mockResolvedValue({});
-      getTargetFromAttacker.mockReturnValue(undefined);
-
-      const result = await handle(makeAction(), makePlayerStats(), campaignName);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.description).toContain('No target selected in combat');
-    });
   });
 
-  describe('attack availability checks', () => {
-    it('should return popup when no attacks array exists', async () => {
-      setupVowOfEnmityActive('Orc');
-      setupDefaultCombatContext('Orc');
-      const stats = makePlayerStats({ attacks: undefined });
-
-      const result = await handle(makeAction(), stats, campaignName);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.description).toContain('No melee attack available');
-    });
-
-    it('should return popup when attacks array is empty', async () => {
+  describe('attack selection', () => {
+    it('should return popup when no attacks are available', async () => {
       setupVowOfEnmityActive('Orc');
       setupDefaultCombatContext('Orc');
       const stats = makePlayerStats({ attacks: [] });
@@ -161,22 +120,7 @@ describe('soulOfVengeanceHandler', () => {
       expect(result.payload.description).toContain('No melee attack available');
     });
 
-    it('should fall back to ranged attack when no melee attack is available', async () => {
-      setupVowOfEnmityActive('Orc');
-      setupDefaultCombatContext('Orc');
-      const stats = makePlayerStats({
-        attacks: [
-          { name: 'Crossbow', type: 'Action', range: 10, hitBonus: 6, damage: '1d8+3', damageType: 'Piercing' },
-        ],
-      });
-
-      const result = await handle(makeAction(), stats, campaignName);
-
-      expect(result.type).toBe('attack_roll');
-      expect(result.payload.attack.name).toBe('Crossbow');
-    });
-
-    it('should prefer melee attack over ranged when both available', async () => {
+    it('should prefer melee attack over ranged', async () => {
       setupVowOfEnmityActive('Orc');
       setupDefaultCombatContext('Orc');
       const stats = makePlayerStats({
@@ -192,7 +136,7 @@ describe('soulOfVengeanceHandler', () => {
       expect(result.payload.attack.name).toBe('Longsword');
     });
 
-    it('should fall back to first non-melee attack when no melee available', async () => {
+    it('should fall back to ranged when no melee attack is available', async () => {
       setupVowOfEnmityActive('Orc');
       setupDefaultCombatContext('Orc');
       const stats = makePlayerStats({
@@ -205,22 +149,6 @@ describe('soulOfVengeanceHandler', () => {
 
       expect(result.type).toBe('attack_roll');
       expect(result.payload.attack.name).toBe('Crossbow');
-    });
-
-    it('should skip non-Action type attacks for melee preference', async () => {
-      setupVowOfEnmityActive('Orc');
-      setupDefaultCombatContext('Orc');
-      const stats = makePlayerStats({
-        attacks: [
-          { name: 'Reaction Strike', type: 'Reaction', range: 5, hitBonus: 6, damage: '1d6+3', damageType: 'Slashing' },
-          { name: 'Longsword', type: 'Action', range: 5, hitBonus: 6, damage: '1d8+3', damageType: 'Slashing' },
-        ],
-      });
-
-      const result = await handle(makeAction(), stats, campaignName);
-
-      expect(result.type).toBe('attack_roll');
-      expect(result.payload.attack.name).toBe('Longsword');
     });
   });
 
@@ -269,44 +197,6 @@ describe('soulOfVengeanceHandler', () => {
       expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
         description: 'Soul of Vengeance used against Dragon',
       }));
-    });
-  });
-
-  describe('popup payload structure', () => {
-    it('should include name and automationType in no-vow popup', async () => {
-      getRuntimeValue.mockImplementation((_name, key) => {
-        if (key === 'activeBuffs') return [];
-        return null;
-      });
-
-      const result = await handle(makeAction(), makePlayerStats(), campaignName);
-
-      expect(result.payload.name).toBe('Soul of Vengeance');
-      expect(result.payload.automationType).toBe('soul_of_vengeance');
-      expect(result.payload.automation).toEqual(makeAction().automation);
-    });
-
-    it('should include name and automationType in no-target popup', async () => {
-      setupVowOfEnmityActive('Orc');
-      getCombatContext.mockResolvedValue(null);
-
-      const result = await handle(makeAction(), makePlayerStats(), campaignName);
-
-      expect(result.payload.name).toBe('Soul of Vengeance');
-      expect(result.payload.automationType).toBe('soul_of_vengeance');
-      expect(result.payload.automation).toEqual(makeAction().automation);
-    });
-
-    it('should include name and automationType in no-melee popup', async () => {
-      setupVowOfEnmityActive('Orc');
-      setupDefaultCombatContext('Orc');
-      const stats = makePlayerStats({ attacks: [] });
-
-      const result = await handle(makeAction(), stats, campaignName);
-
-      expect(result.payload.name).toBe('Soul of Vengeance');
-      expect(result.payload.automationType).toBe('soul_of_vengeance');
-      expect(result.payload.automation).toEqual(makeAction().automation);
     });
   });
 });

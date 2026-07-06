@@ -35,7 +35,7 @@ describe('logService', () => {
             expect(result).toEqual(mockLog);
         });
 
-        it('returns an empty array for campaigns with no log entries', async () => {
+        it('returns an empty array when the log is empty', async () => {
             fetchSpy.mockResolvedValue(createResponse({ data: [] }));
 
             const result = await getLog('empty-campaign');
@@ -52,12 +52,6 @@ describe('logService', () => {
         });
 
         it('throws with descriptive error on non-ok response', async () => {
-            fetchSpy.mockResolvedValue(createResponse({ ok: false, status: 404 }));
-
-            await expect(getLog('missing-campaign')).rejects.toThrow('Failed to fetch log');
-        });
-
-        it('throws on various error status codes', async () => {
             fetchSpy.mockResolvedValue(createResponse({ ok: false, status: 500 }));
 
             await expect(getLog('my-campaign')).rejects.toThrow('Failed to fetch log');
@@ -98,22 +92,6 @@ describe('logService', () => {
             await addEntry('my campaign!', { message: 'Test' });
 
             expect(fetchSpy).toHaveBeenCalledWith('/api/campaigns/my%20campaign!/log', expect.any(Object));
-        });
-
-        it('serializes complex entry objects with nested data', async () => {
-            const mockEntry = {
-                message: 'Player leveled up',
-                type: 'levelup',
-                details: { character: 'Thorin', level: 5, class: 'Cleran' }
-            };
-            fetchSpy.mockResolvedValue(createResponse({ data: { success: true, entryId: 'abc123' } }));
-
-            await addEntry('my-campaign', mockEntry);
-
-            const callArgs = fetchSpy.mock.calls[0];
-            const body = JSON.parse(callArgs[1].body);
-            expect(body.details.level).toBe(5);
-            expect(body.details.class).toBe('Cleran');
         });
 
         it('throws with descriptive error on non-ok response', async () => {

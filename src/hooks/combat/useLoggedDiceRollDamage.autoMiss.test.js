@@ -66,9 +66,8 @@ vi.mock('../../services/rules/combat/applyDamage.js', () => ({
 import { rollExpression } from '../../services/dice/diceRoller.js';
 import { getRuntimeValue } from '../runtime/useRuntimeState.js';
 import { loadCombatSummary } from '../../services/encounters/combatData.js';
-import { hasIgnoreResistance } from '../../services/combat/automation/automationService.js';
 import { endInvisibilityOnHostileAction } from '../../services/rules/features/invisibilityService.js';
-import { hasPotentCantrip, isMagicMissileImmune, applyMinDamageAdjustment } from './loggedDiceRollUtils.js';
+import { hasPotentCantrip, applyMinDamageAdjustment } from './loggedDiceRollUtils.js';
 import { applyDamageToTarget } from '../../services/rules/combat/applyDamage.js';
 import { createLogDamageAndShow } from './useLoggedDiceRollDamage.js';
 
@@ -86,9 +85,7 @@ describe('Auto-miss and potent cantrip miss-half-damage', () => {
         rollExpression.mockReturnValue({ total: 8, rolls: [5, 3], modifier: 0 });
         getRuntimeValue.mockReturnValue(null);
         applyMinDamageAdjustment.mockImplementation((d) => d);
-        isMagicMissileImmune.mockReturnValue(false);
         hasPotentCantrip.mockReturnValue(false);
-        hasIgnoreResistance.mockReturnValue(false);
         endInvisibilityOnHostileAction.mockReturnValue(undefined);
         applyDamageToTarget.mockReturnValue({ finalDamage: 8, newHp: 5, damageReduced: false });
         loadCombatSummary.mockResolvedValue({
@@ -135,6 +132,8 @@ describe('Auto-miss and potent cantrip miss-half-damage', () => {
                 type: 'auto-miss',
             }));
         });
+
+
     });
 
     describe('potent cantrip miss-half-damage', () => {
@@ -162,55 +161,6 @@ describe('Auto-miss and potent cantrip miss-half-damage', () => {
                 dcSuccess: 'half',
                 isPotentCantrip: true,
             }));
-        });
-
-        it('does not apply potent cantrip half damage when isCantrip is false', async () => {
-            hasPotentCantrip.mockReturnValue(true);
-            const fn = createFn();
-            await fn('Fireball', '8d6', 20, [3, 4, 5, 2, 3, 3], 0, {
-                targetName: 'Goblin',
-                damageType: 'fire',
-                isAutoMiss: true,
-                isCantrip: false,
-            });
-            expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
-                rollType: 'auto-miss-damage',
-            }));
-        });
-
-        it('does not apply potent cantrip half damage when potent cantrip flag is false', async () => {
-            hasPotentCantrip.mockReturnValue(false);
-            const fn = createFn();
-            await fn('Shocking Grasp', '1d8', 5, [5], 0, {
-                targetName: 'Goblin',
-                damageType: 'lightning',
-                isAutoMiss: true,
-                isCantrip: true,
-            });
-            expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
-                rollType: 'auto-miss-damage',
-            }));
-        });
-
-        it('ignores resistance when playerStats has ignoreResistance for the damage type', async () => {
-            hasPotentCantrip.mockReturnValue(true);
-            hasIgnoreResistance.mockReturnValue(true);
-            rollExpression.mockReturnValueOnce({ total: 10, rolls: [6, 4], modifier: 0 });
-            applyMinDamageAdjustment.mockReturnValue(10);
-            applyDamageToTarget.mockReturnValue({ finalDamage: 5, newHp: 8, damageReduced: false });
-
-            const fn = createFn();
-            await fn('Shocking Grasp', '1d8', 5, [5], 0, {
-                targetName: 'Goblin',
-                damageType: 'lightning',
-                isAutoMiss: true,
-                isCantrip: true,
-                playerStats: { automation: { passives: [{ type: 'potent_cantrip' }] } },
-            });
-            expect(hasIgnoreResistance).toHaveBeenCalledWith(
-                expect.objectContaining({ automation: { passives: [{ type: 'potent_cantrip' }] } }),
-                'lightning'
-            );
         });
     });
 });

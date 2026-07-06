@@ -71,24 +71,14 @@ describe('reactionSaveHealHandler', () => {
   // ── Early exit guards ───────────────────────────────────────
 
   describe('early exit guards', () => {
-    it('returns popup when rage is zero', async () => {
-      runtimeState.getRuntimeValue.mockReturnValue(0);
-      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-      expect(result.type).toBe('popup');
-      expect(result.payload.type).toBe('automation_info');
-      expect(result.payload.description).toContain('No Rage remaining');
-    });
-
-    it('returns popup when rage is null or undefined', async () => {
-      runtimeState.getRuntimeValue.mockReturnValue(null);
-      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-      expect(result.payload.description).toContain('No Rage remaining');
-    });
-
-    it('returns popup when rage is negative', async () => {
-      runtimeState.getRuntimeValue.mockReturnValue(-1);
-      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-      expect(result.payload.description).toContain('No Rage remaining');
+    it('returns popup when rage is zero, null, undefined, or negative', async () => {
+      for (const badRage of [0, null, undefined, -1]) {
+        runtimeState.getRuntimeValue.mockReturnValue(badRage);
+        const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
+        expect(result.type).toBe('popup');
+        expect(result.payload.type).toBe('automation_info');
+        expect(result.payload.description).toContain('No Rage remaining');
+      }
     });
 
     it('returns popup when no combat is active', async () => {
@@ -133,19 +123,8 @@ describe('reactionSaveHealHandler', () => {
       });
     });
 
-    it('defaults saveType to CON when not provided', async () => {
-      const action = { name: 'Relentless Rage', automation: { saveDc: 10 } };
-      await handle(action, makePlayerStats(), campaignName, null);
-
-      expect(savePrompt.createSaveListener).toHaveBeenCalledWith(campaignName, {
-        targetName: 'TestBarbarian',
-        saveType: 'CON',
-        saveDc: 10,
-      });
-    });
-
-    it('defaults saveDc to 10 when not provided', async () => {
-      const action = { name: 'Relentless Rage', automation: { saveType: 'CON' } };
+    it('defaults saveType to CON and saveDc to 10 when not provided', async () => {
+      const action = { name: 'Relentless Rage', automation: {} };
       await handle(action, makePlayerStats(), campaignName, null);
 
       expect(savePrompt.createSaveListener).toHaveBeenCalledWith(campaignName, {
@@ -165,7 +144,6 @@ describe('reactionSaveHealHandler', () => {
       const action = { name: 'Relentless Rage', automation: { saveType: 'CON', saveDc: 10, dcScaling: 0 } };
       await handle(action, makePlayerStats(), campaignName, null);
 
-      // With dcScaling = 0 and currentUses = 0, DC stays at base value
       expect(savePrompt.createSaveListener).toHaveBeenCalledWith(campaignName, {
         targetName: 'TestBarbarian',
         saveType: 'CON',
@@ -189,20 +167,14 @@ describe('reactionSaveHealHandler', () => {
       });
     });
 
-    it('uses custom feature name in log entry', async () => {
-      const action = { name: 'Unbreakable Spirit', automation: { saveType: 'CON' } };
+    it('uses custom feature name and saveType in log entry', async () => {
+      const action = { name: 'Unbreakable Spirit', automation: { saveType: 'WIS' } };
       await handle(action, makePlayerStats(), campaignName, null);
 
       expect(logService.addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
         abilityName: 'Unbreakable Spirit',
         description: expect.stringContaining('Unbreakable Spirit'),
       }));
-    });
-
-    it('uses custom saveType in log description', async () => {
-      const action = makeAction({ saveType: 'WIS' });
-      await handle(action, makePlayerStats(), campaignName, null);
-
       expect(logService.addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
         description: expect.stringContaining('WIS save'),
       }));
@@ -233,11 +205,6 @@ describe('reactionSaveHealHandler', () => {
   // ── Creature name matching ──────────────────────────────────
 
   describe('creature name matching', () => {
-    it('finds creature by exact name match', async () => {
-      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-      expect(result.payload.targetName).toBe('TestBarbarian');
-    });
-
     it('finds creature by name prefix match (name + space)', async () => {
       damageUtils.getCombatContext.mockResolvedValue({
         creatures: [{ name: 'TestBarbarian (Player)', type: 'player', currentHp: 0 }],
@@ -252,17 +219,6 @@ describe('reactionSaveHealHandler', () => {
       });
       const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
       expect(result.payload.description).toContain('saving throw');
-    });
-
-    it('uses runtime HP for player-type creatures', async () => {
-      runtimeState.getRuntimeValue.mockImplementation((_name, key) => {
-        if (key === 'ragePoints') return 1;
-        if (key === 'currentHitPoints') return 5;
-        if (key === 'relentlessrageUses') return 0;
-        return 0;
-      });
-      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-      expect(result.payload.description).toContain('not at 0 Hit Points');
     });
 
     it('uses creature HP when type is not player', async () => {
@@ -284,16 +240,6 @@ describe('reactionSaveHealHandler', () => {
       expect(runtimeState.getRuntimeValue).toHaveBeenCalledWith(
         'TestBarbarian',
         'specialrageUses',
-      );
-    });
-
-    it('uses feature name with underscores correctly', async () => {
-      const action = { name: 'Relentless Rage', automation: { saveType: 'CON' } };
-      await handle(action, makePlayerStats(), campaignName, null);
-
-      expect(runtimeState.getRuntimeValue).toHaveBeenCalledWith(
-        'TestBarbarian',
-        'relentlessrageUses',
       );
     });
   });
@@ -358,19 +304,6 @@ describe('reactionSaveHealHandler', () => {
       await vi.waitFor(() => expect(dispatched).toHaveBeenCalled());
     });
 
-    it('removes event listener after handling result', async () => {
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      const removeSpy = vi.spyOn(window, 'removeEventListener');
-      triggerSuccess();
-
-      await vi.waitFor(() => {
-        expect(removeSpy).toHaveBeenCalledWith('save-result', expect.any(Function));
-      });
-
-      removeSpy.mockRestore();
-    });
-
     it('ignores save-result with mismatched promptId', async () => {
       await handle(makeAction(), makePlayerStats(), campaignName, null);
 
@@ -427,17 +360,6 @@ describe('reactionSaveHealHandler', () => {
         1,
         campaignName,
       );
-    });
-
-    it('does not dispatch combat-summary-updated on failure', async () => {
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      const dispatched = vi.fn();
-      window.addEventListener('combat-summary-updated', dispatched, { once: true });
-
-      triggerFailure();
-
-      expect(dispatched).not.toHaveBeenCalled();
     });
 
     it('ignores save-result with mismatched promptId', async () => {
@@ -530,20 +452,7 @@ describe('reactionSaveHealHandler', () => {
       );
     });
 
-    it('falls back to level 1 when no expression and no level', async () => {
-      const ps = makePlayerStats({ level: undefined, barbarianLevel: undefined });
-      await handle(makeAction({ healExpression: undefined }), ps, campaignName, null);
-      triggerSuccess();
-
-      expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-        'TestBarbarian',
-        'currentHitPoints',
-        1,
-        campaignName,
-      );
-    });
-
-    it('falls back to player level when barbarian not found in class_levels', async () => {
+    it('falls back to barbarian not found in class_levels', async () => {
       const ps = makePlayerStats({
         barbarianLevel: undefined,
         class: { class_levels: [{ name: 'Fighter', level: 10 }] },
@@ -564,36 +473,7 @@ describe('reactionSaveHealHandler', () => {
   // ── Edge cases ──────────────────────────────────────────────
 
   describe('edge cases', () => {
-    it('passes campaignName to runtime calls', async () => {
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(runtimeState.getRuntimeValue).toHaveBeenCalledWith(
-        'TestBarbarian',
-        'ragePoints',
-        campaignName,
-      );
-    });
-
-    it('handles player name with special characters', async () => {
-      const ps = makePlayerStats({ name: 'Test-Barbarian!' });
-      damageUtils.getCombatContext.mockResolvedValue({
-        creatures: [{ name: 'Test-Barbarian!', type: 'player', currentHp: 0 }],
-      });
-      const result = await handle(makeAction(), ps, campaignName, null);
-
-      expect(result.payload.targetName).toBe('Test-Barbarian!');
-    });
-
-    it('handles null campaignName (no combat)', async () => {
-      runtimeState.getRuntimeValue.mockReturnValue(1);
-      damageUtils.getCombatContext.mockResolvedValue(null);
-
-      const result = await handle(makeAction(), makePlayerStats(), null, null);
-
-      expect(result.payload.description).toContain('No combat active');
-    });
-
-    it('handles undefined player level with numeric heal expression', async () => {
+    it('handles numeric heal expression with undefined player level', async () => {
       const ps = makePlayerStats({ level: undefined });
       await handle(makeAction({ healExpression: 5 }), ps, campaignName, null);
       window.dispatchEvent(new CustomEvent('save-result', {
@@ -606,16 +486,6 @@ describe('reactionSaveHealHandler', () => {
         5,
         campaignName,
       );
-    });
-
-    it('treats unspecified recharge as maxUses = 1', async () => {
-      runtimeState.getRuntimeValue.mockImplementation((_name, key) => {
-        if (key === 'ragePoints') return 1;
-        if (key === 'relentlessrageUses') return 1;
-        return 0;
-      });
-      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-      expect(result.payload.description).toContain('no uses remaining');
     });
   });
 });

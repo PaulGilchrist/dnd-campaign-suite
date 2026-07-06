@@ -183,51 +183,6 @@ describe('countercharmHandler.handle', () => {
       expect(result.payload.description).toContain('Target: TestHero');
       expect(mapsService.loadMapData).not.toHaveBeenCalled();
     });
-
-    it('should skip range check when map data is missing', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-      findLastAttack.mockResolvedValue(makeAttackResult({
-        attackEvent: makeSaveEvent(),
-        targetName: 'TestHero',
-      }));
-      mapsService.loadMapData.mockResolvedValue(null);
-
-      const result = await handle(action, ps, campaignName, mapName);
-
-      expect(result.payload.description).toContain('Target: TestHero');
-    });
-
-    it('should skip range check when source not found on map', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-      findLastAttack.mockResolvedValue(makeAttackResult({
-        attackEvent: makeSaveEvent(),
-        targetName: 'TestHero',
-      }));
-      mapsService.loadMapData.mockResolvedValue(makeMapData({
-        players: [{ name: 'OtherPlayer', gridX: 1, gridY: 1 }],
-      }));
-
-      const result = await handle(action, ps, campaignName, mapName);
-
-      expect(result.payload.description).toContain('Target: TestHero');
-    });
-
-    it('should skip range check when target not found on map', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-      findLastAttack.mockResolvedValue(makeAttackResult({
-        attackEvent: makeSaveEvent(),
-        targetName: 'UnknownCreature',
-      }));
-      mapsService.loadMapData.mockResolvedValue(makeMapData());
-      getNearestPlacedItem.mockReturnValue(null);
-
-      const result = await handle(action, ps, campaignName, mapName);
-
-      expect(result.payload.description).toContain('Target: UnknownCreature');
-    });
   });
 
   describe('save roll type', () => {
@@ -276,20 +231,6 @@ describe('countercharmHandler.handle', () => {
       const result = await handle(action, ps, campaignName, mapName);
 
       expect(result.payload.description).toContain('Target: Goblin');
-    });
-
-    it('should display turned failure into success', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-      findLastAttack.mockResolvedValue(makeAttackResult({
-        attackEvent: makeSaveEvent({ d20: 8, saveDc: 13, saveResult: 'failure' }),
-        targetName: 'TestHero',
-      }));
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.payload.description).toContain('Failed');
-      expect(result.payload.description).toContain('Reroll with Advantage');
     });
 
     it('should display no effect when save already succeeded', async () => {

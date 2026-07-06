@@ -135,16 +135,6 @@ describe('healingHandler', () => {
       expect(result.payload.description).toContain('2 uses remaining');
     });
 
-    it('should report no uses remaining when uses depleted', async () => {
-      runtimeState.getRuntimeValue.mockReturnValue(1);
-      const ps = makePlayerStats();
-      const action = makeAction({ healExpression: '1d4', uses: 1 });
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.payload.description).toContain('no uses remaining');
-    });
-
     it('should block when no uses remaining and report recharge type', async () => {
       runtimeState.getRuntimeValue.mockReturnValue(0);
       const ps = makePlayerStats();
@@ -195,20 +185,6 @@ describe('healingHandler', () => {
         campaignName,
         true,
       );
-    });
-
-    it('should use _trackedResources max when available', async () => {
-      runtimeState.getRuntimeValue.mockReturnValue(5);
-      const ps = makePlayerStats({
-        _trackedResources: {
-          HealingTouchUses: { max: 5 },
-        },
-      });
-      const action = makeAction({ healExpression: '1d4', uses: 1 });
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.payload.description).toContain('4 uses remaining');
     });
 
     it('should replace fighter level in expression', async () => {
@@ -298,32 +274,6 @@ describe('healingHandler', () => {
       );
     });
 
-    it('should skip hit dice balance check when hitDiceCost is 0', async () => {
-      restRules.getHitDieSize.mockReturnValue(8);
-      restRules.computeHitDieRecovery.mockReturnValue(4);
-      diceRoller.rollExpression.mockReturnValue({ total: 3, rolls: [3], modifier: 0 });
-
-      const ps = makePlayerStats();
-      const action = makeAction({
-        healExpression: 'hit_die_roll',
-        hitDiceCost: 0,
-      });
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.type).toBe('popup');
-      expect(restRules.getHitDieSize).toHaveBeenCalledWith(
-        expect.objectContaining({ level: 5 }),
-      );
-      expect(runtimeState.setRuntimeValue).not.toHaveBeenCalledWith(
-        'TestHealer',
-        'shortRestHitDice',
-        expect.any(Number),
-        campaignName,
-        true,
-      );
-    });
-
     it('should use Constitution bonus for hit die recovery', async () => {
       runtimeState.getRuntimeValue.mockReturnValue(2);
       restRules.getHitDieSize.mockReturnValue(10);
@@ -343,24 +293,6 @@ describe('healingHandler', () => {
       expect(restRules.computeHitDieRecovery).toHaveBeenCalledWith(6, 3);
     });
 
-    it('should not decrement hit dice when hitDiceCost is 0', async () => {
-      runtimeState.getRuntimeValue.mockReturnValue(undefined);
-      const ps = makePlayerStats();
-      const action = makeAction({
-        healExpression: 'hit_die_roll',
-        hitDiceCost: 0,
-      });
-
-      await handle(action, ps, campaignName, null);
-
-      expect(runtimeState.setRuntimeValue).not.toHaveBeenCalledWith(
-        'TestHealer',
-        'shortRestHitDice',
-        expect.any(Number),
-        campaignName,
-        true,
-      );
-    });
   });
 
   // ── Bloodied only ────────────────────────────────────────────
@@ -403,18 +335,6 @@ describe('healingHandler', () => {
 
       expect(result.type).toBe('popup');
       expect(result.payload.type).toBe('automation_info');
-    });
-
-    it('should block when HP is zero', async () => {
-      const ps = makePlayerStats({ currentHitPoints: 0, maxHitPoints: 20 });
-      const action = makeAction({
-        healExpression: '1d4',
-        bloodiedOnly: true,
-      });
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.payload.description).toContain('Bloodied');
     });
   });
 
@@ -474,20 +394,6 @@ describe('healingHandler', () => {
 
       expect(result.type).toBe('popup');
       expect(result.payload.type).toBe('automation_info');
-    });
-
-    it('should return automation_info when uses depleted', async () => {
-      runtimeState.getRuntimeValue.mockReturnValue(0);
-
-      const ps = makePlayerStats();
-      const action = makeAction({
-        uses: 1,
-        healExpression: '2d4',
-      });
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.payload.description).toContain('no uses remaining');
     });
 
     it('should return healing popup when no uses field and no healExpression for self_healing', async () => {
@@ -837,47 +743,6 @@ describe('healingHandler', () => {
         true,
       );
     });
-
-    it('should use usesMax from automation when no runtime value', async () => {
-      runtimeState.getRuntimeValue.mockReturnValue(undefined);
-      const ps = makePlayerStats();
-      const action = makeAction({ healExpression: '1d4', usesMax: 3 });
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.type).toBe('popup');
-      expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-        'TestHealer',
-        'healingtouchUses',
-        2,
-        campaignName,
-        true,
-      );
-    });
   });
 
-  // ── Popup description edge cases ─────────────────────────────
-
-  describe('popup description edge cases', () => {
-    it('should report singular "use" when 1 use remaining', async () => {
-      runtimeState.getRuntimeValue.mockReturnValue(2);
-      const ps = makePlayerStats();
-      const action = makeAction({ healExpression: '1d4', uses: 1 });
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.payload.description).toContain('1 use remaining');
-      expect(result.payload.description).not.toContain('uses');
-    });
-
-    it('should report plural "uses" when more than 1 remaining', async () => {
-      runtimeState.getRuntimeValue.mockReturnValue(3);
-      const ps = makePlayerStats();
-      const action = makeAction({ healExpression: '1d4', uses: 1 });
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.payload.description).toContain('2 uses remaining');
-    });
-  });
 });

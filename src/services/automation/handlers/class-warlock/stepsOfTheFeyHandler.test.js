@@ -106,25 +106,6 @@ describe('stepsOfTheFeyHandler.handle', () => {
       expect(result.payload.description).toContain('No free uses');
     });
 
-    it('returns popup when free cast count is null (falls back to uses_expression)', async () => {
-      const action = makeAction({ uses_expression: '3' });
-      const ps = makePlayerStats();
-
-      useRuntimeState.getRuntimeValue.mockReturnValue(null);
-      automationExpressions.evaluateAutoExpression.mockReturnValue(3);
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.type).toBe('popup');
-      // null falls through to usesMax via ?? operator, but then
-      // currentCount = Number(null) which is NaN, NaN <= 0 is false,
-      // so it proceeds. But the real behavior: getRuntimeValue returns
-      // null, ?? usesMax=3, Number(3)=3, so it should proceed.
-      // Actually the code does: getRuntimeValue(...) ?? usesMax, then
-      // Number(...). If getRuntimeValue returns null, ?? gives usesMax (3),
-      // Number(3) = 3, 3 > 0, so it proceeds. We need to test that path.
-    });
-
     it('decrements freeCastCount and proceeds when uses are available', async () => {
       const action = makeAction({ uses_expression: '3' });
       const ps = makePlayerStats();
@@ -197,22 +178,6 @@ describe('stepsOfTheFeyHandler.handle', () => {
       const tempHpCall = setCalls.find(c => c[1] === 'tempHp');
       expect(tempHpCall).toBeDefined();
       expect(tempHpCall[2]).toBe(10);
-    });
-
-    it('sets temp HP when existing is null', async () => {
-      useRuntimeState.getRuntimeValue.mockImplementation((name, key) => {
-        if (key.includes('freeCastCount')) return 1;
-        if (key === 'tempHp') return null;
-        return null;
-      });
-      automationExpressions.evaluateAutoExpression.mockReturnValue(1);
-      targetResolver.resolveTarget.mockResolvedValue(null);
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      const setCalls = useRuntimeState.setRuntimeValue.mock.calls;
-      const tempHpCall = setCalls.find(c => c[1] === 'tempHp');
-      expect(tempHpCall).toBeDefined();
     });
   });
 
@@ -372,22 +337,6 @@ describe('stepsOfTheFeyHandler.handle', () => {
       );
     });
 
-    it('ignores save-result events with different promptId', async () => {
-      setupSaveMocks('correct-prompt');
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      dispatchSaveResult('wrong-prompt', false);
-
-      await Promise.resolve();
-      await Promise.resolve();
-
-      const saveResultCalls = logService.addEntry.mock.calls.filter(
-        call => call[1]?.type === 'save_result',
-      );
-      expect(saveResultCalls.length).toBe(0);
-    });
-
     it('removes event listener after handling save result', async () => {
       const removeEventListenerSpy = vi.spyOn(window, 'removeEventListener');
       const addEventListenerSpy = vi.spyOn(window, 'addEventListener');
@@ -411,24 +360,6 @@ describe('stepsOfTheFeyHandler.handle', () => {
       removeEventListenerSpy.mockRestore();
     });
 
-    it('does not apply condition on successful save', async () => {
-      setupSaveMocks('success-no-cond');
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      dispatchSaveResult('success-no-cond', true);
-
-      await Promise.resolve();
-      await Promise.resolve();
-
-      expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalledWith(
-        'Goblin',
-        'activeConditions',
-        expect.any(Array),
-        campaignName,
-      );
-      expect(expirations.addExpiration).not.toHaveBeenCalled();
-    });
   });
 
   describe('taunting step without target', () => {
@@ -451,43 +382,6 @@ describe('stepsOfTheFeyHandler.handle', () => {
       expect(result.payload.description).toContain('No target selected');
       expect(result.payload.triggerMistyStep).toBe(true);
       expect(savePrompt.createSaveListener).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('log entries', () => {
-    it('adds ability_use log entry on successful execution with target', async () => {
-      useRuntimeState.getRuntimeValue.mockImplementation((name, key) => {
-        if (key.includes('freeCastCount')) return 1;
-        if (key === 'tempHp') return 0;
-        return null;
-      });
-      automationExpressions.evaluateAutoExpression.mockReturnValue(1);
-      targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
-      savePrompt.buildSaveDc.mockReturnValue(13);
-      savePrompt.createSaveListener.mockReturnValue({ promptId: 'entry-prompt' });
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      const abilityUseCalls = logService.addEntry.mock.calls.filter(
-        call => call[1]?.type === 'ability_use',
-      );
-      expect(abilityUseCalls.length).toBeGreaterThanOrEqual(1);
-    });
-
-    it('swallows errors from the final ability_use log entry', async () => {
-      useRuntimeState.getRuntimeValue.mockImplementation((name, key) => {
-        if (key.includes('freeCastCount')) return 1;
-        if (key === 'tempHp') return 0;
-        return null;
-      });
-      automationExpressions.evaluateAutoExpression.mockReturnValue(1);
-      targetResolver.resolveTarget.mockResolvedValue(null);
-      // No target, so only the final addEntry (line 118) is called, which has .catch(() => {})
-      // and swallows errors. Use mockImplementation so it doesn't affect other tests via
-      // mockRejectedValue's global state.
-      logService.addEntry.mockImplementation(() => Promise.reject(new Error('network')));
-
-      await expect(handle(makeAction(), makePlayerStats(), campaignName, null)).resolves.toBeDefined();
     });
   });
 

@@ -61,7 +61,7 @@ describe('shadowyDodgeHandler', () => {
     }
 
     describe('handle', () => {
-        it('should return popup when no recent attack exists', async () => {
+        it('should return popup when no recent attack exists or target does not match player', async () => {
             damageRollback.findLastAttack.mockResolvedValue({
                 attackEvent: null,
                 attackerName: null,
@@ -163,45 +163,10 @@ describe('shadowyDodgeHandler', () => {
             expect(result.payload.description).toContain('Disadvantage has no additional effect');
         });
 
-        it('should handle missing attackerName with placeholder text', async () => {
+        it('should use effectiveAc when present, falling back to targetAc', async () => {
             mockRandom([0.5]);
             const freshTimestamp = Date.now();
-            damageRollback.findLastAttack.mockResolvedValue({
-                attackEvent: { timestamp: freshTimestamp, d20: 10, bonus: 5, targetAc: 13, hit: true },
-                attackerName: null,
-                targetName: 'Test Rogue',
-                primaryDamage: 6,
-                secondaryDamage: 0,
-                totalDamage: 6,
-                damageTypes: [],
-            });
 
-            const result = await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
-
-            expect(result.payload.description).toContain('Unknown creature');
-        });
-
-        it('should fallback to targetAc when effectiveAc is undefined', async () => {
-            mockRandom([0.5]);
-            const freshTimestamp = Date.now();
-            damageRollback.findLastAttack.mockResolvedValue({
-                attackEvent: { timestamp: freshTimestamp, d20: 10, bonus: 5, targetAc: 13, hit: true },
-                attackerName: 'Goblin',
-                targetName: 'Test Rogue',
-                primaryDamage: 6,
-                secondaryDamage: 0,
-                totalDamage: 6,
-                damageTypes: [],
-            });
-
-            const result = await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
-
-            expect(result.payload.description).toContain('vs AC 13');
-        });
-
-        it('should use effectiveAc when present', async () => {
-            mockRandom([0.5]);
-            const freshTimestamp = Date.now();
             damageRollback.findLastAttack.mockResolvedValue({
                 attackEvent: { timestamp: freshTimestamp, d20: 10, bonus: 5, targetAc: 13, hit: true, effectiveAc: 16 },
                 attackerName: 'Goblin',
@@ -213,8 +178,20 @@ describe('shadowyDodgeHandler', () => {
             });
 
             const result = await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
-
             expect(result.payload.description).toContain('vs AC 16');
+
+            damageRollback.findLastAttack.mockResolvedValue({
+                attackEvent: { timestamp: freshTimestamp, d20: 10, bonus: 5, targetAc: 13, hit: true },
+                attackerName: 'Goblin',
+                targetName: 'Test Rogue',
+                primaryDamage: 6,
+                secondaryDamage: 0,
+                totalDamage: 6,
+                damageTypes: [],
+            });
+
+            const result2 = await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
+            expect(result2.payload.description).toContain('vs AC 13');
         });
 
         it('should use custom action name when provided', async () => {

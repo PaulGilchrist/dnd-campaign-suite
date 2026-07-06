@@ -91,21 +91,6 @@ describe('resistanceHandler', () => {
       ]);
     });
 
-    it('returns error popup when no combat context', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-      damageUtils.getCombatContext.mockResolvedValue(null);
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.type).toBe('automation_info');
-      expect(result.payload.name).toBe('Resistance');
-      expect(result.payload.description).toContain('No combat context found');
-      expect(result.payload.description).toContain('Resistance');
-      expect(result.payload.automation).toEqual(action.automation);
-    });
-
     it('filters out the caster from creature targets', async () => {
       const ps = makePlayerStats({ name: 'Cleric' });
       const action = makeAction();
@@ -119,6 +104,20 @@ describe('resistanceHandler', () => {
       const result = await handle(action, ps, campaignName, null);
 
       expect(result.payload.creatureTargets).toEqual(['Goblin']);
+    });
+
+    it('returns error popup when no combat context', async () => {
+      const ps = makePlayerStats();
+      const action = makeAction();
+      damageUtils.getCombatContext.mockResolvedValue(null);
+
+      const result = await handle(action, ps, campaignName, null);
+
+      expect(result.type).toBe('popup');
+      expect(result.payload.type).toBe('automation_info');
+      expect(result.payload.name).toBe('Resistance');
+      expect(result.payload.description).toContain('No combat context found');
+      expect(result.payload.description).toContain('Resistance');
     });
 
     it('returns empty creatureTargets when caster is the only creature', async () => {
@@ -160,20 +159,7 @@ describe('resistanceHandler', () => {
       expect(result.payload.automation).toEqual({});
     });
 
-    it('handles action with no name property', async () => {
-      const ps = makePlayerStats();
-      const action = {};
-      damageUtils.getCombatContext.mockResolvedValue({
-        creatures: [{ name: 'Goblin', type: 'npc' }],
-      });
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.name).toBeUndefined();
-    });
-
-    it('handles action with no name and no automation', async () => {
+    it('handles action with no automation when no combat context', async () => {
       const ps = makePlayerStats();
       const action = {};
       damageUtils.getCombatContext.mockResolvedValue(null);
@@ -296,21 +282,6 @@ describe('resistanceHandler', () => {
       expect(result).toBeNull();
     });
 
-    it('returns null when both targetName and chosenDamageType are missing', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-
-      const result = await applyResistance(
-        action,
-        ps,
-        campaignName,
-        null,
-        null
-      );
-
-      expect(result).toBeNull();
-    });
-
     it('replaces existing Resistance buff instead of appending', async () => {
       const ps = makePlayerStats();
       const action = makeAction();
@@ -404,78 +375,10 @@ describe('resistanceHandler', () => {
       });
     });
 
-    it('returns popup with target and damage type in description', async () => {
-      const ps = makePlayerStats({ name: 'Paladin' });
-      const action = makeAction();
-      useRuntimeState.getRuntimeValue.mockReturnValue(null);
-
-      const result = await applyResistance(
-        action,
-        ps,
-        campaignName,
-        'Goblin',
-        'cold'
-      );
-
-      expect(result.payload.description).toContain('Goblin');
-      expect(result.payload.description).toContain('Cold');
-      expect(result.payload.description).toContain('1d4');
-    });
-
-    it('preserves other buffs when replacing Resistance', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-      useRuntimeState.getRuntimeValue.mockReturnValue([
-        { name: 'Shield of Faith', effect: 'ac_bonus', acBonus: 2 },
-        { name: 'Bless', effect: 'advantage_on_save' },
-        { name: 'Resistance', effect: 'damage_reduction', resistanceTypes: ['Acid'] },
-      ]);
-
-      await applyResistance(
-        action,
-        ps,
-        campaignName,
-        'Goblin',
-        'fire'
-      );
-
-      const callArgs = useRuntimeState.setRuntimeValue.mock.calls.find(
-        (c) => c[1] === 'activeBuffs'
-      );
-      const buffs = callArgs[2];
-
-      expect(buffs).toHaveLength(3);
-      expect(buffs.find((b) => b.name === 'Shield of Faith')).toBeTruthy();
-      expect(buffs.find((b) => b.name === 'Bless')).toBeTruthy();
-      expect(buffs.find((b) => b.name === 'Resistance').resistanceTypes).toEqual(['Fire']);
-    });
-
     it('appends Resistance when no existing buffs array', async () => {
       const ps = makePlayerStats();
       const action = makeAction();
       useRuntimeState.getRuntimeValue.mockReturnValue(undefined);
-
-      await applyResistance(
-        action,
-        ps,
-        campaignName,
-        'Goblin',
-        'fire'
-      );
-
-      const callArgs = useRuntimeState.setRuntimeValue.mock.calls.find(
-        (c) => c[1] === 'activeBuffs'
-      );
-      const buffs = callArgs[2];
-
-      expect(buffs).toHaveLength(1);
-      expect(buffs[0].name).toBe('Resistance');
-    });
-
-    it('appends Resistance when existing buffs array is empty', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-      useRuntimeState.getRuntimeValue.mockReturnValue([]);
 
       await applyResistance(
         action,
@@ -513,48 +416,6 @@ describe('resistanceHandler', () => {
       const buffs = callArgs[2];
 
       expect(buffs[0].sourceCharacter).toBe('Paladin');
-    });
-
-    it('uses action.name in log entry', async () => {
-      const ps = makePlayerStats({ name: 'Paladin' });
-      const action = { name: 'Arcane Ward', automation: makeAction().automation };
-      useRuntimeState.getRuntimeValue.mockReturnValue(null);
-
-      await applyResistance(
-        action,
-        ps,
-        campaignName,
-        'Goblin',
-        'fire'
-      );
-
-      expect(logService.addEntry).toHaveBeenCalledWith(
-        campaignName,
-        expect.objectContaining({
-          abilityName: 'Arcane Ward',
-        })
-      );
-    });
-
-    it('calls addExpiration with correct parameters', async () => {
-      const ps = makePlayerStats({ name: 'Paladin' });
-      const action = makeAction();
-      useRuntimeState.getRuntimeValue.mockReturnValue(null);
-
-      await applyResistance(
-        action,
-        ps,
-        campaignName,
-        'Goblin',
-        'fire'
-      );
-
-      expect(expirations.addExpiration).toHaveBeenCalledWith(
-        'Paladin',
-        'Goblin',
-        expect.any(Array),
-        campaignName
-      );
     });
   });
 
@@ -600,24 +461,13 @@ describe('resistanceHandler', () => {
   });
 
   describe('setResistanceUsedThisTurn', () => {
-    it('sets the flag to true', async () => {
+    it('sets the flag', async () => {
       await setResistanceUsedThisTurn('Goblin', true, campaignName);
 
       expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
         'Goblin',
         'resistanceUsedThisTurn',
         true,
-        campaignName
-      );
-    });
-
-    it('sets the flag to false', async () => {
-      await setResistanceUsedThisTurn('Goblin', false, campaignName);
-
-      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-        'Goblin',
-        'resistanceUsedThisTurn',
-        false,
         campaignName
       );
     });

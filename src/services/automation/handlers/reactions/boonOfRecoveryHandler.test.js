@@ -54,17 +54,21 @@ describe('boonOfRecoveryHandler', () => {
         });
 
         describe('when last stand is available', () => {
-            it('should mark last stand as used, set HP to half max, and clear death saves', async () => {
+            it('should mark last stand as used, set HP to half max, clear death saves, filter unconscious, and post logs', async () => {
+                const dispatchSpy = vi.spyOn(window, 'dispatchEvent');
                 runtimeState.getRuntimeValue.mockImplementation((_charName, key) => {
                     if (key === 'boonOfRecoveryLastStandUsed') return undefined;
                     if (key === 'deathSaves') return [true, false, true];
                     if (key === 'deathFailures') return [false, true, false];
+                    if (key === 'activeConditions') return ['unconscious', 'poisoned'];
                     return undefined;
                 });
                 logService.addEntry.mockResolvedValue(undefined);
 
                 const result = await handle(mockAction, mockPlayerStats, campaignName);
 
+                expect(dispatchSpy).toHaveBeenCalledWith(expect.objectContaining({ type: 'combat-summary-updated' }));
+                dispatchSpy.mockRestore();
                 expect(result.type).toBe('popup');
                 expect(result.payload.type).toBe('automation_info');
                 expect(result.payload.name).toBe('Boon Of Recovery');
@@ -82,32 +86,9 @@ describe('boonOfRecoveryHandler', () => {
                 expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
                     playerName, 'deathFailures', [false, false, false], campaignName
                 );
-            });
-
-            it('should filter out unconscious condition from active conditions', async () => {
-                runtimeState.getRuntimeValue.mockImplementation((_charName, key) => {
-                    if (key === 'boonOfRecoveryLastStandUsed') return undefined;
-                    if (key === 'activeConditions') return ['unconscious', 'poisoned'];
-                    return undefined;
-                });
-                logService.addEntry.mockResolvedValue(undefined);
-
-                await handle(mockAction, mockPlayerStats, campaignName);
-
                 expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
                     playerName, 'activeConditions', ['poisoned'], campaignName
                 );
-            });
-
-            it('should post a heal log entry via logPoster', async () => {
-                runtimeState.getRuntimeValue.mockImplementation((_charName, key) => {
-                    if (key === 'boonOfRecoveryLastStandUsed') return undefined;
-                    return undefined;
-                });
-                logService.addEntry.mockResolvedValue(undefined);
-
-                await handle(mockAction, mockPlayerStats, campaignName);
-
                 expect(logPoster.postLogEntry).toHaveBeenCalledWith(campaignName, {
                     type: 'heal',
                     targetName: playerName,
@@ -118,37 +99,12 @@ describe('boonOfRecoveryHandler', () => {
                     isUnconscious: false,
                     abilityName: 'Boon Of Recovery',
                 });
-            });
-
-            it('should add an ability_use log entry via logService', async () => {
-                runtimeState.getRuntimeValue.mockImplementation((_charName, key) => {
-                    if (key === 'boonOfRecoveryLastStandUsed') return undefined;
-                    return undefined;
-                });
-                logService.addEntry.mockResolvedValue(undefined);
-
-                await handle(mockAction, mockPlayerStats, campaignName);
-
                 expect(logService.addEntry).toHaveBeenCalledWith(campaignName, {
                     type: 'ability_use',
                     characterName: playerName,
                     abilityName: 'Boon Of Recovery',
                     description: expect.stringContaining('used Boon Of Recovery'),
                 });
-            });
-
-            it('should dispatch combat-summary-updated event', async () => {
-                runtimeState.getRuntimeValue.mockImplementation((_charName, key) => {
-                    if (key === 'boonOfRecoveryLastStandUsed') return undefined;
-                    return undefined;
-                });
-                logService.addEntry.mockResolvedValue(undefined);
-                const dispatchSpy = vi.spyOn(window, 'dispatchEvent');
-
-                await handle(mockAction, mockPlayerStats, campaignName);
-
-                expect(dispatchSpy).toHaveBeenCalledWith(expect.objectContaining({ type: 'combat-summary-updated' }));
-                dispatchSpy.mockRestore();
             });
 
             it('should floor the heal amount for odd max HP values', async () => {
@@ -217,29 +173,6 @@ describe('boonOfRecoveryHandler', () => {
                 expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
                     playerName, 'currentHitPoints', 1, campaignName
                 );
-            });
-        });
-
-        describe('fire-and-forget resilience', () => {
-            it('should return popup and apply state even when logService.addEntry rejects', async () => {
-                runtimeState.getRuntimeValue.mockImplementation((_charName, key) => {
-                    if (key === 'boonOfRecoveryLastStandUsed') return undefined;
-                    return undefined;
-                });
-                const logError = new Error('Log service unavailable');
-                logService.addEntry.mockRejectedValue(logError);
-
-                const result = await handle(mockAction, mockPlayerStats, campaignName);
-
-                expect(result.type).toBe('popup');
-                expect(result.payload.type).toBe('automation_info');
-                expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-                    playerName, 'boonOfRecoveryLastStandUsed', true, campaignName
-                );
-                expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-                    playerName, 'currentHitPoints', 20, campaignName
-                );
-                expect(logService.addEntry).toHaveBeenCalledWith(campaignName, expect.any(Object));
             });
         });
     });

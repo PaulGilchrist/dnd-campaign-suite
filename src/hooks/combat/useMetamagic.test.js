@@ -64,32 +64,21 @@ describe('spendSorceryPoints', () => {
     expect(remaining).toBe(0);
   });
 
-  it('handles spending 0 points', async () => {
+  it('handles spending 0 points or non-existent character', async () => {
     const { spendSorceryPoints } = await import('./useMetamagic.js');
-    const remaining = spendSorceryPoints('TestSorcerer', 0, 'test-campaign');
-    expect(remaining).toBe(5);
+    expect(spendSorceryPoints('TestSorcerer', 0, 'test-campaign')).toBe(5);
+    expect(spendSorceryPoints('UnknownCharacter', 5, 'test-campaign')).toBe(0);
   });
 
-  it('handles non-existent character starting at 0', async () => {
-    const { spendSorceryPoints } = await import('./useMetamagic.js');
-    const remaining = spendSorceryPoints('UnknownCharacter', 5, 'test-campaign');
-    expect(remaining).toBe(0);
-  });
-
-  it('dispatches sorcery-points-updated event', async () => {
-    const { spendSorceryPoints } = await import('./useMetamagic.js');
+  it('dispatches sorcery-points-updated event and persists the new value', async () => {
+    const { spendSorceryPoints, getCurrentSorceryPoints } = await import('./useMetamagic.js');
     const dispatchSpy = vi.spyOn(window, 'dispatchEvent');
     spendSorceryPoints('TestSorcerer', 2, 'test-campaign');
     expect(dispatchSpy).toHaveBeenCalledWith(expect.objectContaining({
       type: 'sorcery-points-updated',
     }));
     dispatchSpy.mockRestore();
-  });
-
-  it('persists the new value in the store', async () => {
-    const { spendSorceryPoints, getCurrentSorceryPoints } = await import('./useMetamagic.js');
-    spendSorceryPoints('TestSorcerer', 3, 'test-campaign');
-    expect(getCurrentSorceryPoints('TestSorcerer')).toBe(2);
+    expect(getCurrentSorceryPoints('TestSorcerer')).toBe(3);
   });
 });
 
@@ -98,21 +87,12 @@ describe('spendSorceryPoints', () => {
 describe('getCurrentSorceryPoints', () => {
   beforeEach(() => clearStores());
 
-  it('returns stored value', async () => {
-    const { getCurrentSorceryPoints } = await import('./useMetamagic.js');
-    const { spendSorceryPoints } = await import('./useMetamagic.js');
+  it('returns stored value or fallback when no value stored', async () => {
+    const { getCurrentSorceryPoints, spendSorceryPoints } = await import('./useMetamagic.js');
     spendSorceryPoints('TestSorcerer', 2, 'test-campaign');
     expect(getCurrentSorceryPoints('TestSorcerer')).toBe(3);
-  });
-
-  it('returns null when no value stored', async () => {
-    const { getCurrentSorceryPoints } = await import('./useMetamagic.js');
-    expect(getCurrentSorceryPoints('Unknown')).toBeNull();
-  });
-
-  it('returns fallback when no value stored and fallback provided', async () => {
-    const { getCurrentSorceryPoints } = await import('./useMetamagic.js');
     expect(getCurrentSorceryPoints('Unknown', 10)).toBe(10);
+    expect(getCurrentSorceryPoints('Unknown')).toBeNull();
   });
 
   it('handles stored value of 0', async () => {
@@ -134,16 +114,13 @@ describe('getMaxSorceryPoints', () => {
     });
   });
 
-  it('returns max from class features', async () => {
+  it('returns max from class features or 0 when classFeatures returns null', async () => {
     const { getMaxSorceryPoints } = await import('./useMetamagic.js');
     const stats = { name: 'TestSorcerer', class: { name: 'Sorcerer' } };
     expect(getMaxSorceryPoints(stats)).toBe(10);
-  });
 
-  it('returns 0 when classFeatures returns null', async () => {
     const classFeatures = await import('../../services/character/classFeatures.js');
     classFeatures.getClassFeatures.mockReturnValue(null);
-    const { getMaxSorceryPoints } = await import('./useMetamagic.js');
     expect(getMaxSorceryPoints({ name: 'Wizard', class: { name: 'Wizard' } })).toBe(0);
   });
 });
@@ -153,7 +130,7 @@ describe('getMaxSorceryPoints', () => {
 describe('logMetamagicUse', () => {
   beforeEach(() => clearStores());
 
-  it('posts a metamagic_use log entry to the API', async () => {
+  it('posts a metamagic_use log entry to the API with correct payload', async () => {
     const { logMetamagicUse, spendSorceryPoints } = await import('./useMetamagic.js');
     spendSorceryPoints('TestSorcerer', 2, 'test-campaign');
 
@@ -181,7 +158,7 @@ describe('logMetamagicUse', () => {
     fetchSpy.mockRestore();
   });
 
-  it('wraps non-array options in an array', async () => {
+  it('wraps non-array options in an array and encodes campaign name in URL', async () => {
     const { logMetamagicUse } = await import('./useMetamagic.js');
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue({ ok: true });
     logMetamagicUse('test-campaign', 'TestSorcerer', 'Fireball', 'Empowered Spell', 1);
@@ -190,23 +167,18 @@ describe('logMetamagicUse', () => {
 
     const body = JSON.parse(fetchSpy.mock.calls[0][1].body);
     expect(body.options).toEqual(['Empowered Spell']);
-
     fetchSpy.mockRestore();
-  });
 
-  it('encodes campaign name in URL', async () => {
-    const { logMetamagicUse } = await import('./useMetamagic.js');
-    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue({ ok: true });
+    const fetchSpy2 = vi.spyOn(globalThis, 'fetch').mockResolvedValue({ ok: true });
     logMetamagicUse('my test campaign', 'TestSorcerer', 'Fireball', [], 1);
 
     await new Promise(resolve => setTimeout(resolve, 10));
 
-    expect(fetchSpy).toHaveBeenCalledWith(
+    expect(fetchSpy2).toHaveBeenCalledWith(
       '/api/campaigns/my%20test%20campaign/log',
       expect.anything()
     );
-
-    fetchSpy.mockRestore();
+    fetchSpy2.mockRestore();
   });
 });
 
@@ -223,25 +195,23 @@ describe('useMetamagic hook', () => {
     });
   });
 
-  it('returns current and max SP', () => {
+  it('returns current and max SP and handles null playerStats gracefully', () => {
     const stats = { name: 'TestSorcerer', class: { name: 'Sorcerer' } };
     const { result } = renderHook(() => useMetamagic(stats, 'test-campaign'));
     expect(result.current.currentSP).toBe(5);
     expect(result.current.maxSP).toBe(10);
   });
 
-  it('spendSorceryPoints deducts and dispatches event', () => {
-    const stats = { name: 'TestSorcerer', class: { name: 'Sorcerer' } };
-    const { result } = renderHook(() => useMetamagic(stats, 'test-campaign'));
+  it('handles null playerStats gracefully', async () => {
+    const classFeatures = await import('../../services/character/classFeatures.js');
+    classFeatures.getClassFeatures.mockReturnValue(null);
 
-    act(() => {
-      result.current.spendSorceryPoints(3);
-    });
-
-    expect(result.current.currentSP).toBe(2);
+    const { result } = renderHook(() => useMetamagic(null, 'test-campaign'));
+    expect(result.current.currentSP).toBe(0);
+    expect(result.current.maxSP).toBe(0);
   });
 
-  it('spendSorceryPoints returns remaining value', () => {
+  it('spendSorceryPoints deducts, returns remaining, and does not go below 0', () => {
     const stats = { name: 'TestSorcerer', class: { name: 'Sorcerer' } };
     const { result } = renderHook(() => useMetamagic(stats, 'test-campaign'));
 
@@ -250,24 +220,14 @@ describe('useMetamagic hook', () => {
       spent = result.current.spendSorceryPoints(3);
     });
 
+    expect(result.current.currentSP).toBe(2);
     expect(spent).toBe(2);
-  });
-
-  it('spendSorceryPoints does not go below 0', () => {
-    const stats = { name: 'TestSorcerer', class: { name: 'Sorcerer' } };
-    const { result } = renderHook(() => useMetamagic(stats, 'test-campaign'));
 
     act(() => {
       result.current.spendSorceryPoints(999);
     });
 
     expect(result.current.currentSP).toBe(0);
-  });
-
-  it('returns logMetamagic callback', () => {
-    const stats = { name: 'TestSorcerer', class: { name: 'Sorcerer' } };
-    const { result } = renderHook(() => useMetamagic(stats, 'test-campaign'));
-    expect(typeof result.current.logMetamagic).toBe('function');
   });
 
   it('logMetamagic posts a log entry via logMetamagicUse', async () => {
@@ -288,24 +248,5 @@ describe('useMetamagic hook', () => {
     expect(body.spellName).toBe('Fireball');
 
     fetchSpy.mockRestore();
-  });
-
-  it('returns all expected properties', () => {
-    const stats = { name: 'TestSorcerer', class: { name: 'Sorcerer' } };
-    const { result } = renderHook(() => useMetamagic(stats, 'test-campaign'));
-
-    expect(result.current).toHaveProperty('currentSP');
-    expect(result.current).toHaveProperty('maxSP');
-    expect(result.current).toHaveProperty('spendSorceryPoints');
-    expect(result.current).toHaveProperty('logMetamagic');
-  });
-
-  it('handles null playerStats gracefully', async () => {
-    const classFeatures = await import('../../services/character/classFeatures.js');
-    classFeatures.getClassFeatures.mockReturnValue(null);
-
-    const { result } = renderHook(() => useMetamagic(null, 'test-campaign'));
-    expect(result.current.currentSP).toBe(0);
-    expect(result.current.maxSP).toBe(0);
   });
 });

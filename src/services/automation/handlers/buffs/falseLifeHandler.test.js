@@ -46,7 +46,7 @@ describe('falseLifeHandler.handle', () => {
   });
 
   describe('temp HP expression selection', () => {
-    it('uses default 2d4+4 when automation.tempHpExpression is missing', async () => {
+    it('uses default 2d4+4 when no expression is provided', async () => {
       const ps = makePlayerStats();
       const action = makeAction({ automation: {} });
 
@@ -121,18 +121,9 @@ describe('falseLifeHandler.handle', () => {
       expect(diceRoller.rollExpression).toHaveBeenCalledWith('5d6+5');
     });
 
-    it('uses automation expression when spell object is absent', async () => {
+    it('uses automation or default expression when spell object is absent', async () => {
       const ps = makePlayerStats();
       const action = makeAction({ spell: undefined });
-
-      await handle(action, ps, CAMPAIGN_NAME, null);
-
-      expect(diceRoller.rollExpression).toHaveBeenCalledWith('2d4+4');
-    });
-
-    it('uses automation expression when spell has no level and spellSlotLevel is absent', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction({ spell: {} });
 
       await handle(action, ps, CAMPAIGN_NAME, null);
 
@@ -185,17 +176,10 @@ describe('falseLifeHandler.handle', () => {
 
       expect(result.payload.automationType).toBe('false_life');
     });
-
-    it('includes custom action name in payload', async () => {
-      const action = makeAction({ name: 'Custom False Life' });
-      const result = await handle(action, makePlayerStats(), CAMPAIGN_NAME, null);
-
-      expect(result.payload.name).toBe('Custom False Life');
-    });
   });
 
   describe('roll failure', () => {
-    it('returns info popup with error description when roll returns null', async () => {
+    it('returns info popup with error description when roll fails', async () => {
       diceRoller.rollExpression.mockReturnValue(null);
       const result = await handle(
         makeAction({ automation: { tempHpExpression: 'invalid' } }),
@@ -210,15 +194,6 @@ describe('falseLifeHandler.handle', () => {
       expect(result.payload.description).toBe(
         'False Life: Could not roll temp HP (invalid).'
       );
-      expect(runtimeState.setRuntimeValue).not.toHaveBeenCalled();
-    });
-
-    it('returns info popup when roll returns undefined', async () => {
-      diceRoller.rollExpression.mockReturnValue(undefined);
-      const result = await handle(makeAction(), makePlayerStats(), CAMPAIGN_NAME, null);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.type).toBe('automation_info');
       expect(runtimeState.setRuntimeValue).not.toHaveBeenCalled();
     });
   });

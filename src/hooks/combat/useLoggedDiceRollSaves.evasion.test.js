@@ -87,22 +87,24 @@ describe('createSaves (useLoggedDiceRollSaves) - Evasion & Shields', () => {
     }
 
     describe('quickRollPlayerSave - Evasion', () => {
-        it('handles own evasion - zero damage on save success', async () => {
-            deps.pendingSaves['prompt-1'] = {
-                targetName: 'ElfRogue',
-                rawDamage: 20,
-                saveDc: 15,
-                saveType: 'DEX',
-                dcSuccess: 'half',
-                damageType: 'fire',
-                attackerName: 'TestWizard',
-                name: 'Fireball',
-                formula: '8d6',
-                rolls: [3, 4, 5, 2, 3, 3],
-                modifier: 0,
-                campaignName: 'test-campaign',
-                setPopupHtml: vi.fn(),
-            };
+        const basePending = {
+            targetName: 'ElfRogue',
+            rawDamage: 20,
+            saveDc: 15,
+            saveType: 'DEX',
+            dcSuccess: 'half',
+            damageType: 'fire',
+            attackerName: 'TestWizard',
+            name: 'Fireball',
+            formula: '8d6',
+            rolls: [3, 4, 5, 2, 3, 3],
+            modifier: 0,
+            campaignName: 'test-campaign',
+            setPopupHtml: vi.fn(),
+        };
+
+        it('applies own evasion: zero damage on success, half on failure', async () => {
+            deps.pendingSaves['prompt-1'] = { ...basePending };
             deps.charactersRef.current = [{
                 name: 'ElfRogue',
                 computedStats: {
@@ -110,15 +112,7 @@ describe('createSaves (useLoggedDiceRollSaves) - Evasion & Shields', () => {
                 },
             }];
             rollSaveForCreature.mockReturnValue({ success: true, roll: 18, total: 21, bonus: 3 });
-            computeDamageAfterEvasion.mockImplementation((raw, success, dcSuccess, evasion) => {
-                if (evasion && dcSuccess === 'half') {
-                    if (success) return 0;
-                    return Math.floor(raw / 2);
-                }
-                if (!success) return raw;
-                if (dcSuccess === 'half') return Math.floor(raw / 2);
-                return 0;
-            });
+            computeDamageAfterEvasion.mockReturnValue(0);
             loadCombatSummary.mockResolvedValue({
                 creatures: [{ name: 'ElfRogue', type: 'player', ac: 15, currentHp: 20, maxHp: 20 }],
             });
@@ -135,54 +129,18 @@ describe('createSaves (useLoggedDiceRollSaves) - Evasion & Shields', () => {
                 false,
                 'TestWizard'
             );
-        });
 
-        it('handles own evasion - half damage on save failure', async () => {
-            deps.pendingSaves['prompt-1'] = {
-                targetName: 'ElfRogue',
-                rawDamage: 20,
-                saveDc: 15,
-                saveType: 'DEX',
-                dcSuccess: 'half',
-                damageType: 'fire',
-                attackerName: 'TestWizard',
-                name: 'Fireball',
-                formula: '8d6',
-                rolls: [3, 4, 5, 2, 3, 3],
-                modifier: 0,
-                campaignName: 'test-campaign',
-                setPopupHtml: vi.fn(),
-            };
-            deps.charactersRef.current = [{
-                name: 'ElfRogue',
-                computedStats: {
-                    evasionEffects: [{ saveType: 'DEX', source: 'Evasion' }],
-                },
-            }];
+            deps.pendingSaves['prompt-2'] = { ...basePending };
+            computeDamageAfterEvasion.mockReturnValue(10);
             rollSaveForCreature.mockReturnValue({ success: false, roll: 8, total: 11, bonus: 3 });
-            loadCombatSummary.mockResolvedValue({
-                creatures: [{ name: 'ElfRogue', type: 'player', ac: 15, currentHp: 20, maxHp: 20 }],
-            });
-            const { quickRollPlayerSave } = createFn();
-            await quickRollPlayerSave('prompt-1', 'ElfRogue', 'DEX', 15);
+            await quickRollPlayerSave('prompt-2', 'ElfRogue', 'DEX', 15);
             expect(computeDamageAfterEvasion).toHaveBeenCalledWith(20, false, 'half', true);
         });
 
         it('handles shared evasion from another character', async () => {
             deps.pendingSaves['prompt-1'] = {
+                ...basePending,
                 targetName: 'Goblin',
-                rawDamage: 20,
-                saveDc: 15,
-                saveType: 'DEX',
-                dcSuccess: 'half',
-                damageType: 'fire',
-                attackerName: 'TestWizard',
-                name: 'Fireball',
-                formula: '8d6',
-                rolls: [3, 4, 5, 2, 3, 3],
-                modifier: 0,
-                campaignName: 'test-campaign',
-                setPopupHtml: vi.fn(),
             };
             deps.charactersRef.current = [
                 { name: 'ElfRogue' },
@@ -202,21 +160,10 @@ describe('createSaves (useLoggedDiceRollSaves) - Evasion & Shields', () => {
             expect(computeDamageAfterEvasion).toHaveBeenCalledWith(20, true, 'half', true);
         });
 
-        it('skips evasion when target is incapacitated', async () => {
+        it('skips evasion when target is incapacitated or effect not shareable', async () => {
             deps.pendingSaves['prompt-1'] = {
+                ...basePending,
                 targetName: 'Goblin',
-                rawDamage: 20,
-                saveDc: 15,
-                saveType: 'DEX',
-                dcSuccess: 'half',
-                damageType: 'fire',
-                attackerName: 'TestWizard',
-                name: 'Fireball',
-                formula: '8d6',
-                rolls: [3, 4, 5, 2, 3, 3],
-                modifier: 0,
-                campaignName: 'test-campaign',
-                setPopupHtml: vi.fn(),
             };
             deps.charactersRef.current = [{
                 name: 'Goblin',
@@ -234,57 +181,10 @@ describe('createSaves (useLoggedDiceRollSaves) - Evasion & Shields', () => {
             const { quickRollPlayerSave } = createFn();
             await quickRollPlayerSave('prompt-1', 'Goblin', 'DEX', 15);
             expect(computeDamageAfterEvasion).toHaveBeenCalledWith(20, true, 'half', false);
-        });
 
-        it('does not apply shared evasion when shareRange is insufficient', async () => {
-            deps.pendingSaves['prompt-1'] = {
+            deps.pendingSaves['prompt-2'] = {
+                ...basePending,
                 targetName: 'Goblin',
-                rawDamage: 20,
-                saveDc: 15,
-                saveType: 'DEX',
-                dcSuccess: 'half',
-                damageType: 'fire',
-                attackerName: 'TestWizard',
-                name: 'Fireball',
-                formula: '8d6',
-                rolls: [3, 4, 5, 2, 3, 3],
-                modifier: 0,
-                campaignName: 'test-campaign',
-                setPopupHtml: vi.fn(),
-            };
-            deps.charactersRef.current = [
-                { name: 'Goblin' },
-                {
-                    name: 'Paladin',
-                    computedStats: {
-                        evasionEffects: [{ saveType: 'DEX', source: 'Aura', shareable: true, shareRange: 3 }],
-                    },
-                },
-            ];
-            rollSaveForCreature.mockReturnValue({ success: true, roll: 18, total: 21, bonus: 3 });
-            loadCombatSummary.mockResolvedValue({
-                creatures: [{ name: 'Goblin', type: 'npc', ac: 12, currentHp: 13, maxHp: 13 }],
-            });
-            const { quickRollPlayerSave } = createFn();
-            await quickRollPlayerSave('prompt-1', 'Goblin', 'DEX', 15);
-            expect(computeDamageAfterEvasion).toHaveBeenCalledWith(20, true, 'half', false);
-        });
-
-        it('does not apply shared evasion when not shareable', async () => {
-            deps.pendingSaves['prompt-1'] = {
-                targetName: 'Goblin',
-                rawDamage: 20,
-                saveDc: 15,
-                saveType: 'DEX',
-                dcSuccess: 'half',
-                damageType: 'fire',
-                attackerName: 'TestWizard',
-                name: 'Fireball',
-                formula: '8d6',
-                rolls: [3, 4, 5, 2, 3, 3],
-                modifier: 0,
-                campaignName: 'test-campaign',
-                setPopupHtml: vi.fn(),
             };
             deps.charactersRef.current = [
                 { name: 'Goblin' },
@@ -296,17 +196,13 @@ describe('createSaves (useLoggedDiceRollSaves) - Evasion & Shields', () => {
                 },
             ];
             rollSaveForCreature.mockReturnValue({ success: true, roll: 18, total: 21, bonus: 3 });
-            loadCombatSummary.mockResolvedValue({
-                creatures: [{ name: 'Goblin', type: 'npc', ac: 12, currentHp: 13, maxHp: 13 }],
-            });
-            const { quickRollPlayerSave } = createFn();
-            await quickRollPlayerSave('prompt-1', 'Goblin', 'DEX', 15);
+            await quickRollPlayerSave('prompt-2', 'Goblin', 'DEX', 15);
             expect(computeDamageAfterEvasion).toHaveBeenCalledWith(20, true, 'half', false);
         });
     });
 
     describe('quickRollPlayerSave - Shield & Intervene', () => {
-        it('handles shield immunity for magic missile', async () => {
+        it('handles shield immunity for magic missile only', async () => {
             deps.pendingSaves['prompt-1'] = {
                 targetName: 'Ally',
                 rawDamage: 15,
@@ -329,10 +225,8 @@ describe('createSaves (useLoggedDiceRollSaves) - Evasion & Shields', () => {
             const { quickRollPlayerSave } = createFn();
             await quickRollPlayerSave('prompt-1', 'Ally', 'DEX', 15);
             expect(computeDamageAfterEvasion).toHaveBeenCalledWith(15, true, 'half', false);
-        });
 
-        it('does not apply shield immunity for non-magic-missile spells', async () => {
-            deps.pendingSaves['prompt-1'] = {
+            deps.pendingSaves['prompt-2'] = {
                 targetName: 'Ally',
                 rawDamage: 15,
                 saveDc: 15,
@@ -347,14 +241,9 @@ describe('createSaves (useLoggedDiceRollSaves) - Evasion & Shields', () => {
                 campaignName: 'test-campaign',
                 setPopupHtml: vi.fn(),
             };
-            loadCombatSummary.mockResolvedValue({
-                creatures: [{ name: 'Ally', type: 'player', ac: 16, currentHp: 20, maxHp: 20 }],
-            });
             getRuntimeValue.mockReturnValueOnce(null).mockReturnValueOnce([{ effect: 'shield' }]);
             computeDamageAfterEvasion.mockReturnValue(7);
-            const { quickRollPlayerSave } = createFn();
-            await quickRollPlayerSave('prompt-1', 'Ally', 'DEX', 15);
-            // Shield only blocks Magic Missile, not Fireball - damage should be from evasion calc
+            await quickRollPlayerSave('prompt-2', 'Ally', 'DEX', 15);
             expect(computeDamageAfterEvasion).toHaveBeenCalledWith(15, true, 'half', false);
             expect(applyDamageToTarget).toHaveBeenCalledWith(
                 expect.any(Object),
@@ -368,7 +257,7 @@ describe('createSaves (useLoggedDiceRollSaves) - Evasion & Shields', () => {
             );
         });
 
-        it('handles intervene shield - sets damage to 0 on success', async () => {
+        it('handles intervene shield - sets damage to 0 on success, consumes on any DEX half save', async () => {
             deps.pendingSaves['prompt-1'] = {
                 targetName: 'Ally',
                 rawDamage: 20,
@@ -405,38 +294,8 @@ describe('createSaves (useLoggedDiceRollSaves) - Evasion & Shields', () => {
                 'TestWizard'
             );
             expect(setRuntimeValue).toHaveBeenCalledWith('Ally', 'interveneShieldActive', null, 'test-campaign');
-        });
 
-        it('does not apply intervene shield on non-DEX saves', async () => {
-            deps.pendingSaves['prompt-1'] = {
-                targetName: 'Ally',
-                rawDamage: 20,
-                saveDc: 15,
-                saveType: 'CON',
-                dcSuccess: 'half',
-                damageType: 'poison',
-                attackerName: 'TestWizard',
-                name: 'Cloudkill',
-                formula: '4d8',
-                rolls: [3, 4, 5, 8],
-                modifier: 0,
-                campaignName: 'test-campaign',
-                setPopupHtml: vi.fn(),
-            };
-            loadCombatSummary.mockResolvedValue({
-                creatures: [{ name: 'Ally', type: 'player', ac: 16, currentHp: 20, maxHp: 20 }],
-            });
-            getRuntimeValue.mockReturnValueOnce(null)
-                .mockReturnValueOnce(null)
-                .mockReturnValueOnce(true);
-            rollSaveForCreature.mockReturnValue({ success: true, roll: 18, total: 21, bonus: 3 });
-            const { quickRollPlayerSave } = createFn();
-            await quickRollPlayerSave('prompt-1', 'Ally', 'CON', 15);
-            expect(setRuntimeValue).not.toHaveBeenCalledWith('Ally', 'interveneShieldActive', null, 'test-campaign');
-        });
-
-        it('applies intervene shield and consumes it on DEX save failure', async () => {
-            deps.pendingSaves['prompt-1'] = {
+            deps.pendingSaves['prompt-2'] = {
                 targetName: 'Ally',
                 rawDamage: 20,
                 saveDc: 15,
@@ -451,37 +310,31 @@ describe('createSaves (useLoggedDiceRollSaves) - Evasion & Shields', () => {
                 campaignName: 'test-campaign',
                 setPopupHtml: vi.fn(),
             };
-            loadCombatSummary.mockResolvedValue({
-                creatures: [{ name: 'Ally', type: 'player', ac: 16, currentHp: 20, maxHp: 20 }],
-            });
-            getRuntimeValue.mockReturnValueOnce([])
-                .mockReturnValueOnce(null)
-                .mockReturnValueOnce(null)
-                .mockReturnValueOnce(true);
             rollSaveForCreature.mockReturnValue({ success: false, roll: 5, total: 8, bonus: 3 });
-            const { quickRollPlayerSave } = createFn();
-            await quickRollPlayerSave('prompt-1', 'Ally', 'DEX', 15);
+            await quickRollPlayerSave('prompt-2', 'Ally', 'DEX', 15);
             expect(setRuntimeValue).toHaveBeenCalledWith('Ally', 'interveneShieldActive', null, 'test-campaign');
         });
     });
 
     describe('quickRollPlayerSave - Target Effects Disadvantage Rider', () => {
-        it('applies disadvantage from targetEffects rider effect', async () => {
-            deps.pendingSaves['prompt-1'] = {
-                targetName: 'Goblin',
-                rawDamage: 15,
-                saveDc: 15,
-                saveType: 'DEX',
-                dcSuccess: 'half',
-                damageType: 'fire',
-                attackerName: 'TestWizard',
-                name: 'Fireball',
-                formula: '8d6',
-                rolls: [3, 4, 5, 2, 3, 3],
-                modifier: 0,
-                campaignName: 'test-campaign',
-                setPopupHtml: vi.fn(),
-            };
+        const basePending = {
+            targetName: 'Goblin',
+            rawDamage: 15,
+            saveDc: 15,
+            saveType: 'DEX',
+            dcSuccess: 'half',
+            damageType: 'fire',
+            attackerName: 'TestWizard',
+            name: 'Fireball',
+            formula: '8d6',
+            rolls: [3, 4, 5, 2, 3, 3],
+            modifier: 0,
+            campaignName: 'test-campaign',
+            setPopupHtml: vi.fn(),
+        };
+
+        it('applies disadvantage when rider matches target, skips when it does not', async () => {
+            deps.pendingSaves['prompt-1'] = { ...basePending };
             loadCombatSummary.mockResolvedValue({
                 creatures: [{ name: 'Goblin', type: 'npc', ac: 12, currentHp: 13, maxHp: 13 }],
             });
@@ -495,100 +348,15 @@ describe('createSaves (useLoggedDiceRollSaves) - Evasion & Shields', () => {
                 true,
                 false
             );
-        });
 
-        it('removes the disadvantage_on_next_save effect after applying', async () => {
-            deps.pendingSaves['prompt-1'] = {
-                targetName: 'Goblin',
-                rawDamage: 15,
-                saveDc: 15,
-                saveType: 'DEX',
-                dcSuccess: 'half',
-                damageType: 'fire',
-                attackerName: 'TestWizard',
-                name: 'Fireball',
-                formula: '8d6',
-                rolls: [3, 4, 5, 2, 3, 3],
-                modifier: 0,
-                campaignName: 'test-campaign',
-                setPopupHtml: vi.fn(),
-            };
-            loadCombatSummary.mockResolvedValue({
-                creatures: [{ name: 'Goblin', type: 'npc', ac: 12, currentHp: 13, maxHp: 13 }],
-            });
-            getRuntimeValue.mockReturnValueOnce([
-                { target: 'Other', effect: 'something_else' },
-                { target: 'Goblin', effect: 'disadvantage_on_next_save' },
-            ]);
-            const { quickRollPlayerSave } = createFn();
-            await quickRollPlayerSave('prompt-1', 'Goblin', 'DEX', 15);
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'test-campaign',
-                'targetEffects',
-                [{ target: 'Other', effect: 'something_else' }],
-                'test-campaign'
-            );
-        });
-
-        it('does not apply targetEffects rider when effect does not match target', async () => {
-            deps.pendingSaves['prompt-1'] = {
-                targetName: 'Goblin',
-                rawDamage: 15,
-                saveDc: 15,
-                saveType: 'DEX',
-                dcSuccess: 'half',
-                damageType: 'fire',
-                attackerName: 'TestWizard',
-                name: 'Fireball',
-                formula: '8d6',
-                rolls: [3, 4, 5, 2, 3, 3],
-                modifier: 0,
-                campaignName: 'test-campaign',
-                setPopupHtml: vi.fn(),
-            };
-            loadCombatSummary.mockResolvedValue({
-                creatures: [{ name: 'Goblin', type: 'npc', ac: 12, currentHp: 13, maxHp: 13 }],
-            });
+            deps.pendingSaves['prompt-2'] = { ...basePending };
             getRuntimeValue.mockReturnValueOnce([{ target: 'Other', effect: 'disadvantage_on_next_save' }]);
-            const { quickRollPlayerSave } = createFn();
-            await quickRollPlayerSave('prompt-1', 'Goblin', 'DEX', 15);
+            await quickRollPlayerSave('prompt-2', 'Goblin', 'DEX', 15);
             expect(rollSaveForCreature).toHaveBeenCalledWith(
                 expect.any(Object),
                 'DEX',
                 15,
                 false,
-                false
-            );
-        });
-
-        it('targetEffects rider overrides metamagicHeighten false to true', async () => {
-            deps.pendingSaves['prompt-1'] = {
-                targetName: 'Goblin',
-                rawDamage: 15,
-                saveDc: 15,
-                saveType: 'DEX',
-                dcSuccess: 'half',
-                damageType: 'fire',
-                attackerName: 'TestWizard',
-                name: 'Fireball',
-                formula: '8d6',
-                rolls: [3, 4, 5, 2, 3, 3],
-                modifier: 0,
-                campaignName: 'test-campaign',
-                setPopupHtml: vi.fn(),
-                metamagicHeighten: false,
-            };
-            loadCombatSummary.mockResolvedValue({
-                creatures: [{ name: 'Goblin', type: 'npc', ac: 12, currentHp: 13, maxHp: 13 }],
-            });
-            getRuntimeValue.mockReturnValueOnce([{ target: 'Goblin', effect: 'disadvantage_on_next_save' }]);
-            const { quickRollPlayerSave } = createFn();
-            await quickRollPlayerSave('prompt-1', 'Goblin', 'DEX', 15);
-            expect(rollSaveForCreature).toHaveBeenCalledWith(
-                expect.any(Object),
-                'DEX',
-                15,
-                true,
                 false
             );
         });

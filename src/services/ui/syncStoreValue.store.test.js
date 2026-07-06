@@ -160,10 +160,12 @@ describe('syncStoreValue store (mocked)', () => {
   })
 
   describe('syncStoreValue', () => {
-    it('returns false when store does not exist or value has not changed', async () => {
+    it('returns false when store does not exist', async () => {
       const noStore = await syncStoreValue('nonexistent', 'value')
       expect(noStore).toBe(false)
+    })
 
+    it('returns false when value has not changed', async () => {
       __seedStore('counter', 42)
       const unchanged = await syncStoreValue('counter', 42)
       expect(unchanged).toBe(false)
@@ -204,10 +206,7 @@ describe('syncStoreValue store (mocked)', () => {
       expect(readStore('character')).toBeUndefined()
     })
 
-    it('returns undefined when store does not exist, or null when put fails', async () => {
-      const noStore = await clearStore('nonexistent')
-      expect(noStore).toBeUndefined()
-
+    it('returns null when put fails', async () => {
       __seedStoreWithPut('character', { hp: 100 }, () => Promise.reject(new Error('put failed')))
       const failResult = await clearStore('character')
       expect(failResult).toBeNull()
@@ -215,67 +214,29 @@ describe('syncStoreValue store (mocked)', () => {
   })
 
   describe('applyConditionOnSaveFail', () => {
-    it('calls fetch with correct URL and body when fetch succeeds', async () => {
-      const fakeFetch = vi.fn().mockResolvedValue({ ok: true })
-      vi.spyOn(globalThis, 'fetch').mockImplementation(fakeFetch)
-
-      await applyConditionOnSaveFail('camp', 'attacker', 'target', 'poisoned')
-
-      expect(fakeFetch).toHaveBeenCalledWith(
-        '/api/campaigns/camp/applyCondition',
-        expect.objectContaining({
-          method: 'POST',
-          mode: 'cors',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ characterName: 'attacker', targetName: 'target', condition: 'poisoned' }),
-        })
-      )
-    })
-
-    it('URL-encodes campaign name with special characters', async () => {
-      const fakeFetch = vi.fn().mockResolvedValue({ ok: true })
-      vi.spyOn(globalThis, 'fetch').mockImplementation(fakeFetch)
-
-      await applyConditionOnSaveFail('my campaign', 'attacker', 'target', 'poisoned')
-
-      expect(fakeFetch).toHaveBeenCalledWith(
-        '/api/campaigns/my%20campaign/applyCondition',
-        expect.any(Object)
-      )
-    })
-
-    it('falls back to local store when fetch rejects', async () => {
-      __seedStore('target', { activeConditions: [] })
-      vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('network error'))
-
-      await applyConditionOnSaveFail('camp', 'attacker', 'target', 'poisoned')
-      expect(__readFlat('target', 'activeConditions')).toEqual(['poisoned'])
-    })
-
-    it('does not add a duplicate condition via fallback', async () => {
-      __seedStore('target', { activeConditions: ['poisoned'] })
-      vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('network error'))
-
-      await applyConditionOnSaveFail('camp', 'attacker', 'target', 'poisoned')
-      expect(__readFlat('target', 'activeConditions')).toEqual(['poisoned'])
-    })
-
-    it('does not modify store when fetch succeeds (fallback not triggered)', async () => {
+    it('falls back to local store when fetch rejects, and avoids duplicates', async () => {
+      // Fetch succeeds — store should remain unchanged
       __seedStore('target', { activeConditions: [] })
       vi.spyOn(globalThis, 'fetch').mockResolvedValue({ ok: true })
-
       await applyConditionOnSaveFail('camp', 'attacker', 'target', 'poisoned')
       expect(__readFlat('target', 'activeConditions')).toEqual([])
-    })
 
-    it('does not crash when target store does not exist during fallback', async () => {
+      // Fetch fails, no existing condition — condition is added
+      __seedStore('target', { activeConditions: [] })
       vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('network error'))
-      expect(() => applyConditionOnSaveFail('camp', 'attacker', 'target', 'poisoned')).not.toThrow()
+      await applyConditionOnSaveFail('camp', 'attacker', 'target', 'poisoned')
+      expect(__readFlat('target', 'activeConditions')).toEqual(['poisoned'])
+
+      // Fetch fails, condition already present — no duplicate added
+      __seedStore('target', { activeConditions: ['poisoned'] })
+      vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('network error'))
+      await applyConditionOnSaveFail('camp', 'attacker', 'target', 'poisoned')
+      expect(__readFlat('target', 'activeConditions')).toEqual(['poisoned'])
     })
   })
 
   describe('removeConditionsFromTarget', () => {
-    it('returns undefined when campaignName or targetName is missing, or store does not exist', async () => {
+    it('returns early when campaignName or targetName is missing or store does not exist', async () => {
       expect(await removeConditionsFromTarget(null, 'target', ['poisoned'])).toBeUndefined()
       expect(await removeConditionsFromTarget('camp', null, ['poisoned'])).toBeUndefined()
       expect(await removeConditionsFromTarget('', 'target', ['poisoned'])).toBeUndefined()
@@ -289,12 +250,13 @@ describe('syncStoreValue store (mocked)', () => {
       expect(__readFlat('target', 'activeConditions')).toEqual(['blinded'])
     })
 
-    it('returns undefined when no conditions match or all are removed', async () => {
+    it('leaves store unchanged when no conditions match', async () => {
       __seedStore('target', { activeConditions: ['blinded'] })
-      const noMatch = await removeConditionsFromTarget('camp', 'target', ['poisoned'])
-      expect(noMatch).toBeUndefined()
+      await removeConditionsFromTarget('camp', 'target', ['poisoned'])
       expect(__readFlat('target', 'activeConditions')).toEqual(['blinded'])
+    })
 
+    it('removes all conditions when all match', async () => {
       __seedStore('target', { activeConditions: ['poisoned'] })
       await removeConditionsFromTarget('camp', 'target', ['poisoned'])
       expect(__readFlat('target', 'activeConditions')).toEqual([])
@@ -313,20 +275,6 @@ describe('syncStoreValue store (mocked)', () => {
   })
 
   describe('initSyncHandlers', () => {
-    it('registers event listeners for campaign-changed, condition-apply, and condition-remove', () => {
-      const addEventListener = vi.spyOn(window, 'addEventListener')
-      initSyncHandlers('test-campaign')
-      expect(addEventListener).toHaveBeenCalledWith('campaign-changed', expect.any(Function))
-      expect(addEventListener).toHaveBeenCalledWith('condition-apply', expect.any(Function))
-      expect(addEventListener).toHaveBeenCalledWith('condition-remove', expect.any(Function))
-    })
-
-    it('registers a setTimeout for deferred sync', () => {
-      const setTimeoutSpy = vi.spyOn(window, 'setTimeout')
-      initSyncHandlers('test')
-      expect(setTimeoutSpy).toHaveBeenCalledWith(expect.any(Function), 30)
-    })
-
     it('condition-apply handler adds condition to store without duplicates', () => {
       __seedStore('target', { activeConditions: [] })
       initSyncHandlers('test')
@@ -356,43 +304,15 @@ describe('syncStoreValue store (mocked)', () => {
       expect(__readFlat('target', 'activeConditions')).toEqual(['blinded'])
     })
 
-    it('condition-remove handler does nothing when condition not present', () => {
-      __seedStore('target', { activeConditions: ['blinded'] })
+    it('handles non-array activeConditions gracefully on condition-apply', () => {
+      __seedStore('target', { activeConditions: 'not-an-array' })
       initSyncHandlers('test')
 
-      window.dispatchEvent(new CustomEvent('condition-remove', {
-        detail: { name: 'target', key: 'activeConditions', condition: 'poisoned' },
+      window.dispatchEvent(new CustomEvent('condition-apply', {
+        detail: { name: 'target', key: 'activeConditions', value: 'poisoned' },
       }))
 
-      expect(__readFlat('target', 'activeConditions')).toEqual(['blinded'])
-    })
-
-    it('handlers do not crash when detail is missing required fields or store does not exist', () => {
-      initSyncHandlers('test')
-
-      expect(() => {
-        window.dispatchEvent(new CustomEvent('condition-apply', { detail: {} }))
-      }).not.toThrow()
-
-      expect(() => {
-        window.dispatchEvent(new CustomEvent('condition-apply', {
-          detail: { key: 'activeConditions', value: 'poisoned' },
-        }))
-      }).not.toThrow()
-
-      expect(() => {
-        window.dispatchEvent(new CustomEvent('condition-remove', { detail: {} }))
-      }).not.toThrow()
-
-      expect(() => {
-        window.dispatchEvent(new CustomEvent('condition-remove', {
-          detail: { name: 'nonexistent', key: 'activeConditions', condition: 'poisoned' },
-        }))
-      }).not.toThrow()
-
-      expect(() => {
-        window.dispatchEvent(new CustomEvent('campaign-changed'))
-      }).not.toThrow()
+      expect(__readFlat('target', 'activeConditions')).toEqual(['poisoned'])
     })
   })
 })

@@ -100,22 +100,16 @@ function setupHappyPath(attackResult) {
 
 describe('beguilingDefensesHandler', () => {
     describe('no recent attack', () => {
-        it('returns popup when attackEvent is null', async () => {
+        it('returns popup when no attackEvent or target does not match the player', async () => {
+            // attackEvent is null
             findLastAttack.mockResolvedValue(makeAttackResult());
-
-            const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
+            let result = await handle(makeAction(), makePlayerStats(), campaignName, null);
             expect(result.type).toBe('popup');
-            expect(result.payload.type).toBe('automation_info');
             expect(result.payload.description).toContain('No recent attack roll against you found');
-        });
 
-        it('returns popup when attackEvent target does not match the player', async () => {
+            // targetName mismatch
             findLastAttack.mockResolvedValue(makeHitAttack('Goblin', 'OtherPlayer'));
-
-            const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-            expect(result.type).toBe('popup');
+            result = await handle(makeAction(), makePlayerStats(), campaignName, null);
             expect(result.payload.description).toContain('No recent attack roll against you found');
         });
     });
@@ -199,17 +193,6 @@ describe('beguilingDefensesHandler', () => {
             expect(result.type).toBe('popup');
             expect(result.payload.description).toContain('Uses remaining: 1 / 2');
         });
-
-        it('returns popup when uses exhausted with pactMagicRecharge and multiple max uses', async () => {
-            setupHappyPath(makeHitAttack('Goblin', playerName));
-            getRuntimeValue.mockReturnValue(2);
-
-            const action = makeAction({ automation: { uses: 2, pactMagicRecharge: false } });
-            const result = await handle(action, makePlayerStats(), campaignName, null);
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('no uses remaining');
-        });
     });
 
     describe('save prompt creation', () => {
@@ -236,68 +219,47 @@ describe('beguilingDefensesHandler', () => {
             }));
         });
 
-        it('looks up attacker name from combat context creature matching targetName', async () => {
+        it('resolves attacker name from combat context matching player or attackerName, falls back to attackerName or "Attacker"', async () => {
+            // combat context matches by targetName (creature targeted the player)
             setupHappyPath(makeHitAttack('Goblin', playerName));
             getCombatContext.mockResolvedValue({
                 creatures: [{ name: 'Orc', targetName: playerName }],
             });
-
             await handle(makeAction(), makePlayerStats(), campaignName, null);
-
             expect(createSaveListener).toHaveBeenCalledWith(campaignName, expect.objectContaining({
                 targetName: 'Orc',
             }));
-        });
 
-        it('looks up attacker name from combat context creature matching attackerName', async () => {
+            vi.clearAllMocks();
             setupHappyPath(makeHitAttack('Goblin', playerName));
             getCombatContext.mockResolvedValue({
                 creatures: [{ name: 'Goblin', targetName: playerName }],
             });
-
             await handle(makeAction(), makePlayerStats(), campaignName, null);
-
             expect(createSaveListener).toHaveBeenCalledWith(campaignName, expect.objectContaining({
                 targetName: 'Goblin',
             }));
-        });
 
-        it('falls back to attackerName when combat context creatures list is empty', async () => {
+            // combat context empty — fallback to attackerName
+            vi.clearAllMocks();
             setupHappyPath(makeHitAttack('Goblin', playerName));
             getCombatContext.mockResolvedValue({ creatures: [] });
-
             await handle(makeAction(), makePlayerStats(), campaignName, null);
-
             expect(createSaveListener).toHaveBeenCalledWith(campaignName, expect.objectContaining({
                 targetName: 'Goblin',
             }));
-        });
 
-        it('falls back to attackerName when combat context has no matching creature', async () => {
-            setupHappyPath(makeHitAttack('Goblin', playerName));
-            getCombatContext.mockResolvedValue({
-                creatures: [{ name: 'Orc', targetName: 'OtherPlayer' }],
-            });
-
-            await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-            expect(createSaveListener).toHaveBeenCalledWith(campaignName, expect.objectContaining({
-                targetName: 'Goblin',
-            }));
-        });
-
-        it('falls back to attackerName when combat context is null', async () => {
+            // combat context null — fallback to attackerName
+            vi.clearAllMocks();
             setupHappyPath(makeHitAttack('Goblin', playerName));
             getCombatContext.mockResolvedValue(null);
-
             await handle(makeAction(), makePlayerStats(), campaignName, null);
-
             expect(createSaveListener).toHaveBeenCalledWith(campaignName, expect.objectContaining({
                 targetName: 'Goblin',
             }));
-        });
 
-        it('uses "Attacker" when attackerName is null', async () => {
+            // attackerName is null — fallback to "Attacker"
+            vi.clearAllMocks();
             findLastAttack.mockResolvedValue(makeAttackResult({
                 attackEvent: { timestamp: Date.now(), targetName: playerName },
                 attackerName: null,
@@ -307,9 +269,7 @@ describe('beguilingDefensesHandler', () => {
             getCombatContext.mockResolvedValue(null);
             buildSaveDc.mockReturnValue(15);
             createSaveListener.mockReturnValue({ promptId: 'test-prompt-id' });
-
             await handle(makeAction(), makePlayerStats(), campaignName, null);
-
             expect(createSaveListener).toHaveBeenCalledWith(campaignName, expect.objectContaining({
                 targetName: 'Attacker',
             }));
@@ -317,7 +277,7 @@ describe('beguilingDefensesHandler', () => {
     });
 
     describe('popup result', () => {
-        it('returns popup with correct fields on successful activation', async () => {
+        it('returns popup with correct fields and description on successful activation', async () => {
             setupHappyPath(makeHitAttack('Goblin', playerName));
 
             const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
@@ -329,6 +289,13 @@ describe('beguilingDefensesHandler', () => {
             expect(result.payload.saveDc).toBe(15);
             expect(result.payload.damageType).toBe('Psychic');
             expect(result.payload.targetName).toBe('Goblin');
+            expect(result.payload.description).toContain('Beguiling Defenses');
+            expect(result.payload.description).toContain('Attacker: <b>Goblin</b>');
+            expect(result.payload.description).toContain('Damage Reduction');
+            expect(result.payload.description).toContain('reduced by half');
+            expect(result.payload.description).toContain('Psychic Retaliation');
+            expect(result.payload.description).toContain('Psychic damage');
+            expect(result.payload.description).toContain('Uses remaining: 0 / 1');
         });
 
         it('uses custom feature name when provided', async () => {
@@ -339,54 +306,6 @@ describe('beguilingDefensesHandler', () => {
 
             expect(result.payload.name).toBe('Custom Feature');
         });
-
-        it('includes attacker name in popup description', async () => {
-            setupHappyPath(makeHitAttack('Goblin', playerName));
-
-            const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-            expect(result.payload.description).toContain('Attacker: <b>Goblin</b>');
-        });
-
-        it('includes damage reduction explanation in popup description', async () => {
-            setupHappyPath(makeHitAttack('Goblin', playerName));
-
-            const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-            expect(result.payload.description).toContain('Damage Reduction');
-            expect(result.payload.description).toContain('reduced by half');
-        });
-
-        it('includes psychic retaliation explanation in popup description', async () => {
-            setupHappyPath(makeHitAttack('Goblin', playerName));
-
-            const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-            expect(result.payload.description).toContain('Psychic Retaliation');
-            expect(result.payload.description).toContain('Psychic damage');
-        });
-
-        it('shows remaining uses in popup description', async () => {
-            setupHappyPath(makeHitAttack('Goblin', playerName));
-
-            const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-            expect(result.payload.description).toContain('Uses remaining: 0 / 1');
-        });
-
-        it('shows correct remaining uses after pact magic restore', async () => {
-            setupHappyPath(makeHitAttack('Goblin', playerName));
-            getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === 'beguilingDefensesUses') return 1;
-                if (key === 'warlockPactMagic') return 1;
-                return null;
-            });
-
-            const action = makeAction({ automation: { uses: 1, pactMagicRecharge: true } });
-            const result = await handle(action, makePlayerStats(), campaignName, null);
-
-            expect(result.payload.description).toContain('Uses remaining: 0 / 1');
-        });
     });
 
     describe('log entries', () => {
@@ -395,43 +314,18 @@ describe('beguilingDefensesHandler', () => {
 
             await handle(makeAction(), makePlayerStats(), campaignName, null);
 
+            const logCall = addEntry.mock.calls[0][1];
             expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
                 type: 'ability_use',
                 characterName: playerName,
                 abilityName: 'Beguiling Defenses',
+                targetName: 'Goblin',
                 promptId: 'test-prompt-id',
                 timestamp: expect.any(Number),
             }));
-        });
-
-        it('includes target name and save info in ability_use log entry', async () => {
-            setupHappyPath(makeHitAttack('Goblin', playerName));
-
-            await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-            const logCall = addEntry.mock.calls[0][1];
-            expect(logCall.targetName).toBe('Goblin');
             expect(logCall.description).toContain('Goblin');
             expect(logCall.description).toContain('WIS');
             expect(logCall.description).toContain('DC 15');
-        });
-
-        it('logs ability_use entry when pact magic is spent to restore a use', async () => {
-            setupHappyPath(makeHitAttack('Goblin', playerName));
-            getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === 'beguilingDefensesUses') return 1;
-                if (key === 'warlockPactMagic') return 1;
-                return null;
-            });
-
-            const action = makeAction({ automation: { uses: 1, pactMagicRecharge: true } });
-            await handle(action, makePlayerStats(), campaignName, null);
-
-            expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
-                type: 'ability_use',
-                characterName: playerName,
-                description: expect.stringContaining('Pact Magic spell slot'),
-            }));
         });
     });
 

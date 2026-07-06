@@ -148,27 +148,12 @@ describe('createLogAndShow - Graze Damage', () => {
             expect(grazeLogs[0][0].note).toBe('Graze: ability modifier damage on miss');
         });
 
-        it('does not apply graze damage when grazeAbilityMod is 0', async () => {
+        it('does not apply graze damage when grazeAbilityMod is zero or negative', async () => {
             const fn = createFn();
             await fn('Longsword', 2, 'attack', {
                 targetName: 'Goblin',
                 grazeDamage: true,
                 grazeAbilityMod: 0,
-                damageType: 'slashing',
-            });
-            await vi.advanceTimersByTimeAsync(2500);
-            const grazeLogs = deps.logEntry.mock.calls.filter(
-                call => call[0].rollType === 'graze-damage'
-            );
-            expect(grazeLogs.length).toBe(0);
-        });
-
-        it('does not apply graze damage when grazeAbilityMod is negative', async () => {
-            const fn = createFn();
-            await fn('Longsword', 2, 'attack', {
-                targetName: 'Goblin',
-                grazeDamage: true,
-                grazeAbilityMod: -2,
                 damageType: 'slashing',
             });
             await vi.advanceTimersByTimeAsync(2500);

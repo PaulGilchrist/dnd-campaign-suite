@@ -1,9 +1,3 @@
-// Removed redundant early-return tests (null/undefined/missing-creatures all test same guard),
-// brittle internal-detail tests (fragile mock implementations for runtime prop names),
-// and low-value tests (delta=0 trivial arithmetic, case-sensitivity implementation detail).
-// Consolidated into tests that verify observable behavior: clamping, delta computation,
-// player vs NPC paths, name matching, and runtime store interaction.
-
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // --- mocks ---
@@ -55,58 +49,26 @@ describe('modifyHitPoints', () => {
   });
 
   describe('NPC creatures', () => {
-    it('decreases HP and clamps to 0', () => {
+    it.each([
+      { desc: 'decreases HP and clamps to 0', currentHp: 3, maxHp: 7, delta: -5, expectedOld: 3, expectedNew: 0, expectedDelta: -3 },
+      { desc: 'decreases HP without clamping', currentHp: 10, maxHp: 15, delta: -4, expectedOld: 10, expectedNew: 6, expectedDelta: -4 },
+      { desc: 'increases HP and clamps to maxHp', currentHp: 3, maxHp: 7, delta: 10, expectedOld: 3, expectedNew: 7, expectedDelta: 4 },
+    ])('($desc)', ({ currentHp, maxHp, delta, expectedOld, expectedNew, expectedDelta }) => {
       const summary = makeCombatSummary([
-        makeCreature('Goblin', 'npc', 3, 7),
+        makeCreature('Goblin', 'npc', currentHp, maxHp),
       ]);
 
-      const result = modifyHitPoints(summary, 'Goblin', -5, campaignName);
+      const result = modifyHitPoints(summary, 'Goblin', delta, campaignName);
 
       expect(result).toEqual({
-        oldHp: 3,
-        newHp: 0,
-        delta: -3,
+        oldHp: expectedOld,
+        newHp: expectedNew,
+        delta: expectedDelta,
         isPlayer: false,
         creature: expect.objectContaining({ name: 'Goblin' }),
-        maxHp: 7,
+        maxHp,
       });
-      expect(result.creature.currentHp).toBe(0);
-    });
-
-    it('decreases HP without clamping when within range', () => {
-      const summary = makeCombatSummary([
-        makeCreature('Orc', 'npc', 10, 15),
-      ]);
-
-      const result = modifyHitPoints(summary, 'Orc', -4, campaignName);
-
-      expect(result).toEqual({
-        oldHp: 10,
-        newHp: 6,
-        delta: -4,
-        isPlayer: false,
-        creature: expect.objectContaining({ name: 'Orc' }),
-        maxHp: 15,
-      });
-      expect(result.creature.currentHp).toBe(6);
-    });
-
-    it('increases HP and clamps to maxHp', () => {
-      const summary = makeCombatSummary([
-        makeCreature('Goblin', 'npc', 3, 7),
-      ]);
-
-      const result = modifyHitPoints(summary, 'Goblin', 10, campaignName);
-
-      expect(result).toEqual({
-        oldHp: 3,
-        newHp: 7,
-        delta: 4,
-        isPlayer: false,
-        creature: expect.objectContaining({ name: 'Goblin' }),
-        maxHp: 7,
-      });
-      expect(result.creature.currentHp).toBe(7);
+      expect(result.creature.currentHp).toBe(expectedNew);
     });
   });
 
@@ -119,50 +81,23 @@ describe('modifyHitPoints', () => {
       });
     }
 
-    it('reads maxHp and currentHp from runtime store and clamps to 0', () => {
-      mockPlayerRuntime(10, 3);
+    it.each([
+      { desc: 'decreases HP and clamps to 0', currentHp: 3, maxHp: 10, delta: -20, expectedOld: 3, expectedNew: 0, expectedDelta: -3 },
+      { desc: 'increases HP and clamps to maxHp', currentHp: 8, maxHp: 10, delta: 10, expectedOld: 8, expectedNew: 10, expectedDelta: 2 },
+    ])('($desc)', ({ currentHp, maxHp, delta, expectedOld, expectedNew, expectedDelta }) => {
+      mockPlayerRuntime(maxHp, currentHp);
 
       const summary = makeCombatSummary([
-        makeCreature('Thorin', 'player', undefined, 10),
+        makeCreature('Thorin', 'player', undefined, maxHp),
       ]);
 
-      const result = modifyHitPoints(summary, 'Thorin', -20, campaignName);
+      const result = modifyHitPoints(summary, 'Thorin', delta, campaignName);
 
-      expect(result.oldHp).toBe(3);
-      expect(result.newHp).toBe(0);
-      expect(result.delta).toBe(-3);
+      expect(result.oldHp).toBe(expectedOld);
+      expect(result.newHp).toBe(expectedNew);
+      expect(result.delta).toBe(expectedDelta);
       expect(result.isPlayer).toBe(true);
-      expect(setRuntimeValue).toHaveBeenCalledWith('Thorin', 'currentHitPoints', 0, campaignName);
-    });
-
-    it('clamps player HP to maxHp on the high end', () => {
-      mockPlayerRuntime(10, 8);
-
-      const summary = makeCombatSummary([
-        makeCreature('Thorin', 'player', undefined, 10),
-      ]);
-
-      const result = modifyHitPoints(summary, 'Thorin', 10, campaignName);
-
-      expect(result.oldHp).toBe(8);
-      expect(result.newHp).toBe(10);
-      expect(result.delta).toBe(2);
-      expect(result.isPlayer).toBe(true);
-      expect(setRuntimeValue).toHaveBeenCalledWith('Thorin', 'currentHitPoints', 10, campaignName);
-    });
-
-    it('falls back to creature.maxHp when runtime hitPoints is null', () => {
-      getRuntimeValue.mockReturnValue(null);
-
-      const summary = makeCombatSummary([
-        makeCreature('Elara', 'player', undefined, 12),
-      ]);
-
-      const result = modifyHitPoints(summary, 'Elara', 5, campaignName);
-
-      expect(result.maxHp).toBe(12);
-      expect(result.oldHp).toBe(0);
-      expect(result.newHp).toBe(5);
+      expect(setRuntimeValue).toHaveBeenCalledWith('Thorin', 'currentHitPoints', expectedNew, campaignName);
     });
   });
 

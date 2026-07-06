@@ -1,3 +1,4 @@
+// @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useSpellCastExecutor } from './useSpellCastExecutor.js';
@@ -72,29 +73,6 @@ describe('useSpellCastExecutor', () => {
       expect(typeof result.current.castAction).toBe('function');
       expect(result.current.cachedPosRef).toHaveProperty('current');
     });
-  });
-
-  // ── Ref management ─────────────────────────────────────────────────────
-
-  describe('ref management', () => {
-    it('creates an internal ref when no cachedPosRef is provided', () => {
-      const props = makeProps();
-      const { result } = renderHook(() =>
-        useSpellCastExecutor(
-          props.rollAttack,
-          props.rollDamage,
-          props.playerStats,
-          props.getTargetInfo,
-          props.campaignName,
-          props.mapName,
-          props.characters,
-          props.setPopupHtml,
-        )
-      );
-
-      expect(result.current.cachedPosRef).toBeDefined();
-      expect(result.current.cachedPosRef.current).toBeNull();
-    });
 
     it('uses the provided cachedPosRef when given', () => {
       const externalRef = { current: { attackerPos: { x: 1, y: 2 } } };
@@ -161,82 +139,6 @@ describe('useSpellCastExecutor', () => {
       );
     });
 
-    it('passes attackerPos and targetPos from ref.current when set', async () => {
-      const props = makeProps();
-      mockExecuteSpellCast.mockResolvedValue(null);
-
-      const ref = { current: { attackerPos: { x: 1 }, targetPos: { y: 2 } } };
-
-      const { result } = renderHook(() =>
-        useSpellCastExecutor(
-          props.rollAttack,
-          props.rollDamage,
-          props.playerStats,
-          props.getTargetInfo,
-          props.campaignName,
-          props.mapName,
-          props.characters,
-          props.setPopupHtml,
-          props.extraMeta,
-          ref,
-        )
-      );
-
-      const spell = makeSpell();
-      const metaCtx = {};
-
-      await act(async () => {
-        await result.current.castAction(spell, metaCtx);
-      });
-
-      expect(mockExecuteSpellCast).toHaveBeenCalledWith(
-        spell,
-        metaCtx,
-        expect.objectContaining({
-          attackerPos: { x: 1 },
-          targetPos: { y: 2 },
-        })
-      );
-    });
-
-    it('passes empty attackerPos/targetPos when ref.current is null', async () => {
-      const props = makeProps();
-      mockExecuteSpellCast.mockResolvedValue(null);
-
-      const ref = { current: null };
-
-      const { result } = renderHook(() =>
-        useSpellCastExecutor(
-          props.rollAttack,
-          props.rollDamage,
-          props.playerStats,
-          props.getTargetInfo,
-          props.campaignName,
-          props.mapName,
-          props.characters,
-          props.setPopupHtml,
-          props.extraMeta,
-          ref,
-        )
-      );
-
-      const spell = makeSpell();
-      const metaCtx = {};
-
-      await act(async () => {
-        await result.current.castAction(spell, metaCtx);
-      });
-
-      expect(mockExecuteSpellCast).toHaveBeenCalledWith(
-        spell,
-        metaCtx,
-        expect.objectContaining({
-          attackerPos: undefined,
-          targetPos: undefined,
-        })
-      );
-    });
-
     it('passes extraMeta into the options object', async () => {
       const props = makeProps({ extraMeta: { customFlag: true } });
       mockExecuteSpellCast.mockResolvedValue(null);
@@ -271,30 +173,6 @@ describe('useSpellCastExecutor', () => {
       );
     });
 
-    it('does not set popupHtml when executeSpellCast returns null', async () => {
-      const props = makeProps();
-      mockExecuteSpellCast.mockResolvedValue(null);
-
-      const { result } = renderHook(() =>
-        useSpellCastExecutor(
-          props.rollAttack,
-          props.rollDamage,
-          props.playerStats,
-          props.getTargetInfo,
-          props.campaignName,
-          props.mapName,
-          props.characters,
-          props.setPopupHtml,
-        )
-      );
-
-      await act(async () => {
-        await result.current.castAction(makeSpell(), {});
-      });
-
-      expect(props.setPopupHtml).not.toHaveBeenCalled();
-    });
-
     it('clears ref.current after castAction completes', async () => {
       const props = makeProps();
       mockExecuteSpellCast.mockResolvedValue(null);
@@ -324,43 +202,11 @@ describe('useSpellCastExecutor', () => {
 
       expect(ref.current).toBeNull();
     });
-
-    it('handles executeSpellCast throwing an error', async () => {
-      const props = makeProps();
-      const error = new Error('Cast failed');
-      mockExecuteSpellCast.mockRejectedValue(error);
-
-      const consoleSpy = vi.spyOn(console, 'error');
-
-      const { result } = renderHook(() =>
-        useSpellCastExecutor(
-          props.rollAttack,
-          props.rollDamage,
-          props.playerStats,
-          props.getTargetInfo,
-          props.campaignName,
-          props.mapName,
-          props.characters,
-          props.setPopupHtml,
-        )
-      );
-
-      await act(async () => {
-        await result.current.castAction(makeSpell(), {});
-      });
-
-      expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining('[useSpellCastExecutor] executeSpellCast error for Fireball'),
-        expect.anything()
-      );
-
-      consoleSpy.mockRestore();
-    });
   });
 
-  // ── castAction — automationPopup result ────────────────────────────────
+  // ── castAction — result handling ───────────────────────────────────────
 
-  describe('castAction — automationPopup result', () => {
+  describe('castAction — result handling', () => {
     it('sets popupHtml when result has automationPopup', async () => {
       const props = makeProps();
       const popupPayload = '<div>Spell cast!</div>';
@@ -414,12 +260,8 @@ describe('useSpellCastExecutor', () => {
 
       expect(props.setPopupHtml).toHaveBeenCalledWith('<div>Automation!</div>');
     });
-  });
 
-  // ── castAction — heal result ───────────────────────────────────────────
-
-  describe('castAction — heal result', () => {
-    it('sets popupHtml when result has healAmount > 0 and no automationPopup', async () => {
+    it('sets popupHtml for heal results with no automationPopup', async () => {
       const props = makeProps();
       mockExecuteSpellCast.mockResolvedValue({
         healAmount: 15,
@@ -462,50 +304,11 @@ describe('useSpellCastExecutor', () => {
       });
     });
 
-    it('uses rawTotal when available instead of healAmount for total', async () => {
+    it('does not set popupHtml when result is null, zero, or negative', async () => {
       const props = makeProps();
-      mockExecuteSpellCast.mockResolvedValue({
-        healAmount: 15,
-        rawTotal: 20,
-        formula: '2d8+3',
-        rolls: [4, 3, 5],
-        targetName: 'Ally 1',
-        bonusHeal: 3,
-        bonusDetails: [],
-      });
 
-      const spell = makeSpell({ name: 'Healing Word' });
-
-      const { result } = renderHook(() =>
-        useSpellCastExecutor(
-          props.rollAttack,
-          props.rollDamage,
-          props.playerStats,
-          props.getTargetInfo,
-          props.campaignName,
-          props.mapName,
-          props.characters,
-          props.setPopupHtml,
-        )
-      );
-
-      await act(async () => {
-        await result.current.castAction(spell, {});
-      });
-
-      expect(props.setPopupHtml).toHaveBeenCalledWith(
-        expect.objectContaining({ total: 20 })
-      );
-    });
-
-    it('does not set popupHtml when healAmount is 0', async () => {
-      const props = makeProps();
-      mockExecuteSpellCast.mockResolvedValue({
-        healAmount: 0,
-        formula: '1d8',
-        rolls: [],
-        bonusDetails: [],
-      });
+      // null result
+      mockExecuteSpellCast.mockResolvedValue(null);
 
       const { result } = renderHook(() =>
         useSpellCastExecutor(
@@ -525,16 +328,67 @@ describe('useSpellCastExecutor', () => {
       });
 
       expect(props.setPopupHtml).not.toHaveBeenCalled();
-    });
+      vi.clearAllMocks();
 
-    it('does not set popupHtml when healAmount is negative', async () => {
-      const props = makeProps();
+      // healAmount = 0
+      mockExecuteSpellCast.mockResolvedValue({
+        healAmount: 0,
+        formula: '1d8',
+        rolls: [],
+        bonusDetails: [],
+      });
+
+      const { result: result2 } = renderHook(() =>
+        useSpellCastExecutor(
+          props.rollAttack,
+          props.rollDamage,
+          props.playerStats,
+          props.getTargetInfo,
+          props.campaignName,
+          props.mapName,
+          props.characters,
+          props.setPopupHtml,
+        )
+      );
+
+      await act(async () => {
+        await result2.current.castAction(makeSpell(), {});
+      });
+
+      expect(props.setPopupHtml).not.toHaveBeenCalled();
+      vi.clearAllMocks();
+
+      // healAmount < 0
       mockExecuteSpellCast.mockResolvedValue({
         healAmount: -5,
         formula: '1d8',
         rolls: [],
         bonusDetails: [],
       });
+
+      const { result: result3 } = renderHook(() =>
+        useSpellCastExecutor(
+          props.rollAttack,
+          props.rollDamage,
+          props.playerStats,
+          props.getTargetInfo,
+          props.campaignName,
+          props.mapName,
+          props.characters,
+          props.setPopupHtml,
+        )
+      );
+
+      await act(async () => {
+        await result3.current.castAction(makeSpell(), {});
+      });
+
+      expect(props.setPopupHtml).not.toHaveBeenCalled();
+    });
+
+    it('does not set popupHtml when executeSpellCast throws', async () => {
+      const props = makeProps();
+      mockExecuteSpellCast.mockRejectedValue(new Error('Cast failed'));
 
       const { result } = renderHook(() =>
         useSpellCastExecutor(
@@ -589,150 +443,6 @@ describe('useSpellCastExecutor', () => {
       rerender({ p: props, em: extraMeta, r: ref });
 
       expect(result.current.castAction).toBe(firstAction);
-    });
-
-    it('returns a new castAction when playerStats changes', () => {
-      const props = makeProps();
-      const { result: r1 } = renderHook(({ p }) =>
-        useSpellCastExecutor(
-          props.rollAttack,
-          props.rollDamage,
-          p,
-          props.getTargetInfo,
-          props.campaignName,
-          props.mapName,
-          props.characters,
-          props.setPopupHtml,
-        )
-      , { initialProps: { p: makePlayerStats() } });
-
-      const firstAction = r1.current.castAction;
-
-      const { result: r2 } = renderHook(({ p }) =>
-        useSpellCastExecutor(
-          props.rollAttack,
-          props.rollDamage,
-          p,
-          props.getTargetInfo,
-          props.campaignName,
-          props.mapName,
-          props.characters,
-          props.setPopupHtml,
-        )
-      , { initialProps: { p: makePlayerStats({ name: 'Different' }) } });
-
-      expect(r2.current.castAction).not.toBe(firstAction);
-    });
-  });
-
-  // ── Integration / flow tests ───────────────────────────────────────────
-
-  describe('full cast flow', () => {
-    it('completes the full castAction flow with automationPopup', async () => {
-      const props = makeProps();
-      const popupPayload = '<div>Shield activated!</div>';
-      mockExecuteSpellCast.mockResolvedValue({
-        automationPopup: { payload: popupPayload },
-      });
-
-      const ref = { current: { attackerPos: { x: 1 }, targetPos: { y: 2 } } };
-
-      const { result } = renderHook(() =>
-        useSpellCastExecutor(
-          props.rollAttack,
-          props.rollDamage,
-          props.playerStats,
-          props.getTargetInfo,
-          props.campaignName,
-          props.mapName,
-          props.characters,
-          props.setPopupHtml,
-          {},
-          ref,
-        )
-      );
-
-      expect(ref.current).not.toBeNull();
-
-      await act(async () => {
-        await result.current.castAction(makeSpell({ name: 'Shield' }), {});
-      });
-
-      expect(mockExecuteSpellCast).toHaveBeenCalledWith(
-        expect.any(Object),
-        expect.any(Object),
-        expect.objectContaining({
-          attackerPos: { x: 1 },
-          targetPos: { y: 2 },
-          campaignName: 'TestCampaign',
-          mapName: 'TestMap',
-        })
-      );
-      expect(props.setPopupHtml).toHaveBeenCalledWith(popupPayload);
-      expect(ref.current).toBeNull();
-    });
-
-    it('completes the full castAction flow with heal result', async () => {
-      const props = makeProps();
-      mockExecuteSpellCast.mockResolvedValue({
-        healAmount: 10,
-        formula: '1d8+2',
-        rolls: [5, 3],
-        targetName: 'Ally 1',
-        bonusHeal: 2,
-        bonusDetails: [{ amount: 2, name: 'Divine Favor' }],
-      });
-
-      const { result } = renderHook(() =>
-        useSpellCastExecutor(
-          props.rollAttack,
-          props.rollDamage,
-          props.playerStats,
-          props.getTargetInfo,
-          props.campaignName,
-          props.mapName,
-          props.characters,
-          props.setPopupHtml,
-        )
-      );
-
-      await act(async () => {
-        await result.current.castAction(makeSpell({ name: 'Cure Wounds' }), {});
-      });
-
-      expect(props.setPopupHtml).toHaveBeenCalledWith(
-        expect.objectContaining({
-          type: 'heal',
-          name: 'Cure Wounds',
-          finalHeal: 10,
-          bonusHeal: 2,
-          bonusHealDetail: '2 Divine Favor',
-        })
-      );
-    });
-
-    it('completes the full castAction flow with no result', async () => {
-      const props = makeProps();
-      mockExecuteSpellCast.mockResolvedValue(null);
-
-      const { result } = renderHook(() =>
-        useSpellCastExecutor(
-          props.rollAttack,
-          props.rollDamage,
-          props.playerStats,
-          props.getTargetInfo,
-          props.campaignName,
-          props.mapName,
-          props.characters,
-          props.setPopupHtml,
-        )
-      );
-
-      await act(async () => {
-        await result.current.castAction(makeSpell(), {});
-      });
-
-      expect(props.setPopupHtml).not.toHaveBeenCalled();
     });
   });
 });

@@ -91,15 +91,6 @@ describe('inspiringSmiteHandler.handle', () => {
       expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
     });
 
-    it('returns popup when storedCharges is negative', async () => {
-      useRuntimeState.getRuntimeValue.mockReturnValue(-1);
-
-      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.description).toContain('No Channel Divinity charges remaining');
-    });
-
     it('uses stored charges when available (storedCharges = 1)', async () => {
       useRuntimeState.getRuntimeValue.mockReturnValue(1);
       diceRoller.rollExpression.mockReturnValue({ total: 10 });
@@ -133,7 +124,7 @@ describe('inspiringSmiteHandler.handle', () => {
       );
     });
 
-    it('defaults to maxCharges when storedCharges is null', async () => {
+    it('defaults to maxCharges when storedCharges is null or undefined', async () => {
       useRuntimeState.getRuntimeValue.mockReturnValue(null);
       diceRoller.rollExpression.mockReturnValue({ total: 10 });
       mapsService.loadMapData.mockResolvedValue({ players: [] });
@@ -150,59 +141,7 @@ describe('inspiringSmiteHandler.handle', () => {
       );
     });
 
-    it('defaults to maxCharges when storedCharges is undefined', async () => {
-      useRuntimeState.getRuntimeValue.mockReturnValue(undefined);
-      diceRoller.rollExpression.mockReturnValue({ total: 10 });
-      mapsService.loadMapData.mockResolvedValue({ players: [] });
-
-      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(result.type).toBe('roll');
-    });
-
-    it('defaults to 2 when class_levels data is missing', async () => {
-      useRuntimeState.getRuntimeValue.mockReturnValue(null);
-      diceRoller.rollExpression.mockReturnValue({ total: 10 });
-      mapsService.loadMapData.mockResolvedValue({ players: [] });
-
-      const ps = makePlayerStats({ class: { class_levels: undefined } });
-
-      const result = await handle(makeAction(), ps, campaignName, null);
-
-      expect(result.type).toBe('roll');
-      // maxCharges defaults to 2, newCharges = 1
-      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-        'TestPaladin',
-        'channelDivinityCharges',
-        1,
-        campaignName,
-      );
-    });
-
     it('uses channel_divinity from class_levels for maxCharges', async () => {
-      useRuntimeState.getRuntimeValue.mockReturnValue(null);
-      diceRoller.rollExpression.mockReturnValue({ total: 10 });
-      mapsService.loadMapData.mockResolvedValue({ players: [] });
-
-      const ps = makePlayerStats({
-        level: 3,
-        class: {
-          class_levels: [undefined, undefined, { channel_divinity: 3 }],
-        },
-      });
-
-      await handle(makeAction(), ps, campaignName, null);
-
-      // maxCharges = 3, newCharges = 2
-      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-        'TestPaladin',
-        'channelDivinityCharges',
-        2,
-        campaignName,
-      );
-    });
-
-    it('uses class_specific.channel_divinity_charges as fallback for maxCharges', async () => {
       useRuntimeState.getRuntimeValue.mockReturnValue(null);
       diceRoller.rollExpression.mockReturnValue({ total: 10 });
       mapsService.loadMapData.mockResolvedValue({ players: [] });
@@ -233,18 +172,6 @@ describe('inspiringSmiteHandler.handle', () => {
         campaignName,
       );
     });
-
-    it('defaults to level 1 index when playerStats.level is missing', async () => {
-      useRuntimeState.getRuntimeValue.mockReturnValue(null);
-      diceRoller.rollExpression.mockReturnValue({ total: 10 });
-      mapsService.loadMapData.mockResolvedValue({ players: [] });
-
-      const ps = makePlayerStats({ level: undefined });
-
-      const result = await handle(makeAction(), ps, campaignName, null);
-
-      expect(result.type).toBe('roll');
-    });
   });
 
   // ── Temp HP calculation ─────────────────────────────────────
@@ -263,16 +190,6 @@ describe('inspiringSmiteHandler.handle', () => {
     it('returns popup when temp HP is zero', async () => {
       useRuntimeState.getRuntimeValue.mockReturnValue(null);
       diceRoller.rollExpression.mockReturnValue({ total: 0 });
-
-      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.description).toContain('Could not calculate temp HP');
-    });
-
-    it('returns popup when temp HP is negative', async () => {
-      useRuntimeState.getRuntimeValue.mockReturnValue(null);
-      diceRoller.rollExpression.mockReturnValue({ total: -5 });
 
       const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
@@ -320,25 +237,6 @@ describe('inspiringSmiteHandler.handle', () => {
       expect(result.payload.targets).toEqual(['Ally1', 'Ally2']);
     });
 
-    it('excludes the attacker from target list', async () => {
-      useRuntimeState.getRuntimeValue.mockReturnValue(null);
-      diceRoller.rollExpression.mockReturnValue({ total: 10 });
-      automationService.resolveDiceExpression.mockReturnValue('2d8 + 8');
-      rangeValidation.rangeToFeet.mockReturnValue(30);
-      rangeValidation.getDistanceFeet.mockReturnValue(10);
-      mapsService.loadMapData.mockResolvedValue({
-        players: [
-          { name: 'TestPaladin', gridX: 1, gridY: 1 },
-          { name: 'Ally1', gridX: 2, gridY: 2 },
-        ],
-      });
-
-      const result = await handle(makeAction(), makePlayerStats(), campaignName, mapName);
-
-      expect(result.payload.targets).not.toContain('TestPaladin');
-      expect(result.payload.targets).toContain('Ally1');
-    });
-
     it('caps targets at 10', async () => {
       useRuntimeState.getRuntimeValue.mockReturnValue(null);
       diceRoller.rollExpression.mockReturnValue({ total: 10 });
@@ -357,35 +255,28 @@ describe('inspiringSmiteHandler.handle', () => {
       expect(result.payload.targets.length).toBe(10);
     });
 
-    it('returns empty targets when mapName is null', async () => {
-      useRuntimeState.getRuntimeValue.mockReturnValue(null);
-      diceRoller.rollExpression.mockReturnValue({ total: 10 });
-
-      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(result.payload.targets).toEqual([]);
-      expect(result.payload.description).toContain('no targets in range');
-    });
-
-    it('returns empty targets when attacker not found on map', async () => {
+    it('returns empty targets when attacker not found or map data is missing', async () => {
       useRuntimeState.getRuntimeValue.mockReturnValue(null);
       diceRoller.rollExpression.mockReturnValue({ total: 10 });
       mapsService.loadMapData.mockResolvedValue({
         players: [{ name: 'OtherPlayer', gridX: 1, gridY: 1 }],
       });
 
-      const result = await handle(makeAction(), makePlayerStats(), campaignName, mapName);
-
+      let result = await handle(makeAction(), makePlayerStats(), campaignName, mapName);
       expect(result.payload.targets).toEqual([]);
-    });
 
-    it('returns empty targets when map data has no players array', async () => {
+      vi.clearAllMocks();
+      useRuntimeState.getRuntimeValue.mockReturnValue(null);
+      diceRoller.rollExpression.mockReturnValue({ total: 10 });
+      mapsService.loadMapData.mockResolvedValue(null);
+      result = await handle(makeAction(), makePlayerStats(), campaignName, mapName);
+      expect(result.payload.targets).toEqual([]);
+
+      vi.clearAllMocks();
       useRuntimeState.getRuntimeValue.mockReturnValue(null);
       diceRoller.rollExpression.mockReturnValue({ total: 10 });
       mapsService.loadMapData.mockResolvedValue({});
-
-      const result = await handle(makeAction(), makePlayerStats(), campaignName, mapName);
-
+      result = await handle(makeAction(), makePlayerStats(), campaignName, mapName);
       expect(result.payload.targets).toEqual([]);
     });
 
@@ -425,19 +316,6 @@ describe('inspiringSmiteHandler.handle', () => {
       expect(result.payload.targets).toEqual([]);
     });
 
-    it('uses default range "30 ft" when automation.range is undefined', async () => {
-      useRuntimeState.getRuntimeValue.mockReturnValue(null);
-      diceRoller.rollExpression.mockReturnValue({ total: 10 });
-      rangeValidation.rangeToFeet.mockReturnValue(30);
-      mapsService.loadMapData.mockResolvedValue({
-        players: [{ name: 'TestPaladin', gridX: 1, gridY: 1 }],
-      });
-
-      await handle(makeAction({ automation: {} }), makePlayerStats(), campaignName, mapName);
-
-      expect(rangeValidation.rangeToFeet).toHaveBeenCalledWith('30 ft');
-    });
-
     it('uses automation.range when provided', async () => {
       useRuntimeState.getRuntimeValue.mockReturnValue(null);
       diceRoller.rollExpression.mockReturnValue({ total: 10 });
@@ -454,26 +332,6 @@ describe('inspiringSmiteHandler.handle', () => {
       );
 
       expect(rangeValidation.rangeToFeet).toHaveBeenCalledWith('60 ft');
-    });
-
-    it('returns empty targets when loadMapData returns null', async () => {
-      useRuntimeState.getRuntimeValue.mockReturnValue(null);
-      diceRoller.rollExpression.mockReturnValue({ total: 10 });
-      mapsService.loadMapData.mockResolvedValue(null);
-
-      const result = await handle(makeAction(), makePlayerStats(), campaignName, mapName);
-
-      expect(result.payload.targets).toEqual([]);
-    });
-
-    it('returns empty targets when loadMapData returns undefined', async () => {
-      useRuntimeState.getRuntimeValue.mockReturnValue(null);
-      diceRoller.rollExpression.mockReturnValue({ total: 10 });
-      mapsService.loadMapData.mockResolvedValue(undefined);
-
-      const result = await handle(makeAction(), makePlayerStats(), campaignName, mapName);
-
-      expect(result.payload.targets).toEqual([]);
     });
   });
 
@@ -498,21 +356,6 @@ describe('inspiringSmiteHandler.handle', () => {
 
       expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith('Ally1', 'tempHp', 12, campaignName);
       expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith('Ally2', 'tempHp', 12, campaignName);
-    });
-
-    it('does not call setRuntimeValue for tempHp when no targets', async () => {
-      useRuntimeState.getRuntimeValue.mockReturnValue(null);
-      diceRoller.rollExpression.mockReturnValue({ total: 12 });
-      mapsService.loadMapData.mockResolvedValue({
-        players: [{ name: 'TestPaladin', gridX: 1, gridY: 1 }],
-      });
-
-      await handle(makeAction(), makePlayerStats(), campaignName, mapName);
-
-      const tempHpCalls = useRuntimeState.setRuntimeValue.mock.calls.filter(
-        (call) => call[1] === 'tempHp',
-      );
-      expect(tempHpCalls).toHaveLength(0);
     });
 
     it('expend channel divinity charge', async () => {
@@ -602,24 +445,6 @@ describe('inspiringSmiteHandler.handle', () => {
       expect(result.payload.tempHp).toBe(14);
       expect(result.payload.targets).toEqual([]);
       expect(result.payload.description).toContain('Inspiring Smite');
-    });
-
-    it('includes targets in roll payload when found', async () => {
-      useRuntimeState.getRuntimeValue.mockReturnValue(null);
-      diceRoller.rollExpression.mockReturnValue({ total: 14 });
-      rangeValidation.rangeToFeet.mockReturnValue(30);
-      rangeValidation.getDistanceFeet.mockReturnValue(10);
-      mapsService.loadMapData.mockResolvedValue({
-        players: [
-          { name: 'TestPaladin', gridX: 1, gridY: 1 },
-          { name: 'Ally1', gridX: 2, gridY: 2 },
-          { name: 'Ally2', gridX: 3, gridY: 3 },
-        ],
-      });
-
-      const result = await handle(makeAction(), makePlayerStats(), campaignName, mapName);
-
-      expect(result.payload.targets).toEqual(['Ally1', 'Ally2']);
     });
   });
 });

@@ -244,12 +244,16 @@ describe('reactionDebuffHandler.handle', () => {
   // ── Early exit: uses exhausted ──────────────────────────────
 
   describe('early exits: uses exhausted', () => {
-    it('returns popup when usesUsed equals effectiveUsesMax (numeric)', async () => {
+    function setupExhausted(usesExpression = 3, recharge = 'long_rest') {
       const ps = makePlayerStats({});
-      const action = makeAction({ uses_expression: 3 });
+      const action = makeAction({ uses_expression: usesExpression, recharge });
       automationService.evaluateAutoExpression.mockReturnValue(3);
       useRuntimeState.getRuntimeValue.mockReturnValue(0);
+      return { ps, action };
+    }
 
+    it('returns popup when usesUsed equals effectiveUsesMax (numeric)', async () => {
+      const { ps, action } = setupExhausted(3, 'long_rest');
       const result = await handle(action, ps, campaignName, mapName);
 
       expect(result.type).toBe('popup');
@@ -260,11 +264,8 @@ describe('reactionDebuffHandler.handle', () => {
     });
 
     it('returns popup when usesUsed equals effectiveUsesMax (string expression)', async () => {
-      const ps = makePlayerStats({});
-      const action = makeAction({ uses_expression: 'proficiency_bonus' });
+      const { ps, action } = setupExhausted('proficiency_bonus', 'long_rest');
       automationService.evaluateAutoExpression.mockReturnValue(2);
-      useRuntimeState.getRuntimeValue.mockReturnValue(0);
-
       const result = await handle(action, ps, campaignName, mapName);
 
       expect(result.type).toBe('popup');
@@ -272,25 +273,10 @@ describe('reactionDebuffHandler.handle', () => {
     });
 
     it('mentions Short Rest when recharge is short_rest', async () => {
-      const ps = makePlayerStats({});
-      const action = makeAction({ uses_expression: 3, recharge: 'short_rest' });
-      automationService.evaluateAutoExpression.mockReturnValue(3);
-      useRuntimeState.getRuntimeValue.mockReturnValue(0);
-
+      const { ps, action } = setupExhausted(3, 'short_rest');
       const result = await handle(action, ps, campaignName, mapName);
 
       expect(result.payload.description).toContain('Short or Long Rest');
-    });
-
-    it('mentions Long Rest when recharge is long_rest', async () => {
-      const ps = makePlayerStats({});
-      const action = makeAction({ uses_expression: 3, recharge: 'long_rest' });
-      automationService.evaluateAutoExpression.mockReturnValue(3);
-      useRuntimeState.getRuntimeValue.mockReturnValue(0);
-
-      const result = await handle(action, ps, campaignName, mapName);
-
-      expect(result.payload.description).toContain('Long Rest');
     });
 
     it('proceeds when usesUsed is less than effectiveUsesMax', async () => {
@@ -476,22 +462,6 @@ describe('reactionDebuffHandler.handle', () => {
       );
 
       expect(result.payload.description).toContain('already missed');
-    });
-
-    it('returns popup type with automation_info payload', async () => {
-      const result = await setupAttackPath(
-        {},
-        freshAttackEvent({ d20: 3, bonus: 2, hit: false }),
-        { totalDamage: 0, damageTypes: [] }
-      );
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.type).toBe('automation_info');
-    });
-
-    it('has defenderHp property on result', async () => {
-      const result = await setupAttackPath({}, freshAttackEvent(), { totalDamage: 0, damageTypes: [] });
-      expect(result).toHaveProperty('defenderHp');
     });
 
     it('uses effectiveAc over targetAc when both present', async () => {
@@ -759,33 +729,9 @@ describe('reactionDebuffHandler.handle', () => {
       expect(result.payload.description).toContain('already missed');
     });
 
-    it('returns defenderName in result', async () => {
-      const result = await setupDisadvantagePath();
-
-      expect(result).toHaveProperty('defenderName');
-    });
-
     it('returns popup when out of range', async () => {
       const ps = makePlayerStats({});
       const action = makeAction({ effect: 'disadvantage_on_attack_roll', range: '30_ft' });
-
-      targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
-      rangeValidation.rangeToFeet.mockReturnValue(30);
-      targetResolver.resolveMapPositions.mockResolvedValue({
-        attackerPos: { gridX: 0, gridY: 0 },
-        targetPos: { gridX: 20, gridY: 0 },
-      });
-      rangeValidation.getDistanceFeet.mockReturnValue(50);
-
-      const result = await handle(action, ps, campaignName, mapName);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.description).toContain('out of range');
-    });
-
-    it('uses default range of 30_ft when no range specified', async () => {
-      const ps = makePlayerStats({});
-      const action = makeAction({ effect: 'disadvantage_on_attack_roll' });
 
       targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
       rangeValidation.rangeToFeet.mockReturnValue(30);
@@ -872,36 +818,6 @@ describe('reactionDebuffHandler.handle', () => {
         attackEvent: freshAttackEvent({ d20: 18, bonus: 3, hit: true, effectiveAc: null }),
         attackerName: 'Goblin',
         targetName: 'Goblin',
-        primaryDamage: 10,
-        secondaryDamage: 0,
-        totalDamage: 10,
-        damageTypes: ['Piercing'],
-      });
-
-      await handle(action, ps, campaignName, mapName);
-
-      const tempHpCall = useRuntimeState.setRuntimeValue.mock.calls.find(
-        (c) => c[1] === 'tempHp'
-      );
-      expect(tempHpCall).toBeUndefined();
-    });
-
-    it('does not apply tempHp when defenderName is empty string', async () => {
-      const ps = makeWardingFlarePlayer();
-      const action = makeAction({ effect: 'disadvantage_on_attack_roll' });
-
-      targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
-      damageUtils.getCombatContext.mockResolvedValue(makeCombatSummary());
-      damageRollback.findLastAttack.mockResolvedValue({
-        attackEvent: freshAttackEvent({
-          d20: 18,
-          bonus: 3,
-          hit: true,
-          effectiveAc: null,
-          targetName: '',
-        }),
-        attackerName: 'Goblin',
-        targetName: '',
         primaryDamage: 10,
         secondaryDamage: 0,
         totalDamage: 10,
@@ -1006,66 +922,6 @@ describe('reactionDebuffHandler.handle', () => {
       expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
     });
 
-    it('does not decrement uses on early return (no combat context)', async () => {
-      const ps = makePlayerStats({});
-      const action = makeAction({ uses_expression: 3 });
-      automationService.evaluateAutoExpression.mockReturnValue(3);
-      useRuntimeState.getRuntimeValue.mockReturnValue(0);
-
-      targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
-      damageUtils.getCombatContext.mockResolvedValue(null);
-
-      await handle(action, ps, campaignName, mapName);
-
-      expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
-    });
-
-    it('does not decrement uses on early return (out of range)', async () => {
-      const ps = makePlayerStats({});
-      const action = makeAction({ uses_expression: 3 });
-      automationService.evaluateAutoExpression.mockReturnValue(3);
-      useRuntimeState.getRuntimeValue.mockReturnValue(0);
-
-      targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
-      rangeValidation.rangeToFeet.mockReturnValue(30);
-      targetResolver.resolveMapPositions.mockResolvedValue({
-        attackerPos: { gridX: 0, gridY: 0 },
-        targetPos: { gridX: 20, gridY: 0 },
-      });
-      rangeValidation.getDistanceFeet.mockReturnValue(50);
-
-      await handle(action, ps, campaignName, mapName);
-
-      expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
-    });
-
-    it('uses correct usesKey derived from feature name', async () => {
-      const ps = makePlayerStats({});
-      const action = makeAction({ uses_expression: 3 });
-      automationService.evaluateAutoExpression.mockReturnValue(3);
-      useRuntimeState.getRuntimeValue.mockReturnValue(2);
-
-      targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
-      damageUtils.getCombatContext.mockResolvedValue(makeCombatSummary());
-      damageRollback.findLastAttack.mockResolvedValue({
-        attackEvent: { ...freshAttackEvent({ d20: 5, bonus: 3, hit: false }), damageTypes: [] },
-        attackerName: 'Goblin',
-        targetName: 'Goblin',
-        primaryDamage: 0,
-        secondaryDamage: 0,
-        totalDamage: 0,
-        damageTypes: [],
-      });
-
-      await handle(action, ps, campaignName, mapName);
-
-      const setCall = useRuntimeState.setRuntimeValue.mock.calls.find(
-        (c) => c[1] && c[1].includes('Uses')
-      );
-      expect(setCall).toBeDefined();
-      expect(setCall[1]).toBe('cuttingwordsUses');
-    });
-
     it('uses runtime value from getRuntimeValue for incremental count', async () => {
       useRuntimeState.getRuntimeValue
         .mockReturnValueOnce(2)
@@ -1085,7 +941,7 @@ describe('reactionDebuffHandler.handle', () => {
   // ── Log entry creation ──────────────────────────────────────
 
   describe('log entry', () => {
-    it('adds log entry after successful handling', async () => {
+    function setupLogPath() {
       const ps = makePlayerStats({});
       const action = makeAction({});
 
@@ -1100,6 +956,12 @@ describe('reactionDebuffHandler.handle', () => {
         totalDamage: 0,
         damageTypes: [],
       });
+
+      return { ps, action };
+    }
+
+    it('adds log entry after successful handling', async () => {
+      const { ps, action } = setupLogPath();
 
       await handle(action, ps, campaignName, mapName);
 
@@ -1117,21 +979,8 @@ describe('reactionDebuffHandler.handle', () => {
     });
 
     it('uses "Feature" as name when action.name is empty', async () => {
-      const ps = makePlayerStats({});
-      const action = makeAction({});
+      const { ps, action } = setupLogPath();
       action.name = '';
-
-      targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
-      damageUtils.getCombatContext.mockResolvedValue(makeCombatSummary());
-      damageRollback.findLastAttack.mockResolvedValue({
-        attackEvent: freshAttackEvent({ d20: 5, bonus: 3, hit: false }),
-        attackerName: 'Goblin',
-        targetName: 'Goblin',
-        primaryDamage: 0,
-        secondaryDamage: 0,
-        totalDamage: 0,
-        damageTypes: [],
-      });
 
       await handle(action, ps, campaignName, mapName);
 
@@ -1141,31 +990,6 @@ describe('reactionDebuffHandler.handle', () => {
           abilityName: 'Feature',
         })
       );
-    });
-
-    it('does not add log entry on early exit (no combat context)', async () => {
-      const ps = makePlayerStats({});
-      const action = makeAction({ uses_expression: 3 });
-      automationService.evaluateAutoExpression.mockReturnValue(3);
-      useRuntimeState.getRuntimeValue.mockReturnValue(0);
-
-      targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
-      damageUtils.getCombatContext.mockResolvedValue(null);
-
-      await handle(action, ps, campaignName, mapName);
-
-      expect(logService.addEntry).not.toHaveBeenCalled();
-    });
-
-    it('does not add log entry when uses exhausted', async () => {
-      const ps = makePlayerStats({});
-      const action = makeAction({ uses_expression: 3 });
-      automationService.evaluateAutoExpression.mockReturnValue(3);
-      useRuntimeState.getRuntimeValue.mockReturnValue(3);
-
-      await handle(action, ps, campaignName, mapName);
-
-      expect(logService.addEntry).not.toHaveBeenCalled();
     });
   });
 

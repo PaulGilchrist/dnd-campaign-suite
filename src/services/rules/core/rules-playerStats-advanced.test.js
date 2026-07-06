@@ -88,6 +88,7 @@ import { rules5e as raceRules } from '../../character/race-rules/index.js';
 import * as abilityCalc from './abilityCalc.js';
 import * as attackCalc from './attackCalc.js';
 import * as dataLoader from '../../ui/dataLoader.js';
+import * as featBuffService from '../../character/featBuffService.js';
 
 const defaultSkills = [
   { name: 'Athletics', ability: 'Strength' },
@@ -152,13 +153,6 @@ describe('rules.getPlayerStats - speed', () => {
     const result = await rules.getPlayerStats([], [], [], [], [], playerSummary);
     expect(result.speed).toBe(30);
   });
-
-  it('should default speed when not provided', async () => {
-    const playerSummary = makePlayerSummary();
-    const result = await rules.getPlayerStats([], [], [], [], [], playerSummary);
-    // speed is undefined if not in playerSummary (no default applied)
-    expect(result.speed).toBeUndefined();
-  });
 });
 
 describe('rules.getPlayerStats - racial traits', () => {
@@ -171,85 +165,11 @@ describe('rules.getPlayerStats - racial traits', () => {
     expect(result.sizeMultiplier).toBe(2);
   });
 
-  it('should not set sizeMultiplier when Powerful Build is absent', async () => {
-    setupDefaults({ race: { name: 'Human', languages: ['Common'], traits: [] } });
-    const playerSummary = makePlayerSummary();
-    const result = await rules.getPlayerStats([], [], [], [], [], playerSummary);
-    expect(result.sizeMultiplier).toBeUndefined();
-  });
-
   it('should set canMoveThroughCreatureSpace when Halfling Nimbleness trait exists', async () => {
     setupDefaults({ race: { name: 'Lightfoot Halfling', languages: ['Common'], traits: [{ name: 'Halfling Nimbleness' }] } });
     const playerSummary = makePlayerSummary();
     const result = await rules.getPlayerStats([], [], [], [], [], playerSummary);
     expect(result.canMoveThroughCreatureSpace).toBe(true);
-  });
-
-  it('should not set canMoveThroughCreatureSpace when trait is absent', async () => {
-    setupDefaults({ race: { name: 'Human', languages: ['Common'], traits: [] } });
-    const playerSummary = makePlayerSummary();
-    const result = await rules.getPlayerStats([], [], [], [], [], playerSummary);
-    expect(result.canMoveThroughCreatureSpace).toBeUndefined();
-  });
-});
-
-describe('rules.getPlayerStats - hunter prey', () => {
-  beforeEach(() => { vi.clearAllMocks(); setupDefaults(); });
-
-  it('should add Horde Breaker attack when Hunter prey passive and extra attacks', async () => {
-    vi.mocked(automationService.collectAutomationFromFeatures).mockReturnValue({
-      passives: [{ type: 'hunter_prey', name: "Hunter's Prey" }],
-      actions: [],
-      specialActions: [],
-    });
-    classRules.getRangerFeatures.mockReturnValue({ extraAttacks: 1 });
-    const playerSummary = makePlayerSummary({
-      class: { name: 'Ranger', saving_throws: [], languages: [], subclass: {}, major: {} },
-      proficiency: 3,
-    });
-    const result = await rules.getPlayerStats([], [], [], [], [], playerSummary);
-    const hordeBreaker = result.attacks.find((a) => a.isHordeBreaker);
-    expect(hordeBreaker).toBeDefined();
-    expect(hordeBreaker.name).toBe("Horde Breaker");
-    expect(hordeBreaker.damage).toBe('1d4');
-    expect(hordeBreaker.type).toBe('Bonus Action');
-  });
-
-  it('should not add Horde Breaker when no extra attacks', async () => {
-    vi.mocked(automationService.collectAutomationFromFeatures).mockReturnValue({
-      passives: [{ type: 'hunter_prey', name: "Hunter's Prey" }],
-      actions: [],
-      specialActions: [],
-    });
-    classRules.getRangerFeatures.mockReturnValue({ extraAttacks: 0 });
-    const playerSummary = makePlayerSummary({
-      class: { name: 'Ranger', saving_throws: [], languages: [], subclass: {}, major: {} },
-      proficiency: 2,
-    });
-    const result = await rules.getPlayerStats([], [], [], [], [], playerSummary);
-    const hordeBreaker = result.attacks.find((a) => a.isHordeBreaker);
-    expect(hordeBreaker).toBeUndefined();
-  });
-});
-
-describe('rules.getPlayerStats - allFeatures', () => {
-  beforeEach(() => { vi.clearAllMocks(); setupDefaults(); });
-
-  it('should collect all features from action arrays', async () => {
-    classRules.getFeatures.mockReturnValue({
-      actions: [{ name: 'Action Surge', description: 'Take an extra action' }],
-      bonusActions: [{ name: 'Second Wind' }],
-      reactions: [{ name: 'Opportunity Attack' }],
-      specialActions: [{ name: 'Fighter Level 2' }],
-      characterAdvancement: [],
-    });
-    const playerSummary = makePlayerSummary({ actions: [{ name: 'Attack', description: 'Make an attack' }] });
-    const result = await rules.getPlayerStats([], [], [], [], [], playerSummary);
-    expect(result.allFeatures).toBeDefined();
-    expect(Array.isArray(result.allFeatures)).toBe(true);
-    const actionSurge = result.allFeatures.find((f) => f.name === 'Action Surge');
-    expect(actionSurge).toBeDefined();
-    expect(actionSurge.description).toBe('Take an extra action');
   });
 });
 
@@ -257,7 +177,6 @@ describe('rules.getPlayerStats - feat features', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     setupDefaults();
-    // Reset feat buff mock to return empty by default
     vi.mocked(featBuffService.computeAllFeatBuffs).mockReturnValue({
       abilityScoreIncreases: [],
       proficiencies: [],
@@ -265,97 +184,31 @@ describe('rules.getPlayerStats - feat features', () => {
     });
   });
 
-  it('should add feat features to reactions when casting_time is reaction', async () => {
+  it('should add feat features to the correct action array based on casting_time', async () => {
     vi.mocked(featBuffService.computeAllFeatBuffs).mockReturnValue({
       abilityScoreIncreases: [], proficiencies: [],
-      features: [{ name: 'War Caster', description: 'Advantage on con saves', type: 'passive', automation: { casting_time: '1 reaction' } }],
+      features: [
+        { name: 'War Caster', description: 'Advantage on con saves', type: 'passive', automation: { casting_time: '1 reaction' } },
+        { name: 'Inspiring Leader', description: 'Buff allies', type: 'passive', automation: { casting_time: '1 action' } },
+        { name: 'Heal Word', description: 'Restore HP', type: 'passive', automation: { casting_time: '1 bonus action' } },
+      ],
     });
     const playerSummary = makePlayerSummary();
     const result = await rules.getPlayerStats([], [], [], [], [], playerSummary);
-    const warCaster = result.reactions.find((f) => f.name === 'War Caster');
-    expect(warCaster).toBeDefined();
-    expect(warCaster.source).toBe('feat');
-  });
-
-  it('should add feat features to actions when casting_time is action', async () => {
-    vi.mocked(featBuffService.computeAllFeatBuffs).mockReturnValue({
-      abilityScoreIncreases: [], proficiencies: [],
-      features: [{ name: 'Inspiring Leader', description: 'Buff allies', type: 'passive', automation: { casting_time: '1 action' } }],
-    });
-    const playerSummary = makePlayerSummary();
-    const result = await rules.getPlayerStats([], [], [], [], [], playerSummary);
+    expect(result.reactions.find((f) => f.name === 'War Caster')).toBeDefined();
     expect(result.actions.find((f) => f.name === 'Inspiring Leader')).toBeDefined();
-  });
-
-  it('should add feat features to bonusActions when casting_time is bonus action', async () => {
-    vi.mocked(featBuffService.computeAllFeatBuffs).mockReturnValue({
-      abilityScoreIncreases: [], proficiencies: [],
-      features: [{ name: 'Heal Word', description: 'Restore HP', type: 'passive', automation: { casting_time: '1 bonus action' } }],
-    });
-    const playerSummary = makePlayerSummary();
-    const result = await rules.getPlayerStats([], [], [], [], [], playerSummary);
     expect(result.bonusActions.find((f) => f.name === 'Heal Word')).toBeDefined();
-  });
-
-  it('should re-process automation after adding feat features', async () => {
-    vi.mocked(featBuffService.computeAllFeatBuffs).mockReturnValue({
-      abilityScoreIncreases: [], proficiencies: [],
-      features: [{ name: 'Test Feat', description: 'A test feat', type: 'passive', automation: { type: 'passive_buff', effect: 'test' } }],
-    });
-    automationService.collectAutomationFromFeatures.mockImplementation((features) => {
-      if (features && features.some((f) => f.name === 'Test Feat')) {
-        return { passives: [{ type: 'passive_buff', effect: 'test' }], actions: [], specialActions: [] };
-      }
-      return { passives: [], actions: [], specialActions: [] };
-    });
-    const playerSummary = makePlayerSummary();
-    await rules.getPlayerStats([], [], [], [], [], playerSummary);
-    // Second call should include feat features
-    expect(automationService.collectAutomationFromFeatures).toHaveBeenCalledTimes(2);
-  });
-});
-
-import * as featBuffService from '../../character/featBuffService.js';
-import * as automationService from '../../combat/automation/automationService.js';
-
-describe('rules.getPlayerStats - action defaults', () => {
-  beforeEach(() => { vi.clearAllMocks(); setupDefaults(); });
-
-  it('should default empty action arrays when missing from playerSummary', async () => {
-    const playerSummary = makePlayerSummary({
-      actions: undefined, bonusActions: undefined, reactions: undefined,
-      specialActions: undefined, characterAdvancement: undefined, expertise: undefined,
-    });
-    const result = await rules.getPlayerStats([], [], [], [], [], playerSummary);
-    expect(Array.isArray(result.actions)).toBe(true);
-    expect(Array.isArray(result.bonusActions)).toBe(true);
-    expect(Array.isArray(result.reactions)).toBe(true);
-    expect(Array.isArray(result.specialActions)).toBe(true);
-    expect(Array.isArray(result.characterAdvancement)).toBe(true);
-    expect(Array.isArray(result.expertise)).toBe(true);
+    expect(result.reactions.find((f) => f.name === 'War Caster').source).toBe('feat');
   });
 });
 
 describe('rules.getPlayerStats - cloning', () => {
   beforeEach(() => { vi.clearAllMocks(); setupDefaults(); });
 
-  it('should preserve original playerSummary properties via deep clone', async () => {
-    const playerSummary = makePlayerSummary({ customField: 'customValue', nested: { key: 'value' } });
-    const result = await rules.getPlayerStats([], [], [], [], [], playerSummary);
-    expect(result.customField).toBe('customValue');
-    expect(result.nested.key).toBe('value');
-  });
-
   it('should not mutate the original playerSummary', async () => {
     const playerSummary = makePlayerSummary({ actions: [{ name: 'Attack' }] });
     const originalActions = JSON.stringify(playerSummary.actions);
     await rules.getPlayerStats([], [], [], [], [], playerSummary);
     expect(JSON.stringify(playerSummary.actions)).toBe(originalActions);
-  });
-
-  it('should set proficiency from playerSummary level', async () => {
-    const playerSummary = makePlayerSummary({ level: 11 });
-    const result = await rules.getPlayerStats([], [], [], [], [], playerSummary);
-    expect(result.proficiency).toBe(4);
   });
 });

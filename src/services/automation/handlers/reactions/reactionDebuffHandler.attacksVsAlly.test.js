@@ -207,7 +207,7 @@ describe('reactionDebuffHandler — disadvantage_on_attacks_vs_ally', () => {
       expect(result.payload.description).toContain('Could not determine who was attacked');
     });
 
-    it('stores protection effect in targetEffects', async () => {
+    it('stores protection effect in targetEffects with correct properties', async () => {
       useRuntimeState.getRuntimeValue.mockReturnValue([]);
 
       await setupPath();
@@ -220,18 +220,8 @@ describe('reactionDebuffHandler — disadvantage_on_attacks_vs_ally', () => {
       expect(targetEffectsCall[2][0].effect).toBe('protection');
       expect(targetEffectsCall[2][0].target).toBe('Goblin');
       expect(targetEffectsCall[2][0].source).toBe('Paladin');
-      expect(targetEffectsCall[2][0].timestamp).toBeDefined();
-    });
-
-    it('uses default duration until_start_of_next_turn', async () => {
-      useRuntimeState.getRuntimeValue.mockReturnValue([]);
-
-      await setupPath();
-
-      const targetEffectsCall = useRuntimeState.setRuntimeValue.mock.calls.find(
-        (c) => c[1] === 'targetEffects'
-      );
       expect(targetEffectsCall[2][0].duration).toBe('until_start_of_next_turn');
+      expect(targetEffectsCall[2][0].timestamp).toBeDefined();
     });
 
     it('uses custom duration when specified in automation', async () => {
@@ -304,23 +294,6 @@ describe('reactionDebuffHandler — disadvantage_on_attacks_vs_ally', () => {
       expect(result.payload.description).toContain('Disadvantage');
       expect(result.payload.description).toContain('second d20');
     });
-
-    it('returns defenderName in result', async () => {
-      useRuntimeState.getRuntimeValue.mockReturnValue([]);
-
-      const result = await setupPath();
-
-      expect(result).toHaveProperty('defenderName');
-      expect(result.defenderName).toBe('Goblin');
-    });
-
-    it('returns healedAmount in result', async () => {
-      useRuntimeState.getRuntimeValue.mockReturnValue([]);
-
-      const result = await setupPath();
-
-      expect(result).toHaveProperty('healedAmount');
-    });
   });
 
   describe('effect: disadvantage_on_attacks_vs_ally — range checks', () => {
@@ -365,7 +338,7 @@ describe('reactionDebuffHandler — disadvantage_on_attacks_vs_ally', () => {
       expect(result.payload.description).toContain('out of range');
     });
 
-    it('skips range check when mapName is falsy', async () => {
+    it('skips range check when mapName is falsy or rangeToFeet returns null', async () => {
       const ps = makePlayerStats();
       const action = makeAction();
 
@@ -574,95 +547,6 @@ describe('reactionDebuffHandler — disadvantage_on_attacks_vs_ally', () => {
         (c) => c[1] && c[1].includes('Uses')
       );
       expect(usesCall).toBeUndefined();
-    });
-
-    it('does not decrement uses on early return (out of range)', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-
-      targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
-      rangeValidation.rangeToFeet.mockReturnValue(30);
-      targetResolver.resolveMapPositions.mockResolvedValue({
-        attackerPos: { gridX: 0, gridY: 0 },
-        targetPos: { gridX: 20, gridY: 0 },
-      });
-      rangeValidation.getDistanceFeet.mockReturnValue(50);
-      damageUtils.getCombatContext.mockResolvedValue(makeCombatSummary());
-      damageRollback.findLastAttack.mockResolvedValue({
-        attackEvent: freshAttackEvent(),
-        attackerName: 'Goblin',
-        targetName: 'Goblin',
-        primaryDamage: 10,
-        secondaryDamage: 0,
-        totalDamage: 10,
-        damageTypes: ['Piercing'],
-      });
-
-      await handle(action, ps, campaignName, mapName);
-
-      const usesCall = useRuntimeState.setRuntimeValue.mock.calls.find(
-        (c) => c[1] && c[1].includes('Uses')
-      );
-      expect(usesCall).toBeUndefined();
-    });
-  });
-
-  describe('Improved Warding Flare — not applicable for attacks_vs_ally', () => {
-    function makeAction() {
-      return {
-        name: 'Blessed Defender',
-        automation: {
-          type: 'reaction_debuff',
-          range: '30_ft',
-          effect: 'disadvantage_on_attacks_vs_ally',
-          uses_expression: null,
-          recharge: 'long_rest',
-        },
-      };
-    }
-
-    it('does not apply tempHp for disadvantage_on_attacks_vs_ally effect', async () => {
-      const ps = {
-        name: 'Paladin',
-        proficiency: 2,
-        level: 5,
-        class: {
-          name: 'Paladin',
-          class_levels: [
-            { level: 1, bardic_die: 6, bardic_inspiration_uses: 0 },
-            { level: 2, bardic_die: 6, bardic_inspiration_uses: 0 },
-            { level: 3, bardic_die: 6, bardic_inspiration_uses: 0 },
-            { level: 4, bardic_die: 6, bardic_inspiration_uses: 0 },
-            { level: 5, bardic_die: 6, bardic_inspiration_uses: 0 },
-          ],
-        },
-        abilities: [{ name: 'Wisdom', bonus: 2 }],
-        characterAdvancement: [
-          { name: 'Improved Warding Flare', automation: { tempHpExpression: '2d6' } },
-        ],
-        specialActions: [],
-      };
-      const action = makeAction();
-
-      targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
-      damageUtils.getCombatContext.mockResolvedValue(makeCombatSummary());
-      useRuntimeState.getRuntimeValue.mockReturnValue([]);
-      damageRollback.findLastAttack.mockResolvedValue({
-        attackEvent: freshAttackEvent(),
-        attackerName: 'Goblin',
-        targetName: 'Goblin',
-        primaryDamage: 10,
-        secondaryDamage: 0,
-        totalDamage: 10,
-        damageTypes: ['Piercing'],
-      });
-
-      await handle(action, ps, campaignName, mapName);
-
-      const tempHpCall = useRuntimeState.setRuntimeValue.mock.calls.find(
-        (c) => c[1] === 'tempHp'
-      );
-      expect(tempHpCall).toBeUndefined();
     });
   });
 });

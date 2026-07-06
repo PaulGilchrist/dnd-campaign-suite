@@ -134,45 +134,60 @@ describe('createLogAndShow - Living Legend & Veer', () => {
             }));
         });
 
-        it('does not retry when unerringStrikeUsed is already true', async () => {
-            rollD20.mockReturnValueOnce(5);
-            getTargetFromAttacker.mockReturnValue({ name: 'Goblin', ac: 20 });
-            getRuntimeValue.mockImplementation((name, prop) => {
-                if (name === 'TestFighter' && prop === 'livingLegendActive') return true;
-                if (name === 'TestFighter' && prop === 'unerringStrikeUsed') return true;
-                return null;
-            });
-            const fn = createFn();
-            await fn('Longsword', 5, 'attack', { targetName: 'Goblin', isWeaponAttack: true });
-            expect(deps.setPopupHtml).toHaveBeenCalledWith(expect.objectContaining({
-                hit: false,
-            }));
-        });
+        it('does not retry when living legend conditions are not met', async () => {
+            const scenarios = [
+                {
+                    name: 'unerringStrikeUsed is already true',
+                    setup: () => {
+                        rollD20.mockReturnValueOnce(5);
+                        getTargetFromAttacker.mockReturnValue({ name: 'Goblin', ac: 20 });
+                        getRuntimeValue.mockImplementation((name, prop) => {
+                            if (name === 'TestFighter' && prop === 'livingLegendActive') return true;
+                            if (name === 'TestFighter' && prop === 'unerringStrikeUsed') return true;
+                            return null;
+                        });
+                    },
+                },
+                {
+                    name: 'livingLegendActive is false',
+                    setup: () => {
+                        rollD20.mockReturnValueOnce(5);
+                        getTargetFromAttacker.mockReturnValue({ name: 'Goblin', ac: 20 });
+                        getRuntimeValue.mockReturnValue(null);
+                    },
+                },
+                {
+                    name: 'isWeaponAttack is false',
+                    setup: () => {
+                        rollD20.mockReturnValueOnce(5);
+                        getTargetFromAttacker.mockReturnValue({ name: 'Goblin', ac: 20 });
+                        getRuntimeValue.mockImplementation((name, prop) => {
+                            if (name === 'TestFighter' && prop === 'livingLegendActive') return true;
+                            if (name === 'TestFighter' && prop === 'unerringStrikeUsed') return false;
+                            return null;
+                        });
+                    },
+                    context: { isWeaponAttack: false },
+                },
+            ];
 
-        it('does not retry when livingLegendActive is false', async () => {
-            rollD20.mockReturnValueOnce(5);
-            getTargetFromAttacker.mockReturnValue({ name: 'Goblin', ac: 20 });
-            getRuntimeValue.mockReturnValue(null);
-            const fn = createFn();
-            await fn('Longsword', 5, 'attack', { targetName: 'Goblin', isWeaponAttack: true });
-            expect(deps.setPopupHtml).toHaveBeenCalledWith(expect.objectContaining({
-                hit: false,
-            }));
-        });
+            for (const scenario of scenarios) {
+                vi.clearAllMocks();
+                rollD20.mockReturnValue(15);
+                getTargetFromAttacker.mockReturnValue({ name: 'Goblin', ac: 12 });
+                getRuntimeValue.mockReturnValue(null);
+                isUnbreakableMajestyActive.mockReturnValue(false);
+                hasAttackerTriggeredMajesty.mockReturnValue(false);
+                getShieldAcBonus.mockReturnValue(0);
+                getShieldOfFaithAcBonus.mockReturnValue(0);
 
-        it('does not retry when isWeaponAttack is false', async () => {
-            rollD20.mockReturnValueOnce(5);
-            getTargetFromAttacker.mockReturnValue({ name: 'Goblin', ac: 20 });
-            getRuntimeValue.mockImplementation((name, prop) => {
-                if (name === 'TestFighter' && prop === 'livingLegendActive') return true;
-                if (name === 'TestFighter' && prop === 'unerringStrikeUsed') return false;
-                return null;
-            });
-            const fn = createFn();
-            await fn('Longsword', 5, 'attack', { targetName: 'Goblin', isWeaponAttack: false });
-            expect(deps.setPopupHtml).toHaveBeenCalledWith(expect.objectContaining({
-                hit: false,
-            }));
+                scenario.setup();
+                const fn = createFn();
+                await fn('Longsword', 5, 'attack', { targetName: 'Goblin', ...(scenario.context || {}) });
+                expect(deps.setPopupHtml).toHaveBeenCalledWith(expect.objectContaining({
+                    hit: false,
+                }));
+            }
         });
     });
 
@@ -200,70 +215,61 @@ describe('createLogAndShow - Living Legend & Veer', () => {
             expect(setRuntimeValue).toHaveBeenCalledWith('Rider', 'veerActive', null, 'test-campaign');
         });
 
-        it('veer timeout defaults to redirect (hit again)', async () => {
-            getTargetFromAttacker.mockReturnValue({ name: 'Mount', ac: 12 });
-            getRuntimeValue.mockImplementation((name, prop) => {
-                if (name === 'Mount' && prop === 'mountedBy') return 'Rider';
-                if (name === 'Rider' && prop === 'veerActive') return true;
-                if (name === 'Rider' && prop === 'activeConditions') return [];
-                return null;
-            });
-            loadCombatSummary.mockResolvedValue({
-                creatures: [{ name: 'Mount', type: 'npc', ac: 12, conditions: [] }],
-            });
-            // Don't mock setTimeout - let it not fire (use real setTimeout with 0 delay for microtask)
-            const origSetTimeout = globalThis.setTimeout;
-            globalThis.setTimeout = (cb) => { cb(); return 0; };
-            const fn = createFn();
-            await fn('Longsword', 5, 'attack', { targetName: 'Mount' });
-            globalThis.setTimeout = origSetTimeout;
-            // Default resolve is true (redirectResult), so hit should be true again
-            expect(deps.setPopupHtml).toHaveBeenCalledWith(expect.objectContaining({
-                hit: true,
-            }));
-        });
+        it('does not trigger veer when mount or rider is incapacitated', async () => {
+            const scenarios = [
+                {
+                    name: 'mount is incapacitated',
+                    setup: () => {
+                        getTargetFromAttacker.mockReturnValue({ name: 'Mount', ac: 12 });
+                        getRuntimeValue.mockImplementation((name, prop) => {
+                            if (name === 'Mount' && prop === 'mountedBy') return 'Rider';
+                            if (name === 'Rider' && prop === 'veerActive') return true;
+                            if (name === 'Rider' && prop === 'activeConditions') return [];
+                            return null;
+                        });
+                        loadCombatSummary.mockResolvedValue({
+                            creatures: [{ name: 'Mount', type: 'npc', ac: 12, conditions: [{ key: 'incapacitated' }] }],
+                        });
+                    },
+                },
+                {
+                    name: 'rider is incapacitated',
+                    setup: () => {
+                        getTargetFromAttacker.mockReturnValue({ name: 'Mount', ac: 12 });
+                        getRuntimeValue.mockImplementation((name, prop) => {
+                            if (name === 'Mount' && prop === 'mountedBy') return 'Rider';
+                            if (name === 'Rider' && prop === 'veerActive') return true;
+                            if (name === 'Rider' && prop === 'activeConditions') return [{ key: 'incapacitated' }];
+                            return null;
+                        });
+                        loadCombatSummary.mockResolvedValue({
+                            creatures: [{ name: 'Mount', type: 'npc', ac: 12, conditions: [] }],
+                        });
+                    },
+                },
+            ];
 
-        it('does not trigger veer when mount is incapacitated', async () => {
-            getTargetFromAttacker.mockReturnValue({ name: 'Mount', ac: 12 });
-            getRuntimeValue.mockImplementation((name, prop) => {
-                if (name === 'Mount' && prop === 'mountedBy') return 'Rider';
-                if (name === 'Rider' && prop === 'veerActive') return true;
-                if (name === 'Rider' && prop === 'activeConditions') return [];
-                return null;
-            });
-            loadCombatSummary.mockResolvedValue({
-                creatures: [{ name: 'Mount', type: 'npc', ac: 12, conditions: [{ key: 'incapacitated' }] }],
-            });
-            const origSetTimeout = globalThis.setTimeout;
-            globalThis.setTimeout = (cb) => { cb(); return 0; };
-            const fn = createFn();
-            await fn('Longsword', 5, 'attack', { targetName: 'Mount' });
-            globalThis.setTimeout = origSetTimeout;
-            // Veer should NOT trigger because mount is incapacitated
-            expect(deps.logEntry).not.toHaveBeenCalledWith(expect.objectContaining({
-                abilityName: 'Veer',
-            }));
-        });
+            for (const scenario of scenarios) {
+                vi.clearAllMocks();
+                rollD20.mockReturnValue(15);
+                getTargetFromAttacker.mockReturnValue({ name: 'Goblin', ac: 12 });
+                loadCombatSummary.mockResolvedValue({ creatures: [{ name: 'Goblin', type: 'npc', ac: 12 }] });
+                isUnbreakableMajestyActive.mockReturnValue(false);
+                hasAttackerTriggeredMajesty.mockReturnValue(false);
+                getRuntimeValue.mockReturnValue(null);
+                getShieldAcBonus.mockReturnValue(0);
+                getShieldOfFaithAcBonus.mockReturnValue(0);
 
-        it('does not trigger veer when rider is incapacitated', async () => {
-            getTargetFromAttacker.mockReturnValue({ name: 'Mount', ac: 12 });
-            getRuntimeValue.mockImplementation((name, prop) => {
-                if (name === 'Mount' && prop === 'mountedBy') return 'Rider';
-                if (name === 'Rider' && prop === 'veerActive') return true;
-                if (name === 'Rider' && prop === 'activeConditions') return [{ key: 'incapacitated' }];
-                return null;
-            });
-            loadCombatSummary.mockResolvedValue({
-                creatures: [{ name: 'Mount', type: 'npc', ac: 12, conditions: [] }],
-            });
-            const origSetTimeout = globalThis.setTimeout;
-            globalThis.setTimeout = (cb) => { cb(); return 0; };
-            const fn = createFn();
-            await fn('Longsword', 5, 'attack', { targetName: 'Mount' });
-            globalThis.setTimeout = origSetTimeout;
-            expect(deps.logEntry).not.toHaveBeenCalledWith(expect.objectContaining({
-                abilityName: 'Veer',
-            }));
+                scenario.setup();
+                const origSetTimeout = globalThis.setTimeout;
+                globalThis.setTimeout = (cb) => { cb(); return 0; };
+                const fn = createFn();
+                await fn('Longsword', 5, 'attack', { targetName: 'Mount' });
+                globalThis.setTimeout = origSetTimeout;
+                expect(deps.logEntry).not.toHaveBeenCalledWith(expect.objectContaining({
+                    abilityName: 'Veer',
+                }));
+            }
         });
 
         it('does not trigger veer when veerActive is false', async () => {
@@ -290,14 +296,10 @@ describe('createLogAndShow - Living Legend & Veer', () => {
             loadCombatSummary.mockResolvedValue({
                 creatures: [{ name: 'Mount', type: 'npc', ac: 12, conditions: [] }],
             });
-            // Use fake timers so we can control when the setTimeout fires
             vi.useFakeTimers();
             const fn = createFn();
             const promise = fn('Longsword', 5, 'attack', { targetName: 'Mount' });
-            // The code sets up a Promise that listens for 'veer-confirm' event
-            // We need to advance timers to let the promise setup complete (microtask)
             await vi.advanceTimersByTimeAsync(1);
-            // Now dispatch the veer-confirm event with confirm=false
             window.dispatchEvent(new CustomEvent('veer-confirm', {
                 detail: { promptId: 'veer-Mount', confirm: false },
             }));

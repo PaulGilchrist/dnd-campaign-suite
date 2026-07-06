@@ -651,68 +651,29 @@ describe('sleepHandler.processSleepRepeatSave', () => {
   });
 
   describe('successful repeat save', () => {
-    it('should remove Incapacitated condition', async () => {
-      getRuntimeValue.mockImplementation((target, prop) => {
-        if (prop === 'activeConditions') return ['Incapacitated', 'Frightened'];
+    it('should remove Incapacitated condition, clear tracking, clean up target effect, and log', async () => {
+      getRuntimeValue.mockImplementation((caster, key, _camp) => {
+        if (key === '_sleep_Goblin') return true;
+        if (key === 'activeConditions') return ['Incapacitated', 'Frightened', 'poisoned'];
+        if (key === 'targetEffects') return [{ target: 'Goblin', effect: 'sleep_repeat_save', source: 'TestCaster' }];
         return [];
       });
       createSaveListener.mockReturnValue({
-        promptId: 'sleep-repeat-success',
+        promptId: 'sleep-repeat-consolidated',
         promise: Promise.resolve({ success: true }),
       });
 
       const result = await processSleepRepeatSave('TestCaster', 'Goblin', 15, campaignName);
 
       const condCall = getSetRuntimeCall('Goblin', 'activeConditions');
-      expect(condCall[2]).toEqual(['Frightened']);
+      expect(condCall[2]).toEqual(['Frightened', 'poisoned']);
       expect(result.payload.description).toContain('succeeded on WIS save');
-    });
-
-    it('should clear tracking', async () => {
-      getRuntimeValue.mockImplementation((caster, key) => {
-        if (key === '_sleep_Goblin') return true;
-        return [];
-      });
-      createSaveListener.mockReturnValue({
-        promptId: 'sleep-repeat-track',
-        promise: Promise.resolve({ success: true }),
-      });
-
-      await processSleepRepeatSave('TestCaster', 'Goblin', 15, campaignName);
 
       const trackCall = getSetRuntimeCall('TestCaster', '_sleep_Goblin');
-      expect(trackCall).toBeDefined();
       expect(trackCall[2]).toBe(null);
-    });
-
-    it('should clean up target effect', async () => {
-      getRuntimeValue.mockImplementation((caster, key, prop) => {
-        if (key === '_sleep_Goblin') return true;
-        if (prop === 'targetEffects') return [{ target: 'Goblin', effect: 'sleep_repeat_save', source: 'TestCaster' }];
-        return [];
-      });
-      createSaveListener.mockReturnValue({
-        promptId: 'sleep-repeat-clean',
-        promise: Promise.resolve({ success: true }),
-      });
-
-      await processSleepRepeatSave('TestCaster', 'Goblin', 15, campaignName);
 
       const effectCall = getSetRuntimeCall(campaignName, 'targetEffects');
       expect(effectCall[2]).toEqual([]);
-    });
-
-    it('should call postLogEntry for condition removal', async () => {
-      getRuntimeValue.mockImplementation((target, prop) => {
-        if (prop === 'activeConditions') return ['Incapacitated'];
-        return [];
-      });
-      createSaveListener.mockReturnValue({
-        promptId: 'sleep-repeat-log',
-        promise: Promise.resolve({ success: true }),
-      });
-
-      await processSleepRepeatSave('TestCaster', 'Goblin', 15, campaignName);
 
       expect(postLogEntry).toHaveBeenCalledWith(
         campaignName,
@@ -722,19 +683,6 @@ describe('sleepHandler.processSleepRepeatSave', () => {
           condition: 'Incapacitated',
         }),
       );
-    });
-
-    it('should call addEntry with save_result on successful repeat save', async () => {
-      getRuntimeValue.mockImplementation((target, prop) => {
-        if (prop === 'activeConditions') return ['Incapacitated'];
-        return [];
-      });
-      createSaveListener.mockReturnValue({
-        promptId: 'sleep-repeat-save-result',
-        promise: Promise.resolve({ success: true }),
-      });
-
-      await processSleepRepeatSave('TestCaster', 'Goblin', 15, campaignName);
 
       expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
         type: 'save_result',
@@ -743,103 +691,32 @@ describe('sleepHandler.processSleepRepeatSave', () => {
         rollType: 'save-sleep',
       }));
     });
-
-    it('should not remove unrelated conditions', async () => {
-      getRuntimeValue.mockImplementation((target, prop) => {
-        if (prop === 'activeConditions') return ['Incapacitated', 'Frightened', 'poisoned'];
-        return [];
-      });
-      createSaveListener.mockReturnValue({
-        promptId: 'sleep-no-unrelated',
-        promise: Promise.resolve({ success: true }),
-      });
-
-      await processSleepRepeatSave('TestCaster', 'Goblin', 15, campaignName);
-
-      const condCall = getSetRuntimeCall('Goblin', 'activeConditions');
-      expect(condCall[2]).toContain('Frightened');
-      expect(condCall[2]).toContain('poisoned');
-    });
   });
 
   describe('failed repeat save', () => {
-    it('should apply Unconscious condition', async () => {
-      getRuntimeValue.mockImplementation((caster, key) => {
+    it('should apply Unconscious condition, deduplicate, clear tracking, clean up target effect, and log', async () => {
+      getRuntimeValue.mockImplementation((caster, key, _camp) => {
         if (key === '_sleep_Goblin') return true;
+        if (key === 'activeConditions') return ['unconscious', 'blinded'];
+        if (key === 'targetEffects') return [{ target: 'Goblin', effect: 'sleep_repeat_save', source: 'TestCaster' }];
         return [];
       });
       createSaveListener.mockReturnValue({
-        promptId: 'sleep-repeat-fail',
+        promptId: 'sleep-repeat-fail-consolidated',
         promise: Promise.resolve({ success: false }),
       });
 
       const result = await processSleepRepeatSave('TestCaster', 'Goblin', 15, campaignName);
 
       const condCall = getSetRuntimeCall('Goblin', 'activeConditions');
-      expect(condCall[2]).toContain('unconscious');
-      expect(result.payload.description).toContain('Unconscious');
-    });
-
-    it('should deduplicate Unconscious if target already has it', async () => {
-      getRuntimeValue.mockImplementation((caster, key) => {
-        if (key === '_sleep_Goblin') return true;
-        return ['unconscious', 'blinded'];
-      });
-      createSaveListener.mockReturnValue({
-        promptId: 'sleep-repeat-dedup',
-        promise: Promise.resolve({ success: false }),
-      });
-
-      await processSleepRepeatSave('TestCaster', 'Goblin', 15, campaignName);
-
-      const condCall = getSetRuntimeCall('Goblin', 'activeConditions');
       expect(condCall[2]).toEqual(['blinded', 'unconscious']);
-    });
-
-    it('should clear tracking on failed repeat save', async () => {
-      getRuntimeValue.mockImplementation((caster, key) => {
-        if (key === '_sleep_Goblin') return true;
-        return [];
-      });
-      createSaveListener.mockReturnValue({
-        promptId: 'sleep-repeat-fail-track',
-        promise: Promise.resolve({ success: false }),
-      });
-
-      await processSleepRepeatSave('TestCaster', 'Goblin', 15, campaignName);
+      expect(result.payload.description).toContain('Unconscious');
 
       const trackCall = getSetRuntimeCall('TestCaster', '_sleep_Goblin');
       expect(trackCall[2]).toBe(null);
-    });
-
-    it('should clean up target effect on failed repeat save', async () => {
-      getRuntimeValue.mockImplementation((caster, key, prop) => {
-        if (key === '_sleep_Goblin') return true;
-        if (prop === 'targetEffects') return [{ target: 'Goblin', effect: 'sleep_repeat_save', source: 'TestCaster' }];
-        return [];
-      });
-      createSaveListener.mockReturnValue({
-        promptId: 'sleep-repeat-fail-clean',
-        promise: Promise.resolve({ success: false }),
-      });
-
-      await processSleepRepeatSave('TestCaster', 'Goblin', 15, campaignName);
 
       const effectCall = getSetRuntimeCall(campaignName, 'targetEffects');
       expect(effectCall[2]).toEqual([]);
-    });
-
-    it('should call postLogEntry for Unconscious application', async () => {
-      getRuntimeValue.mockImplementation((caster, key) => {
-        if (key === '_sleep_Goblin') return true;
-        return [];
-      });
-      createSaveListener.mockReturnValue({
-        promptId: 'sleep-repeat-fail-log',
-        promise: Promise.resolve({ success: false }),
-      });
-
-      await processSleepRepeatSave('TestCaster', 'Goblin', 15, campaignName);
 
       expect(postLogEntry).toHaveBeenCalledWith(
         campaignName,
@@ -849,19 +726,6 @@ describe('sleepHandler.processSleepRepeatSave', () => {
           condition: 'Unconscious',
         }),
       );
-    });
-
-    it('should call addEntry with save_result on failed repeat save', async () => {
-      getRuntimeValue.mockImplementation((caster, key) => {
-        if (key === '_sleep_Goblin') return true;
-        return [];
-      });
-      createSaveListener.mockReturnValue({
-        promptId: 'sleep-repeat-fail-result',
-        promise: Promise.resolve({ success: false }),
-      });
-
-      await processSleepRepeatSave('TestCaster', 'Goblin', 15, campaignName);
 
       expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
         type: 'save_result',

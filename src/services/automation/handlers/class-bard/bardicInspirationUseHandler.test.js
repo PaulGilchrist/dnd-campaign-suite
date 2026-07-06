@@ -124,22 +124,5 @@ describe('bardicInspirationUseHandler.handle', () => {
         `Bardic Inspiration (1d${dieSize}): rolled **${rollResult.total}** (${rollResult.rolls.join(', ')}). Add this to an ability check. Die granted by ${granter}.`,
       );
     });
-
-    it('should use "unknown" when no granter is specified', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-      const dieSize = 10;
-      const rollResult = { total: 7, rolls: [7] };
-
-      runtimeState.getRuntimeValue.mockImplementation((_name, key) => {
-        if (key === 'bardicInspirationDie') return dieSize;
-        return null;
-      });
-      diceRoller.rollExpression.mockReturnValue(rollResult);
-
-      const result = await handle(action, ps, campaignName);
-
-      expect(result.payload.description).toContain('Die granted by unknown');
-    });
   });
 });

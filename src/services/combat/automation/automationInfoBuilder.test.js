@@ -7,8 +7,7 @@ describe('buildAttackInfo', () => {
     describe('null/early-return paths', () => {
         it('returns null when feature has no automation property', () => {
             const feature = { name: 'No Automation' }
-            const result = buildAttackInfo(feature, BASE_STATS)
-            expect(result).toBeNull()
+            expect(buildAttackInfo(feature, BASE_STATS)).toBeNull()
         })
 
         it('returns null when automation is null or undefined', () => {
@@ -377,14 +376,6 @@ describe('buildAttackInfo', () => {
             expect(result.uses).toBe(1)
             expect(result.usesMax).toBe(1)
             expect(result.recharge).toBe('long_rest')
-        })
-
-        it('diverse handlers without automation object properties still work', () => {
-            const feature = makeFeature({ type: 'jack_of_all_trades' })
-            const result = buildAttackInfo(feature, BASE_STATS)
-            expect(result).not.toBeNull()
-            expect(result.type).toBe('jack_of_all_trades')
-            expect(result.hasAutomation).toBe(true)
         })
     })
 

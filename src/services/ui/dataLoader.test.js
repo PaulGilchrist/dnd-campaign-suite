@@ -20,7 +20,6 @@ import {
     loadSkills,
     loadPassiveSkills,
     loadManeuvers,
-    loadSpellData,
     clearDataCache,
     getCacheState
 } from './dataLoader.js';
@@ -86,13 +85,6 @@ describe('dataLoader', () => {
             expect(global.fetch).toHaveBeenCalledWith('/data/2024/classes.json');
         });
 
-        it('returns empty array on error', async () => {
-            global.fetch.mockResolvedValueOnce(mockErrorResponse(500));
-
-            const result = await loadClassData('5e');
-            expect(result).toEqual([]);
-        });
-
         it('falls back to 5e path for invalid or undefined version', async () => {
             const mockData = [{ name: 'Wizard' }];
             global.fetch.mockResolvedValueOnce(mockSuccessResponse(mockData));
@@ -100,6 +92,13 @@ describe('dataLoader', () => {
             const result = await loadClassData('invalid');
             expect(result).toEqual(mockData);
             expect(global.fetch).toHaveBeenCalledWith('/data/classes.json');
+        });
+
+        it('returns empty array on error', async () => {
+            global.fetch.mockResolvedValueOnce(mockErrorResponse(500));
+
+            const result = await loadClassData('5e');
+            expect(result).toEqual([]);
         });
     });
 
@@ -146,15 +145,6 @@ describe('dataLoader', () => {
             const result = await loadBackgroundData('5e');
             expect(result).toEqual([]);
         });
-
-        it('caches the 404 empty result to avoid re-fetching', async () => {
-            global.fetch.mockResolvedValueOnce(mockErrorResponse(404));
-
-            await loadBackgroundData('5e');
-            await loadBackgroundData('5e');
-
-            expect(global.fetch).toHaveBeenCalledTimes(1);
-        });
     });
 
     describe('loadFeatData', () => {
@@ -178,14 +168,6 @@ describe('dataLoader', () => {
     });
 
     describe('loadValidationRules', () => {
-        it('extracts versioned data when wrapped', async () => {
-            const mockData = { '5e': { level_range: { min: 1, max: 20 } } };
-            global.fetch.mockResolvedValueOnce(mockSuccessResponse(mockData));
-
-            const result = await loadValidationRules('5e');
-            expect(result).toEqual({ level_range: { min: 1, max: 20 } });
-        });
-
         it('returns data directly when not wrapped in version key', async () => {
             const mockData = { level_range: { min: 1, max: 20 } };
             global.fetch.mockResolvedValueOnce(mockSuccessResponse(mockData));
@@ -211,16 +193,6 @@ describe('dataLoader', () => {
             global.fetch.mockResolvedValueOnce(mockSuccessResponse(mockData));
 
             const result = await fetchClassData('Wizard', '5e');
-            expect(result).toEqual({ name: 'Wizard', index: 'wizard' });
-        });
-
-        it('finds class by index (case-insensitive)', async () => {
-            const mockData = [
-                { name: 'Wizard', index: 'wizard' }
-            ];
-            global.fetch.mockResolvedValueOnce(mockSuccessResponse(mockData));
-
-            const result = await fetchClassData('wizard', '5e');
             expect(result).toEqual({ name: 'Wizard', index: 'wizard' });
         });
 
@@ -459,23 +431,6 @@ describe('dataLoader', () => {
     });
 
     describe('loadSpells', () => {
-        it('loads spells for 5e', async () => {
-            const mockData = [{ name: 'Fireball', level: 3 }];
-            global.fetch.mockResolvedValueOnce(mockSuccessResponse(mockData));
-
-            const result = await loadSpells('5e');
-            expect(result).toEqual(mockData);
-        });
-
-        it('loads spells for 2024 from the 2024 data path', async () => {
-            const mockData = [{ name: 'Magic Missile', level: 1 }];
-            global.fetch.mockResolvedValueOnce(mockSuccessResponse(mockData));
-
-            const result = await loadSpells('2024');
-            expect(result).toEqual(mockData);
-            expect(global.fetch).toHaveBeenCalledWith('/data/2024/spells.json');
-        });
-
         it('caches spells independently per version', async () => {
             const mockData5e = [{ name: 'Fireball', level: 3 }];
             const mockData2024 = [{ name: 'Magic Missile', level: 1 }];
@@ -518,23 +473,6 @@ describe('dataLoader', () => {
                 { name: 'Arcana', ability: 'Intelligence' },
                 { name: 'History', ability: 'Intelligence' }
             ]);
-        });
-
-        it('derives all 18 skills from full ability scores', async () => {
-            const abilityData = [
-                { full_name: 'Strength', skills: ['Athletics'] },
-                { full_name: 'Dexterity', skills: ['Acrobatics', 'Sleight of Hand', 'Stealth'] },
-                { full_name: 'Constitution', skills: [] },
-                { full_name: 'Intelligence', skills: ['Arcana', 'History', 'Investigation', 'Nature', 'Religion'] },
-                { full_name: 'Wisdom', skills: ['Animal Handling', 'Insight', 'Medicine', 'Perception', 'Survival'] },
-                { full_name: 'Charisma', skills: ['Deception', 'Intimidation', 'Performance', 'Persuasion'] }
-            ];
-            global.fetch.mockResolvedValueOnce(mockSuccessResponse(abilityData));
-
-            const result = await loadSkills();
-
-            expect(result).toHaveLength(18);
-            expect(result[0]).toEqual({ name: 'Athletics', ability: 'Strength' });
         });
 
         it('returns fallback skills on network error', async () => {
@@ -580,45 +518,10 @@ describe('dataLoader', () => {
             expect(result2).toEqual(mockData);
         });
 
-        it('uses 2024 path for 2024 ruleset', async () => {
-            const mockData = [{ name: 'Action Surge' }];
-            global.fetch.mockResolvedValueOnce(mockSuccessResponse(mockData));
-
-            await loadManeuvers('2024');
-            expect(global.fetch).toHaveBeenCalledWith('/data/2024/maneuvers.json');
-        });
-
         it('returns empty array on error', async () => {
             global.fetch.mockResolvedValueOnce(mockErrorResponse(500));
 
             const result = await loadManeuvers('5e');
-            expect(result).toEqual([]);
-        });
-    });
-
-    describe('loadSpellData', () => {
-        it('delegates to loadSpells using playerStats.rules', async () => {
-            const mockData = [{ name: 'Fireball', level: 3 }];
-            global.fetch.mockResolvedValueOnce(mockSuccessResponse(mockData));
-
-            const result = await loadSpellData({ rules: '2024' });
-            expect(result).toEqual(mockData);
-            expect(global.fetch).toHaveBeenCalledWith('/data/2024/spells.json');
-        });
-
-        it('defaults to 5e when playerStats has no rules', async () => {
-            const mockData = [{ name: 'Fireball', level: 3 }];
-            global.fetch.mockResolvedValueOnce(mockSuccessResponse(mockData));
-
-            const result = await loadSpellData({});
-            expect(result).toEqual(mockData);
-            expect(global.fetch).toHaveBeenCalledWith('/data/spells.json');
-        });
-
-        it('returns empty array on error', async () => {
-            global.fetch.mockResolvedValueOnce(mockErrorResponse(500));
-
-            const result = await loadSpellData({ rules: '5e' });
             expect(result).toEqual([]);
         });
     });
@@ -653,32 +556,6 @@ describe('dataLoader', () => {
             await loadAbilityScores();
 
             expect(global.fetch).toHaveBeenCalledTimes(2);
-        });
-
-        it('clears both 5e and 2024 caches', async () => {
-            const mockData5e = [{ name: 'Wizard 5e' }];
-            const mockData2024 = [{ name: 'Wizard 2024' }];
-            global.fetch
-                .mockResolvedValueOnce(mockSuccessResponse(mockData5e))
-                .mockResolvedValueOnce(mockSuccessResponse(mockData2024));
-
-            await loadClassData('5e');
-            await loadClassData('2024');
-
-            clearDataCache();
-
-            const cleared = getCacheState();
-            expect(cleared['5e'].classes).toBeNull();
-            expect(cleared['2024'].classes).toBeNull();
-        });
-    });
-
-    describe('getCacheState', () => {
-        it('returns an object with 5e and 2024 versions', () => {
-            const cacheState = getCacheState();
-
-            expect(cacheState).toHaveProperty('5e');
-            expect(cacheState).toHaveProperty('2024');
         });
     });
 

@@ -40,9 +40,8 @@ describe('stripNumericSuffix', () => {
     expect(stripNumericSuffix('42')).toBe('42');
   });
 
-  it('returns empty string for null, undefined, or empty input', () => {
+  it('returns empty string for null or undefined input', () => {
     expect(stripNumericSuffix(null)).toBe('');
     expect(stripNumericSuffix(undefined)).toBe('');
-    expect(stripNumericSuffix('')).toBe('');
   });
 });

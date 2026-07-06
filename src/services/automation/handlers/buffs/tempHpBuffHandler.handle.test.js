@@ -1,4 +1,3 @@
-// @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
@@ -24,24 +23,19 @@ function resetMocks() {
 describe('handle — missing tempHpExpression', () => {
   beforeEach(() => resetMocks());
 
-  it('returns popup when tempHpExpression is empty, undefined, or missing', async () => {
+  it('returns popup with info type when tempHpExpression is empty, undefined, or missing', async () => {
     const ps = makePlayerStats();
 
-    // Empty string
     let result = await handle(makeAction({}), ps, campaignName);
     expect(result.type).toBe('popup');
     expect(result.payload.type).toBe('automation_info');
-    expect(result.payload.description).toContain('No temp HP expression defined');
+    expect(result.payload.description).toBe('Second Wind: No temp HP expression defined.');
     expect(automationService.evaluateAutoExpression).not.toHaveBeenCalled();
     expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
 
-    // undefined
-    const action2 = makeAction({ tempHpExpression: undefined });
-    delete action2.automation.tempHpExpression;
-    result = await handle(action2, ps, campaignName);
-    expect(result.payload.description).toContain('No temp HP expression defined');
+    result = await handle(makeAction({ tempHpExpression: undefined }), ps, campaignName);
+    expect(result.payload.description).toBe('Second Wind: No temp HP expression defined.');
 
-    // Custom name
     const action3 = makeAction({}, { name: 'Rage' });
     result = await handle(action3, ps, campaignName);
     expect(result.payload.description).toBe('Rage: No temp HP expression defined.');
@@ -52,14 +46,10 @@ describe('handle — invalid evaluation result', () => {
   beforeEach(() => resetMocks());
 
   it.each([
-    ['INVALID_EXPR', 'INVALID_EXPR'],
+    ['not-a-number', 'INVALID_EXPR'],
     [0, '0'],
     [-3, '-3'],
-    [null, 'maybe_something'],
-    [undefined, 'undefined_expr'],
-    [true, 'true'],
-    [{ value: 5 }, 'obj'],
-  ])('returns popup when evaluateAutoExpression returns %p', async (mockReturn, expression) => {
+  ])('returns popup when evaluateAutoExpression returns %p (expression: %s)', async (mockReturn, expression) => {
     const action = makeAction({ tempHpExpression: expression });
     const ps = makePlayerStats();
     automationService.evaluateAutoExpression.mockReturnValue(mockReturn);

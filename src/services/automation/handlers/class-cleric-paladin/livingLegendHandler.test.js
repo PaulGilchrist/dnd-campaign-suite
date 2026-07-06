@@ -69,9 +69,10 @@ describe('livingLegendHandler', () => {
     it('includes automationType matching the action automation type', async () => {
       getRuntimeValue.mockReturnValue(undefined);
 
-      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
+      const action = makeAction({ automation: { type: 'custom_legend' } });
+      const result = await handle(action, makePlayerStats(), campaignName, null);
 
-      expect(result.payload.automationType).toBe('living_legend');
+      expect(result.payload.automationType).toBe('custom_legend');
     });
 
     it('includes description listing all three effects', async () => {
@@ -82,15 +83,6 @@ describe('livingLegendHandler', () => {
       expect(result.payload.description).toContain('Charisma checks have advantage');
       expect(result.payload.description).toContain('reroll failed saving throws');
       expect(result.payload.description).toContain('missed weapon attacks hit once per turn');
-    });
-
-    it('passes through the automation object in the payload', async () => {
-      getRuntimeValue.mockReturnValue(undefined);
-
-      const action = makeAction({ customField: 'customValue' });
-      const result = await handle(action, makePlayerStats(), campaignName, null);
-
-      expect(result.payload.automation).toEqual(action.automation);
     });
 
     it('activates living legend by setting runtime value to true', async () => {
@@ -120,20 +112,15 @@ describe('livingLegendHandler', () => {
       });
     });
 
-    it('uses custom action name in popup description', async () => {
+    it('uses custom action name in popup and log entry', async () => {
       getRuntimeValue.mockReturnValue(undefined);
 
       const action = makeAction({ name: 'Custom Legendary Ability' });
       const result = await handle(action, makePlayerStats(), campaignName, null);
 
       expect(result.payload.description).toContain('Custom Legendary Ability');
-    });
 
-    it('uses custom action name in log entry', async () => {
-      getRuntimeValue.mockReturnValue(undefined);
-
-      const action = makeAction({ name: 'My Divine Gift' });
-      await handle(action, makePlayerStats(), campaignName, null);
+      await handle(makeAction({ name: 'My Divine Gift' }), makePlayerStats(), campaignName, null);
 
       expect(addEntry).toHaveBeenCalledWith(
         campaignName,
@@ -144,32 +131,6 @@ describe('livingLegendHandler', () => {
       );
     });
 
-    it('uses automation type from action.automation.type in payload', async () => {
-      getRuntimeValue.mockReturnValue(undefined);
-
-      const action = makeAction({ automation: { type: 'custom_legend' } });
-      const result = await handle(action, makePlayerStats(), campaignName, null);
-
-      expect(result.payload.automationType).toBe('custom_legend');
-    });
-
-    it('passes campaign name to setRuntimeValue and addEntry', async () => {
-      getRuntimeValue.mockReturnValue(undefined);
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        playerName,
-        livingLegendKey,
-        true,
-        campaignName,
-      );
-      expect(addEntry).toHaveBeenCalledWith(
-        campaignName,
-        expect.any(Object),
-      );
-    });
-
     it('does not throw when addEntry rejects (fire-and-forget logging)', async () => {
       getRuntimeValue.mockReturnValue(undefined);
       addEntry.mockRejectedValue(new Error('Network failure'));
@@ -177,40 +138,21 @@ describe('livingLegendHandler', () => {
       const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
       expect(result.type).toBe('popup');
-      expect(result.payload.type).toBe('automation_info');
     });
   });
 
   describe('setUnerringStrikeUsed', () => {
-    it('sets the runtime value to the provided boolean when true', async () => {
-      await setUnerringStrikeUsed(playerName, campaignName, true);
+    it.each`
+      used     | expectedCall
+      ${true}  | ${true}
+      ${false} | ${false}
+    `('sets the runtime value to $used', async ({ used, expectedCall }) => {
+      await setUnerringStrikeUsed(playerName, campaignName, used);
 
       expect(setRuntimeValue).toHaveBeenCalledWith(
         playerName,
         unerringStrikeKey,
-        true,
-        campaignName,
-      );
-    });
-
-    it('sets the runtime value to the provided boolean when false', async () => {
-      await setUnerringStrikeUsed(playerName, campaignName, false);
-
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        playerName,
-        unerringStrikeKey,
-        false,
-        campaignName,
-      );
-    });
-
-    it('passes the campaign name to setRuntimeValue', async () => {
-      await setUnerringStrikeUsed(playerName, campaignName, true);
-
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        playerName,
-        unerringStrikeKey,
-        true,
+        expectedCall,
         campaignName,
       );
     });

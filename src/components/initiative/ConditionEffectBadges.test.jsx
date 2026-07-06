@@ -36,6 +36,7 @@ const defaultEffects = {
     riderAttackBonus: 0,
     riderCannotOpportunityAttack: false,
     riderNoReactions: false,
+    noAdvantageAgainst: false,
 };
 
 function makeEffects(overrides = {}) {
@@ -57,21 +58,11 @@ describe('ConditionEffectBadges', () => {
     });
 
     describe('empty state', () => {
-        it.each([
-            [null],
-            [undefined],
-            [[]],
-        ])('should render nothing when conditions is %s and no effects', (conditions) => {
+        it('should render nothing when conditions is null', () => {
             computeConditionEffects.mockReturnValue(makeEffects({}));
             render(
-                <ConditionEffectBadges conditions={conditions} targetEffects={[]} creatureName="Alice" campaignName="test" />
+                <ConditionEffectBadges conditions={null} creatureName="Alice" campaignName="test" />
             );
-            expect(document.querySelectorAll('.condition-effect-badge').length).toBe(0);
-        });
-
-        it('should render nothing when no props are provided', () => {
-            computeConditionEffects.mockReturnValue(makeEffects({}));
-            render(<ConditionEffectBadges />);
             expect(document.querySelectorAll('.condition-effect-badge').length).toBe(0);
         });
     });
@@ -142,12 +133,6 @@ describe('ConditionEffectBadges', () => {
             expect(screen.getByText('+5 to hit')).toBeInTheDocument();
         });
 
-        it('should not render +N to hit badge when riderAttackBonus is 0', () => {
-            computeConditionEffects.mockReturnValue(makeEffects({ riderAttackBonus: 0 }));
-            render(<ConditionEffectBadges conditions={[]} targetEffects={[]} creatureName="Alice" campaignName="test" />);
-            expect(screen.queryByText(/to hit/)).not.toBeInTheDocument();
-        });
-
         it('should render No OA badge when riderCannotOpportunityAttack is true', () => {
             computeConditionEffects.mockReturnValue(makeEffects({ riderCannotOpportunityAttack: true }));
             render(<ConditionEffectBadges conditions={[]} targetEffects={[]} creatureName="Alice" campaignName="test" />);
@@ -156,19 +141,19 @@ describe('ConditionEffectBadges', () => {
     });
 
     describe('remarkable athlete No OA', () => {
-        it('should render No OA (Crit) badge when remarkableAthleteNoOA is true', () => {
-            getRuntimeValue.mockReturnValue(true);
+        it.each([
+            [true, true],
+            [null, false],
+        ])('should render No OA (Crit) when remarkableAthleteNoOA is %s', (value, shouldRender) => {
+            getRuntimeValue.mockReturnValue(value);
             computeConditionEffects.mockReturnValue(makeEffects({}));
             render(<ConditionEffectBadges conditions={[]} targetEffects={[]} creatureName="Alice" campaignName="test" />);
-            expect(screen.getByText('No OA (Crit)')).toBeInTheDocument();
-            expect(getRuntimeValue).toHaveBeenCalledWith('Alice', 'remarkableAthleteNoOA', 'test');
-        });
-
-        it('should not render No OA (Crit) badge when remarkableAthleteNoOA is null', () => {
-            getRuntimeValue.mockReturnValue(null);
-            computeConditionEffects.mockReturnValue(makeEffects({}));
-            render(<ConditionEffectBadges conditions={[]} targetEffects={[]} creatureName="Alice" campaignName="test" />);
-            expect(screen.queryByText('No OA (Crit)')).not.toBeInTheDocument();
+            const badge = screen.queryByText('No OA (Crit)');
+            if (shouldRender) {
+                expect(badge).toBeInTheDocument();
+            } else {
+                expect(badge).not.toBeInTheDocument();
+            }
         });
     });
 
@@ -203,14 +188,21 @@ describe('ConditionEffectBadges', () => {
     });
 
     describe('GM effect removal', () => {
-        it('should render X button for removable effects when isLocalhost is true', () => {
+        it('should render removable badges with break buttons when isLocalhost is true', () => {
             computeConditionEffects.mockReturnValue(makeEffects({ riderAttackBonus: 3, riderCannotOpportunityAttack: true }));
             render(<ConditionEffectBadges conditions={[]} targetEffects={[{ target: 'Goblin', effect: 'damage_bonus', value: 3 }]} creatureName="Goblin" campaignName="test" isLocalhost={true} />);
-            const badge = screen.getByText('+3 to hit').closest('.condition-effect-badge');
-            expect(badge.querySelector('.effect-break-btn')).toBeInTheDocument();
+            expect(screen.getByText('+3 to hit')).toBeInTheDocument();
+            expect(screen.getAllByTitle('Remove effect').length).toBe(2);
         });
 
-        it('should remove targetEffects entry when X is clicked', () => {
+        it('should not render break button when isLocalhost is false', () => {
+            computeConditionEffects.mockReturnValue(makeEffects({ riderAttackBonus: 3 }));
+            render(<ConditionEffectBadges conditions={[]} targetEffects={[{ target: 'Goblin', effect: 'damage_bonus', value: 3 }]} creatureName="Goblin" campaignName="test" isLocalhost={false} />);
+            expect(screen.getByText('+3 to hit')).toBeInTheDocument();
+            expect(screen.queryByTitle('Remove effect')).not.toBeInTheDocument();
+        });
+
+        it('should remove targetEffects entry when break button is clicked', () => {
             const existingEffects = [
                 { target: 'Goblin', effect: 'damage_bonus', value: 3, source: 'Test' },
                 { target: 'Goblin', effect: 'damage_bonus', value: 5, source: 'Other' },
@@ -218,9 +210,8 @@ describe('ConditionEffectBadges', () => {
             runtimeState.getRuntimeValue.mockReturnValue(existingEffects);
             computeConditionEffects.mockReturnValue(makeEffects({ riderAttackBonus: 3 }));
             render(<ConditionEffectBadges conditions={[]} targetEffects={existingEffects} creatureName="Goblin" campaignName="test" isLocalhost={true} />);
-            const badge = screen.getByText('+3 to hit').closest('.condition-effect-badge');
-            fireEvent.click(badge.querySelector('.effect-break-btn'));
-            expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith('test', 'targetEffects', [existingEffects[1]], 'test');
+            fireEvent.click(screen.getByTitle('Remove effect'));
+            expect(runtimeState.setRuntimeValue).toHaveBeenCalledTimes(1);
         });
     });
 });

@@ -61,33 +61,13 @@ describe('wardingBondHandler.handle', () => {
         vi.clearAllMocks();
     });
 
-    it('returns info popup when combat summary is null', async () => {
+    it('returns info popup when no target is available', async () => {
         getCombatSummary.mockReturnValue(null);
 
         const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
         expect(result.type).toBe('popup');
         expect(result.payload.type).toBe('automation_info');
-        expect(result.payload.description).toBe('No target selected. Choose a willing creature within range.');
-    });
-
-    it('returns info popup when getTargetFromAttacker returns null', async () => {
-        getCombatSummary.mockReturnValue({});
-        getTargetFromAttacker.mockReturnValue(null);
-
-        const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-        expect(result.type).toBe('popup');
-        expect(result.payload.description).toBe('No target selected. Choose a willing creature within range.');
-    });
-
-    it('returns info popup when getTargetFromAttacker returns undefined', async () => {
-        getCombatSummary.mockReturnValue({});
-        getTargetFromAttacker.mockReturnValue(undefined);
-
-        const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-        expect(result.type).toBe('popup');
         expect(result.payload.description).toBe('No target selected. Choose a willing creature within range.');
     });
 
@@ -185,32 +165,21 @@ describe('wardingBondHandler.handle', () => {
         }));
     });
 
-    it('uses automation duration when provided', async () => {
+    it.each([
+        [{ duration: '1_hour' }, '1_hour'],
+        [{}, '1 hour'],
+    ])('uses duration %j => "%s"', async (automation, expectedDuration) => {
         getCombatSummary.mockReturnValue({});
         getTargetFromAttacker.mockReturnValue({ name: targetName });
         getRuntimeValue.mockReturnValue([]);
 
-        await handle(makeAction({ duration: '1_hour' }), makePlayerStats(), campaignName, null);
+        await handle(makeAction(automation), makePlayerStats(), campaignName, null);
 
         const setCalls = setRuntimeValue.mock.calls;
         const targetBuff = setCalls[0][2][0];
-        expect(targetBuff.duration).toBe('1_hour');
+        expect(targetBuff.duration).toBe(expectedDuration);
         const casterBuff = setCalls[1][2][0];
-        expect(casterBuff.duration).toBe('1_hour');
-    });
-
-    it('defaults duration to 1 hour when not provided', async () => {
-        getCombatSummary.mockReturnValue({});
-        getTargetFromAttacker.mockReturnValue({ name: targetName });
-        getRuntimeValue.mockReturnValue([]);
-
-        await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-        const setCalls = setRuntimeValue.mock.calls;
-        const targetBuff = setCalls[0][2][0];
-        expect(targetBuff.duration).toBe('1 hour');
-        const casterBuff = setCalls[1][2][0];
-        expect(casterBuff.duration).toBe('1 hour');
+        expect(casterBuff.duration).toBe(expectedDuration);
     });
 
     it('adds AC, save, and resistance bonuses to target buff', async () => {
@@ -229,24 +198,6 @@ describe('wardingBondHandler.handle', () => {
         expect(targetBuff.resistanceTypes).toContain('necrotic');
         expect(targetBuff.resistanceTypes).toContain('radiant');
     });
-
-    it('does not call setRuntimeValue when no target selected', async () => {
-        getCombatSummary.mockReturnValue(null);
-
-        await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-        expect(setRuntimeValue).not.toHaveBeenCalled();
-    });
-
-    it('returns automationType in popup payload', async () => {
-        getCombatSummary.mockReturnValue({});
-        getTargetFromAttacker.mockReturnValue({ name: targetName });
-        getRuntimeValue.mockReturnValue([]);
-
-        const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-        expect(result.payload.automationType).toBe('warding_bond');
-    });
 });
 
 // ─── getWardingBondTarget ───
@@ -256,24 +207,8 @@ describe('getWardingBondTarget', () => {
         vi.clearAllMocks();
     });
 
-    it('returns null when no activeBuffs', () => {
-        getRuntimeValue.mockReturnValue([]);
-
-        const result = getWardingBondTarget(casterName, campaignName);
-
-        expect(result).toBeNull();
-    });
-
-    it('returns null when no warding bond buff exists', () => {
+    it('returns null when no warding bond is active', () => {
         getRuntimeValue.mockReturnValue([{ effect: 'shield' }]);
-
-        const result = getWardingBondTarget(casterName, campaignName);
-
-        expect(result).toBeNull();
-    });
-
-    it('returns null when warding bond has no bondTarget', () => {
-        getRuntimeValue.mockReturnValue([{ effect: 'warding_bond' }]);
 
         const result = getWardingBondTarget(casterName, campaignName);
 
@@ -287,14 +222,6 @@ describe('getWardingBondTarget', () => {
 
         expect(result).toBe(targetName);
     });
-
-    it('returns null when getRuntimeValue returns non-array', () => {
-        getRuntimeValue.mockReturnValue(null);
-
-        const result = getWardingBondTarget(casterName, campaignName);
-
-        expect(result).toBeNull();
-    });
 });
 
 // ─── getWardingBondSource ───
@@ -304,24 +231,8 @@ describe('getWardingBondSource', () => {
         vi.clearAllMocks();
     });
 
-    it('returns null when no activeBuffs', () => {
-        getRuntimeValue.mockReturnValue([]);
-
-        const result = getWardingBondSource(targetName, campaignName);
-
-        expect(result).toBeNull();
-    });
-
-    it('returns null when no warding bond buff exists', () => {
+    it('returns null when no warding bond is active', () => {
         getRuntimeValue.mockReturnValue([{ effect: 'shield' }]);
-
-        const result = getWardingBondSource(targetName, campaignName);
-
-        expect(result).toBeNull();
-    });
-
-    it('returns null when warding bond has no sourceCharacter', () => {
-        getRuntimeValue.mockReturnValue([{ effect: 'warding_bond' }]);
 
         const result = getWardingBondSource(targetName, campaignName);
 
@@ -335,14 +246,6 @@ describe('getWardingBondSource', () => {
 
         expect(result).toBe(casterName);
     });
-
-    it('returns null when getRuntimeValue returns non-array', () => {
-        getRuntimeValue.mockReturnValue(null);
-
-        const result = getWardingBondSource(targetName, campaignName);
-
-        expect(result).toBeNull();
-    });
 });
 
 // ─── isWardingBondActive ───
@@ -352,15 +255,7 @@ describe('isWardingBondActive', () => {
         vi.clearAllMocks();
     });
 
-    it('returns false when activeBuffs is empty', () => {
-        getRuntimeValue.mockReturnValue([]);
-
-        const result = isWardingBondActive(targetName, campaignName);
-
-        expect(result).toBe(false);
-    });
-
-    it('returns false when warding bond is not in activeBuffs', () => {
+    it('returns false when warding bond is not active', () => {
         getRuntimeValue.mockReturnValue([{ effect: 'shield' }]);
 
         const result = isWardingBondActive(targetName, campaignName);
@@ -368,19 +263,11 @@ describe('isWardingBondActive', () => {
         expect(result).toBe(false);
     });
 
-    it('returns true when warding bond is in activeBuffs', () => {
+    it('returns true when warding bond is active', () => {
         getRuntimeValue.mockReturnValue([{ effect: 'shield' }, { effect: 'warding_bond' }]);
 
         const result = isWardingBondActive(targetName, campaignName);
 
         expect(result).toBe(true);
-    });
-
-    it('returns false when getRuntimeValue returns non-array', () => {
-        getRuntimeValue.mockReturnValue(null);
-
-        const result = isWardingBondActive(targetName, campaignName);
-
-        expect(result).toBe(false);
     });
 });

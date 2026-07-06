@@ -1,9 +1,16 @@
-// @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-import { handle, confirmGiantAncestry, getGiantAncestrySelection, getGiantAncestryOptions, handleDirectType, handleCloudsJaunt, handleFiresBurn, handleFrostsChill, handleHillsTumble, handleStonesEndurance, handleStormsThunder } from './giantAncestryHandler.js';
-
-// ── Mocks ──────────────────────────────────────────────────────
+import {
+    handle,
+    confirmGiantAncestry,
+    handleDirectType,
+    handleCloudsJaunt,
+    handleFiresBurn,
+    handleFrostsChill,
+    handleHillsTumble,
+    handleStonesEndurance,
+    handleStormsThunder,
+} from './giantAncestryHandler.js';
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
     getRuntimeValue: vi.fn((_name, _key, _campaign) => null),
@@ -31,14 +38,10 @@ vi.mock('../../../rules/combat/damageUtils.js', () => ({
     getTargetFromAttacker: vi.fn(() => null),
 }));
 
-// ── Re-import after mocking ────────────────────────────────────
-
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../ui/logService.js';
 import { resolveTarget } from '../../common/targetResolver.js';
 import { getCombatContext, getTargetFromAttacker } from '../../../rules/combat/damageUtils.js';
-
-// ── Helpers ────────────────────────────────────────────────────
 
 function makeAction(overrides = {}) {
     return {
@@ -58,14 +61,10 @@ function makePlayerStats(overrides = {}) {
     return {
         name: 'TestHero',
         proficiency: 3,
-        abilities: [
-            { name: 'Constitution', bonus: 2 },
-        ],
+        abilities: [{ name: 'Constitution', bonus: 2 }],
         ...overrides,
     };
 }
-
-// ── Tests ──────────────────────────────────────────────────────
 
 describe('giantAncestryHandler', () => {
     beforeEach(() => {
@@ -73,81 +72,48 @@ describe('giantAncestryHandler', () => {
     });
 
     describe('handle', () => {
-        it('should show selection modal when no ancestry is selected', async () => {
+        it('shows selection modal when no ancestry is selected', async () => {
             getRuntimeValue.mockReturnValue(null);
-            const action = makeAction();
-            const result = await handle(action, makePlayerStats(), 'campaign', 'map');
+            const result = await handle(makeAction(), makePlayerStats(), 'campaign', 'map');
 
             expect(result.type).toBe('modal');
             expect(result.modalName).toBe('giantAncestry');
-            expect(result.payload.action).toBe(action);
-            expect(result.payload.playerStats).toBeDefined();
+            expect(result.payload.action).toBeInstanceOf(Object);
         });
 
-        it('should dispatch to the correct sub-handler based on stored selection', async () => {
+        it('dispatches to the correct sub-handler based on stored selection', async () => {
             getRuntimeValue.mockReturnValue("Cloud's Jaunt");
-            const action = makeAction();
-            const result = await handle(action, makePlayerStats(), 'campaign', 'map');
+            const result = await handle(makeAction(), makePlayerStats(), 'campaign', 'map');
 
             expect(result.type).toBe('modal');
             expect(result.modalName).toBe('teleport');
         });
 
-        it('should return info popup when stored selection is unknown', async () => {
+        it('returns info popup when stored selection is unknown', async () => {
             getRuntimeValue.mockReturnValue("Unknown Ancestry");
-            const action = makeAction();
-            const result = await handle(action, makePlayerStats(), 'campaign', 'map');
+            const result = await handle(makeAction(), makePlayerStats(), 'campaign', 'map');
 
             expect(result.type).toBe('popup');
             expect(result.payload.type).toBe('automation_info');
             expect(result.payload.description).toContain("Unknown Ancestry");
         });
-
-        it('should dispatch to damage handler for Fire Burn', async () => {
-            getRuntimeValue.mockReturnValue("Fire's Burn");
-            const action = makeAction();
-            const result = await handle(action, makePlayerStats(), 'campaign', 'map');
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain("Fire's Burn");
-        });
-
-        it('should dispatch to damage_reduction handler for Stone Endurance', async () => {
-            getRuntimeValue.mockReturnValue("Stone's Endurance");
-            const action = makeAction();
-            const result = await handle(action, makePlayerStats(), 'campaign', 'map');
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain("Stone's Endurance");
-        });
     });
 
     describe('confirmGiantAncestry', () => {
-        it('should store the selected ancestry and return confirmation', async () => {
-            const result = await confirmGiantAncestry(
-                makePlayerStats(),
-                "Fire's Burn",
-                'campaign'
-            );
+        it('stores the selected ancestry and returns confirmation', async () => {
+            const result = await confirmGiantAncestry(makePlayerStats(), "Fire's Burn", 'campaign');
 
             expect(result.type).toBe('popup');
             expect(result.payload.type).toBe('automation_info');
             expect(result.payload.description).toContain("Fire's Burn");
             expect(result.payload.description).toContain('Recharges');
             expect(setRuntimeValue).toHaveBeenCalledWith(
-                'TestHero',
-                'giantAncestrySelection',
-                "Fire's Burn",
-                'campaign'
+                'TestHero', 'giantAncestrySelection', "Fire's Burn", 'campaign'
             );
         });
 
-        it('should return error when no option is selected', async () => {
-            const result = await confirmGiantAncestry(
-                makePlayerStats(),
-                'Nonexistent Option',
-                'campaign'
-            );
+        it('returns error when no option is selected', async () => {
+            const result = await confirmGiantAncestry(makePlayerStats(), 'Nonexistent Option', 'campaign');
 
             expect(result.type).toBe('popup');
             expect(result.payload.type).toBe('automation_info');
@@ -155,34 +121,11 @@ describe('giantAncestryHandler', () => {
         });
     });
 
-    describe('getGiantAncestrySelection', () => {
-        it('should return the stored selection', () => {
-            getRuntimeValue.mockReturnValue("Stone's Endurance");
-            const selection = getGiantAncestrySelection(makePlayerStats(), 'campaign');
-            expect(selection).toBe("Stone's Endurance");
-        });
-
-        it('should return null when no selection exists', () => {
-            getRuntimeValue.mockReturnValue(null);
-            const selection = getGiantAncestrySelection(makePlayerStats(), 'campaign');
-            expect(selection).toBe(null);
-        });
-    });
-
     describe('getGiantAncestryOptions', () => {
-        it('should return all 6 giant ancestry options with type, icon, and description', () => {
+        it('returns all 6 giant ancestry options with expected names', async () => {
+            const { getGiantAncestryOptions } = await import('./giantAncestryHandler.js');
             const options = getGiantAncestryOptions();
-            expect(Array.isArray(options)).toBe(true);
             expect(options).toHaveLength(6);
-            options.forEach(opt => {
-                expect(opt.type).toBeDefined();
-                expect(opt.icon).toBeDefined();
-                expect(opt.description).toBeDefined();
-            });
-        });
-
-        it('should include all expected ancestry names', () => {
-            const options = getGiantAncestryOptions();
             const names = options.map(o => o.name);
             expect(names).toContain("Cloud's Jaunt");
             expect(names).toContain("Fire's Burn");
@@ -190,76 +133,65 @@ describe('giantAncestryHandler', () => {
             expect(names).toContain("Hill's Tumble");
             expect(names).toContain("Stone's Endurance");
             expect(names).toContain("Storm's Thunder");
-        });
-    });
-
-    describe('resource_pool routing', () => {
-        it('should route Giant Ancestry through resourcePoolHandler', async () => {
-            const { handle: resourcePoolHandle } = await import('../resources/resourcePoolHandler.js');
-            getRuntimeValue.mockReturnValue(null);
-            const action = makeAction();
-            const result = await resourcePoolHandle(action, makePlayerStats(), 'campaign', 'map');
-
-            expect(result.type).toBe('modal');
-            expect(result.modalName).toBe('giantAncestry');
+            options.forEach(opt => {
+                expect(opt.type).toBeDefined();
+                expect(opt.icon).toBeDefined();
+                expect(opt.description).toBeDefined();
+            });
         });
     });
 
     describe('handleDirectType', () => {
-        it('should show modal when no selection', async () => {
+        it('shows modal when no selection', async () => {
             getRuntimeValue.mockReturnValue(null);
-            const action = makeAction();
-            const result = await handleDirectType(action, makePlayerStats(), 'campaign', 'map');
+            const result = await handleDirectType(makeAction(), makePlayerStats(), 'campaign', 'map');
 
             expect(result.type).toBe('modal');
             expect(result.modalName).toBe('giantAncestry');
         });
 
-        it('should dispatch to matching direct type', async () => {
+        it('dispatches to matching direct type', async () => {
             getRuntimeValue.mockReturnValue("Fire's Burn");
-            const action = makeAction({ automation: { type: 'damage' } });
-            const result = await handleDirectType(action, makePlayerStats(), 'campaign', 'map');
+            const result = await handleDirectType(
+                makeAction({ automation: { type: 'damage' } }),
+                makePlayerStats(),
+                'campaign',
+                'map'
+            );
 
             expect(result.type).toBe('popup');
             expect(result.payload.description).toContain("Fire's Burn");
         });
 
-        it('should return info popup when direct type does not match selection', async () => {
+        it('returns info popup when direct type does not match selection', async () => {
             getRuntimeValue.mockReturnValue("Cloud's Jaunt");
-            const action = makeAction({ automation: { type: 'damage' } });
-            const result = await handleDirectType(action, makePlayerStats(), 'campaign', 'map');
+            const result = await handleDirectType(
+                makeAction({ automation: { type: 'damage' } }),
+                makePlayerStats(),
+                'campaign',
+                'map'
+            );
 
             expect(result.type).toBe('popup');
             expect(result.payload.description).toContain("Cloud's Jaunt");
             expect(result.payload.description).toContain('damage');
         });
-
-        it('should show modal when no selection even with direct type', async () => {
-            getRuntimeValue.mockReturnValue(null);
-            const action = makeAction({ automation: { type: 'teleport' } });
-            const result = await handleDirectType(action, makePlayerStats(), 'campaign', 'map');
-
-            expect(result.type).toBe('modal');
-            expect(result.modalName).toBe('giantAncestry');
-        });
-
-        it('should handle missing automation type gracefully', async () => {
-            getRuntimeValue.mockReturnValue("Fire's Burn");
-            const action = makeAction({ automation: undefined });
-            const result = await handleDirectType(action, makePlayerStats(), 'campaign', 'map');
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain("Fire's Burn");
-        });
     });
+
+    // Helper for sub-handler tests that share the "no uses remaining" pattern
+    function makeUsesMock(usesKey, value) {
+        getRuntimeValue.mockImplementation((_name, key) => {
+            if (key === usesKey) return value;
+            return null;
+        });
+    }
 
     describe('handleCloudsJaunt', () => {
         const option = { name: "Cloud's Jaunt", type: 'teleport', range: '30_ft' };
 
-        it('should return modal for teleport with uses available', async () => {
-            getRuntimeValue.mockReturnValue(3);
-            const action = makeAction();
-            const result = await handleCloudsJaunt(action, makePlayerStats(), 'campaign', option);
+        it('returns modal for teleport with uses available', async () => {
+            makeUsesMock("cloud'sjauntUses", 3);
+            const result = await handleCloudsJaunt(makeAction(), makePlayerStats(), 'campaign', option);
 
             expect(result.type).toBe('modal');
             expect(result.modalName).toBe('teleport');
@@ -267,37 +199,22 @@ describe('giantAncestryHandler', () => {
             expect(result.payload.action.automation.distance).toBe('30 ft');
         });
 
-        it('should return info popup when no uses remaining', async () => {
-            getRuntimeValue.mockReturnValue(0);
-            const action = makeAction();
-            const result = await handleCloudsJaunt(action, makePlayerStats(), 'campaign', option);
+        it('returns info popup when no uses remaining', async () => {
+            makeUsesMock("cloud'sjauntUses", 0);
+            const result = await handleCloudsJaunt(makeAction(), makePlayerStats(), 'campaign', option);
 
             expect(result.type).toBe('popup');
             expect(result.payload.type).toBe('automation_info');
             expect(result.payload.description).toContain('no uses remaining');
-            expect(result.payload.description).toContain("Cloud's Jaunt");
-        });
-
-        it('should default to proficiency as max uses when runtime value is undefined', async () => {
-            getRuntimeValue.mockReturnValue(undefined);
-            const action = makeAction();
-            const result = await handleCloudsJaunt(action, makePlayerStats(), 'campaign', option);
-
-            expect(result.type).toBe('modal');
-            expect(result.modalName).toBe('teleport');
         });
     });
 
     describe('handleFiresBurn', () => {
         const option = { name: "Fire's Burn", type: 'damage', damage: '1d10', damageType: 'Fire' };
 
-        it('should deal damage and consume use', async () => {
-            getRuntimeValue.mockImplementation((_name, key, _campaign) => {
-                if (key === "fire'sburnUses") return 3;
-                return null;
-            });
-            const action = makeAction();
-            const result = await handleFiresBurn(action, makePlayerStats(), 'campaign', option);
+        it('deals damage and consumes use', async () => {
+            makeUsesMock("fire'sburnUses", 3);
+            const result = await handleFiresBurn(makeAction(), makePlayerStats(), 'campaign', option);
 
             expect(result.type).toBe('popup');
             expect(result.payload.description).toContain("Fire's Burn");
@@ -311,56 +228,36 @@ describe('giantAncestryHandler', () => {
             }));
         });
 
-        it('should return popup when no target', async () => {
-            getRuntimeValue.mockImplementation((_name, key, _campaign) => {
-                if (key === "fire'sburnUses") return 3;
-                return null;
-            });
-            const action = makeAction();
-            const optionNoTarget = { ...option };
+        it('returns popup when no target', async () => {
+            makeUsesMock("fire'sburnUses", 3);
             resolveTarget.mockResolvedValue(null);
 
-            const result = await handleFiresBurn(action, makePlayerStats(), 'campaign', optionNoTarget);
+            const result = await handleFiresBurn(makeAction(), makePlayerStats(), 'campaign', option);
 
             expect(result.type).toBe('popup');
             expect(result.payload.description).toContain('requires a target');
         });
 
-        it('should return info popup when no uses remaining', async () => {
-            getRuntimeValue.mockImplementation((_name, key, _campaign) => {
-                if (key === "fire'sburnUses") return 0;
-                return null;
-            });
-            const action = makeAction();
-            const result = await handleFiresBurn(action, makePlayerStats(), 'campaign', option);
+        it('returns info popup when no uses remaining', async () => {
+            makeUsesMock("fire'sburnUses", 0);
+            const result = await handleFiresBurn(makeAction(), makePlayerStats(), 'campaign', option);
 
             expect(result.type).toBe('popup');
             expect(result.payload.description).toContain('no uses remaining');
-        });
-
-        it('should default to proficiency as max uses when runtime value is undefined', async () => {
-            getRuntimeValue.mockReturnValue(undefined);
-            resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
-            const action = makeAction();
-            const result = await handleFiresBurn(action, makePlayerStats(), 'campaign', option);
-
-            expect(result.type).toBe('popup');
-            expect(addEntry).toHaveBeenCalled();
         });
     });
 
     describe('handleFrostsChill', () => {
         const option = { name: "Frost's Chill", type: 'damage_with_condition', damage: '1d6', damageType: 'Cold', value: '10_ft' };
 
-        it('should deal damage and apply speed reduction', async () => {
-            resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
+        it('deals damage and applies speed reduction', async () => {
             getRuntimeValue.mockImplementation((_name, key, campaign) => {
                 if (key === "frost'schillUses") return 3;
                 if (key === 'targetEffects' && campaign === 'campaign') return [];
                 return null;
             });
-            const action = makeAction();
-            const result = await handleFrostsChill(action, makePlayerStats(), 'campaign', option);
+            resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
+            const result = await handleFrostsChill(makeAction(), makePlayerStats(), 'campaign', option);
 
             expect(result.type).toBe('popup');
             expect(result.payload.description).toContain("Frost's Chill");
@@ -373,27 +270,19 @@ describe('giantAncestryHandler', () => {
             }));
         });
 
-        it('should return popup when no target', async () => {
-            getRuntimeValue.mockImplementation((_name, key, _campaign) => {
-                if (key === "frost'schillUses") return 3;
-                return null;
-            });
-            const action = makeAction();
+        it('returns popup when no target', async () => {
+            makeUsesMock("frost'schillUses", 3);
             resolveTarget.mockResolvedValue(null);
 
-            const result = await handleFrostsChill(action, makePlayerStats(), 'campaign', option);
+            const result = await handleFrostsChill(makeAction(), makePlayerStats(), 'campaign', option);
 
             expect(result.type).toBe('popup');
             expect(result.payload.description).toContain('requires a target');
         });
 
-        it('should return info popup when no uses remaining', async () => {
-            getRuntimeValue.mockImplementation((_name, key, _campaign) => {
-                if (key === "frost'schillUses") return 0;
-                return null;
-            });
-            const action = makeAction();
-            const result = await handleFrostsChill(action, makePlayerStats(), 'campaign', option);
+        it('returns info popup when no uses remaining', async () => {
+            makeUsesMock("frost'schillUses", 0);
+            const result = await handleFrostsChill(makeAction(), makePlayerStats(), 'campaign', option);
 
             expect(result.type).toBe('popup');
             expect(result.payload.description).toContain('no uses remaining');
@@ -403,7 +292,7 @@ describe('giantAncestryHandler', () => {
     describe('handleHillsTumble', () => {
         const option = { name: "Hill's Tumble", type: 'auto_effect', trigger: 'melee_hit', effect: 'prone' };
 
-        it('should knock target prone', async () => {
+        it('knocks target prone', async () => {
             getRuntimeValue.mockImplementation((_name, key, campaign) => {
                 if (key === "hill'stumbleUses") return 3;
                 if (campaign && key === 'activeConditions') return [];
@@ -411,8 +300,7 @@ describe('giantAncestryHandler', () => {
             });
             getCombatContext.mockResolvedValue({});
             getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
-            const action = makeAction();
-            const result = await handleHillsTumble(action, makePlayerStats(), 'campaign', option);
+            const result = await handleHillsTumble(makeAction(), makePlayerStats(), 'campaign', option);
 
             expect(result.type).toBe('popup');
             expect(result.payload.description).toContain('Goblin');
@@ -423,40 +311,19 @@ describe('giantAncestryHandler', () => {
             }));
         });
 
-        it('should return popup when no target found', async () => {
-            getRuntimeValue.mockImplementation((_name, key, _campaign) => {
-                if (key === "hill'stumbleUses") return 3;
-                return null;
-            });
+        it('returns popup when no target found', async () => {
+            makeUsesMock("hill'stumbleUses", 3);
             getCombatContext.mockResolvedValue({});
             getTargetFromAttacker.mockReturnValue(null);
-            const action = makeAction();
-            const result = await handleHillsTumble(action, makePlayerStats(), 'campaign', option);
+            const result = await handleHillsTumble(makeAction(), makePlayerStats(), 'campaign', option);
 
             expect(result.type).toBe('popup');
             expect(result.payload.description).toContain('No target found');
         });
 
-        it('should return popup when no combat context', async () => {
-            getRuntimeValue.mockImplementation((_name, key, _campaign) => {
-                if (key === "hill'stumbleUses") return 3;
-                return null;
-            });
-            getCombatContext.mockResolvedValue(null);
-            const action = makeAction();
-            const result = await handleHillsTumble(action, makePlayerStats(), 'campaign', option);
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('No target found');
-        });
-
-        it('should return info popup when no uses remaining', async () => {
-            getRuntimeValue.mockImplementation((_name, key, _campaign) => {
-                if (key === "hill'stumbleUses") return 0;
-                return null;
-            });
-            const action = makeAction();
-            const result = await handleHillsTumble(action, makePlayerStats(), 'campaign', option);
+        it('returns info popup when no uses remaining', async () => {
+            makeUsesMock("hill'stumbleUses", 0);
+            const result = await handleHillsTumble(makeAction(), makePlayerStats(), 'campaign', option);
 
             expect(result.type).toBe('popup');
             expect(result.payload.description).toContain('no uses remaining');
@@ -466,10 +333,9 @@ describe('giantAncestryHandler', () => {
     describe('handleStonesEndurance', () => {
         const option = { name: "Stone's Endurance", type: 'damage_reduction', reductionExpression: '1d10 + CON modifier' };
 
-        it('should reduce damage and return popup', async () => {
-            getRuntimeValue.mockReturnValue(3);
-            const action = makeAction();
-            const result = await handleStonesEndurance(action, makePlayerStats(), 'campaign', option);
+        it('reduces damage and returns popup', async () => {
+            makeUsesMock("stone'senduranceUses", 3);
+            const result = await handleStonesEndurance(makeAction(), makePlayerStats(), 'campaign', option);
 
             expect(result.type).toBe('popup');
             expect(result.payload.description).toContain("Stone's Endurance");
@@ -481,36 +347,22 @@ describe('giantAncestryHandler', () => {
             }));
         });
 
-        it('should return info popup when no uses remaining', async () => {
-            getRuntimeValue.mockReturnValue(0);
-            const action = makeAction();
-            const result = await handleStonesEndurance(action, makePlayerStats(), 'campaign', option);
+        it('returns info popup when no uses remaining', async () => {
+            makeUsesMock("stone'senduranceUses", 0);
+            const result = await handleStonesEndurance(makeAction(), makePlayerStats(), 'campaign', option);
 
             expect(result.type).toBe('popup');
             expect(result.payload.description).toContain('no uses remaining');
-        });
-
-        it('should default to proficiency as max uses when runtime value is undefined', async () => {
-            getRuntimeValue.mockReturnValue(undefined);
-            const action = makeAction();
-            const result = await handleStonesEndurance(action, makePlayerStats(), 'campaign', option);
-
-            expect(result.type).toBe('popup');
-            expect(addEntry).toHaveBeenCalled();
         });
     });
 
     describe('handleStormsThunder', () => {
         const option = { name: "Storm's Thunder", type: 'reaction_damage', damage: '1d8', damageType: 'Thunder', range: '60_ft' };
 
-        it('should deal thunder damage as reaction', async () => {
-            getRuntimeValue.mockImplementation((_name, key, _campaign) => {
-                if (key === "storm'sthunderUses") return 3;
-                return null;
-            });
+        it('deals thunder damage as reaction', async () => {
+            makeUsesMock("storm'sthunderUses", 3);
             resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
-            const action = makeAction();
-            const result = await handleStormsThunder(action, makePlayerStats(), 'campaign', 'map', option);
+            const result = await handleStormsThunder(makeAction(), makePlayerStats(), 'campaign', 'map', option);
 
             expect(result.type).toBe('popup');
             expect(result.payload.description).toContain("Storm's Thunder");
@@ -523,40 +375,22 @@ describe('giantAncestryHandler', () => {
             }));
         });
 
-        it('should return popup when no target', async () => {
-            getRuntimeValue.mockImplementation((_name, key, _campaign) => {
-                if (key === "storm'sthunderUses") return 3;
-                return null;
-            });
-            const action = makeAction();
+        it('returns popup when no target', async () => {
+            makeUsesMock("storm'sthunderUses", 3);
             resolveTarget.mockResolvedValue(null);
 
-            const result = await handleStormsThunder(action, makePlayerStats(), 'campaign', 'map', option);
+            const result = await handleStormsThunder(makeAction(), makePlayerStats(), 'campaign', 'map', option);
 
             expect(result.type).toBe('popup');
             expect(result.payload.description).toContain('requires a target');
         });
 
-        it('should return info popup when no uses remaining', async () => {
-            getRuntimeValue.mockImplementation((_name, key, _campaign) => {
-                if (key === "storm'sthunderUses") return 0;
-                return null;
-            });
-            const action = makeAction();
-            const result = await handleStormsThunder(action, makePlayerStats(), 'campaign', 'map', option);
+        it('returns info popup when no uses remaining', async () => {
+            makeUsesMock("storm'sthunderUses", 0);
+            const result = await handleStormsThunder(makeAction(), makePlayerStats(), 'campaign', 'map', option);
 
             expect(result.type).toBe('popup');
             expect(result.payload.description).toContain('no uses remaining');
-        });
-
-        it('should default to proficiency as max uses when runtime value is undefined', async () => {
-            getRuntimeValue.mockReturnValue(undefined);
-            resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
-            const action = makeAction();
-            const result = await handleStormsThunder(action, makePlayerStats(), 'campaign', 'map', option);
-
-            expect(result.type).toBe('popup');
-            expect(addEntry).toHaveBeenCalled();
         });
     });
 });

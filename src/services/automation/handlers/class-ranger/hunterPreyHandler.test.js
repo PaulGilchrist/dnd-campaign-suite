@@ -58,8 +58,11 @@ describe('hunterPreyHandler', () => {
             }
         });
 
-        it('returns popup with Colossus Slayer info when already chosen', async () => {
-            getRuntimeValue.mockReturnValue('Colossus Slayer');
+        it.each([
+            ['Colossus Slayer', ['1d8 damage', 'Once per turn']],
+            ['Horde Breaker', ['another attack']],
+        ])('returns popup with %s info when already chosen', async (choice, expectedTexts) => {
+            getRuntimeValue.mockReturnValue(choice);
 
             const result = await handle(
                 makeAction(),
@@ -70,26 +73,10 @@ describe('hunterPreyHandler', () => {
             expect(result.type).toBe('popup');
             expect(result.payload.type).toBe('automation_info');
             expect(result.payload.name).toBe("Hunter's Prey");
-            expect(result.payload.description).toContain('Colossus Slayer');
-            expect(result.payload.description).toContain('1d8 damage');
-            expect(result.payload.description).toContain('Once per turn');
-            expect(result.payload.automation).toBeDefined();
-        });
-
-        it('returns popup with Horde Breaker info when already chosen', async () => {
-            getRuntimeValue.mockReturnValue('Horde Breaker');
-
-            const result = await handle(
-                makeAction(),
-                makePlayerStats(),
-                'test-campaign',
-            );
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.type).toBe('automation_info');
-            expect(result.payload.name).toBe("Hunter's Prey");
-            expect(result.payload.description).toContain('Horde Breaker');
-            expect(result.payload.description).toContain('another attack');
+            expect(result.payload.description).toContain(choice);
+            for (const text of expectedTexts) {
+                expect(result.payload.description).toContain(text);
+            }
             expect(result.payload.automation).toBeDefined();
         });
     });
@@ -109,23 +96,26 @@ describe('hunterPreyHandler', () => {
             }
         });
 
-        it('stores Colossus Slayer and returns confirmation popup', async () => {
+        it.each([
+            ['Colossus Slayer', "Hunter's Prey choice: Colossus Slayer"],
+            ['Horde Breaker', "Hunter's Prey choice: Horde Breaker"],
+        ])('stores %s and returns confirmation popup', async (choice, description) => {
             const result = await applyChoice(
                 makePlayerStats(),
                 'test-campaign',
-                'Colossus Slayer',
+                choice,
             );
 
             expect(result.type).toBe('popup');
             expect(result.payload.type).toBe('automation_info');
             expect(result.payload.name).toBe("Hunter's Prey");
-            expect(result.payload.description).toContain('Colossus Slayer');
+            expect(result.payload.description).toContain(choice);
             expect(result.payload.description).toContain('Short or Long Rest');
 
             expect(setRuntimeValue).toHaveBeenCalledWith(
                 'RangerBoy',
                 "_Hunter's_Prey_choice",
-                'Colossus Slayer',
+                choice,
                 'test-campaign',
             );
 
@@ -133,55 +123,7 @@ describe('hunterPreyHandler', () => {
                 type: 'ability_use',
                 characterName: 'RangerBoy',
                 abilityName: "Hunter's Prey",
-                description: "Hunter's Prey choice: Colossus Slayer",
-            });
-        });
-
-        it('stores Horde Breaker and returns confirmation popup', async () => {
-            const result = await applyChoice(
-                makePlayerStats(),
-                'test-campaign',
-                'Horde Breaker',
-            );
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.type).toBe('automation_info');
-            expect(result.payload.name).toBe("Hunter's Prey");
-            expect(result.payload.description).toContain('Horde Breaker');
-            expect(result.payload.description).toContain('Short or Long Rest');
-
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'RangerBoy',
-                "_Hunter's_Prey_choice",
-                'Horde Breaker',
-                'test-campaign',
-            );
-
-            expect(addEntry).toHaveBeenCalledWith('test-campaign', {
-                type: 'ability_use',
-                characterName: 'RangerBoy',
-                abilityName: "Hunter's Prey",
-                description: "Hunter's Prey choice: Horde Breaker",
-            });
-        });
-
-        it('uses playerStats name for runtime key and log entry', async () => {
-            const playerStats = makePlayerStats({ name: 'OtherRanger' });
-
-            await applyChoice(playerStats, 'test-campaign', 'Colossus Slayer');
-
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'OtherRanger',
-                "_Hunter's_Prey_choice",
-                'Colossus Slayer',
-                'test-campaign',
-            );
-
-            expect(addEntry).toHaveBeenCalledWith('test-campaign', {
-                type: 'ability_use',
-                characterName: 'OtherRanger',
-                abilityName: "Hunter's Prey",
-                description: "Hunter's Prey choice: Colossus Slayer",
+                description,
             });
         });
     });

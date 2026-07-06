@@ -1,3 +1,4 @@
+// @cleaned-by-ai
 // @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
@@ -128,7 +129,7 @@ describe('useSpellMetamagicFlow — handleMultiTarget', () => {
     expect(result.current.pendingMultiTarget).toBeNull();
   });
 
-  it('calls onExecute with empty context when no secondTarget is provided', () => {
+  it('calls onExecute with empty context when no secondTarget is provided or on skip', () => {
     getMultiTargetSpreadForSpell.mockReturnValueOnce({ range: '20 ft' });
     const onExecute = vi.fn();
     const { result } = renderHook(() =>
@@ -139,40 +140,25 @@ describe('useSpellMetamagicFlow — handleMultiTarget', () => {
       result.current.gateMetamagic(spell);
     });
 
+    // Confirm without secondTarget
     act(() => {
       result.current.handleMultiTargetConfirm({});
     });
 
     expect(onExecute).toHaveBeenCalledWith(spell, {});
-  });
+    vi.clearAllMocks();
 
-  it('does nothing when there is no pending multi-target', () => {
-    const onExecute = vi.fn();
-    const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', onExecute)
-    );
-
-    act(() => {
-      result.current.handleMultiTargetConfirm({ secondTarget: 'Goblin B' });
-    });
-
-    expect(addEntry).not.toHaveBeenCalled();
-    expect(onExecute).not.toHaveBeenCalled();
-  });
-
-  it('logs entry with empty metamagic and calls onExecute with empty context on skip', () => {
+    // Skip
     getMultiTargetSpreadForSpell.mockReturnValueOnce({ range: '20 ft' });
-    const onExecute = vi.fn();
-    const { result } = renderHook(() =>
+    const { result: result2 } = renderHook(() =>
       useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', onExecute)
     );
-    const spell = makeSpell({ name: 'Word of Radiance' });
     act(() => {
-      result.current.gateMetamagic(spell);
+      result2.current.gateMetamagic(spell);
     });
 
     act(() => {
-      result.current.handleMultiTargetSkip();
+      result2.current.handleMultiTargetSkip();
     });
 
     expect(addEntry).toHaveBeenCalledWith('TestCampaign', {
@@ -186,793 +172,190 @@ describe('useSpellMetamagicFlow — handleMultiTarget', () => {
       timestamp: expect.any(Number),
     });
     expect(onExecute).toHaveBeenCalledWith(spell, {});
-    expect(result.current.pendingMultiTarget).toBeNull();
-  });
-
-  it('does nothing on skip when there is no pending multi-target', () => {
-    const onExecute = vi.fn();
-    const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', onExecute)
-    );
-
-    act(() => {
-      result.current.handleMultiTargetSkip();
-    });
-
-    expect(addEntry).not.toHaveBeenCalled();
-    expect(onExecute).not.toHaveBeenCalled();
+    expect(result2.current.pendingMultiTarget).toBeNull();
   });
 });
 
-// ── Spell-specific handlers ──────────────────────────────────────────────────
+// ── Spell-specific confirm handlers ──────────────────────────────────────────
 
-describe('useSpellMetamagicFlow — handleAid', () => {
+// Each spell handler (aid, heroesFeast, greaterRestoration, lesserRestoration,
+// removeCurse, mageArmor, protectionFromEnergy, resistance) follows the same
+// pattern via useConfirmableFlow.createConfirmHandler.  We test each one once
+// to verify the correct automation / service function is invoked and the log
+// entry is written.  The no-pending guard and skip logic are exercised by
+// the generic handler tests below and by useConfirmableFlow's own tests.
+
+describe('useSpellMetamagicFlow — spell confirm handlers', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  const setup = () => renderHookWithSpell(
-    (onExecute) => useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', onExecute),
-    'Aid',
-    { level: 2 },
-  );
+  const spellConfigs = [
+    {
+      name: 'Aid',
+      level: 2,
+      handler: 'handleAidConfirm',
+      pendingKey: 'pendingAid',
+      args: { targets: ['Goblin A', 'Goblin B'] },
+      verify: async (automation) => {
+        expect(automation.applyAidEffect).toHaveBeenCalled();
+      },
+    },
+    {
+      name: "Heroes' Feast",
+      level: 6,
+      handler: 'handleHeroesFeastConfirm',
+      pendingKey: 'pendingHeroesFeast',
+      args: { targets: ['Goblin A', 'Goblin B'] },
+      verify: async (automation) => {
+        expect(automation.applyHeroesFeastEffect).toHaveBeenCalled();
+      },
+    },
+    {
+      name: 'Greater Restoration',
+      level: 5,
+      handler: 'handleGreaterRestorationConfirm',
+      pendingKey: 'pendingGreaterRestoration',
+      args: { targetName: 'Goblin A' },
+      verify: () => {
+        expect(confirmGreaterRestoration).toHaveBeenCalled();
+      },
+    },
+    {
+      name: 'Lesser Restoration',
+      level: 2,
+      handler: 'handleLesserRestorationConfirm',
+      pendingKey: 'pendingLesserRestoration',
+      args: { targetName: 'Goblin A' },
+      verify: async (automation) => {
+        expect(automation.applyLesserRestorationEffect).toHaveBeenCalled();
+      },
+    },
+    {
+      name: 'Remove Curse',
+      level: 3,
+      handler: 'handleRemoveCurseConfirm',
+      pendingKey: 'pendingRemoveCurse',
+      args: { targetName: 'Goblin A' },
+      verify: () => {
+        expect(confirmRemoveCurse).toHaveBeenCalled();
+      },
+    },
+    {
+      name: 'Mage Armor',
+      level: 1,
+      handler: 'handleMageArmorConfirm',
+      pendingKey: 'pendingMageArmor',
+      args: { targetName: 'Goblin A' },
+      verify: async (automation) => {
+        expect(automation.applyMageArmorEffect).toHaveBeenCalled();
+      },
+    },
+    {
+      name: 'Protection from Energy',
+      level: 3,
+      handler: 'handleProtectionFromEnergyConfirm',
+      pendingKey: 'pendingProtectionFromEnergy',
+      args: { targetName: 'Goblin A', damageType: 'Fire' },
+      verify: async (automation) => {
+        expect(automation.applyProtectionFromEnergyHandler).toHaveBeenCalledWith(
+          expect.objectContaining({ name: 'Protection from Energy' }),
+          expect.any(Object),
+          'TestCampaign',
+          'Goblin A',
+          'Fire'
+        );
+      },
+    },
+    {
+      name: 'Resistance',
+      level: 0,
+      handler: 'handleResistanceConfirm',
+      pendingKey: 'pendingResistance',
+      args: { targetName: 'Goblin A', damageType: 'Fire' },
+      verify: async (automation) => {
+        expect(automation.applyResistanceEffect).toHaveBeenCalled();
+      },
+    },
+  ];
 
-  it('applies aid effect, logs entry, and clears pending on confirm', async () => {
-    const { result, onExecute } = setup();
-    const automation = await import('../../services/automation/index.js');
+  for (const config of spellConfigs) {
+    it(`applies effect and logs entry for ${config.name}`, async () => {
+      const { result, onExecute } = renderHookWithSpell(
+        (onExec) => useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', onExec),
+        config.name,
+        { level: config.level },
+      );
 
-    await act(async () => {
-      await result.current.handleAidConfirm({ targets: ['Goblin A', 'Goblin B'] });
+      const automation = await import('../../services/automation/index.js');
+
+      await act(async () => {
+        await result.current[config.handler](config.args);
+      });
+
+      expect(addEntry).toHaveBeenCalledWith('TestCampaign', {
+        type: 'spell',
+        characterName: 'TestSorcerer',
+        spellName: config.name,
+        spellLevel: config.level,
+        castingTime: '1 Action',
+        metamagic: [],
+        spCost: 0,
+        timestamp: expect.any(Number),
+      });
+      await config.verify(automation);
+      expect(onExecute).not.toHaveBeenCalled();
+      expect(result.current[config.pendingKey]).toBeNull();
     });
-
-    expect(addEntry).toHaveBeenCalledWith('TestCampaign', {
-      type: 'spell',
-      characterName: 'TestSorcerer',
-      spellName: 'Aid',
-      spellLevel: 2,
-      castingTime: '1 Action',
-      metamagic: [],
-      spCost: 0,
-      timestamp: expect.any(Number),
-    });
-    expect(automation.applyAidEffect).toHaveBeenCalledWith(
-      expect.objectContaining({ name: 'Aid' }),
-      expect.any(Object),
-      'TestCampaign',
-      null,
-      { targets: ['Goblin A', 'Goblin B'] }
-    );
-    expect(onExecute).not.toHaveBeenCalled();
-    expect(result.current.pendingAid).toBeNull();
-  });
-
-  it('does nothing when there is no pending aid', async () => {
-    const onExecute = vi.fn();
-    const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', onExecute)
-    );
-
-    await act(async () => {
-      await result.current.handleAidConfirm({ targets: ['Goblin A'] });
-    });
-
-    expect(addEntry).not.toHaveBeenCalled();
-    expect(onExecute).not.toHaveBeenCalled();
-  });
-
-  it('re-throws when applyAidEffect rejects', async () => {
-    const { result } = setup();
-    const automation = await import('../../services/automation/index.js');
-    automation.applyAidEffect.mockRejectedValueOnce(new Error('boom'));
-
-    await expect(
-      act(async () => {
-        await result.current.handleAidConfirm({ targets: ['Goblin A'] });
-      })
-    ).rejects.toThrow('boom');
-  });
-
-  it('logs entry and clears pending on skip', () => {
-    const { result } = setup();
-
-    act(() => {
-      result.current.handleAidSkip();
-    });
-
-    expect(addEntry).toHaveBeenCalledWith('TestCampaign', {
-      type: 'spell',
-      characterName: 'TestSorcerer',
-      spellName: 'Aid',
-      spellLevel: 2,
-      castingTime: '1 Action',
-      metamagic: [],
-      spCost: 0,
-      timestamp: expect.any(Number),
-    });
-    expect(result.current.pendingAid).toBeNull();
-  });
-
-  it('does nothing on skip when there is no pending aid', () => {
-    const onExecute = vi.fn();
-    const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', onExecute)
-    );
-
-    act(() => {
-      result.current.handleAidSkip();
-    });
-
-    expect(addEntry).not.toHaveBeenCalled();
-    expect(onExecute).not.toHaveBeenCalled();
-  });
+  }
 });
 
-describe('useSpellMetamagicFlow — handleHeroesFeast', () => {
+// ── Spell-specific skip handlers ─────────────────────────────────────────────
+
+describe('useSpellMetamagicFlow — spell skip handlers', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  const setup = () => renderHookWithSpell(
-    (onExecute) => useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', onExecute),
-    "Heroes' Feast",
-    { level: 6 },
-  );
+  const spellConfigs = [
+    { name: 'Aid', level: 2, handler: 'handleAidSkip', pendingKey: 'pendingAid' },
+    { name: "Heroes' Feast", level: 6, handler: 'handleHeroesFeastSkip', pendingKey: 'pendingHeroesFeast' },
+    { name: 'Greater Restoration', level: 5, handler: 'handleGreaterRestorationSkip', pendingKey: 'pendingGreaterRestoration' },
+    { name: 'Lesser Restoration', level: 2, handler: 'handleLesserRestorationSkip', pendingKey: 'pendingLesserRestoration' },
+    { name: 'Remove Curse', level: 3, handler: 'handleRemoveCurseSkip', pendingKey: 'pendingRemoveCurse' },
+    { name: 'Mage Armor', level: 1, handler: 'handleMageArmorSkip', pendingKey: 'pendingMageArmor' },
+    { name: 'Protection from Energy', level: 3, handler: 'handleProtectionFromEnergySkip', pendingKey: 'pendingProtectionFromEnergy' },
+    { name: 'Resistance', level: 0, handler: 'handleResistanceSkip', pendingKey: 'pendingResistance' },
+  ];
 
-  it('applies heroes feast effect, logs entry, and clears pending on confirm', async () => {
-    const { result, onExecute } = setup();
-    const automation = await import('../../services/automation/index.js');
+  for (const config of spellConfigs) {
+    it(`logs entry and clears pending for ${config.name} skip`, () => {
+      const { result } = renderHookWithSpell(
+        (onExec) => useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', onExec),
+        config.name,
+        { level: config.level },
+      );
 
-    await act(async () => {
-      await result.current.handleHeroesFeastConfirm({ targets: ['Goblin A', 'Goblin B'] });
+      act(() => {
+        result.current[config.handler]();
+      });
+
+      expect(addEntry).toHaveBeenCalledWith('TestCampaign', {
+        type: 'spell',
+        characterName: 'TestSorcerer',
+        spellName: config.name,
+        spellLevel: config.level,
+        castingTime: '1 Action',
+        metamagic: [],
+        spCost: 0,
+        timestamp: expect.any(Number),
+      });
+      expect(result.current[config.pendingKey]).toBeNull();
     });
-
-    expect(addEntry).toHaveBeenCalledWith('TestCampaign', {
-      type: 'spell',
-      characterName: 'TestSorcerer',
-      spellName: "Heroes' Feast",
-      spellLevel: 6,
-      castingTime: '1 Action',
-      metamagic: [],
-      spCost: 0,
-      timestamp: expect.any(Number),
-    });
-    expect(automation.applyHeroesFeastEffect).toHaveBeenCalled();
-    expect(onExecute).not.toHaveBeenCalled();
-    expect(result.current.pendingHeroesFeast).toBeNull();
-  });
-
-  it('does nothing when there is no pending heroes feast', async () => {
-    const onExecute = vi.fn();
-    const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', onExecute)
-    );
-
-    await act(async () => {
-      await result.current.handleHeroesFeastConfirm({ targets: [] });
-    });
-
-    expect(addEntry).not.toHaveBeenCalled();
-    expect(onExecute).not.toHaveBeenCalled();
-  });
-
-  it('re-throws when applyHeroesFeastEffect rejects', async () => {
-    const { result } = setup();
-    const automation = await import('../../services/automation/index.js');
-    automation.applyHeroesFeastEffect.mockRejectedValueOnce(new Error('boom'));
-
-    await expect(
-      act(async () => {
-        await result.current.handleHeroesFeastConfirm({ targets: ['Goblin A'] });
-      })
-    ).rejects.toThrow('boom');
-  });
-
-  it('logs entry and clears pending on skip', () => {
-    const { result } = setup();
-
-    act(() => {
-      result.current.handleHeroesFeastSkip();
-    });
-
-    expect(addEntry).toHaveBeenCalledWith('TestCampaign', {
-      type: 'spell',
-      characterName: 'TestSorcerer',
-      spellName: "Heroes' Feast",
-      spellLevel: 6,
-      castingTime: '1 Action',
-      metamagic: [],
-      spCost: 0,
-      timestamp: expect.any(Number),
-    });
-    expect(result.current.pendingHeroesFeast).toBeNull();
-  });
-
-  it('does nothing on skip when there is no pending heroes feast', () => {
-    const onExecute = vi.fn();
-    const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', onExecute)
-    );
-
-    act(() => {
-      result.current.handleHeroesFeastSkip();
-    });
-
-    expect(addEntry).not.toHaveBeenCalled();
-    expect(onExecute).not.toHaveBeenCalled();
-  });
+  }
 });
 
-describe('useSpellMetamagicFlow — handleGreaterRestoration', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  const setup = () => renderHookWithSpell(
-    (onExecute) => useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', onExecute),
-    'Greater Restoration',
-    { level: 5 },
-  );
-
-  it('applies greater restoration effect, logs entry, and clears pending on confirm', async () => {
-    const { result, onExecute } = setup();
-
-    await act(async () => {
-      await result.current.handleGreaterRestorationConfirm({ targetName: 'Goblin A' });
-    });
-
-    expect(addEntry).toHaveBeenCalledWith('TestCampaign', {
-      type: 'spell',
-      characterName: 'TestSorcerer',
-      spellName: 'Greater Restoration',
-      spellLevel: 5,
-      castingTime: '1 Action',
-      metamagic: [],
-      spCost: 0,
-      timestamp: expect.any(Number),
-    });
-    expect(confirmGreaterRestoration).toHaveBeenCalled();
-    expect(onExecute).not.toHaveBeenCalled();
-    expect(result.current.pendingGreaterRestoration).toBeNull();
-  });
-
-  it('does nothing when there is no pending greater restoration', async () => {
-    const onExecute = vi.fn();
-    const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', onExecute)
-    );
-
-    await act(async () => {
-      await result.current.handleGreaterRestorationConfirm({ targetName: 'Goblin A' });
-    });
-
-    expect(addEntry).not.toHaveBeenCalled();
-    expect(onExecute).not.toHaveBeenCalled();
-  });
-
-  it('re-throws when confirmGreaterRestoration rejects', async () => {
-    const { result } = setup();
-    confirmGreaterRestoration.mockRejectedValueOnce(new Error('boom'));
-
-    await expect(
-      act(async () => {
-        await result.current.handleGreaterRestorationConfirm({ targetName: 'Goblin A' });
-      })
-    ).rejects.toThrow('boom');
-  });
-
-  it('logs entry and clears pending on skip', () => {
-    const { result } = setup();
-
-    act(() => {
-      result.current.handleGreaterRestorationSkip();
-    });
-
-    expect(addEntry).toHaveBeenCalledWith('TestCampaign', {
-      type: 'spell',
-      characterName: 'TestSorcerer',
-      spellName: 'Greater Restoration',
-      spellLevel: 5,
-      castingTime: '1 Action',
-      metamagic: [],
-      spCost: 0,
-      timestamp: expect.any(Number),
-    });
-    expect(result.current.pendingGreaterRestoration).toBeNull();
-  });
-
-  it('does nothing on skip when there is no pending greater restoration', () => {
-    const onExecute = vi.fn();
-    const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', onExecute)
-    );
-
-    act(() => {
-      result.current.handleGreaterRestorationSkip();
-    });
-
-    expect(addEntry).not.toHaveBeenCalled();
-    expect(onExecute).not.toHaveBeenCalled();
-  });
-});
-
-describe('useSpellMetamagicFlow — handleLesserRestoration', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  const setup = () => renderHookWithSpell(
-    (onExecute) => useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', onExecute),
-    'Lesser Restoration',
-    { level: 2 },
-  );
-
-  it('applies lesser restoration effect, logs entry, and clears pending on confirm', async () => {
-    const { result, onExecute } = setup();
-    const automation = await import('../../services/automation/index.js');
-
-    await act(async () => {
-      await result.current.handleLesserRestorationConfirm({ targetName: 'Goblin A' });
-    });
-
-    expect(addEntry).toHaveBeenCalledWith('TestCampaign', {
-      type: 'spell',
-      characterName: 'TestSorcerer',
-      spellName: 'Lesser Restoration',
-      spellLevel: 2,
-      castingTime: '1 Action',
-      metamagic: [],
-      spCost: 0,
-      timestamp: expect.any(Number),
-    });
-    expect(automation.applyLesserRestorationEffect).toHaveBeenCalled();
-    expect(onExecute).not.toHaveBeenCalled();
-    expect(result.current.pendingLesserRestoration).toBeNull();
-  });
-
-  it('does nothing when there is no pending lesser restoration', async () => {
-    const onExecute = vi.fn();
-    const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', onExecute)
-    );
-
-    await act(async () => {
-      await result.current.handleLesserRestorationConfirm({ targetName: 'Goblin A' });
-    });
-
-    expect(addEntry).not.toHaveBeenCalled();
-    expect(onExecute).not.toHaveBeenCalled();
-  });
-
-  it('re-throws when applyLesserRestorationEffect rejects', async () => {
-    const { result } = setup();
-    const automation = await import('../../services/automation/index.js');
-    automation.applyLesserRestorationEffect.mockRejectedValueOnce(new Error('boom'));
-
-    await expect(
-      act(async () => {
-        await result.current.handleLesserRestorationConfirm({ targetName: 'Goblin A' });
-      })
-    ).rejects.toThrow('boom');
-  });
-
-  it('logs entry and clears pending on skip', () => {
-    const { result } = setup();
-
-    act(() => {
-      result.current.handleLesserRestorationSkip();
-    });
-
-    expect(addEntry).toHaveBeenCalledWith('TestCampaign', {
-      type: 'spell',
-      characterName: 'TestSorcerer',
-      spellName: 'Lesser Restoration',
-      spellLevel: 2,
-      castingTime: '1 Action',
-      metamagic: [],
-      spCost: 0,
-      timestamp: expect.any(Number),
-    });
-    expect(result.current.pendingLesserRestoration).toBeNull();
-  });
-
-  it('does nothing on skip when there is no pending lesser restoration', () => {
-    const onExecute = vi.fn();
-    const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', onExecute)
-    );
-
-    act(() => {
-      result.current.handleLesserRestorationSkip();
-    });
-
-    expect(addEntry).not.toHaveBeenCalled();
-    expect(onExecute).not.toHaveBeenCalled();
-  });
-});
-
-describe('useSpellMetamagicFlow — handleRemoveCurse', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  const setup = () => renderHookWithSpell(
-    (onExecute) => useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', onExecute),
-    'Remove Curse',
-    { level: 3 },
-  );
-
-  it('applies remove curse effect, logs entry, and clears pending on confirm', async () => {
-    const { result, onExecute } = setup();
-
-    await act(async () => {
-      await result.current.handleRemoveCurseConfirm({ targetName: 'Goblin A' });
-    });
-
-    expect(addEntry).toHaveBeenCalledWith('TestCampaign', {
-      type: 'spell',
-      characterName: 'TestSorcerer',
-      spellName: 'Remove Curse',
-      spellLevel: 3,
-      castingTime: '1 Action',
-      metamagic: [],
-      spCost: 0,
-      timestamp: expect.any(Number),
-    });
-    expect(confirmRemoveCurse).toHaveBeenCalled();
-    expect(onExecute).not.toHaveBeenCalled();
-    expect(result.current.pendingRemoveCurse).toBeNull();
-  });
-
-  it('does nothing when there is no pending remove curse', async () => {
-    const onExecute = vi.fn();
-    const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', onExecute)
-    );
-
-    await act(async () => {
-      await result.current.handleRemoveCurseConfirm({ targetName: 'Goblin A' });
-    });
-
-    expect(addEntry).not.toHaveBeenCalled();
-    expect(onExecute).not.toHaveBeenCalled();
-  });
-
-  it('re-throws when confirmRemoveCurse rejects', async () => {
-    const { result } = setup();
-    confirmRemoveCurse.mockRejectedValueOnce(new Error('boom'));
-
-    await expect(
-      act(async () => {
-        await result.current.handleRemoveCurseConfirm({ targetName: 'Goblin A' });
-      })
-    ).rejects.toThrow('boom');
-  });
-
-  it('logs entry and clears pending on skip', () => {
-    const { result } = setup();
-
-    act(() => {
-      result.current.handleRemoveCurseSkip();
-    });
-
-    expect(addEntry).toHaveBeenCalledWith('TestCampaign', {
-      type: 'spell',
-      characterName: 'TestSorcerer',
-      spellName: 'Remove Curse',
-      spellLevel: 3,
-      castingTime: '1 Action',
-      metamagic: [],
-      spCost: 0,
-      timestamp: expect.any(Number),
-    });
-    expect(result.current.pendingRemoveCurse).toBeNull();
-  });
-
-  it('does nothing on skip when there is no pending remove curse', () => {
-    const onExecute = vi.fn();
-    const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', onExecute)
-    );
-
-    act(() => {
-      result.current.handleRemoveCurseSkip();
-    });
-
-    expect(addEntry).not.toHaveBeenCalled();
-    expect(onExecute).not.toHaveBeenCalled();
-  });
-});
-
-describe('useSpellMetamagicFlow — handleMageArmor', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  const setup = () => renderHookWithSpell(
-    (onExecute) => useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', onExecute),
-    'Mage Armor',
-    { level: 1 },
-  );
-
-  it('applies mage armor effect, logs entry, and clears pending on confirm', async () => {
-    const { result, onExecute } = setup();
-    const automation = await import('../../services/automation/index.js');
-
-    await act(async () => {
-      await result.current.handleMageArmorConfirm({ targetName: 'Goblin A' });
-    });
-
-    expect(addEntry).toHaveBeenCalledWith('TestCampaign', {
-      type: 'spell',
-      characterName: 'TestSorcerer',
-      spellName: 'Mage Armor',
-      spellLevel: 1,
-      castingTime: '1 Action',
-      metamagic: [],
-      spCost: 0,
-      timestamp: expect.any(Number),
-    });
-    expect(automation.applyMageArmorEffect).toHaveBeenCalled();
-    expect(onExecute).not.toHaveBeenCalled();
-    expect(result.current.pendingMageArmor).toBeNull();
-  });
-
-  it('does nothing when there is no pending mage armor', async () => {
-    const onExecute = vi.fn();
-    const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', onExecute)
-    );
-
-    await act(async () => {
-      await result.current.handleMageArmorConfirm({ targetName: 'Goblin A' });
-    });
-
-    expect(addEntry).not.toHaveBeenCalled();
-    expect(onExecute).not.toHaveBeenCalled();
-  });
-
-  it('re-throws when applyMageArmorEffect rejects', async () => {
-    const { result } = setup();
-    const automation = await import('../../services/automation/index.js');
-    automation.applyMageArmorEffect.mockRejectedValueOnce(new Error('boom'));
-
-    await expect(
-      act(async () => {
-        await result.current.handleMageArmorConfirm({ targetName: 'Goblin A' });
-      })
-    ).rejects.toThrow('boom');
-  });
-
-  it('logs entry and clears pending on skip', () => {
-    const { result } = setup();
-
-    act(() => {
-      result.current.handleMageArmorSkip();
-    });
-
-    expect(addEntry).toHaveBeenCalledWith('TestCampaign', {
-      type: 'spell',
-      characterName: 'TestSorcerer',
-      spellName: 'Mage Armor',
-      spellLevel: 1,
-      castingTime: '1 Action',
-      metamagic: [],
-      spCost: 0,
-      timestamp: expect.any(Number),
-    });
-    expect(result.current.pendingMageArmor).toBeNull();
-  });
-
-  it('does nothing on skip when there is no pending mage armor', () => {
-    const onExecute = vi.fn();
-    const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', onExecute)
-    );
-
-    act(() => {
-      result.current.handleMageArmorSkip();
-    });
-
-    expect(addEntry).not.toHaveBeenCalled();
-    expect(onExecute).not.toHaveBeenCalled();
-  });
-});
-
-describe('useSpellMetamagicFlow — handleProtectionFromEnergy', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  const setup = () => renderHookWithSpell(
-    (onExecute) => useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', onExecute),
-    'Protection from Energy',
-    { level: 3 },
-  );
-
-  it('applies protection from energy effect, logs entry, and clears pending on confirm', async () => {
-    const { result, onExecute } = setup();
-    const automation = await import('../../services/automation/index.js');
-
-    await act(async () => {
-      await result.current.handleProtectionFromEnergyConfirm({ targetName: 'Goblin A', damageType: 'Fire' });
-    });
-
-    expect(addEntry).toHaveBeenCalledWith('TestCampaign', {
-      type: 'spell',
-      characterName: 'TestSorcerer',
-      spellName: 'Protection from Energy',
-      spellLevel: 3,
-      castingTime: '1 Action',
-      metamagic: [],
-      spCost: 0,
-      timestamp: expect.any(Number),
-    });
-    expect(automation.applyProtectionFromEnergyHandler).toHaveBeenCalledWith(
-      expect.objectContaining({ name: 'Protection from Energy' }),
-      expect.any(Object),
-      'TestCampaign',
-      'Goblin A',
-      'Fire'
-    );
-    expect(onExecute).not.toHaveBeenCalled();
-    expect(result.current.pendingProtectionFromEnergy).toBeNull();
-  });
-
-  it('does nothing when there is no pending protection from energy', async () => {
-    const onExecute = vi.fn();
-    const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', onExecute)
-    );
-
-    await act(async () => {
-      await result.current.handleProtectionFromEnergyConfirm({ targetName: 'Goblin A', damageType: 'Fire' });
-    });
-
-    expect(addEntry).not.toHaveBeenCalled();
-    expect(onExecute).not.toHaveBeenCalled();
-  });
-
-  it('re-throws when applyProtectionFromEnergyHandler rejects', async () => {
-    const { result } = setup();
-    const automation = await import('../../services/automation/index.js');
-    automation.applyProtectionFromEnergyHandler.mockRejectedValueOnce(new Error('boom'));
-
-    await expect(
-      act(async () => {
-        await result.current.handleProtectionFromEnergyConfirm({ targetName: 'Goblin A', damageType: 'Fire' });
-      })
-    ).rejects.toThrow('boom');
-  });
-
-  it('logs entry and clears pending on skip', () => {
-    const { result } = setup();
-
-    act(() => {
-      result.current.handleProtectionFromEnergySkip();
-    });
-
-    expect(addEntry).toHaveBeenCalledWith('TestCampaign', {
-      type: 'spell',
-      characterName: 'TestSorcerer',
-      spellName: 'Protection from Energy',
-      spellLevel: 3,
-      castingTime: '1 Action',
-      metamagic: [],
-      spCost: 0,
-      timestamp: expect.any(Number),
-    });
-    expect(result.current.pendingProtectionFromEnergy).toBeNull();
-  });
-
-  it('does nothing on skip when there is no pending protection from energy', () => {
-    const onExecute = vi.fn();
-    const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', onExecute)
-    );
-
-    act(() => {
-      result.current.handleProtectionFromEnergySkip();
-    });
-
-    expect(addEntry).not.toHaveBeenCalled();
-    expect(onExecute).not.toHaveBeenCalled();
-  });
-});
-
-describe('useSpellMetamagicFlow — handleResistance', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  const setup = () => renderHookWithSpell(
-    (onExecute) => useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', onExecute),
-    'Resistance',
-    { level: 0 },
-  );
-
-  it('applies resistance effect, logs entry, and clears pending on confirm', async () => {
-    const { result, onExecute } = setup();
-    const automation = await import('../../services/automation/index.js');
-
-    await act(async () => {
-      await result.current.handleResistanceConfirm({ targetName: 'Goblin A', damageType: 'Fire' });
-    });
-
-    expect(addEntry).toHaveBeenCalledWith('TestCampaign', {
-      type: 'spell',
-      characterName: 'TestSorcerer',
-      spellName: 'Resistance',
-      spellLevel: 0,
-      castingTime: '1 Action',
-      metamagic: [],
-      spCost: 0,
-      timestamp: expect.any(Number),
-    });
-    expect(automation.applyResistanceEffect).toHaveBeenCalled();
-    expect(onExecute).not.toHaveBeenCalled();
-    expect(result.current.pendingResistance).toBeNull();
-  });
-
-  it('does nothing when there is no pending resistance', async () => {
-    const onExecute = vi.fn();
-    const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', onExecute)
-    );
-
-    await act(async () => {
-      await result.current.handleResistanceConfirm({ targetName: 'Goblin A', damageType: 'Fire' });
-    });
-
-    expect(addEntry).not.toHaveBeenCalled();
-    expect(onExecute).not.toHaveBeenCalled();
-  });
-
-  it('re-throws when applyResistanceEffect rejects', async () => {
-    const { result } = setup();
-    const automation = await import('../../services/automation/index.js');
-    automation.applyResistanceEffect.mockRejectedValueOnce(new Error('boom'));
-
-    await expect(
-      act(async () => {
-        await result.current.handleResistanceConfirm({ targetName: 'Goblin A', damageType: 'Fire' });
-      })
-    ).rejects.toThrow('boom');
-  });
-
-  it('logs entry and clears pending on skip', () => {
-    const { result } = setup();
-
-    act(() => {
-      result.current.handleResistanceSkip();
-    });
-
-    expect(addEntry).toHaveBeenCalledWith('TestCampaign', {
-      type: 'spell',
-      characterName: 'TestSorcerer',
-      spellName: 'Resistance',
-      spellLevel: 0,
-      castingTime: '1 Action',
-      metamagic: [],
-      spCost: 0,
-      timestamp: expect.any(Number),
-    });
-    expect(result.current.pendingResistance).toBeNull();
-  });
-
-  it('does nothing on skip when there is no pending resistance', () => {
-    const onExecute = vi.fn();
-    const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', onExecute)
-    );
-
-    act(() => {
-      result.current.handleResistanceSkip();
-    });
-
-    expect(addEntry).not.toHaveBeenCalled();
-    expect(onExecute).not.toHaveBeenCalled();
-  });
-});
+// ── Magic Missile (unique logic — distribution validation) ───────────────────
 
 describe('useSpellMetamagicFlow — handleMagicMissile', () => {
   beforeEach(() => {
@@ -1002,9 +385,10 @@ describe('useSpellMetamagicFlow — handleMagicMissile', () => {
     expect(result.current.pendingMagicMissile).toBeNull();
   });
 
-  it('does nothing when all distribution values are zero', () => {
+  it('does nothing when all distribution values are zero or on skip', () => {
     const { result, onExecute } = setup();
 
+    // All zeros — no execute, no entry, no pending clear
     act(() => {
       result.current.handleMagicMissileConfirm({
         distribution: { 'Goblin A': 0, 'Goblin B': 0 },
@@ -1014,46 +398,14 @@ describe('useSpellMetamagicFlow — handleMagicMissile', () => {
     expect(onExecute).not.toHaveBeenCalled();
     expect(addEntry).not.toHaveBeenCalled();
     expect(result.current.pendingMagicMissile).toBeNull();
-  });
+    vi.clearAllMocks();
 
-  it('does nothing when there is no pending magic missile', () => {
-    const onExecute = vi.fn();
-    const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', onExecute)
-    );
-
-    act(() => {
-      result.current.handleMagicMissileConfirm({
-        distribution: { 'Goblin A': 1 },
-      });
-    });
-
-    expect(onExecute).not.toHaveBeenCalled();
-    expect(addEntry).not.toHaveBeenCalled();
-  });
-
-  it('clears pendingMagicMissile on skip', () => {
-    const { result } = setup();
-
+    // Skip — clears pending only
     act(() => {
       result.current.handleMagicMissileSkip();
     });
 
     expect(result.current.pendingMagicMissile).toBeNull();
-  });
-
-  it('does nothing on skip when there is no pending magic missile', () => {
-    const onExecute = vi.fn();
-    const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', onExecute)
-    );
-
-    act(() => {
-      result.current.handleMagicMissileSkip();
-    });
-
-    expect(onExecute).not.toHaveBeenCalled();
-    expect(addEntry).not.toHaveBeenCalled();
   });
 });
 
@@ -1128,7 +480,7 @@ describe('useSpellMetamagicFlow — handleConfirm with psionic sorcery', () => {
     });
   });
 
-  it('does not add Psionic Sorcery to options when psionicCost is 0', () => {
+  it('does not add Psionic Sorcery to options or metaCtx when psionicCost is 0', () => {
     isPsionicSpell.mockReturnValueOnce(false);
 
     const onExecute = vi.fn();
@@ -1154,20 +506,17 @@ describe('useSpellMetamagicFlow — handleConfirm with psionic sorcery', () => {
       spCost: 2,
       timestamp: expect.any(Number),
     });
-  });
+    vi.clearAllMocks();
 
-  it('does not include psionicSpell in metaCtx when psionicCost is 0', () => {
-    const onExecute = vi.fn();
-    const { result } = renderHook(() =>
+    isPsionicSpell.mockReturnValueOnce(false);
+    const { result: result2 } = renderHook(() =>
       useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', onExecute)
     );
-
     act(() => {
-      result.current.gateMetamagic(makeSpell({ name: 'Fireball', level: 3 }));
+      result2.current.gateMetamagic(makeSpell({ name: 'Fireball', level: 3 }));
     });
-
     act(() => {
-      result.current.handleConfirm({ totalCost: 0, options: [] });
+      result2.current.handleConfirm({ totalCost: 0, options: [] });
     });
 
     expect(onExecute).toHaveBeenCalledWith(

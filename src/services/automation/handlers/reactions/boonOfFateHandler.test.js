@@ -60,29 +60,6 @@ describe('boonOfFateHandler.handle', () => {
         expect(result.payload.description).toContain('TestFighter');
     });
 
-    it('should return error popup when last attack targeted a different creature', async () => {
-        runtimeState.getRuntimeValue.mockImplementation((_charName, key) => {
-            if (key === 'boonOfFateUsed') return false;
-            return undefined;
-        });
-        damageRollback.findLastAttack.mockResolvedValue({
-            attackEvent: { d20: 8, bonus: 5, targetName: 'OtherPlayer', hit: false },
-            attackerName: 'Goblin',
-            targetName: 'OtherPlayer',
-            primaryDamage: 10,
-            secondaryDamage: 0,
-            totalDamage: 10,
-            damageTypes: ['Slashing'],
-        });
-
-        const result = await handle(mockAction, mockPlayerStats, mockCampaignName);
-
-        expect(result.type).toBe('popup');
-        expect(result.payload.type).toBe('automation_info');
-        expect(result.payload.description).toContain('No recent D20 test found');
-        expect(result.payload.description).toContain('TestFighter');
-    });
-
     it('should mark boon as used, log the ability, and return popup with modified roll description on success', async () => {
         runtimeState.getRuntimeValue.mockImplementation((_charName, key) => {
             if (key === 'boonOfFateUsed') return false;

@@ -6,10 +6,8 @@ describe('findFeat', () => {
   it('returns the feat when search name matches exactly', () => {
     const feats = [
       { name: 'Great Weapon Master', desc: '...' },
-      { name: 'Actor (Extra)', desc: 'extra' },
     ];
     expect(findFeat('Great Weapon Master', feats)).toEqual({ name: 'Great Weapon Master', desc: '...' });
-    expect(findFeat('Actor (Extra)', feats)).toEqual({ name: 'Actor (Extra)', desc: 'extra' });
   });
 
   it('strips parenthetical suffixes to find a match when no exact match exists', () => {

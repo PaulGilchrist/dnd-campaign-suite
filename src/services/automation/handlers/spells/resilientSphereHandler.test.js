@@ -95,7 +95,7 @@ describe('resilientSphereHandler', () => {
 
   describe('handle', () => {
     describe('combat context validation', () => {
-      it('returns popup when combat context is null', async () => {
+      it('returns popup when no creatures in combat (null context, empty array, or no creatures property)', async () => {
         damageUtils.getCombatContext.mockResolvedValue(null);
 
         const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
@@ -105,28 +105,10 @@ describe('resilientSphereHandler', () => {
         expect(result.payload.name).toBe('Resilient Sphere');
         expect(result.payload.description).toContain('No creatures in combat');
       });
-
-      it('returns popup when no creatures in combat', async () => {
-        damageUtils.getCombatContext.mockResolvedValue({ creatures: [] });
-
-        const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-        expect(result.type).toBe('popup');
-        expect(result.payload.description).toContain('No creatures in combat');
-      });
     });
 
     describe('target resolution', () => {
-      it('returns popup when no target selected', async () => {
-        targetResolver.resolveTarget.mockResolvedValue({});
-
-        const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-        expect(result.type).toBe('popup');
-        expect(result.payload.description).toContain('No target selected');
-      });
-
-      it('returns popup when resolveTarget returns null', async () => {
+      it('returns popup when no target selected (null, undefined, or empty object)', async () => {
         targetResolver.resolveTarget.mockResolvedValue(null);
 
         const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
@@ -137,7 +119,7 @@ describe('resilientSphereHandler', () => {
     });
 
     describe('save success path', () => {
-      it('returns popup with success message when target passes save', async () => {
+      it('returns popup with success message and logs save_result when target passes save', async () => {
         savePrompt.createSaveListener.mockReturnValue({
           promptId: 'test-prompt-id',
           promise: Promise.resolve({ success: true }),
@@ -147,16 +129,6 @@ describe('resilientSphereHandler', () => {
 
         expect(result.type).toBe('popup');
         expect(result.payload.description).toContain('succeeded on DEX save');
-      });
-
-      it('logs save_result with success=true when target passes save', async () => {
-        savePrompt.createSaveListener.mockReturnValue({
-          promptId: 'test-prompt-id',
-          promise: Promise.resolve({ success: true }),
-        });
-
-        await handle(makeAction(), makePlayerStats(), campaignName, null);
-
         expect(logService.addEntry).toHaveBeenCalledWith(campaignName, {
           type: 'save_result',
           characterName: casterName,
@@ -312,30 +284,10 @@ describe('resilientSphereHandler', () => {
           campaignName,
         );
       });
-
-      it('uses default duration when not provided in automation', async () => {
-        savePrompt.createSaveListener.mockReturnValue({
-          promptId: 'test-prompt-id',
-          promise: Promise.resolve({ success: false }),
-        });
-
-        await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-        expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-          targetName,
-          'activeBuffs',
-          expect.arrayContaining([
-            expect.objectContaining({
-              duration: 'Concentration, up to 1 minute',
-            }),
-          ]),
-          campaignName,
-        );
-      });
     });
 
     describe('toggle behavior (re-cast)', () => {
-      it('removes the buff when sphere is already active', async () => {
+      it('removes the buff and does not add expiration when sphere is already active', async () => {
         savePrompt.createSaveListener.mockReturnValue({
           promptId: 'test-prompt-id',
           promise: Promise.resolve({ success: false }),
@@ -355,20 +307,6 @@ describe('resilientSphereHandler', () => {
           ]),
           campaignName,
         );
-      });
-
-      it('does not add expiration when deactivating existing sphere', async () => {
-        savePrompt.createSaveListener.mockReturnValue({
-          promptId: 'test-prompt-id',
-          promise: Promise.resolve({ success: false }),
-        });
-
-        runtimeState.getRuntimeValue.mockReturnValue([
-          { name: 'Resilient Sphere', effect: 'resilient_sphere', sourceCharacter: casterName },
-        ]);
-
-        await handle(makeAction(), makePlayerStats(), campaignName, null);
-
         expect(expirations.addExpiration).not.toHaveBeenCalled();
       });
 
@@ -400,78 +338,40 @@ describe('resilientSphereHandler', () => {
       expect(result).toBe(true);
     });
 
-    it('returns false when target has different buff', () => {
-      runtimeState.getRuntimeValue.mockReturnValue([
-        { name: 'Fire Shield', effect: 'fire_shield' },
-      ]);
+    it('returns false when target has different buff, empty array, or null/undefined buffs', () => {
+      const testCases = [
+        { buffs: [{ name: 'Fire Shield', effect: 'fire_shield' }], expected: false },
+        { buffs: [], expected: false },
+        { buffs: null, expected: false },
+        { buffs: undefined, expected: false },
+      ];
 
-      const result = isResilientSphereActive(targetName, campaignName);
-
-      expect(result).toBe(false);
-    });
-
-    it('returns false when activeBuffs array is empty', () => {
-      runtimeState.getRuntimeValue.mockReturnValue([]);
-
-      const result = isResilientSphereActive(targetName, campaignName);
-
-      expect(result).toBe(false);
-    });
-
-    it('returns false when activeBuffs is null', () => {
-      runtimeState.getRuntimeValue.mockReturnValue(null);
-
-      const result = isResilientSphereActive(targetName, campaignName);
-
-      expect(result).toBe(false);
-    });
-
-    it('returns false when activeBuffs is undefined', () => {
-      runtimeState.getRuntimeValue.mockReturnValue(undefined);
-
-      const result = isResilientSphereActive(targetName, campaignName);
-
-      expect(result).toBe(false);
+      for (const { buffs, expected } of testCases) {
+        runtimeState.getRuntimeValue.mockReturnValue(buffs);
+        const result = isResilientSphereActive(targetName, campaignName);
+        expect(result).toBe(expected);
+      }
     });
   });
 
   describe('getResilientSphereSource', () => {
-    it('returns caster name when sphere is active with sourceCharacter', () => {
+    it('returns caster name when sphere is active with sourceCharacter, null otherwise', () => {
       runtimeState.getRuntimeValue.mockReturnValue([
         { name: 'Resilient Sphere', effect: 'resilient_sphere', sourceCharacter: casterName },
       ]);
 
-      const result = getResilientSphereSource(targetName, campaignName);
+      expect(getResilientSphereSource(targetName, campaignName)).toBe(casterName);
 
-      expect(result).toBe(casterName);
-    });
+      const testCases = [
+        { buffs: [{ name: 'Fire Shield', effect: 'fire_shield' }] },
+        { buffs: [{ name: 'Resilient Sphere', effect: 'resilient_sphere' }] },
+        { buffs: null },
+      ];
 
-    it('returns null when sphere is not active on target', () => {
-      runtimeState.getRuntimeValue.mockReturnValue([
-        { name: 'Fire Shield', effect: 'fire_shield' },
-      ]);
-
-      const result = getResilientSphereSource(targetName, campaignName);
-
-      expect(result).toBe(null);
-    });
-
-    it('returns null when buff exists but has no sourceCharacter', () => {
-      runtimeState.getRuntimeValue.mockReturnValue([
-        { name: 'Resilient Sphere', effect: 'resilient_sphere' },
-      ]);
-
-      const result = getResilientSphereSource(targetName, campaignName);
-
-      expect(result).toBe(null);
-    });
-
-    it('returns null when activeBuffs is null', () => {
-      runtimeState.getRuntimeValue.mockReturnValue(null);
-
-      const result = getResilientSphereSource(targetName, campaignName);
-
-      expect(result).toBe(null);
+      for (const { buffs } of testCases) {
+        runtimeState.getRuntimeValue.mockReturnValue(buffs);
+        expect(getResilientSphereSource(targetName, campaignName)).toBeNull();
+      }
     });
   });
 });

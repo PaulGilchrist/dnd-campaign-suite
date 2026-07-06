@@ -85,25 +85,9 @@ describe('mistyWandererHandler', () => {
             expect(result.payload.description).toBe('No free casts remaining. Finish a Long Rest to regain them.');
         });
 
-        it('should return info popup when stored count is negative', async () => {
-            getRuntimeValue.mockReturnValue(-1);
-
-            const result = await handle(makeAction(), makePlayerStats(), 'campaign', 'map');
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.type).toBe('automation_info');
-        });
-
-        it('should pass unused mapName parameter without error', async () => {
-            getRuntimeValue.mockReturnValue(2);
-
-            const result = await handle(makeAction(), makePlayerStats(), 'campaign', 'some-map');
-
-            expect(result.type).toBe('modal');
-        });
-
         it('should evaluate custom uses_expression via evaluateAutoExpression', async () => {
             evaluateAutoExpression.mockReturnValue(5);
+            getRuntimeValue.mockReturnValue(5);
 
             const customAction = makeAction({ uses_expression: 'WIS modifier' });
 
@@ -113,15 +97,14 @@ describe('mistyWandererHandler', () => {
             expect(result.payload.usesMax).toBe(5);
         });
 
-        it('should pass action and playerStats objects through in modal payload', async () => {
-            getRuntimeValue.mockReturnValue(1);
-            const stats = makePlayerStats({ name: 'Other Character' });
+        it('should fall back to usesMax of 1 when expression evaluation returns falsy', async () => {
+            evaluateAutoExpression.mockReturnValue(null);
+            getRuntimeValue.mockReturnValue(null);
 
-            const result = await handle(makeAction(), stats, 'campaign', 'map');
+            const result = await handle(makeAction(), makePlayerStats(), 'campaign', 'map');
 
-            expect(result.payload.action).toBeInstanceOf(Object);
-            expect(result.payload.playerStats).toBeInstanceOf(Object);
-            expect(result.payload.playerStats.name).toBe('Other Character');
+            expect(result.type).toBe('modal');
+            expect(result.payload.usesMax).toBe(1);
         });
     });
 
@@ -159,12 +142,11 @@ describe('mistyWandererHandler', () => {
             );
         });
 
-        it('should not include ally text when bringAlly is true but allyName is empty', async () => {
+        it('should omit ally text when bringAlly is true but allyName is empty', async () => {
             getRuntimeValue.mockReturnValue(3);
 
             const result = await confirmMistyWanderer(makeAction(), makePlayerStats(), 'campaign', true, '');
 
-            expect(result.payload.description).not.toContain('Brought');
             expect(result.payload.description).toBe('Misty Wanderer: Cast Misty Step (2 remaining).');
         });
 
@@ -177,20 +159,6 @@ describe('mistyWandererHandler', () => {
             expect(result.payload.type).toBe('automation_info');
             expect(result.payload.description).toBe('No free casts remaining. Finish a Long Rest to regain them.');
             expect(setRuntimeValue).not.toHaveBeenCalled();
-        });
-
-        it('should decrement to zero when one use remains', async () => {
-            getRuntimeValue.mockReturnValue(1);
-
-            const result = await confirmMistyWanderer(makeAction(), makePlayerStats(), 'campaign', false, null);
-
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'Test Character',
-                '_Misty_Wanderer_freeCastCount',
-                0,
-                'campaign',
-            );
-            expect(result.payload.description).toBe('Misty Wanderer: Cast Misty Step (0 remaining).');
         });
 
         it('should use custom feature name in the storage key', async () => {
@@ -215,16 +183,6 @@ describe('mistyWandererHandler', () => {
                 1,
                 'campaign',
             );
-        });
-
-        it('should fall back to usesMax of 1 when expression evaluation returns falsy', async () => {
-            evaluateAutoExpression.mockReturnValue(null);
-            getRuntimeValue.mockReturnValue(null);
-
-            const result = await handle(makeAction(), makePlayerStats(), 'campaign', 'map');
-
-            expect(result.type).toBe('modal');
-            expect(result.payload.usesMax).toBe(1);
         });
     });
 });

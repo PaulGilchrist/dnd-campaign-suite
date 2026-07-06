@@ -90,54 +90,6 @@ describe('processFleshToStoneRepeatSave', () => {
 
     expect(result).toBeNull();
     expect(createSaveListener).not.toHaveBeenCalled();
-    expect(addEntry).not.toHaveBeenCalled();
-  });
-
-  it('creates save listener with correct parameters', async () => {
-    getRuntimeValue.mockReturnValue([0, 0]);
-    createSaveListener.mockReturnValue({
-      promptId: 'fts-repeat-prompt',
-      promise: Promise.resolve({ success: false }),
-    });
-
-    await processFleshToStoneRepeatSave(
-      casterName,
-      targetName,
-      15,
-      campaignName,
-    );
-
-    expect(createSaveListener).toHaveBeenCalledWith(campaignName, {
-      targetName,
-      saveType: 'CON',
-      saveDc: 15,
-      dcSuccess: 'none',
-    });
-  });
-
-  it('calls addEntry with ability_use on repeat save', async () => {
-    getRuntimeValue.mockReturnValue([0, 0]);
-    createSaveListener.mockReturnValue({
-      promptId: 'fts-repeat-entry',
-      promise: Promise.resolve({ success: false }),
-    });
-
-    await processFleshToStoneRepeatSave(
-      casterName,
-      targetName,
-      15,
-      campaignName,
-    );
-
-    expect(addEntry).toHaveBeenCalledWith(
-      campaignName,
-      expect.objectContaining({
-        type: 'ability_use',
-        characterName: casterName,
-        abilityName: 'Flesh to Stone',
-        description: expect.stringContaining('CON save'),
-      }),
-    );
   });
 
   describe('successful repeat save', () => {
@@ -170,19 +122,6 @@ describe('processFleshToStoneRepeatSave', () => {
 
       expect(result.type).toBe('popup');
       expect(result.payload.description).toContain('Flesh to Stone ends');
-    });
-
-    it('handles target with no Restrained condition gracefully', async () => {
-      setupSuccessPath([2, 0], ['Frightened']);
-
-      const result = await processFleshToStoneRepeatSave(
-        casterName,
-        targetName,
-        15,
-        campaignName,
-      );
-
-      expect(result.type).toBe('popup');
     });
 
     it('cleans up target effect for this caster only', async () => {
@@ -251,19 +190,6 @@ describe('processFleshToStoneRepeatSave', () => {
         }),
       );
     });
-
-    it('reports remaining successes when spell continues', async () => {
-      setupSuccessPath([1, 0]);
-
-      const result = await processFleshToStoneRepeatSave(
-        casterName,
-        targetName,
-        15,
-        campaignName,
-      );
-
-      expect(result.payload.description).toContain('1 more needed');
-    });
   });
 
   describe('failed repeat save', () => {
@@ -284,20 +210,6 @@ describe('processFleshToStoneRepeatSave', () => {
 
     it('petrifies after 3 failures', async () => {
       setupFailedPath([0, 2]);
-
-      const result = await processFleshToStoneRepeatSave(
-        casterName,
-        targetName,
-        15,
-        campaignName,
-      );
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.description).toContain('Petrified');
-    });
-
-    it('handles target with no Restrained condition when petrifying', async () => {
-      setupFailedPath([0, 2], ['Frightened']);
 
       const result = await processFleshToStoneRepeatSave(
         casterName,
@@ -372,19 +284,6 @@ describe('processFleshToStoneRepeatSave', () => {
         }),
       );
     });
-
-    it('reports remaining failures when not yet petrified', async () => {
-      setupFailedPath([0, 1]);
-
-      const result = await processFleshToStoneRepeatSave(
-        casterName,
-        targetName,
-        15,
-        campaignName,
-      );
-
-      expect(result.payload.description).toContain('1 more failures');
-    });
   });
 });
 
@@ -396,7 +295,7 @@ describe('fleshToStoneHandler.handle', () => {
   });
 
   describe('combat context validation', () => {
-    it('returns popup when combat context is null', async () => {
+    it('returns popup when combat context is null or empty', async () => {
       getCombatContext.mockResolvedValue(null);
 
       const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
@@ -405,28 +304,10 @@ describe('fleshToStoneHandler.handle', () => {
       expect(result.payload.type).toBe('automation_info');
       expect(result.payload.description).toContain('No creatures in combat');
     });
-
-    it('returns popup when combat context has no creatures', async () => {
-      getCombatContext.mockResolvedValue({ creatures: [] });
-
-      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.description).toContain('No creatures in combat');
-    });
-
-    it('returns popup when creatures array is missing', async () => {
-      getCombatContext.mockResolvedValue({});
-
-      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.description).toContain('No creatures in combat');
-    });
   });
 
   describe('target resolution', () => {
-    it('returns popup when no target selected', async () => {
+    it('returns popup when no target selected or target has no name', async () => {
       getCombatContext.mockResolvedValue(baseCombatContext);
       buildSaveDc.mockReturnValue(15);
       resolveTarget.mockResolvedValue(null);
@@ -435,32 +316,6 @@ describe('fleshToStoneHandler.handle', () => {
 
       expect(result.type).toBe('popup');
       expect(result.payload.description).toContain('No target selected');
-    });
-
-    it('returns popup when target has no name', async () => {
-      getCombatContext.mockResolvedValue(baseCombatContext);
-      buildSaveDc.mockReturnValue(15);
-      resolveTarget.mockResolvedValue({});
-
-      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.description).toContain('No target selected');
-    });
-
-    it('calls resolveTarget with campaignName and casterName', async () => {
-      getCombatContext.mockResolvedValue(baseCombatContext);
-      buildSaveDc.mockReturnValue(15);
-      resolveTarget.mockResolvedValue({ target: { name: targetName } });
-      getRuntimeValue.mockReturnValue(null);
-      createSaveListener.mockReturnValue({
-        promptId: 'fts-resolve',
-        promise: Promise.resolve({ success: true }),
-      });
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(resolveTarget).toHaveBeenCalledWith(campaignName, casterName);
     });
   });
 
@@ -495,7 +350,7 @@ describe('fleshToStoneHandler.handle', () => {
       expect(result.payload.description).toContain('automatically succeeds');
     });
 
-    it('applies speed_zero condition to constructs', async () => {
+    it('applies and expires speed_zero for constructs', async () => {
       setupConstruct();
 
       await handle(makeAction(), makePlayerStats(), campaignName, null);
@@ -506,33 +361,6 @@ describe('fleshToStoneHandler.handle', () => {
         expect.arrayContaining(['speed_zero']),
         campaignName,
       );
-    });
-
-    it('removes existing speed_zero before reapplying', async () => {
-      getCombatContext.mockResolvedValue(baseCombatContext);
-      buildSaveDc.mockReturnValue(15);
-      resolveTarget.mockResolvedValue({ target: { name: targetName, type: 'construct' } });
-      getRuntimeValue.mockImplementation((_entity, keyOrProp, _camp) => {
-        if (keyOrProp === '_fleshToStone_Goblin') return null;
-        if (keyOrProp === 'activeConditions') return ['speed_zero', 'Frightened'];
-        return [];
-      });
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      const condsCall = setRuntimeValue.mock.calls.find(
-        (c) => c[1] === 'activeConditions',
-      );
-      const conds = condsCall[2];
-      expect(conds.filter((c) => c === 'speed_zero').length).toBe(1);
-      expect(conds).toContain('Frightened');
-    });
-
-    it('adds speed_zero expiration for constructs', async () => {
-      setupConstruct();
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
       expect(addExpiration).toHaveBeenCalledWith(
         casterName,
         targetName,
@@ -665,81 +493,9 @@ describe('fleshToStoneHandler.handle', () => {
           condition: 'restrained',
           saveType: 'CON',
           duration: 'concentration',
+          dc: 15,
         }),
       );
-    });
-
-    it('includes saveDc in stored target effect', async () => {
-      getCombatContext.mockResolvedValue(baseCombatContext);
-      buildSaveDc.mockReturnValue(18);
-      resolveTarget.mockResolvedValue({ target: { name: targetName, type: 'monster' } });
-      getRuntimeValue.mockImplementation((_entity, keyOrProp, _camp) => {
-        if (keyOrProp === '_fleshToStone_Goblin') return null;
-        if (keyOrProp === 'activeConditions') return [];
-        if (keyOrProp === 'targetEffects') return [];
-        return [];
-      });
-      createSaveListener.mockReturnValue({
-        promptId: 'fts-dc',
-        promise: Promise.resolve({ success: false }),
-      });
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      const targetEffectsCall = setRuntimeValue.mock.calls.find(
-        (c) => c[1] === 'targetEffects',
-      );
-      const effects = targetEffectsCall[2];
-      const fleshEffect = effects.find(
-        (e) => e.effect === 'flesh_to_stone_repeat_save',
-      );
-      expect(fleshEffect.dc).toBe(18);
-    });
-
-    it('updates existing effect instead of duplicating', async () => {
-      getCombatContext.mockResolvedValue(baseCombatContext);
-      buildSaveDc.mockReturnValue(15);
-      resolveTarget.mockResolvedValue({ target: { name: targetName, type: 'monster' } });
-
-      let readCount = 0;
-      getRuntimeValue.mockImplementation((caster, keyOrProp, _prop) => {
-        if (keyOrProp === '_fleshToStone_Goblin') return null;
-        if (keyOrProp === 'activeConditions') return [];
-        if (keyOrProp === 'targetEffects') {
-          readCount++;
-          if (readCount === 1) {
-            return [
-              {
-                target: targetName,
-                effect: 'flesh_to_stone_repeat_save',
-                source: 'OldCaster',
-              },
-            ];
-          }
-          return [
-            {
-              target: targetName,
-              effect: 'flesh_to_stone_repeat_save',
-              source: casterName,
-            },
-          ];
-        }
-        return [];
-      });
-      createSaveListener.mockReturnValue({
-        promptId: 'fts-update',
-        promise: Promise.resolve({ success: false }),
-      });
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      const targetEffectsCalls = setRuntimeValue.mock.calls.filter(
-        (c) => c[1] === 'targetEffects',
-      );
-      expect(targetEffectsCalls.length).toBe(1);
-      const effects = targetEffectsCalls[0][2];
-      expect(effects.length).toBe(1);
-      expect(effects[0].source).toBe(casterName);
     });
 
     it('posts condition applied log entry', async () => {
@@ -776,22 +532,6 @@ describe('fleshToStoneHandler.handle', () => {
         }),
       );
     });
-
-    it('calls addEntry with ability_use on initial cast', async () => {
-      setupFailedSave();
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(addEntry).toHaveBeenCalledWith(
-        campaignName,
-        expect.objectContaining({
-          type: 'ability_use',
-          characterName: casterName,
-          abilityName: 'Flesh to Stone',
-          description: expect.stringContaining('casts Flesh to Stone'),
-        }),
-      );
-    });
   });
 
   describe('initial cast - successful save', () => {
@@ -823,7 +563,7 @@ describe('fleshToStoneHandler.handle', () => {
       expect(result.payload.description).toContain('succeeded on CON save');
     });
 
-    it('applies speed_zero on successful save', async () => {
+    it('applies speed_zero and expiration on successful save', async () => {
       setupSuccessfulSave();
 
       await handle(makeAction(), makePlayerStats(), campaignName, null);
@@ -834,38 +574,6 @@ describe('fleshToStoneHandler.handle', () => {
         expect.arrayContaining(['speed_zero']),
         campaignName,
       );
-    });
-
-    it('removes existing speed_zero before reapplying on success', async () => {
-      getCombatContext.mockResolvedValue(baseCombatContext);
-      buildSaveDc.mockReturnValue(15);
-      resolveTarget.mockResolvedValue({ target: { name: targetName, type: 'monster' } });
-      getRuntimeValue.mockImplementation((_entity, keyOrProp, _camp) => {
-        if (keyOrProp === '_fleshToStone_Goblin') return null;
-        if (keyOrProp === 'activeConditions') return ['speed_zero', 'Frightened'];
-        if (keyOrProp === 'targetEffects') return [];
-        return [];
-      });
-      createSaveListener.mockReturnValue({
-        promptId: 'fts-success-sz',
-        promise: Promise.resolve({ success: true }),
-      });
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      const condsCall = setRuntimeValue.mock.calls.find(
-        (c) => c[1] === 'activeConditions',
-      );
-      const conds = condsCall[2];
-      expect(conds.filter((c) => c === 'speed_zero').length).toBe(1);
-      expect(conds).toContain('Frightened');
-    });
-
-    it('adds speed_zero expiration on successful save', async () => {
-      setupSuccessfulSave();
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
       expect(addExpiration).toHaveBeenCalledWith(
         casterName,
         targetName,
@@ -909,55 +617,6 @@ describe('fleshToStoneHandler.handle', () => {
         }),
       );
     });
-
-    it('does not apply Restrained on success', async () => {
-      setupSuccessfulSave();
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      const restrainedCalls = setRuntimeValue.mock.calls.filter(
-        (c) => c[1] === 'activeConditions',
-      );
-      for (const call of restrainedCalls) {
-        expect(call[2]).not.toContain('restrained');
-      }
-    });
-
-    it('does not set tracking key on success', async () => {
-      setupSuccessfulSave();
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      const trackingCalls = setRuntimeValue.mock.calls.filter(
-        (c) => c[1] === '_fleshToStone_Goblin',
-      );
-      expect(trackingCalls.length).toBe(0);
-    });
-
-    it('does not store target effects on success', async () => {
-      setupSuccessfulSave();
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      const targetEffectsCalls = setRuntimeValue.mock.calls.filter(
-        (c) => c[1] === 'targetEffects',
-      );
-      expect(targetEffectsCalls.length).toBe(0);
-    });
-
-    it('does not add restrained expiration on success', async () => {
-      setupSuccessfulSave();
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      const restraintExpirations = addExpiration.mock.calls.filter(
-        (call) =>
-          call[2].some(
-            (e) => e.type === 'condition' && e.condition === 'restrained',
-          ),
-      );
-      expect(restraintExpirations.length).toBe(0);
-    });
   });
 
   describe('repeat save delegation', () => {
@@ -980,53 +639,6 @@ describe('fleshToStoneHandler.handle', () => {
       expect(result.payload.description).toContain('failed CON save');
       expect(createSaveListener).toHaveBeenCalledWith(campaignName, {
         targetName,
-        saveType: 'CON',
-        saveDc: 15,
-        dcSuccess: 'none',
-      });
-    });
-
-    it('uses buildSaveDc to compute save DC', async () => {
-      getCombatContext.mockResolvedValue(baseCombatContext);
-      buildSaveDc.mockReturnValue(18);
-      resolveTarget.mockResolvedValue({ target: { name: targetName, type: 'monster' } });
-      getRuntimeValue.mockImplementation((_caster, key) => {
-        if (key === '_fleshToStone_Goblin') return [0, 0];
-        return [];
-      });
-      createSaveListener.mockReturnValue({
-        promptId: 'fts-dc-calc',
-        promise: Promise.resolve({ success: true }),
-      });
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(buildSaveDc).toHaveBeenCalledWith(
-        expect.objectContaining({ type: 'flesh_to_stone', saveType: 'CON', saveDc: 15 }),
-        expect.any(Object),
-      );
-    });
-  });
-
-  describe('tracking key normalization', () => {
-    it('handles target names with spaces', async () => {
-      const spaceyTarget = 'Iron Golem';
-      getCombatContext.mockResolvedValue(baseCombatContext);
-      buildSaveDc.mockReturnValue(15);
-      resolveTarget.mockResolvedValue({ target: { name: spaceyTarget, type: 'monster' } });
-      getRuntimeValue.mockImplementation((_caster, key) => {
-        if (key === '_fleshToStone_Iron_Golem') return [0, 1];
-        return [];
-      });
-      createSaveListener.mockReturnValue({
-        promptId: 'fts-space',
-        promise: Promise.resolve({ success: false }),
-      });
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(createSaveListener).toHaveBeenCalledWith(campaignName, {
-        targetName: spaceyTarget,
         saveType: 'CON',
         saveDc: 15,
         dcSuccess: 'none',

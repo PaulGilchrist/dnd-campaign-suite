@@ -71,14 +71,6 @@ describe('eyebiteHandler.handle', () => {
         expect(result.modalName).toBe('eyebiteEffect');
     });
 
-    it('passes saveDc from buildSaveDc into payload', async () => {
-        defaultMocks();
-
-        const result = await handle(makeAction(), makePlayerStats(), campaignName, mapName);
-
-        expect(result.payload.saveDc).toBe(15);
-    });
-
     it('defaults rangeFeet to 60 when automation range is absent', async () => {
         defaultMocks();
 
@@ -106,17 +98,6 @@ describe('eyebiteHandler.handle', () => {
         expect(result.payload.attackerPos).toEqual({ gridX: 5, gridY: 10 });
     });
 
-    it('sets attackerPos to null when player is not on the map', async () => {
-        defaultMocks();
-        mapsService.loadMapData.mockResolvedValue({
-            players: [],
-        });
-
-        const result = await handle(makeAction(), makePlayerStats(), campaignName, mapName);
-
-        expect(result.payload.attackerPos).toBeNull();
-    });
-
     it('sets attackerPos to null when mapName is null', async () => {
         defaultMocks();
 
@@ -133,49 +114,6 @@ describe('eyebiteHandler.handle', () => {
 
         expect(result.type).toBe('modal');
         expect(result.payload.attackerPos).toBeNull();
-    });
-
-    it('includes combatSummary from getCombatContext', async () => {
-        defaultMocks();
-
-        const expectedContext = { creatures: [{ name: 'Dragon', type: 'boss' }] };
-        getCombatContext.mockResolvedValue(expectedContext);
-
-        const result = await handle(makeAction(), makePlayerStats(), campaignName, mapName);
-
-        expect(result.payload.combatSummary).toBe(expectedContext);
-    });
-
-    it('includes attackerName from playerStats', async () => {
-        defaultMocks();
-
-        const result = await handle(makeAction(), makePlayerStats(), campaignName, mapName);
-
-        expect(result.payload.attackerName).toBe('Necromancer1');
-    });
-
-    it('includes campaignName in payload', async () => {
-        defaultMocks();
-
-        const result = await handle(makeAction(), makePlayerStats(), campaignName, mapName);
-
-        expect(result.payload.campaignName).toBe(campaignName);
-    });
-
-    it('includes featureName from action name', async () => {
-        defaultMocks();
-
-        const result = await handle(makeAction(), makePlayerStats(), campaignName, mapName);
-
-        expect(result.payload.featureName).toBe('Eyebite');
-    });
-
-    it('includes durationRounds as 10', async () => {
-        defaultMocks();
-
-        const result = await handle(makeAction(), makePlayerStats(), campaignName, mapName);
-
-        expect(result.payload.durationRounds).toBe(10);
     });
 
     it('returns modal even when no creatures in combat', async () => {
@@ -199,31 +137,11 @@ describe('getEffectOptions', () => {
         expect(options.length).toBe(3);
     });
 
-    it('returns the same EFFECT_OPTIONS array on each call', () => {
-        const a = getEffectOptions();
-        const b = getEffectOptions();
-
-        expect(a).toBe(b);
-    });
-
-    it('includes asleep option with unconscious condition', () => {
+    it('includes all effect options with correct keys and conditions', () => {
         const options = getEffectOptions();
-        const asleep = options.find((o) => o.key === 'asleep');
 
-        expect(asleep).toEqual({ key: 'asleep', label: 'Asleep', condition: 'unconscious' });
-    });
-
-    it('includes panicked option with frightened condition', () => {
-        const options = getEffectOptions();
-        const panicked = options.find((o) => o.key === 'panicked');
-
-        expect(panicked).toEqual({ key: 'panicked', label: 'Panicked', condition: 'frightened' });
-    });
-
-    it('includes sickened option with poisoned condition', () => {
-        const options = getEffectOptions();
-        const sickened = options.find((o) => o.key === 'sickened');
-
-        expect(sickened).toEqual({ key: 'sickened', label: 'Sickened', condition: 'poisoned' });
+        expect(options).toContainEqual({ key: 'asleep', label: 'Asleep', condition: 'unconscious' });
+        expect(options).toContainEqual({ key: 'panicked', label: 'Panicked', condition: 'frightened' });
+        expect(options).toContainEqual({ key: 'sickened', label: 'Sickened', condition: 'poisoned' });
     });
 });

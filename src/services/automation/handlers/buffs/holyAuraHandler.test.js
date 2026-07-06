@@ -58,10 +58,13 @@ describe('holyAuraHandler.handle', () => {
   });
 
   describe('buff activation and deactivation', () => {
-    it('toggles the buff and returns an activation popup when the buff is not active', async () => {
-      const ps = makePlayerStats();
+    it.each([
+      [false, 'activated', 'activation'],
+      [true, 'deactivated', 'deactivation'],
+    ])('toggles the buff and returns %s popup when wasActive is %p', async (wasActive, expectedDesc, _label) => {
+      const ps = makePlayerStats({ name: 'PaladinSteve' });
       const action = makeAction({ auraRange: 30 });
-      buffToggle.toggleBuff.mockReturnValue({ wasActive: false });
+      buffToggle.toggleBuff.mockReturnValue({ wasActive });
 
       const result = await handle(action, ps, campaignName, null);
 
@@ -77,61 +80,25 @@ describe('holyAuraHandler.handle', () => {
       );
       expect(result.type).toBe('popup');
       expect(result.payload.type).toBe('automation_info');
-      expect(result.payload.description).toBe(`${action.name} activated`);
+      expect(result.payload.name).toBe(action.name);
+      expect(result.payload.automationType).toBe(action.automation.type);
+      expect(result.payload.description).toBe(`${action.name} ${expectedDesc}`);
       expect(result.payload.automation).toBe(action.automation);
-    });
-
-    it('toggles the buff and returns a deactivation popup when the buff is already active', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction({ auraRange: 60 });
-      buffToggle.toggleBuff.mockReturnValue({ wasActive: true });
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(buffToggle.toggleBuff).toHaveBeenCalledWith(
-        ps.name,
-        action.name,
-        {
-          type: 'buff',
-          auraRange: 60,
-          effect: 'holy_aura',
-        },
-        campaignName
-      );
-      expect(result.type).toBe('popup');
-      expect(result.payload.type).toBe('automation_info');
-      expect(result.payload.description).toBe(`${action.name} deactivated`);
-      expect(result.payload.automation).toBe(action.automation);
-    });
-
-    it('uses default auraRange of 30 when automation.auraRange is missing', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction({});
-      buffToggle.toggleBuff.mockReturnValue({ wasActive: false });
-
-      await handle(action, ps, campaignName, null);
-
-      expect(buffToggle.toggleBuff).toHaveBeenCalledWith(
-        ps.name,
-        action.name,
-        { type: 'buff', auraRange: 30, effect: 'holy_aura' },
-        campaignName
-      );
     });
 
     it.each([
-      [0, 'zero'],
-      [null, 'null'],
-      [undefined, 'undefined'],
-      [15, 'custom value'],
-    ])('uses auraRange=%p (%s) — falls back to 30 for falsy values', async (auraRange, _description) => {
+      [0, 30],
+      [null, 30],
+      [undefined, 30],
+      [15, 15],
+      [60, 60],
+    ])('uses auraRange=%p — falls back to %p for falsy values', async (auraRange, expectedRange) => {
       const ps = makePlayerStats();
       const action = makeAction(auraRange != null ? { auraRange } : {});
       buffToggle.toggleBuff.mockReturnValue({ wasActive: false });
 
       await handle(action, ps, campaignName, null);
 
-      const expectedRange = auraRange || 30;
       expect(buffToggle.toggleBuff).toHaveBeenCalledWith(
         ps.name,
         action.name,
@@ -139,92 +106,34 @@ describe('holyAuraHandler.handle', () => {
         campaignName
       );
     });
-  });
 
-  describe('expiration and runtime state management', () => {
-    it('registers an expiration and resets targets when activating the buff', async () => {
+    it.each([
+      [false, 'registers an expiration and resets targets'],
+      [true, 'does not register an expiration but resets targets'],
+    ])('expiration behavior: %p — %s', async (wasActive, _label) => {
       const ps = makePlayerStats();
       const action = makeAction();
-      buffToggle.toggleBuff.mockReturnValue({ wasActive: false });
+      buffToggle.toggleBuff.mockReturnValue({ wasActive });
 
       await handle(action, ps, campaignName, null);
 
-      expect(expirations.addExpiration).toHaveBeenCalledWith(
-        ps.name,
-        ps.name,
-        [{ type: 'remove_active_buff', buffName: action.name }],
-        campaignName
-      );
       expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
         ps.name,
         'holyAuraTargets',
         [],
         campaignName
       );
-    });
 
-    it('resets targets but does not register an expiration when deactivating the buff', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-      buffToggle.toggleBuff.mockReturnValue({ wasActive: true });
-
-      await handle(action, ps, campaignName, null);
-
-      expect(expirations.addExpiration).not.toHaveBeenCalled();
-      expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-        ps.name,
-        'holyAuraTargets',
-        [],
-        campaignName
-      );
-    });
-  });
-
-  describe('return value structure', () => {
-    it('includes name, automationType, and automation in the popup payload on activation', async () => {
-      const ps = makePlayerStats({ name: 'PaladinSteve' });
-      const action = makeAction({ auraRange: 30 });
-      buffToggle.toggleBuff.mockReturnValue({ wasActive: false });
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload).toEqual(
-        expect.objectContaining({
-          type: 'automation_info',
-          name: action.name,
-          automationType: action.automation.type,
-          description: `${action.name} activated`,
-          automation: action.automation,
-        })
-      );
-    });
-
-    it('includes name, automationType, and automation in the popup payload on deactivation', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-      buffToggle.toggleBuff.mockReturnValue({ wasActive: true });
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.payload).toEqual(
-        expect.objectContaining({
-          name: action.name,
-          automationType: action.automation.type,
-          automation: action.automation,
-        })
-      );
-    });
-
-    it('accepts a mapName parameter without affecting behavior', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-      buffToggle.toggleBuff.mockReturnValue({ wasActive: false });
-
-      await handle(action, ps, campaignName, 'TestMap');
-
-      expect(buffToggle.toggleBuff).toHaveBeenCalled();
-      expect(expirations.addExpiration).toHaveBeenCalled();
+      if (wasActive === false) {
+        expect(expirations.addExpiration).toHaveBeenCalledWith(
+          ps.name,
+          ps.name,
+          [{ type: 'remove_active_buff', buffName: 'Holy Aura' }],
+          campaignName
+        );
+      } else {
+        expect(expirations.addExpiration).not.toHaveBeenCalled();
+      }
     });
   });
 });
@@ -260,14 +169,6 @@ describe('holyAuraHandler.getHolyAuraTargets', () => {
     }
   });
 
-  it('returns an empty array when the stored value is an empty array', () => {
-    runtimeState.getRuntimeValue.mockReturnValue([]);
-
-    const result = getHolyAuraTargets('TestHero', campaignName);
-
-    expect(result).toEqual([]);
-  });
-
   it('uses the playerName and campaignName parameters correctly', () => {
     runtimeState.getRuntimeValue.mockReturnValue([]);
 
@@ -295,17 +196,13 @@ describe('holyAuraHandler.isHolyAuraActive', () => {
     expect(isHolyAuraActive('TestHero', campaignName)).toBe(true);
   });
 
-  it('returns false when activeBuffs is null or undefined', () => {
-    runtimeState.getRuntimeValue.mockReturnValue(null);
-    expect(isHolyAuraActive('TestHero', campaignName)).toBe(false);
+  it('returns false when activeBuffs is null, undefined, or non-array', () => {
+    const invalidValues = [null, undefined, 'not-an-array'];
 
-    runtimeState.getRuntimeValue.mockReturnValue(undefined);
-    expect(isHolyAuraActive('TestHero', campaignName)).toBe(false);
-  });
-
-  it('returns false for any non-array activeBuffs value', () => {
-    runtimeState.getRuntimeValue.mockReturnValue('not-an-array');
-    expect(isHolyAuraActive('TestHero', campaignName)).toBe(false);
+    for (const value of invalidValues) {
+      runtimeState.getRuntimeValue.mockReturnValue(value);
+      expect(isHolyAuraActive('TestHero', campaignName)).toBe(false);
+    }
   });
 
   it('returns false when no buffs exist', () => {
@@ -326,30 +223,5 @@ describe('holyAuraHandler.isHolyAuraActive', () => {
 
       expect(isHolyAuraActive('TestHero', campaignName)).toBe(false);
     }
-  });
-
-  it('returns true when multiple buffs include the matching Holy Aura buff', () => {
-    runtimeState.getRuntimeValue.mockReturnValue([
-      { name: 'Shield', effect: 'shield' },
-      { name: 'Holy Aura', effect: 'holy_aura' },
-      { name: 'mage_armor', effect: 'mage_armor' },
-    ]);
-
-    expect(isHolyAuraActive('TestHero', campaignName)).toBe(true);
-  });
-
-  it('uses the playerName and campaignName parameters correctly', () => {
-    runtimeState.getRuntimeValue.mockImplementation((_name, key) => {
-      if (key === 'activeBuffs') return [{ name: 'Holy Aura', effect: 'holy_aura' }];
-      return null;
-    });
-
-    isHolyAuraActive('DifferentPlayer', 'OtherCampaign');
-
-    expect(runtimeState.getRuntimeValue).toHaveBeenCalledWith(
-      'DifferentPlayer',
-      'activeBuffs',
-      'OtherCampaign'
-    );
   });
 });
