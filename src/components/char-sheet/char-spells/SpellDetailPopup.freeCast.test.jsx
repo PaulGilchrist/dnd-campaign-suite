@@ -271,4 +271,92 @@ describe('SpellDetailPopup - Free Cast Authorization', () => {
       ).toBeInTheDocument();
     });
   });
+
+  describe('bonusActions free_spell entries', () => {
+    it('authorizes via bonusActions free_spell by spell name', () => {
+      vi.mocked(getRuntimeValue).mockImplementation((_name, key) => {
+        if (key === '_Mantle_of_Majesty_freeCast') return ['Command'];
+        return null;
+      });
+
+      const stats = {
+        ...baseMockPlayerStats,
+        automation: {
+          passives: [],
+          actions: [],
+          bonusActions: [
+            {
+              name: 'Mantle of Majesty',
+              type: 'free_spell',
+              spell: 'Command',
+            },
+          ],
+        },
+      };
+      const spell = {
+        ...baseMockSpell,
+        name: 'Command',
+        level: 1,
+        damage: null,
+        dc: { dc_type: 'WIS', dc_success: 'none' },
+      };
+      renderPopup(spell, stats);
+      expect(
+        screen.getByText('Free Cast — no spell slot consumed')
+      ).toBeInTheDocument();
+    });
+  });
+
+  describe('Mantle of Majesty active buff', () => {
+    it('authorizes Command when Mantle of Majesty is in activeBuffs', () => {
+      const stats = {
+        ...baseMockPlayerStats,
+        automation: {
+          passives: [],
+          actions: [],
+          bonusActions: [],
+        },
+      };
+      vi.mocked(getRuntimeValue).mockImplementation((_name, key) => {
+        if (key === 'activeBuffs') return [{ name: 'Mantle of Majesty' }];
+        return null;
+      });
+
+      const spell = {
+        ...baseMockSpell,
+        name: 'Command',
+        level: 1,
+        damage: null,
+        dc: { dc_type: 'WIS', dc_success: 'none' },
+      };
+      renderPopup(spell, stats);
+      expect(
+        screen.getByText('Free Cast — no spell slot consumed')
+      ).toBeInTheDocument();
+    });
+
+    it('does not authorize Command when Mantle of Majesty is not active', () => {
+      const stats = {
+        ...baseMockPlayerStats,
+        automation: {
+          passives: [],
+          actions: [],
+          bonusActions: [],
+        },
+      };
+      vi.mocked(getRuntimeValue).mockReturnValue(null);
+
+      const spell = {
+        ...baseMockSpell,
+        name: 'Command',
+        level: 1,
+        damage: null,
+        dc: { dc_type: 'WIS', dc_success: 'none' },
+      };
+      renderPopup(spell, stats);
+      expect(
+        screen.queryByText('Free Cast — no spell slot consumed')
+      ).not.toBeInTheDocument();
+    });
+  });
 });

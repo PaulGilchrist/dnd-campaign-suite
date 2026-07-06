@@ -90,6 +90,43 @@ describe('spellSectionUtils', () => {
       const result = getBonusActionSpellNames(stats, 'test-campaign');
       expect(result.size).toBe(0);
     });
+
+    it('includes spells from active bonus action free_spell features', () => {
+      getRuntimeValue.mockImplementation((name, key) => {
+        if (key === 'activeBuffs') return [{ name: 'Mantle of Majesty' }];
+        if (key === 'activeConditions') return [];
+        return null;
+      });
+      const stats = createStats({
+        spellAbilities: { spells: [{ name: 'Command', casting_time: 'Action', prepared: 'Always' }] },
+        automation: {
+          bonusActions: [{
+            name: 'Mantle of Majesty',
+            type: 'free_spell',
+            spell: 'Command',
+            casting_time: '1 bonus action',
+          }],
+        },
+      });
+      const result = getBonusActionSpellNames(stats, 'test-campaign');
+      expect(result).toEqual(new Set(['Command']));
+    });
+
+    it('excludes spells from inactive bonus action free_spell features', () => {
+      const stats = createStats({
+        spellAbilities: { spells: [{ name: 'Command', casting_time: 'Action', prepared: 'Always' }] },
+        automation: {
+          bonusActions: [{
+            name: 'Mantle of Majesty',
+            type: 'free_spell',
+            spell: 'Command',
+            casting_time: '1 bonus action',
+          }],
+        },
+      });
+      const result = getBonusActionSpellNames(stats, 'test-campaign');
+      expect(result.size).toBe(0);
+    });
   });
 
   describe('getReactionSpellNames', () => {

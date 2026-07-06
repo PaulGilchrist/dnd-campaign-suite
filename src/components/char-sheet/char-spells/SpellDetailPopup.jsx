@@ -85,6 +85,42 @@ function isFreeCastAuthorized(playerName, spellName, spellLevel, playerStats, ca
   const wgbActive = getRuntimeValue(playerName, '_War_Gods_Blessing_active');
   if (wgbActive && ['Shield of Faith', 'Spiritual Weapon'].includes(spellName)) return true;
 
+  const bonusActions = playerStats?.automation?.bonusActions || [];
+  for (const entry of bonusActions) {
+    if (entry.type !== 'free_spell' && entry.type !== 'fey_reinforcements' && entry.type !== 'dragon_companion') continue;
+
+    if (entry.uses_expression && entry.usesMax) {
+      const spellField = Array.isArray(entry.spell) ? entry.spell[0] : entry.spell;
+      const levelMatch = spellField ? spellField.match(/level (\d+)/) : null;
+      const featureLevel = levelMatch ? parseInt(levelMatch[1], 10) : null;
+      if (featureLevel !== null && featureLevel === spellLevel) {
+        const freeCastCountKey = `_${entry.name.replace(/\s+/g, '_')}_freeCastCount`;
+        const count = Number(getRuntimeValue(playerName, freeCastCountKey) ?? entry.usesMax);
+        if (count > 0) return true;
+      }
+      continue;
+    }
+
+    const spells = Array.isArray(entry.spell) ? entry.spell : [entry.spell];
+    if (!spells.includes(spellName)) continue;
+
+    if (entry.perSpellTracking) {
+      const freeKey = `_${entry.name.replace(/\s+/g, '_')}_${spellName.replace(/\s+/g, '_')}_freeCast`;
+      const usedKey = `_${entry.name.replace(/\s+/g, '_')}_${spellName.replace(/\s+/g, '_')}_used`;
+      const hasFreeCast = !!getRuntimeValue(playerName, freeKey);
+      const isUsed = !!getRuntimeValue(playerName, usedKey);
+      return hasFreeCast && !isUsed;
+    }
+
+    const sharedKey = `_${entry.name.replace(/\s+/g, '_')}_freeCast`;
+    const stored = getRuntimeValue(playerName, sharedKey);
+    if (stored && Array.isArray(stored) && stored.includes(spellName)) return true;
+  }
+
+  const mantleActive = getRuntimeValue(playerName, 'activeBuffs');
+  const mantleBuffs = Array.isArray(mantleActive) ? mantleActive : [];
+  if (mantleBuffs.some(b => b.name === 'Mantle of Majesty') && spellName === 'Command') return true;
+
   return false;
 }
 
@@ -232,6 +268,40 @@ function SpellDetailPopup({ spell, playerStats, campaignName, onClose, onCast, u
 
           // Counter-based free casts — match by spell level, not name
           // Must stay in sync with isFreeCastAuthorized logic above
+          if (entry.uses_expression && entry.usesMax) {
+            const spellField = Array.isArray(entry.spell) ? entry.spell[0] : entry.spell;
+            const levelMatch = spellField ? spellField.match(/level (\d+)/) : null;
+            const featureLevel = levelMatch ? parseInt(levelMatch[1], 10) : null;
+            if (featureLevel !== null && featureLevel === spell.level) {
+              const freeCastCountKey = `_${entry.name.replace(/\s+/g, '_')}_freeCastCount`;
+              const count = Number(getRuntimeValue(playerStats.name, freeCastCountKey) ?? entry.usesMax);
+              if (count > 0) {
+                setRuntimeValue(playerStats.name, freeCastCountKey, count - 1, campaignName);
+              }
+              break;
+            }
+            continue;
+          }
+
+          const spells = Array.isArray(entry.spell) ? entry.spell : [entry.spell];
+          if (!spells.includes(spell.name)) continue;
+
+          if (entry.perSpellTracking) {
+            const usedKey = `_${entry.name.replace(/\s+/g, '_')}_${spell.name.replace(/\s+/g, '_')}_used`;
+            setRuntimeValue(playerStats.name, usedKey, true, campaignName);
+            const entrySpells = Array.isArray(entry.spell) ? entry.spell : [entry.spell];
+            for (const s of entrySpells) {
+              const freeKey = `_${entry.name.replace(/\s+/g, '_')}_${s.replace(/\s+/g, '_')}_freeCast`;
+              setRuntimeValue(playerStats.name, freeKey, null, campaignName);
+            }
+            break;
+          }
+        }
+
+        const bonusActions = playerStats?.automation?.bonusActions || [];
+        for (const entry of bonusActions) {
+          if (entry.type !== 'free_spell' && entry.type !== 'fey_reinforcements' && entry.type !== 'dragon_companion') continue;
+
           if (entry.uses_expression && entry.usesMax) {
             const spellField = Array.isArray(entry.spell) ? entry.spell[0] : entry.spell;
             const levelMatch = spellField ? spellField.match(/level (\d+)/) : null;

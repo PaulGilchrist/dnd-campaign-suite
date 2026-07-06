@@ -12,6 +12,14 @@ function isElderChampionActive(playerName, campaignName) {
     } catch { return false; }
 }
 
+function isFeatureActive(featureName, playerName, campaignName) {
+    try {
+        const stored = getRuntimeValue(playerName, 'activeBuffs', campaignName);
+        const activeBuffs = Array.isArray(stored) ? stored : [];
+        return activeBuffs.some(b => b.name === featureName);
+    } catch { return false; }
+}
+
 /**
  * Returns a Set of spell names that should appear in the Actions section.
  * Only damage/healing spells with casting time of 1 action.
@@ -43,6 +51,18 @@ export function getBonusActionSpellNames(playerStats, campaignName) {
         if (!isBonusAction && !isActionSpellSwift) continue;
         if (spell.prepared !== 'Always' && spell.prepared !== 'Prepared') continue;
         names.add(spell.name);
+    }
+    const bonusActions = playerStats.automation?.bonusActions || [];
+    for (const feature of bonusActions) {
+        if (feature.type !== 'free_spell' && feature.type !== 'fey_reinforcements') continue;
+        if (!feature.spell) continue;
+        if (!feature.casting_time || !bonusActionCastingTimes.includes(feature.casting_time)) continue;
+        const featureName = feature.name;
+        if (!isFeatureActive(featureName, playerStats.name, campaignName)) continue;
+        const spellNames = Array.isArray(feature.spell) ? feature.spell : [feature.spell];
+        for (const sn of spellNames) {
+            names.add(sn);
+        }
     }
     return names;
 }

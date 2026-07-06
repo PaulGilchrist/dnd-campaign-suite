@@ -1,8 +1,12 @@
 import { rollExpression } from '../../../dice/diceRoller.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
+import { getCombatSummary } from '../../../encounters/combatData.js';
+import { addConcentration } from '../../../combat/concentration/concentrationService.js';
 import { getEmpoweredEvocationFeatures, getEmpoweredEvocationIntModifier } from '../../../../services/rules/spells/postCastRiderService.js';
 import { getMagicInitiateLevel1Spell } from '../feats/magicInitiateHandler.js';
 import { postLogEntry } from '../../../shared/logPoster.js';
+import { addExpiration } from '../../../rules/effects/expirations.js';
+import storage from '../../../ui/storage.js';
 
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
@@ -14,6 +18,53 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         if (miSpell) {
             spellName = miSpell;
         }
+    }
+
+    // Mantle of Majesty: set activeBuffs for concentration-gated free cast
+    if (action.name === 'Mantle of Majesty' && auto.type === 'free_spell' && auto.concentration) {
+        const activeBuffs = getRuntimeValue(playerStats.name, 'activeBuffs', campaignName);
+        const buffsArray = Array.isArray(activeBuffs) ? activeBuffs : [];
+        if (buffsArray.some(b => b.name === 'Mantle of Majesty')) {
+            return {
+                type: 'popup',
+                payload: {
+                    type: 'automation_info',
+                    name: action.name,
+                    description: `${action.name} is already active.`,
+                    automation: auto,
+                },
+            };
+        }
+        const newBuffs = [...buffsArray, { name: 'Mantle of Majesty', effect: 'mantle_of_majesty', duration: '1_minute' }];
+        await setRuntimeValue(playerStats.name, 'activeBuffs', newBuffs, campaignName);
+        addExpiration(playerStats.name, playerStats.name, [
+            { type: 'remove_active_buff', buffName: 'Mantle of Majesty' }
+        ], campaignName, 10);
+
+        // Set concentration on combat summary so initiative tracker shows it
+        const combatSummary = getCombatSummary(campaignName);
+        if (combatSummary) {
+            const dc = playerStats.spellAbilities?.saveDc || 8 + (playerStats.proficiency || 2);
+            addConcentration(combatSummary, playerStats.name, 'Mantle of Majesty', dc);
+            storage.set('combatSummary', combatSummary, campaignName);
+            window.dispatchEvent(new CustomEvent('combat-summary-updated'));
+        }
+
+        await postLogEntry(campaignName, {
+            type: 'ability_use',
+            characterName: playerStats.name,
+            abilityName: action.name,
+            description: `${playerStats.name} activated Mantle of Majesty. Command is now available as a free bonus action for 1 minute or until concentration ends.`,
+        }).catch(() => {});
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: action.name,
+                description: `${action.name} activated! Command is now available as a free bonus action for 1 minute or until concentration ends.`,
+                automation: auto,
+            },
+        };
     }
 
     if (auto.resourceCost === 'channel_divinity') {

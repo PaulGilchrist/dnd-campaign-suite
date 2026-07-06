@@ -562,7 +562,7 @@ export function createLogDamageAndShow(deps) {
             dcSuccess,
             saveResult: isSoulstitchProtected ? { success: true, roll: 1, total: 0, bonus: 0 } : saveResult,
             finalDamage: primaryApplyResult?.finalDamage ?? finalDamage,
-            damageApplied: true,
+            damageApplied: (primaryApplyResult?.finalDamage ?? finalDamage) > 0,
             damageReduced: primaryApplyResult?.damageReduced,
             isCrit,
             mode: disadvantage ? 'disadvantage' : (advantage ? 'advantage' : 'normal'),

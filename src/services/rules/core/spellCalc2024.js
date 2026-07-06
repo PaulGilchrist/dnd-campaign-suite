@@ -209,7 +209,11 @@ export function getSpellAbilities(allSpells, playerStats, playerSummary) {
                     const spellNames = Array.isArray(feature.spell) ? feature.spell : [feature.spell];
                     spellNames.forEach(spellName => {
                         if (!spellAbilities.spells.find(s => s.name === spellName)) {
-                            spellAbilities.spells.push({ name: spellName, prepared: 'Always' });
+                            const spellEntry = { name: spellName, prepared: 'Always' };
+                            if (feature.automation?.casting_time) {
+                                spellEntry.casting_time = feature.automation.casting_time;
+                            }
+                            spellAbilities.spells.push(spellEntry);
                         }
                     });
                 }

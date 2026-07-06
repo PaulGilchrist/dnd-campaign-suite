@@ -115,8 +115,8 @@ function DiceRollResult({ name, type, rolls, rollType, bonus = 0, bonusDetail, f
                     {name}
                 </div>
             )}
-            {type !== 'damage_type_choice' && <div className="dice-roll-total">{finalTotal}</div>}
-            {type !== 'damage_type_choice' && (
+            {type !== 'damage_type_choice' && !((isSaveDamageType || rollType === 'save-damage') && finalDamage !== undefined && finalDamage <= 0) && <div className="dice-roll-total">{finalTotal}</div>}
+            {type !== 'damage_type_choice' && !((isSaveDamageType || rollType === 'save-damage') && finalDamage !== undefined && finalDamage <= 0) && (
                 <div className="dice-roll-breakdown">
                     {displayFormula ? `${displayFormula}: ` : type === 'd20' ? 'd20 ' : ''}
                     {strokeResult !== null ? (

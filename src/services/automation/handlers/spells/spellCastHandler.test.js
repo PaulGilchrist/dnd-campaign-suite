@@ -19,11 +19,38 @@ vi.mock('../../../../services/rules/spells/postCastRiderService.js', () => ({
   getEmpoweredEvocationIntModifier: vi.fn(),
 }));
 
+vi.mock('../../../rules/effects/expirations.js', () => ({
+  addExpiration: vi.fn(),
+}));
+
+vi.mock('../../../shared/logPoster.js', () => ({
+  postLogEntry: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock('../../../encounters/combatData.js', () => ({
+  getCombatSummary: vi.fn(),
+}));
+
+vi.mock('../../../combat/concentration/concentrationService.js', () => ({
+  addConcentration: vi.fn(),
+}));
+
+vi.mock('../../../ui/storage.js', () => ({
+  default: {
+    set: vi.fn(),
+  },
+}));
+
 import { handle } from './spellCastHandler.js';
 import * as diceRoller from '../../../dice/diceRoller.js';
 import * as runtimeState from '../../../../hooks/runtime/useRuntimeState.js';
 import * as magicInitiateHandler from '../feats/magicInitiateHandler.js';
 import * as postCastRiderService from '../../../../services/rules/spells/postCastRiderService.js';
+import * as expirations from '../../../rules/effects/expirations.js';
+import * as logPoster from '../../../shared/logPoster.js';
+import * as combatData from '../../../encounters/combatData.js';
+import * as concentrationService from '../../../combat/concentration/concentrationService.js';
+import storage from '../../../ui/storage.js';
 
 const campaignName = 'TestCampaign';
 
@@ -416,6 +443,107 @@ describe('spellCastHandler', () => {
       runtimeState.getRuntimeValue.mockReturnValue(null);
       result = await handle(makeAction({ spell: 'Light' }), ps, campaignName, 'combat-map-1');
       expect(result.payload.html).toContain('Light');
+    });
+  });
+
+  describe('Mantle of Majesty', () => {
+    it('sets activeBuffs and shows popup when Mantle of Majesty is activated', async () => {
+      const ps = makePlayerStats({ name: 'GlamourBard', spellAbilities: { saveDc: 15 }, proficiency: 5 });
+      runtimeState.getRuntimeValue.mockReturnValue(null);
+      combatData.getCombatSummary.mockReturnValue({ creatures: [{ name: 'GlamourBard' }] });
+      const dispatchSpy = vi.spyOn(window, 'dispatchEvent');
+
+      const action = {
+        name: 'Mantle of Majesty',
+        description: 'You always have the Command spell prepared...',
+        automation: {
+          type: 'free_spell',
+          spell: 'Command',
+          freeCasts: 'at_will_while_active',
+          action: 'bonus_action',
+          duration: '1_minute',
+          concentration: true,
+          casting_time: '1 bonus action',
+        },
+      };
+
+      const result = await handle(action, ps, campaignName, null);
+
+      expect(result.type).toBe('popup');
+      expect(result.payload.type).toBe('automation_info');
+      expect(result.payload.description).toContain('Mantle of Majesty activated');
+      expect(result.payload.description).toContain('Command is now available as a free bonus action');
+
+      expect(runtimeState.getRuntimeValue).toHaveBeenCalledWith('GlamourBard', 'activeBuffs', campaignName);
+      expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith('GlamourBard', 'activeBuffs', expect.arrayContaining([
+        expect.objectContaining({ name: 'Mantle of Majesty' }),
+      ]), campaignName);
+
+      expect(expirations.addExpiration).toHaveBeenCalledWith(
+        'GlamourBard',
+        'GlamourBard',
+        expect.arrayContaining([
+          expect.objectContaining({ type: 'remove_active_buff', buffName: 'Mantle of Majesty' }),
+        ]),
+        campaignName,
+        10
+      );
+
+      expect(combatData.getCombatSummary).toHaveBeenCalledWith(campaignName);
+      expect(concentrationService.addConcentration).toHaveBeenCalledWith(
+        { creatures: [{ name: 'GlamourBard' }] },
+        'GlamourBard',
+        'Mantle of Majesty',
+        15
+      );
+      expect(storage.set).toHaveBeenCalledWith('combatSummary', expect.any(Object), campaignName);
+      expect(dispatchSpy).toHaveBeenCalledWith(expect.objectContaining({ type: 'combat-summary-updated' }));
+      dispatchSpy.mockRestore();
+
+      expect(logPoster.postLogEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+        type: 'ability_use',
+        characterName: 'GlamourBard',
+        abilityName: 'Mantle of Majesty',
+      }));
+    });
+
+    it('returns already active popup when Mantle of Majesty is already active', async () => {
+      const ps = makePlayerStats({ name: 'GlamourBard' });
+      runtimeState.getRuntimeValue.mockReturnValue([{ name: 'Mantle of Majesty' }]);
+
+      const action = {
+        name: 'Mantle of Majesty',
+        automation: {
+          type: 'free_spell',
+          spell: 'Command',
+          concentration: true,
+        },
+      };
+
+      const result = await handle(action, ps, campaignName, null);
+
+      expect(result.type).toBe('popup');
+      expect(result.payload.type).toBe('automation_info');
+      expect(result.payload.description).toContain('already active');
+    });
+
+    it('does not intercept normal free_spell features', async () => {
+      const ps = makePlayerStats();
+      runtimeState.getRuntimeValue.mockReturnValue(null);
+
+      const action = {
+        name: 'Channel Divinity: Charm',
+        automation: {
+          type: 'free_spell',
+          spell: 'Charm Person',
+          resourceCost: 'channel_divinity',
+        },
+      };
+
+      const result = await handle(action, ps, campaignName, null);
+
+      expect(result.type).toBe('popup');
+      expect(result.payload.html).toContain('Charm Person');
     });
   });
 });

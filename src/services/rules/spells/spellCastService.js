@@ -401,11 +401,17 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
             const context = {
                 targetName: target?.name,
                 attackerName: playerStats.name,
-                ...rollContext,
+                ...metaCtx,
                 saveDc: spellSaveDc + (innateSorceryActive ? 1 : 0),
                 saveType: spell.dc.dc_type,
                 dcSuccess: spell.dc.dc_success,
-                metamagicHeighten: hasInvisible,
+                metamagicHeighten: (() => {
+                    const passives = playerStats.automation?.passives;
+                    const magicalAmbush = passives?.some(p => p.type === 'passive_rule' && p.effect === 'magical_ambush');
+                    const rawConditions = getRuntimeValue(playerStats.name, 'activeConditions', campaignName);
+                    const casterConditions = Array.isArray(rawConditions) ? rawConditions : [];
+                    return magicalAmbush && casterConditions.some(c => String(c).toLowerCase() === 'invisible');
+                })(),
                 isCantrip: spell.baseLevel === 0 || spell.level === 0,
             };
             if (spell.status_effects && spell.status_effects.length > 0) {
