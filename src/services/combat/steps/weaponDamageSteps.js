@@ -12,7 +12,6 @@ import { spendResource } from '../../automation/common/resourceCheck.js';
 import { getActiveBuffs } from '../../automation/common/buffToggle.js';
 import utils from '../../ui/utils.js';
 import { featureModules } from './features/index.js';
-import { createSaveListener } from '../../automation/common/savePrompt.js';
 
 /**
  * Build the damage pipeline steps for a weapon-type action.
@@ -730,176 +729,11 @@ export function buildWeaponDamageSteps() {
     },
 
     // =========================================================
-    // Step: Rend Mind — Soulknife L17 WIS save/Stunned on Psychic Blade sneak attack
-    // =========================================================
-    {
-      name: 'rendMind',
-      subscribe: 'dmg_type:modified',
-      emit: 'rendMind:done',
-      condition: (ctx) => {
-        const attackName = ctx.attack?.name || '';
-        const isPsychicBlade = attackName.includes('Psychic Blade');
-        if (!isPsychicBlade) return false;
-        const passives = ctx.playerStats.automation?.passives || [];
-        const rendMind = passives.find(
-          a => a.type === 'attack_rider' && a.trigger === 'psychic_blade_sneak_attack_hit' && a.saveType
-        );
-        return !!rendMind;
-      },
-      handler: async (ctx) => {
-        const passives = ctx.playerStats.automation?.passives || [];
-        const rendMind = passives.find(
-          a => a.type === 'attack_rider' && a.trigger === 'psychic_blade_sneak_attack_hit' && a.saveType
-        );
-        if (!rendMind) return { data: {} };
-
-        const rendMindUsedKey = '_RendMind_Used';
-        const rendMindUsed = getRuntimeValue(ctx.playerStats.name, rendMindUsedKey, ctx.campaignName);
-        if (rendMindUsed) {
-          const lastLongRest = getRuntimeValue(ctx.playerStats.name, '_LastLongRest', ctx.campaignName);
-          const currentLongRest = getRuntimeValue(ctx.playerStats.name, '_CurrentLongRest', ctx.campaignName);
-          if (lastLongRest !== currentLongRest) {
-            await setRuntimeValue(ctx.playerStats.name, rendMindUsedKey, false, ctx.campaignName);
-          }
-        }
-        const rendMindActive = getRuntimeValue(ctx.playerStats.name, rendMindUsedKey, ctx.campaignName);
-        if (rendMindActive) return { data: {} };
-
-        const targetName = ctx.targetName;
-        if (!targetName) return { data: {} };
-
-        const dexAbility = ctx.playerStats.abilities?.find(a => a.name === 'Dexterity');
-        const dexMod = dexAbility?.bonus || 0;
-        const prof = ctx.playerStats.proficiency || 0;
-        const saveDc = 8 + dexMod + prof;
-
-        const { promise, promptId } = createSaveListener(ctx.campaignName, {
-          targetName,
-          saveType: 'WIS',
-          saveDc,
-        });
-
-        await setRuntimeValue(ctx.playerStats.name, rendMindUsedKey, true, ctx.campaignName);
-
-        addEntry(ctx.campaignName, {
-          type: 'save_triggered',
-          characterName: ctx.playerStats.name,
-          targetName,
-          saveType: 'WIS',
-          saveDc,
-          description: `Rend Mind: ${targetName} must make a DC ${saveDc} WIS save or gain the Stunned condition.`,
-          promptId,
-        }).catch(() => {});
-
-        const saveResult = await promise;
-
-        if (!saveResult.success) {
-          const conditions = getRuntimeValue(targetName, 'activeConditions') || [];
-          if (!conditions.some(c => String(c).toLowerCase() === 'stunned')) {
-            await setRuntimeValue(targetName, 'activeConditions', [...conditions, 'stunned'], ctx.campaignName);
-          }
-        }
-
-        addEntry(ctx.campaignName, {
-          type: 'ability_use',
-          characterName: ctx.playerStats.name,
-          abilityName: 'Rend Mind',
-          description: `Rend Mind triggered on ${targetName} — ${saveResult?.success ? 'succeeded' : 'failed'} WIS save (DC ${saveDc})${saveResult?.success ? '' : ' — Stunned condition applied'}`,
-          targetName,
-        }).catch(() => {});
-
-        return { data: {} };
-      },
-    },
-
-    // =========================================================
-    // Step: Eldritch Strikes — attack_rider weapon_attack_hit automations
-    // =========================================================
-    {
-      name: 'eldritchStrikes',
-      subscribe: 'rendMind:done',
-      emit: 'eldritch:done',
-      condition: (ctx) => !!ctx.playerStats.automation?.actions,
-      handler: async (ctx) => {
-        const riders = [
-          ...(ctx.playerStats.automation?.actions || []),
-          ...(ctx.playerStats.automation?.passives || []),
-        ].filter(
-          a => a.type === 'attack_rider' && a.trigger === 'weapon_attack_hit' && !a.damageExpression && a.name !== "Stalker's Flurry"
-        );
-        if (riders.length === 0) return { data: {} };
-
-        const cs = await getCombatContext(ctx.campaignName);
-        const target = cs ? getTargetFromAttacker(cs, ctx.playerStats.name) : null;
-        const targetName = target?.name || null;
-        if (!targetName) return { data: {} };
-
-        const currentRound = ctx.formula ? getCurrentCombatRound() : getCurrentCombatRound();
-
-        for (const rider of riders) {
-          const usedKey = `_${rider.name.replace(/\s+/g, '_')}_usedRound`;
-          const usedRound = getRuntimeValue(ctx.playerStats.name, usedKey, ctx.campaignName);
-          const isOncePerTurn = rider.oncePerTurn;
-          if (isOncePerTurn && usedRound === currentRound) continue;
-
-          if (rider.options?.length > 0) {
-            const option = rider.options[0];
-            const storedEffects = getRuntimeValue(ctx.campaignName, 'targetEffects') || [];
-            const newEffect = {
-              target: targetName,
-              source: rider.name,
-              option: option.name,
-              effect: option.effect,
-              value: option.value || null,
-              noOpportunityAttacks: option.noOpportunityAttacks || false,
-              duration: 'until_start_of_next_turn',
-            };
-            const updatedEffects = [...storedEffects, newEffect];
-            setRuntimeValue(ctx.campaignName, 'targetEffects', updatedEffects, ctx.campaignName);
-
-            if (isOncePerTurn) {
-              setRuntimeValue(ctx.playerStats.name, usedKey, currentRound, ctx.campaignName);
-            }
-
-            await addEntry(ctx.campaignName, {
-              type: 'ability_use',
-              characterName: ctx.playerStats.name,
-              abilityName: rider.name,
-              description: `${ctx.playerStats.name} used ${rider.name} on ${targetName}, imposing ${option.effect || 'effect'} on the target.`,
-              targetName,
-            }).catch((e) => { console.error("[Eldritch Strikes] Error:", e); });
-          }
-        }
-
-        return { data: {} };
-      },
-    },
-
-    // =========================================================
-    // Step: Remarkable Athlete — on crit, enable movement without OA
-    // =========================================================
-    {
-      name: 'remarkableAthlete',
-      subscribe: 'eldritch:done',
-      emit: 'overchannel:self-damage',
-      condition: (ctx) => ctx.isCrit && !!ctx.playerStats.automation?.passives,
-      handler: async (ctx) => {
-        const hasRemarkableAthlete = ctx.playerStats.automation.passives.some(
-          p => p.type === 'auto_effect' && p.effect === 'remarkable_athlete_movement'
-        );
-        if (!hasRemarkableAthlete) return { data: {} };
-
-        setRuntimeValue(ctx.playerStats.name, 'remarkableAthleteNoOA', true, ctx.campaignName);
-        return { data: {} };
-      },
-    },
-
-    // =========================================================
     // Step: overchannel — Wizard Overchannel self-damage
     // =========================================================
     {
       name: 'overchannel',
-      subscribe: 'overchannel:self-damage',
+      subscribe: 'dmg_type:modified',
       emit: 'damage:ready',
       condition: (ctx) => ctx.overchannelActive && ctx.overchannelUseCount > 1,
       handler: async (ctx) => {
