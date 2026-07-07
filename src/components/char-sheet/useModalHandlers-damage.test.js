@@ -49,6 +49,7 @@ function createDeps(overrides = {}) {
         abilities: [{ name: 'Strength', bonus: 3 }],
         ...overrides.playerStats,
     };
+    const modalState = {};
     return {
         playerStats,
         campaignName: 'test-campaign',
@@ -56,14 +57,13 @@ function createDeps(overrides = {}) {
         proceedWithDamage: vi.fn(),
         pendingDamage: null,
         setPendingDamage: vi.fn(),
-        featureChoice: null,
-        setDamageTypeChoice: vi.fn(),
-        setDivineFuryChoice: vi.fn(),
-        setWeaponMasteryModal: vi.fn(),
-        setWeaponMasteryChoiceModal: vi.fn(),
-        setFeatureChoice: vi.fn(),
-        setStarryFormConstellationModal: vi.fn(),
-        setTwinklingConstellationModal: vi.fn(),
+        modalState,
+        setModalState: vi.fn((updates) => {
+            if (typeof updates === 'function') {
+                return updates(modalState);
+            }
+            Object.assign(modalState, updates);
+        }),
         setPopupHtml: vi.fn(),
         ...overrides,
     };
@@ -96,7 +96,7 @@ describe('useModalHandlers - damage type handlers', () => {
             });
             const { handleDivineFuryDamageType } = useModalHandlers(deps);
             handleDivineFuryDamageType('Radiant');
-            expect(deps.setDivineFuryChoice).toHaveBeenCalledWith(null);
+            expect(deps.setModalState).toHaveBeenCalledWith({ divineFuryChoice: null });
             expect(deps.proceedWithDamage).toHaveBeenCalledWith(
                 expect.any(Object),
                 '1d8 + 1d8 [Radiant]',
@@ -131,7 +131,7 @@ describe('useModalHandlers - damage type handlers', () => {
             });
             const { handleGenericDamageTypeChoice } = useModalHandlers(deps);
             handleGenericDamageTypeChoice('Thunder');
-            expect(deps.setDamageTypeChoice).toHaveBeenCalledWith(null);
+            expect(deps.setModalState).toHaveBeenCalledWith({ damageTypeChoice: null });
             expect(setRuntimeValue).toHaveBeenCalledWith(
                 'TestFighter',
                 '_DivineStrike_usedRound',
@@ -163,7 +163,7 @@ describe('useModalHandlers - damage type handlers', () => {
             });
             const { handleGenericDamageTypeChoice } = useModalHandlers(deps);
             handleGenericDamageTypeChoice('Fire');
-            expect(deps.setDamageTypeChoice).toHaveBeenCalledWith(null);
+            expect(deps.setModalState).toHaveBeenCalledWith({ damageTypeChoice: null });
             expect(deps.proceedWithDamage).toHaveBeenCalled();
             expect(setRuntimeValue).not.toHaveBeenCalled();
         });
@@ -182,7 +182,7 @@ describe('useModalHandlers - damage type handlers', () => {
             });
             const { handleGenericDamageTypeSkip } = useModalHandlers(deps);
             handleGenericDamageTypeSkip();
-            expect(deps.setDamageTypeChoice).toHaveBeenCalledWith(null);
+            expect(deps.setModalState).toHaveBeenCalledWith({ damageTypeChoice: null });
             expect(deps.proceedWithDamage).toHaveBeenCalledWith(
                 { name: 'Extra Damage' },
                 '1d6',
@@ -209,7 +209,7 @@ describe('useModalHandlers - damage type handlers', () => {
             const { handleDamageTypeModifierChoice } = useModalHandlers(deps);
             const attack = deps.pendingDamage.attack;
             handleDamageTypeModifierChoice('radiant');
-            expect(deps.setDamageTypeChoice).toHaveBeenCalledWith(null);
+            expect(deps.setModalState).toHaveBeenCalledWith({ damageTypeChoice: null });
             expect(deps.setPendingDamage).toHaveBeenCalledWith(null);
             expect(attack.damageType).toBe('radiant');
             expect(deps.proceedWithDamage).toHaveBeenCalled();

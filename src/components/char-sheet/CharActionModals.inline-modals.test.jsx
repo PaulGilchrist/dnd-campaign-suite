@@ -233,7 +233,8 @@ describe('CharActionModals inline modals', () => {
       const handleDivineFuryDamageType = vi.fn();
       render(<CharActionModals
         {...createBaseProps({ handleDivineFuryDamageType })}
-        divineFuryChoice={{}}
+        modalState={{ divineFuryChoice: {} }}
+        setModalState={vi.fn()}
       />);
       fireEvent.click(screen.getByText('Necrotic'));
       expect(handleDivineFuryDamageType).toHaveBeenCalledWith('Necrotic');
@@ -243,7 +244,8 @@ describe('CharActionModals inline modals', () => {
       const handleDivineFurySkip = vi.fn();
       render(<CharActionModals
         {...createBaseProps({ handleDivineFurySkip })}
-        divineFuryChoice={{}}
+        modalState={{ divineFuryChoice: {} }}
+        setModalState={vi.fn()}
       />);
       fireEvent.click(screen.getByText('Skip'));
       expect(handleDivineFurySkip).toHaveBeenCalled();
@@ -269,7 +271,8 @@ describe('CharActionModals inline modals', () => {
         const handler = vi.fn();
         render(<CharActionModals
           {...createBaseProps({ [choiceHandler]: handler, pendingDamage: pending })}
-          damageTypeChoice={{ title: 'Pick', types: ['Fire', 'Ice'] }}
+          modalState={{ damageTypeChoice: { title: 'Pick', types: ['Fire', 'Ice'] } }}
+          setModalState={vi.fn()}
         />);
         fireEvent.click(screen.getByText('Fire'));
         expect(handler).toHaveBeenCalledWith('Fire');
@@ -279,7 +282,8 @@ describe('CharActionModals inline modals', () => {
         const handler = vi.fn();
         render(<CharActionModals
           {...createBaseProps({ [skipHandler]: handler, pendingDamage: pending })}
-          damageTypeChoice={{ title: 'Pick', types: ['Fire'] }}
+          modalState={{ damageTypeChoice: { title: 'Pick', types: ['Fire'] } }}
+          setModalState={vi.fn()}
         />);
         fireEvent.click(screen.getByText('Skip'));
         expect(handler).toHaveBeenCalled();
@@ -291,7 +295,8 @@ describe('CharActionModals inline modals', () => {
       const handleDamageTypeModifierChoice = vi.fn();
       render(<CharActionModals
         {...createBaseProps({ handleEnhancedUnarmedChoice, handleDamageTypeModifierChoice, pendingDamage: { _attackRider: true, _damageTypeModifier: true } })}
-        damageTypeChoice={{ title: 'Pick', types: ['Fire', 'Ice'] }}
+        modalState={{ damageTypeChoice: { title: 'Pick', types: ['Fire', 'Ice'] } }}
+        setModalState={vi.fn()}
       />);
       fireEvent.click(screen.getByText('Fire'));
       expect(handleEnhancedUnarmedChoice).toHaveBeenCalledWith('Fire');
@@ -306,7 +311,8 @@ describe('CharActionModals inline modals', () => {
       const handleFeatureChoiceConfirm = vi.fn();
       render(<CharActionModals
         {...createBaseProps({ handleFeatureChoiceConfirm })}
-        featureChoice={{ action: { name: 'Test Feature', description: 'Choose wisely' }, options: ['Option A', 'Option B'] }}
+        modalState={{ featureChoice: { action: { name: 'Test Feature', description: 'Choose wisely' }, options: ['Option A', 'Option B'] } }}
+        setModalState={vi.fn()}
       />);
       fireEvent.click(screen.getByText('Option A'));
       expect(handleFeatureChoiceConfirm).toHaveBeenCalledWith('Option A');
@@ -316,7 +322,8 @@ describe('CharActionModals inline modals', () => {
       const handleFeatureChoiceConfirm = vi.fn();
       render(<CharActionModals
         {...createBaseProps({ handleFeatureChoiceConfirm })}
-        featureChoice={{ action: { name: 'Pick', description: 'Pick one' }, options: [{ name: 'Custom Option' }] }}
+        modalState={{ featureChoice: { action: { name: 'Pick', description: 'Pick one' }, options: [{ name: 'Custom Option' }] } }}
+        setModalState={vi.fn()}
       />);
       fireEvent.click(screen.getByText('Custom Option'));
       expect(handleFeatureChoiceConfirm).toHaveBeenCalledWith('Custom Option');
@@ -326,7 +333,8 @@ describe('CharActionModals inline modals', () => {
       const handleFeatureChoiceSkip = vi.fn();
       render(<CharActionModals
         {...createBaseProps({ handleFeatureChoiceSkip })}
-        featureChoice={{ action: { name: 'Pick', description: 'Pick one' }, options: ['Alpha'] }}
+        modalState={{ featureChoice: { action: { name: 'Pick', description: 'Pick one' }, options: ['Alpha'] } }}
+        setModalState={vi.fn()}
       />);
       fireEvent.click(screen.getByText('Cancel'));
       expect(handleFeatureChoiceSkip).toHaveBeenCalled();

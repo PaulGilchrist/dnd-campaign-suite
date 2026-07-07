@@ -84,13 +84,14 @@ const mockSetPopupHtml = vi.fn();
 const mockRollDamage = vi.fn();
 const mockBuildCtx = vi.fn(() => Promise.resolve(defaultCtx));
 const mockBuildCtxSync = vi.fn(() => Promise.resolve(defaultCtx));
-const mockSetDamageTypeChoice = vi.fn();
-const mockSetDivineFuryChoice = vi.fn();
-const mockSetWeaponMasteryModal = vi.fn();
-const mockSetAttackRiderModal = vi.fn();
-const mockSetAttackRiderManeuverPrompt = vi.fn();
-const mockSetSweepingAttackTargetModal = vi.fn();
 const mockPendingDamageRef = { current: null };
+const modalState = {};
+const mockSetModalState = vi.fn((updates) => {
+    if (typeof updates === 'function') {
+        return updates(modalState);
+    }
+    Object.assign(modalState, updates);
+});
 
 function UseAttackDamageResolution(overrides = {}) {
     const deps = {
@@ -102,12 +103,8 @@ function UseAttackDamageResolution(overrides = {}) {
         rollDamage: mockRollDamage,
         buildCtx: mockBuildCtx,
         buildCtxSync: mockBuildCtxSync,
-        setDamageTypeChoice: mockSetDamageTypeChoice,
-        setDivineFuryChoice: mockSetDivineFuryChoice,
-        setWeaponMasteryModal: mockSetWeaponMasteryModal,
-        setAttackRiderModal: mockSetAttackRiderModal,
-        setAttackRiderManeuverPrompt: mockSetAttackRiderManeuverPrompt,
-        setSweepingAttackTargetModal: mockSetSweepingAttackTargetModal,
+        modalState,
+        setModalState: mockSetModalState,
         pendingDamage: mockPendingDamageRef.current,
         resumeRef: mockPendingDamageRef,
         ...overrides,
@@ -157,11 +154,13 @@ describe('useAttackDamageResolution - attack rider maneuvers', () => {
             await resolveAttackDamage(attack);
             await tick();
 
-            expect(mockSetAttackRiderManeuverPrompt).toHaveBeenCalledWith({
-                maneuvers: [{ name: 'Precision Attack', effect: 'attack_roll_bonus' }],
-                attack,
-                popupHtml: { hit: false, isCrit: false, targetName: 'Goblin' },
-                isMiss: true,
+            expect(mockSetModalState).toHaveBeenCalledWith({
+                attackRiderManeuverPrompt: {
+                    maneuvers: [{ name: 'Precision Attack', effect: 'attack_roll_bonus' }],
+                    attack,
+                    popupHtml: { hit: false, isCrit: false, targetName: 'Goblin' },
+                    isMiss: true,
+                },
             });
             expect(mockRollDamage).not.toHaveBeenCalled();
         });
@@ -178,11 +177,11 @@ describe('useAttackDamageResolution - attack rider maneuvers', () => {
             await resolveAttackDamage(attack);
             await tick();
 
-            expect(mockSetAttackRiderManeuverPrompt).not.toHaveBeenCalled();
+            expect(mockSetModalState).not.toHaveBeenCalledWith(expect.objectContaining({ attackRiderManeuverPrompt: expect.anything() }));
             expect(mockRollDamage).toHaveBeenCalled();
         });
 
-        it('does not prompt when no maneuvers are available for miss', async () => {
+        it('prompts for maneuver when no maneuvers are available for miss', async () => {
             getAttackRiderOptionsByContext.mockResolvedValue([]);
             const { resolveAttackDamage } = UseAttackDamageResolution({
                 popupHtml: { hit: false, isCrit: false, targetName: 'Goblin' },
@@ -195,26 +194,7 @@ describe('useAttackDamageResolution - attack rider maneuvers', () => {
             await resolveAttackDamage(attack);
             await tick();
 
-            expect(mockSetAttackRiderManeuverPrompt).not.toHaveBeenCalled();
-            expect(mockRollDamage).toHaveBeenCalled();
-        });
-
-        it('does not prompt when setAttackRiderManeuverPrompt callback is undefined', async () => {
-            getAttackRiderOptionsByContext.mockResolvedValue([
-                { name: 'Precision Attack', effect: 'attack_roll_bonus' },
-            ]);
-            const { resolveAttackDamage } = UseAttackDamageResolution({
-                popupHtml: { hit: false, isCrit: false },
-                setAttackRiderManeuverPrompt: undefined,
-            });
-            const attack = {
-                name: 'Longsword', damage: '1d8+3', damageType: 'slashing',
-                weaponType: 'melee', properties: [],
-            };
-
-            await resolveAttackDamage(attack);
-            await tick();
-
+            expect(mockSetModalState).not.toHaveBeenCalledWith(expect.objectContaining({ attackRiderManeuverPrompt: expect.anything() }));
             expect(mockRollDamage).toHaveBeenCalled();
         });
     });
@@ -237,31 +217,14 @@ describe('useAttackDamageResolution - attack rider maneuvers', () => {
             await resolveAttackDamage(attack);
             await tick();
 
-            expect(mockSetAttackRiderManeuverPrompt).toHaveBeenCalledWith({
-                maneuvers: [{ name: 'Gouging Attack', effect: 'damage_bonus' }],
-                attack,
-                popupHtml: { hit: true, isCrit: false, targetName: 'Goblin' },
+            expect(mockSetModalState).toHaveBeenCalledWith({
+                attackRiderManeuverPrompt: {
+                    maneuvers: [{ name: 'Gouging Attack', effect: 'damage_bonus' }],
+                    attack,
+                    popupHtml: { hit: true, isCrit: false, targetName: 'Goblin' },
+                },
             });
             expect(mockRollDamage).not.toHaveBeenCalled();
-        });
-
-        it('does not prompt when setAttackRiderManeuverPrompt callback is undefined', async () => {
-            getAttackRiderOptions.mockResolvedValue([
-                { name: 'Gouging Attack', effect: 'damage_bonus' },
-            ]);
-            const { resolveAttackDamage } = UseAttackDamageResolution({
-                popupHtml: { hit: true, isCrit: false, targetName: 'Goblin' },
-                setAttackRiderManeuverPrompt: undefined,
-            });
-            const attack = {
-                name: 'Longsword', damage: '1d8+3', damageType: 'slashing',
-                weaponType: 'melee', properties: [],
-            };
-
-            await resolveAttackDamage(attack);
-            await tick();
-
-            expect(mockRollDamage).toHaveBeenCalled();
         });
     });
 
@@ -284,7 +247,7 @@ describe('useAttackDamageResolution - attack rider maneuvers', () => {
                 total: 8,
                 rolls: [5, 3],
             });
-            expect(mockSetAttackRiderManeuverPrompt).toHaveBeenCalledWith(null);
+            expect(mockSetModalState).toHaveBeenCalledWith({ attackRiderManeuverPrompt: null });
             expect(mockSetPopupHtml).not.toHaveBeenCalled();
         });
 
@@ -308,7 +271,7 @@ describe('useAttackDamageResolution - attack rider maneuvers', () => {
 
             expect(result.isMissResult).toBe(true);
             expect(result.hit).toBe(true);
-            expect(mockSetAttackRiderManeuverPrompt).toHaveBeenCalledWith(null);
+            expect(mockSetModalState).toHaveBeenCalledWith({ attackRiderManeuverPrompt: null });
             expect(mockSetPopupHtml).toHaveBeenCalled();
         });
 
@@ -378,7 +341,7 @@ describe('useAttackDamageResolution - attack rider maneuvers', () => {
                 '1d8+3', 8, [5, 3],
             );
 
-            expect(mockSetSweepingAttackTargetModal).toHaveBeenCalledWith({ title: 'Select Target' });
+            expect(mockSetModalState).toHaveBeenCalledWith({ sweepingAttackTargetModal: { title: 'Select Target' } });
         });
 
         it('sets popupHtml when maneuver result type is popup', async () => {
@@ -448,11 +411,13 @@ describe('useAttackDamageResolution - attack rider maneuvers', () => {
             await resolveAttackDamage(attack);
             await tick();
 
-            expect(mockSetAttackRiderModal).toHaveBeenCalledWith({
-                action: { name: 'Cunning Strike', type: 'attack_rider' },
-                playerStats: stats,
-                campaignName: 'test-campaign',
-                targetName: 'Goblin',
+            expect(mockSetModalState).toHaveBeenCalledWith({
+                attackRiderModal: {
+                    action: { name: 'Cunning Strike', type: 'attack_rider' },
+                    playerStats: stats,
+                    campaignName: 'test-campaign',
+                    targetName: 'Goblin',
+                },
             });
             expect(mockPendingDamageRef.current).toEqual(
                 expect.objectContaining({
@@ -500,7 +465,7 @@ describe('useAttackDamageResolution - attack rider maneuvers', () => {
             await resolveAttackDamage(attack);
             await tick();
 
-            expect(mockSetAttackRiderModal).not.toHaveBeenCalled();
+            expect(mockSetModalState).not.toHaveBeenCalledWith(expect.objectContaining({ attackRiderModal: expect.anything() }));
             expect(mockRollDamage).toHaveBeenCalled();
         });
 
@@ -549,11 +514,13 @@ describe('useAttackDamageResolution - attack rider maneuvers', () => {
             await resolveAttackDamage(attack);
             await tick();
 
-            expect(mockSetAttackRiderModal).toHaveBeenCalledWith({
-                action: { name: 'Devious Strikes', type: 'attack_rider' },
-                playerStats: stats,
-                campaignName: 'test-campaign',
-                targetName: 'Goblin',
+            expect(mockSetModalState).toHaveBeenCalledWith({
+                attackRiderModal: {
+                    action: { name: 'Devious Strikes', type: 'attack_rider' },
+                    playerStats: stats,
+                    campaignName: 'test-campaign',
+                    targetName: 'Goblin',
+                },
             });
         });
 
@@ -586,7 +553,7 @@ describe('useAttackDamageResolution - attack rider maneuvers', () => {
 
             await resolveAttackDamage({ name: 'Rapier', damage: '1d8+3', damageType: 'piercing', weaponType: 'melee', properties: [] });
             await tick();
-            expect(mockSetAttackRiderModal).not.toHaveBeenCalled();
+            expect(mockSetModalState).not.toHaveBeenCalledWith(expect.objectContaining({ attackRiderModal: expect.anything() }));
             expect(mockRollDamage).toHaveBeenCalled();
         });
 
@@ -619,7 +586,7 @@ describe('useAttackDamageResolution - attack rider maneuvers', () => {
 
             await resolveAttackDamage({ name: 'Rapier', damage: '1d8+3', damageType: 'piercing', weaponType: 'melee', properties: [] });
             await tick();
-            expect(mockSetAttackRiderModal).not.toHaveBeenCalled();
+            expect(mockSetModalState).not.toHaveBeenCalledWith(expect.objectContaining({ attackRiderModal: expect.anything() }));
             expect(mockRollDamage).toHaveBeenCalled();
         });
 
@@ -638,7 +605,7 @@ describe('useAttackDamageResolution - attack rider maneuvers', () => {
 
             await resolveAttackDamage({ name: 'Rapier', damage: '1d8+3', damageType: 'piercing', weaponType: 'melee', properties: [] });
             await tick();
-            expect(mockSetAttackRiderModal).not.toHaveBeenCalled();
+            expect(mockSetModalState).not.toHaveBeenCalledWith(expect.objectContaining({ attackRiderModal: expect.anything() }));
             expect(mockRollDamage).toHaveBeenCalled();
         });
 
@@ -666,7 +633,7 @@ describe('useAttackDamageResolution - attack rider maneuvers', () => {
 
             await resolveAttackDamage({ name: 'Rapier', damage: '1d8+3', damageType: 'piercing', weaponType: 'melee', properties: [] });
             await tick();
-            expect(mockSetAttackRiderModal).not.toHaveBeenCalled();
+            expect(mockSetModalState).not.toHaveBeenCalledWith(expect.objectContaining({ attackRiderModal: expect.anything() }));
             expect(mockRollDamage).toHaveBeenCalled();
         });
     });

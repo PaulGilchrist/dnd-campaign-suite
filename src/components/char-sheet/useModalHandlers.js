@@ -9,15 +9,11 @@ export default function useModalHandlers({
     playerStats, campaignName,
     _rollDamage, proceedWithDamage,
     pendingDamage, setPendingDamage,
-    featureChoice,
-    setDamageTypeChoice, setDivineFuryChoice,
-    setWeaponMasteryModal, setWeaponMasteryChoiceModal, setWeaponKindMasteryModal,
-    setFeatureChoice,
-    setStarryFormConstellationModal, setTwinklingConstellationModal,
+    setModalState, modalState,
     setPopupHtml,
 }) {
     const handleMasteryClose = async () => {
-        setWeaponMasteryModal(null);
+        setModalState({ weaponMasteryModal: null });
         if (pendingDamage) {
             const { attack, formula, total, rolls, modifier } = pendingDamage;
             proceedWithDamage(attack, formula, total, rolls, modifier);
@@ -26,13 +22,13 @@ export default function useModalHandlers({
     };
 
     const handleWeaponMasteryChoice = (_masteryName) => {
-        setWeaponMasteryChoiceModal(null);
+        setModalState({ weaponMasteryChoiceModal: null });
     };
 
     const handleDivineFuryDamageType = (chosenType) => {
         const pending = pendingDamage;
         if (!pending) {
-            setDivineFuryChoice(null);
+            setModalState({ divineFuryChoice: null });
             return;
         }
         const { attack, formula, total, rolls, modifier, bonusExpr, bonusTotal, bonusRolls } = pending;
@@ -42,7 +38,7 @@ export default function useModalHandlers({
         const playerName = playerStats.name;
         const currentRound = getCurrentCombatRound();
         setRuntimeValue(playerName, '_divineFuryUsedRound', currentRound, campaignName);
-        setDivineFuryChoice(null);
+        setModalState({ divineFuryChoice: null });
         setPendingDamage(null);
         proceedWithDamage(attack, newFormula, newTotal, newRolls, modifier);
     };
@@ -50,11 +46,11 @@ export default function useModalHandlers({
     const handleDivineFurySkip = () => {
         const pending = pendingDamage;
         if (!pending) {
-            setDivineFuryChoice(null);
+            setModalState({ divineFuryChoice: null });
             return;
         }
         const { attack, formula, total, rolls, modifier } = pending;
-        setDivineFuryChoice(null);
+        setModalState({ divineFuryChoice: null });
         setPendingDamage(null);
         proceedWithDamage(attack, formula, total, rolls, modifier);
     };
@@ -62,7 +58,7 @@ export default function useModalHandlers({
     const handleGenericDamageTypeChoice = (chosenType) => {
         const pending = pendingDamage;
         if (!pending) {
-            setDamageTypeChoice(null);
+            setModalState({ damageTypeChoice: null });
             return;
         }
         const { attack, formula, total, rolls, modifier, bonusExpr, bonusTotal, bonusRolls, oncePerTurnKey } = pending;
@@ -72,7 +68,7 @@ export default function useModalHandlers({
         if (oncePerTurnKey) {
             setRuntimeValue(playerStats.name, oncePerTurnKey, getCurrentCombatRound(), campaignName);
         }
-        setDamageTypeChoice(null);
+        setModalState({ damageTypeChoice: null });
         setPendingDamage(null);
         proceedWithDamage(attack, newFormula, newTotal, newRolls, modifier);
     };
@@ -80,11 +76,11 @@ export default function useModalHandlers({
     const handleGenericDamageTypeSkip = () => {
         const pending = pendingDamage;
         if (!pending) {
-            setDamageTypeChoice(null);
+            setModalState({ damageTypeChoice: null });
             return;
         }
         const { attack, formula, total, rolls, modifier } = pending;
-        setDamageTypeChoice(null);
+        setModalState({ damageTypeChoice: null });
         setPendingDamage(null);
         proceedWithDamage(attack, formula, total, rolls, modifier);
     };
@@ -92,7 +88,7 @@ export default function useModalHandlers({
     const handleDamageTypeModifierChoice = (chosenType) => {
         const pending = pendingDamage;
         if (!pending) {
-            setDamageTypeChoice(null);
+            setModalState({ damageTypeChoice: null });
             return;
         }
         const { attack, formula, total, rolls, modifier, _damageTypeModifier } = pending;
@@ -101,7 +97,7 @@ export default function useModalHandlers({
             const usedKey = `_${_damageTypeModifier.name.replace(/\s+/g, '_')}_usedRound`;
             setRuntimeValue(playerStats.name, usedKey, getCurrentCombatRound(), campaignName);
         }
-        setDamageTypeChoice(null);
+        setModalState({ damageTypeChoice: null });
         setPendingDamage(null);
         proceedWithDamage(attack, formula, total, rolls, modifier);
     };
@@ -109,7 +105,7 @@ export default function useModalHandlers({
     const handleDamageTypeModifierSkip = () => {
         const pending = pendingDamage;
         if (!pending) {
-            setDamageTypeChoice(null);
+            setModalState({ damageTypeChoice: null });
             return;
         }
         const { attack, formula, total, rolls, modifier, _damageTypeModifier } = pending;
@@ -117,7 +113,7 @@ export default function useModalHandlers({
             const usedKey = `_${_damageTypeModifier.name.replace(/\s+/g, '_')}_usedRound`;
             setRuntimeValue(playerStats.name, usedKey, getCurrentCombatRound(), campaignName);
         }
-        setDamageTypeChoice(null);
+        setModalState({ damageTypeChoice: null });
         setPendingDamage(null);
         proceedWithDamage(attack, formula, total, rolls, modifier);
     };
@@ -125,7 +121,7 @@ export default function useModalHandlers({
     const handleEnhancedUnarmedChoice = (chosenOptionName) => {
         const pending = pendingDamage;
         if (!pending) {
-            setDamageTypeChoice(null);
+            setModalState({ damageTypeChoice: null });
             return;
         }
         const { attack, formula, total, rolls, rider, _attackRider } = pending;
@@ -139,14 +135,14 @@ export default function useModalHandlers({
                     const newRolls = [...rolls, ...riderResult.rolls];
                     const usedKey = `_${_attackRider.name.replace(/\s+/g, '_')}_usedRound`;
                     setRuntimeValue(playerStats.name, usedKey, getCurrentCombatRound(), campaignName);
-                    setDamageTypeChoice(null);
+                    setModalState({ damageTypeChoice: null });
                     setPendingDamage(null);
                     proceedWithDamage(attack, newFormula, newTotal, newRolls, rider);
                     return;
                 }
             }
         }
-        setDamageTypeChoice(null);
+        setModalState({ damageTypeChoice: null });
         setPendingDamage(null);
         proceedWithDamage(attack, formula, total, rolls, rider);
     };
@@ -154,7 +150,7 @@ export default function useModalHandlers({
     const handleEnhancedUnarmedSkip = () => {
         const pending = pendingDamage;
         if (!pending) {
-            setDamageTypeChoice(null);
+            setModalState({ damageTypeChoice: null });
             return;
         }
         const { attack, formula, total, rolls, rider, _attackRider } = pending;
@@ -162,16 +158,17 @@ export default function useModalHandlers({
             const usedKey = `_${_attackRider.name.replace(/\s+/g, '_')}_usedRound`;
             setRuntimeValue(playerStats.name, usedKey, getCurrentCombatRound(), campaignName);
         }
-        setDamageTypeChoice(null);
+        setModalState({ damageTypeChoice: null });
         setPendingDamage(null);
         proceedWithDamage(attack, formula, total, rolls, rider);
     };
 
     const handleFeatureChoiceConfirm = (chosenOption) => {
+        const featureChoice = modalState.featureChoice;
         if (!featureChoice) return;
         const { action, optionKey } = featureChoice;
         setRuntimeValue(playerStats.name, optionKey, chosenOption, campaignName);
-        setFeatureChoice(null);
+        setModalState({ featureChoice: null });
         const restMessage = (action.automation?.type === 'hunter_prey' || action.automation?.type === 'defensive_tactics')
             ? 'This choice can be changed on a Short or Long Rest.'
             : 'This choice can be changed by clicking the feature again.';
@@ -179,7 +176,7 @@ export default function useModalHandlers({
     };
 
     const handleFeatureChoiceSkip = () => {
-        setFeatureChoice(null);
+        setModalState({ featureChoice: null });
     };
 
     const handleConstellationSelect = async (payload, optionName) => {
@@ -194,8 +191,7 @@ export default function useModalHandlers({
         if (result) {
             setPopupHtml(result.payload);
         }
-        setStarryFormConstellationModal(null);
-        setTwinklingConstellationModal(null);
+        setModalState({ starryFormConstellationModal: null, twinklingConstellationModal: null });
     };
 
     const handleElderChampionRestore = async (payload) => {
@@ -207,7 +203,7 @@ export default function useModalHandlers({
     };
 
     const handleWeaponKindMasteryClose = () => {
-        setWeaponKindMasteryModal(null);
+        setModalState({ weaponKindMasteryModal: null });
     };
 
     return {

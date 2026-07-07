@@ -49,6 +49,7 @@ function createDeps(overrides = {}) {
         abilities: [{ name: 'Strength', bonus: 3 }],
         ...overrides.playerStats,
     };
+    const modalState = {};
     return {
         playerStats,
         campaignName: 'test-campaign',
@@ -56,14 +57,13 @@ function createDeps(overrides = {}) {
         proceedWithDamage: vi.fn(),
         pendingDamage: null,
         setPendingDamage: vi.fn(),
-        featureChoice: null,
-        setDamageTypeChoice: vi.fn(),
-        setDivineFuryChoice: vi.fn(),
-        setWeaponMasteryModal: vi.fn(),
-        setWeaponMasteryChoiceModal: vi.fn(),
-        setFeatureChoice: vi.fn(),
-        setStarryFormConstellationModal: vi.fn(),
-        setTwinklingConstellationModal: vi.fn(),
+        modalState,
+        setModalState: vi.fn((fn) => {
+            if (typeof fn === 'function') {
+                return fn(modalState);
+            }
+            Object.assign(modalState, fn);
+        }),
         setPopupHtml: vi.fn(),
         ...overrides,
     };
@@ -95,7 +95,7 @@ describe('useModalHandlers', () => {
             });
             const { handleMasteryClose } = useModalHandlers(deps);
             await handleMasteryClose();
-            expect(deps.setWeaponMasteryModal).toHaveBeenCalledWith(null);
+            expect(deps.setModalState).toHaveBeenCalledWith({ weaponMasteryModal: null });
             expect(deps.proceedWithDamage).toHaveBeenCalledWith(
                 { name: 'Longsword' },
                 '1d8+3',
@@ -112,7 +112,7 @@ describe('useModalHandlers', () => {
             const deps = createDeps();
             const { handleMasteryClose } = useModalHandlers(deps);
             await handleMasteryClose();
-            expect(deps.setWeaponMasteryModal).toHaveBeenCalledWith(null);
+            expect(deps.setModalState).toHaveBeenCalledWith({ weaponMasteryModal: null });
             expect(deps.proceedWithDamage).not.toHaveBeenCalled();
         });
     });

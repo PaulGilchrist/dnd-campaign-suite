@@ -97,11 +97,14 @@ const mockSetPopupHtml = vi.fn();
 const mockRollDamage = vi.fn();
 const mockBuildCtx = vi.fn(() => Promise.resolve({ targetName: 'Goblin' }));
 const mockBuildCtxSync = vi.fn(() => Promise.resolve({ targetName: 'Goblin' }));
-const mockSetDamageTypeChoice = vi.fn();
-const mockSetDivineFuryChoice = vi.fn();
-const mockSetWeaponMasteryModal = vi.fn();
-const mockSetAttackRiderModal = vi.fn();
 const mockPendingDamageRef = { current: null };
+const modalState = {};
+const mockSetModalState = vi.fn((updates) => {
+    if (typeof updates === 'function') {
+        return updates(modalState);
+    }
+    Object.assign(modalState, updates);
+});
 
 function UseAttackDamageResolution(overrides = {}) {
     const deps = {
@@ -113,10 +116,8 @@ function UseAttackDamageResolution(overrides = {}) {
         rollDamage: mockRollDamage,
         buildCtx: mockBuildCtx,
         buildCtxSync: mockBuildCtxSync,
-        setDamageTypeChoice: mockSetDamageTypeChoice,
-        setDivineFuryChoice: mockSetDivineFuryChoice,
-        setWeaponMasteryModal: mockSetWeaponMasteryModal,
-        setAttackRiderModal: mockSetAttackRiderModal,
+        modalState,
+        setModalState: mockSetModalState,
         pendingDamage: mockPendingDamageRef.current,
         resumeRef: mockPendingDamageRef,
         ...overrides,
@@ -636,10 +637,12 @@ describe('useAttackDamageResolution - class features', () => {
             const { resolveAttackDamage } = UseAttackDamageResolution({ playerStats: makeStalkersFlurryStats() });
             await resolveAttackDamage(makeAttack());
             await tick();
-            expect(mockSetAttackRiderModal).toHaveBeenCalledWith(
+            expect(mockSetModalState).toHaveBeenCalledWith(
                 expect.objectContaining({
-                    action: expect.objectContaining({ name: "Stalker's Flurry" }),
-                    targetName: 'Bugbear',
+                    attackRiderModal: expect.objectContaining({
+                        action: expect.objectContaining({ name: "Stalker's Flurry" }),
+                        targetName: 'Bugbear',
+                    }),
                 }),
             );
             expect(mockRollDamage).not.toHaveBeenCalled();

@@ -304,7 +304,7 @@ describe('CharActionModals', () => {
 
     for (const { name, prop, payload, testid, inline } of modalCases) {
       it(`renders ${name} modal when ${prop} is truthy`, () => {
-        render(<CharActionModals {...createBaseProps()} {...{ [prop]: payload }} />);
+        render(<CharActionModals {...createBaseProps()} modalState={{ [prop]: payload }} setModalState={vi.fn()} />);
         if (inline) {
           expect(screen.getByText('Healing Illusion')).toBeInTheDocument();
         }
@@ -316,17 +316,17 @@ describe('CharActionModals', () => {
 
     // inline — inline overlays (div-based, not a mocked component)
     it('renders divine-fury inline modal when divineFuryChoice is truthy', () => {
-      render(<CharActionModals {...createBaseProps()} divineFuryChoice={{}} />);
+      render(<CharActionModals {...createBaseProps()} modalState={{ divineFuryChoice: {} }} setModalState={vi.fn()} />);
       expect(screen.getByText(/Divine Fury/)).toBeInTheDocument();
     });
 
     it('renders damage-type inline modal when damageTypeChoice is truthy', () => {
-      render(<CharActionModals {...createBaseProps()} damageTypeChoice={{ title: 'Pick', types: ['Fire', 'Ice'] }} />);
+      render(<CharActionModals {...createBaseProps()} modalState={{ damageTypeChoice: { title: 'Pick', types: ['Fire', 'Ice'] } }} setModalState={vi.fn()} />);
       expect(screen.getByText(/Pick/)).toBeInTheDocument();
     });
 
     it('renders feature-choice inline modal when featureChoice is truthy', () => {
-      render(<CharActionModals {...createBaseProps()} featureChoice={{ action: { name: 'Test Feature', description: 'Choose wisely' }, options: ['Option A', 'Option B'] }} />);
+      render(<CharActionModals {...createBaseProps()} modalState={{ featureChoice: { action: { name: 'Test Feature', description: 'Choose wisely' }, options: ['Option A', 'Option B'] } }} setModalState={vi.fn()} />);
       expect(screen.getByText(/Test Feature/)).toBeInTheDocument();
     });
   });

@@ -256,30 +256,32 @@ describe('CharActionModals handlers', () => {
 
   describe('Constellation Selection modal', () => {
     const constellationCases = [
-      { modalProp: 'starryFormConstellationModal', closeSetter: 'setStarryFormConstellationModal' },
-      { modalProp: 'twinklingConstellationModal', closeSetter: 'setTwinklingConstellationModal' },
+      { modalProp: 'starryFormConstellationModal' },
+      { modalProp: 'twinklingConstellationModal' },
     ];
 
-    for (const { modalProp, closeSetter } of constellationCases) {
+    for (const { modalProp } of constellationCases) {
       it(`${modalProp}: confirm calls handleConstellationSelect with payload and option`, () => {
         const handleConstellationSelect = vi.fn();
         const payload = { action: {}, playerStats: {}, campaignName: 'test' };
         render(<CharActionModals
           {...createBaseProps({ handleConstellationSelect })}
-          {...{ [modalProp]: { payload } }}
+          modalState={{ [modalProp]: { payload } }}
+          setModalState={vi.fn()}
         />);
         fireEvent.click(screen.getByTestId('const-confirm'));
         expect(handleConstellationSelect).toHaveBeenCalledWith(payload, 'test-option');
       });
 
-      it(`${modalProp}: close calls ${closeSetter} with null`, () => {
-        const closeSetterFn = vi.fn();
+      it(`${modalProp}: close calls setModalState with cleared modal`, () => {
+        const setModalState = vi.fn();
         render(<CharActionModals
-          {...createBaseProps({ [closeSetter]: closeSetterFn })}
-          {...{ [modalProp]: { payload: { action: {}, playerStats: {}, campaignName: 'test' } } }}
+          {...createBaseProps({ setModalState })}
+          modalState={{ [modalProp]: { payload: { action: {}, playerStats: {}, campaignName: 'test' } } }}
+          setModalState={setModalState}
         />);
         fireEvent.click(screen.getByTestId('const-close'));
-        expect(closeSetterFn).toHaveBeenCalledWith(null);
+        expect(setModalState).toHaveBeenCalledWith({ [modalProp]: null });
       });
     }
   });
@@ -292,20 +294,22 @@ describe('CharActionModals handlers', () => {
       const handleWeaponMasteryChoice = vi.fn();
       render(<CharActionModals
         {...createBaseProps({ handleWeaponMasteryChoice })}
-        weaponMasteryChoiceModal={{}}
+        modalState={{ weaponMasteryChoiceModal: {} }}
+        setModalState={vi.fn()}
       />);
       fireEvent.click(screen.getByTestId('weapon-mastery-confirm'));
       expect(handleWeaponMasteryChoice).toHaveBeenCalledWith('test-choice');
     });
 
-    it('calls setWeaponMasteryChoiceModal with null on close', () => {
-      const setWeaponMasteryChoiceModal = vi.fn();
+    it('calls setModalState with null on close', () => {
+      const setModalState = vi.fn();
       render(<CharActionModals
-        {...createBaseProps({ setWeaponMasteryChoiceModal })}
-        weaponMasteryChoiceModal={{}}
+        {...createBaseProps({ setModalState })}
+        modalState={{ weaponMasteryChoiceModal: {} }}
+        setModalState={setModalState}
       />);
       fireEvent.click(screen.getByTestId('weapon-mastery-close'));
-      expect(setWeaponMasteryChoiceModal).toHaveBeenCalledWith(null);
+      expect(setModalState).toHaveBeenCalledWith({ weaponMasteryChoiceModal: null });
     });
   });
 
@@ -319,7 +323,8 @@ describe('CharActionModals handlers', () => {
       const handleWeaponKindMasteryClose = vi.fn();
       render(<CharActionModals
         {...createBaseProps({ handleWeaponKindMasteryClose })}
-        weaponKindMasteryModal={{}}
+        modalState={{ weaponKindMasteryModal: {} }}
+        setModalState={vi.fn()}
       />);
       fireEvent.click(screen.getByTestId('weapon-kind-mastery-close'));
       expect(handleWeaponKindMasteryClose).toHaveBeenCalled();
@@ -329,47 +334,49 @@ describe('CharActionModals handlers', () => {
       const handleAttackRiderManeuverSkip = vi.fn();
       render(<CharActionModals
         {...createBaseProps({ handleAttackRiderManeuverSkip })}
-        attackRiderManeuverPrompt={{ maneuvers: [], attack: {}, isMiss: false }}
+        modalState={{ attackRiderManeuverPrompt: { maneuvers: [], attack: {}, isMiss: false } }}
+        setModalState={vi.fn()}
       />);
       fireEvent.click(screen.getByTestId('maneuver-skip'));
       expect(handleAttackRiderManeuverSkip).toHaveBeenCalled();
     });
 
     it('DivineInterventionModal: close clears both modal and action state', () => {
-      const setDivineInterventionModal = vi.fn();
-      const setDivineInterventionAction = vi.fn();
+      const setModalState = vi.fn();
       render(<CharActionModals
-        {...createBaseProps({ setDivineInterventionModal, setDivineInterventionAction })}
-        divineInterventionModal={{}}
+        {...createBaseProps({ setModalState })}
+        modalState={{ divineInterventionModal: {}, divineInterventionAction: {} }}
+        setModalState={setModalState}
       />);
       fireEvent.click(screen.getByTestId('divine-intervention-close'));
-      expect(setDivineInterventionModal).toHaveBeenCalledWith(null);
-      expect(setDivineInterventionAction).toHaveBeenCalledWith(null);
+      expect(setModalState).toHaveBeenCalledWith({ divineInterventionModal: null, divineInterventionAction: null });
     });
 
     it('ElderChampionRestoreModal: confirm calls handler and dismisses', () => {
       const handleElderChampionRestore = vi.fn();
-      const setElderChampionRestoreModal = vi.fn();
+      const setModalState = vi.fn();
       const payload = { action: {}, playerStats: {}, campaignName: 'test' };
       render(<CharActionModals
-        {...createBaseProps({ handleElderChampionRestore, setElderChampionRestoreModal })}
-        elderChampionRestoreModal={{ payload }}
+        {...createBaseProps({ handleElderChampionRestore, setModalState })}
+        modalState={{ elderChampionRestoreModal: { payload } }}
+        setModalState={setModalState}
       />);
       fireEvent.click(screen.getByTestId('elder-confirm'));
       expect(handleElderChampionRestore).toHaveBeenCalledWith(payload);
-      expect(setElderChampionRestoreModal).toHaveBeenCalledWith(null);
+      expect(setModalState).toHaveBeenCalledWith({ elderChampionRestoreModal: null });
     });
 
     it('ElderChampionRestoreModal: close dismisses without calling handler', () => {
       const handleElderChampionRestore = vi.fn();
-      const setElderChampionRestoreModal = vi.fn();
+      const setModalState = vi.fn();
       render(<CharActionModals
-        {...createBaseProps({ handleElderChampionRestore, setElderChampionRestoreModal })}
-        elderChampionRestoreModal={{ payload: { action: {}, playerStats: {}, campaignName: 'test' } }}
+        {...createBaseProps({ handleElderChampionRestore, setModalState })}
+        modalState={{ elderChampionRestoreModal: { payload: { action: {}, playerStats: {}, campaignName: 'test' } } }}
+        setModalState={setModalState}
       />);
       fireEvent.click(screen.getByTestId('elder-close'));
       expect(handleElderChampionRestore).not.toHaveBeenCalled();
-      expect(setElderChampionRestoreModal).toHaveBeenCalledWith(null);
+      expect(setModalState).toHaveBeenCalledWith({ elderChampionRestoreModal: null });
     });
   });
 });

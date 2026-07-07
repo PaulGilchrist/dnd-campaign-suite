@@ -77,7 +77,8 @@ describe('CharActionModals inline choice modals', () => {
       const handler = vi.fn();
       render(<CharActionModals
         {...createBaseProps({ [handlerProp]: handler })}
-        {...{ [modalProp]: modalData }}
+        modalState={{ [modalProp]: modalData }}
+        setModalState={vi.fn()}
       />);
       fireEvent.click(screen.getByText(optionText));
       fireEvent.click(screen.getByText(confirmText));

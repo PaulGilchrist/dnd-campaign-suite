@@ -75,11 +75,8 @@ describe('useAttackDamageResolution - automation damage bonuses', () => {
     const mockRollDamage = vi.fn();
     const mockBuildCtx = vi.fn(() => Promise.resolve({ targetName: 'Goblin' }));
     const mockBuildCtxSync = vi.fn(() => Promise.resolve({ targetName: 'Goblin' }));
-    const mockSetDamageTypeChoice = vi.fn();
-    const mockSetDivineFuryChoice = vi.fn();
-    const mockSetWeaponMasteryModal = vi.fn();
-    const mockSetAttackRiderModal = vi.fn();
     const mockPendingDamageRef = { current: null };
+    const modalState = {};
 
     function UseAttackDamageResolution(overrides = {}) {
         const deps = {
@@ -91,10 +88,13 @@ describe('useAttackDamageResolution - automation damage bonuses', () => {
             rollDamage: mockRollDamage,
             buildCtx: mockBuildCtx,
             buildCtxSync: mockBuildCtxSync,
-            setDamageTypeChoice: mockSetDamageTypeChoice,
-            setDivineFuryChoice: mockSetDivineFuryChoice,
-            setWeaponMasteryModal: mockSetWeaponMasteryModal,
-            setAttackRiderModal: mockSetAttackRiderModal,
+            modalState,
+            setModalState: vi.fn((updates) => {
+                if (typeof updates === 'function') {
+                    return updates(modalState);
+                }
+                Object.assign(modalState, updates);
+            }),
             pendingDamageRef: mockPendingDamageRef,
             ...overrides,
         };

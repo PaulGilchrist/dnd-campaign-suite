@@ -74,10 +74,8 @@ function createMockDeps(overrides = {}) {
         rollDamage: vi.fn(),
         buildCtx: vi.fn(() => Promise.resolve(defaultCtx)),
         buildCtxSync: vi.fn(() => Promise.resolve(defaultCtx)),
-        setDamageTypeChoice: vi.fn(),
-        setDivineFuryChoice: vi.fn(),
-        setWeaponMasteryModal: vi.fn(),
-        setAttackRiderModal: vi.fn(),
+        modalState: {},
+        setModalState: vi.fn(),
         pendingDamage: null,
         resumeRef: { current: null },
         ...overrides,
@@ -479,7 +477,7 @@ describe('useAttackDamageResolution', () => {
             await resolveAttackDamage(attack);
             await new Promise(r => setTimeout(r, 0));
 
-            expect(deps.setWeaponMasteryModal).not.toHaveBeenCalled();
+            expect(deps.setModalState).not.toHaveBeenCalledWith(expect.objectContaining({ weaponMasteryModal: expect.anything() }));
         });
 
         it('applies Vex mastery automatically when in extraMasteries', async () => {
@@ -502,7 +500,7 @@ describe('useAttackDamageResolution', () => {
             await resolveAttackDamage(attack);
             await new Promise(r => setTimeout(r, 0));
 
-            expect(deps.setWeaponMasteryModal).not.toHaveBeenCalled();
+            expect(deps.setModalState).not.toHaveBeenCalledWith(expect.objectContaining({ weaponMasteryModal: expect.anything() }));
         });
     });
 
@@ -580,7 +578,7 @@ describe('useAttackDamageResolution', () => {
             await resolveAttackDamage(attack);
             await new Promise(r => setTimeout(r, 0));
 
-            expect(testDeps.setDivineFuryChoice).toHaveBeenCalledWith('fire or cold');
+            expect(testDeps.setModalState).toHaveBeenCalledWith({ divineFuryChoice: 'fire or cold' });
             expect(testDeps.resumeRef.current).toEqual(
                 expect.objectContaining({
                     attack,

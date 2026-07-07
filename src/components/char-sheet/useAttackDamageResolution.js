@@ -51,10 +51,7 @@ export function normalizeAutoDamage(autoDamage, isCrit, playerStats) {
 export default function useAttackDamageResolution({
     playerStats, campaignName, mapName,
     popupHtml, setPopupHtml, rollDamage, buildCtx, buildCtxSync,
-    setDamageTypeChoice, setDivineFuryChoice, setWeaponMasteryModal: _, setAttackRiderModal,
-    setAttackRiderManeuverPrompt,
-    setSweepingAttackTargetModal,
-    setSecondaryTargetModal,
+    setModalState, _modalState,
     resumeRef = { current: null },
 }) {
     const proceedWithDamage = (attack, formula, total, rolls, modifier) => {
@@ -94,12 +91,12 @@ export default function useAttackDamageResolution({
             autoDamageSaveDc: null,
             empoweredEvocationModifier: ctxOverrides.empoweredEvocationModifier ?? 0,
             setPopupHtml,
-            setDamageTypeChoice,
-            setDivineFuryChoice,
-            setAttackRiderModal,
-            setAttackRiderManeuverPrompt,
-            setSweepingAttackTargetModal,
-            setSecondaryTargetModal,
+            setDamageTypeChoice: (v) => setModalState({ damageTypeChoice: v }),
+            setDivineFuryChoice: (v) => setModalState({ divineFuryChoice: v }),
+            setAttackRiderModal: (v) => setModalState({ attackRiderModal: v }),
+            setAttackRiderManeuverPrompt: (v) => setModalState({ attackRiderManeuverPrompt: v }),
+            setSweepingAttackTargetModal: (v) => setModalState({ sweepingAttackTargetModal: v }),
+            setSecondaryTargetModal: (v) => setModalState({ secondaryTargetModal: v }),
             buildCtx,
             buildCtxSync,
             proceedWithDamage,
@@ -150,7 +147,7 @@ export default function useAttackDamageResolution({
 
                 const dieDesc = `Precision Attack: Added ${dieValue} to the attack roll (${origD20} + ${origBonus} + ${dieValue} = ${newTotal}). ${newHit ? 'The attack now hits!' : 'The attack still misses.'}`;
 
-                setAttackRiderManeuverPrompt(null);
+                setModalState({ attackRiderManeuverPrompt: null });
                 setPopupHtml(updatedPopup);
 
                 return {
@@ -174,12 +171,12 @@ export default function useAttackDamageResolution({
                 }
             }
 
-            setAttackRiderManeuverPrompt(null);
+            setModalState({ attackRiderManeuverPrompt: null });
             if (result?.type === 'popup') {
                 setPopupHtml(result.payload);
             }
             if (result?.type === 'modal' && result.modalName === 'sweepingAttackTarget') {
-                setSweepingAttackTargetModal(result.payload);
+                setModalState({ sweepingAttackTargetModal: result.payload });
             }
         }
 
@@ -187,7 +184,7 @@ export default function useAttackDamageResolution({
     };
 
     const handleAttackRiderManeuverSkip = () => {
-        setAttackRiderManeuverPrompt(null);
+        setModalState({ attackRiderManeuverPrompt: null });
     };
 
     return { resolveAttackDamage, proceedWithDamage, handleAttackRiderManeuverUse, handleAttackRiderManeuverSkip };

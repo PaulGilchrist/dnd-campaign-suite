@@ -175,9 +175,30 @@ vi.mock('../../hooks/combat/useLoggedDiceRoll.js', () => {
 
 vi.mock('./useCharActionModals.js', () => ({
   default: vi.fn(() => ({
+    pendingDamage: null,
+    modalState: {},
+    setModalState: vi.fn(),
     resolveAttackDamage: vi.fn(),
-    stealthAttackModal: null,
-    setStealthAttackModal: vi.fn(),
+    handleMasteryClose: vi.fn(),
+    handleWeaponMasteryChoice: vi.fn(),
+    handleWeaponKindMasteryClose: vi.fn(),
+    handleDivineFuryDamageType: vi.fn(),
+    handleDivineFurySkip: vi.fn(),
+    handleGenericDamageTypeChoice: vi.fn(),
+    handleGenericDamageTypeSkip: vi.fn(),
+    handleDamageTypeModifierChoice: vi.fn(),
+    handleDamageTypeModifierSkip: vi.fn(),
+    handleEnhancedUnarmedChoice: vi.fn(),
+    handleEnhancedUnarmedSkip: vi.fn(),
+    handleFeatureChoiceConfirm: vi.fn(),
+    handleFeatureChoiceSkip: vi.fn(),
+    handleConstellationSelect: vi.fn(),
+    handleElderChampionRestore: vi.fn(),
+    combatSuperiorityModal: null,
+    setCombatSuperiorityModal: vi.fn(),
+    handleCombatSuperiorityConfirm: vi.fn(),
+    handleAttackRiderManeuverUse: vi.fn(),
+    handleAttackRiderManeuverSkip: vi.fn(),
   })),
 }));
 

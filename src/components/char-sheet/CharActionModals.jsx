@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { rollExpression, rollExpressionDoubled } from '../../services/dice/diceRoller.js';
 import HealingPoolModal from './modals/divine/HealingPoolModal.jsx'
 import HandOfHealingModal from './modals/shared/HandOfHealingModal.jsx'
@@ -143,59 +143,31 @@ export default function CharActionModals({
     characters,
     _rollSkillCheck,
     _rollAbilityCheck,
-    healingPoolModal, setHealingPoolModal,
-    handOfHealingModal, setHandOfHealingModal,
-    fontOfMagicModal, setFontOfMagicModal,
-    resourcePoolModal, setResourcePoolModal,
-    wildCompanionModal, setWildCompanionModal,
-    setConditionModal, setSetConditionModal,
-    attackRiderModal, setAttackRiderModal,
-    openHandTechniqueModal, setOpenHandTechniqueModal,
-    weaponMasteryModal,
-    weaponMasteryChoiceModal, setWeaponMasteryChoiceModal,
-    weaponKindMasteryModal,
-    combatStanceModal, setCombatStanceModal,
-    teleportModal, setTeleportModal,
-    healingIllusionModal, setHealingIllusionModal,
-    invokeDuplicityModal, setInvokeDuplicityModal,
-    saveAttackHealModal, setSaveAttackHealModal,
-    divineSparkModal, setDivineSparkModal,
-    divineInterventionModal, setDivineInterventionModal,
-    setDivineInterventionAction,
-    moonlightStepResourceModal, setMoonlightStepResourceModal,
-    starryFormConstellationModal, setStarryFormConstellationModal,
-    twinklingConstellationModal, setTwinklingConstellationModal,
-    arcaneChargeModal, setArcaneChargeModal,
-    warMagicCantripModal, setWarMagicCantripModal,
-    warMagicSpellModal, setWarMagicSpellModal,
-    sacredWeaponModal, setSacredWeaponModal,
-    elderChampionRestoreModal, setElderChampionRestoreModal,
-    primalCompanionBonusActionModal, setPrimalCompanionBonusActionModal,
-    mistyWandererModal, setMistyWandererModal,
-    bonusActionChoiceModal, setBonusActionChoiceModal,
-    revelationInFleshModal, setRevelationInFleshModal,
-    bastionOfLawModal, setBastionOfLawModal,
-    elementalAffinityModal, setElementalAffinityModal,
-    fiendishResilienceModal, setFiendishResilienceModal,
-    dragonCompanionModal, setDragonCompanionModal,
-    wildMagicDoubleRollModal, setWildMagicDoubleRollModal,
-    wildMagicTamedModal, setWildMagicTamedModal,
-    thirdEyeModal, setThirdEyeModal,
-    soulstitchSpellsModal, setSoulstitchSpellsModal,
-    illusoryRealityModal, setIllusoryRealityModal,
-    celestialRevelationModal, setCelestialRevelationModal,
-    fiendishLegacyModal, setFiendishLegacyModal,
-    eyebiteEffectModal, setEyebiteEffectModal,
-    breathWeaponShapeModal, setBreathWeaponShapeModal,
-    hypnoticPatternShakeModal, setHypnoticPatternShakeModal,
-    arcaneWardRestoreModal, setArcaneWardRestoreModal,
+    modalState,
+    setModalState,
     combatSuperiorityModal, setCombatSuperiorityModal,
-    attackRiderManeuverPrompt,
-    sweepingAttackTargetModal, setSweepingAttackTargetModal,
-    stealthAttackModal, setStealthAttackModal,
-    divineFuryChoice,
-    damageTypeChoice,
-    featureChoice,
+    handleCombatSuperiorityConfirm,
+    handleAttackRiderManeuverUse,
+    handleAttackRiderManeuverSkip,
+    handleSweepingAttackConfirm,
+    handleBaitAndSwitchChoiceConfirm,
+    handleCommanderStrikeChoiceConfirm,
+    handleRallyChoiceConfirm,
+    handleBulwarkOfForceConfirm,
+    handleCoronaEnemySelectionConfirm,
+    handleRadianceOfDawnConfirm,
+    handleMantleOfInspirationConfirm,
+    handleTricksterBlessingConfirm,
+    handleBardicInspirationConfirm,
+    handleInspiringMovementConfirm,
+    handleDivineInterventionCast,
+    pendingDamage,
+    buildCtx,
+    buildCtxSync,
+    autoDamageContext,
+    rollDamage,
+    setPopupHtml,
+    mapName,
     handleMasteryClose,
     handleWeaponMasteryChoice,
     handleWeaponKindMasteryClose,
@@ -211,40 +183,8 @@ export default function CharActionModals({
     handleFeatureChoiceSkip,
     handleConstellationSelect,
     handleElderChampionRestore,
-    handleCombatSuperiorityConfirm,
-    handleAttackRiderManeuverUse,
-    handleAttackRiderManeuverSkip,
-    handleSweepingAttackConfirm,
-    baitAndSwitchChoiceModal, setBaitAndSwitchChoiceModal,
-    handleBaitAndSwitchChoiceConfirm,
-    commanderStrikeChoiceModal, setCommanderStrikeChoiceModal,
-    handleCommanderStrikeChoiceConfirm,
-    rallyChoiceModal, setRallyChoiceModal,
-    handleRallyChoiceConfirm,
-    bulwarkOfForceModal, setBulwarkOfForceModal,
-    handleBulwarkOfForceConfirm,
-    coronaEnemySelectionModal, setCoronaEnemySelectionModal,
-    handleCoronaEnemySelectionConfirm,
-    radianceOfDawnModal, setRadianceOfDawnModal,
-    handleRadianceOfDawnConfirm,
-    mantleOfInspirationModal, setMantleOfInspirationModal,
-    handleMantleOfInspirationConfirm,
-    tricksterBlessingModal,
-    handleTricksterBlessingConfirm,
-    bardicInspirationTargetModal,
-    handleBardicInspirationConfirm,
-    inspiringMovementAllyModal,
-    handleInspiringMovementConfirm,
-    handleDivineInterventionCast,
-    pendingDamage,
-    buildCtx,
-    buildCtxSync,
-    autoDamageContext,
-    rollDamage,
-    setPopupHtml,
-    mapName,
 }) {
-    const [combatSummary, setCombatSummary] = useState(null);
+    const [combatSummary, setCombatSummary] = React.useState(null);
 
     useEffect(() => {
         getCombatContext(campaignName).then(cs => {
@@ -254,84 +194,84 @@ export default function CharActionModals({
 
     return (
         <>
-            {healingPoolModal && (
+            {modalState.healingPoolModal && (
                 <HealingPoolModal
                     playerStats={playerStats}
                     campaignName={campaignName}
-                    name={healingPoolModal.name}
-                    poolMax={healingPoolModal.pool}
-                    poolExpression={healingPoolModal.poolExpression}
-                    isDicePool={healingPoolModal.isDicePool}
-                    dieType={healingPoolModal.dieType}
-                    resourceKey={healingPoolModal.resourceKey}
-                    alsoCures={healingPoolModal.alsoCures}
-                    cureCost={healingPoolModal.cureCost}
-                    bloodiedOnly={healingPoolModal.bloodiedOnly}
-                    restoringTouchConditions={healingPoolModal.restoringTouchConditions}
-                    maxDicePerUse={healingPoolModal.maxDicePerUse}
-                    onClose={() => setHealingPoolModal(null)}
+                    name={modalState.healingPoolModal.name}
+                    poolMax={modalState.healingPoolModal.pool}
+                    poolExpression={modalState.healingPoolModal.poolExpression}
+                    isDicePool={modalState.healingPoolModal.isDicePool}
+                    dieType={modalState.healingPoolModal.dieType}
+                    resourceKey={modalState.healingPoolModal.resourceKey}
+                    alsoCures={modalState.healingPoolModal.alsoCures}
+                    cureCost={modalState.healingPoolModal.cureCost}
+                    bloodiedOnly={modalState.healingPoolModal.bloodiedOnly}
+                    restoringTouchConditions={modalState.healingPoolModal.restoringTouchConditions}
+                    maxDicePerUse={modalState.healingPoolModal.maxDicePerUse}
+                    onClose={() => setModalState({ healingPoolModal: null })}
                 />
             )}
-            {handOfHealingModal && (
+            {modalState.handOfHealingModal && (
                 <HandOfHealingModal
-                    {...handOfHealingModal}
+                    {...modalState.handOfHealingModal}
                     campaignName={campaignName}
-                    onClose={() => setHandOfHealingModal(null)}
+                    onClose={() => setModalState({ handOfHealingModal: null })}
                 />
             )}
-            {fontOfMagicModal && (
+            {modalState.fontOfMagicModal && (
                 <FontOfMagicModal
                     playerStats={playerStats}
                     campaignName={campaignName}
-                    onClose={() => setFontOfMagicModal(null)}
+                    onClose={() => setModalState({ fontOfMagicModal: null })}
                 />
             )}
-            {resourcePoolModal && (
+            {modalState.resourcePoolModal && (
                 <ResourcePoolModal
                     playerStats={playerStats}
                     campaignName={campaignName}
-                    automation={resourcePoolModal.automation}
-                    onClose={() => setResourcePoolModal(null)}
+                    automation={modalState.resourcePoolModal.automation}
+                    onClose={() => setModalState({ resourcePoolModal: null })}
                 />
             )}
-            {moonlightStepResourceModal && (
+            {modalState.moonlightStepResourceModal && (
                 <MoonlightStepResourceModal
                     playerStats={playerStats}
                     campaignName={campaignName}
-                    automation={moonlightStepResourceModal.automation}
-                    onClose={() => setMoonlightStepResourceModal(null)}
+                    automation={modalState.moonlightStepResourceModal.automation}
+                    onClose={() => setModalState({ moonlightStepResourceModal: null })}
                 />
             )}
-            {wildCompanionModal && (
+            {modalState.wildCompanionModal && (
                 <WildCompanionModal
                     playerStats={playerStats}
                     campaignName={campaignName}
-                    onClose={() => setWildCompanionModal(null)}
+                    onClose={() => setModalState({ wildCompanionModal: null })}
                 />
             )}
-            {setConditionModal && (
+            {modalState.setConditionModal && (
                 <SetConditionModal
-                    {...setConditionModal}
+                    {...modalState.setConditionModal}
                     characters={characters}
-                    onClose={() => setSetConditionModal(null)}
+                    onClose={() => setModalState({ setConditionModal: null })}
                 />
             )}
-            {eyebiteEffectModal && (
+            {modalState.eyebiteEffectModal && (
                 <EyebiteEffectModal
-                    {...eyebiteEffectModal}
+                    {...modalState.eyebiteEffectModal}
                     characters={characters}
-                    onClose={() => setEyebiteEffectModal(null)}
+                    onClose={() => setModalState({ eyebiteEffectModal: null })}
                 />
             )}
-            {attackRiderModal && (
+            {modalState.attackRiderModal && (
                 <AttackRiderModal
-                    {...attackRiderModal}
+                    {...modalState.attackRiderModal}
                     onClose={() => {
-                        setAttackRiderModal(null);
+                        setModalState({ attackRiderModal: null });
                         window.dispatchEvent(new CustomEvent('target-effects-updated'));
-                        const isCunningStrikeVariant = ['Cunning Strike', 'Improved Cunning Strike', 'Devious Strikes'].includes(attackRiderModal?.action?.name);
+                        const isCunningStrikeVariant = ['Cunning Strike', 'Improved Cunning Strike', 'Devious Strikes'].includes(modalState.attackRiderModal?.action?.name);
                         if (isCunningStrikeVariant) {
-                            const costUsed = getRuntimeValue(attackRiderModal.playerStats.name, '_cunningStrikeCostUsed', attackRiderModal.campaignName);
+                            const costUsed = getRuntimeValue(modalState.attackRiderModal.playerStats.name, '_cunningStrikeCostUsed', modalState.attackRiderModal.campaignName);
                             if (!costUsed || costUsed === 0) {
                                 if (autoDamageContext?.current) {
                                     const ctx = autoDamageContext.current;
@@ -355,7 +295,7 @@ export default function CharActionModals({
                             } else if (autoDamageContext) {
                                 const ctx = autoDamageContext.current;
                                 if (ctx) {
-                                    const cunningStrikeCost = Number(getRuntimeValue(attackRiderModal.playerStats.name, '_cunningStrikeCostUsed', attackRiderModal.campaignName) ?? 0);
+                                    const cunningStrikeCost = Number(getRuntimeValue(modalState.attackRiderModal.playerStats.name, '_cunningStrikeCostUsed', modalState.attackRiderModal.campaignName) ?? 0);
                                     const effectiveSneakDice = Math.max(0, ctx.sneakAttackDice - cunningStrikeCost);
                                     let formula = ctx.formula;
                                     let total = ctx.total;
@@ -405,89 +345,89 @@ export default function CharActionModals({
                     }}
                 />
             )}
-            {openHandTechniqueModal && (
+            {modalState.openHandTechniqueModal && (
                 <OpenHandTechniqueModal
-                    {...openHandTechniqueModal}
-                    onClose={() => { setOpenHandTechniqueModal(null); window.dispatchEvent(new CustomEvent('target-effects-updated')); window.dispatchEvent(new CustomEvent('combat-summary-updated')); }}
+                    {...modalState.openHandTechniqueModal}
+                    onClose={() => { setModalState({ openHandTechniqueModal: null }); window.dispatchEvent(new CustomEvent('target-effects-updated')); window.dispatchEvent(new CustomEvent('combat-summary-updated')); }}
                 />
             )}
-            {weaponMasteryModal && (
+            {modalState.weaponMasteryModal && (
                 <WeaponMasteryModal
-                    {...weaponMasteryModal}
+                    {...modalState.weaponMasteryModal}
                     playerStats={playerStats}
                     campaignName={campaignName}
                     targetName={null}
                     onClose={handleMasteryClose}
                 />
             )}
-            {weaponMasteryChoiceModal && (
+            {modalState.weaponMasteryChoiceModal && (
                 <WeaponMasteryChoiceModal
-                    {...weaponMasteryChoiceModal}
+                    {...modalState.weaponMasteryChoiceModal}
                     playerStats={playerStats}
                     campaignName={campaignName}
-                    onClose={() => { setWeaponMasteryChoiceModal(null); }}
+                    onClose={() => { setModalState({ weaponMasteryChoiceModal: null }); }}
                     onConfirm={handleWeaponMasteryChoice}
                 />
             )}
-            {weaponKindMasteryModal && (
+            {modalState.weaponKindMasteryModal && (
                 <WeaponKindMasteryModal
-                    {...weaponKindMasteryModal}
+                    {...modalState.weaponKindMasteryModal}
                     playerStats={playerStats}
                     campaignName={campaignName}
                     onClose={handleWeaponKindMasteryClose}
                 />
             )}
-            {combatStanceModal && (
+            {modalState.combatStanceModal && (
                 <CombatStanceModal
-                    {...combatStanceModal}
-                    onClose={() => { setCombatStanceModal(null); window.dispatchEvent(new CustomEvent('buffs-updated')); }}
+                    {...modalState.combatStanceModal}
+                    onClose={() => { setModalState({ combatStanceModal: null }); window.dispatchEvent(new CustomEvent('buffs-updated')); }}
                 />
             )}
-            {revelationInFleshModal && (
+            {modalState.revelationInFleshModal && (
                 <RevelationInFleshModal
-                    {...revelationInFleshModal}
-                    onClose={() => { setRevelationInFleshModal(null); window.dispatchEvent(new CustomEvent('buffs-updated')); }}
+                    {...modalState.revelationInFleshModal}
+                    onClose={() => { setModalState({ revelationInFleshModal: null }); window.dispatchEvent(new CustomEvent('buffs-updated')); }}
                 />
             )}
-            {bastionOfLawModal && (
+            {modalState.bastionOfLawModal && (
                 <BastionOfLawModal
-                    {...bastionOfLawModal}
+                    {...modalState.bastionOfLawModal}
                     campaignName={campaignName}
                     onConfirm={async (spAmount, targetName, diceToSpend, clearWard) => {
                         if (clearWard) {
-                            const action = { name: bastionOfLawModal.featureName, automation: bastionOfLawModal.auto };
+                            const action = { name: modalState.bastionOfLawModal.featureName, automation: modalState.bastionOfLawModal.auto };
                             return await handleClearWard(action, playerStats, campaignName);
                         }
                         if (diceToSpend !== undefined && diceToSpend !== null) {
-                            const action = { name: bastionOfLawModal.featureName, automation: bastionOfLawModal.auto };
+                            const action = { name: modalState.bastionOfLawModal.featureName, automation: modalState.bastionOfLawModal.auto };
                             return await handleSpendDice(action, playerStats, campaignName, diceToSpend);
                         }
-                        const action = { name: bastionOfLawModal.featureName, automation: bastionOfLawModal.auto };
+                        const action = { name: modalState.bastionOfLawModal.featureName, automation: modalState.bastionOfLawModal.auto };
                         return await handleApply(action, playerStats, campaignName, spAmount, targetName);
                     }}
-                    onClose={() => setBastionOfLawModal(null)}
+                    onClose={() => setModalState({ bastionOfLawModal: null })}
                 />
             )}
-            {teleportModal && (
+            {modalState.teleportModal && (
                 <TeleportModal
-                    {...teleportModal}
-                    onClose={() => { setTeleportModal(null); window.dispatchEvent(new CustomEvent('buffs-updated')); }}
+                    {...modalState.teleportModal}
+                    onClose={() => { setModalState({ teleportModal: null }); window.dispatchEvent(new CustomEvent('buffs-updated')); }}
                 />
             )}
-            {healingIllusionModal && (
+            {modalState.healingIllusionModal && (
                 <SecondaryTargetModal
                     title="Healing Illusion"
                     targets={buildHealingIllusionTargets(playerStats, characters, combatSummary)}
                     description={`The illusion has ended. Choose a creature within 5 feet to regain ${playerStats.level || 1} HP:`}
-                    onTargetSelected={(targetName) => handleHealingIllusionConfirm(targetName, healingIllusionModal, characters, campaignName, combatSummary, () => { setHealingIllusionModal(null); window.dispatchEvent(new CustomEvent('buffs-updated')); })}
-                    onSkip={() => { setHealingIllusionModal(null); window.dispatchEvent(new CustomEvent('buffs-updated')); }}
+                    onTargetSelected={(targetName) => handleHealingIllusionConfirm(targetName, modalState.healingIllusionModal, characters, campaignName, combatSummary, () => { setModalState({ healingIllusionModal: null }); window.dispatchEvent(new CustomEvent('buffs-updated')); })}
+                    onSkip={() => { setModalState({ healingIllusionModal: null }); window.dispatchEvent(new CustomEvent('buffs-updated')); }}
                     confirmLabel="Heal"
                     confirmIcon="fa-heart"
                     showHp={true}
                     showSize={false}
                 />
             )}
-            {invokeDuplicityModal && (
+            {modalState.invokeDuplicityModal && (
                 <CreatureSelectionModal
                     title="Improved Duplicity — Choose Allies"
                     icon="fa-people-arrows"
@@ -496,183 +436,176 @@ export default function CharActionModals({
                     note="Select all allies who should gain Advantage from the Improved Duplicity."
                     confirmLabel="Grant Advantage"
                     confirmIcon="fa-shield-halved"
-                    onConfirm={(selected) => handleInvokeDuplicityConfirm(selected, invokeDuplicityModal, campaignName, () => { setInvokeDuplicityModal(null); window.dispatchEvent(new CustomEvent('buffs-updated')); })}
-                    onSkip={() => { setInvokeDuplicityModal(null); window.dispatchEvent(new CustomEvent('buffs-updated')); }}
+                    onConfirm={(selected) => handleInvokeDuplicityConfirm(selected, modalState.invokeDuplicityModal, campaignName, () => { setModalState({ invokeDuplicityModal: null }); window.dispatchEvent(new CustomEvent('buffs-updated')); })}
+                    onSkip={() => { setModalState({ invokeDuplicityModal: null }); window.dispatchEvent(new CustomEvent('buffs-updated')); }}
                 />
             )}
-            {saveAttackHealModal && (
+            {modalState.saveAttackHealModal && (
                 <SaveAttackHealModal
-                    {...saveAttackHealModal}
-                    onClose={() => setSaveAttackHealModal(null)}
+                    {...modalState.saveAttackHealModal}
+                    onClose={() => setModalState({ saveAttackHealModal: null })}
                 />
             )}
-            {divineSparkModal && (
+            {modalState.divineSparkModal && (
                 <DivineSparkModal
-                    {...divineSparkModal}
+                    {...modalState.divineSparkModal}
                     playerStats={playerStats}
-                    onClose={() => setDivineSparkModal(null)}
+                    onClose={() => setModalState({ divineSparkModal: null })}
                 />
             )}
-            {divineInterventionModal && (
+            {modalState.divineInterventionModal && (
                 <DivineInterventionModal
-                    {...divineInterventionModal}
+                    {...modalState.divineInterventionModal}
                     onSelect={handleDivineInterventionCast}
                     onClose={() => {
-                        setDivineInterventionModal(null);
-                        setDivineInterventionAction(null);
+                        setModalState({ divineInterventionModal: null, divineInterventionAction: null });
                     }}
                 />
             )}
-            {arcaneChargeModal && (
+            {modalState.arcaneChargeModal && (
                 <ArcaneChargeModal
-                    {...arcaneChargeModal}
-                    onClose={() => setArcaneChargeModal(null)}
+                    {...modalState.arcaneChargeModal}
+                    onClose={() => setModalState({ arcaneChargeModal: null })}
                 />
             )}
-            {warMagicCantripModal && (
+            {modalState.warMagicCantripModal && (
                 <WarMagicCantripModal
-                    {...warMagicCantripModal}
-                    onClose={() => setWarMagicCantripModal(null)}
+                    {...modalState.warMagicCantripModal}
+                    onClose={() => setModalState({ warMagicCantripModal: null })}
                 />
             )}
-            {warMagicSpellModal && (
+            {modalState.warMagicSpellModal && (
                 <WarMagicSpellModal
-                    {...warMagicSpellModal}
-                    onClose={() => setWarMagicSpellModal(null)}
+                    {...modalState.warMagicSpellModal}
+                    onClose={() => setModalState({ warMagicSpellModal: null })}
                 />
             )}
-            {sacredWeaponModal && (
+            {modalState.sacredWeaponModal && (
                 <SacredWeaponModal
-                    {...sacredWeaponModal}
-                    onClose={() => setSacredWeaponModal(null)}
+                    {...modalState.sacredWeaponModal}
+                    onClose={() => setModalState({ sacredWeaponModal: null })}
                 />
             )}
-            {elderChampionRestoreModal && (
+            {modalState.elderChampionRestoreModal && (
                 <ElderChampionRestoreModal
-                    action={elderChampionRestoreModal.payload.action}
-                    playerStats={elderChampionRestoreModal.payload.playerStats}
-                    campaignName={elderChampionRestoreModal.payload.campaignName}
+                    action={modalState.elderChampionRestoreModal.payload.action}
+                    playerStats={modalState.elderChampionRestoreModal.payload.playerStats}
+                    campaignName={modalState.elderChampionRestoreModal.payload.campaignName}
                     onConfirm={() => {
-                        handleElderChampionRestore(elderChampionRestoreModal.payload);
-                        setElderChampionRestoreModal(null);
+                        handleElderChampionRestore(modalState.elderChampionRestoreModal.payload);
+                        setModalState({ elderChampionRestoreModal: null });
                     }}
-                    onClose={() => setElderChampionRestoreModal(null)}
+                    onClose={() => setModalState({ elderChampionRestoreModal: null })}
                 />
             )}
-            {primalCompanionBonusActionModal && (
+            {modalState.primalCompanionBonusActionModal && (
                 <PrimalCompanionBonusActionModal
-                    {...primalCompanionBonusActionModal}
-                    onClose={() => setPrimalCompanionBonusActionModal(null)}
+                    {...modalState.primalCompanionBonusActionModal}
+                    onClose={() => setModalState({ primalCompanionBonusActionModal: null })}
                 />
             )}
-            {mistyWandererModal && (
+            {modalState.mistyWandererModal && (
                 <MistyWandererModal
-                    {...mistyWandererModal}
-                    onClose={() => setMistyWandererModal(null)}
+                    {...modalState.mistyWandererModal}
+                    onClose={() => setModalState({ mistyWandererModal: null })}
                 />
             )}
-            {bonusActionChoiceModal && (
+            {modalState.bonusActionChoiceModal && (
                 <BonusActionChoiceModal
-                    action={bonusActionChoiceModal.action}
-                    options={bonusActionChoiceModal.options}
+                    action={modalState.bonusActionChoiceModal.action}
+                    options={modalState.bonusActionChoiceModal.options}
                     playerStats={playerStats}
                     campaignName={campaignName}
-                    onClose={() => setBonusActionChoiceModal(null)}
+                    onClose={() => setModalState({ bonusActionChoiceModal: null })}
                 />
             )}
-            {stealthAttackModal && (
+            {modalState.stealthAttackModal && (
                 <StealthAttackModal
-                    {...stealthAttackModal}
-                    onClose={() => setStealthAttackModal(null)}
+                    {...modalState.stealthAttackModal}
+                    onClose={() => setModalState({ stealthAttackModal: null })}
                 />
             )}
-            {bastionOfLawModal && (
-                <BastionOfLawModal
-                    {...bastionOfLawModal}
-                    onClose={() => setBastionOfLawModal(null)}
-                />
-            )}
-            {elementalAffinityModal && (
+            {modalState.elementalAffinityModal && (
                 <ElementalAffinityModal
-                    {...elementalAffinityModal}
-                    onClose={() => setElementalAffinityModal(null)}
+                    {...modalState.elementalAffinityModal}
+                    onClose={() => setModalState({ elementalAffinityModal: null })}
                 />
             )}
-            {fiendishResilienceModal && (
+            {modalState.fiendishResilienceModal && (
                 <FiendishResilienceModal
-                    {...fiendishResilienceModal}
-                    onClose={() => setFiendishResilienceModal(null)}
+                    {...modalState.fiendishResilienceModal}
+                    onClose={() => setModalState({ fiendishResilienceModal: null })}
                 />
             )}
-            {dragonCompanionModal && (
+            {modalState.dragonCompanionModal && (
                 <DragonCompanionModal
-                    {...dragonCompanionModal}
-                    onClose={() => setDragonCompanionModal(null)}
+                    {...modalState.dragonCompanionModal}
+                    onClose={() => setModalState({ dragonCompanionModal: null })}
                 />
             )}
-            {wildMagicDoubleRollModal && (
+            {modalState.wildMagicDoubleRollModal && (
                 <WildMagicDoubleRollModal
-                    {...wildMagicDoubleRollModal}
-                    onClose={() => setWildMagicDoubleRollModal(null)}
+                    {...modalState.wildMagicDoubleRollModal}
+                    onClose={() => setModalState({ wildMagicDoubleRollModal: null })}
                 />
             )}
-            {wildMagicTamedModal && (
+            {modalState.wildMagicTamedModal && (
                 <WildMagicTamedModal
-                    {...wildMagicTamedModal}
-                    onClose={() => setWildMagicTamedModal(null)}
+                    {...modalState.wildMagicTamedModal}
+                    onClose={() => setModalState({ wildMagicTamedModal: null })}
                 />
             )}
-            {thirdEyeModal && (
+            {modalState.thirdEyeModal && (
                 <ThirdEyeModal
-                    action={thirdEyeModal.action}
-                    playerStats={thirdEyeModal.playerStats}
-                    campaignName={thirdEyeModal.campaignName}
-                    onClose={() => setThirdEyeModal(null)}
+                    action={modalState.thirdEyeModal.action}
+                    playerStats={modalState.thirdEyeModal.playerStats}
+                    campaignName={modalState.thirdEyeModal.campaignName}
+                    onClose={() => setModalState({ thirdEyeModal: null })}
                 />
             )}
-            {soulstitchSpellsModal && (
+            {modalState.soulstitchSpellsModal && (
                 <SoulstitchSpellsModal
-                    {...soulstitchSpellsModal}
-                    onClose={() => setSoulstitchSpellsModal(null)}
+                    {...modalState.soulstitchSpellsModal}
+                    onClose={() => setModalState({ soulstitchSpellsModal: null })}
                 />
             )}
-            {illusoryRealityModal && (
+            {modalState.illusoryRealityModal && (
                 <IllusoryRealityModal
-                    {...illusoryRealityModal}
-                    onClose={() => setIllusoryRealityModal(null)}
+                    {...modalState.illusoryRealityModal}
+                    onClose={() => setModalState({ illusoryRealityModal: null })}
                 />
             )}
-            {celestialRevelationModal && (
+            {modalState.celestialRevelationModal && (
                 <CelestialRevelationModal
-                    {...celestialRevelationModal}
-                    onClose={() => setCelestialRevelationModal(null)}
-                    onSetConditionModal={setSetConditionModal}
+                    {...modalState.celestialRevelationModal}
+                    onClose={() => setModalState({ celestialRevelationModal: null })}
+                    onSetConditionModal={setModalState}
                 />
             )}
-            {fiendishLegacyModal && (
+            {modalState.fiendishLegacyModal && (
                 <FiendishLegacyModal
-                    {...fiendishLegacyModal}
-                    onClose={() => setFiendishLegacyModal(null)}
+                    {...modalState.fiendishLegacyModal}
+                    onClose={() => setModalState({ fiendishLegacyModal: null })}
                 />
             )}
-            {breathWeaponShapeModal && (
+            {modalState.breathWeaponShapeModal && (
                 <BreathWeaponShapeModal
-                    {...breathWeaponShapeModal}
-                    onClose={() => setBreathWeaponShapeModal(null)}
+                    {...modalState.breathWeaponShapeModal}
+                    onClose={() => setModalState({ breathWeaponShapeModal: null })}
                 />
             )}
-            {hypnoticPatternShakeModal && (
+            {modalState.hypnoticPatternShakeModal && (
                 <HypnoticPatternShakeModal
-                    {...hypnoticPatternShakeModal}
-                    onClose={() => setHypnoticPatternShakeModal(null)}
+                    {...modalState.hypnoticPatternShakeModal}
+                    onClose={() => setModalState({ hypnoticPatternShakeModal: null })}
                 />
             )}
-            {arcaneWardRestoreModal && (
+            {modalState.arcaneWardRestoreModal && (
                 <ArcaneWardRestoreModal
-                    {...arcaneWardRestoreModal}
+                    {...modalState.arcaneWardRestoreModal}
                     playerStats={playerStats}
                     campaignName={campaignName}
-                    onClose={() => setArcaneWardRestoreModal(null)}
+                    onClose={() => setModalState({ arcaneWardRestoreModal: null })}
                 />
             )}
             {combatSuperiorityModal && (
@@ -684,63 +617,63 @@ export default function CharActionModals({
                     onConfirm={handleCombatSuperiorityConfirm}
                 />
             )}
-            {attackRiderManeuverPrompt && (
+            {modalState.attackRiderManeuverPrompt && (
                 <AttackRiderManeuverPrompt
-                    maneuvers={attackRiderManeuverPrompt.maneuvers}
-                    attack={attackRiderManeuverPrompt.attack}
-                    popupHtml={attackRiderManeuverPrompt.popupHtml}
-                    isMiss={attackRiderManeuverPrompt.isMiss}
+                    maneuvers={modalState.attackRiderManeuverPrompt.maneuvers}
+                    attack={modalState.attackRiderManeuverPrompt.attack}
+                    popupHtml={modalState.attackRiderManeuverPrompt.popupHtml}
+                    isMiss={modalState.attackRiderManeuverPrompt.isMiss}
                     onUse={handleAttackRiderManeuverUse}
                     onSkip={handleAttackRiderManeuverSkip}
                 />
             )}
-            {sweepingAttackTargetModal && (
+            {modalState.sweepingAttackTargetModal && (
                 <SecondaryTargetModal
                     title="Sweeping Attack"
-                    targets={sweepingAttackTargetModal.secondaryTargets}
-                    description={`Choose a creature within 5 feet of ${sweepingAttackTargetModal.primaryTarget} to take ${sweepingAttackTargetModal.dieValue} damage:`}
-                    onTargetSelected={(targetName) => handleSweepingAttackConfirm(targetName, sweepingAttackTargetModal)}
-                    onSkip={() => setSweepingAttackTargetModal(null)}
+                    targets={modalState.sweepingAttackTargetModal.secondaryTargets}
+                    description={`Choose a creature within 5 feet of ${modalState.sweepingAttackTargetModal.primaryTarget} to take ${modalState.sweepingAttackTargetModal.dieValue} damage:`}
+                    onTargetSelected={(targetName) => handleSweepingAttackConfirm(targetName, modalState.sweepingAttackTargetModal)}
+                    onSkip={() => setModalState({ sweepingAttackTargetModal: null })}
                     confirmLabel="Apply Sweeping Attack"
                     confirmIcon="fa-bolt"
                     showSize={true}
                 />
             )}
-            {baitAndSwitchChoiceModal && (
+            {modalState.baitAndSwitchChoiceModal && (
                 <SecondaryTargetModal
                     title="Bait and Switch — AC Bonus"
-                    targets={baitAndSwitchChoiceModal.options}
-                    description={baitAndSwitchChoiceModal.description}
-                    onTargetSelected={(targetName) => handleBaitAndSwitchChoiceConfirm(targetName, baitAndSwitchChoiceModal)}
-                    onSkip={() => setBaitAndSwitchChoiceModal(null)}
+                    targets={modalState.baitAndSwitchChoiceModal.options}
+                    description={modalState.baitAndSwitchChoiceModal.description}
+                    onTargetSelected={(targetName) => handleBaitAndSwitchChoiceConfirm(targetName, modalState.baitAndSwitchChoiceModal)}
+                    onSkip={() => setModalState({ baitAndSwitchChoiceModal: null })}
                     confirmLabel="Apply AC Bonus"
                     confirmIcon="fa-check"
                 />
             )}
-            {commanderStrikeChoiceModal && (
+            {modalState.commanderStrikeChoiceModal && (
                 <SecondaryTargetModal
                     title="Commander's Strike — Ally Attack"
-                    targets={commanderStrikeChoiceModal.options}
-                    description={commanderStrikeChoiceModal.description}
-                    onTargetSelected={(targetName) => handleCommanderStrikeChoiceConfirm(targetName, commanderStrikeChoiceModal)}
-                    onSkip={() => setCommanderStrikeChoiceModal(null)}
+                    targets={modalState.commanderStrikeChoiceModal.options}
+                    description={modalState.commanderStrikeChoiceModal.description}
+                    onTargetSelected={(targetName) => handleCommanderStrikeChoiceConfirm(targetName, modalState.commanderStrikeChoiceModal)}
+                    onSkip={() => setModalState({ commanderStrikeChoiceModal: null })}
                     confirmLabel="Grant Attack"
                     confirmIcon="fa-check"
                 />
             )}
-            {rallyChoiceModal && (
+            {modalState.rallyChoiceModal && (
                 <SecondaryTargetModal
                     title="Rally"
-                    targets={rallyChoiceModal.allyOptions}
-                    description={rallyChoiceModal.description}
-                    onTargetSelected={(targetName) => handleRallyChoiceConfirm(targetName, rallyChoiceModal)}
-                    onSkip={() => setRallyChoiceModal(null)}
+                    targets={modalState.rallyChoiceModal.allyOptions}
+                    description={modalState.rallyChoiceModal.description}
+                    onTargetSelected={(targetName) => handleRallyChoiceConfirm(targetName, modalState.rallyChoiceModal)}
+                    onSkip={() => setModalState({ rallyChoiceModal: null })}
                     confirmLabel="Grant Temp HP"
                     confirmIcon="fa-heart"
                 />
             )}
-            {divineFuryChoice && (
-                <div className="sp-overlay" onClick={handleDivineFurySkip}>
+            {modalState.divineFuryChoice && (
+                <div className="sp-overlay" onClick={() => handleDivineFurySkip()}>
                     <div className="sp-modal" onClick={e => e.stopPropagation()}>
                         <div className="sp-header">
                             <i className="fa-solid fa-bolt"></i> Divine Fury — Damage Type
@@ -762,7 +695,7 @@ export default function CharActionModals({
                     </div>
                 </div>
             )}
-            {damageTypeChoice && (
+            {modalState.damageTypeChoice && (
                 <div className="sp-overlay" onClick={() => {
                     if (pendingDamage?._attackRider) handleEnhancedUnarmedSkip();
                     else if (pendingDamage?._damageTypeModifier) handleDamageTypeModifierSkip();
@@ -770,12 +703,12 @@ export default function CharActionModals({
                 }}>
                     <div className="sp-modal" onClick={e => e.stopPropagation()}>
                         <div className="sp-header">
-                            <i className="fa-solid fa-bolt"></i> {damageTypeChoice.title}
+                            <i className="fa-solid fa-bolt"></i> {modalState.damageTypeChoice.title}
                         </div>
                         <div className="sp-body">
                             <p>Choose the damage type for this hit:</p>
                             <div style={{ textAlign: 'center', marginTop: '16px' }}>
-                                {damageTypeChoice.types.map((type) => (
+                                {modalState.damageTypeChoice.types.map((type) => (
                                     <button
                                         key={type}
                                         className="sp-roll-btn"
@@ -801,17 +734,17 @@ export default function CharActionModals({
                     </div>
                 </div>
             )}
-            {featureChoice && (
+            {modalState.featureChoice && (
                 <div className="sp-overlay" onClick={handleFeatureChoiceSkip}>
                     <div className="sp-modal" onClick={e => e.stopPropagation()}>
                         <div className="sp-header">
-                            <i className="fa-solid fa-bolt"></i> {featureChoice.action.name}
+                            <i className="fa-solid fa-bolt"></i> {modalState.featureChoice.action.name}
                         </div>
                         <div className="sp-body">
                             <p><b>Choose your option:</b></p>
-                            <p style={{ opacity: 0.8, fontSize: '0.9em' }}>{featureChoice.action.description}</p>
+                            <p style={{ opacity: 0.8, fontSize: '0.9em' }}>{modalState.featureChoice.action.description}</p>
                             <div style={{ textAlign: 'center', marginTop: '16px' }}>
-                                {featureChoice.options.map((opt, i) => {
+                                {modalState.featureChoice.options.map((opt, i) => {
                                     const optName = typeof opt === 'string' ? opt : opt.name;
                                     return (
                                         <button
@@ -832,68 +765,68 @@ export default function CharActionModals({
                     </div>
                 </div>
             )}
-            {starryFormConstellationModal && (
+            {modalState.starryFormConstellationModal && (
                 <ConstellationSelectionModal
-                    action={starryFormConstellationModal.payload.action}
-                    playerStats={starryFormConstellationModal.payload.playerStats}
-                    campaignName={starryFormConstellationModal.payload.campaignName}
+                    action={modalState.starryFormConstellationModal.payload.action}
+                    playerStats={modalState.starryFormConstellationModal.payload.playerStats}
+                    campaignName={modalState.starryFormConstellationModal.payload.campaignName}
                     isTwinkled={false}
-                    onConfirm={(option) => handleConstellationSelect(starryFormConstellationModal.payload, option)}
-                    onClose={() => setStarryFormConstellationModal(null)}
+                    onConfirm={(option) => handleConstellationSelect(modalState.starryFormConstellationModal.payload, option)}
+                    onClose={() => setModalState({ starryFormConstellationModal: null })}
                 />
             )}
-            {twinklingConstellationModal && (
+            {modalState.twinklingConstellationModal && (
                 <ConstellationSelectionModal
-                    action={twinklingConstellationModal.payload.action}
-                    playerStats={twinklingConstellationModal.payload.playerStats}
-                    campaignName={twinklingConstellationModal.payload.campaignName}
+                    action={modalState.twinklingConstellationModal.payload.action}
+                    playerStats={modalState.twinklingConstellationModal.payload.playerStats}
+                    campaignName={modalState.twinklingConstellationModal.payload.campaignName}
                     isTwinkled={true}
-                    onConfirm={(option) => handleConstellationSelect(twinklingConstellationModal.payload, option)}
-                    onClose={() => setTwinklingConstellationModal(null)}
+                    onConfirm={(option) => handleConstellationSelect(modalState.twinklingConstellationModal.payload, option)}
+                    onClose={() => setModalState({ twinklingConstellationModal: null })}
                 />
             )}
-            {bulwarkOfForceModal && (
+            {modalState.bulwarkOfForceModal && (
                 <BulwarkOfForceModal
-                    targets={bulwarkOfForceModal.creatureTargets}
-                    maxTargets={bulwarkOfForceModal.maxTargets}
+                    targets={modalState.bulwarkOfForceModal.creatureTargets}
+                    maxTargets={modalState.bulwarkOfForceModal.maxTargets}
                     onConfirm={handleBulwarkOfForceConfirm}
-                    onSkip={() => setBulwarkOfForceModal(null)}
+                    onSkip={() => setModalState({ bulwarkOfForceModal: null })}
                 />
             )}
-            {coronaEnemySelectionModal && (
+            {modalState.coronaEnemySelectionModal && (
                 <CoronaEnemySelectionModal
-                    creatureTargets={coronaEnemySelectionModal.creatureTargets}
+                    creatureTargets={modalState.coronaEnemySelectionModal.creatureTargets}
                     onConfirm={handleCoronaEnemySelectionConfirm}
-                    onSkip={() => setCoronaEnemySelectionModal(null)}
+                    onSkip={() => setModalState({ coronaEnemySelectionModal: null })}
                 />
             )}
-            {radianceOfDawnModal && (
+            {modalState.radianceOfDawnModal && (
                 <RadianceOfDawnModal
-                    creatureTargets={radianceOfDawnModal.creatureTargets}
-                    saveType={radianceOfDawnModal.saveType}
-                    saveDc={radianceOfDawnModal.saveDc}
-                    damageExpression={radianceOfDawnModal.damageExpression}
-                    damageType={radianceOfDawnModal.damageType}
-                    rangeFeet={radianceOfDawnModal.rangeFeet}
+                    creatureTargets={modalState.radianceOfDawnModal.creatureTargets}
+                    saveType={modalState.radianceOfDawnModal.saveType}
+                    saveDc={modalState.radianceOfDawnModal.saveDc}
+                    damageExpression={modalState.radianceOfDawnModal.damageExpression}
+                    damageType={modalState.radianceOfDawnModal.damageType}
+                    rangeFeet={modalState.radianceOfDawnModal.rangeFeet}
                     onConfirm={handleRadianceOfDawnConfirm}
-                    onSkip={() => setRadianceOfDawnModal(null)}
+                    onSkip={() => setModalState({ radianceOfDawnModal: null })}
                 />
             )}
-            {mantleOfInspirationModal && (
+            {modalState.mantleOfInspirationTarget && (
                 <MantleOfInspirationModal
-                    creatureTargets={mantleOfInspirationModal.creatureTargets}
-                    tempHp={mantleOfInspirationModal.tempHp}
-                    dieRoll={mantleOfInspirationModal.dieRoll}
-                    bardicDieSize={mantleOfInspirationModal.bardicDieSize}
-                    maxTargets={mantleOfInspirationModal.maxTargets}
+                    creatureTargets={modalState.mantleOfInspirationTarget.creatureTargets}
+                    tempHp={modalState.mantleOfInspirationTarget.tempHp}
+                    dieRoll={modalState.mantleOfInspirationTarget.dieRoll}
+                    bardicDieSize={modalState.mantleOfInspirationTarget.bardicDieSize}
+                    maxTargets={modalState.mantleOfInspirationTarget.maxTargets}
                     onConfirm={handleMantleOfInspirationConfirm}
-                    onSkip={() => setMantleOfInspirationModal(null)}
+                    onSkip={() => setModalState({ mantleOfInspirationTarget: null })}
                 />
             )}
-            {tricksterBlessingModal && (
+            {modalState.tricksterBlessingModal && (
                 <SecondaryTargetModal
                     title="Blessing of the Trickster — Choose Target"
-                    targets={tricksterBlessingModal.creatureTargets}
+                    targets={modalState.tricksterBlessingModal.creatureTargets}
                     confirmLabel="Grant Blessing"
                     confirmIcon="fa-hands"
                     showHp={false}
@@ -901,22 +834,22 @@ export default function CharActionModals({
                     onSkip={() => handleTricksterBlessingConfirm(null)}
                 />
             )}
-            {bardicInspirationTargetModal && (
+            {modalState.bardicInspirationTargetModal && (
                 <SecondaryTargetModal
                     title="Bardic Inspiration — Choose Target"
-                    targets={bardicInspirationTargetModal.creatureTargets}
+                    targets={modalState.bardicInspirationTargetModal.creatureTargets}
                     confirmLabel="Grant Inspiration"
                     confirmIcon="fa-music"
-                    description={`Grant a Bardic Inspiration die (d${bardicInspirationTargetModal.dieSize}) to the target. The creature can roll it on one ability check.`}
+                    description={`Grant a Bardic Inspiration die (d${modalState.bardicInspirationTargetModal.dieSize}) to the target. The creature can roll it on one ability check.`}
                     showHp={false}
                     onTargetSelected={handleBardicInspirationConfirm}
                     onSkip={() => handleBardicInspirationConfirm(null)}
                 />
             )}
-            {inspiringMovementAllyModal && (
+            {modalState.inspiringMovementAllyModal && (
                 <SecondaryTargetModal
                     title="Inspiring Movement — Choose Ally"
-                    targets={inspiringMovementAllyModal.creatureTargets}
+                    targets={modalState.inspiringMovementAllyModal.creatureTargets}
                     confirmLabel="Move"
                     confirmIcon="fa-person-walking"
                     featureDescription="Both you and the chosen ally move up to half your Speeds without provoking Opportunity Attacks."

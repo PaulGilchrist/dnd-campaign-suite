@@ -230,12 +230,12 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                             attackName: autoDamage.name,
                             sneakAttackDice: sneakAttackDice,
                         });
-                        setAttackRiderModal({
+                        setModalState({ attackRiderModal: {
                             action: cunningStrikePassive,
                             playerStats,
                             campaignName,
                             targetName: target?.name || null,
-                        });
+                        }});
 
                         // Rend Mind (Soulknife level 17) — WIS save or Stunned on Psychic Blade sneak attack hit
                         const attackName = autoDamage.name || '';
@@ -694,58 +694,8 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
 
     const {
         pendingDamage,
-        healingPoolModal, setHealingPoolModal,
-        handOfHealingModal, setHandOfHealingModal,
-        fontOfMagicModal, setFontOfMagicModal,
-        resourcePoolModal, setResourcePoolModal,
-        wildCompanionModal, setWildCompanionModal,
-        setConditionModal, setSetConditionModal,
-        attackRiderModal, setAttackRiderModal,
-        openHandTechniqueModal, setOpenHandTechniqueModal,
-        weaponMasteryModal,
-        weaponMasteryChoiceModal, setWeaponMasteryChoiceModal,
-        weaponKindMasteryModal, setWeaponKindMasteryModal,
-        combatStanceModal, setCombatStanceModal,
-        teleportModal, setTeleportModal,
-        healingIllusionModal, setHealingIllusionModal,
-        invokeDuplicityModal, setInvokeDuplicityModal,
-        saveAttackHealModal, setSaveAttackHealModal,
-        divineSparkModal, setDivineSparkModal,
-        divineInterventionModal, setDivineInterventionModal,
-        divineInterventionAction, setDivineInterventionAction,
-        moonlightStepResourceModal, setMoonlightStepResourceModal,
-        starryFormConstellationModal, setStarryFormConstellationModal,
-        twinklingConstellationModal, setTwinklingConstellationModal,
-        arcaneChargeModal, setArcaneChargeModal,
-        warMagicCantripModal, setWarMagicCantripModal,
-        warMagicSpellModal, setWarMagicSpellModal,
-        sacredWeaponModal, setSacredWeaponModal,
-        elderChampionRestoreModal, setElderChampionRestoreModal,
-        primalCompanionBonusActionModal, setPrimalCompanionBonusActionModal,
-        mistyWandererModal, setMistyWandererModal,
-        bonusActionChoiceModal, setBonusActionChoiceModal,
-        stealthAttackModal, setStealthAttackModal,
-        revelationInFleshModal, setRevelationInFleshModal,
-        bastionOfLawModal, setBastionOfLawModal,
-        elementalAffinityModal, setElementalAffinityModal,
-        fiendishResilienceModal, setFiendishResilienceModal,
-        boonOfEnergyResistanceModal, setBoonOfEnergyResistanceModal,
-        dragonCompanionModal, setDragonCompanionModal,
-        wildMagicDoubleRollModal, setWildMagicDoubleRollModal,
-        wildMagicTamedModal, setWildMagicTamedModal,
-        thirdEyeModal, setThirdEyeModal,
-        soulstitchSpellsModal, setSoulstitchSpellsModal,
-        illusoryRealityModal, setIllusoryRealityModal,
-        celestialRevelationModal, setCelestialRevelationModal,
-        elfishLineageModal, setElfisLineageModal,
-        gnomishLineageModal, setGnomishLineageModal,
-        fiendishLegacyModal, setFiendishLegacyModal,
-        giantAncestryModal, setGiantAncestryModal,
-        eyebiteEffectModal, setEyebiteEffectModal,
-        breathWeaponShapeModal, setBreathWeaponShapeModal,
-        divineFuryChoice,
-        damageTypeChoice,
-        featureChoice, setFeatureChoice,
+        modalState,
+        setModalState,
         resolveAttackDamage,
         handleMasteryClose,
         handleWeaponMasteryChoice,
@@ -762,22 +712,8 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         handleFeatureChoiceSkip,
         handleConstellationSelect,
         handleElderChampionRestore,
-        hypnoticPatternShakeModal, setHypnoticPatternShakeModal,
-        arcaneWardRestoreModal, setArcaneWardRestoreModal,
-        combatSuperiorityModal, setCombatSuperiorityModal,
-        attackRiderManeuverPrompt, setAttackRiderManeuverPrompt,
-        sweepingAttackTargetModal, setSweepingAttackTargetModal,
-        baitAndSwitchChoiceModal, setBaitAndSwitchChoiceModal,
-        commanderStrikeChoiceModal, setCommanderStrikeChoiceModal,
-        rallyChoiceModal, setRallyChoiceModal,
-        bulwarkOfForceModal, setBulwarkOfForceModal,
-        coronaEnemySelectionModal, setCoronaEnemySelectionModal,
-        radianceOfDawnModal, setRadianceOfDawnModal,
-        mantleOfInspirationTarget, setMantleOfInspirationTarget,
-        tricksterBlessingModal, setTricksterBlessingModal,
-        bardicInspirationTargetModal, setBardicInspirationTargetModal,
-        inspiringMovementAllyModal, setInspiringMovementAllyModal,
-        secondaryTargetModal, setSecondaryTargetModal,
+        combatSuperiorityModal,
+        setCombatSuperiorityModal,
         handleAttackRiderManeuverUse,
         handleAttackRiderManeuverSkip,
         handleCombatSuperiorityConfirm,
@@ -885,11 +821,11 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
 
     useEffect(() => {
         const handler = (event) => {
-            setSoulstitchSpellsModal(event.detail);
+            setModalState({ soulstitchSpellsModal: event.detail });
         };
         window.addEventListener('soulstitch-modal-show', handler);
         return () => window.removeEventListener('soulstitch-modal-show', handler);
-    }, [setSoulstitchSpellsModal]);
+    }, [setModalState]);
 
     useEffect(() => {
         const handler = async (event) => {
@@ -905,7 +841,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                 size: c.size,
                 type: c.type,
             }));
-            setSecondaryTargetModal({
+            setModalState({ secondaryTargetModal: {
                 title,
                 targets: allyTargets,
                 confirmLabel: evtConfirmLabel || 'Grant Temp HP',
@@ -921,7 +857,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                         note: `Gained ${tempHp} temporary hit points from Potent Spellcasting`,
                         total: tempHp,
                     });
-                    setSecondaryTargetModal(null);
+                    setModalState({ secondaryTargetModal: null });
                 },
                 onSkip: () => {
                     const existing = getRuntimeValue(attackerName, 'tempHp', evtCampaignName) || 0;
@@ -935,47 +871,47 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                         note: `Gained ${tempHp} temporary hit points from Potent Spellcasting`,
                         total: tempHp,
                     });
-                    setSecondaryTargetModal(null);
+                    setModalState({ secondaryTargetModal: null });
                 },
                 featureDescription: `Grant ${tempHp} temporary hit points to a creature within 60 feet.`,
                 description: 'Choose a creature to grant temporary hit points from Potent Spellcasting.',
-            });
+            }});
         };
         window.addEventListener('potent-spellcasting-temp-hp', handler);
         return () => window.removeEventListener('potent-spellcasting-temp-hp', handler);
-    }, [setSecondaryTargetModal]);
+    }, [setModalState]);
 
     useEffect(() => {
         const handler = (event) => {
-            setSweepingAttackTargetModal(event.detail);
+            setModalState({ sweepingAttackTargetModal: event.detail });
         };
         window.addEventListener('sweeping-attack-modal-show', handler);
         return () => window.removeEventListener('sweeping-attack-modal-show', handler);
-    }, [setSweepingAttackTargetModal]);
+    }, [setModalState]);
 
     useEffect(() => {
         const handler = (event) => {
-            setBaitAndSwitchChoiceModal(event.detail);
+            setModalState({ baitAndSwitchChoiceModal: event.detail });
         };
         window.addEventListener('bait-and-switch-modal-show', handler);
         return () => window.removeEventListener('bait-and-switch-modal-show', handler);
-    }, [setBaitAndSwitchChoiceModal]);
+    }, [setModalState]);
 
     useEffect(() => {
         const handler = (event) => {
-            setCommanderStrikeChoiceModal(event.detail);
+            setModalState({ commanderStrikeChoiceModal: event.detail });
         };
         window.addEventListener('commander-strike-modal-show', handler);
         return () => window.removeEventListener('commander-strike-modal-show', handler);
-    }, [setCommanderStrikeChoiceModal]);
+    }, [setModalState]);
 
     useEffect(() => {
         const handler = (event) => {
-            setRallyChoiceModal(event.detail);
+            setModalState({ rallyChoiceModal: event.detail });
         };
         window.addEventListener('rally-choice-modal-show', handler);
         return () => window.removeEventListener('rally-choice-modal-show', handler);
-    }, [setRallyChoiceModal]);
+    }, [setModalState]);
 
     const handleAttackClick = React.useCallback((attack) => {
         if (cannotAct) return;
@@ -1055,8 +991,8 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         if (result.payload) {
             setPopupHtml(result.payload);
         }
-        setSweepingAttackTargetModal(null);
-    }, [setPopupHtml, setSweepingAttackTargetModal]);
+        setModalState({ sweepingAttackTargetModal: null });
+    }, [setPopupHtml, setModalState]);
 
     const handleBaitAndSwitchChoiceConfirm = React.useCallback(async (targetName, modalData) => {
         if (!targetName || !modalData) return;
@@ -1072,8 +1008,8 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         if (result.payload) {
             setPopupHtml(result.payload);
         }
-        setBaitAndSwitchChoiceModal(null);
-    }, [setPopupHtml, setBaitAndSwitchChoiceModal]);
+        setModalState({ baitAndSwitchChoiceModal: null });
+    }, [setPopupHtml, setModalState]);
 
     const handleCommanderStrikeChoiceConfirm = React.useCallback(async (targetName, modalData) => {
         if (!targetName || !modalData) return;
@@ -1089,8 +1025,8 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         if (result.payload) {
             setPopupHtml(result.payload);
         }
-        setCommanderStrikeChoiceModal(null);
-    }, [setPopupHtml, setCommanderStrikeChoiceModal]);
+        setModalState({ commanderStrikeChoiceModal: null });
+    }, [setPopupHtml, setModalState]);
 
     const handleRallyChoiceConfirm = React.useCallback(async (targetName, modalData) => {
         if (!targetName || !modalData) return;
@@ -1109,71 +1045,71 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         if (result.payload) {
             setPopupHtml(result.payload);
         }
-        setRallyChoiceModal(null);
-    }, [setPopupHtml, setRallyChoiceModal]);
+        setModalState({ rallyChoiceModal: null });
+    }, [setPopupHtml, setModalState]);
 
     const handleBulwarkOfForceConfirm = React.useCallback(async (targetNames) => {
-        if (!targetNames || !bulwarkOfForceModal) return;
+        if (!targetNames || !modalState.bulwarkOfForceModal) return;
         const result = await activateBulwarkOfForce(
-            bulwarkOfForceModal.action,
-            bulwarkOfForceModal.playerStats,
-            bulwarkOfForceModal.campaignName,
+            modalState.bulwarkOfForceModal.action,
+            modalState.bulwarkOfForceModal.playerStats,
+            modalState.bulwarkOfForceModal.campaignName,
             targetNames
         );
         if (result?.payload) {
             setPopupHtml(result.payload);
         }
-        setBulwarkOfForceModal(null);
-    }, [setPopupHtml, bulwarkOfForceModal, setBulwarkOfForceModal]);
+        setModalState({ bulwarkOfForceModal: null });
+    }, [setPopupHtml, modalState.bulwarkOfForceModal, setModalState]);
 
     const handleCoronaEnemySelectionConfirm = React.useCallback(async (selectedEnemies) => {
-        if (!selectedEnemies || !coronaEnemySelectionModal) return;
+        if (!selectedEnemies || !modalState.coronaEnemySelectionModal) return;
         const result = await activateCoronaOfLight(
-            coronaEnemySelectionModal.action,
-            coronaEnemySelectionModal.playerStats,
-            coronaEnemySelectionModal.campaignName,
+            modalState.coronaEnemySelectionModal.action,
+            modalState.coronaEnemySelectionModal.playerStats,
+            modalState.coronaEnemySelectionModal.campaignName,
             selectedEnemies
         );
         if (result?.payload) {
             setPopupHtml(result.payload);
         }
-        setCoronaEnemySelectionModal(null);
-    }, [setPopupHtml, coronaEnemySelectionModal, setCoronaEnemySelectionModal]);
+        setModalState({ coronaEnemySelectionModal: null });
+    }, [setPopupHtml, modalState.coronaEnemySelectionModal, setModalState]);
 
     const handleRadianceOfDawnConfirm = React.useCallback(async (selectedTargets) => {
-        if (!selectedTargets || !radianceOfDawnModal) return;
+        if (!selectedTargets || !modalState.radianceOfDawnModal) return;
         const result = await confirmRadianceOfDawn(
-            radianceOfDawnModal.action,
-            radianceOfDawnModal.playerStats,
-            radianceOfDawnModal.campaignName,
+            modalState.radianceOfDawnModal.action,
+            modalState.radianceOfDawnModal.playerStats,
+            modalState.radianceOfDawnModal.campaignName,
             selectedTargets
         );
         if (result?.payload) {
             setPopupHtml(result.payload);
         }
-        setRadianceOfDawnModal(null);
-    }, [setPopupHtml, radianceOfDawnModal, setRadianceOfDawnModal]);
+        setModalState({ radianceOfDawnModal: null });
+    }, [setPopupHtml, modalState.radianceOfDawnModal, setModalState]);
 
     const handleMantleOfInspirationConfirm = React.useCallback(async (selectedTargets) => {
-        if (!selectedTargets || !mantleOfInspirationTarget) return;
+        if (!selectedTargets || !modalState.mantleOfInspirationTarget) return;
         const result = await confirmMantleOfInspiration(
-            mantleOfInspirationTarget.action,
-            mantleOfInspirationTarget.playerStats,
-            mantleOfInspirationTarget.campaignName,
+            modalState.mantleOfInspirationTarget.action,
+            modalState.mantleOfInspirationTarget.playerStats,
+            modalState.mantleOfInspirationTarget.campaignName,
             selectedTargets,
-            mantleOfInspirationTarget.dieRoll,
-            mantleOfInspirationTarget.bardicDieSize,
-            mantleOfInspirationTarget.tempHp
+            modalState.mantleOfInspirationTarget.dieRoll,
+            modalState.mantleOfInspirationTarget.bardicDieSize,
+            modalState.mantleOfInspirationTarget.tempHp
         );
         if (result?.payload) {
             setPopupHtml(result.payload);
         }
-        setMantleOfInspirationTarget(null);
-    }, [setPopupHtml, mantleOfInspirationTarget, setMantleOfInspirationTarget]);
+        setModalState({ mantleOfInspirationTarget: null });
+    }, [setPopupHtml, modalState.mantleOfInspirationTarget, setModalState]);
 
     const handleTricksterBlessingConfirm = React.useCallback(async (targetName) => {
-        if (!tricksterBlessingModal) return;
-        const { action, playerStats, campaignName: evtCampaignName } = tricksterBlessingModal;
+        if (!modalState.tricksterBlessingModal) return;
+        const { action, playerStats, campaignName: evtCampaignName } = modalState.tricksterBlessingModal;
         const auto = action.automation;
         const featureName = action.name || 'Blessing of the Trickster';
 
@@ -1205,32 +1141,32 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                 : `${featureName} activated on ${resolvedTarget === playerStats.name ? 'yourself' : resolvedTarget} (${auto?.duration || '1 hour'})`,
             automation: auto,
         });
-        setTricksterBlessingModal(null);
-    }, [setPopupHtml, tricksterBlessingModal, setTricksterBlessingModal]);
+        setModalState({ tricksterBlessingModal: null });
+    }, [setPopupHtml, modalState.tricksterBlessingModal, setModalState]);
 
     const handleBardicInspirationConfirm = React.useCallback(async (targetName) => {
-        if (!bardicInspirationTargetModal) return;
-        const { action, playerStats: biPlayerStats, campaignName: biCampaignName, dieSize, hasCombatOptions } = bardicInspirationTargetModal;
-        setBardicInspirationTargetModal(null);
+        if (!modalState.bardicInspirationTargetModal) return;
+        const { action, playerStats: biPlayerStats, campaignName: biCampaignName, dieSize, hasCombatOptions } = modalState.bardicInspirationTargetModal;
+        setModalState({ bardicInspirationTargetModal: null });
         if (!targetName) return;
         const result = await applyBardicInspiration(action, biPlayerStats, biCampaignName, targetName, dieSize, hasCombatOptions);
         if (!result) return;
         if (result.type === 'popup') {
             setPopupHtml(result.payload);
         }
-    }, [bardicInspirationTargetModal, setBardicInspirationTargetModal, setPopupHtml]);
+    }, [modalState.bardicInspirationTargetModal, setModalState, setPopupHtml]);
 
     const handleInspiringMovementConfirm = React.useCallback(async (allyName) => {
-        if (!inspiringMovementAllyModal) return;
-        const { action, playerStats: imPlayerStats, campaignName: imCampaignName, halfSpeed, noOAs } = inspiringMovementAllyModal;
-        setInspiringMovementAllyModal(null);
+        if (!modalState.inspiringMovementAllyModal) return;
+        const { action, playerStats: imPlayerStats, campaignName: imCampaignName, halfSpeed, noOAs } = modalState.inspiringMovementAllyModal;
+        setModalState({ inspiringMovementAllyModal: null });
         if (!allyName) return;
         const result = await applyInspiringMovement(action, imPlayerStats, imCampaignName, allyName, halfSpeed, noOAs);
         if (!result) return;
         if (result.type === 'popup') {
             setPopupHtml(result.payload);
         }
-    }, [inspiringMovementAllyModal, setInspiringMovementAllyModal, setPopupHtml]);
+    }, [modalState.inspiringMovementAllyModal, setModalState, setPopupHtml]);
 
     async function handleAutomationAction(action) {
         if (cannotAct) return;
@@ -1250,7 +1186,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
             const optionKey = `_${action.name.replace(/\s+/g, '_')}_option`;
             const chosenOption = getRuntimeValue(playerStats.name, optionKey, campaignName);
             if (!chosenOption) {
-                setFeatureChoice({ action, options: auto.options, optionKey });
+                setModalState({ featureChoice: { action, options: auto.options, optionKey } });
                 return;
             }
         }
@@ -1260,7 +1196,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
             const optionKey = `_${action.name.replace(/\s+/g, '_')}_choice`;
             const chosenOption = getRuntimeValue(playerStats.name, optionKey, campaignName);
             if (!chosenOption) {
-                setFeatureChoice({ action, options: ['Colossus Slayer', 'Horde Breaker'], optionKey });
+                setModalState({ featureChoice: { action, options: ['Colossus Slayer', 'Horde Breaker'], optionKey } });
                 return;
             }
         }
@@ -1270,7 +1206,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
             const optionKey = `_${action.name.replace(/\s+/g, '_')}_choice`;
             const chosenOption = getRuntimeValue(playerStats.name, optionKey, campaignName);
             if (!chosenOption) {
-                setFeatureChoice({ action, options: ['Escape the Horde', 'Multiattack Defense'], optionKey });
+                setModalState({ featureChoice: { action, options: ['Escape the Horde', 'Multiattack Defense'], optionKey } });
                 return;
             }
         }
@@ -1280,7 +1216,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
             const optionKey = `_${action.name.replace(/\s+/g, '_')}_option`;
             const chosenOption = getRuntimeValue(playerStats.name, optionKey, campaignName);
             if (!chosenOption) {
-                setFeatureChoice({ action, options: auto.options, optionKey });
+                setModalState({ featureChoice: { action, options: auto.options, optionKey } });
                 return;
             }
         }
@@ -1326,141 +1262,140 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                 break;
             case 'modal':
                 switch (result.modalName) {
-                    case 'healingPool': setHealingPoolModal(result.payload); break;
-                    case 'handOfHealing': setHandOfHealingModal(result.payload); break;
-                    case 'fontOfMagic': setFontOfMagicModal(true); break;
-                    case 'resourcePool': setResourcePoolModal(result.payload); break;
-                    case 'wildCompanion': setWildCompanionModal(result.payload); break;
-                    case 'setCondition': setSetConditionModal(result.payload); break;
-                    case 'eyebiteEffect': setEyebiteEffectModal(result.payload); break;
-                    case 'attackRider': setAttackRiderModal(result.payload); break;
-                    case 'openHandTechnique': setOpenHandTechniqueModal(result.payload); break;
-                    case 'combatStance': setCombatStanceModal(result.payload); break;
-                    case 'teleport': setTeleportModal(result.payload); break;
-                    case 'healingIllusion': setHealingIllusionModal(result.payload); break;
-                    case 'invokeDuplicity': setInvokeDuplicityModal(result.payload); break;
-                    case 'saveAttackHeal': setSaveAttackHealModal(result.payload); break;
-                    case 'divineSpark': setDivineSparkModal(result.payload); break;
+                    case 'healingPool': setModalState({ healingPoolModal: result.payload }); break;
+                    case 'handOfHealing': setModalState({ handOfHealingModal: result.payload }); break;
+                    case 'fontOfMagic': setModalState({ fontOfMagicModal: true }); break;
+                    case 'resourcePool': setModalState({ resourcePoolModal: result.payload }); break;
+                    case 'wildCompanion': setModalState({ wildCompanionModal: result.payload }); break;
+                    case 'setCondition': setModalState({ setConditionModal: result.payload }); break;
+                    case 'eyebiteEffect': setModalState({ eyebiteEffectModal: result.payload }); break;
+                    case 'attackRider': setModalState({ attackRiderModal: result.payload }); break;
+                    case 'openHandTechnique': setModalState({ openHandTechniqueModal: result.payload }); break;
+                    case 'combatStance': setModalState({ combatStanceModal: result.payload }); break;
+                    case 'teleport': setModalState({ teleportModal: result.payload }); break;
+                    case 'healingIllusion': setModalState({ healingIllusionModal: result.payload }); break;
+                    case 'invokeDuplicity': setModalState({ invokeDuplicityModal: result.payload }); break;
+                    case 'saveAttackHeal': setModalState({ saveAttackHealModal: result.payload }); break;
+                    case 'divineSpark': setModalState({ divineSparkModal: result.payload }); break;
                     case 'divineIntervention':
-                        setDivineInterventionAction(action);
-                        setDivineInterventionModal(result.payload);
+                        setModalState({ divineInterventionAction: action, divineInterventionModal: result.payload });
                         break;
-                    case 'moonlightStepResource': setMoonlightStepResourceModal(result.payload); break;
-                    case 'starryFormConstellation': setStarryFormConstellationModal(result.payload); break;
-                    case 'twinklingConstellation': setTwinklingConstellationModal(result.payload); break;
-                    case 'arcaneCharge': setArcaneChargeModal(result.payload); break;
-                    case 'warMagicCantrip': setWarMagicCantripModal(result.payload); break;
-                    case 'warMagicSpell': setWarMagicSpellModal(result.payload); break;
-                    case 'sacredWeaponDamageType': setSacredWeaponModal(result.payload); break;
-                    case 'elderChampionRestore': setElderChampionRestoreModal(result.payload); break;
-                    case 'primalCompanionBonusActionCommand': setPrimalCompanionBonusActionModal(result.payload); break;
-                    case 'mistyWanderer': setMistyWandererModal(result.payload); break;
-                    case 'bonusActionChoice': setBonusActionChoiceModal(result.payload); break;
-                    case 'stealthAttack': setStealthAttackModal(result.payload); break;
-                    case 'revelationInFlesh': setRevelationInFleshModal(result.payload); break;
-                    case 'bastionOfLaw': setBastionOfLawModal(result.payload); break;
+                    case 'moonlightStepResource': setModalState({ moonlightStepResourceModal: result.payload }); break;
+                    case 'starryFormConstellation': setModalState({ starryFormConstellationModal: result.payload }); break;
+                    case 'twinklingConstellation': setModalState({ twinklingConstellationModal: result.payload }); break;
+                    case 'arcaneCharge': setModalState({ arcaneChargeModal: result.payload }); break;
+                    case 'warMagicCantrip': setModalState({ warMagicCantripModal: result.payload }); break;
+                    case 'warMagicSpell': setModalState({ warMagicSpellModal: result.payload }); break;
+                    case 'sacredWeaponDamageType': setModalState({ sacredWeaponModal: result.payload }); break;
+                    case 'elderChampionRestore': setModalState({ elderChampionRestoreModal: result.payload }); break;
+                    case 'primalCompanionBonusActionCommand': setModalState({ primalCompanionBonusActionModal: result.payload }); break;
+                    case 'mistyWanderer': setModalState({ mistyWandererModal: result.payload }); break;
+                    case 'bonusActionChoice': setModalState({ bonusActionChoiceModal: result.payload }); break;
+                    case 'stealthAttack': setModalState({ stealthAttackModal: result.payload }); break;
+                    case 'revelationInFlesh': setModalState({ revelationInFleshModal: result.payload }); break;
+                    case 'bastionOfLaw': setModalState({ bastionOfLawModal: result.payload }); break;
                     case 'elementalAffinity': {
                         const affPayload = result.payload;
                         const affAction = affPayload?.action;
                         const affTypes = affPayload?.damageTypes || ['Acid', 'Cold', 'Fire', 'Lightning', 'Poison'];
-                        setElementalAffinityModal({ action: affAction, playerStats, campaignName, damageTypes: affTypes, existingType: affPayload?.existingType });
+                        setModalState({ elementalAffinityModal: { action: affAction, playerStats, campaignName, damageTypes: affTypes, existingType: affPayload?.existingType } });
                         break;
                     }
                     case 'fiendishResilience': {
                         const frPayload = result.payload;
                         const frAction = frPayload?.action;
                         const frTypes = frPayload?.damageTypes || ['Acid', 'Bludgeoning', 'Cold', 'Fire', 'Lightning', 'Necrotic', 'Piercing', 'Poison', 'Psychic', 'Radiant', 'Slashing', 'Thunder'];
-                        setFiendishResilienceModal({ action: frAction, playerStats, campaignName, damageTypes: frTypes, existingType: frPayload?.existingType });
+                        setModalState({ fiendishResilienceModal: { action: frAction, playerStats, campaignName, damageTypes: frTypes, existingType: frPayload?.existingType } });
                         break;
                     }
                     case 'boonOfEnergyResistance': {
                         const berPayload = result.payload;
                         const berAction = berPayload?.action;
                         const berTypes = berPayload?.damageTypes || ['Acid', 'Cold', 'Fire', 'Lightning', 'Necrotic', 'Poison', 'Psychic', 'Radiant', 'Thunder'];
-                        setBoonOfEnergyResistanceModal({ action: berAction, playerStats, campaignName, damageTypes: berTypes, existingTypes: berPayload?.existingTypes, maxSelections: berPayload?.maxSelections || 2 });
+                        setModalState({ boonOfEnergyResistanceModal: { action: berAction, playerStats, campaignName, damageTypes: berTypes, existingTypes: berPayload?.existingTypes, maxSelections: berPayload?.maxSelections || 2 } });
                         break;
                     }
                     case 'dragonCompanion':
-                        setDragonCompanionModal(result.payload);
+                        setModalState({ dragonCompanionModal: result.payload });
                         break;
                     case 'wildMagicDoubleRoll':
-                        setWildMagicDoubleRollModal(result.payload);
+                        setModalState({ wildMagicDoubleRollModal: result.payload });
                         break;
                     case 'weaponMasteryChoice':
-                        setWeaponMasteryChoiceModal(result.payload);
+                        setModalState({ weaponMasteryChoiceModal: result.payload });
                         break;
                     case 'weaponKindMastery':
-                        setWeaponKindMasteryModal(result.payload);
+                        setModalState({ weaponKindMasteryModal: result.payload });
                         break;
                     case 'wildMagicTamed':
-                        setWildMagicTamedModal(result.payload);
+                        setModalState({ wildMagicTamedModal: result.payload });
                         break;
                     case 'thirdEye':
-                        setThirdEyeModal(result.payload);
+                        setModalState({ thirdEyeModal: result.payload });
                         break;
                     case 'soulstitchSpells':
-                        setSoulstitchSpellsModal(result.payload);
+                        setModalState({ soulstitchSpellsModal: result.payload });
                         break;
                     case 'illusoryReality':
-                        setIllusoryRealityModal(result.payload);
+                        setModalState({ illusoryRealityModal: result.payload });
                         break;
                     case 'celestialRevelation':
-                        setCelestialRevelationModal(result.payload);
+                        setModalState({ celestialRevelationModal: result.payload });
                         break;
                     case 'elfishLineage':
-                        setElfisLineageModal(result.payload);
+                        setModalState({ elfishLineageModal: result.payload });
                         break;
                     case 'gnomishLineage':
-                        setGnomishLineageModal(result.payload);
+                        setModalState({ gnomishLineageModal: result.payload });
                         break;
                     case 'fiendishLegacy':
-                        setFiendishLegacyModal(result.payload);
+                        setModalState({ fiendishLegacyModal: result.payload });
                         break;
                     case 'giantAncestry':
-                        setGiantAncestryModal(result.payload);
+                        setModalState({ giantAncestryModal: result.payload });
                         break;
                     case 'breathWeaponShape': {
                         const bwPayload = result.payload;
-                        setBreathWeaponShapeModal({ action: bwPayload.action, playerStats, campaignName, options: bwPayload.options });
+                        setModalState({ breathWeaponShapeModal: { action: bwPayload.action, playerStats, campaignName, options: bwPayload.options } });
                         break;
                     }
                     case 'hypnoticPatternShake': {
                         const shakePayload = result.payload;
-                        setHypnoticPatternShakeModal(shakePayload);
+                        setModalState({ hypnoticPatternShakeModal: shakePayload });
                         break;
                     }
                     case 'combatSuperiority':
-                        setCombatSuperiorityModal(result.payload);
+                        setModalState({ combatSuperiorityModal: result.payload });
                         break;
                     case 'sweepingAttackTarget':
-                        setSweepingAttackTargetModal(result.payload);
+                        setModalState({ sweepingAttackTargetModal: result.payload });
                         break;
                     case 'baitAndSwitchChoice':
-                        setBaitAndSwitchChoiceModal(result.payload);
+                        setModalState({ baitAndSwitchChoiceModal: result.payload });
                         break;
                     case 'bulwarkOfForceTarget':
-                        setBulwarkOfForceModal(result.payload);
+                        setModalState({ bulwarkOfForceModal: result.payload });
                         break;
                     case 'coronaEnemySelection':
-                        setCoronaEnemySelectionModal(result.payload);
+                        setModalState({ coronaEnemySelectionModal: result.payload });
                         break;
                     case 'radianceOfDawn':
-                        setRadianceOfDawnModal(result.payload);
+                        setModalState({ radianceOfDawnModal: result.payload });
                         break;
                     case 'mantleOfInspirationTarget':
-                        setMantleOfInspirationTarget(result.payload);
+                        setModalState({ mantleOfInspirationTarget: result.payload });
                         break;
                     case 'tricksterBlessing':
-                        setTricksterBlessingModal(result.payload);
+                        setModalState({ tricksterBlessingModal: result.payload });
                         break;
                     case 'bardicInspirationTarget':
-                        setBardicInspirationTargetModal(result.payload);
+                        setModalState({ bardicInspirationTargetModal: result.payload });
                         break;
                     case 'inspiringMovementAlly':
-                        setInspiringMovementAllyModal(result.payload);
+                        setModalState({ inspiringMovementAllyModal: result.payload });
                         break;
                     case 'arcaneWardRestore':
-                        setArcaneWardRestoreModal(result.payload);
+                        setModalState({ arcaneWardRestoreModal: result.payload });
                         break;
                     case 'defensiveTactics': {
                         const actionData = result.payload?.action;
@@ -1508,9 +1443,8 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
     }
 
     const handleDivineInterventionCast = React.useCallback(async (selectedSpell) => {
-        setDivineInterventionModal(null);
-        const action = divineInterventionAction;
-        setDivineInterventionAction(null);
+        setModalState({ divineInterventionModal: null, divineInterventionAction: null });
+        const action = modalState.divineInterventionAction;
         if (!action) return;
 
         const result = await onDivineInterventionSpellSelected(action, playerStats, campaignName, selectedSpell);
@@ -1556,7 +1490,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                 description: `Divine Intervention cast ${spell.name}. Divine Intervention recharges ${result.rechargeMessage}`,
             });
         }
-    }, [divineInterventionAction, playerStats, campaignName, rollAttack, rollDamage, mapName, setPopupHtml, setDivineInterventionModal, setDivineInterventionAction, characters]);
+    }, [modalState.divineInterventionAction, playerStats, campaignName, rollAttack, rollDamage, mapName, setPopupHtml, setModalState, characters]);
 
 
     const { buildUpcastLevels } = useSpellUpcastFlow(playerStats, campaignName);
@@ -1580,7 +1514,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
 
     const { castAction: actionCastAction } = useSpellCastExecutor(rollAttack, rollDamage, playerStats, getTargetInfo, campaignName, mapName, characters, setPopupHtml, { featEffects: featRangeEffects }, cachedActionCastPosRef);
 
-    const { pendingMetamagic: actionPendingMetamagic, gateMetamagic: actionGateMetamagic, handleConfirm: actionHandleConfirm, handleSkip: actionHandleSkip, pendingAid: actionPendingAid, handleAidConfirm: actionHandleAidConfirm, handleAidSkip: actionHandleAidSkip, pendingGreaterRestoration: actionPendingGreaterRestoration, handleGreaterRestorationConfirm: actionHandleGreaterRestorationConfirm, handleGreaterRestorationSkip: actionHandleGreaterRestorationSkip, pendingRemoveCurse: actionPendingRemoveCurse, handleRemoveCurseConfirm: actionHandleRemoveCurseConfirm, handleRemoveCurseSkip: actionHandleRemoveCurseSkip, pendingMagicMissile: actionPendingMagicMissile, handleMagicMissileConfirm: actionHandleMagicMissileConfirm, handleMagicMissileSkip: actionHandleMagicMissileSkip } = useSpellMetamagicFlow(playerStats, campaignName, actionCastAction, setSecondaryTargetModal, characters);
+    const { pendingMetamagic: actionPendingMetamagic, gateMetamagic: actionGateMetamagic, handleConfirm: actionHandleConfirm, handleSkip: actionHandleSkip, pendingAid: actionPendingAid, handleAidConfirm: actionHandleAidConfirm, handleAidSkip: actionHandleAidSkip, pendingGreaterRestoration: actionPendingGreaterRestoration, handleGreaterRestorationConfirm: actionHandleGreaterRestorationConfirm, handleGreaterRestorationSkip: actionHandleGreaterRestorationSkip, pendingRemoveCurse: actionPendingRemoveCurse, handleRemoveCurseConfirm: actionHandleRemoveCurseConfirm, handleRemoveCurseSkip: actionHandleRemoveCurseSkip, pendingMagicMissile: actionPendingMagicMissile, handleMagicMissileConfirm: actionHandleMagicMissileConfirm, handleMagicMissileSkip: actionHandleMagicMissileSkip } = useSpellMetamagicFlow(playerStats, campaignName, actionCastAction, setModalState, characters);
 
     const handleActionSpellCast = React.useCallback(async (spell, metaCtx) => {
         setSelectedActionSpell(null);
@@ -1700,60 +1634,32 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     campaignName={campaignName}
                     mapName={mapName}
                     characters={characters}
-                    healingPoolModal={healingPoolModal} setHealingPoolModal={setHealingPoolModal}
-                    handOfHealingModal={handOfHealingModal} setHandOfHealingModal={setHandOfHealingModal}
-                    fontOfMagicModal={fontOfMagicModal} setFontOfMagicModal={setFontOfMagicModal}
-                    resourcePoolModal={resourcePoolModal} setResourcePoolModal={setResourcePoolModal}
-                    wildCompanionModal={wildCompanionModal} setWildCompanionModal={setWildCompanionModal}
-                    setConditionModal={setConditionModal} setSetConditionModal={setSetConditionModal}
-                    attackRiderModal={attackRiderModal} setAttackRiderModal={setAttackRiderModal}
-                    openHandTechniqueModal={openHandTechniqueModal} setOpenHandTechniqueModal={setOpenHandTechniqueModal}
-                    weaponMasteryModal={weaponMasteryModal}
-                    weaponMasteryChoiceModal={weaponMasteryChoiceModal} setWeaponMasteryChoiceModal={setWeaponMasteryChoiceModal}
-                    weaponKindMasteryModal={weaponKindMasteryModal} setWeaponKindMasteryModal={setWeaponKindMasteryModal}
-                    combatStanceModal={combatStanceModal} setCombatStanceModal={setCombatStanceModal}
-                    teleportModal={teleportModal} setTeleportModal={setTeleportModal}
-                    healingIllusionModal={healingIllusionModal} setHealingIllusionModal={setHealingIllusionModal}
-                    invokeDuplicityModal={invokeDuplicityModal} setInvokeDuplicityModal={setInvokeDuplicityModal}
-                    saveAttackHealModal={saveAttackHealModal} setSaveAttackHealModal={setSaveAttackHealModal}
-                    divineSparkModal={divineSparkModal} setDivineSparkModal={setDivineSparkModal}
-                    divineInterventionModal={divineInterventionModal} setDivineInterventionModal={setDivineInterventionModal}
-                    divineInterventionAction={divineInterventionAction} setDivineInterventionAction={setDivineInterventionAction}
-                    moonlightStepResourceModal={moonlightStepResourceModal} setMoonlightStepResourceModal={setMoonlightStepResourceModal}
-                    starryFormConstellationModal={starryFormConstellationModal} setStarryFormConstellationModal={setStarryFormConstellationModal}
-                    twinklingConstellationModal={twinklingConstellationModal} setTwinklingConstellationModal={setTwinklingConstellationModal}
-                    arcaneChargeModal={arcaneChargeModal} setArcaneChargeModal={setArcaneChargeModal}
-                    warMagicCantripModal={warMagicCantripModal} setWarMagicCantripModal={setWarMagicCantripModal}
-                    warMagicSpellModal={warMagicSpellModal} setWarMagicSpellModal={setWarMagicSpellModal}
-                    sacredWeaponModal={sacredWeaponModal} setSacredWeaponModal={setSacredWeaponModal}
-                    elderChampionRestoreModal={elderChampionRestoreModal} setElderChampionRestoreModal={setElderChampionRestoreModal}
-                    primalCompanionBonusActionModal={primalCompanionBonusActionModal} setPrimalCompanionBonusActionModal={setPrimalCompanionBonusActionModal}
-                    mistyWandererModal={mistyWandererModal} setMistyWandererModal={setMistyWandererModal}
-                    bonusActionChoiceModal={bonusActionChoiceModal} setBonusActionChoiceModal={setBonusActionChoiceModal}
-                    stealthAttackModal={stealthAttackModal} setStealthAttackModal={setStealthAttackModal}
-                    revelationInFleshModal={revelationInFleshModal} setRevelationInFleshModal={setRevelationInFleshModal}
-                    bastionOfLawModal={bastionOfLawModal} setBastionOfLawModal={setBastionOfLawModal}
-                    elementalAffinityModal={elementalAffinityModal} setElementalAffinityModal={setElementalAffinityModal}
-                    fiendishResilienceModal={fiendishResilienceModal} setFiendishResilienceModal={setFiendishResilienceModal}
-                    boonOfEnergyResistanceModal={boonOfEnergyResistanceModal} setBoonOfEnergyResistanceModal={setBoonOfEnergyResistanceModal}
-                    dragonCompanionModal={dragonCompanionModal} setDragonCompanionModal={setDragonCompanionModal}
-                    wildMagicDoubleRollModal={wildMagicDoubleRollModal} setWildMagicDoubleRollModal={setWildMagicDoubleRollModal}
-                    wildMagicTamedModal={wildMagicTamedModal} setWildMagicTamedModal={setWildMagicTamedModal}
-                    thirdEyeModal={thirdEyeModal} setThirdEyeModal={setThirdEyeModal}
-                    soulstitchSpellsModal={soulstitchSpellsModal} setSoulstitchSpellsModal={setSoulstitchSpellsModal}
-                    illusoryRealityModal={illusoryRealityModal} setIllusoryRealityModal={setIllusoryRealityModal}
-                    celestialRevelationModal={celestialRevelationModal} setCelestialRevelationModal={setCelestialRevelationModal}
-                    elfishLineageModal={elfishLineageModal} setElfisLineageModal={setElfisLineageModal}
-                    gnomishLineageModal={gnomishLineageModal} setGnomishLineageModal={setGnomishLineageModal}
-                    fiendishLegacyModal={fiendishLegacyModal} setFiendishLegacyModal={setFiendishLegacyModal}
-                    giantAncestryModal={giantAncestryModal} setGiantAncestryModal={setGiantAncestryModal}
-                    hypnoticPatternShakeModal={hypnoticPatternShakeModal} setHypnoticPatternShakeModal={setHypnoticPatternShakeModal}
-                    arcaneWardRestoreModal={arcaneWardRestoreModal} setArcaneWardRestoreModal={setArcaneWardRestoreModal}
-                    eyebiteEffectModal={eyebiteEffectModal} setEyebiteEffectModal={setEyebiteEffectModal}
-                    breathWeaponShapeModal={breathWeaponShapeModal} setBreathWeaponShapeModal={setBreathWeaponShapeModal}
-                    divineFuryChoice={divineFuryChoice}
-                    damageTypeChoice={damageTypeChoice}
-                    featureChoice={featureChoice}
+                    modalState={modalState}
+                    setModalState={setModalState}
+                    combatSuperiorityModal={combatSuperiorityModal}
+                    setCombatSuperiorityModal={setCombatSuperiorityModal}
+                    handleCombatSuperiorityConfirm={handleCombatSuperiorityConfirm}
+                    handleAttackRiderManeuverUse={handleAttackRiderManeuverUse}
+                    handleAttackRiderManeuverSkip={handleAttackRiderManeuverSkip}
+                    handleSweepingAttackConfirm={handleSweepingAttackConfirm}
+                    handleBaitAndSwitchChoiceConfirm={handleBaitAndSwitchChoiceConfirm}
+                    handleCommanderStrikeChoiceConfirm={handleCommanderStrikeChoiceConfirm}
+                    handleRallyChoiceConfirm={handleRallyChoiceConfirm}
+                    handleBulwarkOfForceConfirm={handleBulwarkOfForceConfirm}
+                    handleCoronaEnemySelectionConfirm={handleCoronaEnemySelectionConfirm}
+                    handleRadianceOfDawnConfirm={handleRadianceOfDawnConfirm}
+                    handleMantleOfInspirationConfirm={handleMantleOfInspirationConfirm}
+                    handleTricksterBlessingConfirm={handleTricksterBlessingConfirm}
+                    handleBardicInspirationConfirm={handleBardicInspirationConfirm}
+                    handleInspiringMovementConfirm={handleInspiringMovementConfirm}
+                    handleDivineInterventionCast={handleDivineInterventionCast}
+                    pendingDamage={pendingDamage}
+                    buildCtx={buildCtx}
+                    buildCtxSync={buildCtxSync}
+                    autoDamageContext={autoDamageRollContext}
+                    rollDamage={rollDamage}
+                    setPopupHtml={setPopupHtml}
+                    mapName={mapName}
                     handleMasteryClose={handleMasteryClose}
                     handleWeaponMasteryChoice={handleWeaponMasteryChoice}
                     handleWeaponKindMasteryClose={handleWeaponKindMasteryClose}
@@ -1769,41 +1675,6 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     handleFeatureChoiceSkip={handleFeatureChoiceSkip}
                     handleConstellationSelect={handleConstellationSelect}
                     handleElderChampionRestore={handleElderChampionRestore}
-                    handleDivineInterventionCast={handleDivineInterventionCast}
-                    pendingDamage={pendingDamage}
-                    buildCtx={buildCtx}
-                    buildCtxSync={buildCtxSync}
-                    autoDamageContext={autoDamageRollContext}
-                    rollDamage={rollDamage}
-                    setPopupHtml={setPopupHtml}
-                    mapName={mapName}
-                    combatSuperiorityModal={combatSuperiorityModal} setCombatSuperiorityModal={setCombatSuperiorityModal}
-                    attackRiderManeuverPrompt={attackRiderManeuverPrompt} setAttackRiderManeuverPrompt={setAttackRiderManeuverPrompt}
-                    sweepingAttackTargetModal={sweepingAttackTargetModal} setSweepingAttackTargetModal={setSweepingAttackTargetModal}
-                    handleSweepingAttackConfirm={handleSweepingAttackConfirm}
-                    baitAndSwitchChoiceModal={baitAndSwitchChoiceModal} setBaitAndSwitchChoiceModal={setBaitAndSwitchChoiceModal}
-                    handleBaitAndSwitchChoiceConfirm={handleBaitAndSwitchChoiceConfirm}
-                    commanderStrikeChoiceModal={commanderStrikeChoiceModal} setCommanderStrikeChoiceModal={setCommanderStrikeChoiceModal}
-                    handleCommanderStrikeChoiceConfirm={handleCommanderStrikeChoiceConfirm}
-                    rallyChoiceModal={rallyChoiceModal} setRallyChoiceModal={setRallyChoiceModal}
-                    handleRallyChoiceConfirm={handleRallyChoiceConfirm}
-                    bulwarkOfForceModal={bulwarkOfForceModal} setBulwarkOfForceModal={setBulwarkOfForceModal}
-                    handleBulwarkOfForceConfirm={handleBulwarkOfForceConfirm}
-                    coronaEnemySelectionModal={coronaEnemySelectionModal} setCoronaEnemySelectionModal={setCoronaEnemySelectionModal}
-                    handleCoronaEnemySelectionConfirm={handleCoronaEnemySelectionConfirm}
-                    radianceOfDawnModal={radianceOfDawnModal} setRadianceOfDawnModal={setRadianceOfDawnModal}
-                    handleRadianceOfDawnConfirm={handleRadianceOfDawnConfirm}
-                    mantleOfInspirationModal={mantleOfInspirationTarget} setMantleOfInspirationModal={setMantleOfInspirationTarget}
-                    handleMantleOfInspirationConfirm={handleMantleOfInspirationConfirm}
-                    tricksterBlessingModal={tricksterBlessingModal} setTricksterBlessingModal={setTricksterBlessingModal}
-                    handleTricksterBlessingConfirm={handleTricksterBlessingConfirm}
-                    bardicInspirationTargetModal={bardicInspirationTargetModal}
-                    handleBardicInspirationConfirm={handleBardicInspirationConfirm}
-                    inspiringMovementAllyModal={inspiringMovementAllyModal}
-                    handleInspiringMovementConfirm={handleInspiringMovementConfirm}
-                    handleCombatSuperiorityConfirm={handleCombatSuperiorityConfirm}
-                    handleAttackRiderManeuverUse={handleAttackRiderManeuverUse}
-                    handleAttackRiderManeuverSkip={handleAttackRiderManeuverSkip}
                 />
                 <CharActionSpellPopups
                     playerStats={playerStats}
@@ -1929,15 +1800,15 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     onClose={handleTacticalMasterDismiss}
                 />
             )}
-            {secondaryTargetModal && (
+            {modalState.secondaryTargetModal && (
                 <SecondaryTargetModal
-                    title={secondaryTargetModal.title}
-                    targets={secondaryTargetModal.targets}
-                    onTargetSelected={secondaryTargetModal.onTargetSelected}
-                    onSkip={secondaryTargetModal.onSkip}
-                    featureDescription={secondaryTargetModal.featureDescription}
-                    description={secondaryTargetModal.description}
-                    confirmLabel={secondaryTargetModal.confirmLabel}
+                    title={modalState.secondaryTargetModal.title}
+                    targets={modalState.secondaryTargetModal.targets}
+                    onTargetSelected={modalState.secondaryTargetModal.onTargetSelected}
+                    onSkip={modalState.secondaryTargetModal.onSkip}
+                    featureDescription={modalState.secondaryTargetModal.featureDescription}
+                    description={modalState.secondaryTargetModal.description}
+                    confirmLabel={modalState.secondaryTargetModal.confirmLabel}
                 />
             )}
         </div>
