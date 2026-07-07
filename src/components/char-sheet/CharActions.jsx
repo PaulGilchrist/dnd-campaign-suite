@@ -12,8 +12,7 @@ import useLoggedDiceRoll from '../../hooks/combat/useLoggedDiceRoll.js'
 import { useDiceRollPopup } from '../../hooks/combat/DiceRollContext.js'
 import { showWeaponMasteryPopup, buildFeatureDetailHtml } from '../../hooks/combat/useActionPopup.js'
 import { useSpellUpcastFlow } from '../../hooks/combat/useSpellUpcastFlow.js'
-import { rollExpression, rollExpressionDoubled, rollExpressionMaximized } from '../../services/dice/diceRoller.js';
-import { getCurrentCombatRound } from '../../services/encounters/combatData.js';
+import { rollExpression } from '../../services/dice/diceRoller.js';
 import { computeFeatRangeEffects } from '../../services/character/featRangeService.js';
 import { hasAutomation } from '../../services/combat/automation/automationService.js'
 import { isExhausted } from '../../services/automation/handlers/combat/saveAttackHandler.js'
@@ -41,13 +40,10 @@ import { applyInspiringMovement } from '../../services/automation/handlers/react
 import { confirmMantleOfInspiration } from '../../services/automation/handlers/buffs/tempHpBuffHandler.js';
 import { endFriendsOnHostileAction } from '../../services/rules/features/friendsService.js';
 import { endInvisibilityOnHostileAction } from '../../services/rules/features/invisibilityService.js';
-import { applyDamageToTarget } from '../../services/rules/combat/applyDamage.js';
 import { getDistanceFeet } from '../../services/rules/combat/rangeValidation.js';
 import { getInnateSorceryBonus } from '../../services/combat/buffs/buffService.js';
-import { hasBardicInspirationOffense, getBardicInspirationDieSize, getBardicInspirationDieSizeFromClass } from '../../services/combat/auras/bardicInspirationState.js';
 import { buildAttackContext, buildAttackContextSync } from '../../services/automation/contextBuilder.js';
 import { buildEmpoweredSpellState, getEmpoweredSpellDescription } from '../../services/rules/spells/empoweredSpellService.js';
-import { getEmpoweredEvocationFeatures, getEmpoweredEvocationIntModifier } from '../../services/rules/spells/postCastRiderService.js';
 import { useActionSpellMetamagic } from '../../hooks/combat/useActionSpellMetamagic.js';
 import { useSimpleDamageRoll } from '../../hooks/combat/useSimpleDamageRoll.js';
 import { useSpellPositionResolver } from '../../hooks/combat/useSpellPositionResolver.js';
@@ -58,6 +54,7 @@ import useCharActionModals from './useCharActionModals.js';
 import useInitiativeEffects from './useInitiativeEffects.js';
 import SecondaryTargetModal from './modals/shared/SecondaryTargetModal.jsx';
 import TacticalMasterModal from './modals/TacticalMasterModal.jsx';
+import { normalizeAutoDamage } from './useAttackDamageResolution.js';
 
 import './CharActions.css'
 import { isEqual } from 'lodash';
@@ -78,7 +75,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
     const [actions, setActions] = useState([]);
     const [selectedActionSpell, setSelectedActionSpell] = useState(null);
     const [featRangeEffects, setFeatRangeEffects] = useState(null);
-    const [autoDamageRollContext, setAutoDamageRollContext] = useSyncedState(campaignName, 'autoDamageContext', null);
+    const [autoDamageRollContext] = useSyncedState(campaignName, 'autoDamageContext', null);
     const { saveDcBonus: displaySaveDcBonus } = getInnateSorceryBonus(playerStats.name, campaignName);
     const { popupHtml, setPopupHtml } = useDiceRollPopup();
 
@@ -97,530 +94,132 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         characters,
         autoDamageSource: 'char-actions',
         autoDamageRoll: async (autoDamage, isCrit) => {
-            let autoFormula = autoDamage.formula;
-            const hasEmpoweredEvoc = getEmpoweredEvocationFeatures(playerStats).length > 0;
-            const empEvocIntMod = hasEmpoweredEvoc ? getEmpoweredEvocationIntModifier(playerStats) : 0;
-            const spellSchool = (autoDamage.autoDamageSchool || '').toLowerCase();
-            const isEvocation = spellSchool === 'evocation';
-            const shouldApplyEmpoweredEvoc = hasEmpoweredEvoc && isEvocation && empEvocIntMod > 0;
-            if (shouldApplyEmpoweredEvoc) {
-                autoFormula = `${autoFormula} + ${empEvocIntMod} [Empowered Evocation]`;
-            }
+            const { attack, ctx: ctxOverrides } = normalizeAutoDamage(autoDamage, isCrit, playerStats);
+            await resolveAttackDamage(attack, ctxOverrides);
 
-            // Apply weapon_attack_hit damage bonus automations (e.g. Blessed Strikes, Divine Strike, Primal Strike)
-            // These are applied as a separate damage roll after the base weapon damage
-            const isWeaponAttack = !autoDamage.autoDamageSchool && !autoDamage.overchannelActive;
-            let pendingBonusDamage = null;
-            if (isWeaponAttack && playerStats.automation?.actions) {
-                const allAutomation = [
-                    ...(playerStats.automation.actions || []),
-                    ...(playerStats.automation.passives || []),
-                ];
-                const upgradedNames = new Set(allAutomation.filter(b => b.upgrades).map(b => b.upgrades));
-                const weaponHitBonuses = playerStats.automation.actions.filter(
-                    a => a.type === 'damage_bonus' && (a.trigger === 'weapon_attack_hit' || a.trigger === 'weapon_or_beast_form_attack_hit')
-                ).filter(b => !upgradedNames.has(b.name));
-                for (const bonus of weaponHitBonuses) {
-                    const optionKey = `_${bonus.name.replace(/\s+/g, '_')}_option`;
-                    const chosenOption = getRuntimeValue(playerStats.name, optionKey, campaignName);
-                    const selected = chosenOption || bonus.options?.[0] || '';
-                    if (bonus.options?.length > 0) {
-                        const isStrikeOption = selected.toLowerCase().includes('strike');
-                        if (!isStrikeOption) continue;
-                    }
-                    const usedKey = `_${bonus.name.replace(/\s+/g, '_')}_usedRound`;
-                    const currentRound = getCurrentCombatRound();
-                    if (bonus.uses_expression && bonus.recharge) {
-                        const usesKey = `_${bonus.name.replace(/\s+/g, '_')}_uses`;
-                        const currentUses = Number(getRuntimeValue(playerStats.name, usesKey, campaignName) ?? bonus.usesMax);
-                        if (currentUses <= 0) continue;
-                    }
-                    const bonusResult = rollExpression(bonus.damageExpression);
-                    if (bonusResult) {
-                        const damageType = bonus.damageType || '';
-                        if (damageType.includes(' or ')) {
-                            const types = damageType.split(/\s+or\s+/).flatMap(t => t.split(/\s+/)).filter(Boolean);
-                            pendingBonusDamage = {
-                                bonusName: bonus.name,
-                                damageExpression: bonus.damageExpression,
-                                rolls: bonusResult.rolls,
-                                total: bonusResult.total,
-                                damageTypes: types,
-                                usedKey,
-                                currentRound,
-                            };
-                        } else {
-                            const context = {
-                                damageType,
-                                targetName: autoDamage.targetName,
-                                attackerName: autoDamage.attackerName,
-                            };
-                            rollDamage(bonus.name, bonus.damageExpression, bonusResult.total, bonusResult.rolls, 0, context);
-                            if (bonus.oncePerTurn) {
-                                setRuntimeValue(playerStats.name, usedKey, currentRound, campaignName);
-                            }
-                            if (bonus.uses_expression && bonus.recharge) {
-                                const usesKey = `_${bonus.name.replace(/\s+/g, '_')}_uses`;
-                                const currentUses = Number(getRuntimeValue(playerStats.name, usesKey, campaignName) ?? bonus.usesMax);
-                                if (currentUses > 0) {
-                                    setRuntimeValue(playerStats.name, usesKey, currentUses - 1, campaignName);
+            // Post-damage mastery effects (Cleave, Tactical Master, Topple) — run after pipeline completes
+            if (autoDamage.targetName) {
+                try {
+                    const combatSummary = await loadCombatSummary(campaignName);
+                    const lastAttack = combatSummary?.lastAttack;
+                    if (lastAttack?.hit) {
+                        const available = collectWeaponMastery(lastAttack.attackName, playerStats);
+                        const allMasteries = [available.baseMastery, ...(available.extraMasteries || [])].filter(Boolean);
+
+                        // Cleave: show secondary target selection
+                        if (allMasteries.includes('Cleave')) {
+                            const firstTarget = combatSummary?.creatures?.find(c => c.name === lastAttack.targetName);
+                            const mapName = playerStats?.mapName;
+                            const hasMapPositions = mapName && firstTarget?.position;
+
+                            let secondTargets;
+                            if (hasMapPositions) {
+                                const attackerPos = combatSummary?.creatures?.find(c => c.name === playerStats.name)?.position;
+                                const reach = 8;
+                                if (attackerPos) {
+                                    secondTargets = combatSummary.creatures
+                                        .filter(c => c.name !== lastAttack.targetName && c.position)
+                                        .map(c => ({
+                                            ...c,
+                                            ...resolveCreatureHp(c, playerStats),
+                                            distanceFromFirst: getDistanceFeet(firstTarget.position, c.position),
+                                            distanceFromAttacker: getDistanceFeet(attackerPos, c.position),
+                                        }))
+                                        .filter(t => t.distanceFromFirst !== null && t.distanceFromFirst <= 5 && t.distanceFromAttacker !== null && t.distanceFromAttacker <= reach);
                                 }
+                            }
+
+                            if (!hasMapPositions || !secondTargets) {
+                                secondTargets = combatSummary.creatures
+                                    .filter(c => c.name !== lastAttack.targetName)
+                                    .map(c => ({ ...c, ...resolveCreatureHp(c, playerStats) }));
+                            }
+
+                            if (secondTargets.length > 0) {
+                                setCleaveSecondTargets(secondTargets);
+                                setShowCleaveTargetSelection(true);
                             }
                         }
-                    }
-                }
-            }
 
-            const isOverchannel = autoDamage.overchannelActive;
-            const overchannelUseCount = autoDamage.overchannelUseCount || 0;
-            const overchannelSpellLevel = autoDamage.overchannelSpellLevel || 1;
+                        // Tactical Master: mastery replacement choice or auto-apply
+                        if (available.replaceMasteryOptions?.length > 0) {
+                            setTacticalMasterModal({
+                                attackName: lastAttack.attackName,
+                                baseMastery: available.baseMastery,
+                                replaceOptions: available.replaceMasteryOptions,
+                                targetName: lastAttack.targetName,
+                            });
+                        } else {
+                            try {
+                                await applyPostDamageMasteryEffects(lastAttack.attackName, playerStats, campaignName, combatSummary);
+                            } catch (e) {
+                                console.error('[Mastery] Post-damage mastery error:', e);
+                            }
+                        }
 
-            let overchannelResult;
-            if (isOverchannel) {
-                overchannelResult = rollExpressionMaximized(autoFormula);
-            } else {
-                overchannelResult = isCrit ? rollExpressionDoubled(autoFormula) : rollExpression(autoFormula);
-            }
+                        // Topple: CON save or prone
+                        await new Promise(r => setTimeout(r, SHOW_DICE_ROLL_DELAY));
+                        if (allMasteries.includes('Topple')) {
+                            try {
+                                const toppleTargetName = combatSummary.lastAttack.targetName;
+                                const weaponAttack = playerStats.attacks?.find(a => a.name === lastAttack.attackName);
+                                const abilityName = weaponAttack?.abilityName || 'Strength';
+                                const ability = playerStats.abilities?.find(a => a.name === abilityName);
+                                const abilityMod = ability?.bonus || 0;
+                                const prof = playerStats.proficiency || 0;
+                                const saveDc = 8 + abilityMod + prof;
 
-            // Combat Inspiration - Offense: flag to show BI button on damage popup
-            const hasOffense = hasBardicInspirationOffense(playerStats, campaignName);
-            const dieSize = getBardicInspirationDieSize(playerStats.name, campaignName) || getBardicInspirationDieSizeFromClass(playerStats);
-            const biUsesRaw = getRuntimeValue(playerStats.name, 'bardicInspirationUses', campaignName);
-            const biUsesNum = (typeof biUsesRaw === 'object' && biUsesRaw !== null) ? biUsesRaw.current : (biUsesRaw != null ? Number(biUsesRaw) : (playerStats?._trackedResources?.bardicInspirationUses?.current ?? 0));
-            if (hasOffense && dieSize && biUsesNum > 0) {
-                autoDamage.bardicInspirationOffense = true;
-                autoDamage.bardicInspirationOffenseDieSize = dieSize;
-            }
+                                const { promptId, promise } = createSaveListener(campaignName, {
+                                    targetName: toppleTargetName,
+                                    saveType: 'CON',
+                                    saveDc,
+                                });
 
-            // Add Sneak Attack damage for Rogue class feature
-            const sneakAttackDice = autoDamage.sneakAttackDice || 0;
-            if (sneakAttackDice > 0 && overchannelResult) {
-                const cunningStrikePassive = (playerStats.automation?.passives || []).find(
-                    p => p.name === 'Devious Strikes' && p.type === 'attack_rider'
-                ) || (playerStats.automation?.passives || []).find(
-                    p => p.name === 'Improved Cunning Strike' && p.type === 'attack_rider'
-                ) || (playerStats.automation?.passives || []).find(
-                    p => p.name === 'Cunning Strike' && p.type === 'attack_rider'
-                );
-                const hasCunningStrike = !!cunningStrikePassive;
-                if (hasCunningStrike) {
-                    const currentRound = getCurrentCombatRound();
-                    const oncePerRound = getRuntimeValue(playerStats.name, '_CunningStrike_usedRound', campaignName);
-                    const skipRound = getRuntimeValue(playerStats.name, '_cunningStrikeSkippedRound', campaignName);
-                    if (oncePerRound !== currentRound && skipRound !== currentRound) {
-                        await setRuntimeValue(playerStats.name, '_SneakAttack_usedRound', currentRound, campaignName);
-                        const cs = await getCombatContext(campaignName);
-                        const target = cs ? getTargetFromAttacker(cs, playerStats.name) : null;
-                        setAutoDamageRollContext({
-                            formula: autoFormula,
-                            total: overchannelResult.total,
-                            rolls: overchannelResult.rolls,
-                            modifier: overchannelResult.modifier,
-                            context: {
-                                damageType: autoDamage.damageType,
-                                targetName: autoDamage.targetName,
-                                attackerName: autoDamage.attackerName,
-                                saveDc: autoDamage.saveDc,
-                                saveType: autoDamage.saveType,
-                                dcSuccess: autoDamage.dcSuccess,
-                                isAutoCrit: isCrit,
-                                playerStats,
-                                doubledRolls: overchannelResult.doubledRolls,
-                            },
-                            attackName: autoDamage.name,
-                            sneakAttackDice: sneakAttackDice,
-                        });
-                        setModalState({ attackRiderModal: {
-                            action: cunningStrikePassive,
-                            playerStats,
-                            campaignName,
-                            targetName: target?.name || null,
-                        }});
+                                addEntry(campaignName, {
+                                    type: 'save_triggered',
+                                    characterName: playerStats.name,
+                                    targetName: toppleTargetName,
+                                    saveType: 'CON',
+                                    saveDc,
+                                    description: `Topple: ${toppleTargetName} must make a DC ${saveDc} CON save (weapon ${abilityName}) or fall Prone.`,
+                                    promptId,
+                                });
 
-                        // Rend Mind (Soulknife level 17) — WIS save or Stunned on Psychic Blade sneak attack hit
-                        const attackName = autoDamage.name || '';
-                        const isPsychicBlade = attackName.includes('Psychic Blade');
-                        if (sneakAttackDice > 0 && isPsychicBlade) {
-                            const passives = playerStats.automation?.passives || [];
-                            const rendMind = passives.find(
-                                a => a.type === 'attack_rider' && a.trigger === 'psychic_blade_sneak_attack_hit' && a.saveType
-                            );
-                            if (rendMind) {
-                                const rendMindUsedKey = '_RendMind_Used';
-                                const rendMindUsed = getRuntimeValue(playerStats.name, rendMindUsedKey, campaignName);
-                                if (rendMindUsed) {
-                                    const lastLongRest = getRuntimeValue(playerStats.name, '_LastLongRest', campaignName);
-                                    const currentLongRest = getRuntimeValue(playerStats.name, '_CurrentLongRest', campaignName);
-                                    if (lastLongRest !== currentLongRest) {
-                                        await setRuntimeValue(playerStats.name, rendMindUsedKey, false, campaignName);
+                                const result = await promise;
+
+                                if (result && !result.success) {
+                                    const storedConditions = getRuntimeValue(toppleTargetName, 'activeConditions') || [];
+                                    const conditions = Array.isArray(storedConditions) ? storedConditions : [];
+                                    if (!conditions.includes('prone')) {
+                                        await setRuntimeValue(toppleTargetName, 'activeConditions', [...conditions, 'prone'], campaignName);
                                     }
-                                }
-                                const rendMindActive = getRuntimeValue(playerStats.name, rendMindUsedKey, campaignName);
-                                if (!rendMindActive && target?.name) {
-                                    const dexAbility = playerStats.abilities?.find(a => a.name === 'Dexterity');
-                                    const dexMod = dexAbility?.bonus || 0;
-                                    const prof = playerStats.proficiency || 0;
-                                    const saveDc = 8 + dexMod + prof;
-                                    const { promise } = createSaveListener(campaignName, {
-                                        targetName: target.name,
-                                        saveType: 'WIS',
+
+                                    addEntry(campaignName, {
+                                        type: 'save_result',
+                                        characterName: playerStats.name,
+                                        rollType: 'save-topple',
+                                        targetName: toppleTargetName,
                                         saveDc,
-                                    });
-                                    await setRuntimeValue(playerStats.name, rendMindUsedKey, true, campaignName);
-                                    const saveResult = await promise;
-                                    if (!saveResult.success) {
-                                        const conditions = getRuntimeValue(target.name, 'activeConditions') || [];
-                                        if (!conditions.some(c => String(c).toLowerCase() === 'stunned')) {
-                                            await setRuntimeValue(target.name, 'activeConditions', [...conditions, 'stunned'], campaignName);
-                                        }
-                                    }
+                                        saveType: 'CON',
+                                        success: false,
+                                        description: `${toppleTargetName} failed CON save vs Topple. Gains Prone condition.`,
+                                    }).catch((e) => { console.error("[Topple] Error:", e); });
+
                                     addEntry(campaignName, {
                                         type: 'ability_use',
                                         characterName: playerStats.name,
-                                        abilityName: 'Rend Mind',
-                                        description: `Rend Mind triggered on ${target.name} — ${saveResult?.success ? 'succeeded' : 'failed'} WIS save (DC ${saveDc})${saveResult?.success ? '' : ' — Stunned condition applied'}`,
-                                        targetName: target.name,
-                                    }).catch(() => { });
-                                }
-                            }
-                        }
-
-                        return;
-                    }
-                    if (skipRound === currentRound) {
-                        setRuntimeValue(playerStats.name, '_cunningStrikeSkippedRound', null, campaignName);
-                    }
-                }
-                const sneakAttackFormula = `${sneakAttackDice}d6`;
-                const sneakAttackResult = isCrit ? rollExpressionDoubled(sneakAttackFormula) : rollExpression(sneakAttackFormula);
-                if (sneakAttackResult) {
-                    autoFormula += ` + ${sneakAttackFormula} [Sneak Attack]`;
-                    overchannelResult.total += sneakAttackResult.total;
-                    overchannelResult.rolls = [...overchannelResult.rolls, ...sneakAttackResult.rolls];
-                    await setRuntimeValue(playerStats.name, '_SneakAttack_usedRound', getCurrentCombatRound(), campaignName);
-                }
-            }
-
-            // Rend Mind (Soulknife level 17) — WIS save or Stunned on Psychic Blade sneak attack hit
-            const attackName = autoDamage.name || '';
-            const isPsychicBlade = attackName.includes('Psychic Blade');
-            if (sneakAttackDice > 0 && isPsychicBlade) {
-                const passives = playerStats.automation?.passives || [];
-                const rendMind = passives.find(
-                    a => a.type === 'attack_rider' && a.trigger === 'psychic_blade_sneak_attack_hit' && a.saveType
-                );
-                if (rendMind) {
-                    const rendMindUsedKey = '_RendMind_Used';
-                    const rendMindUsed = getRuntimeValue(playerStats.name, rendMindUsedKey, campaignName);
-                    if (rendMindUsed) {
-                        const lastLongRest = getRuntimeValue(playerStats.name, '_LastLongRest', campaignName);
-                        const currentLongRest = getRuntimeValue(playerStats.name, '_CurrentLongRest', campaignName);
-                        if (lastLongRest !== currentLongRest) {
-                            await setRuntimeValue(playerStats.name, rendMindUsedKey, false, campaignName);
-                        }
-                    }
-                    const rendMindActive = getRuntimeValue(playerStats.name, rendMindUsedKey, campaignName);
-                    if (!rendMindActive && autoDamage.targetName) {
-                        const dexAbility = playerStats.abilities?.find(a => a.name === 'Dexterity');
-                        const dexMod = dexAbility?.bonus || 0;
-                        const prof = playerStats.proficiency || 0;
-                        const saveDc = 8 + dexMod + prof;
-                        const { promise } = createSaveListener(campaignName, {
-                            targetName: autoDamage.targetName,
-                            saveType: 'WIS',
-                            saveDc,
-                        });
-                        await setRuntimeValue(playerStats.name, rendMindUsedKey, true, campaignName);
-                        const saveResult = await promise;
-                        if (!saveResult.success) {
-                            const conditions = getRuntimeValue(autoDamage.targetName, 'activeConditions') || [];
-                            if (!conditions.some(c => String(c).toLowerCase() === 'stunned')) {
-                                await setRuntimeValue(autoDamage.targetName, 'activeConditions', [...conditions, 'stunned'], campaignName);
-                            }
-                        }
-                        addEntry(campaignName, {
-                            type: 'ability_use',
-                            characterName: playerStats.name,
-                            abilityName: 'Rend Mind',
-                            description: `Rend Mind triggered on ${autoDamage.targetName} — ${saveResult?.success ? 'succeeded' : 'failed'} WIS save (DC ${saveDc})${saveResult?.success ? '' : ' — Stunned condition applied'}`,
-                            targetName: autoDamage.targetName,
-                        }).catch(() => { });
-                    }
-                }
-            }
-
-            if (overchannelResult) {
-                const context = {
-                    damageType: autoDamage.damageType,
-                    targetName: autoDamage.targetName,
-                    attackerName: autoDamage.attackerName,
-                    saveDc: autoDamage.saveDc,
-                    saveType: autoDamage.saveType,
-                    dcSuccess: autoDamage.dcSuccess,
-                    isAutoCrit: isCrit,
-                    playerStats,
-                    doubledRolls: overchannelResult.doubledRolls,
-                    bardicInspirationOffense: autoDamage.bardicInspirationOffense,
-                    bardicInspirationOffenseDieSize: autoDamage.bardicInspirationOffenseDieSize,
-                };
-                if (autoDamage.metamagicTwinTarget) {
-                    context.metamagicTwinTarget = autoDamage.metamagicTwinTarget;
-                }
-                if (autoDamage.metamagicHeighten) {
-                    context.metamagicHeighten = autoDamage.metamagicHeighten;
-                }
-
-                // When there's a pending type choice, apply base damage normally then show type choice popup after delay
-                if (isWeaponAttack && pendingBonusDamage) {
-                    const { bonusName, damageExpression, rolls: bonusRolls, total: bonusTotal, damageTypes, usedKey, currentRound } = pendingBonusDamage;
-                    const baseFormula = autoFormula;
-                    const baseTotal = overchannelResult.total;
-                    const baseRolls = overchannelResult.rolls;
-                    rollDamage(autoDamage.name, autoFormula, overchannelResult.total, overchannelResult.rolls, overchannelResult.modifier, context);
-                    setTimeout(() => {
-                        setPopupHtml({
-                            type: 'damage_type_choice',
-                            name: `${bonusName} — Damage Type`,
-                            types: damageTypes,
-                            baseFormula,
-                            baseTotal,
-                            baseRolls,
-                            bonusFormula: damageExpression,
-                            bonusRolls,
-                            bonusTotal,
-                            usedKey,
-                            currentRound,
-                            targetName: autoDamage.targetName,
-                            attackerName: autoDamage.attackerName,
-                        });
-                    }, SHOW_DICE_ROLL_DELAY);
-                } else {
-                    rollDamage(autoDamage.name, autoFormula, overchannelResult.total, overchannelResult.rolls, overchannelResult.modifier, context);
-                }
-
-                // Post-damage: check for Cleave mastery and show target selection if applicable
-                if (autoDamage.targetName) {
-                    try {
-                        const combatSummary = await loadCombatSummary(campaignName);
-                        const lastAttack = combatSummary?.lastAttack;
-                        if (lastAttack?.hit) {
-                            const available = collectWeaponMastery(lastAttack.attackName, playerStats);
-                            const allMasteries = [available.baseMastery, ...(available.extraMasteries || [])].filter(Boolean);
-                            if (allMasteries.includes('Cleave')) {
-                                const firstTarget = combatSummary?.creatures?.find(c => c.name === lastAttack.targetName);
-
-                                // Check if there's an active map with position data
-                                const mapName = playerStats?.mapName;
-                                const hasMapPositions = mapName && firstTarget?.position;
-
-                                let secondTargets;
-                                if (hasMapPositions) {
-                                    const attackerPos = combatSummary?.creatures?.find(c => c.name === playerStats.name)?.position;
-                                    const reach = 8;
-                                    if (attackerPos) {
-                                        secondTargets = combatSummary.creatures
-                                            .filter(c => c.name !== lastAttack.targetName && c.position)
-                                            .map(c => ({
-                                                ...c,
-                                                ...resolveCreatureHp(c, playerStats),
-                                                distanceFromFirst: getDistanceFeet(firstTarget.position, c.position),
-                                                distanceFromAttacker: getDistanceFeet(attackerPos, c.position),
-                                            }))
-                                            .filter(t => t.distanceFromFirst !== null && t.distanceFromFirst <= 5 && t.distanceFromAttacker !== null && t.distanceFromAttacker <= reach);
-                                    }
-                                }
-
-                                // No map or no attacker position — all creatures in range
-                                if (!hasMapPositions || !secondTargets) {
-                                    secondTargets = combatSummary.creatures
-                                        .filter(c => c.name !== lastAttack.targetName)
-                                        .map(c => ({ ...c, ...resolveCreatureHp(c, playerStats) }));
-                                }
-
-                                if (secondTargets.length > 0) {
-                                    setCleaveSecondTargets(secondTargets);
-                                    setShowCleaveTargetSelection(true);
-                                }
-                            }
-
-                            // Tactical Master: if weapon has a mastery and replaceMasteryOptions exist,
-                            // show a modal to choose which mastery to apply instead of auto-applying.
-                            if (available.replaceMasteryOptions?.length > 0) {
-                                setTacticalMasterModal({
-                                    attackName: lastAttack.attackName,
-                                    baseMastery: available.baseMastery,
-                                    replaceOptions: available.replaceMasteryOptions,
-                                    targetName: lastAttack.targetName,
-                                });
-                            } else {
-                                // Apply post-damage mastery effects (Sap, Slow, Vex, Push, Nick)
-                                try {
-                                    await applyPostDamageMasteryEffects(lastAttack.attackName, playerStats, campaignName, combatSummary);
-                                } catch (e) {
-                                    console.error('[Mastery] Post-damage mastery error:', e);
-                                }
-                            }
-
-                            // Topple weapon mastery: standalone flow after attack is fully complete.
-                            // Yield to React so the damage popup renders before the save prompt overlays it.
-                            await new Promise(r => setTimeout(r, SHOW_DICE_ROLL_DELAY));
-                            if (allMasteries.includes('Topple')) {
-                                try {
-                                    const toppleTargetName = combatSummary.lastAttack.targetName;
-
-                                    const weaponAttack = playerStats.attacks?.find(a => a.name === lastAttack.attackName);
-                                    const abilityName = weaponAttack?.abilityName || 'Strength';
-                                    const ability = playerStats.abilities?.find(a => a.name === abilityName);
-                                    const abilityMod = ability?.bonus || 0;
-                                    const prof = playerStats.proficiency || 0;
-                                    const saveDc = 8 + abilityMod + prof;
-
-                                    const { promptId, promise } = createSaveListener(campaignName, {
+                                        abilityName: 'Topple',
+                                        description: `${playerStats.name} used Topple on ${toppleTargetName} — target failed CON save (DC ${saveDc}, weapon ${abilityName}), fell Prone.`,
                                         targetName: toppleTargetName,
-                                        saveType: 'CON',
-                                        saveDc,
-                                    });
-
-                                    addEntry(campaignName, {
-                                        type: 'save_triggered',
-                                        characterName: playerStats.name,
-                                        targetName: toppleTargetName,
-                                        saveType: 'CON',
-                                        saveDc,
-                                        description: `Topple: ${toppleTargetName} must make a DC ${saveDc} CON save (weapon ${abilityName}) or fall Prone.`,
-                                        promptId,
-                                    });
-
-                                    const result = await promise;
-
-                                    if (result && !result.success) {
-                                        const storedConditions = getRuntimeValue(toppleTargetName, 'activeConditions') || [];
-                                        const conditions = Array.isArray(storedConditions) ? storedConditions : [];
-                                        if (!conditions.includes('prone')) {
-                                            await setRuntimeValue(toppleTargetName, 'activeConditions', [...conditions, 'prone'], campaignName);
-                                        }
-
-                                        addEntry(campaignName, {
-                                            type: 'save_result',
-                                            characterName: playerStats.name,
-                                            rollType: 'save-topple',
-                                            targetName: toppleTargetName,
-                                            saveDc,
-                                            saveType: 'CON',
-                                            success: false,
-                                            description: `${toppleTargetName} failed CON save vs Topple. Gains Prone condition.`,
-                                        }).catch((e) => { console.error("[Topple] Error:", e); });
-
-                                        addEntry(campaignName, {
-                                            type: 'ability_use',
-                                            characterName: playerStats.name,
-                                            abilityName: 'Topple',
-                                            description: `${playerStats.name} used Topple on ${toppleTargetName} — target failed CON save (DC ${saveDc}, weapon ${abilityName}), fell Prone.`,
-                                            targetName: toppleTargetName,
-                                        }).catch((e) => { console.error("[Topple] Error:", e); });
-                                    }
-                                } catch (e) {
-                                    console.error('[Topple] Error in Topple mastery flow:', e);
+                                    }).catch((e) => { console.error("[Topple] Error:", e); });
                                 }
+                            } catch (e) {
+                                console.error('[Topple] Error in Topple mastery flow:', e);
                             }
                         }
-                    } catch (e) {
-                        console.error('[Cleave] Post-damage mastery error:', e);
                     }
-                }
-
-                // Clear Lunging Attack and Commander's Strike bonuses after auto-damage is rolled
-                const lungingDie = getRuntimeValue(playerStats.name, 'lungingAttackDieValue', campaignName);
-                if (lungingDie && Number(lungingDie) > 0) {
-                    await setRuntimeValue(playerStats.name, 'lungingAttackDieValue', null, campaignName);
-                }
-                const csBonus = getRuntimeValue(playerStats.name, 'commanderStrikeBonus', campaignName);
-                if (csBonus && Number(csBonus) > 0) {
-                    await setRuntimeValue(playerStats.name, 'commanderStrikeBonus', null, campaignName);
-                    await setRuntimeValue(playerStats.name, 'commanderStrikeActive', null, campaignName);
-                    await setRuntimeValue(playerStats.name, 'commanderStrikeSource', null, campaignName);
-                }
-
-                if (isOverchannel && overchannelUseCount > 1) {
-                    const dicePerLevel = 2 + (overchannelUseCount - 1);
-                    const totalDice = dicePerLevel * overchannelSpellLevel;
-                    const necroticFormula = `${totalDice}d12`;
-                    const necroticResult = rollExpression(necroticFormula);
-                    if (necroticResult) {
-                        const combatSummary = await loadCombatSummary(campaignName);
-                        const applyResult = applyDamageToTarget(combatSummary, playerStats.name, necroticResult.total, ['Necrotic'], campaignName, null, true, playerStats.name);
-                        addEntry(campaignName, {
-                            type: 'roll',
-                            characterName: playerStats.name,
-                            rollType: 'overchannel-damage',
-                            name: 'Overchannel',
-                            formula: necroticFormula,
-                            rolls: necroticResult.rolls,
-                            total: necroticResult.total,
-                            modifier: necroticResult.modifier,
-                            damageType: 'Necrotic',
-                            targetName: playerStats.name,
-                            finalDamage: applyResult?.finalDamage,
-                            note: 'Overchannel self-damage (ignores resistance/immunity)',
-                        }).catch((e) => { console.error("[CharActions] Error:", e); });
-                    }
-                }
-            }
-            // Remarkable Athlete: after critical hit, enable movement without opportunity attacks
-            if (isCrit) {
-                const hasRemarkableAthlete = (playerStats.automation?.passives || []).some(
-                    p => p.type === 'auto_effect' && p.effect === 'remarkable_athlete_movement'
-                );
-                if (hasRemarkableAthlete) {
-                    setRuntimeValue(playerStats.name, 'remarkableAthleteNoOA', true, campaignName);
-                }
-            }
-
-            // Apply attack_rider automations with weapon_attack_hit trigger (e.g. Eldritch Strike)
-            const combatSummary = await loadCombatSummary(campaignName);
-            const currentRound = combatSummary?.round ?? null;
-            const eldritchStrikes = [
-                ...(playerStats.automation?.actions || []),
-                ...(playerStats.automation?.passives || []),
-            ].filter(
-                a => a.type === 'attack_rider' && a.trigger === 'weapon_attack_hit' && !a.damageExpression && a.name !== "Stalker's Flurry"
-            );
-            for (const rider of eldritchStrikes) {
-                const usedKey = `_${rider.name.replace(/\s+/g, '_')}_usedRound`;
-                const usedRound = getRuntimeValue(playerStats.name, usedKey, campaignName);
-                const isOncePerTurn = rider.oncePerTurn;
-                if (isOncePerTurn && usedRound === currentRound) continue;
-
-                const cs = await getCombatContext(campaignName);
-                const target = cs ? getTargetFromAttacker(cs, playerStats.name) : null;
-                const targetName = target?.name || null;
-
-                if (targetName && rider.options?.length > 0) {
-                    const option = rider.options[0];
-                    const storedEffects = getRuntimeValue(campaignName, 'targetEffects') || [];
-                    const newEffect = {
-                        target: targetName,
-                        source: rider.name,
-                        option: option.name,
-                        effect: option.effect,
-                        value: option.value || null,
-                        noOpportunityAttacks: option.noOpportunityAttacks || false,
-                        duration: 'until_start_of_next_turn',
-                    };
-                    const updatedEffects = [...storedEffects, newEffect];
-                    setRuntimeValue(campaignName, 'targetEffects', updatedEffects, campaignName);
-
-                    if (isOncePerTurn) {
-                        setRuntimeValue(playerStats.name, usedKey, currentRound, campaignName);
-                    }
-
-                    await addEntry(campaignName, {
-                        type: 'ability_use',
-                        characterName: playerStats.name,
-                        abilityName: rider.name,
-                        description: `${playerStats.name} used ${rider.name} on ${targetName}, imposing Disadvantage on the target's next saving throw.`,
-                        targetName: targetName,
-                    }).catch((e) => { console.error("[CharActions] Eldritch Strike error:", e); });
+                } catch (e) {
+                    console.error('[Cleave] Post-damage mastery error:', e);
                 }
             }
         },
