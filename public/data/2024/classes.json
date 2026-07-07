@@ -1705,7 +1705,7 @@
                                 "defense_add_to_ac",
                                 "offense_add_to_damage"
                             ],
-                            "casting_time": "passive"
+                            "casting_time": "1 reaction"
                         }
                     },
                     {

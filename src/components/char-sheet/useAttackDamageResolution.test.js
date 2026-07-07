@@ -739,6 +739,8 @@ describe('useAttackDamageResolution', () => {
                 .mockReturnValueOnce(null) // commanderStrikeBonus check
                 .mockReturnValueOnce(null) // _Divine_Strike_usedRound check -> returns 1
                 .mockReturnValueOnce(null); // optionKey check
+            // BI offense prompt: bardicInspirationDie check returns null (no BI die)
+            getRuntimeValue.mockReturnValueOnce(null);
             // Actually the code does: getRuntimeValue(playerStats.name, usedKey, campaignName) where usedKey = '_Divine_Strike_usedRound'
             // Then it checks usedRound === currentRound (1 === 1) -> skip
             // We need to mock the usedRound check to return 1 (current round)

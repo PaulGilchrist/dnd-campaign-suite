@@ -29,6 +29,7 @@ import SavePromptModal from './components/common/SavePromptModal.jsx';
 import DeathSavePromptModal from './components/common/DeathSavePromptModal.jsx';
 import ConcentrationPromptModal from './components/common/ConcentrationPromptModal.jsx';
 import ConditionChoiceModal from './components/common/ConditionChoiceModal.jsx';
+import BardicInspirationReactionModal from './components/common/BardicInspirationReactionModal.jsx';
 
 function App() {
   const appData = useAppData();
@@ -515,6 +516,7 @@ function App() {
         <SavePromptModal campaignName={campaignName} characters={computedCharacters} activeMapName={activeMapName} />
         <DeathSavePromptModal campaignName={campaignName} characters={computedCharacters} />
         <ConcentrationPromptModal campaignName={campaignName} characters={computedCharacters} activeMapName={activeMapName} />
+        <BardicInspirationReactionModal campaignName={campaignName} characters={computedCharacters} />
         <ConditionChoiceModal />
         <Subscriber campaignName={campaignName} handleEvent={handleRuntimeEvent} />
         {processingCharacters && <div className="loading-overlay"><div className="loading-spinner">Loading party stats...</div></div>}

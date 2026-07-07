@@ -1379,6 +1379,16 @@ export function createLogDamageAndShow(deps) {
             setRuntimeValue(characterName, 'feintingAttackDieValue', null, campaignName);
         }
 
+        // Apply Combat Inspiration - Offense damage bonus
+        const biOffenseValue = getRuntimeValue(characterName, 'bardicInspirationOffenseValue');
+        if (biOffenseValue && Number(biOffenseValue) > 0) {
+            const biVal = Number(biOffenseValue);
+            formula += ` + ${biVal} [Bardic Inspiration]`;
+            total += biVal;
+            rolls = [...rolls, biVal];
+            setRuntimeValue(characterName, 'bardicInspirationOffenseValue', null, campaignName);
+        }
+
         // Apply Commander's Strike superiority die damage bonus (from ally)
         const csBonus = getRuntimeValue(characterName, 'commanderStrikeBonus');
         if (csBonus && Number(csBonus) > 0) {

@@ -7,51 +7,53 @@
       "name": "Strength",
       "baseScore": 13,
       "featIncrease": 0,
-      "miscIncrease": 0,
-      "backgroundIncrease": 0
+      "backgroundIncrease": 1,
+      "miscIncrease": 0
     },
     {
       "name": "Dexterity",
       "baseScore": 15,
       "featIncrease": 0,
-      "miscIncrease": 1,
-      "backgroundIncrease": 0
+      "backgroundIncrease": 1,
+      "miscIncrease": 1
     },
     {
       "name": "Constitution",
       "baseScore": 15,
       "featIncrease": 0,
-      "miscIncrease": 1,
-      "backgroundIncrease": 0
+      "backgroundIncrease": 1,
+      "miscIncrease": 1
     },
     {
       "name": "Intelligence",
       "baseScore": 8,
       "featIncrease": 0,
-      "miscIncrease": 0,
-      "backgroundIncrease": 0
+      "backgroundIncrease": 0,
+      "miscIncrease": 0
     },
     {
       "name": "Wisdom",
       "baseScore": 12,
       "featIncrease": 0,
-      "miscIncrease": 0,
-      "backgroundIncrease": 0
+      "backgroundIncrease": 1,
+      "miscIncrease": 0
     },
     {
       "name": "Charisma",
       "baseScore": 8,
       "featIncrease": 0,
-      "miscIncrease": 0,
-      "backgroundIncrease": 0
+      "backgroundIncrease": 0,
+      "miscIncrease": 0
     }
   ],
-  "background": "",
+  "background": "Guide",
   "class": {
     "name": "Ranger",
     "subclass": {
       "name": "Beast Master"
     },
+    "divineOrder": "",
+    "primalOrder": "",
     "fightingStyles": [
       "Archery"
     ]

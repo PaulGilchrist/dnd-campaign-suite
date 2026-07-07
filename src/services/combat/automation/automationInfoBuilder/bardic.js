@@ -25,6 +25,7 @@ export const bardicHandlers = {
             type: 'bardic_inspiration_defense',
             name: feature.name,
             hasAutomation: true,
+            casting_time: '1 reaction',
         }
     },
 
@@ -33,6 +34,7 @@ export const bardicHandlers = {
             type: 'bardic_inspiration_offense',
             name: feature.name,
             hasAutomation: true,
+            casting_time: '1 reaction',
         }
     }
 }

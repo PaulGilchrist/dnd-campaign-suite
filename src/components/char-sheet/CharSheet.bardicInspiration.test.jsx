@@ -35,7 +35,10 @@ vi.mock('./CharInventory.jsx', () => ({
 
 vi.mock('./CharReactions.jsx', () => ({
   default: vi.fn(({ playerStats }) => (
-    <div data-testid="char-reactions"><span>{playerStats?.name || 'none'}</span></div>
+    <div data-testid="char-reactions">
+      <span>{playerStats?.name || 'none'}</span>
+      <span data-testid="reactions-count">{playerStats?.reactions?.length || 0}</span>
+    </div>
   )),
 }));
 
@@ -146,12 +149,12 @@ describe('bardic inspiration feature injection', () => {
   });
 
   it.each([
-    { die: null, combatOptions: [], expectedCount: 0, label: 'no die, no options' },
-    { die: 'd6', combatOptions: [], expectedCount: 1, label: 'die only' },
-    { die: 'd6', combatOptions: ['defense_add_to_ac'], expectedCount: 2, label: 'die + defense' },
-    { die: 'd6', combatOptions: ['offense_add_to_damage'], expectedCount: 2, label: 'die + offense' },
-    { die: 'd6', combatOptions: ['defense_add_to_ac', 'offense_add_to_damage'], expectedCount: 3, label: 'die + both' },
-  ])('special actions count is $expectedCount when $label', async ({ die, combatOptions, expectedCount }) => {
+    { die: null, combatOptions: [], expectedReactions: 0, expectedSpecial: 0, label: 'no die, no options' },
+    { die: 'd6', combatOptions: [], expectedReactions: 0, expectedSpecial: 1, label: 'die only' },
+    { die: 'd6', combatOptions: ['defense_add_to_ac'], expectedReactions: 1, expectedSpecial: 1, label: 'die + defense' },
+    { die: 'd6', combatOptions: ['offense_add_to_damage'], expectedReactions: 1, expectedSpecial: 1, label: 'die + offense' },
+    { die: 'd6', combatOptions: ['defense_add_to_ac', 'offense_add_to_damage'], expectedReactions: 2, expectedSpecial: 1, label: 'die + both' },
+  ])('reactions count is $expectedReactions and special actions count is $expectedSpecial when $label', async ({ die, combatOptions, expectedReactions, expectedSpecial }) => {
     mockStore.set('Test Bard:bardicInspirationDie', die);
     mockStore.set('Test Bard:bardicInspirationCombatOptions', JSON.stringify(combatOptions));
 
@@ -161,7 +164,8 @@ describe('bardic inspiration feature injection', () => {
       expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
     });
 
-    expect(screen.getByTestId('special-actions-count')).toHaveTextContent(String(expectedCount));
+    expect(screen.getByTestId('reactions-count')).toHaveTextContent(String(expectedReactions));
+    expect(screen.getByTestId('special-actions-count')).toHaveTextContent(String(expectedSpecial));
   });
 
   it('does not duplicate "Use Bardic Inspiration" if already in specialActions', async () => {

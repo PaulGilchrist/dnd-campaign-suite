@@ -352,13 +352,13 @@ export function collectAutomationFromFeatures(features, playerStats) {
             case 'free_spell':
             case 'fey_reinforcements':
             case 'divine_intervention':
-            case 'bardic_inspiration_offense':
                 if (info.action === 'bonus_action') {
                     result.bonusActions.push(info)
                 } else {
                     result.actions.push(info)
                 }
                 break
+
             case 'resource_pool':
             case 'open_hand_technique':
             case 'initiative_action':
@@ -385,6 +385,7 @@ export function collectAutomationFromFeatures(features, playerStats) {
             case 'bardic_inspiration_defense':
             case 'reaction_save_heal':
             case 'reaction_bonus':
+            case 'bardic_inspiration_offense':
                 result.reactions.push(info)
                 break
             case 'nature_sanctuary_move':

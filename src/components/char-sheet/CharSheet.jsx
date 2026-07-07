@@ -189,10 +189,12 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
                 let combatOpts = [];
                 try { combatOpts = JSON.parse(combatOptRaw) || []; } catch (_e) { /* combatOpts is not valid JSON, ignore */ }
 
+                if (!stats.reactions) stats.reactions = [];
+
                 if (combatOpts.includes('defense_add_to_ac') &&
-                    !stats.specialActions.some(f => f.name === 'Bardic Inspiration: Defense')) {
-                    stats.specialActions.unshift({
-                        name: 'Bardic Inspiration: Defense',
+                    !stats.reactions.some(f => f.name === 'Combat Inspiration - Defense')) {
+                    stats.reactions.unshift({
+                        name: 'Combat Inspiration - Defense',
                         description: `Use your Reaction when hit by an attack roll to roll your Bardic Inspiration die (1d${biDie}) and add the number rolled to your AC. Die granted by ${grantedBy}.`,
                         automation: {
                             type: 'bardic_inspiration_defense',
@@ -201,10 +203,10 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
                 }
 
                 if (combatOpts.includes('offense_add_to_damage') &&
-                    !stats.specialActions.some(f => f.name === 'Bardic Inspiration: Offense')) {
-                    stats.specialActions.unshift({
-                        name: 'Bardic Inspiration: Offense',
-                        description: `Immediately after hitting a target with an attack roll, roll your Bardic Inspiration die (1d${biDie}) and add the number rolled to the attack's damage. Die granted by ${grantedBy}.`,
+                    !stats.reactions.some(f => f.name === 'Combat Inspiration - Offense')) {
+                    stats.reactions.unshift({
+                        name: 'Combat Inspiration - Offense',
+                        description: `Use your Reaction after hitting a target with an attack roll to roll your Bardic Inspiration die (1d${biDie}) and add the number rolled to the attack's damage. Die granted by ${grantedBy}.`,
                         automation: {
                             type: 'bardic_inspiration_offense',
                         },

@@ -43,8 +43,12 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         };
     }
 
+    const hasCombatOptions = (playerStats.automation?.passives || []).some(
+        p => p.effect === 'bardic_inspiration_combat_options'
+    );
+
     const creatureTargets = combatSummary.creatures
-        .filter(c => c.name !== playerStats.name)
+        .filter(c => c.name !== playerStats.name || hasCombatOptions)
         .map(c => ({
             name: c.name,
             currentHp: c.currentHp,
@@ -64,10 +68,6 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             },
         };
     }
-
-    const hasCombatOptions = (playerStats.automation?.passives || []).some(
-        p => p.effect === 'bardic_inspiration_combat_options'
-    );
 
     return {
         type: 'modal',
@@ -100,6 +100,11 @@ export async function applyBardicInspiration(action, playerStats, campaignName, 
     if (hasCombatOptions) {
         const options = auto.options || ['defense_add_to_ac', 'offense_add_to_damage'];
         await setRuntimeValue(targetName, 'bardicInspirationCombatOptions', JSON.stringify(options), campaignName);
+        if (targetName !== playerStats.name) {
+            await setRuntimeValue(playerStats.name, 'bardicInspirationDie', String(dieSize), campaignName);
+            await setRuntimeValue(playerStats.name, 'bardicInspirationGrantedBy', playerStats.name, campaignName);
+            await setRuntimeValue(playerStats.name, 'bardicInspirationCombatOptions', JSON.stringify(options), campaignName);
+        }
     }
 
     addExpiration(playerStats.name, targetName, [

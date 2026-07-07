@@ -16,6 +16,14 @@ import {
     hasAttackerTriggeredMajesty,
     markAttackerTriggeredMajesty,
 } from '../../services/combat/auras/unbreakableMajesty.js';
+import {
+    hasBardicInspirationDefense,
+    getBardicInspirationDieSize,
+    clearBardicInspiration,
+} from '../../services/combat/auras/bardicInspirationState.js';
+import {
+    sendBardicInspirationDefensePrompt,
+} from '../../services/combat/prompts/bardicInspirationPromptUtils.js';
 import { getEmpoweredEvocationFeatures, getEmpoweredEvocationIntModifier } from '../../services/rules/spells/postCastRiderService.js';
 import { hasIgnoreResistance, playerIsImmuneToCondition } from '../../services/combat/automation/automationService.js';
 import { addEntry } from '../../services/ui/logService.js';
@@ -202,6 +210,87 @@ export function createLogAndShow(deps) {
                         }
                     }, 30000);
                 });
+            }
+        }
+
+        // Combat Inspiration - Defense
+        if (hit && target) {
+            const targetChar = (characters || []).find(c => c.name === target.name);
+            const targetComputed = targetChar?.computedStats || targetChar;
+            const hasCombatOptionsPassive = targetComputed?.automation?.passives?.some(p => p.effect === 'bardic_inspiration_combat_options');
+            const availableUses = Number(getRuntimeValue(target.name, 'bardicInspirationUses', campaignName) ?? 0);
+            const biAction = targetComputed?.automation?.bonusActions?.find(a => a.type === 'bardic_inspiration');
+            const biUnlimited = biAction?.usesMax === 0 || !biAction;
+            const maxUses = biAction?.usesMax || 0;
+            const hasUses = biUnlimited || availableUses > 0 || maxUses > 0;
+            console.log('[BI DEF] target=', target.name, 'hasCombatOptionsPassive=', hasCombatOptionsPassive, 'availableUses=', availableUses, 'biUnlimited=', biUnlimited, 'maxUses=', maxUses, 'hasUses=', hasUses, 'hasBardicInspirationDefense=', hasBardicInspirationDefense(target.name, campaignName));
+            if (hasCombatOptionsPassive && hasUses && !hasBardicInspirationDefense(target.name, campaignName)) {
+                const classLevel = (targetComputed?.class?.class_levels || []).find(cl => cl.level === targetComputed?.level);
+                const dieSize = classLevel?.bardic_die || classLevel?.class_specific?.bardic_inspiration_die || 6;
+                console.log('[BI DEF] Auto-granting BI die. dieSize=', dieSize);
+                await setRuntimeValue(target.name, 'bardicInspirationDie', String(dieSize), campaignName);
+                await setRuntimeValue(target.name, 'bardicInspirationGrantedBy', target.name, campaignName);
+                await setRuntimeValue(target.name, 'bardicInspirationCombatOptions', JSON.stringify(['defense_add_to_ac', 'offense_add_to_damage']), campaignName);
+            }
+            const afterCheck = hasBardicInspirationDefense(target.name, campaignName);
+            console.log('[BI DEF] After grant check, hasBardicInspirationDefense=', afterCheck);
+            if (afterCheck) {
+                const dieSize = getBardicInspirationDieSize(target.name, campaignName);
+                console.log('[BI DEF] dieSize from runtime=', dieSize);
+                if (dieSize) {
+                    const promptId = `bi-defense-${utils.guid()}`;
+                    console.log('[BI DEF] Dispatching prompt, promptId=', promptId);
+                    sendBardicInspirationDefensePrompt(campaignName, target.name, attackerName, effectiveD20Roll, bonus, effectiveAc, dieSize, promptId);
+                    let biResolved = false;
+                    await new Promise(resolve => {
+                    const handler = async event => {
+                        console.log('[BI DEF] Event received, detail=', JSON.stringify(event.detail), 'expected promptId=', promptId);
+                        if (event.detail.promptId !== promptId) return;
+                            window.removeEventListener('bardic-inspiration-defense-result', handler);
+                            biResolved = true;
+                            if (event.detail.used) {
+                                const biRoll = event.detail.biRoll;
+                                const currentUses = Number(getRuntimeValue(target.name, 'bardicInspirationUses', campaignName) ?? 0);
+                                await setRuntimeValue(target.name, 'bardicInspirationUses', Math.max(0, currentUses - 1), campaignName);
+                                const newEffectiveAc = effectiveAc + biRoll;
+                                const attackTotal = effectiveD20Roll + bonus;
+                                if (attackTotal < newEffectiveAc) {
+                                    hit = false;
+                                    isAutoMiss = true;
+                                    logEntry({
+                                        type: 'ability_use',
+                                        characterName: target.name,
+                                        abilityName: 'Combat Inspiration - Defense',
+                                        description: `${attackerName}'s attack missed! ${target.name} used Combat Inspiration - Defense, rolling ${biRoll} to boost AC to ${newEffectiveAc}. Attack total (${attackTotal}) < new AC (${newEffectiveAc}).`,
+                                        biDieRoll: biRoll,
+                                        timestamp: Date.now(),
+                                    });
+                                } else {
+                                    logEntry({
+                                        type: 'ability_use',
+                                        characterName: target.name,
+                                        abilityName: 'Combat Inspiration - Defense',
+                                        description: `${target.name} used Combat Inspiration - Defense, rolling ${biRoll} to boost AC to ${newEffectiveAc}, but the attack still hits (${attackTotal} >= ${newEffectiveAc}).`,
+                                        biDieRoll: biRoll,
+                                        timestamp: Date.now(),
+                                    });
+                                }
+                            }
+                            resolve();
+                        };
+                        window.addEventListener('bardic-inspiration-defense-result', handler);
+                        setTimeout(() => {
+                            if (!biResolved) {
+                                window.removeEventListener('bardic-inspiration-defense-result', handler);
+                                // Clear auto-granted BI state if prompt timed out
+                                if (hasCombatOptionsPassive && availableUses > 0) {
+                                    clearBardicInspiration(target.name, campaignName);
+                                }
+                                resolve();
+                            }
+                        }, 30000);
+                    });
+                }
             }
         }
 
