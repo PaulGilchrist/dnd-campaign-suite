@@ -227,14 +227,6 @@ describe('undyingSentinelHandler', () => {
     });
 
     describe('successful heal — NPC target', () => {
-      function setupNPCHeal(target = makeNPCTarget()) {
-        getRuntimeValue
-          .mockReturnValueOnce(false)
-          .mockReturnValue(null);
-        getCombatContext.mockResolvedValue({ creatures: [] });
-        getTargetFromAttacker.mockReturnValue(target);
-      }
-
       it('heals NPC target, saves combatSummary, posts log, and dispatches event', async () => {
         const target = makeNPCTarget('Goblin', 0);
         const cs = { creatures: [target] };

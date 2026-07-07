@@ -4,7 +4,6 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { handle } from './beguilingTwistHandler.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../ui/logService.js';
-import { getDistanceFeet } from '../../../rules/combat/rangeValidation.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { resolveMapPositions } from '../../common/targetResolver.js';
 import { createSaveListener } from '../../common/savePrompt.js';
@@ -22,7 +21,6 @@ vi.mock('../../../ui/logService.js', () => ({
 }));
 
 vi.mock('../../../rules/combat/rangeValidation.js', () => ({
-  getDistanceFeet: vi.fn(),
   rangeToFeet: vi.fn((r) => {
     if (typeof r === 'number') return r;
     const m = String(r).match(/(\d+)_?ft/);

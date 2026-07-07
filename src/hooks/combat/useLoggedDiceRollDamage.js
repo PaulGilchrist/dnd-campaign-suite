@@ -1278,6 +1278,9 @@ export function createLogDamageAndShow(deps) {
             popupData.secondaryFinalDamage = secondaryResult.finalDamage;
         }
 
+        popupData.targetCurrentHp = popupData.targetCurrentHp || (target?.type === 'player' ? (getRuntimeValue(target.name, 'hitPoints') ?? 0) : (target?.currentHp ?? target?.maxHp));
+        popupData.targetMaxHp = popupData.targetMaxHp || targetMaxHp;
+
         if (applyResult) {
             popupData.targetCurrentHp = applyResult.newHp;
             popupData.targetMaxHp = targetMaxHp;
@@ -1285,6 +1288,9 @@ export function createLogDamageAndShow(deps) {
             popupData.finalDamage = applyResult.finalDamage;
             popupData.damageReduced = applyResult.damageReduced;
         }
+
+        popupData.bardicInspirationOffense = context?.bardicInspirationOffense;
+        popupData.bardicInspirationOffenseDieSize = context?.bardicInspirationOffenseDieSize;
 
         setPopupHtml(popupData);
 
@@ -1377,16 +1383,6 @@ export function createLogDamageAndShow(deps) {
             total += feintVal;
             rolls = [...rolls, feintVal];
             setRuntimeValue(characterName, 'feintingAttackDieValue', null, campaignName);
-        }
-
-        // Apply Combat Inspiration - Offense damage bonus
-        const biOffenseValue = getRuntimeValue(characterName, 'bardicInspirationOffenseValue');
-        if (biOffenseValue && Number(biOffenseValue) > 0) {
-            const biVal = Number(biOffenseValue);
-            formula += ` + ${biVal} [Bardic Inspiration]`;
-            total += biVal;
-            rolls = [...rolls, biVal];
-            setRuntimeValue(characterName, 'bardicInspirationOffenseValue', null, campaignName);
         }
 
         // Apply Commander's Strike superiority die damage bonus (from ally)

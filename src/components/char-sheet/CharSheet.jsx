@@ -24,6 +24,7 @@ import { evaluateAutoExpression } from '../../services/combat/automation/automat
 import { EXHAUSTION_LEVELS } from '../../services/combat/conditions/exhaustionRules.js';
 import { isCreatureWarded } from '../../services/automation/handlers/buffs/protectionFromEvilAndGoodHandler.js';
 import { addEntry } from '../../services/ui/logService.js';
+import { applyDamageToTarget } from '../../services/rules/combat/applyDamage.js';
 import { getManeuversForRules, getSuperiorityDice } from '../../services/automation/handlers/class-fighter-rogue/combatSuperiorityHandler.js';
 import { loadCombatSummary } from '../../services/encounters/combatData.js';
 import * as storageService from '../../services/ui/storage.js';
@@ -508,6 +509,68 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
         setRuntimeValue(playerName, 'bardicInspirationGrantedBy', null, campaignName);
     }, [playerStats, campaignName, popupHtml]);
 
+    const handleBardicInspirationDefense = React.useCallback(async (dieValue, dieSize, newAc, willMiss) => {
+        if (!playerStats) return;
+        const playerName = playerStats.name;
+        const currentUses = Number(getRuntimeValue(playerName, 'bardicInspirationUses', campaignName) ?? 0);
+        if (currentUses > 0) {
+            await setRuntimeValue(playerName, 'bardicInspirationUses', currentUses - 1, campaignName);
+        }
+        const cs = await loadCombatSummary(campaignName);
+        const la = cs?.lastAttack;
+        if (la) {
+            la.effectiveAc = newAc;
+            la.bardicInspirationDefense = { used: true, biRoll: dieValue, newEffectiveAc: newAc };
+            if (willMiss) {
+                la.hit = false;
+                la.isAutoMiss = true;
+            }
+            storageService.default.set('combatSummary', cs, campaignName);
+        }
+        const attackerName = popupHtml?.targetName || 'unknown attacker';
+        const attackTotal = popupHtml?.rolls?.[0] + (popupHtml?.bonus || 0);
+        await addEntry(campaignName, {
+            type: 'ability_use',
+            characterName: playerName,
+            abilityName: 'Combat Inspiration - Defense',
+            description: willMiss ? `${attackerName}'s attack missed! ${playerName} used Combat Inspiration - Defense, rolling ${dieValue} to boost AC to ${newAc}. Attack total (${attackTotal}) < new AC (${newAc}).` : `${playerName} used Combat Inspiration - Defense, rolling ${dieValue} to boost AC to ${newAc}, but the attack still hits (${attackTotal} >= ${newAc}).`,
+            biDieRoll: dieValue,
+            timestamp: Date.now(),
+        });
+    }, [playerStats, campaignName, popupHtml]);
+
+    const handleBardicInspirationOffense = React.useCallback(async (dieValue, dieSize) => {
+        if (!playerStats) return;
+        const playerName = playerStats.name;
+        const biUsesRaw = getRuntimeValue(playerName, 'bardicInspirationUses', campaignName);
+        const biUsesNum = (typeof biUsesRaw === 'object' && biUsesRaw !== null) ? biUsesRaw.current : (biUsesRaw != null ? Number(biUsesRaw) : (playerStats?._trackedResources?.bardicInspirationUses?.current ?? 0));
+        if (biUsesNum > 0) {
+            await setRuntimeValue(playerName, 'bardicInspirationUses', biUsesNum - 1, campaignName);
+        }
+        const cs = await loadCombatSummary(campaignName);
+        const la = cs?.lastAttack;
+        const targetName = la?.targetName;
+        const damageType = la?.damageType || 'Bludgeoning';
+        const damageTypes = Array.isArray(damageType) ? damageType : [damageType];
+        if (targetName) {
+            const applyResult = applyDamageToTarget(cs, targetName, dieValue, damageTypes, campaignName, characters, false, playerName);
+            if (applyResult) {
+                storageService.default.set('combatSummary', cs, campaignName);
+            }
+        }
+        setRuntimeValue(playerName, 'bardicInspirationDie', null, campaignName);
+        setRuntimeValue(playerName, 'bardicInspirationCombatOptions', null, campaignName);
+        setRuntimeValue(playerName, 'bardicInspirationGrantedBy', null, campaignName);
+        await addEntry(campaignName, {
+            type: 'ability_use',
+            characterName: playerName,
+            abilityName: 'Combat Inspiration - Offense',
+            description: `${playerName} used Combat Inspiration - Offense, rolling ${dieValue} (d${dieSize}) bonus damage${targetName ? ` on ${targetName}` : ''}.`,
+            biDieRoll: dieValue,
+            timestamp: Date.now(),
+        });
+    }, [playerStats, campaignName, characters]);
+
     const handleTacticalMind = React.useCallback(async (dieResult) => {
         if (!playerStats) return;
         const playerName = playerStats.name;
@@ -731,7 +794,7 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
                                 ) : null}
                                 <div className="dice-roll-hint">click to dismiss</div>
                             </div> :
-                            <DiceRollResult {...popupHtml} onSuperiorityManeuver={popupHtml?.availableSuperiorityManeuvers ? handleSuperiorityManeuver : undefined} onTacticalMind={popupHtml?.tacticalMind ? handleTacticalMind : undefined} onPsiBolsteredKnack={popupHtml?.psiBolsteredKnack ? handlePsiBolsteredKnack : undefined} onBardicInspiration={popupHtml?.bardicInspiration ? handleBardicInspiration : undefined} />
+                            <DiceRollResult {...popupHtml} onSuperiorityManeuver={popupHtml?.availableSuperiorityManeuvers ? handleSuperiorityManeuver : undefined} onTacticalMind={popupHtml?.tacticalMind ? handleTacticalMind : undefined} onPsiBolsteredKnack={popupHtml?.psiBolsteredKnack ? handlePsiBolsteredKnack : undefined} onBardicInspiration={popupHtml?.bardicInspiration ? handleBardicInspiration : undefined} onBardicInspirationDefense={popupHtml?.bardicInspirationDefense ? handleBardicInspirationDefense : undefined} onBardicInspirationOffense={popupHtml?.bardicInspirationOffense ? handleBardicInspirationOffense : undefined} />
                 }
             </Popup>
         )}

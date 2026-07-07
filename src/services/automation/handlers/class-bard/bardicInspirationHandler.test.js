@@ -28,7 +28,6 @@ vi.mock('../../../shared/logPoster.js', () => ({
 import { handle, applyBardicInspiration } from './bardicInspirationHandler.js';
 
 import * as useRuntimeState from '../../../../hooks/runtime/useRuntimeState.js';
-import * as expirations from '../../../rules/effects/expirations.js';
 import * as automationService from '../../../combat/automation/automationService.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { postLogEntry } from '../../../shared/logPoster.js';

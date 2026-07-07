@@ -44,27 +44,32 @@ function BardicInspirationReactionModal({ campaignName }) {
                 }
             }
         }
-        const prefix = `change-${campaignName}-biPrompt-`;
-        if (event.key.startsWith(prefix)) {
-            const targetName = event.key.slice(prefix.length);
-            if (!targetName || !event.data?.promptId) return;
-            if (processedPromptIdsRef.current.has(event.data.promptId)) return;
-            if (activePromptIdRef.current !== null) return;
-            if (promptsRef.current.some(p => p.promptId === event.data.promptId)) return;
-            processedPromptIdsRef.current.add(event.data.promptId);
-            activePromptIdRef.current = event.data.promptId;
-            setPrompts(prev => {
-                const next = [...prev, { targetName, ...event.data }];
-                promptsRef.current = next;
-                return next;
-            });
-        }
+        const prefix = `change-${campaignName}-`;
+        if (!event.key.startsWith(prefix)) return;
+        const keySuffix = event.key.slice(prefix.length);
+        const match = keySuffix.match(/^(.+)-biPrompt$/);
+        if (!match) return;
+        const targetName = match[1];
+        if (!event.data?.promptId) return;
+        if (processedPromptIdsRef.current.has(event.data.promptId)) return;
+        if (activePromptIdRef.current !== null) return;
+        if (promptsRef.current.some(p => p.promptId === event.data.promptId)) return;
+        processedPromptIdsRef.current.add(event.data.promptId);
+        activePromptIdRef.current = event.data.promptId;
+        setPrompts(prev => {
+            const next = [...prev, { targetName, ...event.data }];
+            promptsRef.current = next;
+            return next;
+        });
     }, [campaignName]);
 
     const handleClearedEvent = useCallback((event) => {
         if (!event.key || event.data == null) return;
-        const prefix = `change-${campaignName}-biPromptCleared-`;
+        const prefix = `change-${campaignName}-`;
         if (!event.key.startsWith(prefix)) return;
+        const keySuffix = event.key.slice(prefix.length);
+        const match = keySuffix.match(/^(.+)-biPromptCleared$/);
+        if (!match) return;
         if (!event.data?.promptId) return;
         setPrompts(prev => {
             const next = prev.filter(p => p.promptId !== event.data.promptId);

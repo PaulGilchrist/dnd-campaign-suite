@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import './diceRollResult.css';
 
-function DiceRollResult({ name, type, rolls, rollType, bonus = 0, bonusDetail, formula = '', modifier = 0, total = 0, targetName, targetAc, hit, resistanceNotice, hunterLoreNotice, forcedMode, isAutoMiss, rangeReason, coverReason, isAutoCrit, isCrit, isNatural1, dc, success, dcType, dcSuccess, waitingForPlayerSave, saveDc, saveType, saveResult, finalDamage, damageApplied, targetCurrentHp, damageReduced, damageType, onQuickRoll, autoDamage, coverLevel, coverAcBonus, autoReroll, autoRerollBonus, autoRerollCondition, strSaveReplace, strCheckReplace, strScore, wisCheckReplace, wisCheckMinBonus, reliableTalent, onReroll, tacticalMind, tacticalMindBonus, gloriousDefenseBonus, onCounterAttack, strokeOfLuck, onStrokeOfLuck, defensiveDuelistBonus, baitAndSwitchBonus, isPotentCantrip, luckyAdvantage, luckyDisadvantage, onLuckyAdvantage, onLuckyDisadvantage, secondaryFormula, secondaryRolls, secondaryTotal, secondaryModifier, secondaryDamageType, secondaryFinalDamage, secondarySaveResult, availableSuperiorityManeuvers, onSuperiorityManeuver, onTacticalMind, gwfApplied, gwfOriginalRolls, gwfDisplayRolls, types, baseFormula, baseTotal, baseRolls, bonusFormula, bonusTotal, bonusRolls, finalHeal, healReduced, bonusHeal, bonusHealDetail, psiBolsteredKnack, onPsiBolsteredKnack, psiBolsteredKnackDieSize, bardicInspiration, bardicInspirationDie, onBardicInspiration, luckyRerolled, luckyRerollValue }) {
+function DiceRollResult({ name, type, rolls, rollType, bonus = 0, bonusDetail, formula = '', modifier = 0, total = 0, targetName, targetAc, hit, resistanceNotice, hunterLoreNotice, forcedMode, isAutoMiss, rangeReason, coverReason, isAutoCrit, isCrit, isNatural1, dc, success, dcType, dcSuccess, waitingForPlayerSave, saveDc, saveType, saveResult, finalDamage, damageApplied, targetCurrentHp, damageReduced, damageType, onQuickRoll, autoDamage, coverLevel, coverAcBonus, autoReroll, autoRerollBonus, autoRerollCondition, strSaveReplace, strCheckReplace, strScore, wisCheckReplace, wisCheckMinBonus, reliableTalent, onReroll, tacticalMind, tacticalMindBonus, gloriousDefenseBonus, onCounterAttack, strokeOfLuck, onStrokeOfLuck, defensiveDuelistBonus, baitAndSwitchBonus, isPotentCantrip, luckyAdvantage, luckyDisadvantage, onLuckyAdvantage, onLuckyDisadvantage, secondaryFormula, secondaryRolls, secondaryTotal, secondaryModifier, secondaryDamageType, secondaryFinalDamage, secondarySaveResult, availableSuperiorityManeuvers, onSuperiorityManeuver, onTacticalMind, gwfApplied, gwfOriginalRolls, gwfDisplayRolls, types, baseFormula, baseTotal, baseRolls, bonusFormula, bonusTotal, bonusRolls, finalHeal, healReduced, bonusHeal, bonusHealDetail, psiBolsteredKnack, onPsiBolsteredKnack, psiBolsteredKnackDieSize, bardicInspiration, bardicInspirationDie, onBardicInspiration, luckyRerolled, luckyRerollValue, bardicInspirationDefense, bardicInspirationDefenseDieSize, bardicInspirationDefenseTargetName: _bardicInspirationDefenseTargetName, bardicInspirationOffense, bardicInspirationOffenseDieSize, onBardicInspirationDefense, onBardicInspirationOffense }) {
     const [mode, setMode] = useState(forcedMode || 'normal');
     const [rerollUsed, setRerollUsed] = useState(false);
     const [rerollResult, setRerollResult] = useState(null);
@@ -13,6 +13,10 @@ function DiceRollResult({ name, type, rolls, rollType, bonus = 0, bonusDetail, f
     const [luckyDisadvantageUsed, setLuckyDisadvantageUsed] = useState(false);
     const [bardicInspirationUsed, setBardicInspirationUsed] = useState(false);
     const [bardicInspirationResult, setBardicInspirationResult] = useState(null);
+    const [bardicInspirationDefenseUsed, setBardicInspirationDefenseUsed] = useState(false);
+    const [bardicInspirationDefenseResult, setBardicInspirationDefenseResult] = useState(null);
+    const [bardicInspirationOffenseUsed, setBardicInspirationOffenseUsed] = useState(false);
+    const [bardicInspirationOffenseResult, setBardicInspirationOffenseResult] = useState(null);
     const [superiorityUsed, setSuperiorityUsed] = useState(false);
     const [superiorityResult, setSuperiorityResult] = useState(null);
     const [psiKnackClicked, setPsiKnackClicked] = useState(false);
@@ -74,6 +78,26 @@ function DiceRollResult({ name, type, rolls, rollType, bonus = 0, bonusDetail, f
         setBardicInspirationResult({ d20Roll: finalRoll, dieValue, dieSize, total: newTotal });
         setBardicInspirationUsed(true);
         if (onBardicInspiration) await onBardicInspiration(dieValue, dieSize);
+    };
+
+    const handleBardicInspirationDefense = async () => {
+        const dieSize = bardicInspirationDefenseDieSize || 6;
+        const dieValue = Math.floor(Math.random() * dieSize) + 1;
+        const newAc = (targetAc || 0) + dieValue;
+        const attackTotal = (autoDamage?.source ? null : (rolls?.[0] || 0) + bonus);
+        const willMiss = attackTotal < newAc;
+        setBardicInspirationDefenseResult({ dieValue, dieSize, newAc, willMiss, attackTotal });
+        setBardicInspirationDefenseUsed(true);
+        if (onBardicInspirationDefense) await onBardicInspirationDefense(dieValue, dieSize, newAc, willMiss);
+    };
+
+    const handleBardicInspirationOffense = async () => {
+        const dieSize = bardicInspirationOffenseDieSize || autoDamage?.bardicInspirationOffenseDieSize || 6;
+        const dieValue = Math.floor(Math.random() * dieSize) + 1;
+        const newTotal = total + dieValue;
+        setBardicInspirationOffenseResult({ dieValue, dieSize, bonusTotal: newTotal });
+        setBardicInspirationOffenseUsed(true);
+        if (onBardicInspirationOffense) await onBardicInspirationOffense(dieValue, dieSize);
     };
 
     const handleSuperiorityManeuver = async (maneuver) => {
@@ -378,6 +402,22 @@ function DiceRollResult({ name, type, rolls, rollType, bonus = 0, bonusDetail, f
               </div>
             )}
 
+            {bardicInspirationDefense && !bardicInspirationDefenseUsed && hit && (
+              <div className="dice-roll-reroll">
+                <button className="dice-roll-reroll-btn" onClick={handleBardicInspirationDefense} type="button">
+                  <i className="fa-solid fa-music"></i> Bardic Inspiration - Defense (d{bardicInspirationDefenseDieSize})
+                </button>
+              </div>
+            )}
+
+            {bardicInspirationOffense && !bardicInspirationOffenseUsed && isDamageType && (
+              <div className="dice-roll-reroll">
+                <button className="dice-roll-reroll-btn" onClick={() => handleBardicInspirationOffense()} type="button">
+                  <i className="fa-solid fa-music"></i> Bardic Inspiration - Offense (d{bardicInspirationOffenseDieSize})
+                </button>
+              </div>
+            )}
+
             {psiKnackClicked && !psiKnackConsumed && psiKnackResult !== null && (
               <div className="dice-roll-reroll-result">
                 <i className="fa-solid fa-brain"></i> Psi-Bolstered Knack: +{psiKnackResult.dieValue} (d{psiKnackResult.dieSize}) → <strong>{psiKnackResult.newTotal}</strong>
@@ -419,6 +459,18 @@ function DiceRollResult({ name, type, rolls, rollType, bonus = 0, bonusDetail, f
             {bardicInspirationUsed && bardicInspirationResult !== null && (
               <div className="dice-roll-reroll-result">
                 <i className="fa-solid fa-music"></i> Bardic Inspiration: 1d{bardicInspirationResult.dieSize} → {bardicInspirationResult.dieValue} + <strong>{bardicInspirationResult.total}</strong>
+              </div>
+            )}
+
+            {bardicInspirationDefenseUsed && bardicInspirationDefenseResult !== null && (
+              <div className="dice-roll-reroll-result">
+                <i className="fa-solid fa-music"></i> Bardic Inspiration - Defense: 1d{bardicInspirationDefenseResult.dieSize} → {bardicInspirationDefenseResult.dieValue} → AC {bardicInspirationDefenseResult.newAc} ({bardicInspirationDefenseResult.willMiss ? 'Attack misses!' : 'Attack still hits'})
+              </div>
+            )}
+
+            {bardicInspirationOffenseUsed && bardicInspirationOffenseResult !== null && (
+              <div className="dice-roll-reroll-result">
+                <i className="fa-solid fa-music"></i> Bardic Inspiration - Offense: 1d{bardicInspirationOffenseResult.dieSize} → +{bardicInspirationOffenseResult.dieValue} → <strong>{bardicInspirationOffenseResult.bonusTotal}</strong>
               </div>
             )}
 

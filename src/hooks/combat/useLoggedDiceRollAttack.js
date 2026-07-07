@@ -16,11 +16,7 @@ import {
     hasAttackerTriggeredMajesty,
     markAttackerTriggeredMajesty,
 } from '../../services/combat/auras/unbreakableMajesty.js';
-import {
-    sendBardicInspirationDefensePrompt,
-} from '../../services/combat/prompts/bardicInspirationPromptUtils.js';
-import { hasBardicInspirationDefense, getBardicInspirationDieSize } from '../../services/combat/auras/bardicInspirationState.js';
-import { spendResource } from '../../services/automation/common/resourceCheck.js';
+import { hasBardicInspirationDefense, hasBardicInspirationOffense, getBardicInspirationDieSize, getBardicInspirationDieSizeFromClass } from '../../services/combat/auras/bardicInspirationState.js';
 import { getEmpoweredEvocationFeatures, getEmpoweredEvocationIntModifier } from '../../services/rules/spells/postCastRiderService.js';
 import { hasIgnoreResistance, playerIsImmuneToCondition } from '../../services/combat/automation/automationService.js';
 import { addEntry } from '../../services/ui/logService.js';
@@ -219,63 +215,13 @@ export function createLogAndShow(deps) {
             const targetComputed = targetChar?.computedStats || targetChar;
             const biUsesRaw = getRuntimeValue(targetName, 'bardicInspirationUses', campaignName);
             const biUsesNum = (typeof biUsesRaw === 'object' && biUsesRaw !== null) ? biUsesRaw.current : (biUsesRaw != null ? Number(biUsesRaw) : (targetComputed?._trackedResources?.bardicInspirationUses?.current ?? 0));
-            if (hasDefense && dieSize && biUsesNum > 0) {
-                        const promptId = `bi-defense-${utils.guid()}`;
-                        sendBardicInspirationDefensePrompt(campaignName, targetName, attackerName, effectiveD20Roll, bonus, effectiveAc, dieSize, promptId);
-                    let biResolved = false;
-                    await new Promise(resolve => {
-                    const handler = async event => {
-                        console.log('[BI DEF] Event received, detail=', JSON.stringify(event.detail), 'expected promptId=', promptId);
-                        if (event.detail.promptId !== promptId) return;
-                            window.removeEventListener('bardic-inspiration-defense-result', handler);
-                            biResolved = true;
-                            if (event.detail.used) {
-                                const biRoll = event.detail.biRoll;
-                                spendResource(targetName, 'bardicInspirationUses', 1, campaignName);
-                                const newEffectiveAc = effectiveAc + biRoll;
-                                const attackTotal = effectiveD20Roll + bonus;
-                                console.log('[BI DEF] Result: biRoll=', biRoll, 'newEffectiveAc=', newEffectiveAc, 'attackTotal=', attackTotal, 'wasHit=', hit, 'willMiss=', attackTotal < newEffectiveAc);
-                                if (attackTotal < newEffectiveAc) {
-                                    hit = false;
-                                    isAutoMiss = true;
-                                    if (combatSummary && combatSummary.lastAttack) {
-                                        combatSummary.lastAttack.hit = false;
-                                        combatSummary.lastAttack.effectiveAc = newEffectiveAc;
-                                        combatSummary.lastAttack.isAutoMiss = true;
-                                        combatSummary.lastAttack.bardicInspirationDefense = { used: true, biRoll, newEffectiveAc };
-                                        storage.set('combatSummary', combatSummary, campaignName);
-                                    }
-                                    logEntry({
-                                        type: 'ability_use',
-                                        characterName: targetName,
-                                        abilityName: 'Combat Inspiration - Defense',
-                                        description: `${attackerName}'s attack missed! ${targetName} used Combat Inspiration - Defense, rolling ${biRoll} to boost AC to ${newEffectiveAc}. Attack total (${attackTotal}) < new AC (${newEffectiveAc}).`,
-                                        biDieRoll: biRoll,
-                                        timestamp: Date.now(),
-                                    });
-                                } else {
-                                    logEntry({
-                                        type: 'ability_use',
-                                        characterName: targetName,
-                                        abilityName: 'Combat Inspiration - Defense',
-                                        description: `${targetName} used Combat Inspiration - Defense, rolling ${biRoll} to boost AC to ${newEffectiveAc}, but the attack still hits (${attackTotal} >= ${newEffectiveAc}).`,
-                                        biDieRoll: biRoll,
-                                        timestamp: Date.now(),
-                                    });
-                                }
-                            }
-                            resolve();
-                        };
-                        window.addEventListener('bardic-inspiration-defense-result', handler);
-                        setTimeout(() => {
-                            if (!biResolved) {
-                                window.removeEventListener('bardic-inspiration-defense-result', handler);
-                                resolve();
-                            }
-                        }, 30000);
-                    });
-                }
-            }
+            context.bardicInspirationDefense = hasDefense && dieSize && biUsesNum > 0;
+            context.bardicInspirationDefenseDieSize = dieSize;
+            context.bardicInspirationDefenseTargetName = targetName;
+            context.bardicInspirationDefenseAttackRoll = hit ? effectiveD20Roll : null;
+            context.bardicInspirationDefenseBonus = hit ? bonus : null;
+            context.bardicInspirationDefenseEffectiveAc = hit ? effectiveAc : null;
+        }
 
         if (hit && target && rollType === 'attack') {
             const riderName = getRuntimeValue(target.name, 'mountedBy', campaignName);
@@ -392,9 +338,9 @@ export function createLogAndShow(deps) {
         if (criticalRange) {
             const match = criticalRange.match(/^(\d+)-(\d+)$/);
             if (match) {
-            const low = parseInt(match[1], 10);
-            const high = parseInt(match[2], 10);
-            rollsInCriticalRange = effectiveD20Roll >= low && effectiveD20Roll <= high;
+                const low = parseInt(match[1], 10);
+                const high = parseInt(match[2], 10);
+                rollsInCriticalRange = effectiveD20Roll >= low && effectiveD20Roll <= high;
             }
         }
         const isCrit = !isAutoMiss && (effectiveD20Roll === 20 || context?.isAutoCrit || rollsInCriticalRange) && (hit || rollsInCriticalRange);
@@ -534,6 +480,11 @@ export function createLogAndShow(deps) {
                 psiBolsteredKnackDieSize: context?.psiBolsteredKnackDieSize,
                 bardicInspiration: context?.bardicInspiration,
                 bardicInspirationDie: context?.bardicInspirationDie,
+                bardicInspirationDefense: context?.bardicInspirationDefense,
+                bardicInspirationDefenseDieSize: context?.bardicInspirationDefenseDieSize,
+                bardicInspirationDefenseTargetName: context?.bardicInspirationDefenseTargetName,
+                bardicInspirationOffense: context?.bardicInspirationOffense || (context?.playerStats ? hasBardicInspirationOffense(context.playerStats, campaignName) : false),
+                bardicInspirationOffenseDieSize: context?.bardicInspirationOffenseDieSize || getBardicInspirationDieSize(characterName, campaignName) || (context?.playerStats ? getBardicInspirationDieSizeFromClass(context.playerStats) : null),
                 luckyRerolled,
                 luckyRerollValue,
                 characterName,

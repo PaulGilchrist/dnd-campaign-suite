@@ -59,7 +59,7 @@ describe('powerWordStunService', () => {
             );
 
             expect(executeHandler).toHaveBeenCalledTimes(1);
-            const [action, stats, cname, mname] = executeHandler.mock.calls[0];
+            const [action] = executeHandler.mock.calls[0];
             expect(action.automation.type).toBe('power_word_stun');
             expect(action.automation.saveType).toBe('CON');
             expect(action.spellSlotLevel).toBe(9);
