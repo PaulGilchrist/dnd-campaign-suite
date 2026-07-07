@@ -80,7 +80,8 @@ export function computeTrackedResources(playerStats) {
   resources.channelDivinityCharges = { current: maxCD, max: maxCD }
 
   const charisma = playerStats.abilities?.find(a => a.name === 'Charisma')
-  const maxBI = charisma?.bonus || 0
+  const isBard = playerStats.class?.name === 'Bard'
+  const maxBI = isBard ? (charisma?.bonus || 0) : 0
   resources.bardicInspirationUses = { current: maxBI, max: maxBI }
 
   const maxWS = features?.maxWildShapeUses || 0

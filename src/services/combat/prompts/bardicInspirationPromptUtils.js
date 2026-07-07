@@ -1,4 +1,4 @@
-import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue, getStore } from '../../../hooks/runtime/useRuntimeState.js';
 
 const PROMPT_KEY = 'biPrompt';
 const PROMPT_CLEARED_KEY = 'biPromptCleared';
@@ -31,8 +31,9 @@ export function sendBardicInspirationOffensePrompt(campaignName, attackerName, t
 }
 
 export function clearBardicInspirationPrompt(campaignName, targetName) {
-    setRuntimeValue(targetName, PROMPT_KEY, null, campaignName);
-    setRuntimeValue(targetName, PROMPT_CLEARED_KEY, { promptId: null }, campaignName);
+    const store = getStore(targetName);
+    store.delete(PROMPT_KEY);
+    store.delete(PROMPT_CLEARED_KEY);
 }
 
 export function getBardicInspirationPrompt(campaignName, targetName) {

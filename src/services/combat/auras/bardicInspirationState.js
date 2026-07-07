@@ -13,12 +13,19 @@ export function hasBardicInspirationDefense(name, campaignName) {
     return options.includes('defense_add_to_ac');
 }
 
-export function hasBardicInspirationOffense(name, campaignName) {
-    if (!hasBardicInspiration(name, campaignName)) return false;
-    const optionsRaw = getRuntimeValue(name, 'bardicInspirationCombatOptions', campaignName);
-    let options = [];
-    try { options = JSON.parse(optionsRaw) || []; } catch (_e) { /* ignore */ }
-    return options.includes('offense_add_to_damage');
+export function hasBardicInspirationOffense(playerStats, campaignName) {
+    const runtimeDie = getRuntimeValue(playerStats.name, 'bardicInspirationDie', campaignName);
+    const runtimeOptionsRaw = getRuntimeValue(playerStats.name, 'bardicInspirationCombatOptions', campaignName);
+    let runtimeOptions = [];
+    try { runtimeOptions = JSON.parse(runtimeOptionsRaw) || []; } catch (_e) { /* ignore */ }
+    const hasRuntimeOffense = !!runtimeDie && runtimeOptions.includes('offense_add_to_damage');
+
+    const biUsesRaw = getRuntimeValue(playerStats.name, 'bardicInspirationUses', campaignName);
+    const biUsesNum = (typeof biUsesRaw === 'object' && biUsesRaw !== null) ? biUsesRaw.current : (biUsesRaw != null ? Number(biUsesRaw) : (playerStats?._trackedResources?.bardicInspirationUses?.current ?? 0));
+    const isBard = playerStats.class?.name === 'Bard';
+    const hasBardUses = isBard && biUsesNum > 0;
+
+    return hasRuntimeOffense || hasBardUses;
 }
 
 export function getBardicInspirationDieSize(name, campaignName) {
@@ -28,6 +35,12 @@ export function getBardicInspirationDieSize(name, campaignName) {
     if (!isNaN(num) && num > 0) return num;
     const match = String(die).match(/d(\d+)/);
     return match ? Number(match[1]) : null;
+}
+
+export function getBardicInspirationDieSizeFromClass(playerStats) {
+    const classLevel = playerStats.class?.class_levels?.find(cl => cl.level === playerStats.level);
+    const die = classLevel?.bardic_die || classLevel?.class_specific?.bardic_inspiration_die || 0;
+    return die || null;
 }
 
 export function getBardicInspirationGrantedBy(name, campaignName) {

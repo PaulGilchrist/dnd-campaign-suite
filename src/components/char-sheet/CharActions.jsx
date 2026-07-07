@@ -17,6 +17,7 @@ import { computeFeatRangeEffects } from '../../services/character/featRangeServi
 import { hasAutomation } from '../../services/combat/automation/automationService.js'
 import { isExhausted } from '../../services/automation/handlers/combat/saveAttackHandler.js'
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
+import utils from '../../services/ui/utils.js';
 import { toggleBuff } from '../../services/automation/common/buffToggle.js';
 import { postLogEntry } from '../../services/shared/logPoster.js';
 import { SHOW_DICE_ROLL_DELAY } from '../../config/ui-config.js';
@@ -43,6 +44,9 @@ import { endInvisibilityOnHostileAction } from '../../services/rules/features/in
 import { applyDamageToTarget } from '../../services/rules/combat/applyDamage.js';
 import { getDistanceFeet } from '../../services/rules/combat/rangeValidation.js';
 import { getInnateSorceryBonus } from '../../services/combat/buffs/buffService.js';
+import { hasBardicInspirationOffense, getBardicInspirationDieSize, getBardicInspirationDieSizeFromClass } from '../../services/combat/auras/bardicInspirationState.js';
+import { sendBardicInspirationOffensePrompt } from '../../services/combat/prompts/bardicInspirationPromptUtils.js';
+import { spendResource } from '../../services/automation/common/resourceCheck.js';
 import { buildAttackContext, buildAttackContextSync } from '../../services/automation/contextBuilder.js';
 import { buildEmpoweredSpellState, getEmpoweredSpellDescription } from '../../services/rules/spells/empoweredSpellService.js';
 import { getEmpoweredEvocationFeatures, getEmpoweredEvocationIntModifier } from '../../services/rules/spells/postCastRiderService.js';
@@ -94,8 +98,8 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
     const { rollAttack, rollDamage } = useLoggedDiceRoll(playerStats.name, campaignName, {
         characters,
         autoDamageSource: 'char-actions',
-        autoDamageRoll: async (autoDamage, isCrit) => {
-            let autoFormula = autoDamage.formula;
+    autoDamageRoll: async (autoDamage, isCrit) => {
+        let autoFormula = autoDamage.formula;
             const hasEmpoweredEvoc = getEmpoweredEvocationFeatures(playerStats).length > 0;
             const empEvocIntMod = hasEmpoweredEvoc ? getEmpoweredEvocationIntModifier(playerStats) : 0;
             const spellSchool = (autoDamage.autoDamageSchool || '').toLowerCase();
@@ -178,6 +182,46 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                 overchannelResult = rollExpressionMaximized(autoFormula);
             } else {
                 overchannelResult = isCrit ? rollExpressionDoubled(autoFormula) : rollExpression(autoFormula);
+            }
+
+            // Combat Inspiration - Offense: prompt to add BI die to damage on hit (auto-attack path)
+            const hasOffense = hasBardicInspirationOffense(playerStats, campaignName);
+            const dieSize = getBardicInspirationDieSize(playerStats.name, campaignName) || getBardicInspirationDieSizeFromClass(playerStats);
+            const biUsesRaw = getRuntimeValue(playerStats.name, 'bardicInspirationUses', campaignName);
+            const biUsesNum = (typeof biUsesRaw === 'object' && biUsesRaw !== null) ? biUsesRaw.current : (biUsesRaw != null ? Number(biUsesRaw) : (playerStats?._trackedResources?.bardicInspirationUses?.current ?? 0));
+            if (hasOffense && dieSize && biUsesNum > 0) {
+                const targetName = autoDamage.targetName || 'unknown target';
+                const promptId = `bi-offense-${utils.guid()}`;
+                sendBardicInspirationOffensePrompt(campaignName, playerStats.name, targetName, dieSize, promptId);
+                let biResolved = false;
+                await new Promise(resolve => {
+                    const handler = event => {
+                        if (event.detail.promptId !== promptId) return;
+                        window.removeEventListener('bardic-inspiration-offense-result', handler);
+                        biResolved = true;
+                        if (event.detail.used) {
+                            const biRoll = event.detail.biRoll;
+                            spendResource(playerStats.name, 'bardicInspirationUses', 1, campaignName);
+                            setRuntimeValue(playerStats.name, 'bardicInspirationOffenseValue', String(biRoll), campaignName);
+                            addEntry(campaignName, {
+                                type: 'ability_use',
+                                characterName: playerStats.name,
+                                abilityName: 'Combat Inspiration - Offense',
+                                description: `${playerStats.name} used Combat Inspiration - Offense, rolling ${biRoll} (d${dieSize}) bonus damage.`,
+                                biDieRoll: biRoll,
+                                timestamp: Date.now(),
+                            });
+                        }
+                        resolve();
+                    };
+                    window.addEventListener('bardic-inspiration-offense-result', handler);
+                    setTimeout(() => {
+                        if (!biResolved) {
+                            window.removeEventListener('bardic-inspiration-offense-result', handler);
+                            resolve();
+                        }
+                    }, 30000);
+                });
             }
 
             // Add Sneak Attack damage for Rogue class feature

@@ -7,7 +7,7 @@ import {
     computeDamageAfterEvasion,
     normalizeSaveType,
 } from '../../services/rules/combat/applyDamage.js';
-import { getRuntimeValue, setRuntimeObject, setRuntimeValue } from '../runtime/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue } from '../runtime/useRuntimeState.js';
 import { clearAllExpirationEffects } from '../../services/rules/effects/expirations.js';
 import { loadCombatSummary, getCurrentCombatRound } from '../../services/encounters/combatData.js';
 import {
@@ -20,6 +20,7 @@ import {
     sendBardicInspirationDefensePrompt,
 } from '../../services/combat/prompts/bardicInspirationPromptUtils.js';
 import { hasBardicInspirationDefense, getBardicInspirationDieSize } from '../../services/combat/auras/bardicInspirationState.js';
+import { spendResource } from '../../services/automation/common/resourceCheck.js';
 import { getEmpoweredEvocationFeatures, getEmpoweredEvocationIntModifier } from '../../services/rules/spells/postCastRiderService.js';
 import { hasIgnoreResistance, playerIsImmuneToCondition } from '../../services/combat/automation/automationService.js';
 import { addEntry } from '../../services/ui/logService.js';
@@ -212,17 +213,14 @@ export function createLogAndShow(deps) {
         // Combat Inspiration - Defense
         if (hit && target) {
             const targetName = target.name;
-            if (hasBardicInspirationDefense(targetName, campaignName)) {
-                const runtimeUses = getRuntimeValue(targetName, 'bardicInspirationUses', campaignName);
-                const classLevel = (targetComputed?.class?.class_levels || []).find(cl => cl.level === targetComputed?.level);
-                const biMaxUses = classLevel?.bardic_inspiration_uses;
-                const charismaBonus = targetComputed?.abilities?.find(a => a.name === 'Charisma')?.bonus ?? 0;
-                const availableUses = runtimeUses !== null ? Number(runtimeUses) : (biMaxUses ?? charismaBonus);
-                if (availableUses > 0) {
-                    const dieSize = getBardicInspirationDieSize(targetName, campaignName);
-                    if (dieSize) {
+            const hasDefense = hasBardicInspirationDefense(targetName, campaignName);
+            const dieSize = getBardicInspirationDieSize(targetName, campaignName);
+            const targetChar = (characters || []).find(c => c.name === targetName);
+            const targetComputed = targetChar?.computedStats || targetChar;
+            const biUsesRaw = getRuntimeValue(targetName, 'bardicInspirationUses', campaignName);
+            const biUsesNum = (typeof biUsesRaw === 'object' && biUsesRaw !== null) ? biUsesRaw.current : (biUsesRaw != null ? Number(biUsesRaw) : (targetComputed?._trackedResources?.bardicInspirationUses?.current ?? 0));
+            if (hasDefense && dieSize && biUsesNum > 0) {
                         const promptId = `bi-defense-${utils.guid()}`;
-                        console.log('[BI DEF PROMPT] sending promptId=', promptId, 'target=', targetName, 'stack=', new Error().stack.split('\n').slice(1, 6).join(' | '));
                         sendBardicInspirationDefensePrompt(campaignName, targetName, attackerName, effectiveD20Roll, bonus, effectiveAc, dieSize, promptId);
                     let biResolved = false;
                     await new Promise(resolve => {
@@ -233,14 +231,20 @@ export function createLogAndShow(deps) {
                             biResolved = true;
                             if (event.detail.used) {
                                 const biRoll = event.detail.biRoll;
-                                const currentUses = Number(getRuntimeValue(targetName, 'bardicInspirationUses', campaignName) ?? 0);
-                                setRuntimeObject(targetName, { bardicInspirationUses: Math.max(0, currentUses - 1) }, campaignName, true);
+                                spendResource(targetName, 'bardicInspirationUses', 1, campaignName);
                                 const newEffectiveAc = effectiveAc + biRoll;
                                 const attackTotal = effectiveD20Roll + bonus;
                                 console.log('[BI DEF] Result: biRoll=', biRoll, 'newEffectiveAc=', newEffectiveAc, 'attackTotal=', attackTotal, 'wasHit=', hit, 'willMiss=', attackTotal < newEffectiveAc);
                                 if (attackTotal < newEffectiveAc) {
                                     hit = false;
                                     isAutoMiss = true;
+                                    if (combatSummary && combatSummary.lastAttack) {
+                                        combatSummary.lastAttack.hit = false;
+                                        combatSummary.lastAttack.effectiveAc = newEffectiveAc;
+                                        combatSummary.lastAttack.isAutoMiss = true;
+                                        combatSummary.lastAttack.bardicInspirationDefense = { used: true, biRoll, newEffectiveAc };
+                                        storage.set('combatSummary', combatSummary, campaignName);
+                                    }
                                     logEntry({
                                         type: 'ability_use',
                                         characterName: targetName,
@@ -272,7 +276,6 @@ export function createLogAndShow(deps) {
                     });
                 }
             }
-        }
 
         if (hit && target && rollType === 'attack') {
             const riderName = getRuntimeValue(target.name, 'mountedBy', campaignName);

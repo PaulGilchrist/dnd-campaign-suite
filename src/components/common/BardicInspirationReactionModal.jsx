@@ -3,7 +3,6 @@ import { rollExpression } from '../../services/dice/diceRoller.js';
 import Subscriber from './Subscriber.jsx';
 import { clearBardicInspiration } from '../../services/combat/auras/bardicInspirationState.js';
 import { clearBardicInspirationPrompt } from '../../services/combat/prompts/bardicInspirationPromptUtils.js';
-import { addEntry } from '../../services/ui/logService.js';
 import './savePromptModal.css';
 
 function BardicInspirationReactionModal({ campaignName }) {
@@ -11,12 +10,14 @@ function BardicInspirationReactionModal({ campaignName }) {
     const current = prompts.length > 0 ? prompts[0] : null;
     const activePromptIdRef = useRef(null);
     const promptsRef = useRef([]);
+    const processedPromptIdsRef = useRef(new Set());
 
     const advance = useCallback(() => {
         setPrompts(prev => {
             const next = prev.slice(1);
             activePromptIdRef.current = null;
             promptsRef.current = next;
+            processedPromptIdsRef.current.clear();
             return next;
         });
     }, []);
@@ -29,8 +30,10 @@ function BardicInspirationReactionModal({ campaignName }) {
             if (event.data && typeof event.data === 'object' && event.data.biPrompt) {
                 const promptData = event.data.biPrompt;
                 if (promptData && promptData.promptId) {
+                    if (processedPromptIdsRef.current.has(promptData.promptId)) return;
                     if (activePromptIdRef.current !== null) return;
                     if (promptsRef.current.some(p => p.promptId === promptData.promptId)) return;
+                    processedPromptIdsRef.current.add(promptData.promptId);
                     activePromptIdRef.current = promptData.promptId;
                     setPrompts(prev => {
                         const next = [...prev, { targetName: characterName, ...promptData }];
@@ -45,8 +48,10 @@ function BardicInspirationReactionModal({ campaignName }) {
         if (event.key.startsWith(prefix)) {
             const targetName = event.key.slice(prefix.length);
             if (!targetName || !event.data?.promptId) return;
+            if (processedPromptIdsRef.current.has(event.data.promptId)) return;
             if (activePromptIdRef.current !== null) return;
             if (promptsRef.current.some(p => p.promptId === event.data.promptId)) return;
+            processedPromptIdsRef.current.add(event.data.promptId);
             activePromptIdRef.current = event.data.promptId;
             setPrompts(prev => {
                 const next = [...prev, { targetName, ...event.data }];
@@ -70,7 +75,7 @@ function BardicInspirationReactionModal({ campaignName }) {
 
     const handleDismiss = useCallback(() => {
         if (current) {
-            clearBardicInspirationPrompt(campaignName, current.targetName);
+            clearBardicInspirationPrompt(campaignName, current.mode === 'offense' ? current.attackerName : current.targetName);
             advance();
         }
     }, [campaignName, current, advance]);
@@ -85,28 +90,8 @@ function BardicInspirationReactionModal({ campaignName }) {
             clearBardicInspirationPrompt(campaignName, current.targetName);
             clearBardicInspiration(current.targetName, campaignName);
         } else {
-            clearBardicInspirationPrompt(campaignName, current.targetName);
+            clearBardicInspirationPrompt(campaignName, current.attackerName);
             clearBardicInspiration(current.attackerName, campaignName);
-        }
-
-        if (current.mode === 'defense') {
-            addEntry(campaignName, {
-                type: 'ability_use',
-                characterName: current.targetName,
-                abilityName: 'Combat Inspiration - Defense',
-                description: `${current.targetName} used Combat Inspiration - Defense, rolling ${biRoll} (d${current.dieSize}) to boost AC.`,
-                biDieRoll: biRoll,
-                timestamp: Date.now(),
-            }).catch(() => {});
-        } else {
-            addEntry(campaignName, {
-                type: 'ability_use',
-                characterName: current.attackerName,
-                abilityName: 'Combat Inspiration - Offense',
-                description: `${current.attackerName} used Combat Inspiration - Offense, rolling ${biRoll} (d${current.dieSize}) bonus damage.`,
-                biDieRoll: biRoll,
-                timestamp: Date.now(),
-            }).catch(() => {});
         }
 
         window.dispatchEvent(new CustomEvent(`bardic-inspiration-${current.mode}-result`, {
@@ -122,7 +107,7 @@ function BardicInspirationReactionModal({ campaignName }) {
         window.dispatchEvent(new CustomEvent(`bardic-inspiration-${current.mode}-result`, {
             detail: { promptId, used: false },
         }));
-        clearBardicInspirationPrompt(campaignName, current.targetName);
+        clearBardicInspirationPrompt(campaignName, current.mode === 'offense' ? current.attackerName : current.targetName);
         advance();
     }, [campaignName, current, advance]);
 

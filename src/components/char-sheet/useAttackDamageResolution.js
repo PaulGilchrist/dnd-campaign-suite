@@ -12,6 +12,8 @@ import { createSaveListener } from '../../services/automation/common/savePrompt.
 import { getAttackRiderOptions, getAttackRiderOptionsByContext, executeAttackRiderManeuver as executeAttackRiderManeuverService } from '../../services/automation/handlers/class-fighter-rogue/combatSuperiorityHandler.js';
 import { sendBardicInspirationOffensePrompt } from '../../services/combat/prompts/bardicInspirationPromptUtils.js';
 import { hasBardicInspirationOffense, getBardicInspirationDieSize } from '../../services/combat/auras/bardicInspirationState.js';
+import { spendResource } from '../../services/automation/common/resourceCheck.js';
+import utils from '../../services/ui/utils.js';
 
 export default function useAttackDamageResolution({
     playerStats, campaignName, mapName,
@@ -130,11 +132,13 @@ export default function useAttackDamageResolution({
 
         // Combat Inspiration - Offense: prompt to add BI die to damage on hit
         if (isHit && playerStats.name) {
-            if (hasBardicInspirationOffense(playerStats.name, campaignName)) {
-                const dieSize = getBardicInspirationDieSize(playerStats.name, campaignName);
-                if (dieSize) {
+            const hasOffense = hasBardicInspirationOffense(playerStats.name, campaignName);
+            const dieSize = getBardicInspirationDieSize(playerStats.name, campaignName);
+            const biUsesRaw = getRuntimeValue(playerStats.name, 'bardicInspirationUses', campaignName);
+            const biUsesNum = (typeof biUsesRaw === 'object' && biUsesRaw !== null) ? biUsesRaw.current : (biUsesRaw != null ? Number(biUsesRaw) : (playerStats?._trackedResources?.bardicInspirationUses?.current ?? 0));
+            if (hasOffense && dieSize && biUsesNum > 0) {
                     const targetName = popupHtml?.targetName || 'unknown target';
-                    const promptId = `bi-offense-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+                    const promptId = `bi-offense-${utils.guid()}`;
                     sendBardicInspirationOffensePrompt(campaignName, playerStats.name, targetName, dieSize, promptId);
                     let biResolved = false;
                     await new Promise(resolve => {
@@ -144,8 +148,7 @@ export default function useAttackDamageResolution({
                             biResolved = true;
                             if (event.detail.used) {
                                 const biRoll = event.detail.biRoll;
-                                const currentUses = Number(getRuntimeValue(playerStats.name, 'bardicInspirationUses', campaignName) ?? 0);
-                                setRuntimeObject(playerStats.name, { bardicInspirationUses: Math.max(0, currentUses - 1) }, campaignName, true);
+                                spendResource(playerStats.name, 'bardicInspirationUses', 1, campaignName);
                                 setRuntimeObject(playerStats.name, { bardicInspirationOffenseValue: String(biRoll) }, campaignName, true);
                                 addEntry(campaignName, {
                                     type: 'ability_use',
@@ -168,7 +171,6 @@ export default function useAttackDamageResolution({
                     });
                 }
             }
-        }
 
         const wasCrit = popupHtml?.isCrit;
         const isNatural20 = popupHtml?.isNatural20 === true;

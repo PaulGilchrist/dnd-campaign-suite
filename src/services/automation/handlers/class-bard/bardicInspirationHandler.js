@@ -96,6 +96,7 @@ export async function applyBardicInspiration(action, playerStats, campaignName, 
 
     await setRuntimeValue(targetName, 'bardicInspirationDie', String(dieSize), campaignName);
     await setRuntimeValue(targetName, 'bardicInspirationGrantedBy', playerStats.name, campaignName);
+    await setRuntimeValue(targetName, 'bardicInspirationUses', { current: 1, max: 1 }, campaignName);
 
     if (hasCombatOptions) {
         const options = auto.options || ['defense_add_to_ac', 'offense_add_to_damage'];

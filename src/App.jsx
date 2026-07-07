@@ -148,10 +148,11 @@ function App() {
           const entries = trackedResourcesToStoreEntries(merged);
           seedTrackedResources(stats.name, entries);
           // Also seed arbitrary runtime keys (weapon mastery choices, etc.) from server data
+          // Exclude transient prompt keys that should not persist across refreshes
           if (charServerData && typeof charServerData === 'object') {
             const store = getStore(stats.name);
             for (const [key, value] of Object.entries(charServerData)) {
-              if (!store.has(key) && value != null) {
+              if (!store.has(key) && value != null && key !== 'biPrompt') {
                 store.set(key, value);
               }
             }

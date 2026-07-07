@@ -165,7 +165,10 @@ describe('computeTrackedResources', () => {
   // ── bardicInspirationUses ──
 
   it('sets bardicInspirationUses from Charisma ability bonus', () => {
-    const stats = basePlayerStats({ abilities: [{ name: 'Charisma', bonus: 3 }] });
+    const stats = basePlayerStats({ 
+      class: { name: 'Bard', class_levels: [], major: {}, subclass: {} },
+      abilities: [{ name: 'Charisma', bonus: 3 }] 
+    });
     const result = computeTrackedResources(stats);
     expect(result.bardicInspirationUses).toEqual({ current: 3, max: 3 });
   });
