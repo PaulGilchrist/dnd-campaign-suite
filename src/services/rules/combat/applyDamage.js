@@ -5,11 +5,17 @@ import utils from '../../ui/utils.js';
 import { sendDeathSavePrompt, sendConcentrationPrompt } from '../../combat/conditions/savePromptService.js';
 import { rollConcentrationSave } from '../../combat/concentration/concentrationRules.js';
 import { postLogEntry } from '../../shared/logPoster.js';
-import { isHolyAuraActive, getHolyAuraTargets } from '../../automation/handlers/buffs/holyAuraHandler.js';
 import { getDamageReduction } from '../../combat/automation/automationPassives.js';
 import { isCreatureInSilenceZone } from '../../rules/features/silenceService.js';
 import { processTashasLaughterRepeatSave } from '../../automation/handlers/spells/tashasLaughterHandler.js';
-import { getDistanceFeet } from './rangeValidation.js';
+import { applyWardingBond } from '../../rules/features/wardingBondService.js';
+import { applyThoughtShield } from '../../rules/features/thoughtShieldService.js';
+import { checkPsychicVeil } from '../../rules/features/psychicVeilService.js';
+import { checkHolyAuraDamage } from '../../rules/features/holyAuraDamageService.js';
+import { checkDarkOnesBlessing } from '../../rules/features/darkOnesBlessingService.js';
+import { checkUndyingSentinel } from '../../rules/features/undyingSentinelService.js';
+import { checkBoonOfRecoveryLastStand } from '../../rules/features/boonOfRecoveryService.js';
+import { checkRelentlessEndurance } from '../../rules/features/relentlessEnduranceService.js';
 
 // Tracks which multi-attack sequences have already triggered Relentless Endurance.
 // Prevents follow-up hits in the same sequence from re-killing the character.
@@ -262,192 +268,86 @@ export function applyDamageToTarget(combatSummary, targetName, rawDamage, damage
     }
 
     if (wardDamage > 0) {
-      // Warding Bond: caster takes the same damage as the target (only if within 60 feet)
       if (isPlayer) {
-        const targetBondSource = getRuntimeValue(creature.name, 'activeBuffs', campaignName);
-        const targetActiveBuffs = Array.isArray(targetBondSource) ? targetBondSource : [];
-        const wardingBondBuff = targetActiveBuffs.find(b => b.effect === 'warding_bond');
-        if (wardingBondBuff && wardingBondBuff.sourceCharacter && wardingBondBuff.sourceCharacter !== creature.name) {
-          const casterName = wardingBondBuff.sourceCharacter;
-          const casterCreature = combatSummary.creatures.find(c => c.name === casterName);
-          const targetCreature = combatSummary.creatures.find(c => c.name === creature.name);
-          const distance = casterCreature && targetCreature ? getDistanceFeet(casterCreature.position, targetCreature.position) : null;
-          if (distance === null || distance <= 60) {
-            if (casterCreature && casterCreature.currentHp > 0) {
-              const sharedDamage = wardDamage;
-              casterCreature.currentHp = Math.max(0, casterCreature.currentHp - sharedDamage);
-              postLogEntry(campaignName, {
-                type: 'hp_change',
-                targetName: casterName,
-                delta: -sharedDamage,
-                currentHp: casterCreature.currentHp,
-                maxHp: casterCreature.maxHp,
-                isHealing: false,
-                isUnconscious: casterCreature.currentHp <= 0,
-                abilityName: 'Warding Bond',
-              });
-              if (casterCreature.concentration && sharedDamage > 0) {
-                casterCreature.concentration.dc = Math.max(10, Math.floor(sharedDamage / 2));
-              }
-            }
-          }
-        }
+        applyWardingBond(creature, combatSummary, campaignName, wardDamage);
       }
-      // Thought Shield: reflect Psychic damage back to the attacker
-     if (isPlayer && attackerName && attackerName !== creature.name) {
-      const hasThoughtShield = playerComputed?.characterAdvancement?.some(f => f.name === 'Thought Shield');
-      if (hasThoughtShield && damageTypes?.some(d => d.toLowerCase() === 'psychic')) {
-        const attackerCreature = combatSummary.creatures.find(c => c.name === attackerName);
-        if (attackerCreature && attackerCreature.currentHp > 0) {
-          const reflectedDamage = wardDamage;
-          attackerCreature.currentHp = Math.max(0, attackerCreature.currentHp - reflectedDamage);
+      if (isPlayer && attackerName && attackerName !== creature.name) {
+        applyThoughtShield(creature, attackerName, playerComputed, damageTypes, combatSummary, campaignName, wardDamage);
+      }
+      if (isPlayer) {
+        const rawConditions = getRuntimeValue(creature.name, 'activeConditions');
+        const conditions = rawConditions || [];
+        if (conditions.some(c => String(c).toLowerCase() === 'frightened')) {
+          const filtered = conditions.filter(c => String(c).toLowerCase() !== 'frightened');
+          setRuntimeValue(creature.name, 'activeConditions', filtered, campaignName);
           postLogEntry(campaignName, {
-            type: 'hp_change',
-            targetName: attackerName,
-            delta: -reflectedDamage,
-            currentHp: attackerCreature.currentHp,
-            maxHp: attackerCreature.maxHp,
-            isHealing: false,
-            isUnconscious: attackerCreature.currentHp <= 0,
-            abilityName: "Thought Shield",
+            type: 'condition',
+            action: 'removed',
+            characterName: creature.name,
+            condition: 'Frightened',
+            reason: 'took damage',
+            timestamp: Date.now(),
           });
-          if (attackerCreature.concentration && reflectedDamage > 0) {
-            attackerCreature.concentration.dc = Math.max(10, Math.floor(reflectedDamage / 2));
+        }
+        if (conditions.some(c => String(c).toLowerCase() === 'charmed')) {
+          const filtered = conditions.filter(c => String(c).toLowerCase() !== 'charmed');
+          setRuntimeValue(creature.name, 'activeConditions', filtered, campaignName);
+          postLogEntry(campaignName, {
+            type: 'condition',
+            action: 'removed',
+            characterName: creature.name,
+            condition: 'Charmed',
+            reason: 'took damage (Friends)',
+            timestamp: Date.now(),
+          });
+        }
+      } else {
+        const rawConditions = getRuntimeValue(creature.name, 'activeConditions') || [];
+        const hadFrightened = rawConditions.some(c => String(c).toLowerCase() === 'frightened');
+        if (hadFrightened) {
+          const filtered = rawConditions.filter(c => String(c).toLowerCase() !== 'frightened');
+          setRuntimeValue(creature.name, 'activeConditions', filtered, campaignName);
+          postLogEntry(campaignName, {
+            type: 'condition',
+            action: 'removed',
+            characterName: creature.name,
+            condition: 'Frightened',
+            reason: 'took damage',
+            timestamp: Date.now(),
+          });
+        }
+        const hadCharmed = rawConditions.some(c => String(c).toLowerCase() === 'charmed');
+        if (hadCharmed) {
+          const filtered = rawConditions.filter(c => String(c).toLowerCase() !== 'charmed');
+          setRuntimeValue(creature.name, 'activeConditions', filtered, campaignName);
+          postLogEntry(campaignName, {
+            type: 'condition',
+            action: 'removed',
+            characterName: creature.name,
+            condition: 'Charmed',
+            reason: 'took damage (Animal Friendship)',
+            timestamp: Date.now(),
+          });
+        }
+      }
+      if (attackerName && attackerName !== creature.name) {
+        checkPsychicVeil(attackerName, campaignName);
+        // Supreme Sneak: if Stealth Attack is active, don't remove Invisible condition
+        const stealthAttackCost = getRuntimeValue(attackerName, 'stealthAttackCost', campaignName);
+        if (stealthAttackCost && stealthAttackCost > 0) {
+          const rawAttackerConditions2 = getRuntimeValue(attackerName, 'activeConditions');
+          const attackerConditions2 = rawAttackerConditions2 || [];
+          const attackerCondArray2 = attackerConditions2;
+          const hasInvisible = attackerCondArray2.some(c => String(c).toLowerCase() === 'invisible');
+          if (hasInvisible) {
+            // Preserve Invisible condition — don't remove it
+            // The stealthAttackCost will be cleared at start of next turn
           }
         }
-      }
-    }
-    if (isPlayer) {
-      const rawConditions = getRuntimeValue(creature.name, 'activeConditions');
-      const conditions = rawConditions || [];
-      if (conditions.some(c => String(c).toLowerCase() === 'frightened')) {
-        const filtered = conditions.filter(c => String(c).toLowerCase() !== 'frightened');
-        setRuntimeValue(creature.name, 'activeConditions', filtered, campaignName);
-        postLogEntry(campaignName, {
-          type: 'condition',
-          action: 'removed',
-          characterName: creature.name,
-          condition: 'Frightened',
-          reason: 'took damage',
-          timestamp: Date.now(),
-        });
-      }
-      if (conditions.some(c => String(c).toLowerCase() === 'charmed')) {
-        const filtered = conditions.filter(c => String(c).toLowerCase() !== 'charmed');
-        setRuntimeValue(creature.name, 'activeConditions', filtered, campaignName);
-        postLogEntry(campaignName, {
-          type: 'condition',
-          action: 'removed',
-          characterName: creature.name,
-          condition: 'Charmed',
-          reason: 'took damage (Friends)',
-          timestamp: Date.now(),
-        });
-      }
-    } else {
-      const rawConditions = getRuntimeValue(creature.name, 'activeConditions') || [];
-      const hadFrightened = rawConditions.some(c => String(c).toLowerCase() === 'frightened');
-      if (hadFrightened) {
-        const filtered = rawConditions.filter(c => String(c).toLowerCase() !== 'frightened');
-        setRuntimeValue(creature.name, 'activeConditions', filtered, campaignName);
-        postLogEntry(campaignName, {
-          type: 'condition',
-          action: 'removed',
-          characterName: creature.name,
-          condition: 'Frightened',
-          reason: 'took damage',
-          timestamp: Date.now(),
-        });
-      }
-      const hadCharmed = rawConditions.some(c => String(c).toLowerCase() === 'charmed');
-      if (hadCharmed) {
-        const filtered = rawConditions.filter(c => String(c).toLowerCase() !== 'charmed');
-        setRuntimeValue(creature.name, 'activeConditions', filtered, campaignName);
-        postLogEntry(campaignName, {
-          type: 'condition',
-          action: 'removed',
-          characterName: creature.name,
-          condition: 'Charmed',
-          reason: 'took damage (Animal Friendship)',
-          timestamp: Date.now(),
-        });
-      }
-    }
+     }
 
-    if (attackerName && attackerName !== creature.name) {
-      const attackerBuffs = getRuntimeValue(attackerName, 'activeBuffs', campaignName);
-      const attackerBuffArray = Array.isArray(attackerBuffs) ? attackerBuffs : [];
-      if (attackerBuffArray.some(b => b.name === 'Psychic Veil')) {
-        const rawAttackerConditions = getRuntimeValue(attackerName, 'activeConditions');
-        const attackerConditions = rawAttackerConditions || [];
-        const attackerCondArray = attackerConditions;
-        const filteredConditions = attackerCondArray.filter(c => String(c).toLowerCase() !== 'invisible');
-        if (filteredConditions.length !== attackerCondArray.length) {
-          setRuntimeValue(attackerName, 'activeConditions', filteredConditions, campaignName);
-        }
-        const filteredBuffs = attackerBuffArray.filter(b => b.name !== 'Psychic Veil');
-        if (filteredBuffs.length !== attackerBuffArray.length) {
-          setRuntimeValue(attackerName, 'activeBuffs', filteredBuffs, campaignName);
-        }
-      }
-      // Supreme Sneak: if Stealth Attack is active, don't remove Invisible condition
-      const stealthAttackCost = getRuntimeValue(attackerName, 'stealthAttackCost', campaignName);
-      if (stealthAttackCost && stealthAttackCost > 0) {
-        const rawAttackerConditions2 = getRuntimeValue(attackerName, 'activeConditions');
-        const attackerConditions2 = rawAttackerConditions2 || [];
-        const attackerCondArray2 = attackerConditions2;
-        const hasInvisible = attackerCondArray2.some(c => String(c).toLowerCase() === 'invisible');
-        if (hasInvisible) {
-          // Preserve Invisible condition — don't remove it
-          // The stealthAttackCost will be cleared at start of next turn
-        }
-      }
-   }
-
-    // Holy Aura: Fiend/Undead melee attacker vs affected creature — CON save or Blinded until end of next turn
-    if (attackerName && attackerName !== creature.name && wardDamage > 0) {
-      const casterName = attackerName;
-      if (isHolyAuraActive(casterName, campaignName)) {
-        const holyAuraTargets = getHolyAuraTargets(casterName, campaignName);
-        const isTargetProtected = holyAuraTargets.includes(creature.name) || holyAuraTargets.length === 0;
-        if (isTargetProtected) {
-          const attackerCreature = combatSummary.creatures.find(c => c.name === attackerName);
-          if (attackerCreature) {
-            const attackerType = (attackerCreature.type || '').toLowerCase();
-            const attackerTemplate = (() => { const raw = attackerCreature.template; if (raw == null || !Array.isArray(raw)) { console.error('[applyDamage] attacker template is not an array'); throw new Error('attacker template must be an array'); } return raw; }).map(t => t.toLowerCase());
-            const isFiendOrUndead = attackerType === 'fiend' || attackerType === 'undead' ||
-              attackerTemplate.includes('fiend') || attackerTemplate.includes('undead');
-            if (isFiendOrUndead) {
-              const conSaveDc = getRuntimeValue(casterName, 'holyAuraSaveDc', campaignName);
-              if (conSaveDc) {
-                const saveRoll = rollD20();
-                const conBonus = attackerCreature.ability_score_modifiers?.CON ?? attackerCreature.ability_score_modifiers?.constitution ?? 0;
-                const saveTotal = saveRoll + conBonus;
-                if (saveTotal < conSaveDc) {
-                  const rawAttackerConditions = getRuntimeValue(attackerName, 'activeConditions');
-                  const attackerConditions = rawAttackerConditions || [];
-                  const attackerCondArray = attackerConditions;
-                  const existingBlinded = attackerCondArray.find(c => String(c).toLowerCase() === 'blinded');
-                  if (!existingBlinded) {
-                    setRuntimeValue(attackerName, 'activeConditions', [...attackerCondArray, 'blinded'], campaignName);
-                    postLogEntry(campaignName, {
-                      type: 'condition',
-                      action: 'added',
-                      characterName: attackerName,
-                      condition: 'Blinded',
-                      reason: 'Holy Aura (Fiend/Undead melee hit)',
-                      timestamp: Date.now(),
-                    });
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
+     checkHolyAuraDamage(creature, attackerName, combatSummary, campaignName, wardDamage);
     }
-
-   }
 
    const wasAlive = oldHp > 0;
    const isNowUnconscious = newHp <= 0;
@@ -457,34 +357,7 @@ export function applyDamageToTarget(combatSummary, targetName, rawDamage, damage
      creature.concentration.dc = Math.max(10, Math.floor(dcDamage / 2));
    }
 
-    if (!isPlayer && wasAlive && isNowUnconscious && finalDamage > 0) {
-       const allCharacters = characters;
-       for (const charStats of allCharacters) {
-         const computed = charStats?.computedStats || charStats;
-         if (!computed) continue;
-         const isFiendPatron = computed.class?.subclass?.name === 'Fiend Patron';
-         if (!isFiendPatron) continue;
-         const rawFeatures = computed.characterAdvancement;
-         if (rawFeatures == null || !Array.isArray(rawFeatures)) { console.error('[applyDamage] characterAdvancement is not an array'); throw new Error('characterAdvancement must be an array'); }
-         const features = rawFeatures;
-        const feature = features.find(f => f.name === "Dark One's Blessing");
-        if (!feature || !feature.automation) continue;
-        const chaMod = (() => {
-          const cha = computed.abilities?.find(a => a.name === 'Charisma');
-          return cha ? Math.floor((cha.score - 10) / 2) : 0;
-        })();
-        const warlockLevel = (() => {
-          const rawClassLevels = computed.class?.class_levels;
-          if (rawClassLevels == null || !Array.isArray(rawClassLevels)) { console.error('[applyDamage] class_levels is not an array'); throw new Error('class_levels must be an array'); }
-          const cl = rawClassLevels.find(c => c.level === computed.level);
-          return cl ? cl.level : computed.level;
-        })();
-        let amount = chaMod + warlockLevel;
-        amount = Math.max(1, amount);
-        const existingTempHp = Number(getRuntimeValue(charStats.name, 'tempHp', campaignName) || 0);
-        setRuntimeValue(charStats.name, 'tempHp', existingTempHp + amount, campaignName);
-      }
-    }
+    checkDarkOnesBlessing(characters, creature, finalDamage, isPlayer, wasAlive, isNowUnconscious, campaignName);
 
     if (!suppressHpLog) {
         logDamageApplication(creature, finalDamage, oldHp, newHp, campaignName);
@@ -631,227 +504,4 @@ function logDamageApplication(creature, damage, oldHp, newHp, campaignName) {
       }
 
   postLogEntry(campaignName, entry);
-}
-
-function checkUndyingSentinel(creature, playerComputed, campaignName) {
-    const rawAllFeatures = playerComputed?.allFeatures;
-    if (rawAllFeatures == null || !Array.isArray(rawAllFeatures)) {
-        return { intercepted: false };
-    }
-    const allFeatures = rawAllFeatures;
-    let hasUndyingSentinel = false;
-
-    for (const feature of allFeatures) {
-        if (feature?.name === 'Undying Sentinel') {
-            hasUndyingSentinel = true;
-            break;
-        }
-    }
-
-    if (!hasUndyingSentinel) {
-        return { intercepted: false };
-    }
-
-    // Check if already used this long rest
-    const alreadyUsed = getRuntimeValue(creature.name, 'undyingSentinelUsed', campaignName);
-    if (alreadyUsed) {
-        return { intercepted: false };
-    }
-
-    // Undying Sentinel triggers: set HP to 1 + (3 x paladin level)
-    const paladinClassLevel = playerComputed?.class?.class_levels?.find(cl => cl.level === playerComputed.level);
-    const paladinLevel = paladinClassLevel?.level || playerComputed.level;
-    const healAmount = paladinLevel * 3;
-    const storedMaxHp = getRuntimeValue(creature.name, 'hitPoints', campaignName);
-    if (storedMaxHp == null) {
-        console.error(`[applyDamage] Undying Sentinel: hitPoints not found for ${creature.name} in ${campaignName}`);
-        throw new Error(`Undying Sentinel: hitPoints not found for ${creature.name}`);
-    }
-    const maxHp = storedMaxHp;
-    const newHp = Math.min(1 + healAmount, maxHp);
-
-    // Set the runtime HP value
-    setRuntimeValue(creature.name, 'currentHitPoints', newHp, campaignName);
-
-    // Mark as used
-    setRuntimeValue(creature.name, 'undyingSentinelUsed', true, campaignName);
-
-    // Reset death saves since the character is back above 0 HP
-    setRuntimeValue(creature.name, 'deathSaves', [false, false, false], campaignName);
-    setRuntimeValue(creature.name, 'deathFailures', [false, false, false], campaignName);
-
-    // Remove unconscious condition
-    const rawConditions = getRuntimeValue(creature.name, 'activeConditions', campaignName);
-    const conditions = rawConditions || [];
-    const filtered = conditions.filter(c => String(c).toLowerCase() !== 'unconscious');
-    setRuntimeValue(creature.name, 'activeConditions', filtered, campaignName);
-
-    // Update the creature in combat summary
-    if (creature.type === 'player') {
-        creature.currentHp = newHp;
-    }
-
-    // Log the healing
-    postLogEntry(campaignName, {
-        type: 'heal',
-        targetName: creature.name,
-        delta: newHp,
-        currentHp: newHp,
-        maxHp: maxHp,
-        isHealing: true,
-        isUnconscious: false,
-        abilityName: 'Undying Sentinel',
-    });
-
-    window.dispatchEvent(new CustomEvent('combat-summary-updated'));
-
-    return {
-        intercepted: true,
-        finalDamage: 0,
-        newHp,
-    };
-}
-
-function checkBoonOfRecoveryLastStand(creature, playerComputed, campaignName) {
-    const rawAllFeatures = playerComputed?.allFeatures;
-    if (rawAllFeatures == null || !Array.isArray(rawAllFeatures)) {
-        return { intercepted: false };
-    }
-    const allFeatures = rawAllFeatures;
-    let hasBoonOfRecovery = false;
-
-    for (const feature of allFeatures) {
-        if (feature?.name === 'Boon Of Recovery') {
-            hasBoonOfRecovery = true;
-            break;
-        }
-    }
-
-    if (!hasBoonOfRecovery) {
-        return { intercepted: false };
-    }
-
-    // Check if Last Stand has already been used this long rest
-    const lastStandUsed = getRuntimeValue(creature.name, 'boonOfRecoveryLastStandUsed', campaignName);
-    if (lastStandUsed) {
-        return { intercepted: false };
-    }
-
-    const storedMaxHp = getRuntimeValue(creature.name, 'hitPoints', campaignName);
-    if (storedMaxHp == null) {
-        console.error(`[applyDamage] Last Stand: hitPoints not found for ${creature.name} in ${campaignName}`);
-        throw new Error(`Last Stand: hitPoints not found for ${creature.name}`);
-    }
-    const maxHp = storedMaxHp;
-    const healAmount = Math.floor(maxHp / 2);
-    const newHp = Math.min(1 + healAmount, maxHp);
-
-    setRuntimeValue(creature.name, 'currentHitPoints', newHp, campaignName);
-    setRuntimeValue(creature.name, 'boonOfRecoveryLastStandUsed', true, campaignName);
-
-    setRuntimeValue(creature.name, 'deathSaves', [false, false, false], campaignName);
-    setRuntimeValue(creature.name, 'deathFailures', [false, false, false], campaignName);
-
-    const rawConditions = getRuntimeValue(creature.name, 'activeConditions', campaignName);
-    const conditions = rawConditions || [];
-    const filtered = conditions.filter(c => String(c).toLowerCase() !== 'unconscious');
-    setRuntimeValue(creature.name, 'activeConditions', filtered, campaignName);
-
-    if (creature.type === 'player') {
-        creature.currentHp = newHp;
-    }
-
-    postLogEntry(campaignName, {
-        type: 'heal',
-        targetName: creature.name,
-        delta: newHp,
-        currentHp: newHp,
-        maxHp,
-        isHealing: true,
-        isUnconscious: false,
-        abilityName: 'Boon Of Recovery - Last Stand',
-    });
-
-    window.dispatchEvent(new CustomEvent('combat-summary-updated'));
-
-    return {
-        intercepted: true,
-        finalDamage: 0,
-        newHp,
-    };
-}
-
-function checkRelentlessEndurance(creature, playerComputed, campaignName) {
-    const rawAllFeatures = playerComputed?.allFeatures;
-    if (rawAllFeatures == null || !Array.isArray(rawAllFeatures)) {
-        return { intercepted: false };
-    }
-    const allFeatures = rawAllFeatures;
-    let hasRelentlessEndurance = false;
-
-    for (const feature of allFeatures) {
-        if (feature?.name === 'Relentless Endurance') {
-            hasRelentlessEndurance = true;
-            break;
-        }
-    }
-
-    if (!hasRelentlessEndurance) {
-        return { intercepted: false };
-    }
-
-    // Check if already used this long rest
-    const alreadyUsed = getRuntimeValue(creature.name, 'relentlessEnduranceUsed', campaignName);
-    if (alreadyUsed) {
-        return { intercepted: false };
-    }
-
-    // Relentless Endurance: set HP to 1 instead of 0
-    const storedMaxHp = getRuntimeValue(creature.name, 'hitPoints', campaignName);
-    if (storedMaxHp == null) {
-        console.error(`[applyDamage] Relentless Endurance: hitPoints not found for ${creature.name} in ${campaignName}`);
-        throw new Error(`Relentless Endurance: hitPoints not found for ${creature.name}`);
-    }
-    const maxHp = storedMaxHp;
-    const newHp = 1;
-
-    // Set the runtime HP value
-    setRuntimeValue(creature.name, 'currentHitPoints', newHp, campaignName);
-
-    // Mark as used
-    setRuntimeValue(creature.name, 'relentlessEnduranceUsed', true, campaignName);
-
-    // Reset death saves since the character is back above 0 HP
-    setRuntimeValue(creature.name, 'deathSaves', [false, false, false], campaignName);
-    setRuntimeValue(creature.name, 'deathFailures', [false, false, false], campaignName);
-
-    // Remove unconscious condition
-    const rawConditions = getRuntimeValue(creature.name, 'activeConditions', campaignName);
-    const conditions = rawConditions || [];
-    const filtered = conditions.filter(c => String(c).toLowerCase() !== 'unconscious');
-    setRuntimeValue(creature.name, 'activeConditions', filtered, campaignName);
-
-    // Update the creature in combat summary
-    if (creature.type === 'player') {
-        creature.currentHp = newHp;
-    }
-
-    // Log the healing
-    postLogEntry(campaignName, {
-        type: 'hp_change',
-        targetName: creature.name,
-        delta: newHp,
-        currentHp: newHp,
-        maxHp: maxHp,
-        isUnconscious: false,
-        sourceName: 'Relentless Endurance',
-    });
-
-    window.dispatchEvent(new CustomEvent('combat-summary-updated'));
-
-    return {
-        intercepted: true,
-        finalDamage: 0,
-        newHp,
-    };
 }
