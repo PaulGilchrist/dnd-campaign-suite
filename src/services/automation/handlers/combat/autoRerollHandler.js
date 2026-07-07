@@ -11,17 +11,19 @@ import { getCurrentCombatRound } from '../../../../services/encounters/combatDat
 import { rollExpression } from '../../../dice/diceRoller.js';
 import { applyDamageToTarget } from '../../../rules/combat/applyDamage.js';
 
-function buildAttackRollDescription(action, attackerName, bonus, attackEvent) {
-    const { d20, bonus: atkBonus, targetAc, hit, effectiveAc } = attackEvent;
-    const ac = effectiveAc ?? targetAc;
+async function handleAttackRoll(action, bonus, lastAttack, playerStats, campaignName, skipDamageRoll = false) {
+    const auto = action.automation;
+    if (!lastAttack || lastAttack.rollType !== 'attack') {
+        return infoPopup(action.name, `No recent attack roll found. This feature can only be used shortly after an attack roll.`, auto);
+    }
+
+    const { d20, bonus: atkBonus, targetAc, hit, damageFormula, damageType, targetName } = lastAttack;
+    const ac = targetAc;
     const modifiedD20 = d20 + bonus;
     const modifiedTotal = modifiedD20 + atkBonus;
-    const modifiedHit = ac != null ? (modifiedD20 + atkBonus >= ac) : null;
+    const modifiedHit = ac != null ? (modifiedTotal >= ac) : null;
 
     let description = `<b>${action.name}</b><br/>`;
-    if (attackerName) {
-        description += `Attacker: ${attackerName}<br/>`;
-    }
     description += `Bonus: +${bonus}<br/>`;
     description += `Attack roll: d20(${d20}) + ${atkBonus} = ${d20 + atkBonus} vs AC ${ac != null ? ac : '—'} → <b>${hit ? 'HIT' : 'MISS'}</b><br/>`;
     description += `Modified: d20(${modifiedD20}) + ${atkBonus} = ${modifiedTotal} vs AC ${ac != null ? ac : '—'} → <b>${modifiedHit == null ? 'N/A' : modifiedHit ? 'HIT' : 'MISS'}</b><br/>`;
@@ -30,20 +32,37 @@ function buildAttackRollDescription(action, attackerName, bonus, attackEvent) {
         description += `<br/><i>Attack already hit — no effect.</i>`;
     } else if (hit === false && modifiedHit === true) {
         description += `<br/><i>Miss turned into a hit!</i>`;
+
+        if (!skipDamageRoll && damageFormula) {
+            const damageResult = rollExpression(damageFormula);
+            if (damageResult && damageResult.total > 0) {
+                const cs = await getCombatContext(campaignName);
+                const characters = [playerStats];
+                try {
+                    const appliedDmg = applyDamageToTarget(cs, targetName, damageResult.total, [damageType || 'unknown'], campaignName, characters, false, playerStats.name);
+                    if (appliedDmg) {
+                        addEntry(campaignName, {
+                            type: 'roll',
+                            characterName: playerStats.name,
+                            rollType: 'damage',
+                            name: action.name,
+                            formula: damageFormula,
+                            rolls: damageResult.rolls,
+                            total: damageResult.total,
+                            modifier: damageResult.modifier,
+                            damageType: damageType || 'unknown',
+                            targetName: targetName,
+                            finalDamage: appliedDmg.finalDamage,
+                        }).catch((e) => { console.error("[autoReroll] Damage log error:", e); });
+                    }
+                } catch (e) {
+                    console.error('[autoReroll] applyDamageToTarget failed:', e);
+                }
+            }
+        }
     } else if (hit === false && modifiedHit === false) {
         description += `<br/><i>Still a miss.</i>`;
     }
-
-    return description;
-}
-
-function handleAttackRoll(action, bonus, lastAttack) {
-    const auto = action.automation;
-    if (!lastAttack || lastAttack.rollType !== 'attack') {
-        return infoPopup(action.name, `No recent attack roll found. This feature can only be used shortly after an attack roll.`, auto);
-    }
-
-    const description = buildAttackRollDescription(action, null, bonus, lastAttack);
 
     return infoPopup(action.name, description, auto);
 }
@@ -219,8 +238,9 @@ export async function handle(action, playerStats, campaignName, mapName) {
         const usesMax = playerStats?.class?.class_levels?.[(playerStats.level || 1) - 1]?.bardic_inspiration_uses
             ?? (playerStats.proficiency || 0);
 
+        let currentUses = usesMax;
         if (usesMax > 0) {
-            const currentUses = Number(getRuntimeValue(playerName, 'bardicInspirationUses', campaignName) ?? usesMax);
+            currentUses = Number(getRuntimeValue(playerName, 'bardicInspirationUses', campaignName) ?? usesMax);
             if (currentUses <= 0) {
                 return infoPopup(action.name, `${action.name} has no uses remaining. Recharges on a Long Rest.`, auto);
             }
@@ -240,15 +260,29 @@ export async function handle(action, playerStats, campaignName, mapName) {
             return infoPopup(action.name, `No recent failed ability check or attack roll found. ${action.name} can only be used shortly after a failure.`, auto);
         }
 
+        let logDescription;
         let result;
         if (attackFresh) {
-            result = handleAttackRoll(action, biDieRoll, lastAttack);
+            const { d20, bonus: atkBonus, targetAc, hit } = lastAttack;
+            const ac = targetAc;
+            const modifiedD20 = d20 + biDieRoll;
+            const modifiedTotal = modifiedD20 + atkBonus;
+            const modifiedHit = ac != null ? (modifiedTotal >= ac) : null;
+            const originalTotal = d20 + atkBonus;
+
+            logDescription = `${playerName} used ${action.name} on attack: d20(${d20}) + ${atkBonus} = ${originalTotal} vs AC ${ac != null ? ac : '—'} → ${hit ? 'HIT' : 'MISS'}. Bonus: +${biDieRoll} → Modified: d20(${modifiedD20}) + ${atkBonus} = ${modifiedTotal} vs AC ${ac != null ? ac : '—'} → ${modifiedHit == null ? 'N/A' : modifiedHit ? 'HIT' : 'MISS'}. Bardic Inspiration die: 1d${bardicDieSize} (${biDieRoll}).`;
+            result = await handleAttackRoll(action, biDieRoll, lastAttack, playerStats, campaignName);
         } else {
+            const { d20, bonus: checkBonus, checkName } = lastAttack;
+            const originalTotal = d20 + checkBonus;
+            const modifiedD20 = d20 + biDieRoll;
+            const modifiedTotal = modifiedD20 + checkBonus;
+
+            logDescription = `${playerName} used ${action.name} on ${checkName || 'ability check'}: d20(${d20}) + ${checkBonus} = ${originalTotal}. Bonus: +${biDieRoll} → Modified: d20(${modifiedD20}) + ${checkBonus} = ${modifiedTotal}. Bardic Inspiration die: 1d${bardicDieSize} (${biDieRoll}).`;
             result = handleAbilityCheck(action, biDieRoll, lastAttack);
         }
 
         if (usesMax > 0) {
-            const currentUses = Number(getRuntimeValue(playerName, 'bardicInspirationUses', campaignName) ?? usesMax);
             await setRuntimeValue(playerName, 'bardicInspirationUses', currentUses - 1, campaignName);
         }
 
@@ -256,7 +290,7 @@ export async function handle(action, playerStats, campaignName, mapName) {
             type: 'ability_use',
             characterName: playerName,
             abilityName: action.name,
-            description: `${playerName} used ${action.name}: rolled 1d${bardicDieSize} (${biDieRoll}).`,
+            description: logDescription,
             biDieRoll,
             biDieSize: bardicDieSize,
             timestamp: Date.now(),
@@ -289,10 +323,25 @@ export async function handle(action, playerStats, campaignName, mapName) {
             return infoPopup(action.name, `No recent failed ability check or attack roll found. ${action.name} can only be used shortly after a failure.`, auto);
         }
 
+        let logDescription;
         let result;
         if (attackFresh) {
-            result = handleAttackRoll(action, dieRoll, lastAttack);
+            const { d20, bonus: atkBonus, targetAc, hit } = lastAttack;
+            const ac = targetAc;
+            const modifiedD20 = d20 + dieRoll;
+            const modifiedTotal = modifiedD20 + atkBonus;
+            const modifiedHit = ac != null ? (modifiedTotal >= ac) : null;
+            const originalTotal = d20 + atkBonus;
+
+            logDescription = `${playerName} used ${action.name} on attack: d20(${d20}) + ${atkBonus} = ${originalTotal} vs AC ${ac != null ? ac : '—'} → ${hit ? 'HIT' : 'MISS'}. Bonus: +${dieRoll} → Modified: d20(${modifiedD20}) + ${atkBonus} = ${modifiedTotal} vs AC ${ac != null ? ac : '—'} → ${modifiedHit == null ? 'N/A' : modifiedHit ? 'HIT' : 'MISS'}. Psionic Energy Die: 1d${psionicDieSize} (${dieRoll}). Psionic Energy: ${currentUses - 1}/${defaultMax}.`;
+            result = await handleAttackRoll(action, dieRoll, lastAttack, playerStats, campaignName);
         } else {
+            const { d20, bonus: checkBonus, checkName } = lastAttack;
+            const originalTotal = d20 + checkBonus;
+            const modifiedD20 = d20 + dieRoll;
+            const modifiedTotal = modifiedD20 + checkBonus;
+
+            logDescription = `${playerName} used ${action.name} on ${checkName || 'ability check'}: d20(${d20}) + ${checkBonus} = ${originalTotal}. Bonus: +${dieRoll} → Modified: d20(${modifiedD20}) + ${checkBonus} = ${modifiedTotal}. Psionic Energy Die: 1d${psionicDieSize} (${dieRoll}). Psionic Energy: ${currentUses - 1}/${defaultMax}.`;
             result = handleAbilityCheck(action, dieRoll, lastAttack);
         }
 
@@ -302,7 +351,7 @@ export async function handle(action, playerStats, campaignName, mapName) {
             type: 'ability_use',
             characterName: playerName,
             abilityName: action.name,
-            description: `${playerName} used ${action.name}: rolled 1d${psionicDieSize} (${dieRoll}) to failed attack roll. Psionic Energy: ${currentUses - 1}/${defaultMax}.`,
+            description: logDescription,
             timestamp: Date.now(),
         }).catch((e) => { console.error("[autoReroll] Error:", e); });
 
@@ -429,7 +478,7 @@ export async function handle(action, playerStats, campaignName, mapName) {
                 }
             }
 
-            const result = handleAttackRoll(action, bonus, lastAttack);
+            const result = handleAttackRoll(action, bonus, lastAttack, playerStats, campaignName, true);
             addEntry(campaignName, {
                 type: 'ability_use',
                 characterName: playerName,
@@ -492,7 +541,7 @@ export async function handle(action, playerStats, campaignName, mapName) {
                     }
                 }
 
-                const result = handleAttackRoll(action, bonus, attackEvent);
+                const result = handleAttackRoll(action, bonus, attackEvent, playerStats, campaignName, true);
                 addEntry(campaignName, {
                     type: 'ability_use',
                     characterName: playerName,
