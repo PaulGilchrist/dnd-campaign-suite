@@ -76,6 +76,7 @@ export default function useCharActionModals({
     const [stealthAttackModal, setStealthAttackModal] = useState(null);
     const [mantleOfInspirationTarget, setMantleOfInspirationTarget] = useState(null);
 
+    // eslint-disable-next-line server-first/no-local-game-state
     const pendingDamageRef = useRef(null);
 
     const { resolveAttackDamage, proceedWithDamage } = useAttackDamageResolution({

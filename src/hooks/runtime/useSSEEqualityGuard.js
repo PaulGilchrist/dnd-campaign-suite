@@ -44,6 +44,7 @@ function valuesEqual(a, b) {
 }
 
 function useSSEEqualityGuard(setter) {
+    // eslint-disable-next-line server-first/no-local-game-state
     const currentValueRef = useRef(undefined);
 
     return useCallback((newVal) => {

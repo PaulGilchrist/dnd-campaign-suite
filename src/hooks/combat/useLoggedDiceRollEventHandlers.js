@@ -17,14 +17,16 @@ import storage from '../../services/ui/storage.js';
 export function setupEventListeners(deps) {
     const { characterName, campaignName, logEntry, charactersRef } = deps;
 
-    if (campaignName && !window.__pendingResultHandlersInstalled) {
+    if (!window.__pendingResultHandlersInstalled) {
         window.__pendingResultHandlersInstalled = true;
 
         window.addEventListener('save-result', (e) => {
-            const pending = window.__pendingSaves[e.detail.promptId];
+            const pendingSaves = getRuntimeValue(campaignName, 'pendingSavePrompts') || {};
+            const pending = pendingSaves[e.detail.promptId];
             if (!pending) return;
 
-            if (window.__createSaveListenerPrompts?.has(e.detail.promptId)) return;
+            const createSaveListenerPrompts = getRuntimeValue(campaignName, 'pendingSaveListenerPrompts') || new Set();
+            if (createSaveListenerPrompts.has(e.detail.promptId)) return;
 
             const combatSummary = getCombatSummary(campaignName);
             const normalizedSaveType = normalizeSaveType(e.detail.saveType || pending.saveType);
@@ -237,7 +239,9 @@ export function setupEventListeners(deps) {
                 }
             }
 
-            delete window.__pendingSaves[e.detail.promptId];
+            const saves = getRuntimeValue(campaignName, 'pendingSavePrompts') || {};
+            delete saves[e.detail.promptId];
+            setRuntimeValue(campaignName, 'pendingSavePrompts', saves, campaignName);
 
             if (!e.detail.success && pending.statusEffects?.length > 0) {
                 const targetName = pending.targetName;

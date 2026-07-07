@@ -357,6 +357,7 @@ function App() {
    * setRuntimeObject is called with skipSync=true to prevent re-POSTing the full
    * store back to the server on SSE echoes (the server already has this data).
    */
+  // eslint-disable-next-line server-first/no-local-game-state
   const pendingPromptIdRef = useRef(null);
   const handleRuntimeEvent = useCallback((event) => {
     if (event.key == null || event.data == null) return;

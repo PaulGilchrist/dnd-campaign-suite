@@ -30,6 +30,7 @@ function TravelPanel({
   partyHasMaxExhaustion,
 }) {
   const panelRef = useRef(null);
+  // eslint-disable-next-line server-first/no-local-game-state
   const dragState = useRef(null);
 
   const handleHeaderPointerDown = (e) => {

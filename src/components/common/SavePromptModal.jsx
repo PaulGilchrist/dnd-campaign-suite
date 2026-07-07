@@ -51,10 +51,12 @@ function SavePromptModal({ campaignName, characters, activeMapName }) {
       if (prev.some(p => p.promptId === event.data.promptId)) return prev;
       const { sourceAttackerName, ...restData } = event.data;
       const newPrompt = { targetName, attackerName: sourceAttackerName, ...restData };
-      if (!window.__pendingSaves) window.__pendingSaves = {};
+
+      const pendingSaves = getRuntimeValue(campaignName, 'pendingSavePrompts') || {};
       const fullPrompt = { ...newPrompt, campaignName };
-      if (!window.__pendingSaves[newPrompt.promptId]) {
-        window.__pendingSaves[newPrompt.promptId] = fullPrompt;
+      if (!pendingSaves[newPrompt.promptId]) {
+        pendingSaves[newPrompt.promptId] = fullPrompt;
+        setRuntimeValue(campaignName, 'pendingSavePrompts', pendingSaves, campaignName);
       }
       return [...prev, newPrompt];
      });
@@ -65,7 +67,11 @@ function SavePromptModal({ campaignName, characters, activeMapName }) {
     const prefix = `change-${campaignName}-savePromptCleared-`;
     if (!event.key.startsWith(prefix)) return;
     if (!event.data?.promptId) return;
-    if (window.__pendingSaves) delete window.__pendingSaves[event.data.promptId];
+
+    const pendingSaves = getRuntimeValue(campaignName, 'pendingSavePrompts') || {};
+    delete pendingSaves[event.data.promptId];
+    setRuntimeValue(campaignName, 'pendingSavePrompts', pendingSaves, campaignName);
+
     setPrompts(prev => prev.filter(p => p.promptId !== event.data.promptId));
   }, [campaignName]);
 

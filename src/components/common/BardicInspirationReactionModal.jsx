@@ -8,6 +8,7 @@ import './savePromptModal.css';
 function BardicInspirationReactionModal({ campaignName }) {
     const [prompts, setPrompts] = useState([]);
     const current = prompts.length > 0 ? prompts[0] : null;
+    // eslint-disable-next-line server-first/no-local-game-state
     const activePromptIdRef = useRef(null);
     const promptsRef = useRef([]);
     const processedPromptIdsRef = useRef(new Set());

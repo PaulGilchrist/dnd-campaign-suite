@@ -5,6 +5,7 @@ function useSpellHandlers({ rulerMode, getGridFromEvent, clientToSVG, addOverlay
     const [spellDraft, setSpellDraft] = useState(null);
     const [dragOverlay, setDragOverlay] = useState(null);
     const [rotateOverlay, setRotateOverlay] = useState(null);
+    // eslint-disable-next-line server-first/no-local-game-state
     const spellDragActiveRef = useRef(false);
 
     const computeAngle = useCallback((originX, originY, cursorX, cursorY) => {

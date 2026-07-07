@@ -1,6 +1,7 @@
 import { sendSavePrompt } from '../../combat/conditions/savePromptService.js';
 import utils from '../../ui/utils.js';
 import { getAbilityModifier } from '../../shared/abilityLookup.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 
 export function buildSaveDc(auto, playerStats) {
     if (auto.saveDc === 'ability') {
@@ -22,8 +23,17 @@ export function buildSaveDc(auto, playerStats) {
 export function createSaveListener(campaignName, config) {
     const promptId = utils.guid();
 
-    if (!window.__createSaveListenerPrompts) window.__createSaveListenerPrompts = new Set();
-    window.__createSaveListenerPrompts.add(promptId);
+    const pendingSaves = getRuntimeValue(campaignName, 'pendingSavePrompts') || {};
+    pendingSaves[promptId] = {
+        promptId,
+        targetName: config.targetName,
+        saveType: config.saveType || 'CON',
+        saveDc: config.saveDc,
+        dcSuccess: config.dcSuccess,
+        advantage: config.advantage || false,
+        disadvantage: config.disadvantage || false,
+    };
+    setRuntimeValue(campaignName, 'pendingSavePrompts', pendingSaves, campaignName);
 
     sendSavePrompt(campaignName, {
         promptId,
@@ -39,18 +49,18 @@ export function createSaveListener(campaignName, config) {
         const handler = (event) => {
             if (event.detail.promptId !== promptId) return;
             window.removeEventListener('save-result', handler);
-            if (window.__createSaveListenerPrompts) {
-                window.__createSaveListenerPrompts.delete(promptId);
-            }
+            const saves = getRuntimeValue(campaignName, 'pendingSavePrompts') || {};
+            delete saves[promptId];
+            setRuntimeValue(campaignName, 'pendingSavePrompts', saves, campaignName);
             resolve(event.detail);
          };
         window.addEventListener('save-result', handler);
      });
 
     promise.finally(() => {
-        if (window.__createSaveListenerPrompts) {
-            window.__createSaveListenerPrompts.delete(promptId);
-        }
+        const saves = getRuntimeValue(campaignName, 'pendingSavePrompts') || {};
+        delete saves[promptId];
+        setRuntimeValue(campaignName, 'pendingSavePrompts', saves, campaignName);
     });
 
     return { promptId, promise };

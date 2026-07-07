@@ -1,16 +1,21 @@
 // @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
+let testPendingSaves = {};
+
 // ── Mocks BEFORE imports ───────────────────────────────────────
 
 vi.mock('../../../dice/diceRoller.js', () => ({
   rollExpression: vi.fn(),
 }));
 
-vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
-  getRuntimeValue: vi.fn(),
-  setRuntimeValue: vi.fn(async () => {}),
-}));
+vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => {
+  const mockFn = vi.fn();
+  return {
+    getRuntimeValue: mockFn,
+    setRuntimeValue: vi.fn(async () => {}),
+  };
+});
 
 vi.mock('../../../ui/logService.js', () => ({
   addEntry: vi.fn(async () => {}),
@@ -272,7 +277,11 @@ describe('radianceOfDawnHandler.handle', () => {
 describe('radianceOfDawnHandler.confirmRadianceOfDawn', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    delete window.__pendingSaves;
+    testPendingSaves = {};
+    useRuntimeState.getRuntimeValue.mockImplementation((key, prop) => {
+      if (prop === 'pendingSavePrompts') return testPendingSaves;
+      return null;
+    });
   });
 
   describe('damage resolution', () => {
@@ -374,8 +383,8 @@ describe('radianceOfDawnHandler.confirmRadianceOfDawn', () => {
       const action = makeAction({ saveDc: 15, damageType: 'Fire' });
       await confirmRadianceOfDawn(action, makePlayerStats(), campaignName, ['player-1']);
 
-      expect(window.__pendingSaves).toBeDefined();
-      const pendingSave = Object.values(window.__pendingSaves)[0];
+      expect(testPendingSaves).toBeDefined();
+      const pendingSave = Object.values(testPendingSaves)[0];
       expect(pendingSave.targetName).toBe('player-1');
       expect(pendingSave.saveDc).toBe(15);
       expect(pendingSave.damageType).toBe('Fire');

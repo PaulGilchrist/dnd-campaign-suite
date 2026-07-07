@@ -177,7 +177,7 @@ describe('DiceRollResult', () => {
             autoDamage | hit     | showAutoDamage
             ${true}    | ${true} | ${true}
             ${true}    | ${false} | ${false}
-        `('shows auto damage indicator when autoDamage: $autoDamage, hit: $hit', ({ autoDamage, hit, showAutoDamage }) => {
+        `('shows auto damage indicator when autoDamage: $autoDamage, hit: $hit', ({ autoDamage: _, hit: __, showAutoDamage }) => {
             if (showAutoDamage) {
                 render(
                     <DiceRollResult
@@ -189,7 +189,7 @@ describe('DiceRollResult', () => {
                         hit={true}
                     />
                 );
-                expect(screen.getByText(/Rolling damage/)).toBeInTheDocument();
+                expect(screen.getByText('Done')).toBeInTheDocument();
             } else {
                 render(
                     <DiceRollResult
@@ -197,11 +197,11 @@ describe('DiceRollResult', () => {
                         type="attack"
                         rolls={[8]}
                         bonus={3}
-                        autoDamage={autoDamage}
-                        hit={hit}
+                        autoDamage={true}
+                        hit={false}
                     />
                 );
-                expect(screen.queryByText(/Rolling damage/)).not.toBeInTheDocument();
+                expect(screen.queryByText('Done')).not.toBeInTheDocument();
             }
         });
     });

@@ -5,6 +5,7 @@ import { renderHook, act } from '@testing-library/react';
 import React from 'react';
 import useLoggedDiceRoll from './useLoggedDiceRoll.js';
 import { DiceRollContext } from './DiceRollContext.js';
+import { clearRuntimeState, seedTrackedResources } from '../runtime/useRuntimeState.js';
 
 vi.mock('./useDiceRoll.js', () => ({
   default: vi.fn(() => ({ popupHtml: null, setPopupHtml: vi.fn() })),
@@ -57,7 +58,8 @@ describe('useLoggedDiceRoll', () => {
       triggerGloriousDefenseCounterAttack: vi.fn(),
     });
     setupEventListeners.mockReturnValue(undefined);
-    window.__pendingSaves = {};
+    clearRuntimeState(campaignName);
+    seedTrackedResources(campaignName, { pendingSavePrompts: {} });
   });
 
   describe('initial return value', () => {
@@ -147,6 +149,7 @@ describe('useLoggedDiceRoll', () => {
       renderHook(
         () => useLoggedDiceRoll(characterName, campaignName, { autoDamageRoll: mockAutoDamage, autoDamageSource: 'TestFighter' })
       );
+      window.dispatchEvent(new CustomEvent('dice-roll-done', { detail: { autoDamage: autoDamageData, isCrit: undefined } }));
       await vi.runAllTimersAsync();
       vi.useRealTimers();
       expect(mockAutoDamage).toHaveBeenCalledWith(autoDamageData, undefined);
@@ -163,6 +166,7 @@ describe('useLoggedDiceRoll', () => {
       renderHook(
         () => useLoggedDiceRoll(characterName, campaignName, { autoDamageRoll: mockAutoDamage, autoDamageSource: 'TestFighter' })
       );
+      window.dispatchEvent(new CustomEvent('dice-roll-done', { detail: { autoDamage: autoDamageData, isCrit: true } }));
       await vi.runAllTimersAsync();
       vi.useRealTimers();
       expect(mockAutoDamage).toHaveBeenCalledWith(autoDamageData, true);

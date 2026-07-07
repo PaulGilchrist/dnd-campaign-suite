@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 
 const stores = new Map();
-const listeners = new Map();
+export const listeners = new Map();
 
 function valuesEqual(a, b) {
     if (a === b) return true;
@@ -124,6 +124,7 @@ export function setRuntimeObject(characterKey, fullObject, campaignName, skipSyn
  */
 export function useRuntimeValue(characterKey, propertyName, campaignName) {
     const [value, setValue] = useState(() => getRuntimeValue(characterKey, propertyName));
+    // eslint-disable-next-line server-first/no-local-game-state
     const currentValueRef = useRef(undefined);
 
     useEffect(() => {
@@ -175,6 +176,16 @@ export function setRuntimeBatch(characterKey, properties, campaignName) {
 
 export function clearRuntimeState(characterKey) {
     stores.delete(characterKey);
+}
+
+/**
+ * Check if a property exists in the runtime store (as opposed to returning null).
+ * This is needed because getRuntimeValue returns null for both "key doesn't exist"
+ * and "key exists with null value". Use this to distinguish the two cases.
+ */
+export function hasRuntimeValue(characterKey, propertyName) {
+  const store = getStore(characterKey);
+  return store.has(propertyName);
 }
 
 export function getAllStoreKeys() {

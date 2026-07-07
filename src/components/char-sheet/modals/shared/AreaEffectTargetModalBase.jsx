@@ -61,6 +61,7 @@ function AreaEffectTargetModalBase({
   }, [allResolved, onAllResolved, results, selected, processing, pendingPrompts]);
 
   const handleApplyOverrideRef = useRef(() => {});
+  // eslint-disable-next-line server-first/no-local-game-state
   const handleSaveResultOverrideRef = useRef(() => {});
 
   handleApplyOverrideRef.current = handleApplyOverride || (() => {});

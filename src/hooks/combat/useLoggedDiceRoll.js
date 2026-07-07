@@ -6,21 +6,23 @@ import { createLogDamageAndShow } from './useLoggedDiceRollDamage.js';
 import { createSaves } from './useLoggedDiceRollSaves.js';
 import { setupEventListeners } from './useLoggedDiceRollEventHandlers.js';
 import { useDiceRollPopup } from './DiceRollContext.js';
+import { getRuntimeValue } from '../runtime/useRuntimeState.js';
 
 export default function useLoggedDiceRoll(characterName, campaignName, options = {}) {
   const { setPopupHtml: contextSetPopupHtml, _isShared } = useDiceRollPopup();
   const { popupHtml: internalPopupHtml, setPopupHtml: internalSetPopupHtml } = useDiceRoll();
   const setPopupHtml = _isShared ? contextSetPopupHtml : internalSetPopupHtml;
   const { autoDamageRoll, characters, autoDamageSource } = options;
+  // eslint-disable-next-line server-first/no-local-game-state
   const autoDamageRollRef = useRef(null);
   autoDamageRollRef.current = autoDamageRoll || null;
+  // eslint-disable-next-line server-first/no-local-game-state
   const autoDamageSourceRef = useRef(autoDamageSource || null);
   autoDamageSourceRef.current = autoDamageSource || null;
   const charactersRef = useRef(characters);
   charactersRef.current = characters || [];
 
-  if (!window.__pendingSaves) window.__pendingSaves = {};
-  const pendingSaves = window.__pendingSaves;
+  const pendingSaves = getRuntimeValue(campaignName, 'pendingSavePrompts') || {};
 
   function logEntry(entry) {
     addEntry(campaignName, entry).catch((e) => { console.error("[useLoggedDiceRoll] Error:", e); });

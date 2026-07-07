@@ -2,6 +2,9 @@ import js from '@eslint/js';
 import react from 'eslint-plugin-react';
 import reactHooks from 'eslint-plugin-react-hooks';
 import reactRefresh from 'eslint-plugin-react-refresh';
+import noWindowAccess from './eslint-plugin-custom/rules/no-window-access.js';
+import noLocalGameState from './eslint-plugin-custom/rules/no-local-game-state.js';
+import requireSyncedState from './eslint-plugin-custom/rules/require-synced-state.js';
 
 export default [
   { ignores: ['dist', 'coverage/', 'coverage-report/', '.eslintrc.cjs'] },
@@ -79,6 +82,13 @@ export default [
       react,
       'react-hooks': reactHooks,
       'react-refresh': reactRefresh,
+      'server-first': {
+        rules: {
+          'no-window-access': noWindowAccess,
+          'no-local-game-state': noLocalGameState,
+          'require-synced-state': requireSyncedState,
+        },
+      },
     },
     settings: {
       react: { version: '19' },
@@ -94,6 +104,10 @@ export default [
       'no-unused-vars': ['error', { argsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_' }],
       'react/jsx-uses-vars': 'warn',
       'react/jsx-uses-react': 'warn',
+      // Server-first pattern enforcement
+      'server-first/no-window-access': 'error',
+      'server-first/no-local-game-state': 'warn',
+      'server-first/require-synced-state': 'warn',
     },
   },
 ];

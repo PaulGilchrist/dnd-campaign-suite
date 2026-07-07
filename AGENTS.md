@@ -105,6 +105,47 @@ npm run test:coverage                             # Vitest with coverage (v8, ou
 - **Per-campaign change data is gitignored:** `public/campaigns/*/data/character-change-data.json`, `public/campaigns/*/data/campaign-log.json`, `logs/`, `coverage/`.
 - **React 19 settings:** ESLint config sets `settings: { react: { version: '19' } }` for the plugin.
 
+## Server-First Pattern
+
+**Every piece of game state MUST go through the runtime store.** This is not a suggestion — it is the core architecture that makes all players see the same data.
+
+### The Pattern
+
+```js
+// READ — use the synced state hook (preferred)
+const [value, setValue] = useSyncedState(campaignName, 'myKey', defaultValue);
+
+// OR for existing code not yet migrated:
+const value = getRuntimeValue(characterKey, 'myKey');
+await setRuntimeValue(characterKey, 'myKey', newValue, campaignName);
+```
+
+### What Goes in the Runtime Store
+
+| Category | Examples |
+|----------|----------|
+| HP/SP | `currentHitPoints`, `spellSlots_level_1` |
+| Conditions/Buffs | `activeConditions`, `activeBuffs` |
+| Pipeline State | `pipeline-pause`, `cleavePending` |
+| Save Prompts | `pendingSavePrompts` |
+| Travel State | `travel-pace`, `travel-destination` |
+| Combat UI | `conditionPickerTarget`, `concentrationPickerTarget` |
+
+### What Stays Local (per-client only)
+
+| Category | Examples |
+|----------|----------|
+| Ephemeral UI | `isLoading`, `showModal` (component-specific toggle) |
+| DOM refs | `ref={useRef(null)}` for focus/scroll |
+| Event ordering | `pendingPromptIdRef` (race condition guard) |
+| Display formatting | `theme`, `expandedSections` |
+
+### Anti-Patterns (ESLint will catch these)
+
+- `window.__someState` — **ERROR**: Always use `setRuntimeValue`
+- `useState` with `pending`/`active`/`current` in the name — **WARN**: Consider `useSyncedState`
+- `useRef` storing game data — **WARN**: Consider `getRuntimeValue`/`setRuntimeValue`
+
 ## Code Simplicity
 
 - **Single source of truth:** One variable, one concept. If `isCritical` determines whether dice are doubled, use that same variable everywhere that logic is needed — never introduce `isAutoCrit`, `showCrit`, `isCritDamage` as separate flags for the same concept. Consolidate into one derived variable at the top of the function.

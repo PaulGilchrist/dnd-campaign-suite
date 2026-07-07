@@ -181,8 +181,8 @@ export async function confirmRadianceOfDawn(action, playerStats, campaignName, s
             const promptId = `${featureName.replace(/\s+/g, '_')}_${targetName}_${Date.now()}`;
 
             // Store pending save for damage application
-            if (!window.__pendingSaves) window.__pendingSaves = {};
-            window.__pendingSaves[promptId] = {
+            const pendingSaves = getRuntimeValue(campaignName, 'pendingSavePrompts') || {};
+            pendingSaves[promptId] = {
                 targetName,
                 rawDamage: totalDamage,
                 saveDc,

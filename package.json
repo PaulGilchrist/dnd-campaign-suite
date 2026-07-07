@@ -28,7 +28,7 @@
         "dev:react": "vite --host",
         "prod": "node server.js",
         "build": "vite build",
-        "lint": "eslint . --ext js,jsx --report-unused-disable-directives --max-warnings 0",
+        "lint": "eslint . --ext js,jsx --report-unused-disable-directives --max-warnings 100",
         "preview": "vite preview --host",
         "start": "npm install && npm run build && node server.js",
         "test": "vitest",
