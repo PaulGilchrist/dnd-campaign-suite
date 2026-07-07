@@ -537,6 +537,9 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
             biDieRoll: dieValue,
             timestamp: Date.now(),
         });
+        setRuntimeValue(playerName, 'bardicInspirationDie', null, campaignName);
+        setRuntimeValue(playerName, 'bardicInspirationCombatOptions', null, campaignName);
+        setRuntimeValue(playerName, 'bardicInspirationGrantedBy', null, campaignName);
     }, [playerStats, campaignName, popupHtml]);
 
     const handleBardicInspirationOffense = React.useCallback(async (dieValue, dieSize) => {
@@ -794,7 +797,7 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
                                 ) : null}
                                 <div className="dice-roll-hint">click to dismiss</div>
                             </div> :
-                            <DiceRollResult {...popupHtml} onSuperiorityManeuver={popupHtml?.availableSuperiorityManeuvers ? handleSuperiorityManeuver : undefined} onTacticalMind={popupHtml?.tacticalMind ? handleTacticalMind : undefined} onPsiBolsteredKnack={popupHtml?.psiBolsteredKnack ? handlePsiBolsteredKnack : undefined} onBardicInspiration={popupHtml?.bardicInspiration ? handleBardicInspiration : undefined} onBardicInspirationDefense={popupHtml?.bardicInspirationDefense ? handleBardicInspirationDefense : undefined} onBardicInspirationOffense={popupHtml?.bardicInspirationOffense ? handleBardicInspirationOffense : undefined} />
+                            <DiceRollResult {...popupHtml} onSuperiorityManeuver={popupHtml?.availableSuperiorityManeuvers ? handleSuperiorityManeuver : undefined} onTacticalMind={popupHtml?.tacticalMind ? handleTacticalMind : undefined} onPsiBolsteredKnack={popupHtml?.psiBolsteredKnack ? handlePsiBolsteredKnack : undefined} onBardicInspiration={popupHtml?.bardicInspiration ? handleBardicInspiration : undefined} onBardicInspirationDefense={popupHtml?.bardicInspirationDefense ? handleBardicInspirationDefense : undefined} onBardicInspirationOffense={popupHtml?.bardicInspirationOffense ? handleBardicInspirationOffense : undefined} onDone={popupHtml?.autoDamage && popupHtml?.hit ? () => { window.dispatchEvent(new CustomEvent('dice-roll-done', { detail: { autoDamage: popupHtml.autoDamage, isCrit: popupHtml.isCrit } })); } : undefined} />
                 }
             </Popup>
         )}

@@ -121,3 +121,4 @@ npm run test:coverage                             # Vitest with coverage (v8, ou
 - There's no "out of combat" — there are always creatures.  There is always a combatSummary
 - use getCombatSummary as the primary source of all creatures
 - EVERY automation needs to log to the cmapaign log when trigged with details of the event.  If you are working on any automation, check to ensure it is logging, and add logging if it is not.
+- Do not use fallbacks. use console.error messages instead so we do not swallow errors.  fallbacks are only where we have a new variable being populated with a known default value, defined in the rules.

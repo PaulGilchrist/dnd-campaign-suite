@@ -5,8 +5,15 @@ export function hasBardicInspiration(name, campaignName) {
     return !!die;
 }
 
-export function hasBardicInspirationDefense(name, campaignName) {
-    if (!hasBardicInspiration(name, campaignName)) return false;
+export function hasBardicInspirationDefense(name, campaignName, playerStats) {
+    if (!hasBardicInspiration(name, campaignName)) {
+        // Also allow Bard class resource
+        if (!playerStats) return false;
+        const biUsesRaw = getRuntimeValue(name, 'bardicInspirationUses', campaignName);
+        const biUsesNum = (typeof biUsesRaw === 'object' && biUsesRaw !== null) ? biUsesRaw.current : (biUsesRaw != null ? Number(biUsesRaw) : (playerStats?._trackedResources?.bardicInspirationUses?.current ?? 0));
+        const isBard = playerStats.class?.name === 'Bard';
+        return isBard && biUsesNum > 0;
+    }
     const optionsRaw = getRuntimeValue(name, 'bardicInspirationCombatOptions', campaignName);
     let options = [];
     try { options = JSON.parse(optionsRaw) || []; } catch (_e) { /* ignore */ }
@@ -38,6 +45,7 @@ export function getBardicInspirationDieSize(name, campaignName) {
 }
 
 export function getBardicInspirationDieSizeFromClass(playerStats) {
+    if (!playerStats) return null;
     const classLevel = playerStats.class?.class_levels?.find(cl => cl.level === playerStats.level);
     const die = classLevel?.bardic_die || classLevel?.class_specific?.bardic_inspiration_die || 0;
     return die || null;

@@ -1,6 +1,5 @@
 import { useRef, useEffect } from 'react';
 import useDiceRoll from './useDiceRoll.js';
-import { SHOW_DICE_ROLL_DELAY } from '../../config/ui-config.js';
 import { addEntry } from '../../services/ui/logService.js';
 import { createLogAndShow } from './useLoggedDiceRollAttack.js';
 import { createLogDamageAndShow } from './useLoggedDiceRollDamage.js';
@@ -9,10 +8,9 @@ import { setupEventListeners } from './useLoggedDiceRollEventHandlers.js';
 import { useDiceRollPopup } from './DiceRollContext.js';
 
 export default function useLoggedDiceRoll(characterName, campaignName, options = {}) {
-  const { popupHtml: contextPopupHtml, setPopupHtml: contextSetPopupHtml, _isShared } = useDiceRollPopup();
+  const { setPopupHtml: contextSetPopupHtml, _isShared } = useDiceRollPopup();
   const { popupHtml: internalPopupHtml, setPopupHtml: internalSetPopupHtml } = useDiceRoll();
   const setPopupHtml = _isShared ? contextSetPopupHtml : internalSetPopupHtml;
-  const activePopupHtml = _isShared ? contextPopupHtml : internalPopupHtml;
   const { autoDamageRoll, characters, autoDamageSource } = options;
   const autoDamageRollRef = useRef(null);
   autoDamageRollRef.current = autoDamageRoll || null;
@@ -33,16 +31,15 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
   });
 
   useEffect(() => {
-    if (activePopupHtml?.hit === true && activePopupHtml?.autoDamage && autoDamageRollRef.current) {
-      if (activePopupHtml.autoDamage.source !== autoDamageSourceRef.current) return;
-      const autoDamage = activePopupHtml.autoDamage;
-      const isCrit = activePopupHtml.isCrit;
-      const timer = setTimeout(() => {
-        autoDamageRollRef.current(autoDamage, isCrit);
-      }, SHOW_DICE_ROLL_DELAY);
-      return () => clearTimeout(timer);
-    }
-  }, [activePopupHtml, characterName]);
+    const handler = (e) => {
+      if (autoDamageRollRef.current && e.detail?.autoDamage) {
+        if (e.detail.autoDamage.source !== autoDamageSourceRef.current) return;
+        autoDamageRollRef.current(e.detail.autoDamage, e.detail.isCrit);
+      }
+    };
+    window.addEventListener('dice-roll-done', handler);
+    return () => window.removeEventListener('dice-roll-done', handler);
+  }, [characterName]);
 
   const logAndShow = createLogAndShow({
     characterName, campaignName, characters, setPopupHtml, logEntry, autoDamageSourceRef,

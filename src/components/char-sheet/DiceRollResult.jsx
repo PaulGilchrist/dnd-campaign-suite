@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import './diceRollResult.css';
 
-function DiceRollResult({ name, type, rolls, rollType, bonus = 0, bonusDetail, formula = '', modifier = 0, total = 0, targetName, targetAc, hit, resistanceNotice, hunterLoreNotice, forcedMode, isAutoMiss, rangeReason, coverReason, isAutoCrit, isCrit, isNatural1, dc, success, dcType, dcSuccess, waitingForPlayerSave, saveDc, saveType, saveResult, finalDamage, damageApplied, targetCurrentHp, damageReduced, damageType, onQuickRoll, autoDamage, coverLevel, coverAcBonus, autoReroll, autoRerollBonus, autoRerollCondition, strSaveReplace, strCheckReplace, strScore, wisCheckReplace, wisCheckMinBonus, reliableTalent, onReroll, tacticalMind, tacticalMindBonus, gloriousDefenseBonus, onCounterAttack, strokeOfLuck, onStrokeOfLuck, defensiveDuelistBonus, baitAndSwitchBonus, isPotentCantrip, luckyAdvantage, luckyDisadvantage, onLuckyAdvantage, onLuckyDisadvantage, secondaryFormula, secondaryRolls, secondaryTotal, secondaryModifier, secondaryDamageType, secondaryFinalDamage, secondarySaveResult, availableSuperiorityManeuvers, onSuperiorityManeuver, onTacticalMind, gwfApplied, gwfOriginalRolls, gwfDisplayRolls, types, baseFormula, baseTotal, baseRolls, bonusFormula, bonusTotal, bonusRolls, finalHeal, healReduced, bonusHeal, bonusHealDetail, psiBolsteredKnack, onPsiBolsteredKnack, psiBolsteredKnackDieSize, bardicInspiration, bardicInspirationDie, onBardicInspiration, luckyRerolled, luckyRerollValue, bardicInspirationDefense, bardicInspirationDefenseDieSize, bardicInspirationDefenseTargetName: _bardicInspirationDefenseTargetName, bardicInspirationOffense, bardicInspirationOffenseDieSize, onBardicInspirationDefense, onBardicInspirationOffense }) {
+function DiceRollResult({ name, type, rolls, rollType, bonus = 0, bonusDetail, formula = '', modifier = 0, total = 0, targetName, targetAc, hit, resistanceNotice, hunterLoreNotice, forcedMode, isAutoMiss, rangeReason, coverReason, isAutoCrit, isCrit, isNatural1, dc, success, dcType, dcSuccess, waitingForPlayerSave, saveDc, saveType, saveResult, finalDamage, damageApplied, targetCurrentHp, damageReduced, damageType, onQuickRoll, autoDamage, coverLevel, coverAcBonus, autoReroll, autoRerollBonus, autoRerollCondition, strSaveReplace, strCheckReplace, strScore, wisCheckReplace, wisCheckMinBonus, reliableTalent, onReroll, tacticalMind, tacticalMindBonus, gloriousDefenseBonus, onCounterAttack, strokeOfLuck, onStrokeOfLuck, defensiveDuelistBonus, baitAndSwitchBonus, isPotentCantrip, luckyAdvantage, luckyDisadvantage, onLuckyAdvantage, onLuckyDisadvantage, secondaryFormula, secondaryRolls, secondaryTotal, secondaryModifier, secondaryDamageType, secondaryFinalDamage, secondarySaveResult, availableSuperiorityManeuvers, onSuperiorityManeuver, onTacticalMind, gwfApplied, gwfOriginalRolls, gwfDisplayRolls, types, baseFormula, baseTotal, baseRolls, bonusFormula, bonusTotal, bonusRolls, finalHeal, healReduced, bonusHeal, bonusHealDetail, psiBolsteredKnack, onPsiBolsteredKnack, psiBolsteredKnackDieSize, bardicInspiration, bardicInspirationDie, onBardicInspiration, luckyRerolled, luckyRerollValue, bardicInspirationDefense, bardicInspirationDefenseDieSize, bardicInspirationDefenseTargetName: _bardicInspirationDefenseTargetName, bardicInspirationOffense, bardicInspirationOffenseDieSize, onBardicInspirationDefense, onBardicInspirationOffense, onDone }) {
     const [mode, setMode] = useState(forcedMode || 'normal');
     const [rerollUsed, setRerollUsed] = useState(false);
     const [rerollResult, setRerollResult] = useState(null);
@@ -243,12 +243,6 @@ function DiceRollResult({ name, type, rolls, rollType, bonus = 0, bonusDetail, f
             {coverAcBonus > 0 && (
               <div className="dice-roll-cover">
                 {coverLevel === 'threeQuarter' ? '3/4' : '1/2'} Cover (+{coverAcBonus} AC)
-              </div>
-            )}
-
-            {autoDamage && hit && (
-              <div className="dice-roll-auto-damage">
-                <i className="fa-solid fa-spinner fa-spin"></i> Rolling damage...
               </div>
             )}
 
@@ -545,6 +539,14 @@ function DiceRollResult({ name, type, rolls, rollType, bonus = 0, bonusDetail, f
                         }}>Skip</button>
                     </div>
                 </div>
+            )}
+
+            {autoDamage && hit && (
+              <div className="dice-roll-reroll">
+                <button className="dice-roll-reroll-btn" onClick={() => onDone?.()} type="button">
+                  <i className="fa-solid fa-check"></i> Done
+                </button>
+              </div>
             )}
 
             <div className="dice-roll-hint">click to dismiss</div>
