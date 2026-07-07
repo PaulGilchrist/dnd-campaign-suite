@@ -50,6 +50,11 @@ vi.mock('../../services/automation/handlers/class-fighter-rogue/combatSuperiorit
     executeAttackRiderManeuver: vi.fn(),
 }));
 
+vi.mock('../../services/rules/spells/postCastRiderService.js', () => ({
+    getEmpoweredEvocationFeatures: vi.fn(() => []),
+    getEmpoweredEvocationIntModifier: vi.fn(() => 0),
+}));
+
 import { rollExpression, rollExpressionDoubled } from '../../services/dice/diceRoller.js';
 import { getCombatContext, getTargetFromAttacker } from '../../services/rules/combat/damageUtils.js';
 import { getCurrentCombatRound, loadCombatSummary } from '../../services/encounters/combatData.js';

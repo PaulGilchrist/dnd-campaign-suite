@@ -1,7 +1,52 @@
 import { rollExpression } from '../../services/dice/diceRoller.js';
 import { evaluateAutoExpression } from '../../services/combat/automation/automationService.js';
+import { getEmpoweredEvocationFeatures, getEmpoweredEvocationIntModifier } from '../../services/rules/spells/postCastRiderService.js';
 import { executeAttackRiderManeuver as executeAttackRiderManeuverService } from '../../services/automation/handlers/class-fighter-rogue/combatSuperiorityHandler.js';
 import { buildPipelineForAction } from '../../services/combat/steps/index.js';
+
+/**
+ * Normalize an autoDamage object (from dice roll popup) into an attack-like object
+ * + context overrides for the pipeline.
+ *
+ * @param {object} autoDamage - The autoDamage object from the dice roll popup
+ * @param {boolean} isCrit - Whether the attack was a critical hit
+ * @param {object} playerStats - The acting character's computed stats
+ * @returns {{ attack: object, ctx: object }}
+ */
+export function normalizeAutoDamage(autoDamage, isCrit, playerStats) {
+  const attack = {
+    name: autoDamage.name,
+    damage: autoDamage.formula,
+    damageType: autoDamage.damageType,
+    weaponType: 'weapon',
+    properties: [],
+  };
+
+  // Compute Empowered Evocation modifier
+  const hasEmpoweredEvoc = getEmpoweredEvocationFeatures(playerStats).length > 0;
+  const empEvocIntMod = hasEmpoweredEvoc ? getEmpoweredEvocationIntModifier(playerStats) : 0;
+  const spellSchool = (autoDamage.autoDamageSchool || '').toLowerCase();
+  const shouldApplyEmpoweredEvoc = hasEmpoweredEvoc && spellSchool === 'evocation' && empEvocIntMod > 0;
+
+  const ctx = {
+    hit: true,
+    isCrit: isCrit || autoDamage.isAutoCrit || false,
+    isNatural20: isCrit || false,
+    targetName: autoDamage.targetName || null,
+    isBonusActionAttack: false,
+    overchannelActive: autoDamage.overchannelActive || false,
+    overchannelUseCount: autoDamage.overchannelUseCount || 0,
+    overchannelSpellLevel: autoDamage.overchannelSpellLevel || 1,
+    sneakDice: autoDamage.sneakAttackDice || 0,
+    saveDc: autoDamage.saveDc,
+    saveType: autoDamage.saveType,
+    dcSuccess: autoDamage.dcSuccess,
+    autoDamageSource: true,
+    empoweredEvocationModifier: shouldApplyEmpoweredEvoc ? empEvocIntMod : 0,
+  };
+
+  return { attack, ctx };
+}
 
 export default function useAttackDamageResolution({
     playerStats, campaignName, mapName,
@@ -18,18 +63,22 @@ export default function useAttackDamageResolution({
         }).catch((e) => { console.error("[useAttackDamageResolution] Error:", e); });
     };
 
-    const resolveAttackDamage = async (attack) => {
+    /**
+     * Run the attack damage pipeline. For manual damage clicks, context comes from popupHtml.
+     * For auto-damage (after an attack roll), pass ctxOverrides from normalizeAutoDamage().
+     */
+    const resolveAttackDamage = async (attack, ctxOverrides = {}) => {
         const ctx = {
             attack,
             playerStats,
             campaignName,
             mapName,
             popupHtml,
-            hit: popupHtml?.hit === true || popupHtml?.isCrit === true,
-            isCrit: popupHtml?.isCrit === true,
-            isNatural20: popupHtml?.isNatural20 === true,
-            targetName: popupHtml?.targetName || null,
-            isBonusActionAttack: attack?.type === 'Bonus Action',
+            hit: ctxOverrides.hit ?? (popupHtml?.hit === true || popupHtml?.isCrit === true),
+            isCrit: ctxOverrides.isCrit ?? (popupHtml?.isCrit === true),
+            isNatural20: ctxOverrides.isNatural20 ?? (popupHtml?.isNatural20 === true),
+            targetName: ctxOverrides.targetName ?? (popupHtml?.targetName || null),
+            isBonusActionAttack: ctxOverrides.isBonusActionAttack ?? (attack?.type === 'Bonus Action'),
             formula: null,
             total: 0,
             rolls: [],
@@ -39,10 +88,11 @@ export default function useAttackDamageResolution({
             isMeleeOrUnarmed: false,
             buildCtxResult: null,
             autoFormulaOverride: null,
-            overchannelActive: false,
-            overchannelUseCount: 0,
-            overchannelSpellLevel: 1,
+            overchannelActive: ctxOverrides.overchannelActive ?? false,
+            overchannelUseCount: ctxOverrides.overchannelUseCount ?? 0,
+            overchannelSpellLevel: ctxOverrides.overchannelSpellLevel ?? 1,
             autoDamageSaveDc: null,
+            empoweredEvocationModifier: ctxOverrides.empoweredEvocationModifier ?? 0,
             setPopupHtml,
             setDamageTypeChoice,
             setDivineFuryChoice,
@@ -53,6 +103,7 @@ export default function useAttackDamageResolution({
             buildCtx,
             buildCtxSync,
             proceedWithDamage,
+            ...ctxOverrides,
         };
 
         const pipeline = buildPipelineForAction(attack, playerStats);
