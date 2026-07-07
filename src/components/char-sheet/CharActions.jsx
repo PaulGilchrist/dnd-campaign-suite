@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect } from 'react'
+import { useSyncedState } from '../../hooks/runtime/useSyncedState.js'
 import { getCategories } from '../../services/character/featureCategories.js'
 import { getActionSpellNames } from '../../services/ui/spellSectionUtils.js'
 import { formatRange, signFormatter, getAttackSpellLevel } from '../../services/ui/formatUtils.js'
@@ -77,8 +78,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
     const [actions, setActions] = useState([]);
     const [selectedActionSpell, setSelectedActionSpell] = useState(null);
     const [featRangeEffects, setFeatRangeEffects] = useState(null);
-    // eslint-disable-next-line server-first/no-local-game-state
-    const autoDamageRollContext = useRef(null);
+    const [autoDamageRollContext, setAutoDamageRollContext] = useSyncedState(campaignName, 'autoDamageContext', null);
     const { saveDcBonus: displaySaveDcBonus } = getInnateSorceryBonus(playerStats.name, campaignName);
     const { popupHtml, setPopupHtml } = useDiceRollPopup();
 
@@ -211,7 +211,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                         await setRuntimeValue(playerStats.name, '_SneakAttack_usedRound', currentRound, campaignName);
                         const cs = await getCombatContext(campaignName);
                         const target = cs ? getTargetFromAttacker(cs, playerStats.name) : null;
-                        autoDamageRollContext.current = {
+                        setAutoDamageRollContext({
                             formula: autoFormula,
                             total: overchannelResult.total,
                             rolls: overchannelResult.rolls,
@@ -229,7 +229,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                             },
                             attackName: autoDamage.name,
                             sneakAttackDice: sneakAttackDice,
-                        };
+                        });
                         setAttackRiderModal({
                             action: cunningStrikePassive,
                             playerStats,
@@ -786,9 +786,9 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         popupHtml, setPopupHtml, rollDamage, rollAttack, buildCtx, buildCtxSync,
     });
 
-    const [showCleaveTargetSelection, setShowCleaveTargetSelection] = useState(false);
-    const [cleaveSecondTargets, setCleaveSecondTargets] = useState([]);
-    const [tacticalMasterModal, setTacticalMasterModal] = useState(null);
+    const [showCleaveTargetSelection, setShowCleaveTargetSelection] = useSyncedState(campaignName, 'cleavePending', false);
+    const [cleaveSecondTargets, setCleaveSecondTargets] = useSyncedState(campaignName, 'cleaveSecondTargets', []);
+    const [tacticalMasterModal, setTacticalMasterModal] = useSyncedState(campaignName, 'tacticalMasterPending', null);
 
     const handleCleaveAttack = React.useCallback(async (cleaveTargetName) => {
         if (!cleaveTargetName) {
@@ -856,7 +856,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                 targetName: cleaveTargetName,
             }).catch(() => { });
         }
-    }, [campaignName, playerStats, rollDamage]);
+    }, [campaignName, playerStats, rollDamage, setShowCleaveTargetSelection]);
 
     const handleTacticalMasterConfirm = React.useCallback(async (chosenMastery) => {
         const oldMastery = tacticalMasterModal?.baseMastery;
@@ -877,7 +877,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         const actualTargetName = combatSummary?.lastAttack?.targetName;
         if (!actualTargetName) return;
         await applyMasteryEffect(chosenMastery, playerStats, campaignName, actualTargetName);
-    }, [campaignName, playerStats, tacticalMasterModal]);
+    }, [campaignName, playerStats, tacticalMasterModal, setTacticalMasterModal]);
 
     const handleTacticalMasterDismiss = () => {
         setTacticalMasterModal(null);

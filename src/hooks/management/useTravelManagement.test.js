@@ -28,10 +28,53 @@ vi.mock('../../services/encounters/encounterGenerator.js', () => ({
   generateEncounterSuggestions: vi.fn(() => []),
 }));
 
-vi.mock('../runtime/useRuntimeState.js', () => ({
-  getRuntimeValue: vi.fn(() => null),
-  setRuntimeValue: vi.fn(),
-}));
+function _valuesEqual(a, b) {
+  if (a === b) return true;
+  if (a === null || b === null) return a === b;
+  if (typeof a === 'number' && typeof b === 'string') return a === Number(b);
+  if (typeof a === 'string' && typeof b === 'number') return Number(a) === b;
+  if (typeof a === 'object' && typeof b === 'object') {
+    const keysA = Object.keys(a);
+    const keysB = Object.keys(b);
+    if (keysA.length !== keysB.length) return false;
+    return keysA.every(k => _valuesEqual(a[k], b[k]));
+  }
+  return false;
+}
+
+var _stores;
+var _listeners;
+
+vi.mock('../runtime/useRuntimeState.js', () => {
+  if (!_stores) {
+    _stores = new Map();
+    _listeners = new Map();
+  }
+  function notify(characterKey) {
+    const set = _listeners.get(characterKey);
+    if (set) {
+      set.forEach(fn => fn());
+    }
+  }
+  return {
+    getRuntimeValue: vi.fn(() => null),
+    setRuntimeValue: vi.fn((characterKey, propertyName, value) => {
+      const store = _stores.get(characterKey);
+      if (!store) return;
+      const existing = store.get(propertyName);
+      if (_valuesEqual(existing, value)) return;
+      store.set(propertyName, value);
+      notify(characterKey);
+    }),
+    getStore: vi.fn((key) => {
+      if (!_stores.has(key)) {
+        _stores.set(key, new Map());
+      }
+      return _stores.get(key);
+    }),
+    listeners: _listeners,
+  };
+});
 
 vi.mock('../../services/combat/automation/automationService.js', () => ({
   hasSelfRestoration: vi.fn(() => false),
@@ -62,6 +105,8 @@ describe('useTravelManagement', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    _stores.clear();
+    _listeners.clear();
     calculatePath.mockReturnValue([...defaultPath]);
     getDailyHexBudget.mockReturnValue(6);
     getHexMoveCostWithRoad.mockReturnValue(1);
@@ -336,6 +381,7 @@ describe('useTravelManagement', () => {
     it('transitions from paused to planning, but not from other modes', () => {
       const { result: pausedResult } = renderHook(() => useTravelManagement({
         ...baseArgs,
+        campaignName: 'test-campaign-paused',
         initialTravelState: { travelMode: 'paused' },
       }));
       act(() => { pausedResult.current.forceCamp(); });
@@ -343,6 +389,7 @@ describe('useTravelManagement', () => {
 
       const { result: inactiveResult } = renderHook(() => useTravelManagement({
         ...baseArgs,
+        campaignName: 'test-campaign-inactive',
         initialTravelState: { travelMode: 'inactive' },
       }));
       act(() => { inactiveResult.current.forceCamp(); });

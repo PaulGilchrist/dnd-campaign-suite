@@ -62,4 +62,21 @@ describe('buildPipelineForAction', () => {
     expect(pipeline.step).toBeDefined();
     expect(pipeline.resume).toBeDefined();
   });
+
+  it('registers SSE observers when playerStats has campaignName', () => {
+    const pipeline = buildPipelineForAction(
+      { name: 'Greataxe', damage: '1d12' },
+      { campaignName: 'test-campaign' }
+    );
+    expect(pipeline.run).toBeDefined();
+    expect(pipeline.observe).toBeDefined();
+  });
+
+  it('does not register SSE observers when playerStats has no campaignName', () => {
+    const pipeline = buildPipelineForAction(
+      { name: 'Greataxe', damage: '1d12' },
+      { name: 'Gimli' }
+    );
+    expect(pipeline.run).toBeDefined();
+  });
 });

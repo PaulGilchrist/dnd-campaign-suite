@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useSyncedState } from '../../hooks/runtime/useSyncedState.js';
 import Subscriber from '../common/Subscriber.jsx';
 import MapToolbar from './MapToolbar.jsx';
 import { loadMonsters } from '../../services/ui/dataLoader.js';
@@ -67,7 +68,7 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
     const [itemsPanelOpen, setItemsPanelOpen] = useState(false);
     const [selectedItem, setSelectedItem] = useState(null);
     const [renamePopover, setRenamePopover] = useState(null);
-    const [viewingMonster, setViewingMonster] = useState(null);
+    const [viewingMonster, setViewingMonster] = useSyncedState(campaignName, 'map-viewingMonster', null);
     const [monstersLoaded, setMonstersLoaded] = useState([]);
     const [selectedPlayer, setSelectedPlayer] = useState(null);
     const [spellMode, setSpellMode] = useState(null);
@@ -152,7 +153,7 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
         if (monster) {
             setViewingMonster(monster);
         }
-    }, [placedItems, monstersLoaded]);
+    }, [placedItems, monstersLoaded]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const monsterFound = useMemo(() => {
         if (!selectedItem) return false;

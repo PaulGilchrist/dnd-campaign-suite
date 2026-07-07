@@ -10,10 +10,22 @@ import { clearDeathSavePrompt } from '../../services/combat/conditions/savePromp
 
 vi.mock('../../hooks/runtime/useSSEEqualityGuard.js', () => ({ default: (setter) => setter }));
 vi.mock('../../services/ui/utils.js', () => ({ default: { getName: (name) => name } }));
-vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
-  getStore: vi.fn(() => new Map()),
-  useSyncedState: vi.fn(() => [null, vi.fn()]),
-  listeners: new Map(),
+vi.mock('../../hooks/runtime/useRuntimeState.js', () => {
+  const syncStateStore = new Map();
+  return {
+    getStore: vi.fn(() => syncStateStore),
+    useSyncedState: vi.fn((key, prop, defaultValue) => {
+      const storeKey = `${key}-${prop}`;
+      if (!syncStateStore.has(storeKey)) {
+        syncStateStore.set(storeKey, { value: defaultValue, setter: null });
+      }
+      const entry = syncStateStore.get(storeKey);
+      if (!entry.setter) {
+        entry.setter = vi.fn((newValue) => { entry.value = newValue; });
+      }
+      return [entry.value, entry.setter];
+    }),
+    listeners: new Map(),
     getRuntimeValue: vi.fn((_key, _prop, _campaign) => {
         if (_prop === 'currentHitPoints') return 10;
         if (_prop === 'hitPoints') return 10;
@@ -28,7 +40,8 @@ vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
     }),
     setRuntimeValue: vi.fn((_key, _prop, _value, _campaign) => {}),
     setRuntimeObject: vi.fn(),
-}));
+  };
+});
 vi.mock('../../services/ui/storage.js', () => ({
     default: { get: vi.fn(), set: vi.fn(), getProperty: vi.fn(), setProperty: vi.fn() },
 }));

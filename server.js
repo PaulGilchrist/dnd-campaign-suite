@@ -18,6 +18,7 @@ import campaignsChangedata from './server/routes/campaigns-changedata.js';
 import campaignsAdmin from './server/routes/campaigns-admin.js';
 import logRoutes from './server/routes/log.js';
 import spellOverlayRoutes from './server/routes/spell-overlay.js';
+import pipelineEventsRoutes from './server/routes/pipeline-events.js';
 
 const PORT = process.env.PORT || 80;
 
@@ -117,3 +118,6 @@ app.use(logRoutes);
 
 // Spell overlay routes (transient, broadcast only)
 app.use(spellOverlayRoutes);
+
+// Pipeline event routes (milestone broadcasting)
+app.use(pipelineEventsRoutes);

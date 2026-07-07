@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
+import { useSyncedState } from '../../hooks/runtime/useSyncedState.js';
 import { useMonstersData } from '../../hooks/ui/useMonstersData.js';
 import useEncounterManagement from '../../hooks/management/useEncounterManagement.js';
 import EncounterFilterPanel from './EncounterFilterPanel.jsx';
@@ -152,7 +153,7 @@ function EncounterBuilder({ characters, campaignName, onStartCombat }) {
 
   const [pendingEncounterData, setPendingEncounterData] = useState(null);
   const [showGenerator, setShowGenerator] = useState(false);
-  const [viewingMonster, setViewingMonster] = useState(null);
+  const [viewingMonster, setViewingMonster] = useSyncedState(campaignName, 'encounter-viewingMonster', null);
   const [encounterTitle, setEncounterTitle] = useState('Encounter Builder');
   const [currentEncounterName, setCurrentEncounterName] = useState(null);
   const [description, setDescription] = useState('');

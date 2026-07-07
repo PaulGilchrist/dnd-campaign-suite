@@ -377,6 +377,11 @@ function App() {
       }
       return;
     }
+    if (event.key.startsWith('pipeline-')) {
+      const prefix = `pipeline-${campaignName}-`;
+      if (!event.key.startsWith(prefix)) return;
+      return;
+    }
     if (!event.key.startsWith('change-')) return;
     if (!event.data || typeof event.data !== 'object') return;
     const prefix = `change-${campaignName}-`;

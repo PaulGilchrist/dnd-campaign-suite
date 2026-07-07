@@ -1,4 +1,5 @@
-import { useState, useCallback, useRef } from 'react';
+import { useCallback, useRef } from 'react';
+import { useSyncedState } from '../runtime/useSyncedState.js';
 import {
   calculatePath,
   getDailyHexBudget,
@@ -42,21 +43,21 @@ export default function useTravelManagement({
 }) {
   const _init = initialTravelState || {};
 
-  const [travelMode, setTravelMode] = useState(_init.travelMode || MODES.INACTIVE);
-  const [travelPace, setTravelPace] = useState(_init.travelPace || 'normal');
-  const [destination, setDestination] = useState(_init.destination || null);
-  const [path, setPath] = useState(_init.path || []);
-  const [pathIndex, setPathIndex] = useState(_init.pathIndex || 0);
-  const [accruedCost, setAccruedCost] = useState(typeof _init.accruedCost === 'number' ? _init.accruedCost : 0);
-  const [dailyBudget, setDailyBudget] = useState(typeof _init.dailyBudget === 'number' ? _init.dailyBudget : () => getDailyHexBudget('normal'));
-  const [dayExhausted, setDayExhausted] = useState(!!_init.dayExhausted);
-  const [forcedMarchHours, setForcedMarchHours] = useState(typeof _init.forcedMarchHours === 'number' ? _init.forcedMarchHours : 0);
-  const [travelLog, setTravelLog] = useState([]);
-  const [lastMessage, setLastMessage] = useState(null);
-  const [pendingEvent, setPendingEvent] = useState(null);
-  const [eventFrequency, setEventFrequency] = useState('normal');
-  const [rerollsRemaining, setRerollsRemaining] = useState(3);
-  const [horseback, setHorseback] = useState(false);
+  const [travelMode, setTravelMode] = useSyncedState(campaignName, 'travel-mode', _init.travelMode || MODES.INACTIVE);
+  const [travelPace, setTravelPace] = useSyncedState(campaignName, 'travel-pace', _init.travelPace || 'normal');
+  const [destination, setDestination] = useSyncedState(campaignName, 'travel-destination', _init.destination || null);
+  const [path, setPath] = useSyncedState(campaignName, 'travel-path', _init.path || []);
+  const [pathIndex, setPathIndex] = useSyncedState(campaignName, 'travel-pathIndex', _init.pathIndex || 0);
+  const [accruedCost, setAccruedCost] = useSyncedState(campaignName, 'travel-accruedCost', typeof _init.accruedCost === 'number' ? _init.accruedCost : 0);
+  const [dailyBudget, setDailyBudget] = useSyncedState(campaignName, 'travel-dailyBudget', typeof _init.dailyBudget === 'number' ? _init.dailyBudget : () => getDailyHexBudget('normal'));
+  const [dayExhausted, setDayExhausted] = useSyncedState(campaignName, 'travel-dayExhausted', !!_init.dayExhausted);
+  const [forcedMarchHours, setForcedMarchHours] = useSyncedState(campaignName, 'travel-forcedMarchHours', typeof _init.forcedMarchHours === 'number' ? _init.forcedMarchHours : 0);
+  const [travelLog, setTravelLog] = useSyncedState(campaignName, 'travel-log', []);
+  const [lastMessage, setLastMessage] = useSyncedState(campaignName, 'travel-lastMessage', null);
+  const [pendingEvent, setPendingEvent] = useSyncedState(campaignName, 'travel-pendingEvent', null);
+  const [eventFrequency, setEventFrequency] = useSyncedState(campaignName, 'travel-eventFrequency', 'normal');
+  const [rerollsRemaining, setRerollsRemaining] = useSyncedState(campaignName, 'travel-rerollsRemaining', 3);
+  const [horseback, setHorseback] = useSyncedState(campaignName, 'travel-horseback', false);
 
   const pathRef = useRef([]);
   const pathIndexRef = useRef(0);
@@ -65,7 +66,7 @@ export default function useTravelManagement({
 
   const toggleHorseback = useCallback(() => {
     setHorseback(prev => !prev);
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const effectiveBudgetForPace = useCallback((paceId, w) => {
     const base = getDailyHexBudget(paceId);
@@ -114,7 +115,7 @@ export default function useTravelManagement({
     setPath([]);
     setPathIndex(0);
     setLastMessage(null);
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const cancelTravel = useCallback(() => {
     setTravelMode(MODES.INACTIVE);
@@ -122,7 +123,7 @@ export default function useTravelManagement({
     setPath([]);
     setPathIndex(0);
     setLastMessage(null);
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const setDestinationAndPath = useCallback((to) => {
     if (!partyPosition) return;
@@ -135,14 +136,14 @@ export default function useTravelManagement({
     pathIndexRef.current = 0;
     setLastMessage(null);
     setTravelMode(MODES.PLANNING);
-  }, [partyPosition, hexCols, hexRows, terrain, roads]);
+  }, [partyPosition, hexCols, hexRows, terrain, roads]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const changePace = useCallback((paceId) => {
     setTravelPace(paceId);
     setDailyBudget(effectiveBudgetForPace(paceId, weather));
     setDayExhausted(false);
     setForcedMarchHours(0);
-  }, [effectiveBudgetForPace, weather]);
+  }, [effectiveBudgetForPace, weather]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const advanceOneHex = useCallback(() => {
     const currentPath = pathRef.current;
@@ -194,7 +195,7 @@ export default function useTravelManagement({
     }
 
     return { moved: true };
-  }, [accruedCost, dailyBudget, terrain, onPartyMove, weather, eventFrequency, enhanceCombatEvent, effectiveHexCost, horseback]);
+  }, [accruedCost, dailyBudget, terrain, onPartyMove, weather, eventFrequency, enhanceCombatEvent, effectiveHexCost, horseback]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const forceCamp = useCallback(() => {
     setAccruedCost(0);
@@ -205,7 +206,7 @@ export default function useTravelManagement({
     setForcedMarchHours(0);
     if (travelMode === MODES.PAUSED) setTravelMode(MODES.PLANNING);
     setLastMessage('A new day dawns. Travel budget refreshed.');
-  }, [travelPace, effectiveBudgetForPace, weather, travelMode]);
+  }, [travelPace, effectiveBudgetForPace, weather, travelMode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const partyHasMaxExhaustion = useCallback(() => {
     return characters.some(char => {
@@ -240,7 +241,7 @@ export default function useTravelManagement({
     setDailyBudget(effectiveBudgetForPace(travelPace, weather));
     setLastMessage(`Forced march — 1 exhaustion added to all party members. Speed reduced to ${getExhaustionMultiplierPercent(forcedMarchHours + 1)}%.`);
     return true;
-  }, [partyHasMaxExhaustion, addExhaustionToAll, effectiveBudgetForPace, travelPace, weather, forcedMarchHours]);
+  }, [partyHasMaxExhaustion, addExhaustionToAll, effectiveBudgetForPace, travelPace, weather, forcedMarchHours]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const currentPosition = path.length > 0 && pathIndex < path.length
     ? path[pathIndex]
@@ -258,7 +259,7 @@ export default function useTravelManagement({
       setTravelMode(MODES.PLANNING);
     }
     setLastMessage(null);
-  }, [travelMode]);
+  }, [travelMode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const acceptEvent = useCallback(() => {
     const evt = pendingEvent;
@@ -281,11 +282,11 @@ export default function useTravelManagement({
     newEvent = enhanceCombatEvent(newEvent, tileTerrain);
     setPendingEvent(newEvent);
     setLastMessage(`⚡ ${newEvent.title}`);
-  }, [rerollsRemaining, currentPosition, partyPosition, terrain, enhanceCombatEvent]);
+  }, [rerollsRemaining, currentPosition, partyPosition, terrain, enhanceCombatEvent]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSetEventFrequency = useCallback((freq) => {
     setEventFrequency(freq);
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return {
     travelMode,

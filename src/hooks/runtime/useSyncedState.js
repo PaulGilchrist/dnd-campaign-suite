@@ -46,11 +46,17 @@ export function useSyncedState(characterKey, propertyName, defaultValue) {
       const set = listeners.get(characterKey);
       if (set) set.delete(listener);
     };
-  }, [characterKey, propertyName, defaultValue, store]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [characterKey, propertyName, store]);
 
   const setValueSynced = useCallback(
     (newValue) => {
       setRuntimeValue(characterKey, propertyName, newValue, null);
+      const store = getStore(characterKey);
+      store.set(propertyName, newValue);
+      if (newValue === currentValueRef.current) return;
+      currentValueRef.current = newValue;
+      setValue(newValue);
     },
     [characterKey, propertyName],
   );
