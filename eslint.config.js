@@ -106,7 +106,7 @@ export default [
       'react/jsx-uses-react': 'warn',
       // Server-first pattern enforcement
       'server-first/no-window-access': 'error',
-      'server-first/no-local-game-state': 'warn',
+      'server-first/no-local-game-state': 'error',
       'server-first/require-synced-state': 'warn',
     },
   },
