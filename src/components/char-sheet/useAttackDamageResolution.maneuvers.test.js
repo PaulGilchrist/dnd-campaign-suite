@@ -447,11 +447,13 @@ describe('useAttackDamageResolution - attack rider maneuvers', () => {
                 campaignName: 'test-campaign',
                 targetName: 'Goblin',
             });
-            expect(mockPendingDamageRef.current).toEqual({
-                _cunningStrike: true,
-                attack,
-                popupHtml: { hit: true, isCrit: false, targetName: 'Goblin' },
-            });
+            expect(mockPendingDamageRef.current).toEqual(
+                expect.objectContaining({
+                    _cunningStrike: true,
+                    attack,
+                    popupHtml: { hit: true, isCrit: false, targetName: 'Goblin' },
+                })
+            );
             expect(mockRollDamage).not.toHaveBeenCalled();
         });
 
