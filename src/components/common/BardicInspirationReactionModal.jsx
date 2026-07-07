@@ -10,39 +10,49 @@ function BardicInspirationReactionModal({ campaignName }) {
     const [prompts, setPrompts] = useState([]);
     const current = prompts.length > 0 ? prompts[0] : null;
     const activePromptIdRef = useRef(null);
+    const promptsRef = useRef([]);
 
     const advance = useCallback(() => {
         setPrompts(prev => {
             const next = prev.slice(1);
-            const dismissed = prev[0];
-            if (dismissed) seenPromptIds.current.delete(dismissed.promptId);
+            activePromptIdRef.current = null;
+            promptsRef.current = next;
             return next;
         });
     }, []);
 
     const handleEvent = useCallback((event) => {
         if (!event.key || event.data == null) return;
-        // The biPrompt is stored as a property within the character store.
-        // SSE broadcasts the full character object under `change-{campaign}-{characterName}`.
         const charMatch = event.key.match(/^change-([^]+)-(.+)$/);
         if (charMatch) {
             const characterName = charMatch[2];
             if (event.data && typeof event.data === 'object' && event.data.biPrompt) {
                 const promptData = event.data.biPrompt;
-                if (promptData && promptData.promptId && !seenPromptIds.current.has(promptData.promptId)) {
-                    seenPromptIds.current.add(promptData.promptId);
-                    setPrompts(prev => [...prev, { targetName: characterName, ...promptData }]);
+                if (promptData && promptData.promptId) {
+                    if (activePromptIdRef.current !== null) return;
+                    if (promptsRef.current.some(p => p.promptId === promptData.promptId)) return;
+                    activePromptIdRef.current = promptData.promptId;
+                    setPrompts(prev => {
+                        const next = [...prev, { targetName: characterName, ...promptData }];
+                        promptsRef.current = next;
+                        return next;
+                    });
                     return;
                 }
             }
         }
-        // Also handle the old direct biPrompt key format for backward compatibility
         const prefix = `change-${campaignName}-biPrompt-`;
         if (event.key.startsWith(prefix)) {
             const targetName = event.key.slice(prefix.length);
-            if (!targetName || !event.data?.promptId || seenPromptIds.current.has(event.data.promptId)) return;
-            seenPromptIds.current.add(event.data.promptId);
-            setPrompts(prev => [...prev, { targetName, ...event.data }]);
+            if (!targetName || !event.data?.promptId) return;
+            if (activePromptIdRef.current !== null) return;
+            if (promptsRef.current.some(p => p.promptId === event.data.promptId)) return;
+            activePromptIdRef.current = event.data.promptId;
+            setPrompts(prev => {
+                const next = [...prev, { targetName, ...event.data }];
+                promptsRef.current = next;
+                return next;
+            });
         }
     }, [campaignName]);
 
@@ -51,7 +61,11 @@ function BardicInspirationReactionModal({ campaignName }) {
         const prefix = `change-${campaignName}-biPromptCleared-`;
         if (!event.key.startsWith(prefix)) return;
         if (!event.data?.promptId) return;
-        setPrompts(prev => prev.filter(p => p.promptId !== event.data.promptId));
+        setPrompts(prev => {
+            const next = prev.filter(p => p.promptId !== event.data.promptId);
+            promptsRef.current = next;
+            return next;
+        });
     }, [campaignName]);
 
     const handleDismiss = useCallback(() => {
@@ -68,8 +82,10 @@ function BardicInspirationReactionModal({ campaignName }) {
         const biRoll = dieRoll?.total || 0;
 
         if (current.mode === 'defense') {
+            clearBardicInspirationPrompt(campaignName, current.targetName);
             clearBardicInspiration(current.targetName, campaignName);
         } else {
+            clearBardicInspirationPrompt(campaignName, current.targetName);
             clearBardicInspiration(current.attackerName, campaignName);
         }
 
@@ -97,7 +113,6 @@ function BardicInspirationReactionModal({ campaignName }) {
             detail: { promptId, used: true, biRoll },
         }));
 
-        clearBardicInspirationPrompt(campaignName, current.targetName);
         advance();
     }, [campaignName, current, advance]);
 

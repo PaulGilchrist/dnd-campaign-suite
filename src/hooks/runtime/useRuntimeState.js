@@ -67,6 +67,9 @@ export function getRuntimeValue(characterKey, propertyName) {
 }
 
 export function setRuntimeValue(characterKey, propertyName, value, campaignName) {
+  if (propertyName === 'biPrompt') {
+    console.log('[SET_RUNTIME] biPrompt for=', characterKey, 'value=', JSON.stringify(value), 'stack=', new Error().stack.split('\n').slice(1, 6).join(' | '));
+  }
   const store = getStore(characterKey);
   const existing = store.get(propertyName);
   if (valuesEqual(existing, value)) {

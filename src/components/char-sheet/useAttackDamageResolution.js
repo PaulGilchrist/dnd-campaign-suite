@@ -1,7 +1,7 @@
 import { rollExpression, rollExpressionDoubled } from '../../services/dice/diceRoller.js';
 import { getCombatContext, getTargetFromAttacker } from '../../services/rules/combat/damageUtils.js';
 import { getCurrentCombatRound, loadCombatSummary } from '../../services/encounters/combatData.js';
-import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeObject, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import { postLogEntry } from '../../services/shared/logPoster.js';
 import { getActiveBuffs } from '../../services/automation/common/buffToggle.js';
 import { evaluateAutoExpression, hasTwoWeaponFighting } from '../../services/combat/automation/automationService.js';
@@ -10,8 +10,8 @@ import { parseMagicItemName } from '../../services/rules/core/attackCalc.js';
 import { addEntry } from '../../services/ui/logService.js';
 import { createSaveListener } from '../../services/automation/common/savePrompt.js';
 import { getAttackRiderOptions, getAttackRiderOptionsByContext, executeAttackRiderManeuver as executeAttackRiderManeuverService } from '../../services/automation/handlers/class-fighter-rogue/combatSuperiorityHandler.js';
-import { hasBardicInspirationOffense, getBardicInspirationDieSize, clearBardicInspiration } from '../../services/combat/auras/bardicInspirationState.js';
 import { sendBardicInspirationOffensePrompt } from '../../services/combat/prompts/bardicInspirationPromptUtils.js';
+import { hasBardicInspirationOffense, getBardicInspirationDieSize } from '../../services/combat/auras/bardicInspirationState.js';
 
 export default function useAttackDamageResolution({
     playerStats, campaignName, mapName,
@@ -130,16 +130,6 @@ export default function useAttackDamageResolution({
 
         // Combat Inspiration - Offense: prompt to add BI die to damage on hit
         if (isHit && playerStats.name) {
-            const biOffense = hasBardicInspirationOffense(playerStats.name, campaignName);
-            const hasCombatOptionsPassive = playerStats.automation?.passives?.some(p => p.effect === 'bardic_inspiration_combat_options');
-            const availableUses = Number(getRuntimeValue(playerStats.name, 'bardicInspirationUses', campaignName) ?? 0);
-            if (hasCombatOptionsPassive && availableUses > 0 && !biOffense) {
-                const classLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level);
-                const dieSize = classLevel?.bardic_die || classLevel?.class_specific?.bardic_inspiration_die || 6;
-                await setRuntimeValue(playerStats.name, 'bardicInspirationDie', String(dieSize), campaignName);
-                await setRuntimeValue(playerStats.name, 'bardicInspirationGrantedBy', playerStats.name, campaignName);
-                await setRuntimeValue(playerStats.name, 'bardicInspirationCombatOptions', JSON.stringify(['defense_add_to_ac', 'offense_add_to_damage']), campaignName);
-            }
             if (hasBardicInspirationOffense(playerStats.name, campaignName)) {
                 const dieSize = getBardicInspirationDieSize(playerStats.name, campaignName);
                 if (dieSize) {
@@ -155,8 +145,8 @@ export default function useAttackDamageResolution({
                             if (event.detail.used) {
                                 const biRoll = event.detail.biRoll;
                                 const currentUses = Number(getRuntimeValue(playerStats.name, 'bardicInspirationUses', campaignName) ?? 0);
-                                setRuntimeValue(playerStats.name, 'bardicInspirationUses', Math.max(0, currentUses - 1), campaignName);
-                                setRuntimeValue(playerStats.name, 'bardicInspirationOffenseValue', String(biRoll), campaignName);
+                                setRuntimeObject(playerStats.name, { bardicInspirationUses: Math.max(0, currentUses - 1) }, campaignName, true);
+                                setRuntimeObject(playerStats.name, { bardicInspirationOffenseValue: String(biRoll) }, campaignName, true);
                                 addEntry(campaignName, {
                                     type: 'ability_use',
                                     characterName: playerStats.name,
@@ -172,9 +162,6 @@ export default function useAttackDamageResolution({
                         setTimeout(() => {
                             if (!biResolved) {
                                 window.removeEventListener('bardic-inspiration-offense-result', handler);
-                                if (hasCombatOptionsPassive && availableUses > 0) {
-                                    clearBardicInspiration(playerStats.name, campaignName);
-                                }
                                 resolve();
                             }
                         }, 30000);

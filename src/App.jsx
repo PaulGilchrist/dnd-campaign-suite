@@ -356,6 +356,7 @@ function App() {
    * setRuntimeObject is called with skipSync=true to prevent re-POSTing the full
    * store back to the server on SSE echoes (the server already has this data).
    */
+  const pendingPromptIdRef = useRef(null);
   const handleRuntimeEvent = useCallback((event) => {
     if (event.key == null || event.data == null) return;
     if (event.key.startsWith('character-')) {
@@ -379,6 +380,14 @@ function App() {
     const prefix = `change-${campaignName}-`;
     if (!event.key.startsWith(prefix)) return;
     const storeKey = event.key.slice(prefix.length);
+    if (event.data && typeof event.data === 'object' && 'biPrompt' in event.data) {
+      pendingPromptIdRef.current = event.data.biPrompt?.promptId || null;
+      return;
+    }
+    if (pendingPromptIdRef.current && event.data && typeof event.data === 'object' && 'biPromptCleared' in event.data) {
+      return;
+    }
+    pendingPromptIdRef.current = null;
     setRuntimeObject(storeKey, event.data, campaignName, true);
   }, [campaignName, setCharacters]);
 
