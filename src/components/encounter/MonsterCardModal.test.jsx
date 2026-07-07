@@ -69,6 +69,9 @@ vi.mock('../../services/maps/mapsService.js', () => ({
 }));
 
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
+  getStore: vi.fn(() => new Map()),
+  useSyncedState: vi.fn(() => [null, vi.fn()]),
+  listeners: new Map(),
     useRuntimeValue: vi.fn((campaign, key) => {
         if (key === 'targetEffects') return [];
         if (key === 'inspiringMovementNoOA') return false;

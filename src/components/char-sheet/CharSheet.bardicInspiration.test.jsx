@@ -95,6 +95,9 @@ vi.mock('../../services/rules/rulesFactory.js', () => ({
 const mockStore = new Map();
 
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
+  getStore: vi.fn(() => new Map()),
+  useSyncedState: vi.fn(() => [null, vi.fn()]),
+  listeners: new Map(),
   getRuntimeValue: vi.fn((key, prop, _camp) => mockStore.get(`${key}:${prop}`) ?? null),
   setRuntimeValue: vi.fn((_key, _prop, _val, _camp) => mockStore.set(`${_key}:${_prop}`, _val)),
   useRuntimeValue: vi.fn((key, prop) => {

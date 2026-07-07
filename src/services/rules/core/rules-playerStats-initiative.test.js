@@ -81,6 +81,9 @@ vi.mock('../../character/proficiencyUtils2024.js', () => ({
 }));
 
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
+  getStore: vi.fn(() => new Map()),
+  useSyncedState: vi.fn(() => [null, vi.fn()]),
+  listeners: new Map(),
   getRuntimeValue: vi.fn(() => undefined),
 }));
 

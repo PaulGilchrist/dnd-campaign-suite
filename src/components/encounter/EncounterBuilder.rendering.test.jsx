@@ -54,6 +54,9 @@ vi.mock('../../config/encounterConfig.js', () => ({
 }));
 
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
+  getStore: vi.fn(() => new Map()),
+  useSyncedState: vi.fn(() => [null, vi.fn()]),
+  listeners: new Map(),
   getRuntimeValue: vi.fn(() => 0),
   setRuntimeValue: vi.fn(),
 }));

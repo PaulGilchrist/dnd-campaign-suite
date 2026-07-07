@@ -53,6 +53,9 @@ vi.mock('../../services/combat/buffs/buffService.js', () => ({
 }));
 
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
+  getStore: vi.fn(() => new Map()),
+  useSyncedState: vi.fn(() => [null, vi.fn()]),
+  listeners: new Map(),
   getRuntimeValue: vi.fn(() => null),
   setRuntimeValue: vi.fn(() => Promise.resolve()),
   setRuntimeBatch: vi.fn(),

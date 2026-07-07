@@ -78,7 +78,8 @@ function createMockDeps(overrides = {}) {
         setDivineFuryChoice: vi.fn(),
         setWeaponMasteryModal: vi.fn(),
         setAttackRiderModal: vi.fn(),
-        pendingDamageRef: { current: null },
+        pendingDamage: null,
+        resumeRef: { current: null },
         ...overrides,
     };
 }
@@ -563,6 +564,7 @@ describe('useAttackDamageResolution', () => {
             getRuntimeValue.mockImplementation((key, prop) => {
                 if (prop === '_divineFuryUsedRound') return null;
                 if (prop === 'activeBuffs') return [{ effect: 'advantage_attacks_disadvantage_against' }, { damageBonusExpression: '1d4' }];
+                if (prop === 'resumeRef') return {};
                 return null;
             });
             const testDeps = createMockDeps({ playerStats: stats });
@@ -579,7 +581,7 @@ describe('useAttackDamageResolution', () => {
             await new Promise(r => setTimeout(r, 0));
 
             expect(testDeps.setDivineFuryChoice).toHaveBeenCalledWith('fire or cold');
-            expect(testDeps.pendingDamageRef.current).toEqual(
+            expect(testDeps.resumeRef.current).toEqual(
                 expect.objectContaining({
                     attack,
                     bonusExpr: '2d6',

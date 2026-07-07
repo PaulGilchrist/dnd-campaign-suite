@@ -144,6 +144,9 @@ vi.mock('../../services/maps/mapsService.js', () => ({
 }));
 
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
+  getStore: vi.fn(() => new Map()),
+  useSyncedState: vi.fn(() => [null, vi.fn()]),
+  listeners: new Map(),
   useRuntimeValue: vi.fn((_characterKey, _propertyName, _campaignName) => null),
   getRuntimeValue: vi.fn((_characterKey, _propertyName) => null),
 }));

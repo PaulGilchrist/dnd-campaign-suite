@@ -108,7 +108,8 @@ function UseAttackDamageResolution(overrides = {}) {
         setAttackRiderModal: mockSetAttackRiderModal,
         setAttackRiderManeuverPrompt: mockSetAttackRiderManeuverPrompt,
         setSweepingAttackTargetModal: mockSetSweepingAttackTargetModal,
-        pendingDamageRef: mockPendingDamageRef,
+        pendingDamage: mockPendingDamageRef.current,
+        resumeRef: mockPendingDamageRef,
         ...overrides,
     };
     return useAttackDamageResolution(deps);
@@ -124,6 +125,7 @@ describe('useAttackDamageResolution - attack rider maneuvers', () => {
         rollExpression.mockReturnValue(defaultRollResult);
         rollExpressionDoubled.mockReturnValue({ total: 10, rolls: [5, 5], modifier: 6 });
         getRuntimeValue.mockReturnValue(null);
+        getRuntimeValue.mockImplementation((key, prop) => prop === 'resumeRef' ? {} : null);
         setRuntimeValue.mockReturnValue(undefined);
         getActiveBuffs.mockReturnValue([]);
         hasTwoWeaponFighting.mockReturnValue(false);

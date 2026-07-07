@@ -1,74 +1,27 @@
 import { rollExpression } from '../../services/dice/diceRoller.js';
-import { getCombatContext } from '../../services/rules/combat/damageUtils.js';
-import { getDistanceFeet } from '../../services/rules/combat/rangeValidation.js';
 import { getCurrentCombatRound } from '../../services/encounters/combatData.js';
-import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
+import { setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import { applyConstellationOption } from '../../services/automation/handlers/class-sorcerer/starryFormHandler.js';
 import { applyConstellationOption as twinklingApply } from '../../services/automation/handlers/class-sorcerer/twinklingConstellationHandler.js';
 import { handleRestore } from '../../services/automation/handlers/class-cleric-paladin/elderChampionHandler.js';
 
 export default function useModalHandlers({
     playerStats, campaignName,
-    rollDamage, proceedWithDamage,
-    pendingDamageRef,
-    cleaveAttackPending,
+    _rollDamage, proceedWithDamage,
+    pendingDamage, setPendingDamage,
     featureChoice,
     setDamageTypeChoice, setDivineFuryChoice,
     setWeaponMasteryModal, setWeaponMasteryChoiceModal, setWeaponKindMasteryModal,
-    setCleaveAttackPending,
     setFeatureChoice,
     setStarryFormConstellationModal, setTwinklingConstellationModal,
     setPopupHtml,
 }) {
     const handleMasteryClose = async () => {
         setWeaponMasteryModal(null);
-        if (pendingDamageRef.current) {
-            const { attack, formula, total, rolls, modifier } = pendingDamageRef.current;
-            // Check if Cleave was activated — look for cleave effect in targetEffects
-            const storedEffects = getRuntimeValue(campaignName, 'targetEffects') || [];
-            const cleaveEffect = storedEffects.find(te => te.effect === 'cleave');
-            if (cleaveEffect) {
-                // Clear the cleave effect so it doesn't trigger again
-                const filteredEffects = storedEffects.filter(te => te.effect !== 'cleave');
-                setRuntimeValue(campaignName, 'targetEffects', filteredEffects, campaignName);
-                // Proceed with the first attack damage
-                proceedWithDamage(attack, formula, total, rolls, modifier);
-                pendingDamageRef.current = null;
-                // Show cleave target selection
-                const cs = await getCombatContext(campaignName);
-                const firstTarget = cs?.creatures?.find(c => c.name === cleaveEffect.target);
-                // Cleave: second target must be within your reach (default 5 ft for melee, 10 ft for reach weapons)
-                const attackerPos = cs?.creatures?.find(c => c.name === playerStats.name)?.position;
-                const reach = attack.range || 8;
-                if (cs?.creatures && firstTarget?.position && attackerPos) {
-                    const secondTargets = cs.creatures
-                        .filter(c => c.name !== cleaveEffect.target && c.position)
-                        .map(c => ({
-                            creature: c,
-                            distanceFromFirst: getDistanceFeet(firstTarget.position, c.position),
-                            distanceFromAttacker: getDistanceFeet(attackerPos, c.position),
-                        }))
-                        .filter(t => t.distanceFromFirst !== null && t.distanceFromFirst <= 5 && t.distanceFromAttacker !== null && t.distanceFromAttacker <= reach);
-                    if (secondTargets.length > 0) {
-                        setCleaveAttackPending({
-                            attackName: attack.name,
-                            damage: attack.damage,
-                            damageType: attack.damageType || 'same_as_weapon',
-                            abilityName: attack.abilityName,
-                            weaponType: attack.weaponType,
-                            properties: attack.properties || [],
-                            proficiencyBonus: attack.proficiencyBonus || playerStats.proficiency || 0,
-                            abilities: playerStats.abilities || [],
-                            campaignName,
-                            playerStats,
-                            secondTargets: secondTargets.map(t => t.creature),
-                        });
-                        return;
-                    }
-                }
-            }
+        if (pendingDamage) {
+            const { attack, formula, total, rolls, modifier } = pendingDamage;
             proceedWithDamage(attack, formula, total, rolls, modifier);
-            pendingDamageRef.current = null;
+            setPendingDamage(null);
         }
     };
 
@@ -76,70 +29,8 @@ export default function useModalHandlers({
         setWeaponMasteryChoiceModal(null);
     };
 
-    const handleCleaveAttack = async (cleaveTargetName) => {
-        if (!cleaveTargetName) {
-            setCleaveAttackPending(null);
-            return;
-        }
-        const data = cleaveAttackPending;
-        if (!data) return;
-        setCleaveAttackPending(null);
-
-        const { attackName, damage, damageType, abilityName, proficiencyBonus, abilities, campaignName: cleaveCampaign } = data;
-
-        const ability = abilities?.find(a => a.name === abilityName);
-        const abilityMod = ability?.bonus || 0;
-        const attackBonus = abilityMod + proficiencyBonus;
-
-        const cs = await getCombatContext(cleaveCampaign);
-        const target = cs?.creatures?.find(c => c.name === cleaveTargetName);
-        const targetAc = target?.ac || 0;
-
-        const d20Roll = Math.floor(Math.random() * 20) + 1;
-        const totalRoll = d20Roll + attackBonus;
-        const hit = totalRoll >= targetAc;
-
-        let damageFormula = damage;
-        let damageResult = null;
-        if (hit) {
-            const negMod = abilityMod < 0 ? abilityMod : 0;
-            if (negMod < 0) {
-                damageFormula = `${damage} + ${negMod} [${abilityName}]`;
-            } else {
-                const parts = damage.split(' + ');
-                const filteredParts = parts.filter(part => {
-                    const match = part.match(/^\d+\[([^\]]+)\]$/);
-                    return !match || match[1] !== abilityName;
-                });
-                damageFormula = filteredParts.length > 0 ? filteredParts.join(' + ') : parts[0];
-            }
-            damageResult = rollExpression(damageFormula);
-        }
-
-        if (hit && damageResult) {
-            const context = {
-                targetName: cleaveTargetName,
-                damageType,
-                attackerName: playerStats.name,
-            };
-            rollDamage(`${attackName} (Cleave)`, damageFormula, damageResult.total, damageResult.rolls, 0, context);
-        } else {
-            const context = {
-                targetName: cleaveTargetName,
-                damageType,
-                attackerName: playerStats.name,
-                isAutoMiss: true,
-            };
-            rollDamage(`${attackName} (Cleave)`, damageFormula, 0, [], 0, context);
-        }
-    };
-
-    const handleCleaveSkip = () => {
-        setCleaveAttackPending(null);
-    };
-
     const handleDivineFuryDamageType = (chosenType) => {
-        const pending = pendingDamageRef.current;
+        const pending = pendingDamage;
         if (!pending) {
             setDivineFuryChoice(null);
             return;
@@ -152,24 +43,24 @@ export default function useModalHandlers({
         const currentRound = getCurrentCombatRound();
         setRuntimeValue(playerName, '_divineFuryUsedRound', currentRound, campaignName);
         setDivineFuryChoice(null);
-        pendingDamageRef.current = null;
+        setPendingDamage(null);
         proceedWithDamage(attack, newFormula, newTotal, newRolls, modifier);
     };
 
     const handleDivineFurySkip = () => {
-        const pending = pendingDamageRef.current;
+        const pending = pendingDamage;
         if (!pending) {
             setDivineFuryChoice(null);
             return;
         }
         const { attack, formula, total, rolls, modifier } = pending;
         setDivineFuryChoice(null);
-        pendingDamageRef.current = null;
+        setPendingDamage(null);
         proceedWithDamage(attack, formula, total, rolls, modifier);
     };
 
     const handleGenericDamageTypeChoice = (chosenType) => {
-        const pending = pendingDamageRef.current;
+        const pending = pendingDamage;
         if (!pending) {
             setDamageTypeChoice(null);
             return;
@@ -182,24 +73,24 @@ export default function useModalHandlers({
             setRuntimeValue(playerStats.name, oncePerTurnKey, getCurrentCombatRound(), campaignName);
         }
         setDamageTypeChoice(null);
-        pendingDamageRef.current = null;
+        setPendingDamage(null);
         proceedWithDamage(attack, newFormula, newTotal, newRolls, modifier);
     };
 
     const handleGenericDamageTypeSkip = () => {
-        const pending = pendingDamageRef.current;
+        const pending = pendingDamage;
         if (!pending) {
             setDamageTypeChoice(null);
             return;
         }
         const { attack, formula, total, rolls, modifier } = pending;
         setDamageTypeChoice(null);
-        pendingDamageRef.current = null;
+        setPendingDamage(null);
         proceedWithDamage(attack, formula, total, rolls, modifier);
     };
 
     const handleDamageTypeModifierChoice = (chosenType) => {
-        const pending = pendingDamageRef.current;
+        const pending = pendingDamage;
         if (!pending) {
             setDamageTypeChoice(null);
             return;
@@ -211,12 +102,12 @@ export default function useModalHandlers({
             setRuntimeValue(playerStats.name, usedKey, getCurrentCombatRound(), campaignName);
         }
         setDamageTypeChoice(null);
-        pendingDamageRef.current = null;
+        setPendingDamage(null);
         proceedWithDamage(attack, formula, total, rolls, modifier);
     };
 
     const handleDamageTypeModifierSkip = () => {
-        const pending = pendingDamageRef.current;
+        const pending = pendingDamage;
         if (!pending) {
             setDamageTypeChoice(null);
             return;
@@ -227,12 +118,12 @@ export default function useModalHandlers({
             setRuntimeValue(playerStats.name, usedKey, getCurrentCombatRound(), campaignName);
         }
         setDamageTypeChoice(null);
-        pendingDamageRef.current = null;
+        setPendingDamage(null);
         proceedWithDamage(attack, formula, total, rolls, modifier);
     };
 
     const handleEnhancedUnarmedChoice = (chosenOptionName) => {
-        const pending = pendingDamageRef.current;
+        const pending = pendingDamage;
         if (!pending) {
             setDamageTypeChoice(null);
             return;
@@ -249,19 +140,19 @@ export default function useModalHandlers({
                     const usedKey = `_${_attackRider.name.replace(/\s+/g, '_')}_usedRound`;
                     setRuntimeValue(playerStats.name, usedKey, getCurrentCombatRound(), campaignName);
                     setDamageTypeChoice(null);
-                    pendingDamageRef.current = null;
+                    setPendingDamage(null);
                     proceedWithDamage(attack, newFormula, newTotal, newRolls, rider);
                     return;
                 }
             }
         }
         setDamageTypeChoice(null);
-        pendingDamageRef.current = null;
+        setPendingDamage(null);
         proceedWithDamage(attack, formula, total, rolls, rider);
     };
 
     const handleEnhancedUnarmedSkip = () => {
-        const pending = pendingDamageRef.current;
+        const pending = pendingDamage;
         if (!pending) {
             setDamageTypeChoice(null);
             return;
@@ -272,7 +163,7 @@ export default function useModalHandlers({
             setRuntimeValue(playerStats.name, usedKey, getCurrentCombatRound(), campaignName);
         }
         setDamageTypeChoice(null);
-        pendingDamageRef.current = null;
+        setPendingDamage(null);
         proceedWithDamage(attack, formula, total, rolls, rider);
     };
 
@@ -322,8 +213,6 @@ export default function useModalHandlers({
     return {
         handleMasteryClose,
         handleWeaponMasteryChoice,
-        handleCleaveAttack,
-        handleCleaveSkip,
         handleDivineFuryDamageType,
         handleDivineFurySkip,
         handleGenericDamageTypeChoice,

@@ -54,14 +54,13 @@ function createDeps(overrides = {}) {
         campaignName: 'test-campaign',
         rollDamage: vi.fn(),
         proceedWithDamage: vi.fn(),
-        pendingDamageRef: { current: null },
-        cleaveAttackPending: null,
+        pendingDamage: null,
+        setPendingDamage: vi.fn(),
         featureChoice: null,
         setDamageTypeChoice: vi.fn(),
         setDivineFuryChoice: vi.fn(),
         setWeaponMasteryModal: vi.fn(),
         setWeaponMasteryChoiceModal: vi.fn(),
-        setCleaveAttackPending: vi.fn(),
         setFeatureChoice: vi.fn(),
         setStarryFormConstellationModal: vi.fn(),
         setTwinklingConstellationModal: vi.fn(),
@@ -84,17 +83,15 @@ describe('useModalHandlers - damage type handlers', () => {
     describe('handleDivineFuryDamageType', () => {
         it('applies chosen damage type, records used round, and proceeds', () => {
             const deps = createDeps({
-                pendingDamageRef: {
-                    current: {
-                        attack: { name: 'Fury of the Gods' },
-                        formula: '1d8',
-                        total: 5,
-                        rolls: [5],
-                        modifier: 0,
-                        bonusExpr: '1d8',
-                        bonusTotal: 4,
-                        bonusRolls: [4],
-                    },
+                pendingDamage: {
+                    attack: { name: 'Fury of the Gods' },
+                    formula: '1d8',
+                    total: 5,
+                    rolls: [5],
+                    modifier: 0,
+                    bonusExpr: '1d8',
+                    bonusTotal: 4,
+                    bonusRolls: [4],
                 },
             });
             const { handleDivineFuryDamageType } = useModalHandlers(deps);
@@ -107,7 +104,7 @@ describe('useModalHandlers - damage type handlers', () => {
                 [5, 4],
                 0
             );
-            expect(deps.pendingDamageRef.current).toBeNull();
+            expect(deps.setPendingDamage).toHaveBeenCalledWith(null);
             expect(setRuntimeValue).toHaveBeenCalledWith(
                 'TestFighter',
                 '_divineFuryUsedRound',
@@ -120,18 +117,16 @@ describe('useModalHandlers - damage type handlers', () => {
     describe('handleGenericDamageTypeChoice', () => {
         it('applies chosen damage type with oncePerTurnKey', () => {
             const deps = createDeps({
-                pendingDamageRef: {
-                    current: {
-                        attack: { name: 'Divine Strike' },
-                        formula: '1d8',
-                        total: 5,
-                        rolls: [5],
-                        modifier: 0,
-                        bonusExpr: '1d8',
-                        bonusTotal: 4,
-                        bonusRolls: [4],
-                        oncePerTurnKey: '_DivineStrike_usedRound',
-                    },
+                pendingDamage: {
+                    attack: { name: 'Divine Strike' },
+                    formula: '1d8',
+                    total: 5,
+                    rolls: [5],
+                    modifier: 0,
+                    bonusExpr: '1d8',
+                    bonusTotal: 4,
+                    bonusRolls: [4],
+                    oncePerTurnKey: '_DivineStrike_usedRound',
                 },
             });
             const { handleGenericDamageTypeChoice } = useModalHandlers(deps);
@@ -150,22 +145,20 @@ describe('useModalHandlers - damage type handlers', () => {
                 [5, 4],
                 0
             );
-            expect(deps.pendingDamageRef.current).toBeNull();
+            expect(deps.setPendingDamage).toHaveBeenCalledWith(null);
         });
 
         it('proceeds without oncePerTurnKey when not present', () => {
             const deps = createDeps({
-                pendingDamageRef: {
-                    current: {
-                        attack: { name: 'Extra Damage' },
-                        formula: '1d6',
-                        total: 5,
-                        rolls: [5],
-                        modifier: 0,
-                        bonusExpr: '1d6',
-                        bonusTotal: 3,
-                        bonusRolls: [3],
-                    },
+                pendingDamage: {
+                    attack: { name: 'Extra Damage' },
+                    formula: '1d6',
+                    total: 5,
+                    rolls: [5],
+                    modifier: 0,
+                    bonusExpr: '1d6',
+                    bonusTotal: 3,
+                    bonusRolls: [3],
                 },
             });
             const { handleGenericDamageTypeChoice } = useModalHandlers(deps);
@@ -179,14 +172,12 @@ describe('useModalHandlers - damage type handlers', () => {
     describe('handleGenericDamageTypeSkip', () => {
         it('proceeds with original damage when skipping', () => {
             const deps = createDeps({
-                pendingDamageRef: {
-                    current: {
-                        attack: { name: 'Extra Damage' },
-                        formula: '1d6',
-                        total: 5,
-                        rolls: [5],
-                        modifier: 0,
-                    },
+                pendingDamage: {
+                    attack: { name: 'Extra Damage' },
+                    formula: '1d6',
+                    total: 5,
+                    rolls: [5],
+                    modifier: 0,
                 },
             });
             const { handleGenericDamageTypeSkip } = useModalHandlers(deps);
@@ -199,29 +190,27 @@ describe('useModalHandlers - damage type handlers', () => {
                 [5],
                 0
             );
-            expect(deps.pendingDamageRef.current).toBeNull();
+            expect(deps.setPendingDamage).toHaveBeenCalledWith(null);
         });
     });
 
     describe('handleDamageTypeModifierChoice', () => {
         it('applies chosen damage type to attack and records used round', () => {
             const deps = createDeps({
-                pendingDamageRef: {
-                    current: {
-                        attack: { name: 'Empowered Strikes', damageType: 'slashing' },
-                        formula: '1d8',
-                        total: 5,
-                        rolls: [5],
-                        modifier: 0,
-                        _damageTypeModifier: { name: 'Empowered Strikes' },
-                    },
+                pendingDamage: {
+                    attack: { name: 'Empowered Strikes', damageType: 'slashing' },
+                    formula: '1d8',
+                    total: 5,
+                    rolls: [5],
+                    modifier: 0,
+                    _damageTypeModifier: { name: 'Empowered Strikes' },
                 },
             });
             const { handleDamageTypeModifierChoice } = useModalHandlers(deps);
-            const attack = deps.pendingDamageRef.current.attack;
+            const attack = deps.pendingDamage.attack;
             handleDamageTypeModifierChoice('radiant');
             expect(deps.setDamageTypeChoice).toHaveBeenCalledWith(null);
-            expect(deps.pendingDamageRef.current).toBeNull();
+            expect(deps.setPendingDamage).toHaveBeenCalledWith(null);
             expect(attack.damageType).toBe('radiant');
             expect(deps.proceedWithDamage).toHaveBeenCalled();
             expect(setRuntimeValue).toHaveBeenCalledWith(

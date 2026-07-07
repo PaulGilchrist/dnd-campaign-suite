@@ -4,6 +4,9 @@ import { getActionSpellNames, getBonusActionSpellNames, getReactionSpellNames } 
 import { getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
+  getStore: vi.fn(() => new Map()),
+  useSyncedState: vi.fn(() => [null, vi.fn()]),
+  listeners: new Map(),
   getRuntimeValue: vi.fn(),
 }));
 

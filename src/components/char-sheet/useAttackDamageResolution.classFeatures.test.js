@@ -117,7 +117,8 @@ function UseAttackDamageResolution(overrides = {}) {
         setDivineFuryChoice: mockSetDivineFuryChoice,
         setWeaponMasteryModal: mockSetWeaponMasteryModal,
         setAttackRiderModal: mockSetAttackRiderModal,
-        pendingDamageRef: mockPendingDamageRef,
+        pendingDamage: mockPendingDamageRef.current,
+        resumeRef: mockPendingDamageRef,
         ...overrides,
     };
         return useAttackDamageResolution(deps);
@@ -144,6 +145,7 @@ describe('useAttackDamageResolution - class features', () => {
         rollExpression.mockReturnValue(defaultRollResult);
         rollExpressionDoubled.mockReturnValue({ total: 10, rolls: [5, 5], modifier: 0 });
         getRuntimeValue.mockReturnValue(null);
+        getRuntimeValue.mockImplementation((key, prop) => prop === 'resumeRef' ? {} : null);
         setRuntimeValue.mockReturnValue(undefined);
         getActiveBuffs.mockReturnValue([]);
         hasTwoWeaponFighting.mockReturnValue(false);
@@ -300,6 +302,7 @@ describe('useAttackDamageResolution - class features', () => {
 
         it('triggers WIS save via createSaveListener on first use', async () => {
             getRuntimeValue.mockReturnValue(null);
+        getRuntimeValue.mockImplementation((key, prop) => prop === 'resumeRef' ? {} : null);
             createSaveListener.mockReturnValue({ promise: Promise.resolve({ success: false }) });
             const { resolveAttackDamage } = UseAttackDamageResolution({ playerStats: makeRendMindStats() });
             await resolveAttackDamage(makeAttack({ name: 'Psychic Blade', damage: '1d6+5', damageType: 'Psychic' }));
@@ -318,6 +321,7 @@ describe('useAttackDamageResolution - class features', () => {
 
         it('does not apply stunned condition on save success', async () => {
             getRuntimeValue.mockReturnValue(null);
+        getRuntimeValue.mockImplementation((key, prop) => prop === 'resumeRef' ? {} : null);
             const successPromise = Promise.resolve({ success: true });
             createSaveListener.mockReturnValue({ promise: successPromise });
             const { resolveAttackDamage } = UseAttackDamageResolution({ playerStats: makeRendMindStats() });
@@ -343,6 +347,7 @@ describe('useAttackDamageResolution - class features', () => {
 
         it('skips Rend Mind when no target in context', async () => {
             getRuntimeValue.mockReturnValue(null);
+        getRuntimeValue.mockImplementation((key, prop) => prop === 'resumeRef' ? {} : null);
             mockBuildCtxSync.mockResolvedValue({ targetName: null });
             const { resolveAttackDamage } = UseAttackDamageResolution({ playerStats: makeRendMindStats() });
             await resolveAttackDamage(makeAttack({ name: 'Psychic Blade', damage: '1d6+5', damageType: 'Psychic' }));
@@ -406,6 +411,7 @@ describe('useAttackDamageResolution - class features', () => {
 
         it('does not spread damage when Hunter Mark is not active', async () => {
             getRuntimeValue.mockReturnValue(null);
+        getRuntimeValue.mockImplementation((key, prop) => prop === 'resumeRef' ? {} : null);
             getCombatContext.mockResolvedValue({
                 creatures: [
                     { name: 'TestRogue', type: 'player' },

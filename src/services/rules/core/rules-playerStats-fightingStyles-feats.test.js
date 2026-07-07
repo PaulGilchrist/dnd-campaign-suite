@@ -57,7 +57,11 @@ vi.mock('../../character/proficiencyUtils2024.js', () => ({
   getProficiencies: vi.fn(() => [5, []]),
 }));
 
-vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({ getRuntimeValue: vi.fn(() => undefined) }));
+vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
+  getStore: vi.fn(() => new Map()),
+  useSyncedState: vi.fn(() => [null, vi.fn()]),
+  listeners: new Map(),
+getRuntimeValue: vi.fn(() => undefined) }));
 
 vi.mock('../../combat/automation/automationService.js', () => ({
   collectAutomationFromFeatures: vi.fn(() => ({ passives: [], actions: [], specialActions: [] })),

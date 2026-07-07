@@ -1,4 +1,5 @@
-import { useState, useRef } from 'react'
+import { useState } from 'react'
+import { useSyncedState } from '../../hooks/runtime/useSyncedState.js';
 import useAttackDamageResolution from './useAttackDamageResolution.js';
 import useModalHandlers from './useModalHandlers.js';
 import { useCombatSuperiorityModal } from '../../hooks/combat/useCombatSuperiorityModal.js';
@@ -76,8 +77,7 @@ export default function useCharActionModals({
     const [stealthAttackModal, setStealthAttackModal] = useState(null);
     const [mantleOfInspirationTarget, setMantleOfInspirationTarget] = useState(null);
 
-    // eslint-disable-next-line server-first/no-local-game-state
-    const pendingDamageRef = useRef(null);
+    const [pendingDamage, setPendingDamage] = useSyncedState(campaignName, 'pipeline-pause', null);
 
     const { resolveAttackDamage, proceedWithDamage } = useAttackDamageResolution({
         playerStats, campaignName, mapName,
@@ -85,7 +85,6 @@ export default function useCharActionModals({
         setDamageTypeChoice, setDivineFuryChoice, setWeaponMasteryModal, setAttackRiderModal,
         setAttackRiderManeuverPrompt,
         setSweepingAttackTargetModal,
-        pendingDamageRef,
         setSecondaryTargetModal,
     });
 
@@ -114,7 +113,7 @@ export default function useCharActionModals({
     } = useModalHandlers({
         playerStats, campaignName,
         rollDamage, proceedWithDamage,
-        pendingDamageRef,
+        pendingDamage, setPendingDamage,
         featureChoice,
         setDamageTypeChoice, setDivineFuryChoice,
         setWeaponMasteryModal, setWeaponMasteryChoiceModal,
@@ -124,7 +123,8 @@ export default function useCharActionModals({
     });
 
     return {
-        pendingDamageRef,
+        pendingDamage,
+        setPendingDamage,
         buildCtx,
         buildCtxSync,
         healingPoolModal, setHealingPoolModal,

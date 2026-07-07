@@ -9,6 +9,9 @@ import { clearCombat } from '../../services/encounters/initiativeService.js';
 vi.mock('../../hooks/runtime/useSSEEqualityGuard.js', () => ({ default: (setter) => setter }));
 vi.mock('../../services/ui/utils.js', () => ({ default: { getName: (name) => name } }));
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
+  getStore: vi.fn(() => new Map()),
+  useSyncedState: vi.fn(() => [null, vi.fn()]),
+  listeners: new Map(),
     getRuntimeValue: vi.fn((key, prop) => {
         if (prop === 'currentHitPoints') return 10;
         if (prop === 'hitPoints') return 10;

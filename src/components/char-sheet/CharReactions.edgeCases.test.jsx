@@ -6,6 +6,9 @@ import React from 'react';
 import CharReactions from './CharReactions.jsx';
 
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
+  getStore: vi.fn(() => new Map()),
+  useSyncedState: vi.fn(() => [null, vi.fn()]),
+  listeners: new Map(),
   useRuntimeValue: vi.fn(() => undefined),
   getRuntimeValue: vi.fn(() => null),
   setRuntimeValue: vi.fn(),

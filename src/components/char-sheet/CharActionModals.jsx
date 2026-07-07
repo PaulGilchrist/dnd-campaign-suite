@@ -236,7 +236,7 @@ export default function CharActionModals({
     inspiringMovementAllyModal,
     handleInspiringMovementConfirm,
     handleDivineInterventionCast,
-    pendingDamageRef,
+    pendingDamage,
     buildCtx,
     buildCtxSync,
     autoDamageContext,
@@ -373,10 +373,10 @@ export default function CharActionModals({
                                     rollDamage(ctx.attackName, formula, total, rolls, ctx.modifier, ctx.context);
                                     autoDamageContext.current = null;
                                 }
-                            } else if (pendingDamageRef?.current?._cunningStrike) {
-                                const pending = pendingDamageRef.current;
+                            } else if (pendingDamage?._cunningStrike) {
+                                const pending = pendingDamage;
                                 const { attack } = pending;
-                                pendingDamageRef.current = null;
+                                pendingDamage = null;
                                 (mapName ? buildCtx(attack) : buildCtxSync(attack)).then(ctx => {
                                     const sneakAttackDice = ctx?.sneakAttackDice || 0;
                                     const cunningStrikeCost = Number(getRuntimeValue(playerStats.name, '_cunningStrikeCostUsed', campaignName) ?? 0);
@@ -764,8 +764,8 @@ export default function CharActionModals({
             )}
             {damageTypeChoice && (
                 <div className="sp-overlay" onClick={() => {
-                    if (pendingDamageRef.current?._attackRider) handleEnhancedUnarmedSkip();
-                    else if (pendingDamageRef.current?._damageTypeModifier) handleDamageTypeModifierSkip();
+                    if (pendingDamage?._attackRider) handleEnhancedUnarmedSkip();
+                    else if (pendingDamage?._damageTypeModifier) handleDamageTypeModifierSkip();
                     else handleGenericDamageTypeSkip();
                 }}>
                     <div className="sp-modal" onClick={e => e.stopPropagation()}>
@@ -781,8 +781,8 @@ export default function CharActionModals({
                                         className="sp-roll-btn"
                                         style={{ margin: '0 6px 8px 6px' }}
                                         onClick={() => {
-                                            if (pendingDamageRef.current?._attackRider) handleEnhancedUnarmedChoice(type);
-                                            else if (pendingDamageRef.current?._damageTypeModifier) handleDamageTypeModifierChoice(type);
+                                            if (pendingDamage?._attackRider) handleEnhancedUnarmedChoice(type);
+                                            else if (pendingDamage?._damageTypeModifier) handleDamageTypeModifierChoice(type);
                                             else handleGenericDamageTypeChoice(type);
                                         }}
                                     >
@@ -793,8 +793,8 @@ export default function CharActionModals({
                         </div>
                         <div className="sp-actions">
                             <button className="sp-dismiss-btn" onClick={() => {
-                                if (pendingDamageRef.current?._attackRider) handleEnhancedUnarmedSkip();
-                                else if (pendingDamageRef.current?._damageTypeModifier) handleDamageTypeModifierSkip();
+                                if (pendingDamage?._attackRider) handleEnhancedUnarmedSkip();
+                                else if (pendingDamage?._damageTypeModifier) handleDamageTypeModifierSkip();
                                 else handleGenericDamageTypeSkip();
                             }}>Skip</button>
                         </div>

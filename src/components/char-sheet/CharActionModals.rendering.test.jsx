@@ -75,6 +75,9 @@ vi.mock('./modals/shared/HealingIllusionModal.jsx', () => ({
   },
 }));
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
+  getStore: vi.fn(() => new Map()),
+  useSyncedState: vi.fn(() => [null, vi.fn()]),
+  listeners: new Map(),
   getRuntimeValue: vi.fn(() => null),
   setRuntimeValue: vi.fn(),
 }));

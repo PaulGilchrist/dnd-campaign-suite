@@ -58,14 +58,13 @@ function createDeps(overrides = {}) {
         campaignName: 'test-campaign',
         rollDamage: vi.fn(),
         proceedWithDamage: vi.fn(),
-        pendingDamageRef: { current: null },
-        cleaveAttackPending: null,
+        pendingDamage: null,
+        setPendingDamage: vi.fn(),
         featureChoice: null,
         setDamageTypeChoice: vi.fn(),
         setDivineFuryChoice: vi.fn(),
         setWeaponMasteryModal: vi.fn(),
         setWeaponMasteryChoiceModal: vi.fn(),
-        setCleaveAttackPending: vi.fn(),
         setFeatureChoice: vi.fn(),
         setStarryFormConstellationModal: vi.fn(),
         setTwinklingConstellationModal: vi.fn(),
@@ -89,18 +88,16 @@ describe('useModalHandlers - features & constellation', () => {
     describe('handleEnhancedUnarmedChoice', () => {
         it('applies damage bonus rider when chosen option has damage_bonus', () => {
             const deps = createDeps({
-                pendingDamageRef: {
-                    current: {
-                        attack: { name: 'Unarmed Strike' },
-                        formula: '1d4',
-                        total: 5,
-                        rolls: [5],
-                        modifier: 0,
-                        rider: null,
-                        _attackRider: {
-                            name: 'Unarmed Fighting',
-                            options: [{ name: 'Damage Bonus', effect: 'damage_bonus', damageExpression: '1d4', damageType: 'force' }],
-                        },
+                pendingDamage: {
+                    attack: { name: 'Unarmed Strike' },
+                    formula: '1d4',
+                    total: 5,
+                    rolls: [5],
+                    modifier: 0,
+                    rider: null,
+                    _attackRider: {
+                        name: 'Unarmed Fighting',
+                        options: [{ name: 'Damage Bonus', effect: 'damage_bonus', damageExpression: '1d4', damageType: 'force' }],
                     },
                 },
             });
@@ -108,7 +105,7 @@ describe('useModalHandlers - features & constellation', () => {
             const { handleEnhancedUnarmedChoice } = useModalHandlers(deps);
             handleEnhancedUnarmedChoice('Damage Bonus');
             expect(deps.setDamageTypeChoice).toHaveBeenCalledWith(null);
-            expect(deps.pendingDamageRef.current).toBeNull();
+            expect(deps.setPendingDamage).toHaveBeenCalledWith(null);
             expect(deps.proceedWithDamage).toHaveBeenCalledWith(
                 expect.any(Object),
                 expect.stringContaining('1d4'),
@@ -126,25 +123,23 @@ describe('useModalHandlers - features & constellation', () => {
 
         it('proceeds with original damage when option is found but has no damage_bonus effect', () => {
             const deps = createDeps({
-                pendingDamageRef: {
-                    current: {
-                        attack: { name: 'Unarmed Strike' },
-                        formula: '1d4',
-                        total: 5,
-                        rolls: [5],
-                        modifier: 0,
-                        rider: null,
-                        _attackRider: {
-                            name: 'Unarmed Fighting',
-                            options: [{ name: 'Other Option', effect: 'other' }],
-                        },
+                pendingDamage: {
+                    attack: { name: 'Unarmed Strike' },
+                    formula: '1d4',
+                    total: 5,
+                    rolls: [5],
+                    modifier: 0,
+                    rider: null,
+                    _attackRider: {
+                        name: 'Unarmed Fighting',
+                        options: [{ name: 'Other Option', effect: 'other' }],
                     },
                 },
             });
             const { handleEnhancedUnarmedChoice } = useModalHandlers(deps);
             handleEnhancedUnarmedChoice('Other Option');
             expect(deps.setDamageTypeChoice).toHaveBeenCalledWith(null);
-            expect(deps.pendingDamageRef.current).toBeNull();
+            expect(deps.setPendingDamage).toHaveBeenCalledWith(null);
             expect(deps.proceedWithDamage).toHaveBeenCalledWith(
                 expect.any(Object),
                 '1d4',
@@ -157,18 +152,16 @@ describe('useModalHandlers - features & constellation', () => {
 
         it('proceeds with original damage when option is not found in rider options', () => {
             const deps = createDeps({
-                pendingDamageRef: {
-                    current: {
-                        attack: { name: 'Unarmed Strike' },
-                        formula: '1d4',
-                        total: 5,
-                        rolls: [5],
-                        modifier: 0,
-                        rider: null,
-                        _attackRider: {
-                            name: 'Unarmed Fighting',
-                            options: [{ name: 'Damage Bonus', effect: 'damage_bonus', damageExpression: '1d4', damageType: 'force' }],
-                        },
+                pendingDamage: {
+                    attack: { name: 'Unarmed Strike' },
+                    formula: '1d4',
+                    total: 5,
+                    rolls: [5],
+                    modifier: 0,
+                    rider: null,
+                    _attackRider: {
+                        name: 'Unarmed Fighting',
+                        options: [{ name: 'Damage Bonus', effect: 'damage_bonus', damageExpression: '1d4', damageType: 'force' }],
                     },
                 },
             });
@@ -187,18 +180,16 @@ describe('useModalHandlers - features & constellation', () => {
 
         it('proceeds with original damage when rollExpression returns null for damage_bonus', () => {
             const deps = createDeps({
-                pendingDamageRef: {
-                    current: {
-                        attack: { name: 'Unarmed Strike' },
-                        formula: '1d4',
-                        total: 5,
-                        rolls: [5],
-                        modifier: 0,
-                        rider: null,
-                        _attackRider: {
-                            name: 'Unarmed Fighting',
-                            options: [{ name: 'Damage Bonus', effect: 'damage_bonus', damageExpression: '1d4', damageType: 'force' }],
-                        },
+                pendingDamage: {
+                    attack: { name: 'Unarmed Strike' },
+                    formula: '1d4',
+                    total: 5,
+                    rolls: [5],
+                    modifier: 0,
+                    rider: null,
+                    _attackRider: {
+                        name: 'Unarmed Fighting',
+                        options: [{ name: 'Damage Bonus', effect: 'damage_bonus', damageExpression: '1d4', damageType: 'force' }],
                     },
                 },
             });
@@ -229,22 +220,20 @@ describe('useModalHandlers - features & constellation', () => {
     describe('handleEnhancedUnarmedSkip', () => {
         it('proceeds with original damage and records used round when skipping', () => {
             const deps = createDeps({
-                pendingDamageRef: {
-                    current: {
-                        attack: { name: 'Unarmed Strike' },
-                        formula: '1d4',
-                        total: 5,
-                        rolls: [5],
-                        modifier: 0,
-                        rider: null,
-                        _attackRider: { name: 'Unarmed Fighting' },
-                    },
+                pendingDamage: {
+                    attack: { name: 'Unarmed Strike' },
+                    formula: '1d4',
+                    total: 5,
+                    rolls: [5],
+                    modifier: 0,
+                    rider: null,
+                    _attackRider: { name: 'Unarmed Fighting' },
                 },
             });
             const { handleEnhancedUnarmedSkip } = useModalHandlers(deps);
             handleEnhancedUnarmedSkip();
             expect(deps.setDamageTypeChoice).toHaveBeenCalledWith(null);
-            expect(deps.pendingDamageRef.current).toBeNull();
+            expect(deps.setPendingDamage).toHaveBeenCalledWith(null);
             expect(deps.proceedWithDamage).toHaveBeenCalled();
             expect(setRuntimeValue).toHaveBeenCalledWith(
                 'TestFighter',
@@ -409,12 +398,10 @@ describe('useModalHandlers - features & constellation', () => {
         it('returns all expected handler functions', () => {
             const deps = createDeps();
             const handlers = useModalHandlers(deps);
-            expect(Object.keys(handlers)).toHaveLength(17);
+            expect(Object.keys(handlers)).toHaveLength(15);
             expect(Object.keys(handlers)).toEqual([
                 'handleMasteryClose',
                 'handleWeaponMasteryChoice',
-                'handleCleaveAttack',
-                'handleCleaveSkip',
                 'handleDivineFuryDamageType',
                 'handleDivineFurySkip',
                 'handleGenericDamageTypeChoice',

@@ -12,6 +12,9 @@ import { createBaseProps } from './CharActionModals.test-utils.jsx';
 // component can mount without side effects (e.g. getCombatContext fetch).
 
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
+  getStore: vi.fn(() => new Map()),
+  useSyncedState: vi.fn(() => [null, vi.fn()]),
+  listeners: new Map(),
   getRuntimeValue: vi.fn(() => null),
   setRuntimeValue: vi.fn(),
 }));

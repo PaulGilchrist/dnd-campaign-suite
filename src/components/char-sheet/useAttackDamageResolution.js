@@ -54,8 +54,8 @@ export default function useAttackDamageResolution({
     setDamageTypeChoice, setDivineFuryChoice, setWeaponMasteryModal: _, setAttackRiderModal,
     setAttackRiderManeuverPrompt,
     setSweepingAttackTargetModal,
-    pendingDamageRef,
     setSecondaryTargetModal,
+    resumeRef = { current: null },
 }) {
     const proceedWithDamage = (attack, formula, total, rolls, modifier) => {
         (mapName ? buildCtx(attack) : buildCtxSync(attack)).then(ctx => {
@@ -107,7 +107,7 @@ export default function useAttackDamageResolution({
         };
 
         const pipeline = buildPipelineForAction(attack, playerStats);
-        await pipeline.run('housekeeping:do', ctx, pendingDamageRef);
+        await pipeline.run('housekeeping:do', ctx, resumeRef);
     };
 
     const handleAttackRiderManeuverUse = async (maneuver, attack, popupHtmlData, currentFormula, currentTotal, currentRolls) => {

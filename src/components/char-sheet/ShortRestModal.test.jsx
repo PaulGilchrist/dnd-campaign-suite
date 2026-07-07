@@ -7,6 +7,9 @@ const getRuntimeValueMock = vi.fn(() => null);
 const setRuntimeValueMock = vi.fn();
 
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
+  getStore: vi.fn(() => new Map()),
+  useSyncedState: vi.fn(() => [null, vi.fn()]),
+  listeners: new Map(),
     getRuntimeValue: vi.fn((...args) => getRuntimeValueMock(...args)),
     setRuntimeValue: vi.fn((...args) => setRuntimeValueMock(...args)),
 }));

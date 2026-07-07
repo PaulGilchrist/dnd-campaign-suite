@@ -4,6 +4,9 @@ import { renderHook } from '@testing-library/react';
 import useInitiativeEffects from './useInitiativeEffects.js';
 
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
+  getStore: vi.fn(() => new Map()),
+  useSyncedState: vi.fn(() => [null, vi.fn()]),
+  listeners: new Map(),
     getRuntimeValue: vi.fn(),
     setRuntimeValue: vi.fn(),
     setRuntimeBatch: vi.fn(),

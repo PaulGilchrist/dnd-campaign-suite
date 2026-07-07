@@ -79,6 +79,9 @@ vi.mock('./modals/shared/HealingIllusionModal.jsx', () => ({
   },
 }));
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
+  getStore: vi.fn(() => new Map()),
+  useSyncedState: vi.fn(() => [null, vi.fn()]),
+  listeners: new Map(),
   getRuntimeValue: vi.fn(() => null),
   setRuntimeValue: vi.fn(),
 }));
@@ -262,20 +265,20 @@ describe('CharActionModals inline modals', () => {
     ];
 
     for (const { label, pending, choiceHandler, skipHandler } of choiceCases) {
-      it(`calls ${choiceHandler} when a type is selected with pendingDamageRef.${label}`, () => {
+      it(`calls ${choiceHandler} when a type is selected with pendingDamage.${label}`, () => {
         const handler = vi.fn();
         render(<CharActionModals
-          {...createBaseProps({ [choiceHandler]: handler, pendingDamageRef: { current: pending } })}
+          {...createBaseProps({ [choiceHandler]: handler, pendingDamage: pending })}
           damageTypeChoice={{ title: 'Pick', types: ['Fire', 'Ice'] }}
         />);
         fireEvent.click(screen.getByText('Fire'));
         expect(handler).toHaveBeenCalledWith('Fire');
       });
 
-      it(`calls ${skipHandler} when Skip is clicked with pendingDamageRef.${label}`, () => {
+      it(`calls ${skipHandler} when Skip is clicked with pendingDamage.${label}`, () => {
         const handler = vi.fn();
         render(<CharActionModals
-          {...createBaseProps({ [skipHandler]: handler, pendingDamageRef: { current: pending } })}
+          {...createBaseProps({ [skipHandler]: handler, pendingDamage: pending })}
           damageTypeChoice={{ title: 'Pick', types: ['Fire'] }}
         />);
         fireEvent.click(screen.getByText('Skip'));
@@ -287,7 +290,7 @@ describe('CharActionModals inline modals', () => {
       const handleEnhancedUnarmedChoice = vi.fn();
       const handleDamageTypeModifierChoice = vi.fn();
       render(<CharActionModals
-        {...createBaseProps({ handleEnhancedUnarmedChoice, handleDamageTypeModifierChoice, pendingDamageRef: { current: { _attackRider: true, _damageTypeModifier: true } } })}
+        {...createBaseProps({ handleEnhancedUnarmedChoice, handleDamageTypeModifierChoice, pendingDamage: { _attackRider: true, _damageTypeModifier: true } })}
         damageTypeChoice={{ title: 'Pick', types: ['Fire', 'Ice'] }}
       />);
       fireEvent.click(screen.getByText('Fire'));

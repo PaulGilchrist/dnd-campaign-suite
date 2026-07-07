@@ -693,7 +693,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
     }, [playerStats, campaignName, mapName, conditionAttackMode, featRangeEffects]);
 
     const {
-        pendingDamageRef,
+        pendingDamage,
         healingPoolModal, setHealingPoolModal,
         handOfHealingModal, setHandOfHealingModal,
         fontOfMagicModal, setFontOfMagicModal,
@@ -1770,7 +1770,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     handleConstellationSelect={handleConstellationSelect}
                     handleElderChampionRestore={handleElderChampionRestore}
                     handleDivineInterventionCast={handleDivineInterventionCast}
-                    pendingDamageRef={pendingDamageRef}
+                    pendingDamage={pendingDamage}
                     buildCtx={buildCtx}
                     buildCtxSync={buildCtxSync}
                     autoDamageContext={autoDamageRollContext}

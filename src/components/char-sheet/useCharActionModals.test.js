@@ -200,9 +200,8 @@ describe('useCharActionModals', () => {
     expect(result.current.stealthAttackModal).toBeNull();
     expect(typeof result.current.setStealthAttackModal).toBe('function');
 
-    // pendingDamageRef
-    expect(result.current.pendingDamageRef).toBeDefined();
-    expect(result.current.pendingDamageRef.current).toBeNull();
+    // pendingDamage
+    expect(result.current.pendingDamage).toBeDefined();
 
     // Delegated handlers from useModalHandlers
     expect(result.current.resolveAttackDamage).toBe(mockResolveAttackDamageResult.resolveAttackDamage);

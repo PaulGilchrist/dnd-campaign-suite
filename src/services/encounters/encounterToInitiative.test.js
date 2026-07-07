@@ -16,6 +16,9 @@ vi.mock('../ui/utils.js', () => ({ default: { getName: vi.fn((n) => n || 'Unknow
 vi.mock('../shared/logPoster.js', () => ({ postLogEntry: vi.fn().mockResolvedValue(undefined) }));
 
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
+  getStore: vi.fn(() => new Map()),
+  useSyncedState: vi.fn(() => [null, vi.fn()]),
+  listeners: new Map(),
   getRuntimeValue: vi.fn(),
 }));
 

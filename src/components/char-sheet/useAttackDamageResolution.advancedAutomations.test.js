@@ -18,6 +18,9 @@ vi.mock('../../services/encounters/combatData.js', () => ({
 }));
 
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
+  getStore: vi.fn(() => new Map()),
+  useSyncedState: vi.fn(() => [null, vi.fn()]),
+  listeners: new Map(),
     getRuntimeValue: vi.fn(),
     setRuntimeValue: vi.fn(),
 }));

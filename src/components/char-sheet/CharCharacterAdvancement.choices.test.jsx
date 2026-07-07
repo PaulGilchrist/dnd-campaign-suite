@@ -13,6 +13,9 @@ vi.mock('../../services/ui/sanitize.js', () => ({
 }));
 
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
+  getStore: vi.fn(() => new Map()),
+  useSyncedState: vi.fn(() => [null, vi.fn()]),
+  listeners: new Map(),
   getRuntimeValue: mockGetRuntimeValue,
   setRuntimeValue: mockSetRuntimeValue,
 }));
