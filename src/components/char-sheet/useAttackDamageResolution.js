@@ -5,6 +5,74 @@ import { executeAttackRiderManeuver as executeAttackRiderManeuverService } from 
 import { buildPipelineForAction } from '../../services/combat/steps/index.js';
 
 /**
+ * Standalone resolveAttackDamage for use outside React hooks (e.g., CharSpells, MonsterCardModal).
+ */
+export async function resolveAttackDamageStandalone(attack, ctxOverrides, { playerStats, campaignName, setPopupHtml, rollDamage, setModalState: _setModalState }) {
+    const modalState = {};
+    const setModalStateFn = (updates) => { Object.assign(modalState, updates); };
+
+    const proceedWithDamage = (a, formula, total, rolls, modifier) => {
+        const o = ctxOverrides;
+        const minimalCtx = {
+            damageType: a.damageType,
+            targetName: o.targetName || null,
+            attackerName: o.attackerName || a.name,
+            isAutoCrit: o.isCrit || false,
+            doubledRolls: o.doubledRolls || null,
+            playerStats: o.playerStats || null,
+            autoDamageSecondaryFormula: o.autoDamageSecondaryFormula || null,
+            autoDamageSecondaryName: o.autoDamageSecondaryName || null,
+            autoDamageSecondaryDamageType: o.autoDamageSecondaryDamageType || null,
+            saveDc: o.saveDc || null,
+            saveType: o.saveType || null,
+            dcSuccess: o.dcSuccess || null,
+        };
+        rollDamage(a.name, formula, total, rolls, modifier, minimalCtx);
+    };
+
+    const ctx = {
+        attack,
+        playerStats,
+        campaignName,
+        mapName: null,
+        popupHtml: null,
+        hit: ctxOverrides.hit ?? true,
+        isCrit: ctxOverrides.isCrit ?? false,
+        isNatural20: ctxOverrides.isNatural20 ?? false,
+        targetName: ctxOverrides.targetName ?? null,
+        isBonusActionAttack: ctxOverrides.isBonusActionAttack ?? false,
+        formula: null,
+        total: 0,
+        rolls: [],
+        modifier: 0,
+        sneakDice: 0,
+        effectiveSneakDice: 0,
+        isMeleeOrUnarmed: false,
+        buildCtxResult: null,
+        autoFormulaOverride: null,
+        overchannelActive: ctxOverrides.overchannelActive ?? false,
+        overchannelUseCount: ctxOverrides.overchannelUseCount ?? 0,
+        overchannelSpellLevel: ctxOverrides.overchannelSpellLevel ?? 1,
+        autoDamageSaveDc: null,
+        empoweredEvocationModifier: ctxOverrides.empoweredEvocationModifier ?? 0,
+        setPopupHtml,
+        setDamageTypeChoice: (v) => setModalStateFn({ damageTypeChoice: v }),
+        setDivineFuryChoice: (v) => setModalStateFn({ divineFuryChoice: v }),
+        setAttackRiderModal: (v) => setModalStateFn({ attackRiderModal: v }),
+        setAttackRiderManeuverPrompt: (v) => setModalStateFn({ attackRiderManeuverPrompt: v }),
+        setSweepingAttackTargetModal: (v) => setModalStateFn({ sweepingAttackTargetModal: v }),
+        setSecondaryTargetModal: (v) => setModalStateFn({ secondaryTargetModal: v }),
+        buildCtx: null,
+        buildCtxSync: null,
+        proceedWithDamage,
+        ...ctxOverrides,
+    };
+
+    const pipeline = buildPipelineForAction(attack, playerStats);
+    await pipeline.run('housekeeping:do', ctx, { current: null });
+}
+
+/**
  * Normalize an autoDamage object (from dice roll popup) into an attack-like object
  * + context overrides for the pipeline.
  *
@@ -43,6 +111,10 @@ export function normalizeAutoDamage(autoDamage, isCrit, playerStats) {
     dcSuccess: autoDamage.dcSuccess,
     autoDamageSource: true,
     empoweredEvocationModifier: shouldApplyEmpoweredEvoc ? empEvocIntMod : 0,
+    autoDamageSecondaryFormula: autoDamage.secondaryFormula,
+    autoDamageSecondaryName: autoDamage.secondaryName,
+    autoDamageSecondaryDamageType: autoDamage.secondaryDamageType,
+    attackerName: autoDamage.attackerName,
   };
 
   return { attack, ctx };
@@ -54,10 +126,22 @@ export default function useAttackDamageResolution({
     setModalState, _modalState,
     resumeRef = { current: null },
 }) {
+    let pendingCtxOverrides = {};
+
     const proceedWithDamage = (attack, formula, total, rolls, modifier) => {
-        (mapName ? buildCtx(attack) : buildCtxSync(attack)).then(ctx => {
-            rollDamage(attack.name, formula, total, rolls, modifier, ctx);
-        }).catch((e) => { console.error("[useAttackDamageResolution] Error:", e); });
+        if (buildCtxSync) {
+            (mapName ? buildCtx(attack) : buildCtxSync(attack)).then(ctx => {
+                rollDamage(attack.name, formula, total, rolls, modifier, ctx);
+            }).catch((e) => { console.error("[useAttackDamageResolution] Error:", e); });
+        } else {
+            const o = pendingCtxOverrides;
+            const minimalCtx = {
+                damageType: attack.damageType,
+                targetName: o.targetName || null,
+                attackerName: attack.name,
+            };
+            rollDamage(attack.name, formula, total, rolls, modifier, minimalCtx);
+        }
     };
 
     /**
@@ -65,6 +149,7 @@ export default function useAttackDamageResolution({
      * For auto-damage (after an attack roll), pass ctxOverrides from normalizeAutoDamage().
      */
     const resolveAttackDamage = async (attack, ctxOverrides = {}) => {
+        pendingCtxOverrides = ctxOverrides;
         const ctx = {
             attack,
             playerStats,

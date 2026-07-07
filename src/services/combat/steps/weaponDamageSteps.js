@@ -244,7 +244,7 @@ export function buildWeaponDamageSteps() {
       name: 'buildContext',
       subscribe: 'damage:rolled',
       emit: 'context:built',
-      condition: (ctx) => !ctx.buildCtxResult,
+      condition: (ctx) => !ctx.buildCtxResult && !ctx.autoDamageSource,
       handler: async (ctx) => {
         const buildFn = ctx.mapName ? ctx.buildCtx : ctx.buildCtxSync;
         if (!buildFn) return { data: {} };

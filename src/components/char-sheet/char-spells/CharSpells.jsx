@@ -16,7 +16,6 @@ import SingleTargetPopup from '../popups/SingleTargetPopup.jsx'
 import TargetWithTypePopup from '../popups/TargetWithTypePopup.jsx'
 import { getExcludedSpellNames } from '../../../services/ui/spellSectionUtils.js'
 import MagicMissileTargetPopup from '../popups/MagicMissileTargetPopup.jsx'
-import { rollExpression, rollExpressionDoubled, rollExpressionMaximized } from '../../../services/dice/diceRoller.js';
 import { getCombatContext, getTargetFromAttacker, getAttackerTargetName } from '../../../services/rules/combat/damageUtils.js';
 import { getCombatSummary } from '../../../services/encounters/combatData.js';
 import { getCurrentSorceryPoints, getMaxSorceryPoints, spendSorceryPoints } from '../../../hooks/combat/useMetamagic.js'
@@ -27,11 +26,9 @@ import UpcastPopup from './UpcastPopup.jsx';
 import { useSpellCastExecutor } from '../../../hooks/combat/useSpellCastExecutor.js';
 import { useSpellPositionResolver } from '../../../hooks/combat/useSpellPositionResolver.js';
 import { isInnateSorceryActive } from '../../../services/combat/buffs/buffService.js';
-import { useRuntimeValue, setRuntimeValue, getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
+import { useRuntimeValue, getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import utils from '../../../services/ui/utils.js';
-import { addEntry } from '../../../services/ui/logService.js';
-import { applyDamageToTarget } from '../../../services/rules/combat/applyDamage.js';
-import { getEmpoweredEvocationFeatures, getEmpoweredEvocationIntModifier } from '../../../services/rules/spells/postCastRiderService.js';
+import { normalizeAutoDamage, resolveAttackDamageStandalone } from '../useAttackDamageResolution.js';
 import './CharSpells.css'
 
 const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells, campaignName, exhaustionPenalty = 0, conditionAttackMode, cannotAct, mapName, characters }) {
@@ -43,84 +40,11 @@ const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells
     const { rollAttack, rollDamage } = useLoggedDiceRoll(playerStats.name, campaignName, {
         characters,
         autoDamageSource: 'char-spells',
-        autoDamageRoll: (autoDamage, isCrit) => {
-          let autoFormula = autoDamage.formula;
-          const hasEmpoweredEvoc = getEmpoweredEvocationFeatures(playerStats).length > 0;
-          const empEvocIntMod = hasEmpoweredEvoc ? getEmpoweredEvocationIntModifier(playerStats) : 0;
-          const spellSchool = (autoDamage.autoDamageSchool || '').toLowerCase();
-          const isEvocation = spellSchool === 'evocation';
-          const shouldApplyEmpoweredEvoc = hasEmpoweredEvoc && isEvocation && empEvocIntMod > 0;
-          if (shouldApplyEmpoweredEvoc) {
-            autoFormula = `${autoFormula} + ${empEvocIntMod} [Empowered Evocation]`;
-          }
-          const isOverchannel = autoDamage.overchannelActive;
-          const overchannelUseCount = autoDamage.overchannelUseCount || 0;
-          const overchannelSpellLevel = autoDamage.overchannelSpellLevel || 1;
-
-          let overchannelResult;
-          if (isOverchannel) {
-              overchannelResult = rollExpressionMaximized(autoFormula);
-          } else {
-              overchannelResult = isCrit ? rollExpressionDoubled(autoFormula) : rollExpression(autoFormula);
-          }
-          if (overchannelResult) {
-            const context = {
-              damageType: autoDamage.damageType,
-              targetName: autoDamage.targetName,
-              attackerName: autoDamage.attackerName,
-              isAutoCrit: isCrit,
-              playerStats,
-              doubledRolls: overchannelResult.doubledRolls,
-             };
-            if (autoDamage.saveDc) {
-               context.saveDc = autoDamage.saveDc;
-               context.saveType = autoDamage.saveType;
-               context.dcSuccess = autoDamage.dcSuccess;
-              }
-            if (autoDamage.metamagicTwinTarget) {
-              context.metamagicTwinTarget = autoDamage.metamagicTwinTarget;
-            }
-            if (autoDamage.metamagicHeighten) {
-              context.metamagicHeighten = autoDamage.metamagicHeighten;
-            }
-            rollDamage(autoDamage.name, autoFormula, overchannelResult.total, overchannelResult.rolls, overchannelResult.modifier, context);
-
-            if (isOverchannel && overchannelUseCount > 1) {
-                const dicePerLevel = 2 + (overchannelUseCount - 1);
-                const totalDice = dicePerLevel * overchannelSpellLevel;
-                const necroticFormula = `${totalDice}d12`;
-                const necroticResult = rollExpression(necroticFormula);
-                if (necroticResult) {
-                    const combatSummary = getCombatSummary(campaignName) || { creatures: [] };
-                    const applyResult = applyDamageToTarget(combatSummary, playerStats.name, necroticResult.total, ['Necrotic'], campaignName, null, true, playerStats.name);
-                    addEntry(campaignName, {
-                        type: 'roll',
-                        characterName: playerStats.name,
-                        rollType: 'overchannel-damage',
-                        name: 'Overchannel',
-                        formula: necroticFormula,
-                        rolls: necroticResult.rolls,
-                        total: necroticResult.total,
-                        modifier: necroticResult.modifier,
-                        damageType: 'Necrotic',
-                        targetName: playerStats.name,
-                        finalDamage: applyResult?.finalDamage,
-                        note: 'Overchannel self-damage (ignores resistance/immunity)',
-                    }).catch((e) => { console.error("[CharSpells] Error:", e); });
-                }
-            }
-            }
-            // Remarkable Athlete: after critical hit, enable movement without opportunity attacks
-            if (isCrit) {
-                const hasRemarkableAthlete = (playerStats.automation?.passives || []).some(
-                    p => p.type === 'auto_effect' && p.effect === 'remarkable_athlete_movement'
-                );
-                if (hasRemarkableAthlete) {
-                    setRuntimeValue(playerStats.name, 'remarkableAthleteNoOA', true, campaignName);
-                }
-            }
-           },
-         });
+        autoDamageRoll: async (autoDamage, isCrit) => {
+            const { attack, ctx: ctxOverrides } = normalizeAutoDamage(autoDamage, isCrit, playerStats);
+            await resolveAttackDamageStandalone(attack, ctxOverrides, { playerStats, campaignName, setPopupHtml, rollDamage, setModalState: () => {} });
+        },
+    });
     const [selectedSpell, setSelectedSpell] = React.useState(null);
     const isSorcerer = playerStats.class?.name === 'Sorcerer';
     const [pendingSimpleMetamagic, setPendingSimpleMetamagic] = React.useState(null);

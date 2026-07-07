@@ -1,6 +1,10 @@
-import { rollExpression, rollExpressionDoubled } from '../../services/dice/diceRoller.js';
 import { useState, useCallback, useEffect } from 'react';
-import { getCategories } from '../../services/character/featureCategories.js'
+import { SHOW_DICE_ROLL_DELAY } from '../../config/ui-config.js';
+import useLoggedDiceRoll from '../../hooks/combat/useLoggedDiceRoll.js';
+import { useDiceRollPopup } from '../../hooks/combat/DiceRollContext.js';
+import { useCombatSuperiorityModal } from '../../hooks/combat/useCombatSuperiorityModal.js';
+import { normalizeAutoDamage, resolveAttackDamageStandalone } from './useAttackDamageResolution.js';
+import { getCategories } from '../../services/character/featureCategories.js';
 import { renderMarkdownInline } from '../../services/ui/sanitize.js';
 import { loadFightingStyles } from '../../services/ui/dataLoader.js';
 import { executeHandler } from '../../services/automation/index.js';
@@ -15,11 +19,6 @@ import WeaponMasteryChoiceModal from './modals/WeaponMasteryChoiceModal.jsx';
 import { onSignatureSpellsSelected } from '../../services/automation/handlers/class-wizard/signatureSpellsHandler.js';
 import { onSpellMasterySelected } from '../../services/automation/handlers/class-wizard/spellMasteryHandler.js';
 import { onSavantSelected } from '../../services/automation/handlers/class-wizard/SavantHandler.js';
-
-import { SHOW_DICE_ROLL_DELAY } from '../../config/ui-config.js';
-import useLoggedDiceRoll from '../../hooks/combat/useLoggedDiceRoll.js';
-import { useDiceRollPopup } from '../../hooks/combat/DiceRollContext.js';
-import { useCombatSuperiorityModal } from '../../hooks/combat/useCombatSuperiorityModal.js';
 import './CharSpecialActions.css';
 
 
@@ -36,48 +35,16 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct, characters }
         characters,
         autoDamageSource: 'char-special-actions',
         autoDamageRoll: async (autoDamage, isCrit) => {
-            const formula = autoDamage.formula;
-            let result;
-            const superiorityMatch = formula.match(/\+ (\d+)\s*\[Superiority\]$/);
-            if (superiorityMatch) {
-                const baseFormula = formula.replace(/\+ \d+\s*\[Superiority\]/, '');
-                const superiorityValue = parseInt(superiorityMatch[1], 10);
-                const baseResult = isCrit ? rollExpressionDoubled(baseFormula) : rollExpression(baseFormula);
-                if (baseResult) {
-                    result = {
-                        total: baseResult.total + superiorityValue,
-                        rolls: [...baseResult.rolls, superiorityValue],
-                        modifier: baseResult.modifier,
-                    };
-                }
-            } else {
-                const match = formula.match(/^(\d+)\s*\[Superiority\]$/);
-                if (match) {
-                    const dieValue = parseInt(match[1], 10);
-                    result = { total: dieValue, rolls: [dieValue], modifier: 0 };
-                } else {
-                    result = isCrit ? rollExpressionDoubled(autoDamage.formula) : rollExpression(autoDamage.formula);
-                }
-            }
-            if (result) {
-                const context = {
-                    damageType: autoDamage.damageType,
-                    targetName: autoDamage.targetName,
-                    attackerName: autoDamage.attackerName,
-                    isAutoCrit: isCrit,
-                    playerStats,
-                    doubledRolls: result.doubledRolls,
-                };
-                rollDamage(autoDamage.name, autoDamage.formula, result.total, result.rolls, result.modifier, context);
-                if (autoDamage.ripostePopup) {
-                    const payload = autoDamage.ripostePopup;
-                    const html = typeof payload === 'string'
-                        ? payload
-                        : `<b><i class="fa-solid fa-bolt"></i> ${payload.name || 'Combat Superiority'}</b><br/>${payload.description || ''}<br/><span class="dice-roll-hint">click to dismiss</span>`;
-                    setTimeout(() => {
-                        setPopupHtml(html);
-                    }, SHOW_DICE_ROLL_DELAY);
-                }
+            const { attack, ctx: ctxOverrides } = normalizeAutoDamage(autoDamage, isCrit, playerStats);
+            await resolveAttackDamageStandalone(attack, ctxOverrides, { playerStats, campaignName, setPopupHtml, rollDamage, setModalState: () => {} });
+            if (autoDamage.ripostePopup) {
+                const payload = autoDamage.ripostePopup;
+                const html = typeof payload === 'string'
+                    ? payload
+                    : `<b><i class="fa-solid fa-bolt"></i> ${payload.name || 'Combat Superiority'}</b><br/>${payload.description || ''}<br/><span class="dice-roll-hint">click to dismiss</span>`;
+                setTimeout(() => {
+                    setPopupHtml(html);
+                }, SHOW_DICE_ROLL_DELAY);
             }
         },
     });

@@ -3,6 +3,7 @@ import { sanitizeHtml } from '../../services/ui/sanitize.js';
 import { rollExpression, rollExpressionDoubled } from '../../services/dice/diceRoller.js';
 import useLoggedDiceRoll from '../../hooks/combat/useLoggedDiceRoll.js';
 import { normalizeSaveType } from '../../services/rules/combat/applyDamage.js';
+import { normalizeAutoDamage, resolveAttackDamageStandalone } from '../char-sheet/useAttackDamageResolution.js';
 import Popup from '../common/popup.jsx';
 import DiceRollResult from '../char-sheet/DiceRollResult.jsx';
 import { extractDamageTypes, formatDamageTypes, getTargetFromAttacker, getResistanceNotice } from '../../services/rules/combat/damageUtils.js';
@@ -85,30 +86,12 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
     campaignName,
     {
        autoDamageSource: monsterName,
-       autoDamageRoll: (autoDamage, isCrit) => {
-        const result = isCrit ? rollExpressionDoubled(autoDamage.formula) : rollExpression(autoDamage.formula);
-        if (result) {
-          const context = {
-              damageType: autoDamage.damageType,
-              targetName: autoDamage.targetName,
-              attackerName: autoDamage.attackerName,
-              autoDamageSecondaryFormula: autoDamage.secondaryFormula,
-              autoDamageSecondaryName: autoDamage.secondaryName,
-              autoDamageSecondaryDamageType: autoDamage.secondaryDamageType,
-              isAutoCrit: isCrit,
-              playerStats: monsterCharacter?.computedStats,
-              doubledRolls: result.doubledRolls,
-            };
-          if (autoDamage.saveDc) {
-            context.saveDc = autoDamage.saveDc;
-            context.saveType = autoDamage.saveType;
-            context.dcSuccess = autoDamage.dcSuccess;
-          }
-          rollDamage(autoDamage.name, autoDamage.formula, result.total, result.rolls, result.modifier, context);
-        }
-      },
-      characters,
-    }
+       autoDamageRoll: async (autoDamage, isCrit) => {
+         const { attack, ctx: ctxOverrides } = normalizeAutoDamage(autoDamage, isCrit, monsterCharacter?.computedStats);
+         await resolveAttackDamageStandalone(attack, ctxOverrides, { playerStats: monsterCharacter?.computedStats, campaignName, setPopupHtml, rollDamage, setModalState: () => {} });
+       },
+       characters,
+     }
   );
 
   const getAttackerCreature = useCallback(() => {
