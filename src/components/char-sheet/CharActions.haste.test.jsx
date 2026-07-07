@@ -2,11 +2,20 @@
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
+const _syncedStore = new Map();
+
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(() => null),
   setRuntimeValue: vi.fn(() => Promise.resolve()),
-  getStore: vi.fn(() => new Map()),
-  useSyncedState: vi.fn(() => [null, vi.fn()]),
+  getStore: vi.fn(() => _syncedStore),
+  useSyncedState: vi.fn((_, key, defaultValue) => {
+    const hasValue = _syncedStore.has(key);
+    const value = hasValue ? _syncedStore.get(key) : defaultValue;
+    const setter = vi.fn((newValue) => {
+      _syncedStore.set(key, newValue);
+    });
+    return [value, setter];
+  }),
   listeners: new Map(),
 }));
 
@@ -157,6 +166,7 @@ describe('CharActions haste extra action', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
+    _syncedStore.clear();
     globalThis.fetch = vi.fn().mockResolvedValue({ json: () => Promise.resolve([]) });
   });
 

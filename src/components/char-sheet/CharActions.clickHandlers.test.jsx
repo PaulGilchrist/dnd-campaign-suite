@@ -52,9 +52,18 @@ vi.mock('../../services/combat/buffs/buffService.js', () => ({
   getInnateSorceryBonus: vi.fn((_playerName, _campaignName) => ({ saveDcBonus: 0 })),
 }));
 
+const _syncedStore = new Map();
+
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
-  getStore: vi.fn(() => new Map()),
-  useSyncedState: vi.fn(() => [null, vi.fn()]),
+  getStore: vi.fn(() => _syncedStore),
+  useSyncedState: vi.fn((_, key, defaultValue) => {
+    const hasValue = _syncedStore.has(key);
+    const value = hasValue ? _syncedStore.get(key) : defaultValue;
+    const setter = vi.fn((newValue) => {
+      _syncedStore.set(key, newValue);
+    });
+    return [value, setter];
+  }),
   listeners: new Map(),
   getRuntimeValue: vi.fn(() => null),
   setRuntimeValue: vi.fn(() => Promise.resolve()),
@@ -216,6 +225,7 @@ describe('CharActions click handlers', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
+    _syncedStore.clear();
   });
 
   describe('spell attack/damage click handlers', () => {
