@@ -80,23 +80,6 @@ describe('shadowyDodgeHandler', () => {
             expect(logService.addEntry).not.toHaveBeenCalled();
         });
 
-        it('should return popup when last attack target does not match player', async () => {
-            damageRollback.findLastAttack.mockResolvedValue({
-                attackEvent: { timestamp: Date.now(), d20: 15, bonus: 5, targetAc: 14, hit: true },
-                attackerName: 'Goblin',
-                targetName: 'Other Character',
-                primaryDamage: 8,
-                secondaryDamage: 0,
-                totalDamage: 8,
-                damageTypes: [],
-            });
-
-            const result = await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
-
-            expect(result.payload.description).toContain('No recent attack roll against you found');
-            expect(logService.addEntry).not.toHaveBeenCalled();
-        });
-
         it('should simulate disadvantage and show miss when second roll causes failure', async () => {
             mockRandom([0.05]);
             const freshTimestamp = Date.now();

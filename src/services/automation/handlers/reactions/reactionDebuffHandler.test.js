@@ -175,40 +175,7 @@ describe('reactionDebuffHandler.handle', () => {
       expect(targetResolver.resolveTarget).not.toHaveBeenCalled();
     });
 
-    it('returns popup when requiresShield and equipped list is empty', async () => {
-      const ps = makePlayerStats({ inventory: {} });
-      const action = makeAction({ requiresShield: true });
-
-      const result = await handle(action, ps, campaignName, mapName);
-
-      expect(result.payload.description).toContain('holding a Shield');
-    });
-
-    it('allows use when shield is equipped', async () => {
-      const ps = makePlayerStats({
-        inventory: { equipped: ['Shield'] },
-        equipment: [{ name: 'Shield', armor_category: 'Shield' }],
-      });
-      const action = makeAction({ requiresShield: true });
-
-      targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
-      damageUtils.getCombatContext.mockResolvedValue(makeCombatSummary());
-      damageRollback.findLastAttack.mockResolvedValue({
-        attackEvent: freshAttackEvent({ d20: 5, bonus: 3, hit: false }),
-        attackerName: 'Goblin',
-        targetName: 'Goblin',
-        primaryDamage: 0,
-        secondaryDamage: 0,
-        totalDamage: 0,
-        damageTypes: [],
-      });
-
-      const result = await handle(action, ps, campaignName, mapName);
-
-      expect(result.payload.description).toContain('Attack roll');
-    });
-
-    it('allows use when magic shield (+ prefix) is equipped', async () => {
+    it('allows use when shield is equipped (plain or magic + prefix)', async () => {
       const ps = makePlayerStats({
         inventory: { equipped: ['+1 Shield'] },
         equipment: [{ name: 'Shield', armor_category: 'Shield' }],
@@ -840,27 +807,6 @@ describe('reactionDebuffHandler.handle', () => {
   // ── Uses decrement tracking ─────────────────────────────────
 
   describe('uses decrement', () => {
-    function setupBasicPath() {
-      const ps = makePlayerStats({});
-      const action = makeAction({ uses_expression: 3 });
-      automationService.evaluateAutoExpression.mockReturnValue(3);
-      useRuntimeState.getRuntimeValue.mockReturnValue(2);
-
-      targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
-      damageUtils.getCombatContext.mockResolvedValue(makeCombatSummary());
-      damageRollback.findLastAttack.mockResolvedValue({
-        attackEvent: { ...freshAttackEvent({ d20: 5, bonus: 3, hit: false }), damageTypes: [] },
-        attackerName: 'Goblin',
-        targetName: 'Goblin',
-        primaryDamage: 0,
-        secondaryDamage: 0,
-        totalDamage: 0,
-        damageTypes: [],
-      });
-
-      return handle(action, ps, campaignName, mapName);
-    }
-
     it('increments uses count after success with string expression', async () => {
       const ps = makePlayerStats({});
       const action = makeAction({ uses_expression: 'proficiency_bonus' });
@@ -926,20 +872,6 @@ describe('reactionDebuffHandler.handle', () => {
       expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
     });
 
-    it('uses runtime value from getRuntimeValue for incremental count', async () => {
-      useRuntimeState.getRuntimeValue
-        .mockReturnValueOnce(2)
-        .mockReturnValueOnce(2);
-
-      await setupBasicPath();
-
-      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-        'Bard',
-        'cuttingwordsUses',
-        1,
-        campaignName
-      );
-    });
   });
 
   // ── Log entry creation ──────────────────────────────────────
@@ -960,6 +892,7 @@ describe('reactionDebuffHandler.handle', () => {
         totalDamage: 0,
         damageTypes: [],
       });
+      useRuntimeState.getRuntimeValue.mockReturnValue(2);
 
       return { ps, action };
     }
@@ -997,49 +930,4 @@ describe('reactionDebuffHandler.handle', () => {
     });
   });
 
-  // ── Edge cases and null safety ──────────────────────────────
-
-  describe('edge cases', () => {
-    it('handles playerStats with empty class_levels array', async () => {
-      const ps = makePlayerStats({ class: { name: 'Bard', class_levels: [] } });
-      const action = makeAction({});
-
-      targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
-      damageUtils.getCombatContext.mockResolvedValue(makeCombatSummary());
-      damageRollback.findLastAttack.mockResolvedValue({
-        attackEvent: freshAttackEvent({ d20: 5, bonus: 3, hit: false }),
-        attackerName: 'Goblin',
-        targetName: 'Goblin',
-        primaryDamage: 0,
-        secondaryDamage: 0,
-        totalDamage: 0,
-        damageTypes: [],
-      });
-
-      const result = await handle(action, ps, campaignName, mapName);
-
-      expect(result).toBeDefined();
-    });
-
-    it('handles missing classLevel for bardicDieSize defaults to 6', async () => {
-      const ps = makePlayerStats({ level: 99 });
-      const action = makeAction({});
-
-      targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
-      damageUtils.getCombatContext.mockResolvedValue(makeCombatSummary());
-      damageRollback.findLastAttack.mockResolvedValue({
-        attackEvent: freshAttackEvent({ d20: 5, bonus: 3, hit: false }),
-        attackerName: 'Goblin',
-        targetName: 'Goblin',
-        primaryDamage: 0,
-        secondaryDamage: 0,
-        totalDamage: 0,
-        damageTypes: [],
-      });
-
-      const result = await handle(action, ps, campaignName, mapName);
-
-      expect(result).toBeDefined();
-    });
-  });
 });

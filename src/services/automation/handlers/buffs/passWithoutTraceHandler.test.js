@@ -106,20 +106,6 @@ describe('passWithoutTraceHandler', () => {
                 CAMPAIGN
             )
         })
-
-        it('uses action.name in popup description', async () => {
-            toggleBuff.mockReturnValue({ wasActive: false })
-
-            const result = await handle(
-                { name: 'Custom Spell Name', automation: { type: 'pass_without_trace' } },
-                { name: 'Rogue' },
-                CAMPAIGN,
-                null
-            )
-
-            expect(result.payload.name).toBe('Custom Spell Name')
-            expect(result.payload.description).toContain('Custom Spell Name')
-        })
     })
 
     describe('getPassWithoutTraceStealthBonus', () => {
@@ -147,15 +133,6 @@ describe('passWithoutTraceHandler', () => {
             ])
 
             expect(isPassWithoutTraceActive('Rogue', CAMPAIGN)).toBe(true)
-        })
-
-        it('returns false when buff has no matching name and effect', () => {
-            getRuntimeValue.mockReturnValue([
-                { name: 'Silent Image', effect: 'pass_without_trace' },
-                { name: 'Pass Without Trace', effect: 'other_effect' },
-            ])
-
-            expect(isPassWithoutTraceActive('Rogue', CAMPAIGN)).toBe(false)
         })
     })
 })

@@ -6,7 +6,7 @@ describe('computePassiveSkills', () => {
     expect(computePassiveSkills({})).toEqual([]);
   });
 
-  it('returns existing senses alongside computed passive skills, sorted alphabetically', () => {
+  it('returns senses alongside computed passive skills, sorted alphabetically', () => {
     const input = {
       senses: [
         { name: 'Alpha Sight', value: '10 ft.' },
@@ -26,7 +26,7 @@ describe('computePassiveSkills', () => {
     expect(result).toContainEqual({ name: 'Passive Perception', value: '15' });
   });
 
-  it('falls back to ability bonus when the passive skill is missing from the skills list', () => {
+  it('falls back to ability bonus when a skill is missing from the skills list', () => {
     const input = {
       abilities: [
         { name: 'Wisdom', bonus: 3, skills: [] },

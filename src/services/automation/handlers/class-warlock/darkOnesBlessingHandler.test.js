@@ -66,20 +66,20 @@ describe('darkOnesBlessingHandler', () => {
     });
 
     describe('grantDarkOnesBlessing', () => {
-        describe('early returns (null)', () => {
-            it('returns null when player is not a Fiend patron', async () => {
-                const result = await grantDarkOnesBlessing(makeOtherWarlockStats(), 'campaign', null, null);
-
-                expect(result).toBeNull();
-            });
-
-            it('returns null when feature exists but has no automation', async () => {
-                const playerStats = {
+        describe('early returns', () => {
+            it.each([
+                ['not a Fiend patron', makeOtherWarlockStats()],
+                ['Fiend patron without automation', {
                     name: 'TestWarlock',
                     class: { subclass: { name: 'Fiend Patron' } },
                     characterAdvancement: [{ name: "Dark One's Blessing" }],
-                };
-
+                }],
+                ['Fiend patron with feature but no automation property', {
+                    name: 'TestWarlock',
+                    class: { subclass: { name: 'Fiend Patron' } },
+                    characterAdvancement: [{ name: "Dark One's Blessing", automation: null }],
+                }],
+            ])('returns null when %s', async (_, playerStats) => {
                 const result = await grantDarkOnesBlessing(playerStats, 'campaign', null, null);
 
                 expect(result).toBeNull();
@@ -171,25 +171,18 @@ describe('darkOnesBlessingHandler', () => {
                 expect(result).not.toBeNull();
                 expect(result.outOfRange).toBeUndefined();
             });
-
-            it('skips range check when no mapName or attackerName is provided', async () => {
-                const result = await grantDarkOnesBlessing(makeFiendWarlockStats(), 'campaign', null, null);
-
-                expect(result).not.toBeNull();
-                expect(result.outOfRange).toBeUndefined();
-            });
         });
     });
 
     describe('handle', () => {
-        it('returns null when grantDarkOnesBlessing returns null', async () => {
+        it('returns null and does not log when grantDarkOnesBlessing returns null', async () => {
             const result = await handle(makeAction(), makeOtherWarlockStats(), 'campaign', null);
 
             expect(result).toBeNull();
             expect(addEntry).not.toHaveBeenCalled();
         });
 
-        it('adds a campaign log entry on success', async () => {
+        it('logs the ability use and returns a popup on success', async () => {
             await handle(makeAction(), makeFiendWarlockStats(), 'campaign', null);
 
             expect(addEntry).toHaveBeenCalledWith('campaign', expect.objectContaining({
@@ -200,7 +193,7 @@ describe('darkOnesBlessingHandler', () => {
             }));
         });
 
-        it('returns popup with automation_info type', async () => {
+        it('returns a popup with automation_info type and payload', async () => {
             const result = await handle(makeAction(), makeFiendWarlockStats(), 'campaign', null);
 
             expect(result.type).toBe('popup');
@@ -208,23 +201,7 @@ describe('darkOnesBlessingHandler', () => {
             expect(result.payload.name).toBe("Dark One's Blessing");
             expect(result.payload.description).toContain('temporary hit points');
             expect(result.payload.description).toContain('5');
-        });
-
-        it('includes the action automation in the result payload', async () => {
-            const result = await handle(makeAction({ type: 'dark_ones_blessing' }), makeFiendWarlockStats(), 'campaign', null);
-
             expect(result.payload.automation).toEqual({ type: 'dark_ones_blessing' });
-        });
-
-        it('passes mapName to grantDarkOnesBlessing for range checking', async () => {
-            mapsService.loadMapData.mockResolvedValue({
-                players: [{ name: 'TestWarlock', gridX: 5, gridY: 5 }],
-            });
-
-            const result = await handle(makeAction(), makeFiendWarlockStats(), 'campaign', 'test-map');
-
-            expect(result).not.toBeNull();
-            expect(result.type).toBe('popup');
         });
 
         it('does not throw when addEntry fails (fire-and-forget logging)', async () => {

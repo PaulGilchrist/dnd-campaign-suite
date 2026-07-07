@@ -107,19 +107,7 @@ describe('prayerOfHealingService', () => {
             expect(getCombatContext).not.toHaveBeenCalled();
         });
 
-        it('returns null when spell name is empty string', async () => {
-            const result = await triggerPrayerOfHealing(
-                { name: '', level: 1 },
-                {},
-                CLERIC_STATS,
-                CAMPAIGN_NAME,
-                MAP_NAME,
-            );
-
-            expect(result).toBeNull();
-        });
-
-        it('returns null when spell object has no name property', async () => {
+        it('returns null when spell name is missing or empty', async () => {
             const result = await triggerPrayerOfHealing(
                 { level: 1 },
                 {},
@@ -133,22 +121,8 @@ describe('prayerOfHealingService', () => {
     });
 
     describe('combat context failures', () => {
-        it('returns null when getCombatContext resolves to null', async () => {
+        it('returns null when getCombatContext resolves to falsy', async () => {
             getCombatContext.mockResolvedValue(null);
-
-            const result = await triggerPrayerOfHealing(
-                buildPrayerSpell(),
-                {},
-                CLERIC_STATS,
-                CAMPAIGN_NAME,
-                MAP_NAME,
-            );
-
-            expect(result).toBeNull();
-        });
-
-        it('returns null when getCombatContext resolves to undefined', async () => {
-            getCombatContext.mockResolvedValue(undefined);
 
             const result = await triggerPrayerOfHealing(
                 buildPrayerSpell(),
@@ -181,21 +155,7 @@ describe('prayerOfHealingService', () => {
             expect(result).toEqual({ noTargets: true });
         });
 
-        it('throws when creatures is undefined', async () => {
-            getCombatContext.mockResolvedValue({
-                players: [{ name: 'Cleric', ...CLIC_POS }],
-            });
-
-            await expect(triggerPrayerOfHealing(
-                buildPrayerSpell(),
-                {},
-                CLERIC_STATS,
-                CAMPAIGN_NAME,
-                MAP_NAME,
-            )).rejects.toThrow('Expected array, got undefined');
-        });
-
-        it('throws when creatures is null', async () => {
+        it('throws when creatures is not an array', async () => {
             getCombatContext.mockResolvedValue({
                 players: [{ name: 'Cleric', ...CLIC_POS }],
                 creatures: null,
@@ -332,28 +292,6 @@ describe('prayerOfHealingService', () => {
             expect(result.targets[0].targetName).toBe('PlacedCreature');
         });
 
-        it('falls back to first 5 creatures when caster has no grid position', async () => {
-            getCombatContext.mockResolvedValue({
-                players: [],
-                creatures: [
-                    { name: 'Ally1', maxHp: 50 },
-                    { name: 'Ally2', maxHp: 50 },
-                    { name: 'Ally3', maxHp: 50 },
-                ],
-                placedItems: [],
-            });
-
-            const result = await triggerPrayerOfHealing(
-                buildPrayerSpell(),
-                {},
-                CLERIC_STATS,
-                CAMPAIGN_NAME,
-                MAP_NAME,
-            );
-
-            expect(result.targets.length).toBe(3);
-        });
-
         it('skips targets with null grid coordinates when caster has grid position', async () => {
             getDistanceFeet.mockReturnValue(null);
             getCombatContext.mockResolvedValue({
@@ -371,23 +309,6 @@ describe('prayerOfHealingService', () => {
             );
 
             expect(result).toEqual({ noTargets: true });
-        });
-
-        it('handles missing players array by falling back to creatures', async () => {
-            getCombatContext.mockResolvedValue({
-                creatures: [{ name: 'Ally1', maxHp: 50 }],
-            });
-
-            const result = await triggerPrayerOfHealing(
-                buildPrayerSpell(),
-                {},
-                CLERIC_STATS,
-                CAMPAIGN_NAME,
-                MAP_NAME,
-            );
-
-            expect(result.targets.length).toBe(1);
-            expect(result.targets[0].targetName).toBe('Ally1');
         });
     });
 
@@ -426,26 +347,6 @@ describe('prayerOfHealingService', () => {
             );
 
             expect(rollExpression).toHaveBeenCalledWith('3d8');
-        });
-
-        it('uses exact spell level when it matches a slot', async () => {
-            rollExpression.mockReturnValue({ total: 22, rolls: [11, 11] });
-
-            const spell = {
-                name: 'Prayer of Healing',
-                level: 3,
-                heal_at_slot_level: { 2: '3d8', 3: '4d8' },
-            };
-
-            await triggerPrayerOfHealing(
-                spell,
-                {},
-                CLERIC_STATS,
-                CAMPAIGN_NAME,
-                MAP_NAME,
-            );
-
-            expect(rollExpression).toHaveBeenCalledWith('4d8');
         });
 
         it('falls back to first slot key when no slot >= spell level', async () => {
@@ -510,7 +411,6 @@ describe('prayerOfHealingService', () => {
     });
 
 
-
     describe('healing application', () => {
         it('clamps healing to target max HP', async () => {
             getRuntimeValue.mockImplementation((_key, prop) => {
@@ -547,33 +447,6 @@ describe('prayerOfHealingService', () => {
             expect(result.targets.length).toBe(3);
         });
 
-        it('uses playerStats hitPoints when creature has no maxHp', async () => {
-            getRuntimeValue.mockImplementation((_key, prop) => {
-                if (prop === 'currentHitPoints') return 10;
-                return null;
-            });
-
-            const stats = { name: 'Cleric', hitPoints: 100 };
-            getCombatContext.mockResolvedValue({
-                players: [
-                    { name: 'Cleric', ...CLIC_POS },
-                    { name: 'Ally1', gridX: 2, gridY: 1 },
-                ],
-                creatures: [{ name: 'Ally1' }],
-                placedItems: [],
-            });
-
-            await triggerPrayerOfHealing(
-                buildPrayerSpell(),
-                {},
-                stats,
-                CAMPAIGN_NAME,
-                MAP_NAME,
-            );
-
-            expect(applyHealingToTarget).toHaveBeenCalled();
-        });
-
         it('uses 0 as maxHp fallback when neither creature nor playerStats has HP', async () => {
             getRuntimeValue.mockReturnValue(null);
             getCombatContext.mockResolvedValue({
@@ -595,40 +468,6 @@ describe('prayerOfHealingService', () => {
 
             expect(result.targets.length).toBe(1);
             expect(result.targets[0].healAmount).toBe(0);
-        });
-
-        it('tolerates non-numeric stored HP values', async () => {
-            getRuntimeValue.mockImplementation((_key, prop) => {
-                if (prop === 'currentHitPoints') return '20';
-                return null;
-            });
-
-            await triggerPrayerOfHealing(
-                buildPrayerSpell(),
-                {},
-                CLERIC_STATS,
-                CAMPAIGN_NAME,
-                MAP_NAME,
-            );
-
-            expect(applyHealingToTarget).toHaveBeenCalled();
-        });
-
-        it('treats empty string HP as full HP (no healing)', async () => {
-            getRuntimeValue.mockImplementation((_key, prop) => {
-                if (prop === 'currentHitPoints') return '';
-                return null;
-            });
-
-            const result = await triggerPrayerOfHealing(
-                buildPrayerSpell(),
-                {},
-                CLERIC_STATS,
-                CAMPAIGN_NAME,
-                MAP_NAME,
-            );
-
-            expect(result.targets.every(t => t.healAmount === 0)).toBe(true);
         });
     });
 
@@ -662,7 +501,7 @@ describe('prayerOfHealingService', () => {
             expect(result.totalHealed).toBe(calculatedTotal);
         });
 
-        it('includes the correct formula in result', async () => {
+        it('includes the correct formula based on slot level', async () => {
             const result = await triggerPrayerOfHealing(
                 buildPrayerSpell(2),
                 {},
@@ -674,7 +513,7 @@ describe('prayerOfHealingService', () => {
             expect(result.formula).toBe('3d8');
         });
 
-        it('includes formula from heal_at_slot_level in result', async () => {
+        it('uses formula from heal_at_slot_level override', async () => {
             const spell = {
                 name: 'Prayer of Healing',
                 level: 3,

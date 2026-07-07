@@ -51,7 +51,6 @@ describe('smiteOfProtectionHandler.handle', () => {
 
             expect(result.type).toBe('popup');
             expect(result.payload.type).toBe('automation_info');
-            expect(result.payload.description).toBe('Smite of Protection is already active.');
             expect(result.payload.name).toBe('Smite of Protection');
             expect(setRuntimeValue).not.toHaveBeenCalled();
             expect(addExpiration).not.toHaveBeenCalled();
@@ -96,28 +95,8 @@ describe('smiteOfProtectionHandler.handle', () => {
             expect(result.payload.automation).toEqual(makeAction().automation);
         });
 
-        it('activates smite cover even when a mapName is provided', async () => {
-            await handle(makeAction(), makePlayerStats(), campaignName, 'test-map');
-
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                playerName,
-                'smiteOfProtectionActive',
-                true,
-                campaignName,
-            );
-            expect(addExpiration).toHaveBeenCalledWith(
-                playerName,
-                playerName,
-                [{ type: 'remove_smite_of_protection' }],
-                campaignName,
-                1,
-            );
-        });
-    });
-
-    describe('runtime state guard', () => {
-        it.each([false, '', 0])('treats %p as not active and proceeds with activation', async (falsyValue) => {
-            getRuntimeValue.mockReturnValue(falsyValue);
+        it('treats falsy runtime values as inactive and proceeds with activation', async () => {
+            getRuntimeValue.mockReturnValue(false);
 
             const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 

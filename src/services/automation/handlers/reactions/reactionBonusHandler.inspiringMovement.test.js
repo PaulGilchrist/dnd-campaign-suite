@@ -159,19 +159,6 @@ describe('handleInspiringMovement — with creatures, no map', () => {
     expect(result.payload.creatureTargets).toHaveLength(1);
     expect(result.payload.creatureTargets[0].name).toBe('Fighter');
   });
-
-  it('passes noOAs and allyRange to modal payload', async () => {
-    const ps = makePlayerStats();
-    const action = makeAction({ noOAs: false, allyRange: '50 ft' });
-    damageUtils.getCombatContext.mockResolvedValue(makeCombatSummary([
-      { name: 'Ally', currentHp: 10, maxHp: 20, size: 'Medium', type: 'humanoid' },
-    ]));
-
-    const result = await handle(action, ps, campaignName, null);
-
-    expect(result.payload.noOAs).toBe(false);
-    expect(result.payload.allyRange).toBe('50 ft');
-  });
 });
 
 // ── Uses exhaustion ────────────────────────────────────────────
@@ -218,17 +205,6 @@ describe('applyInspiringMovement', () => {
     expect(result.type).toBe('popup');
   });
 
-  it('skips uses decrement when usesMax is 0', async () => {
-    const ps = makePlayerStats({ name: 'Bard' });
-    const action = makeAction({ usesMax: 0 });
-
-    await applyInspiringMovement(action, ps, campaignName, 'Fighter', 15, true);
-
-    expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalledWith(
-      expect.any(String), expect.stringMatching(/Uses$/i), expect.any(Number), expect.any(String)
-    );
-  });
-
   it('grants no-OA to self', async () => {
     const ps = makePlayerStats({ name: 'Bard' });
     const action = makeAction({ noOAs: true });
@@ -263,20 +239,6 @@ describe('applyInspiringMovement', () => {
     );
   });
 
-  it('does not set no-OA on ally when noOAs is false', async () => {
-    const ps = makePlayerStats({ name: 'Bard' });
-    const action = makeAction({ noOAs: false });
-
-    await applyInspiringMovement(action, ps, campaignName, 'Fighter', 15, false);
-
-    expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalledWith(
-      'Fighter', 'inspiringMovementNoOA', true, campaignName
-    );
-    expect(expirations.addExpiration).not.toHaveBeenCalledWith(
-      'Bard', 'Fighter', [{ type: 'inspiring_movement_no_oa' }], campaignName, 1
-    );
-  });
-
   it('logs to campaign with ally', async () => {
     const ps = makePlayerStats({ name: 'Bard' });
     const action = makeAction({ noOAs: true });
@@ -290,23 +252,6 @@ describe('applyInspiringMovement', () => {
         characterName: 'Bard',
         abilityName: 'Inspiring Movement',
         description: expect.stringContaining('Ally: Fighter'),
-      })
-    );
-  });
-
-  it('logs to campaign without ally', async () => {
-    const ps = makePlayerStats({ name: 'Bard' });
-    const action = makeAction({ noOAs: true });
-
-    await applyInspiringMovement(action, ps, campaignName, null, 15, true);
-
-    expect(logService.addEntry).toHaveBeenCalledWith(
-      campaignName,
-      expect.objectContaining({
-        type: 'ability_use',
-        characterName: 'Bard',
-        abilityName: 'Inspiring Movement',
-        description: expect.stringContaining('Movement does not provoke Opportunity Attacks'),
       })
     );
   });

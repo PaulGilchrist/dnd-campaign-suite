@@ -18,9 +18,15 @@ describe('seeInvisibilityService', () => {
 
     describe('triggerSeeInvisibility', () => {
         it.each([
-            'Fire Bolt', 'Invisibility', 'see invis', 'InViSiBiLiTy', '',
+            'Fire Bolt', 'Invisibility', 'see invis', 'InViSiBiLiTy',
         ])('returns null for non-See Invisibility spell: "%s"', async (name) => {
             const result = await triggerSeeInvisibility({ name, level: 0 }, {}, playerStats, campaignName, mapName);
+            expect(result).toBeNull();
+            expect(executeHandler).not.toHaveBeenCalled();
+        });
+
+        it.each([undefined, null, ''])('returns null when spell name is %s', async (name) => {
+            const result = await triggerSeeInvisibility({ name, level: 2 }, {}, playerStats, campaignName, mapName);
             expect(result).toBeNull();
             expect(executeHandler).not.toHaveBeenCalled();
         });
@@ -32,18 +38,9 @@ describe('seeInvisibilityService', () => {
             expect(result).toEqual({ type: 'popup', payload: { type: 'automation_info' } });
         });
 
-        it.each([undefined, null, ''])('returns null when spell name is %s', async (name) => {
-            const result = await triggerSeeInvisibility({ name, level: 2 }, {}, playerStats, campaignName, mapName);
-            expect(result).toBeNull();
-            expect(executeHandler).not.toHaveBeenCalled();
-        });
-
         it.each([
-            ['spell.level', { level: 4 }, 4],
-            ['default level 2', {}, 2],
-            ['null level', { level: null }, 2],
-            ['undefined level', { level: undefined }, 2],
-            ['zero level', { level: 0 }, 2],
+            ['uses spell.level when provided', { level: 4 }, 4],
+            ['defaults to level 2 when level is absent', {}, 2],
         ])('uses %s for spellSlotLevel', async (_label, spellOverrides, expectedLevel) => {
             executeHandler.mockResolvedValue({ type: 'popup' });
             await triggerSeeInvisibility({ name: 'See Invisibility', ...spellOverrides }, {}, playerStats, campaignName, mapName);

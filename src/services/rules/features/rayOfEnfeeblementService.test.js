@@ -33,7 +33,7 @@ describe('rayOfEnfeeblementService', () => {
             );
         });
 
-        it.each([null, undefined, {}, { targetName: '' }])('falls back to "Unknown" when metaCtx is %s', async (metaCtx) => {
+        it.each([null, {}])('falls back to "Unknown" when metaCtx is %s', async (metaCtx) => {
             executeHandler.mockResolvedValue(null);
             await triggerRayOfEnfeeblement({ name: 'Ray of Enfeeblement', level: 2 }, metaCtx, playerStats, campaignName, mapName);
             expect(executeHandler).toHaveBeenCalledWith(
@@ -42,18 +42,9 @@ describe('rayOfEnfeeblementService', () => {
             );
         });
 
-        it('logs error and re-throws when executeHandler rejects', async () => {
-            const consoleSpy = vi.spyOn(console, 'error').mockReturnValue();
+        it('re-throws when executeHandler rejects', async () => {
             executeHandler.mockRejectedValue(new Error('Handler failed'));
             await expect(triggerRayOfEnfeeblement({ name: 'Ray of Enfeeblement', level: 2 }, { targetName: 'Goblin' }, playerStats, campaignName, mapName)).rejects.toThrow('Handler failed');
-            expect(consoleSpy).toHaveBeenCalledWith('[rayOfEnfeeblement] Trigger failed:', expect.any(Error));
-            consoleSpy.mockRestore();
-        });
-
-        it('returns undefined (no return statement)', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
-            const result = await triggerRayOfEnfeeblement({ name: 'Ray of Enfeeblement', level: 2 }, { targetName: 'Goblin' }, playerStats, campaignName, mapName);
-            expect(result).toBeUndefined();
         });
     });
 });

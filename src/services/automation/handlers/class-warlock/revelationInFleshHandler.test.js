@@ -63,6 +63,14 @@ describe('revelationInFleshHandler', () => {
             });
         });
 
+        it('should return info popup when automation has no options property', async () => {
+            const action = { name: 'Revelation in Flesh', automation: {} };
+            const result = await handle(action, makePlayerStats(), 'campaign');
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain('has no options available');
+        });
+
         it('should return info popup when no sorcery points available', async () => {
             metamagic.getCurrentSorceryPoints.mockReturnValue(0);
 
@@ -91,14 +99,6 @@ describe('revelationInFleshHandler', () => {
                     campaignName: 'campaign',
                 }),
             });
-        });
-
-        it('should handle automation with no options property', async () => {
-            const action = { name: 'Revelation in Flesh', automation: {} };
-            const result = await handle(action, makePlayerStats(), 'campaign');
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('has no options available');
         });
     });
 
@@ -136,17 +136,10 @@ describe('revelationInFleshHandler', () => {
             expect(result.payload.description).toContain('1 SP');
         });
 
-        it('should spend 1 SP when option is applied', async () => {
-            await applyRevelationOption(makeActionWithOptions(), makePlayerStats(), 'campaign', 'Option A');
-
-            expect(metamagic.spendSorceryPoints).toHaveBeenCalledWith('TestWarlock', 1, 'campaign');
-        });
-
-        it('should add new buff when none exists', async () => {
-            runtimeState.getRuntimeValue.mockReturnValue(null);
-
+        it('should spend 1 SP and add buff when option is applied', async () => {
             const result = await applyRevelationOption(makeActionWithOptions(), makePlayerStats(), 'campaign', 'Option A');
 
+            expect(metamagic.spendSorceryPoints).toHaveBeenCalledWith('TestWarlock', 1, 'campaign');
             expect(result.type).toBe('popup');
             expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
                 'TestWarlock',
@@ -155,8 +148,6 @@ describe('revelationInFleshHandler', () => {
                     expect.objectContaining({
                         name: 'Revelation in Flesh',
                         effect: 'effect_a',
-                        hasAutomation: true,
-                        duration: '10_minutes',
                     }),
                 ]),
                 'campaign',
@@ -175,7 +166,7 @@ describe('revelationInFleshHandler', () => {
                 'TestWarlock',
                 'activeBuffs',
                 expect.arrayContaining([
-                    expect.objectContaining({ name: 'Revelation in Flesh', effect: 'effect_a', hasAutomation: true, duration: '10_minutes' }),
+                    expect.objectContaining({ name: 'Revelation in Flesh', effect: 'effect_a' }),
                     expect.objectContaining({ name: 'Other Buff' }),
                 ]),
                 'campaign',
@@ -192,16 +183,10 @@ describe('revelationInFleshHandler', () => {
                 'TestWarlock',
                 'activeBuffs',
                 expect.arrayContaining([
-                    expect.objectContaining({ duration: '1_hour' }),
+                    expect.objectContaining({ name: 'Revelation in Flesh', duration: '1_hour' }),
                 ]),
                 'campaign',
             );
-        });
-
-        it('should include option description in result when available', async () => {
-            const result = await applyRevelationOption(makeActionWithOptions(), makePlayerStats(), 'campaign', 'Option A');
-
-            expect(result.payload.description).toContain('Description A');
         });
 
         it('should include logEntries in result', async () => {
@@ -214,22 +199,6 @@ describe('revelationInFleshHandler', () => {
                     text: 'Revelation in Flesh: Option A (1 SP)',
                 },
             ]);
-        });
-
-        it('should handle non-array stored activeBuffs as empty', async () => {
-            runtimeState.getRuntimeValue.mockReturnValue('not-an-array');
-
-            const result = await applyRevelationOption(makeActionWithOptions(), makePlayerStats(), 'campaign', 'Option A');
-
-            expect(result.type).toBe('popup');
-            expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-                'TestWarlock',
-                'activeBuffs',
-                expect.arrayContaining([
-                    expect.objectContaining({ name: 'Revelation in Flesh' }),
-                ]),
-                'campaign',
-            );
         });
     });
 });

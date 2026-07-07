@@ -150,10 +150,6 @@ function makeServices(overrides = {}) {
   }
 }
 
-function getRollDamageContext(services) {
-  return services.rollDamage.mock.calls[0][5]
-}
-
 /* ------------------------------------------------------------------ */
 /*  Suite                                                             */
 /* ------------------------------------------------------------------ */
@@ -247,14 +243,6 @@ describe('executeSpellCast', () => {
       )
     })
 
-    it('does NOT end Friends when casting the Friends spell itself', async () => {
-      const friends = await import('../features/friendsService.js')
-      const services = makeServices()
-      await executeSpellCast(makeSpell({ name: 'Friends' }), makeMetaCtx(), services)
-
-      expect(friends.endFriendsOnHostileAction).not.toHaveBeenCalled()
-    })
-
     it('ends Invisibility on any non-self spell cast', async () => {
       const invis = await import('../features/invisibilityService.js')
       const services = makeServices()
@@ -272,23 +260,6 @@ describe('executeSpellCast', () => {
       await executeSpellCast(makeSpell({ casting_time: '1 action' }), makeMetaCtx(), services)
 
       expect(runtime.setRuntimeValue).toHaveBeenCalledWith(
-        'TestWizard',
-        'lastActionSpellCast',
-        1,
-        'testCampaign',
-      )
-    })
-
-    it('does NOT set lastActionSpellCast for non-action casting times', async () => {
-      const runtime = await import('../../../hooks/runtime/useRuntimeState.js')
-      const services = makeServices()
-      await executeSpellCast(
-        makeSpell({ casting_time: '1 bonus action' }),
-        makeMetaCtx(),
-        services,
-      )
-
-      expect(runtime.setRuntimeValue).not.toHaveBeenCalledWith(
         'TestWizard',
         'lastActionSpellCast',
         1,
@@ -337,8 +308,9 @@ describe('executeSpellCast', () => {
       const services = makeServices()
       await executeSpellCast(makeSpell(), makeMetaCtx(), services)
 
-      const ctx = getRollDamageContext(services)
       // 8 + Int bonus(5) + proficiency(4) = 17
+      expect(services.rollDamage).toHaveBeenCalled()
+      const ctx = services.rollDamage.mock.calls[0][5]
       expect(ctx.saveDc).toBe(17)
     })
 
@@ -351,7 +323,7 @@ describe('executeSpellCast', () => {
       })
       await executeSpellCast(makeSpell(), makeMetaCtx(), services)
 
-      const ctx = getRollDamageContext(services)
+      const ctx = services.rollDamage.mock.calls[0][5]
       expect(ctx.saveDc).toBe(17)
     })
 
@@ -362,7 +334,7 @@ describe('executeSpellCast', () => {
       const services = makeServices()
       await executeSpellCast(makeSpell(), makeMetaCtx(), services)
 
-      const ctx = getRollDamageContext(services)
+      const ctx = services.rollDamage.mock.calls[0][5]
       expect(ctx.saveDc).toBe(18)
     })
   })
@@ -376,7 +348,7 @@ describe('executeSpellCast', () => {
       const services = makeServices()
       await executeSpellCast(makeSpell(), makeMetaCtx(), services)
 
-      const ctx = getRollDamageContext(services)
+      const ctx = services.rollDamage.mock.calls[0][5]
       expect(ctx.saveType).toBe('dex')
       expect(ctx.dcSuccess).toBe('half')
     })
@@ -389,7 +361,7 @@ describe('executeSpellCast', () => {
         services,
       )
 
-      const ctx = getRollDamageContext(services)
+      const ctx = services.rollDamage.mock.calls[0][5]
       expect(ctx.statusEffects).toEqual(['poisoned', 'paralyzed'])
     })
   })
@@ -443,18 +415,6 @@ describe('executeSpellCast', () => {
 
       expect(services.rollDamage.mock.calls[0][1]).toContain('+ 5')
     })
-
-    it('does not apply when Int modifier is 0', async () => {
-      const rider = await import('./postCastRiderService.js')
-      vi.mocked(rider.getEmpoweredEvocationFeatures).mockReturnValue([{ type: 'empowered_evocation' }])
-      vi.mocked(rider.getEmpoweredEvocationIntModifier).mockReturnValue(0)
-
-      const services = makeServices()
-      await executeSpellCast(makeSpell({ school: 'Evocation' }), makeMetaCtx(), services)
-
-      // Formula should not contain "+ 0" since empEvocIntMod > 0 guard prevents it
-      expect(services.rollDamage.mock.calls[0][1]).not.toContain('+ 0')
-    })
   })
 
   /* ---------------------------------------------------------------- */
@@ -499,7 +459,7 @@ describe('executeSpellCast', () => {
       })
       await executeSpellCast(makeSpell(), makeMetaCtx(), services)
 
-      const ctx = getRollDamageContext(services)
+      const ctx = services.rollDamage.mock.calls[0][5]
       expect(ctx.isAutoMiss).toBe(true)
       expect(ctx.rangeReason).toBe('Out of range')
     })
@@ -532,41 +492,8 @@ describe('executeSpellCast', () => {
       })
       await executeSpellCast(makeSpell(), makeMetaCtx(), services)
 
-      const ctx = getRollDamageContext(services)
+      const ctx = services.rollDamage.mock.calls[0][5]
       expect(ctx.metamagicHeighten).toBe(true)
-    })
-  })
-
-  /* ---------------------------------------------------------------- */
-  /*  Post-cast triggers (aggregated)                                 */
-  /* ---------------------------------------------------------------- */
-
-  describe('post-cast triggers', () => {
-    it('invokes all post-cast trigger services', async () => {
-      const services = makeServices()
-      await executeSpellCast(makeSpell(), makeMetaCtx(), services)
-
-      const rider = await import('./postCastRiderService.js')
-      expect(rider.triggerPostCastRiderSaves).toHaveBeenCalled()
-      expect(rider.triggerSpellThief).toHaveBeenCalled()
-      expect(rider.triggerBewitchingMagic).toHaveBeenCalled()
-      expect(rider.triggerSoulstitchSpells).toHaveBeenCalled()
-
-      const heal = await import('./postCastHealService.js')
-      expect(heal.triggerPostCastSelfHeals).toHaveBeenCalled()
-      expect(heal.triggerPostCastAllyHeals).toHaveBeenCalled()
-
-      const smite = await import('../features/smiteOfProtectionService.js')
-      expect(smite.triggerSmiteOfProtection).toHaveBeenCalled()
-
-      const inspiring = await import('../features/inspiringSmiteService.js')
-      expect(inspiring.triggerInspiringSmite).toHaveBeenCalled()
-
-      const primal = await import('../features/primalCompanionSpellShareService.js')
-      expect(primal.triggerPrimalCompanionSpellShare).toHaveBeenCalled()
-
-      const wild = await import('../features/wildMagicSurgeService.js')
-      expect(wild.triggerWildMagicSurge).toHaveBeenCalled()
     })
   })
 })

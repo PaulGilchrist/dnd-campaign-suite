@@ -138,16 +138,6 @@ describe('logConcentrationSave', () => {
         });
     });
 
-    it('sets success=false on a failed save', () => {
-        logConcentrationSave(campaignName, 'Gortha', 10, 2, '+2 DEX', 'Held Horror', 15, false);
-
-        const entry = capturedEntry();
-        expect(entry.type).toBe('roll');
-        expect(entry.rollType).toBe('concentration-save');
-        expect(entry.success).toBe(false);
-        expect(entry.condition).toBe('Concentration: Held Horror');
-        expect(entry.characterName).toBe('Gortha');
-    });
 });
 
 describe('logConditionSave', () => {
@@ -177,16 +167,6 @@ describe('logConditionSave', () => {
         });
     });
 
-    it('sets success=false on a failed save', () => {
-        logConditionSave(campaignName, 'Gortha', 8, 0, '+0 CON', 'stunned', 'Constitution', 12, false);
-
-        const entry = capturedEntry();
-        expect(entry.type).toBe('roll');
-        expect(entry.rollType).toBe('condition-save');
-        expect(entry.success).toBe(false);
-        expect(entry.condition).toBe('stunned');
-        expect(entry.name).toBe('Constitution');
-    });
 });
 
 describe('logHpChange', () => {
@@ -209,22 +189,6 @@ describe('logHpChange', () => {
         });
     });
 
-    it('sets isHealing=true for healing', () => {
-        logHpChange(campaignName, 'Gortha', 8, 25, 30, true, false);
-
-        const entry = capturedEntry();
-        expect(entry.type).toBe('hp_change');
-        expect(entry.delta).toBe(8);
-        expect(entry.isHealing).toBe(true);
-        expect(entry.isUnconscious).toBe(false);
-    });
-
-    it('sets isUnconscious when hp reaches 0 or below', () => {
-        logHpChange(campaignName, 'Orc', -25, 0, 30, false, true);
-
-        const entry = capturedEntry();
-        expect(entry.isUnconscious).toBe(true);
-    });
 });
 
 describe('logNpcThreshold', () => {

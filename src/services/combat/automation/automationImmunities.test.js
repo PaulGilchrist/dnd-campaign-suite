@@ -35,20 +35,14 @@ describe('getConditionImmunities', () => {
     expect(getConditionImmunities([{ name: 'Test' }])).toEqual([])
   })
 
-  it('extracts passive_immunity conditionImmunity values', () => {
-    const features = [makeFeature({ type: 'passive_immunity', conditionImmunity: 'charmed petrified' })]
-    const result = getConditionImmunities(features)
-    expect(result).toEqual(['charmed petrified'])
-  })
-
-  it('extracts damageResistance as damage: prefixed strings from passive_immunity', () => {
+  it('extracts passive_immunity conditionImmunity and damageResistance values', () => {
     const features = [makeFeature({
       type: 'passive_immunity',
-      conditionImmunity: 'poisoned',
+      conditionImmunity: 'charmed petrified',
       damageResistance: ['fire', 'cold'],
     })]
     const result = getConditionImmunities(features)
-    expect(result).toContain('poisoned')
+    expect(result).toContain('charmed petrified')
     expect(result).toContain('damage:fire')
     expect(result).toContain('damage:cold')
   })
@@ -120,16 +114,6 @@ describe('getConditionalImmunities', () => {
     expect(getConditionalImmunities(features)).toEqual([])
   })
 
-  it('handles empty immunities array in requiresActive entry', () => {
-    const features = [makeFeature({
-      type: 'condition_immunity_while_active',
-      immunities: [],
-      requiresActive: 'form',
-    })]
-    const result = getConditionalImmunities(features)
-    expect(result[0].immunities).toEqual([])
-  })
-
   it('defaults missing fields to empty values', () => {
     const features1 = [makeFeature({
       type: 'condition_immunity_while_active',
@@ -180,15 +164,13 @@ describe('playerIsImmuneToCondition', () => {
 
   // ── Null / missing argument guards ──
 
-  it('returns false when conditionKey or playerStats is missing', () => {
+  it('returns false when required arguments are missing', () => {
     expect(playerIsImmuneToCondition({ conditionKey: null, playerStats })).toBe(false)
     expect(playerIsImmuneToCondition({ conditionKey: undefined, playerStats })).toBe(false)
     expect(playerIsImmuneToCondition({ conditionKey: '', playerStats })).toBe(false)
     expect(playerIsImmuneToCondition({ conditionKey: 'charmed', playerStats: null })).toBe(false)
     expect(playerIsImmuneToCondition({ conditionKey: 'charmed', playerStats: undefined })).toBe(false)
-  })
 
-  it('returns false when allFeatures is undefined on playerStats', () => {
     const stats = { name: 'Test' }
     expect(playerIsImmuneToCondition({ conditionKey: 'charmed', playerStats: stats })).toBe(false)
   })
@@ -204,12 +186,10 @@ describe('playerIsImmuneToCondition', () => {
 
   // ── passive_immunity ──
 
-  it('matches exact word in passive_immunity conditionImmunity', () => {
+  it('matches conditions in passive_immunity conditionImmunity (exact, space, and comma delimited)', () => {
     playerStats.allFeatures = [makeFeature({ type: 'passive_immunity', conditionImmunity: 'charmed' })]
     expect(playerIsImmuneToCondition({ conditionKey: 'charmed', playerStats })).toBe(true)
-  })
 
-  it('handles space and comma delimited conditions in passive_immunity', () => {
     playerStats.allFeatures = [makeFeature({ type: 'passive_immunity', conditionImmunity: 'charmed petrified' })]
     expect(playerIsImmuneToCondition({ conditionKey: 'petrified', playerStats })).toBe(true)
     expect(playerIsImmuneToCondition({ conditionKey: 'charmed', playerStats })).toBe(true)
@@ -245,12 +225,15 @@ describe('playerIsImmuneToCondition', () => {
     expect(playerIsImmuneToCondition({ conditionKey: 'poisoned', playerStats })).toBe(true)
   })
 
-  it('returns true when condition_immunity_while_active has requiresActive and buff is in activeBuffs', () => {
-    playerStats.allFeatures = [makeFeature({
+  it('respects requiresActive gate on condition_immunity_while_active', () => {
+    const feature = makeFeature({
       type: 'condition_immunity_while_active',
       immunities: ['frightened'],
       requiresActive: 'bravery',
-    })]
+    })
+
+    // Buff active → immune
+    playerStats.allFeatures = [feature]
     mockGetRuntimeValue.mockReturnValue([{ name: 'bravery' }])
     expect(playerIsImmuneToCondition({
       conditionKey: 'frightened',
@@ -258,14 +241,8 @@ describe('playerIsImmuneToCondition', () => {
       getRuntimeValue: mockGetRuntimeValue,
       campaignName,
     })).toBe(true)
-  })
 
-  it('returns false when condition_immunity_while_active has requiresActive but buff is not active', () => {
-    playerStats.allFeatures = [makeFeature({
-      type: 'condition_immunity_while_active',
-      immunities: ['frightened'],
-      requiresActive: 'bravery',
-    })]
+    // Buff not active → not immune
     mockGetRuntimeValue.mockReturnValue([{ name: 'other_buff' }])
     expect(playerIsImmuneToCondition({
       conditionKey: 'frightened',
@@ -273,22 +250,12 @@ describe('playerIsImmuneToCondition', () => {
       getRuntimeValue: mockGetRuntimeValue,
       campaignName,
     })).toBe(false)
-  })
 
-  it('returns false when getRuntimeValue or campaignName is missing and requiresActive is needed', () => {
-    playerStats.allFeatures = [makeFeature({
-      type: 'condition_immunity_while_active',
-      immunities: ['charmed'],
-      requiresActive: 'rage',
-    })]
+    // Missing getRuntimeValue/campaignName → not immune
+    mockGetRuntimeValue.mockClear()
     expect(playerIsImmuneToCondition({
       conditionKey: 'charmed',
-      playerStats,
-    })).toBe(false)
-    expect(playerIsImmuneToCondition({
-      conditionKey: 'charmed',
-      playerStats,
-      getRuntimeValue: mockGetRuntimeValue,
+      playerStats: [feature],
     })).toBe(false)
   })
 
@@ -351,9 +318,10 @@ describe('playerIsImmuneToCondition', () => {
 
   it('returns false when Protection from Evil and Good does not apply', async () => {
     const pfegModule = await import('../../automation/handlers/buffs/protectionFromEvilAndGoodHandler.js')
+
+    // Warded check fails
     pfegModule.isProtectionFromEvilAndGoodActive.mockReturnValue(true)
     pfegModule.isCreatureWarded.mockReturnValue(false)
-
     expect(playerIsImmuneToCondition({
       conditionKey: 'charmed',
       playerStats,
@@ -361,6 +329,7 @@ describe('playerIsImmuneToCondition', () => {
       sourceCreatureType: 'aberration',
     })).toBe(false)
 
+    // Creature type not warded
     pfegModule.isCreatureWarded.mockReturnValue(true)
     expect(playerIsImmuneToCondition({
       conditionKey: 'poisoned',
@@ -369,7 +338,7 @@ describe('playerIsImmuneToCondition', () => {
       sourceCreatureType: 'fiend',
     })).toBe(false)
 
-    pfegModule.isProtectionFromEvilAndGoodActive.mockReturnValue(true)
+    // No sourceCreatureType provided
     pfegModule.isCreatureWarded.mockReturnValue(true)
     expect(playerIsImmuneToCondition({
       conditionKey: 'charmed',

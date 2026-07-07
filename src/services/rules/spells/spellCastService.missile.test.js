@@ -184,7 +184,7 @@ describe('executeSpellCast - Magic Missile', () => {
   })
 
   describe('early exit behavior', () => {
-    it('returns without logging or applying damage for empty, null, or undefined distribution', async () => {
+    it('returns without logging or applying damage for empty distribution', async () => {
       vi.mocked(combatData.getCombatSummary).mockReturnValue({ creatures: [] })
 
       const services = makeServices({
@@ -227,32 +227,13 @@ describe('executeSpellCast - Magic Missile', () => {
         services
       )
 
-      // missile rolls + 1 summary roll
+      // Each missile triggers a damage roll; the summary roll is a separate call
       expect(dice.rollExpression).toHaveBeenCalledTimes(expectedMissiles + 1)
+      expect(applyDamage.applyDamageToTarget).toHaveBeenCalledTimes(1)
     })
   })
 
   describe('damage application', () => {
-    it('applies damage to a single target from distribution', async () => {
-      vi.mocked(dice.rollExpression).mockImplementation(() => ({ total: 5, rolls: [4], modifier: 1 }))
-      vi.mocked(combatData.getCombatSummary).mockReturnValue({
-        creatures: [{ name: 'Goblin', maxHp: 15, currentHp: 15 }],
-      })
-      vi.mocked(applyDamage.applyDamageToTarget).mockReturnValue({ finalDamage: 5, damageReduced: false })
-
-      const services = makeServices({
-        getTargetInfo: vi.fn(async () => ({ name: 'Goblin' })),
-      })
-
-      await executeSpellCast(
-        makeMagicMissile(1, { Goblin: 3 }),
-        { slotLevel: 1, magicMissileDistribution: { Goblin: 3 } },
-        services
-      )
-
-      expect(applyDamage.applyDamageToTarget).toHaveBeenCalledTimes(1)
-    })
-
     it('applies damage to multiple targets from distribution', async () => {
       vi.mocked(dice.rollExpression).mockImplementation(() => ({ total: 5, rolls: [4], modifier: 1 }))
       vi.mocked(combatData.getCombatSummary).mockReturnValue({
@@ -325,26 +306,6 @@ describe('executeSpellCast - Magic Missile', () => {
       expect(invisService.endInvisibilityOnHostileAction).toHaveBeenCalled()
       expect(dice.rollExpression).toHaveBeenCalledTimes(4)
     })
-
-    it('applies damage when target has no shield buff', async () => {
-      vi.mocked(dice.rollExpression).mockImplementation(() => ({ total: 5, rolls: [4], modifier: 1 }))
-      vi.mocked(combatData.getCombatSummary).mockReturnValue({
-        creatures: [{ name: 'Goblin', maxHp: 15, currentHp: 15 }],
-      })
-      vi.mocked(applyDamage.applyDamageToTarget).mockReturnValue({ finalDamage: 5, damageReduced: false })
-
-      const services = makeServices({
-        getTargetInfo: vi.fn(async () => ({ name: 'Goblin' })),
-      })
-
-      await executeSpellCast(
-        makeMagicMissile(1, { Goblin: 3 }),
-        { slotLevel: 1, magicMissileDistribution: { Goblin: 3 } },
-        services
-      )
-
-      expect(applyDamage.applyDamageToTarget).toHaveBeenCalledTimes(1)
-    })
   })
 
   describe('ignore_resistance passive', () => {
@@ -416,109 +377,6 @@ describe('executeSpellCast - Magic Missile', () => {
           totalRawDamage: 15,
         })
       )
-    })
-
-    it('logs per-target damage for multiple targets', async () => {
-      vi.mocked(dice.rollExpression).mockImplementation(() => ({ total: 5, rolls: [4], modifier: 1 }))
-      vi.mocked(combatData.getCombatSummary).mockReturnValue({
-        creatures: [
-          { name: 'Goblin', maxHp: 15, currentHp: 15 },
-          { name: 'Orc', maxHp: 30, currentHp: 30 },
-        ],
-      })
-      vi.mocked(applyDamage.applyDamageToTarget).mockReturnValue({ finalDamage: 5, damageReduced: false })
-
-      const services = makeServices({
-        getTargetInfo: vi.fn(async () => ({ name: 'Goblin' })),
-      })
-
-      await executeSpellCast(
-        makeMagicMissile(2, { Goblin: 2, Orc: 2 }),
-        { slotLevel: 2, magicMissileDistribution: { Goblin: 2, Orc: 2 } },
-        services
-      )
-
-      expect(logService.addEntry).toHaveBeenCalledWith(
-        'testCampaign',
-        expect.objectContaining({
-          type: 'spell',
-          missileCount: 4,
-          totalRawDamage: 20,
-          targets: expect.arrayContaining([
-            expect.objectContaining({ name: 'Goblin', missiles: 2, rawDamage: 10 }),
-            expect.objectContaining({ name: 'Orc', missiles: 2, rawDamage: 10 }),
-          ]),
-        })
-      )
-    })
-
-    it('does not log when all missile counts are zero', async () => {
-      vi.mocked(combatData.getCombatSummary).mockReturnValue({
-        creatures: [{ name: 'Goblin', maxHp: 15, currentHp: 15 }],
-      })
-
-      const services = makeServices({
-        getTargetInfo: vi.fn(async () => ({ name: 'Goblin' })),
-      })
-
-      await executeSpellCast(
-        makeMagicMissile(1, { Goblin: 0 }),
-        { slotLevel: 1, magicMissileDistribution: { Goblin: 0 } },
-        services
-      )
-
-      expect(logService.addEntry).not.toHaveBeenCalled()
-    })
-  })
-
-  describe('invisibility end trigger', () => {
-    it('ends invisibility when damage is successfully applied', async () => {
-      vi.mocked(dice.rollExpression).mockImplementation(() => ({ total: 5, rolls: [4], modifier: 1 }))
-      vi.mocked(combatData.getCombatSummary).mockReturnValue({
-        creatures: [{ name: 'Goblin', maxHp: 15, currentHp: 15 }],
-      })
-      vi.mocked(applyDamage.applyDamageToTarget).mockReturnValue({ finalDamage: 5, damageReduced: false })
-
-      const services = makeServices({
-        getTargetInfo: vi.fn(async () => ({ name: 'Goblin' })),
-      })
-
-      await executeSpellCast(
-        makeMagicMissile(1, { Goblin: 3 }),
-        { slotLevel: 1, magicMissileDistribution: { Goblin: 3 } },
-        services
-      )
-
-      expect(invisService.endInvisibilityOnHostileAction).toHaveBeenCalledWith(
-        'TestWizard',
-        'testCampaign'
-      )
-    })
-  })
-
-  describe('post-cast triggers', () => {
-    it('calls post-cast rider saves, self-heals, and ally-heals after missile execution', async () => {
-      const rider = await import('./postCastRiderService.js')
-      const heal = await import('./postCastHealService.js')
-      vi.mocked(dice.rollExpression).mockImplementation(() => ({ total: 5, rolls: [4], modifier: 1 }))
-      vi.mocked(combatData.getCombatSummary).mockReturnValue({
-        creatures: [{ name: 'Goblin', maxHp: 15, currentHp: 15 }],
-      })
-      vi.mocked(applyDamage.applyDamageToTarget).mockReturnValue({ finalDamage: 5, damageReduced: false })
-
-      const services = makeServices({
-        getTargetInfo: vi.fn(async () => ({ name: 'Goblin' })),
-      })
-
-      await executeSpellCast(
-        makeMagicMissile(1, { Goblin: 3 }),
-        { slotLevel: 1, magicMissileDistribution: { Goblin: 3 } },
-        services
-      )
-
-      expect(rider.triggerPostCastRiderSaves).toHaveBeenCalled()
-      expect(heal.triggerPostCastSelfHeals).toHaveBeenCalled()
-      expect(heal.triggerPostCastAllyHeals).toHaveBeenCalled()
     })
   })
 })

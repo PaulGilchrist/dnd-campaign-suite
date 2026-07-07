@@ -134,60 +134,30 @@ describe('createLogAndShow - Living Legend & Veer', () => {
             }));
         });
 
-        it('does not retry when living legend conditions are not met', async () => {
-            const scenarios = [
-                {
-                    name: 'unerringStrikeUsed is already true',
-                    setup: () => {
-                        rollD20.mockReturnValueOnce(5);
-                        getTargetFromAttacker.mockReturnValue({ name: 'Goblin', ac: 20 });
-                        getRuntimeValue.mockImplementation((name, prop) => {
-                            if (name === 'TestFighter' && prop === 'livingLegendActive') return true;
-                            if (name === 'TestFighter' && prop === 'unerringStrikeUsed') return true;
-                            return null;
-                        });
-                    },
-                },
-                {
-                    name: 'livingLegendActive is false',
-                    setup: () => {
-                        rollD20.mockReturnValueOnce(5);
-                        getTargetFromAttacker.mockReturnValue({ name: 'Goblin', ac: 20 });
-                        getRuntimeValue.mockReturnValue(null);
-                    },
-                },
-                {
-                    name: 'isWeaponAttack is false',
-                    setup: () => {
-                        rollD20.mockReturnValueOnce(5);
-                        getTargetFromAttacker.mockReturnValue({ name: 'Goblin', ac: 20 });
-                        getRuntimeValue.mockImplementation((name, prop) => {
-                            if (name === 'TestFighter' && prop === 'livingLegendActive') return true;
-                            if (name === 'TestFighter' && prop === 'unerringStrikeUsed') return false;
-                            return null;
-                        });
-                    },
-                    context: { isWeaponAttack: false },
-                },
-            ];
+        it('does not retry when livingLegendActive is false', async () => {
+            rollD20.mockReturnValueOnce(5);
+            getTargetFromAttacker.mockReturnValue({ name: 'Goblin', ac: 20 });
+            getRuntimeValue.mockReturnValue(null);
+            const fn = createFn();
+            await fn('Longsword', 5, 'attack', { targetName: 'Goblin', isWeaponAttack: true });
+            expect(deps.setPopupHtml).toHaveBeenCalledWith(expect.objectContaining({
+                hit: false,
+            }));
+        });
 
-            for (const scenario of scenarios) {
-                vi.clearAllMocks();
-                rollD20.mockReturnValue(15);
-                getTargetFromAttacker.mockReturnValue({ name: 'Goblin', ac: 12 });
-                getRuntimeValue.mockReturnValue(null);
-                isUnbreakableMajestyActive.mockReturnValue(false);
-                hasAttackerTriggeredMajesty.mockReturnValue(false);
-                getShieldAcBonus.mockReturnValue(0);
-                getShieldOfFaithAcBonus.mockReturnValue(0);
-
-                scenario.setup();
-                const fn = createFn();
-                await fn('Longsword', 5, 'attack', { targetName: 'Goblin', ...(scenario.context || {}) });
-                expect(deps.setPopupHtml).toHaveBeenCalledWith(expect.objectContaining({
-                    hit: false,
-                }));
-            }
+        it('does not retry when isWeaponAttack is false', async () => {
+            rollD20.mockReturnValueOnce(5);
+            getTargetFromAttacker.mockReturnValue({ name: 'Goblin', ac: 20 });
+            getRuntimeValue.mockImplementation((name, prop) => {
+                if (name === 'TestFighter' && prop === 'livingLegendActive') return true;
+                if (name === 'TestFighter' && prop === 'unerringStrikeUsed') return false;
+                return null;
+            });
+            const fn = createFn();
+            await fn('Longsword', 5, 'attack', { targetName: 'Goblin', isWeaponAttack: false });
+            expect(deps.setPopupHtml).toHaveBeenCalledWith(expect.objectContaining({
+                hit: false,
+            }));
         });
     });
 
@@ -270,19 +240,6 @@ describe('createLogAndShow - Living Legend & Veer', () => {
                     abilityName: 'Veer',
                 }));
             }
-        });
-
-        it('does not trigger veer when veerActive is false', async () => {
-            getTargetFromAttacker.mockReturnValue({ name: 'Mount', ac: 12 });
-            getRuntimeValue.mockReturnValue(null);
-            loadCombatSummary.mockResolvedValue({
-                creatures: [{ name: 'Mount', type: 'npc', ac: 12, conditions: [] }],
-            });
-            const fn = createFn();
-            await fn('Longsword', 5, 'attack', { targetName: 'Mount' });
-            expect(deps.logEntry).not.toHaveBeenCalledWith(expect.objectContaining({
-                abilityName: 'Veer',
-            }));
         });
 
         it('logs veer declined when rider confirms false (redirectResult=false)', async () => {

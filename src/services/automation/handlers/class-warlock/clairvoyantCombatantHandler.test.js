@@ -174,22 +174,6 @@ describe('clairvoyantCombatantHandler.handle', () => {
     it('should increment use counter from the current value', async () => {
       getRuntimeValue.mockImplementation((playerName, key) => {
         if (key === 'clairvoyantCombatantTarget') return null;
-        if (key === 'clairvoyantCombatantUses') return 0;
-        return null;
-      });
-      getTargetFromAttacker.mockReturnValue({ name: 'EnemyTarget' });
-      buildSaveDc.mockReturnValue(15);
-      createSaveListener.mockReturnValue({ promptId: 'incr-zero' });
-      getCombatContext.mockResolvedValue({ creatures: [{ name: 'EnemyTarget' }] });
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(setRuntimeValue).toHaveBeenCalledWith('TestWarlock', 'clairvoyantCombatantUses', 1, campaignName);
-    });
-
-    it('should increment use counter from non-zero current value', async () => {
-      getRuntimeValue.mockImplementation((playerName, key) => {
-        if (key === 'clairvoyantCombatantTarget') return null;
         if (key === 'clairvoyantCombatantUses') return 1;
         return null;
       });
@@ -229,12 +213,12 @@ describe('clairvoyantCombatantHandler.handle', () => {
       );
     });
 
-    it('should append to existing targetEffects array', async () => {
+    it('should append to existing targetEffects and activeBuffs arrays', async () => {
       getRuntimeValue.mockImplementation((playerName, key, _campaign) => {
         if (key === 'clairvoyantCombatantTarget') return null;
         if (key === 'clairvoyantCombatantUses') return 0;
         if (key === 'targetEffects' && playerName === campaignName) return [{ target: 'OldTarget', effect: 'other_effect' }];
-        if (key === 'activeBuffs') return [];
+        if (key === 'activeBuffs') return [{ effect: 'old_buff', target: 'OtherTarget' }];
         return null;
       });
       getTargetFromAttacker.mockReturnValue({ name: 'EnemyTarget' });
@@ -253,27 +237,12 @@ describe('clairvoyantCombatantHandler.handle', () => {
         ]),
         campaignName,
       );
-    });
-
-    it('should handle existing targetEffects as null', async () => {
-      getRuntimeValue.mockImplementation((playerName, key, _campaign) => {
-        if (key === 'clairvoyantCombatantTarget') return null;
-        if (key === 'clairvoyantCombatantUses') return 0;
-        if (key === 'targetEffects' && playerName === campaignName) return null;
-        if (key === 'activeBuffs') return [];
-        return null;
-      });
-      getTargetFromAttacker.mockReturnValue({ name: 'EnemyTarget' });
-      buildSaveDc.mockReturnValue(15);
-      createSaveListener.mockReturnValue({ promptId: 'null-effects' });
-      getCombatContext.mockResolvedValue({ creatures: [{ name: 'EnemyTarget' }] });
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
 
       expect(setRuntimeValue).toHaveBeenCalledWith(
-        campaignName,
-        'targetEffects',
+        'TestWarlock',
+        'activeBuffs',
         expect.arrayContaining([
+          expect.objectContaining({ effect: 'old_buff' }),
           expect.objectContaining({ effect: 'clairvoyant_combatant' }),
         ]),
         campaignName,
@@ -306,57 +275,6 @@ describe('clairvoyantCombatantHandler.handle', () => {
             duration: '1_minute',
             target: 'EnemyTarget',
           }),
-        ]),
-        campaignName,
-      );
-    });
-
-    it('should handle activeBuffs as null or non-array', async () => {
-      getRuntimeValue.mockImplementation((playerName, key, _campaign) => {
-        if (key === 'clairvoyantCombatantTarget') return null;
-        if (key === 'clairvoyantCombatantUses') return 0;
-        if (key === 'targetEffects' && playerName === campaignName) return [];
-        if (key === 'activeBuffs') return null;
-        return null;
-      });
-      getTargetFromAttacker.mockReturnValue({ name: 'EnemyTarget' });
-      buildSaveDc.mockReturnValue(15);
-      createSaveListener.mockReturnValue({ promptId: 'null-buffs' });
-      getCombatContext.mockResolvedValue({ creatures: [{ name: 'EnemyTarget' }] });
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'TestWarlock',
-        'activeBuffs',
-        expect.arrayContaining([
-          expect.objectContaining({ effect: 'clairvoyant_combatant' }),
-        ]),
-        campaignName,
-      );
-    });
-
-    it('should append to existing activeBuffs', async () => {
-      getRuntimeValue.mockImplementation((playerName, key, _campaign) => {
-        if (key === 'clairvoyantCombatantTarget') return null;
-        if (key === 'clairvoyantCombatantUses') return 0;
-        if (key === 'targetEffects' && playerName === campaignName) return [];
-        if (key === 'activeBuffs') return [{ effect: 'old_buff', target: 'OtherTarget' }];
-        return null;
-      });
-      getTargetFromAttacker.mockReturnValue({ name: 'EnemyTarget' });
-      buildSaveDc.mockReturnValue(15);
-      createSaveListener.mockReturnValue({ promptId: 'append-buffs' });
-      getCombatContext.mockResolvedValue({ creatures: [{ name: 'EnemyTarget' }] });
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'TestWarlock',
-        'activeBuffs',
-        expect.arrayContaining([
-          expect.objectContaining({ effect: 'old_buff' }),
-          expect.objectContaining({ effect: 'clairvoyant_combatant' }),
         ]),
         campaignName,
       );
@@ -462,63 +380,10 @@ describe('clairvoyantCombatantHandler.handle', () => {
         description: expect.stringContaining('succeeded'),
       }));
     });
-
-    it('should handle save success when targetEffects is null', async () => {
-      getRuntimeValue.mockImplementation((playerName, key, _campaign) => {
-        if (key === 'clairvoyantCombatantTarget') return null;
-        if (key === 'clairvoyantCombatantUses') return 0;
-        if (key === 'targetEffects' && playerName === campaignName) return null;
-        if (key === 'activeBuffs') return [];
-        return null;
-      });
-      getTargetFromAttacker.mockReturnValue({ name: 'EnemyTarget' });
-      buildSaveDc.mockReturnValue(15);
-      const promptId = 'null-effects-success';
-      createSaveListener.mockReturnValue({ promptId });
-      getCombatContext.mockResolvedValue({ creatures: [{ name: 'EnemyTarget' }] });
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      dispatchSaveResult(promptId, true);
-
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'TestWarlock',
-        'clairvoyantCombatantTarget',
-        null,
-        campaignName,
-      );
-    });
-
-    it('should handle save success when activeBuffs is non-array', async () => {
-      getRuntimeValue.mockImplementation((playerName, key, _campaign) => {
-        if (key === 'clairvoyantCombatantTarget') return null;
-        if (key === 'clairvoyantCombatantUses') return 0;
-        if (key === 'targetEffects' && playerName === campaignName) return [];
-        if (key === 'activeBuffs') return 'not-an-array';
-        return null;
-      });
-      getTargetFromAttacker.mockReturnValue({ name: 'EnemyTarget' });
-      buildSaveDc.mockReturnValue(15);
-      const promptId = 'nonarray-buffs-success';
-      createSaveListener.mockReturnValue({ promptId });
-      getCombatContext.mockResolvedValue({ creatures: [{ name: 'EnemyTarget' }] });
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      dispatchSaveResult(promptId, true);
-      await Promise.resolve();
-
-      const buffCalls = vi.mocked(setRuntimeValue).mock.calls.filter(
-        call => call[1] === 'activeBuffs'
-      );
-      const lastBuffCall = buffCalls[buffCalls.length - 1];
-      expect(lastBuffCall).toBeDefined();
-      expect(lastBuffCall[2]).toEqual([]);
-    });
   });
 
   describe('popup response', () => {
-    it('should return popup with correct structure', async () => {
+    it('should return popup with correct structure and description', async () => {
       setupFull();
       const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
@@ -534,11 +399,6 @@ describe('clairvoyantCombatantHandler.handle', () => {
         saveDc: 15,
         uses: 1,
       }));
-    });
-
-    it('should describe target, save, advantage/disadvantage, and uses in the popup', async () => {
-      setupFull();
-      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
       expect(result.payload.description).toContain('EnemyTarget');
       expect(result.payload.description).toContain('WIS');

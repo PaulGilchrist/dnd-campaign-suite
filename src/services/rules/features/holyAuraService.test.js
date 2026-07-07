@@ -49,56 +49,21 @@ describe('holyAuraService', () => {
         });
 
         describe('action passed to executeHandler', () => {
-            it('includes automation type holy_aura with default auraRange 30 and defaults', async () => {
+            it.each([
+                ['defaults', {}, '1_minute', '1 action'],
+                ['custom duration and casting_time', { duration: '10_minutes', casting_time: '1 reaction' }, '10_minutes', '1 reaction'],
+            ])('includes automation type holy_aura with auraRange 30 and %s', async (_label, spellOverrides, expectedDuration, expectedCastingTime) => {
                 executeHandler.mockResolvedValue({ success: true });
-                await callTrigger();
-                expect(executeHandler).toHaveBeenCalledWith(
-                    expect.objectContaining({
-                        automation: expect.objectContaining({
-                            type: 'holy_aura',
-                            auraRange: 30,
-                            duration: '1_minute',
-                            casting_time: '1 action',
-                        }),
-                    }),
-                    basePlayerStats, campaignName, mapName,
-                );
-            });
-
-            it('uses custom duration and casting_time when provided', async () => {
-                executeHandler.mockResolvedValue({ success: true });
-                await callTrigger({ ...baseSpell, duration: '10_minutes', casting_time: '1 reaction' });
-                expect(executeHandler).toHaveBeenCalledWith(
-                    expect.objectContaining({
-                        automation: expect.objectContaining({
-                            duration: '10_minutes',
-                            casting_time: '1 reaction',
-                        }),
-                    }),
-                    basePlayerStats, campaignName, mapName,
-                );
-            });
-
-            it('passes the full spell object into the action', async () => {
-                executeHandler.mockResolvedValue({ success: true });
-                const spell = { name: 'Holy Aura', level: 9, school: 'Abjuration' };
-                await callTrigger(spell);
-                expect(executeHandler).toHaveBeenCalledWith(
-                    expect.objectContaining({ spell }),
-                    basePlayerStats, campaignName, mapName,
-                );
-            });
-
-            it('handles empty spell object with defaults', async () => {
-                executeHandler.mockResolvedValue({ success: true });
-                await callTrigger({}, {});
+                await callTrigger({ ...baseSpell, ...spellOverrides });
                 expect(executeHandler).toHaveBeenCalledWith(
                     expect.objectContaining({
                         name: 'Holy Aura',
+                        spell: expect.objectContaining({ name: 'Holy Aura', level: 9, ...spellOverrides }),
                         automation: expect.objectContaining({
-                            duration: '1_minute',
-                            casting_time: '1 action',
+                            type: 'holy_aura',
                             auraRange: 30,
+                            duration: expectedDuration,
+                            casting_time: expectedCastingTime,
                         }),
                     }),
                     basePlayerStats, campaignName, mapName,

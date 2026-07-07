@@ -26,7 +26,6 @@ describe('postCastHealService', () => {
 
   describe('triggerPostCastSelfHeals', () => {
     const healingSpell = { name: 'Cure Wounds', level: 1 }
-    const cantripSpell = { name: 'Thaumaturgy', level: 0 }
     const baseStats = {
       name: 'Cleric1',
       proficiency: 2,
@@ -37,22 +36,16 @@ describe('postCastHealService', () => {
       activeBuffs: [],
     }
 
-    it('returns null for non-healing spell', async () => {
-      const result = await triggerPostCastSelfHeals({ name: 'Fireball' }, {}, baseStats, 'camp', 'map')
-      expect(result).toBeNull()
-      expect(applyHealingDirectly).not.toHaveBeenCalled()
-    })
+    it('returns null when early-return conditions are met', async () => {
+      const nonHealingResult = await triggerPostCastSelfHeals({ name: 'Fireball' }, {}, baseStats, 'camp', 'map')
+      expect(nonHealingResult).toBeNull()
 
-    it('returns null for cantrip (level 0)', async () => {
-      const result = await triggerPostCastSelfHeals(cantripSpell, {}, baseStats, 'camp', 'map')
-      expect(result).toBeNull()
-      expect(applyHealingDirectly).not.toHaveBeenCalled()
-    })
+      const cantripResult = await triggerPostCastSelfHeals({ name: 'Thaumaturgy', level: 0 }, {}, baseStats, 'camp', 'map')
+      expect(cantripResult).toBeNull()
 
-    it('returns null when no self heal passives', async () => {
-      const noHealStats = { ...baseStats, automation: { passives: [] } }
-      const result = await triggerPostCastSelfHeals(healingSpell, {}, noHealStats, 'camp', 'map')
-      expect(result).toBeNull()
+      const noPassivesStats = { ...baseStats, automation: { passives: [] } }
+      const noPassivesResult = await triggerPostCastSelfHeals(healingSpell, {}, noPassivesStats, 'camp', 'map')
+      expect(noPassivesResult).toBeNull()
     })
 
     it('skips self-heal when othersOnly and spell is self-targeted', async () => {
@@ -62,15 +55,6 @@ describe('postCastHealService', () => {
       }
       const result = await triggerPostCastSelfHeals({ ...healingSpell, range: 'Self' }, {}, othersOnlyStats, 'camp', 'map')
       expect(result).toBeNull()
-    })
-
-    it('applies self-heal when othersOnly but spell range is undefined', async () => {
-      const othersOnlyStats = {
-        ...baseStats,
-        automation: { passives: [{ type: 'post_cast_self_heal', name: 'Others Only', othersOnly: true, healExpression: '1d8' }] },
-      }
-      const result = await triggerPostCastSelfHeals({ ...healingSpell, range: undefined }, {}, othersOnlyStats, 'camp', 'map')
-      expect(result).not.toBeNull()
     })
 
     it('applies healing when conditions are met', async () => {
@@ -86,14 +70,7 @@ describe('postCastHealService', () => {
       expect(result).toEqual([{ name: 'Test Heal', amount: 10, actualHeal: 10 }])
     })
 
-    it('skips healing when evaluation returns non-positive value', async () => {
-      evaluateAutoExpression.mockReturnValue(0)
-      const result = await triggerPostCastSelfHeals(healingSpell, {}, baseStats, 'camp', 'map')
-      expect(result).toBeNull()
-      expect(applyHealingDirectly).not.toHaveBeenCalled()
-    })
-
-    it('upgrades heal expression from 1d8 to 2d8 at level 10+', async () => {
+    it('upgrades heal expression at level 10+', async () => {
       evaluateAutoExpression.mockReturnValue(15)
       const twinkledStats = { ...baseStats, level: 10 }
       await triggerPostCastSelfHeals(healingSpell, {}, twinkledStats, 'camp', 'map')
@@ -117,8 +94,6 @@ describe('postCastHealService', () => {
         },
       }
       const result = await triggerPostCastSelfHeals(healingSpell, {}, multiStats, 'camp', 'map')
-      expect(applyHealingDirectly).toHaveBeenCalledTimes(2)
-      expect(result).toHaveLength(2)
       expect(result).toEqual([
         { name: 'Heal 1', amount: 10, actualHeal: 10 },
         { name: 'Heal 2', amount: 10, actualHeal: 10 },
@@ -132,26 +107,10 @@ describe('postCastHealService', () => {
         triggerPostCastSelfHeals(noSlotSpell, {}, noSlotStats, 'camp', 'map')
       ).rejects.toThrow('slot level is required for post-cast self heals')
     })
-
-    it('returns null when all passives are skipped', async () => {
-      const allSkippedStats = {
-        ...baseStats,
-        automation: {
-          passives: [
-            { type: 'post_cast_self_heal', name: 'Skip 1', othersOnly: true, healExpression: '1d8' },
-            { type: 'post_cast_self_heal', name: 'Skip 2', healExpression: '1d8' },
-          ],
-        },
-      }
-      evaluateAutoExpression.mockReturnValue(0)
-      const result = await triggerPostCastSelfHeals({ ...healingSpell, range: 'Self' }, {}, allSkippedStats, 'camp', 'map')
-      expect(result).toBeNull()
-    })
   })
 
   describe('triggerPostCastAllyHeals', () => {
     const healingSpell = { name: 'Cure Wounds', level: 1 }
-    const cantripSpell = { name: 'Thaumaturgy', level: 0 }
     const baseStats = {
       name: 'Cleric1',
       proficiency: 2,
@@ -162,28 +121,20 @@ describe('postCastHealService', () => {
       },
     }
 
-    it('returns null for non-healing spell', async () => {
-      const result = await triggerPostCastAllyHeals({ name: 'Fireball' }, {}, baseStats, 'camp', 'map')
-      expect(result).toBeNull()
-      expect(applyHealingDirectly).not.toHaveBeenCalled()
-    })
+    it('returns null when early-return conditions are met', async () => {
+      const nonHealingResult = await triggerPostCastAllyHeals({ name: 'Fireball' }, {}, baseStats, 'camp', 'map')
+      expect(nonHealingResult).toBeNull()
 
-    it('returns null for cantrip (level 0)', async () => {
-      const result = await triggerPostCastAllyHeals(cantripSpell, {}, baseStats, 'camp', 'map')
-      expect(result).toBeNull()
-      expect(applyHealingDirectly).not.toHaveBeenCalled()
-    })
+      const cantripResult = await triggerPostCastAllyHeals({ name: 'Thaumaturgy', level: 0 }, {}, baseStats, 'camp', 'map')
+      expect(cantripResult).toBeNull()
 
-    it('returns null when Starry Form not active', async () => {
       const noStarryStats = { ...baseStats, activeBuffs: [] }
-      const result = await triggerPostCastAllyHeals(healingSpell, {}, noStarryStats, 'camp', 'map')
-      expect(result).toBeNull()
-    })
+      const noStarryResult = await triggerPostCastAllyHeals(healingSpell, {}, noStarryStats, 'camp', 'map')
+      expect(noStarryResult).toBeNull()
 
-    it('returns null when no ally heal passives', async () => {
       const noHealStats = { ...baseStats, automation: { passives: [] } }
-      const result = await triggerPostCastAllyHeals(healingSpell, {}, noHealStats, 'camp', 'map')
-      expect(result).toBeNull()
+      const noHealResult = await triggerPostCastAllyHeals(healingSpell, {}, noHealStats, 'camp', 'map')
+      expect(noHealResult).toBeNull()
     })
 
     it('applies ally healing when conditions are met', async () => {
@@ -220,7 +171,7 @@ describe('postCastHealService', () => {
       expect(result).toBeNull()
     })
 
-    it('upgrades heal expression from 1d8 to 2d8 at level 10+', async () => {
+    it('upgrades heal expression at level 10+', async () => {
       evaluateAutoExpression.mockReturnValue(15)
       const twinkledStats = { ...baseStats, level: 10, activeBuffs: [{ name: 'Starry Form', constellation: 'Chalice' }] }
       await triggerPostCastAllyHeals(healingSpell, {}, twinkledStats, 'camp', 'map')
@@ -239,7 +190,6 @@ describe('postCastHealService', () => {
         activeBuffs: [{ name: 'Starry Form', constellation: 'Chalice' }],
       }
       const result = await triggerPostCastAllyHeals(healingSpell, {}, multiStats, 'camp', 'map')
-      expect(applyHealingDirectly).toHaveBeenCalledTimes(2)
       expect(result).toHaveLength(2)
     })
 

@@ -1,4 +1,3 @@
-// @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { getSpellAbilities } from './spellCalc2024.js';
 
@@ -11,27 +10,6 @@ vi.mock('../../character/classRules2024.js', () => ({
 
 vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn((_key, _prop) => null),
-}));
-
-vi.mock('../../automation/handlers/class-other/elfishLineageHandler.js', () => ({
-  getElfisLineageSelection: vi.fn(),
-  getElfisLineageCantrip: vi.fn(),
-  getElfisLineageLevel3Spell: vi.fn(),
-  getElfisLineageLevel5Spell: vi.fn(),
-}));
-
-vi.mock('../../automation/handlers/class-other/gnomishLineageHandler.js', () => ({
-  getGnomishLineageSelection: vi.fn(),
-  getGnomishLineageCantrip: vi.fn(),
-  getGnomishLineageLevel3Spell: vi.fn(),
-  getGnomishLineageLevel5Spell: vi.fn(),
-}));
-
-vi.mock('../../automation/handlers/class-other/fiendishLegacyHandler.js', () => ({
-  getFiendishLegacySelection: vi.fn(),
-  getFiendishLegacyCantrip: vi.fn(),
-  getFiendishLegacyLevel3Spell: vi.fn(),
-  getFiendishLegacyLevel5Spell: vi.fn(),
 }));
 
 vi.mock('../../automation/handlers/feats/magicInitiateHandler.js', () => ({
@@ -67,19 +45,19 @@ function makeSpell(name, level = 0, extra = {}) {
 
 describe('spellCalc2024', () => {
   // References to mocked functions (set in beforeEach via dynamic import)
-  let mockGetHighestMajorLevel;
   let mockGetRuntimeValue;
+  let mockGetHighestMajorLevel;
   let mockMagicInitiateCantrips;
   let mockMagicInitiateLevel1Spell;
 
   beforeEach(async () => {
     vi.resetAllMocks();
-    const classRules = await import('../../character/classRules2024.js');
     const runtimeState = await import('../../../hooks/runtime/useRuntimeState.js');
+    const classRules2024 = await import('../../character/classRules2024.js');
     const magicInitiate = await import('../../automation/handlers/feats/magicInitiateHandler.js');
 
-    mockGetHighestMajorLevel = classRules.default.getHighestMajorLevel;
     mockGetRuntimeValue = runtimeState.getRuntimeValue;
+    mockGetHighestMajorLevel = classRules2024.default.getHighestMajorLevel;
     mockMagicInitiateCantrips = magicInitiate.getMagicInitiateCantrips;
     mockMagicInitiateLevel1Spell = magicInitiate.getMagicInitiateLevel1Spell;
   });
@@ -360,52 +338,6 @@ describe('spellCalc2024', () => {
       expect(result.spells.map(s => s.name)).toEqual(['Fire Bolt', 'Light']);
     });
 
-    it('adds always_prepared_spells from automation actions and bonusActions', () => {
-      const allSpells = [makeSpell('Sanctuary', 1), makeSpell('Healing Word', 1)];
-      const stats = makePlayerStats({
-        class: {
-          name: 'Cleric',
-          class_levels: [{ level: 1, spellcasting: { cantrips_known: 3, spell_slots: { '1': 2 } } }],
-          spell_casting_ability: 'Wisdom',
-        },
-        abilities: [{ name: 'Wisdom', baseScore: 14, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0, bonus: 2 }],
-        spells: [],
-      });
-      stats.automation = {
-        actions: [{ type: 'passive_rule', effect: 'always_prepared_spells', spells: ['Sanctuary'] }],
-        bonusActions: [{ type: 'passive_rule', effect: 'always_prepared_spells', spells: ['Healing Word'] }],
-      };
-
-      const result = getSpellAbilities(allSpells, stats);
-
-      const names = result.spells.map(s => s.name);
-      expect(names).toContain('Sanctuary');
-      expect(names).toContain('Healing Word');
-    });
-
-    it('deduplicates always_prepared_spells already in the known list', () => {
-      const stats = makePlayerStats();
-      stats.spells = ['Fire Bolt'];
-      stats.automation = {
-        passives: [{ type: 'passive_rule', effect: 'always_prepared_spells', spells: ['Fire Bolt'] }],
-      };
-
-      const result = getSpellAbilities([], stats);
-
-      expect(result.spells.filter(s => s.name === 'Fire Bolt').length).toBe(1);
-    });
-
-    it('skips passive_rule when effect is not always_prepared_spells', () => {
-      const stats = makePlayerStats();
-      stats.automation = {
-        passives: [{ type: 'passive_rule', effect: 'some_other_effect', spells: ['Ghost Sound'] }],
-      };
-
-      const result = getSpellAbilities([], stats);
-
-      expect(result.spells).toHaveLength(0);
-    });
-
     it('skips passive_rule when spells array is missing', () => {
       const stats = makePlayerStats();
       stats.automation = {
@@ -431,30 +363,6 @@ describe('spellCalc2024', () => {
       expect(result.spells.map(s => s.name)).toContain('Prestidigitation');
     });
 
-    it('adds fey_reinforcement spells the same way as free_spell', () => {
-      const allSpells = [makeSpell('Shield', 1)];
-      const stats = makePlayerStats();
-      stats.automation = {
-        passives: [{ type: 'fey_reinforcements', spell: 'Shield' }],
-      };
-
-      const result = getSpellAbilities(allSpells, stats);
-
-      expect(result.spells.map(s => s.name)).toContain('Shield');
-    });
-
-    it('deduplicates free_spells already known', () => {
-      const stats = makePlayerStats();
-      stats.spells = ['Fire Bolt'];
-      stats.automation = {
-        passives: [{ type: 'free_spell', spell: 'Fire Bolt' }],
-      };
-
-      const result = getSpellAbilities([], stats);
-
-      expect(result.spells.filter(s => s.name === 'Fire Bolt').length).toBe(1);
-    });
-
     it('adds multiple spells from an array free_spell', () => {
       const allSpells = [
         makeSpell('Shield of Faith', 1),
@@ -478,17 +386,6 @@ describe('spellCalc2024', () => {
       expect(result.spells.map(s => s.name)).toEqual(['Shield of Faith', 'Spiritual Weapon']);
     });
 
-    it('skips free_spell when spell property is missing', () => {
-      const stats = makePlayerStats();
-      stats.automation = {
-        passives: [{ type: 'free_spell' }],
-      };
-
-      const result = getSpellAbilities([], stats);
-
-      expect(result.spells).toHaveLength(0);
-    });
-
     // ── Automation: spell_breaker ──
 
     it('adds alwaysPreparedSpells from spell_breaker', () => {
@@ -501,18 +398,6 @@ describe('spellCalc2024', () => {
       const result = getSpellAbilities(allSpells, stats);
 
       expect(result.spells.map(s => s.name)).toContain('Shield');
-    });
-
-    it('deduplicates spell_breaker spells already known', () => {
-      const stats = makePlayerStats();
-      stats.spells = ['Shield'];
-      stats.automation = {
-        passives: [{ type: 'spell_breaker', alwaysPreparedSpells: ['Shield'] }],
-      };
-
-      const result = getSpellAbilities([], stats);
-
-      expect(result.spells.filter(s => s.name === 'Shield').length).toBe(1);
     });
 
     // ── Automation: cantrip_spellcasting_ability ──

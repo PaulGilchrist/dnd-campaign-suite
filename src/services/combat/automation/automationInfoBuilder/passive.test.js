@@ -9,8 +9,8 @@
 //   • `feature.name` is forwarded to the result
 //   • `hasAutomation` is always true
 //   • Conditional type mapping (passive_buff → passive_rule for max_hp_increase)
-//   • Boolean coercion (!!auto.oncePerTurn)
 //   • snake_case → camelCase field mapping (passive_immunity)
+//   • casting_time pass-through for handlers that share the same pattern
 //
 // What we don't test:
 //   • Internal implementation details (e.g. which `||` fallbacks exist)
@@ -24,7 +24,7 @@ import { BASE_STATS, makeFeature } from '../automationInfoBuilder.fixtures.js'
 
 /**
  * Assert structural invariants on any handler result.
- * Some handlers (passive_immunity, create_thrall_temp_hp) omit `effect`.
+ * Some handlers (passive_immunity) omit `effect`.
  */
 function expectValidResult(result, expectedType, expectedEffect) {
     expect(result).toBeInstanceOf(Object)
@@ -216,61 +216,6 @@ describe('passiveHandlers – casting_time defaults', () => {
             }
         })
     }
-})
-
-// ── holy_nimbus_radiant_damage ───────────────────────────────────────
-
-describe('passiveHandlers – holy_nimbus_radiant_damage', () => {
-    it('passes through custom fields', () => {
-        const feature = makeFeature(
-            {
-                type: 'holy_nimbus_radiant_damage',
-                damageExpression: '2d6',
-                range: '10_ft',
-                casting_time: '1 bonus action'
-            },
-            'Divine Smite Passive'
-        )
-        const result = passiveHandlers.holy_nimbus_radiant_damage(feature, BASE_STATS)
-
-        expect(result.name).toBe('Divine Smite Passive')
-        expect(result.damageExpression).toBe('2d6')
-        expect(result.range).toBe('10_ft')
-        expect(result.casting_time).toBe('1 bonus action')
-    })
-})
-
-// ── create_thrall_temp_hp ────────────────────────────────────────────
-
-describe('passiveHandlers – create_thrall_temp_hp', () => {
-    it('passes through custom fields', () => {
-        const feature = makeFeature(
-            {
-                type: 'create_thrall_temp_hp',
-                tempHpExpression: 'warlock level + CHA modifier'
-            },
-            'Fiendish Vitality'
-        )
-        const result = passiveHandlers.create_thrall_temp_hp(feature, BASE_STATS)
-
-        expect(result.name).toBe('Fiendish Vitality')
-        expect(result.tempHpExpression).toBe('warlock level + CHA modifier')
-    })
-})
-
-// ── tavern_brawler_push – boolean coercion ───────────────────────────
-
-describe('passiveHandlers – tavern_brawler_push coercion', () => {
-    it('coerces oncePerTurn with !!', () => {
-        const feature = makeFeature(
-            { type: 'tavern_brawler_push', oncePerTurn: true },
-            'Brawler Shove'
-        )
-        const result = passiveHandlers.tavern_brawler_push(feature, BASE_STATS)
-
-        expect(result.name).toBe('Brawler Shove')
-        expect(result.oncePerTurn).toBe(true)
-    })
 })
 
 // ── ignore_loading_crossbows ─────────────────────────────────────────

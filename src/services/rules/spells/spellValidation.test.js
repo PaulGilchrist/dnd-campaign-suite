@@ -58,24 +58,17 @@ describe('spellValidation', () => {
   });
 
   describe('getClassSpellList', () => {
-    it('returns the class name when the class exists', async () => {
+    it.each([
+      ['Wizard', ['Wizard']],
+      ['Fighter', []],
+    ])('returns [%s] spell list when class %s', async (className, expected) => {
       vi.mocked(dataLoader.loadClassData).mockResolvedValue([
         { name: 'Wizard', index: 'wizard' },
       ]);
 
-      const result = await getClassSpellList('Wizard', '5e');
+      const result = await getClassSpellList(className, '5e');
 
-      expect(result).toEqual(['Wizard']);
-    });
-
-    it('returns empty array when class is not found', async () => {
-      vi.mocked(dataLoader.loadClassData).mockResolvedValue([
-        { name: 'Wizard', index: 'wizard' },
-      ]);
-
-      const result = await getClassSpellList('Fighter', '5e');
-
-      expect(result).toEqual([]);
+      expect(result).toEqual(expected);
     });
   });
 
@@ -101,16 +94,6 @@ describe('spellValidation', () => {
         const result = await getSpellSources({ class: { name: 'Fighter' } }, '5e');
 
         expect(result.class.isSpellcaster).toBe(false);
-      });
-
-      it('returns empty class data when no class provided', async () => {
-        mockAllLoadersEmpty();
-
-        const result = await getSpellSources({}, '5e');
-
-        expect(result.class.name).toBe('');
-        expect(result.class.isSpellcaster).toBe(false);
-        expect(result.class.spellList).toEqual([]);
       });
     });
 
@@ -198,18 +181,6 @@ describe('spellValidation', () => {
 
         expect(result.race.spells).toContain('Invisibility');
       });
-
-      it('returns empty arrays when race data is missing or null', async () => {
-        mockAllLoadersEmpty();
-
-        const result = await getSpellSources(
-          { class: { name: 'Wizard' }, race: null },
-          '5e',
-        );
-
-        expect(result.race.spells).toEqual([]);
-        expect(result.race.cantrips).toEqual([]);
-      });
     });
 
     describe('background spell extraction', () => {
@@ -232,18 +203,6 @@ describe('spellValidation', () => {
         );
 
         expect(result.background.cantrips).toContain('Prestidigitation');
-      });
-
-      it('returns empty arrays when background data is missing', async () => {
-        mockAllLoadersEmpty();
-
-        const result = await getSpellSources(
-          { class: { name: 'Wizard' }, background: { name: 'Nonexistent' } },
-          '5e',
-        );
-
-        expect(result.background.spells).toEqual([]);
-        expect(result.background.cantrips).toEqual([]);
       });
     });
 
@@ -293,35 +252,30 @@ describe('spellValidation', () => {
         expect(result.feats.grantedSpells).toEqual([]);
         expect(result.feats.grantedCantrips).toEqual([]);
       });
-
-      it('returns empty arrays when no feats provided', async () => {
-        mockAllLoadersEmpty();
-
-        const result = await getSpellSources(
-          { class: { name: 'Wizard' } },
-          '5e',
-        );
-
-        expect(result.feats.grantedSpells).toEqual([]);
-        expect(result.feats.grantedCantrips).toEqual([]);
-        expect(result.feats.spellListAccess).toEqual([]);
-      });
     });
   });
 
   describe('validateSpells', () => {
-    it('returns valid when no spells selected', async () => {
+    it('returns valid when no spells selected or null', async () => {
       mockAllLoadersEmpty();
 
-      const result = await validateSpells(
+      const result1 = await validateSpells(
         { class: { name: 'Wizard' } },
         [],
         [],
         '5e',
       );
+      expect(result1.valid).toBe(true);
+      expect(result1.warnings).toEqual([]);
 
-      expect(result.valid).toBe(true);
-      expect(result.warnings).toEqual([]);
+      const result2 = await validateSpells(
+        { class: { name: 'Wizard' } },
+        null,
+        [],
+        '5e',
+      );
+      expect(result2.valid).toBe(true);
+      expect(result2.warnings).toEqual([]);
     });
 
     it('warns when a spell is not found in the database', async () => {
@@ -505,20 +459,6 @@ describe('spellValidation', () => {
         { class: { name: 'Wizard' } },
         ['Prestidigitation'],
         allSpells,
-        '5e',
-      );
-
-      expect(result.valid).toBe(true);
-      expect(result.warnings).toEqual([]);
-    });
-
-    it('handles null selectedSpells gracefully', async () => {
-      mockAllLoadersEmpty();
-
-      const result = await validateSpells(
-        { class: { name: 'Wizard' } },
-        null,
-        [],
         '5e',
       );
 

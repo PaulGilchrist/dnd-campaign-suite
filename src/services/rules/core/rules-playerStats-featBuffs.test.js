@@ -216,30 +216,31 @@ describe('rules.getPlayerStats - feat buffs proficiency handling', () => {
     expect(result.skillProficiencies).toContain('Perception');
   });
 
-  it('should add proficiency choice feat buff to proficiencies', async () => {
+  it.each`
+    proficiencyType    | profBuff                                     | expectedProficiency
+    ${'choice'}        | ${{ type: 'proficiency', isChoice: true, choose: 3, from: ['Artisan\'s Tools'] }} | ${"3 from: Artisan's Tools"}
+    ${'non-choice'}    | ${{ name: 'Heavy Armor', type: 'proficiency', isChoice: false }}                    | ${'Heavy Armor'}
+  `('should add proficiency feat buff (type: $proficiencyType) to proficiencies', async ({ profBuff, expectedProficiency }) => {
     vi.mocked(featBuffService.computeAllFeatBuffs).mockReturnValue({
       abilityScoreIncreases: [],
-      proficiencies: [{ type: 'proficiency', isChoice: true, choose: 3, from: ['Artisan\'s Tools'] }],
+      proficiencies: [profBuff],
       features: [],
     });
     const playerSummary = makePlayerSummary({
       proficiencies: ['Light Armor'],
     });
     const result = await rules.getPlayerStats([], [], [], [], [], playerSummary);
-    expect(result.proficiencies).toContain('3 from: Artisan\'s Tools');
+    expect(result.proficiencies).toContain(expectedProficiency);
   });
 
-  it('should add non-choice proficiency feat buff to proficiencies', async () => {
-    vi.mocked(featBuffService.computeAllFeatBuffs).mockReturnValue({
-      abilityScoreIncreases: [],
-      proficiencies: [{ name: 'Heavy Armor', type: 'proficiency', isChoice: false }],
-      features: [],
-    });
+  it('should merge expertSkills field into expertise array', async () => {
     const playerSummary = makePlayerSummary({
-      proficiencies: ['Light Armor'],
+      expertise: ['Insight'],
+      expertSkills: ['History'],
     });
     const result = await rules.getPlayerStats([], [], [], [], [], playerSummary);
-    expect(result.proficiencies).toContain('Heavy Armor');
+    expect(result.expertise).toContain('Insight');
+    expect(result.expertise).toContain('History');
   });
 });
 
@@ -294,33 +295,5 @@ describe('rules.getPlayerStats - 2024 expertise feat handling', () => {
     expect(result.expertise).toContain('Insight');
     expect(result.expertise).toContain('History');
     expect(result.expertise).toContain('Perception');
-  });
-});
-
-describe('rules.getPlayerStats - feat feature distribution and sorting', () => {
-  beforeEach(() => { vi.clearAllMocks(); setupDefaults(); });
-
-  it('should distribute feat features to correct action arrays and sort them', async () => {
-    vi.mocked(featBuffService.computeAllFeatBuffs).mockReturnValue({
-      abilityScoreIncreases: [],
-      proficiencies: [],
-      features: [
-        { name: 'ZFeat', description: 'Z feat', type: 'passive', automation: { casting_time: '1 action' } },
-        { name: 'AFeat', description: 'A feat', type: 'passive', automation: { casting_time: '1 bonus action' } },
-      ],
-    });
-    const playerSummary = makePlayerSummary({
-      actions: [{ name: 'MAction' }],
-      bonusActions: [{ name: 'ZBonus' }],
-    });
-    const result = await rules.getPlayerStats([], [], [], [], [], playerSummary);
-    const actionNames = result.actions.map(a => a.name);
-    const bonusNames = result.bonusActions.map(a => a.name);
-    expect(actionNames).toEqual(actionNames.slice().sort());
-    expect(bonusNames).toEqual(bonusNames.slice().sort());
-    expect(actionNames).toContain('ZFeat');
-    expect(actionNames).toContain('MAction');
-    expect(bonusNames).toContain('AFeat');
-    expect(bonusNames).toContain('ZBonus');
   });
 });

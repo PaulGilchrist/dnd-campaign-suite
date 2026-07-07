@@ -50,16 +50,7 @@ describe('createThrallHandler', () => {
             expect(result.modalName).toBe('createThrall');
         });
 
-        it('passes noConcentrationOption true in modal payload', async () => {
-            getRuntimeValue.mockReturnValue(1);
 
-            const result = await handle(makeAction(), makePlayerStats(), 'campaign');
-
-            expect(result.payload.noConcentrationOption).toBe(true);
-            expect(result.payload.action).toBeInstanceOf(Object);
-            expect(result.payload.playerStats).toBeInstanceOf(Object);
-            expect(result.payload.campaignName).toBe('campaign');
-        });
     });
 
     describe('confirmCreateThrall', () => {

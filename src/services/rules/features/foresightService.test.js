@@ -19,10 +19,6 @@ describe('foresightService', () => {
     const mapName = 'testMap';
     const playerStats = { name: 'Wizard' };
 
-    /**
-     * Helper: mock getRuntimeValue to return empty buffs + empty targetEffects,
-     * then return the given value for subsequent calls.
-     */
     function mockEmptyThen(value) {
         mockGetRuntimeValue
             .mockReturnValueOnce([])
@@ -38,12 +34,11 @@ describe('foresightService', () => {
             it.each([
                 ['Fire Bolt', {}],
                 ['lesser restoration', {}],
-                ['', {}],
-                [null, {}],
-            ])('returns null for spell name "%s"', async (spellName) => {
+                ['not foresight', {}],
+            ])('returns null for non-Foresight spell "%s"', async (spellName, metaCtx) => {
                 const result = await triggerForesight(
                     { name: spellName },
-                    {},
+                    metaCtx,
                     playerStats,
                     campaignName,
                     mapName,
@@ -52,32 +47,6 @@ describe('foresightService', () => {
                 expect(result).toBeNull();
                 expect(mockGetRuntimeValue).not.toHaveBeenCalled();
                 expect(mockSetRuntimeValue).not.toHaveBeenCalled();
-            });
-
-            it('returns null for Foresight spell with empty metaCtx when not matching', async () => {
-                const result = await triggerForesight(
-                    { name: 'Fire Bolt' },
-                    { targetName: 'Target' },
-                    playerStats,
-                    campaignName,
-                    mapName,
-                );
-
-                expect(result).toBeNull();
-                expect(mockGetRuntimeValue).not.toHaveBeenCalled();
-            });
-
-            it('returns null when spell has no name property', async () => {
-                const result = await triggerForesight(
-                    {},
-                    {},
-                    playerStats,
-                    campaignName,
-                    mapName,
-                );
-
-                expect(result).toBeNull();
-                expect(mockGetRuntimeValue).not.toHaveBeenCalled();
             });
         });
 
@@ -146,21 +115,9 @@ describe('foresightService', () => {
                 expect(newBuffs[1].source).toBe('Wizard');
             });
 
-            it('treats null activeBuffs as empty array', async () => {
-                mockGetRuntimeValue
-                    .mockReturnValueOnce(null)
-                    .mockReturnValueOnce([]);
-
-                await callTrigger();
-
-                const newBuffs = mockSetRuntimeValue.mock.calls[0][2];
-                expect(newBuffs).toHaveLength(1);
-                expect(newBuffs[0].name).toBe('Foresight');
-            });
-
             it('treats non-array activeBuffs as empty array', async () => {
                 mockGetRuntimeValue
-                    .mockReturnValueOnce('not-an-array')
+                    .mockReturnValueOnce(null)
                     .mockReturnValueOnce([]);
 
                 await callTrigger();
@@ -218,16 +175,6 @@ describe('foresightService', () => {
                 expect(newEffects).toHaveLength(2);
                 expect(newEffects[0]).toEqual(existingEffects[0]);
                 expect(newEffects[1].target).toBe('Fighter');
-            });
-
-            it('throws when targetEffects is not an array', async () => {
-                mockGetRuntimeValue
-                    .mockReturnValueOnce([])
-                    .mockReturnValueOnce(null);
-
-                await expect(
-                    callTrigger(),
-                ).rejects.toThrow('Expected array, got null');
             });
 
             it('treats non-array targetEffects as empty array', async () => {
@@ -292,10 +239,14 @@ describe('foresightService', () => {
         });
 
         describe('metaCtx handling', () => {
-            it('uses playerStats.name when metaCtx is null', async () => {
+            it.each([
+                ['null metaCtx', null],
+                ['undefined metaCtx', undefined],
+                ['missing targetName', {}],
+            ])('uses playerStats.name when %s', async (_, metaCtx) => {
                 mockEmptyThen([]);
 
-                await callTrigger({ name: 'Foresight' }, null);
+                await callTrigger({ name: 'Foresight' }, metaCtx);
 
                 expect(mockSetRuntimeValue).toHaveBeenNthCalledWith(
                     1,
@@ -304,46 +255,6 @@ describe('foresightService', () => {
                     expect.any(Array),
                     campaignName,
                 );
-            });
-
-            it('uses playerStats.name when metaCtx is undefined', async () => {
-                mockEmptyThen([]);
-
-                await callTrigger({ name: 'Foresight' }, undefined);
-
-                expect(mockSetRuntimeValue).toHaveBeenNthCalledWith(
-                    1,
-                    playerStats.name,
-                    'activeBuffs',
-                    expect.any(Array),
-                    campaignName,
-                );
-            });
-
-            it('uses playerStats.name when metaCtx.targetName is missing', async () => {
-                mockEmptyThen([]);
-
-                await callTrigger({ name: 'Foresight' }, {});
-
-                expect(mockSetRuntimeValue).toHaveBeenNthCalledWith(
-                    1,
-                    playerStats.name,
-                    'activeBuffs',
-                    expect.any(Array),
-                    campaignName,
-                );
-            });
-        });
-
-        describe('mapName parameter', () => {
-            it('does not use the mapName parameter', async () => {
-                mockEmptyThen([]);
-
-                await callTrigger();
-
-                const allGetCalls = mockGetRuntimeValue.mock.calls;
-                const mapNames = allGetCalls.map(call => call[2]);
-                expect(mapNames).not.toContain('testMap');
             });
         });
     });

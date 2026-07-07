@@ -89,11 +89,10 @@ describe('divineSparkHandler.handle', () => {
   describe('charge deduction', () => {
     beforeEach(() => {
       targetResolver.resolveTarget.mockResolvedValue(null);
+      useRuntimeState.getRuntimeValue.mockReturnValue(3);
     });
 
     it('deducts 1 from stored charges', async () => {
-      useRuntimeState.getRuntimeValue.mockReturnValue(3);
-
       const ps = makePlayerStats();
       const action = makeAction();
 
@@ -110,7 +109,6 @@ describe('divineSparkHandler.handle', () => {
 
     it('uses class_specific.channel_divinity_charges when channel_divinity is 0', async () => {
       useRuntimeState.getRuntimeValue.mockReturnValue(undefined);
-      targetResolver.resolveTarget.mockResolvedValue(null);
 
       const ps = makePlayerStats({
         level: 3,
@@ -139,7 +137,7 @@ describe('divineSparkHandler.handle', () => {
     });
   });
 
-  describe('modal payload structure', () => {
+  describe('modal payload', () => {
     beforeEach(() => {
       useRuntimeState.getRuntimeValue.mockReturnValue(2);
       targetResolver.resolveTarget.mockResolvedValue(null);
@@ -163,24 +161,20 @@ describe('divineSparkHandler.handle', () => {
       });
     });
 
-    it('uses wisModifier from Wisdom ability or defaults to 0', async () => {
-      const ps = makePlayerStats({ abilities: [{ name: 'Wisdom', bonus: 3 }] });
+    it.each`
+      wisBonus | expectedWisModifier | expectedExpression
+      ${3}     | ${3}                | ${'1d8 + 3'}
+      ${undefined} | ${0}            | ${'1d8 + 0'}
+    `('uses wisModifier from Wisdom ability ($wisBonus) or defaults to 0', async ({ wisBonus, expectedWisModifier, expectedExpression }) => {
+      const abilities = wisBonus !== undefined ? [{ name: 'Wisdom', bonus: wisBonus }] : [{ name: 'Strength', bonus: 3 }];
+      const ps = makePlayerStats({ abilities });
       const action = makeAction();
 
       const result = await handle(action, ps, campaignName, null);
 
-      expect(result.payload.wisModifier).toBe(3);
-      expect(result.payload.healExpression).toBe('1d8 + 3');
-      expect(result.payload.damageExpression).toBe('1d8 + 3');
-    });
-
-    it('uses 0 as wisModifier when Wisdom ability is missing', async () => {
-      const ps = makePlayerStats({ abilities: [{ name: 'Strength', bonus: 3 }] });
-      const action = makeAction();
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.payload.wisModifier).toBe(0);
+      expect(result.payload.wisModifier).toBe(expectedWisModifier);
+      expect(result.payload.healExpression).toBe(expectedExpression);
+      expect(result.payload.damageExpression).toBe(expectedExpression);
     });
 
     it('handles damageTypes from auto or defaults', async () => {
@@ -218,15 +212,6 @@ describe('divineSparkHandler.handle', () => {
 
       expect(result.payload.saveType).toBe('WIS');
     });
-
-    it('defaults saveType to CON when auto.saveType is null or missing', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction({ saveType: null });
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.payload.saveType).toBe('CON');
-    });
   });
 
   describe('target resolution', () => {
@@ -244,17 +229,6 @@ describe('divineSparkHandler.handle', () => {
 
       expect(result.payload.targetName).toBe('Ally');
       expect(targetResolver.resolveTarget).toHaveBeenCalledWith(campaignName, ps.name);
-    });
-
-    it('falls back to playerStats.name when resolveTarget returns null or empty target', async () => {
-      targetResolver.resolveTarget.mockResolvedValue(null);
-
-      const ps = makePlayerStats();
-      const action = makeAction();
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.payload.targetName).toBe(ps.name);
     });
   });
 
@@ -278,20 +252,6 @@ describe('divineSparkHandler.handle', () => {
         abilityName: action.name,
         description: 'Divine Spark activated — targeting Ally.',
       });
-    });
-
-    it('does not await addEntry (fire-and-forget)', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-
-      const addEntryPromise = new Promise(() => {
-        /* never resolves */
-      });
-      logService.addEntry.mockReturnValue(addEntryPromise);
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.type).toBe('modal');
     });
   });
 

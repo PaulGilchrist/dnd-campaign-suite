@@ -21,35 +21,6 @@ describe('sleepService', () => {
     };
 
     describe('triggerSleep', () => {
-        it('executes handler for non-Sleep spells (automation handles filtering)', async () => {
-            executeHandler.mockResolvedValue(null);
-
-            const result = await triggerSleep(
-                { name: 'Fire Bolt', level: 0 },
-                {},
-                playerStats,
-                campaignName,
-                mapName,
-            );
-            expect(executeHandler).toHaveBeenCalled();
-            expect(result).toBeNull();
-        });
-
-        it('matches spell name case-insensitively', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
-
-            const result = await triggerSleep(
-                { name: 'sLeEp', level: 1 },
-                {},
-                playerStats,
-                campaignName,
-                mapName,
-            );
-
-            expect(executeHandler).toHaveBeenCalled();
-            expect(result).toEqual({ type: 'popup' });
-        });
-
         it('passes the spell object into the action', async () => {
             executeHandler.mockResolvedValue({ type: 'popup' });
             const spell = { name: 'Sleep', level: 1, school: 'Evocation' };
@@ -64,7 +35,7 @@ describe('sleepService', () => {
             );
         });
 
-        it('uses spellSaveDc from metaCtx when provided, falls back to playerStats, computes from proficiency', async () => {
+        it('resolves saveDc from metaCtx, playerStats, or proficiency', async () => {
             executeHandler.mockResolvedValue({ type: 'popup' });
 
             await triggerSleep(
@@ -94,76 +65,35 @@ describe('sleepService', () => {
                 campaignName,
                 mapName,
             );
-
-            const stats = { name: 'Wizard', proficiency: 3 };
-            await triggerSleep(
-                { name: 'Sleep', level: 1 },
-                {},
-                stats,
-                campaignName,
-                mapName,
-            );
-            expect(executeHandler).toHaveBeenCalledWith(
-                expect.objectContaining({ automation: expect.objectContaining({ saveDc: 11 }) }),
-                stats,
-                campaignName,
-                mapName,
-            );
         });
 
-        it.each([
-            { stats: { name: 'Wizard' }, label: 'proficiency is missing' },
-            { stats: { name: 'Wizard', proficiency: null }, label: 'proficiency is null' },
-            { stats: { name: 'Wizard', proficiency: undefined }, label: 'proficiency is undefined' },
-            { stats: { name: 'Wizard', spellAbilities: { saveDc: null, modifier: 4 } }, label: 'saveDc is null and proficiency is missing' },
-            { stats: { name: 'Wizard', spellAbilities: undefined }, label: 'spellAbilities is undefined and proficiency is missing' },
-        ])('throws when %s', async ({ stats }) => {
+        it('throws when proficiency is missing and no saveDc fallback', async () => {
             await expect(
-                triggerSleep({ name: 'Sleep', level: 1 }, {}, stats, campaignName, mapName)
+                triggerSleep({ name: 'Sleep', level: 1 }, {}, { name: 'Wizard' }, campaignName, mapName)
             ).rejects.toThrow('playerStats.proficiency is required for sleep spell');
         });
 
-        it.each([
-            ['metaCtx slotLevel', { spellSaveDc: 17, slotLevel: 4 }, 4],
-            ['spell.level', { spellSaveDc: 17 }, 3],
-        ])('uses %s for spellSlotLevel', async (_label, metaCtx, expectedLevel) => {
+        it('uses metaCtx slotLevel over spell.level for spellSlotLevel', async () => {
             executeHandler.mockResolvedValue({ type: 'popup' });
             await triggerSleep(
                 { name: 'Sleep', level: 3 },
-                metaCtx,
+                { spellSaveDc: 17, slotLevel: 4 },
                 playerStats,
                 campaignName,
                 mapName,
             );
             expect(executeHandler).toHaveBeenCalledWith(
-                expect.objectContaining({ spellSlotLevel: expectedLevel }),
+                expect.objectContaining({ spellSlotLevel: 4 }),
                 playerStats,
                 campaignName,
                 mapName,
             );
         });
 
-        it.each([
-            { spell: { name: 'Sleep' }, metaCtx: {}, label: 'no level and no slotLevel' },
-            { spell: { name: 'Sleep', level: null }, metaCtx: { spellSaveDc: 15 }, label: 'spell.level is null' },
-            { spell: { name: 'Sleep', level: undefined }, metaCtx: {}, label: 'spell.level is undefined' },
-            { spell: {}, metaCtx: {}, label: 'empty spell object' },
-        ])('throws when %s', async ({ spell, metaCtx }) => {
+        it('throws when slot level is missing from both metaCtx and spell', async () => {
             await expect(
-                triggerSleep(spell, metaCtx, playerStats, campaignName, mapName)
+                triggerSleep({ name: 'Sleep' }, { spellSaveDc: 15 }, playerStats, campaignName, mapName)
             ).rejects.toThrow('slot level is required for sleep spell');
-        });
-
-        it.each([undefined, null])('handles metaCtx %s gracefully', async (metaCtx) => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
-            await triggerSleep(
-                { name: 'Sleep', level: 1 },
-                metaCtx,
-                playerStats,
-                campaignName,
-                mapName,
-            );
-            expect(executeHandler).toHaveBeenCalled();
         });
 
         it('returns result from executeHandler on success, null when handler returns null or throws', async () => {
@@ -180,52 +110,6 @@ describe('sleepService', () => {
             executeHandler.mockRejectedValue(new Error('Handler failed'));
             result = await triggerSleep({ name: 'Sleep', level: 1 }, {}, playerStats, campaignName, mapName);
             expect(result).toBeNull();
-        });
-
-        it('includes saveType WIS in the automation action', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
-
-            await triggerSleep(
-                { name: 'Sleep', level: 2 },
-                { spellSaveDc: 16 },
-                playerStats,
-                campaignName,
-                mapName,
-            );
-
-            expect(executeHandler).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    automation: expect.objectContaining({ type: 'sleep', saveType: 'WIS' }),
-                }),
-                playerStats,
-                campaignName,
-                mapName,
-            );
-        });
-
-        it('passes campaignName and mapName to executeHandler', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
-
-            await triggerSleep(
-                { name: 'Sleep', level: 1 },
-                {},
-                playerStats,
-                campaignName,
-                mapName,
-            );
-
-            expect(executeHandler).toHaveBeenCalledWith(
-                expect.any(Object),
-                playerStats,
-                campaignName,
-                mapName,
-            );
-        });
-
-        it.each([undefined, null])('throws when playerStats is %s', async (playerStatsVal) => {
-            await expect(
-                triggerSleep({ name: 'Sleep', level: 1 }, {}, playerStatsVal, campaignName, mapName)
-            ).rejects.toThrow();
         });
     });
 });

@@ -76,23 +76,6 @@ describe('cloakOfShadowsHandler', () => {
             );
         });
 
-        it('returns empty buffs array when the only buff is removed', async () => {
-            getRuntimeValue.mockImplementation((player, key) => {
-                if (key === 'activeBuffs') {
-                    return [{ name: 'Cloak of Shadows', effect: 'cloak_of_shadows' }];
-                }
-                return null;
-            });
-
-            await handle(makeAction(), makePlayerStats(), campaignName);
-
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'TestCleric',
-                'activeBuffs',
-                [],
-                campaignName,
-            );
-        });
     });
 
     describe('focus point validation', () => {

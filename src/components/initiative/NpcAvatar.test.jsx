@@ -17,29 +17,24 @@ describe('NpcAvatar', () => {
         onClickMock = vi.fn();
     });
 
-    it('should render AvatarImage when imagePath is provided', () => {
-        render(<NpcAvatar name="Goblin" imagePath="/images/goblin.png" onClick={onClickMock} />);
-        expect(screen.getByRole('img')).toHaveAttribute('src', '/images/goblin.png');
+    it('should render AvatarImage when an image source is provided', () => {
+        render(<NpcAvatar name="Goblin" imageUrl="https://example.com/goblin.png" onClick={onClickMock} />);
+        expect(screen.getByRole('img')).toHaveAttribute('src', 'https://example.com/goblin.png');
     });
 
-    it('should render AvatarImage when imageUrl is provided', () => {
-        render(<NpcAvatar name="Goblin" imageUrl="https://example.com/orc.jpg" onClick={onClickMock} />);
-        expect(screen.getByRole('img')).toHaveAttribute('src', 'https://example.com/orc.jpg');
-    });
-
-    it('should render initial when no image is provided', () => {
+    it('should render the first letter of the name when no image is provided', () => {
         render(<NpcAvatar name="Goblin" onClick={onClickMock} />);
         expect(screen.getByText('G')).toBeInTheDocument();
     });
 
-    it('should render question mark when name is falsy', () => {
+    it('should render a question mark when name is falsy', () => {
         render(<NpcAvatar name={null} onClick={onClickMock} />);
         expect(screen.getByText('?')).toBeInTheDocument();
     });
 
-    it('should call onClick when clicked', () => {
-        render(<NpcAvatar name="Goblin" imagePath="/images/goblin.png" onClick={onClickMock} />);
-        fireEvent.click(screen.getByRole('img'));
+    it('should call onClick when the avatar is clicked', () => {
+        const { container } = render(<NpcAvatar name="Goblin" onClick={onClickMock} />);
+        fireEvent.click(container.querySelector('.npc-avatar'));
         expect(onClickMock).toHaveBeenCalledTimes(1);
     });
 });

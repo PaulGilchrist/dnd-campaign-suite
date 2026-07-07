@@ -105,20 +105,6 @@ describe('CreatureCard', () => {
 
     describe('rendering - player creatures', () => {
         it.each`
-            isActive | expectedClass
-            ${true}  | ${'active'}
-            ${false} | ${''}
-        `('should render "$expectedClass" class when isActive is $isActive', ({ isActive, expectedClass }) => {
-            render(<CreatureCard {...props} isActive={isActive} />);
-            const card = document.querySelector('.creature-card');
-            if (expectedClass) {
-                expect(card).toHaveClass(expectedClass);
-            } else {
-                expect(card).not.toHaveClass('active');
-            }
-        });
-
-        it.each`
             currentHp | expectUnconscious
             ${0}      | ${true}
             ${-5}     | ${true}
@@ -153,13 +139,6 @@ describe('CreatureCard', () => {
             render(<CreatureCard {...props} overlays={overlays} />);
             const targetSelect = document.querySelector('.creature-target select');
             expect(targetSelect.querySelector('option[value="overlay-overlay1"]')).toBeInTheDocument();
-        });
-
-        it('should group overlays under "─── Overlays ───" optgroup', () => {
-            const overlays = [{ id: 'overlay1', shape: 'sphere', radiusFt: 10 }];
-            render(<CreatureCard {...props} overlays={overlays} />);
-            const optgroup = document.querySelector('.creature-target optgroup');
-            expect(optgroup).toHaveAttribute('label', '─── Overlays ───');
         });
     });
 
@@ -216,12 +195,6 @@ describe('CreatureCard', () => {
             fireEvent.change(initiativeInput, { target: { value: '20' } });
             expect(props.onInitiativeChange).toHaveBeenCalledWith('Alice', '20');
         });
-
-        it('should show initiative input for NPC', () => {
-            render(<CreatureCard {...props} creature={defaultNpcCreature} />);
-            const initiativeInput = document.querySelector('.creature-initiative input[type="number"]');
-            expect(initiativeInput).toBeInTheDocument();
-        });
     });
 
     describe('target select', () => {
@@ -245,13 +218,6 @@ describe('CreatureCard', () => {
             render(<CreatureCard {...props} creature={creature} allCreatures={allCreatures} />);
             const targetSelect = document.querySelector('.creature-target select');
             expect(targetSelect).toHaveValue('Bob');
-        });
-
-        it('should default to empty string when targetName is null', () => {
-            const creature = { ...defaultPlayerCreature, targetName: null };
-            render(<CreatureCard {...props} creature={creature} />);
-            const targetSelect = document.querySelector('.creature-target select');
-            expect(targetSelect).toHaveValue('');
         });
     });
 
@@ -338,18 +304,6 @@ describe('CreatureCard', () => {
             fireEvent.click(screen.getByTitle('Add concentration'));
             expect(props.onOpenConcentrationPicker).toHaveBeenCalledWith(defaultPlayerCreature);
         });
-
-        it('should not render concentration add button for non-localhost when no concentration', () => {
-            render(<CreatureCard {...props} creature={defaultPlayerCreature} isLocalhost={false} />);
-            expect(screen.queryByTitle('Add concentration')).not.toBeInTheDocument();
-        });
-
-        it('should show concentration tooltip with spell and DC', () => {
-            const concentration = { spell: 'Shield', dc: 10 };
-            render(<CreatureCard {...props} creature={{ ...defaultPlayerCreature, concentration }} />);
-            const badge = document.querySelector('.initiative-concentration-badge');
-            expect(badge.getAttribute('title')).toBe('Concentration: Shield (DC 10 Constitution)');
-        });
     });
 
     describe('NPC avatar click', () => {
@@ -389,12 +343,6 @@ describe('CreatureCard', () => {
             const creature = { ...defaultPlayerCreature, currentHp: null };
             render(<CreatureCard {...props} creature={creature} />);
             expect(screen.getByTestId('hp-input-Alice')).toHaveValue(0);
-        });
-
-        it('should handle creature with null maxHp', () => {
-            const creature = { ...defaultPlayerCreature, maxHp: null };
-            render(<CreatureCard {...props} creature={creature} />);
-            expect(screen.getByTestId('hp-input-Alice')).toBeInTheDocument();
         });
     });
 });

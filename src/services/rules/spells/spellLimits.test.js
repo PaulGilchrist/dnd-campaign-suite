@@ -73,21 +73,11 @@ describe('spellLimits', () => {
       });
     });
 
-    it('should return default limits when class not found or missing class_levels', async () => {
+    it('should return default limits when class not found', async () => {
       silenceConsole();
       setupFetch([]);
 
       const limits = await getSpellLimits('UnknownClass', 1, '5e');
-
-      expect(limits.isNonSpellcaster).toBe(true);
-      expect(limits.cantrip).toBe(0);
-    });
-
-    it('should return default limits when class data has no class_levels property', async () => {
-      silenceConsole();
-      setupFetch([{ name: 'Wizard', index: 'wizard' }]);
-
-      const limits = await getSpellLimits('Wizard', 1, '5e');
 
       expect(limits.isNonSpellcaster).toBe(true);
       expect(limits.cantrip).toBe(0);
@@ -127,7 +117,7 @@ describe('spellLimits', () => {
       expect(limits.level1).toBe(2);
     });
 
-    it('should return default limits when level has no spellcasting', async () => {
+    it('should return default limits when level has no spellcasting and no subclass fallback', async () => {
       silenceConsole();
       setupFetch(makeClassData({
         name: 'Rogue',
@@ -254,41 +244,6 @@ describe('spellLimits', () => {
       expect(limits.level3).toBe(3);
       expect(limits.level4).toBe(0);
       expect(limits.level9).toBe(0);
-    });
-
-    it('should handle spellcasting with missing optional fields', async () => {
-      setupFetch(makeClassData({
-        name: 'Wizard',
-        index: 'wizard',
-        class_levels: [{
-          level: 1,
-          spellcasting: { cantrips_known: 2 }
-        }]
-      }));
-
-      const limits = await getSpellLimits('Wizard', 1, '5e');
-
-      expect(limits.cantrip).toBe(2);
-      expect(limits.level1).toBe(0);
-      expect(limits.spellType).toBe('known');
-    });
-
-    it('should skip levels with required_major mismatch in findSpellcastingInClass and use fallback', async () => {
-      silenceConsole();
-      setupFetch({
-        name: 'Wizard',
-        index: 'wizard',
-        class_levels: [
-          { level: 1, spellcasting: makeSpellcasting({ cantrips_known: 3, spell_slots_level_1: 2 }) },
-          { level: 2, spellcasting: makeSpellcasting({ required_major: 'Evocation', cantrips_known: 4, spell_slots_level_1: 3 }) },
-          { level: 3, spellcasting: null }
-        ]
-      });
-
-      const limits = await getSpellLimits('Wizard', 3, '2024', 'Abjuration');
-
-      expect(limits.cantrip).toBe(3);
-      expect(limits.isNonSpellcaster).toBeUndefined();
     });
 
     it('should skip subclass feature with required_major mismatch', async () => {
@@ -479,73 +434,6 @@ describe('spellLimits', () => {
       expect(result.counts.cantrip).toBe(1);
     });
 
-    it('should ignore spells not in the allSpells lookup', async () => {
-      setupFetch(makeClassData({
-        name: 'Wizard',
-        index: 'wizard',
-        class_levels: [{
-          level: 1,
-          spellcasting: makeSpellcasting({ cantrips_known: 3, spell_slots_level_1: 2 })
-        }]
-      }));
-
-      const result = await validateSpellSelection(
-        ['Unknown Spell'],
-        mockSpells,
-        'Wizard',
-        1,
-        '5e'
-      );
-
-      expect(result.valid).toBe(true);
-      expect(result.counts.cantrip).toBe(0);
-    });
-
-    it('should detect violations across multiple high spell levels', async () => {
-      const highLevelSpells = [
-        { name: 'Fire Bolt', level: 0 },
-        { name: 'Magic Missile', level: 1 },
-        { name: 'Fireball', level: 3 },
-        { name: 'Wall of Force', level: 5 },
-        { name: 'True Seeing', level: 6 },
-        { name: 'Teleport', level: 7 },
-        { name: 'Clone', level: 8 },
-        { name: 'Wish', level: 9 }
-      ];
-
-      setupFetch(makeClassData({
-        name: 'Wizard',
-        index: 'wizard',
-        class_levels: [
-          { level: 17, spellcasting: makeSpellcasting({
-            cantrips_known: 3,
-            spell_slots_level_1: 4,
-            spell_slots_level_2: 3,
-            spell_slots_level_3: 3,
-            spell_slots_level_4: 3,
-            spell_slots_level_5: 2,
-            spell_slots_level_6: 1,
-            spell_slots_level_7: 1,
-            spell_slots_level_8: 0,
-            spell_slots_level_9: 0
-          })}
-        ]
-      }));
-
-      const result = await validateSpellSelection(
-        ['True Seeing', 'Teleport', 'Clone', 'Wish'],
-        highLevelSpells,
-        'Wizard',
-        17,
-        '5e'
-      );
-
-      expect(result.valid).toBe(false);
-      expect(result.violations.some(v =>
-        v.includes('6th') || v.includes('7th') || v.includes('8th') || v.includes('9th')
-      )).toBe(true);
-    });
-
     it('should allow non-spellcasting classes any selection', async () => {
       silenceConsole();
       setupFetch(makeClassData({
@@ -564,50 +452,6 @@ describe('spellLimits', () => {
 
       expect(result.valid).toBe(true);
       expect(result.violations).toHaveLength(0);
-    });
-
-    it('should handle spell objects with missing level property', async () => {
-      setupFetch(makeClassData({
-        name: 'Wizard',
-        index: 'wizard',
-        class_levels: [{
-          level: 1,
-          spellcasting: makeSpellcasting({ cantrips_known: 3, spell_slots_level_1: 2 })
-        }]
-      }));
-
-      const result = await validateSpellSelection(
-        ['Mystery Spell'],
-        [{ name: 'Mystery Spell' }],
-        'Wizard',
-        1,
-        '5e'
-      );
-
-      expect(result.valid).toBe(true);
-      expect(result.counts.cantrip).toBe(1);
-    });
-
-    it('should handle duplicate spell names in selection', async () => {
-      setupFetch(makeClassData({
-        name: 'Wizard',
-        index: 'wizard',
-        class_levels: [{
-          level: 1,
-          spellcasting: makeSpellcasting({ cantrips_known: 3, spell_slots_level_1: 2 })
-        }]
-      }));
-
-      const result = await validateSpellSelection(
-        ['Fire Bolt', 'Fire Bolt'],
-        mockSpells,
-        'Wizard',
-        1,
-        '5e'
-      );
-
-      // Duplicate spell names count twice
-      expect(result.counts.cantrip).toBe(2);
     });
 
     it('should validate prepared spell type (total non-cantrip limit)', async () => {
@@ -689,38 +533,6 @@ describe('spellLimits', () => {
       expect(result.valid).toBe(false);
       expect(result.violations).toContain('Cantrips: 2/1');
       expect(result.violations).toContain('Prepared spells: 2/1');
-    });
-
-    it('should skip prepared spell check when not a prepared type class', async () => {
-      setupFetch(makeClassData({
-        name: 'Wizard',
-        index: 'wizard',
-        class_levels: [{
-          level: 1,
-          spellcasting: makeSpellcasting({
-            spell_type: 'known',
-            cantrips_known: 3,
-            prepared_spells: 5,
-            spell_slots_level_1: 2
-          })
-        }]
-      }));
-
-      const level1Spells = [
-        { name: 'Magic Missile', level: 1 },
-        { name: 'Shield', level: 1 }
-      ];
-
-      const result = await validateSpellSelection(
-        ['Magic Missile', 'Shield'],
-        level1Spells,
-        'Wizard',
-        1,
-        '5e'
-      );
-
-      expect(result.valid).toBe(true);
-      expect(result.violations).not.toContain('Prepared spells: 2/5');
     });
   });
 

@@ -49,12 +49,13 @@ describe('coronaOfLightHandler.activateCoronaOfLight', () => {
         vi.clearAllMocks();
     });
 
-    describe('buff toggling', () => {
-        it('calls toggleBuff with playerName, action name, automation, campaignName, and playerName', async () => {
+    describe('side effects', () => {
+        it('calls toggleBuff, setRuntimeValue, addExpiration, and addEntry with correct args', async () => {
             const action = makeAction();
             const playerStats = makePlayerStats();
+            const enemies = ['Goblin', 'Orc'];
 
-            await activateCoronaOfLight(action, playerStats, campaignName, []);
+            await activateCoronaOfLight(action, playerStats, campaignName, enemies);
 
             expect(toggleBuff).toHaveBeenCalledWith(
                 'TestCleric',
@@ -63,13 +64,36 @@ describe('coronaOfLightHandler.activateCoronaOfLight', () => {
                 campaignName,
                 'TestCleric',
             );
+
+            expect(setRuntimeValue).toHaveBeenCalledWith(
+                'TestCleric',
+                'coronaOfLightEnemies',
+                enemies,
+                campaignName,
+            );
+
+            expect(addExpiration).toHaveBeenCalledWith(
+                'TestCleric',
+                'TestCleric',
+                [{ type: 'remove_active_buff', buffName: 'Corona of Light' }],
+                campaignName,
+                10,
+            );
+
+            expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+                type: 'ability_use',
+                characterName: 'TestCleric',
+                abilityName: 'Corona of Light',
+                description: expect.stringContaining('Goblin, Orc'),
+            }));
         });
 
-        it('uses the custom action name as the buff identifier', async () => {
+        it('uses custom action name in all side effects', async () => {
             const action = { ...makeAction(), name: 'Custom Corona Name' };
             const playerStats = makePlayerStats();
+            const enemies = ['Troll'];
 
-            await activateCoronaOfLight(action, playerStats, campaignName, []);
+            await activateCoronaOfLight(action, playerStats, campaignName, enemies);
 
             expect(toggleBuff).toHaveBeenCalledWith(
                 'TestCleric',
@@ -78,26 +102,24 @@ describe('coronaOfLightHandler.activateCoronaOfLight', () => {
                 campaignName,
                 'TestCleric',
             );
-        });
-    });
 
-    describe('enemy list storage', () => {
-        it('stores selected enemies on the caster runtime key', async () => {
-            const action = makeAction();
-            const playerStats = makePlayerStats();
-            const enemies = ['Goblin', 'Orc', 'Troll'];
-
-            await activateCoronaOfLight(action, playerStats, campaignName, enemies);
-
-            expect(setRuntimeValue).toHaveBeenCalledWith(
+            expect(addExpiration).toHaveBeenCalledWith(
                 'TestCleric',
-                'coronaOfLightEnemies',
-                enemies,
+                'TestCleric',
+                [{ type: 'remove_active_buff', buffName: 'Custom Corona Name' }],
                 campaignName,
+                10,
             );
+
+            expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+                type: 'ability_use',
+                characterName: 'TestCleric',
+                abilityName: 'Custom Corona Name',
+                description: expect.stringContaining('Troll'),
+            }));
         });
 
-        it('stores empty array when no enemies selected', async () => {
+        it('logs "none selected" and stores empty array when no enemies passed', async () => {
             const action = makeAction();
             const playerStats = makePlayerStats();
 
@@ -109,101 +131,35 @@ describe('coronaOfLightHandler.activateCoronaOfLight', () => {
                 [],
                 campaignName,
             );
-        });
-    });
 
-    describe('expiration setup', () => {
-        it('adds an expiration for 10 rounds with the action name as buffName', async () => {
-            const action = makeAction();
-            const playerStats = makePlayerStats();
-
-            await activateCoronaOfLight(action, playerStats, campaignName, []);
-
-            expect(addExpiration).toHaveBeenCalledWith(
-                'TestCleric',
-                'TestCleric',
-                [{ type: 'remove_active_buff', buffName: 'Corona of Light' }],
-                campaignName,
-                10,
-            );
-        });
-
-        it('uses the custom action name as the buffName in expiration', async () => {
-            const action = { ...makeAction(), name: 'Custom Corona' };
-            const playerStats = makePlayerStats();
-
-            await activateCoronaOfLight(action, playerStats, campaignName, []);
-
-            expect(addExpiration).toHaveBeenCalledWith(
-                'TestCleric',
-                'TestCleric',
-                [{ type: 'remove_active_buff', buffName: 'Custom Corona' }],
-                campaignName,
-                10,
-            );
-        });
-    });
-
-    describe('logging', () => {
-        it('calls addEntry with ability_use type and correct structure', async () => {
-            const action = makeAction();
-            const playerStats = makePlayerStats();
-            const enemies = ['Goblin', 'Orc'];
-
-            const now = Date.now();
-            const dateSpy = vi.spyOn(Date, 'now').mockReturnValue(now);
-
-            await activateCoronaOfLight(action, playerStats, campaignName, enemies);
-
-            expect(addEntry).toHaveBeenCalledWith(campaignName, {
+            expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
                 type: 'ability_use',
                 characterName: 'TestCleric',
                 abilityName: 'Corona of Light',
-                description: expect.stringContaining('Goblin, Orc'),
-                timestamp: now,
-            });
-
-            dateSpy.mockRestore();
-        });
-
-        it('shows "none selected (all enemies affected)" when no enemies are passed', async () => {
-            const action = makeAction();
-            const playerStats = makePlayerStats();
-
-            await activateCoronaOfLight(action, playerStats, campaignName, []);
-
-            const logCall = addEntry.mock.calls[0][1];
-            expect(logCall.description).toContain('none selected (all enemies affected)');
+                description: expect.stringContaining('none selected (all enemies affected)'),
+            }));
         });
     });
 
-    describe('return value structure', () => {
-        it('returns a popup with automation_info payload containing action details', async () => {
-            const action = makeAction();
-            const playerStats = makePlayerStats();
-
-            const result = await activateCoronaOfLight(action, playerStats, campaignName, []);
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.type).toBe('automation_info');
-            expect(result.payload.name).toBe('Corona of Light');
-            expect(result.payload.automationType).toBe('corona_of_light');
-            expect(result.payload.automation).toEqual(action.automation);
-        });
-
-        it('includes a description mentioning enemies with disadvantage', async () => {
+    describe('return value', () => {
+        it('returns a popup with automation_info payload containing action details and description', async () => {
             const action = makeAction();
             const playerStats = makePlayerStats();
             const enemies = ['Goblin', 'Orc'];
 
             const result = await activateCoronaOfLight(action, playerStats, campaignName, enemies);
 
+            expect(result.type).toBe('popup');
+            expect(result.payload.type).toBe('automation_info');
+            expect(result.payload.name).toBe('Corona of Light');
+            expect(result.payload.automationType).toBe('corona_of_light');
+            expect(result.payload.automation).toEqual(action.automation);
             expect(result.payload.description).toContain('Corona of Light activated!');
             expect(result.payload.description).toContain('Goblin, Orc');
             expect(result.payload.description).toContain('disadvantage');
         });
 
-        it('says "all other creatures" when no enemies selected', async () => {
+        it('says "all other creatures" in description when no enemies selected', async () => {
             const action = makeAction();
             const playerStats = makePlayerStats();
 

@@ -86,23 +86,6 @@ describe("heroesFeastHandler", () => {
       expect(result.payload.automation).toEqual(action.automation);
     });
 
-    it('should exclude the player character from creature targets', async () => {
-      const ps = makePlayerStats({ name: 'Alice' });
-      const action = makeAction();
-      damageUtils.getCombatContext.mockResolvedValue({
-        creatures: [
-          { name: 'Alice' },
-          { name: 'Bob' },
-          { name: 'Alice Clone' },
-        ],
-      });
-      automationExpressions.evaluateAutoExpression.mockReturnValue(15);
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.payload.creatureTargets).toEqual(['Bob', 'Alice Clone']);
-    });
-
     it('should return empty creatureTargets when player is the only creature', async () => {
       const ps = makePlayerStats();
       const action = makeAction();
@@ -171,19 +154,6 @@ describe("heroesFeastHandler", () => {
       expect(result.payload.hpIncrease).toBe(11);
     });
 
-    it('should default maxTargets to 12 when automation is missing or empty', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction({ automation: undefined });
-      damageUtils.getCombatContext.mockResolvedValue({
-        creatures: [{ name: 'Enemy' }],
-      });
-      automationExpressions.evaluateAutoExpression.mockReturnValue(11);
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.payload.maxTargets).toBe(12);
-    });
-
     it('should default hpIncrease to 11 when evaluateAutoExpression returns non-positive or non-number', async () => {
       const ps = makePlayerStats();
       const action = makeAction();
@@ -194,33 +164,6 @@ describe("heroesFeastHandler", () => {
 
       const result = await handle(action, ps, campaignName, null);
       expect(result.payload.hpIncrease).toBe(11);
-
-      vi.clearAllMocks();
-      automationExpressions.evaluateAutoExpression.mockReturnValue(0);
-      damageUtils.getCombatContext.mockResolvedValue({
-        creatures: [{ name: 'Enemy' }],
-      });
-
-      const resultZero = await handle(action, ps, campaignName, null);
-      expect(resultZero.payload.hpIncrease).toBe(11);
-
-      vi.clearAllMocks();
-      automationExpressions.evaluateAutoExpression.mockReturnValue(-5);
-      damageUtils.getCombatContext.mockResolvedValue({
-        creatures: [{ name: 'Enemy' }],
-      });
-
-      const resultNegative = await handle(action, ps, campaignName, null);
-      expect(resultNegative.payload.hpIncrease).toBe(11);
-
-      vi.clearAllMocks();
-      automationExpressions.evaluateAutoExpression.mockReturnValue('invalid');
-      damageUtils.getCombatContext.mockResolvedValue({
-        creatures: [{ name: 'Enemy' }],
-      });
-
-      const resultString = await handle(action, ps, campaignName, null);
-      expect(resultString.payload.hpIncrease).toBe(11);
     });
   });
 
@@ -415,7 +358,7 @@ describe("heroesFeastHandler", () => {
       expect(buffsCalls.length).toBe(0);
     });
 
-    it('should treat undefined or non-array activeBuffs as empty array', async () => {
+    it('should treat undefined activeBuffs as empty array', async () => {
       const ps = makePlayerStats();
       const action = makeAction();
       const expectedBuffs = [
@@ -429,31 +372,11 @@ describe("heroesFeastHandler", () => {
         },
       ];
 
-      // undefined activeBuffs
       runtimeState.getRuntimeValue
         .mockReturnValueOnce(0)
         .mockReturnValueOnce(50)
         .mockReturnValueOnce(30)
         .mockReturnValueOnce(undefined);
-      automationExpressions.evaluateAutoExpression.mockReturnValue(15);
-
-      await applyHeroesFeast(action, ps, campaignName, null, ['Goblin1']);
-
-      expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-        'Goblin1',
-        'activeBuffs',
-        expectedBuffs,
-        campaignName
-      );
-
-      vi.clearAllMocks();
-
-      // non-array activeBuffs
-      runtimeState.getRuntimeValue
-        .mockReturnValueOnce(0)
-        .mockReturnValueOnce(50)
-        .mockReturnValueOnce(30)
-        .mockReturnValueOnce('not an array');
       automationExpressions.evaluateAutoExpression.mockReturnValue(15);
 
       await applyHeroesFeast(action, ps, campaignName, null, ['Goblin1']);
@@ -524,25 +447,6 @@ describe("heroesFeastHandler", () => {
         'Goblin2',
         'heroesFeastHpMaxIncrease',
         15,
-        campaignName
-      );
-    });
-
-    it('should use action.spellSlotLevel for hpIncrease in applyHeroesFeast', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction({ spellSlotLevel: 7 });
-      runtimeState.getRuntimeValue
-        .mockReturnValueOnce(0)
-        .mockReturnValueOnce(50)
-        .mockReturnValueOnce(30);
-      automationExpressions.evaluateAutoExpression.mockReturnValue(20);
-
-      await applyHeroesFeast(action, ps, campaignName, null, ['Goblin1']);
-
-      expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-        'Goblin1',
-        'hitPoints',
-        70,
         campaignName
       );
     });

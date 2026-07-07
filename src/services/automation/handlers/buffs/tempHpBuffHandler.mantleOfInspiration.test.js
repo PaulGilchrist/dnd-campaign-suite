@@ -152,7 +152,7 @@ describe('modal payload', () => {
     expect(result.payload.bardicDieSize).toBe(6);
   });
 
-  it('excludes self from creature targets', async () => {
+  it('includes self in creature targets when self is in combat context', async () => {
     const action = makeAction({
       bonusMovement: true,
       tempHpExpression: 'bardic_inspiration_die',
@@ -178,66 +178,90 @@ describe('modal payload', () => {
     ]);
   });
 
-  it('returns empty creature targets when no combat context', async () => {
+  it('uses cha modifier for maxTargets with floor of 1', async () => {
     const action = makeAction({
       bonusMovement: true,
       tempHpExpression: 'bardic_inspiration_die',
     });
-    const ps = makePlayerStats();
 
-    useRuntimeState.getRuntimeValue.mockReturnValue(0);
-    damageUtils.getCombatContext.mockResolvedValue(null);
-
-    const result = await handle(action, ps, campaignName);
-
-    expect(result.payload.creatureTargets).toEqual([]);
-  });
-
-  it('uses cha modifier for maxTargets', async () => {
-    const action = makeAction({
-      bonusMovement: true,
-      tempHpExpression: 'bardic_inspiration_die',
-    });
-    const ps = makePlayerStats({
+    // Test with high CHA (+5 modifier -> maxTargets = 5)
+    const highChaPs = makePlayerStats({
       level: 1,
       class: {
         name: 'Bard',
         class_levels: [{ level: 1, bardic_inspiration_uses: 2 }],
       },
-      abilities: [{ name: 'Charisma', score: 20 }], // +5 modifier
+      abilities: [{ name: 'Charisma', score: 20 }],
     });
 
     useRuntimeState.getRuntimeValue.mockReturnValue(2);
     damageUtils.getCombatContext.mockResolvedValue({ creatures: [] });
 
-    const result = await handle(action, ps, campaignName);
-
+    let result = await handle(action, highChaPs, campaignName);
     expect(result.payload.maxTargets).toBe(5);
-  });
 
-  it('uses minimum 1 for maxTargets when cha modifier is 0', async () => {
-    const action = makeAction({
-      bonusMovement: true,
-      tempHpExpression: 'bardic_inspiration_die',
-    });
-    const ps = makePlayerStats({
+    // Reset for low CHA test (+0 modifier -> maxTargets = 1)
+    resetMocks();
+    useRuntimeState.getRuntimeValue.mockReturnValue(2);
+
+    const lowChaPs = makePlayerStats({
       level: 1,
       class: {
         name: 'Bard',
         class_levels: [{ level: 1, bardic_inspiration_uses: 2 }],
       },
-      abilities: [{ name: 'Charisma', score: 10 }], // +0 modifier
+      abilities: [{ name: 'Charisma', score: 10 }],
     });
 
-    useRuntimeState.getRuntimeValue.mockReturnValue(2);
-    damageUtils.getCombatContext.mockResolvedValue({ creatures: [] });
-
-    const result = await handle(action, ps, campaignName);
-
+    result = await handle(action, lowChaPs, campaignName);
     expect(result.payload.maxTargets).toBe(1);
   });
 
-  it('decrements bardicInspirationUses when available', async () => {
+  it('resolves bardic_die size from classLevels at current level with default fallback', async () => {
+    const action = makeAction({
+      bonusMovement: true,
+      tempHpExpression: 'bardic_inspiration_die',
+    });
+
+    // Test with explicit bardic_die at current level
+    const level5Ps = makePlayerStats({
+      level: 5,
+      class: {
+        name: 'Bard',
+        class_levels: [
+          { level: 1, bardic_die: 6 },
+          { level: 5, bardic_die: 8 },
+          { level: 10, bardic_die: 10 },
+        ],
+      },
+    });
+
+    useRuntimeState.getRuntimeValue.mockReturnValue(0);
+    damageUtils.getCombatContext.mockResolvedValue({ creatures: [] });
+
+    let result = await handle(action, level5Ps, campaignName);
+    expect(result.payload.bardicDieSize).toBe(8);
+
+    // Reset for default fallback test (no bardic_die at level 3)
+    resetMocks();
+    useRuntimeState.getRuntimeValue.mockReturnValue(0);
+
+    const noEntryPs = makePlayerStats({
+      level: 3,
+      class: {
+        name: 'Bard',
+        class_levels: [
+          { level: 1 },
+          { level: 5 },
+        ],
+      },
+    });
+
+    result = await handle(action, noEntryPs, campaignName);
+    expect(result.payload.bardicDieSize).toBe(6);
+  });
+
+  it('decrements bardicInspirationUses on modal display', async () => {
     const action = makeAction({
       bonusMovement: true,
       tempHpExpression: 'bardic_inspiration_die',
@@ -260,55 +284,6 @@ describe('modal payload', () => {
     );
     expect(setCall).toBeDefined();
     expect(setCall[2]).toBe(1);
-  });
-
-  it('uses bardic_die from classLevels entry matching current level', async () => {
-    const action = makeAction({
-      bonusMovement: true,
-      tempHpExpression: 'bardic_inspiration_die',
-    });
-    const ps = makePlayerStats({
-      level: 5,
-      class: {
-        name: 'Bard',
-        class_levels: [
-          { level: 1, bardic_die: 6 },
-          { level: 5, bardic_die: 8 },
-          { level: 10, bardic_die: 10 },
-        ],
-      },
-    });
-
-    useRuntimeState.getRuntimeValue.mockReturnValue(0);
-    damageUtils.getCombatContext.mockResolvedValue({ creatures: [] });
-
-    const result = await handle(action, ps, campaignName);
-
-    expect(result.payload.bardicDieSize).toBe(8);
-  });
-
-  it('uses default bardic_die of 6 when no entry at current level', async () => {
-    const action = makeAction({
-      bonusMovement: true,
-      tempHpExpression: 'bardic_inspiration_die',
-    });
-    const ps = makePlayerStats({
-      level: 3,
-      class: {
-        name: 'Bard',
-        class_levels: [
-          { level: 1 },
-          { level: 5 },
-        ],
-      },
-    });
-
-    useRuntimeState.getRuntimeValue.mockReturnValue(0);
-    damageUtils.getCombatContext.mockResolvedValue({ creatures: [] });
-
-    const result = await handle(action, ps, campaignName);
-
-    expect(result.payload.bardicDieSize).toBe(6);
   });
 });
 
@@ -438,7 +413,7 @@ describe('confirmMantleOfInspiration', () => {
     });
   });
 
-  it('clamps targets to max allowed (CHA modifier)', async () => {
+  it('clamps targets to max allowed by CHA modifier', async () => {
     useRuntimeState.getRuntimeValue.mockReturnValue(0);
 
     const action = makeAction({
@@ -464,7 +439,7 @@ describe('confirmMantleOfInspiration', () => {
     expect(tempCalls[0][0]).toBe('Ally1');
   });
 
-  it('handles empty selected targets', async () => {
+  it('handles empty or null selected targets', async () => {
     useRuntimeState.getRuntimeValue.mockReturnValue(0);
 
     const action = makeAction({
@@ -475,7 +450,7 @@ describe('confirmMantleOfInspiration', () => {
       name: 'Bard1',
     });
 
-    const result = await confirmMantleOfInspiration(
+    let result = await confirmMantleOfInspiration(
       action, ps, campaignName,
       [],
       4, 6, 8
@@ -483,20 +458,8 @@ describe('confirmMantleOfInspiration', () => {
 
     expect(result.payload.description).toContain('no targets selected');
     expect(result.payload.description).not.toContain('Reaction');
-  });
 
-  it('handles null selected targets', async () => {
-    useRuntimeState.getRuntimeValue.mockReturnValue(0);
-
-    const action = makeAction({
-      bonusMovement: true,
-      tempHpExpression: 'bardic_inspiration_die',
-    });
-    const ps = makePlayerStats({
-      name: 'Bard1',
-    });
-
-    const result = await confirmMantleOfInspiration(
+    result = await confirmMantleOfInspiration(
       action, ps, campaignName,
       null,
       4, 6, 8

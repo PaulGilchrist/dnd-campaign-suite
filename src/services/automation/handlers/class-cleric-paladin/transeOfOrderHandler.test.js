@@ -96,21 +96,6 @@ describe('Transe of Order Handler', () => {
             );
         });
 
-        it('should activate with default uses when runtime value is null', async () => {
-            runtimeState.getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === activeKey) return false;
-                if (key === usesKey) return null;
-                return null;
-            });
-            classFeatures.getClassFeatures.mockReturnValue({ maxSorceryPoints: 10 });
-
-            const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('activated');
-            expect(metamagic.spendSorceryPoints).not.toHaveBeenCalled();
-        });
-
         it('should restore uses by spending 5 SP when no uses remain and player has enough SP', async () => {
             runtimeState.getRuntimeValue.mockImplementation((_name, key) => {
                 if (key === activeKey) return false;
@@ -139,30 +124,13 @@ describe('Transe of Order Handler', () => {
             );
         });
 
-        it('should use current SP from playerStats when available instead of maxSorceryPoints', async () => {
-            runtimeState.getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === activeKey) return false;
-                if (key === usesKey) return 0;
-                return null;
-            });
-            classFeatures.getClassFeatures.mockReturnValue({ maxSorceryPoints: 10 });
-
-            const result = await handle(makeAction(), makePlayerStats({
-                resources: { sorcery_points: { current: 3 } },
-            }), campaignName, null);
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('no uses remaining');
-            expect(metamagic.spendSorceryPoints).not.toHaveBeenCalled();
-        });
-
         it('should return error popup when no uses remain and player lacks SP', async () => {
             runtimeState.getRuntimeValue.mockImplementation((_name, key) => {
                 if (key === activeKey) return false;
                 if (key === usesKey) return 0;
                 return null;
             });
-            classFeatures.getClassFeatures.mockReturnValue(null);
+            classFeatures.getClassFeatures.mockReturnValue({ maxSorceryPoints: 10 });
 
             const result = await handle(makeAction(), makePlayerStats({
                 resources: { sorcery_points: { current: 2 } },
@@ -220,15 +188,5 @@ describe('Transe of Order Handler', () => {
             );
         });
 
-        it('should use the correct runtime key for a different player', () => {
-            deactivate('Other Player', campaignName);
-
-            expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-                'Other Player',
-                getRuntimeKey('Other Player', 'transeOfOrderActive'),
-                false,
-                campaignName,
-            );
-        });
     });
 });

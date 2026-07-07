@@ -219,6 +219,12 @@ describe('rules.getPlayerStats - initiative', () => {
   });
 
   it('should set initiative from Dexterity bonus', async () => {
+    const playerSummary = makePlayerSummary();
+    const result = await rules.getPlayerStats([], [], [], [], [], playerSummary);
+    expect(result.initiative).toBe(2);
+  });
+
+  it('should set initiative from a higher Dexterity bonus', async () => {
     setupDefaults({
       abilities: [
         { name: 'Strength', totalScore: 15, bonus: 2, skills: [] },

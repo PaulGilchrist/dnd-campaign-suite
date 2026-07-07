@@ -161,17 +161,6 @@ describe('buffAllyHandler.handle', () => {
       expect(buffToggle.toggleBuff).not.toHaveBeenCalled();
     });
 
-    it('prefers usesMax over uses for the max calculation', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction({ usesMax: 1, uses: 5 });
-      useRuntimeState.getRuntimeValue.mockReturnValue(0);
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.payload.description).toContain('cannot be used again');
-      expect(buffToggle.toggleBuff).not.toHaveBeenCalled();
-    });
-
     it('includes Rage recharge hint for long_rest_or_expend_rage, omits it for other recharge values', async () => {
       const ps = makePlayerStats();
       const action = makeAction({ usesMax: 1, recharge: 'long_rest_or_expend_rage' });

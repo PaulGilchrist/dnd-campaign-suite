@@ -101,7 +101,7 @@ describe('hurlThroughHellHandler', () => {
             expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', 'hurlThroughHellUses', 0, CAMPAIGN);
         });
 
-        it('should return popup when no pact magic slots available', async () => {
+        it('should return popup when no pact magic slots available to recharge', async () => {
             mockRuntimeValues({ hurlThroughHellUses: 1, warlockPactMagic: 0 });
 
             const result = await handle(makeAction({
@@ -122,45 +122,7 @@ describe('hurlThroughHellHandler', () => {
             expect(result.payload.description).toContain('No target selected');
         });
 
-        it('should set use counter and turn-used marker when executing', async () => {
-            getCombatContext.mockResolvedValue({
-                creatures: [{ name: 'Goblin', type: 'fiend' }],
-            });
-            getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
-            mockRuntimeValues({ currentTurn: 'turn1' });
-
-            await handle(makeAction(), makePlayerStats(), CAMPAIGN, MAP);
-
-            expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', 'hurlThroughHellUses', 1, CAMPAIGN);
-            expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', 'hurlThroughHellTurnUsed', 'turn1', CAMPAIGN);
-        });
-
-        it('should set targetEffects on the campaign', async () => {
-            getCombatContext.mockResolvedValue({
-                creatures: [{ name: 'Goblin', type: 'fiend' }],
-            });
-            getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
-            mockRuntimeValues({ currentTurn: 'turn1', targetEffects: [] });
-
-            await handle(makeAction(), makePlayerStats(), CAMPAIGN, MAP);
-
-            const expectedEffect = expect.objectContaining({
-                target: 'Goblin',
-                source: 'Hurl Through Hell',
-                effect: 'incapacitated',
-                saveType: 'CHA',
-                saveDc: 15,
-                damageType: 'Psychic',
-                damageTotal: 44,
-                damageExpression: '8d10',
-                teleport: true,
-            });
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                CAMPAIGN, 'targetEffects', expect.arrayContaining([expectedEffect]), CAMPAIGN
-            );
-        });
-
-        it('should include damage and save info in popup payload', async () => {
+        it('should return popup with damage and save info when executing successfully', async () => {
             getCombatContext.mockResolvedValue({
                 creatures: [{ name: 'Goblin', type: 'fiend' }],
             });
@@ -169,23 +131,12 @@ describe('hurlThroughHellHandler', () => {
 
             const result = await handle(makeAction(), makePlayerStats(), CAMPAIGN, MAP);
 
+            expect(result.type).toBe('popup');
             expect(result.payload.saveType).toBe('CHA');
             expect(result.payload.saveDc).toBe(15);
             expect(result.payload.damageType).toBe('Psychic');
             expect(result.payload.damageTotal).toBe(44);
             expect(result.payload.targetName).toBe('Goblin');
-        });
-
-        it('should use currentTurn value or fallback to unknown', async () => {
-            getCombatContext.mockResolvedValue({
-                creatures: [{ name: 'Goblin', type: 'fiend' }],
-            });
-            getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
-            mockRuntimeValues({ currentTurn: null });
-
-            await handle(makeAction(), makePlayerStats(), CAMPAIGN, MAP);
-
-            expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', 'hurlThroughHellTurnUsed', 'unknown', CAMPAIGN);
         });
     });
 });

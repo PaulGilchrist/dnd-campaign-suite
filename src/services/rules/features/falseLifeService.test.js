@@ -29,17 +29,20 @@ describe('falseLifeService', () => {
             expect(executeHandler).not.toHaveBeenCalled();
         });
 
-        it.each(['fAlSe LiFe', 'false life', 'FALSE LIFE'])('matches "%s" case-insensitively', async (name) => {
+        it('returns null for non-False-Life spell', async () => {
+            const result = await triggerFalseLife({ name: 'Fire Bolt', level: 0 }, {}, playerStats, campaignName, mapName);
+            expect(result).toBeNull();
+            expect(executeHandler).not.toHaveBeenCalled();
+        });
+
+        it('matches "false life" case-insensitively', async () => {
             executeHandler.mockResolvedValue({ type: 'popup' });
-            const result = await triggerFalseLife({ name, level: 1 }, {}, playerStats, campaignName, mapName);
-            expect(executeHandler).toHaveBeenCalledWith(
-                expect.objectContaining({ automation: { type: 'false_life', tempHpExpression: '2d4+4' } }),
-                playerStats, campaignName, mapName,
-            );
+            const result = await triggerFalseLife({ name: 'false life', level: 1 }, {}, playerStats, campaignName, mapName);
+            expect(executeHandler).toHaveBeenCalledTimes(1);
             expect(result).toEqual({ type: 'popup' });
         });
 
-        it('uses slotLevel from metaCtx, falls back to spell.level, defaults to 1', async () => {
+        it('passes slotLevel from metaCtx to handler, falls back to spell.level, defaults to 1', async () => {
             executeHandler.mockResolvedValue({ type: 'popup' });
 
             await triggerFalseLife({ name: 'False Life', level: 1 }, { slotLevel: 5 }, playerStats, campaignName, mapName);

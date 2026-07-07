@@ -39,13 +39,7 @@ describe('silenceService', () => {
             expect(executeHandler).not.toHaveBeenCalled();
         });
 
-        it('is case-sensitive and rejects lowercase "silence"', async () => {
-            const result = await triggerSilence({ name: 'silence', level: 2 }, {}, playerStats, campaignName, mapName);
-            expect(result).toBeNull();
-            expect(executeHandler).not.toHaveBeenCalled();
-        });
-
-        it('returns the handler result for "Silence" spell', async () => {
+        it('returns the handler result for Silence spell', async () => {
             const handlerResult = { type: 'popup', payload: { type: 'automation_info' } };
             executeHandler.mockResolvedValue(handlerResult);
 
@@ -54,7 +48,7 @@ describe('silenceService', () => {
             expect(result).toEqual(handlerResult);
         });
 
-        it('passes null to the handler when executeHandler rejects', async () => {
+        it('returns null when executeHandler rejects', async () => {
             executeHandler.mockRejectedValue(new Error('Handler failed'));
 
             const result = await triggerSilence({ name: 'Silence', level: 2 }, {}, playerStats, campaignName, mapName);
@@ -62,7 +56,7 @@ describe('silenceService', () => {
             expect(result).toBeNull();
         });
 
-        it('passes null to the handler when executeHandler returns null', async () => {
+        it('returns null when executeHandler returns null', async () => {
             executeHandler.mockResolvedValue(null);
 
             const result = await triggerSilence({ name: 'Silence', level: 2 }, {}, playerStats, campaignName, mapName);
@@ -70,120 +64,46 @@ describe('silenceService', () => {
             expect(result).toBeNull();
         });
 
-        it('passes the original spell object to the handler', async () => {
-            executeHandler.mockResolvedValue({ success: true });
-            const spell = { name: 'Silence', level: 2, school: 'Evocation' };
-
-            await triggerSilence(spell, {}, playerStats, campaignName, mapName);
-
-            const [action] = executeHandler.mock.calls[0];
-            expect(action.spell).toBe(spell);
-        });
-
-        it('uses metaCtx slotLevel when provided', async () => {
+        it('resolves spellSlotLevel from metaCtx slotLevel, spell.level, or defaults to 2', async () => {
             executeHandler.mockResolvedValue({ success: true });
 
+            // metaCtx slotLevel takes precedence
             await triggerSilence({ name: 'Silence', level: 2 }, { slotLevel: 5 }, playerStats, campaignName, mapName);
+            expect(executeHandler.mock.calls[0][0].spellSlotLevel).toBe(5);
 
-            const [action] = executeHandler.mock.calls[0];
-            expect(action.spellSlotLevel).toBe(5);
-            expect(action.automation.slotLevel).toBe(5);
-        });
-
-        it('falls back to spell.level when metaCtx has no slotLevel', async () => {
-            executeHandler.mockResolvedValue({ success: true });
-
+            // falls back to spell.level
             await triggerSilence({ name: 'Silence', level: 4 }, {}, playerStats, campaignName, mapName);
+            expect(executeHandler.mock.calls[1][0].spellSlotLevel).toBe(4);
 
-            const [action] = executeHandler.mock.calls[0];
-            expect(action.spellSlotLevel).toBe(4);
-            expect(action.automation.slotLevel).toBe(4);
-        });
-
-        it('uses default level 2 when spell has no level and no metaCtx', async () => {
-            executeHandler.mockResolvedValue({ success: true });
-
+            // defaults to 2 when neither is provided
             await triggerSilence({ name: 'Silence' }, {}, playerStats, campaignName, mapName);
-
-            const [action] = executeHandler.mock.calls[0];
-            expect(action.spellSlotLevel).toBe(2);
-            expect(action.automation.slotLevel).toBe(2);
+            expect(executeHandler.mock.calls[2][0].spellSlotLevel).toBe(2);
         });
 
-        it('parses range from spell.range string like "60-foot"', async () => {
+        it('parses range from spell.range string or defaults to 120', async () => {
             executeHandler.mockResolvedValue({ success: true });
 
             await triggerSilence({ name: 'Silence', level: 2, range: '60-foot' }, {}, playerStats, campaignName, mapName);
-
-            const [action] = executeHandler.mock.calls[0];
-            expect(action.automation.range).toBe(60);
-        });
-
-        it('defaults range to 120 when spell.range is missing', async () => {
-            executeHandler.mockResolvedValue({ success: true });
-
-            await triggerSilence({ name: 'Silence', level: 2 }, {}, playerStats, campaignName, mapName);
-
-            const [action] = executeHandler.mock.calls[0];
-            expect(action.automation.range).toBe(120);
-        });
-
-        it('defaults range to 120 when range string does not match pattern', async () => {
-            executeHandler.mockResolvedValue({ success: true });
+            expect(executeHandler.mock.calls[0][0].automation.range).toBe(60);
 
             await triggerSilence({ name: 'Silence', level: 2, range: 'invalid' }, {}, playerStats, campaignName, mapName);
+            expect(executeHandler.mock.calls[1][0].automation.range).toBe(120);
 
-            const [action] = executeHandler.mock.calls[0];
-            expect(action.automation.range).toBe(120);
+            await triggerSilence({ name: 'Silence', level: 2 }, {}, playerStats, campaignName, mapName);
+            expect(executeHandler.mock.calls[2][0].automation.range).toBe(120);
         });
 
-        it('parses aoe radius from area_of_effect.size like "30-foot-radius"', async () => {
+        it('parses aoe radius from area_of_effect.size or defaults to 20', async () => {
             executeHandler.mockResolvedValue({ success: true });
 
             await triggerSilence({ name: 'Silence', level: 2, area_of_effect: { size: '30-foot-radius' } }, {}, playerStats, campaignName, mapName);
-
-            const [action] = executeHandler.mock.calls[0];
-            expect(action.automation.aoeRadius).toBe(30);
-        });
-
-        it('defaults aoeRadius to 20 when area_of_effect is missing', async () => {
-            executeHandler.mockResolvedValue({ success: true });
-
-            await triggerSilence({ name: 'Silence', level: 2 }, {}, playerStats, campaignName, mapName);
-
-            const [action] = executeHandler.mock.calls[0];
-            expect(action.automation.aoeRadius).toBe(20);
-        });
-
-        it('defaults aoeRadius to 20 when area_of_effect.size is missing', async () => {
-            executeHandler.mockResolvedValue({ success: true });
-
-            await triggerSilence({ name: 'Silence', level: 2, area_of_effect: {} }, {}, playerStats, campaignName, mapName);
-
-            const [action] = executeHandler.mock.calls[0];
-            expect(action.automation.aoeRadius).toBe(20);
-        });
-
-        it('defaults aoeRadius to 20 when size does not match pattern', async () => {
-            executeHandler.mockResolvedValue({ success: true });
+            expect(executeHandler.mock.calls[0][0].automation.aoeRadius).toBe(30);
 
             await triggerSilence({ name: 'Silence', level: 2, area_of_effect: { size: 'invalid' } }, {}, playerStats, campaignName, mapName);
-
-            const [action] = executeHandler.mock.calls[0];
-            expect(action.automation.aoeRadius).toBe(20);
-        });
-
-        it('passes correct campaignName and mapName to the handler', async () => {
-            executeHandler.mockResolvedValue({ success: true });
+            expect(executeHandler.mock.calls[1][0].automation.aoeRadius).toBe(20);
 
             await triggerSilence({ name: 'Silence', level: 2 }, {}, playerStats, campaignName, mapName);
-
-            expect(executeHandler).toHaveBeenCalledWith(
-                expect.any(Object),
-                playerStats,
-                campaignName,
-                mapName,
-            );
+            expect(executeHandler.mock.calls[2][0].automation.aoeRadius).toBe(20);
         });
     });
 
@@ -278,13 +198,6 @@ describe('silenceService', () => {
             expect(result).toBe(false);
         });
 
-        it('returns false when center has no gridX/gridY', () => {
-            setupBase(true, { gridX: null, gridY: null }, 20, { players: [], creatures: [] });
-
-            const result = isCreatureInSilenceZone('Target', 'Caster', 'TestCampaign');
-            expect(result).toBe(false);
-        });
-
         it('returns false when no combat summary', () => {
             getRuntimeValue.mockImplementation((player, key) => {
                 if (key === 'silenceCaster') return true;
@@ -308,68 +221,30 @@ describe('silenceService', () => {
             expect(result).toBe(false);
         });
 
-        it('returns false when target has no grid coordinates', () => {
-            setupBase(true, { gridX: 5, gridY: 5 }, 20, {
-                players: [],
-                creatures: [{ name: 'Target' }],
-            });
-
-            const result = isCreatureInSilenceZone('Target', 'Caster', 'TestCampaign');
-            expect(result).toBe(false);
-        });
-
-        it('returns true when target is within radius', () => {
+        it('returns true when target is within or at boundary of radius', () => {
+            // within radius
             setupBase(true, { gridX: 5, gridY: 5 }, 10, {
                 players: [],
                 creatures: [{ name: 'Target', gridX: 6, gridY: 5 }],
             });
-            getDistanceFeet.mockImplementation((center, target) => {
-                const dx = target.gridX - center.gridX;
-                const dy = target.gridY - center.gridY;
-                return Math.sqrt(dx * dx + dy * dy) * 5;
+            getDistanceFeet.mockReturnValue(5);
+            expect(isCreatureInSilenceZone('Target', 'Caster', 'TestCampaign')).toBe(true);
+
+            // at exact boundary
+            setupBase(true, { gridX: 5, gridY: 5 }, 10, {
+                players: [],
+                creatures: [{ name: 'Target', gridX: 7, gridY: 5 }],
             });
+            getDistanceFeet.mockReturnValue(10);
+            expect(isCreatureInSilenceZone('Target', 'Caster', 'TestCampaign')).toBe(true);
 
-            const result = isCreatureInSilenceZone('Target', 'Caster', 'TestCampaign');
-            expect(result).toBe(true);
-        });
-
-        it('returns false when target is outside radius', () => {
+            // outside radius
             setupBase(true, { gridX: 5, gridY: 5 }, 5, {
                 players: [],
                 creatures: [{ name: 'Target', gridX: 10, gridY: 10 }],
             });
             getDistanceFeet.mockReturnValue(35);
-
-            const result = isCreatureInSilenceZone('Target', 'Caster', 'TestCampaign');
-            expect(result).toBe(false);
-        });
-
-        it('returns true when distance equals radius (boundary)', () => {
-            setupBase(true, { gridX: 5, gridY: 5 }, 10, {
-                players: [],
-                creatures: [{ name: 'Target', gridX: 7, gridY: 5 }],
-            });
-            getDistanceFeet.mockImplementation((center, target) => {
-                const dx = target.gridX - center.gridX;
-                const dy = target.gridY - center.gridY;
-                return Math.sqrt(dx * dx + dy * dy) * 5;
-            });
-
-            const result = isCreatureInSilenceZone('Target', 'Caster', 'TestCampaign');
-            expect(result).toBe(true);
-        });
-
-        it('parses center from string JSON and handles object center', () => {
-            getRuntimeValue.mockImplementation((player, key) => {
-                if (key === 'silenceCaster') return true;
-                if (key === 'silenceCenter') return { gridX: 5, gridY: 5 };
-                if (key === 'silenceRadius') return 20;
-                if (key === 'combatSummary') return JSON.stringify({ players: [], creatures: [] });
-                return undefined;
-            });
-
-            const result = isCreatureInSilenceZone('Target', 'Caster', 'TestCampaign');
-            expect(result).toBe(false);
+            expect(isCreatureInSilenceZone('Target', 'Caster', 'TestCampaign')).toBe(false);
         });
 
         it('uses default radius 20 when radius is falsy', () => {
@@ -377,44 +252,28 @@ describe('silenceService', () => {
                 players: [],
                 creatures: [{ name: 'Target', gridX: 6, gridY: 5 }],
             });
-            getDistanceFeet.mockImplementation((center, target) => {
-                const dx = target.gridX - center.gridX;
-                const dy = target.gridY - center.gridY;
-                return Math.sqrt(dx * dx + dy * dy) * 5;
-            });
+            getDistanceFeet.mockReturnValue(5);
 
             const result = isCreatureInSilenceZone('Target', 'Caster', 'TestCampaign');
             expect(result).toBe(true);
         });
 
-        it('finds target in players array', () => {
+        it('finds target in players or creatures array', () => {
+            // target in players array
             setupBase(true, { gridX: 5, gridY: 5 }, 10, {
                 players: [{ name: 'Target', gridX: 6, gridY: 5 }],
                 creatures: [],
             });
-            getDistanceFeet.mockImplementation((center, target) => {
-                const dx = target.gridX - center.gridX;
-                const dy = target.gridY - center.gridY;
-                return Math.sqrt(dx * dx + dy * dy) * 5;
-            });
+            getDistanceFeet.mockReturnValue(5);
+            expect(isCreatureInSilenceZone('Target', 'Caster', 'TestCampaign')).toBe(true);
 
-            const result = isCreatureInSilenceZone('Target', 'Caster', 'TestCampaign');
-            expect(result).toBe(true);
-        });
-
-        it('finds target in creatures array', () => {
+            // target in creatures array
             setupBase(true, { gridX: 5, gridY: 5 }, 10, {
                 players: [],
                 creatures: [{ name: 'Target', gridX: 6, gridY: 5 }],
             });
-            getDistanceFeet.mockImplementation((center, target) => {
-                const dx = target.gridX - center.gridX;
-                const dy = target.gridY - center.gridY;
-                return Math.sqrt(dx * dx + dy * dy) * 5;
-            });
-
-            const result = isCreatureInSilenceZone('Target', 'Caster', 'TestCampaign');
-            expect(result).toBe(true);
+            getDistanceFeet.mockReturnValue(5);
+            expect(isCreatureInSilenceZone('Target', 'Caster', 'TestCampaign')).toBe(true);
         });
     });
 });

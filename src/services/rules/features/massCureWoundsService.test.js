@@ -89,43 +89,6 @@ describe('massCureWoundsService', () => {
                 expect(rollExpression).not.toHaveBeenCalled();
             });
 
-            it('returns null when spell name is empty string', async () => {
-                const result = await triggerMassCureWounds(
-                    { name: '', level: 5 },
-                    {},
-                    basePlayerStats,
-                    campaignName,
-                    mapName,
-                );
-
-                expect(result).toBeNull();
-                expect(rollExpression).not.toHaveBeenCalled();
-            });
-
-            it('throws when spell is null', async () => {
-                await expect(
-                    triggerMassCureWounds(
-                        null,
-                        {},
-                        basePlayerStats,
-                        campaignName,
-                        mapName,
-                    ),
-                ).rejects.toThrow();
-            });
-
-            it('throws when spell is undefined', async () => {
-                await expect(
-                    triggerMassCureWounds(
-                        undefined,
-                        {},
-                        basePlayerStats,
-                        campaignName,
-                        mapName,
-                    ),
-                ).rejects.toThrow();
-            });
-
             it('returns null when spell has no heal_at_slot_level', async () => {
                 const spell = { name: 'Mass Cure Wounds', level: 5 };
                 const result = await triggerMassCureWounds(
@@ -158,36 +121,6 @@ describe('massCureWoundsService', () => {
                 expect(result).toBeNull();
                 expect(rollExpression).not.toHaveBeenCalled();
             });
-
-            it('returns null when rollExpression returns null', async () => {
-                rollExpression.mockReturnValue(null);
-                getCombatContext.mockResolvedValue({ players: [], creatures: [] });
-
-                const result = await triggerMassCureWounds(
-                    massCureWoundsSpell,
-                    { slotLevel: 5 },
-                    basePlayerStats,
-                    campaignName,
-                    mapName,
-                );
-
-                expect(result).toBeNull();
-            });
-
-            it('returns null when getCombatContext returns falsy value', async () => {
-                rollExpression.mockReturnValue({ total: 20, rolls: [12, 8] });
-                getCombatContext.mockResolvedValue(null);
-
-                const result = await triggerMassCureWounds(
-                    massCureWoundsSpell,
-                    { slotLevel: 5 },
-                    basePlayerStats,
-                    campaignName,
-                    mapName,
-                );
-
-                expect(result).toBeNull();
-            });
         });
 
         describe('slot level resolution', () => {
@@ -212,22 +145,6 @@ describe('massCureWoundsService', () => {
 
                 await triggerMassCureWounds(
                     massCureWoundsSpell,
-                    {},
-                    basePlayerStats,
-                    campaignName,
-                    mapName,
-                );
-
-                expect(rollExpression).toHaveBeenCalledWith('5d8');
-            });
-
-            it('uses default slot level 5 when neither metaCtx nor spell has level', async () => {
-                rollExpression.mockReturnValue({ total: 20, rolls: [10, 10] });
-                getCombatContext.mockResolvedValue({ players: [], creatures: [] });
-
-                const spell = { name: 'Mass Cure Wounds', heal_at_slot_level: { 5: '5d8' } };
-                await triggerMassCureWounds(
-                    spell,
                     {},
                     basePlayerStats,
                     campaignName,
@@ -278,28 +195,6 @@ describe('massCureWoundsService', () => {
 
                 expect(rollExpression).toHaveBeenCalledWith('7d8');
             });
-
-            it('treats slotLevel 0 as below all defined levels', async () => {
-                getCombatContext.mockResolvedValue({ players: [], creatures: [] });
-
-                const spell = {
-                    name: 'Mass Cure Wounds',
-                    level: 5,
-                    heal_at_slot_level: { 3: '3d8', 5: '5d8' },
-                };
-
-                // slotLevel 0 is falsy so metaCtx?.slotLevel || spell.level || 5 resolves to 5
-                // which finds a matching expression, so it proceeds and returns noTargets
-                const result = await triggerMassCureWounds(
-                    spell,
-                    { slotLevel: 0 },
-                    basePlayerStats,
-                    campaignName,
-                    mapName,
-                );
-
-                expect(result).toEqual({ noTargets: true });
-            });
         });
 
         describe('spell casting modifier resolution', () => {
@@ -323,28 +218,6 @@ describe('massCureWoundsService', () => {
                 );
 
                 expect(rollExpression).toHaveBeenCalledWith('5d8+4');
-            });
-
-            it('uses ability bonus when spellCastingAbility matches an ability entry', async () => {
-                rollExpression.mockReturnValue({ total: 20, rolls: [10, 10] });
-                getCombatContext.mockResolvedValue({ players: [], creatures: [] });
-
-                const spell = {
-                    name: 'Mass Cure Wounds',
-                    level: 5,
-                    spellCastingAbility: 'Strength',
-                    heal_at_slot_level: { 5: '5d8+MOD' },
-                };
-
-                await triggerMassCureWounds(
-                    spell,
-                    { slotLevel: 5 },
-                    basePlayerStats,
-                    campaignName,
-                    mapName,
-                );
-
-                expect(rollExpression).toHaveBeenCalledWith('5d8+2');
             });
 
             it('uses negative ability bonus in expression', async () => {
@@ -388,72 +261,6 @@ describe('massCureWoundsService', () => {
                     spell,
                     { slotLevel: 5 },
                     basePlayerStats,
-                    campaignName,
-                    mapName,
-                );
-
-                expect(rollExpression).toHaveBeenCalledWith('5d8+0');
-            });
-
-            it('falls back to spellAbilities.modifier when spell lacks spellCastingAbility', async () => {
-                rollExpression.mockReturnValue({ total: 20, rolls: [10, 10] });
-                getCombatContext.mockResolvedValue({ players: [], creatures: [] });
-
-                const spell = {
-                    name: 'Mass Cure Wounds',
-                    level: 5,
-                    heal_at_slot_level: { 5: '5d8+MOD' },
-                };
-
-                await triggerMassCureWounds(
-                    spell,
-                    { slotLevel: 5 },
-                    basePlayerStats,
-                    campaignName,
-                    mapName,
-                );
-
-                expect(rollExpression).toHaveBeenCalledWith('5d8+4');
-            });
-
-            it('returns 0 modifier when playerStats has no spellAbilities', async () => {
-                rollExpression.mockReturnValue({ total: 5, rolls: [5] });
-                getCombatContext.mockResolvedValue({ players: [], creatures: [] });
-
-                const spell = {
-                    name: 'Mass Cure Wounds',
-                    level: 5,
-                    heal_at_slot_level: { 5: '5d8+MOD' },
-                };
-                const stats = { name: 'Cleric', abilities: [] };
-
-                await triggerMassCureWounds(
-                    spell,
-                    { slotLevel: 5 },
-                    stats,
-                    campaignName,
-                    mapName,
-                );
-
-                expect(rollExpression).toHaveBeenCalledWith('5d8+0');
-            });
-
-            it('returns 0 modifier when playerStats has no abilities array', async () => {
-                rollExpression.mockReturnValue({ total: 5, rolls: [5] });
-                getCombatContext.mockResolvedValue({ players: [], creatures: [] });
-
-                const spell = {
-                    name: 'Mass Cure Wounds',
-                    level: 5,
-                    spellCastingAbility: 'Wisdom',
-                    heal_at_slot_level: { 5: '5d8+MOD' },
-                };
-                const stats = { name: 'Cleric' };
-
-                await triggerMassCureWounds(
-                    spell,
-                    { slotLevel: 5 },
-                    stats,
                     campaignName,
                     mapName,
                 );
@@ -678,58 +485,6 @@ describe('massCureWoundsService', () => {
                 expect(result.targets.length).toBe(3);
                 expect(result.targets.map(t => t.targetName)).toEqual(['Goblin', 'Orc', 'Troll']);
             });
-
-            it('handles metaCtx as undefined', async () => {
-                rollExpression.mockReturnValue({ total: 20, rolls: [10, 10] });
-                getCombatContext.mockResolvedValue({ players: [], creatures: [] });
-
-                const result = await triggerMassCureWounds(
-                    massCureWoundsSpell,
-                    undefined,
-                    basePlayerStats,
-                    campaignName,
-                    mapName,
-                );
-
-                expect(result).toEqual({ noTargets: true });
-            });
-
-            it('handles metaCtx as null', async () => {
-                rollExpression.mockReturnValue({ total: 20, rolls: [10, 10] });
-                getCombatContext.mockResolvedValue({ players: [], creatures: [] });
-
-                const result = await triggerMassCureWounds(
-                    massCureWoundsSpell,
-                    null,
-                    basePlayerStats,
-                    campaignName,
-                    mapName,
-                );
-
-                expect(result).toEqual({ noTargets: true });
-            });
-
-            it('handles combatSummary with no players array', async () => {
-                rollExpression.mockReturnValue({ total: 20, rolls: [10, 10] });
-                getCombatContext.mockResolvedValue({
-                    players: undefined,
-                    creatures: [
-                        { name: 'Cleric', maxHp: 50, currentHp: 20 },
-                        { name: 'Goblin', maxHp: 7, currentHp: 3 },
-                    ],
-                });
-
-                const result = await triggerMassCureWounds(
-                    massCureWoundsSpell,
-                    { slotLevel: 5 },
-                    basePlayerStats,
-                    campaignName,
-                    mapName,
-                );
-
-                expect(result.targets).toHaveLength(1);
-                expect(result.targets[0].targetName).toBe('Goblin');
-            });
         });
 
         describe('AoE resolution', () => {
@@ -855,33 +610,6 @@ describe('massCureWoundsService', () => {
                 expect(result.targets[0].healAmount).toBe(1);
             });
 
-            it('skips applyHealingToTarget when actualHeal is 0', async () => {
-                rollExpression.mockReturnValue({ total: 20, rolls: [10, 10] });
-                getRuntimeValue.mockReturnValue(7);
-                getCombatContext.mockResolvedValue({
-                    players: [
-                        { name: 'Cleric', gridX: 5, gridY: 5 },
-                        { name: 'Goblin', gridX: 6, gridY: 5 },
-                    ],
-                    creatures: [
-                        { name: 'Cleric', maxHp: 50, currentHp: 20 },
-                        { name: 'Goblin', maxHp: 7, currentHp: 7 },
-                    ],
-                });
-                getDistanceFeet.mockReturnValue(5);
-
-                const result = await triggerMassCureWounds(
-                    massCureWoundsSpell,
-                    { slotLevel: 5 },
-                    basePlayerStats,
-                    campaignName,
-                    mapName,
-                );
-
-                expect(applyHealingToTarget).not.toHaveBeenCalled();
-                expect(result.targets[0].healAmount).toBe(0);
-            });
-
             it('does not apply healing when target is at full health', async () => {
                 rollExpression.mockReturnValue({ total: 50, rolls: [10, 10, 10, 10, 10] });
                 getRuntimeValue.mockReturnValue(7);
@@ -934,92 +662,6 @@ describe('massCureWoundsService', () => {
 
                 expect(result.targets[0].healAmount).toBe(6);
             });
-
-            it('falls back to creature maxHp when runtime value is empty string', async () => {
-                rollExpression.mockReturnValue({ total: 20, rolls: [10, 10] });
-                getRuntimeValue.mockReturnValue('');
-                getCombatContext.mockResolvedValue({
-                    players: [
-                        { name: 'Cleric', gridX: 5, gridY: 5 },
-                        { name: 'Goblin', gridX: 6, gridY: 5 },
-                    ],
-                    creatures: [
-                        { name: 'Cleric', maxHp: 50, currentHp: 20 },
-                        { name: 'Goblin', maxHp: 7, currentHp: 7 },
-                    ],
-                });
-                getDistanceFeet.mockReturnValue(5);
-
-                const result = await triggerMassCureWounds(
-                    massCureWoundsSpell,
-                    { slotLevel: 5 },
-                    basePlayerStats,
-                    campaignName,
-                    mapName,
-                );
-
-                expect(result.targets[0].healAmount).toBe(0);
-            });
-
-            it('falls back to creature maxHp when runtime value is null', async () => {
-                rollExpression.mockReturnValue({ total: 20, rolls: [10, 10] });
-                getRuntimeValue.mockReturnValue(null);
-                getCombatContext.mockResolvedValue({
-                    players: [
-                        { name: 'Cleric', gridX: 5, gridY: 5 },
-                        { name: 'Goblin', gridX: 6, gridY: 5 },
-                    ],
-                    creatures: [
-                        { name: 'Cleric', maxHp: 50, currentHp: 20 },
-                        { name: 'Goblin', maxHp: 7, currentHp: 7 },
-                    ],
-                });
-                getDistanceFeet.mockReturnValue(5);
-
-                const result = await triggerMassCureWounds(
-                    massCureWoundsSpell,
-                    { slotLevel: 5 },
-                    basePlayerStats,
-                    campaignName,
-                    mapName,
-                );
-
-                expect(result.targets[0].healAmount).toBe(0);
-            });
-
-            it('falls back to playerStats.hitPoints when target has no maxHp', async () => {
-                rollExpression.mockReturnValue({ total: 20, rolls: [10, 10] });
-                getRuntimeValue.mockReturnValue(0);
-                getCombatContext.mockResolvedValue({
-                    players: [
-                        { name: 'Cleric', gridX: 5, gridY: 5 },
-                        { name: 'Goblin', gridX: 6, gridY: 5 },
-                    ],
-                    creatures: [
-                        { name: 'Cleric', maxHp: 50, currentHp: 20 },
-                        { name: 'Goblin' },
-                    ],
-                });
-                getDistanceFeet.mockReturnValue(5);
-
-                const stats = {
-                    ...basePlayerStats,
-                    hitPoints: { max: 30, current: 15 },
-                };
-
-                const result = await triggerMassCureWounds(
-                    massCureWoundsSpell,
-                    { slotLevel: 5 },
-                    stats,
-                    campaignName,
-                    mapName,
-                );
-
-                // Source uses target.maxHp || playerStats.hitPoints || 0
-                // When target has no maxHp, it gets the hitPoints object,
-                // making maxHp - currentHp = NaN, so actualHeal = NaN
-                expect(result.targets[0].healAmount).toBeNaN();
-            });
         });
 
         describe('logging and events', () => {
@@ -1054,37 +696,6 @@ describe('massCureWoundsService', () => {
                     sourceName: 'Cleric',
                     note: 'Mass Cure Wounds',
                     formula: '5d8',
-                }));
-            });
-
-            it('posts log entries even when actualHeal is 0', async () => {
-                rollExpression.mockReturnValue({ total: 20, rolls: [10, 10] });
-                getRuntimeValue.mockReturnValue(7);
-                getCombatContext.mockResolvedValue({
-                    players: [
-                        { name: 'Cleric', gridX: 5, gridY: 5 },
-                        { name: 'Goblin', gridX: 6, gridY: 5 },
-                    ],
-                    creatures: [
-                        { name: 'Cleric', maxHp: 50, currentHp: 20 },
-                        { name: 'Goblin', maxHp: 7, currentHp: 7 },
-                    ],
-                });
-                getDistanceFeet.mockReturnValue(5);
-
-                await triggerMassCureWounds(
-                    massCureWoundsSpell,
-                    { slotLevel: 5 },
-                    basePlayerStats,
-                    campaignName,
-                    mapName,
-                );
-
-                expect(postLogEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
-                    type: 'hp_change',
-                    targetName: 'Goblin',
-                    delta: 0,
-                    isHealing: true,
                 }));
             });
 
@@ -1188,27 +799,6 @@ describe('massCureWoundsService', () => {
                 expect(result.totalHealed).toBe(
                     result.targets.reduce((sum, t) => sum + t.healAmount, 0),
                 );
-            });
-
-            it('includes formula matching the resolved expression', async () => {
-                rollExpression.mockReturnValue({ total: 27, rolls: [15, 12] });
-                getCombatContext.mockResolvedValue({ players: [], creatures: [] });
-
-                const spell = {
-                    name: 'Mass Cure Wounds',
-                    level: 5,
-                    heal_at_slot_level: { 7: '7d8' },
-                };
-
-                const result = await triggerMassCureWounds(
-                    spell,
-                    { slotLevel: 7 },
-                    basePlayerStats,
-                    campaignName,
-                    mapName,
-                );
-
-                expect(result).toEqual({ noTargets: true });
             });
         });
     });

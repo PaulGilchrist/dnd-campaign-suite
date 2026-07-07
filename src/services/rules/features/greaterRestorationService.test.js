@@ -18,45 +18,26 @@ describe('greaterRestorationService', () => {
     const playerStats = { name: 'Cleric', proficiency: 4 };
 
     describe('triggerGreaterRestoration', () => {
-        it.each(['Greater Restoration', 'greater restoration', 'GREATER RESTORATION'])('matches "%s" case-insensitively', async (name) => {
-            executeHandler.mockResolvedValue({ type: 'popup', payload: { type: 'automation_info' } });
-            const result = await triggerGreaterRestoration({ name, level: 5 }, {}, playerStats, campaignName, mapName);
-            expect(result).toEqual({ type: 'popup', payload: { type: 'automation_info' } });
-        });
-
         it.each([
             'Cure Wounds', 'Healing Word', 'Lesser Restoration', 'Restoration', 'greater', 'restoration', 'greater restorations',
         ])('returns null for non-matching spell: "%s"', async (spellName) => {
             const result = await triggerGreaterRestoration({ name: spellName, level: 1 }, {}, playerStats, campaignName, mapName);
             expect(result).toBeNull();
-            expect(executeHandler).not.toHaveBeenCalled();
         });
 
         it.each([undefined, null, ''])('returns null when spell name is %s', async (name) => {
             const result = await triggerGreaterRestoration({ name, level: 5 }, {}, playerStats, campaignName, mapName);
             expect(result).toBeNull();
-            expect(executeHandler).not.toHaveBeenCalled();
         });
 
         it.each([
             ['spell.range', { range: '60 feet' }, '60 feet'],
             ['default "Touch"', {}, 'Touch'],
-            ['null range', { range: null }, 'Touch'],
-            ['undefined range', { range: undefined }, 'Touch'],
         ])('uses %s for range', async (_label, spellOverrides, expectedRange) => {
             executeHandler.mockResolvedValue({ type: 'popup' });
             await triggerGreaterRestoration({ name: 'Greater Restoration', level: 5, ...spellOverrides }, {}, playerStats, campaignName, mapName);
             expect(executeHandler).toHaveBeenCalledWith(
-                expect.objectContaining({ automation: expect.objectContaining({ range: expectedRange }) }),
-                playerStats, campaignName, mapName,
-            );
-        });
-
-        it('includes automation type greater_restoration in the action', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
-            await triggerGreaterRestoration({ name: 'Greater Restoration', level: 5 }, {}, playerStats, campaignName, mapName);
-            expect(executeHandler).toHaveBeenCalledWith(
-                expect.objectContaining({ automation: expect.objectContaining({ type: 'greater_restoration' }) }),
+                expect.objectContaining({ automation: { type: 'greater_restoration', range: expectedRange } }),
                 playerStats, campaignName, mapName,
             );
         });

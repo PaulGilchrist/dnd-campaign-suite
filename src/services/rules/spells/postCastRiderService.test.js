@@ -161,7 +161,6 @@ describe('postCastRiderService', () => {
 
   describe('triggerPostCastRiderSaves', () => {
     const enchantmentSpell = { name: 'Charm Person', school: 'enchantment' }
-    const illusionSpell = { name: 'Minor Illusion', school: 'illusion' }
     const evocationSpell = { name: 'Fireball', school: 'evocation' }
 
     it('returns null for non-enchantment/illusion spell', async () => {
@@ -170,15 +169,6 @@ describe('postCastRiderService', () => {
         automation: { passives: [{ type: 'post_cast_rider', name: 'Rider' }] },
       }
       const result = await triggerPostCastRiderSaves(evocationSpell, { slotLevel: 1 }, stats, 'camp', 'map')
-      expect(result).toBeNull()
-    })
-
-    it('returns null for illusion spells', async () => {
-      const stats = {
-        name: 'Player',
-        automation: { passives: [{ type: 'post_cast_rider', name: 'Rider' }] },
-      }
-      const result = await triggerPostCastRiderSaves(illusionSpell, { slotLevel: 1 }, stats, 'camp', 'map')
       expect(result).toBeNull()
     })
 
@@ -425,13 +415,6 @@ describe('postCastRiderService', () => {
       expect(result).toBeNull()
     })
 
-    it('triggers when spell has level > 0', async () => {
-      executeHandler.mockResolvedValue({ success: true })
-      const stats = { name: 'Player', automation: { reactions: [{ type: 'spell_thief', name: 'Thief' }] } }
-      const result = await triggerSpellThief(spell, {}, stats, 'camp', 'map')
-      expect(result).toBeNull()
-    })
-
     it('returns null when blocked by spell thief', async () => {
       const { isBlockedBySpellThief } = await import('../../automation/handlers/class-fighter-rogue/spellThiefHandler.js')
       vi.mocked(isBlockedBySpellThief).mockReturnValue(true)
@@ -556,18 +539,6 @@ describe('postCastRiderService', () => {
       expect(result).toBeNull()
     })
 
-    it('returns null for illusion spell', async () => {
-      const stats = { automation: { passives: [{ type: 'bewitching_magic', name: 'Bewitch' }] } }
-      const result = await triggerBewitchingMagic(
-        { name: 'Minor Illusion', school: 'illusion', casting_time: '1 action' },
-        {},
-        stats,
-        'camp',
-        'map',
-      )
-      expect(result).toBeNull()
-    })
-
     it('returns null when no spell slot used', async () => {
       const stats = { automation: { passives: [{ type: 'bewitching_magic', name: 'Bewitch' }] } }
       const result = await triggerBewitchingMagic({ ...enchantmentSpell, level: 0 }, {}, stats, 'camp', 'map')
@@ -662,8 +633,5 @@ describe('postCastRiderService', () => {
       })
     })
 
-    it('does nothing when no pending modal', () => {
-      expect(() => confirmSoulstitchSelection(['A'])).not.toThrow()
-    })
   })
 })

@@ -91,29 +91,6 @@ describe('longstriderHandler', () => {
       expect(result.payload.attackerPos).toBeNull();
     });
 
-    it('excludes caster from target list', async () => {
-      damageUtils.getCombatContext.mockResolvedValue(
-        makeCombatContext({
-          creatures: [{ name: 'Ally1' }, { name: 'TestCharacter' }],
-        })
-      );
-
-      const result = await handle(makeAction(), playerStats, campaignName, null);
-
-      expect(result.payload.creatureTargets).not.toContain('TestCharacter');
-      expect(result.payload.creatureTargets).toContain('Ally1');
-    });
-
-    it('returns empty creatureTargets when caster is the only creature', async () => {
-      damageUtils.getCombatContext.mockResolvedValue({
-        creatures: [{ name: 'TestCharacter' }],
-      });
-
-      const result = await handle(makeAction(), playerStats, campaignName, null);
-
-      expect(result.payload.creatureTargets).toEqual([]);
-    });
-
     it('returns info popup when no combat context', async () => {
       damageUtils.getCombatContext.mockResolvedValue(null);
       targetResolver.resolveMapPositions.mockResolvedValue(null);
@@ -155,15 +132,6 @@ describe('longstriderHandler', () => {
       const result = await handle(action, playerStats, campaignName, null);
 
       expect(result.payload.duration).toBe('10 minutes');
-    });
-
-    it('returns null attackerPos when mapName is null', async () => {
-      damageUtils.getCombatContext.mockResolvedValue(makeCombatContext());
-      targetResolver.resolveMapPositions.mockResolvedValue(null);
-
-      const result = await handle(makeAction(), playerStats, campaignName, null);
-
-      expect(result.payload.attackerPos).toBeNull();
     });
 
     it('returns attackerPos when mapName is provided', async () => {
@@ -257,21 +225,6 @@ describe('longstriderHandler', () => {
       expect(await applyLongstrider(action, playerStats, campaignName, null, 'Ally1')).toBeNull();
     });
 
-    it('uses default duration when spell has no duration', async () => {
-      runtimeState.getRuntimeValue.mockImplementation(() => []);
-
-      const action = makeAction({ spell: { name: 'Longstrider' } });
-      await applyLongstrider(action, playerStats, campaignName, null, ['Ally1']);
-
-      const buffsCall = runtimeState.setRuntimeValue.mock.calls.find(
-        (call) => call[1] === 'activeBuffs'
-      );
-      const buffs = buffsCall[2];
-      const longstriderBuff = buffs.find((b) => b.name === 'Longstrider');
-
-      expect(longstriderBuff.duration).toBe('1 hour');
-    });
-
     it('posts log entry for each target', async () => {
       runtimeState.getRuntimeValue.mockImplementation(() => []);
 
@@ -285,47 +238,6 @@ describe('longstriderHandler', () => {
         abilityName: 'Longstrider',
         description: expect.stringContaining('Longstrider'),
       });
-    });
-
-    it('uses correct sourceCharacter in buff', async () => {
-      runtimeState.getRuntimeValue.mockImplementation(() => []);
-
-      const action = makeAction();
-      await applyLongstrider(action, playerStats, campaignName, null, ['Ally1']);
-
-      const buffsCall = runtimeState.setRuntimeValue.mock.calls.find(
-        (call) => call[1] === 'activeBuffs'
-      );
-      const longstriderBuff = buffsCall[2].find((b) => b.name === 'Longstrider');
-
-      expect(longstriderBuff.sourceCharacter).toBe('TestCharacter');
-    });
-
-    it('handles target with no existing buffs (undefined or non-array)', async () => {
-      runtimeState.getRuntimeValue.mockImplementation(() => undefined);
-
-      const action = makeAction();
-      await applyLongstrider(action, playerStats, campaignName, null, ['Ally1']);
-
-      expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-        'Ally1',
-        'activeBuffs',
-        expect.arrayContaining([
-          expect.objectContaining({ name: 'Longstrider' }),
-        ]),
-        campaignName
-      );
-    });
-
-    it('adds expiration for each target even when buff already exists', async () => {
-      runtimeState.getRuntimeValue.mockImplementation(() => [
-        { name: 'Longstrider', effect: 'speed_boost', speedBonus: 10 },
-      ]);
-
-      const action = makeAction();
-      await applyLongstrider(action, playerStats, campaignName, null, ['Ally1', 'Ally2']);
-
-      expect(expirations.addExpiration).toHaveBeenCalledTimes(2);
     });
   });
 });

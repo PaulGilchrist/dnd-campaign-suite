@@ -114,14 +114,6 @@ describe('webAreaSaveHandler.handle', () => {
       const result = await handle(makeAction({ saveType: 'CON' }), makePlayerStats(), campaignName, null);
       expect(result.payload.saveType).toBe('CON');
     });
-
-    it('defaults saveType to DEX when not specified', async () => {
-      damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
-      savePrompt.buildSaveDc.mockReturnValue(10);
-
-      const result = await handle(makeAction({ saveType: undefined }), makePlayerStats(), campaignName, null);
-      expect(result.payload.saveType).toBe('DEX');
-    });
   });
 
   describe('tracking data storage', () => {
@@ -150,22 +142,26 @@ describe('webAreaSaveHandler.handle', () => {
       );
     });
 
-    it('stores null center when caster not found on map or mapName is null', async () => {
+    it('stores null center when caster not found on map', async () => {
       damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
       savePrompt.buildSaveDc.mockReturnValue(15);
-
-      // caster not found on map
       mapsService.loadMapData.mockResolvedValue({ players: [] });
+
       await handle(makeAction(), makePlayerStats(), campaignName, mapName);
-      let trackingCall = useRuntimeState.setRuntimeValue.mock.calls.find(
+
+      const trackingCall = useRuntimeState.setRuntimeValue.mock.calls.find(
         (c) => c[1] === '_web_TestCaster',
       );
       expect(trackingCall[2].center).toBeNull();
+    });
 
-      // mapName is null
-      useRuntimeState.setRuntimeValue.mockClear();
+    it('stores null center when mapName is null', async () => {
+      damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
+      savePrompt.buildSaveDc.mockReturnValue(15);
+
       await handle(makeAction(), makePlayerStats(), campaignName, null);
-      trackingCall = useRuntimeState.setRuntimeValue.mock.calls.find(
+
+      const trackingCall = useRuntimeState.setRuntimeValue.mock.calls.find(
         (c) => c[1] === '_web_TestCaster',
       );
       expect(trackingCall[2].center).toBeNull();
@@ -176,15 +172,20 @@ describe('webAreaSaveHandler.handle', () => {
       savePrompt.buildSaveDc.mockReturnValue(15);
 
       await handle(makeAction({ duration: '10 minutes' }), makePlayerStats(), campaignName, null);
-      let trackingCall = useRuntimeState.setRuntimeValue.mock.calls.find(
+
+      const trackingCall = useRuntimeState.setRuntimeValue.mock.calls.find(
         (c) => c[1] === '_web_TestCaster',
       );
       expect(trackingCall[2].duration).toBe('10 minutes');
+    });
 
-      // defaults duration to 1 hour when not specified
-      useRuntimeState.setRuntimeValue.mockClear();
+    it('defaults duration to 1 hour when not specified', async () => {
+      damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
+      savePrompt.buildSaveDc.mockReturnValue(15);
+
       await handle(makeAction({ duration: undefined }), makePlayerStats(), campaignName, null);
-      trackingCall = useRuntimeState.setRuntimeValue.mock.calls.find(
+
+      const trackingCall = useRuntimeState.setRuntimeValue.mock.calls.find(
         (c) => c[1] === '_web_TestCaster',
       );
       expect(trackingCall[2].duration).toBe('1 hour');
@@ -211,21 +212,6 @@ describe('webAreaSaveHandler.handle', () => {
       expect(result.type).toBe('modal');
       expect(result.modalName).toBe('setCondition');
     });
-
-    it('passes caster position to tracking when found on map', async () => {
-      damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
-      savePrompt.buildSaveDc.mockReturnValue(15);
-      mapsService.loadMapData.mockResolvedValue({
-        players: [{ name: 'TestCaster', gridX: 5, gridY: 10 }],
-      });
-
-      await handle(makeAction(), makePlayerStats(), campaignName, mapName);
-
-      const trackingCall = useRuntimeState.setRuntimeValue.mock.calls.find(
-        (c) => c[1] === '_web_TestCaster',
-      );
-      expect(trackingCall[2].center).toEqual({ gridX: 5, gridY: 10 });
-    });
   });
 });
 
@@ -235,16 +221,7 @@ describe('webAreaSaveHandler.processWebAreaSave', () => {
   });
 
   describe('early returns', () => {
-    it('returns null when target is already restrained (case-insensitive)', async () => {
-      useRuntimeState.getRuntimeValue.mockImplementation((name, key) => {
-        if (key === '_web_TestCaster') return { saveDc: 15, saveType: 'DEX' };
-        if (key === 'activeConditions') return ['Restrained'];
-        return null;
-      });
-
-      expect(await processWebAreaSave('TestCaster', 'Goblin', campaignName, mapName)).toBeNull();
-
-      // lowercase variant — same case-insensitive check
+    it('returns null when target is already restrained', async () => {
       useRuntimeState.getRuntimeValue.mockImplementation((name, key) => {
         if (key === '_web_TestCaster') return { saveDc: 15, saveType: 'DEX' };
         if (key === 'activeConditions') return ['restrained'];

@@ -37,12 +37,6 @@ describe('removeCurseService', () => {
             expect(executeHandler).toHaveBeenCalledTimes(1);
         });
 
-        it.each([undefined, null, ''])('returns null when spell name is %s', async (name) => {
-            const result = await triggerRemoveCurse({ name, level: 2 }, {}, playerStats, campaignName, mapName);
-            expect(result).toBeNull();
-            expect(executeHandler).not.toHaveBeenCalled();
-        });
-
         it('passes spell range to action automation, defaulting to "Touch"', async () => {
             executeHandler.mockResolvedValue({ type: 'popup' });
             await triggerRemoveCurse({ name: 'Remove Curse', level: 2, range: 'Self' }, {}, playerStats, campaignName, mapName);

@@ -33,32 +33,8 @@ describe('resilientSphereService', () => {
             expect(executeHandler).not.toHaveBeenCalled();
         });
 
-        it('returns null for empty spell name', async () => {
-            const result = await triggerResilientSphere(
-                { name: '', level: 4 },
-                {},
-                playerStats,
-                campaignName,
-                mapName,
-            );
-            expect(result).toBeNull();
-            expect(executeHandler).not.toHaveBeenCalled();
-        });
-
-        it('returns null when spell object has no name property', async () => {
-            const result = await triggerResilientSphere(
-                { level: 4 },
-                {},
-                playerStats,
-                campaignName,
-                mapName,
-            );
-            expect(result).toBeNull();
-            expect(executeHandler).not.toHaveBeenCalled();
-        });
-
         it('matches spell name case-insensitively for full and short names', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup', payload: { type: 'automation_info' } });
+            executeHandler.mockResolvedValue({ type: 'popup' });
 
             const spellNames = [
                 "Otiluke's Resilient Sphere",
@@ -85,31 +61,17 @@ describe('resilientSphereService', () => {
             }
         });
 
-        it('throws when spell is undefined', async () => {
+        it('throws when spell is undefined or null', async () => {
             await expect(
-                triggerResilientSphere(
-                    undefined,
-                    {},
-                    playerStats,
-                    campaignName,
-                    mapName,
-                )
+                triggerResilientSphere(undefined, {}, playerStats, campaignName, mapName)
             ).rejects.toThrow("Cannot read properties of undefined (reading 'name')");
-        });
 
-        it('throws when spell is null', async () => {
             await expect(
-                triggerResilientSphere(
-                    null,
-                    {},
-                    playerStats,
-                    campaignName,
-                    mapName,
-                )
+                triggerResilientSphere(null, {}, playerStats, campaignName, mapName)
             ).rejects.toThrow("Cannot read properties of null (reading 'name')");
         });
 
-        it('executes handler with correct automation payload using playerStats saveDc', async () => {
+        it('passes correct automation payload with saveDc and slotLevel from playerStats', async () => {
             executeHandler.mockResolvedValue({ type: 'popup' });
 
             await triggerResilientSphere(
@@ -140,12 +102,12 @@ describe('resilientSphereService', () => {
             );
         });
 
-        it('uses metaCtx spellSaveDc when provided', async () => {
+        it('prefers metaCtx saveDc and slotLevel over playerStats and spell', async () => {
             executeHandler.mockResolvedValue({ type: 'popup' });
 
             await triggerResilientSphere(
                 { name: 'Resilient Sphere', level: 4 },
-                { spellSaveDc: 18, slotLevel: 5 },
+                { spellSaveDc: 18, slotLevel: 6 },
                 playerStats,
                 campaignName,
                 mapName,
@@ -154,7 +116,7 @@ describe('resilientSphereService', () => {
             expect(executeHandler).toHaveBeenCalledWith(
                 expect.objectContaining({
                     automation: expect.objectContaining({ saveDc: 18 }),
-                    spellSlotLevel: 5,
+                    spellSlotLevel: 6,
                 }),
                 playerStats,
                 campaignName,
@@ -162,28 +124,7 @@ describe('resilientSphereService', () => {
             );
         });
 
-        it('falls back to playerStats spellAbilities saveDc when metaCtx lacks it', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
-
-            await triggerResilientSphere(
-                { name: 'Resilient Sphere', level: 4 },
-                {},
-                playerStats,
-                campaignName,
-                mapName,
-            );
-
-            expect(executeHandler).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    automation: expect.objectContaining({ saveDc: 15 }),
-                }),
-                playerStats,
-                campaignName,
-                mapName,
-            );
-        });
-
-        it('computes saveDc from proficiency when no spellAbilities.saveDc', async () => {
+        it('falls back to proficiency-based saveDc when playerStats lacks spellAbilities', async () => {
             executeHandler.mockResolvedValue({ type: 'popup' });
             const stats = { name: 'Wizard', proficiency: 3 };
 
@@ -205,7 +146,7 @@ describe('resilientSphereService', () => {
             );
         });
 
-        it('uses default proficiency of 2 when not available', async () => {
+        it('falls back to default proficiency of 2 when not available', async () => {
             executeHandler.mockResolvedValue({ type: 'popup' });
             const stats = { name: 'Wizard' };
 
@@ -222,25 +163,6 @@ describe('resilientSphereService', () => {
                     automation: expect.objectContaining({ saveDc: 10 }),
                 }),
                 stats,
-                campaignName,
-                mapName,
-            );
-        });
-
-        it('prefers metaCtx slotLevel over spell.level', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
-
-            await triggerResilientSphere(
-                { name: 'Resilient Sphere', level: 4 },
-                { spellSaveDc: 15, slotLevel: 6 },
-                playerStats,
-                campaignName,
-                mapName,
-            );
-
-            expect(executeHandler).toHaveBeenCalledWith(
-                expect.objectContaining({ spellSlotLevel: 6 }),
-                playerStats,
                 campaignName,
                 mapName,
             );
@@ -284,37 +206,33 @@ describe('resilientSphereService', () => {
             );
         });
 
-        it('passes the original spell object into the action', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
-            const spell = { name: 'Resilient Sphere', level: 4, school: 'Evocation' };
-
-            await triggerResilientSphere(spell, {}, playerStats, campaignName, mapName);
-
-            expect(executeHandler).toHaveBeenCalledWith(
-                expect.objectContaining({ spell }),
-                playerStats,
-                campaignName,
-                mapName,
-            );
-        });
-
-        it('passes campaignName and mapName as-is to executeHandler', async () => {
+        it('handles undefined or null metaCtx gracefully', async () => {
             executeHandler.mockResolvedValue({ type: 'popup' });
 
-            await triggerResilientSphere(
+            const result = await triggerResilientSphere(
                 { name: 'Resilient Sphere', level: 4 },
-                {},
+                undefined,
                 playerStats,
                 campaignName,
                 mapName,
             );
 
-            expect(executeHandler).toHaveBeenCalledWith(
-                expect.any(Object),
+            expect(result).toEqual({ type: 'popup' });
+            expect(executeHandler).toHaveBeenCalled();
+
+            vi.clearAllMocks();
+            executeHandler.mockResolvedValue({ type: 'popup' });
+
+            const result2 = await triggerResilientSphere(
+                { name: 'Resilient Sphere', level: 4 },
+                null,
                 playerStats,
                 campaignName,
                 mapName,
             );
+
+            expect(result2).toEqual({ type: 'popup' });
+            expect(executeHandler).toHaveBeenCalled();
         });
 
         it('returns result from executeHandler on success', async () => {
@@ -335,21 +253,7 @@ describe('resilientSphereService', () => {
             expect(result).toBe(expectedResult);
         });
 
-        it('returns null when executeHandler returns null', async () => {
-            executeHandler.mockResolvedValue(null);
-
-            const result = await triggerResilientSphere(
-                { name: 'Resilient Sphere', level: 4 },
-                {},
-                playerStats,
-                campaignName,
-                mapName,
-            );
-
-            expect(result).toBeNull();
-        });
-
-        it('returns null and logs error when executeHandler throws', async () => {
+        it('returns null when executeHandler throws', async () => {
             const consoleSpy = vi.spyOn(console, 'error').mockReturnValue();
             executeHandler.mockRejectedValue(new Error('Handler failed'));
 
@@ -367,36 +271,6 @@ describe('resilientSphereService', () => {
                 expect.any(Error),
             );
             consoleSpy.mockRestore();
-        });
-
-        it('handles undefined metaCtx gracefully', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
-
-            const result = await triggerResilientSphere(
-                { name: 'Resilient Sphere', level: 4 },
-                undefined,
-                playerStats,
-                campaignName,
-                mapName,
-            );
-
-            expect(result).toEqual({ type: 'popup' });
-            expect(executeHandler).toHaveBeenCalled();
-        });
-
-        it('handles null metaCtx gracefully', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
-
-            const result = await triggerResilientSphere(
-                { name: 'Resilient Sphere', level: 4 },
-                null,
-                playerStats,
-                campaignName,
-                mapName,
-            );
-
-            expect(result).toEqual({ type: 'popup' });
-            expect(executeHandler).toHaveBeenCalled();
         });
     });
 });

@@ -158,7 +158,7 @@ describe('stoneSkinHandler', () => {
       expect(stoneSkinBuffs[0].resistanceTypes).toEqual(['Bludgeoning', 'Piercing', 'Slashing']);
     });
 
-    it('preserves other buffs when replacing Stone Skin', async () => {
+    it('replaces existing Stone Skin while preserving other buffs', async () => {
       const existingStoneSkin = {
         name: 'Stone Skin',
         effect: 'damage_resistance',

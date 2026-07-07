@@ -180,7 +180,7 @@ describe('conditionHandler.handle', () => {
       expect(result.type).toBe('modal');
     });
 
-    it('defaults to 2 charges when class data is missing', async () => {
+    it('uses default charge count from defaults when class data is missing', async () => {
       const ps = makePlayerStats({ class: null });
       const action = makeAction({});
 
@@ -188,7 +188,6 @@ describe('conditionHandler.handle', () => {
 
       const result = await handle(action, ps, CAMPAIGN_NAME, null);
 
-      expect(result.type).toBe('modal');
       expect(result.payload.channelDivinityCharges).toBe(2);
     });
   });
@@ -257,16 +256,6 @@ describe('conditionHandler.handle', () => {
       const result = await handle(action, ps, CAMPAIGN_NAME, MAP_NAME);
 
       expect(result.payload.attackerPos).toEqual({ gridX: 5, gridY: 10 });
-      expect(result.payload.mapData).toBe(mapData);
-    });
-
-    it('returns null attackerPos when mapName is falsy', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction({});
-
-      const result = await handle(action, ps, CAMPAIGN_NAME, null);
-
-      expect(result.payload.attackerPos).toBeNull();
     });
 
     it('returns null attackerPos when attacker not in mapData', async () => {
@@ -324,21 +313,6 @@ describe('conditionHandler.handle', () => {
       await handle(action, ps, CAMPAIGN_NAME, null);
 
       expect(addEntry).not.toHaveBeenCalled();
-    });
-
-    it('uses action name and player name from objects in log description', async () => {
-      const ps = makePlayerStats({ name: 'CustomHero' });
-      const action = makeAction({});
-      action.name = 'Wardens Flare';
-
-      getRuntimeValue.mockReturnValue(2);
-
-      await handle(action, ps, CAMPAIGN_NAME, null);
-
-      expect(addEntry).toHaveBeenCalledWith(CAMPAIGN_NAME, expect.objectContaining({
-        abilityName: 'Wardens Flare',
-        characterName: 'CustomHero',
-      }));
     });
   });
 

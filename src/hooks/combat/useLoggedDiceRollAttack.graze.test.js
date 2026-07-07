@@ -146,6 +146,17 @@ describe('createLogAndShow - Graze Damage', () => {
             );
             expect(grazeLogs.length).toBeGreaterThan(0);
             expect(grazeLogs[0][0].note).toBe('Graze: ability modifier damage on miss');
+            expect(grazeLogs[0][0].damageType).toBe('slashing');
+            const grazePopups = deps.setPopupHtml.mock.calls.filter(
+                call => call[0].type === 'graze-damage'
+            );
+            expect(grazePopups.length).toBeGreaterThan(0);
+            expect(grazePopups[0][0].formula).toBe('3 [Graze]');
+            const { addEntry } = await import('../../services/ui/logService.js');
+            expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
+                type: 'ability_use',
+                abilityName: 'Graze',
+            }));
         });
 
         it('does not apply graze damage when grazeAbilityMod is zero or negative', async () => {
@@ -208,39 +219,6 @@ describe('createLogAndShow - Graze Damage', () => {
             );
             expect(grazeLogs.length).toBeGreaterThan(0);
             expect(grazeLogs[0][0].damageType).toBe('Slashing');
-        });
-
-        it('calls addEntry for graze damage', async () => {
-            const { addEntry } = await import('../../services/ui/logService.js');
-            addEntry.mockResolvedValue({});
-            const fn = createFn();
-            await fn('Longsword', 2, 'attack', {
-                targetName: 'Goblin',
-                grazeDamage: true,
-                grazeAbilityMod: 3,
-                damageType: 'slashing',
-            });
-            await vi.advanceTimersByTimeAsync(2500);
-            expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
-                type: 'ability_use',
-                abilityName: 'Graze',
-            }));
-        });
-
-        it('sets popupHtml with graze-damage type', async () => {
-            const fn = createFn();
-            await fn('Longsword', 2, 'attack', {
-                targetName: 'Goblin',
-                grazeDamage: true,
-                grazeAbilityMod: 3,
-                damageType: 'slashing',
-            });
-            await vi.advanceTimersByTimeAsync(2500);
-            const grazePopups = deps.setPopupHtml.mock.calls.filter(
-                call => call[0].type === 'graze-damage'
-            );
-            expect(grazePopups.length).toBeGreaterThan(0);
-            expect(grazePopups[0][0].formula).toBe('3 [Graze]');
         });
 
         it('uses target hitPoints from runtimeValue for player targets', async () => {

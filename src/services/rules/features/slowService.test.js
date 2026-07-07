@@ -21,342 +21,315 @@ describe('slowService', () => {
     };
 
     describe('triggerSlow', () => {
-        it('returns null for non-Slow spells', async () => {
-            const result = await triggerSlow(
-                { name: 'Haste', level: 3 },
-                {},
-                playerStats,
-                campaignName,
-                mapName,
-            );
-            expect(result).toBeNull();
-            expect(executeHandler).not.toHaveBeenCalled();
+        describe('spell name matching', () => {
+            it.each([
+                ['Slow'],
+                ['slow'],
+                ['SLOW'],
+                ['sLoW'],
+            ])('executes handler for "%s" spell name (case-insensitive)', async (name) => {
+                executeHandler.mockResolvedValue({ type: 'popup' });
+
+                const result = await triggerSlow(
+                    { name, level: 3 },
+                    {},
+                    playerStats,
+                    campaignName,
+                    mapName,
+                );
+
+                expect(executeHandler).toHaveBeenCalledTimes(1);
+                expect(result).toEqual({ type: 'popup' });
+            });
+
+            it.each([
+                'Haste',
+                'Fire Bolt',
+                'Silence',
+                'Fear',
+                'fears',
+                '',
+            ])('returns null for non-Slow spell: "%s"', async (spellName) => {
+                const result = await triggerSlow(
+                    { name: spellName, level: 1 },
+                    {},
+                    playerStats,
+                    campaignName,
+                    mapName,
+                );
+
+                expect(result).toBeNull();
+                expect(executeHandler).not.toHaveBeenCalled();
+            });
+
+            it.each([
+                [undefined],
+                [null],
+            ])('returns null when spell name is %s', async (name) => {
+                const result = await triggerSlow(
+                    { name, level: 3 },
+                    {},
+                    playerStats,
+                    campaignName,
+                    mapName,
+                );
+
+                expect(result).toBeNull();
+                expect(executeHandler).not.toHaveBeenCalled();
+            });
         });
 
-        it('returns null when spell name is missing', async () => {
-            const result = await triggerSlow(
-                {},
-                {},
-                playerStats,
-                campaignName,
-                mapName,
-            );
-            expect(result).toBeNull();
-            expect(executeHandler).not.toHaveBeenCalled();
+        describe('save DC resolution', () => {
+            it('uses spellSaveDc from metaCtx when provided', async () => {
+                executeHandler.mockResolvedValue({ type: 'popup' });
+
+                await triggerSlow(
+                    { name: 'Slow', level: 3 },
+                    { spellSaveDc: 18, slotLevel: 5 },
+                    playerStats,
+                    campaignName,
+                    mapName,
+                );
+
+                expect(executeHandler).toHaveBeenCalledWith(
+                    expect.objectContaining({
+                        automation: expect.objectContaining({ saveDc: 18 }),
+                        spellSlotLevel: 5,
+                    }),
+                    playerStats,
+                    campaignName,
+                    mapName,
+                );
+            });
+
+            it('falls back to playerStats.spellAbilities.saveDc when metaCtx lacks it', async () => {
+                executeHandler.mockResolvedValue({ type: 'popup' });
+
+                await triggerSlow(
+                    { name: 'Slow', level: 3 },
+                    {},
+                    playerStats,
+                    campaignName,
+                    mapName,
+                );
+
+                expect(executeHandler).toHaveBeenCalledWith(
+                    expect.objectContaining({
+                        automation: expect.objectContaining({ saveDc: 15 }),
+                    }),
+                    playerStats,
+                    campaignName,
+                    mapName,
+                );
+            });
+
+            it('computes saveDc from proficiency when no spellAbilities.saveDc', async () => {
+                executeHandler.mockResolvedValue({ type: 'popup' });
+                const stats = { name: 'Wizard', proficiency: 3 };
+
+                await triggerSlow(
+                    { name: 'Slow', level: 3 },
+                    {},
+                    stats,
+                    campaignName,
+                    mapName,
+                );
+
+                expect(executeHandler).toHaveBeenCalledWith(
+                    expect.objectContaining({
+                        automation: expect.objectContaining({ saveDc: 11 }),
+                    }),
+                    stats,
+                    campaignName,
+                    mapName,
+                );
+            });
+
+            it('uses default proficiency of 2 when proficiency is missing', async () => {
+                executeHandler.mockResolvedValue({ type: 'popup' });
+                const stats = { name: 'Wizard' };
+
+                await triggerSlow(
+                    { name: 'Slow', level: 3 },
+                    {},
+                    stats,
+                    campaignName,
+                    mapName,
+                );
+
+                expect(executeHandler).toHaveBeenCalledWith(
+                    expect.objectContaining({
+                        automation: expect.objectContaining({ saveDc: 10 }),
+                    }),
+                    stats,
+                    campaignName,
+                    mapName,
+                );
+            });
         });
 
-        it('returns null when spell name is null', async () => {
-            const result = await triggerSlow(
-                { name: null, level: 3 },
-                {},
-                playerStats,
-                campaignName,
-                mapName,
-            );
-            expect(result).toBeNull();
-            expect(executeHandler).not.toHaveBeenCalled();
+        describe('slot level resolution', () => {
+            it('prefers metaCtx slotLevel over spell.level', async () => {
+                executeHandler.mockResolvedValue({ type: 'popup' });
+
+                await triggerSlow(
+                    { name: 'Slow', level: 1 },
+                    { spellSaveDc: 17, slotLevel: 4 },
+                    playerStats,
+                    campaignName,
+                    mapName,
+                );
+
+                expect(executeHandler).toHaveBeenCalledWith(
+                    expect.objectContaining({ spellSlotLevel: 4 }),
+                    playerStats,
+                    campaignName,
+                    mapName,
+                );
+            });
+
+            it('falls back to spell.level when metaCtx has no slotLevel', async () => {
+                executeHandler.mockResolvedValue({ type: 'popup' });
+
+                await triggerSlow(
+                    { name: 'Slow', level: 5 },
+                    { spellSaveDc: 17 },
+                    playerStats,
+                    campaignName,
+                    mapName,
+                );
+
+                expect(executeHandler).toHaveBeenCalledWith(
+                    expect.objectContaining({ spellSlotLevel: 5 }),
+                    playerStats,
+                    campaignName,
+                    mapName,
+                );
+            });
+
+            it('defaults slotLevel to 3 when neither metaCtx nor spell has level', async () => {
+                executeHandler.mockResolvedValue({ type: 'popup' });
+
+                await triggerSlow(
+                    { name: 'Slow' },
+                    {},
+                    playerStats,
+                    campaignName,
+                    mapName,
+                );
+
+                expect(executeHandler).toHaveBeenCalledWith(
+                    expect.objectContaining({ spellSlotLevel: 3 }),
+                    playerStats,
+                    campaignName,
+                    mapName,
+                );
+            });
+
+            it('treats spell.level 0 as missing and falls back to default slot level 3', async () => {
+                executeHandler.mockResolvedValue({ type: 'popup' });
+
+                await triggerSlow(
+                    { name: 'Slow', level: 0 },
+                    {},
+                    playerStats,
+                    campaignName,
+                    mapName,
+                );
+
+                expect(executeHandler).toHaveBeenCalledWith(
+                    expect.objectContaining({ spellSlotLevel: 3 }),
+                    playerStats,
+                    campaignName,
+                    mapName,
+                );
+            });
         });
 
-        it('returns null when spell name is empty string', async () => {
-            const result = await triggerSlow(
-                { name: '', level: 3 },
-                {},
-                playerStats,
-                campaignName,
-                mapName,
-            );
-            expect(result).toBeNull();
-            expect(executeHandler).not.toHaveBeenCalled();
+        describe('action structure', () => {
+            it('passes the spell object into the action', async () => {
+                executeHandler.mockResolvedValue({ type: 'popup' });
+                const spell = { name: 'Slow', level: 3, school: 'Transmutation' };
+
+                await triggerSlow(spell, {}, playerStats, campaignName, mapName);
+
+                expect(executeHandler).toHaveBeenCalledWith(
+                    expect.objectContaining({ spell }),
+                    playerStats,
+                    campaignName,
+                    mapName,
+                );
+            });
+
+            it('passes campaignName and mapName to executeHandler', async () => {
+                executeHandler.mockResolvedValue({ type: 'popup' });
+
+                await triggerSlow(
+                    { name: 'Slow', level: 3 },
+                    {},
+                    playerStats,
+                    'MyCampaign',
+                    'DungeonMap1',
+                );
+
+                expect(executeHandler).toHaveBeenCalledWith(
+                    expect.any(Object),
+                    playerStats,
+                    'MyCampaign',
+                    'DungeonMap1',
+                );
+            });
         });
 
-        it('matches spell name case-insensitively', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
+        describe('metaCtx edge cases', () => {
+            it.each([
+                [undefined],
+                [null],
+            ])('handles %s metaCtx gracefully', async (metaCtx) => {
+                executeHandler.mockResolvedValue({ type: 'popup' });
 
-            const result = await triggerSlow(
-                { name: 'SLoW', level: 3 },
-                {},
-                playerStats,
-                campaignName,
-                mapName,
-            );
+                const result = await triggerSlow(
+                    { name: 'Slow', level: 3 },
+                    metaCtx,
+                    playerStats,
+                    campaignName,
+                    mapName,
+                );
 
-            expect(executeHandler).toHaveBeenCalled();
-            expect(result).toEqual({ type: 'popup' });
+                expect(executeHandler).toHaveBeenCalledWith(
+                    expect.objectContaining({
+                        automation: expect.objectContaining({ saveDc: 15 }),
+                    }),
+                    playerStats,
+                    campaignName,
+                    mapName,
+                );
+                expect(result).toEqual({ type: 'popup' });
+            });
         });
 
-        it('passes the spell object into the action', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
-            const spell = { name: 'Slow', level: 3, school: 'Transmutation' };
+        describe('return value', () => {
+            it('returns result from executeHandler on success, null when handler returns null or throws', async () => {
+                const expectedResult = {
+                    type: 'popup',
+                    payload: { type: 'automation_info', name: 'Slow', description: 'Slow affects...' },
+                };
+                executeHandler.mockResolvedValue(expectedResult);
 
-            await triggerSlow(spell, {}, playerStats, campaignName, mapName);
+                let result = await triggerSlow({ name: 'Slow', level: 3 }, {}, playerStats, campaignName, mapName);
+                expect(result).toBe(expectedResult);
 
-            expect(executeHandler).toHaveBeenCalledWith(
-                expect.objectContaining({ spell }),
-                playerStats,
-                campaignName,
-                mapName,
-            );
-        });
+                executeHandler.mockResolvedValue(null);
+                result = await triggerSlow({ name: 'Slow', level: 3 }, {}, playerStats, campaignName, mapName);
+                expect(result).toBeNull();
 
-        it('uses spellSaveDc from metaCtx when provided', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
-
-            await triggerSlow(
-                { name: 'Slow', level: 3 },
-                { spellSaveDc: 18, slotLevel: 5 },
-                playerStats,
-                campaignName,
-                mapName,
-            );
-
-            expect(executeHandler).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    automation: expect.objectContaining({ saveDc: 18 }),
-                    spellSlotLevel: 5,
-                }),
-                playerStats,
-                campaignName,
-                mapName,
-            );
-        });
-
-        it('falls back to playerStats.spellAbilities.saveDc when metaCtx lacks it', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
-
-            await triggerSlow(
-                { name: 'Slow', level: 3 },
-                {},
-                playerStats,
-                campaignName,
-                mapName,
-            );
-
-            expect(executeHandler).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    automation: expect.objectContaining({ saveDc: 15 }),
-                }),
-                playerStats,
-                campaignName,
-                mapName,
-            );
-        });
-
-        it('computes saveDc from proficiency when no spellAbilities.saveDc', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
-            const stats = { name: 'Wizard', proficiency: 3 };
-
-            await triggerSlow(
-                { name: 'Slow', level: 3 },
-                {},
-                stats,
-                campaignName,
-                mapName,
-            );
-
-            expect(executeHandler).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    automation: expect.objectContaining({ saveDc: 11 }),
-                }),
-                stats,
-                campaignName,
-                mapName,
-            );
-        });
-
-        it('uses default proficiency of 2 when not available', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
-            const stats = { name: 'Wizard' };
-
-            await triggerSlow(
-                { name: 'Slow', level: 3 },
-                {},
-                stats,
-                campaignName,
-                mapName,
-            );
-
-            expect(executeHandler).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    automation: expect.objectContaining({ saveDc: 10 }),
-                }),
-                stats,
-                campaignName,
-                mapName,
-            );
-        });
-
-        it('uses spell.level as fallback when metaCtx has no slotLevel', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
-
-            await triggerSlow(
-                { name: 'Slow', level: 5 },
-                { spellSaveDc: 17 },
-                playerStats,
-                campaignName,
-                mapName,
-            );
-
-            expect(executeHandler).toHaveBeenCalledWith(
-                expect.objectContaining({ spellSlotLevel: 5 }),
-                playerStats,
-                campaignName,
-                mapName,
-            );
-        });
-
-        it('uses default slot level of 3 when neither metaCtx nor spell has level', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
-
-            await triggerSlow(
-                { name: 'Slow' },
-                {},
-                playerStats,
-                campaignName,
-                mapName,
-            );
-
-            expect(executeHandler).toHaveBeenCalledWith(
-                expect.objectContaining({ spellSlotLevel: 3 }),
-                playerStats,
-                campaignName,
-                mapName,
-            );
-        });
-
-        it('prefers metaCtx slotLevel over spell.level', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
-
-            await triggerSlow(
-                { name: 'Slow', level: 1 },
-                { spellSaveDc: 17, slotLevel: 4 },
-                playerStats,
-                campaignName,
-                mapName,
-            );
-
-            expect(executeHandler).toHaveBeenCalledWith(
-                expect.objectContaining({ spellSlotLevel: 4 }),
-                playerStats,
-                campaignName,
-                mapName,
-            );
-        });
-
-        it('returns result from executeHandler on success', async () => {
-            const expectedResult = {
-                type: 'popup',
-                payload: { type: 'automation_info', name: 'Slow', description: 'Slow affects...' },
-            };
-            executeHandler.mockResolvedValue(expectedResult);
-
-            const result = await triggerSlow(
-                { name: 'Slow', level: 3 },
-                {},
-                playerStats,
-                campaignName,
-                mapName,
-            );
-
-            expect(result).toBe(expectedResult);
-        });
-
-        it('returns null when executeHandler returns null', async () => {
-            executeHandler.mockResolvedValue(null);
-
-            const result = await triggerSlow(
-                { name: 'Slow', level: 3 },
-                {},
-                playerStats,
-                campaignName,
-                mapName,
-            );
-
-            expect(result).toBeNull();
-        });
-
-        it('returns null and suppresses errors from executeHandler', async () => {
-            vi.spyOn(console, 'error').mockReturnValue();
-            executeHandler.mockRejectedValue(new Error('Handler failed'));
-
-            const result = await triggerSlow(
-                { name: 'Slow', level: 3 },
-                {},
-                playerStats,
-                campaignName,
-                mapName,
-            );
-
-            expect(result).toBeNull();
-            expect(console.error).toHaveBeenCalled();
-            vi.restoreAllMocks();
-        });
-
-        it('passes campaignName and mapName to executeHandler', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
-
-            await triggerSlow(
-                { name: 'Slow', level: 3 },
-                {},
-                playerStats,
-                'MyCampaign',
-                'DungeonMap1',
-            );
-
-            expect(executeHandler).toHaveBeenCalledWith(
-                expect.any(Object),
-                playerStats,
-                'MyCampaign',
-                'DungeonMap1',
-            );
-        });
-
-        it('handles undefined metaCtx', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
-
-            const result = await triggerSlow(
-                { name: 'Slow', level: 3 },
-                undefined,
-                playerStats,
-                campaignName,
-                mapName,
-            );
-
-            expect(executeHandler).toHaveBeenCalled();
-            expect(result).toEqual({ type: 'popup' });
-        });
-
-        it('handles null metaCtx', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
-
-            const result = await triggerSlow(
-                { name: 'Slow', level: 3 },
-                null,
-                playerStats,
-                campaignName,
-                mapName,
-            );
-
-            expect(executeHandler).toHaveBeenCalled();
-            expect(result).toEqual({ type: 'popup' });
-        });
-
-        it('treats spell.level 0 as missing and falls back to default slot level 3', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
-
-            await triggerSlow(
-                { name: 'Slow', level: 0 },
-                {},
-                playerStats,
-                campaignName,
-                mapName,
-            );
-
-            expect(executeHandler).toHaveBeenCalledWith(
-                expect.objectContaining({ spellSlotLevel: 3 }),
-                playerStats,
-                campaignName,
-                mapName,
-            );
+                vi.spyOn(console, 'error').mockReturnValue();
+                executeHandler.mockRejectedValue(new Error('Handler failed'));
+                result = await triggerSlow({ name: 'Slow', level: 3 }, {}, playerStats, campaignName, mapName);
+                expect(result).toBeNull();
+                expect(console.error).toHaveBeenCalled();
+                vi.restoreAllMocks();
+            });
         });
     });
 });

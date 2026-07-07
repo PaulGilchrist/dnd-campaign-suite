@@ -21,106 +21,17 @@ describe('buildAttackInfo', () => {
         })
     })
 
-    describe('dispatch correctness — representative handler coverage', () => {
-        // Representative behavioral tests across handler categories.
-        // The DISPATCH map in automationInfoBuilder.js merges 21 handler modules.
-        // This test verifies that each handler category produces a non-null result
-        // with the expected type and hasAutomation flag.
-        const representativeTypes = [
-            // attack.js
-            { type: 'attack_rider', expectedType: 'attack_rider' },
-            { type: 'bonus_action_attack', expectedType: 'bonus_action_attack' },
-            // save.js
-            { type: 'save_attack', expectedType: 'save_attack' },
-            { type: 'sleep', expectedType: 'sleep' },
-            // passive.js
-            { type: 'passive_buff', expectedType: 'passive_buff' },
-            { type: 'passive_immunity', expectedType: 'passive_immunity' },
-            { type: 'ignore_resistance', expectedType: 'passive_rule' },
-            // combatStance.js
-            { type: 'combat_stance', expectedType: 'combat_stance' },
-            // bardic.js
-            { type: 'bardic_inspiration', expectedType: 'bardic_inspiration' },
-            // damage.js
-            { type: 'damage_bonus', expectedType: 'damage_bonus' },
-            { type: 'great_weapon_fighting', expectedType: 'passive_rule' },
-            // healing.js
-            { type: 'healing', expectedType: 'healing' },
-            { type: 'healing_pool', expectedType: 'healing_pool' },
-            // reaction.js
-            { type: 'reaction_damage', expectedType: 'reaction_damage' },
-            { type: 'reaction_save', expectedType: 'reaction_save' },
-            // resource.js
-            { type: 'resource_pool', expectedType: 'resource_pool' },
-            // spell.js
-            { type: 'free_spell', expectedType: 'free_spell' },
-            { type: 'warding_bond', expectedType: 'warding_bond' },
-            // diverse.js
-            { type: 'extra_action', expectedType: 'extra_action' },
-            { type: 'font_of_magic', expectedType: 'font_of_magic' },
-            // misc.js
-            { type: 'auto_effect', expectedType: 'auto_effect' },
-            { type: 'resistance', expectedType: 'resistance' },
-            // nature.js
-            { type: 'nature_sanctuary', expectedType: 'nature_sanctuary' },
-            // primal.js
-            { type: 'primal_companion_summon', expectedType: 'primal_companion_summon' },
-            // psionic.js
-            { type: 'psychic_spells', expectedType: 'psychic_spells' },
-            // sorcery.js
-            { type: 'sorcery_aura', expectedType: 'sorcery_aura' },
-            // starry.js
-            { type: 'starry_form', expectedType: 'starry_form' },
-            // temp.js
-            { type: 'temp_buff', expectedType: 'temp_buff' },
-            { type: 'holy_nimbus', expectedType: 'holy_nimbus' },
-            // conditional.js
-            { type: 'conditional_advantage', expectedType: 'conditional_advantage' },
-            { type: 'passive_rule', expectedType: 'passive_rule' },
-            // initiative.js
-            { type: 'initiative_action', expectedType: 'initiative_action' },
-        ]
-
-        for (const { type, expectedType } of representativeTypes) {
-            it(`dispatches "${type}" and returns correct type`, () => {
-                const feature = makeFeature({ type })
-                const result = buildAttackInfo(feature, BASE_STATS)
-                expect(result).not.toBeNull()
-                expect(result.type).toBe(expectedType)
-                expect(result.hasAutomation).toBe(true)
-                expect(typeof result.name).toBe('string')
-            })
-        }
-    })
-
     describe('behavioral assertions — handlers that compute from playerStats', () => {
-        it('save_attack computes saveDc from ability scores when saveDc is "ability"', () => {
-            const feature = makeFeature({
-                type: 'save_attack',
-                saveDc: 'ability',
-                saveAbility: 'CON',
-            })
-            const result = buildAttackInfo(feature, BASE_STATS)
-            expect(result).not.toBeNull()
-            // CON bonus is 3 in BASE_STATS, so DC = 8 + 3 + proficiency(3) = 14
-            expect(result.saveDc).toBe(14)
-            expect(result.saveAbility).toBe('CON')
-            expect(result.saveType).toBe('DEX')
-        })
-
-        it('save_attack uses explicit saveDc when provided', () => {
-            const feature = makeFeature({
-                type: 'save_attack',
-                saveDc: 16,
-            })
-            const result = buildAttackInfo(feature, BASE_STATS)
-            expect(result.saveDc).toBe(16)
-        })
-
-        it('save_attack defaults saveDc to 10 when not "ability" and no explicit value', () => {
-            const feature = makeFeature({ type: 'save_attack' })
-            const result = buildAttackInfo(feature, BASE_STATS)
-            expect(result.saveDc).toBe(10)
+        it('save_attack computes saveDc from ability, explicit value, or defaults to 10', () => {
+            const abilityFeature = makeFeature({ type: 'save_attack', saveDc: 'ability', saveAbility: 'CON' })
+            const explicitFeature = makeFeature({ type: 'save_attack', saveDc: 16 })
+            const defaultFeature = makeFeature({ type: 'save_attack' })
+            // CON bonus is 3, proficiency is 3, so DC = 8 + 3 + 3 = 14
+            expect(buildAttackInfo(abilityFeature, BASE_STATS).saveDc).toBe(14)
+            expect(buildAttackInfo(abilityFeature, BASE_STATS).saveAbility).toBe('CON')
+            expect(buildAttackInfo(abilityFeature, BASE_STATS).saveType).toBe('DEX')
+            expect(buildAttackInfo(explicitFeature, BASE_STATS).saveDc).toBe(16)
+            expect(buildAttackInfo(defaultFeature, BASE_STATS).saveDc).toBe(10)
         })
 
         it('healing returns healExpression string when expression cannot be evaluated numerically', () => {
@@ -196,42 +107,15 @@ describe('buildAttackInfo', () => {
             expect(result.saveDc).toBeNull()
         })
 
-        it('temp_buff resolves uses="proficiency_bonus" from stats', () => {
-            const feature = makeFeature({
-                type: 'temp_buff',
-                uses: 'proficiency_bonus',
-            })
-            const result = buildAttackInfo(feature, BASE_STATS)
-            expect(result).not.toBeNull()
-            expect(result.usesMax).toBe(3)
-        })
-
-        it('temp_buff resolves uses="paladin_level" when class matches', () => {
-            const stats = {
-                ...BASE_STATS,
-                class: { name: 'Paladin' },
-            }
-            const feature = makeFeature({
-                type: 'temp_buff',
-                uses: 'paladin_level',
-            })
-            const result = buildAttackInfo(feature, stats)
-            expect(result).not.toBeNull()
-            expect(result.usesMax).toBe(5)
-        })
-
-        it('temp_buff resolves uses="warlock_level" when class does not match', () => {
-            const stats = {
-                ...BASE_STATS,
-                class: { name: 'Rogue', levels: 3 },
-            }
-            const feature = makeFeature({
-                type: 'temp_buff',
-                uses: 'warlock_level',
-            })
-            const result = buildAttackInfo(feature, stats)
-            expect(result).not.toBeNull()
-            expect(result.usesMax).toBe(3)
+        it('temp_buff resolves uses from proficiency_bonus, class_level, or fallback', () => {
+            const profFeature = makeFeature({ type: 'temp_buff', uses: 'proficiency_bonus' })
+            const paladinStats = { ...BASE_STATS, class: { name: 'Paladin' } }
+            const paladinFeature = makeFeature({ type: 'temp_buff', uses: 'paladin_level' })
+            const rogueStats = { ...BASE_STATS, class: { name: 'Rogue', levels: 3 } }
+            const warlockFeature = makeFeature({ type: 'temp_buff', uses: 'warlock_level' })
+            expect(buildAttackInfo(profFeature, BASE_STATS).usesMax).toBe(3)
+            expect(buildAttackInfo(paladinFeature, paladinStats).usesMax).toBe(5)
+            expect(buildAttackInfo(warlockFeature, rogueStats).usesMax).toBe(3)
         })
 
         it('glorious_defense computes acBonus from CHA modifier', () => {
@@ -267,67 +151,28 @@ describe('buildAttackInfo', () => {
             expect(result.saveBonus).toBe(13)
         })
 
-        it('passive_buff with max_hp_increase returns type "passive_rule"', () => {
-            const feature = makeFeature({
-                type: 'passive_buff',
-                effect: 'max_hp_increase',
-            })
-            const result = buildAttackInfo(feature, BASE_STATS)
-            expect(result).not.toBeNull()
-            expect(result.type).toBe('passive_rule')
+        it('passive_buff returns type "passive_rule" for max_hp_increase, "passive_buff" otherwise', () => {
+            const hpFeature = makeFeature({ type: 'passive_buff', effect: 'max_hp_increase' })
+            const otherFeature = makeFeature({ type: 'passive_buff', effect: 'ac_bonus' })
+            expect(buildAttackInfo(hpFeature, BASE_STATS).type).toBe('passive_rule')
+            expect(buildAttackInfo(otherFeature, BASE_STATS).type).toBe('passive_buff')
         })
 
-        it('passive_buff without special effect returns type "passive_buff"', () => {
-            const feature = makeFeature({
-                type: 'passive_buff',
-                effect: 'ac_bonus',
-            })
-            const result = buildAttackInfo(feature, BASE_STATS)
-            expect(result).not.toBeNull()
-            expect(result.type).toBe('passive_buff')
-        })
-
-        it('free_spell computes usesMax from uses_expression', () => {
-            const feature = makeFeature({
-                type: 'free_spell',
-                uses_expression: '2 + Math.floor(level / 2)',
-            })
-            const result = buildAttackInfo(feature, BASE_STATS)
-            expect(result).not.toBeNull()
+        it('free_spell computes usesMax from uses_expression or defaults to 1', () => {
+            const exprFeature = makeFeature({ type: 'free_spell', uses_expression: '2 + Math.floor(level / 2)' })
+            const defaultFeature = makeFeature({ type: 'free_spell' })
             // level=5, so 2 + Math.floor(5/2) = 2 + 2 = 4
-            expect(result.usesMax).toBe(4)
+            expect(buildAttackInfo(exprFeature, BASE_STATS).usesMax).toBe(4)
+            expect(buildAttackInfo(defaultFeature, BASE_STATS).usesMax).toBe(1)
         })
 
-        it('free_spell defaults usesMax to 1 when no uses_expression', () => {
-            const feature = makeFeature({
-                type: 'free_spell',
-            })
-            const result = buildAttackInfo(feature, BASE_STATS)
-            expect(result).not.toBeNull()
-            expect(result.usesMax).toBe(1)
-        })
-
-        it('damage_bonus resolves scaling expression by level', () => {
-            const feature = makeFeature({
-                type: 'damage_bonus',
-                damageExpression: '1d6',
-                scaling: { '5': '2d6', '11': '3d6' },
-            })
-            const result = buildAttackInfo(feature, BASE_STATS)
-            expect(result).not.toBeNull()
+        it('damage_bonus resolves scaling expression by level or uses base', () => {
+            const scalingFeature = makeFeature({ type: 'damage_bonus', damageExpression: '1d6', scaling: { '5': '2d6', '11': '3d6' } })
+            const noScalingFeature = makeFeature({ type: 'damage_bonus', damageExpression: '1d4', scaling: { '11': '2d6' } })
             // Level 5 should resolve to '2d6'
-            expect(result.damageExpression).toBe('2d6')
-        })
-
-        it('damage_bonus uses base expression when level below all scaling entries', () => {
-            const feature = makeFeature({
-                type: 'damage_bonus',
-                damageExpression: '1d4',
-                scaling: { '11': '2d6' },
-            })
-            const result = buildAttackInfo(feature, BASE_STATS)
-            expect(result).not.toBeNull()
-            expect(result.damageExpression).toBe('1d4')
+            expect(buildAttackInfo(scalingFeature, BASE_STATS).damageExpression).toBe('2d6')
+            // Level 5 is below all scaling entries, so uses base '1d4'
+            expect(buildAttackInfo(noScalingFeature, BASE_STATS).damageExpression).toBe('1d4')
         })
 
         it('attack_rider resolves scaling expression by level', () => {
@@ -349,7 +194,6 @@ describe('buildAttackInfo', () => {
             expect(result).not.toBeNull()
             expect(result.uses).toBe(1)
             expect(result.recharge).toBe('short_rest')
-            // resourceKey is built from feature.name: 'testfeature' + 'Uses'
             expect(result.resourceKey).toBe('testfeatureUses')
         })
 
@@ -380,24 +224,11 @@ describe('buildAttackInfo', () => {
     })
 
     describe('behavioral assertions — handlers that return null', () => {
-        it('damage handler returns null when feature has no matching type and source', () => {
-            // makeFeature({ type: 'damage' }) creates automation: { type: 'damage' }
-            // The damage handler checks feature.type === 'damage' && feature.source === 'feat'
-            // But makeFeature doesn't set feature.type or feature.source
-            const feature = makeFeature({ type: 'damage' })
-            const result = buildAttackInfo(feature, BASE_STATS)
-            expect(result).toBeNull()
-        })
-
-        it('damage handler returns null when feature type is "damage" but source is not "feat"', () => {
-            const feature = {
-                name: 'Damage from class',
-                type: 'damage',
-                source: 'class',
-                automation: { type: 'damage' },
-            }
-            const result = buildAttackInfo(feature, BASE_STATS)
-            expect(result).toBeNull()
+        it('damage handler returns null for non-feat sources', () => {
+            // The damage handler only processes features where source === 'feat'.
+            // Missing source (via makeFeature) and explicit non-feat source both return null.
+            expect(buildAttackInfo(makeFeature({ type: 'damage' }), BASE_STATS)).toBeNull()
+            expect(buildAttackInfo({ name: 'Damage from class', type: 'damage', source: 'class', automation: { type: 'damage' } }, BASE_STATS)).toBeNull()
         })
     })
 

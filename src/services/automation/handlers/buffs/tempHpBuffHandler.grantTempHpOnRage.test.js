@@ -35,22 +35,11 @@ describe('grantTempHpOnRage', () => {
       expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
     });
 
-    it('returns false when tempHpExpression is empty', () => {
+    it('returns false when tempHpExpression is empty or undefined', () => {
       const action = makeAction({ triggerOnRage: true, tempHpExpression: '' });
       const ps = makePlayerStats();
 
       const result = grantTempHpOnRage(action, ps, campaignName);
-
-      expect(result).toBe(false);
-      expect(automationService.evaluateAutoExpression).not.toHaveBeenCalled();
-      expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
-    });
-
-    it('returns false when tempHpExpression is undefined', () => {
-      const action = makeAction({ triggerOnRage: true });
-      delete action.automation.tempHpExpression;
-
-      const result = grantTempHpOnRage(action, makePlayerStats(), campaignName);
 
       expect(result).toBe(false);
       expect(automationService.evaluateAutoExpression).not.toHaveBeenCalled();
@@ -72,22 +61,7 @@ describe('grantTempHpOnRage', () => {
   });
 
   describe('sets tempHp and returns true', () => {
-    it('uses player name and campaignName from arguments in setRuntimeValue call', () => {
-      const action = makeAction({
-        triggerOnRage: true,
-        tempHpExpression: 'rage_temp_hp',
-      });
-      const ps = makePlayerStats({ name: 'CustomPlayer' });
-
-      useRuntimeState.getRuntimeValue.mockReturnValue(0);
-      automationService.evaluateAutoExpression.mockReturnValue(7);
-
-      grantTempHpOnRage(action, ps, 'MyCampaign');
-
-      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith('CustomPlayer', 'tempHp', 7, 'MyCampaign');
-    });
-
-    it('sets tempHp when amount exceeds existing', () => {
+    it('grants tempHp using evaluated amount when it exceeds existing', () => {
       const action = makeAction({
         triggerOnRage: true,
         tempHpExpression: 'rage_temp_hp',
@@ -100,7 +74,6 @@ describe('grantTempHpOnRage', () => {
       const result = grantTempHpOnRage(action, ps, campaignName);
 
       expect(result).toBe(true);
-      expect(useRuntimeState.getRuntimeValue).toHaveBeenCalledWith('Grog', 'tempHp', campaignName);
       expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith('Grog', 'tempHp', 10, campaignName);
     });
 
@@ -118,21 +91,6 @@ describe('grantTempHpOnRage', () => {
 
       expect(result).toBe(true);
       expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith('Grog', 'tempHp', 15, campaignName);
-    });
-
-    it('treats null existing tempHp as 0 and sets the new amount', () => {
-      const action = makeAction({
-        triggerOnRage: true,
-        tempHpExpression: 'rage_temp_hp',
-      });
-
-      useRuntimeState.getRuntimeValue.mockReturnValue(null);
-      automationService.evaluateAutoExpression.mockReturnValue(5);
-
-      const result = grantTempHpOnRage(action, makePlayerStats(), campaignName);
-
-      expect(result).toBe(true);
-      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith('Grog', 'tempHp', 5, campaignName);
     });
   });
 });

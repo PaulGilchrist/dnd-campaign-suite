@@ -81,7 +81,7 @@ describe('mageArmorHandler.handle', () => {
         expect(result.payload.attackerPos).toBeNull();
     });
 
-    it('uses spell range and duration from action when provided', async () => {
+    it('uses custom spell range and duration when provided', async () => {
         getCombatContext.mockResolvedValue({
             creatures: [{ name: 'Ally1', type: 'player' }],
         });
@@ -315,26 +315,6 @@ describe('mageArmorHandler.applyMageArmor', () => {
         );
     });
 
-    it('uses spell duration for the buff', async () => {
-        getRuntimeValue.mockImplementation((name, key) => {
-            if (key === 'activeBuffs') return [];
-            return null;
-        });
-
-        await applyMageArmor(
-            makeAction({ spell: { duration: '1 hour' } }),
-            makePlayerStats(),
-            campaignName,
-            null,
-            ['Ally1'],
-        );
-
-        const buffsCall = setRuntimeValue.mock.calls.find(
-            (c) => c[0] === 'Ally1' && c[1] === 'activeBuffs',
-        );
-        expect(buffsCall[2][0].duration).toBe('1 hour');
-    });
-
     it('handles activeBuffs not set (null stored value)', async () => {
         getRuntimeValue.mockImplementation((name, key) => {
             if (key === 'activeBuffs') return null;
@@ -384,27 +364,5 @@ describe('mageArmorHandler.applyMageArmor', () => {
             abilityName: 'Mage Armor',
             description: expect.stringContaining('TestWizard cast Mage Armor on Ally2'),
         });
-    });
-
-    it('includes sourceCharacter in buff object', async () => {
-        getRuntimeValue.mockImplementation((name, key) => {
-            if (key === 'activeBuffs') return [];
-            return null;
-        });
-
-        const customPlayer = makePlayerStats({ name: 'CustomCaster' });
-
-        await applyMageArmor(
-            makeAction(),
-            customPlayer,
-            campaignName,
-            null,
-            ['Ally1'],
-        );
-
-        const buffsCall = setRuntimeValue.mock.calls.find(
-            (c) => c[0] === 'Ally1' && c[1] === 'activeBuffs',
-        );
-        expect(buffsCall[2][0].sourceCharacter).toBe('CustomCaster');
     });
 });

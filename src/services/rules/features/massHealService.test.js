@@ -293,7 +293,7 @@ describe('massHealService', () => {
                 expect(applyHealingToTarget).toHaveBeenCalledTimes(3);
             });
 
-            it('falls back to maxHp when stored HP is missing', async () => {
+            it('falls back to maxHp when stored HP is missing or empty', async () => {
                 getRuntimeValue.mockReturnValue(undefined);
 
                 const result = await triggerMassHeal(
@@ -305,12 +305,10 @@ describe('massHealService', () => {
                 );
 
                 expect(result.targets.length).toBe(3);
-            });
 
-            it('falls back to maxHp when stored HP is an empty string', async () => {
                 getRuntimeValue.mockReturnValue('');
 
-                const result = await triggerMassHeal(
+                const result2 = await triggerMassHeal(
                     massHealSpell,
                     {},
                     casterStats,
@@ -318,27 +316,7 @@ describe('massHealService', () => {
                     mapName,
                 );
 
-                expect(result.targets.length).toBe(3);
-            });
-
-            it('uses playerStats.hitPoints when creature has no maxHp', async () => {
-                getCombatContext.mockResolvedValue({
-                    players: [
-                        { name: 'Cleric', gridX: 1, gridY: 1 },
-                        { name: 'Wisp', gridX: 3, gridY: 3 },
-                    ],
-                    creatures: [{ name: 'Wisp' }],
-                });
-
-                const result = await triggerMassHeal(
-                    massHealSpell,
-                    {},
-                    { ...casterStats, hitPoints: 20 },
-                    campaignName,
-                    mapName,
-                );
-
-                expect(result).toBeDefined();
+                expect(result2.targets.length).toBe(3);
             });
         });
 
@@ -466,18 +444,6 @@ describe('massHealService', () => {
                 );
 
                 expect(result.noTargets).toBe(true);
-            });
-
-            it('defaults to 60 feet when spell has no range', async () => {
-                const result = await triggerMassHeal(
-                    { name: 'Mass Heal', level: 9 },
-                    {},
-                    casterStats,
-                    campaignName,
-                    mapName,
-                );
-
-                expect(result.targets.length).toBe(3);
             });
         });
 

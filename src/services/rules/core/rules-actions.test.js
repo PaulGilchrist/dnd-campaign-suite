@@ -1,41 +1,24 @@
-// @improved-by-ai
+// @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-
-vi.mock('../../ui/dataLoader.js', () => ({
-  loadSkills: vi.fn(),
-  loadPassiveSkills: vi.fn(),
-  loadFeatData: vi.fn().mockResolvedValue([]),
-}));
 
 vi.mock('../../character/classRules.js', () => ({
   default: {
-    getClass: vi.fn(),
     getFeatures: vi.fn(),
-    getHighestSubclassLevel: vi.fn(),
   },
 }));
 
 vi.mock('../../character/race-rules/index.js', () => ({
   rules5e: {
-    getRace: vi.fn(),
-    getRacialBonus: vi.fn(),
-    getImmunities: vi.fn(),
-    getResistances: vi.fn(),
-    getSenses: vi.fn(),
     getTraits: vi.fn(),
   },
   rules2024: {
-    getRace: vi.fn(),
-    getSenses: vi.fn(),
     getTraits: vi.fn(),
   },
 }));
 
 vi.mock('../../character/classRules2024.js', () => ({
   default: {
-    getClass: vi.fn(),
     getFeatures: vi.fn(),
-    getHighestSubclassLevel: vi.fn(),
   },
 }));
 
@@ -53,9 +36,11 @@ const makePlayerStats = (overrides = {}) => ({
   ...overrides,
 });
 
-describe('rules', () => {
-  describe('getActions', () => {
+describe('rules getActions', () => {
+  describe('5e action type merging', () => {
     beforeEach(() => {
+      vi.clearAllMocks();
+
       classRules.getFeatures.mockReturnValue({
         actions: [{ name: 'Action Surge' }],
         bonusActions: [{ name: 'Second Wind' }],
@@ -86,7 +71,7 @@ describe('rules', () => {
       expect(actions).toContainEqual({ name: 'Brave' });
     });
 
-    it('should combine actions from all sources for each action type', () => {
+    it('should combine all action types from all sources', () => {
       const playerStats = makePlayerStats({
         actions: [{ name: 'Attack' }],
         bonusActions: [{ name: 'Cunning Action' }],
@@ -247,7 +232,7 @@ describe('rules', () => {
     });
   });
 
-  describe('2024 ruleset dispatch / getActions', () => {
+  describe('2024 ruleset dispatch', () => {
     beforeEach(() => {
       vi.clearAllMocks();
 
@@ -392,7 +377,7 @@ describe('rules', () => {
     });
   });
 
-  describe('5e mode excludes 2024-specific action types', () => {
+  describe('5e excludes 2024-specific action types', () => {
     beforeEach(() => {
       vi.clearAllMocks();
 

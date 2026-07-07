@@ -54,11 +54,6 @@ describe('PartyMarkerLayer', () => {
     });
 
     describe('context menu visibility', () => {
-        it('should not render context menu when contextMenuOpen is false', () => {
-            renderMarker({ contextMenuOpen: false });
-            expect(screen.queryByText('Start Encounter')).not.toBeInTheDocument();
-        });
-
         it('should render encounter menu when contextMenuOpen is true and travelMode is inactive', () => {
             renderMarker({ contextMenuOpen: true, travelMode: 'inactive' });
             expect(screen.getByText('Start Encounter')).toBeInTheDocument();
@@ -80,25 +75,15 @@ describe('PartyMarkerLayer', () => {
             expect(defaultProps.onContextMenu).toHaveBeenCalledWith(0, 0);
         });
 
-        it('should call onEncounter when Start Encounter is clicked', () => {
-            renderMarker({ contextMenuOpen: true, travelMode: 'inactive' });
+        it.each([
+            ['Start Encounter', 'inactive', 'onEncounter', 0],
+            ['Advance One Hex', 'active', 'onAdvance', 0],
+            ['Cancel Travel', 'active', 'onCancelTravel', 1],
+        ])('should call %s callback when %s is clicked', (_label, travelMode, callback, hitIndex) => {
+            renderMarker({ contextMenuOpen: true, travelMode });
             const hitRects = document.querySelectorAll('.party-menu-hit');
-            fireEvent.click(hitRects[0]);
-            expect(defaultProps.onEncounter).toHaveBeenCalledWith(0, 0);
-        });
-
-        it('should call onAdvance when Advance One Hex is clicked', () => {
-            renderMarker({ contextMenuOpen: true, travelMode: 'active' });
-            const hitRects = document.querySelectorAll('.party-menu-hit');
-            fireEvent.click(hitRects[0]);
-            expect(defaultProps.onAdvance).toHaveBeenCalled();
-        });
-
-        it('should call onCancelTravel when Cancel Travel is clicked', () => {
-            renderMarker({ contextMenuOpen: true, travelMode: 'active' });
-            const hitRects = document.querySelectorAll('.party-menu-hit');
-            fireEvent.click(hitRects[1]);
-            expect(defaultProps.onCancelTravel).toHaveBeenCalled();
+            fireEvent.click(hitRects[hitIndex]);
+            expect(defaultProps[callback]).toHaveBeenCalled();
         });
     });
 

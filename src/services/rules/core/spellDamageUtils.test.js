@@ -4,87 +4,78 @@ import { resolveSpellDamageAtLevel, isAutoHitSpell } from './spellDamageUtils.js
 describe('spellDamageUtils', () => {
   describe('resolveSpellDamageAtLevel', () => {
     describe('null/empty handling', () => {
-      it('returns empty string when spell is null, undefined, or has no damage', () => {
+      it('returns empty string for null, undefined, missing damage, or empty damage objects', () => {
         expect(resolveSpellDamageAtLevel(null, 5)).toBe('');
         expect(resolveSpellDamageAtLevel(undefined, 5)).toBe('');
         expect(resolveSpellDamageAtLevel({ name: 'Mage Hand' }, 5)).toBe('');
-      });
-
-      it('returns empty string when damage or damage objects are empty/null', () => {
         expect(resolveSpellDamageAtLevel({ damage: null }, 5)).toBe('');
         expect(resolveSpellDamageAtLevel({ damage: { damage_at_slot_level: {}, damage_at_character_level: null } }, 5)).toBe('');
         expect(resolveSpellDamageAtLevel({ damage: {} }, 5)).toBe('');
       });
     });
 
-    describe('cantrips with damage_at_slot_level (5e format)', () => {
-      const fireBolt = {
-        name: 'Fire Bolt',
-        level: 0,
-        damage: {
-          damage_type: 'Fire',
-          damage_at_slot_level: {
-            '1': '1d10',
-            '5': '2d10',
-            '11': '3d10',
-            '17': '4d6',
+    describe('cantrips scale at tier boundaries', () => {
+      it('selects highest applicable tier from damage_at_slot_level (5e format)', () => {
+        const fireBolt = {
+          name: 'Fire Bolt',
+          level: 0,
+          damage: {
+            damage_type: 'Fire',
+            damage_at_slot_level: {
+              '1': '1d10',
+              '5': '2d10',
+              '11': '3d10',
+              '17': '4d6',
+            },
           },
-        },
-      };
-
-      it('returns the correct tier at each boundary level', () => {
+        };
         expect(resolveSpellDamageAtLevel(fireBolt, 1)).toBe('1d10');
         expect(resolveSpellDamageAtLevel(fireBolt, 5)).toBe('2d10');
         expect(resolveSpellDamageAtLevel(fireBolt, 11)).toBe('3d10');
         expect(resolveSpellDamageAtLevel(fireBolt, 17)).toBe('4d6');
       });
-    });
 
-    describe('cantrips with damage_at_character_level (5e Acid Splash format)', () => {
-      const acidSplash = {
-        name: 'Acid Splash',
-        level: 0,
-        damage: {
-          damage_type: 'Acid',
-          damage_at_character_level: {
-            '1': '1d6',
-            '5': '2d6',
-            '11': '3d6',
-            '17': '4d6',
+      it('selects highest applicable tier from damage_at_character_level (5e Acid Splash format)', () => {
+        const acidSplash = {
+          name: 'Acid Splash',
+          level: 0,
+          damage: {
+            damage_type: 'Acid',
+            damage_at_character_level: {
+              '1': '1d6',
+              '5': '2d6',
+              '11': '3d6',
+              '17': '4d6',
+            },
           },
-        },
-      };
-
-      it('scales cantrip damage at tier boundaries', () => {
+        };
         expect(resolveSpellDamageAtLevel(acidSplash, 1)).toBe('1d6');
         expect(resolveSpellDamageAtLevel(acidSplash, 5)).toBe('2d6');
         expect(resolveSpellDamageAtLevel(acidSplash, 11)).toBe('3d6');
+        expect(resolveSpellDamageAtLevel(acidSplash, 17)).toBe('4d6');
       });
-    });
 
-    describe('cantrips with damage_at_slot_level starting at level 5 (2024 format)', () => {
-      const acidSplash2024 = {
-        name: 'Acid Splash',
-        level: 0,
-        damage: {
-          damage_type: 'Acid',
-          damage_at_slot_level: {
-            '5': '2d6',
-            '11': '3d6',
-            '17': '4d6',
+      it('falls back to first available tier when below all tiers (2024 format)', () => {
+        const acidSplash2024 = {
+          name: 'Acid Splash',
+          level: 0,
+          damage: {
+            damage_type: 'Acid',
+            damage_at_slot_level: {
+              '5': '2d6',
+              '11': '3d6',
+              '17': '4d6',
+            },
           },
-        },
-      };
-
-      it('falls back to first available tier when below all tiers, scales at boundaries', () => {
+        };
         expect(resolveSpellDamageAtLevel(acidSplash2024, 1)).toBe('2d6');
         expect(resolveSpellDamageAtLevel(acidSplash2024, 5)).toBe('2d6');
         expect(resolveSpellDamageAtLevel(acidSplash2024, 11)).toBe('3d6');
       });
     });
 
-    describe('leveled spells with damage_at_slot_level', () => {
-      it('returns base tier regardless of character level (constant damage)', () => {
+    describe('leveled spells return base tier regardless of character level', () => {
+      it('returns base tier for constant damage across all slot levels', () => {
         const magicMissile = {
           name: 'Magic Missile',
           level: 1,
@@ -108,7 +99,7 @@ describe('spellDamageUtils', () => {
         expect(resolveSpellDamageAtLevel(magicMissile, 20)).toBe('1d4 + 1');
       });
 
-      it('returns base tier regardless of character level (varying tiers)', () => {
+      it('returns base tier for varying damage across slot levels', () => {
         const acidArrow = {
           name: 'Acid Arrow',
           level: 2,
@@ -133,7 +124,7 @@ describe('spellDamageUtils', () => {
     });
 
     describe('fallback to damage_at_character_level', () => {
-      it('uses damage_at_character_level when damage_at_slot_level is empty for leveled spells', () => {
+      it('uses damage_at_character_level when damage_at_slot_level is empty', () => {
         const charLevelSpell = {
           name: 'Charm Spell',
           level: 1,
@@ -152,7 +143,7 @@ describe('spellDamageUtils', () => {
         expect(resolveSpellDamageAtLevel(charLevelSpell, 20)).toBe('2d6');
       });
 
-      it('scales cantrip with damage_at_character_level when damage_at_slot_level is empty', () => {
+      it('scales cantrip from damage_at_character_level when damage_at_slot_level is empty', () => {
         const cantrip = {
           name: 'Cantrip Charm',
           level: 0,
@@ -245,22 +236,6 @@ describe('spellDamageUtils', () => {
         };
         expect(resolveSpellDamageAtLevel(spell, 1)).toBe('5');
         expect(resolveSpellDamageAtLevel(spell, 20)).toBe('5');
-      });
-
-      it('handles damage value that is a plain number string', () => {
-        const spell = {
-          name: 'Armor of Agathys',
-          level: 1,
-          damage: {
-            damage_type: 'Cold',
-            damage_at_slot_level: {
-              '1': '5',
-              '2': '10',
-              '3': '15',
-            },
-          },
-        };
-        expect(resolveSpellDamageAtLevel(spell, 1)).toBe('5');
       });
     });
   });

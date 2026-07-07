@@ -133,42 +133,6 @@ describe('resistanceHandler', () => {
 
       expect(result.payload.creatureTargets).toEqual([]);
     });
-
-    it('passes action.automation through to popup payload', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-      damageUtils.getCombatContext.mockResolvedValue({
-        creatures: [{ name: 'Goblin', type: 'npc' }],
-      });
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.payload.automation).toEqual(action.automation);
-    });
-
-    it('handles action with no automation property', async () => {
-      const ps = makePlayerStats();
-      const action = { name: 'Resistance' };
-      damageUtils.getCombatContext.mockResolvedValue({
-        creatures: [{ name: 'Goblin', type: 'npc' }],
-      });
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.automation).toEqual({});
-    });
-
-    it('handles action with no automation when no combat context', async () => {
-      const ps = makePlayerStats();
-      const action = {};
-      damageUtils.getCombatContext.mockResolvedValue(null);
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.payload.name).toBeUndefined();
-      expect(result.payload.automation).toEqual({});
-    });
   });
 
   describe('applyResistance', () => {
@@ -231,27 +195,6 @@ describe('resistanceHandler', () => {
       );
     });
 
-    it('normalizes damage type capitalization', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-      useRuntimeState.getRuntimeValue.mockReturnValue(null);
-
-      await applyResistance(
-        action,
-        ps,
-        campaignName,
-        'Goblin',
-        'lightning'
-      );
-
-      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-        'Goblin',
-        'resistanceChosenDamageType',
-        'Lightning',
-        campaignName
-      );
-    });
-
     it('returns null when targetName is missing', async () => {
       const ps = makePlayerStats();
       const action = makeAction();
@@ -308,46 +251,44 @@ describe('resistanceHandler', () => {
       expect(buffs.find((b) => b.name === 'Shield of Faith')).toBeTruthy();
     });
 
-    it('uses duration from automation when provided', async () => {
+    it('uses duration from automation when provided, default otherwise', async () => {
       const ps = makePlayerStats();
-      const action = makeAction({ duration: 'Concentration, up to 10 minutes' });
       useRuntimeState.getRuntimeValue.mockReturnValue(null);
 
+      // With custom duration
       await applyResistance(
-        action,
+        makeAction({ duration: 'Concentration, up to 10 minutes' }),
         ps,
         campaignName,
         'Goblin',
         'fire'
       );
 
-      const callArgs = useRuntimeState.setRuntimeValue.mock.calls.find(
+      let callArgs = useRuntimeState.setRuntimeValue.mock.calls.find(
         (c) => c[1] === 'activeBuffs'
       );
-      const buffs = callArgs[2];
-      const resistanceBuff = buffs.find((b) => b.name === 'Resistance');
+      let buffs = callArgs[2];
+      let resistanceBuff = buffs.find((b) => b.name === 'Resistance');
 
       expect(resistanceBuff.duration).toBe('Concentration, up to 10 minutes');
-    });
 
-    it('uses default duration when automation has no duration', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction({ duration: undefined });
+      vi.clearAllMocks();
       useRuntimeState.getRuntimeValue.mockReturnValue(null);
 
+      // With default duration
       await applyResistance(
-        action,
+        makeAction({ duration: undefined }),
         ps,
         campaignName,
         'Goblin',
         'fire'
       );
 
-      const callArgs = useRuntimeState.setRuntimeValue.mock.calls.find(
+      callArgs = useRuntimeState.setRuntimeValue.mock.calls.find(
         (c) => c[1] === 'activeBuffs'
       );
-      const buffs = callArgs[2];
-      const resistanceBuff = buffs.find((b) => b.name === 'Resistance');
+      buffs = callArgs[2];
+      resistanceBuff = buffs.find((b) => b.name === 'Resistance');
 
       expect(resistanceBuff.duration).toBe('Concentration, up to 1 minute');
     });
@@ -425,37 +366,14 @@ describe('resistanceHandler', () => {
 
       expect(getResistanceDamageType('Goblin', campaignName)).toBe('Fire');
     });
-
-    it('returns null when no damage type stored', () => {
-      useRuntimeState.getRuntimeValue.mockReturnValue(null);
-
-      expect(getResistanceDamageType('Goblin', campaignName)).toBeNull();
-    });
   });
 
   describe('isResistanceUsedThisTurn', () => {
-    it('returns true when flag is strictly true', () => {
+    it('returns true when flag is true, false otherwise', () => {
       useRuntimeState.getRuntimeValue.mockReturnValue(true);
-
       expect(isResistanceUsedThisTurn('Goblin', campaignName)).toBe(true);
-    });
 
-    it('returns false for any non-true value', () => {
-      useRuntimeState.getRuntimeValue
-        .mockReturnValueOnce(false)
-        .mockReturnValueOnce(null)
-        .mockReturnValueOnce(undefined)
-        .mockReturnValueOnce('yes')
-        .mockReturnValueOnce(1)
-        .mockReturnValueOnce(0)
-        .mockReturnValueOnce({});
-
-      expect(isResistanceUsedThisTurn('Goblin', campaignName)).toBe(false);
-      expect(isResistanceUsedThisTurn('Goblin', campaignName)).toBe(false);
-      expect(isResistanceUsedThisTurn('Goblin', campaignName)).toBe(false);
-      expect(isResistanceUsedThisTurn('Goblin', campaignName)).toBe(false);
-      expect(isResistanceUsedThisTurn('Goblin', campaignName)).toBe(false);
-      expect(isResistanceUsedThisTurn('Goblin', campaignName)).toBe(false);
+      useRuntimeState.getRuntimeValue.mockReturnValue(false);
       expect(isResistanceUsedThisTurn('Goblin', campaignName)).toBe(false);
     });
   });

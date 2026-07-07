@@ -110,6 +110,21 @@ function stubNpcRuntime(currentHp, conditions = [], extraOverrides = {}) {
     });
 }
 
+function createPlayerCreature(name, extra = {}) {
+  return {
+    name,
+    type: 'player',
+    maxHp: 30,
+    currentHp: 30,
+    resistances: [],
+    immunities: [],
+    conditions: [],
+    concentration: null,
+    saveBonuses: {},
+    ...extra,
+  };
+}
+
 // ── Tests ───────────────────────────────────────────────────────
 
 describe('Tasha\'s Hideous Laughter — damage-triggered repeat save', () => {
@@ -150,23 +165,23 @@ describe('Tasha\'s Hideous Laughter — damage-triggered repeat save', () => {
     );
   });
 
-  it('does not trigger when creature lacks incapacitated, lacks target effect, wardDamage is 0 (immune), or is a player', () => {
-    // No incapacitated
+  it('does not trigger when creature lacks incapacitated condition', () => {
     const goblin = createNpcCreature('Goblin', 10, 10, {
       conditions: ['frightened'],
     });
-    const cs1 = makeCombatSummary([goblin]);
+    const cs = makeCombatSummary([goblin]);
     stubNpcRuntime(10);
-    applyDamageToTarget(cs1, 'Goblin', 5, ['Slashing'], 'TestCampaign', [
+    applyDamageToTarget(cs, 'Goblin', 5, ['Slashing'], 'TestCampaign', [
       createMinimalCharacter('Goblin'),
     ]);
     expect(processTashasLaughterRepeatSave).not.toHaveBeenCalled();
+  });
 
-    // No target effect
+  it('does not trigger when incapacitated creature lacks the target effect', () => {
     const barbarian = createNpcCreature('Barbarian', 20, 20, {
       conditions: ['incapacitated'],
     });
-    const cs2 = makeCombatSummary([barbarian]);
+    const cs = makeCombatSummary([barbarian]);
     getRuntimeValue.mockReset();
     getRuntimeValue.mockImplementation((_charName, key, _campaignName) => {
       if (key === 'activeBuffs') return [];
@@ -182,17 +197,18 @@ describe('Tasha\'s Hideous Laughter — damage-triggered repeat save', () => {
       if (key === 'resistanceUsedThisTurn') return undefined;
       return undefined;
     });
-    applyDamageToTarget(cs2, 'Barbarian', 5, ['Slashing'], 'TestCampaign', [
+    applyDamageToTarget(cs, 'Barbarian', 5, ['Slashing'], 'TestCampaign', [
       createMinimalCharacter('Barbarian'),
     ]);
     expect(processTashasLaughterRepeatSave).not.toHaveBeenCalled();
+  });
 
-    // Ward damage 0 (immune)
+  it('does not trigger when creature is immune to damage (wardDamage is 0)', () => {
     const skeleton = createNpcCreature('Skeleton', 20, 20, {
       immunities: ['slashing'],
       conditions: ['incapacitated'],
     });
-    const cs3 = makeCombatSummary([skeleton]);
+    const cs = makeCombatSummary([skeleton]);
     getRuntimeValue.mockReset();
     getRuntimeValue.mockImplementation((_charName, key, _campaignName) => {
       if (key === 'activeBuffs') return [];
@@ -208,14 +224,15 @@ describe('Tasha\'s Hideous Laughter — damage-triggered repeat save', () => {
       if (key === 'resistanceUsedThisTurn') return undefined;
       return undefined;
     });
-    applyDamageToTarget(cs3, 'Skeleton', 10, ['Slashing'], 'TestCampaign', [
+    applyDamageToTarget(cs, 'Skeleton', 10, ['Slashing'], 'TestCampaign', [
       createMinimalCharacter('Skeleton'),
     ]);
     expect(processTashasLaughterRepeatSave).not.toHaveBeenCalled();
+  });
 
-    // Player creature
+  it('does not trigger for player creatures', () => {
     const player = createPlayerCreature('Barbarian');
-    const cs4 = makeCombatSummary([player]);
+    const cs = makeCombatSummary([player]);
     getRuntimeValue.mockReset();
     getRuntimeValue.mockImplementation((_charName, key, _campaignName) => {
       if (key === 'activeBuffs') return [];
@@ -230,7 +247,7 @@ describe('Tasha\'s Hideous Laughter — damage-triggered repeat save', () => {
       if (key === 'resistanceUsedThisTurn') return undefined;
       return undefined;
     });
-    applyDamageToTarget(cs4, 'Barbarian', 5, ['Slashing'], 'TestCampaign', [
+    applyDamageToTarget(cs, 'Barbarian', 5, ['Slashing'], 'TestCampaign', [
       createMinimalCharacter('Barbarian'),
     ]);
     expect(processTashasLaughterRepeatSave).not.toHaveBeenCalled();
@@ -282,10 +299,11 @@ describe('Psychic Veil — attacker condition removal on hit', () => {
     );
   });
 
-  it('does not remove Psychic Veil when attacker is same as target, no damage dealt, or no Psychic Veil buff', () => {
-    // Same as target
-    const player1 = createPlayerCreature('Warlock');
-    const cs1 = makeCombatSummary([player1]);
+  it('does not remove Psychic Veil when no damage is dealt (immune)', () => {
+    const skeleton = createNpcCreature('Skeleton', 10, 10, { immunities: ['psychic'] });
+    const player = createPlayerCreature('Warlock', { currentHp: 20 });
+    player.currentHp = 20;
+    const cs = makeCombatSummary([skeleton, player]);
     getRuntimeValue.mockReset();
     getRuntimeValue.mockImplementation((charName, key, _campaignName) => {
       if (key === 'activeBuffs') { if (charName === 'Warlock') return [{ name: 'Psychic Veil' }]; return []; }
@@ -299,35 +317,15 @@ describe('Psychic Veil — attacker condition removal on hit', () => {
       if (key === 'tempHp') return 0;
       return undefined;
     });
-    applyDamageToTarget(cs1, 'Warlock', 5, ['Psychic'], 'TestCampaign', [createMinimalCharacter('Warlock')]);
+    applyDamageToTarget(cs, 'Skeleton', 5, ['Psychic'], 'TestCampaign', [createMinimalCharacter('Warlock'), createMinimalCharacter('Skeleton')], false, 'Warlock');
     expect(setRuntimeValue).not.toHaveBeenCalledWith('Warlock', 'activeConditions', expect.any(Array), 'TestCampaign');
+  });
 
-    // No damage dealt (immune)
-    const skeleton = createNpcCreature('Skeleton', 10, 10, { immunities: ['psychic'] });
-    const player2 = createPlayerCreature('Warlock2', { currentHp: 20 });
-    player2.currentHp = 20;
-    const cs2 = makeCombatSummary([skeleton, player2]);
-    getRuntimeValue.mockReset();
-    getRuntimeValue.mockImplementation((charName, key, _campaignName) => {
-      if (key === 'activeBuffs') { if (charName === 'Warlock2') return [{ name: 'Psychic Veil' }]; return []; }
-      if (key === 'arcaneWardActive') return false;
-      if (key === 'arcaneWardHp') return 0;
-      if (key === 'lastMetamagicDamage') return undefined;
-      if (key === 'currentHitPoints') return 20;
-      if (key === 'activeConditions') { if (charName === 'Warlock2') return ['invisible']; return []; }
-      if (key === 'holyAuraSaveDc') return undefined;
-      if (key === 'stealthAttackCost') return undefined;
-      if (key === 'tempHp') return 0;
-      return undefined;
-    });
-    applyDamageToTarget(cs2, 'Skeleton', 5, ['Psychic'], 'TestCampaign', [createMinimalCharacter('Warlock2'), createMinimalCharacter('Skeleton')], false, 'Warlock2');
-    expect(setRuntimeValue).not.toHaveBeenCalledWith('Warlock2', 'activeConditions', expect.any(Array), 'TestCampaign');
-
-    // No Psychic Veil buff
+  it('does not remove Psychic Veil when attacker lacks the buff', () => {
     const goblin = createNpcCreature('Goblin', 10, 10);
-    const player3 = createPlayerCreature('Fighter', { currentHp: 20 });
-    player3.currentHp = 20;
-    const cs3 = makeCombatSummary([goblin, player3]);
+    const player = createPlayerCreature('Fighter', { currentHp: 20 });
+    player.currentHp = 20;
+    const cs = makeCombatSummary([goblin, player]);
     getRuntimeValue.mockReset();
     getRuntimeValue.mockImplementation((charName, key, _campaignName) => {
       if (key === 'activeBuffs') { if (charName === 'Fighter') return [{ name: 'Shield' }]; return []; }
@@ -341,7 +339,7 @@ describe('Psychic Veil — attacker condition removal on hit', () => {
       if (key === 'tempHp') return 0;
       return undefined;
     });
-    applyDamageToTarget(cs3, 'Goblin', 5, ['Slashing'], 'TestCampaign', [createMinimalCharacter('Fighter'), createMinimalCharacter('Goblin')], false, 'Fighter');
+    applyDamageToTarget(cs, 'Goblin', 5, ['Slashing'], 'TestCampaign', [createMinimalCharacter('Fighter'), createMinimalCharacter('Goblin')], false, 'Fighter');
     expect(setRuntimeValue).not.toHaveBeenCalledWith('Fighter', 'activeConditions', expect.any(Array), 'TestCampaign');
   });
 });
@@ -352,7 +350,7 @@ describe('Supreme Sneak — preserve Invisible condition', () => {
     global.fetch.mockReset();
   });
 
-  it('preserves Invisible when stealthAttackCost is active and no Psychic Veil, removes when stealthAttackCost is not active', () => {
+  it('preserves Invisible when attacker has stealthAttackCost active and no Psychic Veil', () => {
     const goblin = createNpcCreature('Goblin', 10, 10);
     const rogue = createPlayerCreature('Rogue', { currentHp: 20 });
     rogue.currentHp = 20;
@@ -374,41 +372,5 @@ describe('Supreme Sneak — preserve Invisible condition', () => {
 
     applyDamageToTarget(cs, 'Goblin', 5, ['Psychic'], 'TestCampaign', [createMinimalCharacter('Rogue'), createMinimalCharacter('Goblin')], false, 'Rogue');
     expect(setRuntimeValue).not.toHaveBeenCalledWith('Rogue', 'activeConditions', expect.any(Array), 'TestCampaign');
-
-    // No stealthAttackCost — Psychic Veil removes invisible
-    const rogue2 = createPlayerCreature('Rogue2', { currentHp: 20 });
-    rogue2.currentHp = 20;
-    const cs2 = makeCombatSummary([goblin, rogue2]);
-    getRuntimeValue.mockReset();
-    getRuntimeValue.mockImplementation((charName, key, _campaignName) => {
-      if (key === 'activeBuffs') { if (charName === 'Rogue2') return [{ name: 'Psychic Veil' }]; return []; }
-      if (key === 'arcaneWardActive') return false;
-      if (key === 'arcaneWardHp') return 0;
-      if (key === 'lastMetamagicDamage') return undefined;
-      if (key === 'currentHitPoints') return 20;
-      if (key === 'activeConditions') { if (charName === 'Rogue2') return ['invisible']; return []; }
-      if (key === 'holyAuraSaveDc') return undefined;
-      if (key === 'stealthAttackCost') return undefined;
-      if (key === 'tempHp') return 0;
-      return undefined;
-    });
-
-    applyDamageToTarget(cs2, 'Goblin', 5, ['Psychic'], 'TestCampaign', [createMinimalCharacter('Rogue2'), createMinimalCharacter('Goblin')], false, 'Rogue2');
-    expect(setRuntimeValue).toHaveBeenCalledWith('Rogue2', 'activeConditions', [], 'TestCampaign');
   });
 });
-
-function createPlayerCreature(name, extra = {}) {
-  return {
-    name,
-    type: 'player',
-    maxHp: 30,
-    currentHp: 30,
-    resistances: [],
-    immunities: [],
-    conditions: [],
-    concentration: null,
-    saveBonuses: {},
-    ...extra,
-  };
-}

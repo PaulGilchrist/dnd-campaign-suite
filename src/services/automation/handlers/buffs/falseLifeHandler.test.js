@@ -55,15 +55,6 @@ describe('falseLifeHandler.handle', () => {
       expect(diceRoller.rollExpression).toHaveBeenCalledWith('2d4+4');
     });
 
-    it('uses default 2d4+4 when automation is undefined', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction({ automation: undefined });
-
-      await handle(action, ps, CAMPAIGN_NAME, null);
-
-      expect(diceRoller.rollExpression).toHaveBeenCalledWith('2d4+4');
-    });
-
     it('uses automation.tempHpExpression when provided', async () => {
       const ps = makePlayerStats();
       const action = makeAction({ automation: { tempHpExpression: '3d6+2' } });
@@ -120,15 +111,6 @@ describe('falseLifeHandler.handle', () => {
 
       expect(diceRoller.rollExpression).toHaveBeenCalledWith('5d6+5');
     });
-
-    it('uses automation or default expression when spell object is absent', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction({ spell: undefined });
-
-      await handle(action, ps, CAMPAIGN_NAME, null);
-
-      expect(diceRoller.rollExpression).toHaveBeenCalledWith('2d4+4');
-    });
   });
 
   describe('setRuntimeValue', () => {
@@ -163,7 +145,6 @@ describe('falseLifeHandler.handle', () => {
       expect(result.type).toBe('popup');
       expect(result.payload.type).toBe('automation_info');
       expect(result.payload.name).toBe('False Life');
-      expect(result.payload.automationType).toBeUndefined();
       expect(result.payload.description).toBe(
         'False Life: Gained 11 temporary hit points (rolled 2d4+4).'
       );

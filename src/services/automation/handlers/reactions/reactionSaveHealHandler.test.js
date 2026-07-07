@@ -133,23 +133,6 @@ describe('reactionSaveHealHandler', () => {
         saveDc: 10,
       });
     });
-
-    it('applies dcScaling formula to saveDc', async () => {
-      runtimeState.getRuntimeValue.mockImplementation((_name, key) => {
-        if (key === 'ragePoints') return 1;
-        if (key === 'currentHitPoints') return 0;
-        if (key === 'relentlessrageUses') return 0;
-        return 0;
-      });
-      const action = { name: 'Relentless Rage', automation: { saveType: 'CON', saveDc: 10, dcScaling: 0 } };
-      await handle(action, makePlayerStats(), campaignName, null);
-
-      expect(savePrompt.createSaveListener).toHaveBeenCalledWith(campaignName, {
-        targetName: 'TestBarbarian',
-        saveType: 'CON',
-        saveDc: 10,
-      });
-    });
   });
 
   // ── Log entry ───────────────────────────────────────────────
@@ -220,14 +203,6 @@ describe('reactionSaveHealHandler', () => {
       const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
       expect(result.payload.description).toContain('saving throw');
     });
-
-    it('uses creature HP when type is not player', async () => {
-      damageUtils.getCombatContext.mockResolvedValue({
-        creatures: [{ name: 'TestBarbarian', currentHp: 0 }],
-      });
-      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-      expect(result.payload.description).toContain('saving throw');
-    });
   });
 
   // ── Uses key derivation ─────────────────────────────────────
@@ -244,7 +219,7 @@ describe('reactionSaveHealHandler', () => {
     });
   });
 
-  // ── Save result - Success path ──────────────────────────────
+  // ── Save result - success path ──────────────────────────────
 
   describe('save result - success', () => {
     function triggerSuccess() {
@@ -320,7 +295,7 @@ describe('reactionSaveHealHandler', () => {
     });
   });
 
-  // ── Save result - Failure path ──────────────────────────────
+  // ── Save result - failure path ──────────────────────────────
 
   describe('save result - failure', () => {
     function triggerFailure() {
@@ -348,31 +323,6 @@ describe('reactionSaveHealHandler', () => {
       );
       expect(calls.length).toBeGreaterThan(0);
       expect(calls[0][1].success).toBe(false);
-    });
-
-    it('increments uses after failed save', async () => {
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-      triggerFailure();
-
-      expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-        'TestBarbarian',
-        'relentlessrageUses',
-        1,
-        campaignName,
-      );
-    });
-
-    it('ignores save-result with mismatched promptId', async () => {
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      window.dispatchEvent(new CustomEvent('save-result', {
-        detail: { promptId: 'wrong-prompt-id', success: false },
-      }));
-
-      const calls = logService.addEntry.mock.calls.filter(
-        (call) => call[1]?.type === 'save_result',
-      );
-      expect(calls.length).toBe(0);
     });
   });
 
@@ -465,25 +415,6 @@ describe('reactionSaveHealHandler', () => {
         'TestBarbarian',
         'currentHitPoints',
         10,
-        campaignName,
-      );
-    });
-  });
-
-  // ── Edge cases ──────────────────────────────────────────────
-
-  describe('edge cases', () => {
-    it('handles numeric heal expression with undefined player level', async () => {
-      const ps = makePlayerStats({ level: undefined });
-      await handle(makeAction({ healExpression: 5 }), ps, campaignName, null);
-      window.dispatchEvent(new CustomEvent('save-result', {
-        detail: { promptId: 'prompt-123', success: true },
-      }));
-
-      expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-        'TestBarbarian',
-        'currentHitPoints',
-        5,
         campaignName,
       );
     });

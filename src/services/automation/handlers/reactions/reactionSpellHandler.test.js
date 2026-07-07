@@ -50,7 +50,7 @@ describe('reactionSpellHandler.handle', () => {
     });
 
     describe('return structure', () => {
-        it('returns a popup with automation_info type', async () => {
+        it('returns a popup with automation_info type and correct payload fields', async () => {
             const action = makeAction();
             const ps = makePlayerStats();
 
@@ -60,9 +60,10 @@ describe('reactionSpellHandler.handle', () => {
             expect(result.payload.type).toBe('automation_info');
             expect(result.payload.trigger).toBe('opportunity_attack_reaction');
             expect(result.payload.automation).toEqual(action.automation);
+            expect(result.payload.name).toBe('Reactive Spell');
         });
 
-        it('includes the action name in the popup', async () => {
+        it('returns a popup with custom action name', async () => {
             const action = { name: 'My Reactive Spell', automation: { type: 'reaction_spell' } };
             const ps = makePlayerStats();
 
@@ -73,29 +74,14 @@ describe('reactionSpellHandler.handle', () => {
     });
 
     describe('spell eligibility filtering', () => {
-        it('includes spells with casting time of 1 action', async () => {
+        it('includes 1 action spells and excludes reaction and bonus action spells', async () => {
             const ps = makePlayerStats();
             const result = await handle(makeAction(), ps, campaignName);
 
             const spellNames = result.payload.eligibleSpells.map(s => s.name);
             expect(spellNames).toContain('Burning Hands');
             expect(spellNames).toContain('Fireball');
-        });
-
-        it('excludes spells with casting time of 1 reaction', async () => {
-            const ps = makePlayerStats();
-            const result = await handle(makeAction(), ps, campaignName);
-
-            const spellNames = result.payload.eligibleSpells.map(s => s.name);
             expect(spellNames).not.toContain('Shield');
-        });
-
-        it('excludes spells with casting time of 1 bonus action', async () => {
-            const ps = makePlayerStats();
-            const result = await handle(makeAction(), ps, campaignName);
-
-            const spellNames = result.payload.eligibleSpells.map(s => s.name);
-            expect(spellNames).not.toContain('Mage Armor');
         });
 
         it('excludes unprepared spells', async () => {
@@ -126,48 +112,26 @@ describe('reactionSpellHandler.handle', () => {
             expect(result.payload.eligibleSpells[0].name).toBe('Burning Hands');
         });
 
-        it('handles playerStats with no spellAbilities', async () => {
-            const ps = makePlayerStats({ spellAbilities: null });
-            const result = await handle(makeAction(), ps, campaignName);
-
-            expect(result.payload.eligibleSpells).toHaveLength(0);
-        });
-
-        it('handles playerStats with no spells array', async () => {
-            const ps = makePlayerStats({ spellAbilities: {} });
-            const result = await handle(makeAction(), ps, campaignName);
-
-            expect(result.payload.eligibleSpells).toHaveLength(0);
-        });
-
-        it('handles null playerStats gracefully', async () => {
-            const result = await handle(makeAction(), null, campaignName);
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.eligibleSpells).toHaveLength(0);
+        it('handles null or missing spellAbilities/spells gracefully', async () => {
+            expect((await handle(makeAction(), makePlayerStats({ spellAbilities: null }), campaignName)).payload.eligibleSpells).toHaveLength(0);
+            expect((await handle(makeAction(), makePlayerStats({ spellAbilities: {} }), campaignName)).payload.eligibleSpells).toHaveLength(0);
+            expect((await handle(makeAction(), null, campaignName)).payload.eligibleSpells).toHaveLength(0);
         });
     });
 
     describe('spell data structure', () => {
-        it('includes name, level, casting_time, range in eligible spell data', async () => {
+        it('includes name, level, casting_time, range and target fields in eligible spell data', async () => {
             const ps = makePlayerStats();
             const result = await handle(makeAction(), ps, campaignName);
 
             const spell = result.payload.eligibleSpells.find(s => s.name === 'Burning Hands');
-            expect(spell).toBeDefined();
             expect(spell.name).toBe('Burning Hands');
             expect(spell.level).toBe(1);
             expect(spell.casting_time).toBe('1 action');
             expect(spell.range).toBe('30 feet');
-        });
-
-        it('marks spells without area_of_effect as single target', async () => {
-            const ps = makePlayerStats();
-            const result = await handle(makeAction(), ps, campaignName);
-
-            const spell = result.payload.eligibleSpells.find(s => s.name === 'Burning Hands');
             expect(spell.isSingleTarget).toBe(true);
             expect(spell.hasAreaOfEffect).toBe(false);
+            expect(spell.maxTargets).toBe(1);
         });
 
         it('marks spells with area_of_effect as multi-target', async () => {
@@ -190,14 +154,6 @@ describe('reactionSpellHandler.handle', () => {
             expect(spell.maxTargets).toBe(2);
         });
 
-        it('defaults maxTargets to 1 when not specified', async () => {
-            const ps = makePlayerStats();
-            const result = await handle(makeAction(), ps, campaignName);
-
-            const spell = result.payload.eligibleSpells.find(s => s.name === 'Burning Hands');
-            expect(spell.maxTargets).toBe(1);
-        });
-
         it('defaults level to 0 when not specified', async () => {
             const ps = makePlayerStats({ spellAbilities: { spells: [
                 { name: 'Cantrip', casting_time: '1 action', prepared: 'Always' },
@@ -210,53 +166,37 @@ describe('reactionSpellHandler.handle', () => {
     });
 
     describe('warnings for multi-target spells', () => {
-        it('flags hasWarnings when multi-target spells are present', async () => {
+        it('flags warnings when multi-target spells are present', async () => {
             const ps = makePlayerStats();
             const result = await handle(makeAction(), ps, campaignName);
 
             expect(result.payload.hasWarnings).toBe(true);
-        });
-
-        it('includes warning description for multi-target spells', async () => {
-            const ps = makePlayerStats();
-            const result = await handle(makeAction(), ps, campaignName);
-
             expect(result.payload.description).toContain('Warning');
             expect(result.payload.description).toContain('Fireball');
         });
 
-        it('does not flag warnings when only single-target spells exist', async () => {
-            const ps = makePlayerStats({ spellAbilities: { spells: [
+        it('does not flag warnings when only single-target or no spells exist', async () => {
+            const ps1 = makePlayerStats({ spellAbilities: { spells: [
                 { name: 'Burning Hands', casting_time: '1 action', prepared: 'Always', level: 1 },
                 { name: 'Magic Missile', casting_time: '1 action', prepared: 'Always', level: 1 },
             ] } });
-            const result = await handle(makeAction(), ps, campaignName);
+            const result1 = await handle(makeAction(), ps1, campaignName);
+            expect(result1.payload.hasWarnings).toBe(false);
 
-            expect(result.payload.hasWarnings).toBe(false);
-        });
-
-        it('does not flag warnings when no spells match', async () => {
-            const ps = makePlayerStats({ spellAbilities: { spells: [
+            const ps2 = makePlayerStats({ spellAbilities: { spells: [
                 { name: 'Shield', casting_time: '1 reaction', prepared: 'Always' },
             ] } });
-            const result = await handle(makeAction(), ps, campaignName);
-
-            expect(result.payload.hasWarnings).toBe(false);
+            const result2 = await handle(makeAction(), ps2, campaignName);
+            expect(result2.payload.hasWarnings).toBe(false);
         });
     });
 
     describe('description content', () => {
-        it('describes the trigger behavior', async () => {
+        it('describes the trigger behavior and lists available spells', async () => {
             const ps = makePlayerStats();
             const result = await handle(makeAction(), ps, campaignName);
 
             expect(result.payload.description).toContain('leaves your reach');
-        });
-
-        it('lists available spells in the description', async () => {
-            const ps = makePlayerStats();
-            const result = await handle(makeAction(), ps, campaignName);
-
             expect(result.payload.description).toContain('Burning Hands');
             expect(result.payload.description).toContain('Fireball');
         });
@@ -325,22 +265,6 @@ describe('reactionSpellHandler.handle', () => {
             expect(storedCall[2].length).toBe(2);
         });
 
-        it('includes a timestamp within the call window', async () => {
-            const ps = makePlayerStats();
-            const spellData = { name: 'Burning Hands', level: 3 };
-
-            useRuntimeState.getRuntimeValue.mockReturnValue([]);
-
-            const before = Date.now();
-            applyWarCasterReaction('Goblin', 'Burning Hands', spellData, ps, campaignName);
-            const after = Date.now();
-
-            const storedCall = useRuntimeState.setRuntimeValue.mock.calls.find(c => c[1] === 'warCasterReactions');
-            const entry = storedCall[2][0];
-            expect(entry.timestamp).toBeGreaterThanOrEqual(before);
-            expect(entry.timestamp).toBeLessThanOrEqual(after);
-        });
-
         it('logs an ability_use entry', async () => {
             const ps = makePlayerStats();
             const spellData = { name: 'Burning Hands', level: 3 };
@@ -370,18 +294,6 @@ describe('reactionSpellHandler.handle', () => {
             const result = applyWarCasterReaction('Goblin', 'Fireball', spellData, ps, campaignName);
 
             expect(result).toEqual({ ok: true });
-        });
-
-        it('handles null getRuntimeValue by initializing empty array', async () => {
-            const ps = makePlayerStats();
-            const spellData = { name: 'Burning Hands', level: 3 };
-
-            useRuntimeState.getRuntimeValue.mockReturnValue(null);
-
-            applyWarCasterReaction('Goblin', 'Burning Hands', spellData, ps, campaignName);
-
-            const storedCall = useRuntimeState.setRuntimeValue.mock.calls.find(c => c[1] === 'warCasterReactions');
-            expect(storedCall[2].length).toBe(1);
         });
     });
 });

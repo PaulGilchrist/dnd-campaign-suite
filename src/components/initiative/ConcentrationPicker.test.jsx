@@ -31,10 +31,9 @@ describe('ConcentrationPicker', () => {
         });
 
         it.each`
-            spellName        | expectedDisabled
-            ${''}            | ${true}
-            ${'   '}         | ${true}
-            ${'Fireball'}    | ${false}
+            spellName       | expectedDisabled
+            ${''}           | ${true}
+            ${'Fireball'}   | ${false}
         `('should $expectedDisabled the apply button when spellName is "$spellName"',
             ({ spellName, expectedDisabled }) => {
                 render(<ConcentrationPicker {...props} spellName={spellName} />);

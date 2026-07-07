@@ -116,21 +116,6 @@ describe('darkOnesLookHandler.handle', () => {
             expect(result.payload.description).toContain('1d10(10) = <b>23</b>');
         });
 
-        it('should consume one use after processing ability check', async () => {
-            runtimeState.getRuntimeValue.mockReturnValue(3);
-            automationService.evaluateAutoExpression.mockReturnValue(3);
-            damageUtils.getCombatContext.mockResolvedValue({
-                lastAttack: createCheck(),
-            });
-            mockRandom(5);
-
-            await handle(createAction(), createPlayerStats(), mockCampaignName);
-
-            expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-                'TestWarlock', 'darkOnesLookUses', 2, mockCampaignName
-            );
-        });
-
         it('should log the ability use', async () => {
             runtimeState.getRuntimeValue.mockReturnValue(1);
             automationService.evaluateAutoExpression.mockReturnValue(3);

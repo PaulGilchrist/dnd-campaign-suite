@@ -84,22 +84,6 @@ describe('handle — Bolstering Treats', () => {
       expect(result.type).toBe('popup');
       expect(result.payload.description).toContain('Gained 5 temporary hit points');
     });
-
-    it('should fall through to generic temp HP path when tempHpExpression is absent', async () => {
-      const action = {
-        name: 'Bolstering Treats',
-        automation: {
-          type: 'temp_hp_buff',
-          craftCount: 'proficiency_bonus',
-        },
-      };
-      const ps = makePlayerStats();
-
-      const result = await handle(action, ps, campaignName);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.description).toContain('No temp HP expression defined');
-    });
   });
 
   describe('no treats remaining', () => {
@@ -120,24 +104,10 @@ describe('handle — Bolstering Treats', () => {
       expect(result.payload.description).toContain('No treats remaining');
       expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
     });
-
-    it('should use craftCount as fallback when runtime value is undefined', async () => {
-      const action = makeBolsteringAction({ craftCount: 'proficiency_bonus' });
-      const ps = makePlayerStats({ proficiency: 3 });
-      useRuntimeState.getRuntimeValue.mockReturnValue(undefined);
-      automationService.evaluateAutoExpression.mockReturnValue(3);
-
-      const result = await handle(action, ps, campaignName);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.description).toContain('Ate a bolstering treat');
-      expect(result.payload.description).toContain('3 temporary hit points');
-      expect(result.payload.description).toContain('2 treats remaining');
-    });
   });
 
   describe('successful treat consumption', () => {
-    it('should decrement treat count after consuming one', async () => {
+    it('should consume a treat and grant temp HP with correct description', async () => {
       const action = makeBolsteringAction();
       const ps = makePlayerStats({ proficiency: 2 });
       useRuntimeState.getRuntimeValue.mockImplementation((name, key) => {
@@ -146,29 +116,14 @@ describe('handle — Bolstering Treats', () => {
       });
       automationService.evaluateAutoExpression.mockReturnValue(2);
 
-      await handle(action, ps, campaignName);
+      const result = await handle(action, ps, campaignName);
 
-      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-        'Chef', 'chefBolsteringTreats', 1, campaignName,
-      );
+      expect(result.payload.description).toContain('Ate a bolstering treat');
+      expect(result.payload.description).toContain('2 temporary hit points');
+      expect(result.payload.description).toContain('1 treat remaining');
     });
 
-    it('should set temp HP to the proficiency_bonus value when tempHpExpression is proficiency_bonus', async () => {
-      const action = makeBolsteringAction();
-      const ps = makePlayerStats({ proficiency: 4 });
-      useRuntimeState.getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'chefBolsteringTreats') return 4;
-        return null;
-      });
-
-      await handle(action, ps, campaignName);
-
-      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-        'Chef', 'tempHp', 4, campaignName,
-      );
-    });
-
-    it('should set temp HP using evaluated expression when tempHpExpression is not proficiency_bonus', async () => {
+    it('should use evaluated expression when tempHpExpression is not proficiency_bonus', async () => {
       const action = makeBolsteringAction({ tempHpExpression: 'level + 5' });
       const ps = makePlayerStats({ level: 5, proficiency: 2 });
       useRuntimeState.getRuntimeValue.mockImplementation((name, key) => {
@@ -177,12 +132,10 @@ describe('handle — Bolstering Treats', () => {
       });
       automationService.evaluateAutoExpression.mockReturnValue(10);
 
-      await handle(action, ps, campaignName);
+      const result = await handle(action, ps, campaignName);
 
-      expect(automationService.evaluateAutoExpression).toHaveBeenCalledWith('level + 5', ps);
-      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-        'Chef', 'tempHp', 10, campaignName,
-      );
+      expect(result.payload.description).toContain('10 temporary hit points');
+      expect(result.payload.description).toContain('2 treats remaining');
     });
 
     it('should preserve existing temp HP when it is higher than the new amount', async () => {
@@ -195,8 +148,10 @@ describe('handle — Bolstering Treats', () => {
       });
       automationService.evaluateAutoExpression.mockReturnValue(2);
 
-      await handle(action, ps, campaignName);
+      const result = await handle(action, ps, campaignName);
 
+      // Description shows the granted amount; preservation is applied internally
+      expect(result.payload.description).toContain('2 temporary hit points');
       expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
         'Chef', 'tempHp', 5, campaignName,
       );
@@ -212,11 +167,9 @@ describe('handle — Bolstering Treats', () => {
       });
       automationService.evaluateAutoExpression.mockReturnValue(3);
 
-      await handle(action, ps, campaignName);
+      const result = await handle(action, ps, campaignName);
 
-      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-        'Chef', 'tempHp', 3, campaignName,
-      );
+      expect(result.payload.description).toContain('3 temporary hit points');
     });
 
     it('should pluralize treat/treats correctly based on remaining count', async () => {

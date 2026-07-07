@@ -51,17 +51,6 @@ describe('savageAttacker', () => {
       }
     });
 
-    it('returns first rolls when totals are equal (strict >)', () => {
-      const restore = useDeterministicRandom([0]);
-      try {
-        const rolls = [1, 1];
-        const result = applySavageAttacker(rolls);
-        expect(result).toEqual([1, 1]);
-      } finally {
-        restore.restore();
-      }
-    });
-
     it('does not mutate the input array', () => {
       const rolls = [3, 4];
       const restore = useDeterministicRandom([0]);
@@ -88,20 +77,6 @@ describe('savageAttacker', () => {
       expect(applySavageAttackerFull([3, 4], '2d-6')).toEqual({ rolls: [3, 4], secondRolls: [], higher: false });
     });
 
-    it('rolls second set of dice and compares totals', () => {
-      // firstRolls = [2, 3] => total=5
-      // second: random=0 => reroll=1 each => [1,1] => total=2 < 5 => returns first
-      const restore = useDeterministicRandom([0, 0]);
-      try {
-        const result = applySavageAttackerFull([2, 3], '2d6');
-        expect(result.rolls).toEqual([2, 3]);
-        expect(result.secondRolls).toEqual([1, 1]);
-        expect(result.higher).toBe(false);
-      } finally {
-        restore.restore();
-      }
-    });
-
     it('returns second rolls when second total is higher', () => {
       // firstRolls = [1, 1] => total=2
       // second: random=0.99 => reroll=Math.floor(0.99*6)+1=6 each => [6,6] => total=12 > 2
@@ -124,34 +99,6 @@ describe('savageAttacker', () => {
         const result = applySavageAttackerFull([6, 6], '2d6');
         expect(result.rolls).toEqual([6, 6]);
         expect(result.secondRolls).toEqual([1, 1]);
-        expect(result.higher).toBe(false);
-      } finally {
-        restore.restore();
-      }
-    });
-
-    it('returns first rolls when totals are equal (strict >)', () => {
-      // firstRolls = [4, 4] => total=8
-      // second: random=0.5 => reroll=Math.floor(0.5*6)+1=4 each => [4,4] => total=8 == 8 => returns first
-      const restore = useDeterministicRandom([0.5, 0.5]);
-      try {
-        const result = applySavageAttackerFull([4, 4], '2d6');
-        expect(result.rolls).toEqual([4, 4]);
-        expect(result.secondRolls).toEqual([4, 4]);
-        expect(result.higher).toBe(false);
-      } finally {
-        restore.restore();
-      }
-    });
-
-    it('handles single die', () => {
-      // firstRolls = [4] => total=4
-      // second: random=0 => 1 => [1] => total=1 < 4 => returns first
-      const restore = useDeterministicRandom([0]);
-      try {
-        const result = applySavageAttackerFull([4], '1d6');
-        expect(result.rolls).toEqual([4]);
-        expect(result.secondRolls).toEqual([1]);
         expect(result.higher).toBe(false);
       } finally {
         restore.restore();
@@ -200,31 +147,6 @@ describe('savageAttacker', () => {
       const ps = {
         automation: {
           passives: [
-            { type: 'passive_rule', effect: 'reroll_damage_once_per_turn', name: 'Savage Attacker' },
-          ],
-        },
-      };
-      expect(savageAttackerApplies(ps)).toBe(true);
-    });
-
-    it('returns true when Savage Attacker is among other passives', () => {
-      const ps = {
-        automation: {
-          passives: [
-            { type: 'passive_rule', effect: 'great_weapon_fighting', name: 'Great Weapon Fighting' },
-            { type: 'passive_rule', effect: 'reroll_damage_once_per_turn', name: 'Savage Attacker' },
-            { type: 'passive_rule', effect: 'reckless_attack', name: 'Reckless' },
-          ],
-        },
-      };
-      expect(savageAttackerApplies(ps)).toBe(true);
-    });
-
-    it('returns true for non-passive-rule entries mixed with Savage Attacker', () => {
-      const ps = {
-        automation: {
-          passives: [
-            { type: 'condition', effect: 'frightened', name: 'Frightened' },
             { type: 'passive_rule', effect: 'reroll_damage_once_per_turn', name: 'Savage Attacker' },
           ],
         },

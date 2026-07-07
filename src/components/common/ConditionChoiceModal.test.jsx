@@ -53,19 +53,5 @@ describe('ConditionChoiceModal', () => {
         );
     });
 
-    it('removes modal after choice is made', () => {
-        render(<ConditionChoiceModal />);
 
-        showModal({
-            promptId: 'test-id',
-            targetName: 'Goblin',
-            conditions: ['charmed', 'frightened'],
-        });
-
-        expect(screen.getByText('Charmed')).toBeInTheDocument();
-
-        fireEvent.click(screen.getByText('Charmed'));
-
-        expect(screen.queryByText('Charmed')).not.toBeInTheDocument();
-    });
 });

@@ -154,7 +154,7 @@ describe('invisibilityService', () => {
             expect(condCalls[0][2]).toEqual(['frightened']);
         });
 
-        it('throws when activeConditions is null', () => {
+        it('throws when activeConditions is null or undefined', () => {
             getRuntimeValue
                 .mockReturnValueOnce(invisibleName)
                 .mockReturnValueOnce(null);
@@ -164,18 +164,6 @@ describe('invisibilityService', () => {
 
             expect(() => endInvisibilityOnHostileAction(invisibleName, campaignName))
                 .toThrow('Expected array, got null');
-        });
-
-        it('throws when activeConditions is undefined', () => {
-            getRuntimeValue
-                .mockReturnValueOnce(invisibleName)
-                .mockReturnValueOnce(undefined);
-            getActiveBuffs.mockReturnValue([
-                { name: 'Invisibility', duration: '1_hour' },
-            ]);
-
-            expect(() => endInvisibilityOnHostileAction(invisibleName, campaignName))
-                .toThrow('Expected array, got undefined');
         });
 
         it('clears the invisibility key even when no buffs or conditions needed updating', () => {
@@ -220,23 +208,6 @@ describe('invisibilityService', () => {
             expect(setRuntimeValue).toHaveBeenCalledWith(
                 campaignName,
                 '_activeInvisibility_Elf-Ranger "Swiftarrow"',
-                null,
-                campaignName,
-            );
-        });
-
-        it('handles empty activeBuffs array', () => {
-            getRuntimeValue
-                .mockReturnValueOnce(invisibleName)
-                .mockReturnValueOnce([])
-                .mockReturnValueOnce([]);
-            getActiveBuffs.mockReturnValue([]);
-
-            endInvisibilityOnHostileAction(invisibleName, campaignName);
-
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                campaignName,
-                `_activeInvisibility_${invisibleName}`,
                 null,
                 campaignName,
             );

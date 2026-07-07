@@ -84,24 +84,7 @@ describe('sacredWeaponHandler', () => {
       expect(result.payload.automationType).toBe('temp_buff');
     });
 
-    it('should activate immediately when options array is empty', async () => {
-      const action = makeAction({ automation: { ...makeAction().automation, options: [] } });
-
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'activeBuffs') return [];
-        if (key === 'channelDivinityCharges') return 2;
-        return null;
-      });
-
-      const result = await handle(action, makePlayerStats(), campaignName);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.description).toContain('Sacred Weapon activated');
-      expect(result.payload.description).toContain('bright light');
-      expect(result.payload.description).toContain('Charisma modifier');
-    });
-
-    it('should decrement channel divinity charges on activation', async () => {
+    it('should activate immediately and decrement charges when options array is empty', async () => {
       getRuntimeValue.mockImplementation((name, key) => {
         if (key === 'activeBuffs') return [];
         if (key === 'channelDivinityCharges') return 3;
@@ -110,25 +93,14 @@ describe('sacredWeaponHandler', () => {
 
       const action = makeAction({ automation: { ...makeAction().automation, options: [] } });
 
-      await handle(action, makePlayerStats(), campaignName);
+      const result = await handle(action, makePlayerStats(), campaignName);
 
+      expect(result.type).toBe('popup');
+      expect(result.payload.description).toContain('Sacred Weapon activated');
       expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', 'channelDivinityCharges', 2, campaignName);
     });
 
-    it('should toggle off when already active', async () => {
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'activeBuffs') return [{ name: 'Sacred Weapon', effect: 'sacred_weapon' }];
-        return null;
-      });
-
-      const result = await handle(makeAction(), makePlayerStats(), campaignName);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.description).toBe('Sacred Weapon ended');
-      expect(result.payload.automationType).toBe('temp_buff');
-    });
-
-    it('should clear active buffs when toggling off', async () => {
+    it('should toggle off when already active and remove only that buff', async () => {
       getRuntimeValue.mockImplementation((name, key) => {
         if (key === 'activeBuffs') return [
           { name: 'Other Buff', effect: 'other' },
@@ -137,8 +109,11 @@ describe('sacredWeaponHandler', () => {
         return null;
       });
 
-      await handle(makeAction(), makePlayerStats(), campaignName);
+      const result = await handle(makeAction(), makePlayerStats(), campaignName);
 
+      expect(result.type).toBe('popup');
+      expect(result.payload.description).toBe('Sacred Weapon ended');
+      expect(result.payload.automationType).toBe('temp_buff');
       expect(setRuntimeValue).toHaveBeenCalledWith(
         'TestHero',
         'activeBuffs',

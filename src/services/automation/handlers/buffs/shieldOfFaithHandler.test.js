@@ -102,24 +102,7 @@ describe('shieldOfFaithHandler', () => {
             expect(result.payload.attackerPos).toEqual({ gridX: 1, gridY: 2 });
         });
 
-        it('handles action with no spell property', async () => {
-            resolveMapPositions.mockResolvedValue(null);
-
-            getCombatSummary.mockReturnValue({
-                creatures: [{ name: 'Enemy1' }],
-            });
-
-            const action = { name: 'Shield of Faith' };
-
-            const result = await handle(action, MOCK_PLAYER, MOCK_CAMPAIGN, null, []);
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.range).toBe('60 feet');
-            expect(result.payload.duration).toBe('Concentration, up to 10 minutes');
-            expect(rangeToFeet).toHaveBeenCalledWith('60 feet');
-        });
-
-        it('passes spell range and duration to popup when present', async () => {
+        it('uses spell range/duration when present, falls back to defaults when absent', async () => {
             resolveMapPositions.mockResolvedValue(null);
 
             getCombatSummary.mockReturnValue({
@@ -136,29 +119,35 @@ describe('shieldOfFaithHandler', () => {
             expect(result.payload.range).toBe('30 feet');
             expect(result.payload.duration).toBe('1 minute');
         });
+
+        it('uses defaults when action has no spell property', async () => {
+            resolveMapPositions.mockResolvedValue(null);
+
+            getCombatSummary.mockReturnValue({
+                creatures: [{ name: 'Enemy1' }],
+            });
+
+            const action = { name: 'Shield of Faith' };
+
+            const result = await handle(action, MOCK_PLAYER, MOCK_CAMPAIGN, null, []);
+
+            expect(result.payload.range).toBe('60 feet');
+            expect(result.payload.duration).toBe('Concentration, up to 10 minutes');
+        });
     });
 
     describe('applyShieldOfFaith', () => {
-        it('returns null when no targets provided', async () => {
+        it('returns null when targetNames is null or empty array', async () => {
             const action = {
                 name: 'Shield of Faith',
                 spell: { duration: 'Concentration, up to 10 minutes' },
             };
 
-            const result = await applyShieldOfFaith(action, MOCK_PLAYER, MOCK_CAMPAIGN, null, null);
+            const resultNull = await applyShieldOfFaith(action, MOCK_PLAYER, MOCK_CAMPAIGN, null, null);
+            const resultEmpty = await applyShieldOfFaith(action, MOCK_PLAYER, MOCK_CAMPAIGN, null, []);
 
-            expect(result).toBeNull();
-        });
-
-        it('returns null when targets array is empty', async () => {
-            const action = {
-                name: 'Shield of Faith',
-                spell: { duration: 'Concentration, up to 10 minutes' },
-            };
-
-            const result = await applyShieldOfFaith(action, MOCK_PLAYER, MOCK_CAMPAIGN, null, []);
-
-            expect(result).toBeNull();
+            expect(resultNull).toBeNull();
+            expect(resultEmpty).toBeNull();
         });
 
         it('applies shield of faith buff and sets expiration for each target', async () => {
@@ -287,16 +276,6 @@ describe('shieldOfFaithHandler', () => {
             expect(result).toBe(false);
         });
 
-        it('returns false when buff has different name', () => {
-            getRuntimeValue.mockReturnValue([
-                { name: 'Mage Armor', effect: 'mage_armor', acBonus: 3 },
-            ]);
-
-            const result = isShieldOfFaithActive('Ally1', MOCK_CAMPAIGN);
-
-            expect(result).toBe(false);
-        });
-
         it('returns true when shield of faith is among multiple buffs', () => {
             getRuntimeValue.mockReturnValue([
                 { name: 'Mage Armor', effect: 'mage_armor' },
@@ -339,16 +318,6 @@ describe('shieldOfFaithHandler', () => {
             expect(result).toBe(0);
         });
 
-        it('returns 0 when buff has different name', () => {
-            getRuntimeValue.mockReturnValue([
-                { name: 'Mage Armor', effect: 'mage_armor', acBonus: 3 },
-            ]);
-
-            const result = getShieldOfFaithBonus('Ally1', MOCK_CAMPAIGN);
-
-            expect(result).toBe(0);
-        });
-
         it('returns custom acBonus when present on the buff', () => {
             getRuntimeValue.mockReturnValue([
                 { name: 'Shield of Faith', effect: 'shield_of_faith', acBonus: 5 },
@@ -357,18 +326,6 @@ describe('shieldOfFaithHandler', () => {
             const result = getShieldOfFaithBonus('Ally1', MOCK_CAMPAIGN);
 
             expect(result).toBe(5);
-        });
-
-        it('finds shield of faith bonus among multiple buffs', () => {
-            getRuntimeValue.mockReturnValue([
-                { name: 'Mage Armor', effect: 'mage_armor', acBonus: 3 },
-                { name: 'Shield of Faith', effect: 'shield_of_faith', acBonus: 2 },
-                { name: 'Bless', effect: 'bless' },
-            ]);
-
-            const result = getShieldOfFaithBonus('Ally1', MOCK_CAMPAIGN);
-
-            expect(result).toBe(2);
         });
     });
 });

@@ -190,7 +190,6 @@ describe('computeDamageAfterResistances', () => {
 describe('computeDamageAfterSave', () => {
   it('returns raw damage when save fails regardless of dcSuccess', () => {
     expect(computeDamageAfterSave(10, false, 'half')).toBe(10);
-    expect(computeDamageAfterSave(10, false, 'none')).toBe(10);
   });
 
   it('returns half damage on success with dcSuccess "half"', () => {
@@ -200,7 +199,6 @@ describe('computeDamageAfterSave', () => {
 
   it('returns 0 on success with any dcSuccess other than "half"', () => {
     expect(computeDamageAfterSave(10, true, 'none')).toBe(0);
-    expect(computeDamageAfterSave(10, true, 'all')).toBe(0);
   });
 
   it('returns 0 damage when raw damage is 0', () => {

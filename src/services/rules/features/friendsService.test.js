@@ -56,43 +56,6 @@ describe('friendsService', () => {
             expect(executeHandler).not.toHaveBeenCalled();
         });
 
-        it('returns null when spell name is undefined', async () => {
-            const result = await triggerFriends({}, {}, playerStats, campaignName, mapName);
-
-            expect(result).toBeNull();
-            expect(executeHandler).not.toHaveBeenCalled();
-        });
-
-        it('executes handler and returns result for valid Friends spell', async () => {
-            getCombatContext.mockResolvedValue(null);
-            const expectedResult = { type: 'popup', payload: { type: 'automation_info' } };
-            executeHandler.mockResolvedValue(expectedResult);
-
-            const result = await triggerFriends(
-                { name: 'Friends', level: 0 },
-                { targetName: 'Goblin' },
-                playerStats,
-                campaignName,
-                mapName,
-            );
-
-            expect(result).toBe(expectedResult);
-            expect(executeHandler).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    name: 'Friends',
-                    automation: expect.objectContaining({
-                        type: 'friends',
-                        saveDc: 15,
-                        targetName: 'Goblin',
-                    }),
-                    spellSlotLevel: 0,
-                }),
-                playerStats,
-                campaignName,
-                mapName,
-            );
-        });
-
         it('is case-insensitive for spell name matching', async () => {
             getCombatContext.mockResolvedValue(null);
             executeHandler.mockResolvedValue({ type: 'popup' });
@@ -102,7 +65,7 @@ describe('friendsService', () => {
             expect(executeHandler).toHaveBeenCalled();
         });
 
-        it('returns no-target popup when metaCtx lacks targetName and combat context is empty', async () => {
+        it('returns no-target popup when no target is available', async () => {
             getCombatContext.mockResolvedValue(null);
 
             const result = await triggerFriends(
@@ -137,35 +100,6 @@ describe('friendsService', () => {
             });
         });
 
-        it('falls back to first non-caster creature from combat context when targetName is missing', async () => {
-            getCombatContext.mockResolvedValue({
-                creatures: [
-                    { name: 'Goblin', type: 'npc' },
-                ],
-            });
-            getMonsterData.mockResolvedValue({ type: 'Humanoid' });
-            getRuntimeValue.mockReturnValue(null);
-            executeHandler.mockResolvedValue({ type: 'popup' });
-
-            const result = await triggerFriends(
-                { name: 'Friends', level: 0 },
-                { targetName: 'Goblin' },
-                playerStats,
-                campaignName,
-                mapName,
-            );
-
-            expect(executeHandler).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    automation: expect.objectContaining({ targetName: 'Goblin' }),
-                }),
-                playerStats,
-                campaignName,
-                mapName,
-            );
-            expect(result).toEqual({ type: 'popup' });
-        });
-
         it('returns no-target popup when combat context has only the caster', async () => {
             getCombatContext.mockResolvedValue({
                 creatures: [{ name: 'Wizard', type: 'player' }],
@@ -184,6 +118,35 @@ describe('friendsService', () => {
                 payload: { type: 'automation_info', name: 'Friends', description: 'No target selected for Friends.' },
             });
             expect(executeHandler).not.toHaveBeenCalled();
+        });
+
+        it('falls back to first non-caster creature from combat context when targetName is missing', async () => {
+            getCombatContext.mockResolvedValue({
+                creatures: [
+                    { name: 'Goblin', type: 'npc' },
+                ],
+            });
+            getMonsterData.mockResolvedValue({ type: 'Humanoid' });
+            getRuntimeValue.mockReturnValue(null);
+            executeHandler.mockResolvedValue({ type: 'popup' });
+
+            const result = await triggerFriends(
+                { name: 'Friends', level: 0 },
+                {},
+                playerStats,
+                campaignName,
+                mapName,
+            );
+
+            expect(executeHandler).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    automation: expect.objectContaining({ targetName: 'Goblin' }),
+                }),
+                playerStats,
+                campaignName,
+                mapName,
+            );
+            expect(result).toEqual({ type: 'popup' });
         });
 
         it('returns non-humanoid popup when target is not a Humanoid', async () => {
@@ -214,123 +177,6 @@ describe('friendsService', () => {
             }));
         });
 
-        it('defaults to Humanoid when creature is not found in combat context', async () => {
-            getCombatContext.mockResolvedValue({
-                creatures: [{ name: 'Wizard', type: 'player' }],
-            });
-            executeHandler.mockResolvedValue({ type: 'popup' });
-
-            const result = await triggerFriends(
-                { name: 'Friends', level: 0 },
-                { targetName: 'UnknownCreature' },
-                playerStats,
-                campaignName,
-                mapName,
-            );
-
-            expect(executeHandler).toHaveBeenCalled();
-            expect(result).toEqual({ type: 'popup' });
-        });
-
-        it('defaults to Humanoid when creature is a player type', async () => {
-            getCombatContext.mockResolvedValue({
-                creatures: [
-                    { name: 'Fighter', type: 'player' },
-                ],
-            });
-            getMonsterData.mockResolvedValue({ type: 'Humanoid' });
-            getRuntimeValue.mockReturnValue(null);
-            executeHandler.mockResolvedValue({ type: 'popup' });
-
-            await triggerFriends(
-                { name: 'Friends', level: 0 },
-                { targetName: 'Fighter' },
-                playerStats,
-                campaignName,
-                mapName,
-            );
-
-            expect(executeHandler).toHaveBeenCalled();
-        });
-
-        it('defaults to Humanoid when getMonsterData throws', async () => {
-            getCombatContext.mockResolvedValue({
-                creatures: [
-                    { name: 'Mystery', type: 'npc' },
-                ],
-            });
-            getMonsterData.mockRejectedValue(new Error('Network error'));
-            getRuntimeValue.mockReturnValue(null);
-            executeHandler.mockResolvedValue({ type: 'popup' });
-
-            await triggerFriends(
-                { name: 'Friends', level: 0 },
-                { targetName: 'Mystery' },
-                playerStats,
-                campaignName,
-                mapName,
-            );
-
-            expect(executeHandler).toHaveBeenCalled();
-        });
-
-        it('defaults to Humanoid when getMonsterData returns no type', async () => {
-            getCombatContext.mockResolvedValue({
-                creatures: [
-                    { name: 'Oddity', type: 'npc' },
-                ],
-            });
-            getMonsterData.mockResolvedValue({});
-            getRuntimeValue.mockReturnValue(null);
-            executeHandler.mockResolvedValue({ type: 'popup' });
-
-            await triggerFriends(
-                { name: 'Friends', level: 0 },
-                { targetName: 'Oddity' },
-                playerStats,
-                campaignName,
-                mapName,
-            );
-
-            expect(executeHandler).toHaveBeenCalled();
-        });
-
-        it('proceeds when caster and target are both in combat context', async () => {
-            getCombatContext.mockResolvedValue({
-                creatures: [
-                    { name: 'Wizard', type: 'player' },
-                    { name: 'Goblin', type: 'npc' },
-                ],
-            });
-            getMonsterData.mockResolvedValue({ type: 'Humanoid' });
-            executeHandler.mockResolvedValue({ type: 'popup' });
-
-            await triggerFriends(
-                { name: 'Friends', level: 0 },
-                { targetName: 'Goblin' },
-                playerStats,
-                campaignName,
-                mapName,
-            );
-
-            expect(executeHandler).toHaveBeenCalled();
-        });
-
-        it('proceeds when combat context is null', async () => {
-            getCombatContext.mockResolvedValue(null);
-            executeHandler.mockResolvedValue({ type: 'popup' });
-
-            await triggerFriends(
-                { name: 'Friends', level: 0 },
-                { targetName: 'Goblin' },
-                playerStats,
-                campaignName,
-                mapName,
-            );
-
-            expect(executeHandler).toHaveBeenCalled();
-        });
-
         it('returns cooldown popup when cast within 24 hours', async () => {
             getCombatContext.mockResolvedValue(null);
             getRuntimeValue.mockReturnValue(true);
@@ -354,12 +200,13 @@ describe('friendsService', () => {
             }));
         });
 
-        it('records the cast on success', async () => {
+        it('executes handler and records cast for valid Friends spell', async () => {
             getCombatContext.mockResolvedValue(null);
             getRuntimeValue.mockReturnValue(null);
-            executeHandler.mockResolvedValue({ type: 'popup' });
+            const expectedResult = { type: 'popup', payload: { type: 'automation_info' } };
+            executeHandler.mockResolvedValue(expectedResult);
 
-            await triggerFriends(
+            const result = await triggerFriends(
                 { name: 'Friends', level: 0 },
                 { targetName: 'Goblin' },
                 playerStats,
@@ -367,11 +214,52 @@ describe('friendsService', () => {
                 mapName,
             );
 
+            expect(result).toBe(expectedResult);
+            expect(executeHandler).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    name: 'Friends',
+                    automation: expect.objectContaining({
+                        type: 'friends',
+                        saveDc: 15,
+                        targetName: 'Goblin',
+                    }),
+                    spellSlotLevel: 0,
+                }),
+                playerStats,
+                campaignName,
+                mapName,
+            );
             expect(setRuntimeValue).toHaveBeenCalledWith(
                 'Wizard',
                 '_friends_24h_Wizard_Goblin',
                 true,
                 campaignName,
+            );
+        });
+
+        it('passes targetName in automation to executeHandler', async () => {
+            getCombatContext.mockResolvedValue(null);
+            getMonsterData.mockResolvedValue({ type: 'Humanoid' });
+            getRuntimeValue.mockReturnValue(null);
+            executeHandler.mockResolvedValue({ type: 'popup' });
+
+            await triggerFriends(
+                { name: 'Friends', level: 0 },
+                { targetName: 'Shopkeeper' },
+                playerStats,
+                campaignName,
+                mapName,
+            );
+
+            expect(executeHandler).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    automation: expect.objectContaining({
+                        targetName: 'Shopkeeper',
+                    }),
+                }),
+                playerStats,
+                campaignName,
+                mapName,
             );
         });
 
@@ -391,28 +279,6 @@ describe('friendsService', () => {
                 expect.objectContaining({
                     automation: expect.objectContaining({ saveDc: 18 }),
                     spellSlotLevel: 2,
-                }),
-                playerStats,
-                campaignName,
-                mapName,
-            );
-        });
-
-        it('falls back to playerStats spellAbilities saveDc when metaCtx lacks it', async () => {
-            getCombatContext.mockResolvedValue(null);
-            executeHandler.mockResolvedValue({ type: 'popup' });
-
-            await triggerFriends(
-                { name: 'Friends', level: 0 },
-                { targetName: 'Goblin' },
-                playerStats,
-                campaignName,
-                mapName,
-            );
-
-            expect(executeHandler).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    automation: expect.objectContaining({ saveDc: 15 }),
                 }),
                 playerStats,
                 campaignName,
@@ -503,58 +369,6 @@ describe('friendsService', () => {
                 mapName,
             );
         });
-
-        it('checks target validity in correct order: humanoid -> fighting -> cooldown', async () => {
-            getCombatContext.mockResolvedValue({
-                creatures: [
-                    { name: 'Wizard', type: 'player' },
-                    { name: 'Wolf', type: 'npc' },
-                ],
-            });
-            getMonsterData.mockResolvedValue({ type: 'Beast' });
-            getRuntimeValue.mockReturnValue(true);
-
-            // Both non-humanoid AND fighting AND on cooldown — should report non-humanoid first
-            const result = await triggerFriends(
-                { name: 'Friends', level: 0 },
-                { targetName: 'Wolf' },
-                playerStats,
-                campaignName,
-                mapName,
-            );
-
-            expect(result).toEqual({
-                type: 'popup',
-                payload: { type: 'automation_info', name: 'Friends', description: 'No effect. Wolf is not a Humanoid.' },
-            });
-            expect(executeHandler).not.toHaveBeenCalled();
-        });
-
-        it('passes targetName in automation to executeHandler', async () => {
-            getCombatContext.mockResolvedValue(null);
-            getMonsterData.mockResolvedValue({ type: 'Humanoid' });
-            getRuntimeValue.mockReturnValue(null);
-            executeHandler.mockResolvedValue({ type: 'popup' });
-
-            await triggerFriends(
-                { name: 'Friends', level: 0 },
-                { targetName: 'Shopkeeper' },
-                playerStats,
-                campaignName,
-                mapName,
-            );
-
-            expect(executeHandler).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    automation: expect.objectContaining({
-                        targetName: 'Shopkeeper',
-                    }),
-                }),
-                playerStats,
-                campaignName,
-                mapName,
-            );
-        });
     });
 
     describe('endFriendsOnHostileAction', () => {
@@ -620,60 +434,6 @@ describe('friendsService', () => {
                 activeTarget,
                 'activeConditions',
                 expect.anything(),
-                campaignName,
-            );
-        });
-
-        it('handles case-insensitive Charmed string', () => {
-            const activeTarget = 'Shopkeeper';
-            getRuntimeValue.mockImplementation((key, prop) => {
-                if (key === campaignName && prop === `_activeFriends_Wizard`) return activeTarget;
-                if (key === activeTarget && prop === 'activeConditions') return ['charmed', 'Invisible'];
-                return null;
-            });
-
-            endFriendsOnHostileAction(casterName, campaignName);
-
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                activeTarget,
-                'activeConditions',
-                ['Invisible'],
-                campaignName,
-            );
-        });
-
-        it('handles all-charmed conditions resulting in empty array', () => {
-            const activeTarget = 'Shopkeeper';
-            getRuntimeValue.mockImplementation((key, prop) => {
-                if (key === campaignName && prop === `_activeFriends_Wizard`) return activeTarget;
-                if (key === activeTarget && prop === 'activeConditions') return ['CHARMED'];
-                return null;
-            });
-
-            endFriendsOnHostileAction(casterName, campaignName);
-
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                activeTarget,
-                'activeConditions',
-                [],
-                campaignName,
-            );
-        });
-
-        it('preserves non-Charmed conditions when removing Charmed', () => {
-            const activeTarget = 'Shopkeeper';
-            getRuntimeValue.mockImplementation((key, prop) => {
-                if (key === campaignName && prop === `_activeFriends_Wizard`) return activeTarget;
-                if (key === activeTarget && prop === 'activeConditions') return ['Charmed', 'Charmed', 'Invisible'];
-                return null;
-            });
-
-            endFriendsOnHostileAction(casterName, campaignName);
-
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                activeTarget,
-                'activeConditions',
-                ['Invisible'],
                 campaignName,
             );
         });

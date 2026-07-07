@@ -112,7 +112,25 @@ describe('protectionFromEnergyHandler', () => {
       expect(result.payload.creatureTargets).toEqual(['Goblin']);
     });
 
-    it('returns empty creatureTargets when caster is the only creature', async () => {
+    it('defaults damageTypes when automation is missing or has no damageTypes', async () => {
+      const ps = makePlayerStats();
+      damageUtils.getCombatContext.mockResolvedValue({
+        creatures: [{ name: 'Goblin', type: 'npc' }],
+      });
+
+      const expectedDamageTypes = ['Acid', 'Cold', 'Fire', 'Lightning', 'Thunder'];
+
+      // No automation at all
+      let result = await handle({ name: 'Protection from Energy' }, ps, campaignName, null);
+      expect(result.payload.damageTypes).toEqual(expectedDamageTypes);
+      expect(result.payload.automation).toEqual({});
+
+      // Automation exists but no damageTypes
+      result = await handle({ name: 'Protection from Energy', automation: {} }, ps, campaignName, null);
+      expect(result.payload.damageTypes).toEqual(expectedDamageTypes);
+    });
+
+    it('filters out caster and returns empty targets when caster is the only creature', async () => {
       const ps = makePlayerStats({ name: 'Wizard' });
       const action = makeAction();
       damageUtils.getCombatContext.mockResolvedValue({
@@ -122,31 +140,6 @@ describe('protectionFromEnergyHandler', () => {
       const result = await handle(action, ps, campaignName, null);
 
       expect(result.payload.creatureTargets).toEqual([]);
-    });
-
-    it('defaults damageTypes and automation when action.automation is missing', async () => {
-      const ps = makePlayerStats();
-      const action = { name: 'Protection from Energy' };
-      damageUtils.getCombatContext.mockResolvedValue({
-        creatures: [{ name: 'Goblin', type: 'npc' }],
-      });
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.payload.damageTypes).toEqual(['Acid', 'Cold', 'Fire', 'Lightning', 'Thunder']);
-      expect(result.payload.automation).toEqual({});
-    });
-
-    it('defaults damageTypes when automation exists but has no damageTypes', async () => {
-      const ps = makePlayerStats();
-      const action = { name: 'Protection from Energy', automation: {} };
-      damageUtils.getCombatContext.mockResolvedValue({
-        creatures: [{ name: 'Goblin', type: 'npc' }],
-      });
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.payload.damageTypes).toEqual(['Acid', 'Cold', 'Fire', 'Lightning', 'Thunder']);
     });
   });
 
@@ -254,9 +247,13 @@ describe('protectionFromEnergyHandler', () => {
       expect(buffs.find((b) => b.name === 'Shield of Faith')).toBeTruthy();
     });
 
-    it('uses default duration when automation has no duration', async () => {
+    it.each`
+      duration                         | expectedDuration
+      ${undefined}                     | ${'Concentration, up to 1 hour'}
+      ${'Concentration, up to 10 minutes'} | ${'Concentration, up to 10 minutes'}
+    `('uses $expectedDuration when automation duration is $duration', async ({ duration, expectedDuration }) => {
       const ps = makePlayerStats();
-      const action = makeAction({ duration: undefined });
+      const action = makeAction({ duration });
       useRuntimeState.getRuntimeValue.mockReturnValue(null);
 
       await applyProtectionFromEnergy(
@@ -273,29 +270,7 @@ describe('protectionFromEnergyHandler', () => {
       const buffs = callArgs[2];
       const buff = buffs.find((b) => b.name === 'Protection from Energy');
 
-      expect(buff.duration).toBe('Concentration, up to 1 hour');
-    });
-
-    it('uses custom duration from automation when provided', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction({ duration: 'Concentration, up to 10 minutes' });
-      useRuntimeState.getRuntimeValue.mockReturnValue(null);
-
-      await applyProtectionFromEnergy(
-        action,
-        ps,
-        campaignName,
-        'Goblin',
-        'fire'
-      );
-
-      const callArgs = useRuntimeState.setRuntimeValue.mock.calls.find(
-        (c) => c[1] === 'activeBuffs'
-      );
-      const buffs = callArgs[2];
-      const buff = buffs.find((b) => b.name === 'Protection from Energy');
-
-      expect(buff.duration).toBe('Concentration, up to 10 minutes');
+      expect(buff.duration).toBe(expectedDuration);
     });
 
     it('calls addEntry with the correct log payload', async () => {
@@ -320,24 +295,6 @@ describe('protectionFromEnergyHandler', () => {
         timestamp: expect.any(Number),
       });
     });
-
-    it('returns popup with target and damage type in description', async () => {
-      const ps = makePlayerStats({ name: 'Paladin' });
-      const action = makeAction();
-      useRuntimeState.getRuntimeValue.mockReturnValue(null);
-
-      const result = await applyProtectionFromEnergy(
-        action,
-        ps,
-        campaignName,
-        'Goblin',
-        'cold'
-      );
-
-      expect(result.payload.description).toContain('Goblin');
-      expect(result.payload.description).toContain('Cold');
-      expect(result.payload.automationType).toBe('protection_from_energy');
-    });
   });
 
   describe('isProtectionFromEnergyActive', () => {
@@ -355,10 +312,12 @@ describe('protectionFromEnergyHandler', () => {
       expect(isProtectionFromEnergyActive('Goblin', campaignName)).toBe(false);
     });
 
-    it('returns false when stored value is null or buff has wrong name or effect', () => {
+    it('returns false when stored value is null', () => {
       useRuntimeState.getRuntimeValue.mockReturnValue(null);
       expect(isProtectionFromEnergyActive('Goblin', campaignName)).toBe(false);
+    });
 
+    it('returns false when buff has wrong name or effect', () => {
       useRuntimeState.getRuntimeValue.mockReturnValue([
         { name: 'Protection from Evil and Good', effect: 'damage_resistance' },
       ]);

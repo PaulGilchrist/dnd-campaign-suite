@@ -120,40 +120,36 @@ describe('soulOfVengeanceHandler', () => {
       expect(result.payload.description).toContain('No melee attack available');
     });
 
-    it('should prefer melee attack over ranged', async () => {
-      setupVowOfEnmityActive('Orc');
-      setupDefaultCombatContext('Orc');
-      const stats = makePlayerStats({
+    it.each([
+      {
+        name: 'prefers melee over ranged',
         attacks: [
           { name: 'Crossbow', type: 'Action', range: 10, hitBonus: 6, damage: '1d8+3', damageType: 'Piercing' },
           { name: 'Longsword', type: 'Action', range: 5, hitBonus: 6, damage: '1d8+3', damageType: 'Slashing' },
         ],
-      });
-
-      const result = await handle(makeAction(), stats, campaignName);
-
-      expect(result.type).toBe('attack_roll');
-      expect(result.payload.attack.name).toBe('Longsword');
-    });
-
-    it('should fall back to ranged when no melee attack is available', async () => {
-      setupVowOfEnmityActive('Orc');
-      setupDefaultCombatContext('Orc');
-      const stats = makePlayerStats({
+        expectedAttack: 'Longsword',
+      },
+      {
+        name: 'falls back to ranged when no melee available',
         attacks: [
           { name: 'Crossbow', type: 'Action', range: 10, hitBonus: 6, damage: '1d8+3', damageType: 'Piercing' },
         ],
-      });
+        expectedAttack: 'Crossbow',
+      },
+    ])('should $name', async ({ attacks, expectedAttack }) => {
+      setupVowOfEnmityActive('Orc');
+      setupDefaultCombatContext('Orc');
+      const stats = makePlayerStats({ attacks });
 
       const result = await handle(makeAction(), stats, campaignName);
 
       expect(result.type).toBe('attack_roll');
-      expect(result.payload.attack.name).toBe('Crossbow');
+      expect(result.payload.attack.name).toBe(expectedAttack);
     });
   });
 
   describe('successful attack_roll path', () => {
-    it('should return attack_roll with correct payload structure', async () => {
+    it('should return attack_roll with correct payload and log ability_use', async () => {
       setupVowOfEnmityActive('Orc');
       setupDefaultCombatContext('Orc');
 
@@ -172,30 +168,11 @@ describe('soulOfVengeanceHandler', () => {
       );
       expect(result.payload.targetName).toBe('Orc');
       expect(result.payload.sourceName).toBe('Soul of Vengeance');
-    });
-
-    it('should call addEntry with ability_use on success', async () => {
-      setupVowOfEnmityActive('Orc');
-      setupDefaultCombatContext('Orc');
-
-      await handle(makeAction(), makePlayerStats(), campaignName);
-
       expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
         type: 'ability_use',
         characterName: 'TestHero',
         abilityName: 'Soul of Vengeance',
         description: 'Soul of Vengeance used against Orc',
-      }));
-    });
-
-    it('should use vow target name in addEntry description', async () => {
-      setupVowOfEnmityActive('Dragon');
-      setupDefaultCombatContext('Dragon');
-
-      await handle(makeAction(), makePlayerStats(), campaignName);
-
-      expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
-        description: 'Soul of Vengeance used against Dragon',
       }));
     });
   });

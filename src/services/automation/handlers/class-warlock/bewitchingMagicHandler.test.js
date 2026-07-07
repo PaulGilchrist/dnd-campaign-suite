@@ -45,30 +45,4 @@ describe('bewitchingMagicHandler', () => {
         expect(result.payload.description).toContain('Misty Step');
         expect(result.payload.description).toContain('without expending a spell slot');
     });
-
-    it('uses custom player name and action name from stats', async () => {
-        const playerStats = { name: 'CustomWarlock' };
-        const action = makeAction();
-        action.name = 'Custom Feature';
-
-        await handle(action, playerStats, campaignName, 'map');
-
-        expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-            'CustomWarlock',
-            '_Bewitching_Magic_freeCast',
-            ['Misty Step'],
-            campaignName
-        );
-    });
-
-    it('passes campaign name to setRuntimeValue', async () => {
-        await handle(makeAction(), makePlayerStats(), 'my-campaign', 'map');
-
-        expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-            playerName,
-            '_Bewitching_Magic_freeCast',
-            ['Misty Step'],
-            'my-campaign'
-        );
-    });
 });

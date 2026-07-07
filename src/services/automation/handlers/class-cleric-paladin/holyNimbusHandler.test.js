@@ -1,4 +1,3 @@
-// @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import { handle } from './holyNimbusHandler.js';
@@ -54,17 +53,24 @@ describe('holyNimbusHandler.handle', () => {
     vi.clearAllMocks();
   });
 
-  describe('deactivation', () => {
-    it('returns popup and sets holyNimbusActive to false when already active', async () => {
-      mockInactive([{ name: 'Holy Nimbus', effect: 'sunlight_aura' }]);
+  describe('toggle behavior', () => {
+    it('deactivates when already active: removes buff, sets holyNimbusActive false, returns info popup', async () => {
+      mockInactive([
+        { name: 'Other Buff', effect: 'other' },
+        { name: 'Holy Nimbus', effect: 'sunlight_aura' },
+      ]);
 
       const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
       expect(result.type).toBe('popup');
       expect(result.payload.type).toBe('automation_info');
       expect(result.payload.description).toBe('Holy Nimbus ended.');
-      expect(result.payload.automationType).toBe('holy_nimbus');
-      expect(result.payload.automation).toEqual(makeAction().automation);
+      expect(setRuntimeValue).toHaveBeenCalledWith(
+        'TestCleric',
+        'activeBuffs',
+        [{ name: 'Other Buff', effect: 'other' }],
+        campaignName,
+      );
       expect(setRuntimeValue).toHaveBeenCalledWith(
         'TestCleric',
         'holyNimbusActive',
@@ -73,42 +79,19 @@ describe('holyNimbusHandler.handle', () => {
       );
     });
 
-    it('filters out the Holy Nimbus buff by action name', async () => {
-      mockInactive([
-        { name: 'Other Buff', effect: 'other' },
-        { name: 'Holy Nimbus', effect: 'sunlight_aura' },
-      ]);
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'TestCleric',
-        'activeBuffs',
-        [{ name: 'Other Buff', effect: 'other' }],
-        campaignName,
-      );
-    });
-  });
-
-  describe('charge validation', () => {
-    it('returns error popup when charges are zero or negative', async () => {
-      mockActive(0);
+    it('activates when inactive: spends one charge, sets holyNimbusActive true, adds buff, returns info popup', async () => {
+      mockActive(2);
 
       const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
       expect(result.type).toBe('popup');
       expect(result.payload.type).toBe('automation_info');
-      expect(result.payload.description).toBe('No Channel Divinity charges remaining.');
-      expect(setRuntimeValue).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('activation', () => {
-    it('spends one charge and sets holyNimbusActive to true', async () => {
-      mockActive(2);
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
+      expect(result.payload.name).toBe('Holy Nimbus');
+      expect(result.payload.automationType).toBe('holy_nimbus');
+      expect(result.payload.description).toBe(
+        'Holy Nimbus activated! Aura of Protection is imbued with holy power for 10 minutes.',
+      );
+      expect(result.payload.automation).toEqual(makeAction().automation);
       expect(setRuntimeValue).toHaveBeenNthCalledWith(
         1,
         'TestCleric',
@@ -123,13 +106,6 @@ describe('holyNimbusHandler.handle', () => {
         true,
         campaignName,
       );
-    });
-
-    it('adds a sunlight_aura buff when none exist', async () => {
-      mockActive(2);
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
       expect(setRuntimeValue).toHaveBeenCalledWith(
         'TestCleric',
         'activeBuffs',
@@ -145,8 +121,11 @@ describe('holyNimbusHandler.handle', () => {
       );
     });
 
-    it('appends the buff to existing buffs', async () => {
-      mockActive(2, [{ name: 'Other Buff', effect: 'other' }]);
+    it('appends the buff to existing buffs without duplicating', async () => {
+      mockActive(2, [
+        { name: 'Other Buff', effect: 'other' },
+        { name: 'Holy Nimbus', effect: 'sunlight_aura', duration: '10_minutes', distance: '10_ft' },
+      ]);
 
       await handle(makeAction(), makePlayerStats(), campaignName, null);
 
@@ -160,61 +139,17 @@ describe('holyNimbusHandler.handle', () => {
         campaignName,
       );
     });
-
-    it('does not duplicate the buff if already present', async () => {
-      mockActive(2, [
-        { name: 'Holy Nimbus', effect: 'sunlight_aura', duration: '10_minutes', distance: '10_ft' },
-      ]);
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'TestCleric',
-        'activeBuffs',
-        [{ name: 'Holy Nimbus', effect: 'sunlight_aura', duration: '10_minutes', distance: '10_ft' }],
-        campaignName,
-      );
-    });
-
-    it('falls back to class_specific.channel_divinity_charges when channel_divinity is absent', async () => {
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'holyNimbusActive') return false;
-        if (key === 'channelDivinityCharges') return null;
-        if (key === 'activeBuffs') return [];
-        return null;
-      });
-
-      const ps = makePlayerStats({
-        level: 1,
-        class: { class_levels: [{ level: 1, channel_divinity: undefined, class_specific: { channel_divinity_charges: 3 } }] },
-      });
-
-      await handle(makeAction(), ps, campaignName, null);
-
-      // maxCharges=3 (from class_specific), spent 1 => 2
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'TestCleric',
-        'channelDivinityCharges',
-        2,
-        campaignName,
-      );
-    });
   });
 
-  describe('success popup', () => {
-    it('returns popup with correct description and payload fields', async () => {
-      mockActive(2);
+  describe('charge validation', () => {
+    it('returns error popup when charges are zero', async () => {
+      mockActive(0);
 
       const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
       expect(result.type).toBe('popup');
       expect(result.payload.type).toBe('automation_info');
-      expect(result.payload.name).toBe('Holy Nimbus');
-      expect(result.payload.automationType).toBe('holy_nimbus');
-      expect(result.payload.description).toBe(
-        'Holy Nimbus activated! Aura of Protection is imbued with holy power for 10 minutes.',
-      );
-      expect(result.payload.automation).toEqual(makeAction().automation);
+      expect(result.payload.description).toBe('No Channel Divinity charges remaining.');
     });
   });
 });

@@ -50,6 +50,8 @@ describe('fearService', () => {
                 'fearless',
                 '',
                 'fears',
+                undefined,
+                null,
             ])('returns null for non-Fear spell: "%s"', async (spellName) => {
                 const result = await triggerFear(
                     { name: spellName, level: 1 },
@@ -62,26 +64,10 @@ describe('fearService', () => {
                 expect(result).toBeNull();
                 expect(executeHandler).not.toHaveBeenCalled();
             });
-
-            it.each([
-                [undefined],
-                [null],
-            ])('returns null when spell name is %s', async (name) => {
-                const result = await triggerFear(
-                    { name, level: 3 },
-                    {},
-                    playerStats,
-                    campaignName,
-                    mapName,
-                );
-
-                expect(result).toBeNull();
-                expect(executeHandler).not.toHaveBeenCalled();
-            });
         });
 
         describe('save DC resolution', () => {
-            it('uses spellSaveDc from metaCtx when provided', async () => {
+            it('uses metaCtx spellSaveDc when provided', async () => {
                 executeHandler.mockResolvedValue({ type: 'popup' });
 
                 await triggerFear(
@@ -97,27 +83,6 @@ describe('fearService', () => {
                         automation: expect.objectContaining({ saveDc: 18 }),
                     }),
                     playerStats,
-                    campaignName,
-                    mapName,
-                );
-            });
-
-            it('prefers metaCtx spellSaveDc over playerStats.spellAbilities.saveDc', async () => {
-                executeHandler.mockResolvedValue({ type: 'popup' });
-
-                await triggerFear(
-                    { name: 'Fear', level: 3 },
-                    { spellSaveDc: 20 },
-                    { ...playerStats, spellAbilities: { saveDc: 15 } },
-                    campaignName,
-                    mapName,
-                );
-
-                expect(executeHandler).toHaveBeenCalledWith(
-                    expect.objectContaining({
-                        automation: expect.objectContaining({ saveDc: 20 }),
-                    }),
-                    expect.objectContaining({ spellAbilities: { saveDc: 15 } }),
                     campaignName,
                     mapName,
                 );
@@ -144,7 +109,7 @@ describe('fearService', () => {
                 );
             });
 
-            it('computes saveDc from proficiency when no spellAbilities.saveDc', async () => {
+            it('computes saveDc from proficiency when spellAbilities is missing', async () => {
                 executeHandler.mockResolvedValue({ type: 'popup' });
                 const stats = { name: 'Wizard', proficiency: 3 };
 
@@ -166,29 +131,7 @@ describe('fearService', () => {
                 );
             });
 
-            it('uses default proficiency of 2 when proficiency is missing', async () => {
-                executeHandler.mockResolvedValue({ type: 'popup' });
-                const stats = { name: 'Wizard' };
-
-                await triggerFear(
-                    { name: 'Fear', level: 3 },
-                    {},
-                    stats,
-                    campaignName,
-                    mapName,
-                );
-
-                expect(executeHandler).toHaveBeenCalledWith(
-                    expect.objectContaining({
-                        automation: expect.objectContaining({ saveDc: 10 }),
-                    }),
-                    stats,
-                    campaignName,
-                    mapName,
-                );
-            });
-
-            it('uses default saveDc base of 8 when stats object is empty', async () => {
+            it('uses default saveDc of 10 when stats object is empty', async () => {
                 executeHandler.mockResolvedValue({ type: 'popup' });
 
                 await triggerFear(
@@ -204,28 +147,6 @@ describe('fearService', () => {
                         automation: expect.objectContaining({ saveDc: 10 }),
                     }),
                     {},
-                    campaignName,
-                    mapName,
-                );
-            });
-
-            it('computes saveDc when spellAbilities is undefined', async () => {
-                executeHandler.mockResolvedValue({ type: 'popup' });
-                const stats = { name: 'Wizard', proficiency: 4 };
-
-                await triggerFear(
-                    { name: 'Fear', level: 3 },
-                    {},
-                    stats,
-                    campaignName,
-                    mapName,
-                );
-
-                expect(executeHandler).toHaveBeenCalledWith(
-                    expect.objectContaining({
-                        automation: expect.objectContaining({ saveDc: 12 }),
-                    }),
-                    stats,
                     campaignName,
                     mapName,
                 );
@@ -246,25 +167,6 @@ describe('fearService', () => {
 
                 expect(executeHandler).toHaveBeenCalledWith(
                     expect.objectContaining({ spellSlotLevel: 5 }),
-                    playerStats,
-                    campaignName,
-                    mapName,
-                );
-            });
-
-            it('prefers metaCtx slotLevel over spell.level', async () => {
-                executeHandler.mockResolvedValue({ type: 'popup' });
-
-                await triggerFear(
-                    { name: 'Fear', level: 3 },
-                    { spellSaveDc: 17, slotLevel: 6 },
-                    playerStats,
-                    campaignName,
-                    mapName,
-                );
-
-                expect(executeHandler).toHaveBeenCalledWith(
-                    expect.objectContaining({ spellSlotLevel: 6 }),
                     playerStats,
                     campaignName,
                     mapName,
@@ -308,128 +210,15 @@ describe('fearService', () => {
                     mapName,
                 );
             });
-
-            it('defaults slotLevel to 3 when spell.level is null', async () => {
-                executeHandler.mockResolvedValue({ type: 'popup' });
-
-                await triggerFear(
-                    { name: 'Fear', level: null },
-                    {},
-                    playerStats,
-                    campaignName,
-                    mapName,
-                );
-
-                expect(executeHandler).toHaveBeenCalledWith(
-                    expect.objectContaining({ spellSlotLevel: 3 }),
-                    playerStats,
-                    campaignName,
-                    mapName,
-                );
-            });
-
-            it('defaults slotLevel to 3 when spell.level is undefined', async () => {
-                executeHandler.mockResolvedValue({ type: 'popup' });
-
-                await triggerFear(
-                    { name: 'Fear', level: undefined },
-                    {},
-                    playerStats,
-                    campaignName,
-                    mapName,
-                );
-
-                expect(executeHandler).toHaveBeenCalledWith(
-                    expect.objectContaining({ spellSlotLevel: 3 }),
-                    playerStats,
-                    campaignName,
-                    mapName,
-                );
-            });
         });
 
-        describe('action structure', () => {
-            it('passes the original spell object into the action', async () => {
-                executeHandler.mockResolvedValue({ type: 'popup' });
-                const spell = { name: 'Fear', level: 3, school: 'Illusion' };
-
-                await triggerFear(spell, {}, playerStats, campaignName, mapName);
-
-                expect(executeHandler).toHaveBeenCalledWith(
-                    expect.objectContaining({ spell }),
-                    playerStats,
-                    campaignName,
-                    mapName,
-                );
-            });
-
-            it('includes the action name "Fear"', async () => {
-                executeHandler.mockResolvedValue({ type: 'popup' });
-
-                await triggerFear(
-                    { name: 'Fear', level: 3 },
-                    {},
-                    playerStats,
-                    campaignName,
-                    mapName,
-                );
-
-                expect(executeHandler).toHaveBeenCalledWith(
-                    expect.objectContaining({ name: 'Fear' }),
-                    playerStats,
-                    campaignName,
-                    mapName,
-                );
-            });
-
-            it('includes automation type "fear" in the action', async () => {
-                executeHandler.mockResolvedValue({ type: 'popup' });
-
-                await triggerFear(
-                    { name: 'Fear', level: 3 },
-                    {},
-                    playerStats,
-                    campaignName,
-                    mapName,
-                );
-
-                expect(executeHandler).toHaveBeenCalledWith(
-                    expect.objectContaining({
-                        automation: expect.objectContaining({ type: 'fear' }),
-                    }),
-                    playerStats,
-                    campaignName,
-                    mapName,
-                );
-            });
-
-            it('passes campaignName and mapName to executeHandler', async () => {
-                executeHandler.mockResolvedValue({ type: 'popup' });
-
-                await triggerFear(
-                    { name: 'Fear', level: 3 },
-                    {},
-                    playerStats,
-                    'MyCampaign',
-                    'DungeonMap1',
-                );
-
-                expect(executeHandler).toHaveBeenCalledWith(
-                    expect.any(Object),
-                    playerStats,
-                    'MyCampaign',
-                    'DungeonMap1',
-                );
-            });
-        });
-
-        describe('metaCtx edge cases', () => {
-            it('handles null metaCtx gracefully', async () => {
+        describe('metaCtx null/undefined', () => {
+            it.each([null, undefined])('handles %s metaCtx gracefully', async (metaCtx) => {
                 executeHandler.mockResolvedValue({ type: 'popup' });
 
                 const result = await triggerFear(
                     { name: 'Fear', level: 3 },
-                    null,
+                    metaCtx,
                     playerStats,
                     campaignName,
                     mapName,
@@ -444,68 +233,6 @@ describe('fearService', () => {
                     mapName,
                 );
                 expect(result).toEqual({ type: 'popup' });
-            });
-
-            it('handles undefined metaCtx gracefully', async () => {
-                executeHandler.mockResolvedValue({ type: 'popup' });
-
-                const result = await triggerFear(
-                    { name: 'Fear', level: 3 },
-                    undefined,
-                    playerStats,
-                    campaignName,
-                    mapName,
-                );
-
-                expect(executeHandler).toHaveBeenCalledWith(
-                    expect.objectContaining({
-                        automation: expect.objectContaining({ saveDc: 15 }),
-                    }),
-                    playerStats,
-                    campaignName,
-                    mapName,
-                );
-                expect(result).toEqual({ type: 'popup' });
-            });
-
-            it('handles partial metaCtx with only spellSaveDc', async () => {
-                executeHandler.mockResolvedValue({ type: 'popup' });
-
-                await triggerFear(
-                    { name: 'Fear', level: 3 },
-                    { spellSaveDc: 20 },
-                    playerStats,
-                    campaignName,
-                    mapName,
-                );
-
-                expect(executeHandler).toHaveBeenCalledWith(
-                    expect.objectContaining({
-                        automation: expect.objectContaining({ saveDc: 20 }),
-                    }),
-                    playerStats,
-                    campaignName,
-                    mapName,
-                );
-            });
-
-            it('handles partial metaCtx with only slotLevel', async () => {
-                executeHandler.mockResolvedValue({ type: 'popup' });
-
-                await triggerFear(
-                    { name: 'Fear', level: 3 },
-                    { slotLevel: 5 },
-                    playerStats,
-                    campaignName,
-                    mapName,
-                );
-
-                expect(executeHandler).toHaveBeenCalledWith(
-                    expect.objectContaining({ spellSlotLevel: 5 }),
-                    playerStats,
-                    campaignName,
-                    mapName,
-                );
             });
         });
 

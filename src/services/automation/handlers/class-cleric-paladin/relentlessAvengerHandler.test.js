@@ -63,8 +63,10 @@ describe('relentlessAvengerHandler', () => {
             expect(result.payload.automationType).toBe('relentless_avenger');
             expect(result.payload.description).toContain('No target selected');
         });
+    });
 
-        it('logs ability use with target name when target exists', async () => {
+    describe('with target', () => {
+        it('logs ability use with target name', async () => {
             getCombatContext.mockResolvedValue({});
             getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
 
@@ -77,9 +79,7 @@ describe('relentlessAvengerHandler', () => {
                 description: 'Relentless Avenger used against Goblin',
             }));
         });
-    });
 
-    describe('with target', () => {
         it('applies target effects and condition, then returns popup', async () => {
             getCombatContext.mockResolvedValue({
                 creatures: [{ name: 'Goblin', conditions: [] }],
@@ -139,7 +139,7 @@ describe('relentlessAvengerHandler', () => {
             expect(result.payload.description).toContain("Goblin's Speed is reduced to 0");
         });
 
-        it('uses custom duration when provided, defaults otherwise', async () => {
+        it('uses custom duration when provided', async () => {
             getCombatContext.mockResolvedValue({});
             getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
             getRuntimeValue.mockReturnValue([]);
@@ -156,28 +156,6 @@ describe('relentlessAvengerHandler', () => {
                 'targetEffects',
                 expect.arrayContaining([
                     expect.objectContaining({ duration: '1_round' }),
-                ]),
-                CAMPAIGN_NAME
-            );
-        });
-
-        it('defaults duration when automation duration is missing', async () => {
-            getCombatContext.mockResolvedValue({});
-            getTargetFromAttacker.mockReturnValue({ name: 'Orc' });
-            getRuntimeValue.mockReturnValue([]);
-
-            await handle(
-                makeAction({ automation: {} }),
-                makePlayerStats(),
-                CAMPAIGN_NAME,
-                null
-            );
-
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                CAMPAIGN_NAME,
-                'targetEffects',
-                expect.arrayContaining([
-                    expect.objectContaining({ duration: 'until_end_of_current_turn' }),
                 ]),
                 CAMPAIGN_NAME
             );

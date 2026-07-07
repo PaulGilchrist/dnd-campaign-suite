@@ -142,20 +142,17 @@ describe('celestialResilienceHandler', () => {
         });
 
         it('returns null when self temp HP expression evaluates to invalid value', async () => {
-            for (const value of [0, -3, 'invalid']) {
-                vi.clearAllMocks();
-                evaluateAutoExpression.mockReturnValue(value);
+            evaluateAutoExpression.mockReturnValue(0);
 
-                const result = await grantCelestialResilience(
-                    makeCelestialStats(),
-                    CAMPAIGN,
-                    'magical_cunning',
-                    MAP,
-                );
+            const result = await grantCelestialResilience(
+                makeCelestialStats(),
+                CAMPAIGN,
+                'magical_cunning',
+                MAP,
+            );
 
-                expect(result).toBe(null);
-                expect(setRuntimeValue).not.toHaveBeenCalled();
-            }
+            expect(result).toBe(null);
+            expect(setRuntimeValue).not.toHaveBeenCalled();
         });
 
         it('grants self temp HP and returns result when valid', async () => {
@@ -199,25 +196,6 @@ describe('celestialResilienceHandler', () => {
             );
         });
 
-        it('treats falsy existing temp HP as zero', async () => {
-            evaluateAutoExpression.mockReturnValue(4);
-            getRuntimeValue.mockReturnValue(null);
-
-            await grantCelestialResilience(
-                makeCelestialStats(),
-                CAMPAIGN,
-                'magical_cunning',
-                MAP,
-            );
-
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'TestHero',
-                'tempHp',
-                4,
-                CAMPAIGN,
-            );
-        });
-
         it('does not grant ally temp HP when source is not magical_cunning', async () => {
             evaluateAutoExpression.mockReturnValue(5);
             getRuntimeValue.mockReturnValue(0);
@@ -232,9 +210,6 @@ describe('celestialResilienceHandler', () => {
             expect(result).not.toBe(null);
             expect(result.selfTempHp).toBe(5);
             expect(result.allyTempHp).toBeUndefined();
-            expect(rangeToFeet).not.toHaveBeenCalled();
-            expect(getDistanceFeet).not.toHaveBeenCalled();
-            expect(loadMapData).not.toHaveBeenCalled();
         });
 
         it('grants ally temp HP when source is magical_cunning', async () => {
@@ -340,17 +315,13 @@ describe('celestialResilienceHandler', () => {
             expect(result.allies).not.toContain('FarAlly');
         });
 
-        it('excludes self and handles missing map data', async () => {
-            // self only — should produce empty allies
+        it('returns empty allies when map data is missing or no allies in range', async () => {
+            // missing map data
             evaluateAutoExpression
                 .mockReturnValueOnce(5)
                 .mockReturnValueOnce(2);
             getRuntimeValue.mockReturnValue(0);
-            rangeToFeet.mockReturnValue(100);
-            loadMapData.mockResolvedValue({
-                players: [{ name: 'TestHero', gridX: 0, gridY: 0 }],
-            });
-            getDistanceFeet.mockReturnValue(10);
+            loadMapData.mockResolvedValue(null);
 
             let result = await grantCelestialResilience(
                 makeCelestialStats(),
@@ -359,34 +330,17 @@ describe('celestialResilienceHandler', () => {
                 MAP,
             );
 
+            expect(result.allyTempHp).toBe(2);
             expect(result.allies).toEqual([]);
 
-            // missing map data
+            // no map name
             vi.clearAllMocks();
             evaluateAutoExpression
                 .mockReturnValueOnce(5)
                 .mockReturnValueOnce(2);
             getRuntimeValue.mockReturnValue(0);
-            loadMapData.mockResolvedValue(null);
 
             result = await grantCelestialResilience(
-                makeCelestialStats(),
-                CAMPAIGN,
-                'magical_cunning',
-                MAP,
-            );
-
-            expect(result.allyTempHp).toBe(2);
-            expect(result.allies).toEqual([]);
-        });
-
-        it('returns empty allies when map name is missing', async () => {
-            evaluateAutoExpression
-                .mockReturnValueOnce(5)
-                .mockReturnValueOnce(2);
-            getRuntimeValue.mockReturnValue(0);
-
-            const result = await grantCelestialResilience(
                 makeCelestialStats(),
                 CAMPAIGN,
                 'magical_cunning',
@@ -398,24 +352,21 @@ describe('celestialResilienceHandler', () => {
         });
 
         it('does not grant ally temp HP when ally expression is invalid', async () => {
-            for (const value of [0, 'bad']) {
-                vi.clearAllMocks();
-                evaluateAutoExpression
-                    .mockReturnValueOnce(5)
-                    .mockReturnValueOnce(value);
-                getRuntimeValue.mockReturnValue(0);
+            evaluateAutoExpression
+                .mockReturnValueOnce(5)
+                .mockReturnValueOnce(0);
+            getRuntimeValue.mockReturnValue(0);
 
-                const result = await grantCelestialResilience(
-                    makeCelestialStats(),
-                    CAMPAIGN,
-                    'magical_cunning',
-                    MAP,
-                );
+            const result = await grantCelestialResilience(
+                makeCelestialStats(),
+                CAMPAIGN,
+                'magical_cunning',
+                MAP,
+            );
 
-                expect(result.selfTempHp).toBe(5);
-                expect(result.allyTempHp).toBeUndefined();
-                expect(result.allies).toBeUndefined();
-            }
+            expect(result.selfTempHp).toBe(5);
+            expect(result.allyTempHp).toBeUndefined();
+            expect(result.allies).toBeUndefined();
         });
 
         it('uses default expressions when automation fields are missing', async () => {

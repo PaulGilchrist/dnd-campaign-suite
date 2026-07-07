@@ -122,7 +122,7 @@ describe('triggerHealingWord', () => {
             expect(applyHealingToTarget).not.toHaveBeenCalled();
         });
 
-        it('returns null when spell.name fallback has empty string check', async () => {
+        it('returns null when spell has no name property', async () => {
             const spell = { level: 1, heal_at_slot_level: { '1': '2d4 + MOD' } };
             const result = await triggerHealingWord(spell, {}, makePlayerStats(), CAMPAIGN, 'testMap');
             expect(result).toBeNull();

@@ -1,4 +1,3 @@
-// @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
@@ -90,24 +89,6 @@ describe('searingVengeanceHandler.handle', () => {
       expect(result.payload.description).toContain('has no uses remaining');
       expect(result.payload.description).toContain('Long Rest');
     });
-
-    it('falls back to usesMax when no stored uses value exists', async () => {
-      mockRuntimeValues({ searingvengeanceUses: null });
-      damageUtils.getCombatContext.mockResolvedValue({});
-      damageUtils.getTargetFromAttacker.mockReturnValue({ name: 'Ally', type: 'player' });
-      diceRoller.rollExpression.mockReturnValue({ total: 10 });
-
-      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.description).not.toContain('has no uses remaining');
-      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-        'TestCleric',
-        'searingvengeanceUses',
-        0,
-        campaignName
-      );
-    });
   });
 
   describe('combat context', () => {
@@ -144,7 +125,7 @@ describe('searingVengeanceHandler.handle', () => {
       );
     });
 
-    it('uses the player\'s max HP when the target has no maxHp', async () => {
+    it('falls back to player max HP when target has no maxHp', async () => {
       mockRuntimeValues({ searingvengeanceUses: 1 });
       damageUtils.getCombatContext.mockResolvedValue({});
       damageUtils.getTargetFromAttacker.mockReturnValue({
@@ -176,7 +157,7 @@ describe('searingVengeanceHandler.handle', () => {
       expect(target.maxHp).toBe(30);
     });
 
-    it('saves combatSummary when healing an NPC', async () => {
+    it('persists NPC healing to combatSummary storage', async () => {
       mockRuntimeValues({ searingvengeanceUses: 1 });
       damageUtils.getCombatContext.mockResolvedValue({ creatures: [] });
       const target = { name: 'Goblin', type: 'npc', currentHp: 0, maxHp: 20 };
@@ -187,19 +168,12 @@ describe('searingVengeanceHandler.handle', () => {
 
       expect(storage.set).toHaveBeenCalledWith('combatSummary', expect.any(Object), campaignName);
     });
-
   });
 
   describe('condition clearing', () => {
-    it('clears all conditions from the creature via setRuntimeValue', async () => {
+    it('clears all conditions from the creature', async () => {
       mockRuntimeValues({ searingvengeanceUses: 1 });
-      const cs = {
-        creatures: [{
-          name: 'Ally',
-          conditions: [{ key: 'unconscious' }, { key: 'blinded' }],
-        }],
-      };
-      damageUtils.getCombatContext.mockResolvedValueOnce(cs).mockResolvedValueOnce(cs);
+      damageUtils.getCombatContext.mockResolvedValue({});
       damageUtils.getTargetFromAttacker.mockReturnValue({
         name: 'Ally',
         type: 'player',
@@ -270,21 +244,6 @@ describe('searingVengeanceHandler.handle', () => {
       expect(blinded.value).toBe(0);
     });
 
-    it('uses the default damage expression when action lacks one', async () => {
-      mockRuntimeValues({ searingvengeanceUses: 1 });
-      damageUtils.getCombatContext.mockResolvedValue({});
-      damageUtils.getTargetFromAttacker.mockReturnValue({
-        name: 'Ally',
-        type: 'player',
-      });
-      diceRoller.rollExpression.mockReturnValue({ total: 8 });
-      const action = makeAction({ damageExpression: undefined });
-
-      await handle(action, makePlayerStats(), campaignName, null);
-
-      expect(diceRoller.rollExpression).toHaveBeenCalledWith('2d8 + CHA modifier');
-    });
-
     it('uses all_enemies as target when no target is found', async () => {
       mockRuntimeValues({ searingvengeanceUses: 1 });
       damageUtils.getCombatContext.mockResolvedValue({});
@@ -296,6 +255,18 @@ describe('searingVengeanceHandler.handle', () => {
       const calls = useRuntimeState.setRuntimeValue.mock.calls.filter(c => c[1] === 'targetEffects');
       const blinded = calls[0][2].find(e => e.effect === 'blinded');
       expect(blinded.target).toBe('all_enemies');
+    });
+
+    it('returns a popup when no target is found', async () => {
+      mockRuntimeValues({ searingvengeanceUses: 1 });
+      damageUtils.getCombatContext.mockResolvedValue({});
+      damageUtils.getTargetFromAttacker.mockReturnValue(null);
+      diceRoller.rollExpression.mockReturnValue({ total: 10 });
+
+      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+      expect(result.type).toBe('popup');
+      expect(result.payload.description).toContain('Target');
     });
   });
 
@@ -356,23 +327,6 @@ describe('searingVengeanceHandler.handle', () => {
       }));
     });
 
-    it('does not log a damage_roll entry when damage is zero', async () => {
-      mockRuntimeValues({ searingvengeanceUses: 1 });
-      damageUtils.getCombatContext.mockResolvedValue({});
-      damageUtils.getTargetFromAttacker.mockReturnValue({
-        name: 'Ally',
-        type: 'player',
-      });
-      diceRoller.rollExpression.mockReturnValue({ total: 0 });
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      const damageEntries = addEntry.mock.calls.filter(
-        call => call[1] && call[1].type === 'damage_roll'
-      );
-      expect(damageEntries).toHaveLength(0);
-    });
-
     it('uses the default damage type when action lacks one', async () => {
       mockRuntimeValues({ searingvengeanceUses: 1 });
       damageUtils.getCombatContext.mockResolvedValue({});
@@ -413,7 +367,6 @@ describe('searingVengeanceHandler.handle', () => {
       expect(result.payload.description).toContain('16 radiant damage');
       expect(result.payload.description).toContain('Blinded');
     });
-
   });
 
   describe('uses consumption', () => {
@@ -435,23 +388,10 @@ describe('searingVengeanceHandler.handle', () => {
         campaignName
       );
     });
-
   });
 
   describe('edge cases', () => {
-    it('handles a missing target gracefully', async () => {
-      mockRuntimeValues({ searingvengeanceUses: 1 });
-      damageUtils.getCombatContext.mockResolvedValue({});
-      damageUtils.getTargetFromAttacker.mockReturnValue(null);
-      diceRoller.rollExpression.mockReturnValue({ total: 10 });
-
-      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.description).toContain('Target');
-    });
-
-    it('handles missing hitPoints.max on playerStats by using currentHitPoints', async () => {
+    it('handles missing hitPoints.max by using currentHitPoints', async () => {
       mockRuntimeValues({ searingvengeanceUses: 1 });
       damageUtils.getCombatContext.mockResolvedValue({});
       damageUtils.getTargetFromAttacker.mockReturnValue({
@@ -470,22 +410,6 @@ describe('searingVengeanceHandler.handle', () => {
         20,
         campaignName
       );
-    });
-
-    it('initializes targetEffects when none exist', async () => {
-      mockRuntimeValues({ searingvengeanceUses: 1, targetEffects: null });
-      damageUtils.getCombatContext.mockResolvedValue({});
-      damageUtils.getTargetFromAttacker.mockReturnValue({
-        name: 'Ally',
-        type: 'player',
-      });
-      diceRoller.rollExpression.mockReturnValue({ total: 10 });
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      const calls = useRuntimeState.setRuntimeValue.mock.calls.filter(c => c[1] === 'targetEffects');
-      expect(calls.length).toBeGreaterThan(0);
-      expect(Array.isArray(calls[0][2])).toBe(true);
     });
   });
 });

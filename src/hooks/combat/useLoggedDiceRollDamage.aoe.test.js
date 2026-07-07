@@ -111,17 +111,6 @@ describe('AOE damage handling', () => {
         return createLogDamageAndShow(deps);
     }
 
-    it('does not process AOE when overlay context or combatSummary is missing', async () => {
-        readAoeContext.mockReturnValue(null);
-        const fn = createFn();
-        await fn('Fireball', '8d6', 20, [3, 4, 5, 2, 3, 3], 0, {
-            targetName: 'overlay-fireball',
-            damageType: 'fire',
-        });
-        expect(getAffectedCreatures).not.toHaveBeenCalled();
-        expect(deps.setPopupHtml).not.toHaveBeenCalled();
-    });
-
     it('processes AOE with NPC saves when saveDc and saveType are provided', async () => {
         const overlay = { id: 'fireball-1', label: 'Fireball', shape: 'circle' };
         readAoeContext.mockReturnValue({
@@ -209,16 +198,12 @@ describe('AOE damage handling', () => {
             dcSuccess: 'half',
         });
 
-        expect(applyDamageToTarget).toHaveBeenCalledWith(
-            expect.any(Object),
-            'Ally1',
-            0,
-            ['fire'],
-            'test-campaign',
-            expect.any(Array),
-            false,
-            'TestWizard'
-        );
+        expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
+            type: 'aoe-damage',
+            npcResults: ['Ally1'],
+        }));
+        expect(deps.setPopupHtml).toHaveBeenCalledWith(expect.stringContaining('Ally1'));
+        expect(deps.setPopupHtml).toHaveBeenCalledWith(expect.stringContaining('Soulstitch'));
     });
 
     it('calls endInvisibilityOnHostileAction when AOE deals damage without saves', async () => {

@@ -165,40 +165,50 @@ const setupDefaults = (overrides = {}) => {
   abilityCalc.getHitPoints.mockReturnValue(overrides.hitPoints ?? 12);
   abilityCalc.getCarryingCapacity.mockReturnValue(overrides.carryingCapacity ?? 150);
   attackCalc.getAttacks.mockReturnValue(overrides.attacks || []);
+  elfishLineageHandler.getElfisLineageSelection.mockReturnValue(overrides.lineage ?? null);
+};
+
+const setup2024Defaults = (overrides = {}) => {
+  vi.mocked(dataLoader.loadSkills).mockResolvedValue(defaultSkills);
+  vi.mocked(dataLoader.loadPassiveSkills).mockResolvedValue(['Insight']);
+  raceRules2024.getRace.mockReturnValue({ name: 'Human', languages: ['Common'], traits: [], ...overrides.race });
+  raceRules2024.getSenses.mockReturnValue(overrides.senses || []);
+  raceRules2024.getTraits.mockReturnValue({ actions: [], bonusActions: [], reactions: [], specialActions: [], characterAdvancement: [], ...overrides.traits });
+  classRules2024.getClass.mockReturnValue({ name: 'Fighter', hit_die: 10, saving_throws: [], proficiencies: [], class_levels: [{}], languages: [], major: {}, ...overrides.class });
+  classRules2024.getFeatures.mockReturnValue({ actions: [], bonusActions: [], reactions: [], specialActions: [], characterAdvancement: [], ...overrides.features });
+  abilityCalc2024.getAbilities.mockResolvedValue(overrides.abilities || defaultAbilities);
+  abilityCalc.getHitPoints.mockReturnValue(overrides.hitPoints ?? 12);
+  abilityCalc.getCarryingCapacity.mockReturnValue(overrides.carryingCapacity ?? 150);
+  attackCalc.getAttacks.mockReturnValue(overrides.attacks || []);
+  automationService.collectAutomationFromFeatures.mockReturnValue(overrides.automation || { passives: [], actions: [], specialActions: [] });
+  automationService.collectSaveModifiers.mockReturnValue({});
+  automationService.collectTurnStartEffects.mockReturnValue([]);
+  automationService.getConditionImmunities.mockReturnValue([]);
+  automationService.getConditionalImmunities.mockReturnValue([]);
+  automationService.getEvasionEffects.mockReturnValue([]);
+  automationService.getAllSaveProficiencies.mockReturnValue([]);
+  elfishLineageHandler.getElfisLineageSelection.mockReturnValue(null);
 };
 
 describe('rules.getPlayerStats - speed bonuses', () => {
   beforeEach(() => { vi.clearAllMocks(); setupDefaults(); });
 
   it('should add 5 ft speed for Wood Elf lineage', async () => {
-    vi.mocked(elfishLineageHandler.getElfisLineageSelection).mockReturnValue('Wood Elf');
+    setupDefaults({ lineage: 'Wood Elf' });
     const playerSummary = makePlayerSummary({ speed: 30 });
     const result = await rules.getPlayerStats([], [], [], [], [], playerSummary);
     expect(result.speed).toBe(35);
   });
 
-  it('should not add speed bonus for non-Wood Elf lineage', async () => {
-    vi.mocked(elfishLineageHandler.getElfisLineageSelection).mockReturnValue('High Elf');
-    const playerSummary = makePlayerSummary({ speed: 30 });
-    const result = await rules.getPlayerStats([], [], [], [], [], playerSummary);
-    expect(result.speed).toBe(30);
-  });
-
   it('should add speed_bonus when condition allows', async () => {
-    automationService.collectAutomationFromFeatures.mockReturnValue({
-      passives: [{ type: 'passive_buff', effect: 'speed_bonus', bonusExpression: '15', condition: 'no_heavy_armor' }],
-      actions: [], specialActions: [],
-    });
+    setupDefaults({ automation: { passives: [{ type: 'passive_buff', effect: 'speed_bonus', bonusExpression: '15', condition: 'no_heavy_armor' }], actions: [], specialActions: [] } });
     const playerSummary = makePlayerSummary({ speed: 30 });
     const result = await rules.getPlayerStats([], [], [], [], [], playerSummary);
     expect(result.speed).toBe(45);
   });
 
   it('should not apply speed_bonus when wearing heavy armor with no_heavy_armor condition', async () => {
-    automationService.collectAutomationFromFeatures.mockReturnValue({
-      passives: [{ type: 'passive_buff', effect: 'speed_bonus', bonusExpression: '10', condition: 'no_heavy_armor' }],
-      actions: [], specialActions: [],
-    });
+    setupDefaults({ automation: { passives: [{ type: 'passive_buff', effect: 'speed_bonus', bonusExpression: '10', condition: 'no_heavy_armor' }], actions: [], specialActions: [] } });
     const playerSummary = makePlayerSummary({
       speed: 30,
       inventory: { equipped: ['Plate Armor'], magicItems: [] },
@@ -209,61 +219,47 @@ describe('rules.getPlayerStats - speed bonuses', () => {
   });
 });
 
-describe('rules.getPlayerStats - senses enhancements', () => {
+describe('rules.getPlayerStats - senses enhancements (5e)', () => {
   beforeEach(() => { vi.clearAllMocks(); setupDefaults(); });
 
-  it('should upgrade Darkvision to 120 ft with Third Eye buff', async () => {
+  it.each`
+    existingSenses                          | expectedSenses
+    ${[{ name: 'Darkvision', value: '60 ft.' }]}                         | ${[{ name: 'Darkvision', value: '120 ft.' }]}
+    ${[{ name: 'Darkvision', value: '120 ft.' }]}                         | ${[{ name: 'Darkvision', value: '120 ft.' }]}
+    ${[]}                                   | ${[{ name: 'Darkvision', value: '120 ft.' }]}
+  `('should handle Third Eye darkvision: existing=$existingSenses', async ({ existingSenses, expectedSenses }) => {
     vi.spyOn(runtimeState, 'getRuntimeValue').mockReturnValue([{ name: 'The Third Eye', effect: 'darkvision_120' }]);
-    raceRules.getSenses.mockReturnValue([{ name: 'Darkvision', value: '60 ft.' }]);
+    raceRules.getSenses.mockReturnValue(existingSenses);
     const playerSummary = makePlayerSummary();
     const result = await rules.getPlayerStats([], [], [], [], [], playerSummary);
-    expect(result.senses).toContainEqual({ name: 'Darkvision', value: '120 ft.' });
-  });
-
-  it('should not upgrade Darkvision if already 120 ft or more with Third Eye buff', async () => {
-    vi.spyOn(runtimeState, 'getRuntimeValue').mockReturnValue([{ name: 'The Third Eye', effect: 'darkvision_120' }]);
-    raceRules.getSenses.mockReturnValue([{ name: 'Darkvision', value: '120 ft.' }]);
-    const playerSummary = makePlayerSummary();
-    const result = await rules.getPlayerStats([], [], [], [], [], playerSummary);
-    expect(result.senses).toContainEqual({ name: 'Darkvision', value: '120 ft.' });
-  });
-
-  it('should add Darkvision when Third Eye buff exists but no existing darkvision (5e)', async () => {
-    vi.spyOn(runtimeState, 'getRuntimeValue').mockReturnValue([{ name: 'The Third Eye', effect: 'darkvision_120' }]);
-    raceRules.getSenses.mockReturnValue([]);
-    const playerSummary = makePlayerSummary();
-    const result = await rules.getPlayerStats([], [], [], [], [], playerSummary);
-    expect(result.senses).toContainEqual({ name: 'Darkvision', value: '120 ft.' });
+    expect(result.senses).toEqual(expectedSenses);
   });
 
   it('should add Truesight from passive_buff automation', async () => {
-    automationService.collectAutomationFromFeatures.mockReturnValue({
-      passives: [{ type: 'passive_buff', effect: 'truesight', range: '60 ft.' }],
-      actions: [], specialActions: [],
+    setupDefaults({
+      automation: { passives: [{ type: 'passive_buff', effect: 'truesight', range: '60 ft.' }], actions: [], specialActions: [] },
+      senses: [{ name: 'Darkvision', value: '60 ft.' }],
     });
-    raceRules.getSenses.mockReturnValue([{ name: 'Darkvision', value: '60 ft.' }]);
     const playerSummary = makePlayerSummary();
     const result = await rules.getPlayerStats([], [], [], [], [], playerSummary);
     expect(result.senses).toContainEqual({ name: 'Truesight', value: '60 ft.' });
   });
 
   it('should use default 60 ft for Truesight when range is missing', async () => {
-    automationService.collectAutomationFromFeatures.mockReturnValue({
-      passives: [{ type: 'passive_buff', effect: 'truesight' }],
-      actions: [], specialActions: [],
+    setupDefaults({
+      automation: { passives: [{ type: 'passive_buff', effect: 'truesight' }], actions: [], specialActions: [] },
+      senses: [],
     });
-    raceRules.getSenses.mockReturnValue([]);
     const playerSummary = makePlayerSummary();
     const result = await rules.getPlayerStats([], [], [], [], [], playerSummary);
     expect(result.senses).toContainEqual({ name: 'Truesight', value: '60 ft.' });
   });
 
   it('should not duplicate Truesight if already present', async () => {
-    automationService.collectAutomationFromFeatures.mockReturnValue({
-      passives: [{ type: 'passive_buff', effect: 'truesight', range: '120 ft.' }],
-      actions: [], specialActions: [],
+    setupDefaults({
+      automation: { passives: [{ type: 'passive_buff', effect: 'truesight', range: '120 ft.' }], actions: [], specialActions: [] },
+      senses: [{ name: 'Truesight', value: '30 ft.' }],
     });
-    raceRules.getSenses.mockReturnValue([{ name: 'Truesight', value: '30 ft.' }]);
     const playerSummary = makePlayerSummary();
     const result = await rules.getPlayerStats([], [], [], [], [], playerSummary);
     const truesightCount = result.senses.filter(s => s.name === 'Truesight').length;
@@ -272,145 +268,40 @@ describe('rules.getPlayerStats - senses enhancements', () => {
 });
 
 describe('rules.getPlayerStats - 2024 senses', () => {
-  beforeEach(() => { vi.clearAllMocks(); });
+  beforeEach(() => { vi.clearAllMocks(); setup2024Defaults(); });
 
   it('should set senses from raceRules.getSenses in 2024 mode', async () => {
-    vi.mocked(dataLoader.loadSkills).mockResolvedValue(defaultSkills);
-    vi.mocked(dataLoader.loadPassiveSkills).mockResolvedValue(['Insight']);
-    raceRules2024.getRace.mockReturnValue({ name: 'Elf', languages: ['Common'], traits: [] });
-    raceRules2024.getSenses.mockReturnValue(['Darkvision 60 ft.']);
-    raceRules2024.getTraits.mockReturnValue({ actions: [], bonusActions: [], reactions: [], specialActions: [], characterAdvancement: [] });
-    classRules2024.getClass.mockReturnValue({ name: 'Fighter', hit_die: 10, saving_throws: [], proficiencies: [], class_levels: [{}], languages: [], major: {} });
-    classRules2024.getFeatures.mockReturnValue({ actions: [], bonusActions: [], reactions: [], specialActions: [], characterAdvancement: [] });
-    abilityCalc2024.getAbilities.mockResolvedValue(defaultAbilities);
-    abilityCalc.getHitPoints.mockReturnValue(12);
-    abilityCalc.getCarryingCapacity.mockReturnValue(150);
-    attackCalc.getAttacks.mockReturnValue([]);
-    automationService.collectAutomationFromFeatures.mockReturnValue({ passives: [], actions: [], specialActions: [] });
-    automationService.collectSaveModifiers.mockReturnValue({});
-    automationService.collectTurnStartEffects.mockReturnValue([]);
-    automationService.getConditionImmunities.mockReturnValue([]);
-    automationService.getConditionalImmunities.mockReturnValue([]);
-    automationService.getEvasionEffects.mockReturnValue([]);
-    automationService.getAllSaveProficiencies.mockReturnValue([]);
-    elfishLineageHandler.getElfisLineageSelection.mockReturnValue(null);
+    setup2024Defaults({ senses: [{ name: 'Darkvision', value: '60 ft.' }] });
     const playerSummary = makePlayerSummary({ rules: '2024' });
     const result = await rules.getPlayerStats([], [], [], [], [], playerSummary);
-    expect(result.senses).toEqual(['Darkvision 60 ft.']);
+    expect(result.senses).toContainEqual({ name: 'Darkvision', value: '60 ft.' });
   });
 
   it('should apply Umbral Sight darkvision for Gloom Stalker in 2024', async () => {
-    vi.mocked(dataLoader.loadSkills).mockResolvedValue(defaultSkills);
-    vi.mocked(dataLoader.loadPassiveSkills).mockResolvedValue(['Insight']);
-    classRules2024.getClass.mockReturnValue({
-      name: 'Ranger', hit_die: 10, saving_throws: [], proficiencies: [],
-      class_levels: [{ level: 3, features: [] }],
-      major: { name: 'Stalker', features: [] },
-      languages: [],
-    });
-    raceRules2024.getRace.mockReturnValue({ name: 'Human', languages: ['Common'], traits: [] });
-    raceRules2024.getSenses.mockReturnValue([{ name: 'Darkvision', value: '60 ft.' }]);
-    raceRules2024.getTraits.mockReturnValue({ actions: [], bonusActions: [], reactions: [], specialActions: [], characterAdvancement: [] });
-    classRules2024.getFeatures.mockReturnValue({ actions: [], bonusActions: [], reactions: [], specialActions: [], characterAdvancement: [] });
-    abilityCalc2024.getAbilities.mockResolvedValue(defaultAbilities);
-    abilityCalc.getHitPoints.mockReturnValue(12);
-    abilityCalc.getCarryingCapacity.mockReturnValue(150);
-    attackCalc.getAttacks.mockReturnValue([]);
-    automationService.collectAutomationFromFeatures.mockReturnValue({ passives: [], actions: [], specialActions: [] });
-    automationService.collectSaveModifiers.mockReturnValue({});
-    automationService.collectTurnStartEffects.mockReturnValue([]);
-    automationService.getConditionImmunities.mockReturnValue([]);
-    automationService.getConditionalImmunities.mockReturnValue([]);
-    automationService.getEvasionEffects.mockReturnValue([]);
-    automationService.getAllSaveProficiencies.mockReturnValue([]);
-    elfishLineageHandler.getElfisLineageSelection.mockReturnValue(null);
-    const playerSummary = makePlayerSummary({
-      rules: '2024',
+    setup2024Defaults({
       class: { name: 'Ranger', major: { name: 'Stalker' } },
+      senses: [{ name: 'Darkvision', value: '60 ft.' }],
     });
+    const playerSummary = makePlayerSummary({ rules: '2024', class: { name: 'Ranger', major: { name: 'Stalker' } } });
     const result = await rules.getPlayerStats([], [], [], [], [], playerSummary);
     expect(result.senses).toContainEqual({ name: 'Darkvision', value: '120 ft.' });
   });
 
   it('should apply Third Eye darkvision in 2024 mode', async () => {
-    vi.mocked(dataLoader.loadSkills).mockResolvedValue(defaultSkills);
-    vi.mocked(dataLoader.loadPassiveSkills).mockResolvedValue(['Insight']);
     vi.spyOn(runtimeState, 'getRuntimeValue').mockReturnValue([{ name: 'The Third Eye', effect: 'darkvision_120' }]);
-    raceRules2024.getRace.mockReturnValue({ name: 'Human', languages: ['Common'], traits: [] });
-    raceRules2024.getSenses.mockReturnValue([{ name: 'Darkvision', value: '60 ft.' }]);
-    raceRules2024.getTraits.mockReturnValue({ actions: [], bonusActions: [], reactions: [], specialActions: [], characterAdvancement: [] });
-    classRules2024.getClass.mockReturnValue({ name: 'Fighter', hit_die: 10, saving_throws: [], proficiencies: [], class_levels: [{}], languages: [], major: {} });
-    classRules2024.getFeatures.mockReturnValue({ actions: [], bonusActions: [], reactions: [], specialActions: [], characterAdvancement: [] });
-    abilityCalc2024.getAbilities.mockResolvedValue(defaultAbilities);
-    abilityCalc.getHitPoints.mockReturnValue(12);
-    abilityCalc.getCarryingCapacity.mockReturnValue(150);
-    attackCalc.getAttacks.mockReturnValue([]);
-    automationService.collectAutomationFromFeatures.mockReturnValue({ passives: [], actions: [], specialActions: [] });
-    automationService.collectSaveModifiers.mockReturnValue({});
-    automationService.collectTurnStartEffects.mockReturnValue([]);
-    automationService.getConditionImmunities.mockReturnValue([]);
-    automationService.getConditionalImmunities.mockReturnValue([]);
-    automationService.getEvasionEffects.mockReturnValue([]);
-    automationService.getAllSaveProficiencies.mockReturnValue([]);
-    elfishLineageHandler.getElfisLineageSelection.mockReturnValue(null);
+    setup2024Defaults({ senses: [{ name: 'Darkvision', value: '60 ft.' }], class: { name: 'Fighter' } });
     const playerSummary = makePlayerSummary({ rules: '2024' });
     const result = await rules.getPlayerStats([], [], [], [], [], playerSummary);
     expect(result.senses).toContainEqual({ name: 'Darkvision', value: '120 ft.' });
   });
 
   it('should apply Truesight in 2024 mode', async () => {
-    vi.mocked(dataLoader.loadSkills).mockResolvedValue(defaultSkills);
-    vi.mocked(dataLoader.loadPassiveSkills).mockResolvedValue(['Insight']);
-    automationService.collectAutomationFromFeatures.mockReturnValue({
-      passives: [{ type: 'passive_buff', effect: 'truesight', range: '120 ft.' }],
-      actions: [], specialActions: [],
+    setup2024Defaults({
+      automation: { passives: [{ type: 'passive_buff', effect: 'truesight', range: '120 ft.' }], actions: [], specialActions: [] },
+      senses: [{ name: 'Darkvision', value: '60 ft.' }],
     });
-    raceRules2024.getRace.mockReturnValue({ name: 'Human', languages: ['Common'], traits: [] });
-    raceRules2024.getSenses.mockReturnValue([{ name: 'Darkvision', value: '60 ft.' }]);
-    raceRules2024.getTraits.mockReturnValue({ actions: [], bonusActions: [], reactions: [], specialActions: [], characterAdvancement: [] });
-    classRules2024.getClass.mockReturnValue({ name: 'Fighter', hit_die: 10, saving_throws: [], proficiencies: [], class_levels: [{}], languages: [], major: {} });
-    classRules2024.getFeatures.mockReturnValue({ actions: [], bonusActions: [], reactions: [], specialActions: [], characterAdvancement: [] });
-    abilityCalc2024.getAbilities.mockResolvedValue(defaultAbilities);
-    abilityCalc.getHitPoints.mockReturnValue(12);
-    abilityCalc.getCarryingCapacity.mockReturnValue(150);
-    attackCalc.getAttacks.mockReturnValue([]);
-    automationService.collectSaveModifiers.mockReturnValue({});
-    automationService.collectTurnStartEffects.mockReturnValue([]);
-    automationService.getConditionImmunities.mockReturnValue([]);
-    automationService.getConditionalImmunities.mockReturnValue([]);
-    automationService.getEvasionEffects.mockReturnValue([]);
-    automationService.getAllSaveProficiencies.mockReturnValue([]);
-    elfishLineageHandler.getElfisLineageSelection.mockReturnValue(null);
     const playerSummary = makePlayerSummary({ rules: '2024' });
     const result = await rules.getPlayerStats([], [], [], [], [], playerSummary);
     expect(result.senses).toContainEqual({ name: 'Truesight', value: '120 ft.' });
   });
 });
-
-describe('rules.getPlayerStats - Horde Breaker attack', () => {
-  beforeEach(() => { vi.clearAllMocks(); setupDefaults(); });
-
-  it('should include Horde Breaker attack with correct properties when Hunter\'s Prey is active', async () => {
-    automationService.collectAutomationFromFeatures.mockReturnValue({
-      passives: [{ type: 'hunter_prey', name: "Hunter's Prey" }],
-      actions: [], specialActions: [],
-    });
-    classRules.getRangerFeatures.mockReturnValue({ extraAttacks: 1 });
-    const playerSummary = makePlayerSummary({
-      class: { name: 'Ranger', saving_throws: [], languages: [], subclass: {}, major: {} },
-      proficiency: 3,
-    });
-    const result = await rules.getPlayerStats([], [], [], [], [], playerSummary);
-    const hordeBreaker = result.attacks.find((a) => a.isHordeBreaker);
-    expect(hordeBreaker).toBeDefined();
-    expect(hordeBreaker.name).toBe('Horde Breaker');
-    expect(hordeBreaker.damage).toBe('1d4');
-    expect(hordeBreaker.damageType).toBe('Slashing');
-    expect(hordeBreaker.type).toBe('Bonus Action');
-    expect(hordeBreaker.weaponType).toBe('melee');
-    expect(hordeBreaker.isHordeBreaker).toBe(true);
-    expect(hordeBreaker.hitBonusFormula).toContain('To Hit Bonus');
-  });
-});
-
-

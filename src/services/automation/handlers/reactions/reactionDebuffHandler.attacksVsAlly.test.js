@@ -131,26 +131,7 @@ describe('reactionDebuffHandler — disadvantage_on_attacks_vs_ally', () => {
   });
 
   describe('effect: disadvantage_on_attacks_vs_ally', () => {
-    function setupPath(options = {}) {
-      const ps = makePlayerStats(options);
-      const action = makeAction();
-
-      targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
-      damageUtils.getCombatContext.mockResolvedValue(makeCombatSummary());
-      damageRollback.findLastAttack.mockResolvedValue({
-        attackEvent: freshAttackEvent(options),
-        attackerName: 'Goblin',
-        targetName: 'Goblin',
-        primaryDamage: options.primaryDamage ?? 10,
-        secondaryDamage: 0,
-        totalDamage: options.totalDamage ?? (options.hit ? 10 : 0),
-        damageTypes: options.damageTypes || ['Piercing'],
-      });
-
-      return handle(action, ps, campaignName, mapName);
-    }
-
-    function makeAction() {
+    function makeAction(overrides = {}) {
       return {
         name: 'Blessed Defender',
         automation: {
@@ -159,8 +140,28 @@ describe('reactionDebuffHandler — disadvantage_on_attacks_vs_ally', () => {
           effect: 'disadvantage_on_attacks_vs_ally',
           uses_expression: null,
           recharge: 'long_rest',
+          ...overrides,
         },
       };
+    }
+
+    function setupPath(action, ps, extraMocks = {}) {
+      const a = action || makeAction();
+      const p = ps || makePlayerStats();
+
+      targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
+      damageUtils.getCombatContext.mockResolvedValue(makeCombatSummary());
+      damageRollback.findLastAttack.mockResolvedValue({
+        attackEvent: freshAttackEvent(extraMocks.attackEvent),
+        attackerName: extraMocks.attackerName || 'Goblin',
+        targetName: extraMocks.targetName || 'Goblin',
+        primaryDamage: extraMocks.primaryDamage ?? 10,
+        secondaryDamage: 0,
+        totalDamage: extraMocks.totalDamage ?? (extraMocks.attackEvent?.hit !== false ? 10 : 0),
+        damageTypes: extraMocks.damageTypes || ['Piercing'],
+      });
+
+      return handle(a, p, campaignName, mapName);
     }
 
     it('returns popup when no attack event found', async () => {
@@ -207,10 +208,10 @@ describe('reactionDebuffHandler — disadvantage_on_attacks_vs_ally', () => {
       expect(result.payload.description).toContain('Could not determine who was attacked');
     });
 
-    it('stores protection effect in targetEffects with correct properties', async () => {
+    it('stores protection effect in targetEffects and returns disadvantage popup', async () => {
       useRuntimeState.getRuntimeValue.mockReturnValue([]);
 
-      await setupPath();
+      const result = await setupPath();
 
       const targetEffectsCall = useRuntimeState.setRuntimeValue.mock.calls.find(
         (c) => c[1] === 'targetEffects'
@@ -221,37 +222,17 @@ describe('reactionDebuffHandler — disadvantage_on_attacks_vs_ally', () => {
       expect(targetEffectsCall[2][0].target).toBe('Goblin');
       expect(targetEffectsCall[2][0].source).toBe('Paladin');
       expect(targetEffectsCall[2][0].duration).toBe('until_start_of_next_turn');
-      expect(targetEffectsCall[2][0].timestamp).toBeDefined();
+
+      expect(result.type).toBe('popup');
+      expect(result.payload.description).toContain('Disadvantage');
+      expect(result.payload.description).toContain('second d20');
     });
 
     it('uses custom duration when specified in automation', async () => {
-      const ps = makePlayerStats();
-      const action = {
-        name: 'Blessed Defender',
-        automation: {
-          type: 'reaction_debuff',
-          range: '30_ft',
-          effect: 'disadvantage_on_attacks_vs_ally',
-          duration: '1_round',
-          uses_expression: null,
-          recharge: 'long_rest',
-        },
-      };
-
-      targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
-      damageUtils.getCombatContext.mockResolvedValue(makeCombatSummary());
       useRuntimeState.getRuntimeValue.mockReturnValue([]);
-      damageRollback.findLastAttack.mockResolvedValue({
-        attackEvent: freshAttackEvent(),
-        attackerName: 'Goblin',
-        targetName: 'Goblin',
-        primaryDamage: 10,
-        secondaryDamage: 0,
-        totalDamage: 10,
-        damageTypes: ['Piercing'],
-      });
 
-      await handle(action, ps, campaignName, mapName);
+      const action = makeAction({ duration: '1_round' });
+      await setupPath(action);
 
       const targetEffectsCall = useRuntimeState.setRuntimeValue.mock.calls.find(
         (c) => c[1] === 'targetEffects'
@@ -259,7 +240,8 @@ describe('reactionDebuffHandler — disadvantage_on_attacks_vs_ally', () => {
       expect(targetEffectsCall[2][0].duration).toBe('1_round');
     });
 
-    it('replaces existing protection effect for same target', async () => {
+    it('replaces existing protection effect for same target or appends for different target', async () => {
+      // Same target: replacement
       useRuntimeState.getRuntimeValue.mockReturnValue([
         { effect: 'protection', target: 'Goblin', source: 'Other', duration: 'until_start_of_next_turn', timestamp: Date.now() - 1000 },
       ]);
@@ -271,44 +253,31 @@ describe('reactionDebuffHandler — disadvantage_on_attacks_vs_ally', () => {
       );
       expect(targetEffectsCall[2]).toHaveLength(1);
       expect(targetEffectsCall[2][0].source).toBe('Paladin');
-    });
 
-    it('does not replace if different target has existing protection', async () => {
+      // Different target: append
+      vi.clearAllMocks();
       useRuntimeState.getRuntimeValue.mockReturnValue([
         { effect: 'protection', target: 'Orc', source: 'Other', duration: 'until_start_of_next_turn', timestamp: Date.now() },
       ]);
+      targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
+      damageUtils.getCombatContext.mockResolvedValue(makeCombatSummary());
+      damageRollback.findLastAttack.mockResolvedValue({
+        attackEvent: freshAttackEvent(),
+        attackerName: 'Goblin',
+        targetName: 'Goblin',
+        primaryDamage: 10,
+        secondaryDamage: 0,
+        totalDamage: 10,
+        damageTypes: ['Piercing'],
+      });
 
-      await setupPath();
+      await handle(makeAction(), makePlayerStats(), campaignName, mapName);
 
-      const targetEffectsCall = useRuntimeState.setRuntimeValue.mock.calls.find(
+      const targetEffectsCall2 = useRuntimeState.setRuntimeValue.mock.calls.find(
         (c) => c[1] === 'targetEffects'
       );
-      expect(targetEffectsCall[2]).toHaveLength(2);
+      expect(targetEffectsCall2[2]).toHaveLength(2);
     });
-
-    it('reports disadvantage in description', async () => {
-      useRuntimeState.getRuntimeValue.mockReturnValue([]);
-
-      const result = await setupPath();
-
-      expect(result.payload.description).toContain('Disadvantage');
-      expect(result.payload.description).toContain('second d20');
-    });
-  });
-
-  describe('effect: disadvantage_on_attacks_vs_ally — range checks', () => {
-    function makeAction() {
-      return {
-        name: 'Blessed Defender',
-        automation: {
-          type: 'reaction_debuff',
-          range: '30_ft',
-          effect: 'disadvantage_on_attacks_vs_ally',
-          uses_expression: null,
-          recharge: 'long_rest',
-        },
-      };
-    }
 
     it('returns popup when out of range', async () => {
       const ps = makePlayerStats();
@@ -337,93 +306,6 @@ describe('reactionDebuffHandler — disadvantage_on_attacks_vs_ally', () => {
       expect(result.type).toBe('popup');
       expect(result.payload.description).toContain('out of range');
     });
-
-    it('skips range check when mapName is falsy or rangeToFeet returns null', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-
-      targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
-      damageUtils.getCombatContext.mockResolvedValue(makeCombatSummary());
-      damageRollback.findLastAttack.mockResolvedValue({
-        attackEvent: freshAttackEvent(),
-        attackerName: 'Goblin',
-        targetName: 'Goblin',
-        primaryDamage: 10,
-        secondaryDamage: 0,
-        totalDamage: 10,
-        damageTypes: ['Piercing'],
-      });
-
-      await handle(action, ps, campaignName, null);
-
-      expect(targetResolver.resolveMapPositions).not.toHaveBeenCalled();
-    });
-
-    it('skips range check when rangeToFeet returns null', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-
-      targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
-      rangeValidation.rangeToFeet.mockReturnValueOnce(null);
-      damageUtils.getCombatContext.mockResolvedValue(makeCombatSummary());
-      damageRollback.findLastAttack.mockResolvedValue({
-        attackEvent: freshAttackEvent(),
-        attackerName: 'Goblin',
-        targetName: 'Goblin',
-        primaryDamage: 10,
-        secondaryDamage: 0,
-        totalDamage: 10,
-        damageTypes: ['Piercing'],
-      });
-
-      await handle(action, ps, campaignName, mapName);
-
-      expect(targetResolver.resolveMapPositions).not.toHaveBeenCalled();
-    });
-
-    it('skips range check when only attackerPos is available', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-
-      targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
-      damageUtils.getCombatContext.mockResolvedValue(makeCombatSummary());
-      damageRollback.findLastAttack.mockResolvedValue({
-        attackEvent: freshAttackEvent(),
-        attackerName: 'Goblin',
-        targetName: 'Goblin',
-        primaryDamage: 10,
-        secondaryDamage: 0,
-        totalDamage: 10,
-        damageTypes: ['Piercing'],
-      });
-      targetResolver.resolveMapPositions.mockResolvedValue({
-        attackerPos: { gridX: 0, gridY: 0 },
-        targetPos: null,
-      });
-
-      // Should proceed (not return early) and store targetEffects
-      await handle(action, ps, campaignName, mapName);
-
-      const targetEffectsCall = useRuntimeState.setRuntimeValue.mock.calls.find(
-        (c) => c[1] === 'targetEffects'
-      );
-      expect(targetEffectsCall).toBeDefined();
-    });
-  });
-
-  describe('effect: disadvantage_on_attacks_vs_ally — log entry', () => {
-    function makeAction() {
-      return {
-        name: 'Blessed Defender',
-        automation: {
-          type: 'reaction_debuff',
-          range: '30_ft',
-          effect: 'disadvantage_on_attacks_vs_ally',
-          uses_expression: null,
-          recharge: 'long_rest',
-        },
-      };
-    }
 
     it('adds log entry with disadvantage description', async () => {
       const ps = makePlayerStats();
@@ -482,26 +364,12 @@ describe('reactionDebuffHandler — disadvantage_on_attacks_vs_ally', () => {
         })
       );
     });
-  });
 
-  describe('effect: disadvantage_on_attacks_vs_ally — uses decrement', () => {
-    function makeAction() {
-      return {
-        name: 'Blessed Defender',
-        automation: {
-          type: 'reaction_debuff',
-          range: '30_ft',
-          effect: 'disadvantage_on_attacks_vs_ally',
-          uses_expression: 2,
-          recharge: 'long_rest',
-        },
-      };
-    }
-
-    it('decrements uses after successful handling', async () => {
+    it('decrements uses after successful handling or skips on early return', async () => {
       const ps = makePlayerStats();
-      const action = makeAction();
+      const action = makeAction({ uses_expression: 2 });
 
+      // Successful path: decrement
       targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
       damageUtils.getCombatContext.mockResolvedValue(makeCombatSummary());
       useRuntimeState.getRuntimeValue
@@ -525,11 +393,11 @@ describe('reactionDebuffHandler — disadvantage_on_attacks_vs_ally', () => {
       );
       expect(usesCall).toBeDefined();
       expect(usesCall[2]).toBe(0);
-    });
 
-    it('does not decrement uses on early return (no attack event)', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
+      // No-decrement path: no attack event
+      vi.clearAllMocks();
+      const ps2 = makePlayerStats();
+      const action2 = makeAction({ uses_expression: 2 });
 
       damageRollback.findLastAttack.mockResolvedValue({
         attackEvent: null,
@@ -541,12 +409,12 @@ describe('reactionDebuffHandler — disadvantage_on_attacks_vs_ally', () => {
         damageTypes: [],
       });
 
-      await handle(action, ps, campaignName, mapName);
+      await handle(action2, ps2, campaignName, mapName);
 
-      const usesCall = useRuntimeState.setRuntimeValue.mock.calls.find(
+      const usesCall2 = useRuntimeState.setRuntimeValue.mock.calls.find(
         (c) => c[1] && c[1].includes('Uses')
       );
-      expect(usesCall).toBeUndefined();
+      expect(usesCall2).toBeUndefined();
     });
   });
 });

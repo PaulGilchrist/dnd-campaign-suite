@@ -8,9 +8,6 @@ describe('stripParenthetical', () => {
     expect(stripParenthetical('Longfellow the Brave (Halfling)')).toBe(
       'Longfellow the Brave',
     );
-  });
-
-  it('does not remove parentheses that are not at the end', () => {
     expect(stripParenthetical('Grimjaw (Orc) the Destroyer')).toBe(
       'Grimjaw (Orc) the Destroyer',
     );
@@ -30,6 +27,8 @@ describe('stripNumericSuffix', () => {
       'Longfellow the Brave',
     );
     expect(stripNumericSuffix('Grimjaw (Orc) 2')).toBe('Grimjaw (Orc)');
+    expect(stripNumericSuffix(null)).toBe('');
+    expect(stripNumericSuffix(undefined)).toBe('');
   });
 
   it('does not remove numbers without leading whitespace', () => {
@@ -38,10 +37,5 @@ describe('stripNumericSuffix', () => {
     expect(stripNumericSuffix('Grimjaw 5a')).toBe('Grimjaw 5a');
     expect(stripNumericSuffix('Grimjaw 5  ')).toBe('Grimjaw 5  ');
     expect(stripNumericSuffix('42')).toBe('42');
-  });
-
-  it('returns empty string for null or undefined input', () => {
-    expect(stripNumericSuffix(null)).toBe('');
-    expect(stripNumericSuffix(undefined)).toBe('');
   });
 });

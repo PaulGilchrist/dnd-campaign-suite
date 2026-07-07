@@ -194,7 +194,7 @@ describe('undyingSentinelHandler', () => {
         );
       });
 
-      it('uses level 7 paladin to heal 22 HP (capped at max HP)', async () => {
+      it('uses level 7 paladin to heal 22 HP', async () => {
         setupPlayerHeal('DownedAlly', 100);
 
         await handle(makeAction(), makePlayerStats({ level: 7 }), campaignName, null);
@@ -207,7 +207,7 @@ describe('undyingSentinelHandler', () => {
         );
       });
 
-      it('posts a heal log entry', async () => {
+      it('posts a heal log entry and dispatches combat-summary-updated event', async () => {
         setupPlayerHeal();
 
         await handle(makeAction(), makePlayerStats(), campaignName, null);
@@ -220,13 +220,6 @@ describe('undyingSentinelHandler', () => {
           abilityName: 'Undying Sentinel',
           timestamp: 1700000000000,
         });
-      });
-
-      it('dispatches combat-summary-updated event', async () => {
-        setupPlayerHeal();
-
-        await handle(makeAction(), makePlayerStats(), campaignName, null);
-
         expect(dispatchEventSpy).toHaveBeenCalledWith(
           expect.objectContaining({ type: 'combat-summary-updated' }),
         );
@@ -242,16 +235,7 @@ describe('undyingSentinelHandler', () => {
         getTargetFromAttacker.mockReturnValue(target);
       }
 
-      it('sets currentHp directly on NPC target', async () => {
-        const target = makeNPCTarget('Goblin', 0);
-        setupNPCHeal(target);
-
-        await handle(makeAction(), makePlayerStats({ level: 5 }), campaignName, null);
-
-        expect(target.currentHp).toBe(16);
-      });
-
-      it('saves updated combatSummary to storage', async () => {
+      it('heals NPC target, saves combatSummary, posts log, and dispatches event', async () => {
         const target = makeNPCTarget('Goblin', 0);
         const cs = { creatures: [target] };
         getRuntimeValue
@@ -262,7 +246,19 @@ describe('undyingSentinelHandler', () => {
 
         await handle(makeAction(), makePlayerStats({ level: 5 }), campaignName, null);
 
+        expect(target.currentHp).toBe(16);
         expect(storage.set).toHaveBeenCalledWith('combatSummary', cs, campaignName);
+        expect(postLogEntry).toHaveBeenCalledWith(campaignName, {
+          type: 'heal',
+          characterName: 'TestCleric',
+          targetName: 'Goblin',
+          amount: 16,
+          abilityName: 'Undying Sentinel',
+          timestamp: 1700000000000,
+        });
+        expect(dispatchEventSpy).toHaveBeenCalledWith(
+          expect.objectContaining({ type: 'combat-summary-updated' }),
+        );
       });
     });
   });

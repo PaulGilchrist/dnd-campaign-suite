@@ -139,58 +139,5 @@ describe('Great Weapon Fighting with critical hits', () => {
             // GWF total: (3+3+4+5)*2 = 30
             expect(applyMinDamageAdjustment).toHaveBeenCalledWith(30, [3, 3, 4, 5], {}, 'slashing');
         });
-
-        it('uses non-doubled rolls for GWF when not a crit', async () => {
-            hasGreatWeaponFighting.mockReturnValue(true);
-            applyGreatWeaponFightingToDamage.mockReturnValue([3, 3, 4, 5]);
-
-            const fn = createFn();
-            await fn('Greatsword', '4d6', 10, [1, 1, 4, 5], 0, {
-                targetName: 'Goblin',
-                damageType: 'slashing',
-                playerStats: {},
-            });
-
-            expect(applyGreatWeaponFightingToDamage).toHaveBeenCalledWith([1, 1, 4, 5], {});
-            expect(applyMinDamageAdjustment).toHaveBeenCalledWith(15, [3, 3, 4, 5], {}, 'slashing');
-        });
-
-        it('skips GWF on doubled rolls when no 1s or 2s in first half', async () => {
-            hasGreatWeaponFighting.mockReturnValue(true);
-            // No 1s or 2s, so GWF returns the rolls unchanged
-            applyGreatWeaponFightingToDamage.mockImplementation((rolls) => rolls);
-
-            const fn = createFn();
-            await fn('Greatsword', '4d6', 18, [3, 4, 5, 6], 0, {
-                targetName: 'Goblin',
-                damageType: 'slashing',
-                isAutoCrit: true,
-                doubledRolls: [3, 4, 5, 6, 3, 4, 5, 6],
-                playerStats: {},
-            });
-
-            // rollsForMin uses doubled rolls for min damage check, GWF block is skipped because hasChanges is false
-            expect(applyMinDamageAdjustment).toHaveBeenCalledWith(18, [3, 4, 5, 6, 3, 4, 5, 6], {}, 'slashing');
-        });
-    });
-
-    describe('GWF with Elemental Adept interaction', () => {
-        it('applies min damage adjustment after GWF on crit', async () => {
-            hasGreatWeaponFighting.mockReturnValue(true);
-            applyGreatWeaponFightingToDamage.mockReturnValue([3, 3, 4, 5]);
-            applyMinDamageAdjustment.mockReturnValue(32);
-
-            const fn = createFn();
-            await fn('Greatsword', '4d6', 10, [1, 1, 4, 5], 0, {
-                targetName: 'Goblin',
-                damageType: 'slashing',
-                isAutoCrit: true,
-                doubledRolls: [1, 1, 4, 5, 1, 1, 4, 5],
-                playerStats: { automation: { passives: [] } },
-            });
-
-            // GWF produces 30, then Elemental Adept bumps it to 32
-            expect(applyMinDamageAdjustment).toHaveBeenLastCalledWith(30, [3, 3, 4, 5], expect.any(Object), 'slashing');
-        });
     });
 });

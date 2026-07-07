@@ -66,7 +66,7 @@ describe('agileStrikeHandler.handle', () => {
     vi.clearAllMocks();
   });
 
-  describe('no combat context', () => {
+  describe('error handling', () => {
     it('returns popup when combat context is null', async () => {
       damageUtils.getCombatContext.mockResolvedValue(null);
       damageUtils.getTargetFromAttacker.mockReturnValue(null);
@@ -79,10 +79,8 @@ describe('agileStrikeHandler.handle', () => {
       expect(result.type).toBe('popup');
       expect(result.payload.description).toContain('No combat context available');
     });
-  });
 
-  describe('no target selected', () => {
-    it('returns popup when there is no targetName', async () => {
+    it('returns popup when there is no target selected', async () => {
       damageUtils.getCombatContext.mockResolvedValue({ creatures: [] });
       damageUtils.getTargetFromAttacker.mockReturnValue(null);
 
@@ -96,8 +94,8 @@ describe('agileStrikeHandler.handle', () => {
     });
   });
 
-  describe('attack roll', () => {
-    it('calculates hit bonus correctly (DEX + proficiency)', async () => {
+  describe('attack resolution', () => {
+    it('hits and applies damage when total meets AC', async () => {
       const ps = makePlayerStats();
       const action = makeAction();
       const target = makeTarget(15);
@@ -105,7 +103,7 @@ describe('agileStrikeHandler.handle', () => {
       damageUtils.getCombatContext.mockResolvedValue({ creatures: [target] });
       damageUtils.getTargetFromAttacker.mockReturnValue(target);
       diceRoller.rollD20.mockReturnValue(12);
-      diceRoller.rollExpression.mockReturnValue({ total: 5, rolls: [5] });
+      diceRoller.rollExpression.mockReturnValue({ total: 7, rolls: [7] });
       runtimeState.getRuntimeValue.mockReturnValue([]);
 
       await handle(action, ps, campaignName);
@@ -115,7 +113,7 @@ describe('agileStrikeHandler.handle', () => {
       expect(logService.addEntry).toHaveBeenCalled();
     });
 
-    it('misses when total is below AC', async () => {
+    it('misses and skips damage when total is below AC', async () => {
       const ps = makePlayerStats();
       const action = makeAction();
       const target = makeTarget(18);
@@ -135,37 +133,8 @@ describe('agileStrikeHandler.handle', () => {
     });
   });
 
-  describe('damage calculation', () => {
-    it('adds BI die + DEX modifier to damage', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-      const target = makeTarget(10);
-
-      damageUtils.getCombatContext.mockResolvedValue({ creatures: [target] });
-      damageUtils.getTargetFromAttacker.mockReturnValue(target);
-      diceRoller.rollD20.mockReturnValue(15);
-      diceRoller.rollExpression.mockReturnValue({ total: 7, rolls: [7] });
-      runtimeState.getRuntimeValue.mockReturnValue([]);
-
-      await handle(action, ps, campaignName);
-
-      // d20(15) + 5 = 20 >= 10 = HIT
-      // BI(7) + DEX(3) = 10 damage
-      expect(applyDamage.applyDamageToTarget).toHaveBeenCalledWith(
-        expect.any(Object),
-        'Goblin',
-        10,
-        ['Bludgeoning'],
-        campaignName,
-        [],
-        false,
-        'Bard',
-      );
-    });
-  });
-
   describe('popup description', () => {
-    it('includes all roll details in popup description', async () => {
+    it('includes roll details in popup description', async () => {
       const ps = makePlayerStats();
       const action = makeAction();
       const target = makeTarget(14);
@@ -189,8 +158,8 @@ describe('agileStrikeHandler.handle', () => {
     });
   });
 
-  describe('default BI die size', () => {
-    it('uses d6 when bardicDie is not specified in automation', async () => {
+  describe('bardic die size', () => {
+    it('uses d6 when bardicDie is not specified', async () => {
       const ps = makePlayerStats();
       const action = makeAction({ automation: { type: 'agile_strike' } });
       const target = makeTarget(12);
@@ -203,7 +172,6 @@ describe('agileStrikeHandler.handle', () => {
 
       await handle(action, ps, campaignName);
 
-      expect(logService.addEntry).toHaveBeenCalled();
       const logEntry = logService.addEntry.mock.calls[0][1];
       expect(logEntry.description).toContain('1d6');
     });

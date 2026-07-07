@@ -2,9 +2,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { triggerCharmPerson } from './charmPersonService.js';
 import { executeHandler } from '../../automation/index.js';
+import { getCombatContext } from '../combat/damageUtils.js';
 
 vi.mock('../../automation/index.js', () => ({
     executeHandler: vi.fn(),
+}));
+
+vi.mock('../combat/damageUtils.js', () => ({
+    getCombatContext: vi.fn(),
 }));
 
 describe('charmPersonService', () => {
@@ -27,24 +32,15 @@ describe('charmPersonService', () => {
             return triggerCharmPerson(spell, metaCtx, stats, campaignName, mapName);
         }
 
-        it('returns null when spell name is missing/null/undefined', async () => {
-            for (const name of [null, undefined, '']) {
+        it('returns null when spell name is missing, null, or does not match "charm person"', async () => {
+            for (const name of [null, undefined, '', 'Charm', 'Person', 'Charming Person']) {
                 const result = await callTrigger({ ...baseSpell, name });
                 expect(result).toBeNull();
             }
         });
 
-        it('returns null for non-matching spell names', async () => {
-            const results = await Promise.all([
-                callTrigger({ name: 'Charm' }),
-                callTrigger({ name: 'Person' }),
-                callTrigger({ name: 'Charming Person' }),
-            ]);
-            expect(results).toEqual([null, null, null]);
-            expect(executeHandler).not.toHaveBeenCalled();
-        });
-
-        it('returns popup when no targetName in metaCtx and no creatures in combat context', async () => {
+        it('returns popup when no targetName and no creatures in combat context', async () => {
+            vi.mocked(getCombatContext).mockResolvedValue({ creatures: [] });
             const result = await callTrigger(baseSpell, { ...baseMetaCtx, targetName: null }, baseStats);
             expect(result).toEqual({
                 type: 'popup',
@@ -53,7 +49,7 @@ describe('charmPersonService', () => {
             expect(executeHandler).not.toHaveBeenCalled();
         });
 
-        it('calls executeHandler with correct action shape including saveDc and targetName', async () => {
+        it('calls executeHandler with correct action shape including saveDc, targetName, and spell', async () => {
             executeHandler.mockResolvedValue({ success: true });
             await callTrigger();
 
@@ -65,17 +61,8 @@ describe('charmPersonService', () => {
                         saveDc: 15,
                         targetName: 'Goblin',
                     }),
+                    spell: baseSpell,
                 }),
-                baseStats, campaignName, mapName,
-            );
-        });
-
-        it('passes spell object and metaCtx into the action', async () => {
-            executeHandler.mockResolvedValue({ success: true });
-            const spell = { name: 'Charm Person', level: 1 };
-            await callTrigger(spell, { targetName: 'Goblin' });
-            expect(executeHandler).toHaveBeenCalledWith(
-                expect.objectContaining({ spell }),
                 baseStats, campaignName, mapName,
             );
         });
@@ -87,7 +74,7 @@ describe('charmPersonService', () => {
             expect(result).toBe(expectedResult);
         });
 
-        it('returns popup on handler error (not null)', async () => {
+        it('returns popup on handler error', async () => {
             executeHandler.mockRejectedValue(new Error('Handler failed'));
             const result = await callTrigger();
             expect(result).toEqual({

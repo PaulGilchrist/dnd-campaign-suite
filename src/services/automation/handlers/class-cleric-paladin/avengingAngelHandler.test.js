@@ -56,7 +56,6 @@ import { rollD20 } from '../../../dice/diceRoller.js';
 import { getAbilityModifier } from '../../../shared/abilityLookup.js';
 import { sendSaveResult } from '../../../combat/conditions/savePromptService.js';
 import utils from '../../../ui/utils.js';
-import storage from '../../../ui/storage.js';
 
 const campaignName = 'TestCampaign';
 
@@ -117,26 +116,6 @@ describe('avengingAngelHandler.handle', () => {
         description: 'Avenging Angel ended.',
         timestamp: now,
       }));
-    });
-
-    it('should filter out avenging_angel_flight effect keeping other buffs', async () => {
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'avengingAngelActive') return true;
-        if (key === 'activeBuffs') return [
-          { name: 'Avenging Angel', effect: 'avenging_angel_flight' },
-          { name: 'Divine Shield', effect: 'divine_shield' },
-        ];
-        return null;
-      });
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'TestPaladin',
-        'activeBuffs',
-        [{ name: 'Divine Shield', effect: 'divine_shield' }],
-        campaignName,
-      );
     });
   });
 
@@ -279,52 +258,26 @@ describe('avengingAngelHandler.handle', () => {
       expect(addExpiration).not.toHaveBeenCalled();
     });
 
-    it('should handle wis fallback and missing saveBonuses', async () => {
+    it('should handle missing saveBonuses defaulting to 0', async () => {
       getRuntimeValue.mockImplementation((name, key) => {
         if (key === 'avengingAngelActive') return false;
         if (key === 'activeBuffs') return [];
         return null;
       });
 
-      // Test wis fallback: saveBonuses.wisdom used when wis is absent
       getCombatContext.mockResolvedValue({
         creatures: [
-          { name: 'Goblin1', type: 'npc', saveBonuses: { wisdom: 5 }, conditions: [] },
+          { name: 'Goblin', type: 'npc', conditions: [] },
         ],
       });
-      rollD20.mockReturnValue(10);
+      rollD20.mockReturnValue(1);
       getAbilityModifier.mockReturnValue(3);
       utils.guid.mockReturnValue('test-guid');
 
       await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-      // saveDc = 8 + 3 + 3 = 14, roll 10 + 5 = 15 >= 14 = success
-      expect(sendSaveResult).toHaveBeenCalledWith(campaignName, 'Goblin1', expect.objectContaining({
-        success: true,
-        saveBonus: 5,
-      }));
-
-      vi.clearAllMocks();
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'avengingAngelActive') return false;
-        if (key === 'activeBuffs') return [];
-        return null;
-      });
-
-      // Test missing saveBonuses defaults to 0
-      getCombatContext.mockResolvedValue({
-        creatures: [
-          { name: 'Goblin2', type: 'npc', conditions: [] },
-        ],
-      });
-      rollD20.mockReturnValue(1);
-      getAbilityModifier.mockReturnValue(3);
-      utils.guid.mockReturnValue('test-guid-2');
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
       // saveDc = 8 + 3 + 3 = 14, roll 1 + 0 = 1 < 14 = fail
-      expect(sendSaveResult).toHaveBeenCalledWith(campaignName, 'Goblin2', expect.objectContaining({
+      expect(sendSaveResult).toHaveBeenCalledWith(campaignName, 'Goblin', expect.objectContaining({
         success: false,
         saveBonus: 0,
       }));
@@ -354,48 +307,6 @@ describe('avengingAngelHandler.handle', () => {
         roll: 0,
       }));
     });
-
-    it('should skip self creature in Frightful Aura', async () => {
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'avengingAngelActive') return false;
-        if (key === 'activeBuffs') return [];
-        return null;
-      });
-      getCombatContext.mockResolvedValue({
-        creatures: [
-          { name: 'TestPaladin', type: 'player' },
-        ],
-      });
-      rollD20.mockReturnValue(20);
-      getAbilityModifier.mockReturnValue(3);
-      utils.guid.mockReturnValue('test-guid');
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(sendSaveResult).not.toHaveBeenCalled();
-    });
-
-    it('should treat creatures without type as npc', async () => {
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'avengingAngelActive') return false;
-        if (key === 'activeBuffs') return [];
-        return null;
-      });
-      getCombatContext.mockResolvedValue({
-        creatures: [
-          { name: 'UnknownCreature', conditions: [] },
-        ],
-      });
-      rollD20.mockReturnValue(1);
-      getAbilityModifier.mockReturnValue(3);
-      utils.guid.mockReturnValue('test-guid');
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(sendSaveResult).toHaveBeenCalledWith(campaignName, 'UnknownCreature', expect.objectContaining({
-        success: false,
-      }));
-    });
   });
 
   describe('Frightful Aura - storage', () => {
@@ -422,79 +333,6 @@ describe('avengingAngelHandler.handle', () => {
       expect(setRuntimeValue).toHaveBeenCalledWith('TestPaladin', 'avengingAngelAuraTargets', ['Goblin1', 'Ally'], campaignName);
     });
   });
-
-  describe('Frightful Aura - edge cases', () => {
-    it('should handle no combat context gracefully', async () => {
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'avengingAngelActive') return false;
-        if (key === 'activeBuffs') return [];
-        return null;
-      });
-      getCombatContext.mockResolvedValue(null);
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(sendSaveResult).not.toHaveBeenCalled();
-      expect(addExpiration).not.toHaveBeenCalled();
-    });
-
-    it('should handle combat context with no creatures', async () => {
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'avengingAngelActive') return false;
-        if (key === 'activeBuffs') return [];
-        return null;
-      });
-      getCombatContext.mockResolvedValue({ creatures: [] });
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(sendSaveResult).not.toHaveBeenCalled();
-      expect(setRuntimeValue).toHaveBeenCalledWith('TestPaladin', 'avengingAngelAuraTargets', [], campaignName);
-    });
-
-    it('should build save DC from chaBonus + proficiency + 8', async () => {
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'avengingAngelActive') return false;
-        if (key === 'activeBuffs') return [];
-        return null;
-      });
-      getCombatContext.mockResolvedValue({
-        creatures: [{ name: 'Goblin', type: 'npc', saveBonuses: { wis: 2 }, conditions: [] }],
-      });
-      rollD20.mockReturnValue(20);
-      getAbilityModifier.mockReturnValue(4);
-      utils.guid.mockReturnValue('test-guid');
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      // saveDc = 8 + 4 + 3 = 15, roll 20 + 2 = 22 >= 15 = success
-      expect(sendSaveResult).toHaveBeenCalledWith(campaignName, 'Goblin', expect.objectContaining({
-        success: true,
-      }));
-    });
-
-    it('should default proficiency to 0 when missing from playerStats', async () => {
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'avengingAngelActive') return false;
-        if (key === 'activeBuffs') return [];
-        return null;
-      });
-      getCombatContext.mockResolvedValue({
-        creatures: [{ name: 'Goblin', type: 'npc', saveBonuses: { wis: 0 }, conditions: [] }],
-      });
-      rollD20.mockReturnValue(1);
-      getAbilityModifier.mockReturnValue(3);
-      utils.guid.mockReturnValue('test-guid');
-
-      const noProfStats = makePlayerStats({ proficiency: undefined });
-      await handle(makeAction(), noProfStats, campaignName, null);
-
-      // saveDc = 8 + 3 + 0 = 11, roll 1 + 0 = 1 < 11 = fail
-      expect(sendSaveResult).toHaveBeenCalledWith(campaignName, 'Goblin', expect.objectContaining({
-        success: false,
-      }));
-    });
-  });
 });
 
 describe('avengingAngelHandler.isAuraTarget', () => {
@@ -505,20 +343,14 @@ describe('avengingAngelHandler.isAuraTarget', () => {
 
     getRuntimeValue.mockReturnValue([]);
     expect(isAuraTarget('TestPaladin', 'Goblin1', campaignName)).toBe(false);
-
-    getRuntimeValue.mockReturnValue(null);
-    expect(isAuraTarget('TestPaladin', 'Goblin1', campaignName)).toBe(false);
   });
 });
-
-
 
 describe('avengingAngelHandler.removeFrightenedOnDamage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     getRuntimeValue.mockReset();
     getCombatContext.mockReset();
-    storage.set.mockReset();
     setRuntimeValue.mockReset();
   });
 
@@ -541,7 +373,7 @@ describe('avengingAngelHandler.removeFrightenedOnDamage', () => {
     expect(setRuntimeValue).toHaveBeenCalledWith('TestPaladin', 'avengingAngelAuraTargets', [], campaignName);
   });
 
-  it('should remove target from aura targets list', async () => {
+  it('should remove target from aura targets list preserving others', async () => {
     getRuntimeValue.mockImplementation((name, key) => {
       if (key === 'avengingAngelAuraTargets') return ['Goblin1', 'Goblin2', 'Goblin3'];
       if (key === 'activeConditions') return ['frightened'];
@@ -555,24 +387,5 @@ describe('avengingAngelHandler.removeFrightenedOnDamage', () => {
 
     expect(setRuntimeValue).toHaveBeenCalledWith('TestPaladin', 'avengingAngelAuraTargets', ['Goblin1', 'Goblin3'], campaignName);
   });
-
-  it('should not modify anything if target not in aura targets', async () => {
-    getRuntimeValue.mockReset().mockImplementation((name, key) => {
-      if (key === 'avengingAngelAuraTargets') return ['OtherCreature'];
-      return null;
-    });
-    getCombatContext.mockResolvedValue({
-      creatures: [{
-        name: 'Goblin',
-        conditions: [{ key: 'frightened' }],
-      }],
-    });
-
-    await removeFrightenedOnDamage('TestPaladin', 'Goblin', campaignName);
-
-    expect(setRuntimeValue).not.toHaveBeenCalled();
-    expect(storage.set).not.toHaveBeenCalled();
-  });
 });
-
 

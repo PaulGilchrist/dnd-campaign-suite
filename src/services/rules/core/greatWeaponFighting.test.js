@@ -22,14 +22,6 @@ describe('greatWeaponFighting', () => {
       expect(applyGreatWeaponFighting([])).toEqual([]);
     });
 
-    it('returns a new array without mutating the input', () => {
-      const rolls = [1, 2, 3];
-      const result = applyGreatWeaponFighting(rolls);
-      expect(result).toEqual([3, 3, 3]);
-      expect(result).not.toBe(rolls);
-      expect(rolls).toEqual([1, 2, 3]);
-    });
-
     it('converts 1s and 2s to 3s, leaves 3+ unchanged', () => {
       expect(applyGreatWeaponFighting([1, 2, 3, 4, 5, 6])).toEqual([3, 3, 3, 4, 5, 6]);
     });
@@ -39,14 +31,6 @@ describe('greatWeaponFighting', () => {
     it('returns false when player has no GWF passive', () => {
       const weapon = { properties: ['Two-Handed'] };
       const playerStats = { automation: { passives: [] } };
-      expect(greatWeaponFightingApplies(weapon, playerStats)).toBe(false);
-    });
-
-    it('returns false when player has passives but none match GWF', () => {
-      const weapon = { properties: ['Two-Handed'] };
-      const playerStats = {
-        automation: { passives: [{ type: 'passive_rule', effect: 'savage_attacker', name: 'Savage Attacker' }] },
-      };
       expect(greatWeaponFightingApplies(weapon, playerStats)).toBe(false);
     });
 

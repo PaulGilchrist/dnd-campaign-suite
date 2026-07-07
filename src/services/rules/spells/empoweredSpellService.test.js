@@ -497,6 +497,9 @@ describe('getEmpoweredSpellDescription', () => {
     { details: null },
     { details: '' },
     { details: undefined },
+    '<li><b>Quickened Spell</b> Cast as bonus action.</li>',
+    '<p><b>Empowered Spell</b> Not in li tag.</p>',
+    '<li><b>Twinned Spell</b> Target two creatures.</li>',
   ])('returns default description for action=%j', (action) => {
     expect(getEmpoweredSpellDescription(action)).toBe(DEFAULT_DESC);
   });
@@ -521,14 +524,6 @@ describe('getEmpoweredSpellDescription', () => {
   ])('extracts description from: %s', (details, expected) => {
     const result = getEmpoweredSpellDescription({ details });
     expect(result).toBe(expected);
-  });
-
-  it.each([
-    '<li><b>Quickened Spell</b> Cast as bonus action.</li>',
-    '<p><b>Empowered Spell</b> Not in li tag.</p>',
-    '<li><b>Twinned Spell</b> Target two creatures.</li>',
-  ])('returns default when details has non-Empowered metamagic: %s', (details) => {
-    expect(getEmpoweredSpellDescription({ details })).toBe(DEFAULT_DESC);
   });
 
 });

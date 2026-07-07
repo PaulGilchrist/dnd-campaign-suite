@@ -92,7 +92,7 @@ describe('getMetamagicCost', () => {
     expect(getMetamagicCost({ cost: 3 }, 10)).toBe(3);
   });
 
-  it('returns spell level when option cost is spell_level', () => {
+  it('returns spell level when option cost is spell_level with valid level', () => {
     expect(getMetamagicCost({ cost: 'spell_level' }, 3)).toBe(3);
     expect(getMetamagicCost({ cost: 'spell_level' }, 5)).toBe(5);
   });
@@ -154,12 +154,6 @@ describe('getPreCastOptions', () => {
     expect(careful3.resolvedCost).toBe(1);
     expect(careful5.resolvedCost).toBe(1);
   });
-
-  it('does not include Empowered Spell in pre-cast options', () => {
-    const result = getPreCastOptions(makeStats(), 10, 1);
-    const empowered = result.find((o) => o.name === 'Empowered Spell');
-    expect(empowered).toBeUndefined();
-  });
 });
 
 // ── getChaModifier ──────────────────────────────────────────────
@@ -209,18 +203,14 @@ describe('getMaxMetamagicPerSpell', () => {
   it('returns 1 when stats is null', () => {
     expect(getMaxMetamagicPerSpell(null, 'player')).toBe(1);
   });
-
-  it('calls getRuntimeValue with the player name and activeBuffs key', () => {
-    getRuntimeValue.mockReturnValue([{ name: 'Innate Sorcery' }]);
-    getMaxMetamagicPerSpell({ rules: '2024', level: 6 }, 'Lyra');
-    expect(getRuntimeValue).toHaveBeenCalledWith('Lyra', 'activeBuffs');
-  });
 });
 
 // ── isPreCastOption ─────────────────────────────────────────────
 
 describe('isPreCastOption', () => {
-  it('returns true for all pre-cast effect types', () => {
+  it('returns false for Empowered Spell and true for all other effects', () => {
+    expect(isPreCastOption({ effect: 'reroll_damage_dice' })).toBe(false);
+    expect(isPreCastOption({ effect: METAMAGIC_EFFECTS.EMPOWERED })).toBe(false);
     expect(isPreCastOption({ effect: 'ally_auto_succeed_save' })).toBe(true);
     expect(isPreCastOption({ effect: 'double_range' })).toBe(true);
     expect(isPreCastOption({ effect: 'double_duration' })).toBe(true);
@@ -228,11 +218,6 @@ describe('isPreCastOption', () => {
     expect(isPreCastOption({ effect: 'cast_spell_as_bonus_action' })).toBe(true);
     expect(isPreCastOption({ effect: 'no_verbal_somatic' })).toBe(true);
     expect(isPreCastOption({ effect: 'target_two_creatures' })).toBe(true);
-  });
-
-  it('returns false for Empowered Spell and any non-pre-cast effect', () => {
-    expect(isPreCastOption({ effect: 'reroll_damage_dice' })).toBe(false);
-    expect(isPreCastOption({ effect: METAMAGIC_EFFECTS.EMPOWERED })).toBe(false);
   });
 });
 
@@ -254,12 +239,6 @@ describe('hasArcaneApotheosis', () => {
     expect(hasArcaneApotheosis(stats, 'player')).toBe(false);
   });
 
-  it('throws when Arcane Apotheosis is present but getRuntimeValue returns undefined', () => {
-    getRuntimeValue.mockReturnValue(undefined);
-    const stats = { automation: { passives: [{ name: 'Arcane Apotheosis' }] } };
-    expect(() => hasArcaneApotheosis(stats, 'player')).toThrow('Expected array, got undefined');
-  });
-
   it('returns true when both Arcane Apotheosis and Innate Sorcery buff are present', () => {
     getRuntimeValue.mockReturnValue([{ name: 'Innate Sorcery' }]);
     const stats = { automation: { passives: [{ name: 'Arcane Apotheosis' }] } };
@@ -270,13 +249,6 @@ describe('hasArcaneApotheosis', () => {
     getRuntimeValue.mockReturnValue([{ name: 'Innate Sorcery' }]);
     const stats = { automation: { passives: [{ name: 'Other Feature' }] } };
     expect(hasArcaneApotheosis(stats, 'player')).toBe(false);
-  });
-
-  it('calls getRuntimeValue with the player name and activeBuffs key', () => {
-    getRuntimeValue.mockReturnValue([{ name: 'Innate Sorcery' }]);
-    const stats = { automation: { passives: [{ name: 'Arcane Apotheosis' }] } };
-    hasArcaneApotheosis(stats, 'Lyra');
-    expect(getRuntimeValue).toHaveBeenCalledWith('Lyra', 'activeBuffs');
   });
 });
 

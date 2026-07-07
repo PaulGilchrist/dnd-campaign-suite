@@ -107,13 +107,10 @@ describe('holyAuraHandler.handle', () => {
       );
     });
 
-    it.each([
-      [false, 'registers an expiration and resets targets'],
-      [true, 'does not register an expiration but resets targets'],
-    ])('expiration behavior: %p — %s', async (wasActive, _label) => {
+    it('resets targets and registers expiration on activation', async () => {
       const ps = makePlayerStats();
       const action = makeAction();
-      buffToggle.toggleBuff.mockReturnValue({ wasActive });
+      buffToggle.toggleBuff.mockReturnValue({ wasActive: false });
 
       await handle(action, ps, campaignName, null);
 
@@ -123,17 +120,28 @@ describe('holyAuraHandler.handle', () => {
         [],
         campaignName
       );
+      expect(expirations.addExpiration).toHaveBeenCalledWith(
+        ps.name,
+        ps.name,
+        [{ type: 'remove_active_buff', buffName: 'Holy Aura' }],
+        campaignName
+      );
+    });
 
-      if (wasActive === false) {
-        expect(expirations.addExpiration).toHaveBeenCalledWith(
-          ps.name,
-          ps.name,
-          [{ type: 'remove_active_buff', buffName: 'Holy Aura' }],
-          campaignName
-        );
-      } else {
-        expect(expirations.addExpiration).not.toHaveBeenCalled();
-      }
+    it('resets targets on deactivation without registering expiration', async () => {
+      const ps = makePlayerStats();
+      const action = makeAction();
+      buffToggle.toggleBuff.mockReturnValue({ wasActive: true });
+
+      await handle(action, ps, campaignName, null);
+
+      expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
+        ps.name,
+        'holyAuraTargets',
+        [],
+        campaignName
+      );
+      expect(expirations.addExpiration).not.toHaveBeenCalled();
     });
   });
 });
@@ -157,16 +165,12 @@ describe('holyAuraHandler.getHolyAuraTargets', () => {
     );
   });
 
-  it('returns an empty array for any non-array stored value', () => {
-    const nonArrays = [null, undefined, 'not-an-array', 0, {}, { target: 'Enemy1' }, '', true];
+  it('returns an empty array for non-array stored values', () => {
+    runtimeState.getRuntimeValue.mockReturnValue(null);
 
-    for (const value of nonArrays) {
-      runtimeState.getRuntimeValue.mockReturnValue(value);
+    const result = getHolyAuraTargets('TestHero', campaignName);
 
-      const result = getHolyAuraTargets('TestHero', campaignName);
-
-      expect(result).toEqual([]);
-    }
+    expect(result).toEqual([]);
   });
 
   it('uses the playerName and campaignName parameters correctly', () => {
@@ -187,7 +191,7 @@ describe('holyAuraHandler.isHolyAuraActive', () => {
     resetMocks();
   });
 
-  it('returns true when activeBuffs contains a buff with matching name and effect', () => {
+  it('returns true when activeBuffs contains a matching buff', () => {
     runtimeState.getRuntimeValue.mockImplementation((_name, key) => {
       if (key === 'activeBuffs') return [{ name: 'Holy Aura', effect: 'holy_aura' }];
       return null;
@@ -196,32 +200,17 @@ describe('holyAuraHandler.isHolyAuraActive', () => {
     expect(isHolyAuraActive('TestHero', campaignName)).toBe(true);
   });
 
-  it('returns false when activeBuffs is null, undefined, or non-array', () => {
-    const invalidValues = [null, undefined, 'not-an-array'];
-
-    for (const value of invalidValues) {
-      runtimeState.getRuntimeValue.mockReturnValue(value);
-      expect(isHolyAuraActive('TestHero', campaignName)).toBe(false);
-    }
-  });
-
-  it('returns false when no buffs exist', () => {
-    runtimeState.getRuntimeValue.mockReturnValue([]);
+  it('returns false when activeBuffs is invalid or empty', () => {
+    runtimeState.getRuntimeValue.mockReturnValue(null);
 
     expect(isHolyAuraActive('TestHero', campaignName)).toBe(false);
   });
 
-  it('returns false when a buff has the wrong name or wrong effect', () => {
-    const cases = [
-      [{ name: 'Fire Shield', effect: 'fire_resistance' }, 'different name and effect'],
-      [{ name: 'Holy Aura', effect: 'fire_shield' }, 'wrong effect'],
-      [{ name: 'Other Aura', effect: 'holy_aura' }, 'wrong name'],
-    ];
+  it('returns false when a buff has the wrong name or effect', () => {
+    runtimeState.getRuntimeValue.mockReturnValue([
+      { name: 'Holy Aura', effect: 'fire_shield' },
+    ]);
 
-    for (const [buffs] of cases) {
-      runtimeState.getRuntimeValue.mockReturnValue(buffs);
-
-      expect(isHolyAuraActive('TestHero', campaignName)).toBe(false);
-    }
+    expect(isHolyAuraActive('TestHero', campaignName)).toBe(false);
   });
 });

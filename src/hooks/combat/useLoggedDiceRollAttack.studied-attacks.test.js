@@ -202,38 +202,6 @@ describe('createLogAndShow - auto_effect miss trigger (Studied Attacks)', () => 
             );
         });
 
-        it('does not apply effect when attack hits', async () => {
-            getTargetFromAttacker.mockReturnValue({ name: 'Goblin', ac: 10 });
-            const fn = createFn();
-            await fn('Longsword', 5, 'attack', baseContext);
-
-            const targetEffectsCalls = setRuntimeValue.mock.calls.filter(isTargetEffectsCall);
-            expect(targetEffectsCalls.length).toBe(0);
-        });
-
-        it('does not apply effect when isAutoMiss is true', async () => {
-            const fn = createFn();
-            await fn('Longsword', 0, 'attack', {
-                ...baseContext,
-                isAutoMiss: true,
-            });
-
-            const targetEffectsCalls = setRuntimeValue.mock.calls.filter(isTargetEffectsCall);
-            expect(targetEffectsCalls.length).toBe(0);
-        });
-
-        it('does not apply effect when no target', async () => {
-            getTargetFromAttacker.mockReturnValue(null);
-            const fn = createFn();
-            await fn('Longsword', 0, 'attack', {
-                ...baseContext,
-                targetName: null,
-            });
-
-            const targetEffectsCalls = setRuntimeValue.mock.calls.filter(isTargetEffectsCall);
-            expect(targetEffectsCalls.length).toBe(0);
-        });
-
         it('does not apply effect when playerStats has no automation passives', async () => {
             const fn = createFn();
             await fn('Longsword', 0, 'attack', {

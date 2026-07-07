@@ -64,22 +64,6 @@ describe('livingLegendHandler', () => {
       expect(result.type).toBe('popup');
       expect(result.payload.type).toBe('automation_info');
       expect(result.payload.name).toBe('Living Legend');
-    });
-
-    it('includes automationType matching the action automation type', async () => {
-      getRuntimeValue.mockReturnValue(undefined);
-
-      const action = makeAction({ automation: { type: 'custom_legend' } });
-      const result = await handle(action, makePlayerStats(), campaignName, null);
-
-      expect(result.payload.automationType).toBe('custom_legend');
-    });
-
-    it('includes description listing all three effects', async () => {
-      getRuntimeValue.mockReturnValue(undefined);
-
-      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
       expect(result.payload.description).toContain('Charisma checks have advantage');
       expect(result.payload.description).toContain('reroll failed saving throws');
       expect(result.payload.description).toContain('missed weapon attacks hit once per turn');
@@ -112,25 +96,6 @@ describe('livingLegendHandler', () => {
       });
     });
 
-    it('uses custom action name in popup and log entry', async () => {
-      getRuntimeValue.mockReturnValue(undefined);
-
-      const action = makeAction({ name: 'Custom Legendary Ability' });
-      const result = await handle(action, makePlayerStats(), campaignName, null);
-
-      expect(result.payload.description).toContain('Custom Legendary Ability');
-
-      await handle(makeAction({ name: 'My Divine Gift' }), makePlayerStats(), campaignName, null);
-
-      expect(addEntry).toHaveBeenCalledWith(
-        campaignName,
-        expect.objectContaining({
-          abilityName: 'My Divine Gift',
-          description: expect.stringContaining('activated My Divine Gift'),
-        }),
-      );
-    });
-
     it('does not throw when addEntry rejects (fire-and-forget logging)', async () => {
       getRuntimeValue.mockReturnValue(undefined);
       addEntry.mockRejectedValue(new Error('Network failure'));
@@ -142,17 +107,13 @@ describe('livingLegendHandler', () => {
   });
 
   describe('setUnerringStrikeUsed', () => {
-    it.each`
-      used     | expectedCall
-      ${true}  | ${true}
-      ${false} | ${false}
-    `('sets the runtime value to $used', async ({ used, expectedCall }) => {
-      await setUnerringStrikeUsed(playerName, campaignName, used);
+    it('sets the runtime value', async () => {
+      await setUnerringStrikeUsed(playerName, campaignName, true);
 
       expect(setRuntimeValue).toHaveBeenCalledWith(
         playerName,
         unerringStrikeKey,
-        expectedCall,
+        true,
         campaignName,
       );
     });

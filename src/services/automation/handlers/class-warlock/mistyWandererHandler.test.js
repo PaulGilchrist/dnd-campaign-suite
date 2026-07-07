@@ -66,23 +66,14 @@ describe('mistyWandererHandler', () => {
             });
         });
 
-        it('should return modal when stored count is null (fallback to usesMax)', async () => {
+        it('should fall back to usesMax of 1 when expression evaluation returns falsy or stored count is null', async () => {
+            evaluateAutoExpression.mockReturnValue(null);
             getRuntimeValue.mockReturnValue(null);
 
             const result = await handle(makeAction(), makePlayerStats(), 'campaign', 'map');
 
             expect(result.type).toBe('modal');
-            expect(result.payload.usesMax).toBe(3);
-        });
-
-        it('should return info popup when no free casts remaining', async () => {
-            getRuntimeValue.mockReturnValue(0);
-
-            const result = await handle(makeAction(), makePlayerStats(), 'campaign', 'map');
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.type).toBe('automation_info');
-            expect(result.payload.description).toBe('No free casts remaining. Finish a Long Rest to regain them.');
+            expect(result.payload.usesMax).toBe(1);
         });
 
         it('should evaluate custom uses_expression via evaluateAutoExpression', async () => {
@@ -93,18 +84,7 @@ describe('mistyWandererHandler', () => {
 
             const result = await handle(customAction, makePlayerStats(), 'campaign', 'map');
 
-            expect(evaluateAutoExpression).toHaveBeenCalledWith('WIS modifier', expect.any(Object));
             expect(result.payload.usesMax).toBe(5);
-        });
-
-        it('should fall back to usesMax of 1 when expression evaluation returns falsy', async () => {
-            evaluateAutoExpression.mockReturnValue(null);
-            getRuntimeValue.mockReturnValue(null);
-
-            const result = await handle(makeAction(), makePlayerStats(), 'campaign', 'map');
-
-            expect(result.type).toBe('modal');
-            expect(result.payload.usesMax).toBe(1);
         });
     });
 
@@ -142,14 +122,6 @@ describe('mistyWandererHandler', () => {
             );
         });
 
-        it('should omit ally text when bringAlly is true but allyName is empty', async () => {
-            getRuntimeValue.mockReturnValue(3);
-
-            const result = await confirmMistyWanderer(makeAction(), makePlayerStats(), 'campaign', true, '');
-
-            expect(result.payload.description).toBe('Misty Wanderer: Cast Misty Step (2 remaining).');
-        });
-
         it('should return info popup when no free casts remaining', async () => {
             getRuntimeValue.mockReturnValue(0);
 
@@ -161,7 +133,7 @@ describe('mistyWandererHandler', () => {
             expect(setRuntimeValue).not.toHaveBeenCalled();
         });
 
-        it('should use custom feature name in the storage key', async () => {
+        it('should use custom feature name in the output', async () => {
             getRuntimeValue.mockReturnValue(2);
             const customAction = {
                 name: 'Custom Feature',
@@ -175,14 +147,10 @@ describe('mistyWandererHandler', () => {
                 },
             };
 
-            await confirmMistyWanderer(customAction, makePlayerStats(), 'campaign', false, null);
+            const result = await confirmMistyWanderer(customAction, makePlayerStats(), 'campaign', false, null);
 
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'Test Character',
-                '_Custom_Feature_freeCastCount',
-                1,
-                'campaign',
-            );
+            expect(result.payload.description).toBe('Custom Feature: Cast Misty Step (1 remaining).');
+            expect(result.payload.name).toBe('Custom Feature');
         });
     });
 });

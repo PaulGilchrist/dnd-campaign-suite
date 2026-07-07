@@ -202,7 +202,7 @@ describe('executeSpellCast - heal spells', () => {
       )
     })
 
-    it('does nothing when combat context is null', async () => {
+    it('does nothing when combat context is null or target is undefined', async () => {
       const services = makeServices({ getTargetInfo: async () => ({ name: 'Target' }) })
 
       await executeSpellCast(makeSpell(), { slotLevel: 6 }, services)
@@ -312,24 +312,8 @@ describe('executeSpellCast - heal spells', () => {
       expect(applyHealing.applyHealingToTarget).toHaveBeenCalledTimes(1)
     })
 
-    it('does nothing when combat context is null', async () => {
+    it('does nothing when combat context is null or target is undefined', async () => {
       const services = makeServices({ getTargetInfo: async () => ({ name: 'Target' }) })
-
-      const spell = makeSpell({
-        name: 'Cure Wounds',
-        level: 1,
-        heal_at_slot_level: { 1: '1d8 + MOD' },
-      })
-
-      await executeSpellCast(spell, { slotLevel: 1 }, services)
-
-      expect(applyHealing.applyHealingToTarget).not.toHaveBeenCalled()
-    })
-
-    it('does nothing when getTargetInfo returns undefined', async () => {
-      mockCombatContext('Target', 20, 100)
-      mockHealingResult(10, 20, 30)
-      const services = makeServices({ getTargetInfo: async () => undefined })
 
       const spell = makeSpell({
         name: 'Cure Wounds',

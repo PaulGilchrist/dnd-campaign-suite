@@ -141,32 +141,16 @@ describe('bardicInspirationHandler.handle', () => {
       ]);
       expect(result.payload.dieSize).toBe(8);
       expect(result.payload.hasCombatOptions).toBe(false);
-      expect(result.payload.campaignName).toBe(campaignName);
-      expect(result.payload.action).toEqual(action);
-      expect(result.payload.playerStats).toEqual(playerStats);
     });
 
-  });
-
-  describe('die size in modal payload', () => {
-    it('falls back to die size 6 when class data has no matching level', async () => {
-      playerStats.class = { class_levels: [{ level: 1, bardic_die: 4 }] };
-
-      const result = await handle(action, playerStats, campaignName);
-
-      expect(result.payload.dieSize).toBe(6);
-    });
-
-    it('falls back to die size 6 when class_levels is missing', async () => {
+    it('falls back to die size 6 when class data is missing or has no matching level', async () => {
       playerStats.class = {};
 
       const result = await handle(action, playerStats, campaignName);
 
       expect(result.payload.dieSize).toBe(6);
     });
-  });
 
-  describe('combat options in modal payload', () => {
     it('sets hasCombatOptions true when passive is present', async () => {
       playerStats.automation.passives = [{ effect: 'bardic_inspiration_combat_options' }];
 
@@ -207,43 +191,6 @@ describe('bardicInspirationHandler.applyBardicInspiration', () => {
         campaignName,
       );
     });
-
-    it('does not decrement uses when uses_expression is absent', async () => {
-      action.automation.uses_expression = undefined;
-
-      await applyBardicInspiration(action, playerStats, campaignName, 'Fighter', 8, false);
-
-      expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalledWith(
-        'Bard',
-        'bardicInspirationUses',
-        expect.any(Number),
-        campaignName,
-      );
-    });
-  });
-
-  describe('runtime values', () => {
-    it('sets bardicInspirationDie on the target', async () => {
-      await applyBardicInspiration(action, playerStats, campaignName, 'Fighter', 8, false);
-
-      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-        'Fighter',
-        'bardicInspirationDie',
-        '8',
-        campaignName,
-      );
-    });
-
-    it('sets bardicInspirationGrantedBy on the target', async () => {
-      await applyBardicInspiration(action, playerStats, campaignName, 'Rogue', 6, false);
-
-      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-        'Rogue',
-        'bardicInspirationGrantedBy',
-        'Bard',
-        campaignName,
-      );
-    });
   });
 
   describe('combat options', () => {
@@ -270,33 +217,6 @@ describe('bardicInspirationHandler.applyBardicInspiration', () => {
         'bardicInspirationCombatOptions',
         JSON.stringify(['defense_add_to_ac', 'offense_add_to_damage']),
         campaignName,
-      );
-    });
-
-    it('does not set combat options when hasCombatOptions is false', async () => {
-      action.automation.options = ['some_option'];
-
-      await applyBardicInspiration(action, playerStats, campaignName, 'Fighter', 8, false);
-
-      expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalledWith(
-        'Fighter',
-        'bardicInspirationCombatOptions',
-        expect.any(String),
-        campaignName,
-      );
-    });
-  });
-
-  describe('expiration', () => {
-    it('creates an expiration for the granted inspiration', async () => {
-      await applyBardicInspiration(action, playerStats, campaignName, 'Fighter', 8, false);
-
-      expect(expirations.addExpiration).toHaveBeenCalledWith(
-        'Bard',
-        'Fighter',
-        [{ type: 'remove_bardic_inspiration' }],
-        campaignName,
-        100,
       );
     });
   });

@@ -38,16 +38,10 @@ describe('smiteOfProtectionService', () => {
             expect(getSmiteOfProtectionPassives(playerStats)).toEqual([]);
         });
 
-        it('throws when automation.passives is missing', () => {
-            expect(() => getSmiteOfProtectionPassives({})).toThrow('Expected array, got undefined');
-        });
-
-        it('throws when automation.passives is null', () => {
+        it('throws when automation.passives is null or missing', () => {
             expect(() => getSmiteOfProtectionPassives({ automation: { passives: null } })).toThrow('Expected array, got null');
-        });
-
-        it('throws when automation is missing', () => {
             expect(() => getSmiteOfProtectionPassives({ automation: {} })).toThrow('Expected array, got undefined');
+            expect(() => getSmiteOfProtectionPassives({})).toThrow('Expected array, got undefined');
         });
     });
 
@@ -87,21 +81,6 @@ describe('smiteOfProtectionService', () => {
                 campaignName,
                 null,
             );
-            expect(result).toEqual([{ type: 'popup' }]);
-        });
-
-        it('triggers executeHandler for each smite passive when Divine Smite is cast with spell level', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
-
-            const result = await triggerSmiteOfProtection(
-                makeSpell({ level: 1 }),
-                makeMetaCtx({ slotLevel: 0 }),
-                makePlayerStats(),
-                campaignName,
-                null,
-            );
-
-            expect(executeHandler).toHaveBeenCalledTimes(1);
             expect(result).toEqual([{ type: 'popup' }]);
         });
 
@@ -150,47 +129,27 @@ describe('smiteOfProtectionService', () => {
             expect(executeHandler).not.toHaveBeenCalled();
         });
 
-        it('returns null when metaCtx and spell have no valid level', async () => {
+        it('returns null when metaCtx is null/undefined and spell level is 0', async () => {
             executeHandler.mockResolvedValue({ type: 'popup' });
 
-            const result = await triggerSmiteOfProtection(
-                makeSpell({ level: 0 }),
-                makeMetaCtx({ slotLevel: 0 }),
-                makePlayerStats(),
-                campaignName,
-                null,
-            );
-
-            expect(result).toBeNull();
-            expect(executeHandler).not.toHaveBeenCalled();
-        });
-
-        it('returns null when metaCtx is null and spell level is 0', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
-
-            const result = await triggerSmiteOfProtection(
+            let result = await triggerSmiteOfProtection(
                 makeSpell({ level: 0 }),
                 null,
                 makePlayerStats(),
                 campaignName,
                 null,
             );
-
             expect(result).toBeNull();
             expect(executeHandler).not.toHaveBeenCalled();
-        });
 
-        it('returns null when metaCtx is undefined and spell level is 0', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
-
-            const result = await triggerSmiteOfProtection(
+            executeHandler.mockClear();
+            result = await triggerSmiteOfProtection(
                 makeSpell({ level: 0 }),
                 undefined,
                 makePlayerStats(),
                 campaignName,
                 null,
             );
-
             expect(result).toBeNull();
             expect(executeHandler).not.toHaveBeenCalled();
         });

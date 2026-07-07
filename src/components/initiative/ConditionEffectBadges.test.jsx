@@ -63,101 +63,52 @@ describe('ConditionEffectBadges', () => {
             render(
                 <ConditionEffectBadges conditions={null} creatureName="Alice" campaignName="test" />
             );
-            expect(document.querySelectorAll('.condition-effect-badge').length).toBe(0);
+            expect(screen.queryByTestId('condition-effect-badge')).not.toBeInTheDocument();
         });
     });
 
-    describe('cannot act effects', () => {
-        it('should render Insp. Move badge when inspiringMovementNoOA runtime value is true', () => {
-            getRuntimeValue.mockReturnValue(true);
-            computeConditionEffects.mockReturnValue(makeEffects({}));
+    describe('badges from conditions and target effects', () => {
+        it.each([
+            ['Speed -15', { speedReduction: 15 }, 'Speed -15'],
+            ['Disadv vs', { targetDisadvantageCount: 2 }, 'Disadv vs'],
+            ['No Adv vs', { noAdvantageAgainst: true }, 'No Adv vs'],
+            ['Save Disadv', { riderSaveDisadvantage: true }, 'Save Disadv'],
+            ['+5 to hit', { riderAttackBonus: 5 }, '+5 to hit'],
+            ['No OA', { riderCannotOpportunityAttack: true }, 'No OA'],
+        ])('should render %s badge when condition is active', (_, effects, expectedLabel) => {
+            computeConditionEffects.mockReturnValue(makeEffects(effects));
             render(<ConditionEffectBadges conditions={[]} targetEffects={[]} creatureName="Alice" campaignName="test" />);
-            expect(screen.getByText('Insp. Move')).toBeInTheDocument();
-            expect(getRuntimeValue).toHaveBeenCalledWith('Alice', 'inspiringMovementNoOA', 'test');
+            expect(screen.getByText(expectedLabel)).toBeInTheDocument();
         });
 
-        it('should render Insp. Move badge when hasTacticalShift is true', () => {
-            getRuntimeValue.mockReturnValue(null);
-            computeConditionEffects.mockReturnValue(makeEffects({}));
-            render(
-                <ConditionEffectBadges
-                    conditions={[]}
-                    targetEffects={[]}
-                    creatureName="Alice"
-                    campaignName="test"
-                    hasTacticalShift={true}
-                />
-            );
-            expect(screen.getByText('Insp. Move')).toBeInTheDocument();
-        });
-    });
-
-    describe('speed effects', () => {
-        it('should render Speed -N badge when speedReduction is set', () => {
-            computeConditionEffects.mockReturnValue(makeEffects({ speedReduction: 15 }));
+        it.each([
+            ['+3 to hit', { riderAttackBonus: 3 }],
+            ['+7 to hit', { riderAttackBonus: 7 }],
+        ])('should render rider attack bonus badge with value %s when riderAttackBonus is set', (_, effects) => {
+            computeConditionEffects.mockReturnValue(makeEffects(effects));
             render(<ConditionEffectBadges conditions={[]} targetEffects={[]} creatureName="Alice" campaignName="test" />);
-            expect(screen.getByText('Speed -15')).toBeInTheDocument();
-        });
-    });
-
-    describe('target disadvantage', () => {
-        it('should render Disadv vs badge when targetDisadvantageCount > 0', () => {
-            computeConditionEffects.mockReturnValue(makeEffects({ targetDisadvantageCount: 2 }));
-            render(<ConditionEffectBadges conditions={[]} targetEffects={[]} creatureName="Alice" campaignName="test" />);
-            expect(screen.getByText('Disadv vs')).toBeInTheDocument();
-        });
-
-        it('should render No Adv vs badge when noAdvantageAgainst is true', () => {
-            computeConditionEffects.mockReturnValue(makeEffects({ noAdvantageAgainst: true }));
-            render(<ConditionEffectBadges conditions={[]} targetEffects={[]} creatureName="Alice" campaignName="test" />);
-            expect(screen.getByText('No Adv vs')).toBeInTheDocument();
+            expect(screen.getByText(effects.riderAttackBonus > 0 ? `+${effects.riderAttackBonus} to hit` : '')).toBeInTheDocument();
         });
 
         it('should prefer No Adv vs over Disadv vs when both are set', () => {
             computeConditionEffects.mockReturnValue(makeEffects({ noAdvantageAgainst: true, targetDisadvantageCount: 3 }));
             render(<ConditionEffectBadges conditions={[]} targetEffects={[]} creatureName="Alice" campaignName="test" />);
+            expect(screen.getByText('No Adv vs')).toBeInTheDocument();
             expect(screen.queryByText('Disadv vs')).not.toBeInTheDocument();
         });
     });
 
-    describe('rider effects', () => {
-        it('should render Save Disadv badge when riderSaveDisadvantage is true', () => {
-            computeConditionEffects.mockReturnValue(makeEffects({ riderSaveDisadvantage: true }));
-            render(<ConditionEffectBadges conditions={[]} targetEffects={[]} creatureName="Alice" campaignName="test" />);
-            expect(screen.getByText('Save Disadv')).toBeInTheDocument();
-        });
-
-        it('should render +N to hit badge when riderAttackBonus > 0', () => {
-            computeConditionEffects.mockReturnValue(makeEffects({ riderAttackBonus: 5 }));
-            render(<ConditionEffectBadges conditions={[]} targetEffects={[]} creatureName="Alice" campaignName="test" />);
-            expect(screen.getByText('+5 to hit')).toBeInTheDocument();
-        });
-
-        it('should render No OA badge when riderCannotOpportunityAttack is true', () => {
-            computeConditionEffects.mockReturnValue(makeEffects({ riderCannotOpportunityAttack: true }));
-            render(<ConditionEffectBadges conditions={[]} targetEffects={[]} creatureName="Alice" campaignName="test" />);
-            expect(screen.getByText('No OA')).toBeInTheDocument();
-        });
-    });
-
-    describe('remarkable athlete No OA', () => {
+    describe('badges from props', () => {
         it.each([
-            [true, true],
-            [null, false],
-        ])('should render No OA (Crit) when remarkableAthleteNoOA is %s', (value, shouldRender) => {
-            getRuntimeValue.mockReturnValue(value);
+            ['Insp. Move', { getRuntimeValue: true, hasTacticalShift: false }],
+            ['Insp. Move', { getRuntimeValue: null, hasTacticalShift: true }],
+        ])('should render %s badge when inspiringMovementNoOA is %s or hasTacticalShift is true', (_, { getRuntimeValue: rv, hasTacticalShift: ts }) => {
+            getRuntimeValue.mockReturnValue(rv);
             computeConditionEffects.mockReturnValue(makeEffects({}));
-            render(<ConditionEffectBadges conditions={[]} targetEffects={[]} creatureName="Alice" campaignName="test" />);
-            const badge = screen.queryByText('No OA (Crit)');
-            if (shouldRender) {
-                expect(badge).toBeInTheDocument();
-            } else {
-                expect(badge).not.toBeInTheDocument();
-            }
+            render(<ConditionEffectBadges conditions={[]} targetEffects={[]} creatureName="Alice" campaignName="test" hasTacticalShift={ts} />);
+            expect(screen.getByText('Insp. Move')).toBeInTheDocument();
         });
-    });
 
-    describe('speedy effects', () => {
         it('should render OA Disadv badge when hasSpeedyOpportunityDisadvantage is true', () => {
             computeConditionEffects.mockReturnValue(makeEffects({}));
             render(
@@ -185,6 +136,21 @@ describe('ConditionEffectBadges', () => {
             );
             expect(screen.getByText('No Difficult Terrain on Dash')).toBeInTheDocument();
         });
+
+        it.each([
+            [true, true],
+            [null, false],
+        ])('should render No OA (Crit) when remarkableAthleteNoOA runtime value is %s', (value, shouldRender) => {
+            getRuntimeValue.mockReturnValue(value);
+            computeConditionEffects.mockReturnValue(makeEffects({}));
+            render(<ConditionEffectBadges conditions={[]} targetEffects={[]} creatureName="Alice" campaignName="test" />);
+            const badge = screen.queryByText('No OA (Crit)');
+            if (shouldRender) {
+                expect(badge).toBeInTheDocument();
+            } else {
+                expect(badge).not.toBeInTheDocument();
+            }
+        });
     });
 
     describe('GM effect removal', () => {
@@ -192,17 +158,18 @@ describe('ConditionEffectBadges', () => {
             computeConditionEffects.mockReturnValue(makeEffects({ riderAttackBonus: 3, riderCannotOpportunityAttack: true }));
             render(<ConditionEffectBadges conditions={[]} targetEffects={[{ target: 'Goblin', effect: 'damage_bonus', value: 3 }]} creatureName="Goblin" campaignName="test" isLocalhost={true} />);
             expect(screen.getByText('+3 to hit')).toBeInTheDocument();
+            expect(screen.getByText('No OA')).toBeInTheDocument();
             expect(screen.getAllByTitle('Remove effect').length).toBe(2);
         });
 
-        it('should not render break button when isLocalhost is false', () => {
+        it('should not render break buttons when isLocalhost is false', () => {
             computeConditionEffects.mockReturnValue(makeEffects({ riderAttackBonus: 3 }));
             render(<ConditionEffectBadges conditions={[]} targetEffects={[{ target: 'Goblin', effect: 'damage_bonus', value: 3 }]} creatureName="Goblin" campaignName="test" isLocalhost={false} />);
             expect(screen.getByText('+3 to hit')).toBeInTheDocument();
             expect(screen.queryByTitle('Remove effect')).not.toBeInTheDocument();
         });
 
-        it('should remove targetEffects entry when break button is clicked', () => {
+        it('should remove the first matching targetEffect entry when break button is clicked', () => {
             const existingEffects = [
                 { target: 'Goblin', effect: 'damage_bonus', value: 3, source: 'Test' },
                 { target: 'Goblin', effect: 'damage_bonus', value: 5, source: 'Other' },

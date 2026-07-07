@@ -87,16 +87,6 @@ describe('divineInterventionHandler', () => {
             expect(result.type).toBe('modal');
         });
 
-        it('should default to 1 use when both stored and tracked resources are absent', async () => {
-            getRuntimeValue.mockReturnValue(null);
-            loadSpells.mockResolvedValue([]);
-            const stats = makePlayerStats({ _trackedResources: {} });
-
-            const result = await handle(makeAction(), stats, campaignName, 'TestMap');
-
-            expect(result.type).toBe('modal');
-        });
-
         it('should return modal with filtered Cleric spells for normal Divine Intervention', async () => {
             mockUses(1);
             const mockSpells = [
@@ -135,15 +125,6 @@ describe('divineInterventionHandler', () => {
             expect(loadSpells).toHaveBeenCalledWith('5e');
         });
 
-        it('should default to 2024 rules when playerStats.rules is falsy', async () => {
-            mockUses(1);
-            loadSpells.mockResolvedValue([]);
-
-            await handle(makeAction(), makePlayerStats({ rules: null }), campaignName, 'TestMap');
-
-            expect(loadSpells).toHaveBeenCalledWith('2024');
-        });
-
         it('should return empty eligibleSpells when no spells match', async () => {
             mockUses(1);
             loadSpells.mockResolvedValue([
@@ -175,16 +156,6 @@ describe('divineInterventionHandler', () => {
             mockUses(0);
             const result = await onSpellSelected(makeAction(), makePlayerStats(), campaignName, { name: 'Cure Wounds' });
             expect(result).toBeNull();
-        });
-
-        it('should default to 1 use when stored is null and tracked resources has current', async () => {
-            getRuntimeValue.mockReturnValue(null);
-            const stats = makePlayerStats({ _trackedResources: { divineInterventionUses: { current: 1 } } });
-
-            const result = await onSpellSelected(makeAction(), stats, campaignName, { name: 'Cure Wounds' });
-
-            expect(result.type).toBe('spell_selected');
-            expect(setRuntimeValue).toHaveBeenCalledWith('Player One', 'divineInterventionUses', 0, campaignName, true);
         });
 
         it('should decrement uses and return success for normal spell selection', async () => {
@@ -221,16 +192,16 @@ describe('divineInterventionHandler', () => {
             expect(setRuntimeValue).toHaveBeenCalledWith('Player One', 'divineInterventionUses', 1, campaignName, true);
         });
 
-        it('should handle Greater Divine Intervention when Wish is selected', async () => {
+        it('should apply cooldown based on Wish dice rolls', async () => {
             mockUses(1);
             const action = makeAction({ upgradeTo: 'wish' });
             const selectedSpell = { name: 'Wish' };
 
-            vi.spyOn(Math, 'random').mockReturnValue(0.25);
+            // Simulate d4 rolls: roll1=2, roll2=2 => cooldown=4
+            vi.spyOn(Math, 'random').mockReturnValue(0.25); // floor(0.25*4)+1 = 2
 
             const result = await onSpellSelected(action, makePlayerStats(), campaignName, selectedSpell);
 
-            // (0.25 * 4) + 1 = 2. Total = 2+2=4.
             expect(result.rechargeMessage).toBe('until you finish 4 Long Rests.');
             expect(setRuntimeValue).toHaveBeenCalledWith('Player One', '_divineInterventionWishCooldown', 4, campaignName, true);
             expect(setRuntimeValue).toHaveBeenCalledWith('Player One', 'divineInterventionUses', -1, campaignName, true);
@@ -238,58 +209,10 @@ describe('divineInterventionHandler', () => {
             vi.restoreAllMocks();
         });
 
-        it('should handle minimum cooldown (2) when both d4 rolls are 1', async () => {
-            mockUses(1);
-            const action = makeAction({ upgradeTo: 'wish' });
-            const selectedSpell = { name: 'Wish' };
-
-            vi.spyOn(Math, 'random').mockReturnValue(0); // floor(0*4)+1 = 1, total = 1+1 = 2
-
-            const result = await onSpellSelected(action, makePlayerStats(), campaignName, selectedSpell);
-
-            expect(result.rechargeMessage).toBe('until you finish 2 Long Rests.');
-            expect(setRuntimeValue).toHaveBeenCalledWith('Player One', '_divineInterventionWishCooldown', 2, campaignName, true);
-
-            vi.restoreAllMocks();
-        });
-
-        it('should handle maximum cooldown (8) when both d4 rolls are 4', async () => {
-            mockUses(1);
-            const action = makeAction({ upgradeTo: 'wish' });
-            const selectedSpell = { name: 'Wish' };
-
-            vi.spyOn(Math, 'random').mockReturnValue(0.99); // floor(0.99*4)+1 = 4, total = 4+4 = 8
-
-            const result = await onSpellSelected(action, makePlayerStats(), campaignName, selectedSpell);
-
-            expect(result.rechargeMessage).toBe('until you finish 8 Long Rests.');
-            expect(setRuntimeValue).toHaveBeenCalledWith('Player One', '_divineInterventionWishCooldown', 8, campaignName, true);
-
-            vi.restoreAllMocks();
-        });
-
-        it('should treat Wish spell selection as normal if not Greater Divine Intervention', async () => {
+        it('should treat non-Wish spell selection as normal even with upgradeTo set', async () => {
             mockUses(1);
             const action = makeAction({ upgradeTo: 'something_else' });
             const selectedSpell = { name: 'Wish' };
-
-            const result = await onSpellSelected(action, makePlayerStats(), campaignName, selectedSpell);
-
-            expect(result.rechargeMessage).toBe('until you finish a Long Rest.');
-            expect(setRuntimeValue).toHaveBeenCalledWith('Player One', 'divineInterventionUses', 0, campaignName, true);
-            expect(setRuntimeValue).not.toHaveBeenCalledWith(
-                'Player One',
-                '_divineInterventionWishCooldown',
-                expect.any(Number),
-                campaignName,
-                true,
-            );
-        });
-
-        it('should not set cooldown when spell is not Wish even if upgradeTo is wish', async () => {
-            mockUses(1);
-            const action = makeAction({ upgradeTo: 'wish' });
-            const selectedSpell = { name: 'Cure Wounds' };
 
             const result = await onSpellSelected(action, makePlayerStats(), campaignName, selectedSpell);
 

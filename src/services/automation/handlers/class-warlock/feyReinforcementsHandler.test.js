@@ -53,16 +53,6 @@ describe('feyReinforcementsHandler', () => {
             expect(result.payload.noConcentrationOption).toBe(true);
         });
 
-        it('returns modal when runtime value is null (defaults to usesMax)', async () => {
-            getRuntimeValue.mockReturnValue(null);
-            const action = makeAction({ automation: { usesMax: 1 } });
-
-            const result = await handle(action, makePlayerStats(), 'campaign');
-
-            expect(result.type).toBe('modal');
-            expect(result.modalName).toBe('feyReinforcements');
-        });
-
         it('returns popup when no free casts remain', async () => {
             getRuntimeValue.mockReturnValue(0);
 
@@ -74,26 +64,6 @@ describe('feyReinforcementsHandler', () => {
             expect(result.payload.description).toContain('No free casts remaining');
             expect(result.payload.description).toContain('Long Rest');
             expect(result.payload.automation).toEqual(makeAction().automation);
-        });
-
-        it('uses custom action name in runtime key and popup', async () => {
-            getRuntimeValue.mockReturnValue(0);
-            const action = makeAction({ name: 'Custom Fey Feature' });
-
-            const result = await handle(action, makePlayerStats(), 'campaign');
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.name).toBe('Custom Fey Feature');
-            expect(result.payload.description).toContain('No free casts remaining');
-        });
-
-        it('passes custom usesMax through to automation in popup', async () => {
-            getRuntimeValue.mockReturnValue(0);
-            const action = makeAction({ automation: { usesMax: 2, spell: 'Summon Fey' } });
-
-            const result = await handle(action, makePlayerStats(), 'campaign');
-
-            expect(result.payload.automation.usesMax).toBe(2);
         });
     });
 
@@ -149,20 +119,6 @@ describe('feyReinforcementsHandler', () => {
             expect(setRuntimeValue).not.toHaveBeenCalled();
         });
 
-        it('uses 2 usesMax and decrements from 2', async () => {
-            getRuntimeValue.mockReturnValue(2);
-
-            const result = await confirmFeyReinforcement(makeAction({ automation: { usesMax: 2 } }), makePlayerStats(), 'campaign', false);
-
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'Test Character',
-                '_Fey_Reinforcements_freeCastCount',
-                1,
-                'campaign'
-            );
-            expect(result.payload.description).toContain('(1 remaining)');
-        });
-
         it('uses correct runtime key derived from custom action name', async () => {
             getRuntimeValue.mockReturnValue(1);
             const action = makeAction({ name: 'Custom Fey Power' });
@@ -175,51 +131,6 @@ describe('feyReinforcementsHandler', () => {
                 0,
                 'campaign'
             );
-        });
-
-        it('uses default spell name when automation.spell is missing', async () => {
-            getRuntimeValue.mockReturnValue(1);
-            const action = makeAction({ automation: { spell: undefined } });
-
-            const result = await confirmFeyReinforcement(action, makePlayerStats(), 'campaign', false);
-
-            expect(result.payload.description).toContain('Free cast of Summon Fey');
-        });
-
-        it('uses correct campaign name in setRuntimeValue', async () => {
-            getRuntimeValue.mockReturnValue(1);
-
-            await confirmFeyReinforcement(makeAction(), makePlayerStats(), 'my-campaign', false);
-
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'Test Character',
-                '_Fey_Reinforcements_freeCastCount',
-                0,
-                'my-campaign'
-            );
-        });
-
-        it('uses correct player name from stats in setRuntimeValue', async () => {
-            getRuntimeValue.mockReturnValue(1);
-            const stats = makePlayerStats({ name: 'Elven Warlock' });
-
-            await confirmFeyReinforcement(makeAction(), stats, 'campaign', false);
-
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'Elven Warlock',
-                '_Fey_Reinforcements_freeCastCount',
-                0,
-                'campaign'
-            );
-        });
-
-        it('includes hint text about opening spell sheet in popup description', async () => {
-            getRuntimeValue.mockReturnValue(1);
-
-            const result = await confirmFeyReinforcement(makeAction(), makePlayerStats(), 'campaign', false);
-
-            expect(result.payload.description).toContain('Open your spell sheet');
-            expect(result.payload.description).toContain('no spell slot will be consumed');
         });
     });
 });

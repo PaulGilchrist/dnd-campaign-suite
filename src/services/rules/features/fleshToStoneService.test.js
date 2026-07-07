@@ -42,8 +42,9 @@ describe('fleshToStoneService', () => {
                 expect(executeHandler).toHaveBeenCalledWith(
                     expect.objectContaining({
                         name: 'Flesh to Stone',
-                        automation: expect.objectContaining({ type: 'flesh_to_stone' }),
+                        automation: expect.objectContaining({ type: 'flesh_to_stone', saveDc: 15, saveType: 'CON' }),
                         spell: expect.objectContaining({ name: inputName }),
+                        spellSlotLevel: 6,
                     }),
                     playerStats,
                     campaignName,
@@ -75,77 +76,19 @@ describe('fleshToStoneService', () => {
         });
 
         describe('save DC computation', () => {
-            it('uses spellSaveDc from metaCtx when provided', async () => {
+            it.each([
+                { desc: 'uses metaCtx spellSaveDc', metaCtx: { spellSaveDc: 18 }, expectedDc: 18 },
+                { desc: 'falls back to playerStats.spellAbilities.saveDc', metaCtx: {}, expectedDc: 15 },
+                { desc: 'computes from proficiency when no saveDc', metaCtx: {}, stats: { name: 'Wizard', proficiency: 3 }, expectedDc: 11 },
+                { desc: 'uses default proficiency of 2', metaCtx: {}, stats: { name: 'Wizard' }, expectedDc: 10 },
+                { desc: 'uses default saveDc base when no stats', metaCtx: {}, stats: {}, expectedDc: 10 },
+                { desc: 'computes when spellAbilities is undefined', metaCtx: {}, stats: { name: 'Wizard', proficiency: 4 }, expectedDc: 12 },
+            ])('save DC: $desc', async ({ metaCtx, stats = playerStats, expectedDc }) => {
                 executeHandler.mockResolvedValue({ type: 'popup' });
 
                 await triggerFleshToStone(
                     { name: 'Flesh to Stone', level: 6 },
-                    { spellSaveDc: 18, slotLevel: 5 },
-                    playerStats,
-                    campaignName,
-                    mapName,
-                );
-
-                expect(executeHandler).toHaveBeenCalledWith(
-                    expect.objectContaining({
-                        automation: expect.objectContaining({ saveDc: 18 }),
-                        spellSlotLevel: 5,
-                    }),
-                    playerStats,
-                    campaignName,
-                    mapName,
-                );
-            });
-
-            it('prefers metaCtx spellSaveDc over playerStats.spellAbilities.saveDc', async () => {
-                executeHandler.mockResolvedValue({ type: 'popup' });
-
-                await triggerFleshToStone(
-                    { name: 'Flesh to Stone', level: 6 },
-                    { spellSaveDc: 20 },
-                    { ...playerStats, spellAbilities: { saveDc: 15 } },
-                    campaignName,
-                    mapName,
-                );
-
-                expect(executeHandler).toHaveBeenCalledWith(
-                    expect.objectContaining({
-                        automation: expect.objectContaining({ saveDc: 20 }),
-                    }),
-                    expect.objectContaining({ spellAbilities: { saveDc: 15 } }),
-                    campaignName,
-                    mapName,
-                );
-            });
-
-            it('falls back to playerStats.spellAbilities.saveDc when metaCtx lacks it', async () => {
-                executeHandler.mockResolvedValue({ type: 'popup' });
-
-                await triggerFleshToStone(
-                    { name: 'Flesh to Stone', level: 6 },
-                    {},
-                    playerStats,
-                    campaignName,
-                    mapName,
-                );
-
-                expect(executeHandler).toHaveBeenCalledWith(
-                    expect.objectContaining({
-                        automation: expect.objectContaining({ saveDc: 15 }),
-                    }),
-                    playerStats,
-                    campaignName,
-                    mapName,
-                );
-            });
-
-            it('computes saveDc from proficiency when no spellAbilities.saveDc', async () => {
-                executeHandler.mockResolvedValue({ type: 'popup' });
-                const stats = { name: 'Wizard', proficiency: 3 };
-
-                await triggerFleshToStone(
-                    { name: 'Flesh to Stone', level: 6 },
-                    {},
+                    metaCtx,
                     stats,
                     campaignName,
                     mapName,
@@ -153,74 +96,9 @@ describe('fleshToStoneService', () => {
 
                 expect(executeHandler).toHaveBeenCalledWith(
                     expect.objectContaining({
-                        automation: expect.objectContaining({ saveDc: 11 }),
+                        automation: expect.objectContaining({ saveDc: expectedDc }),
                     }),
-                    stats,
-                    campaignName,
-                    mapName,
-                );
-            });
-
-            it('uses default proficiency of 2 when proficiency is missing', async () => {
-                executeHandler.mockResolvedValue({ type: 'popup' });
-                const stats = { name: 'Wizard' };
-
-                await triggerFleshToStone(
-                    { name: 'Flesh to Stone', level: 6 },
-                    {},
-                    stats,
-                    campaignName,
-                    mapName,
-                );
-
-                expect(executeHandler).toHaveBeenCalledWith(
-                    expect.objectContaining({
-                        automation: expect.objectContaining({ saveDc: 10 }),
-                    }),
-                    stats,
-                    campaignName,
-                    mapName,
-                );
-            });
-
-            it('uses default saveDc base of 8 when no proficiency at all', async () => {
-                executeHandler.mockResolvedValue({ type: 'popup' });
-
-                await triggerFleshToStone(
-                    { name: 'Flesh to Stone', level: 6 },
-                    {},
-                    {},
-                    campaignName,
-                    mapName,
-                );
-
-                expect(executeHandler).toHaveBeenCalledWith(
-                    expect.objectContaining({
-                        automation: expect.objectContaining({ saveDc: 10 }),
-                    }),
-                    {},
-                    campaignName,
-                    mapName,
-                );
-            });
-
-            it('computes saveDc when spellAbilities is undefined', async () => {
-                executeHandler.mockResolvedValue({ type: 'popup' });
-                const stats = { name: 'Wizard', proficiency: 4 };
-
-                await triggerFleshToStone(
-                    { name: 'Flesh to Stone', level: 6 },
-                    {},
-                    stats,
-                    campaignName,
-                    mapName,
-                );
-
-                expect(executeHandler).toHaveBeenCalledWith(
-                    expect.objectContaining({
-                        automation: expect.objectContaining({ saveDc: 12 }),
-                    }),
-                    stats,
+                    expect.any(Object),
                     campaignName,
                     mapName,
                 );
@@ -228,114 +106,26 @@ describe('fleshToStoneService', () => {
         });
 
         describe('slot level resolution', () => {
-            it('uses metaCtx slotLevel when provided', async () => {
+            it.each([
+                { desc: 'uses metaCtx slotLevel', spell: { name: 'Flesh to Stone', level: 5 }, metaCtx: { slotLevel: 7 }, expectedLevel: 7 },
+                { desc: 'uses metaCtx slotLevel over spell.level', spell: { name: 'Flesh to Stone', level: 3 }, metaCtx: { spellSaveDc: 17, slotLevel: 6 }, expectedLevel: 6 },
+                { desc: 'falls back to spell.level', spell: { name: 'Flesh to Stone', level: 7 }, metaCtx: { spellSaveDc: 17 }, expectedLevel: 7 },
+                { desc: 'defaults to 6 when spell has no level', spell: { name: 'Flesh to Stone' }, metaCtx: {}, expectedLevel: 6 },
+                { desc: 'defaults to 6 when spell.level is null', spell: { name: 'Flesh to Stone', level: null }, metaCtx: {}, expectedLevel: 6 },
+                { desc: 'defaults to 6 when spell.level is undefined', spell: { name: 'Flesh to Stone', level: undefined }, metaCtx: {}, expectedLevel: 6 },
+            ])('slot level: $desc', async ({ spell, metaCtx, expectedLevel }) => {
                 executeHandler.mockResolvedValue({ type: 'popup' });
 
                 await triggerFleshToStone(
-                    { name: 'Flesh to Stone', level: 5 },
-                    { slotLevel: 7 },
+                    spell,
+                    metaCtx,
                     playerStats,
                     campaignName,
                     mapName,
                 );
 
                 expect(executeHandler).toHaveBeenCalledWith(
-                    expect.objectContaining({ spellSlotLevel: 7 }),
-                    playerStats,
-                    campaignName,
-                    mapName,
-                );
-            });
-
-            it('uses metaCtx slotLevel over spell.level', async () => {
-                executeHandler.mockResolvedValue({ type: 'popup' });
-
-                await triggerFleshToStone(
-                    { name: 'Flesh to Stone', level: 3 },
-                    { spellSaveDc: 17, slotLevel: 6 },
-                    playerStats,
-                    campaignName,
-                    mapName,
-                );
-
-                expect(executeHandler).toHaveBeenCalledWith(
-                    expect.objectContaining({ spellSlotLevel: 6 }),
-                    playerStats,
-                    campaignName,
-                    mapName,
-                );
-            });
-
-            it('falls back to spell.level when metaCtx has no slotLevel', async () => {
-                executeHandler.mockResolvedValue({ type: 'popup' });
-
-                await triggerFleshToStone(
-                    { name: 'Flesh to Stone', level: 7 },
-                    { spellSaveDc: 17 },
-                    playerStats,
-                    campaignName,
-                    mapName,
-                );
-
-                expect(executeHandler).toHaveBeenCalledWith(
-                    expect.objectContaining({ spellSlotLevel: 7 }),
-                    playerStats,
-                    campaignName,
-                    mapName,
-                );
-            });
-
-            it('defaults slotLevel to 6 when neither metaCtx nor spell has level', async () => {
-                executeHandler.mockResolvedValue({ type: 'popup' });
-
-                await triggerFleshToStone(
-                    { name: 'Flesh to Stone' },
-                    {},
-                    playerStats,
-                    campaignName,
-                    mapName,
-                );
-
-                expect(executeHandler).toHaveBeenCalledWith(
-                    expect.objectContaining({ spellSlotLevel: 6 }),
-                    playerStats,
-                    campaignName,
-                    mapName,
-                );
-            });
-
-            it('defaults slotLevel to 6 when spell.level is null', async () => {
-                executeHandler.mockResolvedValue({ type: 'popup' });
-
-                await triggerFleshToStone(
-                    { name: 'Flesh to Stone', level: null },
-                    {},
-                    playerStats,
-                    campaignName,
-                    mapName,
-                );
-
-                expect(executeHandler).toHaveBeenCalledWith(
-                    expect.objectContaining({ spellSlotLevel: 6 }),
-                    playerStats,
-                    campaignName,
-                    mapName,
-                );
-            });
-
-            it('defaults slotLevel to 6 when spell.level is undefined', async () => {
-                executeHandler.mockResolvedValue({ type: 'popup' });
-
-                await triggerFleshToStone(
-                    { name: 'Flesh to Stone', level: undefined },
-                    {},
-                    playerStats,
-                    campaignName,
-                    mapName,
-                );
-
-                expect(executeHandler).toHaveBeenCalledWith(
-                    expect.objectContaining({ spellSlotLevel: 6 }),
+                    expect.objectContaining({ spellSlotLevel: expectedLevel }),
                     playerStats,
                     campaignName,
                     mapName,
@@ -343,76 +133,15 @@ describe('fleshToStoneService', () => {
             });
         });
 
-        describe('action structure', () => {
-            it('passes the original spell object into the action', async () => {
+        describe('action structure and propagation', () => {
+            it('passes original spell object, campaignName, and mapName to executeHandler', async () => {
                 executeHandler.mockResolvedValue({ type: 'popup' });
                 const spell = { name: 'Flesh to Stone', level: 6, school: 'Transmutation' };
 
-                await triggerFleshToStone(spell, {}, playerStats, campaignName, mapName);
+                await triggerFleshToStone(spell, {}, playerStats, 'MyCampaign', 'DungeonMap1');
 
                 expect(executeHandler).toHaveBeenCalledWith(
                     expect.objectContaining({ spell }),
-                    playerStats,
-                    campaignName,
-                    mapName,
-                );
-            });
-
-            it('includes saveType CON in the automation action', async () => {
-                executeHandler.mockResolvedValue({ type: 'popup' });
-
-                await triggerFleshToStone(
-                    { name: 'Flesh to Stone', level: 6 },
-                    {},
-                    playerStats,
-                    campaignName,
-                    mapName,
-                );
-
-                expect(executeHandler).toHaveBeenCalledWith(
-                    expect.objectContaining({
-                        automation: expect.objectContaining({ saveType: 'CON' }),
-                    }),
-                    playerStats,
-                    campaignName,
-                    mapName,
-                );
-            });
-
-            it('includes automation type flesh_to_stone in the action', async () => {
-                executeHandler.mockResolvedValue({ type: 'popup' });
-
-                await triggerFleshToStone(
-                    { name: 'Flesh to Stone', level: 6 },
-                    {},
-                    playerStats,
-                    campaignName,
-                    mapName,
-                );
-
-                expect(executeHandler).toHaveBeenCalledWith(
-                    expect.objectContaining({
-                        automation: expect.objectContaining({ type: 'flesh_to_stone' }),
-                    }),
-                    playerStats,
-                    campaignName,
-                    mapName,
-                );
-            });
-
-            it('passes campaignName and mapName to executeHandler', async () => {
-                executeHandler.mockResolvedValue({ type: 'popup' });
-
-                await triggerFleshToStone(
-                    { name: 'Flesh to Stone', level: 6 },
-                    {},
-                    playerStats,
-                    'MyCampaign',
-                    'DungeonMap1',
-                );
-
-                expect(executeHandler).toHaveBeenCalledWith(
-                    expect.any(Object),
                     playerStats,
                     'MyCampaign',
                     'DungeonMap1',
@@ -439,83 +168,43 @@ describe('fleshToStoneService', () => {
                 expect(result).toBe(expectedResult);
             });
 
-            it('returns null when executeHandler returns null', async () => {
+            it('returns null when executeHandler returns null or throws', async () => {
                 executeHandler.mockResolvedValue(null);
+                expect(await triggerFleshToStone({ name: 'Flesh to Stone', level: 6 }, {}, playerStats, campaignName, mapName)).toBeNull();
 
-                const result = await triggerFleshToStone(
-                    { name: 'Flesh to Stone', level: 6 },
-                    {},
-                    playerStats,
-                    campaignName,
-                    mapName,
-                );
-
-                expect(result).toBeNull();
-            });
-
-            it('returns null when executeHandler throws an error', async () => {
                 executeHandler.mockRejectedValue(new Error('Handler failed'));
-
-                const result = await triggerFleshToStone(
-                    { name: 'Flesh to Stone', level: 6 },
-                    {},
-                    playerStats,
-                    campaignName,
-                    mapName,
-                );
-
-                expect(result).toBeNull();
+                expect(await triggerFleshToStone({ name: 'Flesh to Stone', level: 6 }, {}, playerStats, campaignName, mapName)).toBeNull();
             });
         });
 
         describe('invalid/null spell name handling', () => {
-            it('returns null when spell name is undefined', async () => {
+            it.each([
+                { desc: 'undefined name', spell: { level: 6 } },
+                { desc: 'null name', spell: { name: null, level: 6 } },
+                { desc: 'empty string name', spell: { name: '', level: 6 } },
+            ])('returns null when spell name is $desc', async ({ spell }) => {
                 const result = await triggerFleshToStone(
-                    { level: 6 },
+                    spell,
                     {},
                     playerStats,
                     campaignName,
                     mapName,
                 );
-
-                expect(result).toBeNull();
-                expect(executeHandler).not.toHaveBeenCalled();
-            });
-
-            it('returns null when spell name is null', async () => {
-                const result = await triggerFleshToStone(
-                    { name: null, level: 6 },
-                    {},
-                    playerStats,
-                    campaignName,
-                    mapName,
-                );
-
-                expect(result).toBeNull();
-                expect(executeHandler).not.toHaveBeenCalled();
-            });
-
-            it('returns null when spell name is empty string', async () => {
-                const result = await triggerFleshToStone(
-                    { name: '', level: 6 },
-                    {},
-                    playerStats,
-                    campaignName,
-                    mapName,
-                );
-
                 expect(result).toBeNull();
                 expect(executeHandler).not.toHaveBeenCalled();
             });
         });
 
-        describe('metaCtx handling', () => {
-            it('handles null metaCtx gracefully', async () => {
+        describe('null/undefined metaCtx', () => {
+            it.each([
+                { desc: 'null', metaCtx: null },
+                { desc: 'undefined', metaCtx: undefined },
+            ])('handles $desc metaCtx gracefully', async ({ metaCtx }) => {
                 executeHandler.mockResolvedValue({ type: 'popup' });
 
                 const result = await triggerFleshToStone(
                     { name: 'Flesh to Stone', level: 6 },
-                    null,
+                    metaCtx,
                     playerStats,
                     campaignName,
                     mapName,
@@ -530,68 +219,6 @@ describe('fleshToStoneService', () => {
                     mapName,
                 );
                 expect(result).toEqual({ type: 'popup' });
-            });
-
-            it('handles undefined metaCtx gracefully', async () => {
-                executeHandler.mockResolvedValue({ type: 'popup' });
-
-                const result = await triggerFleshToStone(
-                    { name: 'Flesh to Stone', level: 6 },
-                    undefined,
-                    playerStats,
-                    campaignName,
-                    mapName,
-                );
-
-                expect(executeHandler).toHaveBeenCalledWith(
-                    expect.objectContaining({
-                        automation: expect.objectContaining({ saveDc: 15 }),
-                    }),
-                    playerStats,
-                    campaignName,
-                    mapName,
-                );
-                expect(result).toEqual({ type: 'popup' });
-            });
-
-            it('handles partial metaCtx with only spellSaveDc', async () => {
-                executeHandler.mockResolvedValue({ type: 'popup' });
-
-                await triggerFleshToStone(
-                    { name: 'Flesh to Stone', level: 6 },
-                    { spellSaveDc: 20 },
-                    playerStats,
-                    campaignName,
-                    mapName,
-                );
-
-                expect(executeHandler).toHaveBeenCalledWith(
-                    expect.objectContaining({
-                        automation: expect.objectContaining({ saveDc: 20 }),
-                    }),
-                    playerStats,
-                    campaignName,
-                    mapName,
-                );
-            });
-
-            it('handles partial metaCtx with only slotLevel', async () => {
-                executeHandler.mockResolvedValue({ type: 'popup' });
-
-                await triggerFleshToStone(
-                    { name: 'Flesh to Stone', level: 6 },
-                    { slotLevel: 6 },
-                    playerStats,
-                    campaignName,
-                    mapName,
-                );
-
-                expect(executeHandler).toHaveBeenCalledWith(
-                    expect.objectContaining({ spellSlotLevel: 6 }),
-                    playerStats,
-                    campaignName,
-                    mapName,
-                );
             });
         });
     });

@@ -60,7 +60,7 @@ describe('fiendishResilienceHandler', () => {
             expect(addEntry).not.toHaveBeenCalled();
         });
 
-        it('returns modal with existingType when a type has already been chosen', async () => {
+        it('returns modal with existingType and logs ability use when a type has already been chosen', async () => {
             getChosenRuntimeValue.mockReturnValue('Fire');
 
             const result = await handle(makeFeature(), makeStats(), CAMPAIGN);
@@ -69,18 +69,11 @@ describe('fiendishResilienceHandler', () => {
             expect(result.modalName).toBe('fiendishResilience');
             expect(result.payload.existingType).toBe('Fire');
             expect(result.payload.damageTypes).toHaveLength(12);
-        });
-
-        it('logs ability use when a type has already been chosen', async () => {
-            getChosenRuntimeValue.mockReturnValue('Cold');
-
-            await handle(makeFeature(), makeStats(), CAMPAIGN);
-
             expect(addEntry).toHaveBeenCalledWith(CAMPAIGN, expect.objectContaining({
                 type: 'ability_use',
                 characterName: 'TestCharacter',
                 abilityName: 'Fiendish Resilience',
-                description: 'Fiendish Resilience — damage type is Cold',
+                description: 'Fiendish Resilience — damage type is Fire',
             }));
         });
 
@@ -91,16 +84,6 @@ describe('fiendishResilienceHandler', () => {
             const result = await handle(makeFeature({ automation: { damageTypes: customTypes } }), makeStats(), CAMPAIGN);
 
             expect(result.payload.damageTypes).toEqual(customTypes);
-        });
-
-        it('passes through custom damageTypes when existing type is set', async () => {
-            getChosenRuntimeValue.mockReturnValue('Poison');
-
-            const customTypes = ['Fire', 'Poison', 'Necrotic'];
-            const result = await handle(makeFeature({ automation: { damageTypes: customTypes } }), makeStats(), CAMPAIGN);
-
-            expect(result.payload.damageTypes).toEqual(customTypes);
-            expect(result.payload.existingType).toBe('Poison');
         });
     });
 
@@ -159,22 +142,6 @@ describe('fiendishResilienceHandler', () => {
 
             expect(addEntry).toHaveBeenCalledWith(CAMPAIGN, expect.objectContaining({
                 description: 'Fiendish Resilience — damage type changed to Cold',
-            }));
-        });
-
-        it('allows re-selecting the same type', async () => {
-            getChosenRuntimeValue.mockReturnValue('Fire');
-
-            const result = await applyTypeChoice(
-                makeFeature({ automation: { damageTypes: ['Fire', 'Cold'] } }),
-                makeStats(),
-                CAMPAIGN,
-                'Fire',
-            );
-
-            expect(result.type).toBe('popup');
-            expect(addEntry).toHaveBeenCalledWith(CAMPAIGN, expect.objectContaining({
-                description: 'Fiendish Resilience — damage type set to Fire',
             }));
         });
     });

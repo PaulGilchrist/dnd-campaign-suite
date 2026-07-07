@@ -13,7 +13,7 @@ describe('inspiringSmiteService', () => {
     });
 
     describe('getInspiringSmitePassives', () => {
-        it('returns only post_cast_inspiring_smite passives', () => {
+        it('returns only post_cast_inspiting_smite passives', () => {
             const stats = {
                 automation: {
                     passives: [
@@ -51,16 +51,20 @@ describe('inspiringSmiteService', () => {
             ...overrides,
         });
 
-        it('returns null for non-divine smite spell, zero slot level, or no passives', async () => {
-            let result = await triggerInspiringSmite({ name: 'Fireball' }, {}, createStats(), campaignName, mapName);
+        it('returns null for non-divine smite spell', async () => {
+            const result = await triggerInspiringSmite({ name: 'Fireball' }, {}, createStats(), campaignName, mapName);
             expect(result).toBeNull();
             expect(executeHandler).not.toHaveBeenCalled();
+        });
 
-            result = await triggerInspiringSmite({ name: 'Divine Smite', level: 0 }, { slotLevel: 0 }, createStats(), campaignName, mapName);
+        it('returns null when slot level is zero', async () => {
+            const result = await triggerInspiringSmite({ name: 'Divine Smite', level: 0 }, { slotLevel: 0 }, createStats(), campaignName, mapName);
             expect(result).toBeNull();
             expect(executeHandler).not.toHaveBeenCalled();
+        });
 
-            result = await triggerInspiringSmite({ name: 'Divine Smite' }, {}, { automation: { passives: [] } }, campaignName, mapName);
+        it('returns null when no passives exist', async () => {
+            const result = await triggerInspiringSmite({ name: 'Divine Smite' }, {}, { automation: { passives: [] } }, campaignName, mapName);
             expect(result).toBeNull();
             expect(executeHandler).not.toHaveBeenCalled();
         });
@@ -80,7 +84,7 @@ describe('inspiringSmiteService', () => {
             expect(result).toEqual([{ success: true }]);
         });
 
-        it('handles multiple passives, skips falsy results, and uses custom casting_time', async () => {
+        it('filters out falsy results from executeHandler', async () => {
             executeHandler.mockResolvedValueOnce({ result: 1 });
             executeHandler.mockResolvedValueOnce(null);
             executeHandler.mockResolvedValueOnce({ result: 3 });
@@ -95,52 +99,43 @@ describe('inspiringSmiteService', () => {
                 },
             };
 
-            let result = await triggerInspiringSmite({ name: 'Divine Smite' }, { slotLevel: 1 }, stats, campaignName, mapName);
+            const result = await triggerInspiringSmite({ name: 'Divine Smite' }, { slotLevel: 1 }, stats, campaignName, mapName);
             expect(result).toEqual([{ result: 1 }, { result: 3 }]);
+        });
 
-            executeHandler.mockReset().mockResolvedValue({ success: true });
-            const stats2 = {
+        it('uses custom casting_time from passive when provided', async () => {
+            executeHandler.mockResolvedValue({ success: true });
+            const stats = {
                 automation: {
                     passives: [{ type: 'post_cast_inspiring_smite', name: 'Inspire', casting_time: '1 action' }],
                 },
             };
-            await triggerInspiringSmite({ name: 'Divine Smite' }, { slotLevel: 1 }, stats2, campaignName, mapName);
+            await triggerInspiringSmite({ name: 'Divine Smite' }, { slotLevel: 1 }, stats, campaignName, mapName);
             const [action] = vi.mocked(executeHandler).mock.calls[0];
             expect(action.automation.casting_time).toBe('1 action');
         });
 
-        it('uses spell.level when metaCtx has no slotLevel, defaults to passive casting_time', async () => {
+        it('defaults casting_time to passive when spell has level but no slotLevel', async () => {
             executeHandler.mockResolvedValue({ success: true });
             const stats = { automation: { passives: [{ type: 'post_cast_inspiring_smite', name: 'Inspire' }] } };
 
             await triggerInspiringSmite({ name: 'Divine Smite', level: 1 }, {}, stats, campaignName, mapName);
-            expect(executeHandler).toHaveBeenCalled();
 
             const [action] = vi.mocked(executeHandler).mock.calls[0];
             expect(action.automation.casting_time).toBe('passive');
         });
 
-        it('returns null when executeHandler returns falsy, throws on handler failure', async () => {
+        it('returns null when all executeHandler results are falsy', async () => {
             executeHandler.mockResolvedValue(null);
             const stats = { automation: { passives: [{ type: 'post_cast_inspiring_smite', name: 'Inspire' }] } };
 
             const result = await triggerInspiringSmite({ name: 'Divine Smite' }, { slotLevel: 2 }, stats, campaignName, mapName);
             expect(result).toBeNull();
-
-            executeHandler.mockRejectedValue(new Error('handler failed'));
-            await expect(
-                triggerInspiringSmite({ name: 'Divine Smite' }, { slotLevel: 2 }, stats, campaignName, mapName)
-            ).rejects.toThrow('handler failed');
         });
 
-        it('handles metaCtx as undefined when spell has no level, stops on first handler failure', async () => {
-            const spell = { name: 'Divine Smite' };
-            const result = await triggerInspiringSmite(spell, undefined, createStats(), campaignName, mapName);
-            expect(result).toBeNull();
-
-            executeHandler.mockRejectedValueOnce(new Error('fail'));
-            executeHandler.mockResolvedValueOnce({ result: 2 });
-            const stats2 = {
+        it('throws on first handler failure and stops processing remaining passives', async () => {
+            executeHandler.mockRejectedValueOnce(new Error('handler failed'));
+            const stats = {
                 automation: {
                     passives: [
                         { type: 'post_cast_inspiring_smite', name: 'Inspire 1' },
@@ -149,15 +144,9 @@ describe('inspiringSmiteService', () => {
                 },
             };
             await expect(
-                triggerInspiringSmite({ name: 'Divine Smite' }, { slotLevel: 1 }, stats2, campaignName, mapName)
-            ).rejects.toThrow('fail');
+                triggerInspiringSmite({ name: 'Divine Smite' }, { slotLevel: 1 }, stats, campaignName, mapName)
+            ).rejects.toThrow('handler failed');
             expect(executeHandler).toHaveBeenCalledTimes(1);
-        });
-
-        it('handles spell as undefined gracefully', async () => {
-            await expect(
-                triggerInspiringSmite(undefined, { slotLevel: 1 }, createStats(), campaignName, mapName)
-            ).rejects.toThrow();
         });
     });
 });

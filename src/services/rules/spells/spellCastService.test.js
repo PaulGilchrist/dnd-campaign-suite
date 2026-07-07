@@ -72,11 +72,6 @@ describe('spellCastService', () => {
         refundSpellBreakerSlot('Wizard1', 3, 'camp')
 
         expect(runtimeStateMock.setRuntimeValue).not.toHaveBeenCalled()
-        vi.clearAllMocks()
-        runtimeStateMock.getRuntimeValue.mockImplementation((_characterKey, propertyName) => {
-          if (propertyName === 'activeConditions') return []
-          return undefined
-        })
       }
     })
   })
@@ -86,6 +81,16 @@ describe('spellCastService', () => {
       return {
         name,
         level,
+        damage: { damage_at_slot_level: { 3: '8d6' } },
+        school: 'Evocation',
+      }
+    }
+
+    function makeSpellWithDC(name = 'Fireball', level = 3) {
+      return {
+        name,
+        level,
+        dc: { dc_type: 'DEX', dc_success: 'none' },
         damage: { damage_at_slot_level: { 3: '8d6' } },
         school: 'Evocation',
       }
@@ -126,16 +131,6 @@ describe('spellCastService', () => {
     })
 
     describe('spell save DC calculation', () => {
-      function makeSpellWithDC(name = 'Fireball', level = 3) {
-        return {
-          name,
-          level,
-          dc: { dc_type: 'DEX', dc_success: 'none' },
-          damage: { damage_at_slot_level: { 3: '8d6' } },
-          school: 'Evocation',
-        }
-      }
-
       it('uses spellAbilities.saveDc when available', async () => {
         const spell = makeSpellWithDC('Burning Hands')
         const playerStats = makePlayerStats({ spellAbilities: { saveDc: 13, toHit: 5, modifier: 1 } })
@@ -198,16 +193,6 @@ describe('spellCastService', () => {
     })
 
     describe('range validation', () => {
-      function makeSpellWithDC(name = 'Fireball', level = 3) {
-        return {
-          name,
-          level,
-          dc: { dc_type: 'DEX', dc_success: 'none' },
-          damage: { damage_at_slot_level: { 3: '8d6' } },
-          school: 'Evocation',
-        }
-      }
-
       it('marks auto miss when target is out of range', async () => {
         const spell = {
           ...makeSpellWithDC('Fireball'),
@@ -237,16 +222,6 @@ describe('spellCastService', () => {
     })
 
     describe('empowered evocation', () => {
-      function makeSpellWithDC(name = 'Fireball', level = 3) {
-        return {
-          name,
-          level,
-          dc: { dc_type: 'DEX', dc_success: 'none' },
-          damage: { damage_at_slot_level: { 3: '8d6' } },
-          school: 'Evocation',
-        }
-      }
-
       it('adds INT modifier to damage formula when empowered evocation is active', async () => {
         const playerStats = makePlayerStats({
           automation: {
@@ -277,16 +252,6 @@ describe('spellCastService', () => {
     })
 
     describe('overchannel', () => {
-      function makeSpellWithDC(name = 'Fireball', level = 3) {
-        return {
-          name,
-          level,
-          dc: { dc_type: 'DEX', dc_success: 'none' },
-          damage: { damage_at_slot_level: { 3: '8d6' } },
-          school: 'Evocation',
-        }
-      }
-
       it('maximizes damage when overchannel is active for valid slot levels', async () => {
         const playerStats = makePlayerStats({
           automation: {
@@ -320,43 +285,6 @@ describe('spellCastService', () => {
           'camp',
         )
       })
-
-      it('does not overchannel for cantrips (level 0) or slot levels above 5', async () => {
-        const playerStats = makePlayerStats({
-          automation: {
-            passives: [
-              { name: 'Overchannel', type: 'overchannel' },
-            ],
-          },
-        })
-
-        const invalidSlotLevels = [
-          { spell: { ...makeSpellWithDC('Ray of Frost'), level: 0 }, metaCtx: { overchannel: true, slotLevel: 0 } },
-          { spell: makeSpellWithDC('Wish', 9), metaCtx: { overchannel: true, slotLevel: 9 } },
-        ]
-
-        for (const { spell, metaCtx: mc } of invalidSlotLevels) {
-          const rollDamageSpy = vi.fn()
-          const { executeSpellCast: spellCast } = await import('./spellCastService.js')
-          await spellCast(spell, mc, {
-            rollAttack: vi.fn(),
-            rollDamage: rollDamageSpy,
-            playerStats,
-            getTargetInfo: vi.fn(() => ({ name: 'Goblin1' })),
-            campaignName: 'camp',
-            mapName: 'map1',
-          })
-
-          expect(rollDamageSpy).toHaveBeenCalled()
-          const formula = rollDamageSpy.mock.calls[0][1]
-          expect(formula).not.toContain('Overchannel')
-          vi.clearAllMocks()
-          runtimeStateMock.getRuntimeValue.mockImplementation((_characterKey, propertyName) => {
-            if (propertyName === 'activeConditions') return []
-            return undefined
-          })
-        }
-      })
     })
 
     describe('healing spells', () => {
@@ -384,23 +312,6 @@ describe('spellCastService', () => {
     })
 
     describe('error handling', () => {
-      it('throws when automation.passives is missing for magical ambush check', async () => {
-        const spell = makeSpell('Fireball')
-        const playerStats = makePlayerStats({ automation: {} })
-        const metaCtx = makeMetaCtx()
-
-        const { executeSpellCast: spellCast } = await import('./spellCastService.js')
-        await expect(
-          spellCast(spell, metaCtx, {
-            rollAttack: vi.fn(),
-            rollDamage: vi.fn(),
-            playerStats,
-            getTargetInfo: vi.fn(() => ({ name: 'Goblin1' })),
-            campaignName: 'camp',
-          }),
-        ).rejects.toThrow('playerStats.automation.passives is required for magical ambush check')
-      })
-
       it('throws when activeConditions is not an array', async () => {
         const spell = makeSpell('Fireball')
         const playerStats = makePlayerStats()

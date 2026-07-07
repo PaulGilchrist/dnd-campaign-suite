@@ -47,24 +47,19 @@ describe('primalCompanionSpellShareService', () => {
             expect(hasShareSpells(playerStats)).toBe(false);
         });
 
-        it('throws when automation.passives is null', () => {
-            const playerStats = { automation: { passives: null } };
-            expect(() => hasShareSpells(playerStats)).toThrow('Expected array, got null');
-        });
+        it('throws when automation.passives is null or undefined', () => {
+            const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-        it('throws when automation.passives is undefined', () => {
-            const playerStats = { automation: { passives: undefined } };
-            expect(() => hasShareSpells(playerStats)).toThrow('Expected array, got undefined');
-        });
+            const nullStats = { automation: { passives: null } };
+            expect(() => hasShareSpells(nullStats)).toThrow('Expected array, got null');
 
-        it('throws when automation is null', () => {
-            const playerStats = { automation: null };
-            expect(() => hasShareSpells(playerStats)).toThrow('Expected array, got undefined');
-        });
+            const undefStats = { automation: { passives: undefined } };
+            expect(() => hasShareSpells(undefStats)).toThrow('Expected array, got undefined');
 
-        it('throws when automation is undefined', () => {
-            const playerStats = {};
-            expect(() => hasShareSpells(playerStats)).toThrow('Expected array, got undefined');
+            const noAutomationStats = {};
+            expect(() => hasShareSpells(noAutomationStats)).toThrow('Expected array, got undefined');
+
+            consoleSpy.mockRestore();
         });
     });
 
@@ -141,10 +136,9 @@ describe('primalCompanionSpellShareService', () => {
             expect(executeHandler).not.toHaveBeenCalled();
         });
 
-        it('returns null when spell is not self-targeted', async () => {
-            const spell = createSpell({ range: '120 feet' });
+        it('returns null for non-self-targeted spells', async () => {
             const result = await triggerPrimalCompanionSpellShare(
-                spell,
+                createSpell({ range: '120 feet' }),
                 createMetaCtx(),
                 createPlayerStats(),
                 campaignName
@@ -153,28 +147,22 @@ describe('primalCompanionSpellShareService', () => {
             expect(executeHandler).not.toHaveBeenCalled();
         });
 
-        it('returns null when spell range is undefined', async () => {
-            const spell = createSpell({ range: undefined });
-            const result = await triggerPrimalCompanionSpellShare(
-                spell,
+        it('returns null for self-targeted spells with undefined or empty range', async () => {
+            const result1 = await triggerPrimalCompanionSpellShare(
+                createSpell({ range: undefined }),
                 createMetaCtx(),
                 createPlayerStats(),
                 campaignName
             );
-            expect(result).toBeNull();
-            expect(executeHandler).not.toHaveBeenCalled();
-        });
+            expect(result1).toBeNull();
 
-        it('returns null when spell range is empty string', async () => {
-            const spell = createSpell({ range: '' });
-            const result = await triggerPrimalCompanionSpellShare(
-                spell,
+            const result2 = await triggerPrimalCompanionSpellShare(
+                createSpell({ range: '' }),
                 createMetaCtx(),
                 createPlayerStats(),
                 campaignName
             );
-            expect(result).toBeNull();
-            expect(executeHandler).not.toHaveBeenCalled();
+            expect(result2).toBeNull();
         });
 
         it('returns null for cantrips (level 0)', async () => {
@@ -189,40 +177,28 @@ describe('primalCompanionSpellShareService', () => {
             expect(executeHandler).not.toHaveBeenCalled();
         });
 
-        it('returns null for area effect casting with multiTarget', async () => {
+        it('returns null for area effect casting with multiTarget or aoeTarget', async () => {
             getRuntimeValue.mockImplementation((player, key, _campaign) => {
                 if (key === 'primalCompanionType') return 'Beast of the Forest';
                 if (key === 'primalCompanionAlive') return true;
                 return undefined;
             });
 
-            const metaCtx = createMetaCtx({ multiTarget: 'Goblin' });
-            const result = await triggerPrimalCompanionSpellShare(
+            const result1 = await triggerPrimalCompanionSpellShare(
                 createSpell(),
-                metaCtx,
+                createMetaCtx({ multiTarget: 'Goblin' }),
                 createPlayerStats(),
                 campaignName
             );
-            expect(result).toBeNull();
-            expect(executeHandler).not.toHaveBeenCalled();
-        });
+            expect(result1).toBeNull();
 
-        it('returns null for area effect casting with aoeTarget', async () => {
-            getRuntimeValue.mockImplementation((player, key, _campaign) => {
-                if (key === 'primalCompanionType') return 'Beast of the Forest';
-                if (key === 'primalCompanionAlive') return true;
-                return undefined;
-            });
-
-            const metaCtx = createMetaCtx({ aoeTarget: 'area' });
-            const result = await triggerPrimalCompanionSpellShare(
+            const result2 = await triggerPrimalCompanionSpellShare(
                 createSpell(),
-                metaCtx,
+                createMetaCtx({ aoeTarget: 'area' }),
                 createPlayerStats(),
                 campaignName
             );
-            expect(result).toBeNull();
-            expect(executeHandler).not.toHaveBeenCalled();
+            expect(result2).toBeNull();
         });
 
         it('returns null when no companion is summoned', async () => {
@@ -274,7 +250,7 @@ describe('primalCompanionSpellShareService', () => {
             expect(result).toEqual({ type: 'modal', modalName: 'primalCompanionSpellShare' });
         });
 
-        it('triggers for self (5-foot radius) spell', async () => {
+        it('triggers for self (30-foot cone) and self (60-foot cone) spells', async () => {
             getRuntimeValue.mockImplementation((player, key, _campaign) => {
                 if (key === 'primalCompanionType') return 'Beast of the Sea';
                 if (key === 'primalCompanionAlive') return true;
@@ -286,66 +262,25 @@ describe('primalCompanionSpellShareService', () => {
                 modalName: 'primalCompanionSpellShare',
             });
 
-            const spell = createSpell({ name: 'Fire Bolt', level: 0, range: 'Self (5-foot radius)' });
-            const result = await triggerPrimalCompanionSpellShare(
-                spell,
+            const result1 = await triggerPrimalCompanionSpellShare(
+                createSpell({ name: 'Acid Splash', level: 1, range: 'Self (30-foot cone)' }),
                 createMetaCtx(),
                 createPlayerStats(),
                 campaignName
             );
-
-            expect(result).toBeNull();
-        });
-
-        it('triggers for self (30-foot cone) spell', async () => {
-            getRuntimeValue.mockImplementation((player, key, _campaign) => {
-                if (key === 'primalCompanionType') return 'Beast of the Sea';
-                if (key === 'primalCompanionAlive') return true;
-                return undefined;
-            });
-
-            executeHandler.mockResolvedValue({
-                type: 'modal',
-                modalName: 'primalCompanionSpellShare',
-            });
-
-            const spell = createSpell({ name: 'Acid Splash', level: 1, range: 'Self (30-foot cone)' });
-            const result = await triggerPrimalCompanionSpellShare(
-                spell,
-                createMetaCtx(),
-                createPlayerStats(),
-                campaignName
-            );
-
             expect(executeHandler).toHaveBeenCalled();
-            expect(result).toEqual({
-                type: 'modal',
-                modalName: 'primalCompanionSpellShare',
-            });
-        });
-
-        it('triggers for self (60-foot cone) spell', async () => {
-            getRuntimeValue.mockImplementation((player, key, _campaign) => {
-                if (key === 'primalCompanionType') return 'Beast of the Sea';
-                if (key === 'primalCompanionAlive') return true;
-                return undefined;
-            });
-
-            executeHandler.mockResolvedValue({
+            expect(result1).toEqual({
                 type: 'modal',
                 modalName: 'primalCompanionSpellShare',
             });
 
-            const spell = createSpell({ name: 'Frostbite', level: 1, range: 'Self (60-foot cone)' });
-            const result = await triggerPrimalCompanionSpellShare(
-                spell,
+            const result2 = await triggerPrimalCompanionSpellShare(
+                createSpell({ name: 'Frostbite', level: 1, range: 'Self (60-foot cone)' }),
                 createMetaCtx(),
                 createPlayerStats(),
                 campaignName
             );
-
-            expect(executeHandler).toHaveBeenCalled();
-            expect(result).toEqual({
+            expect(result2).toEqual({
                 type: 'modal',
                 modalName: 'primalCompanionSpellShare',
             });
@@ -423,7 +358,7 @@ describe('primalCompanionSpellShareService', () => {
             });
         });
 
-        it('uses shareFeature.range fallback when range is missing', async () => {
+        it('uses shareFeature fallbacks when range and description are missing', async () => {
             getRuntimeValue.mockImplementation((player, key, _campaign) => {
                 if (key === 'primalCompanionType') return 'Beast of the Sea';
                 if (key === 'primalCompanionAlive') return true;
@@ -448,37 +383,6 @@ describe('primalCompanionSpellShareService', () => {
             expect(executeHandler).toHaveBeenCalledWith(
                 expect.objectContaining({
                     automation: expect.objectContaining({ range: '30_ft' }),
-                }),
-                expect.any(Object),
-                campaignName,
-                undefined
-            );
-        });
-
-        it('uses shareFeature.description fallback when description is missing', async () => {
-            getRuntimeValue.mockImplementation((player, key, _campaign) => {
-                if (key === 'primalCompanionType') return 'Beast of the Sea';
-                if (key === 'primalCompanionAlive') return true;
-                return undefined;
-            });
-
-            executeHandler.mockResolvedValue({ type: 'modal', modalName: 'primalCompanionSpellShare' });
-
-            const playerStats = createPlayerStats({
-                automation: {
-                    passives: [{ type: 'primal_companion_spell_share', name: 'Share Spells' }],
-                },
-            });
-
-            await triggerPrimalCompanionSpellShare(
-                createSpell(),
-                createMetaCtx(),
-                playerStats,
-                campaignName
-            );
-
-            expect(executeHandler).toHaveBeenCalledWith(
-                expect.objectContaining({
                     description: 'When you cast a spell targeting yourself, you can also affect your Primal Companion beast if within 30 feet.',
                 }),
                 expect.any(Object),
@@ -509,30 +413,6 @@ describe('primalCompanionSpellShareService', () => {
                 expect.any(Object),
                 campaignName,
                 'dungeon-level-3'
-            );
-        });
-
-        it('passes undefined mapName when not provided', async () => {
-            getRuntimeValue.mockImplementation((player, key, _campaign) => {
-                if (key === 'primalCompanionType') return 'Beast of the Sea';
-                if (key === 'primalCompanionAlive') return true;
-                return undefined;
-            });
-
-            executeHandler.mockResolvedValue({ type: 'modal', modalName: 'primalCompanionSpellShare' });
-
-            await triggerPrimalCompanionSpellShare(
-                createSpell(),
-                createMetaCtx(),
-                createPlayerStats(),
-                campaignName
-            );
-
-            expect(executeHandler).toHaveBeenCalledWith(
-                expect.any(Object),
-                expect.any(Object),
-                campaignName,
-                undefined
             );
         });
 
@@ -584,7 +464,7 @@ describe('primalCompanionSpellShareService', () => {
             expect(result).toBeNull();
         });
 
-        it('returns null when metaCtx is undefined', async () => {
+        it('returns null when metaCtx is null or undefined', async () => {
             getRuntimeValue.mockImplementation((player, key, _campaign) => {
                 if (key === 'primalCompanionType') return 'Beast of the Forest';
                 if (key === 'primalCompanionAlive') return true;
@@ -593,38 +473,25 @@ describe('primalCompanionSpellShareService', () => {
 
             executeHandler.mockResolvedValue({ type: 'modal', modalName: 'primalCompanionSpellShare' });
 
-            const result = await triggerPrimalCompanionSpellShare(
+            const result1 = await triggerPrimalCompanionSpellShare(
                 createSpell(),
                 undefined,
                 createPlayerStats(),
                 campaignName
             );
-
             expect(executeHandler).toHaveBeenCalled();
-            expect(result).toEqual({ type: 'modal', modalName: 'primalCompanionSpellShare' });
-        });
+            expect(result1).toEqual({ type: 'modal', modalName: 'primalCompanionSpellShare' });
 
-        it('returns null when metaCtx is null', async () => {
-            getRuntimeValue.mockImplementation((player, key, _campaign) => {
-                if (key === 'primalCompanionType') return 'Beast of the Forest';
-                if (key === 'primalCompanionAlive') return true;
-                return undefined;
-            });
-
-            executeHandler.mockResolvedValue({ type: 'modal', modalName: 'primalCompanionSpellShare' });
-
-            const result = await triggerPrimalCompanionSpellShare(
+            const result2 = await triggerPrimalCompanionSpellShare(
                 createSpell(),
                 null,
                 createPlayerStats(),
                 campaignName
             );
-
-            expect(executeHandler).toHaveBeenCalled();
-            expect(result).toEqual({ type: 'modal', modalName: 'primalCompanionSpellShare' });
+            expect(result2).toEqual({ type: 'modal', modalName: 'primalCompanionSpellShare' });
         });
 
-        it('throws when spell is undefined', async () => {
+        it('throws when spell is null or undefined', async () => {
             const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
             await expect(
@@ -636,12 +503,6 @@ describe('primalCompanionSpellShareService', () => {
                 )
             ).rejects.toThrow("Cannot read properties of undefined (reading 'range')");
 
-            expect(executeHandler).not.toHaveBeenCalled();
-
-            consoleSpy.mockRestore();
-        });
-
-        it('throws when spell is null', async () => {
             await expect(
                 triggerPrimalCompanionSpellShare(
                     null,
@@ -652,6 +513,8 @@ describe('primalCompanionSpellShareService', () => {
             ).rejects.toThrow("Cannot read properties of null (reading 'range')");
 
             expect(executeHandler).not.toHaveBeenCalled();
+
+            consoleSpy.mockRestore();
         });
 
         it('returns null when spell has no range property', async () => {

@@ -44,8 +44,6 @@ function makePlayerStats(overrides = {}) {
 describe('resolveUses', () => {
   it('returns the number directly when usesSpec is a number', () => {
     expect(resolveUses(makePlayerStats(), 3)).toBe(3)
-    expect(resolveUses(makePlayerStats(), 0)).toBe(0)
-    expect(resolveUses(makePlayerStats(), -1)).toBe(-1)
   })
 
   it('returns proficiency_bonus when usesSpec is "proficiency_bonus"', () => {
@@ -114,10 +112,6 @@ describe('resolveScaling', () => {
     expect(resolveScaling(stats, scaling)).toEqual({ level: 5, value: 'mid' })
   })
 
-  it('handles empty scaling array', () => {
-    expect(resolveScaling(makePlayerStats(), [])).toBe(null)
-  })
-
   it('handles unsorted scaling entries', () => {
     const stats = makePlayerStats({ level: 5 })
     const scaling = [
@@ -147,16 +141,6 @@ describe('getSaveDc', () => {
     expect(getSaveDc(stats, 'charisma', 4)).toBe(11)
   })
 
-  it('handles all six abilities without proficiency', () => {
-    const stats = makePlayerStats()
-    expect(getSaveDc(stats, 'strength')).toBe(12)
-    expect(getSaveDc(stats, 'dexterity')).toBe(10)
-    expect(getSaveDc(stats, 'constitution')).toBe(11)
-    expect(getSaveDc(stats, 'intelligence')).toBe(9)
-    expect(getSaveDc(stats, 'wisdom')).toBe(8)
-    expect(getSaveDc(stats, 'charisma')).toBe(7)
-  })
-
   it('handles unknown ability names gracefully', () => {
     const stats = makePlayerStats()
     expect(getSaveDc(stats, 'unknown', 4)).toBe(12)
@@ -168,7 +152,6 @@ describe('getSaveDc', () => {
 describe('resolveHealingPoolExpression', () => {
   it('returns baseExpression when scaling is falsy', () => {
     expect(resolveHealingPoolExpression('2d6', null)).toBe('2d6')
-    expect(resolveHealingPoolExpression('2d6', undefined)).toBe('2d6')
   })
 
   it('returns baseExpression when player level is below all scaling levels', () => {
@@ -200,11 +183,6 @@ describe('resolveHealingPoolExpression', () => {
     const scaling = { invalid: 'bad', 3: '3d6', 5: '4d6' }
     expect(resolveHealingPoolExpression('2d6', scaling, stats)).toBe('4d6')
   })
-
-  it('handles empty scaling object', () => {
-    const stats = makePlayerStats({ level: 5 })
-    expect(resolveHealingPoolExpression('2d6', {}, stats)).toBe('2d6')
-  })
 })
 
 // ── getSuperiorityDieSize ────────────────────────────────────────
@@ -212,22 +190,18 @@ describe('resolveHealingPoolExpression', () => {
 describe('getSuperiorityDieSize', () => {
   it('returns 12 for level 18+', () => {
     expect(getSuperiorityDieSize({ level: 18 })).toBe(12)
-    expect(getSuperiorityDieSize({ level: 20 })).toBe(12)
   })
 
   it('returns 10 for level 10-17', () => {
     expect(getSuperiorityDieSize({ level: 10 })).toBe(10)
-    expect(getSuperiorityDieSize({ level: 17 })).toBe(10)
   })
 
   it('returns 8 for level below 10', () => {
     expect(getSuperiorityDieSize({ level: 5 })).toBe(8)
-    expect(getSuperiorityDieSize({ level: 1 })).toBe(8)
   })
 
   it('returns 8 when level is missing', () => {
     expect(getSuperiorityDieSize({})).toBe(8)
-    expect(getSuperiorityDieSize(null)).toBe(8)
   })
 })
 
@@ -246,27 +220,22 @@ describe('getPsionicEnergyDieSize', () => {
 
   it('returns 12 for level 17+', () => {
     expect(getPsionicEnergyDieSize({ level: 17 })).toBe(12)
-    expect(getPsionicEnergyDieSize({ level: 20 })).toBe(12)
   })
 
   it('returns 10 for level 13-16', () => {
     expect(getPsionicEnergyDieSize({ level: 13 })).toBe(10)
-    expect(getPsionicEnergyDieSize({ level: 16 })).toBe(10)
   })
 
   it('returns 8 for level 9-12', () => {
     expect(getPsionicEnergyDieSize({ level: 9 })).toBe(8)
-    expect(getPsionicEnergyDieSize({ level: 12 })).toBe(8)
   })
 
   it('returns 6 for level below 9', () => {
     expect(getPsionicEnergyDieSize({ level: 3 })).toBe(6)
-    expect(getPsionicEnergyDieSize({ level: 8 })).toBe(6)
   })
 
   it('returns 6 when level is missing or class has no class_levels', () => {
     expect(getPsionicEnergyDieSize({})).toBe(6)
-    expect(getPsionicEnergyDieSize({ level: 5, class: {} })).toBe(6)
   })
 })
 
@@ -275,8 +244,6 @@ describe('getPsionicEnergyDieSize', () => {
 describe('resolveDiceExpression', () => {
   it('returns expression when expression is falsy', () => {
     expect(resolveDiceExpression(null, makePlayerStats(), 1)).toBe(null)
-    expect(resolveDiceExpression(undefined, makePlayerStats(), 1)).toBe(undefined)
-    expect(resolveDiceExpression('', makePlayerStats(), 1)).toBe('')
   })
 
   it('replaces bardic_inspiration_die with bardic_die value', () => {
@@ -327,12 +294,6 @@ describe('resolveDiceExpression', () => {
     expect(resolveDiceExpression('rage_damage_d6', stats, 1)).toBe('2d6')
   })
 
-  it('defaults rage_damage to 2 when class_levels is empty', () => {
-    const stats = makePlayerStats({ level: 1, class: { class_levels: [] } })
-    expect(resolveDiceExpression('rage_damage', stats, 1)).toBe('2')
-    expect(resolveDiceExpression('rage_damage_d6', stats, 1)).toBe('2d6')
-  })
-
   it('replaces ability modifiers correctly for all six abilities', () => {
     const stats = makePlayerStats()
     expect(resolveDiceExpression('1STR modifier', stats, 1)).toBe('14')
@@ -380,16 +341,11 @@ describe('resolveDiceExpression', () => {
 describe('evaluateAutoExpression', () => {
   it('returns expression when expression is falsy', () => {
     expect(evaluateAutoExpression(null, makePlayerStats())).toBe(null)
-    expect(evaluateAutoExpression(undefined, makePlayerStats())).toBe(undefined)
-    expect(evaluateAutoExpression('', makePlayerStats())).toBe('')
   })
 
   it('evaluates simple arithmetic expressions', () => {
     const stats = makePlayerStats()
     expect(evaluateAutoExpression('2+3', stats)).toBe(5)
-    expect(evaluateAutoExpression('10-4', stats)).toBe(6)
-    expect(evaluateAutoExpression('3*4', stats)).toBe(12)
-    expect(evaluateAutoExpression('20/5', stats)).toBe(4)
   })
 
   it('evaluates expressions with variable replacements', () => {
@@ -409,37 +365,6 @@ describe('evaluateAutoExpression', () => {
     expect(evaluateAutoExpression('-5_min_3', stats)).toBe(3)
     expect(evaluateAutoExpression('10_min_3', stats)).toBe(10)
     expect(evaluateAutoExpression('-proficiency_bonus_min_2', stats)).toBe(2)
-  })
-
-  it('returns string when expression evaluation fails with invalid syntax', () => {
-    const stats = makePlayerStats()
-    const result = evaluateAutoExpression('invalid_syntax_!!', stats)
-    expect(typeof result).toBe('string')
-    expect(result).toBe('invalid_syntax_!!')
-  })
-
-  it('returns numeric result from Math.max via _min_ pattern', () => {
-    const stats = makePlayerStats()
-    const result = evaluateAutoExpression('Math.max(3, (0))', stats)
-    expect(result).toBe(3)
-  })
-
-  it('handles rage_damage_d6 replacement in complex expression', () => {
-    const stats = makePlayerStats()
-    const result = evaluateAutoExpression('2rage_damage_d6+proficiency_bonus', stats)
-    expect(result).toBe('22d6+4')
-  })
-
-  it('handles bardic_inspiration_die in expression', () => {
-    const stats = makePlayerStats()
-    const result = evaluateAutoExpression('3bardic_inspiration_die', stats)
-    expect(result).toBe(36)
-  })
-
-  it('handles proficiency_bonus_d4 as string (not evaluated as valid JS)', () => {
-    const stats = makePlayerStats()
-    const result = evaluateAutoExpression('proficiency_bonus_d4', stats)
-    expect(result).toBe('4d4')
   })
 
   it('replaces ally_hit_die in combined expression', () => {

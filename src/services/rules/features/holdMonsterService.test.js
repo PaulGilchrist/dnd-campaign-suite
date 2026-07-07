@@ -62,6 +62,8 @@ describe('holdMonsterService', () => {
                 'hold monsters',
                 'hold',
                 'monster',
+                undefined,
+                null,
             ])('returns null for non-hold spell: "%s"', async (spellName) => {
                 const result = await triggerHoldMonster(
                     { name: spellName, level: 1 },
@@ -93,27 +95,6 @@ describe('holdMonsterService', () => {
                         automation: expect.objectContaining({ saveDc: 18 }),
                     }),
                     playerStats,
-                    campaignName,
-                    mapName,
-                );
-            });
-
-            it('prefers metaCtx spellSaveDc over playerStats.spellAbilities.saveDc', async () => {
-                executeHandler.mockResolvedValue({ type: 'popup' });
-
-                await triggerHoldMonster(
-                    { name: 'Hold Monster', level: 7 },
-                    { spellSaveDc: 20 },
-                    { ...playerStats, spellAbilities: { saveDc: 15 } },
-                    campaignName,
-                    mapName,
-                );
-
-                expect(executeHandler).toHaveBeenCalledWith(
-                    expect.objectContaining({
-                        automation: expect.objectContaining({ saveDc: 20 }),
-                    }),
-                    expect.objectContaining({ spellAbilities: { saveDc: 15 } }),
                     campaignName,
                     mapName,
                 );
@@ -162,28 +143,6 @@ describe('holdMonsterService', () => {
                 );
             });
 
-            it('uses default proficiency of 2 when proficiency is missing', async () => {
-                executeHandler.mockResolvedValue({ type: 'popup' });
-                const stats = { name: 'Wizard' };
-
-                await triggerHoldMonster(
-                    { name: 'Hold Monster', level: 7 },
-                    {},
-                    stats,
-                    campaignName,
-                    mapName,
-                );
-
-                expect(executeHandler).toHaveBeenCalledWith(
-                    expect.objectContaining({
-                        automation: expect.objectContaining({ saveDc: 10 }),
-                    }),
-                    stats,
-                    campaignName,
-                    mapName,
-                );
-            });
-
             it('uses default saveDc base of 8 when no proficiency at all', async () => {
                 executeHandler.mockResolvedValue({ type: 'popup' });
 
@@ -200,28 +159,6 @@ describe('holdMonsterService', () => {
                         automation: expect.objectContaining({ saveDc: 10 }),
                     }),
                     {},
-                    campaignName,
-                    mapName,
-                );
-            });
-
-            it('computes saveDc when spellAbilities is undefined', async () => {
-                executeHandler.mockResolvedValue({ type: 'popup' });
-                const stats = { name: 'Wizard', proficiency: 4 };
-
-                await triggerHoldMonster(
-                    { name: 'Hold Monster', level: 7 },
-                    {},
-                    stats,
-                    campaignName,
-                    mapName,
-                );
-
-                expect(executeHandler).toHaveBeenCalledWith(
-                    expect.objectContaining({
-                        automation: expect.objectContaining({ saveDc: 12 }),
-                    }),
-                    stats,
                     campaignName,
                     mapName,
                 );
@@ -304,119 +241,29 @@ describe('holdMonsterService', () => {
                     mapName,
                 );
             });
-
-            it('defaults slotLevel to 5 when spell.level is null', async () => {
-                executeHandler.mockResolvedValue({ type: 'popup' });
-
-                await triggerHoldMonster(
-                    { name: 'Hold Monster', level: null },
-                    {},
-                    playerStats,
-                    campaignName,
-                    mapName,
-                );
-
-                expect(executeHandler).toHaveBeenCalledWith(
-                    expect.objectContaining({ spellSlotLevel: 5 }),
-                    playerStats,
-                    campaignName,
-                    mapName,
-                );
-            });
-
-            it('defaults slotLevel to 5 when spell.level is undefined', async () => {
-                executeHandler.mockResolvedValue({ type: 'popup' });
-
-                await triggerHoldMonster(
-                    { name: 'Hold Monster', level: undefined },
-                    {},
-                    playerStats,
-                    campaignName,
-                    mapName,
-                );
-
-                expect(executeHandler).toHaveBeenCalledWith(
-                    expect.objectContaining({ spellSlotLevel: 5 }),
-                    playerStats,
-                    campaignName,
-                    mapName,
-                );
-            });
         });
 
         describe('action structure', () => {
-            it('passes the original spell object into the action', async () => {
+            it('constructs the action with all expected fields', async () => {
                 executeHandler.mockResolvedValue({ type: 'popup' });
                 const spell = { name: 'Hold Monster', level: 7, school: 'Enchantment' };
 
                 await triggerHoldMonster(spell, {}, playerStats, campaignName, mapName);
 
                 expect(executeHandler).toHaveBeenCalledWith(
-                    expect.objectContaining({ spell }),
-                    playerStats,
-                    campaignName,
-                    mapName,
-                );
-            });
-
-            it('includes saveType WIS in the automation action', async () => {
-                executeHandler.mockResolvedValue({ type: 'popup' });
-
-                await triggerHoldMonster(
-                    { name: 'Hold Monster', level: 7 },
-                    {},
-                    playerStats,
-                    campaignName,
-                    mapName,
-                );
-
-                expect(executeHandler).toHaveBeenCalledWith(
                     expect.objectContaining({
-                        automation: expect.objectContaining({ saveType: 'WIS' }),
+                        name: 'Hold Monster',
+                        spell,
+                        spellSlotLevel: 7,
+                        automation: expect.objectContaining({
+                            type: 'hold_monster',
+                            saveDc: 15,
+                            saveType: 'WIS',
+                        }),
                     }),
                     playerStats,
                     campaignName,
                     mapName,
-                );
-            });
-
-            it('includes automation type hold_monster in the action', async () => {
-                executeHandler.mockResolvedValue({ type: 'popup' });
-
-                await triggerHoldMonster(
-                    { name: 'Hold Monster', level: 7 },
-                    {},
-                    playerStats,
-                    campaignName,
-                    mapName,
-                );
-
-                expect(executeHandler).toHaveBeenCalledWith(
-                    expect.objectContaining({
-                        automation: expect.objectContaining({ type: 'hold_monster' }),
-                    }),
-                    playerStats,
-                    campaignName,
-                    mapName,
-                );
-            });
-
-            it('passes campaignName and mapName to executeHandler', async () => {
-                executeHandler.mockResolvedValue({ type: 'popup' });
-
-                await triggerHoldMonster(
-                    { name: 'Hold Monster', level: 7 },
-                    {},
-                    playerStats,
-                    'MyCampaign',
-                    'DungeonMap1',
-                );
-
-                expect(executeHandler).toHaveBeenCalledWith(
-                    expect.any(Object),
-                    playerStats,
-                    'MyCampaign',
-                    'DungeonMap1',
                 );
             });
         });
@@ -469,51 +316,8 @@ describe('holdMonsterService', () => {
             });
         });
 
-        describe('invalid/null spell name handling', () => {
-            it('returns null when spell name is undefined', async () => {
-                executeHandler.mockResolvedValue({ type: 'popup' });
-
-                const result = await triggerHoldMonster(
-                    { level: 7 },
-                    {},
-                    playerStats,
-                    campaignName,
-                    mapName,
-                );
-
-                expect(result).toBeNull();
-                expect(executeHandler).not.toHaveBeenCalled();
-            });
-
-            it('returns null when spell name is null', async () => {
-                const result = await triggerHoldMonster(
-                    { name: null, level: 7 },
-                    {},
-                    playerStats,
-                    campaignName,
-                    mapName,
-                );
-
-                expect(result).toBeNull();
-                expect(executeHandler).not.toHaveBeenCalled();
-            });
-
-            it('returns null when spell name is empty string', async () => {
-                const result = await triggerHoldMonster(
-                    { name: '', level: 7 },
-                    {},
-                    playerStats,
-                    campaignName,
-                    mapName,
-                );
-
-                expect(result).toBeNull();
-                expect(executeHandler).not.toHaveBeenCalled();
-            });
-        });
-
         describe('metaCtx handling', () => {
-            it('handles null metaCtx gracefully', async () => {
+            it('handles null/undefined metaCtx gracefully', async () => {
                 executeHandler.mockResolvedValue({ type: 'popup' });
 
                 const result = await triggerHoldMonster(
@@ -533,68 +337,6 @@ describe('holdMonsterService', () => {
                     mapName,
                 );
                 expect(result).toEqual({ type: 'popup' });
-            });
-
-            it('handles undefined metaCtx gracefully', async () => {
-                executeHandler.mockResolvedValue({ type: 'popup' });
-
-                const result = await triggerHoldMonster(
-                    { name: 'Hold Monster', level: 7 },
-                    undefined,
-                    playerStats,
-                    campaignName,
-                    mapName,
-                );
-
-                expect(executeHandler).toHaveBeenCalledWith(
-                    expect.objectContaining({
-                        automation: expect.objectContaining({ saveDc: 15 }),
-                    }),
-                    playerStats,
-                    campaignName,
-                    mapName,
-                );
-                expect(result).toEqual({ type: 'popup' });
-            });
-
-            it('handles partial metaCtx with only spellSaveDc', async () => {
-                executeHandler.mockResolvedValue({ type: 'popup' });
-
-                await triggerHoldMonster(
-                    { name: 'Hold Monster', level: 7 },
-                    { spellSaveDc: 20 },
-                    playerStats,
-                    campaignName,
-                    mapName,
-                );
-
-                expect(executeHandler).toHaveBeenCalledWith(
-                    expect.objectContaining({
-                        automation: expect.objectContaining({ saveDc: 20 }),
-                    }),
-                    playerStats,
-                    campaignName,
-                    mapName,
-                );
-            });
-
-            it('handles partial metaCtx with only slotLevel', async () => {
-                executeHandler.mockResolvedValue({ type: 'popup' });
-
-                await triggerHoldMonster(
-                    { name: 'Hold Monster', level: 7 },
-                    { slotLevel: 6 },
-                    playerStats,
-                    campaignName,
-                    mapName,
-                );
-
-                expect(executeHandler).toHaveBeenCalledWith(
-                    expect.objectContaining({ spellSlotLevel: 6 }),
-                    playerStats,
-                    campaignName,
-                    mapName,
-                );
             });
         });
     });

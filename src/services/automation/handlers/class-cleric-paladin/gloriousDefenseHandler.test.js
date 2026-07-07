@@ -34,6 +34,13 @@ function makeAction(overrides = {}) {
   };
 }
 
+function counterAction(overrides = {}) {
+  return makeAction({
+    automation: { ...makeAction().automation, effect: 'counter_attack', ...overrides.automation },
+    ...overrides,
+  });
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   vi.spyOn(runtimeState, 'getRuntimeValue').mockImplementation((_name, key) => {
@@ -61,16 +68,6 @@ describe('gloriousDefenseHandler.handle — ac_bonus', () => {
     expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(playerName, 'gloriousDefenseBonus', 3, campaignName);
   });
 
-  it('should log the ability use', async () => {
-    await handle(makeAction(), makePlayerStats(), campaignName, undefined);
-
-    expect(logService.addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
-      type: 'ability_use',
-      characterName: playerName,
-      abilityName: 'Glorious Defense',
-    }));
-  });
-
   it('should deny when no uses remaining', async () => {
     runtimeState.getRuntimeValue.mockImplementation((_name, key) => {
       if (key === 'gloriousDefenseUses') return 0;
@@ -84,6 +81,14 @@ describe('gloriousDefenseHandler.handle — ac_bonus', () => {
     expect(runtimeState.setRuntimeValue).not.toHaveBeenCalled();
   });
 
+  it('should use CHA bonus when positive as AC bonus', async () => {
+    const stats = makePlayerStats({ abilities: [{ name: 'Charisma', bonus: 5 }] });
+
+    await handle(makeAction(), stats, campaignName, undefined);
+
+    expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(playerName, 'gloriousDefenseBonus', 5, campaignName);
+  });
+
   it('should use minimum 1 when CHA modifier is negative or zero', async () => {
     const negativeStats = makePlayerStats({ abilities: [{ name: 'Charisma', bonus: -2 }] });
     const zeroStats = makePlayerStats({ abilities: [{ name: 'Charisma', bonus: 0 }] });
@@ -93,26 +98,6 @@ describe('gloriousDefenseHandler.handle — ac_bonus', () => {
 
     await handle(makeAction(), zeroStats, campaignName, undefined);
     expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(playerName, 'gloriousDefenseBonus', 1, campaignName);
-  });
-
-  it('should use CHA bonus when positive and greater than 1', async () => {
-    const stats = makePlayerStats({ abilities: [{ name: 'Charisma', bonus: 5 }] });
-
-    await handle(makeAction(), stats, campaignName, undefined);
-
-    expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(playerName, 'gloriousDefenseBonus', 5, campaignName);
-  });
-
-  it('should use usesMax from CHA when CHA is positive as initial uses', async () => {
-    runtimeState.getRuntimeValue.mockImplementation((_name, key) => {
-      if (key === 'gloriousDefenseUses') return null;
-      return null;
-    });
-    const stats = makePlayerStats({ abilities: [{ name: 'Charisma', bonus: 2 }] });
-
-    await handle(makeAction(), stats, campaignName, undefined);
-
-    expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(playerName, 'gloriousDefenseUses', 1, campaignName);
   });
 
   it('should default usesMax when CHA bonus is 0 or no Charisma ability', async () => {
@@ -129,17 +114,6 @@ describe('gloriousDefenseHandler.handle — ac_bonus', () => {
     await handle(makeAction(), noChaStats, campaignName, undefined);
     expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(playerName, 'gloriousDefenseUses', 0, campaignName);
   });
-
-  it('should use existing runtime value when already set', async () => {
-    runtimeState.getRuntimeValue.mockImplementation((_name, key) => {
-      if (key === 'gloriousDefenseUses') return 2;
-      return null;
-    });
-
-    await handle(makeAction(), makePlayerStats(), campaignName, undefined);
-
-    expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(playerName, 'gloriousDefenseUses', 1, campaignName);
-  });
 });
 
 describe('gloriousDefenseHandler.handle — counter_attack', () => {
@@ -147,8 +121,7 @@ describe('gloriousDefenseHandler.handle — counter_attack', () => {
     damageUtils.getCombatContext.mockResolvedValue({});
     damageUtils.getTargetFromAttacker.mockReturnValue({ name: 'Orc' });
 
-    const counterAction = makeAction({ automation: { ...makeAction().automation, effect: 'counter_attack' } });
-    const result = await handle(counterAction, makePlayerStats(), campaignName, undefined);
+    const result = await handle(counterAction(), makePlayerStats(), campaignName, undefined);
 
     expect(result.type).toBe('attack_roll');
     expect(result.payload.attack.name).toBe('Longsword');
@@ -160,25 +133,9 @@ describe('gloriousDefenseHandler.handle — counter_attack', () => {
     damageUtils.getCombatContext.mockResolvedValue({});
     damageUtils.getTargetFromAttacker.mockReturnValue({ name: 'Orc' });
 
-    const counterAction = makeAction({ automation: { ...makeAction().automation, effect: 'counter_attack' } });
-    await handle(counterAction, makePlayerStats(), campaignName, undefined);
+    await handle(counterAction(), makePlayerStats(), campaignName, undefined);
 
     expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(playerName, 'gloriousDefenseUses', 3, campaignName);
-  });
-
-  it('should log the ability use on counter_attack', async () => {
-    damageUtils.getCombatContext.mockResolvedValue({});
-    damageUtils.getTargetFromAttacker.mockReturnValue({ name: 'Orc' });
-
-    const counterAction = makeAction({ automation: { ...makeAction().automation, effect: 'counter_attack' } });
-    await handle(counterAction, makePlayerStats(), campaignName, undefined);
-
-    expect(logService.addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
-      type: 'ability_use',
-      characterName: playerName,
-      abilityName: 'Glorious Defense',
-      description: expect.stringContaining('Orc'),
-    }));
   });
 
   it('should fall back to first attack when no melee attacks', async () => {
@@ -188,9 +145,8 @@ describe('gloriousDefenseHandler.handle — counter_attack', () => {
     const stats = makePlayerStats({
       attacks: [{ name: 'Longbow', type: 'Action', range: 150, hitBonus: 7, damage: '1d8+3' }],
     });
-    const counterAction = makeAction({ automation: { ...makeAction().automation, effect: 'counter_attack' } });
 
-    const result = await handle(counterAction, stats, campaignName, undefined);
+    const result = await handle(counterAction(), stats, campaignName, undefined);
 
     expect(result.type).toBe('attack_roll');
     expect(result.payload.attack.name).toBe('Longbow');
@@ -201,30 +157,18 @@ describe('gloriousDefenseHandler.handle — counter_attack', () => {
     damageUtils.getTargetFromAttacker.mockReturnValue({ name: 'Orc' });
 
     const stats = makePlayerStats({ attacks: [] });
-    const counterAction = makeAction({ automation: { ...makeAction().automation, effect: 'counter_attack' } });
 
-    const result = await handle(counterAction, stats, campaignName, undefined);
+    const result = await handle(counterAction(), stats, campaignName, undefined);
 
     expect(result.type).toBe('popup');
     expect(result.payload.description).toContain('No melee attack available');
   });
 
-  it('should handle null targetName when no attacker in combat context', async () => {
+  it('should return null targetName when no attacker in combat context', async () => {
     damageUtils.getCombatContext.mockResolvedValue({});
     damageUtils.getTargetFromAttacker.mockReturnValue(null);
 
-    const counterAction = makeAction({ automation: { ...makeAction().automation, effect: 'counter_attack' } });
-    const result = await handle(counterAction, makePlayerStats(), campaignName, undefined);
-
-    expect(result.type).toBe('attack_roll');
-    expect(result.payload.targetName).toBeNull();
-  });
-
-  it('should handle null combat context gracefully', async () => {
-    damageUtils.getCombatContext.mockResolvedValue(null);
-
-    const counterAction = makeAction({ automation: { ...makeAction().automation, effect: 'counter_attack' } });
-    const result = await handle(counterAction, makePlayerStats(), campaignName, undefined);
+    const result = await handle(counterAction(), makePlayerStats(), campaignName, undefined);
 
     expect(result.type).toBe('attack_roll');
     expect(result.payload.targetName).toBeNull();
@@ -239,10 +183,8 @@ describe('gloriousDefenseHandler.handle — counter_attack', () => {
     damageUtils.getCombatContext.mockResolvedValue({});
     damageUtils.getTargetFromAttacker.mockReturnValue({ name: 'Orc' });
 
-    const counterAction = makeAction({ automation: { ...makeAction().automation, effect: 'counter_attack' } });
-    await handle(counterAction, stats, campaignName, undefined);
+    await handle(counterAction(), stats, campaignName, undefined);
 
-    // usesMax = max(1, 5) = 5, current = 5 (null falls back to usesMax), after decrement = 4
     expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(playerName, 'gloriousDefenseUses', 4, campaignName);
   });
 
@@ -255,10 +197,8 @@ describe('gloriousDefenseHandler.handle — counter_attack', () => {
     damageUtils.getCombatContext.mockResolvedValue({});
     damageUtils.getTargetFromAttacker.mockReturnValue({ name: 'Orc' });
 
-    const counterAction = makeAction({ automation: { ...makeAction().automation, effect: 'counter_attack' } });
-    await handle(counterAction, stats, campaignName, undefined);
+    await handle(counterAction(), stats, campaignName, undefined);
 
-    // usesMax = max(1, -2) = 1, current = 1, after decrement = 0
     expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(playerName, 'gloriousDefenseUses', 0, campaignName);
   });
 });

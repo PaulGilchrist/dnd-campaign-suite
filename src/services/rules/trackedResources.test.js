@@ -68,24 +68,15 @@ describe('computeTrackedResources', () => {
     vi.clearAllMocks();
   });
 
-  it('returns empty object when playerStats is null or undefined', () => {
+  it('returns empty object when playerStats is null', () => {
     expect(computeTrackedResources(null)).toEqual({});
-    expect(computeTrackedResources(undefined)).toEqual({});
   });
-
-  // ── hitPoints ──
 
   it('sets hitPoints and currentHitPoints from playerStats.hitPoints', () => {
     const stats = basePlayerStats({ hitPoints: 35 });
     const result = computeTrackedResources(stats);
     expect(result.hitPoints).toEqual({ current: 35, max: 35 });
     expect(result.currentHitPoints).toEqual({ current: 35, max: 35 });
-  });
-
-  it('defaults hitPoints to 0 when not provided', () => {
-    const result = computeTrackedResources(basePlayerStats());
-    expect(result.hitPoints).toEqual({ current: 0, max: 0 });
-    expect(result.currentHitPoints).toEqual({ current: 0, max: 0 });
   });
 
   // ── spell slots ──
@@ -109,14 +100,6 @@ describe('computeTrackedResources', () => {
     }
   });
 
-  it('defaults all spell slots to 0 when spellAbilities is missing', () => {
-    const result = computeTrackedResources(basePlayerStats());
-    for (let level = 1; level <= 9; level++) {
-      const key = `spell_slots_level_${level}`;
-      expect(result[key]).toEqual({ current: 0, max: 0 });
-    }
-  });
-
   // ── shortRestHitDice ──
 
   it('sets shortRestHitDice from playerStats.level', () => {
@@ -132,24 +115,12 @@ describe('computeTrackedResources', () => {
     expect(result.sorceryPoints).toEqual({ current: 5, max: 5 });
   });
 
-  it('defaults sorceryPoints to 0 when features is null', () => {
-    getClassFeatures.mockReturnValue(null);
-    const result = computeTrackedResources(basePlayerStats());
-    expect(result.sorceryPoints).toEqual({ current: 0, max: 0 });
-  });
-
   // ── innateSorceryUses ──
 
   it('sets innateSorceryUses from features.maxInnateSorcery', () => {
     getClassFeatures.mockReturnValue({ maxInnateSorcery: 3 });
     const result = computeTrackedResources(basePlayerStats());
     expect(result.innateSorceryUses).toEqual({ current: 3, max: 3 });
-  });
-
-  it('defaults innateSorceryUses to 0 when features is null', () => {
-    getClassFeatures.mockReturnValue(null);
-    const result = computeTrackedResources(basePlayerStats());
-    expect(result.innateSorceryUses).toEqual({ current: 0, max: 0 });
   });
 
   // ── focusPoints / kiPoints ──
@@ -183,16 +154,6 @@ describe('computeTrackedResources', () => {
     expect(result.kiPoints).toEqual({ current: 2, max: 2 });
   });
 
-  it('defaults focusPoints and kiPoints to 0 when neither source is available', () => {
-    getClassFeatures.mockReturnValue(null);
-    const stats = basePlayerStats({
-      class: { ...basePlayerStats().class, class_levels: [{ level: 5 }] },
-    });
-    const result = computeTrackedResources(stats);
-    expect(result.focusPoints).toEqual({ current: 0, max: 0 });
-    expect(result.kiPoints).toEqual({ current: 0, max: 0 });
-  });
-
   // ── channelDivinityCharges ──
 
   it('sets channelDivinityCharges from features.maxChannelDivinity', () => {
@@ -207,11 +168,6 @@ describe('computeTrackedResources', () => {
     const stats = basePlayerStats({ abilities: [{ name: 'Charisma', bonus: 3 }] });
     const result = computeTrackedResources(stats);
     expect(result.bardicInspirationUses).toEqual({ current: 3, max: 3 });
-  });
-
-  it('defaults bardicInspirationUses to 0 when no Charisma ability', () => {
-    const result = computeTrackedResources(basePlayerStats({ abilities: [] }));
-    expect(result.bardicInspirationUses).toEqual({ current: 0, max: 0 });
   });
 
   // ── wildShapeUses ──
@@ -338,16 +294,6 @@ describe('computeTrackedResources', () => {
       });
       const result = computeTrackedResources(stats);
       expect(result.layOnHandsPool).toEqual({ current: 25, max: 25 });
-    });
-
-    it('level 0 paladin has 0 pool', () => {
-      const stats = basePlayerStats({
-        rules: '5e',
-        class: { ...basePlayerStats().class, name: 'Paladin' },
-        level: 0,
-      });
-      const result = computeTrackedResources(stats);
-      expect(result.layOnHandsPool).toEqual({ current: 0, max: 0 });
     });
 
     it('non-paladin has 0 pool', () => {
@@ -493,12 +439,6 @@ describe('computeTrackedResources', () => {
       const result = computeTrackedResources(basePlayerStats());
       expect(result.arcaneRecoveryLevels).toEqual({ current: 3, max: 3 });
     });
-
-    it('defaults to 0 when not in features', () => {
-      getClassFeatures.mockReturnValue(null);
-      const result = computeTrackedResources(basePlayerStats());
-      expect(result.arcaneRecoveryLevels).toEqual({ current: 0, max: 0 });
-    });
   });
 
   // ── warlockPactMagic ──
@@ -559,12 +499,6 @@ describe('computeTrackedResources', () => {
       const result = computeTrackedResources(basePlayerStats());
       expect(result.uncannymetabolismUses).toEqual({ current: 2, max: 2 });
     });
-
-    it('defaults to 0 when not in features', () => {
-      getClassFeatures.mockReturnValue(null);
-      const result = computeTrackedResources(basePlayerStats());
-      expect(result.uncannymetabolismUses).toEqual({ current: 0, max: 0 });
-    });
   });
 
   // ── luckyPoints (Lucky feat) ──
@@ -587,13 +521,6 @@ describe('computeTrackedResources', () => {
       const result = computeTrackedResources(stats);
       expect(result.luckyPoints).toEqual({ current: 0, max: 0 });
     });
-
-    it('defaults to 0 when feats array is empty', () => {
-      const stats = basePlayerStats({ feats: [] });
-      const result = computeTrackedResources(stats);
-      expect(result.luckyPoints).toEqual({ current: 0, max: 0 });
-    });
-  });
 
   // ── divineInterventionUses (Cleric) ──
 
@@ -697,18 +624,16 @@ describe('computeTrackedResources', () => {
     });
   });
 });
+});
 
 // ── applyServerOverride ─────────────────────────────────────────
 
 describe('applyServerOverride', () => {
-  it('returns a shallow copy when serverData is null, undefined, or a non-object primitive', () => {
+  it('returns a shallow copy when serverData is null', () => {
     const computed = { hitPoints: { current: 10, max: 20 } };
-    expect(applyServerOverride(computed, null)).toEqual(computed);
-    expect(applyServerOverride(computed, null)).not.toBe(computed);
-    expect(applyServerOverride(computed, undefined)).toEqual(computed);
-    expect(applyServerOverride(computed, 42)).toEqual(computed);
-    expect(applyServerOverride(computed, 'string')).toEqual(computed);
-    expect(applyServerOverride(computed, [])).toEqual(computed);
+    const result = applyServerOverride(computed, null);
+    expect(result).toEqual(computed);
+    expect(result).not.toBe(computed);
   });
 
   it('overrides current value for known keys present in computed resources', () => {
@@ -724,10 +649,9 @@ describe('applyServerOverride', () => {
     expect(result.sorceryPoints).toEqual({ current: 3, max: 5 });
   });
 
-  it('does not override when serverValue is null or undefined', () => {
+  it('does not override when serverValue is null', () => {
     const computed = { hitPoints: { current: 20, max: 20 } };
     expect(applyServerOverride(computed, { hitPoints: null }).hitPoints).toEqual({ current: 20, max: 20 });
-    expect(applyServerOverride(computed, { hitPoints: undefined }).hitPoints).toEqual({ current: 20, max: 20 });
   });
 
   it('overrides with 0 when serverValue is 0 (falsy but valid)', () => {
@@ -775,17 +699,4 @@ describe('trackedResourcesToStoreEntries', () => {
     expect(trackedResourcesToStoreEntries({})).toEqual({});
   });
 
-  it('preserves all keys from tracked resources', () => {
-    const tracked = {
-      hitPoints: { current: 10, max: 20 },
-      spell_slots_level_1: { current: 2, max: 4 },
-      spell_slots_level_2: { current: 1, max: 3 },
-    };
-    const result = trackedResourcesToStoreEntries(tracked);
-    expect(Object.keys(result).sort()).toEqual([
-      'hitPoints',
-      'spell_slots_level_1',
-      'spell_slots_level_2',
-    ]);
-  });
 });

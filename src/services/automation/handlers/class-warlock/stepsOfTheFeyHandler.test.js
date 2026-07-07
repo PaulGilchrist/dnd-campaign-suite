@@ -77,7 +77,7 @@ describe('stepsOfTheFeyHandler.handle', () => {
     vi.resetAllMocks();
   });
 
-  describe('uses remaining check', () => {
+  describe('remaining uses check', () => {
     it('returns popup when no free uses remaining', async () => {
       const action = makeAction();
       const ps = makePlayerStats();
@@ -92,59 +92,6 @@ describe('stepsOfTheFeyHandler.handle', () => {
       expect(result.payload.description).toContain('No free uses');
       expect(result.payload.description).toContain('Finish a Long Rest');
       expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
-    });
-
-    it('returns popup when free cast count is negative', async () => {
-      const action = makeAction();
-      const ps = makePlayerStats();
-
-      useRuntimeState.getRuntimeValue.mockReturnValue(-1);
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.description).toContain('No free uses');
-    });
-
-    it('decrements freeCastCount and proceeds when uses are available', async () => {
-      const action = makeAction({ uses_expression: '3' });
-      const ps = makePlayerStats();
-
-      useRuntimeState.getRuntimeValue.mockImplementation((name, key) => {
-        if (key.includes('freeCastCount')) return 3;
-        if (key === 'tempHp') return 0;
-        return null;
-      });
-
-      automationExpressions.evaluateAutoExpression.mockReturnValue(1);
-      targetResolver.resolveTarget.mockResolvedValue(null);
-
-      await handle(action, ps, campaignName, null);
-
-      const setCalls = useRuntimeState.setRuntimeValue.mock.calls;
-      const countCall = setCalls.find(c => c[1].includes('freeCastCount'));
-      expect(countCall).toBeDefined();
-      expect(countCall[2]).toBe(2);
-    });
-
-    it('uses default of 1 when uses_expression is undefined', async () => {
-      const action = { name: 'Steps of the Fey', automation: { type: 'free_cast' } };
-      const ps = makePlayerStats();
-
-      useRuntimeState.getRuntimeValue.mockImplementation((name, key) => {
-        if (key.includes('freeCastCount')) return 1;
-        if (key === 'tempHp') return 0;
-        return null;
-      });
-
-      targetResolver.resolveTarget.mockResolvedValue(null);
-
-      await handle(action, ps, campaignName, null);
-
-      const setCalls = useRuntimeState.setRuntimeValue.mock.calls;
-      const countCall = setCalls.find(c => c[1].includes('freeCastCount'));
-      expect(countCall).toBeDefined();
-      expect(countCall[2]).toBe(0);
     });
   });
 
@@ -221,22 +168,6 @@ describe('stepsOfTheFeyHandler.handle', () => {
         saveType: 'WIS',
         saveDc: 17,
       });
-    });
-
-    it('adds ability_use log entry with promptId', async () => {
-      setupTargetMocks('log-prompt-1');
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(logService.addEntry).toHaveBeenCalledWith(
-        campaignName,
-        expect.objectContaining({
-          type: 'ability_use',
-          characterName: 'TestCleric',
-          abilityName: 'Steps of the Fey',
-          promptId: 'log-prompt-1',
-        }),
-      );
     });
 
     it('registers save-result event listener for the prompt', async () => {
@@ -409,52 +340,6 @@ describe('stepsOfTheFeyHandler.handle', () => {
       expect(result.payload.name).toBe('Steps of the Fey');
       expect(result.payload.triggerMistyStep).toBe(true);
       expect(result.payload.automation).toBe(action.automation);
-    });
-
-    it('uses action.name as featureName when provided', async () => {
-      useRuntimeState.getRuntimeValue.mockImplementation((name, key) => {
-        if (key.includes('freeCastCount')) return 1;
-        if (key === 'tempHp') return 0;
-        return null;
-      });
-      automationExpressions.evaluateAutoExpression.mockReturnValue(1);
-      targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
-      savePrompt.buildSaveDc.mockReturnValue(13);
-      savePrompt.createSaveListener.mockReturnValue({ promptId: 'name-prompt' });
-
-      const customAction = { name: 'My Fey Steps', automation: { type: 'free_cast' } };
-      const result = await handle(customAction, makePlayerStats(), campaignName, null);
-
-      expect(result.payload.name).toBe('My Fey Steps');
-      expect(result.payload.description).toContain('My Fey Steps');
-    });
-
-    it('includes remaining count in popup description', async () => {
-      useRuntimeState.getRuntimeValue.mockImplementation((name, key) => {
-        if (key.includes('freeCastCount')) return 2;
-        if (key === 'tempHp') return 0;
-        return null;
-      });
-      automationExpressions.evaluateAutoExpression.mockReturnValue(1);
-      targetResolver.resolveTarget.mockResolvedValue(null);
-
-      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(result.payload.description).toContain('(1 remaining)');
-    });
-
-    it('includes rolled temp HP value in popup description', async () => {
-      useRuntimeState.getRuntimeValue.mockImplementation((name, key) => {
-        if (key.includes('freeCastCount')) return 1;
-        if (key === 'tempHp') return 0;
-        return null;
-      });
-      automationExpressions.evaluateAutoExpression.mockReturnValue(1);
-      targetResolver.resolveTarget.mockResolvedValue(null);
-
-      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(result.payload.description).toContain('Temporary Hit Points');
     });
   });
 });

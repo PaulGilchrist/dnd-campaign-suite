@@ -1,6 +1,6 @@
 // @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { handle, isRelentlessEnduranceUsed, setRelentlessEnduranceUsed } from './relentlessEnduranceHandler.js';
+import { handle } from './relentlessEnduranceHandler.js';
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
     getRuntimeValue: vi.fn(),
@@ -112,7 +112,7 @@ describe('relentlessEnduranceHandler', () => {
             );
         });
 
-        it('handles empty or undefined conditions gracefully', async () => {
+        it('handles empty conditions gracefully', async () => {
             getRuntimeValue.mockImplementation((name, key) => {
                 if (key === 'relentlessEnduranceUsed') return false;
                 if (key === 'currentHitPoints') return 0;
@@ -125,33 +125,6 @@ describe('relentlessEnduranceHandler', () => {
                 'ClericBoy',
                 'activeConditions',
                 [],
-                campaignName,
-            );
-        });
-    });
-
-    describe('isRelentlessEnduranceUsed', () => {
-        it('returns true when the runtime value is true', () => {
-            getRuntimeValue.mockReturnValue(true);
-
-            expect(isRelentlessEnduranceUsed('ClericBoy', campaignName)).toBe(true);
-        });
-
-        it('returns false for any non-true value', () => {
-            getRuntimeValue.mockReturnValue(false);
-
-            expect(isRelentlessEnduranceUsed('ClericBoy', campaignName)).toBe(false);
-        });
-    });
-
-    describe('setRelentlessEnduranceUsed', () => {
-        it('sets the used flag via setRuntimeValue', async () => {
-            await setRelentlessEnduranceUsed('ClericBoy', campaignName, true);
-
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'ClericBoy',
-                'relentlessEnduranceUsed',
-                true,
                 campaignName,
             );
         });

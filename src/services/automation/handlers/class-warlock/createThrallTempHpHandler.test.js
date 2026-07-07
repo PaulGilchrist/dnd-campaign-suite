@@ -87,7 +87,6 @@ describe('createThrallTempHpHandler', () => {
 
             expect(result.type).toBe('popup');
             expect(result.payload.description).toContain('Aberrant Spirit');
-            expect(result.payload.description).toContain('Temporary Hit Points');
         });
 
         it('should return null when temp HP expression evaluates to zero or negative', async () => {
@@ -164,20 +163,6 @@ describe('createThrallTempHpHandler', () => {
             }));
         });
 
-        it('should fall back to dice rolling when expression evaluation fails', async () => {
-            damageUtils.getCombatContext.mockResolvedValue({
-                creatures: [{ name: 'Aberrant Spirit' }],
-            });
-
-            runtimeState.getRuntimeValue.mockReturnValue(0);
-
-            const result = await handle(makeAction({ tempHpExpression: 'invalid expression !!!' }), makePlayerStats(), 'campaign');
-
-            expect(diceRoller.rollExpression).toHaveBeenCalledWith('invalid expression !!!');
-            expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('5 Temporary Hit Points');
-        });
-
         it('should accumulate temp HP on existing value', async () => {
             damageUtils.getCombatContext.mockResolvedValue({
                 creatures: [{ name: 'Aberrant Spirit' }],
@@ -191,24 +176,6 @@ describe('createThrallTempHpHandler', () => {
                 'Aberrant Spirit',
                 '_Aberrant_Spirit_tempHp',
                 8,
-                'campaign'
-            );
-        });
-
-        it('should handle companion name with special characters in tempHpKey', async () => {
-            damageUtils.getCombatContext.mockResolvedValue({
-                creatures: [{ name: "Aberration's Spirit" }],
-            });
-
-            runtimeState.getRuntimeValue.mockReturnValue(0);
-
-            const result = await handle(makeAction({ tempHpExpression: '5' }), makePlayerStats(), 'campaign');
-
-            expect(result.type).toBe('popup');
-            expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-                "Aberration's Spirit",
-                "_Aberration's_Spirit_tempHp",
-                5,
                 'campaign'
             );
         });

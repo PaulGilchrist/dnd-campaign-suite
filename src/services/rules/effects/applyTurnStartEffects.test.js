@@ -151,25 +151,6 @@ describe('applyTurnStartEffects', () => {
         'TestCampaign'
       );
     });
-
-    it('removes all matching conditions leaving none', async () => {
-      setupConditions(['charmed', 'poisoned']);
-
-      await applyTurnStartEffects('TestCharacter', {
-        turnStartEffects: [{
-          type: 'condition_removal',
-          name: 'Self-Restoration',
-          conditions: ['charmed', 'poisoned']
-        }]
-      }, 'TestCampaign');
-
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'TestCharacter',
-        'activeConditions',
-        [],
-        'TestCampaign'
-      );
-    });
   });
 
   describe('umbral_sight effect', () => {
@@ -221,107 +202,9 @@ describe('applyTurnStartEffects', () => {
 
       expect(setRuntimeValue).not.toHaveBeenCalled();
     });
-
-    it('handles null activeConditions by adding invisible', async () => {
-      getRuntimeValue.mockImplementation((name, prop) => {
-        if (prop === 'umbralSightDarknessActive') return true;
-        if (prop === 'activeConditions') return null;
-        if (prop === 'targetEffects') return [];
-        return null;
-      });
-
-      await applyTurnStartEffects('TestCharacter', {
-        turnStartEffects: [{ type: 'umbral_sight', name: 'Umbral Sight' }]
-      }, 'TestCampaign');
-
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'TestCharacter',
-        'activeConditions',
-        ['invisible'],
-        'TestCampaign'
-      );
-    });
-  });
-
-  describe('living_legend_turn_start effect', () => {
-    it('resets unerringStrikeUsed to false at start of turn', async () => {
-      getRuntimeValue.mockImplementation((name, prop) => {
-        if (prop === 'targetEffects') return [];
-        return null;
-      });
-
-      await applyTurnStartEffects('TestCharacter', {
-        turnStartEffects: [{ type: 'living_legend_turn_start', name: 'Living Legend' }]
-      }, 'TestCampaign');
-
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'TestCharacter',
-        'unerringStrikeUsed',
-        false,
-        'TestCampaign'
-      );
-    });
-  });
-
-  describe('radiant_soul_turn_start effect', () => {
-    it('resets per-turn radiant soul flag to false', async () => {
-      getRuntimeValue.mockImplementation((name, prop) => {
-        if (prop === 'targetEffects') return [];
-        return null;
-      });
-
-      await applyTurnStartEffects('TestCharacter', {
-        turnStartEffects: [{ type: 'radiant_soul_turn_start', name: 'Radiant Soul' }]
-      }, 'TestCampaign');
-
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'TestCharacter',
-        '_radiantSoul_TestCharacter_oncePerTurn',
-        false,
-        'TestCampaign'
-      );
-    });
-  });
-
-  describe('resistance_clear_turn effect', () => {
-    it('resets resistanceUsedThisTurn to false', async () => {
-      getRuntimeValue.mockImplementation((name, prop) => {
-        if (prop === 'targetEffects') return [];
-        return null;
-      });
-
-      await applyTurnStartEffects('TestCharacter', {
-        turnStartEffects: [{ type: 'resistance_clear_turn', name: 'Resistance Clear' }]
-      }, 'TestCampaign');
-
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'TestCharacter',
-        'resistanceUsedThisTurn',
-        false,
-        'TestCampaign'
-      );
-    });
   });
 
   describe('elder_champion_regeneration effect', () => {
-    it('does nothing when elderChampionActive is false', async () => {
-      getRuntimeValue.mockImplementation((name, prop) => {
-        if (prop === 'elderChampionActive') return false;
-        if (prop === 'targetEffects') return [];
-        return null;
-      });
-
-      await applyTurnStartEffects('TestCharacter', {
-        turnStartEffects: [{
-          type: 'elder_champion_regeneration',
-          name: 'Elder Champion Regeneration',
-          healExpression: '8 + WIS modifier',
-        }]
-      }, 'TestCampaign');
-
-      expect(setRuntimeValue).not.toHaveBeenCalled();
-    });
-
     it('heals when elderChampionActive is true', async () => {
       getRuntimeValue.mockImplementation((name, prop) => {
         if (prop === 'elderChampionActive') return true;

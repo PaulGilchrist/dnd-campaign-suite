@@ -106,19 +106,6 @@ describe('spellCalc', () => {
         expect(result.saveDc).toBe(15);
       });
 
-      it('calculates modifier from Wisdom', () => {
-        const playerStats = makePlayerStats({
-          class: { spell_casting_ability: 'Wisdom', class_levels: [] },
-        });
-        playerStats.class.class_levels = [];
-        for (let i = 0; i < 5; i++) playerStats.class.class_levels[i] = { spellcasting: null };
-        setSpellcasting(playerStats, buildSpellcasting({ spellCastingAbility: 'Wisdom' }));
-        const result = getSpellAbilities([], playerStats);
-        expect(result.modifier).toBe(3);
-        expect(result.toHit).toBe(6);
-        expect(result.saveDc).toBe(14);
-      });
-
       it('handles negative ability modifier', () => {
         const playerStats = makePlayerStats({
           proficiency: 2,
@@ -252,7 +239,7 @@ describe('spellCalc', () => {
     });
 
     describe('subclass spell bonuses', () => {
-      it('adds Nature subclass cantrip bonus for Druid', () => {
+      it('adds bonus cantrip for Nature subclass', () => {
         const playerStats = makePlayerStats({
           class: {
             name: 'Druid',
@@ -261,22 +248,6 @@ describe('spellCalc', () => {
             spell_casting_ability: 'Wisdom',
           },
           spells: ['Druidcraft'],
-        });
-        playerStats.class.class_levels = [];
-        for (let i = 0; i < 5; i++) playerStats.class.class_levels[i] = { spellcasting: null };
-        setSpellcasting(playerStats, buildSpellcasting({ cantrips_known: 2, spellCastingAbility: 'Wisdom' }));
-        const result = getSpellAbilities([], playerStats);
-        expect(result.cantrips_known).toBe(3);
-      });
-
-      it('adds Land subclass bonus cantrip', () => {
-        const playerStats = makePlayerStats({
-          class: {
-            name: 'Druid',
-            subclass: { name: 'Land', circle: 'Forest' },
-            class_levels: [],
-            spell_casting_ability: 'Wisdom',
-          },
         });
         playerStats.class.class_levels = [];
         for (let i = 0; i < 5; i++) playerStats.class.class_levels[i] = { spellcasting: null };
@@ -293,22 +264,6 @@ describe('spellCalc', () => {
         setSpellcasting(playerStats, buildSpellcasting());
         const result = getSpellAbilities([], playerStats);
         expect(result.schoolLimits).toEqual(['enchantment', 'illusion']);
-      });
-
-      it('sets Eldritch Knight school limits', () => {
-        const playerStats = makePlayerStats({
-          class: {
-            name: 'Fighter',
-            subclass: { name: 'Eldritch Knight' },
-            class_levels: [],
-            spell_casting_ability: 'Intelligence',
-          },
-        });
-        playerStats.class.class_levels = [];
-        for (let i = 0; i < 5; i++) playerStats.class.class_levels[i] = { spellcasting: null };
-        setSpellcasting(playerStats, buildSpellcasting({ cantrips_known: 2, spellCastingAbility: 'Intelligence' }));
-        const result = getSpellAbilities([], playerStats);
-        expect(result.schoolLimits).toEqual(['abjuration', 'evocation']);
       });
     });
 

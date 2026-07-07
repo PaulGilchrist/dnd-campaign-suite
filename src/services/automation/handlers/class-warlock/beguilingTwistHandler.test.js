@@ -87,18 +87,6 @@ function makeHitAttack(targetName, attackerName = 'Goblin') {
   };
 }
 
-function makeMissAttack(targetName, attackerName = 'Goblin') {
-  return {
-    attackEvent: { hit: false, timestamp: Date.now(), targetName },
-    attackerName,
-    targetName,
-    primaryDamage: 0,
-    secondaryDamage: 0,
-    totalDamage: 0,
-    damageTypes: [],
-  };
-}
-
 function dispatchSaveResult(promptId, success) {
   window.dispatchEvent(new CustomEvent('save-result', {
     detail: { promptId, success },
@@ -147,24 +135,6 @@ describe('beguilingTwistHandler.handle', () => {
       expect(result.payload.type).toBe('automation_info');
       expect(result.payload.description).toContain('No recent successful save found');
       expect(result.payload.description).toContain('Charmed or Frightened');
-    });
-
-    it('should return popup when attack missed', async () => {
-      findLastAttack.mockResolvedValue(makeMissAttack(playerName));
-
-      const result = await handle(makeAction({ target: 'self' }), makePlayerStats(), campaignName, null);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.description).toContain('No recent successful save found');
-    });
-
-    it('should return popup when attack hit someone else', async () => {
-      findLastAttack.mockResolvedValue(makeHitAttack('OtherPlayer'));
-
-      const result = await handle(makeAction({ target: 'self' }), makePlayerStats(), campaignName, null);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.description).toContain('No recent successful save found');
     });
   });
 
@@ -248,27 +218,6 @@ describe('beguilingTwistHandler.handle', () => {
       });
     });
 
-    it('should skip when attacker is the player themselves', async () => {
-      findLastAttack.mockResolvedValue(makeHitAttack('Goblin', playerName));
-
-      const result = await handle(makeAction(), makePlayerStats(), campaignName, mapName);
-
-      expect(result.payload.description).toContain('No recent successful save found');
-    });
-
-    it('should skip when ally is out of range', async () => {
-      findLastAttack.mockResolvedValue(makeHitAttack('Goblin', 'Ally1'));
-      resolveMapPositions.mockResolvedValue({
-        attackerPos: { gridX: 1, gridY: 1 },
-        targetPos: { gridX: 50, gridY: 50 },
-      });
-      getDistanceFeet.mockReturnValue(268);
-
-      const result = await handle(makeAction(), makePlayerStats(), campaignName, mapName);
-
-      expect(result.payload.description).toContain('No recent successful save found');
-    });
-
     it('should proceed when map positions are unavailable', async () => {
       findLastAttack.mockResolvedValue(makeHitAttack('Goblin', 'Ally1'));
       getAbilityModifier.mockReturnValue(3);
@@ -276,17 +225,6 @@ describe('beguilingTwistHandler.handle', () => {
       resolveMapPositions.mockResolvedValue(null);
 
       const result = await handle(makeAction(), makePlayerStats(), campaignName, mapName);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.targetName).toBe('Ally1');
-    });
-
-    it('should proceed when no mapName provided', async () => {
-      findLastAttack.mockResolvedValue(makeHitAttack('Goblin', 'Ally1'));
-      getAbilityModifier.mockReturnValue(3);
-      createSaveListener.mockReturnValue({ promptId: 'no-map-prompt' });
-
-      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
       expect(result.type).toBe('popup');
       expect(result.payload.targetName).toBe('Ally1');

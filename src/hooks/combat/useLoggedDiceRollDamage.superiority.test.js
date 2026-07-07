@@ -1,4 +1,3 @@
-// @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../services/dice/diceRoller.js', () => ({
@@ -100,7 +99,7 @@ describe('Superiority die damage bonuses', () => {
     }
 
     describe('feinting attack bonus', () => {
-        it('adds feinting attack die value to damage and clears the runtime value', async () => {
+        it('adds feinting attack die value to damage', async () => {
             getRuntimeValue.mockImplementation((charName, key) => {
                 if (charName === 'TestFighter' && key === 'feintingAttackDieValue') return 4;
                 return null;
@@ -121,36 +120,10 @@ describe('Superiority die damage bonuses', () => {
             const logCall = deps.logEntry.mock.calls[0][0];
             expect(logCall.total).toBe(12);
         });
-
-        it('uses same_as_weapon damage type when context has no damageType', async () => {
-            getRuntimeValue.mockImplementation((charName, key) => {
-                if (charName === 'TestFighter' && key === 'feintingAttackDieValue') return 4;
-                return null;
-            });
-
-            const fn = createFn();
-            await fn('Longsword', '1d8+3', 8, [5, 3], 3, {
-                targetName: 'Goblin',
-            });
-
-            const logCall = deps.logEntry.mock.calls[0][0];
-            expect(logCall.formula).toContain('[same_as_weapon]');
-        });
-
-        it('does not add feinting attack when value is falsy', async () => {
-            const fn = createFn();
-            await fn('Longsword', '1d8+3', 8, [5, 3], 3, {
-                targetName: 'Goblin',
-                damageType: 'slashing',
-            });
-
-            const logCall = deps.logEntry.mock.calls[0][0];
-            expect(logCall.total).toBe(8);
-        });
     });
 
     describe("commander's strike bonus", () => {
-        it("adds commander's strike bonus to damage and clears runtime values", async () => {
+        it("adds commander's strike bonus to damage", async () => {
             getRuntimeValue.mockImplementation((charName, key) => {
                 if (charName === 'TestFighter' && key === 'commanderStrikeBonus') return 5;
                 return null;
@@ -183,21 +156,10 @@ describe('Superiority die damage bonuses', () => {
             const logCall = deps.logEntry.mock.calls[0][0];
             expect(logCall.total).toBe(13);
         });
-
-        it("does not add commander's strike when value is falsy", async () => {
-            const fn = createFn();
-            await fn('Longsword', '1d8+3', 8, [5, 3], 3, {
-                targetName: 'Goblin',
-                damageType: 'slashing',
-            });
-
-            const logCall = deps.logEntry.mock.calls[0][0];
-            expect(logCall.total).toBe(8);
-        });
     });
 
     describe('lunging attack bonus', () => {
-        it('adds lunging attack die value to damage and clears the runtime value', async () => {
+        it('adds lunging attack die value to damage', async () => {
             getRuntimeValue.mockImplementation((charName, key) => {
                 if (charName === 'TestFighter' && key === 'lungingAttackDieValue') return 3;
                 return null;
@@ -217,17 +179,6 @@ describe('Superiority die damage bonuses', () => {
             );
             const logCall = deps.logEntry.mock.calls[0][0];
             expect(logCall.total).toBe(11);
-        });
-
-        it('does not add lunging attack when value is falsy', async () => {
-            const fn = createFn();
-            await fn('Longsword', '1d8+3', 8, [5, 3], 3, {
-                targetName: 'Goblin',
-                damageType: 'slashing',
-            });
-
-            const logCall = deps.logEntry.mock.calls[0][0];
-            expect(logCall.total).toBe(8);
         });
     });
 

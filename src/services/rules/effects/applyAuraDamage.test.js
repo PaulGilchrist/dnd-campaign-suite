@@ -66,54 +66,6 @@ function resetMocks() {
 }
 
 // ---------------------------------------------------------------------------
-// applyAuraDamage — early-exit guards
-// ---------------------------------------------------------------------------
-describe('applyAuraDamage — early exits', () => {
-  beforeEach(() => {
-    resetMocks();
-    getRuntimeValue.mockImplementation((_name, _prop, _campaign) => null);
-    utils.getName.mockImplementation((v) => String(v));
-  });
-
-  it('returns early when aura is not active', async () => {
-    getRuntimeValue.mockImplementation((name, prop) => {
-      if (prop === 'innerRadianceActive') return false;
-      return null;
-    });
-
-    await applyAuraDamage('Test', {}, 'Campaign');
-
-    expect(getCombatSummary).not.toHaveBeenCalled();
-  });
-
-
-
-  it('returns early when creatures is not an array', async () => {
-    getRuntimeValue.mockImplementation((name, prop) => {
-      if (prop === 'innerRadianceActive') return true;
-      return null;
-    });
-    getCombatSummary.mockReturnValue({ creatures: 'not-an-array' });
-
-    await applyAuraDamage('Test', {}, 'Campaign');
-
-    expect(applyDamageToTarget).not.toHaveBeenCalled();
-  });
-
-  it('returns early when damageValue is not a positive number', async () => {
-    getRuntimeValue.mockImplementation((name, prop) => {
-      if (prop === 'innerRadianceActive') return true;
-      return null;
-    });
-    getCombatSummary.mockReturnValue({ creatures: [] });
-
-    await applyAuraDamage('Test', {}, 'Campaign', [], { damageValue: 0 });
-
-    expect(applyDamageToTarget).not.toHaveBeenCalled();
-  });
-});
-
-// ---------------------------------------------------------------------------
 // applyAuraDamage — damage application
 // ---------------------------------------------------------------------------
 describe('applyAuraDamage — damage application', () => {

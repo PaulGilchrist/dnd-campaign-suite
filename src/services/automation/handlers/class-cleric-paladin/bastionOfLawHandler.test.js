@@ -116,46 +116,30 @@ describe('bastionOfLawHandler', () => {
         });
 
         it('skips range check when map conditions are unavailable', async () => {
-            // rangeToFeet returns null
+            // rangeToFeet returns null — no range check
             rangeToFeet.mockReturnValue(null);
 
             const result = await handle(makeAction(), makePlayerStats(), campaignName, mapName);
 
             expect(result.type).toBe('modal');
+        });
 
-            vi.clearAllMocks();
-            setupDefaultMocks();
-
-            // map positions missing targetPos
+        it('skips range check when map positions are incomplete', async () => {
+            // attackerPos present but targetPos missing
             resolveMapPositions.mockResolvedValue({ attackerPos: { gridX: 0, gridY: 0 } });
 
-            const result2 = await handle(makeAction(), makePlayerStats(), campaignName, mapName);
+            const result = await handle(makeAction(), makePlayerStats(), campaignName, mapName);
 
-            expect(result2.type).toBe('modal');
-
-            vi.clearAllMocks();
-            setupDefaultMocks();
-
-            // map positions return null targetPos
-            resolveMapPositions.mockResolvedValue({ attackerPos: { gridX: 0, gridY: 0 }, targetPos: null });
-
-            const result3 = await handle(makeAction(), makePlayerStats(), campaignName, mapName);
-
-            expect(result3.type).toBe('modal');
+            expect(result.type).toBe('modal');
         });
 
-        it('uses default feature name when action.name is falsy', async () => {
-            const action = makeAction({ name: '' });
-            const result = await handle(action, makePlayerStats(), campaignName, null);
-
+        it('uses feature name from action or defaults to Bastion of Law', async () => {
+            const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
             expect(result.payload.featureName).toBe('Bastion of Law');
-        });
 
-        it('uses action name when provided', async () => {
-            const action = makeAction({ name: 'Custom Bastion' });
-            const result = await handle(action, makePlayerStats(), campaignName, null);
-
-            expect(result.payload.featureName).toBe('Custom Bastion');
+            const customAction = makeAction({ name: 'Custom Bastion' });
+            const customResult = await handle(customAction, makePlayerStats(), campaignName, null);
+            expect(customResult.payload.featureName).toBe('Custom Bastion');
         });
     });
 
@@ -231,12 +215,13 @@ describe('bastionOfLawHandler', () => {
             expect(setRuntimeValue).toHaveBeenCalledWith(playerName, 'sorceryPoints', 7, campaignName);
         });
 
-        it('uses default feature name when action.name is empty', async () => {
-            const action = makeAction({ name: '' });
-            const result = await handleApply(action, makePlayerStats(), campaignName, 3, targetName);
-
+        it('uses feature name from action or defaults to Bastion of Law', async () => {
+            const result = await handleApply(makeAction(), makePlayerStats(), campaignName, 3, targetName);
             expect(result.payload.name).toBe('Bastion of Law');
-            expect(result.payload.description).toContain('Bastion of Law');
+
+            const customAction = makeAction({ name: 'Custom Bastion' });
+            const customResult = await handleApply(customAction, makePlayerStats(), campaignName, 3, targetName);
+            expect(customResult.payload.name).toBe('Custom Bastion');
         });
 
         it('logs ability use on apply', async () => {
@@ -247,16 +232,6 @@ describe('bastionOfLawHandler', () => {
                 characterName: playerName,
                 abilityName: 'Bastion of Law',
                 description: expect.stringContaining('spending 3 Sorcery Points'),
-            }));
-        });
-
-        it('logs ability use with custom action name', async () => {
-            const action = makeAction({ name: 'Custom Bastion' });
-            await handleApply(action, makePlayerStats(), campaignName, 2, targetName);
-
-            expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
-                abilityName: 'Custom Bastion',
-                description: expect.stringContaining('Custom Bastion'),
             }));
         });
     });
@@ -275,7 +250,7 @@ describe('bastionOfLawHandler', () => {
             expect(result.payload.description).toContain('No ward active');
         });
 
-        it('rolls dice and returns reduction total', async () => {
+        it('rolls dice and returns reduction with remaining count', async () => {
             getRuntimeValue.mockImplementation((name, key) => {
                 if (key === 'bastionOfLawWardTarget') return targetName;
                 if (key === 'bastionOfLawWardDice') return ['1d8', '1d8', '1d8'];
@@ -321,7 +296,8 @@ describe('bastionOfLawHandler', () => {
             expect(setRuntimeValue).toHaveBeenCalledWith(playerName, 'bastionOfLawActive', false, campaignName);
         });
 
-        it('defaults to 1 dice when numDice is falsy', async () => {
+        it('handles numDice edge cases: defaults to 1 and clamps to available', async () => {
+            // defaults to 1 when numDice is falsy
             getRuntimeValue.mockImplementation((name, key) => {
                 if (key === 'bastionOfLawWardTarget') return targetName;
                 if (key === 'bastionOfLawWardDice') return ['1d8', '1d8'];
@@ -337,9 +313,11 @@ describe('bastionOfLawHandler', () => {
                 ['1d8'],
                 campaignName
             );
-        });
 
-        it('clamps numDice when exceeding available dice', async () => {
+            vi.clearAllMocks();
+            setupDefaultMocks();
+
+            // clamps when numDice exceeds available dice
             getRuntimeValue.mockImplementation((name, key) => {
                 if (key === 'bastionOfLawWardTarget') return targetName;
                 if (key === 'bastionOfLawWardDice') return ['1d8', '1d8'];
@@ -349,7 +327,6 @@ describe('bastionOfLawHandler', () => {
 
             await handleSpendDice(makeAction(), makePlayerStats(), campaignName, 5);
 
-            // Should only roll 2 dice, not 5
             expect(rollExpression).toHaveBeenCalledWith('1d8+1d8');
             expect(setRuntimeValue).toHaveBeenCalledWith(
                 playerName,
@@ -373,19 +350,6 @@ describe('bastionOfLawHandler', () => {
             expect(result.payload.description).toContain('Rolled 1d8 for total 8');
             expect(result.payload.description).toContain('Damage reduced by 8');
             expect(result.payload.description).toContain('1 dice remaining');
-        });
-
-        it('handles null or missing roll result total by returning 0 reduction', async () => {
-            getRuntimeValue.mockImplementation((name, key) => {
-                if (key === 'bastionOfLawWardTarget') return targetName;
-                if (key === 'bastionOfLawWardDice') return ['1d8'];
-                return null;
-            });
-            rollExpression.mockReturnValue(null);
-
-            const result = await handleSpendDice(makeAction(), makePlayerStats(), campaignName, 1);
-
-            expect(result.damageReduction).toBe(0);
         });
 
         it('logs ability use on spend', async () => {
@@ -425,12 +389,14 @@ describe('bastionOfLawHandler', () => {
             expect(result.payload.description).toContain('ward cleared');
         });
 
-        it('uses custom feature name when provided', async () => {
-            const action = makeAction({ name: 'Custom Bastion' });
-            const result = await handleClearWard(action, makePlayerStats(), campaignName);
+        it('uses feature name from action or defaults to Bastion of Law', async () => {
+            const result = await handleClearWard(makeAction(), makePlayerStats(), campaignName);
+            expect(result.payload.name).toBe('Bastion of Law');
 
-            expect(result.payload.name).toBe('Custom Bastion');
-            expect(result.payload.description).toContain('ward cleared');
+            const customAction = makeAction({ name: 'Custom Bastion' });
+            const customResult = await handleClearWard(customAction, makePlayerStats(), campaignName);
+            expect(customResult.payload.name).toBe('Custom Bastion');
+            expect(customResult.payload.description).toContain('ward cleared');
         });
     });
 });

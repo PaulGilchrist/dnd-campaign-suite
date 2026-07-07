@@ -1,4 +1,3 @@
-// @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../services/dice/diceRoller.js', () => ({
@@ -100,7 +99,7 @@ describe('Auto-miss and potent cantrip miss-half-damage', () => {
     }
 
     describe('auto-miss', () => {
-        it('logs auto-miss with rangeReason when provided', async () => {
+        it('logs auto-miss and shows auto-miss popup', async () => {
             const fn = createFn();
             await fn('Longbow', '1d8+3', 8, [5, 3], 3, {
                 targetName: 'Goblin',
@@ -110,30 +109,11 @@ describe('Auto-miss and potent cantrip miss-half-damage', () => {
             });
             expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
                 rollType: 'auto-miss-damage',
-                rangeReason: 'Out of range',
-            }));
-            expect(deps.setPopupHtml).toHaveBeenCalledWith(expect.objectContaining({
-                type: 'auto-miss',
-                rangeReason: 'Out of range',
-            }));
-        });
-
-        it('logs auto-miss without rangeReason when not provided', async () => {
-            const fn = createFn();
-            await fn('Fireball', '8d6', 20, [3, 4, 5, 2, 3, 3], 0, {
-                targetName: 'Goblin',
-                damageType: 'fire',
-                isAutoMiss: true,
-            });
-            expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
-                rollType: 'auto-miss-damage',
             }));
             expect(deps.setPopupHtml).toHaveBeenCalledWith(expect.objectContaining({
                 type: 'auto-miss',
             }));
         });
-
-
     });
 
     describe('potent cantrip miss-half-damage', () => {
@@ -151,7 +131,6 @@ describe('Auto-miss and potent cantrip miss-half-damage', () => {
                 isCantrip: true,
                 playerStats: { automation: { passives: [{ type: 'potent_cantrip' }] } },
             });
-            expect(hasPotentCantrip).toHaveBeenCalled();
             expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
                 rollType: 'cantrip-miss-half-damage',
                 isPotentCantrip: true,

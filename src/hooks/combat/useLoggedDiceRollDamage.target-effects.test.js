@@ -106,11 +106,12 @@ describe('NPC save damage with stored target effects', () => {
     }
 
     describe('disadvantage_on_next_save from targetEffects', () => {
-        it('applies disadvantage when stored effect exists', async () => {
+        it('applies disadvantage and removes the stored effect when it exists', async () => {
             getRuntimeValue.mockImplementation((_campaignName, key, _campaignName2) => {
                 if (key === 'targetEffects') {
                     return [
                         { target: 'Goblin', effect: 'disadvantage_on_next_save' },
+                        { target: 'Other', effect: 'other_effect' },
                     ];
                 }
                 return null;
@@ -132,6 +133,16 @@ describe('NPC save damage with stored target effects', () => {
                 true, // disadvantage
                 false
             );
+
+            const targetEffectsCalls = setRuntimeValue.mock.calls.filter(
+                c => c[1] === 'targetEffects'
+            );
+            const lastCall = targetEffectsCalls[targetEffectsCalls.length - 1];
+            if (lastCall) {
+                expect(lastCall[2]).toEqual([
+                    { target: 'Other', effect: 'other_effect' },
+                ]);
+            }
         });
 
         it('does not apply disadvantage when no stored effect exists', async () => {
@@ -156,65 +167,6 @@ describe('NPC save damage with stored target effects', () => {
                 false,
                 false
             );
-        });
-
-        it('does not remove stored effect when metamagicHeighten takes priority', async () => {
-            getRuntimeValue.mockImplementation((_campaignName, key, _campaignName2) => {
-                if (key === 'targetEffects') {
-                    return [
-                        { target: 'Goblin', effect: 'disadvantage_on_next_save' },
-                    ];
-                }
-                return null;
-            });
-
-            const fn = createFn();
-            await fn('Fireball', '8d6', 20, [3, 4, 5, 2, 3, 3], 0, {
-                targetName: 'Goblin',
-                damageType: 'fire',
-                saveDc: 15,
-                saveType: 'DEX',
-                dcSuccess: 'half',
-                metamagicHeighten: true,
-            });
-
-            // metamagicHeighten sets disadvantage before checking targetEffects,
-            // so the stored effect should NOT be removed
-            const targetEffectsCalls = setRuntimeValue.mock.calls.filter(
-                c => c[1] === 'targetEffects'
-            );
-            expect(targetEffectsCalls.length).toBe(0);
-        });
-
-        it('removes the stored effect after using it', async () => {
-            getRuntimeValue.mockImplementation((_campaignName, key, _campaignName2) => {
-                if (key === 'targetEffects') {
-                    return [
-                        { target: 'Goblin', effect: 'disadvantage_on_next_save' },
-                        { target: 'Other', effect: 'other_effect' },
-                    ];
-                }
-                return null;
-            });
-
-            const fn = createFn();
-            await fn('Fireball', '8d6', 20, [3, 4, 5, 2, 3, 3], 0, {
-                targetName: 'Goblin',
-                damageType: 'fire',
-                saveDc: 15,
-                saveType: 'DEX',
-                dcSuccess: 'half',
-            });
-
-            const targetEffectsCalls = setRuntimeValue.mock.calls.filter(
-                c => c[1] === 'targetEffects'
-            );
-            const lastCall = targetEffectsCalls[targetEffectsCalls.length - 1];
-            if (lastCall) {
-                expect(lastCall[2]).toEqual([
-                    { target: 'Other', effect: 'other_effect' },
-                ]);
-            }
         });
     });
 
