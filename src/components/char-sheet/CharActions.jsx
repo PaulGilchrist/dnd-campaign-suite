@@ -59,7 +59,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
     const [actions, setActions] = useState([]);
     const [selectedActionSpell, setSelectedActionSpell] = useState(null);
     const [featRangeEffects, setFeatRangeEffects] = useState(null);
-    const [autoDamageRollContext] = useSyncedState(campaignName, 'autoDamageContext', null);
+    const [autoDamageRollContext] = useSyncedState(campaignName, 'autoDamageContext', null, campaignName);
     const { saveDcBonus: displaySaveDcBonus } = getInnateSorceryBonus(playerStats.name, campaignName);
     const { popupHtml, setPopupHtml } = useDiceRollPopup();
 
@@ -179,9 +179,9 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         popupHtml, setPopupHtml, rollDamage, rollAttack, buildCtx, buildCtxSync,
     });
 
-    const [showCleaveTargetSelection, setShowCleaveTargetSelection] = useSyncedState(campaignName, 'cleavePending', false);
-    const [cleaveSecondTargets, setCleaveSecondTargets] = useSyncedState(campaignName, 'cleaveSecondTargets', []);
-    const [tacticalMasterModal, setTacticalMasterModal] = useSyncedState(campaignName, 'tacticalMasterPending', null);
+    const [showCleaveTargetSelection, setShowCleaveTargetSelection] = useSyncedState(campaignName, 'cleavePending', false, campaignName);
+    const [cleaveSecondTargets, setCleaveSecondTargets] = useSyncedState(campaignName, 'cleaveSecondTargets', [], campaignName);
+    const [tacticalMasterModal, setTacticalMasterModal] = useSyncedState(campaignName, 'tacticalMasterPending', null, campaignName);
 
     const handleCleaveAttack = React.useCallback(async (cleaveTargetName) => {
         if (!cleaveTargetName) {

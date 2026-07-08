@@ -8,12 +8,12 @@ export default function useCharActionModals({
     playerStats, campaignName, mapName,
     popupHtml, setPopupHtml, rollDamage, rollAttack, buildCtx, buildCtxSync,
 }) {
-    const [modalState, _setModalState] = useSyncedState(campaignName, 'modalState', {});
+    const [modalState, _setModalState] = useSyncedState(campaignName, 'modalState', {}, campaignName);
     const setModalState = useCallback((updates) => {
         _setModalState(prev => ({ ...prev, ...updates }));
     }, [_setModalState]);
 
-    const [pendingDamage, setPendingDamage] = useSyncedState(campaignName, 'pipeline-pause', null);
+    const [pendingDamage, setPendingDamage] = useSyncedState(campaignName, 'pipeline-pause', null, campaignName);
 
     const { resolveAttackDamage, proceedWithDamage } = useAttackDamageResolution({
         playerStats, campaignName, mapName,

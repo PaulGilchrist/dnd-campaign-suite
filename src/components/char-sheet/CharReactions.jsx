@@ -33,7 +33,7 @@ function CharReactions({ playerStats, campaignName, cannotAct, mapName, characte
     const [reactiveSpellEligible, setReactiveSpellEligible] = React.useState(null);
     const [reactiveSpellWarnings, setReactiveSpellWarnings] = React.useState(false);
     const [isReactiveSpellFlow, setIsReactiveSpellFlow] = React.useState(false);
-    const [modalState, setModalState] = useSyncedState(campaignName, 'modalState', {});
+    const [modalState, setModalState] = useSyncedState(campaignName, 'modalState', {}, campaignName);
 
     const activeBuffs = useRuntimeValue(playerStats?.name, 'activeBuffs', campaignName) ?? [];
 

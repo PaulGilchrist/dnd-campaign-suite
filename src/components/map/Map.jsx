@@ -68,7 +68,7 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
     const [itemsPanelOpen, setItemsPanelOpen] = useState(false);
     const [selectedItem, setSelectedItem] = useState(null);
     const [renamePopover, setRenamePopover] = useState(null);
-    const [viewingMonster, setViewingMonster] = useSyncedState(campaignName, 'map-viewingMonster', null);
+    const [viewingMonster, setViewingMonster] = useSyncedState(campaignName, 'map-viewingMonster', null, campaignName);
     const [monstersLoaded, setMonstersLoaded] = useState([]);
     const [selectedPlayer, setSelectedPlayer] = useState(null);
     const [spellMode, setSpellMode] = useState(null);

@@ -153,7 +153,7 @@ function EncounterBuilder({ characters, campaignName, onStartCombat }) {
 
   const [pendingEncounterData, setPendingEncounterData] = useState(null);
   const [showGenerator, setShowGenerator] = useState(false);
-  const [viewingMonster, setViewingMonster] = useSyncedState(campaignName, 'encounter-viewingMonster', null);
+  const [viewingMonster, setViewingMonster] = useSyncedState(campaignName, 'encounter-viewingMonster', null, campaignName);
   const [encounterTitle, setEncounterTitle] = useState('Encounter Builder');
   const [currentEncounterName, setCurrentEncounterName] = useState(null);
   const [description, setDescription] = useState('');

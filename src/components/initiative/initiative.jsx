@@ -72,8 +72,8 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
     }, [campaignName, combatSummary])
     const setActiveCreatureNameG = useSSEEqualityGuard(setActiveCreatureName)
     const [npcImages, setNpcImages] = React.useState({})
-    const [viewingMonster, setViewingMonster] = useSyncedState(campaignName, 'combat-ui-viewingMonster', null)
-    const [viewingMonsterCreatureName, setViewingMonsterCreatureName] = useSyncedState(campaignName, 'combat-ui-viewingMonsterCreatureName', null)
+    const [viewingMonster, setViewingMonster] = useSyncedState(campaignName, 'combat-ui-viewingMonster', null, campaignName)
+    const [viewingMonsterCreatureName, setViewingMonsterCreatureName] = useSyncedState(campaignName, 'combat-ui-viewingMonsterCreatureName', null, campaignName)
     const carouselRef = React.useRef(null)
     const combatSummaryRef = React.useRef(null)
     combatSummaryRef.current = combatSummary
@@ -83,13 +83,13 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [combatSummary])
 
-    const [conditionPickerTarget, setConditionPickerTarget] = useSyncedState(campaignName, 'combat-ui-conditionPickerTarget', null)
+    const [conditionPickerTarget, setConditionPickerTarget] = useSyncedState(campaignName, 'combat-ui-conditionPickerTarget', null, campaignName)
     const [conditionPopup, setConditionPopup] = React.useState(null)
     const [conditionPickerDc, setConditionPickerDc] = React.useState(10)
     const [conditionPickerAbility, setConditionPickerAbility] = React.useState('con')
     const [conditionPickerSelected, setConditionPickerSelected] = React.useState(null)
 
-    const [concentrationPickerTarget, setConcentrationPickerTarget] = useSyncedState(campaignName, 'combat-ui-concentrationPickerTarget', null)
+    const [concentrationPickerTarget, setConcentrationPickerTarget] = useSyncedState(campaignName, 'combat-ui-concentrationPickerTarget', null, campaignName)
     const [concentrationSpellName, setConcentrationSpellName] = React.useState('')
     const [concentrationDc, setConcentrationDc] = React.useState(10)
 

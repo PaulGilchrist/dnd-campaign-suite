@@ -635,7 +635,7 @@ const CLASS_COMPONENTS = {
 function CharClassFeatures({ playerStats, campaignName }) {
     const Cmp = CLASS_COMPONENTS[playerStats?.class?.name];
     const hasAdrenalineRush = (playerStats?.automation?.specialActions ?? []).some(a => a.effect === 'bonus_action_dash');
-    const [modalState, setModalState] = useSyncedState(campaignName, 'modalState', {});
+    const [modalState, setModalState] = useSyncedState(campaignName, 'modalState', {}, campaignName);
 
     const handleWeaponMasteryClick = () => {
         const existing = getRuntimeValue(playerStats.name, '_Weapon_Kind_Mastery_chosenWeapons', campaignName);

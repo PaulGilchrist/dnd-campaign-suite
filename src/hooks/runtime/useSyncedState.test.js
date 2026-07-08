@@ -202,9 +202,9 @@ describe('useSyncedState', () => {
     expect(result2.current[0]).toBe(25);
   });
 
-  it('setValue POSTs to the server API', () => {
+  it('setValue POSTs to the server API with campaignName', () => {
     seedTrackedResources('test-char', { hp: 15 });
-    const { result } = renderHook(() => useSyncedState('test-char', 'hp', 20));
+    const { result } = renderHook(() => useSyncedState('test-char', 'hp', 20, 'test-campaign'));
     vi.spyOn(global, 'fetch').mockResolvedValue(undefined);
 
     act(() => {
@@ -212,9 +212,7 @@ describe('useSyncedState', () => {
     });
 
     const callArgs = vi.spyOn(global, 'fetch').mock.calls[0];
-    // campaignName is null because useSyncedState passes null to setRuntimeValue
-    // (the caller is expected to handle campaign context separately)
-    expect(callArgs[0]).toBe('/api/campaigns/null/test-char');
+    expect(callArgs[0]).toBe('/api/campaigns/test-campaign/test-char');
     const body = JSON.parse(callArgs[1].body);
     expect(body.value).toHaveProperty('hp', 25);
   });

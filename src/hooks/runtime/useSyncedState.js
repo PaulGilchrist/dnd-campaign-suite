@@ -12,13 +12,14 @@ import { getStore, setRuntimeValue, listeners } from './useRuntimeState.js';
  * @param {string} propertyName - The property name within the store
  * @param {*} defaultValue - Only used on first mount when no value exists in the store.
  *   A stored `null` value is NOT replaced by defaultValue.
+ * @param {string} [campaignName] - Optional campaign name for server persistence via setRuntimeValue
  * @returns {[*, function]} - [value, setValue] tuple identical to useState
  *
  * @example
  * const [pendingDamage, setPendingDamage] = useSyncedState(campaignName, 'pipeline-pause', null);
  * const [healingPool, setHealingPool] = useSyncedState(characterName, 'healingPool', 0);
  */
-export function useSyncedState(characterKey, propertyName, defaultValue) {
+export function useSyncedState(characterKey, propertyName, defaultValue, campaignName) {
   const store = getStore(characterKey);
   const hasKey = store.has(propertyName);
   const initialValue = hasKey ? store.get(propertyName) : defaultValue;
@@ -51,14 +52,14 @@ export function useSyncedState(characterKey, propertyName, defaultValue) {
 
   const setValueSynced = useCallback(
     (newValue) => {
-      setRuntimeValue(characterKey, propertyName, newValue, null);
+      setRuntimeValue(characterKey, propertyName, newValue, campaignName);
       const store = getStore(characterKey);
       store.set(propertyName, newValue);
       if (newValue === currentValueRef.current) return;
       currentValueRef.current = newValue;
       setValue(newValue);
     },
-    [characterKey, propertyName],
+    [characterKey, propertyName, campaignName],
   );
 
   return [value, setValueSynced];
