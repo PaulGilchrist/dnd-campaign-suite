@@ -40,6 +40,7 @@ vi.mock('../runtime/useRuntimeState.js', () => ({
 vi.mock('../../services/encounters/combatData.js', () => ({
     loadCombatSummary: vi.fn(),
     getCombatSummary: vi.fn(),
+    getCurrentCombatRound: vi.fn(() => 1),
 }));
 
 vi.mock('../../services/combat/automation/automationService.js', () => ({

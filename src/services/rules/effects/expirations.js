@@ -153,64 +153,6 @@ export async function applyTurnStartEffects(activeName, playerStats, campaignNam
         }
     }
 
-    // Clean up Multiattack Defense effects at start of each creature's turn
-    const allTargetEffects = getRuntimeValue(campaignName, 'targetEffects') || [];
-    if (allTargetEffects.length > 0) {
-        const cleaned = allTargetEffects.filter(te => te.effect !== 'multiattack_defense');
-        if (cleaned.length !== allTargetEffects.length) {
-            setRuntimeValue(campaignName, 'targetEffects', cleaned, campaignName);
-        }
-    }
-
-    // Clean up Sap weapon mastery disadvantage at start of attacker's next turn
-    const allTargetEffectsSap = getRuntimeValue(campaignName, 'targetEffects') || [];
-    if (allTargetEffectsSap.length > 0) {
-        const currentRound = getCurrentCombatRound(campaignName);
-        const cleanedSap = allTargetEffectsSap.filter(te => {
-            if (te.effect !== 'disadvantage_next_attack') return true;
-            if (!te.target) return true;
-            const isSapOnAttacker = te.target === activeName;
-            if (!isSapOnAttacker) return true;
-            const sapAppliedRound = te.appliedRound;
-            if (sapAppliedRound != null && currentRound >= sapAppliedRound + 1) {
-                return false;
-            }
-            return true;
-        });
-        if (cleanedSap.length !== allTargetEffectsSap.length) {
-            setRuntimeValue(campaignName, 'targetEffects', cleanedSap, campaignName);
-        }
-    }
-
-    // Clean up Slow weapon mastery speed reduction at start of each creature's turn
-    const allTargetEffectsSlow = getRuntimeValue(campaignName, 'targetEffects') || [];
-    if (allTargetEffectsSlow.length > 0) {
-        const cleanedSlow = allTargetEffectsSlow.filter(te => te.effect !== 'speed_reduction' || te.source !== 'Slow');
-        if (cleanedSlow.length !== allTargetEffectsSlow.length) {
-            setRuntimeValue(campaignName, 'targetEffects', cleanedSlow, campaignName);
-        }
-    }
-
-    // Clean up Vex weapon mastery advantage at start of each creature's turn (expires at end of attacker's next turn)
-    const allTargetEffectsVex = getRuntimeValue(campaignName, 'targetEffects') || [];
-    if (allTargetEffectsVex.length > 0) {
-        const currentRound = getCurrentCombatRound(campaignName);
-        const cleanedVex = allTargetEffectsVex.filter(te => {
-            if (te.effect !== 'next_attack_advantage') return true;
-            if (!te.vexTarget) return true;
-            const isVexOnAttacker = te.target === activeName;
-            if (!isVexOnAttacker) return true;
-            const vexAppliedRound = te.appliedRound;
-            if (vexAppliedRound != null && currentRound >= vexAppliedRound + 2) {
-                return false;
-            }
-            return true;
-        });
-        if (cleanedVex.length !== allTargetEffectsVex.length) {
-            setRuntimeValue(campaignName, 'targetEffects', cleanedVex, campaignName);
-        }
-    }
-
     // Clean up Topple weapon mastery Prone condition at start of target's next turn
     const allTargetEffectsTopple = getRuntimeValue(campaignName, 'targetEffects') || [];
     if (allTargetEffectsTopple.length > 0) {
@@ -1135,7 +1077,12 @@ function clearExpirationEffects(effects, targetName, attackerName, campaignName)
                 setRuntimeValue(
                     campaignName,
                     'targetEffects',
-                    storedEffects.filter(te => !(te.effect === effect.effectKey && te.source === effect.source)),
+                    storedEffects.filter(te => {
+                        if (te.effect !== effect.effectKey) return true;
+                        if (te.source !== effect.source) return true;
+                        if (effect.target && te.target !== effect.target) return true;
+                        return false;
+                    }),
                     campaignName
                 );
                 break;

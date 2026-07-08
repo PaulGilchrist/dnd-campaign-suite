@@ -3,6 +3,7 @@ import { addEntry } from '../../../ui/logService.js';
 import { getCombatContext, getTargetFromAttacker } from '../../../rules/combat/damageUtils.js';
 import { getCurrentCombatRound } from '../../../../services/encounters/combatData.js';
 import { collectWeaponMastery } from '../../../combat/automation/automationService.js';
+import { addExpiration } from '../../../rules/effects/expirations.js';
 const MASTERY_EFFECTS = {
     Push: {
         label: 'Push (10 ft)',
@@ -208,6 +209,9 @@ export async function applyMasteryEffect(masteryName, playerStats, campaignName,
             vexTarget: targetName,
             appliedRound: currentRound,
         };
+        addExpiration(playerStats.name, targetName, [
+            { type: 'remove_target_effect', effectKey: 'next_attack_advantage', source: 'Vex', target: targetName }
+        ], campaignName, 2);
     }
     if (masteryName === 'Sap') {
         const currentRound = getCurrentCombatRound();
@@ -215,6 +219,9 @@ export async function applyMasteryEffect(masteryName, playerStats, campaignName,
             ...newEffect,
             appliedRound: currentRound,
         };
+        addExpiration(playerStats.name, targetName, [
+            { type: 'remove_target_effect', effectKey: 'disadvantage_next_attack', source: 'Sap', target: targetName }
+        ], campaignName, undefined, playerStats.name);
     }
     if (masteryName === 'Slow') {
         const existingSlowForTarget = storedEffects.filter(
@@ -230,6 +237,9 @@ export async function applyMasteryEffect(masteryName, playerStats, campaignName,
                 },
             };
         }
+        addExpiration(playerStats.name, targetName, [
+            { type: 'remove_target_effect', effectKey: 'speed_reduction', source: 'Slow', target: targetName }
+        ], campaignName, 1);
     }
     const updatedEffects = [...storedEffects, newEffect];
     setRuntimeValue(campaignName, 'targetEffects', updatedEffects, campaignName);

@@ -883,6 +883,9 @@ export async function executeBonusActionManeuver(action, playerStats, campaignNa
             appliedRound: currentRound,
         };
         await setRuntimeValue(campaignName, 'targetEffects', [...storedEffects, newEffect], campaignName);
+        addExpiration(playerStats.name, playerStats.name, [
+            { type: 'remove_target_effect', effectKey: 'next_attack_advantage', source: maneuver.name, target: playerStats.name }
+        ], campaignName, 2);
         description += ` You have Advantage on your next attack roll against the target. If it hits, add ${dieValue} to the damage roll.`;
     }
 
@@ -1889,6 +1892,9 @@ export async function executeManeuver(action, playerStats, campaignName, maneuve
             appliedRound: currentRound,
         };
         await setRuntimeValue(campaignName, 'targetEffects', [...storedEffects, newEffect], campaignName);
+        addExpiration(playerStats.name, playerStats.name, [
+            { type: 'remove_target_effect', effectKey: 'next_attack_advantage', source: maneuver.name, target: playerStats.name }
+        ], campaignName, 2);
         description += ` You have Advantage on your next attack roll against the target. If it hits, add ${dieValue} to the damage roll.`;
     }
 

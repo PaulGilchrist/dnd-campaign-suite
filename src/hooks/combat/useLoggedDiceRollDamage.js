@@ -13,6 +13,7 @@ import { sendSavePrompt } from '../../services/combat/conditions/savePromptServi
 import { getAffectedCreatures, processAoeNpcs, sendAoePlayerSaves } from '../../services/rules/combat/aoeService.js';
 import { getRuntimeValue, setRuntimeValue } from '../runtime/useRuntimeState.js';
 import { loadCombatSummary, getCombatSummary } from '../../services/encounters/combatData.js';
+import { addExpiration } from '../../services/rules/effects/expirations.js';
 import { hasIgnoreResistance, playerIsImmuneToCondition, hasGreatWeaponFighting, applyGreatWeaponFightingToDamage, evaluateAutoExpression } from '../../services/combat/automation/automationService.js';
 import { endInvisibilityOnHostileAction } from '../../services/rules/features/invisibilityService.js';
 import {
@@ -1217,6 +1218,9 @@ export function createLogDamageAndShow(deps) {
                 };
                 const updatedEffects = [...storedEffects, newEffect];
                 setRuntimeValue(campaignName, 'targetEffects', updatedEffects, campaignName);
+                addExpiration(target.name, target.name, [
+                    { type: 'remove_target_effect', effectKey: 'multiattack_defense', source: 'Defensive Tactics', target: target.name }
+                ], campaignName, 1);
             }
         }
 

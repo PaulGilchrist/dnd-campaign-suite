@@ -55,7 +55,7 @@ vi.mock('../../rules/combat/applyDamage.js', () => ({
   applyDamageToTarget: vi.fn(),
 }));
 
-import { applyTurnStartEffects } from './expirations.js';
+import { applyTurnStartEffects, expireStaleEffects } from './expirations.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import { getCombatSummary, getCurrentCombatRound, getActiveCreatureName } from '../../encounters/combatData.js';
 import { applyDamageToTarget } from '../../rules/combat/applyDamage.js';
@@ -566,128 +566,109 @@ describe('applyTurnStartEffects — additional effect types', () => {
     });
   });
 
-  describe('clearing targetEffects at turn start', () => {
-    it('clears multiattack_defense target effects', async () => {
-      getRuntimeValue.mockImplementation((name, prop) => {
-        if (prop === 'resistanceUsedThisTurn') return false;
-        if (prop === 'portentUsedThisTurn') return false;
-        if (prop === 'targetEffects') return [
-          { effect: 'multiattack_defense', target: 'Orc' },
+  describe('targetEffects expiration via addExpiration', () => {
+    const KEY = 'pendingExpirations';
+
+    it('clears multiattack_defense via expireStaleEffects', () => {
+      getCurrentCombatRound.mockReturnValue(2);
+      getCombatSummary.mockReturnValue({ creatures: [{ name: 'TestCharacter' }] });
+      getRuntimeValue.mockImplementation((name, key) => {
+        if (key === KEY && name === 'TestCharacter') return [
+          { target: 'Orc', effects: [{ type: 'remove_target_effect', effectKey: 'multiattack_defense', source: 'Defensive Tactics', target: 'Orc' }], appliedRound: 1, expiryRounds: 1 },
+        ];
+        if (key === KEY) return [];
+        if (key === 'targetEffects') return [
+          { effect: 'multiattack_defense', target: 'Orc', source: 'Defensive Tactics' },
           { effect: 'slow', target: 'Human' },
         ];
         return null;
       });
 
-      await applyTurnStartEffects('TestCharacter', {
-        turnStartEffects: [],
-      }, 'TestCampaign');
+      expireStaleEffects('TestCampaign', 'TestCharacter');
 
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'TestCampaign',
-        'targetEffects',
-        [{ effect: 'slow', target: 'Human' }],
-        'TestCampaign',
-      );
-    });
-
-    it('clears disadvantage_next_attack (sap) when currentRound >= appliedRound + 1', async () => {
-      getRuntimeValue.mockImplementation((name, prop) => {
-        if (prop === 'resistanceUsedThisTurn') return false;
-        if (prop === 'portentUsedThisTurn') return false;
-        if (prop === 'targetEffects') return [
-          { effect: 'disadvantage_next_attack', target: 'TestCharacter', appliedRound: 1 },
-          { effect: 'disadvantage_next_attack', target: 'Orc', appliedRound: 1 },
-        ];
-        return null;
-      });
-      getCurrentCombatRound.mockReturnValue(2);
-      getActiveCreatureName.mockReturnValue('TestCharacter');
-
-      await applyTurnStartEffects('TestCharacter', {
-        turnStartEffects: [],
-      }, 'TestCampaign');
-
-      const sapCalls = setRuntimeValue.mock.calls.filter(
+      const effectCalls = setRuntimeValue.mock.calls.filter(
         (c) => c[0] === 'TestCampaign' && c[1] === 'targetEffects',
       );
-      expect(sapCalls.length).toBeGreaterThan(0);
-      // Only the Orc-targeted sap should remain (TestCharacter is the attacker, so it expires)
-      expect(sapCalls[0][2]).toEqual([
-        { effect: 'disadvantage_next_attack', target: 'Orc', appliedRound: 1 },
+      expect(effectCalls.length).toBeGreaterThan(0);
+      expect(effectCalls[0][2]).toEqual([
+        { effect: 'slow', target: 'Human' },
       ]);
     });
 
-    it('keeps disadvantage_next_attack (sap) when currentRound < appliedRound + 1', async () => {
-      getRuntimeValue.mockImplementation((name, prop) => {
-        if (prop === 'resistanceUsedThisTurn') return false;
-        if (prop === 'portentUsedThisTurn') return false;
-        if (prop === 'targetEffects') return [
-          { effect: 'disadvantage_next_attack', target: 'TestCharacter', appliedRound: 2 },
+    it('clears disadvantage_next_attack (sap) via expireStaleEffects when round expired', () => {
+      getCurrentCombatRound.mockReturnValue(2);
+      getCombatSummary.mockReturnValue({ creatures: [{ name: 'TestCharacter' }] });
+      getRuntimeValue.mockImplementation((name, key) => {
+        if (key === KEY && name === 'TestCharacter') return [
+          { target: 'TestCharacter', effects: [{ type: 'remove_target_effect', effectKey: 'disadvantage_next_attack', source: 'Sap', target: 'TestCharacter' }], appliedRound: 1, expiryRounds: undefined, expireOnCreatureName: 'TestCharacter' },
+        ];
+        if (key === KEY) return [];
+        if (key === 'targetEffects') return [
+          { effect: 'disadvantage_next_attack', target: 'TestCharacter', source: 'Sap' },
+          { effect: 'disadvantage_next_attack', target: 'Orc', source: 'Sap' },
         ];
         return null;
       });
-      getCurrentCombatRound.mockReturnValue(2);
-      getActiveCreatureName.mockReturnValue('TestCharacter');
 
-      await applyTurnStartEffects('TestCharacter', {
-        turnStartEffects: [],
-      }, 'TestCampaign');
+      expireStaleEffects('TestCampaign', 'TestCharacter');
 
-      const sapCalls = setRuntimeValue.mock.calls.filter(
+      const effectCalls = setRuntimeValue.mock.calls.filter(
         (c) => c[0] === 'TestCampaign' && c[1] === 'targetEffects',
       );
-      // Should not have been called since no change
-      expect(sapCalls.length).toBe(0);
+      expect(effectCalls.length).toBeGreaterThan(0);
+      expect(effectCalls[0][2]).toEqual([
+        { effect: 'disadvantage_next_attack', target: 'Orc', source: 'Sap' },
+      ]);
     });
 
-    it('clears speed_reduction from Slow weapon mastery', async () => {
-      getRuntimeValue.mockImplementation((name, prop) => {
-        if (prop === 'resistanceUsedThisTurn') return false;
-        if (prop === 'portentUsedThisTurn') return false;
-        if (prop === 'targetEffects') return [
-          { effect: 'speed_reduction', source: 'Slow' },
+    it('clears speed_reduction from Slow weapon mastery via expireStaleEffects', () => {
+      getCombatSummary.mockReturnValue({ creatures: [{ name: 'TestCharacter' }] });
+      getRuntimeValue.mockImplementation((name, key) => {
+        if (key === KEY && name === 'TestCharacter') return [
+          { target: 'Orc', effects: [{ type: 'remove_target_effect', effectKey: 'speed_reduction', source: 'Slow', target: 'Orc' }], appliedRound: 1, expiryRounds: 1 },
+        ];
+        if (key === KEY) return [];
+        if (key === 'targetEffects') return [
+          { effect: 'speed_reduction', source: 'Slow', target: 'Orc' },
           { effect: 'slow', source: 'Slow' },
         ];
         return null;
       });
 
-      await applyTurnStartEffects('TestCharacter', {
-        turnStartEffects: [],
-      }, 'TestCampaign');
+      expireStaleEffects('TestCampaign', 'TestCharacter');
 
-      const slowCalls = setRuntimeValue.mock.calls.filter(
+      const effectCalls = setRuntimeValue.mock.calls.filter(
         (c) => c[0] === 'TestCampaign' && c[1] === 'targetEffects',
       );
-      expect(slowCalls.length).toBeGreaterThan(0);
-      expect(slowCalls[0][2]).toEqual([
+      expect(effectCalls.length).toBeGreaterThan(0);
+      expect(effectCalls[0][2]).toEqual([
         { effect: 'slow', source: 'Slow' },
       ]);
     });
 
-    it('clears next_attack_advantage (vex) when currentRound >= appliedRound + 2', async () => {
-      getRuntimeValue.mockImplementation((name, prop) => {
-        if (prop === 'resistanceUsedThisTurn') return false;
-        if (prop === 'portentUsedThisTurn') return false;
-        if (prop === 'targetEffects') return [
-          { effect: 'next_attack_advantage', target: 'TestCharacter', appliedRound: 1, vexTarget: 'Orc' },
-          { effect: 'next_attack_advantage', target: 'Orc', appliedRound: 1, vexTarget: 'Human' },
+    it('clears next_attack_advantage (vex) via expireStaleEffects when round 3 >= appliedRound 1 + 2', () => {
+      getCurrentCombatRound.mockReturnValue(3);
+      getCombatSummary.mockReturnValue({ creatures: [{ name: 'TestCharacter' }] });
+      getRuntimeValue.mockImplementation((name, key) => {
+        if (key === KEY && name === 'TestCharacter') return [
+          { target: 'TestCharacter', effects: [{ type: 'remove_target_effect', effectKey: 'next_attack_advantage', source: 'Vex', target: 'TestCharacter' }], appliedRound: 1, expiryRounds: 2 },
+        ];
+        if (key === KEY) return [];
+        if (key === 'targetEffects') return [
+          { effect: 'next_attack_advantage', target: 'TestCharacter', source: 'Vex', vexTarget: 'Orc' },
+          { effect: 'next_attack_advantage', target: 'Orc', source: 'Vex', vexTarget: 'Human' },
         ];
         return null;
       });
-      getCurrentCombatRound.mockReturnValue(3);
-      getActiveCreatureName.mockReturnValue('TestCharacter');
 
-      await applyTurnStartEffects('TestCharacter', {
-        turnStartEffects: [],
-      }, 'TestCampaign');
+      expireStaleEffects('TestCampaign', 'TestCharacter');
 
-      const vexCalls = setRuntimeValue.mock.calls.filter(
+      const effectCalls = setRuntimeValue.mock.calls.filter(
         (c) => c[0] === 'TestCampaign' && c[1] === 'targetEffects',
       );
-      expect(vexCalls.length).toBeGreaterThan(0);
-      // TestCharacter-targeted vex expires (round 3 >= 1+2), Orc-targeted stays
-      expect(vexCalls[0][2]).toEqual([
-        { effect: 'next_attack_advantage', target: 'Orc', appliedRound: 1, vexTarget: 'Human' },
+      expect(effectCalls.length).toBeGreaterThan(0);
+      expect(effectCalls[0][2]).toEqual([
+        { effect: 'next_attack_advantage', target: 'Orc', source: 'Vex', vexTarget: 'Human' },
       ]);
     });
 
