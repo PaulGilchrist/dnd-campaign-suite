@@ -323,7 +323,7 @@ const PaladinFeatures = function PaladinFeatures({ playerStats, campaignName }) 
 };
 
 /* ─── Ranger ─── */
-const RangerFeatures = function RangerFeatures({ playerStats }) {
+const RangerFeatures = function RangerFeatures({ playerStats, campaignName }) {
     const rangerFeatures = getClassFeatures(playerStats);
     const [fightingStylePopup, setFightingStylePopup] = React.useState(null);
     const [fightingStylesMap, setFightingStylesMap] = React.useState(null);
@@ -346,16 +346,16 @@ const RangerFeatures = function RangerFeatures({ playerStats }) {
         }
     };
     return (
-         <div data-testid="char-class-ranger">
-              <div className="automation-actions">
-                  {playerStats.level >= 2 && (
-                      <button className="automation-btn" title="Favored Foe: Mark a foe for extra 1d4 damage">
-                          <i className="fas fa-crosshairs"></i> Favored Foe
-                      </button>
-                  )}
-              </div>
-             <div><b>Extra Attacks: </b>{rangerFeatures?.extraAttacks || 0}</div>
-             <div><b>Favored Enemies: </b>{rangerFeatures?.favoredEnemies}</div>
+          <div data-testid="char-class-ranger">
+               <div className="automation-actions">
+                   {playerStats.level >= 2 && (
+                       <button className="automation-btn" title="Favored Foe: Mark a foe for extra 1d4 damage">
+                           <i className="fas fa-crosshairs"></i> Favored Foe
+                       </button>
+                   )}
+               </div>
+              <div><b>Extra Attacks: </b>{rangerFeatures?.extraAttacks || 0}</div>
+              <div><b>Favored Enemies: </b>{rangerFeatures?.favoredEnemies}</div>
               {playerStats.class.fightingStyles && playerStats.level > 1 && <div><b>Fighting Styles: </b>{(
                   <span>{playerStats.class.fightingStyles.map((style, idx) => (
                       <React.Fragment key={style}>
@@ -367,7 +367,10 @@ const RangerFeatures = function RangerFeatures({ playerStats }) {
                   ))}</span>
               )}</div>}
               {fightingStylePopup && <Popup html={fightingStylePopup} onClickOrKeyDown={() => setFightingStylePopup(null)} />}
-         </div>
+              {playerStats.level >= 14 && (
+                  <TrackedResourceInput label="Nature's Veil" resourceKey="naturesVeilUses" playerName={playerStats.name} getMax={() => Math.max((playerStats.abilities?.find(a => a.name === 'Wisdom')?.bonus || 0), 1)} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
+              )}
+          </div>
     );
 };
 

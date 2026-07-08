@@ -4,6 +4,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(),
   setRuntimeValue: vi.fn(),
+  getAllStoreKeys: vi.fn(() => []),
 }));
 
 vi.mock('../../ui/utils.js', () => ({
@@ -25,7 +26,7 @@ vi.mock('../../encounters/combatData.js', () => ({
 }));
 
 import { expireStaleEffects } from './expirations.js';
-import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue, getAllStoreKeys } from '../../../hooks/runtime/useRuntimeState.js';
 import utils from '../../ui/utils.js';
 import {
   getCurrentCombatRound,
@@ -228,5 +229,97 @@ describe('expireStaleEffects — error recovery', () => {
     getRuntimeValue.mockReturnValueOnce('not-an-array');
 
     expect(() => expireStaleEffects('MyCampaign')).not.toThrow();
+  });
+
+  // ---------------------------------------------------------------------------
+  // Self-targeted expirations (Phase 2: scan all stores for entries targeting active)
+
+  describe('self-targeted expirations', () => {
+    beforeEach(() => {
+      resetMocks();
+      getCurrentCombatRound.mockReturnValue(4);
+      getActiveCreatureName.mockReturnValue('RangerGirl');
+      stubUtilsNameIdentity();
+    });
+
+    it('expires invisible condition when target matches active creature and round is met', () => {
+      getCombatSummary.mockReturnValue({ creatures: [{ name: 'RangerGirl' }] });
+      getAllStoreKeys.mockReturnValue(['RangerGirl', 'Goblin']);
+
+      // RangerGirl has a self-targeted entry for invisible
+      getRuntimeValue.mockImplementation((key, prop) => {
+        if (key === 'RangerGirl' && prop === KEY) return [
+          { target: 'RangerGirl', effects: [{ type: 'condition', condition: 'invisible' }], appliedRound: 3, expiryRounds: 1 }
+        ];
+        if (key === 'RangerGirl' && prop === 'activeConditions') return ['invisible'];
+        if (key === 'Goblin' && prop === KEY) return [];
+        return null;
+      });
+
+      expireStaleEffects('test-campaign');
+
+      // Should have removed the invisible condition from activeConditions
+      expect(setRuntimeValue).toHaveBeenCalledWith(
+        'RangerGirl',
+        'activeConditions',
+        [],
+        'test-campaign'
+      );
+      // Should have cleared the expired entry
+      expect(setRuntimeValue).toHaveBeenCalledWith(
+        'RangerGirl',
+        KEY,
+        [],
+        'test-campaign'
+      );
+    });
+
+    it('keeps self-targeted expiration when round not yet met', () => {
+      getCombatSummary.mockReturnValue({ creatures: [{ name: 'RangerGirl' }] });
+      getAllStoreKeys.mockReturnValue(['RangerGirl']);
+
+      getRuntimeValue.mockImplementation((key, prop) => {
+        if (key === 'RangerGirl' && prop === KEY) return [
+          { target: 'RangerGirl', effects: [{ type: 'condition', condition: 'invisible' }], appliedRound: 3, expiryRounds: 2 }
+        ];
+        if (key === 'RangerGirl' && prop === 'activeConditions') return ['invisible'];
+        return null;
+      });
+
+      expireStaleEffects('test-campaign');
+
+      // Should NOT have removed the invisible condition
+      expect(setRuntimeValue).not.toHaveBeenCalledWith(
+        'RangerGirl',
+        'activeConditions',
+        [],
+        'test-campaign'
+      );
+    });
+
+    it('does not expire entries targeting a different creature when round not met', () => {
+      getCombatSummary.mockReturnValue({ creatures: [{ name: 'RangerGirl' }] });
+      getAllStoreKeys.mockReturnValue(['Goblin']);
+
+      // Goblin has an entry targeting someone else, not yet expired by round
+      getRuntimeValue.mockImplementation((key, prop) => {
+        if (key === 'Goblin' && prop === KEY) return [
+          { target: 'Orc', effects: [{ type: 'condition', condition: 'blinded' }], appliedRound: 3, expiryRounds: 2 }
+        ];
+        return null;
+      });
+
+      expireStaleEffects('test-campaign');
+
+      // Should NOT have called activeConditions (no conditions removed)
+      const conditionCalls = setRuntimeValue.mock.calls.filter(c => c[1] === 'activeConditions');
+      expect(conditionCalls.length).toBe(0);
+      // The KEY call that exists is just from Phase 1 initializing RangerGirl's empty pendingExpirations
+      // The Goblin store should NOT have been modified
+      const goblinKeyCalls = setRuntimeValue.mock.calls.filter(
+        c => c[1] === KEY && c[0] === 'Goblin'
+      );
+      expect(goblinKeyCalls.length).toBe(0);
+    });
   });
 });

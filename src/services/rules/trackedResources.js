@@ -33,6 +33,7 @@ export const ALL_TRACKED_RESOURCES = [
   'divineInterventionUses',
   'wholenessofbodyUses',
   'adrenalineRushUses',
+  'naturesVeilUses',
   'shortRestHitDice',
   'spell_slots_level_1',
   'spell_slots_level_2',
@@ -188,6 +189,10 @@ export function computeTrackedResources(playerStats) {
     .some(a => a.effect === 'bonus_action_dash')
   const adrenalineRushMax = hasAdrenalineRush ? (playerStats.proficiency || 0) : 0
   resources.adrenalineRushUses = { current: adrenalineRushMax, max: adrenalineRushMax }
+
+  const isRanger = playerStats.class?.name === 'Ranger'
+  const maxNV = isRanger && playerStats.level >= 14 ? Math.max(wis?.bonus || 0, 1) : 0
+  resources.naturesVeilUses = { current: maxNV, max: maxNV }
 
   return resources
 }

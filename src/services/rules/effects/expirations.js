@@ -15,7 +15,8 @@ const ALL_DAMAGES_EXCEPT_FORCE = [
     'necrotic', 'psychic', 'radiant'
 ];
 
-const KEY = 'pendingExpirations';
+ const KEY = 'pendingExpirations';
+
 
 function ensureArray(value, name) {
     if (!Array.isArray(value)) {
@@ -603,18 +604,111 @@ async function applyGrappleDamageTurnStart(activeName, playerStats, effect, camp
     window.dispatchEvent(new CustomEvent('combat-summary-updated'));
 }
 
- export function addExpiration(attackerName, targetName, effects, campaignName, rounds) {
-    const list = getRuntimeValue(attackerName, KEY);
-    if (!Array.isArray(list)) {
-        console.error('expirations: expected pendingExpirations to be an array for', attackerName);
-        throw new Error('Missing array: pendingExpirations for ' + attackerName);
-    }
-    const currentRound = getCurrentCombatRound(campaignName);
-    setRuntimeValue(attackerName, KEY, [
-         ...list,
-          { target: targetName, effects, appliedRound: currentRound, expiryRounds: rounds ?? Infinity }
-     ], campaignName);
-}
+  export function addExpiration(attackerName, targetName, effects, campaignName, rounds, nextCreatureName) {
+      let list = getRuntimeValue(attackerName, KEY);
+      if (!Array.isArray(list)) {
+          console.warn('expirations: pendingExpirations not initialized for', attackerName, '— initializing empty array');
+          list = [];
+          setRuntimeValue(attackerName, KEY, list, campaignName);
+      }
+      const currentRound = getCurrentCombatRound(campaignName);
+      const newEntry = { target: targetName, effects, appliedRound: currentRound, expiryRounds: rounds ?? Infinity, nextCreatureName: nextCreatureName ?? null };
+      console.log('[addExpiration] attacker=%s target=%s round=%s rounds=%s nextCreatureName=%s entry=%s',
+          attackerName, targetName, currentRound, rounds, nextCreatureName, JSON.stringify(newEntry));
+      setRuntimeValue(attackerName, KEY, [
+           ...list,
+            newEntry
+        ], campaignName);
+      console.log('[addExpiration] stored entry in', attackerName, KEY, 'total entries:', list.length + 1);
+  }
+
+  /**
+   * Process a single expiration list: remove expired entries, keep the rest.
+   * Expired = currentRound >= appliedRound + expiryRounds.
+   * Also expires when nextCreatureName is set and the active creature matches.
+   * Returns { processed, expiredCount, changed }.
+   */
+  function processExpirationList(list, currentRound, targetOwner, campaignName, activeName) {
+      if (!Array.isArray(list) || !list.length) return { processed: [], expiredCount: 0, changed: false };
+
+      let newEntries = [];
+      let expiredCount = 0;
+      let changed = false;
+
+      for (const item of list) {
+          const rounds = item.expiryRounds ?? Infinity;
+          const expirationRound = item.appliedRound + rounds;
+          const isRoundExpired = currentRound >= expirationRound;
+          const isCreatureExpired = item.nextCreatureName && activeName &&
+              utils.getName(item.nextCreatureName) === utils.getName(activeName) &&
+              currentRound > item.appliedRound;
+          const isExpired = isRoundExpired || isCreatureExpired;
+          console.log('[processExpirationList] target=%s effects=%s appliedRound=%s expiryRounds=%s currentRound=%s activeName=%s expirationRound=%s isRoundExpired=%s isCreatureExpired=%s nextCreatureName=%s',
+              item.target, JSON.stringify(item.effects), item.appliedRound, rounds, currentRound, activeName, expirationRound, isRoundExpired, isCreatureExpired, item.nextCreatureName);
+          if (isExpired) {
+              clearExpirationEffects(item.effects, item.target, targetOwner, campaignName);
+              expiredCount++;
+              changed = true;
+              console.log('[processExpirationList] EXPIRED entry for', item.target);
+          } else {
+             newEntries.push(item);
+         }
+     }
+
+     return { processed: newEntries, expiredCount, changed };
+ }
+
+ /**
+  * Expire stale pendingExpirations for a single creature's store.
+  * Returns true if any entries were expired.
+  */
+   function expireForCreature(attackerName, currentRound, campaignName) {
+       console.log('[expireForCreature] checking attacker=%s round=%s', attackerName, currentRound);
+       let list = getRuntimeValue(attackerName, KEY);
+       if (!Array.isArray(list)) {
+           console.log('[expireForCreature] no pendingExpirations for', attackerName, '— initializing empty');
+           list = [];
+           setRuntimeValue(attackerName, KEY, list, campaignName);
+       }
+       console.log('[expireForCreature] found', list.length, 'entries for', attackerName);
+       const { processed, changed } = processExpirationList(list, currentRound, attackerName, campaignName, attackerName);
+       if (changed) {
+           console.log('[expireForCreature] writing updated list for', attackerName);
+           setRuntimeValue(attackerName, KEY, processed, campaignName);
+       }
+       return changed;
+   }
+
+ /**
+  * Scan all runtime stores for entries targeting a specific name and expire them.
+  * Returns true if any entries were expired.
+  */
+  function expireForTarget(targetName, currentRound, campaignName) {
+      console.log('[expireForTarget] scanning all stores for entries targeting=%s round=%s', targetName, currentRound);
+      const allKeys = getAllStoreKeys();
+      console.log('[expireForTarget] all store keys:', JSON.stringify(allKeys));
+      let totalChanged = false;
+
+       for (const key of allKeys) {
+           if (typeof key !== 'string') continue;
+           if (key.toLowerCase() === targetName.toLowerCase()) continue;
+
+           const list = getRuntimeValue(key, KEY);
+           if (!Array.isArray(list) || !list.length) continue;
+
+           console.log('[expireForTarget] checking store=%s with', key, list.length, 'entries');
+           const { processed, changed } = processExpirationList(list, currentRound, key, campaignName, targetName);
+           if (changed) {
+               console.log('[expireForTarget] writing updated list for', key);
+               setRuntimeValue(key, KEY, processed, campaignName);
+               totalChanged = true;
+           }
+       }
+
+      console.log('[expireForTarget] totalChanged=%s for target=%s', totalChanged, targetName);
+      return totalChanged;
+  }
+
 
  export function clearAllExpirationEffects(characterName, campaignName) {
     if (!characterName || !campaignName) return;
@@ -674,47 +768,34 @@ async function applyGrappleDamageTurnStart(activeName, playerStats, effect, camp
       }
 }
 
-export function expireStaleEffects(campaignName) {
-    const currentRound = getCurrentCombatRound(campaignName);
-    const activeName = getActiveCreatureName(campaignName);
-    if (!activeName) return;
+   export function expireStaleEffects(campaignName, overrideActiveName) {
+       const currentRound = getCurrentCombatRound(campaignName);
+       const activeName = overrideActiveName || getActiveCreatureName(campaignName);
+       console.log('[expireStaleEffects] round=%s activeName=%s (override=%s) campaignName=%s', currentRound, activeName, overrideActiveName, campaignName);
+       if (!activeName) { console.log('[expireStaleEffects] early exit: no activeName'); return; }
 
-    try {
-        const combatData = getCombatSummary(campaignName);
-        if (!combatData || typeof combatData !== 'object') return;
-        const creatures = combatData.creatures;
-        if (!Array.isArray(creatures)) return;
+      try {
+          const combatData = getCombatSummary(campaignName);
+          if (!combatData || typeof combatData !== 'object') { console.log('[expireStaleEffects] early exit: no combatData'); return; }
+          const creatures = combatData.creatures;
+          if (!Array.isArray(creatures)) { console.log('[expireStaleEffects] early exit: creatures not array'); return; }
 
-        for (const attacker of creatures) {
-            if (utils.getName(attacker.name) !== utils.getName(activeName)) continue;
+          // Phase 1: Process entries owned by the active creature
+          console.log('[expireStaleEffects] Phase 1: processing entries owned by active creature');
+          for (const attacker of creatures) {
+              if (utils.getName(attacker.name) !== utils.getName(activeName)) continue;
+              console.log('[expireStaleEffects] Phase 1: calling expireForCreature for', attacker.name);
+              expireForCreature(attacker.name, currentRound, campaignName);
+          }
 
-            const list = getRuntimeValue(attacker.name, KEY);
-            if (!Array.isArray(list)) {
-                console.error('expirations: expected pendingExpirations to be an array for', attacker.name);
-                throw new Error('Missing array: pendingExpirations for ' + attacker.name);
-            }
-            if (!list.length) continue;
-
-            let newEntries = [];
-            for (const item of list) {
-                const rounds = (() => {
-                    if (item.expiryRounds == null) {
-                      console.error('[expirations] expireStaleEffects: expiryRounds is missing for item in', attacker.name)
-                      throw new Error('expiryRounds is required for expireStaleEffects')
-                    }
-                    return item.expiryRounds
-                  })()
-                if (currentRound >= item.appliedRound + rounds) {
-                    clearExpirationEffects(item.effects, item.target, attacker.name, campaignName);
-                    } else {
-                      newEntries.push(item);
-                     }
-                 }
-
-           setRuntimeValue(attacker.name, KEY, newEntries, campaignName);
-            }
-           } catch (_e) { /* ignore */ }
-}
+          // Phase 2: Scan all stores for entries targeting the active creature
+          // This handles self-targeted effects (e.g. Nature's Veil, Misty Escape)
+          // stored on the character's own pendingExpirations — they fire whenever
+          // the target becomes active, regardless of who owns the entry.
+          console.log('[expireStaleEffects] Phase 2: scanning all stores for entries targeting', activeName);
+          expireForTarget(activeName, currentRound, campaignName);
+          } catch (_e) { console.error('[expireStaleEffects] error:', _e); }
+  }
 
 export async function applyAuraDamage(activeName, playerStats, campaignName, characters = [], options = {}) {
     const { activeKey, damageValue, range, damageType = 'Radiant', targetFilter } = options;
@@ -1111,5 +1192,8 @@ function removeNpcCondition(targetName, conditionName, campaignName) {
 function removeActiveCondition(targetName, conditionName, campaignName) {
     const condList = Array.isArray(getRuntimeValue(targetName, 'activeConditions')) ? getRuntimeValue(targetName, 'activeConditions') : [];
     const filtered = condList.filter(c => utils.getName(c) !== utils.getName(conditionName));
+    if (filtered.length !== condList.length) {
+        console.log('[removeActiveCondition] REMOVED condition "%s" from %s (was: %s, now: %s)', conditionName, targetName, JSON.stringify(condList), JSON.stringify(filtered));
+    }
     setRuntimeValue(targetName, 'activeConditions', filtered, campaignName);
 }

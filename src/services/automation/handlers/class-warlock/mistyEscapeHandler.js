@@ -3,6 +3,7 @@ import { addEntry } from '../../../ui/logService.js';
 import { buildSaveDc } from '../../common/savePrompt.js';
 import { addExpiration } from '../../../rules/effects/expirations.js';
 import { findLastAttack } from '../../common/damageRollback.js';
+import { getCombatSummary } from '../../../encounters/combatData.js';
 
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
@@ -32,9 +33,18 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     }
 
     // Set expiration: Invisible lasts until start of player's next turn (~1 round)
+    const combatSummary = getCombatSummary(campaignName);
+    let nextCreatureName = null;
+    if (combatSummary?.creatures) {
+        const currentIndex = combatSummary.creatures.findIndex(c => c.name === playerName);
+        if (currentIndex >= 0) {
+            const nextIndex = (currentIndex + 1) % combatSummary.creatures.length;
+            nextCreatureName = combatSummary.creatures[nextIndex].name;
+        }
+    }
     addExpiration(playerName, playerName, [
         { type: 'condition', condition: 'invisible' }
-    ], campaignName, 1);
+    ], campaignName, 1, nextCreatureName);
 
     // Dreadful Step: Creatures within 5 feet of space you left or appear in
     // make WIS save or take 2d10 Psychic damage

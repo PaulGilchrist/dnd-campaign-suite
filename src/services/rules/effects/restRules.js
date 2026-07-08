@@ -113,9 +113,10 @@ export const LONG_REST_RESOURCES = [
               'breathWeaponUses',
                'stonecunningUses',
                 'adrenalineRushUses',
-                 '_celestialRevelationUses',
-                 '_War_Gods_Blessing_active'
-        ]
+                  '_celestialRevelationUses',
+                  '_War_Gods_Blessing_active',
+                  'naturesVeilUses'
+         ]
 
 export function getLongRestResources() {
   return [...LONG_REST_RESOURCES]

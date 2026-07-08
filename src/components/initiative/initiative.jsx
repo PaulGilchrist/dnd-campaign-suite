@@ -198,18 +198,30 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
 
         const dataKey = event.key.slice(`change-${campaignName}-`.length)
            if (dataKey === 'combatSummary') {
-               if (!event.data?.creatures) return
-               const prevRound = combatSummaryRef.current?.round ?? 1
-               combatSummaryRef.current = event.data
-              setCombatSummaryG(event.data)
-              if (event.data.round !== prevRound) {
-                  expireStaleEffects(campaignName)
-              }
-            } else if (dataKey === 'activeCreatureName') {
-              const prevActive = activeCreatureNameRef.current
-              activeCreatureNameRef.current = event.data
-              setActiveCreatureNameG(event.data)
-              expireStaleEffects(campaignName)
+                if (!event.data?.creatures) return
+                const prevRound = combatSummaryRef.current?.round ?? 1
+                const merged = { ...event.data, activeCreatureName: event.data.activeCreatureName || activeCreatureName }
+                combatSummaryRef.current = merged
+               setCombatSummaryCache(merged, campaignName)
+               console.log('[initiative] combatSummary SSE: round=%s activeCreatureName=%s cache set', merged.round, merged.activeCreatureName)
+               setCombatSummaryG(merged)
+               if (merged.round !== prevRound) {
+                   console.log('[initiative] ROUND CHANGE: %s -> %s', prevRound, merged.round)
+                   expireStaleEffects(campaignName, merged.activeCreatureName || null)
+               }
+             } else if (dataKey === 'activeCreatureName') {
+               const prevActive = activeCreatureNameRef.current
+               const newActive = event.data
+               const currentRound = combatSummaryRef.current?.round ?? 1
+               console.log('[initiative] activeCreatureName changed: %s -> %s (round %s)', prevActive, newActive, currentRound)
+               activeCreatureNameRef.current = newActive
+               const cs = combatSummaryRef.current
+               if (cs) {
+                   setCombatSummaryCache(cs, campaignName)
+               }
+               setActiveCreatureNameG(newActive)
+                console.log('[initiative] calling expireStaleEffects for active change')
+                expireStaleEffects(campaignName, newActive)
               // Only apply turn-start effects when the active creature actually changes
               // (not on SSE snapshot re-sync where the creature is the same)
               const lastApplied = lastAppliedTurnStartCreatureRef.current

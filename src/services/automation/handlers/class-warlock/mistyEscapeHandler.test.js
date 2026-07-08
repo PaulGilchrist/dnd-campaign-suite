@@ -124,7 +124,8 @@ describe('mistyEscapeHandler', () => {
                 'WarlockGirl',
                 [{ type: 'condition', condition: 'invisible' }],
                 'test-campaign',
-                1
+                1,
+                null
             );
         });
     });
