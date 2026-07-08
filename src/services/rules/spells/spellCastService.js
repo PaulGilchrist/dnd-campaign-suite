@@ -607,6 +607,12 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
         }
     }
 
+    // Hunter's Mark: does not deal damage on cast — adds 1d6 Force damage to weapon attacks via concentration
+    if (spell.name === "Hunter's Mark") {
+        addEntry(campaignName, { type: 'cast', characterName: playerStats.name, spellName: "Hunter's Mark" }).catch(() => {});
+        return;
+    }
+
     const rollContext = { ...metaCtx, damageType };
 
     if (attackerPos && targetPos) {

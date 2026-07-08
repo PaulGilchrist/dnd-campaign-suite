@@ -355,7 +355,9 @@ const RangerFeatures = function RangerFeatures({ playerStats, campaignName }) {
                    )}
                </div>
               <div><b>Extra Attacks: </b>{rangerFeatures?.extraAttacks || 0}</div>
-              <div><b>Favored Enemies: </b>{rangerFeatures?.favoredEnemies}</div>
+              {playerStats.level >= 2 && (
+                  <TrackedResourceInput label="Favored Enemy" resourceKey="favoredEnemyUses" playerName={playerStats.name} getMax={() => Math.max(1, (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level)?.favored_enemy || 0)} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
+              )}
               {playerStats.class.fightingStyles && playerStats.level > 1 && <div><b>Fighting Styles: </b>{(
                   <span>{playerStats.class.fightingStyles.map((style, idx) => (
                       <React.Fragment key={style}>

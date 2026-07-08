@@ -34,6 +34,7 @@ export const ALL_TRACKED_RESOURCES = [
   'wholenessofbodyUses',
   'adrenalineRushUses',
   'naturesVeilUses',
+  'favoredEnemyUses',
   'stonecunningUses',
   'shortRestHitDice',
   'spell_slots_level_1',
@@ -194,6 +195,10 @@ export function computeTrackedResources(playerStats) {
   const isRanger = playerStats.class?.name === 'Ranger'
   const maxNV = isRanger && playerStats.level >= 14 ? Math.max(wis?.bonus || 0, 1) : 0
   resources.naturesVeilUses = { current: maxNV, max: maxNV }
+
+  const favoredEnemyValue = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level)?.favored_enemy || 0
+  const favoredEnemyMax = Math.max(1, favoredEnemyValue)
+  resources.favoredEnemyUses = { current: favoredEnemyMax, max: favoredEnemyMax }
 
   const hasStonecunning = (playerStats.race?.traits || []).some(t => t.name === 'Stonecunning' && t.automation)
   const maxSC = hasStonecunning ? (playerStats.proficiency || 0) : 0

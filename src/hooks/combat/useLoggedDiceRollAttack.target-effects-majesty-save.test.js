@@ -40,8 +40,13 @@ vi.mock('../../services/rules/effects/expirations.js', () => ({
     clearAllExpirationEffects: vi.fn(),
 }));
 
+vi.mock('../../services/rules/effects/restRules.js', () => ({
+    clearHuntersMarkConcentration: vi.fn(),
+}));
+
 vi.mock('../../services/encounters/combatData.js', () => ({
     loadCombatSummary: vi.fn(),
+    getCurrentCombatRound: vi.fn(),
 }));
 
 vi.mock('../../services/combat/auras/unbreakableMajesty.js', () => ({

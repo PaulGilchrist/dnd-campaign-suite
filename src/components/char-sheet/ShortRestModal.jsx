@@ -4,6 +4,7 @@ import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntime
 import { rollDice } from '../../services/dice/diceRoller.js'
 import { getHitDieSize, computeHitDieRecovery, SHORT_REST_RESOURCES, getShortRestResourceLabels } from '../../services/rules/effects/restRules.js'
 import { clearAllExpirationEffects } from '../../services/rules/effects/expirations.js'
+import { clearHuntersMarkConcentration } from '../../services/rules/effects/restRules.js'
 import { getClassFeatures } from '../../services/character/classFeatures.js'
 import { evaluateAutoExpression } from '../../services/combat/automation/automationService.js'
 import { getCombatContext } from '../../services/rules/combat/damageUtils.js'
@@ -212,6 +213,7 @@ function ShortRestModal({ playerStats, campaignName, onClose, onComplete }) {
         }
 
         clearAllExpirationEffects(playerStats.name, campaignName);
+        clearHuntersMarkConcentration(playerStats.name, campaignName);
 
         onComplete && onComplete();
        };

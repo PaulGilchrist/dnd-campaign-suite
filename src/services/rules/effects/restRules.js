@@ -2,6 +2,24 @@ import { getLevelAfterLongRest } from '../../combat/conditions/exhaustionRules.j
 import { getRuntimeValue, setRuntimeBatch, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js'
 import { clearAllExpirationEffects } from './expirations.js'
 import { rollD20 } from '../../../services/dice/diceRoller.js'
+import * as storageService from '../../../services/ui/storage.js'
+import { getCombatSummary } from '../../../services/encounters/combatData.js'
+
+export function clearHuntersMarkConcentration(name, campaignName) {
+  const cs = getCombatSummary(campaignName)
+  if (!cs || !cs.creatures) return
+  const creature = cs.creatures.find(c => c.name === name)
+  if (creature && creature.concentration?.spell === "Hunter's Mark") {
+    creature.concentration = null
+    storageService.default.set('combatSummary', cs, campaignName)
+    const existingBuffs = getRuntimeValue(name, 'activeBuffs') || []
+    const filteredBuffs = Array.isArray(existingBuffs) ? existingBuffs.filter(b => b.name !== "Hunter's Mark") : []
+    if (filteredBuffs.length !== existingBuffs.length) {
+      setRuntimeValue(name, 'activeBuffs', filteredBuffs, campaignName)
+    }
+    window.dispatchEvent(new CustomEvent('combat-summary-updated'))
+  }
+}
 
 export function getHitDieSize(playerStats) {
   const hitDieStr = playerStats?.class?.hit_point_die || playerStats?.class?.hit_die;
@@ -110,7 +128,8 @@ export const LONG_REST_RESOURCES = [
   '_Phantasmal_Creatures_freeCastCount',
   'breathWeaponUses',
   'stonecunningUses',
-  'naturesVeilUses'
+  'naturesVeilUses',
+  'favoredEnemyUses'
 ]
 
 export function getLongRestResources() {
@@ -320,6 +339,7 @@ export async function applyShortRest(playerStats, campaignName) {
     setRuntimeBatch(name, updates, campaignName)
 
   clearAllExpirationEffects(name, campaignName)
+  clearHuntersMarkConcentration(name, campaignName)
 }
 
 export async function applyLongRest(playerStats, campaignName) {
@@ -412,34 +432,36 @@ export async function applyLongRest(playerStats, campaignName) {
       }
     }
 
-       // Single atomic write fires ONE SSE event with the complete final state
-   setRuntimeBatch(name, charData, campaignName)
+        // Single atomic write fires ONE SSE event with the complete final state
+    setRuntimeBatch(name, charData, campaignName)
 
-   // Natural Recovery: reset free cast tracking on long rest
-   const hasNaturalRecovery = (playerStats.automation?.passives ?? []).some(
-     p => p.type === 'resource_restoration' && p.resourceKey === 'naturalRecoverySlots'
-   )
-   if (hasNaturalRecovery) {
-     charData.naturalRecoveryFreeCast = null
-     charData.naturalRecoverySlots = null
-   }
+    // Natural Recovery: reset free cast tracking on long rest
+    const hasNaturalRecovery = (playerStats.automation?.passives ?? []).some(
+      p => p.type === 'resource_restoration' && p.resourceKey === 'naturalRecoverySlots'
+    )
+    if (hasNaturalRecovery) {
+      charData.naturalRecoveryFreeCast = null
+      charData.naturalRecoverySlots = null
+    }
 
-   // Handle Greater Divine Intervention Wish cooldown (2d4 long rests) — must run AFTER batch reset
-   const wishCooldown = getRuntimeValue(name, '_divineInterventionWishCooldown', campaignName)
-   if (wishCooldown != null && Number(wishCooldown) > 0) {
-     const newCooldown = Number(wishCooldown) - 1
-     if (newCooldown <= 0) {
-       setRuntimeValue(name, '_divineInterventionWishCooldown', 0, campaignName, true)
-     } else {
-       setRuntimeValue(name, '_divineInterventionWishCooldown', newCooldown, campaignName, true)
-       setRuntimeValue(name, 'divineInterventionUses', -1, campaignName, true)
-     }
-   }
+    // Handle Greater Divine Intervention Wish cooldown (2d4 long rests) — must run AFTER batch reset
+    const wishCooldown = getRuntimeValue(name, '_divineInterventionWishCooldown', campaignName)
+    if (wishCooldown != null && Number(wishCooldown) > 0) {
+      const newCooldown = Number(wishCooldown) - 1
+      if (newCooldown <= 0) {
+        setRuntimeValue(name, '_divineInterventionWishCooldown', 0, campaignName, true)
+      } else {
+        setRuntimeValue(name, '_divineInterventionWishCooldown', newCooldown, campaignName, true)
+        setRuntimeValue(name, 'divineInterventionUses', -1, campaignName, true)
+      }
+    }
 
+    console.log('[applyLongRest] before clearAllExpirationEffects and clearHuntersMarkConcentration', { name, campaignName })
     clearAllExpirationEffects(name, campaignName)
+    clearHuntersMarkConcentration(name, campaignName)
 
-    // Reset Psionic Strike once-per-turn flag on long rest
-    setRuntimeValue(name, 'psionicStrikeUsedThisTurn', null, campaignName, true)
+      // Reset Psionic Strike once-per-turn flag on long rest
+     setRuntimeValue(name, 'psionicStrikeUsedThisTurn', null, campaignName, true)
 
     // Reset Uncanny Metabolism tracking on long rest
     setRuntimeValue(name, 'uncannyMetabolismUsed', false, campaignName, true)
@@ -508,6 +530,9 @@ export async function applyLongRest(playerStats, campaignName) {
       setRuntimeValue(name, '_Phantasmal_Creatures_freeCastCount', null, campaignName, true)
       setRuntimeValue(name, '_phantasmalCreatures_list', [], campaignName, true)
     }
+
+    // Reset Favored Enemy free cast count on long rest
+    setRuntimeValue(name, '_Favored_Enemy_freeCastCount', null, campaignName, true)
 
     // Reset Stonecunning uses on long rest
     setRuntimeValue(name, 'stonecunningUses', null, campaignName, true)

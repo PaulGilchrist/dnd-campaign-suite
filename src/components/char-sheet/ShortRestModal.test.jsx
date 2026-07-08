@@ -24,6 +24,7 @@ vi.mock('../../services/rules/effects/restRules.js', () => ({
     computeHitDieRecovery: vi.fn((roll, conBonus) => roll + conBonus),
     SHORT_REST_RESOURCES: ['spell_slots_level_1', 'spell_slots_level_2'],
     getShortRestResourceLabels: vi.fn(() => ['Spell Slots (1st+)', 'Hit Dice']),
+    clearHuntersMarkConcentration: vi.fn(),
 }));
 
 const clearAllExpirationEffectsMock = vi.fn();

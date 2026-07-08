@@ -406,7 +406,7 @@ describe('CharClassFeatures', () => {
                 automation: { passives: [] },
             });
             renderComponent(stats);
-            expect(screen.getByText(/Favored Enemies.*/)).toBeInTheDocument();
+            expect(screen.getByText(/Favored Enemy.*/)).toBeInTheDocument();
         });
     });
 

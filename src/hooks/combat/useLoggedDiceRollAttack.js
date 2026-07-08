@@ -10,6 +10,7 @@ import {
 import { getRuntimeValue, setRuntimeValue } from '../runtime/useRuntimeState.js';
 import { clearAllExpirationEffects } from '../../services/rules/effects/expirations.js';
 import { loadCombatSummary, getCurrentCombatRound } from '../../services/encounters/combatData.js';
+import { clearHuntersMarkConcentration } from '../../services/rules/effects/restRules.js';
 import {
     isUnbreakableMajestyActive,
     getUnbreakableMajestySaveDc,
@@ -1188,6 +1189,7 @@ export function createLogAndShow(deps) {
                 bardicInspirationDie: context?.bardicInspirationDie,
             });
             window.dispatchEvent(new CustomEvent('initiative-rolled', { detail: { characterName: firstName, roll: r1 + totalBonus } }));
+            clearHuntersMarkConcentration(firstName, campaignName);
         }
     };
 }

@@ -194,6 +194,7 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
     let tremorsenseActive = false;
     const thirdEyeBuff = Array.isArray(activeBuffs) ? (activeBuffs.find(b => b.name === 'The Third Eye') || null) : null;
     const thirdEyeEffect = thirdEyeBuff?.effect || null;
+    const huntersMarkActive = Array.isArray(activeBuffs) && activeBuffs.some(b => b.name === "Hunter's Mark");
     activeBuffs.forEach(buff => {
         if (buff.effect === 'fly_speed_equals_walk_speed' || buff.flySpeed) flySpeed = speed;
         if (buff.effect === 'fly_speed_20_hover') flySpeed = 20;
@@ -344,6 +345,7 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
                         }
                     }} />
                     {flyBuffActive && <span className="automation-badge">{flyBuffName} Active</span>}
+                    {huntersMarkActive && <span className="automation-badge">Hunter's Mark Active</span>}
                     {seeInvisibleRange && <span className="automation-badge">See Invisible {seeInvisibleRange} ft</span>}
                     {thirdEyeEffect === 'darkvision_120' && <span className="automation-badge">Darkvision 120 ft</span>}
                     {thirdEyeEffect === 'greater_comprehension' && <span className="automation-badge">Greater Comprehension (read any language)</span>}

@@ -63,7 +63,16 @@ function isFreeCastAuthorized(playerName, spellName, spellLevel, playerStats, ca
         const count = Number(getRuntimeValue(playerName, freeCastCountKey) ?? entry.usesMax);
         if (count > 0) return true;
       }
-      continue;
+      else if (featureLevel === null) {
+        // Counter-based free cast with real spell name (e.g. Favored Enemy)
+        const spells = Array.isArray(entry.spell) ? entry.spell : [entry.spell];
+        if (spells.includes(spellName)) {
+          const freeCastCountKey = `_${entry.name.replace(/\s+/g, '_')}_freeCastCount`;
+          const count = Number(getRuntimeValue(playerName, freeCastCountKey) ?? entry.usesMax);
+          if (count > 0) return true;
+        }
+      }
+      if (featureLevel !== null) continue;
     }
 
     const spells = Array.isArray(entry.spell) ? entry.spell : [entry.spell];
@@ -98,7 +107,15 @@ function isFreeCastAuthorized(playerName, spellName, spellLevel, playerStats, ca
         const count = Number(getRuntimeValue(playerName, freeCastCountKey) ?? entry.usesMax);
         if (count > 0) return true;
       }
-      continue;
+      else if (featureLevel === null) {
+        const spells = Array.isArray(entry.spell) ? entry.spell : [entry.spell];
+        if (spells.includes(spellName)) {
+          const freeCastCountKey = `_${entry.name.replace(/\s+/g, '_')}_freeCastCount`;
+          const count = Number(getRuntimeValue(playerName, freeCastCountKey) ?? entry.usesMax);
+          if (count > 0) return true;
+        }
+      }
+      if (featureLevel !== null) continue;
     }
 
     const spells = Array.isArray(entry.spell) ? entry.spell : [entry.spell];
@@ -280,7 +297,18 @@ function SpellDetailPopup({ spell, playerStats, campaignName, onClose, onCast, u
               }
               break;
             }
-            continue;
+            else if (featureLevel === null) {
+              const spells = Array.isArray(entry.spell) ? entry.spell : [entry.spell];
+              if (spells.includes(spell.name)) {
+                const freeCastCountKey = `_${entry.name.replace(/\s+/g, '_')}_freeCastCount`;
+                const count = Number(getRuntimeValue(playerStats.name, freeCastCountKey) ?? entry.usesMax);
+                if (count > 0) {
+                  setRuntimeValue(playerStats.name, freeCastCountKey, count - 1, campaignName);
+                }
+                break;
+              }
+            }
+            if (featureLevel !== null) continue;
           }
 
           const spells = Array.isArray(entry.spell) ? entry.spell : [entry.spell];
@@ -314,7 +342,18 @@ function SpellDetailPopup({ spell, playerStats, campaignName, onClose, onCast, u
               }
               break;
             }
-            continue;
+            else if (featureLevel === null) {
+              const spells = Array.isArray(entry.spell) ? entry.spell : [entry.spell];
+              if (spells.includes(spell.name)) {
+                const freeCastCountKey = `_${entry.name.replace(/\s+/g, '_')}_freeCastCount`;
+                const count = Number(getRuntimeValue(playerStats.name, freeCastCountKey) ?? entry.usesMax);
+                if (count > 0) {
+                  setRuntimeValue(playerStats.name, freeCastCountKey, count - 1, campaignName);
+                }
+                break;
+              }
+            }
+            if (featureLevel !== null) continue;
           }
 
           const spells = Array.isArray(entry.spell) ? entry.spell : [entry.spell];
@@ -329,6 +368,13 @@ function SpellDetailPopup({ spell, playerStats, campaignName, onClose, onCast, u
               setRuntimeValue(playerStats.name, freeKey, null, campaignName);
             }
             break;
+          }
+        }
+        const favoredEnemyCount = getRuntimeValue(playerStats.name, '_Favored_Enemy_freeCastCount');
+        if (favoredEnemyCount != null) {
+          const newCount = Number(favoredEnemyCount);
+          if (newCount >= 0) {
+            setRuntimeValue(playerStats.name, 'favoredEnemyUses', newCount, campaignName);
           }
         }
         const nrFreeCast = getRuntimeValue(playerStats.name, 'naturalRecoveryFreeCast');
@@ -375,6 +421,13 @@ function SpellDetailPopup({ spell, playerStats, campaignName, onClose, onCast, u
         addConcentration(cs, playerStats.name, spell.name, 10);
         storageService.default.set('combatSummary', cs, campaignName);
       }
+    }
+
+    // Hunter's Mark: also store as activeBuff so character sheet shows it
+    if (shouldSetConcentration && spell.name === "Hunter's Mark") {
+      const existingBuffs = getRuntimeValue(playerStats.name, 'activeBuffs', campaignName) || [];
+      const newBuffs = Array.isArray(existingBuffs) ? [...existingBuffs, { name: "Hunter's Mark", effect: 'hunters_mark_concentration', duration: 'concentration' }] : [{ name: "Hunter's Mark", effect: 'hunters_mark_concentration', duration: 'concentration' }];
+      setRuntimeValue(playerStats.name, 'activeBuffs', newBuffs, campaignName);
     }
 
     const modifiedSpell = (() => {

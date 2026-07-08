@@ -197,7 +197,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
         if (!event.key.startsWith(`change-${campaignName}-`)) return
 
         const dataKey = event.key.slice(`change-${campaignName}-`.length)
-           if (dataKey === 'combatSummary') {
+            if (dataKey === 'combatSummary') {
                 if (!event.data?.creatures) return
                 const prevRound = combatSummaryRef.current?.round ?? 1
                 const merged = { ...event.data, activeCreatureName: event.data.activeCreatureName || activeCreatureName }
@@ -410,6 +410,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
                 combatSummaryRef.current = summary
                 setCombatSummary(summary)
             }
+            let clearedHuntersMark = false
             for (const creature of (summary?.creatures || [])) {
                 if (creature.type === 'player') {
                     setRuntimeValue(creature.name, 'activeBuffs', [], campaignName)
@@ -417,6 +418,14 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
                     setRuntimeValue(creature.name, 'unbreakableMajestyActive', null, campaignName)
                     setRuntimeValue(creature.name, 'unbreakableMajestySaveDc', null, campaignName)
                 }
+                if (creature.concentration?.spell === "Hunter's Mark") {
+                    creature.concentration = null
+                    storage.set('combatSummary', summary, campaignName)
+                    clearedHuntersMark = true
+                }
+            }
+            if (clearedHuntersMark) {
+                setCombatSummary(cloneDeep(summary))
             }
         }
         window.addEventListener('initiative-rolled', handler)
@@ -434,9 +443,15 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
                 c.name === e.detail.targetName || c.name.startsWith(e.detail.targetName + ' ')
             )
             if (creature && !e.detail.success) {
+                const concentrationSpell = creature.concentration?.spell
                 creature.concentration = null
                 storage.set('combatSummary', combatSummary, campaignName)
                 setCombatSummary(cloneDeep(combatSummary))
+                if (concentrationSpell === "Hunter's Mark") {
+                    const existingBuffs = getRuntimeValue(creature.name, 'activeBuffs', campaignName) || []
+                    const newBuffs = Array.isArray(existingBuffs) ? existingBuffs.filter(b => b.name !== "Hunter's Mark") : []
+                    setRuntimeValue(creature.name, 'activeBuffs', newBuffs, campaignName)
+                }
             }
         }
         window.addEventListener('concentration-result', handler)
@@ -645,6 +660,11 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
         storage.set('combatSummary', combatSummary, campaignName)
         setCombatSummary(cloneDeep(combatSummary))
         logConditionEvent(campaignName, 'concentration-broken', creatureName, `Concentration: ${spell}`)
+        if (spell === "Hunter's Mark") {
+            const existingBuffs = getRuntimeValue(creatureName, 'activeBuffs', campaignName) || []
+            const newBuffs = Array.isArray(existingBuffs) ? existingBuffs.filter(b => b.name !== "Hunter's Mark") : []
+            setRuntimeValue(creatureName, 'activeBuffs', newBuffs, campaignName)
+        }
     }
 
     const handleAutoBreakCondition = (creatureName, condition) => {
