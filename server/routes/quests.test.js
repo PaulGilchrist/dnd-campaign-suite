@@ -18,10 +18,18 @@ function clearMockStore() {
     MOCK_STORE.clear();
 }
 
-// Create a mock Express router that simulates the real jsonEntityCrud behavior
-function createMockRouter(entityName) {
+// Create a mock Express router that faithfully simulates jsonEntityCrud behavior
+// with full support for the options parameter (transformList, authorizeRead, etc.)
+function createMockRouter(entityName, options = {}) {
     const router = Router();
-    const singular = entityName.endsWith('ies') ? entityName.slice(0, -3) + 'y' : entityName.endsWith('s') ? entityName.slice(0, -1) : entityName;
+    const {
+        singularDisplayName,
+        transformList,
+        authorizeRead,
+        forbiddenMessage,
+    } = options;
+
+    const singular = singularDisplayName || (entityName.endsWith('ies') ? entityName.slice(0, -3) + 'y' : entityName.endsWith('s') ? entityName.slice(0, -1) : entityName);
     const capitalizedSingular = singular.charAt(0).toUpperCase() + singular.slice(1);
 
     // GET list
@@ -31,17 +39,18 @@ function createMockRouter(entityName) {
         const data = MOCK_STORE.get(key);
         const entities = Array.isArray(data) ? data : [];
 
-        // Apply transformList logic: only localhost sees data
-        const isLocalhost = req.hostname === 'localhost' || req.hostname === '127.0.0.1';
-        const result = isLocalhost ? entities : [];
+        const result = transformList ? transformList(entities, req) : entities;
 
         res.json({ [entityName]: result });
     });
 
-    // POST save
+    // POST save (overwrite entire array)
     router.post(`/api/campaigns/:campaign/${entityName}`, (req, res) => {
         const campaign = req.params.campaign;
         const entities = req.body[entityName];
+        if (!Array.isArray(entities)) {
+            return res.status(400).json({ error: `Expected an array for ${entityName}` });
+        }
         setupMock(entityName, campaign, entities);
         res.json({ success: true });
     });
@@ -51,12 +60,12 @@ function createMockRouter(entityName) {
         const campaign = req.params.campaign;
         const id = decodeURIComponent(req.params.id);
         const key = `${campaign}:${entityName}`;
-        const data = MOCK_STORE.get(key);
 
         if (!MOCK_STORE.has(key)) {
             return res.status(404).json({ error: `${capitalizedSingular} not found` });
         }
 
+        const data = MOCK_STORE.get(key);
         const entities = Array.isArray(data) ? data : [];
         const entity = entities.find(e => e.id === id);
 
@@ -64,10 +73,8 @@ function createMockRouter(entityName) {
             return res.status(404).json({ error: `${capitalizedSingular} not found` });
         }
 
-        // authorizeRead: only localhost
-        const isLocalhost = req.hostname === 'localhost' || req.hostname === '127.0.0.1';
-        if (!isLocalhost) {
-            return res.status(403).json({ error: 'Access denied: GM-only feature' });
+        if (authorizeRead && !authorizeRead(entity, req)) {
+            return res.status(403).json({ error: forbiddenMessage });
         }
 
         res.json({ [singular]: entity });
@@ -94,9 +101,9 @@ function createMockRouter(entityName) {
     return router;
 }
 
-// Mock jsonEntityCrud
+// Mock jsonEntityCrud - must pass options through to createMockRouter
 vi.mock('../utils/jsonEntityCrud.js', () => ({
-    createJsonEntityRouter: (entityName) => createMockRouter(entityName),
+    createJsonEntityRouter: (entityName, options) => createMockRouter(entityName, options),
 }));
 
 import quests from './quests.js';
@@ -317,7 +324,7 @@ describe('quests - POST /api/campaigns/:campaign/quests', () => {
         expect(stored[0].rewards.items).toEqual(['Ancient Sword']);
     });
 
-    it('should handle missing quests in request body and save empty array', async () => {
+    it('should return 400 when quests is missing from request body', async () => {
         const existingData = [
             { id: 'old-1', title: 'Old Quest', description: 'Old', stage: 'completed', objectives: [] },
         ];
@@ -328,11 +335,8 @@ describe('quests - POST /api/campaigns/:campaign/quests', () => {
             .post('/api/campaigns/test-campaign/quests')
             .send({});
 
-        expect(res.status).toBe(200);
-        expect(res.body).toHaveProperty('success', true);
-
-        const stored = MOCK_STORE.get('test-campaign:quests');
-        expect(stored).toEqual([]);
+        expect(res.status).toBe(400);
+        expect(res.body).toHaveProperty('error', 'Expected an array for quests');
     });
 
     it('should save quests with string objectives (array of strings)', async () => {

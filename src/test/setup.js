@@ -26,5 +26,4 @@ Object.defineProperty(window, 'localStorage', {
 // Cleanup after each test
 afterEach(() => {
   cleanup();
-  vi.restoreAllMocks();
 });

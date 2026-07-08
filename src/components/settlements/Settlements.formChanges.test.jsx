@@ -130,4 +130,20 @@ describe('Settlements - form field changes', () => {
     fireEvent.click(settlementItem);
     expect(screen.getByText(/threats/i)).toBeInTheDocument();
   });
+
+  it('updates threat value via PreviewToggle when threat is present', () => {
+    Object.assign(settlementMockReturn, {
+      ...mockUseSettlements,
+      items: [
+        { name: 'Threat Town', size: 'village', population: '', tags: '', services: [], description: '', atmosphere: '', government: '', notableNPCs: [], rumors: [], notes: '', threat: 'Bandits' },
+      ],
+    });
+    render(<Settlements campaignName="test" onBack={() => {}} />);
+    const settlementItem = screen.getByRole('button', { name: /edit settlement/i });
+    fireEvent.click(settlementItem);
+    // Find the threat PreviewToggle textarea by its data-testid
+    const threatTextarea = screen.getByTestId('preview-toggle-settlement-threat');
+    fireEvent.change(threatTextarea, { target: { value: 'Dragon sightings' } });
+    expect(threatTextarea.value).toBe('Dragon sightings');
+  });
 });

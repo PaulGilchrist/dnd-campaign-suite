@@ -167,6 +167,15 @@ describe('logConditionSave', () => {
         });
     });
 
+    it('posts a failed condition save entry', () => {
+        logConditionSave(campaignName, 'Gortha', 8, 3, '+3 WIS', 'poisoned', 'Wisdom', 14, false);
+
+        const entry = capturedEntry();
+        expect(entry.success).toBe(false);
+        expect(entry.rollType).toBe('condition-save');
+        expect(entry.condition).toBe('poisoned');
+    });
+
 });
 
 describe('logHpChange', () => {
@@ -189,6 +198,30 @@ describe('logHpChange', () => {
         });
     });
 
+    it('posts an hp_change entry for healing', () => {
+        logHpChange(campaignName, 'Ally', 10, 25, 30, true, false);
+
+        const entry = capturedEntry();
+        expect(entry).toEqual({
+            type: 'hp_change',
+            targetName: 'Ally',
+            delta: 10,
+            currentHp: 25,
+            maxHp: 30,
+            isHealing: true,
+            isUnconscious: false,
+        });
+    });
+
+    it('posts an hp_change entry with isUnconscious flag', () => {
+        logHpChange(campaignName, 'Orc', -15, 0, 30, false, true);
+
+        const entry = capturedEntry();
+        expect(entry.isUnconscious).toBe(true);
+        expect(entry.currentHp).toBe(0);
+        expect(entry.isHealing).toBe(false);
+    });
+
 });
 
 describe('logNpcThreshold', () => {
@@ -207,5 +240,41 @@ describe('logNpcThreshold', () => {
             threshold: 5,
             maxHp: 10,
         });
+    });
+});
+
+describe('error handling', () => {
+    beforeEach(() => {
+        clearMocks();
+    });
+
+    it('logInitiativeRoll does not throw when addEntry rejects', async () => {
+        mockAddEntry.mockRejectedValueOnce(new Error('network error'));
+        await expect(logInitiativeRoll(campaignName, 'Gortha', 15, 3)).resolves.toBeUndefined();
+    });
+
+    it('logConditionEvent does not throw when addEntry rejects', async () => {
+        mockAddEntry.mockRejectedValueOnce(new Error('network error'));
+        await expect(logConditionEvent(campaignName, 'add', 'Orc', 'charmed', 12, 'CHA')).resolves.toBeUndefined();
+    });
+
+    it('logConcentrationSave does not throw when addEntry rejects', async () => {
+        mockAddEntry.mockRejectedValueOnce(new Error('network error'));
+        await expect(logConcentrationSave(campaignName, 'Gortha', 14, 2, '+2', 'Fireball', 15, true)).resolves.toBeUndefined();
+    });
+
+    it('logConditionSave does not throw when addEntry rejects', async () => {
+        mockAddEntry.mockRejectedValueOnce(new Error('network error'));
+        await expect(logConditionSave(campaignName, 'Gortha', 13, 3, '+3', 'poisoned', 'Wisdom', 14, true)).resolves.toBeUndefined();
+    });
+
+    it('logHpChange does not throw when addEntry rejects', async () => {
+        mockAddEntry.mockRejectedValueOnce(new Error('network error'));
+        await expect(logHpChange(campaignName, 'Orc', -5, 20, 30, false, false)).resolves.toBeUndefined();
+    });
+
+    it('logNpcThreshold does not throw when addEntry rejects', async () => {
+        mockAddEntry.mockRejectedValueOnce(new Error('network error'));
+        await expect(logNpcThreshold(campaignName, 'Bandit Leader', -10, 5, 10)).resolves.toBeUndefined();
     });
 });

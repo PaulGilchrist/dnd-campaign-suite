@@ -84,4 +84,16 @@ describe('Settlements - generate settlement', () => {
       expect(screen.getByRole('heading', { name: 'New Settlement' })).toBeInTheDocument();
     });
   });
+
+  it('logs error and does not open modal when generation fails', async () => {
+    vi.mocked(await import('../../services/campaign/settlementGenerator.js')).generateSettlement = vi.fn().mockRejectedValue(new Error('Generation failed'));
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    render(<Settlements campaignName="test" onBack={() => {}} />);
+    const genBtn = screen.getByRole('button', { name: /generate settlement/i });
+    fireEvent.click(genBtn);
+    await waitFor(() => {
+      expect(consoleSpy).toHaveBeenCalledWith('Failed to generate settlement:', expect.any(Error));
+    });
+    expect(screen.queryByRole('heading', { name: 'New Settlement' })).not.toBeInTheDocument();
+  });
 });

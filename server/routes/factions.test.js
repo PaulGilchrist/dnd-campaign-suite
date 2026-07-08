@@ -22,6 +22,7 @@ function clearMockStore() {
 // factions uses default idField='id', responseWrapper='factions', itemWrapper='faction'
 function createMockRouter() {
     const router = Router();
+    const idField = 'id';
     const singularDisplayName = 'Faction';
 
     // GET list
@@ -37,6 +38,9 @@ function createMockRouter() {
     router.post('/api/campaigns/:campaign/factions', (req, res) => {
         const campaign = req.params.campaign;
         const entities = req.body.factions;
+        if (!Array.isArray(entities)) {
+            return res.status(400).json({ error: 'Expected an array for factions' });
+        }
         setupMock(campaign, entities);
         res.json({ success: true });
     });
@@ -52,7 +56,7 @@ function createMockRouter() {
         }
 
         const entities = Array.isArray(MOCK_STORE.get(key)) ? MOCK_STORE.get(key) : [];
-        const entity = entities.find(e => e.id === id);
+        const entity = entities.find(e => e[idField] === id);
 
         if (!entity) {
             return res.status(404).json({ error: `${singularDisplayName} not found` });
@@ -72,7 +76,7 @@ function createMockRouter() {
         }
 
         const entities = Array.isArray(MOCK_STORE.get(key)) ? MOCK_STORE.get(key) : [];
-        const filtered = entities.filter(e => e.id !== id);
+        const filtered = entities.filter(e => e[idField] !== id);
 
         setupMock(campaign, filtered);
         res.json({ success: true });
@@ -275,7 +279,7 @@ describe('factions - POST /api/campaigns/:campaign/factions', () => {
         expect(res.body).toHaveProperty('success', true);
     });
 
-    it('should handle missing factions in request body and save empty array', async () => {
+    it('should return 400 when factions is missing from request body', async () => {
         const existingData = [
             { id: 'old-1', name: 'Old Faction', description: 'Old', goals: 'Old', influence: 1, notes: '' },
         ];
@@ -286,11 +290,8 @@ describe('factions - POST /api/campaigns/:campaign/factions', () => {
             .post('/api/campaigns/test-campaign/factions')
             .send({});
 
-        expect(res.status).toBe(200);
-        expect(res.body).toHaveProperty('success', true);
-
-        const stored = MOCK_STORE.get('test-campaign:factions');
-        expect(stored).toEqual([]);
+        expect(res.status).toBe(400);
+        expect(res.body).toHaveProperty('error', 'Expected an array for factions');
     });
 });
 

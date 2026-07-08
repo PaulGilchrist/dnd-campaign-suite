@@ -2,6 +2,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import CharClassFeatures from './CharClassFeatures.jsx';
+import { getRuntimeValue, useRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
+import { getClassFeatures } from '../../../services/character/classFeatures.js';
 
 vi.mock('./TrackedResourceInput.jsx', () => ({
     default: ({ label, getMax }) => (
@@ -147,6 +149,48 @@ describe('CharClassFeatures', () => {
             renderComponent(stats);
             expect(screen.getByTestId('tracked-resource-Sorcerous Restoration')).toBeInTheDocument();
         });
+
+        it('renders innate sorcery active badge when activeBuffs contains Innate Sorcery', () => {
+            vi.mocked(useRuntimeValue).mockImplementation((_name, key) => {
+                if (key === 'activeBuffs') return [{ name: 'Innate Sorcery' }];
+                return null;
+            });
+            const stats = makeStats({
+                class: { name: 'Sorcerer', class_levels: [{ level: 5 }] },
+                automation: { passives: [] },
+            });
+            renderComponent(stats);
+            expect(screen.getByText(/\+1 Save DC, Spell Adv/)).toBeInTheDocument();
+        });
+
+        it('renders revelation in flesh badge with effect name', () => {
+            vi.mocked(useRuntimeValue).mockImplementation((_name, key) => {
+                if (key === 'activeBuffs') return [{ name: 'Revelation in Flesh', effect: 'glistening_flight' }];
+                return null;
+            });
+            const stats = makeStats({
+                class: { name: 'Sorcerer', class_levels: [{ level: 5 }] },
+                automation: { passives: [] },
+            });
+            renderComponent(stats);
+            expect(screen.getByText(/Glistening Flight/)).toBeInTheDocument();
+        });
+
+        it('renders spell slot costs when creatingSpellSlotCosts has entries', () => {
+            vi.mocked(getClassFeatures).mockReturnValue({
+                creatingSpellSlotCosts: ['1 sorcery point', '1 HP'],
+                maxSorceryPoints: 6,
+                metamagicKnown: 4,
+                maxInnateSorcery: 3,
+            });
+            const stats = makeStats({
+                class: { name: 'Sorcerer', class_levels: [{ level: 5 }] },
+                automation: { passives: [] },
+            });
+            renderComponent(stats);
+            expect(screen.getByText(/Spell Slot \(level 1-5\) Costs:/)).toBeInTheDocument();
+            vi.mocked(getClassFeatures).mockRestore();
+        });
     });
 
     describe('Warlock features', () => {
@@ -186,6 +230,16 @@ describe('CharClassFeatures', () => {
             expect(screen.getByText(/within 60 ft\./)).toBeInTheDocument();
         });
 
+        it('renders projected ward with default range when not specified', () => {
+            const stats = makeStats({
+                level: 5,
+                class: { name: 'Wizard', class_levels: [{ level: 5 }] },
+                automation: { reactions: [{ type: 'projected_ward', name: 'Projected Ward' }] },
+            });
+            renderComponent(stats);
+            expect(screen.getByText(/within 30 ft\./)).toBeInTheDocument();
+        });
+
         it('renders portent section and button when portent action exists', () => {
             const stats = makeStats({
                 level: 5,
@@ -197,6 +251,64 @@ describe('CharClassFeatures', () => {
             expect(screen.getByText(/Portent Dice:/)).toBeInTheDocument();
             expect(screen.getByTitle(/Use Portent/)).toBeInTheDocument();
         });
+
+        it('renders portent dice display when dice are stored', () => {
+            vi.mocked(getRuntimeValue).mockImplementation((_name, key, _campaign) => {
+                if (key === 'portentDice') return [1, 20];
+                return null;
+            });
+            const stats = makeStats({
+                level: 5,
+                class: { name: 'Wizard', class_levels: [{ level: 5 }] },
+                automation: { passives: [] },
+                specialActions: [{ name: 'Portent', automation: { type: 'portent' } }],
+            });
+            renderComponent(stats);
+            expect(screen.getByText(/Portent Dice:/)).toBeInTheDocument();
+            expect(screen.getByText(/2 remaining \(refreshes on Long Rest\)/)).toBeInTheDocument();
+        });
+
+        it('shows no dice remaining badge when portent dice array is empty', () => {
+            vi.mocked(getRuntimeValue).mockImplementation((_name, key, _campaign) => {
+                if (key === 'portentDice') return [];
+                return null;
+            });
+            const stats = makeStats({
+                level: 5,
+                class: { name: 'Wizard', class_levels: [{ level: 5 }] },
+                automation: { passives: [] },
+                specialActions: [{ name: 'Portent', automation: { type: 'portent' } }],
+            });
+            renderComponent(stats);
+            expect(screen.getByText(/No dice remaining/)).toBeInTheDocument();
+        });
+
+        it('returns null when showWizardFeatures is false', () => {
+            vi.mocked(getClassFeatures).mockReturnValue({ showWizardFeatures: false });
+            const stats = makeStats({
+                level: 5,
+                class: { name: 'Wizard', class_levels: [{ level: 5 }] },
+                automation: { passives: [] },
+            });
+            const { container } = renderComponent(stats);
+            expect(container.innerHTML).toBe('');
+            vi.mocked(getClassFeatures).mockRestore();
+        });
+
+        it('renders third eye buff when active', () => {
+            vi.mocked(useRuntimeValue).mockImplementation((_name, key) => {
+                if (key === 'activeBuffs') return [{ name: 'The Third Eye', effect: 'darkvision_120' }];
+                return null;
+            });
+            const stats = makeStats({
+                level: 5,
+                class: { name: 'Wizard', class_levels: [{ level: 5 }] },
+                automation: { passives: [] },
+            });
+            renderComponent(stats);
+            expect(screen.getByText(/The Third Eye:/)).toBeInTheDocument();
+            expect(screen.getByText(/Darkvision 120 ft/)).toBeInTheDocument();
+        });
     });
 
     describe('main CharClassFeatures entry point', () => {
@@ -207,6 +319,26 @@ describe('CharClassFeatures', () => {
             });
             renderComponent(stats);
             expect(screen.getByTestId('tracked-resource-Adrenaline Rush')).toBeInTheDocument();
+        });
+
+        it('renders both adrenaline rush and class features when both exist', () => {
+            const stats = makeStats({
+                level: 5,
+                class: { name: 'Fighter', class_levels: [{ level: 1 }, { level: 2 }, { level: 3 }, { level: 4 }, { level: 5 }], fightingStyles: [] },
+                automation: { specialActions: [{ effect: 'bonus_action_dash' }], passives: [] },
+            });
+            renderComponent(stats);
+            expect(screen.getByTestId('tracked-resource-Adrenaline Rush')).toBeInTheDocument();
+            expect(screen.getByTestId('char-class-fighter')).toBeInTheDocument();
+        });
+
+        it('renders nothing when no class match and no adrenaline rush', () => {
+            const stats = makeStats({
+                class: { name: 'UnknownClass' },
+                automation: { specialActions: [] },
+            });
+            const { container } = renderComponent(stats);
+            expect(container.innerHTML).toBe('');
         });
     });
 });

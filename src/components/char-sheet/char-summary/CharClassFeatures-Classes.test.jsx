@@ -356,6 +356,11 @@ describe('CharClassFeatures', () => {
             renderComponent(stats);
             expect(screen.getByText(/Fighting Styles.*/)).toBeInTheDocument();
         });
+
+        it('renders aura range when available from class features', () => {
+            renderComponent(paladinStats());
+            expect(screen.getByText(/Aura Range.*/)).toBeInTheDocument();
+        });
     });
 
     describe('Ranger features', () => {
@@ -393,6 +398,15 @@ describe('CharClassFeatures', () => {
             });
             renderComponent(statsNull);
             expect(screen.queryByText(/Fighting Styles:/)).not.toBeInTheDocument();
+        });
+
+        it('renders favored enemies display', () => {
+            const stats = makeStats({
+                class: { name: 'Ranger', class_levels: [{ level: 5 }] },
+                automation: { passives: [] },
+            });
+            renderComponent(stats);
+            expect(screen.getByText(/Favored Enemies.*/)).toBeInTheDocument();
         });
     });
 

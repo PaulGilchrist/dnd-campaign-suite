@@ -144,6 +144,97 @@ describe('CharInventory rendering', () => {
       renderComponent(stats);
       expect(screen.queryByText(/Magic Items:/)).not.toBeInTheDocument();
     });
+
+    it('should render magic items without subtype when subtype is missing', () => {
+      const stats = {
+        inventory: {
+          magicItems: [
+            {
+              name: 'Ring of Protection',
+              type: 'Ring',
+              rarity: 'Rare',
+              description: 'A protective ring.',
+              requiresAttunement: false,
+            },
+          ],
+          equipped: [],
+          backpack: [],
+        },
+      };
+      renderComponent(stats);
+      expect(screen.getByText(/Ring of Protection/)).toBeInTheDocument();
+      expect(screen.getByText(/Rare/)).toBeInTheDocument();
+      expect(screen.queryByText(/\(/)).not.toBeInTheDocument();
+    });
+
+    it('should render magic items without requiresAttunement when false', () => {
+      const stats = {
+        inventory: {
+          magicItems: [
+            {
+              name: 'Potion of Healing',
+              type: 'Potion',
+              rarity: 'Common',
+              description: 'Restores hit points.',
+              requiresAttunement: false,
+            },
+          ],
+          equipped: [],
+          backpack: [],
+        },
+      };
+      renderComponent(stats);
+      expect(screen.getByText(/Potion of Healing/)).toBeInTheDocument();
+      expect(screen.queryByText(/requires attunement/)).not.toBeInTheDocument();
+    });
+
+    it('should render magic item description with sanitizeHtml passthrough', () => {
+      const stats = {
+        inventory: {
+          magicItems: [
+            {
+              name: 'Enchanted Wand',
+              type: 'Wand',
+              rarity: 'Uncommon',
+              description: '<b>Channeled spell</b> that fires magic.',
+              requiresAttunement: true,
+              attunementRequirements: 'Spellcaster',
+            },
+          ],
+          equipped: [],
+          backpack: [],
+        },
+      };
+      renderComponent(stats);
+      expect(screen.getByText(/Enchanted Wand/)).toBeInTheDocument();
+      expect(screen.getByText(/Spellcaster/)).toBeInTheDocument();
+    });
+
+    it('should render single equipped item without trailing comma', () => {
+      const stats = {
+        inventory: {
+          magicItems: [],
+          equipped: ['Dagger'],
+          backpack: [],
+        },
+      };
+      renderComponent(stats);
+      expect(screen.getByText(/Equipped:/)).toBeInTheDocument();
+      expect(screen.getByText('Dagger')).toBeInTheDocument();
+    });
+
+    it('should render single backpack item without trailing comma', () => {
+      const stats = {
+        inventory: {
+          magicItems: [],
+          equipped: [],
+          backpack: ['Torch'],
+        },
+      };
+      renderComponent(stats);
+      expect(screen.getByText(/Backpack:/)).toBeInTheDocument();
+      expect(screen.getByText('Torch')).toBeInTheDocument();
+    });
   });
 
   describe('equipped and backpack rendering', () => {

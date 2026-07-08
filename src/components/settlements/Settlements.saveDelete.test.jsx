@@ -145,4 +145,40 @@ describe('Settlements - save and delete behavior', () => {
     fireEvent.click(saveBtn);
     expect(mockUseSettlements.saveItems).not.toHaveBeenCalled();
   });
+
+  it('logs error and keeps modal open when save fails', async () => {
+    mockUseSettlements.saveItems = vi.fn().mockRejectedValue(new Error('Save failed'));
+    Object.assign(settlementMockReturn, mockUseSettlements);
+    render(<Settlements campaignName="test" onBack={() => {}} />);
+    const modalOpen = screen.getByRole('button', { name: /new settlement/i });
+    fireEvent.click(modalOpen);
+    const nameInput = screen.getByLabelText(/name/i);
+    fireEvent.change(nameInput, { target: { value: 'My Settlement' } });
+    const saveBtn = screen.getByRole('button', { name: /save/i });
+    fireEvent.click(saveBtn);
+    await waitFor(() => {
+      expect(mockUseSettlements.saveItems).toHaveBeenCalled();
+    });
+    expect(screen.getByRole('heading', { name: 'New Settlement' })).toBeInTheDocument();
+  });
+
+  it('logs error and keeps modal open when delete fails', async () => {
+    global.window.confirm = vi.fn(() => true);
+    mockUseSettlements.deleteItem = vi.fn().mockRejectedValue(new Error('Delete failed'));
+    Object.assign(settlementMockReturn, {
+      ...mockUseSettlements,
+      items: [
+        { name: 'Keep Me', size: 'village', population: '', tags: '', services: [], description: '', atmosphere: '', government: '', notableNPCs: [], rumors: [], notes: '', threat: '' },
+      ],
+    });
+    render(<Settlements campaignName="test" onBack={() => {}} />);
+    const settlementItem = screen.getByRole('button', { name: /edit settlement/i });
+    fireEvent.click(settlementItem);
+    const deleteBtn = screen.getByRole('button', { name: 'Delete' });
+    fireEvent.click(deleteBtn);
+    await waitFor(() => {
+      expect(mockUseSettlements.deleteItem).toHaveBeenCalled();
+    });
+    expect(screen.getByRole('heading', { name: 'Edit Settlement' })).toBeInTheDocument();
+  });
 });

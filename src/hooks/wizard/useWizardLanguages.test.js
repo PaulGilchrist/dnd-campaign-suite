@@ -131,4 +131,39 @@ describe('useWizardLanguages', () => {
       expect(useWizardConfig).toHaveBeenCalledTimes(2);
     });
   });
+
+  describe('getDeps callback', () => {
+    it('extracts the correct dependency fields from formData', () => {
+      renderLanguages();
+      const config = useWizardConfig.mock.calls[0][0];
+      const deps = config.getDeps(DEFAULT_FORM_DATA);
+      expect(deps).toEqual([
+        DEFAULT_FORM_DATA.languages,
+        DEFAULT_FORM_DATA.class.fightingStyles,
+        DEFAULT_FORM_DATA.class.name,
+        DEFAULT_FORM_DATA.race.name,
+        DEFAULT_FORM_DATA.background,
+        DEFAULT_FORM_DATA.rules,
+        DEFAULT_FORM_DATA.level,
+      ]);
+    });
+
+    it('includes undefined values when formData fields are missing', () => {
+      const minimalFormData = {};
+      renderLanguages(minimalFormData);
+      const config = useWizardConfig.mock.calls[0][0];
+      const deps = config.getDeps(minimalFormData);
+      expect(deps).toEqual([undefined, undefined, undefined, undefined, undefined, undefined, undefined]);
+    });
+
+    it('includes undefined when nested fields are missing', () => {
+      const partialFormData = { languages: ['Common'] };
+      renderLanguages(partialFormData);
+      const config = useWizardConfig.mock.calls[0][0];
+      const deps = config.getDeps(partialFormData);
+      expect(deps[1]).toBeUndefined();
+      expect(deps[2]).toBeUndefined();
+      expect(deps[3]).toBeUndefined();
+    });
+  });
 });
