@@ -35,12 +35,10 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     const conditions = Array.isArray(storedConditions) ? storedConditions : [];
     if (!conditions.some(c => String(c).toLowerCase() === 'invisible')) {
         await setRuntimeValue(playerName, 'activeConditions', [...conditions, 'invisible'], campaignName);
-        console.log('[naturesVeil] ADDED invisible condition to %s, conditions now: %s', playerName, JSON.stringify([...conditions, 'invisible']));
     }
 
     // Set _activeInvisibility_ key so endInvisibilityOnHostileAction works
     await setRuntimeValue(campaignName, `_activeInvisibility_${playerName}`, playerStats.name, campaignName);
-    console.log('[naturesVeil] SET _activeInvisibility_%s = %s', playerName, playerStats.name);
 
     // Set expiration: Invisible lasts until the creature after this one in initiative order
     // is active on the next round. Use addExpiration with rounds=2 so it expires when
@@ -56,8 +54,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     }
     addExpiration(playerName, playerName, [
         { type: 'condition', condition: 'invisible' }
-    ], campaignName, 1, nextCreatureName);
-    console.log('[naturesVeil] added expiration: target=%s rounds=2 nextCreatureName=%s', playerName, nextCreatureName);
+    ], campaignName, 2, nextCreatureName);
 
     // Log the ability use
     await addEntry(campaignName, {
