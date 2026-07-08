@@ -5,7 +5,6 @@ import { handle, applyRemoveCurse } from './removeCurseHandler.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../ui/logService.js';
-import { postLogEntry } from '../../../shared/logPoster.js';
 
 vi.mock('../../../rules/combat/damageUtils.js', () => ({
   getCombatContext: vi.fn(),
@@ -20,8 +19,8 @@ vi.mock('../../../ui/logService.js', () => ({
   addEntry: vi.fn(() => Promise.resolve()),
 }));
 
-vi.mock('../../../shared/logPoster.js', () => ({
-  postLogEntry: vi.fn(),
+vi.mock('../../../ui/logService.js', () => ({
+  addEntry: vi.fn(() => Promise.resolve()),
 }));
 
 const campaignName = 'TestCampaign';
@@ -268,7 +267,7 @@ describe('removeCurseHandler.applyRemoveCurse', () => {
       );
 
       expect(setRuntimeValue).toHaveBeenCalledWith('Goblin', 'activeBuffs', [{ type: 'buff', name: 'Shield' }], campaignName);
-      expect(postLogEntry).toHaveBeenCalledWith(
+      expect(addEntry).toHaveBeenCalledWith(
         campaignName,
         expect.objectContaining({ type: 'buff', action: 'removed', buffName: 'Cursed Sword' }),
       );
@@ -294,7 +293,7 @@ describe('removeCurseHandler.applyRemoveCurse', () => {
       );
 
       expect(setRuntimeValue).toHaveBeenCalledWith('Goblin', 'activeBuffs', [{ type: 'buff', name: 'Shield' }], campaignName);
-      expect(postLogEntry).toHaveBeenCalledTimes(3);
+      expect(addEntry).toHaveBeenCalledTimes(4);
       expect(result.payload.description).toContain('2 cursed effect');
     });
 
@@ -435,7 +434,7 @@ describe('removeCurseHandler.applyRemoveCurse', () => {
       expect(result.payload.type).toBe('automation_info');
       expect(result.payload.description).toContain('No curses or attunement found');
       expect(addEntry).not.toHaveBeenCalled();
-      expect(postLogEntry).not.toHaveBeenCalled();
+      expect(addEntry).not.toHaveBeenCalled();
     });
 
     it('should return info popup when only non-cursed buffs exist', async () => {
@@ -497,7 +496,7 @@ describe('removeCurseHandler.applyRemoveCurse', () => {
         { targetName: 'Goblin' },
       );
 
-      expect(postLogEntry).toHaveBeenCalledWith(
+      expect(addEntry).toHaveBeenCalledWith(
         campaignName,
         expect.objectContaining({
           type: 'spell_effect',
@@ -522,7 +521,7 @@ describe('removeCurseHandler.applyRemoveCurse', () => {
         { targetName: 'Goblin' },
       );
 
-      expect(postLogEntry).toHaveBeenCalledWith(
+      expect(addEntry).toHaveBeenCalledWith(
         campaignName,
         expect.objectContaining({
           effects: expect.arrayContaining([
@@ -549,7 +548,7 @@ describe('removeCurseHandler.applyRemoveCurse', () => {
       );
 
       expect(addEntry).not.toHaveBeenCalled();
-      expect(postLogEntry).not.toHaveBeenCalled();
+      expect(addEntry).not.toHaveBeenCalled();
     });
   });
 });

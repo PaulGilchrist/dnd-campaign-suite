@@ -28,57 +28,7 @@ const rulesFactory = {
         return playerSummary.rules || '5e';
       },
 
-      // === DELEGATION WRAPPERS (preserve existing API for callers) ===
-
-    getAbilityLongName: (shortName) => {
-        return rules.getAbilityLongName(shortName);
-      },
-
-    getAbilities: async (playerStats, playerSummary) => {
-        return rules.getAbilities(playerStats, playerSummary);
-      },
-
-    getActions: (playerStats, playerSummary) => {
-        return rules.getActions(playerStats, playerSummary);
-      },
-
-    getArmorClass: (allEquipment, playerStats, playerSummary) => {
-        return rules.getArmorClass(allEquipment, playerStats, playerSummary);
-      },
-
-    getAttacks: (allEquipment, allSpells, playerStats, playerSummary) => {
-        return rules.getAttacks(allEquipment, allSpells, playerStats, playerSummary);
-      },
-
-    getHitPoints: (playerStats, playerSummary) => {
-        return rules.getHitPoints(playerStats, playerSummary);
-      },
-
-    getLanguages: (playerStats, playerSummary) => {
-        return rules.getLanguages(playerStats, playerSummary);
-      },
-
-    getMagicItems: (allMagicItems, playerSummary, playerStats) => {
-        return rules.getMagicItems(allMagicItems, playerSummary, playerStats);
-      },
-
-    getProficiencyChoiceCount: (playerStats, skills, playerSummary) => {
-        return rules.getProficiencyChoiceCount(playerStats, skills, playerSummary);
-      },
-
-    getProficiencies: (playerStats, skill, playerSummary) => {
-        return rules.getProficiencies(playerStats, skill, playerSummary);
-      },
-
-    getSpellAbilities: (allSpells, playerStats, playerSummary) => {
-        return rules.getSpellAbilities(allSpells, playerStats, playerSummary);
-      },
-
-    getSpellMaxLevel: (spellAbilities) => {
-        return rules.getSpellMaxLevel(spellAbilities);
-      },
-
-      // Class rules delegation - raceRules-specific
+      // Class rules delegation - dispatches to classRules which varies by ruleset
     getDruidMaxWildShapeChallengeRating: (playerStats, playerSummary) => {
         const { classRules: cr } = rulesFactory.getRules(playerSummary);
         return cr.getDruidMaxWildShapeChallengeRating(playerStats);
@@ -102,17 +52,6 @@ const rulesFactory = {
     getRogueSneakAttack: (playerStats, playerSummary) => {
         const { classRules: cr } = rulesFactory.getRules(playerSummary);
         return cr.getRogueSneakAttack(playerStats);
-      },
-
-      // Race rules delegation
-    getImmunities: (playerSummary) => {
-        const { raceRules: rr } = rulesFactory.getRules(playerSummary);
-        return rr.getImmunities(playerSummary);
-      },
-
-    getResistances: (playerSummary) => {
-        const { raceRules: rr } = rulesFactory.getRules(playerSummary);
-        return rr.getResistances(playerSummary);
       },
 
     getSenses: (playerStats, playerSummary) => {

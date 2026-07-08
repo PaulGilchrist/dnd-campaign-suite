@@ -7,7 +7,7 @@ import { addExpiration } from '../../../rules/effects/expirations.js';
 import { getCombatContext } from '../../../../services/rules/combat/damageUtils.js';
 
 import { resolveMapPositions } from '../../common/targetResolver.js';
-import { postLogEntry } from '../../../../services/shared/logPoster.js';
+import { addEntry } from '../../../../services/ui/logService.js';
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
     getRuntimeValue: vi.fn(),
@@ -30,8 +30,8 @@ vi.mock('../../common/targetResolver.js', () => ({
     resolveMapPositions: vi.fn(),
 }));
 
-vi.mock('../../../../services/shared/logPoster.js', () => ({
-    postLogEntry: vi.fn(() => Promise.resolve()),
+vi.mock('../../../../services/ui/logService.js', () => ({
+    addEntry: vi.fn(() => Promise.resolve()),
 }));
 
 const campaignName = 'test-campaign';
@@ -352,13 +352,13 @@ describe('mageArmorHandler.applyMageArmor', () => {
             ['Ally1', 'Ally2'],
         );
 
-        expect(postLogEntry).toHaveBeenCalledWith(campaignName, {
+        expect(addEntry).toHaveBeenCalledWith(campaignName, {
             type: 'ability_use',
             characterName: 'TestWizard',
             abilityName: 'Mage Armor',
             description: expect.stringContaining('TestWizard cast Mage Armor on Ally1'),
         });
-        expect(postLogEntry).toHaveBeenCalledWith(campaignName, {
+        expect(addEntry).toHaveBeenCalledWith(campaignName, {
             type: 'ability_use',
             characterName: 'TestWizard',
             abilityName: 'Mage Armor',

@@ -23,7 +23,10 @@ vi.mock('../../services/rules/features/invisibilityService.js', () => ({ endInvi
 vi.mock('../../services/ui/utils.js', () => ({ default: { getName: vi.fn((n) => n || 'Unknown'), guid: vi.fn(() => 'test-guid-1234') } }));
 vi.mock('../../services/ui/storage.js', () => ({ default: { set: vi.fn() } }));
 vi.mock('./loggedDiceRollUtils.js', () => ({ hasSoulstitchProtection: vi.fn() }));
-vi.mock('../../services/shared/logPoster.js', () => ({ postLogEntry: vi.fn() }));
+vi.mock('../../services/ui/logService.js', () => {
+    const mockAddEntry = vi.fn().mockReturnValue(Promise.resolve(undefined));
+    return { addEntry: mockAddEntry };
+});
 
 import { addExpiration } from '../../services/rules/effects/expirations.js';
 import { getCombatSummary } from '../../services/encounters/combatData.js';
@@ -34,7 +37,7 @@ import { endInvisibilityOnHostileAction } from '../../services/rules/features/in
 import { hasSoulstitchProtection } from './loggedDiceRollUtils.js';
 import utils from '../../services/ui/utils.js';
 import storage from '../../services/ui/storage.js';
-import { postLogEntry } from '../../services/shared/logPoster.js';
+import { addEntry } from '../../services/ui/logService.js';
 import { rollExpression, rollExpressionDoubled } from '../../services/dice/diceRoller.js';
 import { setupEventListeners } from './useLoggedDiceRollEventHandlers.js';
 
@@ -68,8 +71,8 @@ describe('setupEventListeners (useLoggedDiceRollEventHandlers)', () => {
         playerIsImmuneToCondition.mockReset();
         playerIsImmuneToCondition.mockReturnValue(false);
         utils.getName.mockImplementation((n) => n);
-        postLogEntry.mockReset();
-        postLogEntry.mockReturnValue(undefined);
+        addEntry.mockReset();
+        addEntry.mockReturnValue(Promise.resolve(undefined));
         deps.logEntry.mockClear();
         rollExpression.mockReturnValue({ total: 10, rolls: [5, 5], modifier: 0 });
         rollExpressionDoubled.mockReturnValue({ total: 20, rolls: [5, 5, 5, 5], modifier: 0 });
@@ -252,7 +255,7 @@ describe('setupEventListeners (useLoggedDiceRollEventHandlers)', () => {
             const pid = 'p13';
             testPendingSaves = { [pid]: createSavePrompt(pid, { rawDamage: 15 }) };
             window.dispatchEvent(new CustomEvent('save-result', { detail: { promptId: pid, targetName: 'Goblin', success: false, roll: 8, total: 11, saveBonus: 3 } }));
-            expect(postLogEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({ type: 'hp_change', targetName: 'Goblin', isUnconscious: true }));
+            expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({ type: 'hp_change', targetName: 'Goblin', isUnconscious: true }));
         });
 
         it('logs hp_change with bloodied threshold', () => {
@@ -262,7 +265,7 @@ describe('setupEventListeners (useLoggedDiceRollEventHandlers)', () => {
             const pid = 'p14';
             testPendingSaves = { [pid]: createSavePrompt(pid, { rawDamage: 18 }) };
             window.dispatchEvent(new CustomEvent('save-result', { detail: { promptId: pid, targetName: 'Goblin', success: false, roll: 8, total: 11, saveBonus: 3 } }));
-            expect(postLogEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({ type: 'hp_change', targetName: 'Goblin', threshold: 'bloodied' }));
+            expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({ type: 'hp_change', targetName: 'Goblin', threshold: 'bloodied' }));
         });
 
         // --- save-result: death saves / invisibility ---

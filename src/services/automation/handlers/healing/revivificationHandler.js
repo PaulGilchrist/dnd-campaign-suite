@@ -1,6 +1,7 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { getCombatContext, getTargetFromAttacker } from '../../../rules/combat/damageUtils.js';
-import { postLogEntry } from '../../../shared/logPoster.js';
+import { addEntry } from '../../../ui/logService.js';
+
 import storage from '../../../ui/storage.js';
 
 export async function handle(action, playerStats, campaignName, _mapName) {
@@ -79,14 +80,14 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 
     window.dispatchEvent(new CustomEvent('combat-summary-updated'));
 
-    postLogEntry(campaignName, {
+    addEntry(campaignName, {
         type: 'heal',
         characterName: playerName,
         targetName: target.name,
         amount: healAmount,
         abilityName: action.name,
         timestamp: Date.now(),
-    });
+    }).catch((e) => { console.error("[revivification] Error:", e); });
 
     return {
         type: 'popup',

@@ -1,7 +1,7 @@
 import { buildSaveDc, createSaveListener } from '../../common/savePrompt.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { addEntry } from '../../../ui/logService.js';
-import { postLogEntry } from '../../../shared/logPoster.js';
+
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addExpiration } from '../../../rules/effects/expirations.js';
 
@@ -74,14 +74,14 @@ export async function processSlowRepeatSave(casterName, targetName, saveDc, camp
             description: `${targetName} succeeded on WIS save. Slow ends!`,
         }).catch((e) => { console.error("[slow] Error:", e); });
 
-        postLogEntry(campaignName, {
+        addEntry(campaignName, {
             type: 'condition',
             action: 'removed',
             characterName: targetName,
             condition: 'Slow',
             reason: 'Slow (successful repeat save)',
             timestamp: Date.now(),
-        });
+        }).catch((e) => { console.error("[slow] Error:", e); });
 
         return {
             type: 'popup',
@@ -259,7 +259,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             ];
             setRuntimeValue(campaignName, 'targetEffects', allEffects, campaignName);
 
-            postLogEntry(campaignName, {
+            addEntry(campaignName, {
                 type: 'condition',
                 action: 'applied',
                 characterName: targetName,
@@ -267,7 +267,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
                 reason: 'Slow spell',
                 note: `${targetName} is affected by Slow: Speed halved, -2 AC penalty, disadvantage on DEX saves, no reactions, action OR bonus action (not both), one attack max, 25% somatic spell failure. Repeats WIS save at end of each turn.`,
                 timestamp: Date.now(),
-            });
+            }).catch((e) => { console.error("[slow] Error:", e); });
 
             addEntry(campaignName, {
                 type: 'save_result',

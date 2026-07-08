@@ -30,6 +30,23 @@ describe('buildPipelineForAction', () => {
     expect(pipeline.run).toBeDefined();
   });
 
+  it('registers spell damage steps for a spell action', () => {
+    const pipeline = buildPipelineForAction({ name: 'Fireball', spellType: 'spell', autoDamageSchool: 'evocation' }, {});
+    expect(pipeline.run).toBeDefined();
+  });
+
+  it('spell pipeline includes featureRiders step', async () => {
+    const { buildSpellDamageSteps } = await import('./spellDamageSteps.js');
+    const steps = buildSpellDamageSteps();
+    const stepNames = steps.map(s => s.name);
+    expect(stepNames).toContain('spellFeatureRiders');
+    expect(stepNames).toContain('spellRollDamage');
+    expect(stepNames).toContain('spellOverchannel');
+    const ridersIdx = stepNames.indexOf('spellFeatureRiders');
+    const overchannelIdx = stepNames.indexOf('spellOverchannel');
+    expect(ridersIdx).toBeLessThan(overchannelIdx);
+  });
+
   function makeCtx() {
     return {
       playerStats: {

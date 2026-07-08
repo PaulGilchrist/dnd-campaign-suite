@@ -1,7 +1,7 @@
 import { buildSaveDc, createSaveListener } from '../../common/savePrompt.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { addEntry } from '../../../ui/logService.js';
-import { postLogEntry } from '../../../shared/logPoster.js';
+
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addExpiration } from '../../../rules/effects/expirations.js';
 
@@ -71,14 +71,14 @@ export async function processSleepRepeatSave(casterName, targetName, saveDc, cam
             description: `${targetName} succeeded on WIS save. Sleep ends!`,
         }).catch((e) => { console.error("[sleep] Error:", e); });
 
-        postLogEntry(campaignName, {
+        addEntry(campaignName, {
             type: 'condition',
             action: 'removed',
             characterName: targetName,
             condition: 'Incapacitated',
             reason: 'Sleep (successful repeat save)',
             timestamp: Date.now(),
-        });
+        }).catch((e) => { console.error("[sleep] Error:", e); });
 
         return {
             type: 'popup',
@@ -97,7 +97,7 @@ export async function processSleepRepeatSave(casterName, targetName, saveDc, cam
     setRuntimeValue(casterName, trackingKey, null, campaignName);
     cleanupTargetEffect(casterName, targetName, campaignName);
 
-    postLogEntry(campaignName, {
+    addEntry(campaignName, {
         type: 'condition',
         action: 'applied',
         characterName: targetName,
@@ -105,7 +105,7 @@ export async function processSleepRepeatSave(casterName, targetName, saveDc, cam
         reason: 'Sleep (failed repeat save)',
         note: `${targetName} is now Unconscious for the duration of Sleep.`,
         timestamp: Date.now(),
-    });
+    }).catch((e) => { console.error("[sleep] Error:", e); });
 
     addEntry(campaignName, {
         type: 'save_result',
@@ -171,7 +171,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
                 characterName: casterName,
                 abilityName: action.name,
                 description: `${targetName} is immune to Sleep (does not sleep / Exhaustion immunity).`,
-            }).catch(() => {});
+            }).catch((e) => { console.error("[sleep] Error:", e); });
             results.push(`${targetName} is immune to Sleep.`);
             continue;
         }
@@ -245,7 +245,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             }
             setRuntimeValue(campaignName, 'targetEffects', effects, campaignName);
 
-            postLogEntry(campaignName, {
+            addEntry(campaignName, {
                 type: 'condition',
                 action: 'applied',
                 characterName: targetName,
@@ -253,7 +253,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
                 reason: 'Sleep spell',
                 note: `${targetName} is Incapacitated by Sleep. At the end of its next turn, it repeats the save. Failure means Unconscious for the duration. The spell ends if the target takes damage or someone within 5ft shakes it.`,
                 timestamp: Date.now(),
-            });
+            }).catch((e) => { console.error("[sleep] Error:", e); });
 
             addEntry(campaignName, {
                 type: 'save_result',

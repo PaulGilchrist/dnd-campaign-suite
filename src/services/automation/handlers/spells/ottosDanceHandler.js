@@ -4,7 +4,7 @@ import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useR
 import { addEntry } from '../../../ui/logService.js';
 import { addExpiration } from '../../../rules/effects/expirations.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
-import { postLogEntry } from '../../../shared/logPoster.js';
+
 
 /**
  * Process a repeated WIS save for a creature charmed by Otto's Irresistible Dance.
@@ -57,14 +57,14 @@ export async function processOttoDanceRepeatSave(casterName, targetName, saveDc,
             description: `${targetName} succeeded on WIS save. ${spellName} ends!`,
         }).catch((e) => { console.error("[ottosDance] Error:", e); });
 
-        postLogEntry(campaignName, {
+        addEntry(campaignName, {
             type: 'condition',
             action: 'removed',
             characterName: targetName,
             condition: 'Charmed, Speed 0',
             reason: `${spellName} (successful save)`,
             timestamp: Date.now(),
-        });
+        }).catch((e) => { console.error("[ottosDance] Error:", e); });
 
         return {
             type: 'popup',
@@ -125,7 +125,7 @@ export async function processOttoDanceSuccessSave(casterName, targetName, spellN
         { type: 'speed_zero', condition: 'speed_zero' },
     ], campaignName, 1);
 
-    postLogEntry(campaignName, {
+    addEntry(campaignName, {
         type: 'condition',
         action: 'applied',
         characterName: targetName,
@@ -133,7 +133,7 @@ export async function processOttoDanceSuccessSave(casterName, targetName, spellN
         reason: `${spellName} (successful save)`,
         note: `${targetName} dances comically until the end of its next turn, spending all movement in place.`,
         timestamp: Date.now(),
-    });
+    }).catch((e) => { console.error("[ottosDance] Error:", e); });
 
     return {
         type: 'popup',
@@ -255,7 +255,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         description: `${targetName} failed WIS save against Otto's Irresistible Dance and is Charmed with Speed 0. On each of its turns, it can take an action to collect itself and repeat the save.`,
     }).catch((e) => { console.error("[ottosDance] Error:", e); });
 
-    postLogEntry(campaignName, {
+    addEntry(campaignName, {
         type: 'condition',
         action: 'applied',
         characterName: targetName,
@@ -263,7 +263,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         reason: action.name,
         note: `${targetName} is Charmed by ${action.name}. While Charmed, the target dances comically, must use all movement to dance in place, has Disadvantage on Dexterity saving throws and attack rolls, and other creatures have Advantage on attack rolls against it.`,
         timestamp: Date.now(),
-    });
+    }).catch((e) => { console.error("[ottosDance] Error:", e); });
 
     return {
         type: 'popup',

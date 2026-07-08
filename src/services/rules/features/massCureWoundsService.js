@@ -2,7 +2,7 @@ import { rollExpression, rollExpressionMaximized } from '../../dice/diceRoller.j
 import { getCombatContext } from '../combat/damageUtils.js';
 import { applyHealingToTarget } from '../combat/applyHealing.js';
 import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
-import { postLogEntry } from '../../shared/logPoster.js';
+import { addEntry } from '../../ui/logService.js';
 import { getDistanceFeet } from '../combat/rangeValidation.js';
 import { resolveHealingBonusesWithDetails, hasHealingMaximization } from '../../combat/automation/automationService.js';
 
@@ -140,7 +140,7 @@ export async function triggerMassCureWounds(spell, metaCtx, playerStats, campaig
             formulaParts.push(`(${bonusParts})`);
         }
 
-        postLogEntry(campaignName, {
+        addEntry(campaignName, {
             type: 'hp_change',
             targetName,
             delta: actualHeal,
@@ -151,7 +151,7 @@ export async function triggerMassCureWounds(spell, metaCtx, playerStats, campaig
             note: 'Mass Cure Wounds',
             formula: formulaParts.join(' + '),
             timestamp: Date.now(),
-        });
+        }).catch((e) => { console.error("[massCureWounds] Error:", e); });
 
         results.push({ targetName, healAmount: actualHeal });
     }

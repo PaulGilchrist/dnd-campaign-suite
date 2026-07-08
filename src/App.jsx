@@ -380,6 +380,8 @@ function App() {
     if (event.key.startsWith('pipeline-')) {
       const prefix = `pipeline-${campaignName}-`;
       if (!event.key.startsWith(prefix)) return;
+      const actualKey = event.key.slice(prefix.length);
+      setRuntimeObject(actualKey, event.data, campaignName, true);
       return;
     }
     if (!event.key.startsWith('change-')) return;

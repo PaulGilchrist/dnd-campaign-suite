@@ -14,11 +14,11 @@ const mockAddEntry = vi.fn(() => Promise.resolve());
 function makeMockPostLogEntry() {
     return vi.fn((campaignName, entry) => mockAddEntry(campaignName, entry));
 }
-vi.mock('../shared/logPoster.js', () => ({
-    postLogEntry: makeMockPostLogEntry(),
+vi.mock('../ui/logService.js', () => ({
+    addEntry: makeMockPostLogEntry(),
 }));
 
-import { postLogEntry } from '../shared/logPoster.js';
+import { addEntry } from '../ui/logService.js';
 import {
     logInitiativeRoll,
     logConditionEvent,
@@ -35,7 +35,7 @@ function clearMocks() {
 }
 
 function capturedEntry() {
-    return postLogEntry.mock.calls[0][1];
+    return addEntry.mock.calls[0][1];
 }
 
 const campaignName = 'Dragonfall';

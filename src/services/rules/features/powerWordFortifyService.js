@@ -1,7 +1,7 @@
 import { rollExpression } from '../../dice/diceRoller.js';
 import { getCombatContext } from '../combat/damageUtils.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
-import { postLogEntry } from '../../shared/logPoster.js';
+import { addEntry } from '../../ui/logService.js';
 import { rangeToFeet } from '../combat/rangeValidation.js';
 import { getDistanceFeet } from '../combat/rangeValidation.js';
 
@@ -99,7 +99,7 @@ export async function triggerPowerWordFortify(spell, metaCtx, playerStats, campa
         const newTempHp = currentTempHp + grantAmount;
         setRuntimeValue(targetName, 'tempHp', newTempHp, campaignName);
 
-        postLogEntry(campaignName, {
+        addEntry(campaignName, {
             type: 'hp_change',
             targetName,
             delta: grantAmount,
@@ -111,7 +111,7 @@ export async function triggerPowerWordFortify(spell, metaCtx, playerStats, campa
             note: POWER_WORD_FORTIFY_NAME,
             formula: tempHpExpression,
             timestamp: Date.now(),
-        });
+        }).catch((e) => { console.error("[powerWordFortify] Error:", e); });
 
         results.push({ targetName, tempHpAmount: grantAmount });
     }

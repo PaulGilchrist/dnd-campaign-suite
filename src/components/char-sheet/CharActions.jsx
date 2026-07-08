@@ -15,14 +15,13 @@ import { hasAutomation } from '../../services/combat/automation/automationServic
 import { isExhausted } from '../../services/automation/handlers/combat/saveAttackHandler.js'
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import { toggleBuff } from '../../services/automation/common/buffToggle.js';
-import { postLogEntry } from '../../services/shared/logPoster.js';
+import { addEntry } from '../../services/ui/logService.js';
 import CharActionModals from './CharActionModals.jsx'
 import CharActionSpellPopups from './CharActionSpellPopups.jsx'
 import CharBonusActions from './CharBonusActions.jsx'
 import { executeHandler } from '../../services/automation/index.js';
 import { onSpellSelected as onDivineInterventionSpellSelected } from '../../services/automation/handlers/class-cleric-paladin/divineInterventionHandler.js';
 import { getClassFeatures } from '../../services/character/classFeatures.js';
-import { addEntry } from '../../services/ui/logService.js';
 import { useSpellMetamagicFlow } from '../../hooks/combat/useSpellMetamagicFlow.js'
 import { executeSpellCast } from '../../services/rules/spells/spellCastService.js'
 import { getTargetFromAttacker, getCombatContext, getAttackerTargetName } from '../../services/rules/combat/damageUtils.js';
@@ -306,7 +305,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                 onTargetSelected: async (targetName) => {
                     const existing = getRuntimeValue(targetName, 'tempHp', evtCampaignName) || 0;
                     setRuntimeValue(targetName, 'tempHp', Math.max(existing, tempHp), evtCampaignName);
-                    postLogEntry(evtCampaignName, {
+                    addEntry(evtCampaignName, {
                         type: 'roll',
                         characterName: attackerName,
                         rollType: 'temp-hp',
@@ -314,13 +313,13 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                         targetName,
                         note: `Gained ${tempHp} temporary hit points from Potent Spellcasting`,
                         total: tempHp,
-                    });
+                    }).catch((e) => { console.error("[CharActions] Error:", e); });
                     setModalState({ secondaryTargetModal: null });
                 },
                 onSkip: () => {
                     const existing = getRuntimeValue(attackerName, 'tempHp', evtCampaignName) || 0;
                     setRuntimeValue(attackerName, 'tempHp', Math.max(existing, tempHp), evtCampaignName);
-                    postLogEntry(evtCampaignName, {
+                    addEntry(evtCampaignName, {
                         type: 'roll',
                         characterName: attackerName,
                         rollType: 'temp-hp',
@@ -582,7 +581,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         );
 
         if (!wasActive) {
-            postLogEntry(evtCampaignName, {
+            addEntry(evtCampaignName, {
                 type: 'ability_use',
                 characterName: playerStats.name,
                 abilityName: featureName,

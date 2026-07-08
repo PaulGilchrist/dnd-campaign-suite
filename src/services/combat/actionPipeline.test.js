@@ -99,7 +99,7 @@ describe('createPipeline', () => {
 
       await pipeline.run('start', {}, { current: null });
       expect(observer).toHaveBeenCalledTimes(1);
-      expect(observer).toHaveBeenCalledWith(expect.any(Object), expect.objectContaining({ data: { value: 1 } }));
+      expect(observer).toHaveBeenCalledWith(expect.any(Object), expect.objectContaining({ data: { value: 1 } }), 'start');
     });
 
     it('notifies wildcard observer (*) on every event', async () => {

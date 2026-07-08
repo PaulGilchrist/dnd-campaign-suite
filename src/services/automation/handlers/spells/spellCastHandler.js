@@ -4,7 +4,8 @@ import { getCombatSummary } from '../../../encounters/combatData.js';
 import { addConcentration } from '../../../combat/concentration/concentrationService.js';
 import { getEmpoweredEvocationFeatures, getEmpoweredEvocationIntModifier } from '../../../../services/rules/spells/postCastRiderService.js';
 import { getMagicInitiateLevel1Spell } from '../feats/magicInitiateHandler.js';
-import { postLogEntry } from '../../../shared/logPoster.js';
+import { addEntry } from '../../../ui/logService.js';
+
 import { addExpiration } from '../../../rules/effects/expirations.js';
 import storage from '../../../ui/storage.js';
 
@@ -50,12 +51,12 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             window.dispatchEvent(new CustomEvent('combat-summary-updated'));
         }
 
-        await postLogEntry(campaignName, {
+        await addEntry(campaignName, {
             type: 'ability_use',
             characterName: playerStats.name,
             abilityName: action.name,
             description: `${playerStats.name} activated Mantle of Majesty. Command is now available as a free bonus action for 1 minute or until concentration ends.`,
-        }).catch(() => {});
+        }).catch((e) => { console.error("[spellCast] Error:", e); });
         return {
             type: 'popup',
             payload: {
@@ -91,12 +92,12 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         // War God's Blessing: state-based activation, not per-spell tracking
         if (auto.noConcentration && auto.spell && Array.isArray(auto.spell) && auto.spell.length > 1) {
             await setRuntimeValue(playerStats.name, '_War_Gods_Blessing_active', true, campaignName);
-            postLogEntry(campaignName, {
+            addEntry(campaignName, {
                 type: 'ability_use',
                 characterName: playerStats.name,
                 abilityName: action.name,
                 description: `${playerStats.name} activated ${action.name} for 1 minute. ${auto.spell.join(' and ')} can be cast without expending a spell slot or requiring Concentration.`,
-            }).catch(() => {});
+            }).catch((e) => { console.error("[spellCast] Error:", e); });
             return {
                 type: 'popup',
                 payload: {
@@ -114,12 +115,12 @@ export async function handle(action, playerStats, campaignName, _mapName) {
                 await setRuntimeValue(playerStats.name, usedKey, null, campaignName);
                 await setRuntimeValue(playerStats.name, freeKey, null, campaignName);
             }
-            postLogEntry(campaignName, {
+            addEntry(campaignName, {
                 type: 'ability_use',
                 characterName: playerStats.name,
                 abilityName: action.name,
                 description: `${playerStats.name} activated ${action.name}, gaining free casts of ${spells.join(' or ')}. Channel Divinity charges: ${newCharges}.`,
-            }).catch(() => {});
+            }).catch((e) => { console.error("[spellCast] Error:", e); });
         }
     }
 

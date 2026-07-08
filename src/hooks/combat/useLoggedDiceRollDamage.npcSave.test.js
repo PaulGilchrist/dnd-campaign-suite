@@ -71,8 +71,8 @@ vi.mock('./loggedDiceRollUtils.js', () => ({
     applyMinDamageAdjustment: vi.fn((d) => d),
 }));
 
-vi.mock('../../services/shared/logPoster.js', () => ({
-    postLogEntry: vi.fn(),
+vi.mock('../../services/ui/logService.js', () => ({
+    addEntry: vi.fn(() => Promise.resolve()),
 }));
 
 vi.mock('../../services/rules/combat/applyDamage.js', () => ({
@@ -89,7 +89,7 @@ import { getRuntimeValue } from '../runtime/useRuntimeState.js';
 import { loadCombatSummary } from '../../services/encounters/combatData.js';
 import { hasIgnoreResistance, playerIsImmuneToCondition } from '../../services/combat/automation/automationService.js';
 import { endInvisibilityOnHostileAction } from '../../services/rules/features/invisibilityService.js';
-import { postLogEntry } from '../../services/shared/logPoster.js';
+import { addEntry } from '../../services/ui/logService.js';
 import { hasPotentCantrip, hasSoulstitchProtection, applyMinDamageAdjustment } from './loggedDiceRollUtils.js';
 import { computeDamageAfterSave, rollSaveForCreature, applyDamageToTarget } from '../../services/rules/combat/applyDamage.js';
 import { createLogDamageAndShow } from './useLoggedDiceRollDamage.js';
@@ -225,7 +225,7 @@ describe('NPC save damage edge cases', () => {
             dcSuccess: 'half',
         });
 
-        expect(postLogEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
+        expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
             type: 'hp_change',
             targetName: 'Goblin',
             currentHp: 0,
@@ -245,7 +245,7 @@ describe('NPC save damage edge cases', () => {
             dcSuccess: 'half',
         });
 
-        expect(postLogEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
+        expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
             type: 'hp_change',
             threshold: 'bloodied',
         }));

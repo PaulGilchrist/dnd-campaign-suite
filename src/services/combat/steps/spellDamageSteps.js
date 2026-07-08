@@ -1,6 +1,7 @@
 import { rollExpression, rollExpressionDoubled, rollExpressionMaximized } from '../../dice/diceRoller.js';
 import { getEmpoweredEvocationFeatures, getEmpoweredEvocationIntModifier } from '../../rules/spells/postCastRiderService.js';
 import { addEntry } from '../../ui/logService.js';
+import { featureModules } from './features/index.js';
 
 /**
  * Build the damage pipeline steps for a spell-type action.
@@ -91,11 +92,34 @@ export function buildSpellDamageSteps() {
     },
 
     // =========================================================
+    // Step: spellFeatureRiders — dispatches to individual feature modules
+    // =========================================================
+    {
+      name: 'spellFeatureRiders',
+      subscribe: 'spell:rolled',
+      emit: 'spell:riders:applied',
+      condition: () => true,
+      handler: async (ctx) => {
+        let data = { formula: ctx.formula, total: ctx.total, rolls: [...(ctx.rolls || [])] };
+        for (const feat of featureModules) {
+          if (feat.condition(ctx)) {
+            const result = await feat.handler(ctx, data);
+            if (!result) continue;
+            if (result.modal) return result;
+            if (result.data) data = result.data;
+            if (result.sideEffects) await result.sideEffects();
+          }
+        }
+        return { data };
+      },
+    },
+
+    // =========================================================
     // Step: spellOverchannel — Wizard Overchannel self-damage for spells
     // =========================================================
     {
       name: 'spellOverchannel',
-      subscribe: 'spell:rolled',
+      subscribe: 'spell:riders:applied',
       emit: 'spell:ready',
       condition: (ctx) => ctx.overchannelActive && ctx.overchannelUseCount > 1,
       handler: async (ctx) => {

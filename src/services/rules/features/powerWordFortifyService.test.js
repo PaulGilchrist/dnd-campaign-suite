@@ -4,7 +4,7 @@ import { triggerPowerWordFortify } from './powerWordFortifyService.js';
 import { rollExpression } from '../../dice/diceRoller.js';
 import { getCombatContext } from '../../rules/combat/damageUtils.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
-import { postLogEntry } from '../../shared/logPoster.js';
+import { addEntry } from '../../ui/logService.js';
 import { rangeToFeet, getDistanceFeet } from '../../rules/combat/rangeValidation.js';
 
 vi.mock('../../dice/diceRoller.js', () => ({
@@ -20,8 +20,8 @@ vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
     setRuntimeValue: vi.fn(),
 }));
 
-vi.mock('../../shared/logPoster.js', () => ({
-    postLogEntry: vi.fn(),
+vi.mock('../../ui/logService.js', () => ({
+    addEntry: vi.fn(() => Promise.resolve()),
 }));
 
 vi.mock('../../rules/combat/rangeValidation.js', () => ({
@@ -200,7 +200,7 @@ describe('powerWordFortifyService', () => {
 
             expect(result).toEqual({ noTargets: true });
             expect(setRuntimeValue).not.toHaveBeenCalled();
-            expect(postLogEntry).not.toHaveBeenCalled();
+            expect(addEntry).not.toHaveBeenCalled();
         });
 
         it('grants temp HP to targets within range and excludes the caster', async () => {
@@ -497,9 +497,9 @@ describe('powerWordFortifyService', () => {
                 mapName,
             );
 
-            expect(postLogEntry).toHaveBeenCalledTimes(2);
+            expect(addEntry).toHaveBeenCalledTimes(2);
 
-            const firstLog = postLogEntry.mock.calls[0][1];
+            const firstLog = addEntry.mock.calls[0][1];
             expect(firstLog).toMatchObject({
                 type: 'hp_change',
                 targetName: 'A',
@@ -510,7 +510,7 @@ describe('powerWordFortifyService', () => {
             });
             expect(firstLog).toHaveProperty('timestamp');
 
-            const secondLog = postLogEntry.mock.calls[1][1];
+            const secondLog = addEntry.mock.calls[1][1];
             expect(secondLog).toMatchObject({
                 type: 'hp_change',
                 targetName: 'B',

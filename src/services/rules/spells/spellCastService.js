@@ -10,7 +10,7 @@ import { triggerWildMagicSurge } from '../features/wildMagicSurgeService.js';
 import { setRuntimeValue, getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import { applyHealingToTarget } from '../combat/applyHealing.js';
 import { getCombatContext } from '../combat/damageUtils.js';
-import { postLogEntry } from '../../shared/logPoster.js';
+import { addEntry } from '../../ui/logService.js';
 import { executeHandler } from '../../automation/index.js';
 import { rollExpressionMaximized } from '../../dice/diceRoller.js';
 import { addExpiration } from '../effects/expirations.js';
@@ -55,7 +55,6 @@ import { executeHandler as executeStoneSkin } from '../../automation/index.js';
 import { onAbjurationSpellCast } from '../../automation/handlers/class-wizard/arcaneWardHandler.js';
 import { getCombatSummary } from '../../../services/encounters/combatData.js';
 import { applyDamageToTarget } from '../../../services/rules/combat/applyDamage.js';
-import { addEntry } from '../../../services/ui/logService.js';
 import { resolveHealingBonusesWithDetails, hasHealingMaximization } from '../../combat/automation/automationService.js';
 
 function applyEldritchHex(spell, playerStats, campaignName, targetName) {
@@ -452,7 +451,7 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
                                 applyHealingToTarget(combatSummary, target.name, actualHeal, campaignName);
                             }
                             genericHealResult = { targetName: target.name, healAmount: actualHeal, formula: 'max', rolls: [], rawTotal: actualHeal, bonusHeal, bonusDetails };
-                            postLogEntry(campaignName, {
+                            addEntry(campaignName, {
                                 type: 'hp_change',
                                 targetName: target.name,
                                 delta: actualHeal,
@@ -462,7 +461,7 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
                                 sourceName: playerStats.name,
                                 note: spell.name,
                                 timestamp: Date.now(),
-                            });
+                            }).catch((e) => { console.error("[spellCast] Error:", e); });
                         }
                     } else {
                         let resolvedExpression = expression.replace(/\bMOD\b/g, String(spellCastingMod));
@@ -485,7 +484,7 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
                                     const bonusParts = bonusDetails.map(d => `${d.amount} ${d.name}`).join(' + ');
                                     formulaParts.push(`(${bonusParts})`);
                                 }
-                                postLogEntry(campaignName, {
+                                addEntry(campaignName, {
                                     type: 'hp_change',
                                     targetName: target.name,
                                     delta: actualHeal,
@@ -496,7 +495,7 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
                                     note: spell.name,
                                     formula: formulaParts.join(' + '),
                                     timestamp: Date.now(),
-                                });
+                                }).catch((e) => { console.error("[spellCast] Error:", e); });
                             }
                         }
                     }
@@ -921,7 +920,7 @@ async function applyPowerWordHealToTarget(targetName, playerStats, campaignName)
         const result = applyHealingToTarget(combatSummary, targetName, healAmount, campaignName);
         const actualHeal = result?.actualHeal ?? healAmount;
         const newHp = Math.min(maxHp, currentHp + actualHeal);
-        postLogEntry(campaignName, {
+        addEntry(campaignName, {
             type: 'hp_change',
             targetName,
             delta: actualHeal,
@@ -931,7 +930,7 @@ async function applyPowerWordHealToTarget(targetName, playerStats, campaignName)
             sourceName: playerStats.name,
             note: 'Power Word Heal',
             timestamp: Date.now(),
-        });
+        }).catch((e) => { console.error("[spellCast] Error:", e); });
         window.dispatchEvent(new CustomEvent('healing-popup', {
             detail: {
                 targetName,
@@ -957,14 +956,14 @@ async function applyPowerWordHealToTarget(targetName, playerStats, campaignName)
         setRuntimeValue(targetName, 'activeConditions', newConditions, campaignName);
         for (const removed of conditionsToRemove) {
             if (!newConditions.some(c => String(c).toLowerCase() === removed)) {
-                postLogEntry(campaignName, {
+                addEntry(campaignName, {
                     type: 'condition',
                     action: 'removed',
                     characterName: targetName,
                     condition: removed.charAt(0).toUpperCase() + removed.slice(1),
                     reason: 'Power Word Heal',
                     timestamp: Date.now(),
-                });
+                }).catch((e) => { console.error("[spellCast] Error:", e); });
             }
         }
     }
@@ -990,13 +989,13 @@ async function applyPowerWordKillToTarget(targetName, playerStats, campaignName)
         : (creature.currentHp ?? creature.maxHp);
 
     if (currentHp <= 100) {
-        postLogEntry(campaignName, {
+        addEntry(campaignName, {
             type: 'creature_death',
             characterName: targetName,
             cause: 'Power Word Kill',
             casterName: playerStats.name,
             timestamp: Date.now(),
-        });
+        }).catch((e) => { console.error("[spellCast] Error:", e); });
 
         applyDamageToTarget(combatSummary, targetName, currentHp, ['Psychic'], campaignName, [], false, playerStats.name);
 
@@ -1070,7 +1069,7 @@ async function triggerHeal(spell, metaCtx, playerStats, campaignName, _mapName) 
             const bonusParts = bonusDetails.map(d => `${d.amount} ${d.name}`).join(' + ');
             formulaParts.push(`(${bonusParts})`);
         }
-        postLogEntry(campaignName, {
+        addEntry(campaignName, {
             type: 'hp_change',
             targetName,
             delta: actualHeal,
@@ -1081,7 +1080,7 @@ async function triggerHeal(spell, metaCtx, playerStats, campaignName, _mapName) 
             note: spell.name,
             formula: formulaParts.join(' + '),
             timestamp: Date.now(),
-        });
+        }).catch((e) => { console.error("[spellCast] Error:", e); });
     }
 
     const conditionsToRemove = ['blinded', 'deafened', 'poisoned'];
@@ -1096,19 +1095,19 @@ async function triggerHeal(spell, metaCtx, playerStats, campaignName, _mapName) 
         setRuntimeValue(targetName, 'activeConditions', newConditions, campaignName);
         for (const removed of conditionsToRemove) {
             if (!newConditions.some(c => String(c).toLowerCase() === removed)) {
-                postLogEntry(campaignName, {
+                addEntry(campaignName, {
                     type: 'condition',
                     action: 'removed',
                     characterName: targetName,
                     condition: removed.charAt(0).toUpperCase() + removed.slice(1),
                     reason: 'Heal',
                     timestamp: Date.now(),
-                });
+                }).catch((e) => { console.error("[spellCast] Error:", e); });
             }
         }
     }
 
-    postLogEntry(campaignName, {
+    addEntry(campaignName, {
         type: 'hp_change',
         targetName,
         delta: actualHeal,
@@ -1117,7 +1116,7 @@ async function triggerHeal(spell, metaCtx, playerStats, campaignName, _mapName) 
         isHealing: true,
         sourceName: playerStats.name,
         note: 'Heal',
-    });
+    }).catch((e) => { console.error("[spellCast] Error:", e); });
 
     return { targetName, healAmount: actualHeal, formula: healAtSlotLevel ? `${healAtSlotLevel[slotLevel] || '70'}` : '70', rolls: [], rawTotal: actualHeal, bonusHeal, bonusDetails };
 }
@@ -1218,7 +1217,7 @@ async function applyRegenerateSpell(spell, target, caster, campaignName) {
                     const bonusParts = bonusDetails.map(d => `${d.amount} ${d.name}`).join(' + ');
                     formulaParts.push(`(${bonusParts})`);
                 }
-                postLogEntry(campaignName, {
+                addEntry(campaignName, {
                     type: 'hp_change',
                     targetName,
                     delta: initialHeal,
@@ -1229,7 +1228,7 @@ async function applyRegenerateSpell(spell, target, caster, campaignName) {
                     note: spell.name,
                     formula: formulaParts.join(' + '),
                     timestamp: Date.now(),
-                });
+                }).catch((e) => { console.error("[spellCast] Error:", e); });
             }
         }
     }
@@ -1243,7 +1242,7 @@ async function applyRegenerateSpell(spell, target, caster, campaignName) {
         { type: 'remove_regenerate_buff' }
     ], campaignName, 600);
 
-    postLogEntry(campaignName, {
+    addEntry(campaignName, {
         type: 'ability_use',
         characterName: casterName,
         abilityName: spell.name,

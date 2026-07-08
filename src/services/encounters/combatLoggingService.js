@@ -1,8 +1,8 @@
 import utils from '../ui/utils.js'
-import { postLogEntry } from '../shared/logPoster.js'
+import { addEntry } from '../ui/logService.js'
 
 function logInitiativeRoll(campaignName, creatureName, roll, bonus) {
-    return postLogEntry(campaignName, {
+    return addEntry(campaignName, {
         type: 'roll',
         characterName: creatureName,
         rollType: 'initiative',
@@ -15,11 +15,11 @@ function logInitiativeRoll(campaignName, creatureName, roll, bonus) {
         isNatural1: roll === 1,
         timestamp: Date.now(),
         id: utils.guid(),
-    })
+    }).catch((e) => { console.error("[combatLogging] Error:", e); })
 }
 
 function logConditionEvent(campaignName, action, creatureName, conditionLabel, dc, ability) {
-    return postLogEntry(campaignName, {
+    return addEntry(campaignName, {
         type: 'condition',
         action,
         characterName: creatureName,
@@ -28,11 +28,11 @@ function logConditionEvent(campaignName, action, creatureName, conditionLabel, d
         ability,
         timestamp: Date.now(),
         id: utils.guid(),
-    })
+    }).catch((e) => { console.error("[combatLogging] Error:", e); })
 }
 
 function logConcentrationSave(campaignName, creatureName, roll, bonus, bonusDetail, spellName, dc, success) {
-    return postLogEntry(campaignName, {
+    return addEntry(campaignName, {
         type: 'roll',
         rollType: 'concentration-save',
         characterName: creatureName,
@@ -47,11 +47,11 @@ function logConcentrationSave(campaignName, creatureName, roll, bonus, bonusDeta
         success,
         timestamp: Date.now(),
         id: utils.guid(),
-    })
+    }).catch((e) => { console.error("[combatLogging] Error:", e); })
 }
 
 function logConditionSave(campaignName, creatureName, roll, bonus, bonusDetail, conditionLabel, abilityLabel, dc, success) {
-    return postLogEntry(campaignName, {
+    return addEntry(campaignName, {
         type: 'roll',
         rollType: 'condition-save',
         characterName: creatureName,
@@ -66,11 +66,11 @@ function logConditionSave(campaignName, creatureName, roll, bonus, bonusDetail, 
         success,
         timestamp: Date.now(),
         id: utils.guid(),
-    })
+    }).catch((e) => { console.error("[combatLogging] Error:", e); })
 }
 
 function logHpChange(campaignName, targetName, delta, currentHp, maxHp, isHealing, isUnconscious) {
-    return postLogEntry(campaignName, {
+    return addEntry(campaignName, {
         type: 'hp_change',
         targetName,
         delta,
@@ -78,17 +78,17 @@ function logHpChange(campaignName, targetName, delta, currentHp, maxHp, isHealin
         maxHp,
         isHealing,
         isUnconscious,
-    })
+    }).catch((e) => { console.error("[combatLogging] Error:", e); })
 }
 
 function logNpcThreshold(campaignName, targetName, delta, threshold, maxHp) {
-    return postLogEntry(campaignName, {
+    return addEntry(campaignName, {
         type: 'hp_change',
         targetName,
         delta,
         threshold,
         maxHp,
-    })
+    }).catch((e) => { console.error("[combatLogging] Error:", e); })
 }
 
 export {

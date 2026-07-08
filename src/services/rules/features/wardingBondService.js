@@ -1,5 +1,5 @@
 import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
-import { postLogEntry } from '../../shared/logPoster.js';
+import { addEntry } from '../../ui/logService.js';
 import { getDistanceFeet } from '../../rules/combat/rangeValidation.js';
 
 export function applyWardingBond(creature, combatSummary, campaignName, wardDamage) {
@@ -15,7 +15,7 @@ export function applyWardingBond(creature, combatSummary, campaignName, wardDama
             if (casterCreature && casterCreature.currentHp > 0) {
                 const sharedDamage = wardDamage;
                 casterCreature.currentHp = Math.max(0, casterCreature.currentHp - sharedDamage);
-                postLogEntry(campaignName, {
+                addEntry(campaignName, {
                     type: 'hp_change',
                     targetName: casterName,
                     delta: -sharedDamage,
@@ -24,7 +24,7 @@ export function applyWardingBond(creature, combatSummary, campaignName, wardDama
                     isHealing: false,
                     isUnconscious: casterCreature.currentHp <= 0,
                     abilityName: 'Warding Bond',
-                });
+                }).catch((e) => { console.error("[wardingBond] Error:", e); });
                 if (casterCreature.concentration && sharedDamage > 0) {
                     casterCreature.concentration.dc = Math.max(10, Math.floor(sharedDamage / 2));
                 }

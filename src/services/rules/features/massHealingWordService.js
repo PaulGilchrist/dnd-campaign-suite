@@ -2,7 +2,7 @@ import { rollExpression, rollExpressionMaximized } from '../../dice/diceRoller.j
 import { getCombatContext } from '../combat/damageUtils.js';
 import { applyHealingToTarget } from '../combat/applyHealing.js';
 import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
-import { postLogEntry } from '../../shared/logPoster.js';
+import { addEntry } from '../../ui/logService.js';
 import { resolveHealingBonusesWithDetails, hasHealingMaximization } from '../../combat/automation/automationService.js';
 
 const MASS_HEALING_WORD_NAME = 'Mass Healing Word';
@@ -108,7 +108,7 @@ export async function triggerMassHealingWord(spell, metaCtx, playerStats, campai
             formulaParts.push(`(${bonusParts})`);
         }
 
-        postLogEntry(campaignName, {
+        addEntry(campaignName, {
             type: 'hp_change',
             targetName,
             delta: actualHeal,
@@ -119,7 +119,7 @@ export async function triggerMassHealingWord(spell, metaCtx, playerStats, campai
             note: 'Mass Healing Word',
             formula: formulaParts.join(' + '),
             timestamp: Date.now(),
-        });
+        }).catch((e) => { console.error("[massHealingWord] Error:", e); });
 
         results.push({ targetName, healAmount: actualHeal });
     }

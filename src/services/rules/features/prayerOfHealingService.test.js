@@ -19,8 +19,8 @@ vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
     setRuntimeValue: vi.fn(),
 }));
 
-vi.mock('../../shared/logPoster.js', () => ({
-    postLogEntry: vi.fn(),
+vi.mock('../../ui/logService.js', () => ({
+    addEntry: vi.fn(() => Promise.resolve()),
 }));
 
 vi.mock('../combat/rangeValidation.js', () => ({
@@ -32,7 +32,7 @@ import { rollExpression } from '../../dice/diceRoller.js';
 import { getCombatContext } from '../combat/damageUtils.js';
 import { applyHealingToTarget } from '../combat/applyHealing.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
-import { postLogEntry } from '../../shared/logPoster.js';
+import { addEntry } from '../../ui/logService.js';
 import { getDistanceFeet, rangeToFeet } from '../combat/rangeValidation.js';
 
 const CAMPAIGN_NAME = 'TestCampaign';
@@ -82,7 +82,7 @@ function mockDefaults(rollTotal = DEFAULT_ROLL_TOTAL) {
         return null;
     });
     applyHealingToTarget.mockReturnValue({ actualHeal: rollTotal, oldHp: 10, newHp: 28 });
-    postLogEntry.mockResolvedValue(undefined);
+    addEntry.mockResolvedValue(undefined);
     setRuntimeValue.mockReturnValue(undefined);
     window.dispatchEvent = vi.fn();
 }
@@ -566,7 +566,7 @@ describe('prayerOfHealingService', () => {
                 MAP_NAME,
             );
 
-            const hpChangeCalls = vi.mocked(postLogEntry).mock.calls.filter(
+            const hpChangeCalls = vi.mocked(addEntry).mock.calls.filter(
                 call => call[1].type === 'hp_change',
             );
             expect(hpChangeCalls.length).toBeGreaterThan(0);
@@ -588,7 +588,7 @@ describe('prayerOfHealingService', () => {
                 MAP_NAME,
             );
 
-            const prayerCalls = vi.mocked(postLogEntry).mock.calls.filter(
+            const prayerCalls = vi.mocked(addEntry).mock.calls.filter(
                 call => call[1].type === 'prayer_of_healing',
             );
             expect(prayerCalls.length).toBe(3);
@@ -645,8 +645,8 @@ describe('prayerOfHealingService', () => {
             expect(result.targets.length).toBe(3);
         });
 
-        it('survives postLogEntry rejecting without throwing', async () => {
-            postLogEntry.mockRejectedValue(new Error('Log failed'));
+        it('survives addEntry rejecting without throwing', async () => {
+            addEntry.mockRejectedValue(new Error('Log failed'));
 
             const result = await triggerPrayerOfHealing(
                 buildPrayerSpell(),

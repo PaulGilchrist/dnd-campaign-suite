@@ -1,7 +1,7 @@
 import { buildSaveDc, createSaveListener } from '../../common/savePrompt.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { addEntry } from '../../../ui/logService.js';
-import { postLogEntry } from '../../../shared/logPoster.js';
+
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addExpiration } from '../../../../services/rules/effects/expirations.js';
 
@@ -72,7 +72,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             );
             setRuntimeValue(targetName, 'activeConditions', [...filtered, 'charmed', 'incapacitated', 'speed_zero'], campaignName);
 
-            postLogEntry(campaignName, {
+            addEntry(campaignName, {
                 type: 'condition',
                 action: 'applied',
                 characterName: targetName,
@@ -80,7 +80,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
                 reason: 'Hypnotic Pattern spell',
                 note: `${targetName} is Charmed, Incapacitated, and has Speed 0. The spell ends if the creature takes damage or someone uses an action to shake it free.`,
                 timestamp: Date.now(),
-            });
+            }).catch((e) => { console.error("[hypnoticPattern] Error:", e); });
 
             addExpiration(casterName, targetName, [
                 { type: 'charmed', condition: 'charmed' },

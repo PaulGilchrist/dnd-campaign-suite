@@ -20,8 +20,8 @@ vi.mock('../../../combat/automation/automationExpressions.js', () => ({
   evaluateAutoExpression: vi.fn(),
 }));
 
-vi.mock('../../../shared/logPoster.js', () => ({
-  postLogEntry: vi.fn(),
+vi.mock('../../../ui/logService.js', () => ({
+  addEntry: vi.fn(() => Promise.resolve()),
 }));
 
 // ── Imports ────────────────────────────────────────────────────
@@ -31,7 +31,7 @@ import * as runtimeState from '../../../../hooks/runtime/useRuntimeState.js';
 import * as expirations from '../../../rules/effects/expirations.js';
 import * as damageUtils from '../../../rules/combat/damageUtils.js';
 import * as automationExpressions from '../../../combat/automation/automationExpressions.js';
-import * as logPoster from '../../../shared/logPoster.js';
+import * as logPoster from '../../../ui/logService.js';
 
 // ── Helpers ────────────────────────────────────────────────────
 
@@ -400,8 +400,8 @@ describe("heroesFeastHandler", () => {
 
       await applyHeroesFeast(action, ps, campaignName, null, ['Goblin1', 'Goblin2']);
 
-      expect(logPoster.postLogEntry).toHaveBeenCalledTimes(2);
-      expect(logPoster.postLogEntry).toHaveBeenCalledWith(campaignName, {
+      expect(logPoster.addEntry).toHaveBeenCalledTimes(2);
+      expect(logPoster.addEntry).toHaveBeenCalledWith(campaignName, {
         type: 'hp_change',
         targetName: 'Goblin1',
         delta: 15,
@@ -409,7 +409,7 @@ describe("heroesFeastHandler", () => {
         sourceName: 'TestHero',
         note: "Heroes' Feast (+15 HP max)",
       });
-      expect(logPoster.postLogEntry).toHaveBeenCalledWith(campaignName, {
+      expect(logPoster.addEntry).toHaveBeenCalledWith(campaignName, {
         type: 'hp_change',
         targetName: 'Goblin2',
         delta: 15,

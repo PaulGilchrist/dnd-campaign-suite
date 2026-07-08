@@ -1,5 +1,5 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
-import { postLogEntry } from '../../shared/logPoster.js';
+import { addEntry } from '../../ui/logService.js';
 
 export function checkUndyingSentinel(creature, playerComputed, campaignName) {
     const rawAllFeatures = playerComputed?.allFeatures;
@@ -52,7 +52,7 @@ export function checkUndyingSentinel(creature, playerComputed, campaignName) {
         creature.currentHp = newHp;
     }
 
-    postLogEntry(campaignName, {
+    addEntry(campaignName, {
         type: 'heal',
         targetName: creature.name,
         delta: newHp,
@@ -61,7 +61,7 @@ export function checkUndyingSentinel(creature, playerComputed, campaignName) {
         isHealing: true,
         isUnconscious: false,
         abilityName: 'Undying Sentinel',
-    });
+    }).catch((e) => { console.error("[undyingSentinelService] Error:", e); });
 
     window.dispatchEvent(new CustomEvent('combat-summary-updated'));
 

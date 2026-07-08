@@ -1,6 +1,6 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
-import { postLogEntry } from '../../../shared/logPoster.js';
+
 import { addEntry } from '../../../ui/logService.js';
 
 export async function handle(action, playerStats, campaignName, _mapName) {
@@ -73,14 +73,14 @@ export async function applyRemoveCurse(action, playerStats, campaignName, mapNam
         removedItems.push(`Curse (removed ${cursedBuffs.length} cursed effect(s))`);
 
         for (const cursedBuff of cursedBuffs) {
-            postLogEntry(campaignName, {
+            addEntry(campaignName, {
                 type: 'buff',
                 action: 'removed',
                 characterName: targetName,
                 buffName: cursedBuff.name || 'Curse',
                 reason: 'Remove Curse',
                 timestamp: Date.now(),
-            });
+            }).catch((e) => { console.error("[removeCurse] Error:", e); });
         }
     }
 
@@ -101,14 +101,14 @@ export async function applyRemoveCurse(action, playerStats, campaignName, mapNam
             timestamp: Date.now(),
         });
 
-        postLogEntry(campaignName, {
+        addEntry(campaignName, {
             type: 'spell_effect',
             characterName: playerStats.name,
             spellName: action.name,
             targetName,
             effects: removedItems,
             timestamp: Date.now(),
-        });
+        }).catch((e) => { console.error("[removeCurse] Error:", e); });
     }
 
     return {

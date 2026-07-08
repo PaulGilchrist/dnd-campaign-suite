@@ -1,6 +1,6 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../ui/logService.js';
-import { postLogEntry } from '../../../shared/logPoster.js';
+
 
 const LAST_STAND_KEY = 'boonOfRecoveryLastStandUsed';
 
@@ -36,7 +36,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     await setRuntimeValue(playerName, 'deathSaves', [false, false, false], campaignName);
     await setRuntimeValue(playerName, 'deathFailures', [false, false, false], campaignName);
 
-    postLogEntry(campaignName, {
+    addEntry(campaignName, {
         type: 'heal',
         targetName: playerName,
         delta: newHp,
@@ -45,14 +45,14 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         isHealing: true,
         isUnconscious: false,
         abilityName: action.name,
-    });
+    }).catch((e) => { console.error("[boonOfRecovery] Error:", e); });
 
     addEntry(campaignName, {
         type: 'ability_use',
         characterName: playerName,
         abilityName: action.name,
         description: `${playerName} used ${action.name} (Last Stand) to drop to ${newHp} HP instead of 0.`,
-    }).catch(() => {});
+    }).catch((e) => { console.error("[boonOfRecovery] Error:", e); });
 
     window.dispatchEvent(new CustomEvent('combat-summary-updated'));
 

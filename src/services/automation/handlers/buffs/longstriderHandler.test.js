@@ -24,8 +24,8 @@ vi.mock('../../common/targetResolver.js', () => ({
   resolveMapPositions: vi.fn(),
 }));
 
-vi.mock('../../../shared/logPoster.js', () => ({
-  postLogEntry: vi.fn(() => Promise.resolve()),
+vi.mock('../../../ui/logService.js', () => ({
+  addEntry: vi.fn(() => Promise.resolve()),
 }));
 
 // ── Imports ──────────────────────────────────────────────────────
@@ -36,7 +36,7 @@ import * as expirations from '../../../rules/effects/expirations.js';
 import * as damageUtils from '../../../rules/combat/damageUtils.js';
 import * as rangeValidation from '../../../rules/combat/rangeValidation.js';
 import * as targetResolver from '../../common/targetResolver.js';
-import * as logPoster from '../../../shared/logPoster.js';
+import * as logPoster from '../../../ui/logService.js';
 
 // ── Helpers ──────────────────────────────────────────────────────
 
@@ -214,7 +214,7 @@ describe('longstriderHandler', () => {
       );
       expect(buffsCalls).toHaveLength(2);
       expect(expirations.addExpiration).toHaveBeenCalledTimes(2);
-      expect(logPoster.postLogEntry).toHaveBeenCalledTimes(2);
+      expect(logPoster.addEntry).toHaveBeenCalledTimes(2);
     });
 
     it('returns null for empty, null, undefined, or non-array target list', async () => {
@@ -231,8 +231,8 @@ describe('longstriderHandler', () => {
       const action = makeAction();
       await applyLongstrider(action, playerStats, campaignName, null, ['Ally1', 'Ally2']);
 
-      expect(logPoster.postLogEntry).toHaveBeenCalledTimes(2);
-      expect(logPoster.postLogEntry).toHaveBeenCalledWith(campaignName, {
+      expect(logPoster.addEntry).toHaveBeenCalledTimes(2);
+      expect(logPoster.addEntry).toHaveBeenCalledWith(campaignName, {
         type: 'ability_use',
         characterName: 'TestCharacter',
         abilityName: 'Longstrider',

@@ -1,7 +1,7 @@
 import { buildSaveDc, createSaveListener } from '../../common/savePrompt.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { addEntry } from '../../../ui/logService.js';
-import { postLogEntry } from '../../../shared/logPoster.js';
+
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addExpiration } from '../../../rules/effects/expirations.js';
 
@@ -72,7 +72,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             const filtered = conditions.filter(c => String(c).toLowerCase() !== 'charmed');
             setRuntimeValue(targetName, 'activeConditions', [...filtered, 'charmed'], campaignName);
 
-            postLogEntry(campaignName, {
+            addEntry(campaignName, {
                 type: 'condition',
                 action: 'applied',
                 characterName: targetName,
@@ -80,7 +80,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
                 reason: 'Mass Suggestion spell',
                 note: `${targetName} is Charmed by Mass Suggestion and pursues the suggested course of activity. The spell ends if ${casterName} or allies deal damage to the target.`,
                 timestamp: Date.now(),
-            });
+            }).catch((e) => { console.error("[massSuggestion] Error:", e); });
 
             addExpiration(casterName, targetName, [
                 { type: 'charmed', condition: 'charmed' },

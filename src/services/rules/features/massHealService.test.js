@@ -15,8 +15,8 @@ vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
     setRuntimeValue: vi.fn(),
 }));
 
-vi.mock('../../shared/logPoster.js', () => ({
-    postLogEntry: vi.fn(),
+vi.mock('../../ui/logService.js', () => ({
+    addEntry: vi.fn(() => Promise.resolve()),
 }));
 
 vi.mock('../combat/rangeValidation.js', () => ({
@@ -27,7 +27,7 @@ vi.mock('../combat/rangeValidation.js', () => ({
 import { getCombatContext } from '../combat/damageUtils.js';
 import { applyHealingToTarget } from '../combat/applyHealing.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
-import { postLogEntry } from '../../shared/logPoster.js';
+import { addEntry } from '../../ui/logService.js';
 import { getDistanceFeet, rangeToFeet } from '../combat/rangeValidation.js';
 
 describe('massHealService', () => {
@@ -136,7 +136,7 @@ describe('massHealService', () => {
 
                 expect(result).toEqual({ noTargets: true });
                 expect(applyHealingToTarget).not.toHaveBeenCalled();
-                expect(postLogEntry).not.toHaveBeenCalled();
+                expect(addEntry).not.toHaveBeenCalled();
             });
 
             it('excludes the caster from targets', async () => {
@@ -378,7 +378,7 @@ describe('massHealService', () => {
                     mapName,
                 );
 
-                expect(postLogEntry).toHaveBeenCalled();
+                expect(addEntry).toHaveBeenCalled();
             });
 
             it('uses highest slot key when metaCtx slotLevel is not in heal_at_slot_level', async () => {
@@ -463,7 +463,7 @@ describe('massHealService', () => {
                     mapName,
                 );
 
-                const condLogs = postLogEntry.mock.calls.filter(
+                const condLogs = addEntry.mock.calls.filter(
                     call => call[1].type === 'condition',
                 );
                 expect(condLogs.length).toBeGreaterThan(0);
@@ -489,7 +489,7 @@ describe('massHealService', () => {
                     mapName,
                 );
 
-                const blindedLogs = postLogEntry.mock.calls.filter(
+                const blindedLogs = addEntry.mock.calls.filter(
                     call => call[1].type === 'condition' && call[1].condition === 'Blinded',
                 );
                 expect(blindedLogs.length).toBe(0);
@@ -547,7 +547,7 @@ describe('massHealService', () => {
                     mapName,
                 );
 
-                const condLogs = postLogEntry.mock.calls.filter(
+                const condLogs = addEntry.mock.calls.filter(
                     call => call[1].type === 'condition',
                 );
                 expect(condLogs.length).toBe(0);
@@ -569,7 +569,7 @@ describe('massHealService', () => {
                     mapName,
                 );
 
-                const hpLogs = postLogEntry.mock.calls.filter(
+                const hpLogs = addEntry.mock.calls.filter(
                     call => call[1].type === 'hp_change',
                 );
                 expect(hpLogs.length).toBeGreaterThan(0);
@@ -624,7 +624,7 @@ describe('massHealService', () => {
                     mapName,
                 );
 
-                const hpLogs = postLogEntry.mock.calls.filter(
+                const hpLogs = addEntry.mock.calls.filter(
                     call => call[1].type === 'hp_change',
                 );
                 expect(hpLogs.length).toBe(3);

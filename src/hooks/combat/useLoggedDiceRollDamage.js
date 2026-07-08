@@ -1,5 +1,5 @@
 import { rollExpression, rollExpressionDoubled, formatDamageFormula } from '../../services/dice/diceRoller.js';
-import { postLogEntry } from '../../services/shared/logPoster.js';
+import { addEntry } from '../../services/ui/logService.js';
 import utils from '../../services/ui/utils.js';
 import {
     computeDamageAfterSave,
@@ -510,7 +510,7 @@ export function createLogDamageAndShow(deps) {
             isUnconscious: isDead,
         };
         if (threshold) hpEntry.threshold = threshold;
-        postLogEntry(campaignName, hpEntry);
+        addEntry(campaignName, hpEntry).catch((e) => { console.error("[useLoggedDiceRollDamage] Error:", e); });
 
         if (target.type === 'player') {
             setRuntimeValue(target.name, 'currentHitPoints', newHp, campaignName);
@@ -1120,7 +1120,7 @@ export function createLogDamageAndShow(deps) {
             isUnconscious: isDead,
         };
         if (threshold) hpEntry.threshold = threshold;
-        postLogEntry(campaignName, hpEntry);
+        addEntry(campaignName, hpEntry).catch((e) => { console.error("[useLoggedDiceRollDamage] Error:", e); });
 
         if (target?.type === 'player') {
             setRuntimeValue(target.name, 'currentHitPoints', newHp, campaignName);

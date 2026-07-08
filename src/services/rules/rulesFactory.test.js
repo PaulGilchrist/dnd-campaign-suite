@@ -1,6 +1,7 @@
 // @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import rulesFactory from './rulesFactory.js'
+import rules from './rules.js'
 
 vi.mock('./rules.js', () => ({
   default: {
@@ -125,73 +126,89 @@ describe('rulesFactory', () => {
     })
   })
 
-  describe('delegation wrappers', () => {
-    it('getAbilityLongName delegates to rules', () => {
-      expect(rulesFactory.getAbilityLongName('str')).toBe('Long: str')
+  describe('direct rules calls', () => {
+    it('rules.getAbilityLongName returns long name', () => {
+      expect(rules.getAbilityLongName('str')).toBe('Long: str')
     })
 
-    it('getAbilities delegates to rules and returns abilities array', async () => {
-      const result = await rulesFactory.getAbilities({}, {})
+    it('rules.getAbilities returns abilities array', async () => {
+      const result = await rules.getAbilities({}, {})
       expect(Array.isArray(result)).toBe(true)
       expect(result.length).toBe(2)
       expect(result[0].name).toBe('Strength')
     })
 
-    it('getActions delegates to rules and returns nested arrays', () => {
-      const result = rulesFactory.getActions({ rules: '5e' }, {})
+    it('rules.getActions returns nested arrays', () => {
+      const result = rules.getActions({ rules: '5e' }, {})
       expect(Array.isArray(result)).toBe(true)
       expect(result.length).toBe(5)
     })
 
-    it('getArmorClass delegates to rules and returns [ac, contributions]', () => {
-      const result = rulesFactory.getArmorClass([], { rules: '5e' }, {})
+    it('rules.getArmorClass returns [ac, contributions]', () => {
+      const result = rules.getArmorClass([], { rules: '5e' }, {})
       expect(Array.isArray(result)).toBe(true)
       expect(result[0]).toBe(18)
       expect(result[1]).toBe('Chain mail + Dex')
     })
 
-    it('getAttacks delegates to rules and returns attack objects', () => {
-      const result = rulesFactory.getAttacks([], [], { rules: '5e' }, {})
+    it('rules.getAttacks returns attack objects', () => {
+      const result = rules.getAttacks([], [], { rules: '5e' }, {})
       expect(Array.isArray(result)).toBe(true)
       expect(result[0].name).toBe('Longsword')
     })
 
-    it('getHitPoints delegates to rules and returns a number', () => {
-      expect(rulesFactory.getHitPoints({ rules: '5e' }, {})).toBe(45)
+    it('rules.getHitPoints returns a number', () => {
+      expect(rules.getHitPoints({ rules: '5e' }, {})).toBe(45)
     })
 
-    it('getLanguages delegates to rules and returns [count, languages]', () => {
-      const result = rulesFactory.getLanguages({ rules: '5e' }, {})
+    it('rules.getLanguages returns [count, languages]', () => {
+      const result = rules.getLanguages({ rules: '5e' }, {})
       expect(Array.isArray(result)).toBe(true)
       expect(result[0]).toBe(3)
       expect(result[1]).toEqual(['Common', 'Dwarvish', 'Elvish'])
     })
 
-    it('getMagicItems delegates to rules', () => {
-      const result = rulesFactory.getMagicItems([], {}, { rules: '5e' })
+    it('rules.getMagicItems returns items', () => {
+      const result = rules.getMagicItems([], {}, { rules: '5e' })
       expect(Array.isArray(result)).toBe(true)
       expect(result.length).toBe(0)
     })
 
-    it('getProficiencyChoiceCount delegates to rules', () => {
-      expect(rulesFactory.getProficiencyChoiceCount({}, [], {})).toBe(2)
+    it('rules.getProficiencyChoiceCount returns count', () => {
+      expect(rules.getProficiencyChoiceCount({}, [], {})).toBe(2)
     })
 
-    it('getProficiencies delegates to rules and returns [count, proficiencies]', () => {
-      const result = rulesFactory.getProficiencies({ rules: '5e' }, true, {})
+    it('rules.getProficiencies returns [count, proficiencies]', () => {
+      const result = rules.getProficiencies({ rules: '5e' }, true, {})
       expect(Array.isArray(result)).toBe(true)
       expect(result[0]).toBe(5)
       expect(result[1]).toContain('Athletics')
     })
 
-    it('getSpellAbilities delegates to rules and returns spell ability object', () => {
-      const result = rulesFactory.getSpellAbilities([], { rules: '5e' }, {})
+    it('rules.getSpellAbilities returns spell ability object', () => {
+      const result = rules.getSpellAbilities([], { rules: '5e' }, {})
       expect(result).toBeDefined()
       expect(result.spell_slots_level_1).toBe(4)
     })
 
-    it('getSpellMaxLevel delegates to rules', () => {
-      expect(rulesFactory.getSpellMaxLevel({})).toBe(9)
+    it('rules.getSpellMaxLevel returns max level', () => {
+      expect(rules.getSpellMaxLevel({})).toBe(9)
+    })
+
+    it('raceRules.getImmunities returns immunities', async () => {
+      const { rules5e, rules2024 } = await import(
+        '../character/race-rules/index.js'
+      )
+      expect(rules5e.getImmunities({ rules: '5e' })).toContain('Poisoned')
+      expect(rules2024.getImmunities({ rules: '2024' })).toContain('Charmed')
+    })
+
+    it('raceRules.getResistances returns resistances', async () => {
+      const { rules5e, rules2024 } = await import(
+        '../character/race-rules/index.js'
+      )
+      expect(rules5e.getResistances({ rules: '5e' })).toContain('Fire')
+      expect(rules2024.getResistances({ rules: '2024' })).toContain('Cold')
     })
   })
 
@@ -215,11 +232,14 @@ describe('rulesFactory', () => {
   })
 
   describe('race rules delegation - 5e vs 2024', () => {
-    it('delegates immunities and resistances to the correct ruleset', () => {
-      expect(rulesFactory.getImmunities({ rules: '5e' })).toContain('Poisoned')
-      expect(rulesFactory.getImmunities({ rules: '2024' })).toContain('Charmed')
-      expect(rulesFactory.getResistances({ rules: '5e' })).toContain('Fire')
-      expect(rulesFactory.getResistances({ rules: '2024' })).toContain('Cold')
+    it('uses raceRules for immunities and resistances', async () => {
+      const { rules5e, rules2024 } = await import(
+        '../character/race-rules/index.js'
+      )
+      expect(rules5e.getImmunities({ rules: '5e' })).toContain('Poisoned')
+      expect(rules2024.getImmunities({ rules: '2024' })).toContain('Charmed')
+      expect(rules5e.getResistances({ rules: '5e' })).toContain('Fire')
+      expect(rules2024.getResistances({ rules: '2024' })).toContain('Cold')
     })
 
     it('returns base senses from race rules', () => {

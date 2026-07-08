@@ -7,7 +7,7 @@ import { applyHealingToTarget } from '../../../rules/combat/applyHealing.js';
 import { applyDamageToTarget } from '../../../rules/combat/applyDamage.js';
 import { endInvisibilityOnHostileAction } from '../../../rules/features/invisibilityService.js';
 import { getCombatSummary } from '../../../encounters/combatData.js';
-import { postLogEntry } from '../../../shared/logPoster.js';
+
 
 function getCreatureTargets(excludeName, withinRangeFt, campaignName, mapName, attackerPos) {
     const cs = getCombatSummary(campaignName);
@@ -157,7 +157,7 @@ export async function applyMultiTarget(
                 endInvisibilityOnHostileAction(playerStats.name, campaignName);
             }
             if (applyResult) {
-                postLogEntry(campaignName, {
+                addEntry(campaignName, {
                     type: 'hp_change',
                     targetName: secondTargetName,
                     delta: applyResult.newHp - (secondTarget.currentHp || 0),
@@ -166,7 +166,7 @@ export async function applyMultiTarget(
                     isHealing: false,
                     sourceName: playerStats.name,
                     note: `${spellName} (multi-target spread)`,
-                });
+                }).catch((e) => { console.error("[multiTarget] Error:", e); });
             }
         }
     }
@@ -178,7 +178,7 @@ export async function applyMultiTarget(
         if (healAmount > 0) {
             const healResult = applyHealingToTarget(combatSummary, secondTargetName, healAmount, campaignName);
             if (healResult) {
-                postLogEntry(campaignName, {
+                addEntry(campaignName, {
                     type: 'hp_change',
                     targetName: secondTargetName,
                     delta: healResult.actualHeal,
@@ -187,7 +187,7 @@ export async function applyMultiTarget(
                     isHealing: true,
                     sourceName: playerStats.name,
                     note: `${spellName} (multi-target spread)`,
-                });
+                }).catch((e) => { console.error("[multiTarget] Error:", e); });
             }
         }
 
@@ -202,14 +202,14 @@ export async function applyMultiTarget(
                 setRuntimeValue(secondTargetName, 'activeConditions', newConditions, campaignName);
                 for (const removed of conditionsToRemove) {
                     if (!newConditions.some(c => String(c).toLowerCase() === removed)) {
-                        postLogEntry(campaignName, {
+                        addEntry(campaignName, {
                             type: 'condition',
                             action: 'removed',
                             characterName: secondTargetName,
                             condition: removed.charAt(0).toUpperCase() + removed.slice(1),
                             reason: `${spellName} (multi-target spread)`,
                             timestamp: Date.now(),
-                        });
+                        }).catch((e) => { console.error("[multiTarget] Error:", e); });
                     }
                 }
             }

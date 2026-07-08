@@ -31,8 +31,8 @@ vi.mock('../../rules/combat/applyHealing.js', () => ({
     applyHealingToTarget: vi.fn(),
 }));
 
-vi.mock('../../shared/logPoster.js', () => ({
-    postLogEntry: vi.fn(() => Promise.resolve()),
+vi.mock('../../ui/logService.js', () => ({
+    addEntry: vi.fn(() => Promise.resolve()),
 }));
 
 // Re-import after mocking
@@ -49,7 +49,7 @@ const { getCombatContext, getTargetFromAttacker } = await import(
     '../../rules/combat/damageUtils.js'
 );
 
-const { postLogEntry } = await import('../../shared/logPoster.js');
+const { addEntry } = await import('../../ui/logService.js');
 
 // ── Test fixtures ─────────────────────────────────────────────────
 
@@ -309,7 +309,7 @@ describe('logHealingToSSE', () => {
 
         logHealingToSSE(campaignName, info);
 
-        expect(postLogEntry).toHaveBeenCalledWith(campaignName, {
+        expect(addEntry).toHaveBeenCalledWith(campaignName, {
             type: 'hp_change',
             targetName: 'Goblin',
             sourceName: 'Cleric',
@@ -354,7 +354,7 @@ describe('logHealingToSSE', () => {
             maxUses: 1,
         });
 
-        expect(postLogEntry).toHaveBeenCalledTimes(1);
+        expect(addEntry).toHaveBeenCalledTimes(1);
         const popupEvent = customEventSpy.mock.calls.find(
             call => call[0] === 'healing-popup'
         );
@@ -379,7 +379,7 @@ describe('logHealingToSSE', () => {
             healingName: 'Cure Wounds',
         });
 
-        expect(postLogEntry).toHaveBeenCalledTimes(1);
+        expect(addEntry).toHaveBeenCalledTimes(1);
         const popupEvent = customEventSpy.mock.calls.find(
             call => call[0] === 'healing-popup'
         );

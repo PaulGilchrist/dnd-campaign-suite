@@ -2,7 +2,7 @@ import utils from '../ui/utils.js'
 import storage from '../ui/storage.js';
 import { cloneDeep } from 'lodash';
 import { rollD20 } from '../dice/diceRoller.js';
-import { postLogEntry } from '../shared/logPoster.js';
+import { addEntry } from '../ui/logService.js';
 import { getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 
 export function getMonsterSaveBonuses(monster) {
@@ -36,7 +36,7 @@ function rollNpcInitiative(monster) {
 }
 
 function logRoll(campaignName, name, rollResult) {
-    postLogEntry(campaignName, {
+    addEntry(campaignName, {
         type: 'roll',
         characterName: name,
         rollType: 'initiative',
@@ -47,7 +47,7 @@ function logRoll(campaignName, name, rollResult) {
         mode: 'normal',
         isNatural20: rollResult.roll === 20,
         isNatural1: rollResult.roll === 1
-     });
+     }).catch((e) => { console.error("[encounterToInitiative] Error:", e); });
 }
 
 export async function expandMonstersToCreatures(selectedMonsters, characters, _campaignName) {

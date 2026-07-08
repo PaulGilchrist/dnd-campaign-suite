@@ -8,7 +8,7 @@ import {
   normalizeSaveType,
 } from '../../services/rules/combat/applyDamage.js';
 import { hasIgnoreResistance, playerIsImmuneToCondition } from '../../services/combat/automation/automationService.js';
-import { postLogEntry } from '../../services/shared/logPoster.js';
+import { addEntry } from '../../services/ui/logService.js';
 import { endInvisibilityOnHostileAction } from '../../services/rules/features/invisibilityService.js';
 import { hasSoulstitchProtection } from './loggedDiceRollUtils.js';
 import utils from '../../services/ui/utils.js';
@@ -145,7 +145,7 @@ export function setupEventListeners(deps) {
                 isUnconscious: isDead,
             };
             if (threshold) hpEntry.threshold = threshold;
-            postLogEntry(pending.campaignName, hpEntry);
+            addEntry(pending.campaignName, hpEntry).catch((e) => { console.error("[useLoggedDiceRollEventHandlers] Error:", e); });
 
             if (pendingTargetName.startsWith('player-')) {
                 setRuntimeValue(pendingTargetName, 'currentHitPoints', newHp, pending.campaignName);

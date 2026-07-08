@@ -3,7 +3,8 @@ import { addExpiration } from '../../../rules/effects/expirations.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { rangeToFeet } from '../../../rules/combat/rangeValidation.js';
 import { resolveMapPositions } from '../../common/targetResolver.js';
-import { postLogEntry } from '../../../shared/logPoster.js';
+import { addEntry } from '../../../ui/logService.js';
+
 
 const LONGSTRIDER_BUFF_NAME = 'Longstrider';
 
@@ -76,7 +77,7 @@ export async function applyLongstrider(action, playerStats, campaignName, mapNam
             { type: 'remove_active_buff', buffName: LONGSTRIDER_BUFF_NAME }
         ], campaignName);
 
-        postLogEntry(campaignName, {
+        addEntry(campaignName, {
             type: 'ability_use',
             characterName: playerStats.name,
             abilityName: LONGSTRIDER_BUFF_NAME,

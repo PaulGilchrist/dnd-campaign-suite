@@ -2,7 +2,7 @@ import { buildSaveDc, createSaveListener } from '../../common/savePrompt.js';
 import { resolveTarget } from '../../common/targetResolver.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../ui/logService.js';
-import { postLogEntry } from '../../../shared/logPoster.js';
+
 import { addExpiration } from '../../../rules/effects/expirations.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 
@@ -55,14 +55,14 @@ export async function processPowerWordStunRepeatSave(casterName, targetName, sav
             description: `${targetName} succeeded on CON save. ${spellName} ends!`,
         }).catch((e) => { console.error("[powerWordStun] Error:", e); });
 
-        postLogEntry(campaignName, {
+        addEntry(campaignName, {
             type: 'condition',
             action: 'removed',
             characterName: targetName,
             condition: 'Stunned',
             reason: `${spellName} (successful save)`,
             timestamp: Date.now(),
-        });
+        }).catch((e) => { console.error("[powerWordStun] Error:", e); });
 
         return {
             type: 'popup',
@@ -185,7 +185,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         }
         setRuntimeValue(campaignName, 'targetEffects', effects, campaignName);
 
-        postLogEntry(campaignName, {
+        addEntry(campaignName, {
             type: 'condition',
             action: 'applied',
             characterName: targetName,
@@ -193,7 +193,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             reason: action.name,
             note: `${targetName} is Stunned by ${action.name} (${targetCurrentHp} HP). Must make CON save at end of each turn.`,
             timestamp: Date.now(),
-        });
+        }).catch((e) => { console.error("[powerWordStun] Error:", e); });
 
         description = `${targetName} has ${targetCurrentHp} HP (150 or fewer). ${targetName} is Stunned. At the end of each of its turns, ${targetName} makes a CON save (DC ${dc}). On a success, the condition ends.`;
         actionsTaken.push('stunned');
@@ -206,7 +206,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             { type: 'speed_zero', condition: 'speed_zero' },
         ], campaignName, 1);
 
-        postLogEntry(campaignName, {
+        addEntry(campaignName, {
             type: 'condition',
             action: 'applied',
             characterName: targetName,
@@ -214,7 +214,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             reason: action.name,
             note: `${targetName} has Speed 0 from ${action.name} (${targetCurrentHp !== null ? targetCurrentHp + ' HP' : 'HP unknown'}). Ends at start of caster's next turn.`,
             timestamp: Date.now(),
-        });
+        }).catch((e) => { console.error("[powerWordStun] Error:", e); });
 
         description = `${targetName} has ${targetCurrentHp !== null ? targetCurrentHp + ' HP' : 'unknown HP'} (more than 150). ${targetName}'s Speed is 0 until the start of your next turn.`;
         actionsTaken.push('speed_zero');

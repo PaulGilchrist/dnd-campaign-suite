@@ -1,7 +1,8 @@
 import { rollExpression, rollExpressionMaximized } from '../../../dice/diceRoller.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
-import { postLogEntry } from '../../../shared/logPoster.js';
+import { addEntry } from '../../../ui/logService.js';
+
 import storage from '../../../ui/storage.js';
 import { resolveTarget } from '../../common/targetResolver.js';
 import { hasHealingMaximization } from '../../../combat/automation/automationService.js';
@@ -112,14 +113,14 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         await setRuntimeValue(targetName, 'activeConditions', filtered, campaignName);
     }
 
-    postLogEntry(campaignName, {
+    addEntry(campaignName, {
         type: 'heal',
         characterName: playerName,
         targetName: targetName,
         amount: healAmount,
         abilityName: action.name,
         timestamp: Date.now(),
-    });
+    }).catch((e) => { console.error("[handOfUltimateMercy] Error:", e); });
 
     const cureMsg = cureConditions.length > 0
         ? ` Also removed: ${cureConditions.join(', ')}.`

@@ -4,7 +4,7 @@ import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useR
 import { addExpiration } from '../../../rules/effects/expirations.js';
 import { rangeToFeet } from '../../../rules/combat/rangeValidation.js';
 import { resolveMapPositions } from '../../common/targetResolver.js';
-import { postLogEntry } from '../../../shared/logPoster.js';
+import { addEntry } from '../../../ui/logService.js';
 import { getCombatSummary } from '../../../encounters/combatData.js';
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
@@ -24,8 +24,8 @@ vi.mock('../../common/targetResolver.js', () => ({
     resolveMapPositions: vi.fn(),
 }));
 
-vi.mock('../../../shared/logPoster.js', () => ({
-    postLogEntry: vi.fn(() => Promise.resolve()),
+vi.mock('../../../ui/logService.js', () => ({
+    addEntry: vi.fn(() => Promise.resolve()),
 }));
 
 vi.mock('../../../encounters/combatData.js', () => ({
@@ -193,7 +193,7 @@ describe('shieldOfFaithHandler', () => {
                 MOCK_CAMPAIGN
             );
 
-            expect(postLogEntry).toHaveBeenCalledWith(MOCK_CAMPAIGN, expect.objectContaining({
+            expect(addEntry).toHaveBeenCalledWith(MOCK_CAMPAIGN, expect.objectContaining({
                 type: 'ability_use',
                 characterName: 'Cleric1',
                 abilityName: 'Shield of Faith',
@@ -217,7 +217,7 @@ describe('shieldOfFaithHandler', () => {
             expect(result.type).toBe('popup');
             expect(setRuntimeValue).not.toHaveBeenCalled();
             expect(addExpiration).toHaveBeenCalledTimes(1);
-            expect(postLogEntry).toHaveBeenCalledTimes(1);
+            expect(addEntry).toHaveBeenCalledTimes(1);
         });
 
         it('applies to new targets and skips duplicates in multi-target call', async () => {
@@ -236,7 +236,7 @@ describe('shieldOfFaithHandler', () => {
             expect(setRuntimeValue).toHaveBeenCalledTimes(1);
             expect(setRuntimeValue).toHaveBeenCalledWith('Ally2', 'activeBuffs', expect.any(Array), MOCK_CAMPAIGN);
             expect(addExpiration).toHaveBeenCalledTimes(2);
-            expect(postLogEntry).toHaveBeenCalledTimes(2);
+            expect(addEntry).toHaveBeenCalledTimes(2);
         });
 
         it('reports correct target count in description for multiple targets', async () => {

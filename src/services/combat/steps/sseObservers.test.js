@@ -10,24 +10,22 @@ describe('createSseObservers', () => {
     it('should return an array of observer objects', () => {
         const observers = createSseObservers('test-campaign');
         expect(Array.isArray(observers)).toBe(true);
-        expect(observers.length).toBeGreaterThan(0);
+        expect(observers.length).toBe(3);
     });
 
-    it('should have observers for each mapped event', () => {
-        const observers = createSseObservers('test-campaign');
-        const events = observers.map(o => o.event);
-
-        expect(events).toContain('damage:rolled');
-        expect(events).toContain('damage:applied');
-        expect(events).toContain('sneak:applied');
-        expect(events).toContain('housekeeping:do');
-    });
-
-    it('should have a wildcard observer for modal pauses', () => {
+    it('should have a wildcard observer for general broadcast', () => {
         const observers = createSseObservers('test-campaign');
         const events = observers.map(o => o.event);
 
         expect(events).toContain('*');
+    });
+
+    it('should have two wildcard observers (broadcast + modal pauses)', () => {
+        const observers = createSseObservers('test-campaign');
+        const events = observers.map(o => o.event);
+
+        const wildcardCount = events.filter(e => e === '*').length;
+        expect(wildcardCount).toBe(2);
     });
 
     it('should have a pipeline:resumed observer', () => {
@@ -37,14 +35,14 @@ describe('createSseObservers', () => {
         expect(events).toContain('pipeline:resumed');
     });
 
-    it('should POST to the correct endpoint for damage:rolled', async () => {
+    it('should broadcast event name via wildcard observer', async () => {
         const fetchMock = global.fetch;
         fetchMock.mockResolvedValue({ ok: true });
 
         const observers = createSseObservers('my-campaign');
-        const damageObserver = observers.find(o => o.event === 'damage:rolled');
+        const wildcardObserver = observers.find(o => o.event === '*');
 
-        await damageObserver.handler({}, { data: { total: 15 } });
+        await wildcardObserver.handler({}, { data: { total: 15 } }, 'damage:rolled');
 
         expect(fetchMock).toHaveBeenCalledWith(
             '/api/campaigns/my-campaign/pipeline-event',
@@ -59,17 +57,17 @@ describe('createSseObservers', () => {
         expect(callArg.data).toEqual({ data: { total: 15 } });
     });
 
-    it('should POST to the correct endpoint for damage:applied', async () => {
+    it('should broadcast different event names correctly', async () => {
         const fetchMock = global.fetch;
         fetchMock.mockResolvedValue({ ok: true });
 
         const observers = createSseObservers('my-campaign');
-        const damageObserver = observers.find(o => o.event === 'damage:applied');
+        const wildcardObserver = observers.find(o => o.event === '*');
 
-        await damageObserver.handler({}, { data: { done: true } });
+        await wildcardObserver.handler({}, { data: { done: true } }, 'spell:applied');
 
         const callArg = JSON.parse(fetchMock.mock.calls[0][1].body);
-        expect(callArg.key).toBe('damage:applied');
+        expect(callArg.key).toBe('spell:applied');
     });
 
     it('should POST modal:shown when result has modal property', async () => {
@@ -77,7 +75,7 @@ describe('createSseObservers', () => {
         fetchMock.mockResolvedValue({ ok: true });
 
         const observers = createSseObservers('my-campaign');
-        const modalObserver = observers.find(o => o.event === '*');
+        const modalObserver = observers.find((o, idx) => o.event === '*' && idx > 0);
 
         await modalObserver.handler({}, { modal: true, data: { step: 'test-step' } });
 
@@ -97,7 +95,7 @@ describe('createSseObservers', () => {
         fetchMock.mockResolvedValue({ ok: true });
 
         const observers = createSseObservers('my-campaign');
-        const modalObserver = observers.find(o => o.event === '*');
+        const modalObserver = observers.find((o, idx) => o.event === '*' && idx > 0);
 
         await modalObserver.handler({}, { data: { total: 10 } });
 
@@ -129,10 +127,10 @@ describe('createSseObservers', () => {
         fetchMock.mockRejectedValue(new Error('Network error'));
 
         const observers = createSseObservers('my-campaign');
-        const damageObserver = observers.find(o => o.event === 'damage:rolled');
+        const wildcardObserver = observers.find(o => o.event === '*');
 
         // Should not throw
-        await expect(damageObserver.handler({}, { data: { total: 10 } })).resolves.toBeUndefined();
+        await expect(wildcardObserver.handler({}, { data: { total: 10 } }, 'damage:rolled')).resolves.toBeUndefined();
     });
 
     it('should encode campaign name in URL', async () => {
@@ -140,9 +138,9 @@ describe('createSseObservers', () => {
         fetchMock.mockResolvedValue({ ok: true });
 
         const observers = createSseObservers('my campaign!');
-        const damageObserver = observers.find(o => o.event === 'damage:rolled');
+        const wildcardObserver = observers.find(o => o.event === '*');
 
-        await damageObserver.handler({}, { data: { total: 10 } });
+        await wildcardObserver.handler({}, { data: { total: 10 } }, 'damage:rolled');
 
         expect(fetchMock).toHaveBeenCalledWith(
             '/api/campaigns/my%20campaign!/pipeline-event',
@@ -150,35 +148,16 @@ describe('createSseObservers', () => {
         );
     });
 
-    it('should include all 20 mapped events', () => {
-        const observers = createSseObservers('test-campaign');
-        const events = observers.map(o => o.event);
+    it('should skip broadcast when modal is present', async () => {
+        const fetchMock = global.fetch;
+        fetchMock.mockResolvedValue({ ok: true });
 
-        const requiredEvents = [
-            'housekeeping:do',
-            'maneuvers:check',
-            'maneuvers:handled',
-            'cunning:checked',
-            'bi:checked',
-            'damage:rolled',
-            'context:built',
-            'sneak:applied',
-            'twf:applied',
-            'effects:applied',
-            'superiority:applied',
-            'automation:applied',
-            'weapon_hit:applied',
-            'n20:applied',
-            'celestial:applied',
-            'riders:applied',
-            'overchannel:self-damage',
-            'dmg_type:modified',
-            'damage:ready',
-            'damage:applied',
-        ];
+        const observers = createSseObservers('my-campaign');
+        const wildcardObserver = observers.find((o, idx) => o.event === '*' && idx === 0);
 
-        for (const event of requiredEvents) {
-            expect(events).toContain(event);
-        }
+        await wildcardObserver.handler({}, { modal: true, data: { step: 'test-step' } }, 'damage:rolled');
+
+        // Should not have posted because modal is present
+        expect(fetchMock).not.toHaveBeenCalled();
     });
 });

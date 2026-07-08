@@ -2,7 +2,8 @@ import { toggleBuff } from '../../common/buffToggle.js';
 import { addExpiration } from '../../../rules/effects/expirations.js';
 import { setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
-import { postLogEntry } from '../../../shared/logPoster.js';
+import { addEntry } from '../../../ui/logService.js';
+
 import { isSilenceActive as isSilenceActiveService } from '../../../rules/features/silenceService.js';
 
 const SILENCE_EFFECT = 'silence';
@@ -43,7 +44,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             { type: 'remove_active_buff', buffName }
         ], campaignName);
 
-        await postLogEntry(campaignName, {
+        await addEntry(campaignName, {
             type: 'ability_use',
             characterName: playerName,
             abilityName: buffName,

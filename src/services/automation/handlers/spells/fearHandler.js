@@ -1,7 +1,7 @@
 import { buildSaveDc, createSaveListener } from '../../common/savePrompt.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { addEntry } from '../../../ui/logService.js';
-import { postLogEntry } from '../../../shared/logPoster.js';
+
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addExpiration } from '../../../rules/effects/expirations.js';
 
@@ -68,7 +68,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             const filtered = conditions.filter(c => String(c).toLowerCase() !== 'frightened');
             setRuntimeValue(targetName, 'activeConditions', [...filtered, 'frightened'], campaignName);
 
-            postLogEntry(campaignName, {
+            addEntry(campaignName, {
                 type: 'condition',
                 action: 'applied',
                 characterName: targetName,
@@ -76,7 +76,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
                 reason: 'Fear spell',
                 note: `${targetName} drops what it was holding, becomes Frightened, and must take the Dash action to move away from ${casterName} on each of its turns.`,
                 timestamp: Date.now(),
-            });
+            }).catch((e) => { console.error("[fear] Error:", e); });
 
             addExpiration(casterName, targetName, [
                 { type: 'condition', condition: 'frightened' },

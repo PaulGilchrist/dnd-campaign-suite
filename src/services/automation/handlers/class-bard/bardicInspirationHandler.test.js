@@ -19,8 +19,8 @@ vi.mock('../../../rules/combat/damageUtils.js', () => ({
   getCombatContext: vi.fn(),
 }));
 
-vi.mock('../../../shared/logPoster.js', () => ({
-  postLogEntry: vi.fn(),
+vi.mock('../../../ui/logService.js', () => ({
+  addEntry: vi.fn(() => Promise.resolve()),
 }));
 
 // ── Imports ────────────────────────────────────────────────────────
@@ -30,7 +30,7 @@ import { handle, applyBardicInspiration } from './bardicInspirationHandler.js';
 import * as useRuntimeState from '../../../../hooks/runtime/useRuntimeState.js';
 import * as automationService from '../../../combat/automation/automationService.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
-import { postLogEntry } from '../../../shared/logPoster.js';
+import { addEntry } from '../../../ui/logService.js';
 
 // ── Helpers ────────────────────────────────────────────────────────
 
@@ -176,7 +176,7 @@ describe('bardicInspirationHandler.applyBardicInspiration', () => {
 
     automationService.evaluateAutoExpression.mockReturnValue(4);
     useRuntimeState.getRuntimeValue.mockReturnValue(3);
-    postLogEntry.mockResolvedValue(undefined);
+    addEntry.mockResolvedValue(undefined);
   });
 
   describe('uses decrement', () => {
@@ -224,7 +224,7 @@ describe('bardicInspirationHandler.applyBardicInspiration', () => {
     it('posts a log entry with the die size and target name', async () => {
       await applyBardicInspiration(action, playerStats, campaignName, 'Fighter', 8, false);
 
-      expect(postLogEntry).toHaveBeenCalledWith(campaignName, {
+      expect(addEntry).toHaveBeenCalledWith(campaignName, {
         type: 'ability_use',
         characterName: 'Bard',
         abilityName: 'Bardic Inspiration',

@@ -3,7 +3,8 @@ import { hasHealingMaximization } from '../../combat/automation/automationServic
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import { getCombatContext, getTargetFromAttacker } from '../../rules/combat/damageUtils.js';
 import { applyHealingToTarget } from '../../rules/combat/applyHealing.js';
-import { postLogEntry } from '../../shared/logPoster.js';
+import { addEntry } from '../../ui/logService.js';
+
 
 export function rollHealingForAction(auto, playerStats, campaignName, isSelf = false) {
     const formula = auto.healExpression || '';
@@ -26,15 +27,15 @@ export function rollHealingForAction(auto, playerStats, campaignName, isSelf = f
 
          const result = applyHealingToTarget(cs, targetName, healAmount, campaignName);
          if (result) {
-             postLogEntry(campaignName, {
-                 type: 'hp_change',
-                 targetName,
-                 delta: result.delta,
-                 currentHp: result.newHp,
-                 maxHp: result.maxHp,
-                 isHealing: true,
-                 isUnconscious: false,
-             }).catch(() => {});
+              addEntry(campaignName, {
+                  type: 'hp_change',
+                  targetName,
+                  delta: result.delta,
+                  currentHp: result.newHp,
+                  maxHp: result.maxHp,
+                  isHealing: true,
+                  isUnconscious: false,
+              }).catch((e) => { console.error("[healingRoll] Error:", e); });
          }
       });
 
@@ -59,7 +60,7 @@ export function applyHealingDirectly(playerStats, targetName, amount, campaignNa
 
 export function logHealingToSSE(campaignName, info) {
     const { targetName, sourceName, actualHeal, newHp, maxHp, rollInfo, maximize, healingName, remainingUses } = info;
-    postLogEntry(campaignName, {
+    addEntry(campaignName, {
         type: 'hp_change',
         targetName,
         sourceName,
@@ -70,7 +71,7 @@ export function logHealingToSSE(campaignName, info) {
         isUnconscious: false,
         rollInfo: rollInfo || null,
         maximizeHealingDice: maximize || false,
-      }).catch(() => {});
+      }).catch((e) => { console.error("[healingRoll] Error:", e); });
 
     if (healingName) {
         const healDesc = actualHeal > 0

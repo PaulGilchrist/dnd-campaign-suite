@@ -1,4 +1,4 @@
-import { postLogEntry } from '../../shared/logPoster.js';
+import { addEntry } from '../../ui/logService.js';
 
 export function applyThoughtShield(creature, attackerName, playerComputed, damageTypes, combatSummary, campaignName, wardDamage) {
     const hasThoughtShield = playerComputed?.characterAdvancement?.some(f => f.name === 'Thought Shield');
@@ -7,7 +7,7 @@ export function applyThoughtShield(creature, attackerName, playerComputed, damag
         if (attackerCreature && attackerCreature.currentHp > 0) {
             const reflectedDamage = wardDamage;
             attackerCreature.currentHp = Math.max(0, attackerCreature.currentHp - reflectedDamage);
-            postLogEntry(campaignName, {
+            addEntry(campaignName, {
                 type: 'hp_change',
                 targetName: attackerName,
                 delta: -reflectedDamage,
@@ -16,7 +16,7 @@ export function applyThoughtShield(creature, attackerName, playerComputed, damag
                 isHealing: false,
                 isUnconscious: attackerCreature.currentHp <= 0,
                 abilityName: 'Thought Shield',
-            });
+            }).catch((e) => { console.error("[thoughtShield] Error:", e); });
             if (attackerCreature.concentration && reflectedDamage > 0) {
                 attackerCreature.concentration.dc = Math.max(10, Math.floor(reflectedDamage / 2));
             }

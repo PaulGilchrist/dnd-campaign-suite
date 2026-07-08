@@ -13,8 +13,8 @@ vi.mock('../../../rules/combat/damageUtils.js', () => ({
   getTargetFromAttacker: vi.fn(),
 }));
 
-vi.mock('../../../shared/logPoster.js', () => ({
-  postLogEntry: vi.fn(),
+vi.mock('../../../ui/logService.js', () => ({
+  addEntry: vi.fn(() => Promise.resolve()),
 }));
 
 // ── Imports ────────────────────────────────────────────────────
@@ -22,7 +22,7 @@ vi.mock('../../../shared/logPoster.js', () => ({
 import { handle } from './revivificationHandler.js';
 import * as useRuntimeState from '../../../../hooks/runtime/useRuntimeState.js';
 import * as damageUtils from '../../../rules/combat/damageUtils.js';
-import * as logPoster from '../../../shared/logPoster.js';
+import * as logPoster from '../../../ui/logService.js';
 
 // ── Helpers ────────────────────────────────────────────────────
 
@@ -274,7 +274,7 @@ describe('revivificationHandler', () => {
         null,
       );
 
-      expect(logPoster.postLogEntry).toHaveBeenCalledWith(campaignName, {
+      expect(logPoster.addEntry).toHaveBeenCalledWith(campaignName, {
         type: 'heal',
         characterName: playerName,
         targetName: 'Ally',

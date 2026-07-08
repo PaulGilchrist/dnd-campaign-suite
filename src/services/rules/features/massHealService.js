@@ -1,7 +1,7 @@
 import { getCombatContext } from '../combat/damageUtils.js';
 import { applyHealingToTarget } from '../combat/applyHealing.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
-import { postLogEntry } from '../../shared/logPoster.js';
+import { addEntry } from '../../ui/logService.js';
 import { getDistanceFeet, rangeToFeet } from '../combat/rangeValidation.js';
 import { resolveHealingBonusesWithDetails } from '../../combat/automation/automationService.js';
 
@@ -31,14 +31,14 @@ async function removeConditionsOnTarget(targetName, campaignName, spell, reason)
         setRuntimeValue(targetName, 'activeConditions', newConditions, campaignName);
         for (const removed of conditionsToRemove) {
             if (!newConditions.some(c => String(c).toLowerCase() === removed)) {
-                postLogEntry(campaignName, {
+                addEntry(campaignName, {
                     type: 'condition',
                     action: 'removed',
                     characterName: targetName,
                     condition: removed.charAt(0).toUpperCase() + removed.slice(1),
                     reason,
                     timestamp: Date.now(),
-                });
+                }).catch((e) => { console.error("[massHeal] Error:", e); });
             }
         }
     }
@@ -139,7 +139,7 @@ export async function triggerMassHeal(spell, metaCtx, playerStats, campaignName,
             formulaParts.push(`(${bonusParts})`);
         }
 
-        postLogEntry(campaignName, {
+        addEntry(campaignName, {
             type: 'hp_change',
             targetName,
             delta: actualHeal,
@@ -150,7 +150,7 @@ export async function triggerMassHeal(spell, metaCtx, playerStats, campaignName,
             note: 'Mass Heal',
             formula: formulaParts.join(' + '),
             timestamp: Date.now(),
-        });
+        }).catch((e) => { console.error("[massHeal] Error:", e); });
 
         await removeConditionsOnTarget(targetName, campaignName, spell, 'Mass Heal');
 

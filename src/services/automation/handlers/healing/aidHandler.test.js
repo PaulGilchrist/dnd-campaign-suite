@@ -32,8 +32,8 @@ vi.mock('../../../combat/automation/automationExpressions.js', () => ({
   evaluateAutoExpression: vi.fn(),
 }));
 
-vi.mock('../../../shared/logPoster.js', () => ({
-  postLogEntry: vi.fn(),
+vi.mock('../../../ui/logService.js', () => ({
+  addEntry: vi.fn(() => Promise.resolve()),
 }));
 
 // ── Imports ────────────────────────────────────────────────────
@@ -44,7 +44,7 @@ import { addExpiration } from '../../../rules/effects/expirations.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { resolveMapPositions } from '../../common/targetResolver.js';
 import { evaluateAutoExpression } from '../../../combat/automation/automationExpressions.js';
-import { postLogEntry } from '../../../shared/logPoster.js';
+import { addEntry } from '../../../ui/logService.js';
 
 // ── Helpers ────────────────────────────────────────────────────
 
@@ -445,8 +445,8 @@ describe('aidHandler', () => {
         ['Ally1', 'Ally2'],
       );
 
-      expect(postLogEntry).toHaveBeenCalledTimes(2);
-      expect(postLogEntry).toHaveBeenNthCalledWith(1, campaignName, {
+      expect(addEntry).toHaveBeenCalledTimes(2);
+      expect(addEntry).toHaveBeenNthCalledWith(1, campaignName, {
         type: 'hp_change',
         targetName: 'Ally1',
         delta: 5,
@@ -454,7 +454,7 @@ describe('aidHandler', () => {
         sourceName: 'TestCleric',
         note: 'Aid (+5 HP max)',
       });
-      expect(postLogEntry).toHaveBeenNthCalledWith(2, campaignName, {
+      expect(addEntry).toHaveBeenNthCalledWith(2, campaignName, {
         type: 'hp_change',
         targetName: 'Ally2',
         delta: 5,

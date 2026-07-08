@@ -2,7 +2,7 @@ import { buildSaveDc, createSaveListener } from '../../common/savePrompt.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../ui/logService.js';
 import { addExpiration } from '../../../rules/effects/expirations.js';
-import { postLogEntry } from '../../../shared/logPoster.js';
+
 
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation || {};
@@ -67,7 +67,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         { type: 'condition', condition: condKey },
     ], campaignName, 2);
 
-    postLogEntry(campaignName, {
+    addEntry(campaignName, {
         type: 'condition',
         action: 'applied',
         characterName: targetName,
@@ -75,7 +75,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         reason: 'Friends cantrip',
         note: `${targetName} is Charmed by ${playerStats.name} (Concentration, up to 1 minute). Spell ends if ${playerStats.name} makes an attack roll, deals damage, or forces a save.`,
         timestamp: Date.now(),
-    });
+    }).catch((e) => { console.error("[friends] Error:", e); });
 
     return {
         type: 'popup',

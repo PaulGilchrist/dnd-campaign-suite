@@ -2,7 +2,7 @@ import { rollExpression, rollExpressionMaximized } from '../../dice/diceRoller.j
 import { getCombatContext } from '../combat/damageUtils.js';
 import { applyHealingToTarget } from '../combat/applyHealing.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
-import { postLogEntry } from '../../shared/logPoster.js';
+import { addEntry } from '../../ui/logService.js';
 import { getDistanceFeet, rangeToFeet } from '../combat/rangeValidation.js';
 import { getCurrentCombatRound } from '../../encounters/combatData.js';
 import { resolveHealingBonusesWithDetails, hasHealingMaximization } from '../../combat/automation/automationService.js';
@@ -133,7 +133,7 @@ export async function triggerPrayerOfHealing(spell, metaCtx, playerStats, campai
             formulaParts.push(`(${bonusParts})`);
         }
 
-        postLogEntry(campaignName, {
+        addEntry(campaignName, {
             type: 'hp_change',
             targetName,
             delta: actualHeal,
@@ -144,15 +144,15 @@ export async function triggerPrayerOfHealing(spell, metaCtx, playerStats, campai
             note: 'Prayer of Healing',
             formula: formulaParts.join(' + '),
             timestamp: Date.now(),
-        });
+        }).catch((e) => { console.error("[prayerOfHealing] Error:", e); });
 
-        postLogEntry(campaignName, {
+        addEntry(campaignName, {
             type: 'prayer_of_healing',
             targetName,
             casterName,
             isAffected: true,
             timestamp: Date.now(),
-        });
+        }).catch((e) => { console.error("[prayerOfHealing] Error:", e); });
 
         results.push({ targetName, healAmount: actualHeal });
     }

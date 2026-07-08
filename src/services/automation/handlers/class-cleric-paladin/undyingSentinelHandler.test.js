@@ -4,7 +4,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { handle } from './undyingSentinelHandler.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { getCombatContext, getTargetFromAttacker } from '../../../rules/combat/damageUtils.js';
-import { postLogEntry } from '../../../shared/logPoster.js';
+import { addEntry } from '../../../ui/logService.js';
 import storage from '../../../ui/storage.js';
 
 // ── Mocks ────────────────────────────────────────────────────────
@@ -19,8 +19,8 @@ vi.mock('../../../rules/combat/damageUtils.js', () => ({
   getTargetFromAttacker: vi.fn(),
 }));
 
-vi.mock('../../../shared/logPoster.js', () => ({
-  postLogEntry: vi.fn(),
+vi.mock('../../../ui/logService.js', () => ({
+  addEntry: vi.fn(() => Promise.resolve()),
 }));
 
 vi.mock('../../../ui/storage.js', () => ({
@@ -212,7 +212,7 @@ describe('undyingSentinelHandler', () => {
 
         await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-        expect(postLogEntry).toHaveBeenCalledWith(campaignName, {
+        expect(addEntry).toHaveBeenCalledWith(campaignName, {
           type: 'heal',
           characterName: 'TestCleric',
           targetName: 'DownedAlly',
@@ -240,7 +240,7 @@ describe('undyingSentinelHandler', () => {
 
         expect(target.currentHp).toBe(16);
         expect(storage.set).toHaveBeenCalledWith('combatSummary', cs, campaignName);
-        expect(postLogEntry).toHaveBeenCalledWith(campaignName, {
+        expect(addEntry).toHaveBeenCalledWith(campaignName, {
           type: 'heal',
           characterName: 'TestCleric',
           targetName: 'Goblin',

@@ -4,7 +4,7 @@ import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useR
 import { addEntry } from '../../../ui/logService.js';
 import { addExpiration } from '../../../rules/effects/expirations.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
-import { postLogEntry } from '../../../shared/logPoster.js';
+
 
 const MAX_FAILS = 3;
 const MAX_SUCCESSES = 3;
@@ -67,14 +67,14 @@ export async function processFleshToStoneRepeatSave(casterName, targetName, save
                 description: `${targetName} succeeded on CON save (${newSuccesses}/${MAX_SUCCESSES}). Flesh to Stone ends!`,
             }).catch((e) => { console.error("[fleshToStone] Error:", e); });
 
-            postLogEntry(campaignName, {
+            addEntry(campaignName, {
                 type: 'condition',
                 action: 'removed',
                 characterName: targetName,
                 condition: 'Restrained',
                 reason: 'Flesh to Stone ended (3 successful saves)',
                 timestamp: Date.now(),
-            });
+            }).catch((e) => { console.error("[fleshToStone] Error:", e); });
 
             return {
                 type: 'popup',
@@ -134,7 +134,7 @@ export async function processFleshToStoneRepeatSave(casterName, targetName, save
             description: `${targetName} failed CON save (${newFails}/${MAX_FAILS})! Turned to stone — Petrified!`,
         }).catch((e) => { console.error("[fleshToStone] Error:", e); });
 
-        postLogEntry(campaignName, {
+        addEntry(campaignName, {
             type: 'condition',
             action: 'applied',
             characterName: targetName,
@@ -142,7 +142,7 @@ export async function processFleshToStoneRepeatSave(casterName, targetName, save
             reason: 'Flesh to Stone (3 failed saves)',
             note: `${targetName} turned to stone by Flesh to Stone.`,
             timestamp: Date.now(),
-        });
+        }).catch((e) => { console.error("[fleshToStone] Error:", e); });
 
         return {
             type: 'popup',
@@ -237,7 +237,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             characterName: casterName,
             abilityName: action.name,
             description: `${targetName} is a Construct and automatically succeeds on the save against Flesh to Stone.`,
-        }).catch(() => {});
+        }).catch((e) => { console.error("[fleshToStone] Error:", e); });
 
         // Constructs still get Speed 0 until start of your next turn
         const storedConditions = getRuntimeValue(targetName, 'activeConditions', campaignName) || [];
@@ -298,7 +298,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             description: `${targetName} succeeded on CON save against Flesh to Stone. Speed is 0 until the start of ${casterName}'s next turn.`,
         }).catch((e) => { console.error("[fleshToStone] Error:", e); });
 
-        postLogEntry(campaignName, {
+        addEntry(campaignName, {
             type: 'condition',
             action: 'applied',
             characterName: targetName,
@@ -306,7 +306,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             reason: 'Flesh to Stone (successful save)',
             note: `${targetName} succeeded on CON save; Speed is 0 until the start of ${casterName}'s next turn.`,
             timestamp: Date.now(),
-        });
+        }).catch((e) => { console.error("[fleshToStone] Error:", e); });
 
         return {
             type: 'popup',
@@ -364,7 +364,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         description: `${targetName} failed CON save against Flesh to Stone and is Restrained (1/3 failed saves). After 3 failed saves, ${targetName} becomes Petrified.`,
     }).catch((e) => { console.error("[fleshToStone] Error:", e); });
 
-    postLogEntry(campaignName, {
+    addEntry(campaignName, {
         type: 'condition',
         action: 'applied',
         characterName: targetName,
@@ -372,7 +372,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         reason: 'Flesh to Stone',
         note: `${targetName} is Restrained by Flesh to Stone. Must make CON save at end of each turn. 3 failures → Petrified`,
         timestamp: Date.now(),
-    });
+    }).catch((e) => { console.error("[fleshToStone] Error:", e); });
 
     return {
         type: 'popup',

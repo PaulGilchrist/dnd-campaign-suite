@@ -2,7 +2,8 @@ import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useR
 import { addExpiration } from '../../../rules/effects/expirations.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { evaluateAutoExpression } from '../../../combat/automation/automationExpressions.js';
-import { postLogEntry } from '../../../shared/logPoster.js';
+import { addEntry } from '../../../ui/logService.js';
+
 
 const HEROES_FEAST_BUFF_NAME = "Heroes' Feast";
 const HEROES_FEAST_HP_KEY = 'heroesFeastHpMaxIncrease';
@@ -102,14 +103,14 @@ export async function applyHeroesFeast(action, playerStats, campaignName, mapNam
             setRuntimeValue(targetName, 'activeBuffs', buffs, campaignName);
         }
 
-        postLogEntry(campaignName, {
+        addEntry(campaignName, {
             type: 'hp_change',
             targetName,
             delta: hpIncrease,
             isHealing: true,
             sourceName: playerStats.name,
             note: `${action.name} (+${hpIncrease} HP max)`,
-        });
+        }).catch((e) => { console.error("[heroesFeast] Error:", e); });
     }
 
     return {

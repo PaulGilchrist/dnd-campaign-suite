@@ -5,7 +5,6 @@ import { handle, applyGreaterRestoration } from './greaterRestorationHandler.js'
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../ui/logService.js';
-import { postLogEntry } from '../../../shared/logPoster.js';
 
 vi.mock('../../../rules/combat/damageUtils.js', () => ({
   getCombatContext: vi.fn(),
@@ -20,8 +19,8 @@ vi.mock('../../../ui/logService.js', () => ({
   addEntry: vi.fn(() => Promise.resolve()),
 }));
 
-vi.mock('../../../shared/logPoster.js', () => ({
-  postLogEntry: vi.fn(),
+vi.mock('../../../ui/logService.js', () => ({
+  addEntry: vi.fn(() => Promise.resolve()),
 }));
 
 const campaignName = 'TestCampaign';
@@ -239,7 +238,7 @@ describe('greaterRestorationHandler.applyGreaterRestoration', () => {
       );
 
       expect(setRuntimeValue).toHaveBeenCalledWith('Goblin', 'activeBuffs', [{ type: 'buff', name: 'Shield' }], campaignName);
-      expect(postLogEntry).toHaveBeenCalledWith(
+      expect(addEntry).toHaveBeenCalledWith(
         campaignName,
         expect.objectContaining({ type: 'buff', action: 'removed', buffName: 'Cursed Sword', reason: 'Greater Restoration' }),
       );
@@ -471,7 +470,7 @@ describe('greaterRestorationHandler.applyGreaterRestoration', () => {
         }),
       );
 
-      expect(postLogEntry).toHaveBeenCalledWith(
+      expect(addEntry).toHaveBeenCalledWith(
         campaignName,
         expect.objectContaining({
           type: 'spell_effect',
@@ -500,7 +499,7 @@ describe('greaterRestorationHandler.applyGreaterRestoration', () => {
       );
 
       expect(addEntry).not.toHaveBeenCalled();
-      expect(postLogEntry).not.toHaveBeenCalled();
+      expect(addEntry).not.toHaveBeenCalled();
     });
   });
 

@@ -25,8 +25,8 @@ vi.mock('../../../rules/effects/expirations.js', () => ({
     addExpiration: vi.fn(),
 }));
 
-vi.mock('../../../shared/logPoster.js', () => ({
-    postLogEntry: vi.fn(),
+vi.mock('../../../ui/logService.js', () => ({
+    addEntry: vi.fn(() => Promise.resolve()),
 }));
 
 // ── Imported mocks ─────────────────────────────────────────────
@@ -35,7 +35,6 @@ import { buildSaveDc, createSaveListener } from '../../common/savePrompt.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../ui/logService.js';
 import { addExpiration } from '../../../rules/effects/expirations.js';
-import { postLogEntry } from '../../../shared/logPoster.js';
 
 // ── Helpers ────────────────────────────────────────────────────
 
@@ -203,7 +202,7 @@ describe('rayOfEnfeeblementHandler', () => {
 
             await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
 
-            expect(postLogEntry).toHaveBeenCalledWith('test-campaign', {
+            expect(addEntry).toHaveBeenCalledWith('test-campaign', {
                 type: 'condition',
                 action: 'applied',
                 characterName: 'Goblin',
@@ -327,7 +326,7 @@ describe('rayOfEnfeeblementHandler', () => {
 
             await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
 
-            expect(postLogEntry).toHaveBeenCalledWith('test-campaign', {
+            expect(addEntry).toHaveBeenCalledWith('test-campaign', {
                 type: 'automation_info',
                 action: 'applied',
                 characterName: 'Goblin',

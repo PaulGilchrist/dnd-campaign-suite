@@ -5,7 +5,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { applyDamageToTarget } from './applyDamage.js';
 import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import { rollConcentrationSave } from '../../combat/concentration/concentrationRules.js';
-import { postLogEntry } from '../../shared/logPoster.js';
+import { addEntry } from '../../ui/logService.js';
 
 // ── Mocks ──────────────────────────────────────────────────────
 
@@ -41,8 +41,8 @@ vi.mock('./rangeValidation.js', () => ({
   getDistanceFeet: vi.fn(() => 30),
 }));
 
-vi.mock('../../shared/logPoster.js', () => ({
-  postLogEntry: vi.fn(),
+vi.mock('../../ui/logService.js', () => ({
+  addEntry: vi.fn(() => Promise.resolve()),
 }));
 
 // ── Globals ─────────────────────────────────────────────────────
@@ -300,7 +300,7 @@ describe('NPC Concentration — Dragon Constellation & Relentless Hunter', () =>
         createMinimalCharacter('Orc', 1),
       ]);
 
-      expect(postLogEntry).toHaveBeenCalledWith('TestCampaign', expect.objectContaining({
+      expect(addEntry).toHaveBeenCalledWith('TestCampaign', expect.objectContaining({
         type: 'concentration-broken',
         characterName: 'Orc',
         spellName: 'Haste',
@@ -325,7 +325,7 @@ describe('NPC Concentration — Dragon Constellation & Relentless Hunter', () =>
         createMinimalCharacter('Orc', 1),
       ]);
 
-      expect(postLogEntry).toHaveBeenCalledWith('TestCampaign', expect.objectContaining({
+      expect(addEntry).toHaveBeenCalledWith('TestCampaign', expect.objectContaining({
         type: 'concentration-save',
         characterName: 'Orc',
         spellName: 'Haste',

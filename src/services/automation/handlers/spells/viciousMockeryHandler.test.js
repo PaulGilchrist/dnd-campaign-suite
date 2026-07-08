@@ -10,8 +10,8 @@ vi.mock('../../../rules/effects/expirations.js', () => ({
     addExpiration: vi.fn(),
 }));
 
-vi.mock('../../../shared/logPoster.js', () => ({
-    postLogEntry: vi.fn(),
+vi.mock('../../../ui/logService.js', () => ({
+    addEntry: vi.fn(() => Promise.resolve()),
 }));
 
 import { setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';

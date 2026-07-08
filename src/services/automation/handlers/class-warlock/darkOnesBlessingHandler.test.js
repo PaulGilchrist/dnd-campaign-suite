@@ -24,7 +24,7 @@ vi.mock('../../../maps/mapsService.js', () => ({
 }));
 
 vi.mock('../../../ui/logService.js', () => ({
-    addEntry: vi.fn(),
+    addEntry: vi.fn(() => Promise.resolve()),
 }));
 
 const { addEntry } = await import('../../../ui/logService.js');

@@ -16,8 +16,8 @@ vi.mock('../../../ui/logService.js', () => ({
   addEntry: vi.fn(() => Promise.resolve()),
 }));
 
-vi.mock('../../../shared/logPoster.js', () => ({
-  postLogEntry: vi.fn(),
+vi.mock('../../../ui/logService.js', () => ({
+  addEntry: vi.fn(() => Promise.resolve()),
 }));
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
@@ -35,7 +35,6 @@ import { handle } from './massSuggestionHandler.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { buildSaveDc, createSaveListener } from '../../common/savePrompt.js';
 import { addEntry } from '../../../ui/logService.js';
-import { postLogEntry } from '../../../shared/logPoster.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addExpiration } from '../../../rules/effects/expirations.js';
 
@@ -186,7 +185,7 @@ describe('massSuggestionHandler.handle', () => {
         campaignName,
         24,
       );
-      expect(postLogEntry).toHaveBeenCalledWith(campaignName, {
+      expect(addEntry).toHaveBeenCalledWith(campaignName, {
         type: 'condition',
         action: 'applied',
         characterName: 'Goblin',
@@ -231,7 +230,11 @@ describe('massSuggestionHandler.handle', () => {
 
       expect(setRuntimeValue).not.toHaveBeenCalled();
       expect(addExpiration).not.toHaveBeenCalled();
-      expect(postLogEntry).not.toHaveBeenCalled();
+      expect(addEntry).toHaveBeenCalledTimes(8);
+      const abilityEntries = addEntry.mock.calls.filter(call => call[1].type === 'ability_use');
+      expect(abilityEntries.length).toBe(4);
+      const saveEntries = addEntry.mock.calls.filter(call => call[1].type === 'save_result');
+      expect(saveEntries.length).toBe(4);
     });
   });
 

@@ -1,6 +1,6 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import { rollD20 } from '../../dice/diceRoller.js';
-import { postLogEntry } from '../../shared/logPoster.js';
+import { addEntry } from '../../ui/logService.js';
 import { isHolyAuraActive, getHolyAuraTargets } from '../../automation/handlers/buffs/holyAuraHandler.js';
 
 export function checkHolyAuraDamage(creature, attackerName, combatSummary, campaignName, wardDamage) {
@@ -28,14 +28,14 @@ export function checkHolyAuraDamage(creature, attackerName, combatSummary, campa
                                 const existingBlinded = attackerConditions.find(c => String(c).toLowerCase() === 'blinded');
                                 if (!existingBlinded) {
                                     setRuntimeValue(attackerName, 'activeConditions', [...attackerConditions, 'blinded'], campaignName);
-                                    postLogEntry(campaignName, {
+                                    addEntry(campaignName, {
                                         type: 'condition',
                                         action: 'added',
                                         characterName: attackerName,
                                         condition: 'Blinded',
                                         reason: 'Holy Aura (Fiend/Undead melee hit)',
                                         timestamp: Date.now(),
-                                    });
+                                    }).catch((e) => { console.error("[holyAura] Error:", e); });
                                 }
                             }
                         }

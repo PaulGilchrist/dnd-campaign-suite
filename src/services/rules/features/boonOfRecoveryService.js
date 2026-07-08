@@ -1,5 +1,5 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
-import { postLogEntry } from '../../shared/logPoster.js';
+import { addEntry } from '../../ui/logService.js';
 
 export function checkBoonOfRecoveryLastStand(creature, playerComputed, campaignName) {
     const rawAllFeatures = playerComputed?.allFeatures;
@@ -49,7 +49,7 @@ export function checkBoonOfRecoveryLastStand(creature, playerComputed, campaignN
         creature.currentHp = newHp;
     }
 
-    postLogEntry(campaignName, {
+    addEntry(campaignName, {
         type: 'heal',
         targetName: creature.name,
         delta: newHp,
@@ -58,7 +58,7 @@ export function checkBoonOfRecoveryLastStand(creature, playerComputed, campaignN
         isHealing: true,
         isUnconscious: false,
         abilityName: 'Boon Of Recovery - Last Stand',
-    });
+    }).catch((e) => { console.error("[boonOfRecovery] Error:", e); });
 
     window.dispatchEvent(new CustomEvent('combat-summary-updated'));
 

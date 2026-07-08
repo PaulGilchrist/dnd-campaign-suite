@@ -10,10 +10,6 @@ vi.mock('../../../ui/logService.js', () => ({
   addEntry: vi.fn(() => Promise.resolve()),
 }));
 
-vi.mock('../../../shared/logPoster.js', () => ({
-  postLogEntry: vi.fn(),
-}));
-
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(),
   setRuntimeValue: vi.fn(),
@@ -44,7 +40,6 @@ import { buildSaveDc, createSaveListener } from '../../common/savePrompt.js';
 import { resolveTarget } from '../../common/targetResolver.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../ui/logService.js';
-import { postLogEntry } from '../../../shared/logPoster.js';
 import { addExpiration } from '../../../rules/effects/expirations.js';
 import { sendSaveResult } from '../../../combat/conditions/savePromptService.js';
 import { rollSaveForCreature } from '../../../rules/combat/applyDamage.js';
@@ -199,7 +194,11 @@ describe('charmPersonHandler.handle', () => {
 
       expect(setRuntimeValue).not.toHaveBeenCalled();
       expect(addExpiration).not.toHaveBeenCalled();
-      expect(postLogEntry).not.toHaveBeenCalled();
+      expect(addEntry).toHaveBeenCalledTimes(2);
+      const abilityEntries = addEntry.mock.calls.filter(call => call[1].type === 'ability_use');
+      expect(abilityEntries.length).toBe(1);
+      const saveEntries = addEntry.mock.calls.filter(call => call[1].type === 'save_result');
+      expect(saveEntries.length).toBe(1);
     });
   });
 
@@ -282,7 +281,7 @@ describe('charmPersonHandler.handle', () => {
 
       await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-      expect(postLogEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+      expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
         type: 'condition',
         action: 'applied',
         characterName: 'Goblin',

@@ -2,7 +2,8 @@ import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useR
 import { addExpiration } from '../../../rules/effects/expirations.js';
 import { evaluateAutoExpression } from '../../../combat/automation/automationService.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
-import { postLogEntry } from '../../../shared/logPoster.js';
+import { addEntry } from '../../../ui/logService.js';
+
 import { executeHandler } from '../../index.js';
 
 export async function handle(action, playerStats, campaignName, _mapName) {
@@ -112,7 +113,7 @@ export async function applyBardicInspiration(action, playerStats, campaignName, 
         { type: 'remove_bardic_inspiration' }
     ], campaignName, 100);
 
-    postLogEntry(campaignName, {
+    addEntry(campaignName, {
         type: 'ability_use',
         characterName: playerStats.name,
         abilityName: action.name,

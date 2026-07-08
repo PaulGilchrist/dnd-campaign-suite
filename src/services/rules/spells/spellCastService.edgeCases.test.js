@@ -15,7 +15,7 @@ vi.mock('../../dice/diceRoller.js', () => ({
 }))
 
 vi.mock('../../../services/ui/logService.js', () => ({
-  addEntry: vi.fn(),
+  addEntry: vi.fn(() => Promise.resolve()),
   getLog: vi.fn(),
 }))
 
@@ -32,8 +32,8 @@ vi.mock('../../../services/encounters/combatData.js', () => ({
   loadCombatSummary: vi.fn(),
 }))
 
-vi.mock('../../shared/logPoster.js', () => ({
-  postLogEntry: vi.fn(() => Promise.resolve()),
+vi.mock('../../ui/logService.js', () => ({
+  addEntry: vi.fn(() => Promise.resolve()),
 }))
 
 vi.mock('../features/silenceService.js', () => ({

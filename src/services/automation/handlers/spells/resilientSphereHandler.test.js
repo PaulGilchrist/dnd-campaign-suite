@@ -16,10 +16,6 @@ vi.mock('../../../ui/logService.js', () => ({
   addEntry: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock('../../../shared/logPoster.js', () => ({
-  postLogEntry: vi.fn(),
-}));
-
 vi.mock('../../../rules/effects/expirations.js', () => ({
   addExpiration: vi.fn(),
 }));
@@ -44,7 +40,7 @@ import * as savePrompt from '../../common/savePrompt.js';
 import * as targetResolver from '../../common/targetResolver.js';
 import * as damageUtils from '../../../rules/combat/damageUtils.js';
 import * as logService from '../../../ui/logService.js';
-import * as logPoster from '../../../shared/logPoster.js';
+import * as logPoster from '../../../ui/logService.js';
 import * as expirations from '../../../rules/effects/expirations.js';
 
 // ── Helpers ────────────────────────────────────────────────────
@@ -151,7 +147,11 @@ describe('resilientSphereHandler', () => {
 
         expect(runtimeState.setRuntimeValue).not.toHaveBeenCalled();
         expect(expirations.addExpiration).not.toHaveBeenCalled();
-        expect(logPoster.postLogEntry).not.toHaveBeenCalled();
+        expect(logPoster.addEntry).toHaveBeenCalledTimes(2);
+        const abilityEntries = logPoster.addEntry.mock.calls.filter(call => call[1].type === 'ability_use');
+        expect(abilityEntries.length).toBe(1);
+        const saveEntries = logPoster.addEntry.mock.calls.filter(call => call[1].type === 'save_result');
+        expect(saveEntries.length).toBe(1);
       });
     });
 
@@ -213,7 +213,7 @@ describe('resilientSphereHandler', () => {
 
         await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-        expect(logPoster.postLogEntry).toHaveBeenCalledWith(campaignName, {
+        expect(logPoster.addEntry).toHaveBeenCalledWith(campaignName, {
           type: 'condition',
           action: 'applied',
           characterName: targetName,

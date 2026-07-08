@@ -3,7 +3,7 @@ import { addEntry } from '../../../ui/logService.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { getDistanceFeet, rangeToFeet } from '../../../rules/combat/rangeValidation.js';
 import { resolveMapPositions } from '../../common/targetResolver.js';
-import { postLogEntry } from '../../../shared/logPoster.js';
+
 
 export async function handle(action, playerStats, campaignName, mapName) {
     const auto = action.automation;
@@ -109,14 +109,14 @@ export async function handleConfirm(action, playerStats, campaignName, _mapName,
             setRuntimeValue(targetName, 'activeConditions', filtered, campaignName);
             for (const cond of ['charmed', 'incapacitated', 'speed_zero']) {
                 if (!filtered.some(f => String(f).toLowerCase() === cond)) {
-                    postLogEntry(campaignName, {
+                    addEntry(campaignName, {
                         type: 'condition',
                         action: 'removed',
                         characterName: targetName,
                         condition: cond.charAt(0).toUpperCase() + cond.slice(1),
                         reason: 'Shake Out Stupor (Hypnotic Pattern)',
                         timestamp: Date.now(),
-                    });
+                    }).catch((e) => { console.error("[hypnoticPatternShake] Error:", e); });
                 }
             }
         }
@@ -133,24 +133,24 @@ export async function handleConfirm(action, playerStats, campaignName, _mapName,
             setRuntimeValue(targetName, 'activeConditions', filtered, campaignName);
         }
         if (hadCharmed) {
-            postLogEntry(campaignName, {
+            addEntry(campaignName, {
                 type: 'condition',
                 action: 'removed',
                 characterName: targetName,
                 condition: 'Charmed',
                 reason: 'Shake Out Stupor (Hypnotic Pattern)',
                 timestamp: Date.now(),
-            });
+            }).catch((e) => { console.error("[hypnoticPatternShake] Error:", e); });
         }
         if (hadIncapacitated) {
-            postLogEntry(campaignName, {
+            addEntry(campaignName, {
                 type: 'condition',
                 action: 'removed',
                 characterName: targetName,
                 condition: 'Incapacitated',
                 reason: 'Shake Out Stupor (Hypnotic Pattern)',
                 timestamp: Date.now(),
-            });
+            }).catch((e) => { console.error("[hypnoticPatternShake] Error:", e); });
         }
     }
 

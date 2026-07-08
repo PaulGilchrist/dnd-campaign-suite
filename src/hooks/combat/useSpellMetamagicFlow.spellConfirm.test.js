@@ -18,7 +18,7 @@ vi.mock('./useMetamagic.js', () => ({
 }));
 
 vi.mock('../../services/ui/logService.js', () => ({
-  addEntry: vi.fn(),
+  addEntry: vi.fn(() => Promise.resolve()),
 }));
 
 vi.mock('../../services/rules/spells/postCastRiderService.js', () => ({

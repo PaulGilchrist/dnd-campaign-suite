@@ -39,7 +39,7 @@ export function createPipeline() {
 
         for (const obs of observers) {
           if (obs.event === eventType || obs.event === '*') {
-            await obs.handler(ctx, result);
+            await obs.handler(ctx, result, eventType);
           }
         }
 

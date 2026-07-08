@@ -48,8 +48,8 @@ vi.mock('../../combat/automation/automationPassives.js', () => ({
   getDamageReduction: vi.fn(() => null),
 }));
 
-vi.mock('../../shared/logPoster.js', () => ({
-  postLogEntry: vi.fn(),
+vi.mock('../../ui/logService.js', () => ({
+  addEntry: vi.fn(() => Promise.resolve()),
 }));
 
 // ── Globals ─────────────────────────────────────────────────────

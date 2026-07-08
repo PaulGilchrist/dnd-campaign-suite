@@ -41,10 +41,6 @@ vi.mock('../../../rules/features/invisibilityService.js', () => ({
   endInvisibilityOnHostileAction: vi.fn(),
 }));
 
-vi.mock('../../../shared/logPoster.js', () => ({
-  postLogEntry: vi.fn(),
-}));
-
 // ── Imports ────────────────────────────────────────────────────
 
 import { handle, applyMultiTarget } from './multiTargetHandler.js';
@@ -57,7 +53,6 @@ import { resolveMapPositions } from '../../common/targetResolver.js';
 import { applyHealingToTarget } from '../../../rules/combat/applyHealing.js';
 import { applyDamageToTarget } from '../../../rules/combat/applyDamage.js';
 import { endInvisibilityOnHostileAction } from '../../../rules/features/invisibilityService.js';
-import { postLogEntry } from '../../../shared/logPoster.js';
 
 // ── Helpers ────────────────────────────────────────────────────
 
@@ -605,7 +600,7 @@ describe('multiTargetHandler.applyMultiTarget', () => {
         cs, 'Orc', 20, ['cold'], campaignName, null, false, ps.name
       );
       expect(endInvisibilityOnHostileAction).toHaveBeenCalledWith(ps.name, campaignName);
-      expect(postLogEntry).toHaveBeenCalledWith(campaignName, {
+      expect(addEntry).toHaveBeenCalledWith(campaignName, {
         type: 'hp_change',
         targetName: 'Orc',
         delta: -10,
@@ -710,7 +705,13 @@ describe('multiTargetHandler.applyMultiTarget', () => {
         'Goblin', 'Orc', spell, metaCtx
       );
 
-      expect(postLogEntry).not.toHaveBeenCalled();
+      expect(addEntry).toHaveBeenCalledTimes(1);
+      expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+        type: 'ability_use',
+        characterName: 'TestHero',
+        abilityName: 'Word of Creation',
+        description: expect.stringContaining('Orc'),
+      }));
     });
 
     it('should not call endInvisibility when finalDamage is 0', async () => {
@@ -771,7 +772,7 @@ describe('multiTargetHandler.applyMultiTarget', () => {
       );
 
       expect(applyHealingToTarget).toHaveBeenCalledWith(cs, 'Orc', 7, campaignName);
-      expect(postLogEntry).toHaveBeenCalledWith(campaignName, {
+      expect(addEntry).toHaveBeenCalledWith(campaignName, {
         type: 'hp_change',
         targetName: 'Orc',
         delta: 7,
@@ -864,7 +865,13 @@ describe('multiTargetHandler.applyMultiTarget', () => {
         'Goblin', 'Orc', spell, metaCtx
       );
 
-      expect(postLogEntry).not.toHaveBeenCalled();
+      expect(addEntry).toHaveBeenCalledTimes(1);
+      expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+        type: 'ability_use',
+        characterName: 'TestHero',
+        abilityName: 'Word of Creation',
+        description: expect.stringContaining('Orc'),
+      }));
     });
 
     it('should remove conditions when spell has status_effects', async () => {
@@ -914,7 +921,7 @@ describe('multiTargetHandler.applyMultiTarget', () => {
         'Goblin', 'Orc', spell, metaCtx
       );
 
-      expect(postLogEntry).toHaveBeenCalledWith(campaignName, {
+      expect(addEntry).toHaveBeenCalledWith(campaignName, {
         type: 'condition',
         action: 'removed',
         characterName: 'Orc',

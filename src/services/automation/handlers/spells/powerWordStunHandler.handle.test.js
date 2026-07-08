@@ -14,8 +14,8 @@ vi.mock('../../../ui/logService.js', () => ({
   addEntry: vi.fn(() => Promise.resolve()),
 }));
 
-vi.mock('../../../shared/logPoster.js', () => ({
-  postLogEntry: vi.fn(),
+vi.mock('../../../ui/logService.js', () => ({
+  addEntry: vi.fn(() => Promise.resolve()),
 }));
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
@@ -37,7 +37,6 @@ import { buildSaveDc } from '../../common/savePrompt.js';
 import { resolveTarget } from '../../common/targetResolver.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../ui/logService.js';
-import { postLogEntry } from '../../../shared/logPoster.js';
 import { addExpiration } from '../../../rules/effects/expirations.js';
 
 const campaignName = 'TestCampaign';
@@ -290,7 +289,7 @@ describe('powerWordStunHandler.handle - target with more than 150 HP', () => {
     setupMocks('Dragon', 300);
     await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-    expect(postLogEntry).toHaveBeenCalledWith(
+    expect(addEntry).toHaveBeenCalledWith(
       campaignName,
       expect.objectContaining({
         type: 'condition',

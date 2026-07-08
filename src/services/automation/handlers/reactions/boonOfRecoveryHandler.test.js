@@ -5,11 +5,9 @@ process.on('unhandledRejection', () => {});
 import { handle, isLastStandAvailable, getLastStandUsed } from './boonOfRecoveryHandler.js';
 import * as runtimeState from '../../../../hooks/runtime/useRuntimeState.js';
 import * as logService from '../../../ui/logService.js';
-import * as logPoster from '../../../shared/logPoster.js';
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js');
-vi.mock('../../../ui/logService.js');
-vi.mock('../../../shared/logPoster.js');
+vi.mock('../../../ui/logService.js', () => ({ addEntry: vi.fn().mockResolvedValue(undefined) }));
 
 describe('boonOfRecoveryHandler', () => {
     const campaignName = 'TestCampaign';
@@ -49,7 +47,6 @@ describe('boonOfRecoveryHandler', () => {
                 expect(result.payload.description).toContain('Long Rest');
                 expect(runtimeState.setRuntimeValue).not.toHaveBeenCalled();
                 expect(logService.addEntry).not.toHaveBeenCalled();
-                expect(logPoster.postLogEntry).not.toHaveBeenCalled();
             });
         });
 
@@ -89,7 +86,7 @@ describe('boonOfRecoveryHandler', () => {
                 expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
                     playerName, 'activeConditions', ['poisoned'], campaignName
                 );
-                expect(logPoster.postLogEntry).toHaveBeenCalledWith(campaignName, {
+                expect(logService.addEntry).toHaveBeenCalledWith(campaignName, {
                     type: 'heal',
                     targetName: playerName,
                     delta: 20,

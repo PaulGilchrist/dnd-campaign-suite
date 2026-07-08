@@ -18,8 +18,8 @@ vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
     getRuntimeValue: vi.fn(),
 }));
 
-vi.mock('../../shared/logPoster.js', () => ({
-    postLogEntry: vi.fn(),
+vi.mock('../../ui/logService.js', () => ({
+    addEntry: vi.fn(() => Promise.resolve()),
 }));
 
 vi.mock('../../rules/combat/rangeValidation.js', () => ({
@@ -30,7 +30,7 @@ const { rollExpression } = await import('../../dice/diceRoller.js');
 const { getCombatContext } = await import('../../rules/combat/damageUtils.js');
 const { applyHealingToTarget } = await import('../../rules/combat/applyHealing.js');
 const { getRuntimeValue } = await import('../../../hooks/runtime/useRuntimeState.js');
-const { postLogEntry } = await import('../../shared/logPoster.js');
+const { addEntry } = await import('../../ui/logService.js');
 const { getDistanceFeet } = await import('../../rules/combat/rangeValidation.js');
 
 describe('massCureWoundsService', () => {
@@ -688,7 +688,7 @@ describe('massCureWoundsService', () => {
                     mapName,
                 );
 
-                expect(postLogEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+                expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
                     type: 'hp_change',
                     targetName: 'Goblin',
                     delta: 2,

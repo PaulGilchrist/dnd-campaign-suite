@@ -13,7 +13,7 @@ vi.mock('../ui/storage.js', () => ({ default: { get: vi.fn(), set: vi.fn() } }))
 
 vi.mock('../ui/utils.js', () => ({ default: { getName: vi.fn((n) => n || 'Unknown') } }));
 
-vi.mock('../shared/logPoster.js', () => ({ postLogEntry: vi.fn().mockResolvedValue(undefined) }));
+vi.mock('../ui/logService.js', () => ({ addEntry: vi.fn().mockResolvedValue(undefined) }));
 
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
   getStore: vi.fn(() => new Map()),
@@ -31,7 +31,7 @@ import {
 
 import { rollD20 } from '../dice/diceRoller.js';
 import storage from '../ui/storage.js';
-import { postLogEntry } from '../shared/logPoster.js';
+import { addEntry } from '../ui/logService.js';
 import { getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 
 // ── Helpers ─────────────────────────────────────────────────────
@@ -343,12 +343,12 @@ describe('loadEncounterToInitiative', () => {
     expect(result.combatSummary.creatures[0].initiative).toBe('');
   });
 
-  it('calls postLogEntry for each npc roll with correct fields', async () => {
+  it('calls addEntry for each npc roll with correct fields', async () => {
     rollD20.mockReturnValueOnce(17).mockReturnValueOnce(3);
     await loadEncounterToInitiative([createMonster('Goblin')], [], 'TestCampaign');
 
-    expect(postLogEntry).toHaveBeenCalledTimes(1);
-    const entry = postLogEntry.mock.calls[0][1];
+    expect(addEntry).toHaveBeenCalledTimes(1);
+    const entry = addEntry.mock.calls[0][1];
     expect(entry).toMatchObject({
       type: 'roll',
       rollType: 'initiative',
@@ -360,12 +360,12 @@ describe('loadEncounterToInitiative', () => {
   it('logs roll with isNatural20/isNatural1 flags', async () => {
     rollD20.mockReturnValueOnce(20).mockReturnValueOnce(15);
     await loadEncounterToInitiative([createMonster('Goblin')], [], 'TestCampaign');
-    expect(postLogEntry.mock.calls[0][1].isNatural20).toBe(true);
+    expect(addEntry.mock.calls[0][1].isNatural20).toBe(true);
 
     vi.clearAllMocks();
     rollD20.mockReturnValueOnce(1).mockReturnValueOnce(8);
     await loadEncounterToInitiative([createMonster('Goblin')], [], 'TestCampaign');
-    expect(postLogEntry.mock.calls[0][1].isNatural1).toBe(true);
+    expect(addEntry.mock.calls[0][1].isNatural1).toBe(true);
   });
 
   it('logs roll with correct bonus when monster has initiative_details', async () => {
@@ -373,14 +373,14 @@ describe('loadEncounterToInitiative', () => {
     const monster = createMonster('Dragon', { initiative_details: '+5' });
     await loadEncounterToInitiative([monster], [], 'TestCampaign');
 
-    expect(postLogEntry.mock.calls[0][1].bonus).toBe(5);
+    expect(addEntry.mock.calls[0][1].bonus).toBe(5);
   });
 
   it('logs roll for each npc when multiple exist', async () => {
     rollD20.mockImplementation(() => [10, 5, 12, 7].shift() || 10);
     await loadEncounterToInitiative([createMonster('Wolf', { qty: 2 })], [], 'TestCampaign');
 
-    expect(postLogEntry).toHaveBeenCalledTimes(2);
+    expect(addEntry).toHaveBeenCalledTimes(2);
   });
 
   it('includes both players and npcs in combatSummary.creatures', async () => {

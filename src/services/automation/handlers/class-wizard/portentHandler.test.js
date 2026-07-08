@@ -17,7 +17,7 @@ vi.mock('../../../../services/dice/diceRoller.js', () => ({
 }));
 
 vi.mock('../../../ui/logService.js', () => ({
-    addEntry: vi.fn(),
+    addEntry: vi.fn(() => Promise.resolve()),
 }));
 
 vi.mock('../../../rules/combat/damageUtils.js', () => ({

@@ -19,7 +19,7 @@ vi.mock('../../rules/combat/applyHealing.js', () => ({
 }));
 
 vi.mock('../../ui/logService.js', () => ({
-    addEntry: vi.fn(),
+    addEntry: vi.fn(() => Promise.resolve()),
 }));
 
 // ── Imports ──────────────────────────────────────────────────────

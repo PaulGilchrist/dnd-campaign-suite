@@ -13,7 +13,7 @@ vi.mock('../../automation/common/buffToggle.js', () => ({
 }));
 
 vi.mock('../../ui/logService.js', () => ({
-    addEntry: vi.fn(),
+    addEntry: vi.fn(() => Promise.resolve()),
 }));
 
 const { getRuntimeValue, setRuntimeValue } = await import('../../../hooks/runtime/useRuntimeState.js');

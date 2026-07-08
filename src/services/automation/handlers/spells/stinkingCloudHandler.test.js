@@ -14,8 +14,8 @@ vi.mock('../../../ui/logService.js', () => ({
   addEntry: vi.fn(() => Promise.resolve()),
 }));
 
-vi.mock('../../../shared/logPoster.js', () => ({
-  postLogEntry: vi.fn(),
+vi.mock('../../../ui/logService.js', () => ({
+  addEntry: vi.fn(() => Promise.resolve()),
 }));
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
@@ -32,7 +32,6 @@ import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { buildSaveDc, createSaveListener } from '../../common/savePrompt.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../ui/logService.js';
-import { postLogEntry } from '../../../shared/logPoster.js';
 import { addExpiration } from '../../../rules/effects/expirations.js';
 
 const campaignName = 'TestCampaign';
@@ -573,7 +572,7 @@ describe('stinkingCloudHandler', () => {
         );
       });
 
-      it('should call postLogEntry with condition removed and log save_result', async () => {
+      it('should call addEntry with condition removed and log save_result', async () => {
         getRuntimeValue
           .mockReturnValueOnce(true) // tracking
           .mockReturnValueOnce([]); // activeConditions
@@ -589,7 +588,7 @@ describe('stinkingCloudHandler', () => {
           campaignName,
         );
 
-        expect(postLogEntry).toHaveBeenCalledWith(campaignName, {
+        expect(addEntry).toHaveBeenCalledWith(campaignName, {
           type: 'condition',
           action: 'removed',
           characterName: 'EnemyGoblin',
@@ -707,7 +706,11 @@ describe('stinkingCloudHandler', () => {
           success: false,
           description: expect.stringContaining('remains Poisoned'),
         });
-        expect(postLogEntry).not.toHaveBeenCalled();
+        expect(addEntry).toHaveBeenCalledTimes(2);
+        const abilityEntries = addEntry.mock.calls.filter(call => call[1].type === 'ability_use');
+        expect(abilityEntries.length).toBe(1);
+        const saveEntries = addEntry.mock.calls.filter(call => call[1].type === 'save_result');
+        expect(saveEntries.length).toBe(1);
       });
 
       it('should call cleanupTargetEffect on repeat save success', async () => {

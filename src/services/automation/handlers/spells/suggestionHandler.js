@@ -2,7 +2,7 @@ import { buildSaveDc, createSaveListener } from '../../common/savePrompt.js';
 import { resolveTarget } from '../../common/targetResolver.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../ui/logService.js';
-import { postLogEntry } from '../../../shared/logPoster.js';
+
 import { addExpiration } from '../../../rules/effects/expirations.js';
 
 export async function handle(action, playerStats, campaignName, _mapName) {
@@ -74,7 +74,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         { type: 'charmed', condition: 'charmed' },
     ], campaignName, durationHours);
 
-    postLogEntry(campaignName, {
+    addEntry(campaignName, {
         type: 'condition',
         action: 'applied',
         characterName: targetName,
@@ -82,7 +82,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         reason: 'Suggestion spell',
         note: `${targetName} is Charmed by Suggestion and pursues the suggested course of activity. The spell ends if ${casterName} or allies deal damage to the target.`,
         timestamp: Date.now(),
-    });
+    }).catch((e) => { console.error("[suggestion] Error:", e); });
 
     addEntry(campaignName, {
         type: 'save_result',

@@ -1,7 +1,7 @@
 import { buildSaveDc, createSaveListener } from '../../common/savePrompt.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { addEntry } from '../../../ui/logService.js';
-import { postLogEntry } from '../../../shared/logPoster.js';
+
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addExpiration } from '../../../rules/effects/expirations.js';
 
@@ -71,14 +71,14 @@ export async function processStinkingCloudRepeatSave(casterName, targetName, sav
             description: `${targetName} succeeded on CON save. Stinking Cloud ends!`,
         }).catch((e) => { console.error("[stinkingCloud] Error:", e); });
 
-        postLogEntry(campaignName, {
+        addEntry(campaignName, {
             type: 'condition',
             action: 'removed',
             characterName: targetName,
             condition: 'Poisoned',
             reason: 'Stinking Cloud (successful repeat save)',
             timestamp: Date.now(),
-        });
+        }).catch((e) => { console.error("[stinkingCloud] Error:", e); });
 
         return {
             type: 'popup',
@@ -149,7 +149,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
                     characterName: casterName,
                     abilityName: action.name,
                     description: `${targetName} is immune to Stinking Cloud (Poison immunity).`,
-                }).catch(() => {});
+                }).catch((e) => { console.error("[stinkingCloud] Error:", e); });
                 results.push(`${targetName} is immune to Stinking Cloud.`);
                 continue;
             }
@@ -224,7 +224,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             }
             setRuntimeValue(campaignName, 'targetEffects', effects, campaignName);
 
-            postLogEntry(campaignName, {
+            addEntry(campaignName, {
                 type: 'condition',
                 action: 'applied',
                 characterName: targetName,
@@ -232,7 +232,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
                 reason: 'Stinking Cloud spell',
                 note: `${targetName} is Poisoned by Stinking Cloud. While Poisoned, the creature can't take an Action or Bonus Action. At the end of its next turn, it repeats the save. Failure means remaining Poisoned.`,
                 timestamp: Date.now(),
-            });
+            }).catch((e) => { console.error("[stinkingCloud] Error:", e); });
 
             addEntry(campaignName, {
                 type: 'save_result',

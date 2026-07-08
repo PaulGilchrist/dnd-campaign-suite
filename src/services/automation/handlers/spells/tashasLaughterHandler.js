@@ -1,7 +1,7 @@
 import { buildSaveDc, createSaveListener } from '../../common/savePrompt.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { addEntry } from '../../../ui/logService.js';
-import { postLogEntry } from '../../../shared/logPoster.js';
+
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addExpiration } from '../../../rules/effects/expirations.js';
 
@@ -78,14 +78,14 @@ export async function processTashasLaughterRepeatSave(casterName, targetName, sa
             description: `${targetName} succeeded on WIS save. Tasha's Hideous Laughter ends!`,
         }).catch((e) => { console.error("[tashasLaughter] Error:", e); });
 
-        postLogEntry(campaignName, {
+        addEntry(campaignName, {
             type: 'condition',
             action: 'removed',
             characterName: targetName,
             condition: 'Prone, Incapacitated',
             reason: "Tasha's Hideous Laughter (successful repeat save)",
             timestamp: Date.now(),
-        });
+        }).catch((e) => { console.error("[tashasLaughter] Error:", e); });
 
         return {
             type: 'popup',
@@ -221,7 +221,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             }
             setRuntimeValue(campaignName, 'targetEffects', effects, campaignName);
 
-            postLogEntry(campaignName, {
+            addEntry(campaignName, {
                 type: 'condition',
                 action: 'applied',
                 characterName: targetName,
@@ -229,7 +229,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
                 reason: "Tasha's Hideous Laughter spell",
                 note: `${targetName} is Prone and Incapacitated by Tasha's Hideous Laughter. The target can't end the Prone condition on itself. At the end of each of its turns and each time it takes damage, it repeats the WIS save with Advantage (if triggered by damage).`,
                 timestamp: Date.now(),
-            });
+            }).catch((e) => { console.error("[tashasLaughter] Error:", e); });
 
             addEntry(campaignName, {
                 type: 'save_result',

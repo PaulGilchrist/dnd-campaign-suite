@@ -17,8 +17,8 @@ vi.mock('../../../rules/combat/damageUtils.js', () => ({
     getCombatContext: vi.fn(),
 }));
 
-vi.mock('../../../shared/logPoster.js', () => ({
-    postLogEntry: vi.fn(() => Promise.resolve()),
+vi.mock('../../../ui/logService.js', () => ({
+    addEntry: vi.fn(() => Promise.resolve()),
 }));
 
 import { handle } from './silenceHandler.js';
@@ -26,7 +26,7 @@ import { toggleBuff } from '../../common/buffToggle.js';
 import { addExpiration } from '../../../rules/effects/expirations.js';
 import { setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
-import { postLogEntry } from '../../../shared/logPoster.js';
+import { addEntry } from '../../../ui/logService.js';
 
 const campaignName = 'test-campaign';
 const casterName = 'ClericBoy';
@@ -83,7 +83,7 @@ describe('silenceHandler', () => {
 
                 expect(result.payload.description).toContain('30-foot-radius');
 
-                expect(postLogEntry).toHaveBeenCalledWith(
+                expect(addEntry).toHaveBeenCalledWith(
                     campaignName,
                     expect.objectContaining({
                         description: expect.stringContaining('30-foot-radius'),
@@ -154,7 +154,7 @@ describe('silenceHandler', () => {
             it('posts log entry for ability use', async () => {
                 await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-                expect(postLogEntry).toHaveBeenCalledWith(campaignName, {
+                expect(addEntry).toHaveBeenCalledWith(campaignName, {
                     type: 'ability_use',
                     characterName: casterName,
                     abilityName: 'Silence',
@@ -196,7 +196,7 @@ describe('silenceHandler', () => {
                 await handle(makeAction(), makePlayerStats(), campaignName, null);
 
                 expect(addExpiration).not.toHaveBeenCalled();
-                expect(postLogEntry).not.toHaveBeenCalled();
+                expect(addEntry).not.toHaveBeenCalled();
             });
         });
     });

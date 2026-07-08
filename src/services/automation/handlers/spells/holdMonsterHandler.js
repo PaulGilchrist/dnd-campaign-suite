@@ -4,7 +4,7 @@ import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useR
 import { addEntry } from '../../../ui/logService.js';
 import { addExpiration } from '../../../rules/effects/expirations.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
-import { postLogEntry } from '../../../shared/logPoster.js';
+
 
 /**
  * Process a repeated WIS save for a creature already Paralyzed by Hold Person/Monster.
@@ -56,14 +56,14 @@ export async function processHoldMonsterRepeatSave(casterName, targetName, saveD
             description: `${targetName} succeeded on WIS save. ${spellName} ends!`,
         }).catch((e) => { console.error("[holdMonster] Error:", e); });
 
-        postLogEntry(campaignName, {
+        addEntry(campaignName, {
             type: 'condition',
             action: 'removed',
             characterName: targetName,
             condition: 'Paralyzed',
             reason: `${spellName} (successful save)`,
             timestamp: Date.now(),
-        });
+        }).catch((e) => { console.error("[holdMonster] Error:", e); });
 
         return {
             type: 'popup',
@@ -234,7 +234,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         description: `${targetName} failed WIS save against ${action.name} and is Paralyzed. At the end of each of its turns, it repeats the save.`,
     }).catch((e) => { console.error("[holdMonster] Error:", e); });
 
-    postLogEntry(campaignName, {
+    addEntry(campaignName, {
         type: 'condition',
         action: 'applied',
         characterName: targetName,
@@ -242,7 +242,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         reason: action.name,
         note: `${targetName} is Paralyzed by ${action.name}. Must make WIS save at end of each turn. Success ends the spell.`,
         timestamp: Date.now(),
-    });
+    }).catch((e) => { console.error("[holdMonster] Error:", e); });
 
     return {
         type: 'popup',

@@ -3,7 +3,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import { applyDamageToTarget } from './applyDamage.js';
-import { postLogEntry } from '../../shared/logPoster.js';
+import { addEntry } from '../../ui/logService.js';
 
 const campaignName = 'TestCampaign';
 
@@ -25,8 +25,8 @@ vi.mock('../../combat/concentration/concentrationRules.js', () => ({
 
 vi.mock('../../ui/utils.js', () => ({ default: { guid: vi.fn(() => 'test-guid-001') } }));
 
-vi.mock('../../shared/logPoster.js', () => ({
-  postLogEntry: vi.fn(),
+vi.mock('../../ui/logService.js', () => ({
+  addEntry: vi.fn(() => Promise.resolve()),
 }));
 
 vi.mock('../../automation/handlers/spells/tashasLaughterHandler.js', () => ({
@@ -346,7 +346,7 @@ describe('applyDamageToTarget — Undying Sentinel', () => {
         [makeCharacter('GloryPaladin', { level: 15, features: [{ name: 'Undying Sentinel' }] })],
       );
 
-      expect(postLogEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+      expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
         type: 'heal',
         targetName: 'GloryPaladin',
         abilityName: 'Undying Sentinel',
@@ -765,7 +765,7 @@ describe('applyDamageToTarget — Relentless Endurance (Orc race trait)', () => 
         })],
       );
 
-      expect(postLogEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+      expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
         type: 'hp_change',
         targetName: 'OrcPlayer6',
         sourceName: 'Relentless Endurance',

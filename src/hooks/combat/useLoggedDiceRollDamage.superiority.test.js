@@ -51,8 +51,8 @@ vi.mock('./loggedDiceRollUtils.js', () => ({
     applyMinDamageAdjustment: vi.fn((d) => d),
 }));
 
-vi.mock('../../services/shared/logPoster.js', () => ({
-    postLogEntry: vi.fn(),
+vi.mock('../../services/ui/logService.js', () => ({
+    addEntry: vi.fn(() => Promise.resolve()),
 }));
 
 vi.mock('../../services/rules/combat/applyDamage.js', () => ({

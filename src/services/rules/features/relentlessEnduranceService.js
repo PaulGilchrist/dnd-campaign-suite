@@ -1,5 +1,5 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
-import { postLogEntry } from '../../shared/logPoster.js';
+import { addEntry } from '../../ui/logService.js';
 
 export function checkRelentlessEndurance(creature, playerComputed, campaignName) {
     const rawAllFeatures = playerComputed?.allFeatures;
@@ -49,7 +49,7 @@ export function checkRelentlessEndurance(creature, playerComputed, campaignName)
         creature.currentHp = newHp;
     }
 
-    postLogEntry(campaignName, {
+    addEntry(campaignName, {
         type: 'hp_change',
         targetName: creature.name,
         delta: newHp,
@@ -57,7 +57,7 @@ export function checkRelentlessEndurance(creature, playerComputed, campaignName)
         maxHp: maxHp,
         isUnconscious: false,
         sourceName: 'Relentless Endurance',
-    });
+    }).catch((e) => { console.error("[relentlessEndurance] Error:", e); });
 
     window.dispatchEvent(new CustomEvent('combat-summary-updated'));
 

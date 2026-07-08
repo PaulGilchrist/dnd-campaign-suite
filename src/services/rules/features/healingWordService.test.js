@@ -18,8 +18,8 @@ vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
     setRuntimeValue: vi.fn(),
 }));
 
-vi.mock('../../shared/logPoster.js', () => ({
-    postLogEntry: vi.fn(),
+vi.mock('../../ui/logService.js', () => ({
+    addEntry: vi.fn(() => Promise.resolve()),
 }));
 
 vi.mock('../../dice/diceRoller.js', () => ({
@@ -31,7 +31,7 @@ vi.mock('../../dice/diceRoller.js', () => ({
 import { getCombatContext, getTargetFromAttacker } from '../combat/damageUtils.js';
 import { applyHealingToTarget } from '../combat/applyHealing.js';
 import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
-import { postLogEntry } from '../../shared/logPoster.js';
+import { addEntry } from '../../ui/logService.js';
 import { rollExpression } from '../../dice/diceRoller.js';
 
 // ── Globals ────────────────────────────────────────────────────
@@ -271,7 +271,7 @@ describe('triggerHealingWord', () => {
             const playerStats = makePlayerStats(3);
             await triggerHealingWord(spell, {}, playerStats, CAMPAIGN, 'testMap');
 
-            expect(postLogEntry).toHaveBeenCalledWith(CAMPAIGN, {
+            expect(addEntry).toHaveBeenCalledWith(CAMPAIGN, {
                 type: 'hp_change',
                 targetName: 'Ally',
                 delta: 8,

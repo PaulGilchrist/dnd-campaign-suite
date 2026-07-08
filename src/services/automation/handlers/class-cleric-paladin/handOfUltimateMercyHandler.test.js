@@ -16,8 +16,8 @@ vi.mock('../../../rules/combat/damageUtils.js', () => ({
   getCombatContext: vi.fn(),
 }));
 
-vi.mock('../../../shared/logPoster.js', () => ({
-  postLogEntry: vi.fn(),
+vi.mock('../../../ui/logService.js', () => ({
+  addEntry: vi.fn(() => Promise.resolve()),
 }));
 
 vi.mock('../../../ui/storage.js', () => ({
@@ -36,7 +36,7 @@ import { handle } from './handOfUltimateMercyHandler.js';
 import * as useRuntimeState from '../../../../hooks/runtime/useRuntimeState.js';
 import * as diceRoller from '../../../dice/diceRoller.js';
 import * as damageUtils from '../../../rules/combat/damageUtils.js';
-import * as logPoster from '../../../shared/logPoster.js';
+import * as logPoster from '../../../ui/logService.js';
 import storage from '../../../ui/storage.js';
 import { resolveTarget } from '../../common/targetResolver.js';
 
@@ -416,7 +416,7 @@ describe('handOfUltimateMercyHandler.handle', () => {
   });
 
   describe('Logging', () => {
-    it('should call postLogEntry with correct heal data on success', async () => {
+    it('should call addEntry with correct heal data on success', async () => {
       setupSuccessPath(7);
 
       const now = Date.now();
@@ -424,7 +424,7 @@ describe('handOfUltimateMercyHandler.handle', () => {
 
       await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-      expect(logPoster.postLogEntry).toHaveBeenCalledWith(campaignName, {
+      expect(logPoster.addEntry).toHaveBeenCalledWith(campaignName, {
         type: 'heal',
         characterName: 'TestCleric',
         targetName: 'DownedAlly',
@@ -435,10 +435,10 @@ describe('handOfUltimateMercyHandler.handle', () => {
       dateSpy.mockRestore();
     });
 
-    it('should not call postLogEntry on early returns', async () => {
+    it('should not call addEntry on early returns', async () => {
       useRuntimeState.getRuntimeValue.mockReturnValue(2);
       await handle(makeAction(), makePlayerStats(), campaignName, null);
-      expect(logPoster.postLogEntry).not.toHaveBeenCalled();
+      expect(logPoster.addEntry).not.toHaveBeenCalled();
 
       vi.resetAllMocks();
 
@@ -448,7 +448,7 @@ describe('handOfUltimateMercyHandler.handle', () => {
       });
       resolveTarget.mockResolvedValue(null);
       await handle(makeAction(), makePlayerStats(), campaignName, null);
-      expect(logPoster.postLogEntry).not.toHaveBeenCalled();
+      expect(logPoster.addEntry).not.toHaveBeenCalled();
     });
   });
 });

@@ -4,7 +4,7 @@ import { rollD20 } from '../../dice/diceRoller.js';
 import utils from '../../ui/utils.js';
 import { sendDeathSavePrompt, sendConcentrationPrompt } from '../../combat/conditions/savePromptService.js';
 import { rollConcentrationSave } from '../../combat/concentration/concentrationRules.js';
-import { postLogEntry } from '../../shared/logPoster.js';
+import { addEntry } from '../../ui/logService.js';
 import { getDamageReduction } from '../../combat/automation/automationPassives.js';
 import { isCreatureInSilenceZone } from '../../rules/features/silenceService.js';
 import { processTashasLaughterRepeatSave } from '../../automation/handlers/spells/tashasLaughterHandler.js';
@@ -280,26 +280,26 @@ export function applyDamageToTarget(combatSummary, targetName, rawDamage, damage
         if (conditions.some(c => String(c).toLowerCase() === 'frightened')) {
           const filtered = conditions.filter(c => String(c).toLowerCase() !== 'frightened');
           setRuntimeValue(creature.name, 'activeConditions', filtered, campaignName);
-          postLogEntry(campaignName, {
+          addEntry(campaignName, {
             type: 'condition',
             action: 'removed',
             characterName: creature.name,
             condition: 'Frightened',
             reason: 'took damage',
             timestamp: Date.now(),
-          });
+          }).catch((e) => { console.error("[applyDamage] Error:", e); });
         }
         if (conditions.some(c => String(c).toLowerCase() === 'charmed')) {
           const filtered = conditions.filter(c => String(c).toLowerCase() !== 'charmed');
           setRuntimeValue(creature.name, 'activeConditions', filtered, campaignName);
-          postLogEntry(campaignName, {
+          addEntry(campaignName, {
             type: 'condition',
             action: 'removed',
             characterName: creature.name,
             condition: 'Charmed',
             reason: 'took damage (Friends)',
             timestamp: Date.now(),
-          });
+          }).catch((e) => { console.error("[applyDamage] Error:", e); });
         }
       } else {
         const rawConditions = getRuntimeValue(creature.name, 'activeConditions') || [];
@@ -307,27 +307,27 @@ export function applyDamageToTarget(combatSummary, targetName, rawDamage, damage
         if (hadFrightened) {
           const filtered = rawConditions.filter(c => String(c).toLowerCase() !== 'frightened');
           setRuntimeValue(creature.name, 'activeConditions', filtered, campaignName);
-          postLogEntry(campaignName, {
+          addEntry(campaignName, {
             type: 'condition',
             action: 'removed',
             characterName: creature.name,
             condition: 'Frightened',
             reason: 'took damage',
             timestamp: Date.now(),
-          });
+          }).catch((e) => { console.error("[applyDamage] Error:", e); });
         }
         const hadCharmed = rawConditions.some(c => String(c).toLowerCase() === 'charmed');
         if (hadCharmed) {
           const filtered = rawConditions.filter(c => String(c).toLowerCase() !== 'charmed');
           setRuntimeValue(creature.name, 'activeConditions', filtered, campaignName);
-          postLogEntry(campaignName, {
+          addEntry(campaignName, {
             type: 'condition',
             action: 'removed',
             characterName: creature.name,
             condition: 'Charmed',
             reason: 'took damage (Animal Friendship)',
             timestamp: Date.now(),
-          });
+          }).catch((e) => { console.error("[applyDamage] Error:", e); });
         }
       }
       if (attackerName && attackerName !== creature.name) {
@@ -437,16 +437,16 @@ export function applyDamageToTarget(combatSummary, targetName, rawDamage, damage
           const dc = creature.concentration.dc;
           creature.concentration = null;
           npcConcentrationBroken = true;
-          postLogEntry(campaignName, {
+          addEntry(campaignName, {
             type: 'concentration-broken',
             characterName: creature.name,
             spellName,
             roll,
             total,
             dc,
-          });
+          }).catch((e) => { console.error("[applyDamage] Error:", e); });
         } else {
-          postLogEntry(campaignName, {
+          addEntry(campaignName, {
             type: 'concentration-save',
             characterName: creature.name,
             spellName: creature.concentration.spell,
@@ -454,7 +454,7 @@ export function applyDamageToTarget(combatSummary, targetName, rawDamage, damage
             total,
             dc: creature.concentration.dc,
             success: true,
-          });
+          }).catch((e) => { console.error("[applyDamage] Error:", e); });
         }
       }
     }
@@ -503,5 +503,5 @@ function logDamageApplication(creature, damage, oldHp, newHp, campaignName) {
        }
       }
 
-  postLogEntry(campaignName, entry);
+  addEntry(campaignName, entry);
 }

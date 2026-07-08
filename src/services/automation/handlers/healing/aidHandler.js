@@ -4,7 +4,8 @@ import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { rangeToFeet } from '../../../rules/combat/rangeValidation.js';
 import { resolveMapPositions } from '../../common/targetResolver.js';
 import { evaluateAutoExpression } from '../../../combat/automation/automationExpressions.js';
-import { postLogEntry } from '../../../shared/logPoster.js';
+import { addEntry } from '../../../ui/logService.js';
+
 
 const AID_BUFF_NAME = 'Aid';
 
@@ -107,14 +108,14 @@ export async function applyAid(action, playerStats, campaignName, mapName, targe
             setRuntimeValue(targetName, 'activeBuffs', buffs, campaignName);
         }
 
-        postLogEntry(campaignName, {
+        addEntry(campaignName, {
             type: 'hp_change',
             targetName,
             delta: hpIncrease,
             isHealing: true,
             sourceName: playerStats.name,
             note: `${action.name} (+${hpIncrease} HP max)`,
-        });
+        }).catch((e) => { console.error("[aidHandler] Error:", e); });
     }
 
     return {

@@ -3,7 +3,7 @@ import { resolveTarget } from '../../common/targetResolver.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../ui/logService.js';
 import { addExpiration } from '../../../rules/effects/expirations.js';
-import { postLogEntry } from '../../../shared/logPoster.js';
+
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 
 export async function handle(action, playerStats, campaignName, _mapName) {
@@ -91,7 +91,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         ], campaignName, 10);
     }
 
-    postLogEntry(campaignName, {
+    addEntry(campaignName, {
         type: 'condition',
         action: 'applied',
         characterName: targetName,
@@ -99,7 +99,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         reason: action.name,
         note: `${targetName} is enclosed in Otiluke's Resilient Sphere. Nothing can pass through the barrier. The sphere is immune to all damage. Inside can't be damaged from outside; inside can't damage outside. Enclosed creature can use action to roll sphere at half speed. Others can pick up and move it. Disintegrate destroys it.`,
         timestamp: Date.now(),
-    });
+    }).catch((e) => { console.error("[resilientSphere] Error:", e); });
 
     addEntry(campaignName, {
         type: 'save_result',

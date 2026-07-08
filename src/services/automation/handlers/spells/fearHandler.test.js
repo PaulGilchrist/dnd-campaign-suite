@@ -16,8 +16,8 @@ vi.mock('../../../ui/logService.js', () => ({
   addEntry: vi.fn(() => Promise.resolve()),
 }));
 
-vi.mock('../../../shared/logPoster.js', () => ({
-  postLogEntry: vi.fn(),
+vi.mock('../../../ui/logService.js', () => ({
+  addEntry: vi.fn(() => Promise.resolve()),
 }));
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
@@ -35,7 +35,6 @@ import { handle } from './fearHandler.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { buildSaveDc, createSaveListener } from '../../common/savePrompt.js';
 import { addEntry } from '../../../ui/logService.js';
-import { postLogEntry } from '../../../shared/logPoster.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addExpiration } from '../../../rules/effects/expirations.js';
 
@@ -199,7 +198,7 @@ describe('fearHandler.handle', () => {
 
       await handle(action, ps, campaignName, null);
 
-      expect(addEntry).toHaveBeenCalledTimes(2);
+      expect(addEntry).toHaveBeenCalledTimes(4);
       const abilityEntries = addEntry.mock.calls.filter(
         call => call[1].type === 'ability_use',
       );
@@ -263,7 +262,11 @@ describe('fearHandler.handle', () => {
 
       await handle(action, ps, campaignName, null);
 
-      expect(postLogEntry).not.toHaveBeenCalled();
+      expect(addEntry).toHaveBeenCalledTimes(2);
+      const abilityEntries = addEntry.mock.calls.filter(call => call[1].type === 'ability_use');
+      expect(abilityEntries.length).toBe(1);
+      const saveEntries = addEntry.mock.calls.filter(call => call[1].type === 'save_result');
+      expect(saveEntries.length).toBe(1);
       expect(setRuntimeValue).not.toHaveBeenCalledWith(
         'Goblin', 'activeConditions', expect.any(Array), campaignName,
       );
@@ -320,7 +323,7 @@ describe('fearHandler.handle', () => {
 
       await handle(action, ps, campaignName, null);
 
-      expect(postLogEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+      expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
         type: 'condition',
         action: 'applied',
         characterName: 'Goblin',

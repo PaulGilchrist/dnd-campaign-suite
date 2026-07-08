@@ -1,6 +1,7 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addExpiration } from '../../../rules/effects/expirations.js';
-import { postLogEntry } from '../../../shared/logPoster.js';
+import { addEntry } from '../../../ui/logService.js';
+
 
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation || {};
@@ -35,7 +36,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         { type: 'remove_target_effect', effectKey: 'disadvantage_next_attack', source: playerStats.name },
     ], campaignName, 1);
 
-    postLogEntry(campaignName, {
+    addEntry(campaignName, {
         type: 'condition',
         action: 'applied',
         characterName: targetName,
@@ -43,7 +44,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         reason: 'Vicious Mockery (failed save)',
         note: `${targetName} has Disadvantage on the next attack roll until the start of ${playerStats.name}'s next turn.`,
         timestamp: Date.now(),
-    });
+    }).catch((e) => { console.error("[viciousMockery] Error:", e); });
 
     return {
         type: 'popup',

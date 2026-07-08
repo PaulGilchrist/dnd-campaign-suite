@@ -23,8 +23,8 @@ vi.mock('../../../rules/effects/expirations.js', () => ({
   addExpiration: vi.fn(),
 }));
 
-vi.mock('../../../shared/logPoster.js', () => ({
-  postLogEntry: vi.fn().mockResolvedValue(undefined),
+vi.mock('../../../ui/logService.js', () => ({
+  addEntry: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock('../../../encounters/combatData.js', () => ({
@@ -47,7 +47,7 @@ import * as runtimeState from '../../../../hooks/runtime/useRuntimeState.js';
 import * as magicInitiateHandler from '../feats/magicInitiateHandler.js';
 import * as postCastRiderService from '../../../../services/rules/spells/postCastRiderService.js';
 import * as expirations from '../../../rules/effects/expirations.js';
-import * as logPoster from '../../../shared/logPoster.js';
+import * as logPoster from '../../../ui/logService.js';
 import * as combatData from '../../../encounters/combatData.js';
 import * as concentrationService from '../../../combat/concentration/concentrationService.js';
 import storage from '../../../ui/storage.js';
@@ -500,7 +500,7 @@ describe('spellCastHandler', () => {
       expect(dispatchSpy).toHaveBeenCalledWith(expect.objectContaining({ type: 'combat-summary-updated' }));
       dispatchSpy.mockRestore();
 
-      expect(logPoster.postLogEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+      expect(logPoster.addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
         type: 'ability_use',
         characterName: 'GlamourBard',
         abilityName: 'Mantle of Majesty',

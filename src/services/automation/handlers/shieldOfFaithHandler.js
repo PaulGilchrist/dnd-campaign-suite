@@ -2,7 +2,7 @@ import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRunt
 import { addExpiration } from '../../rules/effects/expirations.js';
 import { rangeToFeet } from '../../rules/combat/rangeValidation.js';
 import { resolveMapPositions } from '../common/targetResolver.js';
-import { postLogEntry } from '../../shared/logPoster.js';
+import { addEntry } from '../../ui/logService.js';
 import { getCombatSummary } from '../../encounters/combatData.js';
 
 const SHIELD_OF_FAITH_BUFF_NAME = 'Shield of Faith';
@@ -65,7 +65,7 @@ export async function applyShieldOfFaith(action, playerStats, campaignName, mapN
             { type: 'remove_active_buff', buffName: SHIELD_OF_FAITH_BUFF_NAME }
         ], campaignName);
 
-        postLogEntry(campaignName, {
+        addEntry(campaignName, {
             type: 'ability_use',
             characterName: playerStats.name,
             abilityName: SHIELD_OF_FAITH_BUFF_NAME,

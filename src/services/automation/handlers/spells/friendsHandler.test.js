@@ -6,7 +6,6 @@ import { buildSaveDc, createSaveListener } from '../../common/savePrompt.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../ui/logService.js';
 import { addExpiration } from '../../../rules/effects/expirations.js';
-import { postLogEntry } from '../../../shared/logPoster.js';
 import storage from '../../../ui/storage.js';
 
 vi.mock('../../common/savePrompt.js', () => ({
@@ -27,8 +26,8 @@ vi.mock('../../../rules/effects/expirations.js', () => ({
     addExpiration: vi.fn(),
 }));
 
-vi.mock('../../../shared/logPoster.js', () => ({
-    postLogEntry: vi.fn(),
+vi.mock('../../../ui/logService.js', () => ({
+    addEntry: vi.fn(() => Promise.resolve()),
 }));
 
 vi.mock('../../../ui/storage.js', () => ({
@@ -149,7 +148,7 @@ describe('friendsHandler.handle', () => {
             expect(newConditions).toEqual(['frightened', 'charmed']);
         });
 
-        it('calls addExpiration and postLogEntry for the target', async () => {
+        it('calls addExpiration and addEntry for the target', async () => {
             defaultSaveListener(false);
             getRuntimeValue.mockReturnValue([]);
 
@@ -162,7 +161,7 @@ describe('friendsHandler.handle', () => {
                 campaignName,
                 2,
             );
-            expect(postLogEntry).toHaveBeenCalledWith(
+            expect(addEntry).toHaveBeenCalledWith(
                 campaignName,
                 expect.objectContaining({ characterName: 'Ally1' }),
             );
@@ -174,7 +173,7 @@ describe('friendsHandler.handle', () => {
 
             await handle(makeAction({ targetName: 'Goblin' }), defaultPlayerStats, campaignName, null);
 
-            expect(postLogEntry).toHaveBeenCalledWith(
+            expect(addEntry).toHaveBeenCalledWith(
                 campaignName,
                 expect.objectContaining({
                     type: 'condition',
@@ -225,7 +224,7 @@ describe('friendsHandler.handle', () => {
                 campaignName,
                 2,
             );
-            expect(postLogEntry).toHaveBeenCalledWith(
+            expect(addEntry).toHaveBeenCalledWith(
                 campaignName,
                 expect.objectContaining({ characterName: 'MissingTarget' }),
             );
@@ -277,7 +276,7 @@ describe('friendsHandler.handle', () => {
 
             await handle(makeAction({ targetName: 'CustomTarget' }), defaultPlayerStats, campaignName, null);
 
-            expect(postLogEntry).toHaveBeenCalledWith(
+            expect(addEntry).toHaveBeenCalledWith(
                 campaignName,
                 expect.objectContaining({ characterName: 'CustomTarget' }),
             );

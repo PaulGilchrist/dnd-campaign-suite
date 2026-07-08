@@ -1,6 +1,6 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
-import { postLogEntry } from '../../../shared/logPoster.js';
+
 import { addEntry } from '../../../ui/logService.js';
 
 function conditionMatches(c, targetCondition) {
@@ -75,14 +75,14 @@ export async function applyGreaterRestoration(action, playerStats, campaignName,
                 removedItems.push(`Curse (removed ${cursedBuffs.length} cursed effect(s))`);
 
                 for (const cursedBuff of cursedBuffs) {
-                    postLogEntry(campaignName, {
+                    addEntry(campaignName, {
                         type: 'buff',
                         action: 'removed',
                         characterName: targetName,
                         buffName: cursedBuff.name || 'Curse',
                         reason: 'Greater Restoration',
                         timestamp: Date.now(),
-                    });
+                    }).catch((e) => { console.error("[greaterRestoration] Error:", e); });
                 }
             }
         }
@@ -130,14 +130,14 @@ export async function applyGreaterRestoration(action, playerStats, campaignName,
             timestamp: Date.now(),
         });
 
-        postLogEntry(campaignName, {
+        addEntry(campaignName, {
             type: 'spell_effect',
             characterName: playerStats.name,
             spellName: action.name,
             targetName,
             effects: removedItems,
             timestamp: Date.now(),
-        });
+        }).catch((e) => { console.error("[greaterRestoration] Error:", e); });
     }
 
     return {

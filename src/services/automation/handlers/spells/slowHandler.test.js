@@ -14,8 +14,8 @@ vi.mock('../../../ui/logService.js', () => ({
   addEntry: vi.fn(() => Promise.resolve()),
 }));
 
-vi.mock('../../../shared/logPoster.js', () => ({
-  postLogEntry: vi.fn(),
+vi.mock('../../../ui/logService.js', () => ({
+  addEntry: vi.fn(() => Promise.resolve()),
 }));
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
@@ -32,7 +32,6 @@ import { buildSaveDc, createSaveListener } from '../../common/savePrompt.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../ui/logService.js';
-import { postLogEntry } from '../../../shared/logPoster.js';
 import { addExpiration } from '../../../rules/effects/expirations.js';
 
 const campaignName = 'TestCampaign';
@@ -208,7 +207,7 @@ describe('processSlowRepeatSave', () => {
 
       await processSlowRepeatSave(casterName, targetName, saveDc, campaignName);
 
-      expect(postLogEntry).toHaveBeenCalledWith(
+      expect(addEntry).toHaveBeenCalledWith(
         campaignName,
         expect.objectContaining({
           type: 'condition',
@@ -493,7 +492,7 @@ describe('slowHandler.handle', () => {
 
       await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-      expect(postLogEntry).toHaveBeenCalledWith(
+      expect(addEntry).toHaveBeenCalledWith(
         campaignName,
         expect.objectContaining({
           type: 'condition',

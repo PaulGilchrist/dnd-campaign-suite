@@ -2,7 +2,7 @@ import { buildSaveDc, createSaveListener } from '../../common/savePrompt.js';
 import { resolveTarget } from '../../common/targetResolver.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../ui/logService.js';
-import { postLogEntry } from '../../../shared/logPoster.js';
+
 import { addExpiration } from '../../../rules/effects/expirations.js';
 import { rollSaveForCreature } from '../../../rules/combat/applyDamage.js';
 import { rollD20 } from '../../../dice/diceRoller.js';
@@ -141,7 +141,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         { type: 'charmed', condition: 'charmed' },
     ], campaignName, 1);
 
-    postLogEntry(campaignName, {
+    addEntry(campaignName, {
         type: 'condition',
         action: 'applied',
         characterName: targetName,
@@ -149,7 +149,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         reason: 'Charm Person spell',
         note: `${targetName} is Charmed by ${casterName} and regards them as a friendly acquaintance. The spell ends if ${casterName} or their companions do anything harmful to ${targetName}.`,
         timestamp: Date.now(),
-    });
+    }).catch((e) => { console.error("[charmPerson] Error:", e); });
 
     addEntry(campaignName, {
         type: 'save_result',

@@ -2,7 +2,7 @@ import { buildSaveDc, createSaveListener } from '../../common/savePrompt.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../ui/logService.js';
 import { addExpiration } from '../../../rules/effects/expirations.js';
-import { postLogEntry } from '../../../shared/logPoster.js';
+
 
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation || {};
@@ -62,7 +62,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             { type: 'remove_target_effect', effectKey: 'disadvantage_next_attack', source: playerStats.name },
         ], campaignName, 1);
 
-        postLogEntry(campaignName, {
+        addEntry(campaignName, {
             type: 'automation_info',
             action: 'applied',
             characterName: targetName,
@@ -70,7 +70,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             reason: 'Ray of Enfeeblement (successful save)',
             note: `${targetName} has Disadvantage on the next attack roll until the start of ${playerStats.name}'s next turn.`,
             timestamp: Date.now(),
-        });
+        }).catch((e) => { console.error("[rayOfEnfeeblement] Error:", e); });
 
         return {
             type: 'popup',
@@ -110,7 +110,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         { type: 'remove_target_effect', effectKey: 'ray_of_enfeeble_debuff', source: playerStats.name },
     ], campaignName, 10);
 
-    postLogEntry(campaignName, {
+    addEntry(campaignName, {
         type: 'condition',
         action: 'applied',
         characterName: targetName,
@@ -118,7 +118,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         reason: 'Ray of Enfeeblement (failed save)',
         note: `${targetName} has Disadvantage on Strength-based d20 tests and subtracts 1d8 from all damage rolls (Concentration, up to 1 minute). Target repeats CON save at end of each turn.`,
         timestamp: Date.now(),
-    });
+    }).catch((e) => { console.error("[rayOfEnfeeblement] Error:", e); });
 
     return {
         type: 'popup',

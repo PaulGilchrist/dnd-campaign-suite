@@ -20,8 +20,8 @@ vi.mock('../../../ui/logService.js', () => ({
   addEntry: vi.fn(() => Promise.resolve()),
 }));
 
-vi.mock('../../../shared/logPoster.js', () => ({
-  postLogEntry: vi.fn(),
+vi.mock('../../../ui/logService.js', () => ({
+  addEntry: vi.fn(() => Promise.resolve()),
 }));
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
@@ -41,7 +41,6 @@ import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { buildSaveDc, createSaveListener } from '../../common/savePrompt.js';
 import { resolveTarget } from '../../common/targetResolver.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
-import { postLogEntry } from '../../../shared/logPoster.js';
 import { addExpiration } from '../../../rules/effects/expirations.js';
 import { addEntry } from '../../../ui/logService.js';
 
@@ -167,12 +166,12 @@ describe('ottosDanceHandler.handle', () => {
       expect(result.payload.description).toContain('dances comically');
     });
 
-    it('should call postLogEntry with condition applied on successful save', async () => {
+    it('should call addEntry with condition applied on successful save', async () => {
       setupSuccessfulSave();
 
       await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-      expect(postLogEntry).toHaveBeenCalledWith(
+      expect(addEntry).toHaveBeenCalledWith(
         campaignName,
         expect.objectContaining({
           type: 'condition',
@@ -286,11 +285,11 @@ describe('ottosDanceHandler.handle', () => {
       );
     });
 
-    it('should call postLogEntry on failed save', async () => {
+    it('should call addEntry on failed save', async () => {
       setupFailedSave();
       await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-      expect(postLogEntry).toHaveBeenCalledWith(
+      expect(addEntry).toHaveBeenCalledWith(
         campaignName,
         expect.objectContaining({
           type: 'condition',
@@ -508,7 +507,7 @@ describe('ottosDanceHandler.processOttoDanceRepeatSave', () => {
         campaignName,
       );
 
-      expect(postLogEntry).toHaveBeenCalledWith(
+      expect(addEntry).toHaveBeenCalledWith(
         campaignName,
         expect.objectContaining({
           type: 'condition',
@@ -657,7 +656,7 @@ describe('ottosDanceHandler.processOttoDanceSuccessSave', () => {
     );
   });
 
-  it('should call postLogEntry', async () => {
+  it('should call addEntry', async () => {
     getRuntimeValue.mockReturnValue([]);
 
     await processOttoDanceSuccessSave(
@@ -667,7 +666,7 @@ describe('ottosDanceHandler.processOttoDanceSuccessSave', () => {
       campaignName,
     );
 
-    expect(postLogEntry).toHaveBeenCalledWith(
+    expect(addEntry).toHaveBeenCalledWith(
       campaignName,
       expect.objectContaining({
         type: 'condition',
