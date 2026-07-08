@@ -418,7 +418,10 @@ function SpellDetailPopup({ spell, playerStats, campaignName, onClose, onCast, u
     if (shouldSetConcentration) {
       const cs = getCombatSummary(campaignName);
       if (cs) {
-        addConcentration(cs, playerStats.name, spell.name, 10);
+        const targetName = spell.name === "Hunter's Mark"
+          ? (cs.creatures.find(c => c.name === playerStats.name)?.targetName || null)
+          : null;
+        addConcentration(cs, playerStats.name, spell.name, 10, targetName);
         storageService.default.set('combatSummary', cs, campaignName);
       }
     }

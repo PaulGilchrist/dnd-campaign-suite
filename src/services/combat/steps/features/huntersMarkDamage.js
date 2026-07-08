@@ -11,6 +11,9 @@ export const huntersMarkDamage = {
     const atk = cs.creatures?.find(c => c.name === ctx.playerStats.name);
     if (atk?.concentration?.spell !== "Hunter's Mark") return { data: prevData };
 
+    // Only apply damage if the attack target matches the Hunter's Mark target
+    if (atk.concentration.target && atk.concentration.target !== ctx.targetName) return { data: prevData };
+
     const isFoeSlayer = ctx.playerStats.class?.name === 'Ranger' && ctx.playerStats.level >= 20;
     const die = isFoeSlayer ? '1d10' : '1d6';
 

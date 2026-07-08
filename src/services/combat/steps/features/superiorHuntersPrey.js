@@ -16,6 +16,7 @@ export const superiorHuntersPrey = {
 
     const atk = cs.creatures?.find(c => c.name === ctx.playerStats.name);
     if (atk?.concentration?.spell !== "Hunter's Mark") return { data: prevData };
+    if (atk.concentration.target && atk.concentration.target !== ctx.targetName) return { data: prevData };
 
     const key = '_Superior_Hunters_Prey_UsedRound';
     const round = getCurrentCombatRound();

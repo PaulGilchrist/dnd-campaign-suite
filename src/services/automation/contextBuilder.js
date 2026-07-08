@@ -169,6 +169,20 @@ export function buildAttackContextSync(attack, playerStats, campaignName, condit
             }
         }
 
+        // Precise Hunter (2024 Ranger level 17): Advantage on attack rolls against Hunter's Mark target
+        let advantageReason = undefined;
+        const hasPreciseHunter = (playerStats.automation?.passives || []).some(
+            p => p.type === 'passive_rule' && p.effect === 'precise_hunter'
+        );
+        if (hasPreciseHunter && targetName && forcedMode === undefined) {
+            const combatSummary = await getCombatContext(campaignName);
+            const attackerCreature = combatSummary?.creatures?.find(c => c.name === playerName);
+            if (attackerCreature?.concentration?.spell === "Hunter's Mark" && attackerCreature?.concentration?.target === targetName) {
+                forcedMode = 'advantage';
+                advantageReason = 'Precise Hunter (Hunter\'s Mark)';
+            }
+        }
+
         // Aura checks when no map is active — all creatures considered in range
         if (forcedMode === undefined) {
             const noMapWolf = getWolfAdvantageAgainst({
@@ -367,6 +381,7 @@ export function buildAttackContextSync(attack, playerStats, campaignName, condit
             dcSuccess: attack.saveSuccess,
             attackerName: playerName,
             forcedMode,
+            advantageReason,
             autoDamageFormula,
             autoDamageName: attack.name,
             ramActive,

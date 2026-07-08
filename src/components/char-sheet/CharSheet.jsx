@@ -430,11 +430,6 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
         }
     }
 
-    // Precise Hunter: Advantage on attack rolls against Hunter's Mark target (level 17+ Ranger)
-    if (playerStats && playerStats.class?.name === 'Ranger' && playerStats.level >= 17) {
-        conditionEffects.attackAdvantageCount = (conditionEffects.attackAdvantageCount || 0) + 1;
-    }
-
     // Defensive Tactics: Escape the Horde — all attacks against you have Disadvantage
     if (playerStats) {
         const defensiveChoice = getRuntimeValue(playerStats.name, '_Defensive_Tactics_choice', campaignName);

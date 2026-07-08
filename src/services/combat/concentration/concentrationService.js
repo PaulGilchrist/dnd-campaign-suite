@@ -32,13 +32,14 @@ function breakConcentration(combatSummary, creatureName) {
     return spell
 }
 
-function addConcentration(combatSummary, creatureName, spellName, dc) {
+function addConcentration(combatSummary, creatureName, spellName, dc, target = null) {
     const creature = combatSummary.creatures.find(c => c.name === creatureName)
     if (!creature) return
     creature.concentration = {
         id: crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`,
         spell: spellName.trim(),
         dc,
+        target,
     }
 }
 

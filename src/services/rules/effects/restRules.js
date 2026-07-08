@@ -456,7 +456,6 @@ export async function applyLongRest(playerStats, campaignName) {
       }
     }
 
-    console.log('[applyLongRest] before clearAllExpirationEffects and clearHuntersMarkConcentration', { name, campaignName })
     clearAllExpirationEffects(name, campaignName)
     clearHuntersMarkConcentration(name, campaignName)
 

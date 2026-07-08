@@ -194,6 +194,13 @@ function CreatureCard({
                         <i className='fa-solid fa-spinner'></i>
                     </button>
                 ) : null}
+                {allCreatures?.some(c => c.concentration?.spell === "Hunter's Mark" && c.concentration?.target === creature.name) && (
+                    <div className='hunters-mark-badge-wrapper'>
+                        <span className='initiative-hunters-mark-badge' title={`Marked by ${allCreatures.find(c => c.concentration?.spell === "Hunter's Mark" && c.concentration?.target === creature.name)?.name}`}>
+                            <i className='fa-solid fa-crosshairs'></i> Hunter's Mark
+                        </span>
+                    </div>
+                )}
                 {isMajestyActive && (
                     <div className='majesty-badge-wrapper'>
                         <button

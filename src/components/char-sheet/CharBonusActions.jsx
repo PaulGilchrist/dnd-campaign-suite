@@ -135,23 +135,26 @@ function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, condit
                             const resolvedDamage = spell.heal_at_slot_level ? '' : resolveSpellDamageAtLevel(spell, playerStats.level);
                             const autoHit = isAutoHitSpell(spell);
                             const isSpellAtk = !spell.dc;
+                            const isUtilityConc = spell.concentration && !spell.dc;
                             const attackItem = { ...spell, type: 'Bonus Action', hitBonus: playerStats.spellAbilities?.toHit, saveDc: spell.dc ? playerStats.spellAbilities.saveDc : null, saveType: spell.dc?.dc_type, saveSuccess: spell.dc?.dc_success, damage: resolvedDamage, damageType };
                             return <React.Fragment key={spell.name}>
                                 <div className='left clickable' onClick={() => handleBonusSpellClick(spell.name)}>{spell.name}</div>
                                 <div>{spell.level === 0 ? 'Cantrip' : spell.level}</div>
                                 <div>{formatRange(spell.range)}</div>
-                                {autoHit
+                                {isUtilityConc
                                     ? <div></div>
-                                    : isSpellAtk
-                                        ? <div className={"clickable" + (exhaustionPenalty > 0 || conditionAttackMode === 'disadvantage' || cannotAct ? " stat--penalized" : "") + (cannotAct ? " disabled-attack" : "")} onClick={() => onAttackClick(attackItem)}>{signFormatter.format(playerStats.spellAbilities?.toHit - exhaustionPenalty)}</div>
-                                        : <div className="save-dc-display">DC {playerStats.spellAbilities?.saveDc + displaySaveDcBonus} {spell.dc?.dc_type}</div>}
-                                <div className={resolvedDamage ? "clickable" : ""} onClick={() => {
-                                    if (cannotAct) return;
+                                    : autoHit
+                                        ? <div></div>
+                                        : isSpellAtk
+                                            ? <div className={"clickable" + (exhaustionPenalty > 0 || conditionAttackMode === 'disadvantage' || cannotAct ? " stat--penalized" : "") + (cannotAct ? " disabled-attack" : "")} onClick={() => onAttackClick(attackItem)}>{signFormatter.format(playerStats.spellAbilities?.toHit - exhaustionPenalty)}</div>
+                                            : <div className="save-dc-display">DC {playerStats.spellAbilities?.saveDc + displaySaveDcBonus} {spell.dc?.dc_type}</div>}
+                                <div className={isUtilityConc ? "" : (resolvedDamage ? "clickable" : "")} onClick={() => {
+                                    if (cannotAct || isUtilityConc) return;
                                     if (isSpellAtk && spell.saveDc) { onResolveSpellDamage(attackItem); return; }
                                     if (isSpellAtk) { bonusCastAction(spell, {}); return; }
                                     bonusCastAction(spell, {});
-                                }}>{resolvedDamage}</div>
-                                <div className='left'>{damageType || (spell.heal_at_slot_level ? 'Healing' : 'Utility')}</div>
+                                }}>{isUtilityConc ? '' : resolvedDamage}</div>
+                                <div className='left'>{isUtilityConc ? 'Utility' : (damageType || (spell.heal_at_slot_level ? 'Healing' : 'Utility'))}</div>
                                 {is2024Rules && <div></div>}
                            </React.Fragment>;
                       })}

@@ -1063,5 +1063,112 @@ describe('contextBuilder: buildAttackContextSync', () => {
 
 
   });
+
+  describe('precise hunter (2024 Ranger level 17)', () => {
+    it('sets advantage when attacker has precise_hunter passive and target has Hunter\'s Mark concentration', async () => {
+      const { getCombatContext } = await import('../rules/combat/damageUtils.js');
+
+      const rangerStats = {
+        ...mockStats,
+        name: 'TestRanger',
+        automation: {
+          passives: [
+            { type: 'passive_rule', effect: 'precise_hunter', name: 'Precise Hunter' },
+          ],
+        },
+      };
+
+      getRuntimeValue.mockImplementation((name, key) => {
+        if (key === 'activeBuffs') return [];
+        return undefined;
+      });
+
+      getCombatContext.mockResolvedValue({
+        creatures: [
+          { name: 'TestRanger', concentration: { spell: "Hunter's Mark", target: 'Orc' } },
+          { name: 'Orc' },
+        ],
+      });
+
+      const result = await buildAttackContextSync(mockAttack, rangerStats, 'camp', 'normal', {});
+
+      expect(result.forcedMode).toBe('advantage');
+      expect(result.advantageReason).toBe('Precise Hunter (Hunter\'s Mark)');
+    });
+
+    it('does not set advantage when attacker has precise_hunter but target lacks Hunter\'s Mark', async () => {
+      const { getCombatContext } = await import('../rules/combat/damageUtils.js');
+
+      const rangerStats = {
+        ...mockStats,
+        name: 'TestRanger',
+        automation: {
+          passives: [
+            { type: 'passive_rule', effect: 'precise_hunter', name: 'Precise Hunter' },
+          ],
+        },
+      };
+
+      getRuntimeValue.mockImplementation((name, key) => {
+        if (key === 'activeBuffs') return [];
+        return undefined;
+      });
+
+      getCombatContext.mockResolvedValue({
+        creatures: [
+          { name: 'TestRanger' },
+          { name: 'Orc' },
+        ],
+      });
+
+      const result = await buildAttackContextSync(mockAttack, rangerStats, 'camp', 'normal', {});
+
+      expect(result.forcedMode).toBeUndefined();
+      expect(result.advantageReason).toBeUndefined();
+    });
+
+    it('does not set advantage when target has Hunter\'s Mark but attacker lacks precise_hunter', async () => {
+      const { getCombatContext } = await import('../rules/combat/damageUtils.js');
+
+      getRuntimeValue.mockImplementation((name, key) => {
+        if (key === 'activeBuffs') return [];
+        return undefined;
+      });
+
+      getCombatContext.mockResolvedValue({
+        creatures: [
+          { name: 'TestCharacter' },
+          { name: 'Orc', concentration: { spell: "Hunter's Mark" } },
+        ],
+      });
+
+      const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal', {});
+
+      expect(result.forcedMode).toBeUndefined();
+      expect(result.advantageReason).toBeUndefined();
+    });
+
+    it('precise_hunter does not override higher-priority advantage sources', async () => {
+      const rangerStats = {
+        ...mockStats,
+        name: 'TestRanger',
+        automation: {
+          passives: [
+            { type: 'passive_rule', effect: 'precise_hunter', name: 'Precise Hunter' },
+          ],
+        },
+      };
+
+      getRuntimeValue.mockImplementation((name, key) => {
+        if (key === 'activeBuffs') return [{ effect: 'vow_of_enmity' }];
+        if (key === 'vowOfEnmityTarget') return 'Orc';
+        return undefined;
+      });
+
+      const result = await buildAttackContextSync(mockAttack, rangerStats, 'camp', 'normal', {});
+
+      expect(result.forcedMode).toBe('advantage');
+    });
+  });
 });
 // @cleaned-by-ai

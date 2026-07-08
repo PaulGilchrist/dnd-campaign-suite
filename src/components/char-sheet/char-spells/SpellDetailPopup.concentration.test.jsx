@@ -117,7 +117,7 @@ describe('SpellDetailPopup - handleCast: Concentration management', () => {
 
       fireEvent.click(screen.getByRole('button', { name: /Cast Spell/ }));
 
-      expect(addConcentration).toHaveBeenCalledWith(cs, 'Elara', 'Bane', 10);
+      expect(addConcentration).toHaveBeenCalledWith(cs, 'Elara', 'Bane', 10, null);
       expect(storageService.default.set).toHaveBeenCalledWith('combatSummary', cs, mockCampaignName);
     });
 
@@ -186,7 +186,7 @@ describe('SpellDetailPopup - handleCast: Concentration management', () => {
 
       expect(breakConcentration).toHaveBeenCalledWith(cs, 'Elara');
       expect(storageService.default.set).toHaveBeenCalledWith('combatSummary', cs, mockCampaignName);
-      expect(addConcentration).toHaveBeenCalledWith(cs, 'Elara', 'Bane', 10);
+      expect(addConcentration).toHaveBeenCalledWith(cs, 'Elara', 'Bane', 10, null);
     });
 
     it('does not break concentration when recasting the same spell (concentration refresh)', () => {

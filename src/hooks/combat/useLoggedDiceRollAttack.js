@@ -435,6 +435,7 @@ export function createLogAndShow(deps) {
             coverLevel: context?.coverLevel,
             coverAcBonus: context?.coverAcBonus,
             coverReason: context?.coverReason,
+            advantageReason: context?.advantageReason,
         });
 
         const shouldSkipPopup = rollType === 'save' && target?.type === 'player';
@@ -456,6 +457,7 @@ export function createLogAndShow(deps) {
                 coverAcBonus: context?.coverAcBonus,
                 coverReason: context?.coverReason,
                 forcedMode: context?.forcedMode,
+                advantageReason: context?.advantageReason,
                 isAutoCrit: context?.isAutoCrit,
                 isCrit,
                 isNatural20: effectiveD20Roll === 20,
