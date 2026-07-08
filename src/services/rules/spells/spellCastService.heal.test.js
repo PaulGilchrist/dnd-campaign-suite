@@ -255,7 +255,7 @@ describe('executeSpellCast - heal spells', () => {
       return makeSpell({ name: 'Power Word Heal', level: 9 })
     }
 
-    it('heals both primary and multiTarget when both exist in combat context', async () => {
+    it('heals only multiTarget when metaCtx.multiTarget is provided', async () => {
       vi.mocked(damageUtils.getCombatContext).mockResolvedValue({
         creatures: [
           { name: 'Target', maxHp: 100, currentHp: 30 },
@@ -268,22 +268,28 @@ describe('executeSpellCast - heal spells', () => {
 
       await executeSpellCast(makePowerWordHealSpell(), { slotLevel: 9, multiTarget: 'Target2' }, services)
 
-      expect(applyHealing.applyHealingToTarget.mock.calls.length).toBeGreaterThanOrEqual(2)
+      expect(applyHealing.applyHealingToTarget).toHaveBeenCalledTimes(1)
+      expect(applyHealing.applyHealingToTarget).toHaveBeenCalledWith(expect.any(Object), 'Target2', expect.any(Number), CAMPAIGN)
     })
 
-    it('removes charmed, frightened, paralyzed, and poisoned conditions from the target', async () => {
+    it('removes charmed, frightened, paralyzed, and poisoned conditions from the multiTarget', async () => {
       vi.mocked(runtime.getRuntimeValue).mockImplementation((_char, key) => {
         if (key === 'activeConditions') return ['Charmed', 'Frightened', 'Prone', 'Poisoned']
         return undefined
       })
-      mockCombatContext('Target', 30, 100)
+      vi.mocked(damageUtils.getCombatContext).mockResolvedValue({
+        creatures: [
+          { name: 'Target', maxHp: 100, currentHp: 30 },
+          { name: 'Target2', maxHp: 80, currentHp: 10 },
+        ],
+      })
       mockHealingResult(70, 30, 100)
       const services = makeServices({ getTargetInfo: async () => ({ name: 'Target' }) })
 
       await executeSpellCast(makePowerWordHealSpell(), { slotLevel: 9, multiTarget: 'Target2' }, services)
 
       expect(runtime.setRuntimeValue).toHaveBeenCalledWith(
-        'Target',
+        'Target2',
         'activeConditions',
         ['Prone'],
         CAMPAIGN,

@@ -167,22 +167,24 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
     }
 
     if (spell.name.toLowerCase() === 'power word heal') {
-        const target = await getTargetInfo();
-        if (target?.name) {
-            await applyPowerWordHealToTarget(target.name, playerStats, campaignName);
-            if (metaCtx?.multiTarget) {
-                await applyPowerWordHealToTarget(metaCtx.multiTarget, playerStats, campaignName);
+        if (metaCtx?.multiTarget) {
+            await applyPowerWordHealToTarget(metaCtx.multiTarget, playerStats, campaignName);
+        } else {
+            const target = await getTargetInfo();
+            if (target?.name) {
+                await applyPowerWordHealToTarget(target.name, playerStats, campaignName);
             }
         }
         return;
     }
 
     if (spell.name && spell.name.toLowerCase() === 'power word kill') {
-        const target = await getTargetInfo();
-        if (target?.name) {
-            await applyPowerWordKillToTarget(target.name, playerStats, campaignName);
-            if (metaCtx?.multiTarget) {
-                await applyPowerWordKillToTarget(metaCtx.multiTarget, playerStats, campaignName);
+        if (metaCtx?.multiTarget) {
+            await applyPowerWordKillToTarget(metaCtx.multiTarget, playerStats, campaignName);
+        } else {
+            const target = await getTargetInfo();
+            if (target?.name) {
+                await applyPowerWordKillToTarget(target.name, playerStats, campaignName);
             }
         }
         return;
