@@ -23,6 +23,7 @@ import { useSpellPositionResolver } from '../../hooks/combat/useSpellPositionRes
 import { useSpellCastExecutor } from '../../hooks/combat/useSpellCastExecutor.js';
 import { resolveSpellDamageAtLevel, isAutoHitSpell } from '../../services/rules/core/spellDamageUtils.js'
 import { signFormatter } from '../../services/ui/formatUtils.js';
+import { useSyncedState } from '../../hooks/runtime/useSyncedState.js';
 import './CharActions.css'
 
 function CharReactions({ playerStats, campaignName, cannotAct, mapName, characters }) {
@@ -32,8 +33,7 @@ function CharReactions({ playerStats, campaignName, cannotAct, mapName, characte
     const [reactiveSpellEligible, setReactiveSpellEligible] = React.useState(null);
     const [reactiveSpellWarnings, setReactiveSpellWarnings] = React.useState(false);
     const [isReactiveSpellFlow, setIsReactiveSpellFlow] = React.useState(false);
-    const [arcaneWardRestoreModal, setArcaneWardRestoreModal] = React.useState(null);
-    const [inspiringMovementAllyModal, setInspiringMovementAllyModal] = React.useState(null);
+    const [modalState, setModalState] = useSyncedState(campaignName, 'modalState', {});
 
     const activeBuffs = useRuntimeValue(playerStats?.name, 'activeBuffs', campaignName) ?? [];
 
@@ -157,9 +157,9 @@ function CharReactions({ playerStats, campaignName, cannotAct, mapName, characte
 
         if (result.type === 'modal') {
             if (result.modalName === 'arcaneWardRestore') {
-                setArcaneWardRestoreModal(result.payload);
+                setModalState({ arcaneWardRestoreModal: result.payload });
             } else if (result.modalName === 'inspiringMovementAlly') {
-                setInspiringMovementAllyModal(result.payload);
+                setModalState({ inspiringMovementAllyModal: result.payload });
             } else {
                 const html = buildFeatureDetailHtml(reaction);
                 if (html) setPopupHtml(html);
@@ -204,16 +204,16 @@ function CharReactions({ playerStats, campaignName, cannotAct, mapName, characte
     }, [gateMetamagic, resolveReactionSpellPositions, campaignName, playerStats]);
 
     const handleInspiringMovementConfirm = React.useCallback(async (allyName) => {
-        if (!inspiringMovementAllyModal) return;
-        const { action, playerStats: imPlayerStats, campaignName: imCampaignName, halfSpeed, noOAs } = inspiringMovementAllyModal;
-        setInspiringMovementAllyModal(null);
+        if (!modalState.inspiringMovementAllyModal) return;
+        const { action, playerStats: imPlayerStats, campaignName: imCampaignName, halfSpeed, noOAs } = modalState.inspiringMovementAllyModal;
+        setModalState({ inspiringMovementAllyModal: null });
         if (!allyName) return;
         const result = await applyInspiringMovement(action, imPlayerStats, imCampaignName, allyName, halfSpeed, noOAs);
         if (!result) return;
         if (result.type === 'popup') {
             setPopupHtml(result.payload);
         }
-    }, [inspiringMovementAllyModal, setPopupHtml]);
+    }, [modalState.inspiringMovementAllyModal, setModalState, setPopupHtml]);
 
     return (
         <div className='char-actions'>
@@ -307,18 +307,18 @@ function CharReactions({ playerStats, campaignName, cannotAct, mapName, characte
                     </React.Fragment>;
                 })}<div className='half-line'></div>
             </div>}
-            {arcaneWardRestoreModal && (
+            {modalState.arcaneWardRestoreModal && (
                 <ArcaneWardRestoreModal
-                    {...arcaneWardRestoreModal}
+                    {...modalState.arcaneWardRestoreModal}
                     playerStats={playerStats}
                     campaignName={campaignName}
-                    onClose={() => setArcaneWardRestoreModal(null)}
+                    onClose={() => setModalState({ arcaneWardRestoreModal: null })}
                 />
             )}
-            {inspiringMovementAllyModal && (
+            {modalState.inspiringMovementAllyModal && (
                 <SecondaryTargetModal
                     title="Inspiring Movement — Choose Ally"
-                    targets={inspiringMovementAllyModal.creatureTargets}
+                    targets={modalState.inspiringMovementAllyModal.creatureTargets}
                     confirmLabel="Move"
                     confirmIcon="fa-person-walking"
                     featureDescription="Both you and the chosen ally move up to half your Speeds without provoking Opportunity Attacks."

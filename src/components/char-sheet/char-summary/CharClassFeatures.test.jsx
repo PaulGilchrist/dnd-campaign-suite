@@ -70,6 +70,9 @@ vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
         }
     }),
     setRuntimeValue: vi.fn(),
+    getStore: vi.fn(() => new Map()),
+    listeners: new Map(),
+    useSyncedState: vi.fn(() => [{}, vi.fn()]),
 }));
 
 vi.mock('../../../services/automation/index.js', () => ({

@@ -9,6 +9,7 @@ import Popup from '../../common/popup.jsx';
 import WeaponKindMasteryModal from '../modals/WeaponKindMasteryModal.jsx';
 import { loadFightingStyles } from '../../../services/ui/dataLoader.js';
 import { isUnbreakableMajestyActive, getUnbreakableMajestySaveDc, clearUnbreakableMajesty } from '../../../services/combat/auras/unbreakableMajesty.js';
+import { useSyncedState } from '../../../hooks/runtime/useSyncedState.js';
 /* ─── Barbarian ─── */
 const BarbarianFeatures = function BarbarianFeatures({ playerStats, campaignName, onWeaponMasteryClick }) {
     const classLevel = playerStats.class?.class_levels?.[playerStats.level - 1];
@@ -634,15 +635,15 @@ const CLASS_COMPONENTS = {
 function CharClassFeatures({ playerStats, campaignName }) {
     const Cmp = CLASS_COMPONENTS[playerStats?.class?.name];
     const hasAdrenalineRush = (playerStats?.automation?.specialActions ?? []).some(a => a.effect === 'bonus_action_dash');
-    const [weaponKindMasteryModal, setWeaponKindMasteryModal] = React.useState(null);
+    const [modalState, setModalState] = useSyncedState(campaignName, 'modalState', {});
 
     const handleWeaponMasteryClick = () => {
         const existing = getRuntimeValue(playerStats.name, '_Weapon_Kind_Mastery_chosenWeapons', campaignName);
-        setWeaponKindMasteryModal({
+        setModalState({ weaponKindMasteryModal: {
             action: { automation: { maxKinds: 'class_level_scaling', meleeOnly: false } },
             meleeOnly: false,
             existing: (existing && Array.isArray(existing)) ? existing : [],
-        });
+        }});
     };
 
     if (!Cmp && !hasAdrenalineRush) return null;
@@ -653,12 +654,12 @@ function CharClassFeatures({ playerStats, campaignName }) {
                 <TrackedResourceInput label="Adrenaline Rush" resourceKey="adrenalineRushUses" playerName={playerStats.name} getMax={() => playerStats.proficiency || 0} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
             )}
             {Cmp && <Cmp playerStats={playerStats} campaignName={campaignName} onWeaponMasteryClick={handleWeaponMasteryClick} />}
-            {weaponKindMasteryModal && (
+            {modalState.weaponKindMasteryModal && (
                 <WeaponKindMasteryModal
-                    {...weaponKindMasteryModal}
+                    {...modalState.weaponKindMasteryModal}
                     playerStats={playerStats}
                     campaignName={campaignName}
-                    onClose={() => setWeaponKindMasteryModal(null)}
+                    onClose={() => setModalState({ weaponKindMasteryModal: null })}
                 />
             )}
         </>
