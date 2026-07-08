@@ -237,7 +237,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
                   setTurnStartTick(t => t + 1)
               }
           }
-        }, [campaignName, characters, handleOverlayEvent, setCombatSummaryG, setActiveCreatureNameG])
+        }, [campaignName, characters, activeCreatureName, handleOverlayEvent, setCombatSummaryG, setActiveCreatureNameG])
 
     React.useEffect(() => {
         if (!combatSummary) return
