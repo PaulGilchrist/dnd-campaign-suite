@@ -26,7 +26,7 @@ export function useSyncedState(characterKey, propertyName, defaultValue, campaig
 
   const [value, setValue] = useState(initialValue);
   // eslint-disable-next-line server-first/no-local-game-state
-  const currentValueRef = useRef(undefined);
+  const currentValueRef = useRef(initialValue);
 
   useEffect(() => {
     if (!characterKey || !propertyName) return;
@@ -52,12 +52,19 @@ export function useSyncedState(characterKey, propertyName, defaultValue, campaig
 
   const setValueSynced = useCallback(
     (newValue) => {
-      setRuntimeValue(characterKey, propertyName, newValue, campaignName);
+      // Support function updater pattern: fn => fn(prevValue)
+      const isUpdaterFn = typeof newValue === 'function';
+      let resolvedValue = newValue;
+      if (isUpdaterFn) {
+        const currentValue = currentValueRef.current;
+        resolvedValue = newValue(currentValue);
+      }
+      setRuntimeValue(characterKey, propertyName, resolvedValue, campaignName);
       const store = getStore(characterKey);
-      store.set(propertyName, newValue);
-      if (newValue === currentValueRef.current) return;
-      currentValueRef.current = newValue;
-      setValue(newValue);
+      store.set(propertyName, resolvedValue);
+      if (resolvedValue === currentValueRef.current) return;
+      currentValueRef.current = resolvedValue;
+      setValue(resolvedValue);
     },
     [characterKey, propertyName, campaignName],
   );

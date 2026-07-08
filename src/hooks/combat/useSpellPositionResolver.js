@@ -9,8 +9,9 @@ export function useSpellPositionResolver(campaignName, mapName, playerName) {
     const resolvePositions = useCallback(async () => {
         if (!mapName) return;
         try {
-            const [mapData] = await Promise.all([
+            const [mapData] = await Promise.race([
                 mapsService.loadMapData(campaignName, mapName),
+                new Promise((_, reject) => setTimeout(() => reject(new Error('loadMapData timeout')), 3000)),
             ]);
             const attackerPlayer = mapData?.players?.find(p => p.name === playerName);
             if (attackerPlayer) {

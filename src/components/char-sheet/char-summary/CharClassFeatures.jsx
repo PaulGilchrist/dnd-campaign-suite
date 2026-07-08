@@ -9,7 +9,6 @@ import Popup from '../../common/popup.jsx';
 import WeaponKindMasteryModal from '../modals/WeaponKindMasteryModal.jsx';
 import { loadFightingStyles } from '../../../services/ui/dataLoader.js';
 import { isUnbreakableMajestyActive, getUnbreakableMajestySaveDc, clearUnbreakableMajesty } from '../../../services/combat/auras/unbreakableMajesty.js';
-import { useSyncedState } from '../../../hooks/runtime/useSyncedState.js';
 /* ─── Barbarian ─── */
 const BarbarianFeatures = function BarbarianFeatures({ playerStats, campaignName, onWeaponMasteryClick }) {
     const classLevel = playerStats.class?.class_levels?.[playerStats.level - 1];
@@ -635,7 +634,7 @@ const CLASS_COMPONENTS = {
 function CharClassFeatures({ playerStats, campaignName }) {
     const Cmp = CLASS_COMPONENTS[playerStats?.class?.name];
     const hasAdrenalineRush = (playerStats?.automation?.specialActions ?? []).some(a => a.effect === 'bonus_action_dash');
-    const [modalState, setModalState] = useSyncedState(campaignName, 'modalState', {}, campaignName);
+    const [modalState, setModalState] = React.useState({});
 
     const handleWeaponMasteryClick = () => {
         const existing = getRuntimeValue(playerStats.name, '_Weapon_Kind_Mastery_chosenWeapons', campaignName);

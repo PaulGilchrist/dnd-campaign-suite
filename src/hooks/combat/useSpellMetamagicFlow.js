@@ -263,7 +263,7 @@ export function useSpellMetamagicFlow(playerStats, campaignName, onExecute, setS
               setSecondaryTargetModal(null);
             },
           };
-          setSecondaryTargetModal(modalConfig);
+          setSecondaryTargetModal({ secondaryTargetModal: modalConfig });
           return;
         }
         cfSetPending('multiTarget', {

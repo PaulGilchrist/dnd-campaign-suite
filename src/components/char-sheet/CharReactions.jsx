@@ -23,7 +23,6 @@ import { useSpellPositionResolver } from '../../hooks/combat/useSpellPositionRes
 import { useSpellCastExecutor } from '../../hooks/combat/useSpellCastExecutor.js';
 import { resolveSpellDamageAtLevel, isAutoHitSpell } from '../../services/rules/core/spellDamageUtils.js'
 import { signFormatter } from '../../services/ui/formatUtils.js';
-import { useSyncedState } from '../../hooks/runtime/useSyncedState.js';
 import './CharActions.css'
 
 function CharReactions({ playerStats, campaignName, cannotAct, mapName, characters }) {
@@ -33,7 +32,7 @@ function CharReactions({ playerStats, campaignName, cannotAct, mapName, characte
     const [reactiveSpellEligible, setReactiveSpellEligible] = React.useState(null);
     const [reactiveSpellWarnings, setReactiveSpellWarnings] = React.useState(false);
     const [isReactiveSpellFlow, setIsReactiveSpellFlow] = React.useState(false);
-    const [modalState, setModalState] = useSyncedState(campaignName, 'modalState', {}, campaignName);
+    const [modalState, setModalState] = React.useState({});
 
     const activeBuffs = useRuntimeValue(playerStats?.name, 'activeBuffs', campaignName) ?? [];
 

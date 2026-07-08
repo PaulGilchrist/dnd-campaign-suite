@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { useSyncedState } from '../../hooks/runtime/useSyncedState.js';
 import useAttackDamageResolution from './useAttackDamageResolution.js';
 import useModalHandlers from './useModalHandlers.js';
@@ -8,8 +8,12 @@ export default function useCharActionModals({
     playerStats, campaignName, mapName,
     popupHtml, setPopupHtml, rollDamage, rollAttack, buildCtx, buildCtxSync,
 }) {
-    const [modalState, _setModalState] = useSyncedState(campaignName, 'modalState', {}, campaignName);
+    const [modalState, _setModalState] = useState({});
     const setModalState = useCallback((updates) => {
+        if (!updates) {
+            _setModalState({});
+            return;
+        }
         _setModalState(prev => ({ ...prev, ...updates }));
     }, [_setModalState]);
 

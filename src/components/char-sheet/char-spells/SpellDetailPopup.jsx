@@ -197,6 +197,7 @@ function SpellDetailPopup({ spell, playerStats, campaignName, onClose, onCast, u
   }, [isCantrip, charDmg, slotDmg, playerLevel]);
 
   const handleCast = () => {
+    console.log('[SpellDetailPopup.handleCast] ENTER spell:', spell.name, 'canCast:', canCast);
     if (!canCast) return;
     const metaCtx = { overchannel: useOverchannel };
     if (isDispelMagicAsBonusAction) {
