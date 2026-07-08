@@ -1,5 +1,5 @@
 import { createPipeline } from '../actionPipeline.js';
-import { buildWeaponDamageSteps } from './weaponDamageSteps.js';
+import { buildDamageSteps } from './weaponDamageSteps.js';
 import { buildSpellDamageSteps } from './spellDamageSteps.js';
 import { buildGenericSteps } from './genericSteps.js';
 import { createObservers } from './observers.js';
@@ -36,7 +36,7 @@ export function buildPipelineForAction(action, playerStats) {
   const isSpell = action?.type === 'spell' || action?.spellType || action?.autoDamageSchool;
 
   if (isWeaponAttack) {
-    const steps = buildWeaponDamageSteps();
+    const steps = buildDamageSteps();
     for (const step of steps) {
       pipeline.step(step);
     }

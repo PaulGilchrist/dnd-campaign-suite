@@ -116,6 +116,9 @@ export function normalizeAutoDamage(autoDamage, isCrit, playerStats) {
     autoDamageSecondaryName: autoDamage.secondaryName,
     autoDamageSecondaryDamageType: autoDamage.secondaryDamageType,
     attackerName: autoDamage.attackerName,
+    isCantrip: autoDamage.isCantrip || false,
+    metamagicHeighten: autoDamage.metamagicHeighten || false,
+    autoDamageSchool: autoDamage.autoDamageSchool || '',
   };
 
   return { attack, ctx };

@@ -21,7 +21,7 @@ import { SHOW_DICE_ROLL_DELAY } from '../../../config/ui-config.js';
  * Build the damage pipeline steps for a weapon-type action.
  * Each step: { name, subscribe, emit, condition(ctx), handler(ctx) → result|null }
  */
-export function buildWeaponDamageSteps() {
+export function buildDamageSteps() {
 
   // Shared helpers used by multiple steps - these receive ctx at call time
 
