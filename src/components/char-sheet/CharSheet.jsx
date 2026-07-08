@@ -675,11 +675,7 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
         }
     }, [isRaging, playerStats, campaignName]);
 
-    React.useEffect(() => {
-        if (popupHtml) {
-            console.log('[BI Defense] popupHtml present, keys:', Object.keys(popupHtml), 'bardicInspirationDefense:', popupHtml.bardicInspirationDefense, 'truthy:', !!popupHtml.bardicInspirationDefense);
-        }
-    }, [popupHtml]);
+
 
     const [auraComboEffects, setAuraComboEffects] = React.useState(null);
     React.useEffect(() => {

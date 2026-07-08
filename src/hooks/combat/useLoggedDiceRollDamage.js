@@ -23,6 +23,7 @@ import {
     applyMinDamageAdjustment,
 } from './loggedDiceRollUtils.js';
 import { getCoronaSaveDisadvantage } from '../../services/combat/auras/coronaAuraUtils.js';
+import { hasBardicInspirationOffense, getBardicInspirationDieSize, getBardicInspirationDieSizeFromClass } from '../../services/combat/auras/bardicInspirationState.js';
 
 function handleOverchannelSelfDamage(characterName, campaignName, context, logEntry, characters) {
     if (context?.overchannelActive) {
@@ -1289,8 +1290,8 @@ export function createLogDamageAndShow(deps) {
             popupData.damageReduced = applyResult.damageReduced;
         }
 
-        popupData.bardicInspirationOffense = context?.bardicInspirationOffense;
-        popupData.bardicInspirationOffenseDieSize = context?.bardicInspirationOffenseDieSize;
+        popupData.bardicInspirationOffense = context?.bardicInspirationOffense || (context?.playerStats ? hasBardicInspirationOffense(context.playerStats, campaignName) : false);
+        popupData.bardicInspirationOffenseDieSize = context?.bardicInspirationOffenseDieSize || getBardicInspirationDieSize(characterName, campaignName) || (context?.playerStats ? getBardicInspirationDieSizeFromClass(context.playerStats) : null);
 
         setPopupHtml(popupData);
 
