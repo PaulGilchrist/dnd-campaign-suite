@@ -65,6 +65,7 @@ export async function resolveAttackDamageStandalone(attack, ctxOverrides, { play
         buildCtx: null,
         buildCtxSync: null,
         proceedWithDamage,
+        rollDamage,
         ...ctxOverrides,
     };
 
@@ -185,6 +186,7 @@ export default function useAttackDamageResolution({
             buildCtx,
             buildCtxSync,
             proceedWithDamage,
+            rollDamage,
             ...ctxOverrides,
         };
 

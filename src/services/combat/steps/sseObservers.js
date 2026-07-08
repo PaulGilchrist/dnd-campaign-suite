@@ -29,6 +29,19 @@ const EVENT_MAPPING = {
   'dmg_type:modified': 'dmg_type:modified',
   'damage:ready': 'damage:ready',
   'damage:applied': 'damage:applied',
+  'cleave:done': 'cleave:done',
+  'tactical:done': 'tactical:done',
+  'mastery:done': 'mastery:done',
+  'pipeline:complete': 'pipeline:complete',
+  'spell:do': 'spell:do',
+  'spell:context': 'spell:context',
+  'spell:formulas': 'spell:formulas',
+  'spell:rolled': 'spell:rolled',
+  'spell:ready': 'spell:ready',
+  'spell:applied': 'spell:applied',
+  'generic:do': 'generic:do',
+  'generic:ready': 'generic:ready',
+  'generic:applied': 'generic:applied',
 };
 
 function createSseObservers(campaignName) {

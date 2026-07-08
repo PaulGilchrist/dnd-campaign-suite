@@ -2,7 +2,7 @@ import { rollExpression, rollExpressionDoubled, rollExpressionMaximized } from '
 import { getCombatContext, getTargetFromAttacker } from '../../rules/combat/damageUtils.js';
 import { getCurrentCombatRound, loadCombatSummary } from '../../encounters/combatData.js';
 import { getRuntimeValue, setRuntimeObject, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
-import { hasTwoWeaponFighting } from '../../combat/automation/automationService.js';
+import { hasTwoWeaponFighting, collectWeaponMastery } from '../../combat/automation/automationService.js';
 import { applyDamageToTarget } from '../../rules/combat/applyDamage.js';
 import { addEntry } from '../../ui/logService.js';
 import { getAttackRiderOptions, getAttackRiderOptionsByContext } from '../../automation/handlers/class-fighter-rogue/combatSuperiorityHandler.js';
@@ -12,6 +12,10 @@ import { spendResource } from '../../automation/common/resourceCheck.js';
 import { getActiveBuffs } from '../../automation/common/buffToggle.js';
 import utils from '../../ui/utils.js';
 import { featureModules } from './features/index.js';
+import { applyMasteryEffect } from '../../automation/handlers/combat/weaponMasteryHandler.js';
+import { getDistanceFeet } from '../../rules/combat/rangeValidation.js';
+import { createSaveListener } from '../../automation/common/savePrompt.js';
+import { SHOW_DICE_ROLL_DELAY } from '../../../config/ui-config.js';
 
 /**
  * Build the damage pipeline steps for a weapon-type action.
@@ -760,6 +764,280 @@ export function buildWeaponDamageSteps() {
       handler: async (ctx) => {
         ctx.proceedWithDamage(ctx.attack, ctx.formula, ctx.total, ctx.rolls, ctx.modifier);
         return { data: { _done: true } };
+      },
+    },
+
+    // =========================================================
+    // Step: cleaveMastery — Secondary target selection for Cleave
+    // =========================================================
+    {
+      name: 'cleaveMastery',
+      subscribe: 'damage:applied',
+      emit: 'cleave:done',
+      condition: (ctx) => !!ctx.setSecondaryTargetModal && ctx.attack?.name && ctx.playerStats?.automation,
+      handler: async (ctx) => {
+        const cs = await loadCombatSummary(ctx.campaignName);
+        const lastAttack = cs?.lastAttack;
+        if (!lastAttack?.hit) return { data: {} };
+
+        const available = collectWeaponMastery(lastAttack.attackName, ctx.playerStats);
+        if (!available) return { data: {} };
+        const allMasteries = [available.baseMastery, ...(available.extraMasteries || [])].filter(Boolean);
+        if (!allMasteries.includes('Cleave')) return { data: {} };
+
+        const firstTarget = cs?.creatures?.find(c => c.name === lastAttack.targetName);
+        const mapName = ctx.playerStats?.mapName;
+        const hasMapPositions = mapName && firstTarget?.position;
+
+        const resolveHp = (creature, ps) => {
+          if (!creature) return { currentHp: 0, maxHp: 0 };
+          if (creature.type === 'player') {
+            const currentHp = getRuntimeValue(creature.name, 'currentHitPoints') ?? getRuntimeValue(creature.name, 'hitPoints') ?? 0;
+            const maxHp = getRuntimeValue(creature.name, 'hitPoints') ?? ps?.hitPoints ?? 0;
+            return { currentHp, maxHp };
+          }
+          return { currentHp: creature.currentHp ?? creature.maxHp, maxHp: creature.maxHp };
+        };
+
+        let secondTargets;
+        if (hasMapPositions) {
+          const attackerPos = cs?.creatures?.find(c => c.name === ctx.playerStats.name)?.position;
+          const reach = 8;
+          if (attackerPos) {
+            secondTargets = cs.creatures
+              .filter(c => c.name !== lastAttack.targetName && c.position)
+              .map(c => ({
+                ...c,
+                ...resolveHp(c, ctx.playerStats),
+                distanceFromFirst: getDistanceFeet(firstTarget.position, c.position),
+                distanceFromAttacker: getDistanceFeet(attackerPos, c.position),
+              }))
+              .filter(t => t.distanceFromFirst !== null && t.distanceFromFirst <= 5 && t.distanceFromAttacker !== null && t.distanceFromAttacker <= reach);
+          }
+        }
+
+        if (!hasMapPositions || !secondTargets) {
+          secondTargets = cs.creatures
+            .filter(c => c.name !== lastAttack.targetName)
+            .map(c => ({ ...c, ...resolveHp(c, ctx.playerStats) }));
+        }
+
+        if (secondTargets.length === 0) return { data: {} };
+
+        // Store attack info for Cleave secondary attack
+        const cleaveDamageFormula = lastAttack.damageFormula
+          ? lastAttack.damageFormula.replace(/\+\s*\d+/g, '').trim()
+          : lastAttack.damageFormula;
+
+        ctx._cleaveAttackInfo = {
+          attackName: lastAttack.attackName,
+          damageFormula: cleaveDamageFormula || lastAttack.damageFormula,
+          damageType: lastAttack.damageType || 'same_as_weapon',
+        };
+
+        ctx.setSecondaryTargetModal?.({
+          title: 'Cleave — Choose Second Target',
+          targets: secondTargets,
+          onTargetSelected: async (cleaveTargetName) => {
+            if (!cleaveTargetName || !ctx.rollDamage) return;
+
+            const combatSummary = await getCombatContext(ctx.campaignName);
+            const target = combatSummary?.creatures?.find(c => c.name === cleaveTargetName);
+            const targetAc = target?.ac || 0;
+            const abilityName = ctx.playerStats?.abilities?.[0]?.name || 'STR';
+            const ability = ctx.playerStats?.abilities?.find(a => a.name === abilityName);
+            const abilityMod = ability?.bonus || 0;
+            const attackBonus = abilityMod + (ctx.playerStats.proficiency || 0);
+            const d20Roll = Math.floor(Math.random() * 20) + 1;
+            const totalRoll = d20Roll + attackBonus;
+            const hit = totalRoll >= targetAc;
+
+            const cleaveFormula = ctx._cleaveAttackInfo?.damageFormula || '0';
+            let damageResult = null;
+            if (hit) {
+              damageResult = rollExpression(cleaveFormula);
+            }
+
+            if (hit && damageResult) {
+              const context = {
+                targetName: cleaveTargetName,
+                damageType: ctx._cleaveAttackInfo.damageType,
+                attackerName: ctx.playerStats.name,
+              };
+              ctx.rollDamage(`${ctx._cleaveAttackInfo.attackName} (Cleave)`, cleaveFormula, damageResult.total, damageResult.rolls, 0, context);
+              addEntry(ctx.campaignName, {
+                type: 'ability_use',
+                characterName: ctx.playerStats.name,
+                abilityName: 'Cleave',
+                description: `${ctx.playerStats.name} used Cleave on ${ctx._cleaveAttackInfo.attackName} against ${cleaveTargetName}`,
+                targetName: cleaveTargetName,
+              }).catch(() => {});
+            } else {
+              const context = {
+                targetName: cleaveTargetName,
+                damageType: ctx._cleaveAttackInfo.damageType,
+                attackerName: ctx.playerStats.name,
+                isAutoMiss: true,
+              };
+              ctx.rollDamage(`${ctx._cleaveAttackInfo.attackName} (Cleave)`, cleaveFormula, 0, [], 0, context);
+              addEntry(ctx.campaignName, {
+                type: 'ability_use',
+                characterName: ctx.playerStats.name,
+                abilityName: 'Cleave',
+                description: `${ctx.playerStats.name} used Cleave on ${ctx._cleaveAttackInfo.attackName} against ${cleaveTargetName} — Miss`,
+                targetName: cleaveTargetName,
+              }).catch(() => {});
+            }
+          },
+          onSkip: () => {},
+          featureDescription: 'On a hit, the second creature takes weapon damage (no ability modifier to damage unless negative). Once per turn.',
+        });
+
+        return {
+          data: { _cleavePending: true },
+          modal: { type: 'cleaveTargetSelection', props: { title: 'Cleave — Choose Second Target', targets: secondTargets } },
+        };
+      },
+    },
+
+    // =========================================================
+    // Step: tacticalMaster — Mastery replacement choice
+    // =========================================================
+    {
+      name: 'tacticalMaster',
+      subscribe: 'cleave:done',
+      emit: 'tactical:done',
+      condition: (ctx) => ctx.attack?.name && ctx.playerStats?.automation,
+      handler: async (ctx) => {
+        const cs = await loadCombatSummary(ctx.campaignName);
+        const lastAttack = cs?.lastAttack;
+        if (!lastAttack?.hit) return { data: {} };
+
+        const available = collectWeaponMastery(lastAttack.attackName, ctx.playerStats);
+        if (!available) return { data: {} };
+        if (available.replaceMasteryOptions?.length === 0) {
+          // Auto-apply mastery effects (Push, Sap, Slow, Vex, etc.)
+          const allMasteries = [available.baseMastery, ...(available.extraMasteries || [])].filter(Boolean);
+          const targetName = lastAttack.targetName;
+          if (targetName) {
+            for (const masteryName of allMasteries) {
+              if (['Graze', 'Topple', 'Nick'].includes(masteryName)) continue;
+              const alreadyApplied = getRuntimeValue(ctx.campaignName, `_${masteryName}_appliedTarget`, ctx.campaignName);
+              if (alreadyApplied === targetName) continue;
+              if (masteryName !== 'Slow') {
+                setRuntimeValue(ctx.campaignName, `_${masteryName}_appliedTarget`, targetName, ctx.campaignName);
+              }
+              await applyMasteryEffect(masteryName, ctx.playerStats, ctx.campaignName, targetName).catch((e) => { console.error('[Mastery] Error:', e); });
+            }
+          }
+          return { data: {} };
+        }
+
+        ctx.setModalState?.({
+          tacticalMasterPending: {
+            attackName: lastAttack.attackName,
+            baseMastery: available.baseMastery,
+            replaceOptions: available.replaceMasteryOptions,
+            targetName: lastAttack.targetName,
+          },
+        });
+
+        return {
+          data: { _tacticalMasterPending: true },
+          modal: { type: 'tacticalMaster', props: { attackName: lastAttack.attackName, baseMastery: available.baseMastery, replaceOptions: available.replaceMasteryOptions, targetName: lastAttack.targetName } },
+        };
+      },
+    },
+
+    // =========================================================
+    // Step: toppleMastery — CON save or prone
+    // =========================================================
+    {
+      name: 'toppleMastery',
+      subscribe: 'tactical:done',
+      emit: 'mastery:done',
+      condition: (ctx) => ctx.attack?.name && ctx.playerStats,
+      handler: async (ctx) => {
+        const cs = await loadCombatSummary(ctx.campaignName);
+        const lastAttack = cs?.lastAttack;
+        if (!lastAttack?.hit) return { data: {} };
+
+        const available = collectWeaponMastery(lastAttack.attackName, ctx.playerStats);
+        if (!available) return { data: {} };
+        const allMasteries = [available.baseMastery, ...(available.extraMasteries || [])].filter(Boolean);
+        if (!allMasteries.includes('Topple')) return { data: {} };
+
+        const toppleTargetName = lastAttack.targetName;
+        if (!toppleTargetName) return { data: {} };
+
+        await new Promise(r => setTimeout(r, SHOW_DICE_ROLL_DELAY));
+
+        const weaponAttack = ctx.playerStats.attacks?.find(a => a.name === lastAttack.attackName);
+        const abilityName = weaponAttack?.abilityName || 'Strength';
+        const ability = ctx.playerStats.abilities?.find(a => a.name === abilityName);
+        const abilityMod = ability?.bonus || 0;
+        const prof = ctx.playerStats.proficiency || 0;
+        const saveDc = 8 + abilityMod + prof;
+
+        const { promptId, promise } = createSaveListener(ctx.campaignName, {
+          targetName: toppleTargetName,
+          saveType: 'CON',
+          saveDc,
+        });
+
+        addEntry(ctx.campaignName, {
+          type: 'save_triggered',
+          characterName: ctx.playerStats.name,
+          targetName: toppleTargetName,
+          saveType: 'CON',
+          saveDc,
+          description: `Topple: ${toppleTargetName} must make a DC ${saveDc} CON save (weapon ${abilityName}) or fall Prone.`,
+          promptId,
+        }).catch(() => {});
+
+        const result = await promise;
+
+        if (result && !result.success) {
+          const storedConditions = getRuntimeValue(toppleTargetName, 'activeConditions') || [];
+          const conditions = Array.isArray(storedConditions) ? storedConditions : [];
+          if (!conditions.includes('prone')) {
+            await setRuntimeValue(toppleTargetName, 'activeConditions', [...conditions, 'prone'], ctx.campaignName);
+          }
+
+          addEntry(ctx.campaignName, {
+            type: 'save_result',
+            characterName: ctx.playerStats.name,
+            rollType: 'save-topple',
+            targetName: toppleTargetName,
+            saveDc,
+            saveType: 'CON',
+            success: false,
+            description: `${toppleTargetName} failed CON save vs Topple. Gains Prone condition.`,
+          }).catch(() => {});
+
+          addEntry(ctx.campaignName, {
+            type: 'ability_use',
+            characterName: ctx.playerStats.name,
+            abilityName: 'Topple',
+            description: `${ctx.playerStats.name} used Topple on ${toppleTargetName} — target failed CON save (DC ${saveDc}, weapon ${abilityName}), fell Prone.`,
+            targetName: toppleTargetName,
+          }).catch(() => {});
+        }
+
+        return { data: {} };
+      },
+    },
+
+    // =========================================================
+    // Step: masteryDone — Final step
+    // =========================================================
+    {
+      name: 'masteryDone',
+      subscribe: 'mastery:done',
+      emit: 'pipeline:complete',
+      condition: () => true,
+      handler: async () => {
+        return { data: { _pipelineComplete: true } };
       },
     },
   ];

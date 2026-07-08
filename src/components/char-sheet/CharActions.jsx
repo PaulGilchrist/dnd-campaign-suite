@@ -4,10 +4,7 @@ import { getCategories } from '../../services/character/featureCategories.js'
 import { getActionSpellNames } from '../../services/ui/spellSectionUtils.js'
 import { formatRange, signFormatter, getAttackSpellLevel } from '../../services/ui/formatUtils.js'
 import { resolveSpellDamageAtLevel, isAutoHitSpell } from '../../services/rules/core/spellDamageUtils.js';
-import { collectWeaponMastery } from '../../services/combat/automation/automationService.js';
-import { applyPostDamageMasteryEffects, applyMasteryEffect } from '../../services/automation/handlers/combat/weaponMasteryHandler.js';
 import { sanitizeHtml } from '../../services/ui/sanitize.js';
-import { createSaveListener } from '../../services/automation/common/savePrompt.js';
 import useLoggedDiceRoll from '../../hooks/combat/useLoggedDiceRoll.js'
 import { useDiceRollPopup } from '../../hooks/combat/DiceRollContext.js'
 import { showWeaponMasteryPopup, buildFeatureDetailHtml } from '../../hooks/combat/useActionPopup.js'
@@ -19,7 +16,6 @@ import { isExhausted } from '../../services/automation/handlers/combat/saveAttac
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import { toggleBuff } from '../../services/automation/common/buffToggle.js';
 import { postLogEntry } from '../../services/shared/logPoster.js';
-import { SHOW_DICE_ROLL_DELAY } from '../../config/ui-config.js';
 import CharActionModals from './CharActionModals.jsx'
 import CharActionSpellPopups from './CharActionSpellPopups.jsx'
 import CharBonusActions from './CharBonusActions.jsx'
@@ -30,7 +26,6 @@ import { addEntry } from '../../services/ui/logService.js';
 import { useSpellMetamagicFlow } from '../../hooks/combat/useSpellMetamagicFlow.js'
 import { executeSpellCast } from '../../services/rules/spells/spellCastService.js'
 import { getTargetFromAttacker, getCombatContext, getAttackerTargetName } from '../../services/rules/combat/damageUtils.js';
-import { loadCombatSummary } from '../../services/encounters/combatData.js';
 import { executeSweepingAttack, executeBaitAndSwitchChoice, executeCommanderStrikeChoice, executeRallyChoice } from '../../services/automation/handlers/class-fighter-rogue/combatSuperiorityHandler.js';
 import { activateBulwarkOfForce } from '../../services/automation/handlers/class-sorcerer/bulwarkOfForceHandler.js';
 import { activateCoronaOfLight } from '../../services/automation/handlers/class-cleric-paladin/coronaOfLightHandler.js';
@@ -40,7 +35,6 @@ import { applyInspiringMovement } from '../../services/automation/handlers/react
 import { confirmMantleOfInspiration } from '../../services/automation/handlers/buffs/tempHpBuffHandler.js';
 import { endFriendsOnHostileAction } from '../../services/rules/features/friendsService.js';
 import { endInvisibilityOnHostileAction } from '../../services/rules/features/invisibilityService.js';
-import { getDistanceFeet } from '../../services/rules/combat/rangeValidation.js';
 import { getInnateSorceryBonus } from '../../services/combat/buffs/buffService.js';
 import { buildAttackContext, buildAttackContextSync } from '../../services/automation/contextBuilder.js';
 import { buildEmpoweredSpellState, getEmpoweredSpellDescription } from '../../services/rules/spells/empoweredSpellService.js';
@@ -54,20 +48,11 @@ import useCharActionModals from './useCharActionModals.js';
 import useInitiativeEffects from './useInitiativeEffects.js';
 import SecondaryTargetModal from './modals/shared/SecondaryTargetModal.jsx';
 import TacticalMasterModal from './modals/TacticalMasterModal.jsx';
+import { applyMasteryEffect } from '../../services/automation/handlers/combat/weaponMasteryHandler.js';
 import { normalizeAutoDamage } from './useAttackDamageResolution.js';
 
 import './CharActions.css'
 import { isEqual } from 'lodash';
-
-function resolveCreatureHp(creature, playerStatsForHp) {
-    if (!creature) return { currentHp: 0, maxHp: 0 };
-    if (creature.type === 'player') {
-        const currentHp = getRuntimeValue(creature.name, 'currentHitPoints') ?? getRuntimeValue(creature.name, 'hitPoints') ?? 0;
-        const maxHp = getRuntimeValue(creature.name, 'hitPoints') ?? playerStatsForHp?.hitPoints ?? 0;
-        return { currentHp, maxHp };
-    }
-    return { currentHp: creature.currentHp ?? creature.maxHp, maxHp: creature.maxHp };
-}
 
 const areEqual = (prevProps, nextProps) => isEqual(prevProps.playerStats, nextProps.playerStats) && prevProps.conditionAttackMode === nextProps.conditionAttackMode && prevProps.exhaustionPenalty === nextProps.exhaustionPenalty && prevProps.cannotAct === nextProps.cannotAct;
 
@@ -96,132 +81,6 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         autoDamageRoll: async (autoDamage, isCrit) => {
             const { attack, ctx: ctxOverrides } = normalizeAutoDamage(autoDamage, isCrit, playerStats);
             await resolveAttackDamage(attack, ctxOverrides);
-
-            // Post-damage mastery effects (Cleave, Tactical Master, Topple) — run after pipeline completes
-            if (autoDamage.targetName) {
-                try {
-                    const combatSummary = await loadCombatSummary(campaignName);
-                    const lastAttack = combatSummary?.lastAttack;
-                    if (lastAttack?.hit) {
-                        const available = collectWeaponMastery(lastAttack.attackName, playerStats);
-                        const allMasteries = [available.baseMastery, ...(available.extraMasteries || [])].filter(Boolean);
-
-                        // Cleave: show secondary target selection
-                        if (allMasteries.includes('Cleave')) {
-                            const firstTarget = combatSummary?.creatures?.find(c => c.name === lastAttack.targetName);
-                            const mapName = playerStats?.mapName;
-                            const hasMapPositions = mapName && firstTarget?.position;
-
-                            let secondTargets;
-                            if (hasMapPositions) {
-                                const attackerPos = combatSummary?.creatures?.find(c => c.name === playerStats.name)?.position;
-                                const reach = 8;
-                                if (attackerPos) {
-                                    secondTargets = combatSummary.creatures
-                                        .filter(c => c.name !== lastAttack.targetName && c.position)
-                                        .map(c => ({
-                                            ...c,
-                                            ...resolveCreatureHp(c, playerStats),
-                                            distanceFromFirst: getDistanceFeet(firstTarget.position, c.position),
-                                            distanceFromAttacker: getDistanceFeet(attackerPos, c.position),
-                                        }))
-                                        .filter(t => t.distanceFromFirst !== null && t.distanceFromFirst <= 5 && t.distanceFromAttacker !== null && t.distanceFromAttacker <= reach);
-                                }
-                            }
-
-                            if (!hasMapPositions || !secondTargets) {
-                                secondTargets = combatSummary.creatures
-                                    .filter(c => c.name !== lastAttack.targetName)
-                                    .map(c => ({ ...c, ...resolveCreatureHp(c, playerStats) }));
-                            }
-
-                            if (secondTargets.length > 0) {
-                                setCleaveSecondTargets(secondTargets);
-                                setShowCleaveTargetSelection(true);
-                            }
-                        }
-
-                        // Tactical Master: mastery replacement choice or auto-apply
-                        if (available.replaceMasteryOptions?.length > 0) {
-                            setTacticalMasterModal({
-                                attackName: lastAttack.attackName,
-                                baseMastery: available.baseMastery,
-                                replaceOptions: available.replaceMasteryOptions,
-                                targetName: lastAttack.targetName,
-                            });
-                        } else {
-                            try {
-                                await applyPostDamageMasteryEffects(lastAttack.attackName, playerStats, campaignName, combatSummary);
-                            } catch (e) {
-                                console.error('[Mastery] Post-damage mastery error:', e);
-                            }
-                        }
-
-                        // Topple: CON save or prone
-                        await new Promise(r => setTimeout(r, SHOW_DICE_ROLL_DELAY));
-                        if (allMasteries.includes('Topple')) {
-                            try {
-                                const toppleTargetName = combatSummary.lastAttack.targetName;
-                                const weaponAttack = playerStats.attacks?.find(a => a.name === lastAttack.attackName);
-                                const abilityName = weaponAttack?.abilityName || 'Strength';
-                                const ability = playerStats.abilities?.find(a => a.name === abilityName);
-                                const abilityMod = ability?.bonus || 0;
-                                const prof = playerStats.proficiency || 0;
-                                const saveDc = 8 + abilityMod + prof;
-
-                                const { promptId, promise } = createSaveListener(campaignName, {
-                                    targetName: toppleTargetName,
-                                    saveType: 'CON',
-                                    saveDc,
-                                });
-
-                                addEntry(campaignName, {
-                                    type: 'save_triggered',
-                                    characterName: playerStats.name,
-                                    targetName: toppleTargetName,
-                                    saveType: 'CON',
-                                    saveDc,
-                                    description: `Topple: ${toppleTargetName} must make a DC ${saveDc} CON save (weapon ${abilityName}) or fall Prone.`,
-                                    promptId,
-                                });
-
-                                const result = await promise;
-
-                                if (result && !result.success) {
-                                    const storedConditions = getRuntimeValue(toppleTargetName, 'activeConditions') || [];
-                                    const conditions = Array.isArray(storedConditions) ? storedConditions : [];
-                                    if (!conditions.includes('prone')) {
-                                        await setRuntimeValue(toppleTargetName, 'activeConditions', [...conditions, 'prone'], campaignName);
-                                    }
-
-                                    addEntry(campaignName, {
-                                        type: 'save_result',
-                                        characterName: playerStats.name,
-                                        rollType: 'save-topple',
-                                        targetName: toppleTargetName,
-                                        saveDc,
-                                        saveType: 'CON',
-                                        success: false,
-                                        description: `${toppleTargetName} failed CON save vs Topple. Gains Prone condition.`,
-                                    }).catch((e) => { console.error("[Topple] Error:", e); });
-
-                                    addEntry(campaignName, {
-                                        type: 'ability_use',
-                                        characterName: playerStats.name,
-                                        abilityName: 'Topple',
-                                        description: `${playerStats.name} used Topple on ${toppleTargetName} — target failed CON save (DC ${saveDc}, weapon ${abilityName}), fell Prone.`,
-                                        targetName: toppleTargetName,
-                                    }).catch((e) => { console.error("[Topple] Error:", e); });
-                                }
-                            } catch (e) {
-                                console.error('[Topple] Error in Topple mastery flow:', e);
-                            }
-                        }
-                    }
-                } catch (e) {
-                    console.error('[Cleave] Post-damage mastery error:', e);
-                }
-            }
         },
     });
 

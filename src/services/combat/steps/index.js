@@ -1,5 +1,7 @@
 import { createPipeline } from '../actionPipeline.js';
 import { buildWeaponDamageSteps } from './weaponDamageSteps.js';
+import { buildSpellDamageSteps } from './spellDamageSteps.js';
+import { buildGenericSteps } from './genericSteps.js';
 import { createObservers } from './observers.js';
 import { createSseObservers } from './sseObservers.js';
 
@@ -30,10 +32,22 @@ export function buildPipelineForAction(action, playerStats) {
 
   // Register steps based on action type
   const hasDamage = action?.damage || action?.hasDamage || action?.damageExpression;
-  const isWeaponAttack = action?.type === 'weapon_attack' || action?.weaponType || hasDamage;
+  const isWeaponAttack = action?.type === 'weapon_attack' || action?.weaponType || (hasDamage && !action?.autoDamageSchool && !action?.spellType);
+  const isSpell = action?.type === 'spell' || action?.spellType || action?.autoDamageSchool;
 
   if (isWeaponAttack) {
     const steps = buildWeaponDamageSteps();
+    for (const step of steps) {
+      pipeline.step(step);
+    }
+  } else if (isSpell) {
+    const steps = buildSpellDamageSteps();
+    for (const step of steps) {
+      pipeline.step(step);
+    }
+  } else if (hasDamage) {
+    // Generic: anything with damage that isn't weapon or spell
+    const steps = buildGenericSteps();
     for (const step of steps) {
       pipeline.step(step);
     }
